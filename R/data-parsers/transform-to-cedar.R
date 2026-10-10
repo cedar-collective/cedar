@@ -351,6 +351,70 @@ generate_program_map <- function(as_file, ext, subj_dept_map,
   files
 }
 
+# A course's reported college (ADR-002 Stage 3b): its subject row's
+# college_code, else its unit's home college. A subject with no confirmed row
+# reports Banner's section college instead, translated through colleges.csv
+# (ED -> EH) and labelled college_basis = "banner" until the subject is decided
+# (decided 2026-10-10: nothing drops out of college totals meanwhile).
+.course_colleges <- function(course_units, source_college, files) {
+  banner <- translate_source_college(source_college, files)
+  undecided <- is.na(course_units$unit_code)
+  tibble::tibble(
+    college = dplyr::if_else(undecided, banner, course_units$college_code),
+    college_basis = dplyr::case_when(
+      !undecided & !is.na(course_units$college_code) ~ "mapped",
+      undecided & !is.na(banner)                      ~ "banner",
+      TRUE                                            ~ NA_character_))
+}
+
+# Colleges on cedar_programs (ADR-002 Stage 3b; decided 2026-10-10).
+#
+# - program_college: each row's own program's college -- program -> unit ->
+#   college through the files; a concentration takes its primary major's.
+# - college_code / student_college: the STUDENT's college that term, the
+#   program_college of their primary major, on every one of their rows, so
+#   "students in a college" and a college filter mean what they always have.
+# - When the primary major's code is not yet decided in programs.csv, or the
+#   student has no primary major that term, the student's college is Banner's
+#   (Translated College, else Actual College), translated through colleges.csv
+#   and labelled college_basis = "banner". A decided code that names no college
+#   (Non-Degree) has none.
+# - Banner's values stay beside them: source_college (Translated College) and
+#   source_college_code (Actual College).
+add_program_colleges <- function(programs, files) {
+  needed <- c("student_id", "term", "program_type", "major_code", "student_college", "college_code")
+  missing <- setdiff(needed, names(programs))
+  if (length(missing)) {
+    stop("[add_program_colleges] programs lacks ", paste(missing, collapse = ", "), call. = FALSE)
+  }
+  programs <- programs %>%
+    dplyr::rename(source_college = student_college, source_college_code = college_code) %>%
+    dplyr::mutate(
+      program_college = resolve_program_colleges(major_code, dplyr::coalesce(source_college_code, ""), files),
+      .decided = !is.na(.confirmed_program_rows(major_code, dplyr::coalesce(source_college_code, ""),
+                                                files$programs, no_unit = TRUE)),
+      .banner = dplyr::coalesce(translate_source_college(source_college, files),
+                                translate_source_college(source_college_code, files)))
+  primary <- programs %>%
+    dplyr::filter(program_type == "Major") %>%
+    dplyr::arrange(student_id, term, major_code) %>%
+    dplyr::distinct(student_id, term, .keep_all = TRUE) %>%
+    dplyr::select(student_id, term, .primary_college = program_college, .primary_decided = .decided)
+  programs %>%
+    dplyr::left_join(primary, by = c("student_id", "term")) %>%
+    dplyr::mutate(
+      program_college = dplyr::if_else(grepl("Concentration", program_type),
+                                       .primary_college, program_college),
+      .primary_decided = dplyr::coalesce(.primary_decided, FALSE),
+      college_code = dplyr::if_else(.primary_decided, .primary_college, .banner),
+      college_basis = dplyr::case_when(
+        .primary_decided & !is.na(.primary_college) ~ "mapped",
+        !.primary_decided & !is.na(.banner)         ~ "banner",
+        TRUE                                        ~ NA_character_),
+      student_college = college_names(college_code, files)) %>%
+    dplyr::select(-".decided", -".banner", -".primary_college", -".primary_decided")
+}
+
 # ── 1. transform_sections: DESRs → cedar_sections ────────────────────────────
 
 #' @param desrs    Raw DESRs data frame (output of parse-data.R + parse-DESR.R)
@@ -404,7 +468,12 @@ transform_sections <- function(desrs, data_dir, ext, maps) {
   # subject, the section's college and the course level. A subject with no
   # confirmed row has no unit -- never a department named after itself. The
   # end-of-transform mapping audit and Admin > Mappings list each one.
-  desrs$DEPT <- resolve_course_units(desrs$SUBJ, desrs$COLLEGE, desrs$level, files)$unit_code
+  course_units <- resolve_course_units(desrs$SUBJ, desrs$COLLEGE, desrs$level, files)
+  desrs$DEPT <- course_units$unit_code
+  course_colleges <- .course_colleges(course_units, desrs$COLLEGE, files)
+  desrs$COLLEGE_REPORTED <- course_colleges$college
+  desrs$COLLEGE_BASIS    <- course_colleges$college_basis
+  rm(course_units, course_colleges)
   no_unit <- sort(unique(desrs$SUBJ[is.na(desrs$DEPT)]))
   if (length(no_unit) > 0)
     message("  ⚠️  ", length(no_unit), " subject code(s) have no confirmed subjects.csv row, so no unit: ",
@@ -456,7 +525,10 @@ transform_sections <- function(desrs, data_dir, ext, maps) {
       course_title     = SECT_TITLE,
       part_term    = if ("PT" %in% names(.)) PT else NA_character_,
       campus       = CAMP,
-      college      = COLLEGE,
+      # The mapped college (Stage 3b); Banner's own value stays beside it.
+      college        = COLLEGE_REPORTED,
+      source_college = COLLEGE,
+      college_basis  = COLLEGE_BASIS,
       department   = DEPT,
       instructor_id   = as.character(PRIM_INST_ID),
       instructor_name = INST_NAME,
@@ -727,9 +799,14 @@ transform_students <- function(class_lists, data_dir, ext, maps) {
     # below: one classifier, called once per course table (ISSUES.md I5).
     files <- .require_mapping_files(maps, "transform_students", c("subjects", "units", "colleges"))
     class_lists$COURSE_LEVEL <- course_level_from_number(class_lists$SUBJ_CRSE)
-    class_lists$DEPT <- resolve_course_units(
+    course_units <- resolve_course_units(
       class_lists$`Subject Code`, class_lists$`Course College Code`,
-      class_lists$COURSE_LEVEL, files)$unit_code
+      class_lists$COURSE_LEVEL, files)
+    class_lists$DEPT <- course_units$unit_code
+    course_colleges <- .course_colleges(course_units, class_lists$`Course College Code`, files)
+    class_lists$COURSE_COLLEGE <- course_colleges$college
+    class_lists$COLLEGE_BASIS  <- course_colleges$college_basis
+    rm(course_units, course_colleges)
   }
 
   # Drop Subject Code and Course Number (now encoded in SUBJ_CRSE); keep transmute inputs.
@@ -739,6 +816,7 @@ transform_students <- function(class_lists, data_dir, ext, maps) {
       "SUBJ_CRSE", "Short Course Title",
       "Primary Instructor ID", "Primary Instructor Last Name", "Primary Instructor First Name",
       "Course Campus Code", "Course College Code", "DEPT", "COURSE_LEVEL",
+      "COURSE_COLLEGE", "COLLEGE_BASIS",
       "Registration Status", "Registration Status Code", "Registration Status Date",
       "Final Grade", "Course Credits", "Total Credits",
       "Student Level Code", "Student Classification", "Major Code", "Major",
@@ -769,7 +847,10 @@ transform_students <- function(class_lists, data_dir, ext, maps) {
         TRUE ~ NA_character_
       ),
       campus     = `Course Campus Code`,
-      college    = `Course College Code`,
+      # The mapped college (Stage 3b); Banner's own value stays beside it.
+      college        = COURSE_COLLEGE,
+      source_college = `Course College Code`,
+      college_basis  = COLLEGE_BASIS,
       department = if ("DEPT" %in% names(.)) DEPT else Department,
       registration_status      = `Registration Status`,
       registration_status_code = `Registration Status Code`,
@@ -979,7 +1060,7 @@ transform_programs <- function(academic_studies, data_dir, ext, maps) {
   message("  Loaded ", nrow(academic_studies), " rows, ", ncol(academic_studies), " columns")
   message("  Input columns: ", paste(names(academic_studies), collapse = ", "))
 
-  files                    <- .require_mapping_files(maps, "transform_programs", "programs")
+  files                    <- .require_mapping_files(maps, "transform_programs", c("programs", "units", "colleges"))
   major_name_to_major_code <- maps$major_name_to_major_code
   college_name_to_code     <- maps$college_name_to_code
 
@@ -1051,7 +1132,7 @@ transform_programs <- function(academic_studies, data_dir, ext, maps) {
         if (length(college_name_to_code) == 0)
           stop("[transform_programs] 'college_name_to_code' lookup is not loaded. ",
                "Ensure mappings.R has been sourced before running transform-to-cedar.R.")
-        college_name_to_code[`Actual College`]
+        unname(college_name_to_code[`Actual College`])
       },
       student_population     = if ("Student Population"             %in% names(.)) `Student Population`             else NA_character_,
       # ── Cumulative credit hours — NOT a per-term series ────────────────────
@@ -1200,6 +1281,8 @@ transform_programs <- function(academic_studies, data_dir, ext, maps) {
                                              .primary_unit, dept_code)) %>%
     dplyr::select(-".primary_unit")
 
+  cedar_programs <- add_program_colleges(cedar_programs, files)
+
   # Warn about Major/Second Major rows with no major_code
   still_no_code <- cedar_programs %>%
     dplyr::filter(program_type %in% c("Major", "Second Major"),
@@ -1262,7 +1345,7 @@ transform_degrees <- function(degrees, data_dir, ext, maps) {
   message("  Input columns: ", paste(names(degrees), collapse = ", "))
   message("  Transforming to CEDAR model...")
 
-  files                 <- .require_mapping_files(maps, "transform_degrees", "programs")
+  files                 <- .require_mapping_files(maps, "transform_degrees", c("programs", "units", "colleges"))
   college_name_to_code  <- maps$college_name_to_code
 
   required_cols <- c("Major", "Program Code", "Academic Period Code", "ID", "Degree", "Graduation Status")
@@ -1310,9 +1393,25 @@ transform_degrees <- function(degrees, data_dir, ext, maps) {
         college_name_to_code[student_college]
       },
       dept_code = resolve_program_units(major_code, unname(.college_code), files$programs),
+      # College (ADR-002 Stage 3b): the degree program's college through the
+      # files; for a code not yet decided, Banner's (Translated College, else
+      # Actual College), labelled "banner". Banner's values stay beside it.
+      .decided = !is.na(.confirmed_program_rows(major_code, dplyr::coalesce(unname(.college_code), ""),
+                                                files$programs, no_unit = TRUE)),
+      .mapped  = resolve_program_colleges(major_code, dplyr::coalesce(unname(.college_code), ""), files),
+      .banner  = dplyr::coalesce(translate_source_college(college, files),
+                                 translate_source_college(student_college, files)),
+      source_college         = college,
+      source_student_college = student_college,
+      college_code  = dplyr::if_else(.decided, .mapped, .banner),
+      college_basis = dplyr::case_when(.decided & !is.na(.mapped) ~ "mapped",
+                                       !.decided & !is.na(.banner) ~ "banner",
+                                       TRUE ~ NA_character_),
+      college         = college_names(college_code, files),
+      student_college = college,
       degree_abbr = sub("^([A-Za-z]+)-.*$", "\\1", program_code)
     ) %>%
-    dplyr::select(-.college_code)
+    dplyr::select(-.college_code, -.decided, -.mapped, -.banner)
 
   message("  ✅ Created cedar_degrees: ", nrow(cedar_degrees), " rows, ", ncol(cedar_degrees), " columns")
   message("  Output columns: ", paste(names(cedar_degrees), collapse = ", "))

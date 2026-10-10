@@ -199,6 +199,10 @@
 #   FOAN -> ANTH. EC14-B: History major HIST -> HIST, with a Public Policy
 #   concentration -> HIST (its primary major's unit, not a major's of the same
 #   name); Art minor ART, only a proposed row -> no unit (NA), never "ART".
+#   EC14-C: Art major ART, still proposed -> no unit. Colleges (Stage 3b): a
+#   student's college is their primary major's -- EC14-A Pharmacy, EC14-B Arts
+#   & Sciences on every row, minors included -- and EC14-C, whose major is
+#   undecided, takes Banner's Translated College (Fine Arts), labelled "banner".
 #
 # EC-16 (separate cedar_programs_shared_name table):
 #   Two departments each own a major named "Engineering" at 202110: ENG (three
@@ -3652,20 +3656,22 @@ cedar_programs_many_programs <- dplyr::bind_rows(lapply(seq_len(13), function(i)
 # files, a confirmed row decides the unit, anything else has none, and a
 # concentration takes its primary major's unit.
 academic_studies_program_units <- tibble::tibble(
-  term_code = "202110", ID = c("EC14-A", "EC14-B"),
-  `Program Classification` = c("Doctoral", "Baccalaureate"),
-  Degree = c("Doctor of Pharmacy", "Bachelor of Arts"),
-  `Student Classification` = c("Professional", "Senior"),
-  `Student Level` = c("Graduate/GASM", "Undergraduate"),
+  term_code = "202110", ID = c("EC14-A", "EC14-B", "EC14-C"),
+  `Program Classification` = c("Doctoral", "Baccalaureate", "Baccalaureate"),
+  Degree = c("Doctor of Pharmacy", "Bachelor of Arts", "Bachelor of Fine Arts"),
+  `Student Classification` = c("Professional", "Senior", "Junior"),
+  `Student Level` = c("Graduate/GASM", "Undergraduate", "Undergraduate"),
   `Student Campus` = "Albuquerque/Main",
-  `Translated College` = "College of Arts & Sciences",
-  `Actual College` = "College of Arts & Sciences",
+  `Translated College` = c("College of Arts & Sciences", "College of Arts & Sciences",
+                           "College of Fine Arts"),
+  `Actual College` = c("College of Arts & Sciences", "College of Arts & Sciences",
+                       "College of Fine Arts"),
   as_of_date = "2021-02-01",
-  Major = c("Doctor of Pharmacy", "History"), `Major Code` = c("FPMD", "HIST"),
-  `Program Code` = c("PHARMD-FPMD", "BA-HIST-AS"),
-  `First Minor` = c("Forensic Anthropology", "Art"),
-  `First Minor Code` = c("FOAN", "ART"),
-  `First Concentration` = c(NA, "Public Policy")
+  Major = c("Doctor of Pharmacy", "History", "Art"), `Major Code` = c("FPMD", "HIST", "ART"),
+  `Program Code` = c("PHARMD-FPMD", "BA-HIST-AS", "BFA-ART-FA"),
+  `First Minor` = c("Forensic Anthropology", "Art", NA),
+  `First Minor Code` = c("FOAN", "ART", NA),
+  `First Concentration` = c(NA, "Public Policy", NA)
 )
 
 

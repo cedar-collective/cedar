@@ -95,6 +95,19 @@ build_program_mapping_queue <- function(files, programs, issues, known_units) {
       is.na(dept_code)                ~ "none",
       !dept_code %in% known_units     ~ paste(dept_code, "(phantom)"),
       TRUE                            ~ dept_code))
+  # A student whose primary major is still undecided reports Banner's college,
+  # labelled (ADR-002 Stage 3b): say so, so nobody mistakes it for a decision.
+  # Tables built before Stage 3b have no college_basis and nothing to add.
+  if ("college_basis" %in% names(held)) {
+    banner <- held %>% dplyr::filter(college_basis %in% "banner", !is.na(college_code)) %>%
+      dplyr::count(major_code, college_code) %>%
+      dplyr::group_by(major_code) %>% dplyr::slice_max(n, n = 1, with_ties = FALSE) %>%
+      dplyr::ungroup() %>% dplyr::select(major_code, banner_college = college_code)
+    today <- today %>% dplyr::left_join(banner, by = "major_code") %>%
+      dplyr::mutate(today = dplyr::if_else(is.na(banner_college), today,
+                                           paste0(today, "; college ", banner_college, " from Banner"))) %>%
+      dplyr::select(-banner_college)
+  }
   unknown <- setdiff(issues$issue_type, names(ADMIN_PROBLEM_LABELS))
   if (length(unknown)) {
     stop("[admin.R] No Problem label for issue type(s): ", paste(unknown, collapse = ", "),
@@ -246,9 +259,12 @@ build_mapping_worklist <- function(files, programs, issues, audit, source_depart
                           work$context),
     size = work$rows,
     size_unit = dplyr::if_else(work$kind == "subject", "enrollments", "rows"),
-    # A subject with no confirmed row is reported today under a department
-    # named after itself.
-    reported_today = dplyr::if_else(work$kind == "subject", paste(work$value, "(phantom)"), NA_character_),
+    # A subject with no confirmed row has no department (ADR-002 Stage 3), and
+    # reports the college Banner gives its sections, labelled (Stage 3b).
+    reported_today = dplyr::if_else(
+      work$kind == "subject",
+      paste0("none; college ", sub("^college ([^;]+).*$", "\\1", work$context), " from Banner"),
+      NA_character_),
     reported_detail = NA_character_,
     suggested = dplyr::case_when(
       !is.na(proposed_row) ~ dplyr::na_if(sj$unit_code[proposed_row], ""),
