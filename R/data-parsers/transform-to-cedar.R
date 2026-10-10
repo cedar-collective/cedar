@@ -1740,7 +1740,11 @@ transform_to_cedar <- function(data_dir = NULL, use_qs = NULL, tables = NULL) {
   if (!exists("read_institution_mappings")) {
     source(file.path(cedar_root, "R", "lists", "institution_files.R"))
   }
-  mapping_files <- read_institution_mappings(cedar_institution_dir(cedar_root))
+  # The directory comes from the base load_funcs() recorded, as at app startup,
+  # not from cedar_root: cedar_root falls back to the working directory, and a
+  # path guessed inside the container is how the deploy's mapping rebuild once
+  # failed (ISSUES.md I14).
+  mapping_files <- read_institution_mappings(cedar_institution_dir())
   message("  Mapping files: ", nrow(mapping_files$programs), " program rows, ",
           nrow(mapping_files$subjects), " subject rows, ", nrow(mapping_files$units), " units")
 
