@@ -99,7 +99,7 @@ MUSC,FA,,MUS,,confirmed,,
 MUSE,FA,,MUS,,confirmed,,
 APMS,FA,,MUS,,confirmed,,
 DANC,FA,,DANC,,confirmed,,
-ALBS,FA,,ALBS,,confirmed,,
+ALBS,FA,,FACW,,confirmed,,"Arts Leadership & Business, ALB before Summer 2020; a Fine Arts college-wide program, no department. Decided 2026-10-09."
 THEA,FA,,THEA,,confirmed,,
 NURS,NU,,NURS,,confirmed,,
 NMNC,NU,,NURS,,confirmed,,
@@ -230,10 +230,10 @@ AFAS,PA,,AFAS,,confirmed,,
 MLSL,PA,,MLSL,,confirmed,,
 NVSC,PA,,NVSC,,confirmed,,
 PADM,PA,,PADM,,confirmed,,
-ALB,FA,,,,proposed,"289 class-list rows, taught under college FA; source department ""*Interdisciplinary: Fine Arts"" on 100% of rows; a bucket department, which names no single unit; no evidence settles the unit",
+ALB,FA,,FACW,,confirmed,"289 class-list rows, taught under college FA; source department ""*Interdisciplinary: Fine Arts"" on 100% of rows; a bucket department, which names no single unit; no evidence settles the unit","Arts Leadership & Business before it became ALBS (Summer 2020; same courses, ALB 450 is ALBS 450). Decided 2026-10-09."
 ARSC,AS,,ASCW,,confirmed,"3679 class-list rows, taught under college AS; source department ""*Interdisciplinary: A.S."" on 100% of rows; a bucket department, which names no single unit; no evidence settles the unit",Arts & Sciences college-wide courses; no department owns them. Decided 2026-10-04.
 ASCP,AS,,,,proposed,"1150 class-list rows, taught under college AS; source department ""*Interdisciplinary: A.S."" on 100% of rows; a bucket department, which names no single unit; no evidence settles the unit",
-FA,FA,,,,proposed,"1598 class-list rows, taught under college FA; source department ""*Interdisciplinary: Fine Arts"" on 100% of rows; a bucket department, which names no single unit; no evidence settles the unit",
+FA,FA,,FACW,,confirmed,"1598 class-list rows, taught under college FA; source department ""*Interdisciplinary: Fine Arts"" on 100% of rows; a bucket department, which names no single unit; no evidence settles the unit",Fine Arts college-wide courses; no department owns them. Decided 2026-10-09.
 GEX,GP,,,,proposed,"18 class-list rows, taught under college GP; no evidence settles the unit",
 HHHA,AD,,,,proposed,"1865 class-list rows, taught under college AD; source department ""Provost Branch Campuses"" on 100% of rows; a bucket department, which names no single unit; no evidence settles the unit",
 MA,FA,,FDMA,,confirmed,"53 class-list rows, taught under college FA; source department ""Film and Digital Arts"" on 100% of rows",Confirmed 2026-10-04: accepted the suggestion from Banner's own department.

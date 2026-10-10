@@ -7,7 +7,7 @@ ACTI,,Adv Comp Tomogphy Imaging,RADS,,FALSE,,source_department,confirmed,"4 rows
 AFAM,,African American Studies,,,FALSE,,unresolved,proposed,1 rows as First Minor; no evidence settles the unit,
 AFST,,Africana Studies,AFST,,FALSE,,source_department,confirmed,"317 rows as First Minor; Major; Second Major; Second Minor; source department ""African American Studies"" on 100% of primary-major rows",
 AGC,,Advanced Grad Counseling,COUN,,FALSE,,decided,confirmed,"4 rows as Major; source department ""Individual Fam Comm Educ IFCE"" on 100% of primary-major rows; split department; none of FCS|NUTR|COUN fits; no evidence settles the unit; assistant proposed nothing","Kept at its Stage 0 unit, a hand decision in program_code_maps.R; decided 2026-10-03."
-ALB,,Arts Leadership & Business,ALBS,,FALSE,,name_match,proposed,"531 rows as First Minor; Second Minor; unit named ""Arts Leadership & Business""",
+ALB,,Arts Leadership & Business,FACW,,FALSE,,decided,confirmed,"531 rows as First Minor; Second Minor; unit named ""Arts Leadership & Business""","A minor (undergraduate and graduate) open to every major; no department, owned by the College of Fine Arts. Decided 2026-10-09 over the assistant's ALBS, which was never a department."
 AM,,Arts Management,,,FALSE,,unresolved,proposed,23 rows as First Minor; no evidence settles the unit,
 AMRI,,Adv Magnetic Reson Imaging,RADS,,FALSE,,source_department,confirmed,"38 rows as Major; source department ""Radiology"" on 100% of primary-major rows",
 AMST,,American Studies,AMST,,FALSE,,source_department,confirmed,"1018 rows as First Minor; Major; Second Major; Second Minor; source department ""AS American Studies"" on 100% of primary-major rows",

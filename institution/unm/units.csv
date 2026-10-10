@@ -5,7 +5,6 @@ ADOB,Adobe/Creative Suite,AD,department,College proposed 2026-10-04 from its cou
 AEEC,Automotive/Electrical,AD,department,College proposed 2026-10-04 from its course sections since Spring 2024: AD 100% (6 sections).
 AFAS,Air Force Aerospace Studies,UC,department,College proposed 2026-10-04 from its course sections since Spring 2024: UC 100% (77 sections).
 AFST,Africana Studies,AS,department,College proposed 2026-10-04 from its course sections since Spring 2024: AS 100% (176 sections).
-ALBS,Arts Leadership & Business,FA,department,College proposed 2026-10-04 from its course sections since Spring 2024: FA 100% (77 sections).
 AMST,American Studies,AS,department,College proposed 2026-10-04 from its course sections since Spring 2024: AS 100% (736 sections).
 ANES,Anesthesiology,ME,department,College proposed 2026-10-04 from its course sections since Spring 2024: ME 100% (78 sections).
 ANTH,Anthropology,AS,department,College proposed 2026-10-04 from its course sections since Spring 2024: AS 100% (2275 sections).
@@ -66,6 +65,7 @@ ENPD,Environmental Planning & Design,AD,department,"College proposed 2026-10-04 
 ENTR,Entrepreneurship,MG,department,College proposed 2026-10-04 from its course sections since Spring 2024: MG 100% (9 sections).
 ENVS,Environmental Science (Branch),AD,department,"College proposed 2026-10-04 from subjects.csv, where all its subjects sit under AD; no sections under it since Spring 2024 and no programs."
 EPS,Earth & Planetary Sciences,AS,department,College proposed 2026-10-04 from its course sections since Spring 2024: AS 100% (1620 sections).
+FACW,Fine Arts (college-wide),FA,college,"Courses and programs the College of Fine Arts owns directly, no department: FA courses, and Arts Leadership & Business (ALB, ALBS), a minor open to every major. Added 2026-10-09; replaces the ALBS unit, which was never a department."
 FCS,Family and Child Studies,EH,department,College proposed 2026-10-04 from its course sections since Spring 2024: EH 100% (574 sections).
 FDMA,Film and Digital Arts,FA,department,"College proposed 2026-10-04 from its course sections since Spring 2024: FA 99%, AD 1% (1024 sections)."
 FISC,Fire Science,AD,department,College proposed 2026-10-04 from its course sections since Spring 2024: AD 100% (29 sections).
