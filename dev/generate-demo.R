@@ -7,7 +7,9 @@ if (!length(args) &&
     (!identical(Sys.getenv("CEDAR_DEMO"), "true") || !file.exists("/.dockerenv"))) {
   stop("Supply a new output directory or use bash scripts/dev.sh up inside Docker.")
 }
-Sys.setenv(docker = "TRUE", CEDAR_STUDENT_SALT = "public-synthetic-demo-only")
+# The demo is its own institution (ADR-002 Stage 5): institution/demo/.
+Sys.setenv(docker = "TRUE", CEDAR_STUDENT_SALT = "public-synthetic-demo-only",
+           CEDAR_INSTITUTION = "demo")
 suppressPackageStartupMessages(library(tidyverse))
 source("dev/demo-data.R")
 target <- if (length(args)) args[[1]] else "/srv/shiny-server/cedar/data"

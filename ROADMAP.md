@@ -213,7 +213,11 @@ Plan: [ADR-002](docs/developers/adr-002-explicit-mapping-files.md).
 - Done 2026-10-10: **Stage 4** — `generate_program_map()`, `program_map.qs` and
   `program_code_maps.R` retired; runtime lookups and pre-major flags come from
   the files. Closed I9.
-- [ ] **Stage 5:** the demo institution runs on its own files — the adopter test.
+- Done 2026-10-10: **Stage 5** — the demo runs on its own `institution/demo/`
+  files, with UNM's absent. ADR-002 is complete.
+- [ ] Move the remaining UNM R lists (`mappings.R`, campuses, Gen Ed and
+  excluded-course lists, population and projection groups) into
+  `institution/<id>/`, so an adopter replaces files only.
 
 ### 2. Domain-shaped data model (ADR-001)
 

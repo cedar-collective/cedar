@@ -178,6 +178,14 @@ test_that("a mapping file with the wrong columns, or an unknown institution, sto
                      expect_error(cedar_institution_id(), "lowercase directory name"))
 })
 
+test_that("the demo institution's files load and validate on their own", {
+  dir <- cedar_institution_dir(cedar_base_dir, "demo")
+  files <- read_institution_mappings(dir)
+  expect_gt(nrow(files$programs), 0)
+  expect_equal(files$units$unit_code[!nzchar(files$units$college_code)], character(0))
+  expect_silent(validate_source_departments(read_institution_file("source_departments", dir), files$units))
+})
+
 test_that("UNM programs.csv and source_departments.csv load and validate", {
   dir <- cedar_institution_dir(cedar_base_dir, "unm")
   files <- read_institution_mappings(dir)

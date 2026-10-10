@@ -293,7 +293,24 @@ Staged, each stage compared against the previous output before it ships.
 | 3 | Transform reads the files for units; both self-naming fallbacks removed | **Done 2026-10-09.** Rebuilt from the same exports, programs, degrees, sections and class lists differ from Stage 1 only as decided; no real unit loses a row. See Stage 3 results |
 | 3b | Colleges reported through program → unit → college, and through subject rows for courses | **Done 2026-10-10.** Units unchanged from Stage 3; colleges differ only as decided. See Stage 3b results |
 | 4 | Retire `generate_program_map()`, `program_map.qs`, and the lists it fed | **Done 2026-10-10.** Tests pass with the lists gone; units and colleges identical to Stage 3b; pre-major flags differ only as reviewed. See Stage 4 results |
-| 5 | Give the synthetic demo its own `institution/demo/` files | Demo runs with no UNM file loaded |
+| 5 | Give the synthetic demo its own `institution/demo/` files | **Done 2026-10-10.** The demo builds with `institution/unm/` absent; its course units and colleges are identical to the UNM-files build. See Stage 5 results |
+
+### Stage 5 results (2026-10-10)
+
+`institution/demo/` holds the demo's own colleges, units, subjects and
+programs, covering every code the fixtures use; `dev/generate-demo.R` and the
+demo app's config set `CEDAR_INSTITUTION=demo`. With `institution/unm/` moved
+away, the demo builds. Against the demo built on UNM's files: sections and
+class lists identical in unit and college; programs differ only where UNM's
+files had no row for a fixture code (GES, PSYC, PSYC-MIN and the business
+codes now have units) and in BUSA's few fixture pre-major rows, since a flag is
+stated per code. `test-demo-data.R` fails if the generator reads UNM's files.
+
+**Not yet institution files:** UNM's R lists -- `mappings.R` (text maps),
+`campuses.R`, `gen_ed_courses.R`, `excluded_courses.R`, the population groups
+and projection groups -- still load for every institution, the demo included.
+Moving them to `institution/<id>/` is the remaining "installable structure"
+work in ROADMAP.md, beyond ADR-002's mapping files.
 
 ### Stage 4 results (2026-10-10)
 
