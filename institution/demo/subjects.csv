@@ -1,0 +1,19 @@
+subject_code,in_college,in_level,unit_code,college_code,status,evidence,notes
+AMST,,,AMST,,confirmed,,
+ANTH,,,ANTH,,confirmed,,
+BIOL,,,BIOL,,confirmed,,
+CHEM,,,CHEM,,confirmed,,
+ENGL,,,ENGL,,confirmed,,
+HIST,,,HIST,,confirmed,,
+LING,,,LING,,confirmed,,
+MATH,,,MATH,,confirmed,,
+PHIL,,,PHIL,,confirmed,,
+PHYS,,,PHYS,,confirmed,,
+POLS,,,POLS,,confirmed,,
+PSYC,,,PSYC,,confirmed,,
+SOCI,,,SOCI,,confirmed,,
+SPAN,,,SPAN,,confirmed,,
+COMM,,,CJ,,confirmed,,Communication courses belong to Communication and Journalism.
+GEOG,,,GES,,confirmed,,Geography courses belong to Geography and Environmental Studies.
+MGMT,,,MGMT,,confirmed,,
+NURS,,,NURS,,confirmed,,
