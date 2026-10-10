@@ -4985,15 +4985,15 @@ output$enrl_classlist_download <- downloadHandler(
                                         subj_dept_map$dept_code == dept])
     } else character(0)
 
-    # Program codes: Banner program codes in cedar_programs for this dept
-    prog_rows <- if (exists("program_map")) {
-      pm <- program_map[!is.na(program_map$dept_code) & program_map$dept_code == dept, ]
-      pm[!is.na(pm$program_code), ]
-    } else NULL
-
-    degree_codes  <- if (!is.null(prog_rows)) sort(prog_rows$program_code[prog_rows$program_type == "degree"])   else character(0)
-    variant_codes <- if (!is.null(prog_rows)) sort(prog_rows$program_code[prog_rows$program_type == "variant"])  else character(0)
-    premaj_codes  <- if (!is.null(prog_rows)) sort(prog_rows$program_code[prog_rows$program_type == "pre_major"]) else character(0)
+    # Program codes: the programs.csv rows confirmed to this unit (ADR-002), the
+    # same rows the transform assigns to it. Pre-majors as the file states them.
+    pr <- cedar_institution_files$programs
+    prog_rows <- pr[pr$status == "confirmed" & pr$unit_code == dept, ]
+    pre <- prog_rows$is_pre_major == "TRUE"
+    online <- grepl("^X", prog_rows$program_code)
+    degree_codes  <- sort(unique(prog_rows$program_code[!pre & !online]))
+    variant_codes <- sort(unique(prog_rows$program_code[!pre & online]))
+    premaj_codes  <- sort(unique(prog_rows$program_code[pre]))
 
     code_pill <- function(code) {
       tags$code(
@@ -5021,9 +5021,9 @@ output$enrl_classlist_download <- downloadHandler(
         div(
           class = "filter-context-inline-list",
           row_item("Course subject codes (cedar_sections):", subj_codes),
-          row_item("Degree program codes (cedar_programs):",  degree_codes),
-          row_item("Variant codes (X-prefix):",               variant_codes),
-          row_item("Pre-major codes (F-prefix):",             premaj_codes)
+          row_item("Program codes (programs.csv):",           degree_codes),
+          row_item("Accelerated online codes (X-prefix):",    variant_codes),
+          row_item("Pre-major codes:",                        premaj_codes)
         )
       )
     )
@@ -5719,7 +5719,8 @@ output$enrl_classlist_download <- downloadHandler(
   # map is concerned, and names a department that does not exist.
   .mapping_issues <- reactive({
     build_admin_mapping_issues(
-      startup = get0("cedar_mapping_issues", ifnotfound = NULL),
+      # program_map's startup checks were retired at ADR-002 Stage 4.
+      startup = NULL,
       programs = data_objects[["cedar_programs"]],
       known_departments = get0("subj_dept_map", ifnotfound = NULL)$dept_code
     )
@@ -6014,32 +6015,6 @@ output$enrl_classlist_download <- downloadHandler(
       .named_lookup_table(get0("dept_code_to_name", ifnotfound = NULL),
                           "dept_code", "dept_name") %>%
         .admin_humanize_columns(),
-      page_size = 25L
-    )
-  })
-
-  output$allowed_unmapped_mapping_table <- reactable::renderReactable({
-    codes <- get0("allowed_unmapped_program_codes", ifnotfound = character())
-    if (length(codes) == 0) {
-      return(.admin_reactable(
-        data.frame(Message = "No reviewed unmapped program-code exceptions configured", stringsAsFactors = FALSE),
-        pagination = FALSE,
-        searchable = FALSE
-      ))
-    }
-
-    out <- data.frame(program_code = codes, stringsAsFactors = FALSE)
-    pm <- get0("program_map", ifnotfound = NULL)
-    if (!is.null(pm) && "program_code" %in% names(pm)) {
-      keep_cols <- intersect(
-        c("program_code", "major_code", "college_code", "dept_code", "degree_level", "program_type", "canonical_code"),
-        names(pm)
-      )
-      out <- merge(out, as.data.frame(pm[, keep_cols, drop = FALSE]), by = "program_code", all.x = TRUE, sort = FALSE)
-    }
-
-    .admin_reactable(
-      out %>% .admin_humanize_columns(),
       page_size = 25L
     )
   })

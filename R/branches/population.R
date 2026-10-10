@@ -1037,8 +1037,10 @@ build_demographic_population <- function(programs, opt = list(), students = NULL
 #                    (FRAD and RADS are both "Radiologic Sciences"), so this
 #                    picks up declared and pre-major codes together, including
 #                    codes Banner added after this list was written.
-#   2. premaj_canon — catches pre-majors whose NAME has drifted from the major
-#                    they lead to, which name matching alone would split.
+#   2. leads_to   — catches pre-majors whose NAME has drifted from the major
+#                    they lead to, which name matching alone would split
+#                    (premajor_leads_to, from programs.csv; it replaced the
+#                    premaj_canon list at ADR-002 Stage 4).
 #
 # ISSUES.md I7 documents the live example of each failing separately.
 
@@ -1085,9 +1087,9 @@ population_group_major_codes <- function(group_id, programs,
     filter(program_name %in% names_wanted, !is.na(major_code)) %>%
     distinct(major_code, is_pre_major)
 
-  # Pre-majors whose own name has drifted, recovered through the canon map.
+  # Pre-majors whose own name has drifted, recovered through their leads_to.
   declared <- matched$major_code[!matched$is_pre_major]
-  drifted <- names(premaj_canon)[premaj_canon %in% declared]
+  drifted <- names(premajor_leads_to)[premajor_leads_to %in% declared]
   drifted <- setdiff(drifted, matched$major_code)
   if (length(drifted) > 0) {
     matched <- bind_rows(
