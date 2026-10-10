@@ -135,7 +135,7 @@ decided once. See below.
 | `program_name` | Display name |
 | `unit_code` | Owning unit |
 | `is_pre_major` | `TRUE` / `FALSE`, stated rather than inferred |
-| `leads_to` | For a pre-major, the program code it leads to (replaces `premaj_canon`) |
+| `leads_to` | For a pre-major, the program code of the degree it leads to (replaces `premaj_canon`). A program code, never a department code; blank when that degree has no code. It translates pre-major to major and records no history: a code that replaced another is lineage (`institution/unm/README.md`) |
 | `basis` | Why this unit: `source_department`, `subject_code`, `inherited`, `name_match`, `course_taking`, `decided`, `override`, `no_unit` (nothing owns it), `unresolved` (no evidence; always proposed) |
 | `status` | `confirmed` or `proposed` |
 | `evidence` | What the assistant saw, e.g. `Banner Department "Radiology" on 236 rows` |

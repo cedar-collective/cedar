@@ -64,6 +64,29 @@ Translated College, with a link to the file that fixes it.
   `name_match`, `course_taking`, `decided` (a person chose), `override` (a
   college-specific row), `no_unit` (nothing owns the program: Non-Degree,
   Undecided), `unresolved` (no evidence settled it; always `proposed`).
+- **`is_pre_major` and `leads_to` translate a pre-major to its major, and
+  nothing else.**
+  - `is_pre_major` says *whether* the code is a pre-major (`TRUE` / `FALSE`),
+    stated rather than inferred from an F prefix.
+  - `leads_to` says *which program* a pre-major leads to: the `program_code` of
+    the degree its own Banner record names. `FFCS` is "BS Pre Family & Child
+    Studies", so it leads to `FCST`, Family & Child Studies. It is blank on
+    every row that is not a pre-major (the loader refuses it), and blank on a
+    pre-major whose degree has no code in the data: `FING` is the pre-major
+    for the Bachelor of Integrative Studies, which has none.
+  - **Always a program code, never a department code.** The two share strings:
+    `FCS` is Family & Child Studies' department and pre-Computer Science's
+    program code, so `FFCS` → `FCS` named the wrong degree. Check the target's
+    row: the same unit and a matching name.
+  - **Not history.** A code that replaced another (BIS by BISI, course subject
+    `ALB` by `ALBS`) is lineage. Record it in `notes` until `code_history.csv`
+    exists (ROADMAP, "Code history"), and never point `leads_to` at a successor
+    to stand in for a degree with no code.
+  - What reads it: a pre-major's college, when its target sets its own
+    `college_code`; the mapping assistant, which gives a pre-major its target's
+    unit (`basis = inherited`); and, once it replaces `premaj_canon` (ADR-002),
+    the named population groups in Pathways and projections, which count a
+    program's pre-majors through it.
 - **A code with no row gets no unit.** It is never reported under a department
   named after itself.
 - Concentrations have no rows: they take the unit of the student's primary
