@@ -86,8 +86,7 @@ CEDAR_MAPPING_FILE_SPECS <- list(
 #   the institution's directory, e.g. https://github.com/<org>/<repo>/blob/main/institution/<id>.
 #   The Admin > Mappings page links each row needing a decision to its line.
 #   source_files_url: the same repository's root, as a GitHub "blob" URL, for
-#   links to platform files that still hold mappings (R/lists/program_code_maps.R
-#   until ADR-002 retires it).
+#   links to platform files (R/lists/mappings.R holds the text maps that remain).
 CEDAR_REQUIRED_SETTINGS <- c("mapping_files_url", "source_files_url")
 # Optional settings.
 #   source_values_without_college: `|`-separated source college values that
@@ -345,13 +344,16 @@ resolve_program_units <- function(program_code, college_code, programs) {
 
 # Which confirmed programs.csv row each data row resolves through: the row for
 # (code, in_college) if there is one, else the code's every-college row. NA
-# where no confirmed row with a unit applies.
-.confirmed_program_rows <- function(program_code, college_code, programs) {
+# where no confirmed row with a unit applies -- or, with no_unit = TRUE, a
+# confirmed no_unit row too (nothing owns the program, but it may still name a
+# college: Undecided reports under University College).
+.confirmed_program_rows <- function(program_code, college_code, programs, no_unit = FALSE) {
   if (length(program_code) != length(college_code)) {
     stop("[institution_files.R] program_code and college_code must be the same length")
   }
   idx  <- seq_len(nrow(programs))
-  ok   <- programs$status == "confirmed" & nzchar(programs$unit_code)
+  ok   <- programs$status == "confirmed" &
+    (nzchar(programs$unit_code) | (no_unit & programs$basis == "no_unit"))
   spec <- ok & nzchar(programs$in_college)
   gen  <- ok & !nzchar(programs$in_college)
   at_college <- idx[spec][match(paste(program_code, college_code, sep = ":"),
@@ -359,21 +361,48 @@ resolve_program_units <- function(program_code, college_code, programs) {
   dplyr::coalesce(at_college, idx[gen][match(program_code, programs$program_code[gen])])
 }
 
+#' Whether each program code is a pre-major, as programs.csv states it
+#'
+#' Read from the code's every-college row, whatever its status: the flag is
+#' stated per code, not inferred from a prefix (ADR-002). NA where the code has
+#' no row.
+#'
+#' @param program_code Program codes, one per data row.
+#' @param programs The programs.csv data frame.
+#' @return A logical vector, NA where programs.csv has no row for the code.
+program_pre_major_flags <- function(program_code, programs) {
+  every <- programs[!nzchar(programs$in_college), ]
+  flag <- every$is_pre_major[match(program_code, every$program_code)]
+  ifelse(is.na(flag), NA, flag == "TRUE")
+}
+
+#' College names for college codes, from colleges.csv
+#'
+#' @param codes College codes; NA stays NA.
+#' @param files The list read_institution_mappings() returns.
+#' @return The college names, unnamed.
+college_names <- function(codes, files) {
+  unname(files$colleges$college_name[match(codes, files$colleges$college_code)])
+}
+
 #' The college each program row reports under, under the ADR-002 contract
 #'
 #' Program -> unit -> college, stated in the files: the program row's own
 #' college_code if it sets one, else (for a pre-major) the college of the
 #' program it leads to if that program sets one, else its unit's home college
-#' from units.csv. A row with no unit has no college. Never reads a college off
-#' the data row: the source's college only chooses an in_college row, as it
-#' chooses the unit.
+#' from units.csv. A program nothing owns (basis no_unit) has the college its
+#' row names, if any (decided 2026-10-10: Undecided is University College's).
+#' A code with no confirmed row has none here; the transform then reports
+#' Banner's college for it, labelled (college_basis = "banner"). Never reads a
+#' college off the data row: the source's college only chooses an in_college
+#' row, as it chooses the unit.
 #'
 #' @inheritParams resolve_program_units
 #' @param files The list read_institution_mappings() returns.
 #' @return A character vector of college codes, NA where none is assigned.
 resolve_program_colleges <- function(program_code, college_code, files) {
   pr   <- files$programs
-  rows <- .confirmed_program_rows(program_code, college_code, pr)
+  rows <- .confirmed_program_rows(program_code, college_code, pr, no_unit = TRUE)
   own  <- dplyr::na_if(pr$college_code[rows], "")
   target <- dplyr::na_if(pr$leads_to[rows], "")
   gen  <- !nzchar(pr$in_college)

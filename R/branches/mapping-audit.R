@@ -36,17 +36,29 @@ audit_mapping_coverage <- function(files, sections = NULL, students = NULL,
     dplyr::group_by(...) %>%
     dplyr::summarize(rows = dplyr::n(), first_term = edge(term, min),
                      last_term = edge(term, max), .groups = "drop")
+  # Banner's own college value, the audit's evidence. From ADR-002 Stage 3b the
+  # tables report the mapped college and keep Banner's beside it; a table built
+  # before then carries Banner's value in the reported column itself.
+  banner_col <- function(df, from_3b, before_3b, what) {
+    if (from_3b %in% names(df)) return(df[[from_3b]])
+    if (before_3b %in% names(df)) return(df[[before_3b]])
+    stop("[mapping-audit.R] ", what, " lacks ", from_3b, " and ", before_3b)
+  }
   org_id_or <- function(code, otherwise) dplyr::if_else(
     grepl("^[0-9]+$", code),
     "a Banner organisation ID in the major code column, not a program", otherwise)
 
   # Course subjects with no subjects.csv row at all.
   course_rows <- if (!is.null(students)) {
-    need(students, c("subject_code", "college", "term"), "cedar_students")
-    students %>% dplyr::select(subject = subject_code, college, term)
+    need(students, c("subject_code", "term"), "cedar_students")
+    tibble::tibble(subject = students$subject_code,
+                   college = banner_col(students, "source_college", "college", "cedar_students"),
+                   term = students$term)
   } else if (!is.null(sections)) {
-    need(sections, c("subject", "college", "term"), "cedar_sections")
-    sections %>% dplyr::select(subject, college, term)
+    need(sections, c("subject", "term"), "cedar_sections")
+    tibble::tibble(subject = sections$subject,
+                   college = banner_col(sections, "source_college", "college", "cedar_sections"),
+                   term = sections$term)
   }
   if (!is.null(course_rows)) {
     checked <- c(checked, "subject")
@@ -74,9 +86,11 @@ audit_mapping_coverage <- function(files, sections = NULL, students = NULL,
 
   # Section colleges no colleges.csv row names.
   if (!is.null(sections)) {
-    need(sections, c("college", "term"), "cedar_sections")
+    need(sections, "term", "cedar_sections")
     checked <- c(checked, "section_college")
-    out$section_college <- sections %>%
+    out$section_college <- tibble::tibble(
+      college = banner_col(sections, "source_college", "college", "cedar_sections"),
+      term = sections$term) %>%
       dplyr::filter(!is.na(college), nzchar(college),
                     !college_value_is_known(college, files)) %>%
       span(college) %>%
@@ -87,8 +101,10 @@ audit_mapping_coverage <- function(files, sections = NULL, students = NULL,
   }
 
   if (!is.null(programs)) {
-    need(programs, c("program_type", "major_code", "college_code", "student_college",
-                     "is_pre_major", "term"), "cedar_programs")
+    need(programs, c("program_type", "major_code", "is_pre_major", "term"), "cedar_programs")
+    programs <- programs %>% dplyr::mutate(
+      .banner_college      = banner_col(programs, "source_college", "student_college", "cedar_programs"),
+      .banner_college_code = banner_col(programs, "source_college_code", "college_code", "cedar_programs"))
     declared <- programs %>%
       dplyr::filter(!grepl("Concentration", program_type), !is.na(major_code))
     checked <- c(checked, "program_code", "source_college", "college_disagreement")
@@ -106,10 +122,10 @@ audit_mapping_coverage <- function(files, sections = NULL, students = NULL,
 
     # College names a source used that no colleges.csv row names.
     out$source_college <- programs %>%
-      dplyr::filter(!is.na(student_college), nzchar(student_college),
-                    !college_value_is_known(student_college, files)) %>%
-      span(student_college) %>%
-      dplyr::transmute(kind = "source_college", value = student_college,
+      dplyr::filter(!is.na(.banner_college), nzchar(.banner_college),
+                    !college_value_is_known(.banner_college, files)) %>%
+      span(.banner_college) %>%
+      dplyr::transmute(kind = "source_college", value = .banner_college,
                        context = "Translated College (academic studies)",
                        rows, first_term, last_term, status = "unmapped",
                        consequence = "The audit cannot compare these rows' mapped college with Banner's",
@@ -121,8 +137,8 @@ audit_mapping_coverage <- function(files, sections = NULL, students = NULL,
     # leads to does, by decision, where Banner keeps some in an advising college.
     majors <- declared %>% dplyr::filter(program_type == "Major") %>%
       dplyr::mutate(
-        mapped = resolve_program_colleges(major_code, dplyr::coalesce(college_code, ""), files),
-        banner = translate_source_college(student_college, files)) %>%
+        mapped = resolve_program_colleges(major_code, dplyr::coalesce(.banner_college_code, ""), files),
+        banner = translate_source_college(.banner_college, files)) %>%
       dplyr::filter(!is.na(mapped), !is.na(banner), mapped != banner)
     out$college_disagreement <- majors %>%
       span(major_code, mapped, banner, is_pre_major) %>%
@@ -139,7 +155,9 @@ audit_mapping_coverage <- function(files, sections = NULL, students = NULL,
   }
 
   if (!is.null(degrees)) {
-    need(degrees, c("major_code", "college", "term"), "cedar_degrees")
+    need(degrees, c("major_code", "term"), "cedar_degrees")
+    degrees <- degrees %>% dplyr::mutate(
+      .banner_college = banner_col(degrees, "source_college", "college", "cedar_degrees"))
     checked <- c(checked, "degree_program_code", "degree_college")
     out$degree_program_code <- degrees %>%
       dplyr::filter(!is.na(major_code), !major_code %in% files$programs$program_code) %>%
@@ -150,9 +168,10 @@ audit_mapping_coverage <- function(files, sections = NULL, students = NULL,
                        consequence = "Its graduates have no unit: today CEDAR names a department after the code",
                        file = "programs", line = NA_integer_)
     out$degree_college <- degrees %>%
-      dplyr::filter(!is.na(college), nzchar(college), !college_value_is_known(college, files)) %>%
-      span(college) %>%
-      dplyr::transmute(kind = "source_college", value = college, context = "degree record",
+      dplyr::filter(!is.na(.banner_college), nzchar(.banner_college),
+                    !college_value_is_known(.banner_college, files)) %>%
+      span(.banner_college) %>%
+      dplyr::transmute(kind = "source_college", value = .banner_college, context = "degree record",
                        rows, first_term, last_term, status = "unmapped",
                        consequence = "These degrees' college cannot be compared or translated",
                        file = "colleges", line = NA_integer_)

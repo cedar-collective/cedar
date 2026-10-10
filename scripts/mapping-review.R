@@ -21,7 +21,7 @@ files <- read_institution_mappings(cedar_institution_dir(cedar_base_dir))
 at    <- function(file, line) ifelse(is.na(line), file.path(dir, paste0(file, ".csv")),
                                      paste0(file.path(dir, paste0(file, ".csv")), ":", line))
 
-issues <- build_admin_mapping_issues(get0("cedar_mapping_issues"), cedar_programs,
+issues <- build_admin_mapping_issues(NULL, cedar_programs,
                                      files$units$unit_code)
 audit  <- audit_mapping_coverage(files, sections = cedar_sections, students = cedar_students,
                                  programs = cedar_programs, degrees = cedar_degrees)

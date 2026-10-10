@@ -159,7 +159,7 @@ GLNS,,,GLNS,UC,confirmed,,Undergraduate GLNS courses are University College's; o
 OILS,LL,,OILS,,confirmed,,
 IADL,LL,,IADL,,confirmed,,
 APTE,AD,,APTE,,confirmed,,
-ARTS,AD,,ARTS,,confirmed,,
+ARTS,AD,,ARTS,AD,confirmed,,"Branch-campus sections count under the branch college, AD, as Banner has them; the unit stays ARTS. Decided 2026-10-10."
 ASPE,AD,,ASPE,,confirmed,,
 AUTT,AD,,AUTT,,confirmed,,
 BSTC,AD,,BSTC,,confirmed,,
@@ -174,14 +174,14 @@ COSM,AD,,COSM,,confirmed,,
 DDM,AD,,DDM,,confirmed,,
 DMA,AD,,DMA,,confirmed,,
 DRFT,AD,,DRFT,,confirmed,,
-ECED,AD,,ECED,,confirmed,,
-EDUC,AD,,EDUC,,confirmed,,
+ECED,AD,,ECED,AD,confirmed,,"Branch-campus sections count under the branch college, AD, as Banner has them; the unit stays ECED. Decided 2026-10-10."
+EDUC,AD,,EDUC,AD,confirmed,,"Branch-campus sections count under the branch college, AD, as Banner has them; the unit stays EDUC. Decided 2026-10-10."
 ELCT,AD,,ELCT,,confirmed,,
 ELTR,AD,,ELTR,,confirmed,,
-EMS,AD,,EMS,,confirmed,,
+EMS,AD,,EMS,AD,confirmed,,"Branch-campus sections count under the branch college, AD, as Banner has them; the unit stays EMS. Decided 2026-10-10."
 ENPD,AD,,ENPD,,confirmed,,
 ENVS,AD,,ENVS,,confirmed,,
-FDMA,AD,,FDMA,,confirmed,,
+FDMA,AD,,FDMA,AD,confirmed,,"Branch-campus sections count under the branch college, AD, as Banner has them; the unit stays FDMA. Decided 2026-10-10."
 FISC,AD,,FISC,,confirmed,,
 FORS,AD,,FORS,,confirmed,,
 GAME,AD,,GAME,,confirmed,,
@@ -258,6 +258,6 @@ BIOC,AS,,BIOC,,confirmed,,"Stage 3: carries the unit these sections had at Stage
 ARTH,AS,,ARTH,,confirmed,,"Stage 3: carries the unit these sections had at Stage 0. 4 sections taught under college AS, 2019-2023. Added 2026-10-09."
 ARTS,AS,,ARTS,,confirmed,,"Stage 3: carries the unit these sections had at Stage 0. 3 sections taught under college AS, 2018-2020. Added 2026-10-09."
 ECE,AS,,ECE,,confirmed,,"Stage 3: carries the unit these sections had at Stage 0. 3 graduate sections taught under college AS, 2025-2026. Added 2026-10-09."
-ARCH,AD,,ARCH,,confirmed,,"Stage 3: carries the unit these sections had at Stage 0. 3 sections taught at Taos under college AD, 2025-2026 (ARCH 1130). Added 2026-10-09."
-BIOL,AD,,BIOL,,confirmed,,"Stage 3: carries the unit these sections had at Stage 0. 2 sections taught at Valencia under college AD, 2025-2026. Added 2026-10-09."
-MGMT,AD,,MGMT,,confirmed,,"Stage 3: carries the unit these sections had at Stage 0. 2 sections taught at Valencia under college AD, 2018-2019. Added 2026-10-09."
+ARCH,AD,,ARCH,AD,confirmed,,"Stage 3: carries the unit these sections had at Stage 0. 3 sections taught at Taos under college AD, 2025-2026 (ARCH 1130). Added 2026-10-09. Branch-campus sections count under the branch college, AD, as Banner has them; the unit stays ARCH. Decided 2026-10-10."
+BIOL,AD,,BIOL,AD,confirmed,,"Stage 3: carries the unit these sections had at Stage 0. 2 sections taught at Valencia under college AD, 2025-2026. Added 2026-10-09. Branch-campus sections count under the branch college, AD, as Banner has them; the unit stays BIOL. Decided 2026-10-10."
+MGMT,AD,,MGMT,AD,confirmed,,"Stage 3: carries the unit these sections had at Stage 0. 2 sections taught at Valencia under college AD, 2018-2019. Added 2026-10-09. Branch-campus sections count under the branch college, AD, as Banner has them; the unit stays MGMT. Decided 2026-10-10."

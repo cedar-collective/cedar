@@ -7,7 +7,6 @@ test_that("the fingerprint covers every file that decides dept_code", {
   # this whole mechanism exists to prevent.
   expect_true(all(c(
     "R/lists/subj_dept_map.R",
-    "R/lists/program_code_maps.R",
     "R/lists/catalog_lookups.R",
     "R/data-parsers/transform-to-cedar.R"
   ) %in% files))
@@ -40,13 +39,13 @@ test_that("drift is detected, and an unstamped table counts as drifted", {
 
   # Stamped with different source: rebuild, and NAME the file that moved.
   moved <- cedar_mapping_provenance("../..")
-  moved$files[["R/lists/program_code_maps.R"]] <- "different"
+  moved$files[["R/lists/mappings.R"]] <- "different"
   moved$combined <- "different"
   attr(stamped, "cedar_mapping_provenance") <- moved
   qs2::qs_save(stamped, path)
   drift <- cedar_programs_mapping_drift(path, "../..")
   expect_match(drift, "mapping source changed")
-  expect_match(drift, "program_code_maps", fixed = TRUE)
+  expect_match(drift, "R/lists/mappings.R", fixed = TRUE)
 })
 
 # ISSUES.md M26: since ADR-002 Stage 3 subjects.csv decides every course's unit,

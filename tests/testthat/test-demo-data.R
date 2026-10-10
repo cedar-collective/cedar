@@ -42,6 +42,9 @@ test_that("fixture institution survives production transforms with usable proven
   programs <- qs2::qs_read(file.path(target, "cedar_programs.qs"))
   grades <- qs2::qs_read(file.path(target, "cedar_grades.qs"))
   expect_identical(attr(grades, "cedar_outcome_policy_version"), CEDAR_OUTCOME_POLICY_VERSION)
+  # The demo is its own institution (ADR-002 Stage 5): PSYC-MIN has a unit only
+  # in institution/demo/, so reading UNM's files instead would leave it none.
+  expect_equal(unique(programs$dept_code[programs$major_code %in% "PSYC-MIN"]), "PSYC")
   expect_equal(nrow(anti_join(students, sections, by = c("term", "crn"))), 0L)
   expect_false(anyNA(students$synthetic_cohort))
   expect_setequal(students$synthetic_cohort, 1:5)

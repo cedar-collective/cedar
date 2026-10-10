@@ -1,0 +1,21 @@
+program_code,in_college,program_name,unit_code,college_code,is_pre_major,leads_to,basis,status,evidence,notes
+ACCT,,Accounting,ACCT,,FALSE,,decided,confirmed,,
+ANTH,,Anthropology,ANTH,,FALSE,,decided,confirmed,,
+BIOL,,Biology,BIOL,,FALSE,,decided,confirmed,,
+BUAN,,Business Analytics,MGMT,,FALSE,,decided,confirmed,,
+BUMG,,Business Management,MGMT,,FALSE,,decided,confirmed,,
+BUSA,,Business Administration,MGMT,,FALSE,,decided,confirmed,,"The fixtures mark a few BUSA rows pre-major; a flag is stated per code, so the demo calls it a program."
+ENGL,,English,ENGL,,FALSE,,decided,confirmed,,
+FINC,,Finance,MGMT,,FALSE,,decided,confirmed,,
+FSEC,,Secondary Education,EDUC,,TRUE,,decided,confirmed,,Pre-major; the degree it leads to has no code in the demo.
+GES,,Change Studies,GES,,TRUE,,decided,confirmed,,"Pre-major (the fixtures' ""Pre Change Studies"")."
+HIST,,History,HIST,,FALSE,,decided,confirmed,,
+LING,,Linguistics,LING,,FALSE,,decided,confirmed,,
+MATH,,Mathematics,MATH,,FALSE,,decided,confirmed,,
+NURS,,Nursing,NURS,,FALSE,,decided,confirmed,,
+PHIL,,Philosophy,PHIL,,FALSE,,decided,confirmed,,
+POLS,,Political Science,POLS,,FALSE,,decided,confirmed,,
+PSYC,,Psychology,PSYC,,FALSE,,decided,confirmed,,
+PSYC-MIN,,Psychology (minor),PSYC,,FALSE,,decided,confirmed,,
+SPAN,,Spanish,SPAN,,FALSE,,decided,confirmed,,
+UNDC,,Undeclared,,UC,FALSE,,no_unit,confirmed,,"No department owns it; its students report under University College."

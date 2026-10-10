@@ -207,12 +207,17 @@ Plan: [ADR-002](docs/developers/adr-002-explicit-mapping-files.md).
   Data & Usage → Mappings; `scripts/mapping-review.R`).
 - Done 2026-10-09: **Stage 3**, units — the transform takes every unit from the
   files and creates no self-named department. Closed I7; I11's stored units.
-- [ ] **Stage 3b:** colleges reported through program → unit → college, and
-  through subject rows for courses, compared against Stage 3 like it. Closes
-  I12.
-- [ ] **Stage 4:** delete `generate_program_map()`, `program_map.qs`, and the
-  lists they fed. Closes I9.
-- [ ] **Stage 5:** the demo institution runs on its own files — the adopter test.
+- Done 2026-10-10: **Stage 3b**, colleges — students under their primary
+  major's college, courses under their subject's, Banner's value labelled for
+  codes not yet decided. Closed I12.
+- Done 2026-10-10: **Stage 4** — `generate_program_map()`, `program_map.qs` and
+  `program_code_maps.R` retired; runtime lookups and pre-major flags come from
+  the files. Closed I9.
+- Done 2026-10-10: **Stage 5** — the demo runs on its own `institution/demo/`
+  files, with UNM's absent. ADR-002 is complete.
+- [ ] Move the remaining UNM R lists (`mappings.R`, campuses, Gen Ed and
+  excluded-course lists, population and projection groups) into
+  `institution/<id>/`, so an adopter replaces files only.
 
 ### 2. Domain-shaped data model (ADR-001)
 

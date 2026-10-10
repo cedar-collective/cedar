@@ -35,6 +35,23 @@ CEDAR requires 5 core tables. Each table is described below with:
 
 ---
 
+## Colleges: reported and source (ADR-002 Stage 3b)
+
+Every college a report reads comes from the institution mapping files; the
+value Banner recorded stays beside it for audit.
+
+| Table | Reported college | Banner's value | Rule |
+|---|---|---|---|
+| `cedar_programs` | `college_code`, `student_college` (name) | `source_college_code` (Actual College), `source_college` (Translated College) | The student's college that term: their primary major's `program_college`, on every row they have |
+| `cedar_programs` | `program_college` | — | Each row's own program: program → unit → college; a concentration takes its primary major's |
+| `cedar_sections`, `cedar_students` | `college` | `source_college` | The subject row's `college_code`, else the unit's home college |
+| `cedar_degrees` | `college_code`, `college`, `student_college` | `source_college` (Translated), `source_student_college` (Actual) | The degree program's college |
+
+`college_basis` on each says where the reported value came from: `mapped` (the
+files), `banner` (the code is not yet decided, so Banner's value, translated
+through `colleges.csv`), or `NA` (nothing names one, as for Non-Degree). Read
+the reported columns; only the mapping audit reads the source ones.
+
 ## 1. `cedar_sections` (Course Offerings)
 
 **Purpose:** One row per course section per term (e.g., MATH 1350-001 in Fall 2025)

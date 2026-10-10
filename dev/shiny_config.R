@@ -1,5 +1,8 @@
 # Fixed synthetic world: changing the calendar must not age out the demo.
 cedar_demo <- TRUE
+# The demo is its own institution (ADR-002 Stage 5): its mapping files are
+# institution/demo/, and no UNM mapping file is read. Set before load_funcs().
+Sys.setenv(CEDAR_INSTITUTION = "demo")
 cedar_base_dir <- "./"
 cedar_data_dir <- "./data"
 cedar_output_dir <- "./output"

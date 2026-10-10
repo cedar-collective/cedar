@@ -69,7 +69,7 @@ test_that("a pre-major code that is also a real department says so", {
   )
   frad <- collision$details[collision$major_code == "FRAD"]
   expect_match(frad, "namespace collision")
-  expect_match(frad, "major_college_to_dept")
+  expect_match(frad, "in_college row")
   # A flagged code that is NOT a department keeps the ordinary advice.
   expect_false(grepl("namespace collision",
                      collision$details[collision$major_code == "FMDL"]))
@@ -361,5 +361,5 @@ test_that("the mapping audit checks only the tables it is given, and says so", {
   only_programs <- audit_mapping_coverage(audit_files(), programs = test_programs)
   expect_false(anyNA(only_programs$needs))
   expect_error(audit_mapping_coverage(audit_files(), programs = dplyr::select(test_programs, -student_college)),
-               "cedar_programs lacks student_college")
+               "cedar_programs lacks source_college and student_college")
 })

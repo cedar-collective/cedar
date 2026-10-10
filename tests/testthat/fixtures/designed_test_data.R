@@ -45,12 +45,12 @@
 #            program_name, different code. Name matching must capture both; a
 #            group built from declared codes alone loses 3 of 5 students.
 #          Nursing: NURS declared (2) + FNRS pre-major (4) — same name AND
-#            premaj_canon["FNRS"] == "NURS", so both mechanisms agree.
+#            programs.csv leads FNRS to NURS, so both mechanisms agree.
 #          Medical Laboratory Sciences: MEDL declared (2); Medical Laboratory
 #            Science (singular): FMDL pre-major (2) — a name that has DRIFTED
-#            from its major's. premaj_canon has no FMDL entry, so it is reached
-#            ONLY because the registry lists both spellings. This is the fix for
-#            ISSUES.md I7 in miniature: break the registry entry and 2 students
+#            from its major's. It is reached because the registry lists both
+#            spellings (and, in UNM's files, because FMDL leads to MEDL). This is
+#            the fix for ISSUES.md I7 in miniature: with neither, 2 students
 #            vanish silently.
 #          Radiologic Science (singular): XRAD pre-major (2) — the SAME drift
 #            with no registry entry, i.e. the next one nobody has noticed yet.
@@ -199,6 +199,10 @@
 #   FOAN -> ANTH. EC14-B: History major HIST -> HIST, with a Public Policy
 #   concentration -> HIST (its primary major's unit, not a major's of the same
 #   name); Art minor ART, only a proposed row -> no unit (NA), never "ART".
+#   EC14-C: Art major ART, still proposed -> no unit. Colleges (Stage 3b): a
+#   student's college is their primary major's -- EC14-A Pharmacy, EC14-B Arts
+#   & Sciences on every row, minors included -- and EC14-C, whose major is
+#   undecided, takes Banner's Translated College (Fine Arts), labelled "banner".
 #
 # EC-16 (separate cedar_programs_shared_name table):
 #   Two departments each own a major named "Engineering" at 202110: ENG (three
@@ -3618,7 +3622,7 @@ cedar_programs_hp <- dplyr::bind_rows(
   # Same name, different code: only name matching reaches FRAD.
   .hp_row(c("HP_RADS_1", "HP_RADS_2"), "Radiologic Sciences", "RADS", FALSE, "RADS"),
   .hp_row(c("HP_FRAD_1", "HP_FRAD_2", "HP_FRAD_3"), "Radiologic Sciences", "FRAD", TRUE, "FRAD"),
-  # Same name AND a premaj_canon entry: both mechanisms agree.
+  # Same name AND a leads_to in programs.csv: both mechanisms agree.
   .hp_row(c("HP_NURS_1", "HP_NURS_2"), "Nursing", "NURS", FALSE, "NURS"),
   .hp_row(c("HP_FNRS_1", "HP_FNRS_2", "HP_FNRS_3", "HP_FNRS_4"), "Nursing", "FNRS", TRUE, "NURS"),
   # Drifted name, no canon entry: unreachable, and must be REPORTED not guessed.
@@ -3646,26 +3650,28 @@ cedar_programs_many_programs <- dplyr::bind_rows(lapply(seq_len(13), function(i)
 
 # ── EC-14 — each program's unit from programs.csv ───────────────────────────
 # Raw Academic Studies rows for transform_programs(). The old department chain
-# missed codes with no program_map row -- minors carry no Banner program code,
-# so FPMD="PHRM" once sat in program_code_maps.R and changed nothing -- and
+# missed codes with no row in the old program map -- minors carry no Banner
+# program code, so FPMD="PHRM" once sat in a list and changed nothing -- and
 # named a department after any code it could not place. Read by the mapping
 # files, a confirmed row decides the unit, anything else has none, and a
 # concentration takes its primary major's unit.
 academic_studies_program_units <- tibble::tibble(
-  term_code = "202110", ID = c("EC14-A", "EC14-B"),
-  `Program Classification` = c("Doctoral", "Baccalaureate"),
-  Degree = c("Doctor of Pharmacy", "Bachelor of Arts"),
-  `Student Classification` = c("Professional", "Senior"),
-  `Student Level` = c("Graduate/GASM", "Undergraduate"),
+  term_code = "202110", ID = c("EC14-A", "EC14-B", "EC14-C"),
+  `Program Classification` = c("Doctoral", "Baccalaureate", "Baccalaureate"),
+  Degree = c("Doctor of Pharmacy", "Bachelor of Arts", "Bachelor of Fine Arts"),
+  `Student Classification` = c("Professional", "Senior", "Junior"),
+  `Student Level` = c("Graduate/GASM", "Undergraduate", "Undergraduate"),
   `Student Campus` = "Albuquerque/Main",
-  `Translated College` = "College of Arts & Sciences",
-  `Actual College` = "College of Arts & Sciences",
+  `Translated College` = c("College of Arts & Sciences", "College of Arts & Sciences",
+                           "College of Fine Arts"),
+  `Actual College` = c("College of Arts & Sciences", "College of Arts & Sciences",
+                       "College of Fine Arts"),
   as_of_date = "2021-02-01",
-  Major = c("Doctor of Pharmacy", "History"), `Major Code` = c("FPMD", "HIST"),
-  `Program Code` = c("PHARMD-FPMD", "BA-HIST-AS"),
-  `First Minor` = c("Forensic Anthropology", "Art"),
-  `First Minor Code` = c("FOAN", "ART"),
-  `First Concentration` = c(NA, "Public Policy")
+  Major = c("Doctor of Pharmacy", "History", "Art"), `Major Code` = c("FPMD", "HIST", "ART"),
+  `Program Code` = c("PHARMD-FPMD", "BA-HIST-AS", "BFA-ART-FA"),
+  `First Minor` = c("Forensic Anthropology", "Art", NA),
+  `First Minor Code` = c("FOAN", "ART", NA),
+  `First Concentration` = c(NA, "Public Policy", NA)
 )
 
 

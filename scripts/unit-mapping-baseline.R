@@ -34,6 +34,13 @@ mode <- commandArgs(trailingOnly = TRUE)[1]
 if (is.na(mode) || !mode %in% c("snapshot", "compare", "reconcile", "files", "colleges")) {
   stop("Usage: Rscript --vanilla scripts/unit-mapping-baseline.R snapshot|compare|reconcile|files|colleges")
 }
+# reconcile (Stage 2) and colleges (Stage 2b) read the lists that fed
+# program_map.qs, retired at ADR-002 Stage 4. They did their work once and are
+# kept as the record of how programs.csv and units.csv were seeded.
+if (mode %in% c("reconcile", "colleges")) {
+  stop("unit-mapping-baseline.R ", mode, " ran once, at ADR-002 Stage 2; the lists it read ",
+       "were retired at Stage 4. snapshot, compare and files still run.", call. = FALSE)
+}
 baseline_file <- file.path(cedar_data_dir, "unit_mapping_baseline.qs")
 
 current_units <- function() {

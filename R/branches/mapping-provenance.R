@@ -14,10 +14,11 @@
 # are the morning refresh's job. This answers only "was this table built by the
 # mapping code that is deployed now?"
 
-#' Files whose content decides cedar_programs$dept_code
+#' Files whose content decides the stored units and colleges
 #'
-#' Institution configuration plus the transform logic that consumes it. A change
-#' to any of them can move a student between departments.
+#' The institution mapping files plus the code that reads them into the CEDAR
+#' tables (ADR-002). A change to any of them can move a student or a course
+#' between departments or colleges.
 cedar_mapping_source_files <- function() {
   c(
     "R/lists/subj_dept_map.R",
@@ -27,7 +28,6 @@ cedar_mapping_source_files <- function() {
     file.path("institution", cedar_institution_id(), "subjects.csv"),
     # Read by the transform from ADR-002 Stage 3: it decides every program's unit.
     file.path("institution", cedar_institution_id(), "programs.csv"),
-    "R/lists/program_code_maps.R",
     "R/lists/mappings.R",
     "R/lists/catalog_lookups.R",
     "R/data-parsers/transform-to-cedar.R"
