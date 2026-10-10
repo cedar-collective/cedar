@@ -218,6 +218,24 @@ Plan: [ADR-002](docs/developers/adr-002-explicit-mapping-files.md).
 - [ ] Move the remaining UNM R lists (`mappings.R`, campuses, Gen Ed and
   excluded-course lists, population and projection groups) into
   `institution/<id>/`, so an adopter replaces files only.
+- [ ] **Code history on Admin → Mappings:** each unit's program codes and course
+  subjects, old and new, with when each was in use and which code replaced
+  which.
+  - *When in use* is computed from the data on every load — first and last term
+    in program, degree, and class-list rows, read against the data edges (a code
+    in the first term was in use "since before" it) — never stored, because it
+    would go stale at every refresh.
+  - *Which replaced which* is recorded, because the data can only suggest it: a
+    new `code_history.csv` (`kind`, `from_code`, `to_code`, `effective_term`,
+    `scope`, `basis`, `evidence`, `notes`), one row per succession, so partial
+    successions (undergraduate `PHRD` → `FPHS`) and splits (`RADS` → `RADS` +
+    `FRAD`) fit. An annotation only: it never rewrites old rows to the new code.
+    `CEDAR_DATA_SEMANTICS` keeps explaining what a code *meant*.
+  - A screen proposes candidates for review: course numbers carried across a
+    prefix change (`ALB 450` → `ALBS 450`), or a code that stops as a same-unit
+    code starts (`FING` → `FINN`). Timing alone confirms nothing — FING's last
+    students were not recoded — so those need the catalog.
+  - Until the file exists, lineage found during review goes in the row's `notes`.
 
 ### 2. Domain-shaped data model (ADR-001)
 
