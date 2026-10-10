@@ -189,7 +189,7 @@ FLIN,,Linguistics,LING,,TRUE,LING,source_department,confirmed,"303 rows as Major
 FLNG,,Languages,LCL,,TRUE,LANG,source_department,confirmed,"238 rows as Major; named Pre- on 86% of rows; source department ""Foreign Languages Literatures"" on 100% of primary-major rows",
 FLPR,,Film Production,FDMA,,FALSE,,course_taking,proposed,116 rows as First Minor; Second Minor; students take FDMA courses at 10.8x the overall rate (124 enrolments),
 FLTA,,Latin American Studies,LTAM,,TRUE,LTAM,inherited,confirmed,"26 rows as Major; named Pre- on 92% of rows; source department ""*Interdisciplinary: A.S."" on 100% of primary-major rows; leads to LTAM",
-FMAR,,Media Arts,FDMA,,TRUE,FDMA,source_department,confirmed,"91 rows as Major; source department ""Film and Digital Arts"" on 100% of primary-major rows",
+FMAR,,Media Arts,FDMA,,TRUE,MA,source_department,confirmed,"91 rows as Major; source department ""Film and Digital Arts"" on 100% of primary-major rows","BA Pre Media Arts (BA-FMAR-FA), 2018-2020, leading to MA, the BA in Media Arts (BA-MA-FA). leads_to corrected 2026-10-09 from FDMA, Film & Digital Arts, which appears to have replaced Media Arts: lineage, not the pre-major's own degree."
 FMAT,,Mathematics,MATH,,TRUE,MATH,source_department,confirmed,"550 rows as Major; named Pre- on 82% of rows; source department ""Mathematics Statistics"" on 100% of primary-major rows",
 FMCO,,Mass Communication,CJ,,TRUE,,source_department,confirmed,"1 rows as Major; source department ""Communication Journalism"" on 100% of primary-major rows",
 FMDL,,Medical Laboratory Science,MEDL,,TRUE,MEDL,source_department,confirmed,"103 rows as Major; source department ""SOM Pathology Medical Lab Sci"" on 100% of primary-major rows",
