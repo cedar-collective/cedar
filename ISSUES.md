@@ -1345,7 +1345,11 @@ refuses a confirmed pre-major in a different unit from its target (tested in
 `test-catalogs.R`). A same-unit wrong target, as `FEE`'s was, still needs a
 reviewer: check the target's name.
 
-**M26 — The mapping gate rebuilds cedar_programs only.** Since ADR-002 Stage 3
+**M26 — The mapping gate rebuilds cedar_programs only.** *Status: resolved
+2026-10-10.* The transform stamps programs, degrees, sections and class lists
+with their mapping provenance, and the gate rebuilds whichever are stale
+(`cedar_stale_mapped_tables()`), stopping if an export it needs is missing or a
+rebuilt table is still stale. Since ADR-002 Stage 3
 `subjects.csv` decides every course's unit, but
 `scripts/rebuild-programs-if-mappings-changed.R` rebuilds only
 `cedar_programs` (and the lookups) when the mapping files change. A subject
