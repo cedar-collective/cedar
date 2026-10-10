@@ -39,6 +39,21 @@ proposed on 2026-10-04 by `scripts/unit-mapping-baseline.R colleges`, from
 where each unit's sections sit since Spring 2024 and Banner's Translated
 College; each row's `notes` gives the evidence.
 
+The transform reports these colleges (ADR-002 Stage 3b, decided 2026-10-10):
+
+- **A student counts under their primary major's college** that term, on every
+  row they have (`college_code`, `student_college`); each row also carries its
+  own program's college (`program_college`).
+- **A course counts under its subject row's `college_code`, else its unit's
+  home college.** Branch-campus rows (`in_college` AD) for main-campus units set
+  `college_code` AD, so branch sections stay in the branch college.
+- **A program nothing owns may still name a college**: Undecided is UC's.
+- **A code not yet decided reports Banner's college**, translated through
+  `source_names` and labelled `college_basis = banner`, until its row is
+  confirmed; Admin > Mappings says so on its row.
+- Banner's own values stay beside them as `source_college` (and
+  `source_college_code` on programs), for the audit.
+
 Admin > Data & Usage > Mappings lists every value the data uses that these files
 do not cover, and every program whose mapped college differs from Banner's
 Translated College, with a link to the file that fixes it.

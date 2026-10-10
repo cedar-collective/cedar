@@ -291,9 +291,29 @@ Staged, each stage compared against the previous output before it ships.
 | 2 | Build the assistant; generate `programs.csv` and `source_departments.csv` | **Done.** See Stage 2 results |
 | 2b | Colleges mapped (`units.csv` and per-program `college_code`, `colleges.csv` `source_names`); the mapping audit at the end of every transform and on Admin | **Done.** Mapped college agrees with Banner's Translated College on 98.98% of major rows; the rest are decided pre-major differences and two to review. Changes no number |
 | 3 | Transform reads the files for units; both self-naming fallbacks removed | **Done 2026-10-09.** Rebuilt from the same exports, programs, degrees, sections and class lists differ from Stage 1 only as decided; no real unit loses a row. See Stage 3 results |
-| 3b | Colleges reported through program → unit → college, and through subject rows for courses | Differences from Stage 3 are exactly the decided ones (graduate students out of `GP`, pre-majors to their target's college, the I12 renames) |
+| 3b | Colleges reported through program → unit → college, and through subject rows for courses | **Done 2026-10-10.** Units unchanged from Stage 3; colleges differ only as decided. See Stage 3b results |
 | 4 | Retire `generate_program_map()`, `program_map.qs`, and the lists it fed | Tests pass with the lists gone |
 | 5 | Give the synthetic demo its own `institution/demo/` files | Demo runs with no UNM file loaded |
+
+### Stage 3b results (2026-10-10)
+
+Decided with the user before building: a student counts under their primary
+major's college on every row (Headcount's college filter keeps meaning
+"students in this college"); a program nothing owns may name a college
+(Undecided → UC); the four School of Medicine programs Banner's Actual College
+files under UC (Dental Hygiene, Radiologic Sciences, EMS, Medical Laboratory
+Sciences) report under ME by the rule; a code not yet decided reports Banner's
+college, labelled `college_basis = banner`; and branch-campus sections of
+main-campus units stay in the branch college (their `in_college` AD rows set
+`college_code` AD).
+
+Rebuilt from the 2026-10-08 exports and compared with Stage 3, row by row:
+units identical in all four tables, one college per student-term, and
+
+| Table | What changed |
+|---|---|
+| `cedar_programs`, Fall 2025 | 1,041 of 33,352 rows against Banner's Translated College, the column the app read: pre-majors to their target's college (pre-Nursing 811 to NU, pre-Pharmacy 139 to PH, pre-Population Health 32 to PO), and about 60 branch students whose Translated College was blank gaining one (21 of them labelled `banner`). Graduate students and the four Medicine programs did not move: Translated College already placed them so |
+| `cedar_sections` | 11,712 of 242,413: 10,423 Education sections `ED` → `EH` (I12); 1,092 Provost-filed sections (`PA`) to their units' colleges (AS 616, UC 476); about 200 restated to today's organisation (Native American Studies' 2018–19 sections UC → AS, BCIS 2019 EN → MG, and a handful of cross-listed one-offs) |
 
 ### Stage 3 results (2026-10-09)
 

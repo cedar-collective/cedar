@@ -30,7 +30,6 @@ recurrence is recognizable.
 | ID | Kind | Summary |
 |---|---|---|
 | [I16](#i16--bottleneck-waitlist-pressure-ignores-term-so-later-registration-erases-earlier-waiting) | Defect | `get_bottlenecks()` waitlist pressure ignores term: ~6% under true demand (RStudio only; no page shows it) |
-| [I12](#i12--renamed-and-non-college-names-leave-48k-program-rows-and-10k-sections-with-no-college) | Defect | Renamed and non-college names leave rows with no college (fixed by ADR-002 Stage 3) |
 | [I9](#i9--real_f_progs-lists-codes-the-transform-treats-as-pre-majors) | Defect | Two pre-major lists disagree (retired by ADR-002 Stage 4) |
 | [I8](#i8--a-timing-log-row-is-silently-dropped-when-the-write-lock-times-out) | Defect | A timing-log row is dropped when the write lock times out |
 | [I6](#i6--a-killed-projection-rebuild-strands-its-lock-and-blocks-every-later-refresh) | Defect | A killed projection rebuild strands its lock |
@@ -1021,7 +1020,7 @@ shipping — "Public Policy" will not be the only one.
 
 ## I12 — Renamed and non-college names leave 48k program rows and 10k sections with no college
 
-**Status:** open
+**Status:** resolved 2026-10-10 by ADR-002 Stage 3b: every reported college comes from the mapping files, Banner's values translated through `colleges.csv` `source_names` (ED and "College of Education" → EH, "University Studies" → UC, "Undergrad Certificate Program" → AD). 10,423 Education sections now report EH, and Banner's original stays in `source_college`.
 **Found:** 2026-10-04, measuring unmapped codes of every kind for the Admin > Mappings page
 **Severity:** medium — any college-scoped count of Education before 2021 is short,
 and nothing says so
