@@ -1,7 +1,7 @@
 # CEDAR-INSTITUTION: name → code and HR-org → department text maps
 # mappings.R
 #
-# Hand-curated text/name lookup maps that cannot be derived from subj_dept_map or program_map.
+# Hand-curated text/name lookup maps that cannot be derived from the institution mapping files.
 #
 # Contents:
 #   major_name_to_major_code — Major name text → Banner major code.
@@ -11,12 +11,12 @@
 #                             Used in parse-HRreport.R and Dept Trends support.
 #
 # SUPERSEDED — do NOT re-add these; they are now derived automatically and loaded by
-# catalog_lookups.R (sources subj_dept_map.R + reads data/program_map.qs):
+# catalog_lookups.R (from the institution mapping files):
 #   subj_to_dept          → catalog_lookups.R (from subj_dept_map)
 #   college_name_to_code  → catalog_lookups.R (from subj_dept_map)
 #   dept_code_to_name     → catalog_lookups.R (from subj_dept_map dept_name)
-#   major_to_dept         → catalog_lookups.R (from program_map)
-#   major_college_to_dept → catalog_lookups.R (from program_map)
+#   major_to_dept         → catalog_lookups.R (from programs.csv)
+#   major_college_to_dept → retired at ADR-002 Stage 4; use resolve_program_units()
 #   old_code_to_new_code  → subj_dept_map subject_code → dept_code mappings
 
 

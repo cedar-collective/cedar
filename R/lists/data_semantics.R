@@ -28,7 +28,7 @@
 #                 a per-term fact.
 #
 #   Does NOT:     a mapping ERROR -- that is wrong data, and belongs in
-#                 program_code_maps.R where it can be corrected retroactively.
+#                 institution/<id>/*.csv where it can be corrected retroactively.
 #                 Nor a DERIVED measure: "which students were admitted" is not
 #                 recorded anywhere, so no annotation can supply it. That needs
 #                 a computed proxy and is genuinely code.

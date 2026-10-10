@@ -30,7 +30,6 @@ x-development: &development
     - ./config/enrollment-projections.yml:/srv/shiny-server/cedar/config/enrollment-projections.yml:ro
     - ./shiny-server.conf:/etc/shiny-server/shiny-server.conf:ro
     - ./entrypoint.sh:/srv/shiny-server/cedar/entrypoint.sh:ro
-    - ./data/program_map.qs:/opt/cedar-program-map.qs:ro
     - demo-data:/srv/shiny-server/cedar/data
     - demo-output:/srv/shiny-server/cedar/output
     - demo-cache:/srv/shiny-server/cedar/app_cache
