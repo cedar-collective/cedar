@@ -279,7 +279,7 @@ LATN,,Latin,LCL,,FALSE,,subject_code,confirmed,38 rows as First Minor; Second Mi
 LAW,,Law,LAW,,FALSE,,source_department,confirmed,"6683 rows as Major; source department ""School of Law Administration"" on 100% of primary-major rows",
 LBSC,,Library Science,,,FALSE,,unresolved,proposed,1 rows as First Minor; no evidence settles the unit,
 LEAD,,Educational Leadership,LEAD,,FALSE,,source_department,confirmed,"2590 rows as First Minor; Major; source department ""Dept Teacher Ed, Ed Lead & Pol"" on 96% of primary-major rows; course subject LEAD",
-LENG,,Law Environment & Geography,GES,,FALSE,,source_department,proposed,"55 rows as First Minor; Major; Second Minor; source department ""Geography"" on 100% of primary-major rows",
+LENG,,Law Environment & Geography,GES,,FALSE,,source_department,confirmed,"55 rows as First Minor; Major; Second Minor; source department ""Geography"" on 100% of primary-major rows","Undergraduate minor (2018-19 catalog) and graduate certificate (2021-22 catalog), both GES. One MSL student carries LENG as a major in Fall 2020, possibly the certificate; no GCERT program code appears. No holders since Spring 2025. Confirmed 2026-10-09."
 LIBA,,Liberal Arts,LAIS,,FALSE,,source_department,confirmed,"7127 rows as Major; Second Major; source department ""UC Bachelor University Studies"" on 100% of primary-major rows",
 LING,,Linguistics,LING,,FALSE,,source_department,confirmed,"2194 rows as First Minor; Major; Second Major; Second Minor; source department ""AS Linguistics"" on 100% of primary-major rows",
 LLSS,,"Lang, Literacy & Sociocult St",LLSS,,FALSE,,source_department,confirmed,"1867 rows as Major; source department ""Lang Literacy Sociocultural LL"" on 100% of primary-major rows",
