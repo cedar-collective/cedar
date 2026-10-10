@@ -303,7 +303,7 @@ MSST,,Museum Studies,MSST,,FALSE,,subject_code,confirmed,"1147 rows as First Min
 MUS,,Music,MUS,,FALSE,,source_department,confirmed,"3323 rows as First Minor; Major; Second Major; Second Minor; source department ""Music"" on 100% of primary-major rows",
 MUSE,,Music Education,MUS,,FALSE,,source_department,confirmed,"763 rows as First Minor; Major; source department ""Music"" on 100% of primary-major rows",
 MUSP,,Music Performance,MUS,,FALSE,,source_department,confirmed,"286 rows as Major; source department ""Music"" on 100% of primary-major rows",
-NAST,,Native American Studies,NATV,,FALSE,,name_match,proposed,"27 rows as First Minor; unit named ""Native American Studies""",
+NAST,,Native American Studies,NATV,,FALSE,,name_match,confirmed,"27 rows as First Minor; unit named ""Native American Studies""","Native American Studies minor, main campus, last held Spring 2025. Confirmed 2026-10-09 on the name match."
 NATV,,Native American Studies,NATV,,FALSE,,source_department,confirmed,"1428 rows as First Minor; Major; Second Major; Second Minor; source department ""Native American Studies"" on 98% of primary-major rows",
 NDIT,,Nutrition/Dietetics,NUTR,,FALSE,,source_department,confirmed,"965 rows as Major; source department ""Individual Fam Comm Educ IFCE"" on 100% of primary-major rows; students take NUTR courses at 80.6x the overall rate (1124 enrolments)",
 NE,,Nuclear Engineering,NE,,FALSE,,source_department,confirmed,"1641 rows as Major; Second Major; source department ""Nuclear Engineering"" on 95% of primary-major rows",
