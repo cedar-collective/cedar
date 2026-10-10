@@ -1,273 +1,54 @@
 # CEDAR-PLATFORM: derives lookup vectors from institution data
 # catalog_lookups.R
 #
-# Derives all lookup VECTORS from subj_dept_map and program_map.
-# Source this file AFTER subj_dept_map.R is loaded and program_map is read from data/program_map.qs.
+# Derives the runtime lookup VECTORS from the institution mapping files
+# (cedar_institution_files, read by subj_dept_map.R). Source it after
+# subj_dept_map.R.
+#
+# Since ADR-002 Stage 4 nothing here comes from program_map.qs, which is
+# retired: every stored unit is written by the transform from the files
+# (Stage 3), and these vectors are conveniences for code that needs a quick
+# code -> unit lookup at runtime.
 #
 # Provides:
-#   subj_to_dept          — subject_code → dept_code  (for cedar_sections)
-#   college_name_to_code  — "College of Arts and Sciences" → "AS"  (for cedar_programs)
-#   dept_code_to_name     — dept_code → human-readable dept name  (for display)
-#   major_college_to_dept — "major_code:college_code" → dept_code  (preferred; disambiguates
-#                           same major_code in multiple colleges, e.g. CS in EN vs AD)
-#   major_to_dept         — major_code → dept_code  (fallback; first/main-campus mapping wins)
+#   subj_to_dept       — subject_code → unit code: the first confirmed subjects.csv
+#                        row for the code. A runtime convenience only; the
+#                        transform uses resolve_course_units(), which also keys on
+#                        the section's college and course level.
+#   college_name_to_code — college name → code (colleges.csv). Prefer
+#                        translate_source_college(), which also reads source_names.
+#   dept_code_to_name  — unit code → unit name.
+#   major_to_dept      — program_code → unit code: confirmed every-college
+#                        programs.csv rows. College-specific rows (BADM and CRIM
+#                        at the branch campuses) are not in it; resolve those with
+#                        resolve_program_units().
+#   premajor_leads_to  — pre-major program_code → the program code it leads to
+#                        (programs.csv leads_to). Translation only, never history.
 #
-# To change a mapping, edit institution/<id>/*.csv or program_code_maps.R — not this file.
-#
-# ── Dept-code lookup priority (cedar_programs and cedar_degrees) ───────────────
-#
-# dept_code is assigned by a priority chain in transform-to-cedar.R.
-# Each tier is tried in order; the first non-NA result wins.
-#
-#   Tier 1  major_college_to_dept["major_code:college_code"]
-#           Compound key built from program_map.  Most precise — disambiguates
-#           programs that share a major_code across colleges (CRIM in AS vs AD,
-#           CS in EN vs AD, EDUC in EH vs AD).
-#           Uses the Banner "Actual College" code, which is usually correct but
-#           records graduate students under "GP" (Graduate Programs) regardless
-#           of their academic home college.
-#
-#   Tier 2  subj_to_dept[major_code]
-#           Subject-code lookup from subj_dept_map.  Catches language and
-#           subject codes that appear as major_codes (e.g. SPAN, HIST, BIOL).
-#
-#   Tier 3  major_to_dept[major_code]
-#           Simple major_code lookup built from program_map.  Catches graduate
-#           programs whose Banner college_code is "GP" rather than the home
-#           college used when program_map was built.  Example: SPLP and CSD
-#           students enrol under college "GP" but program_map has "SPLP:AS"
-#           (inferred from dept SHS → college AS), so Tier 1 fails; Tier 3
-#           resolves SPLP → SHS correctly.
-#
-#   Tier 4  major_code itself  (cedar_programs only)
-#           Identity fallback so dept_code is never NA for unknown codes.
-#           Numeric codes are then nullified (they are Banner internal org IDs).
-#           cedar_degrees omits this tier — unknown codes get NA and are flagged.
-#
-#           WARNING: this tier is indistinguishable from a correct answer. A
-#           program that reaches it gets a department named after itself, which
-#           no report can tell apart from a real one, and cedar_mapping_issues
-#           never sees it because the row *is* mapped. That is how Radiologic
-#           Sciences came to report 35 students at department level when it had
-#           229 — see ISSUES.md I7. It fires whenever program_map.qs is older
-#           than the academic_studies export cedar_programs was built from, so
-#           regenerate the map when programs are added, and treat any dept_code
-#           equal to its own major_code as a mapping failure to investigate.
-#
-# To add a new mapping not derivable from the subject or program tables, add it
-# to extra_p2d in R/lists/program_code_maps.R and regenerate program_map.qs.
+# To change a mapping, edit institution/<id>/*.csv — not this file.
 
-# ── From subj_dept_map ─────────────────────────────────────────────────────────
+# ── From subjects.csv, units.csv, colleges.csv (via subj_dept_map) ────────────
 
-# subject_code → dept_code (for matching DESR course sections to departments)
 subj_to_dept           <- subj_dept_map$dept_code
 names(subj_to_dept)    <- subj_dept_map$subject_code
 
-# College text name → 2-letter Banner code (for cedar_programs college_code column)
 .college_lu                <- dplyr::distinct(subj_dept_map, college_code, college_name)
 college_name_to_code       <- .college_lu$college_code
 names(college_name_to_code)<- .college_lu$college_name
 
-# dept_code → human-readable name (for display; subj_dept_map dept_name is authoritative)
 .dept_lu                   <- dplyr::distinct(subj_dept_map, dept_code, dept_name)
 dept_code_to_name          <- .dept_lu$dept_name
 names(dept_code_to_name)   <- .dept_lu$dept_code
 
-# ── From program_map ───────────────────────────────────────────────────────────
-# program_map is loaded from data/program_map.qs (generated by transform_to_cedar()).
-# Rows without usable lookup keys are excluded from lookup vectors and recorded
-# in cedar_mapping_issues so the app can surface them without blocking startup.
+# ── From programs.csv ──────────────────────────────────────────────────────────
 
-.required_program_map_cols <- c("program_code", "college_code", "dept_code", "major_code")
-.missing_program_map_cols <- setdiff(.required_program_map_cols, names(program_map))
-if (length(.missing_program_map_cols) > 0) {
-  stop("[catalog_lookups.R] program_map is missing required columns: ",
-       paste(.missing_program_map_cols, collapse = ", "))
-}
+.programs <- cedar_institution_files$programs
+.every    <- .programs[.programs$status == "confirmed" & !nzchar(.programs$in_college) &
+                         nzchar(.programs$unit_code), ]
+major_to_dept <- stats::setNames(.every$unit_code, .every$program_code)
 
-if (!exists("allowed_unmapped_program_codes")) {
-  allowed_unmapped_program_codes <- character(0)
-}
+.pre <- .programs[.programs$is_pre_major == "TRUE" & nzchar(.programs$leads_to) &
+                    !nzchar(.programs$in_college), ]
+premajor_leads_to <- stats::setNames(.pre$leads_to, .pre$program_code)
 
-.mapping_issue_cols <- c(
-  "issue_type", "severity", "review_status", "program_code", "major_code",
-  "college_code", "dept_code", "degree_level", "program_type", "details"
-)
-cedar_mapping_issues <- data.frame(
-  issue_type = character(),
-  severity = character(),
-  review_status = character(),
-  program_code = character(),
-  major_code = character(),
-  college_code = character(),
-  dept_code = character(),
-  degree_level = character(),
-  program_type = character(),
-  details = character(),
-  stringsAsFactors = FALSE
-)
-
-.issue_rows <- function(df, issue_type, severity, review_status, details) {
-  if (nrow(df) == 0) return(cedar_mapping_issues)
-  out <- as.data.frame(df[, intersect(
-    c("program_code", "major_code", "college_code", "dept_code", "degree_level", "program_type"),
-    names(df)
-  ), drop = FALSE], stringsAsFactors = FALSE)
-  for (nm in setdiff(.mapping_issue_cols, names(out))) out[[nm]] <- NA_character_
-  out$issue_type <- issue_type
-  out$severity <- severity
-  out$review_status <- review_status
-  out$details <- details
-  out[, .mapping_issue_cols, drop = FALSE]
-}
-
-# Programs generate_program_map() discarded because their college suffix is not
-# in known_suffixes. They have no map row at all, so no lookup can reach them and
-# their students land in the dept_code identity fallback. The transform warns,
-# but a warning in a build log is invisible to whoever reads the department
-# number afterwards -- so they are surfaced on Admin > Data & Usage > Mappings
-# alongside every other mapping problem.
-.dropped_programs <- attr(program_map, "dropped_programs")
-if (!is.null(.dropped_programs) && nrow(.dropped_programs) > 0) {
-  cedar_mapping_issues <- rbind(
-    cedar_mapping_issues,
-    .issue_rows(
-      .dropped_programs,
-      issue_type = "program_dropped_unknown_college_suffix",
-      severity = "warning",
-      review_status = "needs_review",
-      details = paste0(
-        "Program code's college suffix is not in known_suffixes, so the program ",
-        "was excluded from program_map entirely and its students fall through to ",
-        "the dept_code identity fallback. Add the suffix in ",
-        "R/lists/program_code_maps.R if it is a real college."
-      )
-    )
-  )
-  message("[catalog_lookups.R] ", nrow(.dropped_programs),
-          " program(s) dropped for an unknown college suffix; see cedar_mapping_issues.")
-}
-
-.malformed_program_map <- program_map[
-  is.na(program_map$major_code) | !nzchar(program_map$major_code) |
-    is.na(program_map$college_code) | !nzchar(program_map$college_code),
-  ,
-  drop = FALSE
-]
-
-if (nrow(.malformed_program_map) > 0) {
-  cedar_mapping_issues <- rbind(
-    cedar_mapping_issues,
-    .issue_rows(
-      .malformed_program_map,
-      issue_type = "malformed_program_map_row",
-      severity = "warning",
-      review_status = "needs_review",
-      details = "program_map row is missing major_code or college_code; excluded from dept lookup vectors"
-    )
-  )
-  message("[catalog_lookups.R] Excluding ", nrow(.malformed_program_map),
-          " malformed program_map rows from dept lookup vectors; see cedar_mapping_issues.")
-}
-
-.unmapped_program_map <- program_map[
-  !(is.na(program_map$major_code) | !nzchar(program_map$major_code) |
-      is.na(program_map$college_code) | !nzchar(program_map$college_code)) &
-    (is.na(program_map$dept_code) | !nzchar(program_map$dept_code)),
-  ,
-  drop = FALSE
-]
-
-if (nrow(.unmapped_program_map) > 0) {
-  .unexpected_unmapped <- .unmapped_program_map[
-    is.na(.unmapped_program_map$program_code) |
-      !(.unmapped_program_map$program_code %in% allowed_unmapped_program_codes),
-    ,
-    drop = FALSE
-  ]
-  if (nrow(.unexpected_unmapped) > 0) {
-    cedar_mapping_issues <- rbind(
-      cedar_mapping_issues,
-      .issue_rows(
-        .unexpected_unmapped,
-        issue_type = "unmapped_program_code",
-        severity = "warning",
-        review_status = "needs_review",
-        details = "program_map row has no dept_code and is not listed in allowed_unmapped_program_codes; excluded from dept lookup vectors"
-      )
-    )
-  }
-  .reviewed_unmapped <- .unmapped_program_map[
-    !is.na(.unmapped_program_map$program_code) &
-      .unmapped_program_map$program_code %in% allowed_unmapped_program_codes,
-    ,
-    drop = FALSE
-  ]
-  if (nrow(.reviewed_unmapped) > 0) {
-    cedar_mapping_issues <- rbind(
-      cedar_mapping_issues,
-      .issue_rows(
-        .reviewed_unmapped,
-        issue_type = "unmapped_program_code",
-        severity = "info",
-        review_status = "reviewed_exception",
-        details = "reviewed program_map row has no defensible department owner yet; excluded from dept lookup vectors"
-      )
-    )
-  }
-  message("[catalog_lookups.R] Excluding ", nrow(.unmapped_program_map),
-          " unmapped program_map rows from dept lookup vectors; see cedar_mapping_issues.")
-}
-
-.program_map_for_dept_lookup <- program_map[
-  !(is.na(program_map$major_code) | !nzchar(program_map$major_code) |
-      is.na(program_map$college_code) | !nzchar(program_map$college_code) |
-      is.na(program_map$dept_code) | !nzchar(program_map$dept_code)),
-  ,
-  drop = FALSE
-]
-
-# Compound key lookup: "major_code:college_code" → dept_code
-# Use this in transform-to-cedar.R where college_code is known.
-# Correctly disambiguates cases where the same major_code exists in multiple colleges
-# (e.g., EDUC in EH vs AD, CRIM in AS/SOCI vs AD/CJUS, CS in EN vs AD).
-.pc                        <- dplyr::distinct(
-  dplyr::filter(
-    .program_map_for_dept_lookup,
-    !is.na(major_code), nzchar(major_code),
-    !is.na(college_code), nzchar(college_code),
-    !is.na(dept_code), nzchar(dept_code)
-  ),
-  major_code, college_code, .keep_all = TRUE
-)
-major_college_to_dept      <- .pc$dept_code
-names(major_college_to_dept) <- paste(.pc$major_code, .pc$college_code, sep = ":")
-
-# Simple major_code → dept_code (no college context; first occurrence wins).
-# Main-campus departments take priority, and that ORDER IS SET HERE rather than
-# inherited. It used to rely on program_map rows happening to arrive
-# main-campus-first out of academic_studies; regenerating the map in September
-# 2026 reversed two of them and silently moved CRIM from SOCI (main campus) to
-# CJUS (branch), which a single test caught. Branch programs carry college "AD",
-# so sorting those last makes the rule explicit and regenerate-proof.
-# Use major_college_to_dept (compound key) when college_code is available — it is more accurate.
-.pc_simple             <- dplyr::distinct(
-  dplyr::arrange(
-    dplyr::filter(
-      .program_map_for_dept_lookup,
-      !is.na(major_code), nzchar(major_code),
-      !is.na(dept_code), nzchar(dept_code)
-    ),
-    college_code == CEDAR_BRANCH_COLLEGE_CODE
-  ),
-  major_code, .keep_all = TRUE
-)
-major_to_dept          <- .pc_simple$dept_code
-names(major_to_dept)   <- .pc_simple$major_code
-
-rm(.college_lu, .dept_lu, .pc, .pc_simple, .required_program_map_cols,
-   .missing_program_map_cols, .malformed_program_map, .unmapped_program_map,
-   .program_map_for_dept_lookup, .mapping_issue_cols, .issue_rows)
-if (exists(".dropped_programs")) rm(.dropped_programs)
-if (exists(".unexpected_unmapped")) rm(.unexpected_unmapped)
-if (exists(".reviewed_unmapped")) rm(.reviewed_unmapped)
+rm(.college_lu, .dept_lu, .programs, .every, .pre)

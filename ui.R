@@ -1855,17 +1855,14 @@ nav_panel(
           uiOutput("mapping_freshness"),
           card(
             card_header("Mapping decisions"),
-            p("Everything settled by editing a mapping file in institution/unm/: programs and course subjects awaiting a decision, codes the data uses that no file has, college values no file names, and mapped colleges Banner's Translated College disagrees with. Largest first. Banner code is the code Banner uses (a program's major or minor code, or a course subject); Suggested department is the department (CEDAR unit) the mapping assistant thinks should own it, and Confidence says how far to trust that, with the evidence on hover. Needs says what to supply and opens the line (or the file, for a new row); Where gives the same place for a local checkout. Reported today as is what CEDAR shows now, still from R/lists/program_code_maps.R until the transform reads the files (ADR-002 Stage 3); phantom means a department named after the code itself. A change that cannot wait for Stage 3 also goes in ",
-              tags$a(href = source_file_url(cedar_institution_files, "R/lists/program_code_maps.R"),
-                     target = "_blank", rel = "noopener", "program_code_maps.R"),
-              ".",
+            p("Everything settled by editing a mapping file in institution/unm/: programs and course subjects awaiting a decision, codes the data uses that no file has, college values no file names, and mapped colleges Banner's Translated College disagrees with. Largest first. Banner code is the code Banner uses (a program's major or minor code, or a course subject); Suggested department is the department (CEDAR unit) the mapping assistant thinks should own it, and Confidence says how far to trust that, with the evidence on hover. Needs says what to supply and opens the line (or the file, for a new row); Where gives the same place for a local checkout. Reported today as is the department the stored tables carry now. They take every unit from these files (ADR-002 Stage 3), so an unconfirmed code reads none until its row is confirmed and the tables are rebuilt; phantom, a department named after the code itself, appears only in tables built before then.",
               class = "text-hint"),
             uiOutput("mapping_decisions_summary"),
             reactable::reactableOutput("mapping_decisions_table")
           ),
           card(
             card_header("Other problems in the data"),
-            p("Problems no mapping can fix, found by the same checks: values that are errors in the source data, and codes only the old program_map checks report. They are listed so they can be reported to whoever owns the source.",
+            p("Problems no mapping can fix, found by the same checks: values that are errors in the source data. They are listed so they can be reported to whoever owns the source.",
               class = "text-hint"),
             uiOutput("mapping_other_summary"),
             reactable::reactableOutput("mapping_other_table")
@@ -1874,7 +1871,7 @@ nav_panel(
             nav_panel(
               title = "Program to Dept",
               br(),
-              p("Validated major/program code to department-code lookup used for home-major classification and transform fallbacks.",
+              p("Confirmed programs.csv rows that apply in every college: program code to department (unit). College-specific rows, such as branch-campus BADM and CRIM, are resolved separately.",
                 class = "text-hint"),
               reactable::reactableOutput("program_dept_mapping_table")
             ),
@@ -1891,13 +1888,6 @@ nav_panel(
               p("Department code display names derived from the subject/dept catalog.",
                 class = "text-hint"),
               reactable::reactableOutput("dept_name_mapping_table")
-            ),
-            nav_panel(
-              title = "Reviewed Exceptions",
-              br(),
-              p("Program codes intentionally allowed to remain unmapped at app startup. These should be treated as a review queue, not permanent truth.",
-                class = "text-hint"),
-              reactable::reactableOutput("allowed_unmapped_mapping_table")
             )
           )
         )

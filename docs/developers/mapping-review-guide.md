@@ -35,7 +35,7 @@ by the kind of work:
   |---|---|
   | Needs | What to supply, as a link to the row's line (or the file, for a new row) |
   | Where | The same place as `file.csv:line`, for a local checkout |
-  | Reported today as | What CEDAR shows now, still from `program_code_maps.R` until ADR-002 Stage 3. *Phantom* means a department named after the code itself. Not in any file: confirming the row fixes it |
+  | Reported today as | The unit the stored tables carry now. Since ADR-002 Stage 3 that comes from these files, so an unconfirmed code reads *none*; *phantom* (a department named after the code itself) appears only in tables built before Stage 3 |
   | Kind, Banner code | What the row is (program major/minor/pre-major, course subject, college) and Banner's code for it |
   | Suggested department | The unit the assistant suggests should own it, with its name |
   | Confidence | Strong (the source's own department, matching names or subject code, a pre-major's target), Plausible (clear course-taking: 5x the usual rate or more, over 100 or more enrolments), Weak (otherwise, or in a catch-all source department), with the evidence on hover. `.suggestion_confidence()` in `R/features/admin.R` |
@@ -48,15 +48,15 @@ by the kind of work:
   holds a copy of the source that the next deploy replaces.
 
 - **Other problems in the data** — what no mapping can fix: Banner
-  organisation IDs leaking into the major-code column, and codes only the old
-  `program_map` checks report (which Stage 4 retires). List them for whoever
+  organisation IDs leaking into the major-code column. List them for whoever
   owns the source.
 
 Expected differences — pre-majors reporting under the college they lead to —
-are counted, not listed. A decision changes reported numbers when the transform
-reads the files (Stage 3); a change that cannot wait also goes in
-`program_code_maps.R`, as described below. `scripts/mapping-review.R` prints
-the same two lists in the terminal.
+are counted, not listed. A decision changes reported numbers at the next
+rebuild: the deploy gate rebuilds every table built from older mapping files —
+programs, degrees, sections and class lists each carry a stamp of the files
+that built them. `scripts/mapping-review.R` prints the same two lists in
+the terminal.
 
 Below them, the lookup tables show what *is* mapped today.
 
@@ -70,119 +70,93 @@ this guide reports `major_code` unless it says otherwise.
 
 | Namespace | Lives in | Example | What it identifies |
 |---|---|---|---|
-| `major_code` | `cedar_programs`, `cedar_degrees` | `RADS` | the program a student declared |
-| `dept_code` | `subj_dept_map`, derived onto programs | `RADS` | the academic department |
-| `subject_code` | the prefix in `subject_course` | `RADS 101` | the course subject |
+| `major_code` | `cedar_programs`, `cedar_degrees`; `programs.csv` `program_code` | `RADS` | the program a student declared |
+| `dept_code` | `units.csv` `unit_code`, written onto every table | `RADS` | the academic department (unit) |
+| `subject_code` | the prefix in `subject_course`; `subjects.csv` | `RADS 101` | the course subject |
 
 They often coincide, which is why the collisions are easy to miss. `FCS` is a
 pre-major code for Computer Science **and** the department code for Family and
 Child Studies. `FORS` is a major code, a department code, and a course subject
-all at once.
-
-A collision cannot be fixed by mapping the code, because the code already
-resolves — to the wrong thing for one of its meanings. It needs a
-`major_college_to_dept` entry keyed on the college, which is why the screens call
-it out separately in their `details`.
+all at once. A `leads_to` must name a program code, never a department code —
+`FFCS` once led to `FCS`, pre-Computer Science (the validator now refuses a
+target in another unit).
 
 ```r
 # Which namespaces does a string live in?
-code <- "FCS"
-c(major   = code %in% cedar_programs$major_code,
-  dept    = code %in% subj_dept_map$dept_code,
-  subject = code %in% subj_dept_map$subject_code)
+code <- "FCS"; f <- cedar_institution_files
+c(program = code %in% f$programs$program_code,
+  unit    = code %in% f$units$unit_code,
+  subject = code %in% f$subjects$subject_code)
 ```
 
 ## Prioritise by program type, not just headcount
 
-`program_type` decides how much a wrong department costs. A student's **Major**
+`program_type` decides how much an undecided code costs. A student's **Major**
 determines their home unit and appears in every department report; a **Minor**
-mostly does not. Of the flagged rows, more than a third are minors.
-
-The mapping backlog worth working is *majors in a phantom department*:
-
-```r
-rep <- build_data_anomaly_report(cedar_programs, cedar_degrees,
-                                 known_departments = subj_dept_map$dept_code)
-phantom <- rep |> dplyr::filter(issue_type != "declared_majors_far_exceed_graduates")
-
-cedar_programs |>
-  dplyr::filter(major_code %in% phantom$major_code, term >= 202410L,
-                program_type %in% c("Major", "Second Major")) |>
-  dplyr::group_by(major_code) |>
-  dplyr::summarise(students = dplyr::n_distinct(student_id), .groups = "drop") |>
-  dplyr::arrange(dplyr::desc(students))
-```
-
-Note the filter dropping `declared_majors_far_exceed_graduates`. That screen is
-**not** a mapping problem — it flags programs whose code records intent rather
-than admission, and those are usually mapped perfectly. Mixing it into a mapping
-worklist produces a to-do list where the top entries need no work.
+mostly does not. `scripts/mapping-review.R` and the Admin table already sort by
+students; read the Kind column before the size.
 
 ## The files, and what to look at in each
 
-All live in `R/lists/`. Files whose first line says `# CEDAR-INSTITUTION:` are
-UNM's; `# CEDAR-PLATFORM:` files are mechanism you should not need to touch.
+All in `institution/unm/`; `README.md` there gives every column.
 
-### `program_code_maps.R` — the one that goes wrong most
+### `programs.csv` — the one that goes wrong most
 
-Six lists, each a different way a Banner code can mislead:
+One row per program code (optionally per college): its unit, whether it is a
+pre-major, the program it `leads_to`, why (`basis`), and whether a person has
+confirmed it (`status`).
 
-- **`premaj_canon`** — pre-major code → the major it leads to. *Missing entries
-  are the most damaging error in the whole pipeline.* A pre-major with no entry
-  gets a department named after itself, and its students vanish from their real
-  unit. This is how Radiologic Sciences reported 35 students when it had 229
-  (ISSUES.md I7).
-  **Look for:** any F-prefixed code in the data that is not a key here.
-- **`real_F_progs`** and **`pre_major_exempt_codes`** — the exceptions to
-  "F means pre-major". **It very often does not.** `FREN` is French, `FRST`
-  French Studies, `FCST` Family & Child Studies, `FDMA` Film and Digital Arts —
-  real programs that award degrees. All four were flagged as pre-majors at some
-  point purely because of their first letter.
-  **Look for:** a code in one list but not the other. They serve different
-  consumers, so that is not automatically wrong — but it is always worth asking.
-- **`xvar_explicit`** — X-prefix variant → canonical code. Same failure shape as
-  `premaj_canon`.
-- **`extra_p2d`** — major code → department, for codes absent from
-  `subj_dept_map`. **Look for:** entries with no comment saying why.
-- **`ad_major_to_dept`** — branch-campus overrides, only where the branch
-  department differs from main campus.
-- **`allowed_unmapped_program_codes`** — reviewed exceptions. **Look for:** the
-  `NEEDS RESEARCH` block, which is parked questions rather than settled ones.
-- **`department_less_major_codes`** — programs no department owns, such as
-  Non-Degree and Undecided. **The bar is "nothing owns this", never "nobody has
-  worked out what owns this."**
+- **`is_pre_major`** is stated, not inferred. **Look for** a flag that disagrees
+  with Banner's own program record: main-campus pre-majors are named "Pre-" in
+  the Academic Studies `Program` field ("BS Pre-Exercise Science") and award no
+  degrees. Branch-campus "Pre-" programs ("AS Pre-Engineering") are associate
+  degrees students are admitted to, not pre-majors — and the degrees export
+  carries no associate degrees, so "no degrees" is no evidence there (ISSUES I18).
+- **`leads_to`** translates a pre-major to its major and nothing else. **Look
+  for** a target whose name is not the pre-major's own degree.
+- **`basis = no_unit`** — programs no department owns, such as Non-Degree and
+  Undecided. **The bar is "nothing owns this", never "nobody has worked out
+  what owns this."** A no_unit row may still name a college (Undecided: UC).
+- **`in_college` rows** — a code whose unit differs in one college (CRIM and
+  BADM at the branch campuses).
 
-### `institution/unm/*.csv` — subject → department → college
+### `subjects.csv` — course subject to unit
 
-The authoritative department list, as plain CSV files (`colleges.csv`,
-`units.csv`, `subjects.csv`; see ADR-002). If a department is missing here,
-every code that should map to it falls through.
-**Look for:** a department you know exists that is not in the file.
+Keyed on subject, section college and level; the most specific confirmed row
+wins. **Look for** a branch-campus row for a main-campus unit without
+`college_code` AD (branch sections stay in the branch college).
 
-### `mappings.R` — text → code
+### `units.csv` and `colleges.csv`
+
+The authoritative unit list, each with its home college, and every spelling a
+source uses for a college (`source_names`). **Look for** a department you know
+exists that is not in the file, and a renamed college whose old name is missing.
+
+### `R/lists/mappings.R` — text → code
 
 `major_name_to_major_code` and `hr_org_desc_to_dept` translate free text from
 Banner and HR exports. Text maps rot when the source system renames something.
 **Look for:** names that no longer appear in current exports.
 
-### `data_semantics.R` — what the data means
+### `R/lists/data_semantics.R` — what the data means
 
 Not a mapping, but read it alongside them: it records codes whose *meaning*
 changed, which is different from codes that are mapped wrong.
 
-## The four failure signatures
+## The failure signatures
 
 Learn these and most problems become visible on sight.
 
-**1. A department named after a program code.** `dept_code == major_code` where
-that code is not a real department. Guaranteed wrong for a pre-major. The
-identity fallback exists so `dept_code` is never empty, which means an unmapped
-program is indistinguishable from a mapped one.
+**1. A code with no department.** Since ADR-002 Stage 3 an unconfirmed code has
+no unit (`NA`) and appears on Admin > Mappings. Before then it got a department
+named after itself, which no report could tell from a real one (ISSUES I7);
+EC-14 fails if that fallback returns.
 
-**2. An F-prefix assumption.** Any rule keyed on the first letter of a code is a
-guess about naming, not a fact about programs. Check `pre_major_basis`: a row
-reading `code_convention` was decided by the prefix alone, with no supporting
-name.
+**2. A prefix assumption.** Any rule keyed on the first letter of a code is a
+guess about naming, not a fact about programs: F did not mark every pre-major,
+and not every "Pre-" program is one. Check `pre_major_basis`: `programs_csv`
+means the file decided; `name_prefix` means the code has no row and Banner's
+name was used.
 
 **3. A drifted name.** `FMDL` is "Medical Laboratory Science", `MEDL` is
 "Medical Laboratory Sciences". Anything matching programs by name splits that
@@ -192,71 +166,57 @@ pair silently. `population_group_audit()` reports these as near misses.
 than it graduates is usually recording intent rather than admission. Not a
 mapping error, but it reads like one.
 
-**5. A program that is not in `program_map` at all.** `generate_program_map()`
-discards any program whose college suffix is not in `known_suffixes`, before the
-unmapped check runs — so it produced no warning until one was added. `BA-FLAI-US`
-and `BSCNE-FCOE-E` vanished this way: the suffixes `US` and `E` are unlisted, and
-their students went straight to the identity fallback. If a code has no map row
-at all, check its program code's third segment first.
-
-```r
-# Programs the map never saw
-pm <- qs2::qs_read(file.path(cedar_data_dir, "program_map.qs"))
-setdiff(unique(cedar_programs$major_code), pm$major_code) |> head(20)
-```
+**5. A code with no row at all.** A program or subject the data uses that no
+file lists. The mapping audit lists it ("A programs.csv row"); run
+`scripts/propose-mappings.R --write` to add a proposed row with the evidence.
 
 ## Queries, when you want them
 
 ```r
 source("scripts/cedar-repl.R")
+f <- cedar_institution_files
 
-# Everything the screens can find, in one table
-build_data_anomaly_report(cedar_programs, cedar_degrees,
-                          known_departments = subj_dept_map$dept_code)
+# Undecided codes, largest first: the same list as Admin > Mappings
+source("scripts/mapping-review.R")
 
-# Pre-majors with no canonical target -- the most damaging gap
-cedar_programs |>
-  dplyr::filter(is_pre_major, !major_code %in% names(premaj_canon)) |>
+# Pre-majors with no target in the file
+f$programs |> dplyr::filter(is_pre_major == "TRUE", !nzchar(leads_to)) |>
+  dplyr::select(program_code, program_name, unit_code, status)
+
+# Rows whose pre-major flag came from Banner's name, not the file
+cedar_programs |> dplyr::filter(pre_major_basis == "name_prefix") |>
   dplyr::count(major_code, program_name, sort = TRUE)
 
-# Rows flagged pre-major on the strength of the code alone
-cedar_programs |>
-  dplyr::filter(pre_major_basis == "code_convention") |>
-  dplyr::count(major_code, program_name, sort = TRUE)
-
-# Does a "pre-major" award degrees? If so it is not one.
+# Does a "pre-major" award degrees? If so it is not one (main campus only: I18)
 cedar_degrees |>
-  dplyr::filter(major_code %in% unique(cedar_programs$major_code[cedar_programs$is_pre_major])) |>
+  dplyr::filter(major_code %in% f$programs$program_code[f$programs$is_pre_major == "TRUE"]) |>
   dplyr::count(major_code, sort = TRUE)
 
-# Departments a program claims that do not exist
-setdiff(unique(cedar_programs$dept_code), subj_dept_map$dept_code)
+# Rows reporting Banner's college because their code is undecided
+cedar_programs |> dplyr::filter(college_basis == "banner") |> dplyr::count(major_code, college_code)
 ```
 
 ## Resolving one mapping, start to finish
 
-Worked example: **Military Studies (`MLST`)**, 179 students sitting in a
-department called `MLST` that does not exist.
+Worked example: **Military Studies (`MLST`)**, a minor whose row is still
+proposed, so its students count toward no department.
 
 ### 1. Decide what it should be
 
 Two possible answers, and they are not the same:
 
-- **It has an owner.** Find the real department code. `MLSL` (Military Science &
-  Leadership) exists in `institution/unm/units.csv`, which settles it.
-- **Nothing owns it.** Non-Degree and Undecided are the clear cases. Then it
-  belongs in `department_less_major_codes`, not in a mapping.
+- **It has an owner.** Find the real unit code in `units.csv`. The assistant
+  suggests NVSC (its students take Naval Science courses); MLSL (Military
+  Science & Leadership) also exists. Someone who knows the program decides.
+- **Nothing owns it.** Non-Degree and Undecided are the clear cases. Then its
+  row gets `basis = no_unit` and no unit.
 
-Do not guess between these. A wrong department is invisible once written — that
-is the whole reason this backlog existed.
+Do not guess between these. A wrong department is invisible once written.
 
 ```r
 source("scripts/cedar-repl.R")
-# What departments exist that could plausibly own it?
-subj_dept_map |> dplyr::filter(grepl("milit", dept_name, ignore.case = TRUE)) |>
-  dplyr::distinct(dept_code, dept_name)
-
-# How many students, over what period, so you know what you are moving
+units <- cedar_institution_files$units
+units[grepl("milit|naval", units$unit_name, ignore.case = TRUE), ]
 cedar_programs |> dplyr::filter(major_code == "MLST") |>
   dplyr::summarise(students = dplyr::n_distinct(student_id),
                    first = min(term), last = max(term))
@@ -264,100 +224,50 @@ cedar_programs |> dplyr::filter(major_code == "MLST") |>
 
 ### 2. Make the edit
 
-All in `R/lists/program_code_maps.R`. Which list depends on what kind of code it
-is:
+In `institution/unm/programs.csv` (or `subjects.csv` for a course subject), on
+the code's row:
 
-| The code is | Put it in | Example |
-|---|---|---|
-| A declared program with a department | `extra_p2d` | `MLST = "MLSL"` |
-| A pre-major leading to a program | `premaj_canon` | `FRAD = "RADS"` |
-| An X-prefix variant | `xvar_explicit` | `XFDE = "DEHY"` |
-| A branch program whose department differs from main campus | `ad_major_to_dept` | `CRIM = "CJUS"` |
-| Owned by nobody | `department_less_major_codes` | `NOND`, `UNDC` |
-| Real, but its F prefix makes it look like a pre-major | `pre_major_exempt_codes` | `FREN`, `FCST` |
+| To | Change |
+|---|---|
+| Accept the suggestion | `status` → `confirmed`; `basis` stays |
+| Choose another unit | `unit_code`, `basis` → `decided`, `status` → `confirmed` |
+| Say nothing owns it | `unit_code` blank, `basis` → `no_unit`, `status` → `confirmed` |
+| Mark a pre-major | `is_pre_major` → `TRUE`; `leads_to` → its own degree's program code, if it has one |
+| Credit a different college | `college_code` (a program's own college; a subject row's credited college) |
 
-**Write the reason next to the entry.** Every existing entry has one. An
-unexplained mapping is the next person's unanswerable question.
+**Write the reason in `notes`**, with the date. An unexplained mapping is the
+next person's unanswerable question. Commit on a branch, one decision per
+commit, through a pull request: the app never edits the files.
 
-### 3. Rebuild — automatic on deploy and data refresh, manual if you want it now
+### 3. Rebuild — automatic on deploy and data refresh
 
 `scripts/rebuild-programs-if-mappings-changed.R` runs on every deploy and every
-`scripts/update-data.sh` run, local or production — including a refresh that
-skips Academic Studies and so would otherwise leave `cedar_programs` built from
-the old mappings. It hashes
-the five files that decide `dept_code`, compares them against a fingerprint
-stamped onto `cedar_programs`, and rebuilds only when they differ — so a mapping
-edit reaches production without anyone remembering to do anything, and a deploy
-that changed no mapping costs about a second.
+`scripts/update-data.sh` run. It hashes the files that decide units and colleges
+(`cedar_mapping_source_files()`), compares them with the fingerprint stamped on
+each of `cedar_programs`, `cedar_degrees`, `cedar_sections` and
+`cedar_students`, and rebuilds only the tables that differ. It stops, rather
+than reporting success, if an export it needs is missing or a rebuilt table is
+still stale.
 
 The hash covers whole files, comments included, so Admin > Data & Usage reports
 STALE after any edit to them, even one that moves no department. The rebuild
-clears it.
+clears it. To apply an edit now: `Rscript --vanilla
+scripts/rebuild-programs-if-mappings-changed.R` (`--force` rebuilds all four).
 
-To apply an edit immediately rather than waiting for a deploy or refresh:
+**Rebuild from the exports the transform reads** (`cedar_shared_data_dir`), not
+an old local copy: a stale `academic_studies.qs` faithfully reproduces stale
+programs.
 
-```bash
-Rscript --vanilla scripts/rebuild-programs-if-mappings-changed.R
-```
-
-`--force` rebuilds regardless. You need it if a table was stamped by a build that
-did **not** regenerate `program_map.qs`, because the stamp then asserts something
-false and the gate will skip a rebuild that is genuinely needed.
-
-The rest of this section is what the gate does for you, and what to do if you
-rebuild by hand.
-
-### 3b. Rebuilding by hand — the edit alone does nothing
-
-`program_map.qs` is generated, and `cedar_programs$dept_code` is written during
-the transform. Editing a list changes neither until you rebuild. Three traps,
-each of which silently produces a wrong or unchanged result:
-
-1. **Generate from the shared data directory**, not `data/`. The repo's local
-   copy of `academic_studies.qs` may be months behind; generating from it
-   faithfully reproduces a stale map.
-2. **`rm(program_map)` first.** `transform_to_cedar()` skips the regenerate when
-   `program_map` already exists in the session, and `load_funcs()` defines it —
-   so a script that loads CEDAR functions first rebuilds against the old map
-   *and reports success*.
-3. **Never move the map aside** to force a regenerate. The running app reads it
-   from the shared directory; removing it breaks startup.
-
-```r
-SOURCED_FROM_PARSE_DATA <- TRUE          # sourcing the transform runs it otherwise
-source("config/config.R"); source("R/trunk/load-funcs.R")
-load_funcs(cedar_base_dir, modules = FALSE)
-source("R/data-parsers/transform-to-cedar.R")
-
-pm <- generate_program_map(
-  file.path(cedar_shared_data_dir, "academic_studies.qs"), ".qs",
-  subj_dept_map, premaj_canon, xvar_explicit, extra_p2d, known_suffixes,
-  real_F_progs, get_lev, ad_major_to_dept, allowed_unmapped_program_codes)
-nrow(pm)                                  # sanity-check before saving
-qs2::qs_save(pm, file.path(cedar_shared_data_dir, "program_map.qs"))
-qs2::qs_save(pm, file.path(cedar_data_dir, "program_map.qs"))
-
-rm(program_map)
-transform_to_cedar(tables = "programs")
-```
-
-### 4. Verify, and expect an exact number
-
-Two checks. The first confirms the students moved; the second confirms nothing
-else did.
+### 4. Verify
 
 ```r
 source("scripts/cedar-repl.R")
 cedar_programs |> dplyr::filter(major_code == "MLST") |>
-  dplyr::count(dept_code)                 # expect MLSL, not MLST
-
-build_data_anomaly_report(cedar_programs, cedar_degrees,
-                          known_departments = subj_dept_map$dept_code) |> nrow()
+  dplyr::count(dept_code, college_code, college_basis)   # the decided unit, "mapped"
 ```
 
-The flagged count should fall by **exactly** the number of programs you mapped.
-If it falls by more, something else changed and you should find out what. If it
-falls by less, the rebuild did not take — check trap 2.
+The code leaves Admin > Mappings' decisions table. Nothing else should move: a
+decision changes only the rows of its own code.
 
 ### 5. Restart the app
 
@@ -369,17 +279,5 @@ reads it at startup.
 Do not work alphabetically. Rank by students affected and stop when the tail goes
 quiet — a handful of programs usually carry most of the impact, and the long tail
 of one- and two-student programs can wait indefinitely without harming a report.
-
-```r
-rep <- build_data_anomaly_report(cedar_programs, cedar_degrees,
-                                 known_departments = subj_dept_map$dept_code)
-cedar_programs |>
-  dplyr::filter(major_code %in% rep$major_code, term >= 202410L) |>
-  dplyr::group_by(major_code) |>
-  dplyr::summarise(students = dplyr::n_distinct(student_id), .groups = "drop") |>
-  dplyr::arrange(dplyr::desc(students))
-```
-
-Rebuilding once after several edits is fine and faster than rebuilding per
-change — the verification in step 4 still works, you simply expect the count to
-fall by the number of programs in the batch.
+`scripts/mapping-review.R` lists them in that order. Rebuilding once after
+several decisions is fine.

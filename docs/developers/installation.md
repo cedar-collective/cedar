@@ -42,8 +42,8 @@ are not supplied.
 ## Institutional instance: restricted data and production-style Docker
 
 This is a separate operational path, not the contributor quickstart. It requires
-an approved data location containing normalized `cedar_*` files and the
-corresponding `program_map.qs`. See [Data Integration](data-integration-guide.html)
+an approved data location containing normalized `cedar_*` files; departments
+and colleges come from the repository's `institution/<id>/` files. See [Data Integration](data-integration-guide.html)
 for source mapping and validation, and the [Release Runbook](release-runbook.html)
 for deployment. Access controls, retention, and backups are institution-owned.
 

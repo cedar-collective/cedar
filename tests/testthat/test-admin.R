@@ -133,7 +133,7 @@ review_files <- function() {
 # (listed, unlinked), and NURS is already confirmed (not listed, but counted).
 review_issues <- function() {
   tibble::tibble(
-    issue_type = c("pre_major_self_mapped_department", "unmapped_program_code",
+    issue_type = c("pre_major_self_mapped_department", "declared_majors_far_exceed_graduates",
                    "identity_fallback_department"),
     severity = "warning", review_status = "needs_review",
     program_code = c(NA, "BA-NOFILE-AS", NA), major_code = c("FRAD", "NOFILE", "NURS"),
@@ -149,7 +149,7 @@ test_that("the program queue merges proposed rows with today's issues, most stud
   expect_equal(q$students, c(3L, 0L, 0L))
   # FRAD's department today is a phantom named after itself (fixture HP01).
   expect_equal(q$today, c("FRAD (phantom)", "none", "none"))
-  expect_equal(q$problem, c("pre-major mapped to itself", "no department in program_map", NA))
+  expect_equal(q$problem, c("pre-major mapped to itself", "far more majors than graduates", NA))
   expect_equal(q$problem_detail[1], "pre-major maps to itself")
   bad <- review_issues(); bad$issue_type[1] <- "new_screen"
   expect_error(build_program_mapping_queue(review_files(), test_programs_hp, bad, "NURS"),
@@ -201,8 +201,7 @@ test_that("the mapping work list separates decisions from problems no mapping fi
   expect_equal(frad$suggested_name, "Radiologic Sciences")
   expect_equal(frad$confidence, "Strong: the program it leads to")
   expect_equal(w$decisions$suggested[w$decisions$code == "POLS-BA"], "ARTS")
-  expect_setequal(paste(w$other$kind, w$other$code),
-                  c("Program code 1084", "Old program_map check NOFILE"))
+  expect_equal(paste(w$other$kind, w$other$code), "Program code 1084")
   expect_equal(w$n_expected, 1L)
   # Named columns reach the browser as JSON objects and break the table.
   expect_false(any(vapply(w$decisions, function(x) !is.null(names(x)), logical(1))))

@@ -29,16 +29,12 @@ recurrence is recognizable.
 
 | ID | Kind | Summary |
 |---|---|---|
-| [I15](#i15--the-headcount-tab-scopes-a-department-by-program-name-crediting-it-with-other-departments-students) | Defect | Headcount tab and Dept Trends scope a department by program name: 243 graduate Engineering students credited to ASPE |
+| [I18](#i18--cedar_degrees-holds-no-associate-degrees-so-branch-campus-completions-read-zero) | Defect | `cedar_degrees` holds no associate degrees: branch-campus completions read zero |
 | [I16](#i16--bottleneck-waitlist-pressure-ignores-term-so-later-registration-erases-earlier-waiting) | Defect | `get_bottlenecks()` waitlist pressure ignores term: ~6% under true demand (RStudio only; no page shows it) |
-| [I12](#i12--renamed-and-non-college-names-leave-48k-program-rows-and-10k-sections-with-no-college) | Defect | Renamed and non-college names leave rows with no college (fixed by ADR-002 Stage 3) |
-| [I11](#i11--concentrations-are-assigned-to-departments-by-name-so-padm-borrows-political-science-students-and-misses-its-own) | Defect | Concentrations assigned to departments by name (fixed by ADR-002 Stage 3) |
-| [I9](#i9--real_f_progs-lists-codes-the-transform-treats-as-pre-majors) | Defect | Two pre-major lists disagree (retired by ADR-002 Stage 4) |
 | [I8](#i8--a-timing-log-row-is-silently-dropped-when-the-write-lock-times-out) | Defect | A timing-log row is dropped when the write lock times out |
-| [I7](#i7--health-pre-major-codes-get-a-phantom-department-hiding-most-of-a-programs-students) | Defect | Phantom departments (health pre-majors fixed; the rest by ADR-002 Stage 3) |
 | [I6](#i6--a-killed-projection-rebuild-strands-its-lock-and-blocks-every-later-refresh) | Defect | A killed projection rebuild strands its lock |
 | [I4](#i4--pre-change-course-ratios-are-confounded-by-career-stage) | Defect | Pre-change course ratios confounded by career stage (deferred) |
-| M1–M24 | Improvement | See [Improvements](#improvements) |
+| M1–M26 | Improvement | See [Improvements](#improvements) |
 
 ---
 
@@ -542,7 +538,7 @@ happens; it does not fix the stranding.
 
 ## I7 — Health pre-major codes get a phantom department, hiding most of a program's students
 
-**Status:** resolved for the health pre-majors (2026-09-09); a wider backlog remains, now visible in Admin
+**Status:** resolved 2026-10-09 by ADR-002 Stage 3: the transform takes every unit from the mapping files, and a code with no confirmed row has no unit instead of a department named after itself. Codes still awaiting a decision are listed on Admin > Data & Usage > Mappings. (Health pre-majors fixed 2026-09-09.)
 **Found:** 2026-09-09 (while resolving named population groups to Banner codes for
 the projection growth scenario)
 **Severity:** high — silent wrongness at the department level. Nothing errors and
@@ -822,8 +818,11 @@ session — so the fix is about the swallowed error, not the deadline.
 
 ## I9 — `real_F_progs` lists codes the transform treats as pre-majors
 
-**Status:** open — narrowed 2026-09-09 after `pre_major_basis` made the evidence
-readable. **The original diagnosis on this entry was wrong; it is corrected below.**
+**Status:** resolved 2026-10-10 by ADR-002 Stage 4: both lists are retired.
+`is_pre_major` is read per code from `programs.csv`, checked against Banner's own
+program records; `FCS` resolves to CS through its row. Narrowed 2026-09-09 after
+`pre_major_basis` made the evidence readable; **the original diagnosis on this
+entry was wrong; it is corrected below.**
 **Found:** 2026-09-09 (platform/institution boundary audit)
 **Severity:** moderate for `FCS`, which has a demonstrated consequence; unproven
 for the rest.
@@ -971,7 +970,9 @@ the script header describing itself for months.
 
 ## I11 — Concentrations are assigned to departments by name, so PADM borrows Political Science students and misses its own
 
-**Status:** open
+**Status:** resolved 2026-10-10. ADR-002 Stage 3 gives every concentration
+row in `cedar_programs` the unit of the student's primary major, and with I15's
+fix Headcount reads that unit rather than matching the concentration's name.
 **Found:** 2026-10-02, auditing SPA (PADM) program mappings after an MHA request
 **Severity:** low — single-digit students per term — but it misattributes
 students across departments, and the same mechanism applies to every concentration
@@ -1022,7 +1023,7 @@ shipping — "Public Policy" will not be the only one.
 
 ## I12 — Renamed and non-college names leave 48k program rows and 10k sections with no college
 
-**Status:** open
+**Status:** resolved 2026-10-10 by ADR-002 Stage 3b: every reported college comes from the mapping files, Banner's values translated through `colleges.csv` `source_names` (ED and "College of Education" → EH, "University Studies" → UC, "Undergrad Certificate Program" → AD). 10,423 Education sections now report EH, and Banner's original stays in `source_college`.
 **Found:** 2026-10-04, measuring unmapped codes of every kind for the Admin > Mappings page
 **Severity:** medium — any college-scoped count of Education before 2021 is short,
 and nothing says so
@@ -1162,7 +1163,12 @@ and the institution-files lookup uses it first.
 
 ## I15 — The Headcount tab scopes a department by program name, crediting it with other departments' students
 
-**Status:** open — confirmed 2026-10-07
+**Status:** resolved 2026-10-10. `filter_programs_to_dept()` (`R/branches/headcount.R`)
+keeps the rows whose own `dept_code` is the department, and the Headcount tab,
+Dept Trends and the Dept Dashboard all scope through it; the rollup to
+department totals uses the row's unit too. EC-16 (two departments' programs
+named "Engineering") is the cross-tab test, and fails with the name match
+restored. Both scope strips now say the same thing.
 **Found:** 2026-10-07, auditing where CEDAR counts the same thing twice
 **Severity:** medium — wrong department totals where program names collide; the
 counting itself agrees everywhere
@@ -1223,6 +1229,8 @@ uses too, and a cross-tab test. Do it with ADR-002 Stage 3: dropping the name
 match before then would move FLIB's students out of LAIS while they still carry a
 phantom department (FLIB → LAIS is already confirmed in `programs.csv`). The
 Headcount page's scope bar should then say how the department was decided.
+**Unblocked 2026-10-09:** Stage 3 shipped, so FLIB's students carry LAIS on
+their own rows and nothing still depends on the name match.
 
 ---
 
@@ -1269,6 +1277,48 @@ Roadblocks question, but then it needs its own label and definition; otherwise
 use `get_true_waitlisted_rows()` / `summarize_waitlist_demand()` per term. Either
 way, a fixture student waitlisted in 202080 and registered in 202110 for the
 same course pins the behaviour.
+
+---
+
+## I18 — cedar_degrees holds no associate degrees, so branch-campus completions read zero
+
+**Status:** open
+**Found:** 2026-10-10, checking whether branch pre-programs (ASPE, PBA, PRSC) award degrees
+**Severity:** medium for any completions view of the branch campuses — every
+associate degree and branch certificate is missing, and the count is zero, not
+blank. Main-campus degrees are unaffected.
+**Affects:** `cedar_degrees`, and anything reading it for branch programs:
+degree counts, Pathways' `graduated` outcome for branch students, and the
+evidence the mapping review uses ("no degrees awarded" is meaningless for a
+branch code).
+
+### What is wrong
+
+The degrees export CEDAR receives has no associate degrees at all: no row whose
+`degree` begins "Associate", and no program code ending in a branch campus
+(`-LA`, `-VA`, `-TA`, `-GA`) other than the Master of Landscape Architecture,
+whose codes happen to end `-LA`. Branch associate programs appear in Academic
+Studies (AS Pre-Engineering at Los Alamos and Valencia, AA Pre-Business
+Administration, AS General Science...) but never graduate.
+
+This nearly misled a mapping decision: five branch "Pre-" programs looked like
+pre-majors partly because none had awarded a degree. They had no chance to.
+
+### Reproduce
+
+```r
+source("scripts/cedar-repl.R")
+sum(grepl("^Associate", cedar_degrees$degree))                       # 0
+cedar_degrees |> dplyr::filter(grepl("-(LA|VA|TA|GA)$", program_code)) |>
+  dplyr::count(degree)                                                 # Master of Landscape Architect only
+```
+
+### What a fix requires
+
+Find out whether the degrees report is scoped to the main campus by design.
+If so, request the branch campuses' awards and add them; if not, find where
+they are dropped. Until then, say on any degree count that it excludes the
+branch campuses.
 
 ---
 
@@ -1327,6 +1377,31 @@ setting).
 institutional tour has passed on a host where the VM is not near its memory
 limit, and dependency changes are validated in both the native library and the
 Docker image.
+
+**M25 — The mapping validator accepts any program as a `leads_to`.**
+*Status: resolved 2026-10-09.* `leads_to` was seeded from `premaj_canon`, which
+mixes department and program codes, so where a department code is also a
+program code it named the wrong degree: `FFCS` → `FCS`, pre-Computer Science.
+Ten more named a general program or a successor (`FEE` → `ECE`, `FIDA` →
+`FDMA`, `FMAR` → `FDMA`, …); all now name the pre-major's own degree, and
+`FING`, whose degree has no code, has none. `.validate_program_rows()` now
+refuses a confirmed pre-major in a different unit from its target (tested in
+`test-catalogs.R`). A same-unit wrong target, as `FEE`'s was, still needs a
+reviewer: check the target's name.
+
+**M26 — The mapping gate rebuilds cedar_programs only.** *Status: resolved
+2026-10-10.* The transform stamps programs, degrees, sections and class lists
+with their mapping provenance, and the gate rebuilds whichever are stale
+(`cedar_stale_mapped_tables()`), stopping if an export it needs is missing or a
+rebuilt table is still stale. Since ADR-002 Stage 3
+`subjects.csv` decides every course's unit, but
+`scripts/rebuild-programs-if-mappings-changed.R` rebuilds only
+`cedar_programs` (and the lookups) when the mapping files change. A subject
+decision reaches `cedar_sections` and `cedar_students` only at the next refresh
+that transforms them, and until then the course tables carry the units of the
+previous files while the stamp says nothing about them. *Done when:* the gate
+rebuilds the course tables too when `subjects.csv`, `units.csv` or
+`colleges.csv` changed, or stamps them so the drift is reported.
 
 ### Architecture rules (`AGENTS.md`)
 

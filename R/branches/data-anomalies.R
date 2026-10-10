@@ -72,13 +72,14 @@ detect_pre_major_self_mapping <- function(programs, known_departments = NULL) {
         "Pre-major '", program_name, "' resolves to a department named after ",
         "itself (", rows, " program rows). A pre-major leads to a program and ",
         "is not a department, so this is the dept_code identity fallback, not a ",
-        "real mapping. Map it in R/lists/program_code_maps.R.",
+        "real mapping. Give it a confirmed row in institution/<id>/programs.csv ",
+        "and rebuild the tables.",
         dplyr::if_else(
           is_real_department,
           paste0(" NOTE: '", major_code, "' is ALSO a real department code, so ",
                  "this is a namespace collision rather than a missing mapping. ",
-                 "It cannot be fixed by mapping the code alone -- it needs a ",
-                 "major_college_to_dept entry keyed on the college."),
+                 "Check that its programs.csv row names the unit it leads to, ",
+                 "with an in_college row if the answer differs by college."),
           ""
         )
       )
@@ -102,13 +103,13 @@ detect_pre_major_self_mapping <- function(programs, known_departments = NULL) {
 #' @param programs cedar_programs.
 #' @param known_departments Character vector of real department codes, normally
 #'   `subj_dept_map$dept_code`.
-#' @param department_less Major codes that legitimately have no department, so
-#'   the screen does not report them forever. Defaults to the curated list in
-#'   `R/lists/program_code_maps.R`.
+#' @param department_less Major codes that legitimately have no department.
+#'   Since ADR-002 Stage 3 those are `basis = no_unit` rows in programs.csv and
+#'   carry no dept_code, so none reaches this screen; the parameter stays for
+#'   tables built before then.
 #' @return Rows in the cedar_mapping_issues shape.
 detect_identity_fallback_departments <- function(
-    programs, known_departments,
-    department_less = get0("department_less_major_codes", ifnotfound = character(0))) {
+    programs, known_departments, department_less = character(0)) {
   required <- c("major_code", "dept_code", "is_pre_major", "program_name")
   missing <- setdiff(required, names(programs))
   if (length(missing) > 0) {
@@ -140,8 +141,8 @@ detect_identity_fallback_departments <- function(
         "'", program_name, "' has no department mapping (", rows,
         " program rows), so dept_code fell back to the major code itself. ",
         "That names a department which does not exist, and every dept-scoped ",
-        "report silently excludes these students from their real unit. Map it ",
-        "in R/lists/program_code_maps.R and regenerate program_map.qs."
+        "report silently excludes these students from their real unit. Give it ",
+        "a confirmed row in institution/<id>/programs.csv and rebuild the tables."
       )
     )
 }

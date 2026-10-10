@@ -99,7 +99,7 @@ MUSC,FA,,MUS,,confirmed,,
 MUSE,FA,,MUS,,confirmed,,
 APMS,FA,,MUS,,confirmed,,
 DANC,FA,,DANC,,confirmed,,
-ALBS,FA,,ALBS,,confirmed,,
+ALBS,FA,,FACW,,confirmed,,"Arts Leadership & Business, ALB before Summer 2020; a Fine Arts college-wide program, no department. Decided 2026-10-09."
 THEA,FA,,THEA,,confirmed,,
 NURS,NU,,NURS,,confirmed,,
 NMNC,NU,,NURS,,confirmed,,
@@ -159,7 +159,7 @@ GLNS,,,GLNS,UC,confirmed,,Undergraduate GLNS courses are University College's; o
 OILS,LL,,OILS,,confirmed,,
 IADL,LL,,IADL,,confirmed,,
 APTE,AD,,APTE,,confirmed,,
-ARTS,AD,,ARTS,,confirmed,,
+ARTS,AD,,ARTS,AD,confirmed,,"Branch-campus sections count under the branch college, AD, as Banner has them; the unit stays ARTS. Decided 2026-10-10."
 ASPE,AD,,ASPE,,confirmed,,
 AUTT,AD,,AUTT,,confirmed,,
 BSTC,AD,,BSTC,,confirmed,,
@@ -174,14 +174,14 @@ COSM,AD,,COSM,,confirmed,,
 DDM,AD,,DDM,,confirmed,,
 DMA,AD,,DMA,,confirmed,,
 DRFT,AD,,DRFT,,confirmed,,
-ECED,AD,,ECED,,confirmed,,
-EDUC,AD,,EDUC,,confirmed,,
+ECED,AD,,ECED,AD,confirmed,,"Branch-campus sections count under the branch college, AD, as Banner has them; the unit stays ECED. Decided 2026-10-10."
+EDUC,AD,,EDUC,AD,confirmed,,"Branch-campus sections count under the branch college, AD, as Banner has them; the unit stays EDUC. Decided 2026-10-10."
 ELCT,AD,,ELCT,,confirmed,,
 ELTR,AD,,ELTR,,confirmed,,
-EMS,AD,,EMS,,confirmed,,
+EMS,AD,,EMS,AD,confirmed,,"Branch-campus sections count under the branch college, AD, as Banner has them; the unit stays EMS. Decided 2026-10-10."
 ENPD,AD,,ENPD,,confirmed,,
 ENVS,AD,,ENVS,,confirmed,,
-FDMA,AD,,FDMA,,confirmed,,
+FDMA,AD,,FDMA,AD,confirmed,,"Branch-campus sections count under the branch college, AD, as Banner has them; the unit stays FDMA. Decided 2026-10-10."
 FISC,AD,,FISC,,confirmed,,
 FORS,AD,,FORS,,confirmed,,
 GAME,AD,,GAME,,confirmed,,
@@ -230,10 +230,10 @@ AFAS,PA,,AFAS,,confirmed,,
 MLSL,PA,,MLSL,,confirmed,,
 NVSC,PA,,NVSC,,confirmed,,
 PADM,PA,,PADM,,confirmed,,
-ALB,FA,,,,proposed,"289 class-list rows, taught under college FA; source department ""*Interdisciplinary: Fine Arts"" on 100% of rows; a bucket department, which names no single unit; no evidence settles the unit",
+ALB,FA,,FACW,,confirmed,"289 class-list rows, taught under college FA; source department ""*Interdisciplinary: Fine Arts"" on 100% of rows; a bucket department, which names no single unit; no evidence settles the unit","Arts Leadership & Business before it became ALBS (Summer 2020; same courses, ALB 450 is ALBS 450). Decided 2026-10-09."
 ARSC,AS,,ASCW,,confirmed,"3679 class-list rows, taught under college AS; source department ""*Interdisciplinary: A.S."" on 100% of rows; a bucket department, which names no single unit; no evidence settles the unit",Arts & Sciences college-wide courses; no department owns them. Decided 2026-10-04.
 ASCP,AS,,,,proposed,"1150 class-list rows, taught under college AS; source department ""*Interdisciplinary: A.S."" on 100% of rows; a bucket department, which names no single unit; no evidence settles the unit",
-FA,FA,,,,proposed,"1598 class-list rows, taught under college FA; source department ""*Interdisciplinary: Fine Arts"" on 100% of rows; a bucket department, which names no single unit; no evidence settles the unit",
+FA,FA,,FACW,,confirmed,"1598 class-list rows, taught under college FA; source department ""*Interdisciplinary: Fine Arts"" on 100% of rows; a bucket department, which names no single unit; no evidence settles the unit",Fine Arts college-wide courses; no department owns them. Decided 2026-10-09.
 GEX,GP,,,,proposed,"18 class-list rows, taught under college GP; no evidence settles the unit",
 HHHA,AD,,,,proposed,"1865 class-list rows, taught under college AD; source department ""Provost Branch Campuses"" on 100% of rows; a bucket department, which names no single unit; no evidence settles the unit",
 MA,FA,,FDMA,,confirmed,"53 class-list rows, taught under college FA; source department ""Film and Digital Arts"" on 100% of rows",Confirmed 2026-10-04: accepted the suggestion from Banner's own department.
@@ -251,3 +251,13 @@ PHLB,AD,,,,proposed,"73 class-list rows, taught under college AD; source departm
 POPH,PO,,HSCI,,confirmed,"873 class-list rows, taught under college PO; source department ""College of Population Health"" on 100% of rows",Confirmed 2026-10-04: accepted the suggestion from Banner's own department.
 RADT,ME,,RADS,,confirmed,"6 class-list rows, taught under college ME; source department ""Radiology"" on 100% of rows",Confirmed 2026-10-04: accepted the suggestion from Banner's own department.
 SHIN,AD,,,,proposed,"57 class-list rows, taught under college AD; source department ""Provost Branch Campuses"" on 100% of rows; a bucket department, which names no single unit; no evidence settles the unit",
+ECED,EH,,ECED,,confirmed,,"Stage 3: carries the unit these sections had at Stage 0. 409 sections taught under college EH since Summer 2021, and under ED before (ED translates to EH), on every campus. Added 2026-10-09."
+NATV,UC,,NATV,,confirmed,,"Stage 3: carries the unit these sections had at Stage 0. 139 sections taught under University College, 2018-2019, before Native American Studies moved to Arts & Sciences. Added 2026-10-09."
+WR,GP,,WR,,confirmed,,Stage 3: carries the unit these sections had at Stage 0. 17 graduate sections taught under college GP from Fall 2026. Added 2026-10-09.
+BIOC,AS,,BIOC,,confirmed,,"Stage 3: carries the unit these sections had at Stage 0. 6 sections taught under college AS, 2024-2026. Added 2026-10-09."
+ARTH,AS,,ARTH,,confirmed,,"Stage 3: carries the unit these sections had at Stage 0. 4 sections taught under college AS, 2019-2023. Added 2026-10-09."
+ARTS,AS,,ARTS,,confirmed,,"Stage 3: carries the unit these sections had at Stage 0. 3 sections taught under college AS, 2018-2020. Added 2026-10-09."
+ECE,AS,,ECE,,confirmed,,"Stage 3: carries the unit these sections had at Stage 0. 3 graduate sections taught under college AS, 2025-2026. Added 2026-10-09."
+ARCH,AD,,ARCH,AD,confirmed,,"Stage 3: carries the unit these sections had at Stage 0. 3 sections taught at Taos under college AD, 2025-2026 (ARCH 1130). Added 2026-10-09. Branch-campus sections count under the branch college, AD, as Banner has them; the unit stays ARCH. Decided 2026-10-10."
+BIOL,AD,,BIOL,AD,confirmed,,"Stage 3: carries the unit these sections had at Stage 0. 2 sections taught at Valencia under college AD, 2025-2026. Added 2026-10-09. Branch-campus sections count under the branch college, AD, as Banner has them; the unit stays BIOL. Decided 2026-10-10."
+MGMT,AD,,MGMT,AD,confirmed,,"Stage 3: carries the unit these sections had at Stage 0. 2 sections taught at Valencia under college AD, 2018-2019. Added 2026-10-09. Branch-campus sections count under the branch college, AD, as Banner has them; the unit stays MGMT. Decided 2026-10-10."

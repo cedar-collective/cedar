@@ -137,206 +137,82 @@ to_snake <- function(x) {
 }
 
 
-# ── generate_program_map ──────────────────────────────────────────────────────
-
-#' Build program_map from academic_studies
-#'
-#' Parses Banner program codes from raw academic_studies data and resolves each
-#' to college_code, dept_code, degree_level, program_type, and canonical_code.
-#' Called by transform_to_cedar() when program_map.qs is absent.
-#'
-#' @param as_file       Path to academic_studies file (qs or Rds)
-#' @param ext           File extension: ".qs" or ".Rds"
-#' @param subj_dept_map Data frame from subj_dept_map.R
-#' @param premaj_canon  Named character vector from program_code_maps.R
-#' @param xvar_explicit Named character vector from program_code_maps.R
-#' @param extra_p2d     Named character vector from program_code_maps.R
-#' @param known_suffixes Character vector of valid college suffixes
-#' @param real_F_progs  Character vector of F-prefix codes that are not pre-majors
-#' @param get_lev       Function that maps degree description → degree level string
-#' @return A tibble with columns: program_code, college_code, dept_code, major_code,
-#'         degree_abbr, degree_level, program_type, canonical_code
-generate_program_map <- function(as_file, ext, subj_dept_map,
-                                 premaj_canon, xvar_explicit, extra_p2d,
-                                 known_suffixes, real_F_progs, get_lev,
-                                 ad_major_to_dept = NULL,
-                                 allowed_unmapped_program_codes = character()) {
-  ap <- if (ext == ".qs") qs2::qs_read(as_file) else readRDS(as_file)
-
-  uc  <- subj_dept_map
-  p2d <- setNames(uc$dept_code, uc$subject_code)
-  .col_lu    <- dplyr::distinct(uc, college_code, college_name)
-  cname2code <- setNames(.col_lu$college_code, .col_lu$college_name)
-  d2c        <- { u <- uc[!duplicated(uc$dept_code), ]; setNames(u$college_code, u$dept_code) }
-
-  for (nm in names(extra_p2d))   if (is.na(p2d[nm])) p2d[nm] <- extra_p2d[nm]
-  for (d  in unique(uc$dept_code)) if (is.na(p2d[d]))  p2d[d]  <- d
-  for (nm in names(premaj_canon)) {
-    can <- premaj_canon[nm]
-    if (is.na(p2d[nm]) && !is.na(p2d[can])) p2d[nm] <- p2d[can]
+# The ADR-002 mapping files (read_institution_mappings()) that decide every
+# unit. Required: a transform that cannot read them stops, rather than naming
+# departments after codes as the old lookup chain did (ISSUES.md I7).
+.require_mapping_files <- function(maps, caller, tables) {
+  files <- maps$mapping_files
+  missing <- tables[vapply(tables, function(t) is.null(files[[t]]), logical(1))]
+  if (length(missing)) {
+    stop("[", caller, "] maps$mapping_files must carry ", paste(missing, collapse = ", "),
+         ": the institution mapping files decide every unit (ADR-002 Stage 3).")
   }
-
-  progs        <- unique(ap[, c("Program Code", "Program", "Degree", "Actual College")])
-  names(progs) <- c("full", "name", "deg", "col_text")
-  parts        <- strsplit(progs$full, "-")
-  progs$d_abbr <- sapply(parts, `[`, 1)
-  progs$p_mid  <- sapply(parts, `[`, 2)
-  progs$c_suff <- sapply(parts, function(x) if (length(x) >= 3) x[3] else NA_character_)
-  # A program whose college suffix is not recognised is dropped here -- BEFORE
-  # the unmapped check below, so it never reaches that warning either. It simply
-  # has no map row, no lookup can find it, and its students land in the dept_code
-  # identity fallback. That is how BA-FLAI-US, BA-FLIB-US and BSCNE-FCOE-E
-  # disappeared: the suffixes "US" and "E" are absent from known_suffixes, and
-  # nothing said so. Silently discarding a program is never acceptable; add the
-  # suffix to known_suffixes in R/lists/program_code_maps.R if it is real.
-  unknown_suffix <- !is.na(progs$c_suff) & !progs$c_suff %in% known_suffixes
-  if (any(unknown_suffix)) {
-    dropped <- unique(progs$full[unknown_suffix])
-    warning(
-      "[generate_program_map] ", length(dropped), " program(s) dropped: college ",
-      "suffix not in known_suffixes (",
-      paste(sort(unique(progs$c_suff[unknown_suffix])), collapse = ", "),
-      "). Their students fall through to the dept_code identity fallback.\n  ",
-      paste(sort(dropped), collapse = "\n  "),
-      call. = FALSE, immediate. = TRUE
-    )
-  }
-  dropped_programs <- if (any(unknown_suffix)) {
-    unique(data.frame(
-      program_code = progs$full[unknown_suffix],
-      major_code   = progs$p_mid[unknown_suffix],
-      college_code = progs$c_suff[unknown_suffix],
-      program_name = progs$name[unknown_suffix],
-      stringsAsFactors = FALSE
-    ))
-  } else NULL
-  progs        <- progs[is.na(progs$c_suff) | progs$c_suff %in% known_suffixes, ]
-  progs        <- progs[!is.na(progs$p_mid) & progs$deg != "Non-Degree Program", ]
-
-  progs$prog_type <- ifelse(
-    grepl("^X", progs$p_mid), "variant",
-    ifelse(
-      progs$p_mid %in% names(premaj_canon) |
-        (grepl("Pre", progs$name, fixed = TRUE) & !(progs$p_mid %in% real_F_progs)),
-      "pre_major", "degree"
-    )
-  )
-
-  progs$canonical <- NA_character_
-  pm_idx <- progs$prog_type == "pre_major" & progs$p_mid %in% names(premaj_canon)
-  progs$canonical[pm_idx] <- premaj_canon[progs$p_mid[pm_idx]]
-  v_idx  <- progs$prog_type == "variant"
-  progs$canonical[v_idx]  <- ifelse(
-    !is.na(xvar_explicit[progs$p_mid[v_idx]]),
-    xvar_explicit[progs$p_mid[v_idx]],
-    sub("^X", "", progs$p_mid[v_idx])
-  )
-
-  lookup_dept <- function(code) {
-    if (is.na(code)) return(NA_character_)
-    d <- p2d[code]
-    if (!is.na(d)) return(d)
-    if (code %in% unique(uc$dept_code)) return(code)
-    NA_character_
-  }
-  progs$dept     <- sapply(progs$p_mid, lookup_dept)
-
-  # A pre-major belongs to the department of the program it LEADS TO, so its
-  # canonical target wins over a direct lookup on its own code. Those can be
-  # different departments entirely: FCS is Banner's pre-Computer-Science code AND
-  # the department code for Family and Child Studies, so the direct lookup filed
-  # 6,121 pre-CS students in Family and Child Studies -- a real department, which
-  # is why nothing looked wrong. FCS is the only code where the two disagree
-  # today; the rule is written generally because the next collision will not
-  # announce itself either.
-  prefer_canonical <- progs$prog_type == "pre_major" & !is.na(progs$canonical)
-  if (any(prefer_canonical)) {
-    canonical_dept <- sapply(progs$canonical[prefer_canonical], lookup_dept)
-    resolved <- !is.na(canonical_dept)
-    progs$dept[which(prefer_canonical)[resolved]] <- canonical_dept[resolved]
-  }
-
-  need_can       <- is.na(progs$dept) & !is.na(progs$canonical)
-  progs$dept[need_can] <- sapply(progs$canonical[need_can], lookup_dept)
-  progs$col      <- d2c[progs$dept]
-  fb             <- is.na(progs$col)
-  progs$col[fb]  <- cname2code[progs$col_text[fb]]
-
-  # Branch campus programs (GA/LA/TA/VA suffix) always belong to the AD college.
-  # The dept→college lookup above assigns them to their main-campus equivalent college
-  # (e.g. CRIM → SOCI → AS, MATH → AS, CS → EN). Force college_code = "AD".
-  # For programs where the main-campus dept is also wrong (CRIM should map to CJUS
-  # not SOCI at branch campus), apply explicit overrides from ad_major_to_dept.
-  # Institution configuration: R/lists/campuses.R.
-  branch_campus_suffixes <- if (exists("CEDAR_BRANCH_CAMPUS_SUFFIXES")) {
-    CEDAR_BRANCH_CAMPUS_SUFFIXES
-  } else {
-    stop("[generate_program_map] CEDAR_BRANCH_CAMPUS_SUFFIXES is not loaded.",
-         call. = FALSE)
-  }
-  branch_mask <- !is.na(progs$c_suff) & progs$c_suff %in% branch_campus_suffixes
-  if (any(branch_mask) && !is.null(ad_major_to_dept) && length(ad_major_to_dept) > 0) {
-    override_depts <- ad_major_to_dept[progs$p_mid[branch_mask]]
-    has_override   <- !is.na(override_depts)
-    progs$dept[branch_mask][has_override] <- override_depts[has_override]
-  }
-  progs$col[branch_mask] <- CEDAR_BRANCH_COLLEGE_CODE
-
-  progs$lev <- mapply(get_lev, progs$deg, progs$d_abbr)
-  progs$lev[progs$d_abbr == "PMS"]                     <- "Graduate"
-  progs$lev[grepl("ME in Mfg|ME in Manuf", progs$deg)] <- "Graduate"
-
-  unmapped <- progs[is.na(progs$dept), ]
-  if (nrow(unmapped) > 0) {
-    unexpected <- unmapped[!(unmapped$full %in% allowed_unmapped_program_codes), ]
-    if (nrow(unexpected) > 0) {
-      # as.data.frame() matters: `unexpected` is a tibble when academic_studies
-      # is read from .qs, and print.tbl_df rejects row.names, so the message that
-      # exists to name the unmapped codes errored instead of listing them.
-      display <- utils::capture.output(print(
-        as.data.frame(
-          unexpected[, c("full", "name", "deg", "col_text", "p_mid", "c_suff")]
-        ),
-        row.names = FALSE, max = 2000
-      ))
-      # Recorded, not fatal. A handful of unmapped programs is usually minor and
-      # must not stop a data refresh the whole app depends on -- but "not fatal"
-      # is not "not visible": these rows carry no department, so every
-      # dept-scoped report silently drops their students, and Admin >
-      # Data & Usage > Mappings is where that has to be seen. Occasionally it is
-      # not minor at all: Radiologic Sciences hid 194 of 229 students this way
-      # (ISSUES.md I7).
-      warning(
-        "[generate_program_map] ", nrow(unexpected), " unmapped program code(s) ",
-        "retained without a department. They are surfaced in Admin > Data & ",
-        "Usage > Mappings. Map them in R/lists/program_code_maps.R, or add a ",
-        "reviewed exception to allowed_unmapped_program_codes.\n",
-        paste(display, collapse = "\n"),
-        call. = FALSE, immediate. = TRUE
-      )
-    }
-    message("  Unmapped program codes retained without dept_code: ", nrow(unmapped),
-            " (", nrow(unmapped) - nrow(unexpected), " reviewed, ",
-            nrow(unexpected), " new)")
-  }
-
-  # Carried on the map so the app can surface them. A warning in a transform log
-  # is not visible to anyone reading a department number six months later.
-  result <- progs %>%
-    dplyr::transmute(
-      program_code   = full,
-      college_code   = col,
-      dept_code      = dept,
-      major_code     = p_mid,
-      degree_abbr    = d_abbr,
-      degree_level   = lev,
-      program_type   = prog_type,
-      canonical_code = canonical
-    )
-  attr(result, "dropped_programs") <- dropped_programs
-  result
+  files
 }
 
+# A course's reported college (ADR-002 Stage 3b): its subject row's
+# college_code, else its unit's home college. A subject with no confirmed row
+# reports Banner's section college instead, translated through colleges.csv
+# (ED -> EH) and labelled college_basis = "banner" until the subject is decided
+# (decided 2026-10-10: nothing drops out of college totals meanwhile).
+.course_colleges <- function(course_units, source_college, files) {
+  banner <- translate_source_college(source_college, files)
+  undecided <- is.na(course_units$unit_code)
+  tibble::tibble(
+    college = dplyr::if_else(undecided, banner, course_units$college_code),
+    college_basis = dplyr::case_when(
+      !undecided & !is.na(course_units$college_code) ~ "mapped",
+      undecided & !is.na(banner)                      ~ "banner",
+      TRUE                                            ~ NA_character_))
+}
+
+# Colleges on cedar_programs (ADR-002 Stage 3b; decided 2026-10-10).
+#
+# - program_college: each row's own program's college -- program -> unit ->
+#   college through the files; a concentration takes its primary major's.
+# - college_code / student_college: the STUDENT's college that term, the
+#   program_college of their primary major, on every one of their rows, so
+#   "students in a college" and a college filter mean what they always have.
+# - When the primary major's code is not yet decided in programs.csv, or the
+#   student has no primary major that term, the student's college is Banner's
+#   (Translated College, else Actual College), translated through colleges.csv
+#   and labelled college_basis = "banner". A decided code that names no college
+#   (Non-Degree) has none.
+# - Banner's values stay beside them: source_college (Translated College) and
+#   source_college_code (Actual College).
+add_program_colleges <- function(programs, files) {
+  needed <- c("student_id", "term", "program_type", "major_code", "student_college", "college_code")
+  missing <- setdiff(needed, names(programs))
+  if (length(missing)) {
+    stop("[add_program_colleges] programs lacks ", paste(missing, collapse = ", "), call. = FALSE)
+  }
+  programs <- programs %>%
+    dplyr::rename(source_college = student_college, source_college_code = college_code) %>%
+    dplyr::mutate(
+      program_college = resolve_program_colleges(major_code, dplyr::coalesce(source_college_code, ""), files),
+      .decided = !is.na(.confirmed_program_rows(major_code, dplyr::coalesce(source_college_code, ""),
+                                                files$programs, no_unit = TRUE)),
+      .banner = dplyr::coalesce(translate_source_college(source_college, files),
+                                translate_source_college(source_college_code, files)))
+  primary <- programs %>%
+    dplyr::filter(program_type == "Major") %>%
+    dplyr::arrange(student_id, term, major_code) %>%
+    dplyr::distinct(student_id, term, .keep_all = TRUE) %>%
+    dplyr::select(student_id, term, .primary_college = program_college, .primary_decided = .decided)
+  programs %>%
+    dplyr::left_join(primary, by = c("student_id", "term")) %>%
+    dplyr::mutate(
+      program_college = dplyr::if_else(grepl("Concentration", program_type),
+                                       .primary_college, program_college),
+      .primary_decided = dplyr::coalesce(.primary_decided, FALSE),
+      college_code = dplyr::if_else(.primary_decided, .primary_college, .banner),
+      college_basis = dplyr::case_when(
+        .primary_decided & !is.na(.primary_college) ~ "mapped",
+        !.primary_decided & !is.na(.banner)         ~ "banner",
+        TRUE                                        ~ NA_character_),
+      student_college = college_names(college_code, files)) %>%
+    dplyr::select(-".decided", -".banner", -".primary_college", -".primary_decided")
+}
 
 # ── 1. transform_sections: DESRs → cedar_sections ────────────────────────────
 
@@ -352,8 +228,8 @@ transform_sections <- function(desrs, data_dir, ext, maps) {
   message("  Loaded ", nrow(desrs), " rows, ", ncol(desrs), " columns")
   message("  Input columns: ", paste(names(desrs), collapse = ", "))
 
-  subj_to_dept <- maps$subj_to_dept
-  gen_ed       <- maps$gen_ed
+  files  <- .require_mapping_files(maps, "transform_sections", c("subjects", "units", "colleges"))
+  gen_ed <- maps$gen_ed
 
   # ── Pre-processing: derive helper columns ────────────────────────────────
   message("  Pre-processing: deriving helper columns...")
@@ -387,19 +263,20 @@ transform_sections <- function(desrs, data_dir, ext, maps) {
     message("  ⚠️  gen_ed vectors not found — gen_ed_area will be NA")
   }
 
-  if (length(subj_to_dept) > 0) {
-    desrs <- desrs %>% mutate(DEPT = dplyr::coalesce(subj_to_dept[SUBJ], SUBJ))
-    unmapped_as_subj <- desrs %>%
-      filter(COLLEGE == "AS", DEPT == SUBJ, !SUBJ %in% names(subj_to_dept)) %>%
-      distinct(SUBJ) %>% pull(SUBJ)
-    if (length(unmapped_as_subj) > 0)
-      message("  ⚠️  AS subject codes not in subj_to_dept (using SUBJ as dept): ",
-              paste(unmapped_as_subj, collapse = ", "),
-              "\n      Add to subj_to_dept in R/lists/mappings.R if dept aggregation is needed")
-  } else {
-    desrs <- desrs %>% mutate(DEPT = SUBJ)
-    message("  ⚠️  subj_to_dept not found — using SUBJ as DEPT for all rows")
-  }
+  # Unit from subjects.csv (ADR-002): the most specific confirmed row for the
+  # subject, the section's college and the course level. A subject with no
+  # confirmed row has no unit -- never a department named after itself. The
+  # end-of-transform mapping audit and Admin > Mappings list each one.
+  course_units <- resolve_course_units(desrs$SUBJ, desrs$COLLEGE, desrs$level, files)
+  desrs$DEPT <- course_units$unit_code
+  course_colleges <- .course_colleges(course_units, desrs$COLLEGE, files)
+  desrs$COLLEGE_REPORTED <- course_colleges$college
+  desrs$COLLEGE_BASIS    <- course_colleges$college_basis
+  rm(course_units, course_colleges)
+  no_unit <- sort(unique(desrs$SUBJ[is.na(desrs$DEPT)]))
+  if (length(no_unit) > 0)
+    message("  ⚠️  ", length(no_unit), " subject code(s) have no confirmed subjects.csv row, so no unit: ",
+            paste(no_unit, collapse = ", "))
 
   # ── HR merge (job_cat / title enrichment) ────────────────────────────────
   hr_file <- file.path(data_dir, paste0("hr_data", ext))
@@ -447,7 +324,10 @@ transform_sections <- function(desrs, data_dir, ext, maps) {
       course_title     = SECT_TITLE,
       part_term    = if ("PT" %in% names(.)) PT else NA_character_,
       campus       = CAMP,
-      college      = COLLEGE,
+      # The mapped college (Stage 3b); Banner's own value stays beside it.
+      college        = COLLEGE_REPORTED,
+      source_college = COLLEGE,
+      college_basis  = COLLEGE_BASIS,
       department   = DEPT,
       instructor_id   = as.character(PRIM_INST_ID),
       instructor_name = INST_NAME,
@@ -628,6 +508,9 @@ transform_sections <- function(desrs, data_dir, ext, maps) {
   message("  ✅ Created cedar_sections: ", nrow(cedar_sections), " rows, ", ncol(cedar_sections), " columns")
   message("  Output columns: ", paste(names(cedar_sections), collapse = ", "))
 
+  # Units come from the mapping files: stamp which files, so the rebuild gate
+  # can tell when they move (ISSUES.md M26), as for cedar_programs.
+  attr(cedar_sections, "cedar_mapping_provenance") <- cedar_mapping_provenance()
   saved_meta <- save_cedar_file(cedar_sections, "sections", data_dir, ext)
 
   # Slim to only the columns build_lookups needs (subject_lookup).
@@ -655,7 +538,6 @@ transform_students <- function(class_lists, data_dir, ext, maps) {
   message("  Loaded ", nrow(class_lists), " rows, ", ncol(class_lists), " columns")
   message("  Input columns: ", paste(names(class_lists), collapse = ", "))
 
-  subj_to_dept            <- maps$subj_to_dept
   major_name_to_major_code <- maps$major_name_to_major_code
 
   # ── Pre-processing ────────────────────────────────────────────────────────
@@ -710,12 +592,20 @@ transform_students <- function(class_lists, data_dir, ext, maps) {
   }
 
   if ("Subject Code" %in% names(class_lists)) {
-    if (length(subj_to_dept) > 0) {
-      class_lists <- class_lists %>%
-        mutate(DEPT = dplyr::coalesce(subj_to_dept[`Subject Code`], `Subject Code`))
-    } else {
-      class_lists$DEPT <- class_lists$`Subject Code`
-    }
+    # Unit from subjects.csv, as for sections (ADR-002): no confirmed row, no
+    # unit -- never a department named after the subject.
+    # The course level is derived once here, and reused for the level column
+    # below: one classifier, called once per course table (ISSUES.md I5).
+    files <- .require_mapping_files(maps, "transform_students", c("subjects", "units", "colleges"))
+    class_lists$COURSE_LEVEL <- course_level_from_number(class_lists$SUBJ_CRSE)
+    course_units <- resolve_course_units(
+      class_lists$`Subject Code`, class_lists$`Course College Code`,
+      class_lists$COURSE_LEVEL, files)
+    class_lists$DEPT <- course_units$unit_code
+    course_colleges <- .course_colleges(course_units, class_lists$`Course College Code`, files)
+    class_lists$COURSE_COLLEGE <- course_colleges$college
+    class_lists$COLLEGE_BASIS  <- course_colleges$college_basis
+    rm(course_units, course_colleges)
   }
 
   # Drop Subject Code and Course Number (now encoded in SUBJ_CRSE); keep transmute inputs.
@@ -724,7 +614,8 @@ transform_students <- function(class_lists, data_dir, ext, maps) {
       "Academic Period Code", "Course Reference Number", "Student ID",
       "SUBJ_CRSE", "Short Course Title",
       "Primary Instructor ID", "Primary Instructor Last Name", "Primary Instructor First Name",
-      "Course Campus Code", "Course College Code", "DEPT",
+      "Course Campus Code", "Course College Code", "DEPT", "COURSE_LEVEL",
+      "COURSE_COLLEGE", "COLLEGE_BASIS",
       "Registration Status", "Registration Status Code", "Registration Status Date",
       "Final Grade", "Course Credits", "Total Credits",
       "Student Level Code", "Student Classification", "Major Code", "Major",
@@ -745,7 +636,7 @@ transform_students <- function(class_lists, data_dir, ext, maps) {
       subject_course = SUBJ_CRSE,
       subject_code   = sub(" .*", "", SUBJ_CRSE),
       course_title   = if ("Short Course Title" %in% names(.)) `Short Course Title` else NA_character_,
-      level = dplyr::coalesce(course_level_from_number(SUBJ_CRSE), "unknown"),
+      level = dplyr::coalesce(COURSE_LEVEL, "unknown"),
       instructor_id         = if ("Primary Instructor ID"         %in% names(.)) `Primary Instructor ID`         else NA_character_,
       instructor_last_name  = if ("Primary Instructor Last Name"  %in% names(.)) `Primary Instructor Last Name`  else NA_character_,
       instructor_first_name = if ("Primary Instructor First Name" %in% names(.)) `Primary Instructor First Name` else NA_character_,
@@ -755,7 +646,10 @@ transform_students <- function(class_lists, data_dir, ext, maps) {
         TRUE ~ NA_character_
       ),
       campus     = `Course Campus Code`,
-      college    = `Course College Code`,
+      # The mapped college (Stage 3b); Banner's own value stays beside it.
+      college        = COURSE_COLLEGE,
+      source_college = `Course College Code`,
+      college_basis  = COLLEGE_BASIS,
       department = if ("DEPT" %in% names(.)) DEPT else Department,
       registration_status      = `Registration Status`,
       registration_status_code = `Registration Status Code`,
@@ -857,6 +751,9 @@ transform_students <- function(class_lists, data_dir, ext, maps) {
   message("  Output columns: ", paste(names(cedar_students), collapse = ", "))
   rm(class_lists); gc(verbose = FALSE)
 
+  # Units come from the mapping files: stamp which files, so the rebuild gate
+  # can tell when they move (ISSUES.md M26), as for cedar_programs.
+  attr(cedar_students, "cedar_mapping_provenance") <- cedar_mapping_provenance()
   students_meta <- save_cedar_file(cedar_students, "students", data_dir, ext)
 
   # ── cedar_student_term_credits ────────────────────────────────────────────
@@ -962,13 +859,8 @@ transform_programs <- function(academic_studies, data_dir, ext, maps) {
   message("  Loaded ", nrow(academic_studies), " rows, ", ncol(academic_studies), " columns")
   message("  Input columns: ", paste(names(academic_studies), collapse = ", "))
 
-  major_college_to_dept    <- maps$major_college_to_dept
-  subj_to_dept             <- maps$subj_to_dept
-  major_to_dept            <- maps$major_to_dept
-  extra_p2d                <- maps$extra_p2d
+  files                    <- .require_mapping_files(maps, "transform_programs", c("programs", "units", "colleges"))
   major_name_to_major_code <- maps$major_name_to_major_code
-  college_name_to_code     <- maps$college_name_to_code
-  real_F_progs             <- maps$real_F_progs
 
   # ── Pre-processing: derive term ───────────────────────────────────────────
   message("  Pre-processing: deriving helper columns...")
@@ -1034,12 +926,9 @@ transform_programs <- function(academic_studies, data_dir, ext, maps) {
       student_level          = `Student Level`,
       student_campus         = `Student Campus`,
       student_college        = `Translated College`,
-      college_code           = {
-        if (length(college_name_to_code) == 0)
-          stop("[transform_programs] 'college_name_to_code' lookup is not loaded. ",
-               "Ensure mappings.R has been sourced before running transform-to-cedar.R.")
-        college_name_to_code[`Actual College`]
-      },
+      # Banner's Actual College as a code, through colleges.csv (its names and
+      # source_names), so a renamed college still resolves.
+      college_code           = translate_source_college(`Actual College`, files),
       student_population     = if ("Student Population"             %in% names(.)) `Student Population`             else NA_character_,
       # ── Cumulative credit hours — NOT a per-term series ────────────────────
       # Reported by Academic Studies as running totals AS OF THE PULL, stamped
@@ -1113,58 +1002,36 @@ transform_programs <- function(academic_studies, data_dir, ext, maps) {
       ))
     ) %>%
     dplyr::mutate(
-      # Dept code lookup — five-tier priority:
-      #   1. major_college_to_dept["major_code:college_code"] — disambiguates same code in multiple colleges
-      #   2. subj_to_dept[major_code] — handles language/subject codes used as major codes
-      #   3. major_to_dept[major_code] — catches grad programs whose Banner college_code differs
-      #      from the program_map-inferred college (e.g. SPLP grad students: college "GP" vs "AS")
-      #   4. extra_p2d[major_code] — the hand-maintained overrides, read directly. Tiers 1-3
-      #      only see codes that have a program_map row, and minors have no Banner program
-      #      code, so they never do: without this tier FPMD="PHRM" (184 Doctor of Pharmacy
-      #      students), FOAN, GIS and FILM were mapped in program_code_maps.R and silently
-      #      ignored, and no minor could be mapped at all.
-      #   5. major_code — last-resort identity mapping
-      dept_code = dplyr::coalesce(
-        major_college_to_dept[paste(major_code, college_code, sep = ":")],
-        subj_to_dept[major_code],
-        major_to_dept[major_code],
-        extra_p2d[major_code],
-        major_code
-      ),
-      # Nullify numeric dept_codes — Banner internal org IDs that leaked into major_code
-      dept_code = dplyr::if_else(grepl("^[0-9]+$", dept_code), NA_character_, dept_code),
-      # is_pre_major: two complementary signals:
-      #   1. "Pre " or "Pre-" prefix in program_name
-      #   2. F-prefix in major_code (Banner's pre-major convention), excluding known real programs
-      #
-      # Record WHICH signal fired, not just the verdict. The prefix is stripped
-      # from program_name a few lines below, so a row decided by the name rule
-      # carries no evidence of why it is flagged -- 13,646 rows, 11% of all
-      # pre-major flags, were unexplainable from the data before this column
-      # existed. That is also what made ISSUES.md I9 unanswerable without
-      # institutional memory: when the two signals disagree, nothing recorded
-      # which one had spoken.
+      # Unit from programs.csv (ADR-002): the confirmed row for (code, college)
+      # if there is one, else the code's every-college row. One tier. A code
+      # with no confirmed row -- including a Banner organisation ID leaked into
+      # the major code column -- has no unit, never a department named after
+      # itself (ISSUES.md I7). Concentrations are resolved below.
+      dept_code = resolve_program_units(major_code, college_code, files$programs),
+      # is_pre_major comes from programs.csv, stated per code (ADR-002 Stage 4),
+      # not inferred from an F prefix. Banner's own program records name every
+      # F and XF code the old rule exempted or missed "Pre-" (BS Pre-Exercise
+      # Science, BBA Pre-Business Admin), and the branch "Pre-" programs (AS
+      # Pre-Engineering) are associate degrees students are admitted to, so not
+      # pre-majors (reviewed 2026-10-10). A code with no programs.csv row falls
+      # back to Banner's own word, a "Pre-" program name, and says so in
+      # pre_major_basis.
+      .pre_in_file = program_pre_major_flags(major_code, files$programs),
       .pre_by_name = grepl("^Pre[- ]", program_name, ignore.case = TRUE),
-      .pre_by_code = grepl("^F[A-Z]", major_code) &
-        !major_code %in% maps$pre_major_exempt_codes,
-      .pre_by_phrd = major_code == "PHRD" & student_level %in% c("UG", "NG"),
-      is_pre_major = grepl("^Pre[- ]", program_name, ignore.case = TRUE) |
-        # Institution configuration, not platform code: R/lists/program_code_maps.R.
-        # NOTE it disagrees with real_F_progs, which answers the same question for
-        # generate_program_map() -- see ISSUES.md I9.
-        .pre_by_code |
-        # PHRD used for UG pre-pharmacy students before 202580 (switched to FPHS).
-        # Recorded in CEDAR_DATA_SEMANTICS as phrd-undergraduate-pre-pharmacy.
-        .pre_by_phrd,
-      # Why the flag is set, so a disagreement between the signals is visible in
-      # the data instead of requiring someone who remembers.
+      # PHRD was the code for undergraduate pre-pharmacy before 202580 (FPHS
+      # since): a row-level fact a per-code flag cannot state. Recorded in
+      # CEDAR_DATA_SEMANTICS as phrd-undergraduate-pre-pharmacy.
+      .pre_by_phrd = major_code %in% "PHRD" & student_level %in% c("UG", "NG"),
+      is_pre_major = dplyr::case_when(
+        .pre_by_phrd         ~ TRUE,
+        !is.na(.pre_in_file) ~ .pre_in_file,
+        TRUE                 ~ .pre_by_name),
+      # Why the flag is set, so it can be traced to its source.
       pre_major_basis = dplyr::case_when(
-        !is_pre_major                 ~ NA_character_,
-        .pre_by_name & .pre_by_code   ~ "name+code",
-        .pre_by_name                  ~ "name_prefix",
-        .pre_by_code                  ~ "code_convention",
-        .pre_by_phrd                  ~ "phrd_undergraduate",
-        TRUE                          ~ "unknown"
+        !is_pre_major        ~ NA_character_,
+        .pre_by_phrd         ~ "phrd_undergraduate",
+        !is.na(.pre_in_file) ~ "programs_csv",
+        TRUE                 ~ "name_prefix"
       ),
       # Strip "Pre-" prefix from program_name for clean display
       program_name = dplyr::if_else(
@@ -1175,13 +1042,33 @@ transform_programs <- function(academic_studies, data_dir, ext, maps) {
       # Normalize variant/historical Banner names to canonical display names.
       # Catches X-prefix variants and program renames that left a different text
       # string in the Major column even though the dept resolves correctly.
-      program_name = dplyr::coalesce(
+      # unname(): as for major_code above, the lookup's names would otherwise
+      # ride along on the whole column.
+      program_name = unname(dplyr::coalesce(
         program_name_aliases[program_name],
         program_name
-      )
+      ))
     ) %>%
     # Working columns; pre_major_basis carries what they decided.
-    dplyr::select(-dplyr::any_of(c(".pre_by_name", ".pre_by_code", ".pre_by_phrd")))
+    dplyr::select(-dplyr::any_of(c(".pre_in_file", ".pre_by_name", ".pre_by_phrd")))
+
+  # Concentrations take the unit of the student's primary major that term
+  # (ADR-002): a concentration sits under a major, and matching its name to a
+  # major's instead lent PADM Political Science students (ISSUES.md I11). A
+  # student-term with two primary-major rows takes the first by major code, so
+  # the choice does not depend on row order.
+  primary_unit <- cedar_programs %>%
+    dplyr::filter(program_type == "Major") %>%
+    dplyr::arrange(student_id, term, major_code) %>%
+    dplyr::distinct(student_id, term, .keep_all = TRUE) %>%
+    dplyr::select(student_id, term, .primary_unit = dept_code)
+  cedar_programs <- cedar_programs %>%
+    dplyr::left_join(primary_unit, by = c("student_id", "term")) %>%
+    dplyr::mutate(dept_code = dplyr::if_else(grepl("Concentration", program_type),
+                                             .primary_unit, dept_code)) %>%
+    dplyr::select(-".primary_unit")
+
+  cedar_programs <- add_program_colleges(cedar_programs, files)
 
   # Warn about Major/Second Major rows with no major_code
   still_no_code <- cedar_programs %>%
@@ -1245,11 +1132,7 @@ transform_degrees <- function(degrees, data_dir, ext, maps) {
   message("  Input columns: ", paste(names(degrees), collapse = ", "))
   message("  Transforming to CEDAR model...")
 
-  major_college_to_dept <- maps$major_college_to_dept
-  subj_to_dept          <- maps$subj_to_dept
-  major_to_dept         <- maps$major_to_dept
-  extra_p2d             <- maps$extra_p2d
-  college_name_to_code  <- maps$college_name_to_code
+  files                 <- .require_mapping_files(maps, "transform_degrees", c("programs", "units", "colleges"))
 
   required_cols <- c("Major", "Program Code", "Academic Period Code", "ID", "Degree", "Graduation Status")
   missing_cols  <- setdiff(required_cols, names(degrees))
@@ -1287,27 +1170,36 @@ transform_degrees <- function(degrees, data_dir, ext, maps) {
       as_of_date = as.Date(as_of_date)
     ) %>%
     dplyr::mutate(
-      # Dept code — the programs chain without its identity fallback; unknown codes get NA.
-      # extra_p2d is read directly for codes that have no program_map row.
-      .college_code = {
-        if (length(college_name_to_code) == 0)
-          stop("[transform_degrees] 'college_name_to_code' lookup is not loaded. ",
-               "Ensure mappings.R has been sourced before running transform-to-cedar.R.")
-        college_name_to_code[student_college]
-      },
-      dept_code = dplyr::coalesce(
-        major_college_to_dept[paste(major_code, .college_code, sep = ":")],
-        subj_to_dept[major_code],
-        major_to_dept[major_code],
-        extra_p2d[major_code]
-      ),
+      # Unit from programs.csv, as for cedar_programs (ADR-002): a code with
+      # no confirmed row has no unit.
+      .college_code = translate_source_college(student_college, files),
+      dept_code = resolve_program_units(major_code, unname(.college_code), files$programs),
+      # College (ADR-002 Stage 3b): the degree program's college through the
+      # files; for a code not yet decided, Banner's (Translated College, else
+      # Actual College), labelled "banner". Banner's values stay beside it.
+      .decided = !is.na(.confirmed_program_rows(major_code, dplyr::coalesce(unname(.college_code), ""),
+                                                files$programs, no_unit = TRUE)),
+      .mapped  = resolve_program_colleges(major_code, dplyr::coalesce(unname(.college_code), ""), files),
+      .banner  = dplyr::coalesce(translate_source_college(college, files),
+                                 translate_source_college(student_college, files)),
+      source_college         = college,
+      source_student_college = student_college,
+      college_code  = dplyr::if_else(.decided, .mapped, .banner),
+      college_basis = dplyr::case_when(.decided & !is.na(.mapped) ~ "mapped",
+                                       !.decided & !is.na(.banner) ~ "banner",
+                                       TRUE ~ NA_character_),
+      college         = college_names(college_code, files),
+      student_college = college,
       degree_abbr = sub("^([A-Za-z]+)-.*$", "\\1", program_code)
     ) %>%
-    dplyr::select(-.college_code)
+    dplyr::select(-.college_code, -.decided, -.mapped, -.banner)
 
   message("  ✅ Created cedar_degrees: ", nrow(cedar_degrees), " rows, ", ncol(cedar_degrees), " columns")
   message("  Output columns: ", paste(names(cedar_degrees), collapse = ", "))
 
+  # Units come from the mapping files: stamp which files, so the rebuild gate
+  # can tell when they move (ISSUES.md M26), as for cedar_programs.
+  attr(cedar_degrees, "cedar_mapping_provenance") <- cedar_mapping_provenance()
   saved_meta <- save_cedar_file(cedar_degrees, "degrees", data_dir, ext)
   list(saved = list(degrees = saved_meta))
 }
@@ -1431,27 +1323,21 @@ build_lookups <- function(cedar_sections, cedar_programs, data_dir, ext, maps,
   hr_org_desc_to_dept       <- maps$hr_org_desc_to_dept
   dept_code_to_name_catalog <- maps$dept_code_to_name_catalog
   college_name_to_code      <- maps$college_name_to_code
-  major_college_to_dept     <- maps$major_college_to_dept
 
   cedar_lookups <- list()
 
   # 7a. Program name → dept_code lookup (data-derived from cedar_programs)
   message("  Building program_name → dept_code lookup...")
   if (!is.null(cedar_programs)) {
-    .extra_p2d <- if (length(maps$extra_p2d) > 0) maps$extra_p2d else character(0)
-
+    # dept_code is a unit from the mapping files (ADR-002): no self-named
+    # department reaches here, so nothing needs correcting after the fact.
     program_name_lookup <- cedar_programs %>%
       filter(!is.na(program_name) & program_name != "" & !is.na(dept_code) & dept_code != "") %>%
       count(program_name, dept_code, sort = TRUE) %>%
       group_by(program_name) %>%
       slice_head(n = 1) %>%
       ungroup() %>%
-      select(program_name, dept_code) %>%
-      # Correct identity-fallback dept_codes: minor/concentration Banner codes that
-      # aren't in subj_dept_map get set to dept_code = major_code during transform.
-      # Apply extra_p2d overrides here so a lookups-only regeneration picks them up
-      # without needing a full cedar_programs rebuild.
-      dplyr::mutate(dept_code = dplyr::coalesce(.extra_p2d[dept_code], dept_code))
+      select(program_name, dept_code)
     message("    ✅ program_name_lookup: ", nrow(program_name_lookup), " entries")
     message("    Sample: ", paste(head(program_name_lookup$program_name, 10), collapse = ", "))
     cedar_lookups$program_name_lookup <- program_name_lookup
@@ -1666,98 +1552,41 @@ transform_to_cedar <- function(data_dir = NULL, use_qs = NULL, tables = NULL) {
   message("")
 
   # ── Load helper maps ───────────────────────────────────────────────────────
-  # Resolve cedar project root from this script's location, falling back to getwd().
-  script_path <- tryCatch(
-    normalizePath(sys.frame(0)$ofile, mustWork = TRUE),
-    error = function(e) NULL
-  )
-  cedar_root <- if (!is.null(script_path)) {
-    dirname(dirname(dirname(script_path)))  # R/data-parsers → R → project root
-  } else {
-    getwd()
+  # Every lookup comes from the lists load_funcs() sources, and those read the
+  # institution mapping files (ADR-002). program_map.qs and the lists that fed
+  # it were retired at Stage 4. Script mode, the deploy gate and the demo
+  # generator all load CEDAR's functions first; anything else must too.
+  gen_ed_names <- paste0("gen_ed_", c("1_communication", "2_math_stat", "3_phys_nat_sci",
+                                      "4_soc_behav_sci", "5_humanities", "7_arts_design"))
+  needed <- c("read_institution_mappings", "subj_dept_map", "college_name_to_code",
+              "dept_code_to_name", "major_name_to_major_code", "hr_org_desc_to_dept", gen_ed_names)
+  missing <- needed[!vapply(needed, exists, logical(1))]
+  if (length(missing)) {
+    stop("[transform-to-cedar.R] CEDAR's lists are not loaded (run load_funcs() first); missing: ",
+         paste(missing, collapse = ", "), call. = FALSE)
   }
-  catalog_file            <- file.path(cedar_root, "R", "lists", "subj_dept_map.R")
-  program_code_maps_file  <- file.path(cedar_root, "R", "lists", "program_code_maps.R")
-  program_map_file        <- file.path(data_dir, "program_map.qs")
-  cat_lookups_file        <- file.path(cedar_root, "R", "lists", "catalog_lookups.R")
-  mappings_file           <- file.path(cedar_root, "R", "lists", "mappings.R")
-  gen_ed_file             <- file.path(cedar_root, "R", "lists", "gen_ed_courses.R")
+  message("  subj_dept_map: ", nrow(subj_dept_map), " rows, ",
+          length(unique(subj_dept_map$subject_code)), " subject codes, ",
+          length(unique(subj_dept_map$dept_code)), " dept codes, ",
+          length(unique(subj_dept_map$college_code)), " colleges")
 
-  if (!exists("subj_dept_map") && file.exists(catalog_file)) {
-    message("  Loading subj_dept_map from: ", catalog_file)
-    source(file.path(cedar_root, "R", "lists", "institution_files.R"))
-    source(catalog_file)
-  }
-  if (file.exists(program_code_maps_file)) {
-    source(program_code_maps_file, local = environment())
-  }
+  # The mapping files decide every unit and college. Read once, validated on
+  # read: a malformed file stops the transform with every problem listed. The
+  # directory comes from the base load_funcs() recorded, as at app startup --
+  # a path guessed inside the container is how the deploy's mapping rebuild
+  # once failed (ISSUES.md I14).
+  mapping_files <- read_institution_mappings(cedar_institution_dir())
+  message("  Mapping files: ", nrow(mapping_files$programs), " program rows, ",
+          nrow(mapping_files$subjects), " subject rows, ", nrow(mapping_files$units), " units")
 
-  if (!exists("program_map") && file.exists(program_map_file)) {
-    message("  Loading program_map from: ", program_map_file)
-    program_map <- qs2::qs_read(program_map_file)
-  } else if (!exists("program_map") && exists("subj_dept_map") &&
-             exists("premaj_canon") && exists("xvar_explicit") && exists("extra_p2d")) {
-    as_file_for_pm <- file.path(data_dir, paste0("academic_studies", ext))
-    if (!file.exists(as_file_for_pm)) {
-      stop("[transform-to-cedar.R] program_map.qs not found and academic_studies not available at: ",
-           as_file_for_pm,
-           "\n  Cannot build program_map. Place academic_studies in data_dir and re-run.")
-    }
-    message("  program_map.qs not found — generating from academic_studies...")
-    program_map <- generate_program_map(as_file_for_pm, ext, subj_dept_map,
-                                        premaj_canon, xvar_explicit, extra_p2d,
-                                        known_suffixes, real_F_progs, get_lev,
-                                        ad_major_to_dept,
-                                        allowed_unmapped_program_codes)
-    qs2::qs_save(program_map, program_map_file)
-    message("  Generated and saved program_map.qs: ", nrow(program_map), " rows → ", program_map_file)
-  }
-
-  if (exists("subj_dept_map") && exists("program_map")) {
-    message("  Deriving lookup vectors from catalogs...")
-    source(cat_lookups_file, local = environment())
-    dept_code_to_name_catalog <- dept_code_to_name
-    message("  subj_dept_map: ", nrow(subj_dept_map), " rows, ",
-            length(unique(subj_dept_map$subject_code)), " subject codes, ",
-            length(unique(subj_dept_map$dept_code)), " dept codes, ",
-            length(unique(subj_dept_map$college_code)), " colleges")
-    message("  program_map: ", nrow(program_map), " rows, ",
-            length(major_college_to_dept), " compound lookup keys")
-  } else {
-    message("  ⚠️  subj_dept_map or program_map not found — falling back to mappings.R")
-    major_college_to_dept <- setNames(character(0), character(0))
-    if (!exists("subj_to_dept") && file.exists(mappings_file)) source(mappings_file)
-  }
-  if (!exists("hr_org_desc_to_dept") && file.exists(mappings_file)) {
-    message("  Loading text mappings from: ", mappings_file)
-    source(mappings_file)
-  }
-  if (!exists("gen_ed_1_communication") && file.exists(gen_ed_file)) {
-    message("  Loading gen_ed courses from: ", gen_ed_file)
-    source(gen_ed_file)
-  }
-
-  # Bundle all loaded lookup vectors into a single list for passing to transform functions
   maps <- list(
-    subj_to_dept              = if (exists("subj_to_dept"))              subj_to_dept              else character(0),
-    major_college_to_dept     = if (exists("major_college_to_dept"))     major_college_to_dept     else character(0),
-    major_name_to_major_code  = if (exists("major_name_to_major_code"))  major_name_to_major_code  else character(0),
-    major_to_dept             = if (exists("major_to_dept"))             major_to_dept             else character(0),
-    extra_p2d                 = if (exists("extra_p2d"))                 extra_p2d                 else character(0),
-    college_name_to_code      = if (exists("college_name_to_code"))      college_name_to_code      else character(0),
-    real_F_progs              = if (exists("real_F_progs"))              real_F_progs              else character(0),
-    pre_major_exempt_codes    = if (exists("pre_major_exempt_codes"))    pre_major_exempt_codes    else character(0),
-    subj_dept_map             = if (exists("subj_dept_map"))             subj_dept_map             else NULL,
-    hr_org_desc_to_dept       = if (exists("hr_org_desc_to_dept"))       hr_org_desc_to_dept       else character(0),
-    dept_code_to_name_catalog = if (exists("dept_code_to_name_catalog")) dept_code_to_name_catalog else character(0),
-    gen_ed = list(
-      `1` = if (exists("gen_ed_1_communication")) gen_ed_1_communication else character(0),
-      `2` = if (exists("gen_ed_2_math_stat"))     gen_ed_2_math_stat     else character(0),
-      `3` = if (exists("gen_ed_3_phys_nat_sci"))  gen_ed_3_phys_nat_sci  else character(0),
-      `4` = if (exists("gen_ed_4_soc_behav_sci")) gen_ed_4_soc_behav_sci else character(0),
-      `5` = if (exists("gen_ed_5_humanities"))    gen_ed_5_humanities    else character(0),
-      `7` = if (exists("gen_ed_7_arts_design"))   gen_ed_7_arts_design   else character(0)
-    )
+    mapping_files             = mapping_files,
+    major_name_to_major_code  = major_name_to_major_code,
+    college_name_to_code      = college_name_to_code,
+    subj_dept_map             = subj_dept_map,
+    hr_org_desc_to_dept       = hr_org_desc_to_dept,
+    dept_code_to_name_catalog = dept_code_to_name,
+    gen_ed = stats::setNames(lapply(gen_ed_names, get), c("1", "2", "3", "4", "5", "7"))
   )
 
   # Initialize results tracking

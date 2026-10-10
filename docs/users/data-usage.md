@@ -73,7 +73,7 @@ mapped college differs from Banner's. For each row:
 | **Where** | The same place as `file.csv:line`, for someone editing a local copy |
 | **Kind** | What the row is: a program (major, minor, both, or pre-major), a course subject, a college name, or a college check |
 | **Banner code** | The code Banner uses for it — a program's major or minor code (for example `ART`, the Art minor) or a course subject |
-| **Reported today as** | What CEDAR shows now. *Phantom* means a department named after the code itself: its students are missing from their real department until the row is decided |
+| **Reported today as** | The department CEDAR shows now. Every department comes from the mapping files, so an undecided code reads *none*: its students count toward no department until the row is confirmed and the data is rebuilt. *Phantom*, a department named after the code itself, appears only in data built before October 2026 |
 | **Suggested department** | The department (CEDAR unit) the mapping assistant thinks should own it, with its name — for example `ARTS — Art Studio` |
 | **Confidence** | How far to trust the suggestion. *Strong*: Banner's own department, matching names, or the program a pre-major leads to. *Plausible*: its students clearly take that department's courses. *Weak*: course-taking only, and not clear-cut, or the program sits in a catch-all Banner department. Hover for the full evidence |
 

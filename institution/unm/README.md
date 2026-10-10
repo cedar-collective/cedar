@@ -39,12 +39,31 @@ proposed on 2026-10-04 by `scripts/unit-mapping-baseline.R colleges`, from
 where each unit's sections sit since Spring 2024 and Banner's Translated
 College; each row's `notes` gives the evidence.
 
+The transform reports these colleges (ADR-002 Stage 3b, decided 2026-10-10):
+
+- **A student counts under their primary major's college** that term, on every
+  row they have (`college_code`, `student_college`); each row also carries its
+  own program's college (`program_college`).
+- **A course counts under its subject row's `college_code`, else its unit's
+  home college.** Branch-campus rows (`in_college` AD) for main-campus units set
+  `college_code` AD, so branch sections stay in the branch college.
+- **A program nothing owns may still name a college**: Undecided is UC's.
+- **A code not yet decided reports Banner's college**, translated through
+  `source_names` and labelled `college_basis = banner`, until its row is
+  confirmed; Admin > Mappings says so on its row.
+- Banner's own values stay beside them as `source_college` (and
+  `source_college_code` on programs), for the audit.
+
 Admin > Data & Usage > Mappings lists every value the data uses that these files
 do not cover, and every program whose mapped college differs from Banner's
 Translated College, with a link to the file that fixes it.
 
-`programs.csv` is not read by the transform until ADR-002 Stage 3; until then
-`cedar_programs$dept_code` still comes from `R/lists/program_code_maps.R`.
+The transform reads these files (ADR-002 Stage 3): every stored unit —
+`dept_code` on programs and degrees, `department` on sections and class lists —
+comes from a confirmed row here, and a code with no confirmed row has none.
+A decision reaches the app when the deploy gate rebuilds the tables built
+from the old files: programs and degrees for `programs.csv`, sections and
+class lists for `subjects.csv`, all four for `units.csv` or `colleges.csv`.
 
 ## programs.csv
 
@@ -64,6 +83,28 @@ Translated College, with a link to the file that fixes it.
   `name_match`, `course_taking`, `decided` (a person chose), `override` (a
   college-specific row), `no_unit` (nothing owns the program: Non-Degree,
   Undecided), `unresolved` (no evidence settled it; always `proposed`).
+- **`is_pre_major` and `leads_to` translate a pre-major to its major, and
+  nothing else.**
+  - `is_pre_major` says *whether* the code is a pre-major (`TRUE` / `FALSE`),
+    stated rather than inferred from an F prefix.
+  - `leads_to` says *which program* a pre-major leads to: the `program_code` of
+    the degree its own Banner record names. `FFCS` is "BS Pre Family & Child
+    Studies", so it leads to `FCST`, Family & Child Studies. It is blank on
+    every row that is not a pre-major (the loader refuses it), and blank on a
+    pre-major whose degree has no code in the data: `FING` is the pre-major
+    for the Bachelor of Integrative Studies, which has none.
+  - **Always a program code, never a department code.** The two share strings:
+    `FCS` is Family & Child Studies' department and pre-Computer Science's
+    program code, so `FFCS` → `FCS` named the wrong degree. Check the target's
+    row: the same unit and a matching name.
+  - **Not history.** A code that replaced another (BIS by BISI, course subject
+    `ALB` by `ALBS`) is lineage. Record it in `notes` until `code_history.csv`
+    exists (ROADMAP, "Code history"), and never point `leads_to` at a successor
+    to stand in for a degree with no code.
+  - What reads it: a pre-major's college, when its target sets its own
+    `college_code`; the mapping assistant, which gives a pre-major its target's
+    unit (`basis = inherited`); and the named population groups in Pathways and projections, which count a
+    program's pre-majors through it.
 - **A code with no row gets no unit.** It is never reported under a department
   named after itself.
 - Concentrations have no rows: they take the unit of the student's primary
@@ -95,8 +136,9 @@ beside `Film and Digital Arts`).
 - **Which rows apply:** `in_college` (the source's section college) and
   `in_level` (`lower`, `upper`, `grad`) narrow a row; blank means any. The most
   specific confirmed row wins: subject + college + level, then subject +
-  college, then subject + level, then subject alone (ADR-002 Stage 3; until
-  then lookups use the subject code alone).
+  college, then subject + level, then subject alone. A section's college is
+  first translated through `colleges.csv`, so a former code (`ED` for `EH`)
+  matches its college's rows.
 - **Which college is credited:** `college_code`, when it is not the unit's home
   college. Global & National Security is one unit, so its director sees both
   levels, but its undergraduate courses are credited to University College and
@@ -130,10 +172,12 @@ codes in the data get proposed rows from `scripts/propose-mappings.R --write`.
 
 **Row order.** `programs.csv`, `units.csv`, `colleges.csv` and
 `source_departments.csv` are sorted by their first column; keep them so.
-**`subjects.csv` is not, and must not be sorted yet:** until ADR-002 Stage 3,
-lookups take the first row for a subject code regardless of college, so for a
-subject listed under two colleges (`HLED`, `PH`, `SUST`) the order decides
-which unit wins. Only confirmed rows are looked up. New rows go at the end.
+**`subjects.csv` is not, and must not be sorted yet:** the transform takes the
+most specific row, but the runtime lookups built from `subj_dept_map` still
+take the first row for a subject code regardless of college, until ADR-002
+Stage 4. For a subject listed under two colleges (`HLED`, `PH`, `SUST`) the
+order decides which unit those lookups use. Only confirmed rows are looked up.
+New rows go at the end.
 
 **A subject can appear under two colleges with different units.** Branch
 campuses reuse subject codes (for example `HLED`, `PH`, `SUST`) for units that

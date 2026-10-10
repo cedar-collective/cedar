@@ -68,6 +68,12 @@ annotation that warned forever would become noise.
 
 Both come from defects that were found by accident and cost real time.
 
+> **Since ADR-002 Stage 3 (2026-10-09)** the transform takes every unit from the
+> mapping files and has no identity fallback: an unmapped code gets no unit
+> (`NA`). On tables it builds, the two screens below find nothing. They stay as
+> the guard against the fallback's return, and they still find the defect in any
+> table built before Stage 3.
+
 ### `detect_pre_major_self_mapping(programs)`
 
 A pre-major whose `dept_code` equals its own `major_code`. The `dept_code` chain

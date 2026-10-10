@@ -6,6 +6,15 @@ parent: Developer Guide
 
 # Codes, Programs, and Departments
 
+> **Since ADR-002 (Stages 3–4, October 2026)** every department and college a
+> report reads comes from `institution/<id>/*.csv`: `programs.csv` for program
+> codes (including which are pre-majors and what they lead to), `subjects.csv`
+> for course subjects, `units.csv` and `colleges.csv` for the hierarchy.
+> `program_map.qs` and `R/lists/program_code_maps.R` are retired. The three
+> namespaces below still mean what this page says; where it describes the old
+> lists, read [ADR-002](adr-002-explicit-mapping-files.md) and the
+> [mapping review guide](mapping-review-guide.md) instead.
+
 Three distinct code namespaces appear across Cedar's data sources. They look similar — four-letter uppercase abbreviations — but come from different Banner systems and mean different things. Conflating them is the source of most mapping bugs.
 
 ---
@@ -69,15 +78,10 @@ reverse question, "which program codes belong to this department?" For example,
 Dept Trends > Credit Hours uses `major_to_dept` to classify home majors versus
 outside majors.
 
-`program_map.qs` can contain Banner programs that do not have a defensible
-academic-department owner yet, such as broad branch-campus associate programs or
-undecided programs. Runtime lookup vectors exclude invalid or unmapped rows and
-collect them in `cedar_mapping_issues`, which is surfaced under Admin > Data &
-Usage > Mappings. Reviewed exceptions live in `allowed_unmapped_program_codes`
-in `R/lists/program_code_maps.R`. Regenerating `program_map.qs` should still
-fail loudly on new unmapped codes until they are mapped or reviewed. The goal is
-to prevent unknown programs from silently becoming `NA` entries in department
-lookups while keeping the Shiny app available.
+A program with no confirmed row in `programs.csv` has no department: it is
+listed on Admin > Data & Usage > Mappings until someone decides it, never given
+a department named after its own code. Programs no department owns (Non-Degree,
+Undecided) are `basis = no_unit` rows.
 
 ### For cedar_sections (course data)
 
@@ -125,15 +129,13 @@ These five, plus six optional editorial refinements (e.g., "Physics and Astronom
 
 ## What lives where
 
-### `R/lists/program_code_maps.R`
+### `institution/<id>/programs.csv`
 
-| Map | Purpose | When used |
-|-----|---------|-----------|
-| `premaj_canon` | F-prefix pre-major code → target major code | program map generation |
-| `xvar_explicit` | X-prefix variant code → canonical major code | program map generation |
-| `extra_p2d` | program/major code → dept_code overrides | program map generation |
-| `ad_major_to_dept` | branch-campus program overrides | program map generation |
-| `allowed_unmapped_program_codes` | reviewed programs with no dept owner | labels reviewed exceptions; excluded from dept lookup vectors |
+One row per program code (optionally per college): its unit, whether it is a
+pre-major, the program it `leads_to`, and why. It replaced `premaj_canon`,
+`xvar_explicit`, `extra_p2d`, `ad_major_to_dept` and
+`allowed_unmapped_program_codes` at ADR-002 Stage 4. See
+`institution/unm/README.md` for its columns.
 
 ### `R/lists/catalog_lookups.R`
 
@@ -180,8 +182,7 @@ Short answer: yes, the current system is close to minimal — one more step is p
 
 **What still requires hand-maintained review:**
 - `subj_to_dept` — irreducible, no data source provides this
-- `extra_p2d` / `ad_major_to_dept` — program codes whose ownership cannot be inferred from subject codes alone
-- `allowed_unmapped_program_codes` — codes intentionally excluded from department ownership until reviewed or mapped
+- `programs.csv` — every program code's unit, pre-major flag and target, reviewed row by row
 - `dept_display_names` — could be reduced to the 5 required entries (removing editorial refinements like "Physics and Astronomy")
 
 **The irreducible minimum:** `subj_to_dept`. This is the only map that encodes information genuinely absent from all data sources. Everything else is either derived at transform time and stored in the .qs files, or could be.

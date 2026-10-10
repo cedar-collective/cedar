@@ -178,7 +178,7 @@ because new features build most cleanly on the first two:
 
 1. **Reconcile counts computed twice** — all three confirmed 2026-10-07; I17
    (two "returned next term" definitions on Course Dynamics → Retention) fixed
-   in #119. I15 (headcount department scope) is fixed with Stage 3. I16
+   in #119. I15 (headcount department scope) fixed with Stage 3. I16
    (bottleneck waitlist pressure) is RStudio-only: decide its definition, or
    retire it. Each gets one helper or a documented difference, with a cross-tab
    test. Then M1–M3 and M24 (lifecycle labels).
@@ -205,12 +205,19 @@ Plan: [ADR-002](docs/developers/adr-002-explicit-mapping-files.md).
   assistant, the transform-time audit, and the Admin decisions table.
 - [ ] Decide the largest programs and course subjects still proposed (Admin →
   Data & Usage → Mappings; `scripts/mapping-review.R`).
-- [ ] **Stage 3:** the transform reads the files and stops creating self-named
-  departments; colleges reported through program → unit → college. Closes I7,
-  I11, I12.
-- [ ] **Stage 4:** delete `generate_program_map()`, `program_map.qs`, and the
-  lists they fed. Closes I9.
-- [ ] **Stage 5:** the demo institution runs on its own files — the adopter test.
+- Done 2026-10-09: **Stage 3**, units — the transform takes every unit from the
+  files and creates no self-named department. Closed I7; I11's stored units.
+- Done 2026-10-10: **Stage 3b**, colleges — students under their primary
+  major's college, courses under their subject's, Banner's value labelled for
+  codes not yet decided. Closed I12.
+- Done 2026-10-10: **Stage 4** — `generate_program_map()`, `program_map.qs` and
+  `program_code_maps.R` retired; runtime lookups and pre-major flags come from
+  the files. Closed I9.
+- Done 2026-10-10: **Stage 5** — the demo runs on its own `institution/demo/`
+  files, with UNM's absent. ADR-002 is complete.
+- [ ] Move the remaining UNM R lists (`mappings.R`, campuses, Gen Ed and
+  excluded-course lists, population and projection groups) into
+  `institution/<id>/`, so an adopter replaces files only.
 
 ### 2. Domain-shaped data model (ADR-001)
 

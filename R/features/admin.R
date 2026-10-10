@@ -27,9 +27,6 @@ build_admin_data_status <- function(summary, current_term) {
 # available as the column's hover text. identity_fallback_department has no
 # label: the Today column already says "phantom".
 ADMIN_PROBLEM_LABELS <- c(
-  program_dropped_unknown_college_suffix = "unknown college suffix; dropped from program_map",
-  malformed_program_map_row              = "program_map row lacks a major or college code",
-  unmapped_program_code                  = "no department in program_map",
   pre_major_self_mapped_department       = "pre-major mapped to itself",
   declared_majors_far_exceed_graduates   = "far more majors than graduates",
   identity_fallback_department           = NA
@@ -39,16 +36,16 @@ ADMIN_PROBLEM_LABELS <- c(
 #'
 #' One row per program to decide: each `proposed` row of programs.csv, plus any
 #' program a mapping issue names that has no row in the file at all. Each
-#' carries the department CEDAR reports for it today -- until the transform
-#' reads programs.csv (ADR-002 Stage 3) that still comes from
-#' program_code_maps.R, so "today" can be a phantom department named after the
-#' code -- and the problem the issue screens found with it.
+#' carries the department CEDAR reports for it today -- from the files since
+#' ADR-002 Stage 3, so NA ("none") until the row is confirmed and the tables
+#' rebuilt; a phantom department named after the code only in tables built
+#' before Stage 3 -- and the problem the issue screens found with it.
 #'
 #' Decisions are edits to the file in the repository, reviewed as a diff, never
 #' to the app: the running container holds a copy of the source that the next
 #' deploy replaces. Issues on a program already confirmed in the file are not
 #' listed -- there is nothing left to decide -- but are counted, because they
-#' persist in today's departments until Stage 3.
+#' persist in the stored tables until the next rebuild.
 #'
 #' @param files The list read_institution_mappings() returns.
 #' @param programs cedar_programs.
@@ -95,6 +92,19 @@ build_program_mapping_queue <- function(files, programs, issues, known_units) {
       is.na(dept_code)                ~ "none",
       !dept_code %in% known_units     ~ paste(dept_code, "(phantom)"),
       TRUE                            ~ dept_code))
+  # A student whose primary major is still undecided reports Banner's college,
+  # labelled (ADR-002 Stage 3b): say so, so nobody mistakes it for a decision.
+  # Tables built before Stage 3b have no college_basis and nothing to add.
+  if ("college_basis" %in% names(held)) {
+    banner <- held %>% dplyr::filter(college_basis %in% "banner", !is.na(college_code)) %>%
+      dplyr::count(major_code, college_code) %>%
+      dplyr::group_by(major_code) %>% dplyr::slice_max(n, n = 1, with_ties = FALSE) %>%
+      dplyr::ungroup() %>% dplyr::select(major_code, banner_college = college_code)
+    today <- today %>% dplyr::left_join(banner, by = "major_code") %>%
+      dplyr::mutate(today = dplyr::if_else(is.na(banner_college), today,
+                                           paste0(today, "; college ", banner_college, " from Banner"))) %>%
+      dplyr::select(-banner_college)
+  }
   unknown <- setdiff(issues$issue_type, names(ADMIN_PROBLEM_LABELS))
   if (length(unknown)) {
     stop("[admin.R] No Problem label for issue type(s): ", paste(unknown, collapse = ", "),
@@ -246,9 +256,12 @@ build_mapping_worklist <- function(files, programs, issues, audit, source_depart
                           work$context),
     size = work$rows,
     size_unit = dplyr::if_else(work$kind == "subject", "enrollments", "rows"),
-    # A subject with no confirmed row is reported today under a department
-    # named after itself.
-    reported_today = dplyr::if_else(work$kind == "subject", paste(work$value, "(phantom)"), NA_character_),
+    # A subject with no confirmed row has no department (ADR-002 Stage 3), and
+    # reports the college Banner gives its sections, labelled (Stage 3b).
+    reported_today = dplyr::if_else(
+      work$kind == "subject",
+      paste0("none; college ", sub("^college ([^;]+).*$", "\\1", work$context), " from Banner"),
+      NA_character_),
     reported_detail = NA_character_,
     suggested = dplyr::case_when(
       !is.na(proposed_row) ~ dplyr::na_if(sj$unit_code[proposed_row], ""),
@@ -268,15 +281,12 @@ build_mapping_worklist <- function(files, programs, issues, audit, source_depart
         kind == "Course subject" ~ "None: the source names no single department",
         TRUE ~ NA_character_))
 
-  legacy <- queue %>% dplyr::filter(is.na(line))
-  other <- dplyr::bind_rows(
-    tibble::tibble(kind = "Program code", code = audit$value[org_id], context = audit$context[org_id],
-                   size = audit$rows[org_id], needs = audit$needs[org_id]),
-    tibble::tibble(kind = "Old program_map check", code = legacy$program_code,
-                   context = paste0(dplyr::coalesce(legacy$program_name, ""), "; ",
-                                    dplyr::coalesce(legacy$problem_detail, "")),
-                   size = legacy$students,
-                   needs = "Nothing to map: reported only by the old program_map checks, which Stage 4 retires"))
+  # A code with no programs.csv row is a decision the audit lists itself
+  # ("A programs.csv row"); the old program_map checks that also reported such
+  # codes were retired at ADR-002 Stage 4.
+  other <- tibble::tibble(kind = "Program code", code = audit$value[org_id],
+                          context = audit$context[org_id], size = audit$rows[org_id],
+                          needs = audit$needs[org_id])
 
   # No names on any column: a named vector reaches the browser as a JSON object,
   # not an array, and the table built from it renders nothing, silently.

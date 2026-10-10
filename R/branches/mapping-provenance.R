@@ -14,10 +14,11 @@
 # are the morning refresh's job. This answers only "was this table built by the
 # mapping code that is deployed now?"
 
-#' Files whose content decides cedar_programs$dept_code
+#' Files whose content decides the stored units and colleges
 #'
-#' Institution configuration plus the transform logic that consumes it. A change
-#' to any of them can move a student between departments.
+#' The institution mapping files plus the code that reads them into the CEDAR
+#' tables (ADR-002). A change to any of them can move a student or a course
+#' between departments or colleges.
 cedar_mapping_source_files <- function() {
   c(
     "R/lists/subj_dept_map.R",
@@ -25,7 +26,8 @@ cedar_mapping_source_files <- function() {
     file.path("institution", cedar_institution_id(), "colleges.csv"),
     file.path("institution", cedar_institution_id(), "units.csv"),
     file.path("institution", cedar_institution_id(), "subjects.csv"),
-    "R/lists/program_code_maps.R",
+    # Read by the transform from ADR-002 Stage 3: it decides every program's unit.
+    file.path("institution", cedar_institution_id(), "programs.csv"),
     "R/lists/mappings.R",
     "R/lists/catalog_lookups.R",
     "R/data-parsers/transform-to-cedar.R"
@@ -67,30 +69,38 @@ cedar_mapping_provenance <- function(base_dir = getwd()) {
 }
 
 
-#' Has the mapping source moved since cedar_programs was built?
+# The tables whose units the mapping files decide (ADR-002 Stage 3), each
+# stamped by the transform with the provenance that built it. The rebuild gate
+# checks every one: a subject decision moves course units as surely as a
+# program decision moves program units (ISSUES.md M26).
+CEDAR_MAPPED_TABLES <- c("programs", "degrees", "sections", "students")
+
+
+#' Has the mapping source moved since a CEDAR table was built?
 #'
 #' Reads only the stamped attribute, never a CEDAR table, so it is cheap enough
 #' to run on every deploy.
 #'
-#' @param programs_file Path to cedar_programs.qs.
+#' @param table_file Path to the table's .qs file.
 #' @param base_dir Repository root.
+#' @param table The table's name, for the reason: "cedar_programs".
 #' @return NULL when current, otherwise a human-readable reason. Anything
 #'   unreadable or unstamped counts as drift: rebuilding costs minutes, while
-#'   serving departments built by unknown code is how this went unnoticed for
+#'   serving units built by unknown code is how a stale map went unnoticed for
 #'   nine months.
-cedar_programs_mapping_drift <- function(programs_file, base_dir = getwd()) {
-  if (!file.exists(programs_file)) {
-    return(paste("no cedar_programs at", programs_file))
+cedar_table_mapping_drift <- function(table_file, base_dir = getwd(), table = "cedar_programs") {
+  if (!file.exists(table_file)) {
+    return(paste("no", table, "at", table_file))
   }
   stamped <- tryCatch(
-    attr(qs2::qs_read(programs_file), "cedar_mapping_provenance"),
+    attr(qs2::qs_read(table_file), "cedar_mapping_provenance"),
     error = function(e) e
   )
   if (inherits(stamped, "error")) {
-    return(paste("cedar_programs is unreadable:", conditionMessage(stamped)))
+    return(paste(table, "is unreadable:", conditionMessage(stamped)))
   }
   if (is.null(stamped)) {
-    return("cedar_programs predates mapping-provenance tracking")
+    return(paste(table, "predates mapping-provenance tracking"))
   }
 
   current <- cedar_mapping_provenance(base_dir)
@@ -105,4 +115,26 @@ cedar_programs_mapping_drift <- function(programs_file, base_dir = getwd()) {
   removed <- setdiff(names(stamped$files), names(current$files))
   changed <- unique(c(changed, added, removed))
   paste("mapping source changed:", paste(sort(changed), collapse = ", "))
+}
+
+#' Has the mapping source moved since cedar_programs was built?
+#'
+#' cedar_table_mapping_drift() for cedar_programs, which Admin > Data & Usage
+#' reports as the mapping freshness.
+cedar_programs_mapping_drift <- function(programs_file, base_dir = getwd()) {
+  cedar_table_mapping_drift(programs_file, base_dir, "cedar_programs")
+}
+
+#' Which mapped tables in a data directory are stale?
+#'
+#' @param data_dir The directory holding cedar_<table>.qs.
+#' @param base_dir Repository root.
+#' @return A named character vector: for each table in CEDAR_MAPPED_TABLES that
+#'   needs a rebuild, the reason. Empty when all are current.
+cedar_stale_mapped_tables <- function(data_dir, base_dir = getwd()) {
+  reasons <- vapply(CEDAR_MAPPED_TABLES, function(table) {
+    cedar_table_mapping_drift(file.path(data_dir, paste0("cedar_", table, ".qs")),
+                              base_dir, paste0("cedar_", table)) %||% NA_character_
+  }, character(1))
+  reasons[!is.na(reasons)]
 }
