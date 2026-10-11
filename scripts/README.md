@@ -375,7 +375,9 @@ when it fails. Automatic and manual checks share `rebuild-request.yml.lock`
 to prevent overlap. A hard-killed process can leave this lock; only after
 confirming no builder is running, remove the empty directory with
 `rmdir output/projections/rebuild-request.yml.lock`. Removing a one-shot
-request cancels that force-build, not the automatic policy.
+request cancels that force-build, not the automatic policy. "Cannot create the
+rebuild lock" is a different failure: there is no lock to remove, and
+`output/` is not writable from wherever the build ran (ISSUES.md I19).
 
 By default the command replaces
 `output/projections/enrollment-projections-TARGET-latest.qs`. Routine reruns are

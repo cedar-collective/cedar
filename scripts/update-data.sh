@@ -560,15 +560,15 @@ else
     log_step "Check enrollment projections and rebuild only when stale"
     STEP_START=$SECONDS
     if [[ "$MODE" == "production" ]]; then
-        # Separate R process using the deployed image and production data mount.
-        # Only this temporary builder gets write access to output; Shiny keeps
-        # its read-only mount. Host UID owns the consumed request and artifacts.
+        # The cedar-projections service: the deployed image and data mount, and
+        # the only writable output/ in the stack. Not cedar-shiny with a CLI
+        # --volume -- Compose keeps the app's read-only mount, so that build
+        # could never write and reported a "stale lock" on every run
+        # (ISSUES.md I19). The same command as the deploy's gate. Host UID owns
+        # the consumed request and artifacts.
         run_cmd /usr/bin/docker compose -f "$DOCKER_COMPOSE_FILE" run --rm --no-deps -T \
-            --user "$(id -u):$(id -g)" \
-            --volume "$CEDAR_HOST_DIR/output:$CEDAR_CONTAINER_DIR/output:rw" \
-            --workdir "$CEDAR_CONTAINER_DIR" --entrypoint Rscript cedar-shiny \
-            --vanilla scripts/build-enrollment-projections.R \
-            --refresh
+            --user "$(id -u):$(id -g)" cedar-projections \
+            scripts/build-enrollment-projections.R --refresh < /dev/null
         PROJECTION_RC=$?
     else
         run_cmd "${RSCRIPT_LOCAL[@]}" "$CEDAR_HOST_DIR/scripts/build-enrollment-projections.R" \

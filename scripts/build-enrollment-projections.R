@@ -199,6 +199,33 @@ build_one_enrollment_projection <- function(args, repo_root, refreshing) {
   invisible(output_path)
 }
 
+# The lock is a directory, released by the caller's on.exit(). A failed create
+# has two causes that need different hands: a lock already there (a build
+# running, or one killed before it could release -- ISSUES.md I6), or a
+# projections directory this process cannot write, which once passed for a
+# stale lock every morning (I19). Say which.
+take_projection_lock <- function(lock_path) {
+  reason <- NULL
+  created <- withCallingHandlers(
+    dir.create(lock_path),
+    warning = function(w) {
+      reason <<- conditionMessage(w)
+      invokeRestart("muffleWarning")
+    }
+  )
+  if (created) return(invisible(lock_path))
+  if (dir.exists(lock_path)) {
+    stop("[projections] Rebuild already running or stale lock: ", lock_path,
+         " (created ", format(file.mtime(lock_path), "%Y-%m-%d %H:%M"), "). ",
+         "If no projection build is running, remove it and retry (ISSUES.md I6).",
+         call. = FALSE)
+  }
+  stop("[projections] Cannot create the rebuild lock -- ",
+       if (is.null(reason)) lock_path else reason, ". The projections ",
+       "directory must be writable; in production, build through the ",
+       "cedar-projections service (ISSUES.md I19).", call. = FALSE)
+}
+
 # A request file is a one-shot flag, checked before loading the data or model.
 # Keep it on failure so the next successful morning refresh can retry.
 run_projection_rebuild_request <- function(
@@ -209,11 +236,7 @@ run_projection_rebuild_request <- function(
   }
   # The standalone builder changes to the repository root before loading data.
   request_path <- normalizePath(request_path, mustWork = TRUE)
-  lock_path <- paste0(request_path, ".lock")
-  if (!dir.create(lock_path, showWarnings = FALSE)) {
-    stop("[projections] Rebuild already running or stale lock: ", lock_path,
-         call. = FALSE)
-  }
+  lock_path <- take_projection_lock(paste0(request_path, ".lock"))
   on.exit(unlink(lock_path, recursive = TRUE), add = TRUE)
 
   request_text <- readLines(request_path, warn = FALSE)
@@ -268,12 +291,9 @@ run_projection_auto_refresh <- function(
   }
   config <- yaml::read_yaml(config_path, eval.expr = FALSE)
   dir.create(dirname(request_path), recursive = TRUE, showWarnings = FALSE)
-  lock_path <- file.path(normalizePath(dirname(request_path), mustWork = TRUE),
-                         paste0(basename(request_path), ".lock"))
-  if (!dir.create(lock_path, showWarnings = FALSE)) {
-    stop("[projections] Rebuild already running or stale lock: ", lock_path,
-         call. = FALSE)
-  }
+  lock_path <- take_projection_lock(
+    file.path(normalizePath(dirname(request_path), mustWork = TRUE),
+              paste0(basename(request_path), ".lock")))
   on.exit(unlink(lock_path, recursive = TRUE), add = TRUE)
   build(character(0), refresh_config = config)
 }

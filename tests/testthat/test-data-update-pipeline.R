@@ -65,11 +65,14 @@ test_that("morning projection builds are gated and use a writable publisher moun
   # No flag is necessary: a successful refresh always checks freshness.
   expect_true(any(startsWith(exercise(), "RUN:")))
   expect_false(any(startsWith(exercise(success = FALSE), "RUN:")))
+  # The publisher service owns the only writable output/. The app service with a
+  # CLI --volume looks writable here but is not: Compose keeps the app's
+  # read-only mount, and the build failed every morning (ISSUES.md I19).
   commands <- exercise()
-  expect_true("RUN:cedar-shiny" %in% commands)
-  expect_true("RUN:--entrypoint" %in% commands)
-  expect_true("RUN:Rscript" %in% commands)
-  expect_true(paste0("RUN:", root, "/output:/srv/shiny-server/cedar/output:rw") %in% commands)
+  expect_true("RUN:cedar-projections" %in% commands)
+  expect_false("RUN:cedar-shiny" %in% commands)
+  expect_false(any(commands %in% c("RUN:--volume", "RUN:-v")))
+  expect_true("RUN:scripts/build-enrollment-projections.R" %in% commands)
   expect_true("RUN:--refresh" %in% commands)
   expect_true("OK" %in% commands)
   expect_true("FAILED" %in% exercise(build_rc = 1L))

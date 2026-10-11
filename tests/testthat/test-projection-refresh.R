@@ -293,6 +293,19 @@ test_that("an active build lock rejects a second request", {
   expect_true(file.exists(path))
 })
 
+# I19: an unwritable projections directory read as a stale lock every morning,
+# sending the reader to look for a lock that did not exist. A lock path whose
+# parent is missing fails to create the same way, and holds even as root.
+test_that("a lock that cannot be created is not reported as a stale lock", {
+  env <- new.env(parent = globalenv())
+  sys.source("../../scripts/build-enrollment-projections.R", envir = env)
+  lock <- file.path(tempfile("no-projections-dir-"), "rebuild-request.yml.lock")
+  err <- tryCatch(env$take_projection_lock(lock), error = conditionMessage)
+  expect_match(err, "Cannot create the rebuild lock", fixed = TRUE)
+  expect_no_match(err, "stale lock", fixed = TRUE)
+  expect_false(dir.exists(lock))
+})
+
 test_that("a request edited during a build is retained for the next refresh", {
   path <- tempfile(fileext = ".yml")
   write_projection_request(path)
