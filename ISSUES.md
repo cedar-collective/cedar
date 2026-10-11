@@ -1322,6 +1322,55 @@ branch campuses.
 
 ---
 
+## I19 — The morning refresh could never publish projections, and blamed a stale lock
+
+**Status:** resolved 2026-10-11. `update-data.sh` builds through the
+`cedar-projections` service, the same command as the deploy's gate, and
+`take_projection_lock()` (`scripts/build-enrollment-projections.R`) tells a held
+lock from a directory it cannot write. `test-data-update-pipeline.R` asserts the
+publisher service and fails with the old command restored;
+`test-projection-refresh.R` checks the second message.
+**Found:** 2026-10-11, when a manual refresh failed at its projection step
+**Severity:** moderate — projections went stale silently. They moved only when a
+deploy changed the model, never with new data, and the one visible symptom
+pointed at a different defect (I6).
+**Affects:** the projection step of `scripts/update-data.sh` in production mode.
+
+### What is wrong
+
+The morning step ran the build as `docker compose run ... --volume
+./output:...:rw cedar-shiny`. Compose keeps the app service's read-only `output/`
+mount, so the override did nothing. `7cdf09b` (2026-09-08) measured exactly
+that, gave the publisher its own `cedar-projections` service, and moved the
+deploy to it, but not the morning refresh. `test-data-update-pipeline.R` asserted
+the broken command, so nothing flagged it.
+
+The build then failed one second in, at `dir.create()` of the lock, which
+reported any failure to create as `Rebuild already running or stale lock`.
+Production on 2026-10-11:
+
+```
+==> Check enrollment projections and rebuild only when stale
+Error: [projections] Rebuild already running or stale lock: /srv/shiny-server/cedar/output/projections/rebuild-request.yml.lock
+  refresh projections          ❌      1s       exit 1; retry on next successful data refresh
+```
+
+The deploy the evening before had taken and released that same lock cleanly
+through `cedar-projections`, which is what pointed away from I6.
+
+### Reproduction
+
+On the droplet, from the repository, with the old command's mounts:
+
+```bash
+docker compose run --rm --no-deps -T \
+  --volume "$PWD/output:/srv/shiny-server/cedar/output:rw" \
+  --entrypoint Rscript cedar-shiny --vanilla -e 'dir.create("output/probe")' </dev/null
+# FALSE, with "Read-only file system"; no lock directory exists
+```
+
+---
+
 # Improvements
 
 Short entries: **what**, **where**, **done when**. Counts measured 2026-10-07.
