@@ -145,12 +145,12 @@ OCTH,ME,,OCTH,,confirmed,,
 PAST,ME,,PAST,,confirmed,,
 PT,ME,,PT,,confirmed,,
 RADS,ME,,RADS,,confirmed,,
-AFAS,UC,,AFAS,,confirmed,,
+AFAS,UC,,ROTC,,confirmed,,ROTC is one department; this subject was its own unit until 2026-10-12.
 FYEX,UC,,FYEX,,confirmed,,
 LAIS,UC,,LAIS,,confirmed,,
-MLSL,UC,,MLSL,,confirmed,,
+MLSL,UC,,ROTC,,confirmed,,ROTC is one department; this subject was its own unit until 2026-10-12.
 NSE,UC,,NSE,,confirmed,,
-NVSC,UC,,NVSC,,confirmed,,
+NVSC,UC,,ROTC,,confirmed,,ROTC is one department; this subject was its own unit until 2026-10-12.
 UNIV,UC,,UNIV,,confirmed,,
 WR,UC,,WR,,confirmed,,
 ISEP,UC,,ISEP,,confirmed,,
@@ -226,9 +226,9 @@ BFIN,AD,,BFIN,,confirmed,,
 CADT,AD,,CADT,,confirmed,,
 CRT,AD,,CRT,,confirmed,,
 CT,AD,,CT,,confirmed,,
-AFAS,PA,,AFAS,,confirmed,,
-MLSL,PA,,MLSL,,confirmed,,
-NVSC,PA,,NVSC,,confirmed,,
+AFAS,PA,,ROTC,,confirmed,,ROTC is one department; this subject was its own unit until 2026-10-12.
+MLSL,PA,,ROTC,,confirmed,,ROTC is one department; this subject was its own unit until 2026-10-12.
+NVSC,PA,,ROTC,,confirmed,,ROTC is one department; this subject was its own unit until 2026-10-12.
 PADM,PA,,PADM,,confirmed,,
 ALB,FA,,FACW,,confirmed,"289 class-list rows, taught under college FA; source department ""*Interdisciplinary: Fine Arts"" on 100% of rows; a bucket department, which names no single unit; no evidence settles the unit","Arts Leadership & Business before it became ALBS (Summer 2020; same courses, ALB 450 is ALBS 450). Decided 2026-10-09."
 ARSC,AS,,ASCW,,confirmed,"3679 class-list rows, taught under college AS; source department ""*Interdisciplinary: A.S."" on 100% of rows; a bucket department, which names no single unit; no evidence settles the unit",Arts & Sciences college-wide courses; no department owns them. Decided 2026-10-04.

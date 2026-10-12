@@ -297,7 +297,7 @@ MEDL,,Medical Laboratory Sciences,MEDL,,FALSE,,source_department,confirmed,"2102
 MFGE,,Manufacturing Engineering,ME,,FALSE,,course_taking,confirmed,"93 rows as Major; source department ""*Interdisciplinary:Engineering"" on 100% of primary-major rows; students take ME courses at 36.0x the overall rate (55 enrolments)",
 MGMT,,Management,MGMT,,FALSE,,source_department,confirmed,"7409 rows as First Minor; Major; Second Minor; source department ""Management"" on 100% of primary-major rows",
 MKTG,,Marketing Management,MKTG,,FALSE,,subject_code,confirmed,86 rows as First Minor; course subject MKTG,
-MLST,,Military Studies,NVSC,,FALSE,,course_taking,proposed,1328 rows as First Minor; Second Minor; students take NVSC courses at 124.9x the overall rate (862 enrolments),
+MLST,,Military Studies,ROTC,,FALSE,,course_taking,proposed,1328 rows as First Minor; Second Minor; students take NVSC courses at 124.9x the overall rate (862 enrolments),
 MRI,,Magnetic Resonance Imaging,RADS,,FALSE,,source_department,confirmed,"22 rows as Major; source department ""Radiology"" on 100% of primary-major rows",
 MSST,,Museum Studies,MSST,,FALSE,,subject_code,confirmed,"1147 rows as First Minor; Major; Second Minor; source department ""*Interdisciplinary: A.S."" on 100% of primary-major rows; course subject MSST",
 MUS,,Music,MUS,,FALSE,,source_department,confirmed,"3323 rows as First Minor; Major; Second Major; Second Minor; source department ""Music"" on 100% of primary-major rows",
@@ -318,7 +318,7 @@ NUR,,Nursing,NURS,,FALSE,,source_department,confirmed,"563 rows as Major; source
 NURP,,Nursing Practice,NURS,,FALSE,,source_department,confirmed,"1735 rows as Major; source department ""College of Nursing"" on 100% of primary-major rows",
 NURS,,Nursing,NURS,,FALSE,,source_department,confirmed,"31974 rows as Major; source department ""College of Nursing"" on 100% of primary-major rows",
 NUTR,,Nutrition,NUTR,,FALSE,,source_department,confirmed,"813 rows as First Minor; Major; Second Minor; source department ""Individual Fam Comm Educ IFCE"" on 100% of primary-major rows; course subject NUTR",
-NVSC,,Naval Science,NVSC,,FALSE,,subject_code,confirmed,3 rows as First Minor; course subject NVSC,
+NVSC,,Naval Science,ROTC,,FALSE,,decided,confirmed,3 rows as First Minor; course subject NVSC,Naval Science minor; goes with its courses to ROTC. Decided 2026-10-12.
 OCTH,,Occupational Therapy,OCTH,,FALSE,,subject_code,confirmed,"1805 rows as Major; source department ""Pediatrics Occupational Ther"" on 64% of primary-major rows; too mixed to settle the unit; course subject OCTH",
 OILS,,Organiza Info & Learning Sci,OILS,,FALSE,,source_department,confirmed,"1583 rows as Major; source department ""Organization Info Learning Sci"" on 100% of primary-major rows; course subject OILS",
 OLIT,,Org Learn & Instructional Tech,IADL,,FALSE,,decided,confirmed,"42 rows as Major; source department ""Organization Info Learning Sci"" on 88% of primary-major rows; students take OILS courses at 215.5x the overall rate (34 enrolments); assistant proposed OILS","Kept at its Stage 0 unit, a hand decision in program_code_maps.R; decided 2026-10-03."
