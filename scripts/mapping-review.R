@@ -34,8 +34,12 @@ cat(sprintf("\n── Mapping decisions (%d) %s\n", nrow(d), strrep("─", 50)))
 for (i in seq_len(nrow(d))) {
   suggested <- if (is.na(d$suggested[i])) "none" else
     paste0(d$suggested[i], if (!is.na(d$suggested_name[i])) paste0(" (", d$suggested_name[i], ")"))
+  # A course subject has no name; say which college teaches it instead.
+  what <- if (!is.na(d$name[i])) d$name[i] else
+    if (!is.na(d$taught_in[i])) paste("taught in", d$taught_in[i]) else
+    if (!is.na(d$detail[i])) d$detail[i] else ""
   cat(sprintf("%s  %s %s  %s | %s %s | suggested %s -- %s | needs: %s\n",
-              at(d$file[i], d$line[i]), d$kind[i], d$code[i], d$name[i] %||% "",
+              at(d$file[i], d$line[i]), d$kind[i], d$code[i], what,
               format(d$size[i], big.mark = ","), d$size_unit[i], suggested,
               d$confidence[i] %||% "unrated", d$needs[i]))
 }
