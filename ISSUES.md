@@ -29,6 +29,7 @@ recurrence is recognizable.
 
 | ID | Kind | Summary |
 |---|---|---|
+| [I21](#i21--concentrations-named-pre-are-flagged-pre-majors-and-lose-the-pre) | Defect | Concentrations named "Pre-" (Pre-Law, Pre-Professional Architecture) are flagged pre-majors: inflated pre-major counts in five departments |
 | [I20](#i20--cedar_programs-holds-almost-no-branch-campus-students) | Defect | `cedar_programs` holds 1–3% of branch-campus students; branch program counts read near zero |
 | [I18](#i18--cedar_degrees-holds-no-associate-degrees-so-branch-campus-completions-read-zero) | Defect | `cedar_degrees` holds no associate degrees: branch-campus completions read zero |
 | [I16](#i16--bottleneck-waitlist-pressure-ignores-term-so-later-registration-erases-earlier-waiting) | Defect | `get_bottlenecks()` waitlist pressure ignores term: ~6% under true demand (RStudio only; no page shows it) |
@@ -1429,6 +1430,62 @@ Confirm the form's campus default. If it is Albuquerque, have mrgather select
 every campus for Academic Studies and Degrees, re-pull the history, and rebuild.
 Until then, branch-campus program counts are not usable, including the counts
 the mapping review shows for branch codes.
+
+---
+
+## I21 — Concentrations named "Pre-" are flagged pre-majors and lose the "Pre-"
+
+**Status:** open
+**Found:** 2026-10-12, reading the new Counting rules table on Admin > Mappings
+**Severity:** medium. Headcount and the Dept Dashboard report inflated
+pre-major figures for five departments, Architecture most, and two
+concentrations display under a misleading name. Department totals themselves
+are unaffected: concentrations count with the student's primary major either
+way.
+**Affects:** `transform_programs()` in `R/data-parsers/transform-to-cedar.R`:
+`is_pre_major`, `pre_major_basis` and `program_name` on concentration rows;
+then every reader of `is_pre_major`, including the "Pre-majors" part of the
+Headcount and Dashboard scope strips (`headcount_scope_facts()`).
+
+### What is wrong
+
+A program row with no `programs.csv` row falls back to Banner's name: a
+"Pre-" name makes it a pre-major (`pre_major_basis = "name_prefix"`), and the
+"Pre-" is stripped from the stored name. The fallback was meant for codes not
+yet in the file. But concentrations have no code at all, so every
+concentration takes it. Banner names two concentrations "Pre-Professional
+Architecture" and "Pre-Law"; they are tracks within a major, not pre-majors
+leading to a program.
+
+All 5,606 name-flagged rows are concentration rows (4,547 Professional
+Architecture, 1,059 Law); no coded program takes the fallback. In Fall 2026:
+
+| Department | Concentration students counted as pre-majors | Real pre-majors |
+|---|---:|---:|
+| ARCH | 294 | 0 |
+| PHIL | 33 | 46 |
+| SOCI | 27 | 375 |
+| LAIS | 25 | 79 |
+| POLS | 1 | 174 |
+
+So Architecture's strip says 294 pre-majors are included, where it has none,
+and the concentrations display as "Professional Architecture" and "Law".
+
+### Reproduce
+
+```r
+source("scripts/cedar-repl.R")
+cedar_programs |>
+  dplyr::filter(pre_major_basis %in% "name_prefix", is_pre_major %in% TRUE) |>
+  dplyr::count(program_type, program_name)
+```
+
+### What a fix requires
+
+Apply the name fallback to coded rows only: a concentration is never a
+pre-major, and keeps Banner's name. That changes the transform, so the deploy
+gate rebuilds the program tables. Check first that nothing matches a
+concentration by its stripped name.
 
 ---
 
