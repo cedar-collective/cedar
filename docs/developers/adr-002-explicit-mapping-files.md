@@ -473,7 +473,8 @@ seen the day they appear.
    unit decision, or a rule such as "branch programs report to their campus".
 3. **Bucket programs.** Whether each interdisciplinary program (Museum Studies,
    Latin American Studies, International Studies) is its own unit or belongs to
-   a home department, as MPP belongs to PADM.
+   a home department. The MPP was mapped to PADM until 2026-10-12, when it
+   moved to ASCW with its PUBP courses.
 4. **Concentration rule.** Inferred from the data, not confirmed against
    Banner's own concentration-to-major link, which the export flattens away.
 5. **CSV or YAML.** CSV is proposed for diffability and spreadsheet editing.

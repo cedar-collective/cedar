@@ -960,7 +960,7 @@ make_headcount_plot <- function(summarized) {
 #' Label Department Program Headcount Rows for Display
 #'
 #' A department can own several programs at one level -- PADM's graduate
-#' majors are the MPA, MHA, MPP, and a Public Policy certificate. Colouring
+#' majors include the MPA and the MHA. Colouring
 #' the Dept Trends headcount charts by program_type stacked them all into one
 #' unlabelled "Major" series, so no program could be read off the chart. Each
 #' row is labelled with its program instead.
