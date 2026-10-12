@@ -479,7 +479,8 @@ seen the day they appear.
 5. **CSV or YAML.** CSV is proposed for diffability and spreadsheet editing.
 6. **The 81 proposed programs.** Mostly branch-campus certificates and
    minor-only codes. Many carry a sensible proposal (Art → ARTS, Liberal Arts
-   → LAIS, Military Studies → NVSC); each needs someone who knows the program.
+   → LAIS); each needs someone who knows the program, because some do not
+   survive review (Military Studies was proposed for NVSC and belongs to ROTC).
    From Stage 3 they appear under no unit, on Admin > Mappings, until confirmed.
 7. **Hand decisions Banner disagrees with.** Kept at Stage 2, but Banner names
    a different owner for ABA and ASD (Special Education, CEDAR says PSYC), CTS
