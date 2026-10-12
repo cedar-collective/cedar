@@ -91,6 +91,18 @@ try {
     document.getElementById('program_dept_mapping_table').innerText);
   check('program mappings show program and department names',
     /program name/i.test(programRef) && /dept name/i.test(programRef));
+  // The rules that place rows without a mapping-file row, with their counts,
+  // and the campus codes with where each is counted.
+  await readyAll(['counting_rules_table']);
+  const rules = await page.evaluate(() => document.getElementById('counting_rules_table').innerText);
+  check('counting rules list each rule with what it touches',
+    ['Concentrations', 'Cross-listed courses', 'Students with no program record', 'Home campus']
+      .every(rule => rules.includes(rule)) && /affects now/i.test(rules));
+  await openSubTab(page, 'Campuses');
+  await readyAll(['campus_mapping_table']);
+  const campusRef = await page.evaluate(() => document.getElementById('campus_mapping_table').innerText);
+  check('campus codes show their group and default scope',
+    campusRef.includes('ABQ') && /in default scope/i.test(campusRef));
   await page.screenshot({ path: '/tmp/cedar-admin-mappings.png', fullPage: true });
 
   await clickNavTab(page, 'Projections');

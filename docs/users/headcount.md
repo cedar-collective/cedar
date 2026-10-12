@@ -39,6 +39,8 @@ After each run, the strip under the filters says what the numbers count, read fr
 
 When a department is selected, Headcount counts the programs that department owns, as the mapping files assign them: a concentration counts with the student's primary major. Programs that share a name with one of the department's own are not included. Dept Trends and the Dept Dashboard's headcount cards use the same rule, so the three agree. A program still awaiting a mapping decision counts toward no department until it is decided.
 
+With a department selected, the strip also lists the codes behind it, each program with its name: its course subject codes, program codes, accelerated online (X-prefix) codes, and pre-major codes with the program each leads to. A code that applies only in one college or at one course level says so. These are the rows in the institution mapping files, the same block Dept Trends and the Dept Dashboard show; Admin > Data & Usage > Mappings explains each.
+
 ---
 
 ## Charts

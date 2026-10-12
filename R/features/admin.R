@@ -349,7 +349,7 @@ build_mapping_worklist <- function(files, programs, issues, audit, source_depart
 #' owns (`basis = no_unit`) is listed with none.
 #'
 #' @param files Mapping files from read_institution_mappings().
-#' @return List of `programs`, `subjects` and `units` data frames.
+#' @return List of `programs`, `subjects`, `units` and `colleges` data frames.
 build_mapping_reference_tables <- function(files) {
   unit_name <- function(code) files$units$unit_name[match(code, files$units$unit_code)]
   college_label <- function(code) {
@@ -378,7 +378,172 @@ build_mapping_reference_tables <- function(files) {
     units = tibble::tibble(
       dept_code = un$unit_code, dept_name = un$unit_name,
       college = college_label(un$college_code), kind = un$kind) %>%
-      dplyr::arrange(dept_code) %>% plain())
+      dplyr::arrange(dept_code) %>% plain(),
+    # Each college with the other values sources use for it (source_names),
+    # which the transform translates to its code: ED is EH.
+    colleges = tibble::tibble(
+      college_code = files$colleges$college_code, college_name = files$colleges$college_name,
+      also_matches = dplyr::na_if(gsub("|", ", ", files$colleges$source_names, fixed = TRUE), ""),
+      depts = as.integer(table(factor(un$college_code, levels = files$colleges$college_code)))) %>%
+      dplyr::arrange(college_code) %>% plain())
+}
+
+
+#' The counting rules CEDAR applies without a mapping-file row
+#'
+#' Admin > Mappings lists every decision the files hold. These are the rules
+#' that place or drop rows without one: a concentration's department, a
+#' pre-major read off its name, Banner's college for an undecided code, course
+#' level, the crosslist home, the excluded-course list, students with no
+#' program record, the two vocabularies for a home campus, and the hand-kept
+#' name lists. Each says what CEDAR does, how many rows it touches in the
+#' loaded tables, and where it is coded, so a count can be traced past the
+#' files to the rule that placed it.
+#'
+#' @param files Mapping files from read_institution_mappings().
+#' @param programs,sections,students cedar_programs, cedar_sections,
+#'   cedar_students as loaded.
+#' @return A tibble: rule, what, affects, coded_in.
+build_counting_rules <- function(files, programs, sections, students) {
+  need <- function(df, cols, what) {
+    missing <- setdiff(cols, names(df))
+    if (length(missing)) stop("[admin.R] build_counting_rules: ", what, " lacks ",
+                              paste(missing, collapse = ", "))
+  }
+  need(programs, c("student_id", "term", "program_type", "program_name", "major_code", "dept_code",
+                   "is_pre_major", "pre_major_basis", "college_basis", "student_campus"),
+       "cedar_programs")
+  need(sections, c("term", "campus", "subject", "subject_course", "level", "department",
+                   "college_basis", "crosslist_group", "crosslist_role"), "cedar_sections")
+  need(students, c("student_id", "term", "student_campus", "college_basis"), "cedar_students")
+  n <- function(x) format(x, big.mark = ",")
+  pct <- function(a, b) if (b == 0) "—" else sprintf("%.1f%%", 100 * a / b)
+  some <- function(codes, k = 6) {
+    codes <- sort(unique(codes))
+    if (length(codes) > k) paste0(paste(head(codes, k), collapse = ", "), ", ...") else
+      paste(codes, collapse = ", ")
+  }
+
+  conc <- programs[grepl("Concentration", programs$program_type), ]
+  by_name <- programs[programs$pre_major_basis %in% "name_prefix" & programs$is_pre_major %in% TRUE, ]
+  phrd <- programs[programs$pre_major_basis %in% "phrd_undergraduate", ]
+  banner_pr <- programs[programs$college_basis %in% "banner", ]
+  banner_sec <- sections[sections$college_basis %in% "banner", ]
+  levels <- table(factor(sections$level, levels = c("lower", "upper", "grad")))
+  xl <- sections[!is.na(sections$crosslist_group), ]
+  xl_groups <- xl %>% dplyr::distinct(term, campus, crosslist_group, department) %>%
+    dplyr::count(term, campus, crosslist_group, name = "n_depts")
+  partners <- sum(!xl$crosslist_role %in% c("home", "internal"))
+  excluded <- sections[sections$subject_course %in% excluded_courses, ]
+
+  # Student-terms in the class lists with no program record (ISSUES.md I20).
+  st <- students %>% dplyr::distinct(student_id, term, student_campus)
+  has_program <- paste(st$student_id, st$term) %in%
+    unique(paste(programs$student_id, programs$term))
+  branch <- st$student_campus %in% CEDAR_CAMPUS_BRANCH
+  main <- st$student_campus %in% CEDAR_CAMPUS_MAIN
+
+  tibble::tibble(
+    rule = c("Concentrations", "Pre-majors by name", "PHRD", "Banner's college",
+             "Course level", "Cross-listed courses", "Excluded courses",
+             "Students with no program record", "Home campus", "HR departments",
+             "Program names to codes"),
+    what = c(
+      "A concentration has no code in Banner's report, so it counts with the department of the student's primary major that term.",
+      "A program row with no programs.csv row is a pre-major when Banner's name for it begins \"Pre-\", and is stored without the \"Pre-\". Every concentration is such a row, since concentrations have no code (ISSUES.md I21). A row in programs.csv states the flag instead.",
+      "PHRD was undergraduate pre-pharmacy before Fall 2025; undergraduate PHRD rows are pre-majors whatever programs.csv says.",
+      "A code with no confirmed row has no department, and reports the college Banner gives it, labelled college_basis = \"banner\".",
+      sprintf("A course's level is read from the first digit of its number: %s. subjects.csv rows with in_level apply at one level only.",
+              paste(sprintf("%s %s", names(COURSE_LEVEL_BY_LEADING_DIGIT), COURSE_LEVEL_BY_LEADING_DIGIT),
+                    collapse = ", ")),
+      "Every section in a cross-list group carries the group's combined enrollment, so a course counts once, under its home section's department (keep_home_sections()). The transform picks the home section, falling back to enrollment where Banner names none.",
+      "Thesis, dissertation, honors-credit and similar courses are left out wherever a computation applies the excluded list (opt$uel = TRUE): department enrollment trends and reviews, Regstats waitlists and saturation, Open Seats; optional on the Enrollment tab.",
+      "Class lists cover every campus; program records (Academic Studies) mostly cover Albuquerque. A student-term with no program record counts in course enrollment but in no department's or college's headcount.",
+      "Program records name a student's home campus (\"Albuquerque/Main\"); class lists code it (\"ABQ\"). No file maps one to the other: headcounts filter on the names, course figures on the codes.",
+      "Faculty get a department from the HR report's organisation name through a hand-kept list. HR organisations not on it are dropped when the report is parsed.",
+      "Older exports with a program name but no code get the code from a hand-kept list of names."),
+    affects = c(
+      sprintf("%s concentration rows; %s count toward no department because the primary major is undecided.",
+              n(nrow(conc)), n(sum(is.na(conc$dept_code)))),
+      if (nrow(by_name)) {
+        by_name_conc <- grepl("Concentration", by_name$program_type)
+        conc_text <- sprintf("%s concentration rows (%s)", n(sum(by_name_conc)),
+                             some(by_name$program_name[by_name_conc]))
+        coded_text <- sprintf("%s rows under %s codes (%s)", n(sum(!by_name_conc)),
+                              n(dplyr::n_distinct(stats::na.omit(by_name$major_code[!by_name_conc]))),
+                              some(by_name$major_code[!by_name_conc]))
+        if (all(by_name_conc)) {
+          sprintf("%s rows, all concentrations (%s); no coded program takes this fallback.",
+                  n(nrow(by_name)), some(by_name$program_name))
+        } else if (!any(by_name_conc)) {
+          paste0(coded_text, ".")
+        } else sprintf("%s rows: %s; %s.", n(nrow(by_name)), conc_text, coded_text)
+      } else "None in the loaded data.",
+      sprintf("%s rows.", n(nrow(phrd))),
+      sprintf("%s program rows (%s codes: %s); %s sections (subjects %s); %s class-list rows.",
+              n(nrow(banner_pr)), n(dplyr::n_distinct(stats::na.omit(banner_pr$major_code))), some(banner_pr$major_code),
+              n(nrow(banner_sec)), some(banner_sec$subject), n(sum(students$college_basis %in% "banner"))),
+      sprintf("Sections: %s lower, %s upper, %s grad. %s subjects.csv rows keyed on level.",
+              n(levels[["lower"]]), n(levels[["upper"]]), n(levels[["grad"]]),
+              n(sum(nzchar(files$subjects$in_level)))),
+      sprintf("%s cross-list groups; %s span more than one department, so the home section decides which counts them. %s partner sections are left out of course counts. How many homes came from the enrollment fallback is not recorded.",
+              n(nrow(xl_groups)), n(sum(xl_groups$n_depts > 1)), n(partners)),
+      sprintf("%s courses on the list; %s sections in the loaded data.",
+              n(length(excluded_courses)), n(nrow(excluded))),
+      sprintf("%s of %s student-terms (%s): %s at Albuquerque, %s at the branch campuses (ISSUES.md I20).",
+              n(sum(!has_program)), n(nrow(st)), pct(sum(!has_program), nrow(st)),
+              pct(sum(!has_program & main), sum(main)), pct(sum(!has_program & branch), sum(branch))),
+      sprintf("%s home-campus names in program records; %s campus codes in class lists.",
+              n(dplyr::n_distinct(stats::na.omit(programs$student_campus))),
+              n(dplyr::n_distinct(stats::na.omit(students$student_campus)))),
+      sprintf("%s organisation names to %s departments.", n(length(hr_org_desc_to_dept)),
+              n(dplyr::n_distinct(hr_org_desc_to_dept))),
+      sprintf("%s names.", n(length(major_name_to_major_code)))),
+    coded_in = c(
+      "transform_programs(), R/data-parsers/transform-to-cedar.R",
+      "transform_programs(), R/data-parsers/transform-to-cedar.R",
+      "transform_programs(); CEDAR_DATA_SEMANTICS (R/lists/data_semantics.R)",
+      "add_program_colleges() and .course_colleges(), R/data-parsers/transform-to-cedar.R",
+      "COURSE_LEVEL_BY_LEADING_DIGIT, R/lists/course_numbering.R",
+      "keep_home_sections(), R/trunk/filter.R; transform_sections()",
+      "excluded_courses, R/lists/excluded_courses.R",
+      "the source exports (mrgather); ISSUES.md I18, I20",
+      "R/lists/campuses.R",
+      "hr_org_desc_to_dept, R/lists/mappings.R; R/data-parsers/parse-HRreport.R",
+      "major_name_to_major_code, R/lists/mappings.R"))
+}
+
+#' Every campus code: its label, group, and where it is counted
+#'
+#' The codes R/lists/campuses.R defines, plus any code the loaded data uses
+#' that it does not, so an unexplained code is visible rather than silently
+#' grouped. Sections and enrollments count where a course was taught
+#' (`campus`); home-campus rows count the student's home campus as class lists
+#' code it.
+#'
+#' @param sections,students cedar_sections and cedar_students as loaded.
+#' @return A tibble: campus, label, group, default_scope, sections,
+#'   enrollments_taught, enrollments_home.
+build_campus_reference <- function(sections, students) {
+  if (!"campus" %in% names(sections)) stop("[admin.R] build_campus_reference: cedar_sections lacks campus")
+  if (!all(c("campus", "student_campus") %in% names(students))) {
+    stop("[admin.R] build_campus_reference: cedar_students lacks campus or student_campus")
+  }
+  known <- c(CEDAR_CAMPUS_MAIN, CEDAR_CAMPUS_ONLINE, CEDAR_CAMPUS_BRANCH)
+  seen <- unique(stats::na.omit(c(sections$campus, students$campus, students$student_campus)))
+  codes <- c(known, sort(setdiff(seen[nzchar(seen)], known)))
+  count_in <- function(x) as.integer(table(factor(x, levels = codes)))
+  tibble::tibble(
+    campus = codes,
+    label = unname(CEDAR_CAMPUS_LABELS[codes]),
+    group = dplyr::case_when(codes %in% CEDAR_CAMPUS_MAIN ~ "Main",
+                             codes %in% CEDAR_CAMPUS_ONLINE ~ "Online",
+                             codes %in% CEDAR_CAMPUS_BRANCH ~ "Branch",
+                             TRUE ~ "Not in campuses.R"),
+    default_scope = codes %in% CEDAR_CAMPUS_DEFAULT,
+    sections = count_in(sections$campus),
+    enrollments_taught = count_in(students$campus),
+    enrollments_home = count_in(students$student_campus))
 }
 
 

@@ -259,6 +259,11 @@ export async function runReportChecks({ scope = 'smoke', synthetic = false } = {
           !cards.includes("the program's owning department")) {
         throw new Error(`Dashboard headcount scope strip missing: ${cards}`);
       }
+      // The filter strip names the codes behind the department, from the files.
+      const codes = await page.$eval('#dashboard_program_info', (el) => el.textContent);
+      for (const part of ['Data scope for', 'Program codes:', 'Course subject codes:']) {
+        if (!codes.includes(part)) throw new Error(`Dashboard code scope lacks "${part}": ${codes}`);
+      }
     });
 
     await withStep(page, ['dept-trends'], 'Dept Trends defers hidden charts and renders opened tabs', async () => {
@@ -272,6 +277,10 @@ export async function runReportChecks({ scope = 'smoke', synthetic = false } = {
         { type: 'plotly', id: 'dept_trends-hc_progs_under_long_majors_plot' },
       ]);
       await waitForIdle(page, { timeout: STEP_TIMEOUT });
+      const codes = await page.$eval('#dept_trends-program_info', (el) => el.textContent);
+      if (!codes.includes('Program codes:') || !codes.includes('Course subject codes:')) {
+        throw new Error(`Dept Trends code scope missing: ${codes}`);
+      }
       const hiddenChartsRendered = await page.evaluate(() => [
         'dept_trends-degree_summary_faceted_by_major_plot',
         'dept_trends-pt_plot',
@@ -538,7 +547,9 @@ export async function runReportChecks({ scope = 'smoke', synthetic = false } = {
       // The strip says what was counted, read off the run, and that a
       // department is its programs' own department (ISSUES I15, fixed).
       const scope = await page.$eval('#headcount-scope_summary', (el) => el.textContent);
-      for (const part of ['Counting', 'Campus', 'Terms', 'Department', "the program's owning department"]) {
+      // ...and names the codes behind the department, as Dept Trends does.
+      for (const part of ['Counting', 'Campus', 'Terms', 'Department', "the program's owning department",
+                          'Data scope for', 'Program codes:']) {
         if (!scope.includes(part)) throw new Error(`Headcount scope strip lacks "${part}": ${scope}`);
       }
     });

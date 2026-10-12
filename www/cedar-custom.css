@@ -1167,6 +1167,13 @@ a:hover { color: var(--juniper-blue-dark); }
   margin: 2px 3px 2px 0;
   padding: 1px 6px;
 }
+/* A code's name beside its pill, in unit_codes_scope(); the margin separates
+   one code from the next. */
+.filters-compact .filter-context-name {
+  color: var(--cedar-green-dark);
+  font-size: 0.82em;
+  margin-right: 12px;
+}
 
 /* ── Selectize dropdown (global — all selectize instances) ────────────────── */
 .selectize-dropdown,

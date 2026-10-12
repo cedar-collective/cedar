@@ -353,6 +353,8 @@ test_that("headcount scope reports what the run counted, read off the result", {
   expect_equal(facts$latest_term, 202080)
   expect_equal(facts$n_pre_major, 2)
   expect_equal(facts$department_rule, "dept_code")
+  # The departments counted, so the scope bar can name the codes behind them.
+  expect_equal(facts$dept_codes, "HIST")
   expect_equal(facts$grouping, "program")
   expect_equal(facts$campus_basis, "home")
 

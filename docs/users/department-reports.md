@@ -14,7 +14,7 @@ nav_order: 2
 
 Dept Trends is the longer-term department report. Unlike the [Dept Dashboard](dept-dashboard) — which auto-loads and focuses on current-term course activity — Dept Trends assembles historical views from versioned tab caches. Standard department and campus scopes are prepared after production data refreshes; an uncommon scope computes once on demand and is then cached. The cache stores ready-to-render charts, and a change to the app's visual palette creates a distinct cache entry for that styling.
 
-Select a department (and optionally a campus) and the report assembles automatically.
+Select a department (and optionally a campus) and the report assembles automatically. The strip under the filters lists the codes behind the department, each program with its name: course subject codes, program codes, accelerated online (X-prefix) codes, and pre-major codes. A code that applies only in one college or at one course level says so. They are the rows the institution mapping files assign it; Admin > Data & Usage > Mappings explains each, and the same block appears on the Dept Dashboard and Headcount.
 
 ---
 

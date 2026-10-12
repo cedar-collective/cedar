@@ -268,7 +268,127 @@ test_that("the mapping reference tables carry every confirmed row, with names", 
   expect_equal(ref$subjects$dept_name, c("Health Education", "Health Ed (Branch)"))
   expect_equal(ref$units$college[ref$units$dept_code == "HED"], "EH (Education)")
   expect_equal(ref$units$college[ref$units$dept_code == "NURS"], "NU")   # a college no file names
+  expect_equal(ref$colleges$college_code, c("AD", "EH"))
+  expect_equal(ref$colleges$depts, c(2L, 1L))                            # BUSA and HLED; HED
   for (tbl in ref) expect_false(any(vapply(tbl, function(x) !is.null(names(x)), logical(1))))
+})
+
+
+# The codes a department's scope bar names: every confirmed row that assigns a
+# subject or program to it, each program with its name. Scaffolding: the
+# reference-table files above, with HLED's every-college and AD-only rows, a
+# proposed subject that must not appear, and a pre-major leading to NURS.
+test_that("a unit's scope names every confirmed subject and program row behind it", {
+  files <- review_files()
+  files$programs <- rbind(files$programs, data.frame(
+    program_code = c("FNRS", "BADM"), in_college = c("", "AD"),
+    program_name = c("Pre-Nursing", "Business Administration"),
+    unit_code = c("NURS", "BUSA"), college_code = "", is_pre_major = c("TRUE", "FALSE"),
+    leads_to = c("NURS", ""), basis = "decided", status = "confirmed", evidence = "", notes = ""))
+  files$units <- data.frame(unit_code = c("NURS", "BUSA", "HLED"),
+                            unit_name = c("Nursing", "Business (Branch)", "Health Ed (Branch)"),
+                            college_code = c("NU", "AD", ""), kind = "department", notes = "")
+  files$colleges <- data.frame(college_code = c("AD", "NU"),
+                               college_name = c("Associate Degree", "Nursing"), source_names = "")
+  files$subjects <- data.frame(
+    subject_code = c("NURS", "HLED", "HLED", "XNUR"), in_college = c("", "", "AD", ""),
+    in_level = c("", "", "lower", ""), unit_code = c("NURS", "HLED", "HLED", "NURS"),
+    college_code = "", status = c("confirmed", "confirmed", "confirmed", "proposed"),
+    evidence = "", notes = "")
+  rows <- unit_mapping_rows(c("NURS", "HLED"), files)
+
+  expect_equal(rows$units$unit_name, c("Nursing", "Health Ed (Branch)"))
+  expect_equal(rows$units$college_name, c("Nursing", NA))           # HLED has no home college
+  expect_equal(rows$subjects$subject_code[rows$subjects$unit_code == "NURS"], "NURS")  # not XNUR
+  hled <- rows$subjects[rows$subjects$unit_code == "HLED", ]
+  expect_equal(hled$in_college, c(NA, "AD"))
+  expect_equal(hled$in_level, c(NA, "lower"))
+  nurs <- rows$programs[rows$programs$unit_code == "NURS", ]
+  expect_equal(nurs$program_code, c("FNRS", "NURS"))                # FRAD is proposed
+  expect_equal(nurs$program_name, c("Pre-Nursing", "Nursing"))
+  expect_equal(nurs$is_pre_major, c(TRUE, FALSE))
+  expect_equal(nurs$leads_to, c("NURS", NA))
+  expect_false("BADM" %in% rows$programs$program_code)              # BUSA was not asked for
+  expect_error(unit_mapping_rows("NOPE", files), "not in units.csv: NOPE")
+})
+
+# Scaffolding for build_counting_rules(): the transform's output columns the
+# rules read, as small frames. Programs: two concentration rows (one under an
+# undecided major, so no department, and flagged a pre-major by its name, as
+# the transform does to "Pre-Law": I21), one coded pre-major by name (FZZZ),
+# one PHRD undergraduate, rows reporting Banner's college. Sections: a cross-list
+# group spanning HIST and ENGL (home and partner) and one within HIST, an
+# excluded course, levels 3 lower / 1 upper / 1 grad. Students: S1-S3 in
+# 202080; S3 at TA has no program record.
+counting_rule_tables <- function() {
+  programs <- tibble::tibble(
+    student_id = c("S1", "S1", "S2", "S2", "S1", "S2"), term = 202080L,
+    program_type = c("Major", "First Concentration", "Major", "First Concentration",
+                     "Second Major", "First Minor"),
+    program_name = c("History", "Public Policy", "Zed", "Law", "Pharmacy", "Undecided"),
+    major_code = c("HIST", NA, "FZZZ", NA, "PHRD", "UNDC"),
+    dept_code = c("HIST", "HIST", NA, NA, "PHRM", NA),
+    is_pre_major = c(FALSE, FALSE, TRUE, TRUE, TRUE, FALSE),
+    pre_major_basis = c("programs_csv", "name_prefix", "name_prefix", "name_prefix",
+                        "phrd_undergraduate", "programs_csv"),
+    college_basis = c("mapped", "mapped", "banner", "banner", "mapped", "banner"),
+    student_campus = c("Albuquerque/Main", "Albuquerque/Main", "Albuquerque/Main",
+                       "Albuquerque/Main", "Albuquerque/Main", "Albuquerque/Main"))
+  sections <- tibble::tibble(
+    term = 202080L, campus = c("ABQ", "ABQ", "ABQ", "ABQ", "EA"),
+    subject = c("HIST", "ENGL", "HIST", "HIST", "ZZZZ"),
+    subject_course = c("HIST 300", "ENGL 300", "HIST 101", "HIST 501", excluded_courses[1]),
+    level = c("upper", "lower", "lower", "grad", "lower"),
+    department = c("HIST", "ENGL", "HIST", "HIST", NA),
+    college_basis = c("mapped", "mapped", "mapped", "mapped", "banner"),
+    crosslist_group = c("G1", "G1", "G2", "G2", NA),
+    crosslist_role = c("home", "partner", "internal", "internal", NA))
+  students <- tibble::tibble(
+    student_id = c("S1", "S2", "S3", "S3"), term = 202080L,
+    student_campus = c("ABQ", "ABQ", "TA", "TA"), campus = c("ABQ", "EA", "TA", "ZZ"),
+    college_basis = c("mapped", "mapped", "banner", "mapped"))
+  list(programs = programs, sections = sections, students = students)
+}
+
+test_that("counting rules report what each touches in the loaded tables", {
+  t <- counting_rule_tables()
+  files <- review_files()
+  files$subjects <- data.frame(subject_code = c("HIST", "HIST"), in_level = c("", "grad"))
+  rules <- build_counting_rules(files, t$programs, t$sections, t$students)
+  affects <- stats::setNames(rules$affects, rules$rule)
+
+  expect_equal(rules$rule[1], "Concentrations")
+  expect_match(affects[["Concentrations"]], "^2 concentration rows; 1 count toward no department")
+  # Concentrations, which have no code, are reported by name apart from codes.
+  expect_equal(affects[["Pre-majors by name"]],
+               "2 rows: 1 concentration rows (Law); 1 rows under 1 codes (FZZZ).")
+  expect_equal(affects[["PHRD"]], "1 rows.")
+  expect_match(affects[["Banner's college"]],
+               "^3 program rows \\(2 codes: FZZZ, UNDC\\); 1 sections \\(subjects ZZZZ\\); 1 class-list rows")
+  expect_match(affects[["Course level"]], "^Sections: 3 lower, 1 upper, 1 grad. 1 subjects.csv rows keyed on level")
+  expect_match(affects[["Cross-listed courses"]], "^2 cross-list groups; 1 span more than one department")
+  expect_match(affects[["Cross-listed courses"]], "1 partner sections are left out")
+  expect_match(affects[["Excluded courses"]], "1 sections in the loaded data")
+  # S1 and S2 have program rows in 202080; S3 (TA) has none.
+  expect_match(affects[["Students with no program record"]],
+               "^1 of 3 student-terms \\(33.3%\\): 0.0% at Albuquerque, 100.0% at the branch campuses")
+  expect_match(affects[["Home campus"]], "^1 home-campus names in program records; 2 campus codes")
+  expect_error(build_counting_rules(files, dplyr::select(t$programs, -pre_major_basis),
+                                    t$sections, t$students),
+               "cedar_programs lacks pre_major_basis")
+})
+
+test_that("the campus table lists every defined code and any the data adds", {
+  t <- counting_rule_tables()
+  campuses <- build_campus_reference(t$sections, t$students)
+  expect_equal(head(campuses$campus, 3), c("ABQ", "EA", "GA"))
+  zz <- campuses[campuses$campus == "ZZ", ]
+  expect_equal(zz$group, "Not in campuses.R")                 # a code campuses.R lacks is shown
+  expect_true(is.na(zz$label))
+  abq <- campuses[campuses$campus == "ABQ", ]
+  expect_equal(c(abq$sections, abq$enrollments_taught, abq$enrollments_home), c(4L, 1L, 2L))
+  expect_true(abq$default_scope)
+  expect_false(campuses$default_scope[campuses$campus == "TA"])
 })
 
 

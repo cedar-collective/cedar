@@ -68,8 +68,8 @@ largest first, in three tabs:
 - **Programs**: programs awaiting a decision, program codes in the data that no
   file covers, and programs whose mapped college differs from Banner's.
 - **Course subjects**: course subjects awaiting a decision.
-- **Colleges**: college names no file recognizes, and departments with no
-  home college.
+- **College values**: college names no file recognizes, and departments with
+  no home college.
 
 Each row opens with what it is, then what it needs:
 
@@ -92,6 +92,16 @@ reviewed like any other change; the app never edits them.
 Banner organization IDs that appear in the major-code column — so they can be
 reported to whoever owns the source data.
 
+**Counting rules** lists the rules that place or drop rows without a row in a
+mapping file, each with how many rows it touches in the loaded data and where
+it is coded: concentrations counting with the student's primary major,
+pre-majors read off a "Pre-" name, Banner's college for an undecided code,
+course level from the course number, cross-listed courses counting once under
+their home section, the excluded-courses list, students with no program
+record (ISSUES.md I20), the two vocabularies for a home campus, and the
+hand-kept HR and program-name lists. With the decisions and the tables below,
+they account for every department, college and campus a count is assigned to.
+
 Below those, subtabs show what *is* mapped today:
 
 | Subtab | What it shows |
@@ -99,6 +109,8 @@ Below those, subtabs show what *is* mapped today:
 | **Program to Dept** | Every confirmed program: its code and name, the department (code and name) that owns it, and the college it applies in when it is not every college. A program no department owns says so. |
 | **Subject to Dept** | Every confirmed course subject: the department (code and name) that owns it, and the college or course level it applies to when it is not all of them. |
 | **Dept Names** | Every department: its code, name, home college, and kind (a department, a program, or a college-wide unit for courses no department owns). |
+| **Colleges** | Every college: its code and name, the other values sources use for it (which CEDAR translates to its code: ED is EH), and how many departments it is home to. |
+| **Campuses** | Every campus code: its label, group (main, online, branch), whether it is in the default scope, how many sections and enrollments it taught, and how many enrollments are from students whose home campus it is. A code the data uses that CEDAR does not define is listed too. |
 
 A long decisions list does not mean the app is broken. It means some codes
 should be checked before someone treats a department or college total as

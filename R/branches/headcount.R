@@ -605,7 +605,7 @@ get_headcount <- function(programs, opt = list(), group_by = NULL, lookups = NUL
 #' @param opt The normalized options.
 #' @param rolled_up_by_dept Whether programs were rolled up to departments.
 #' @return A list: program_types, levels, terms, campus, department_rule,
-#'   grouping, n_pre_major (pre-major students in the latest term),
+#'   dept_codes, grouping, n_pre_major (pre-major students in the latest term),
 #'   latest_term.
 headcount_scope_facts <- function(df, summarized, opt, rolled_up_by_dept) {
   # Read from the counted rows: the summary keeps only the caller's grouping
@@ -628,6 +628,8 @@ headcount_scope_facts <- function(df, summarized, opt, rolled_up_by_dept) {
     # How rows were assigned to the selected department: by each program's
     # own department, as the Dept Dashboard does (filter_programs_to_dept()).
     department_rule = if (length(opt$dept_code)) "dept_code" else "none",
+    # The departments the run counted, so a scope bar can name their codes.
+    dept_codes = if (length(opt$dept_code)) as.character(opt$dept_code) else character(0),
     grouping = grouping,
     n_pre_major = if ("is_pre_major" %in% names(df) && !is.na(latest))
       dplyr::n_distinct(df$student_id[df$term == latest & df$is_pre_major %in% TRUE]) else NA_integer_

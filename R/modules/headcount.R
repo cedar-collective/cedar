@@ -365,8 +365,15 @@ headcountServer <- function(id, programs, lookups, in_progress_terms, error_hand
       described <- describe_headcount_scope(result$scope, in_progress_terms)
       selected <- c(input$college, input$dept, input$major, input$minor, input$concentration)
 
-      headcount_scope_bar(described,
-                          scope_chip("Selected", if (length(selected)) selected else "everything"))
+      # The codes behind each department the run counted, by name, from the
+      # mapping files: the same block Dept Trends and the Dept Dashboard show.
+      codes <- if (length(result$scope$dept_codes)) {
+        unit_codes_scope(unit_mapping_rows(result$scope$dept_codes, cedar_institution_files))
+      }
+      tagList(
+        headcount_scope_bar(described,
+                            scope_chip("Selected", if (length(selected)) selected else "everything")),
+        codes)
     })
 
     output$download_ui <- renderUI({

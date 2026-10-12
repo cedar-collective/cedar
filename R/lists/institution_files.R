@@ -376,6 +376,49 @@ program_pre_major_flags <- function(program_code, programs) {
   ifelse(is.na(flag), NA, flag == "TRUE")
 }
 
+#' The mapping-file rows a unit's figures are built from
+#'
+#' Every confirmed subjects.csv row that assigns a course subject to the unit,
+#' and every confirmed programs.csv row that assigns a program, each program
+#' with its name; rows that apply in only one college or at one level say so.
+#' These are the rows the transform resolves through, so a scope bar built
+#' from them names exactly the codes the unit counts. Concentrations have no
+#' row: they count with the student's primary major.
+#'
+#' @param unit_codes Unit codes, each in units.csv.
+#' @param files The list read_institution_mappings() returns.
+#' @return A list of `units` (unit_code, unit_name, college_code,
+#'   college_name), `subjects` (unit_code, subject_code, in_college, in_level)
+#'   and `programs` (unit_code, program_code, program_name, in_college,
+#'   is_pre_major, leads_to); blanks in the files are NA.
+unit_mapping_rows <- function(unit_codes, files) {
+  unknown <- setdiff(unit_codes, files$units$unit_code)
+  if (length(unknown)) {
+    stop("[institution_files.R] unit_mapping_rows: not in units.csv: ",
+         paste(unknown, collapse = ", "))
+  }
+  blank_na <- function(x) ifelse(nzchar(x), x, NA_character_)
+  un <- files$units[match(unit_codes, files$units$unit_code), ]
+  sj <- files$subjects[files$subjects$status == "confirmed" &
+                         files$subjects$unit_code %in% unit_codes, ]
+  pr <- files$programs[files$programs$status == "confirmed" &
+                         files$programs$unit_code %in% unit_codes, ]
+  sj <- sj[order(sj$unit_code, sj$subject_code, sj$in_college, sj$in_level), ]
+  pr <- pr[order(pr$unit_code, pr$program_code, pr$in_college), ]
+  list(
+    units = tibble::tibble(
+      unit_code = un$unit_code, unit_name = un$unit_name,
+      college_code = blank_na(un$college_code),
+      college_name = college_names(blank_na(un$college_code), files)),
+    subjects = tibble::tibble(
+      unit_code = sj$unit_code, subject_code = sj$subject_code,
+      in_college = blank_na(sj$in_college), in_level = blank_na(sj$in_level)),
+    programs = tibble::tibble(
+      unit_code = pr$unit_code, program_code = pr$program_code,
+      program_name = pr$program_name, in_college = blank_na(pr$in_college),
+      is_pre_major = pr$is_pre_major == "TRUE", leads_to = blank_na(pr$leads_to)))
+}
+
 #' College names for college codes, from colleges.csv
 #'
 #' @param codes College codes; NA stays NA.
