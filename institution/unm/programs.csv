@@ -297,7 +297,7 @@ MEDL,,Medical Laboratory Sciences,MEDL,,FALSE,,source_department,confirmed,"2102
 MFGE,,Manufacturing Engineering,ME,,FALSE,,course_taking,confirmed,"93 rows as Major; source department ""*Interdisciplinary:Engineering"" on 100% of primary-major rows; students take ME courses at 36.0x the overall rate (55 enrolments)",
 MGMT,,Management,MGMT,,FALSE,,source_department,confirmed,"7409 rows as First Minor; Major; Second Minor; source department ""Management"" on 100% of primary-major rows",
 MKTG,,Marketing Management,MKTG,,FALSE,,subject_code,confirmed,86 rows as First Minor; course subject MKTG,
-MLST,,Military Studies,ROTC,,FALSE,,course_taking,proposed,1328 rows as First Minor; Second Minor; students take NVSC courses at 124.9x the overall rate (862 enrolments),
+MLST,,Military Studies,ROTC,,FALSE,,decided,confirmed,1328 rows as First Minor; Second Minor; students take NVSC courses at 124.9x the overall rate (862 enrolments),"The Military Studies minor, offered through ROTC: its students take all three ROTC programs' courses (MLSL 2037, NVSC 1346, AFAS 1245). The LAIS concentration of the same name is a separate Banner record with no program code; it counts under LAIS from the student's major. Decided 2026-10-12."
 MRI,,Magnetic Resonance Imaging,RADS,,FALSE,,source_department,confirmed,"22 rows as Major; source department ""Radiology"" on 100% of primary-major rows",
 MSST,,Museum Studies,MSST,,FALSE,,subject_code,confirmed,"1147 rows as First Minor; Major; Second Minor; source department ""*Interdisciplinary: A.S."" on 100% of primary-major rows; course subject MSST",
 MUS,,Music,MUS,,FALSE,,source_department,confirmed,"3323 rows as First Minor; Major; Second Major; Second Minor; source department ""Music"" on 100% of primary-major rows",
