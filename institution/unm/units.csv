@@ -1,9 +1,9 @@
 unit_code,unit_name,college_code,kind,notes
 AAC,Academic Assistance Center,AD,department,College proposed 2026-10-04 from its course sections since Spring 2024: AD 100% (3 sections).
 ACCT,Accounting,MG,department,College proposed 2026-10-04 from its course sections since Spring 2024: MG 100% (149 sections).
+ADCW,Associate Degree (college-wide),AD,college,"Courses the branch campuses teach under college AD with no department: Banner names only ""Provost Branch Campuses"". First use HHHA (Holistic Health & Healing Arts, UNM-Taos). Added 2026-10-12."
 ADOB,Adobe/Creative Suite,AD,department,College proposed 2026-10-04 from its course sections since Spring 2024: AD 100% (2 sections).
 AEEC,Automotive/Electrical,AD,department,College proposed 2026-10-04 from its course sections since Spring 2024: AD 100% (6 sections).
-AFAS,Air Force Aerospace Studies,UC,department,College proposed 2026-10-04 from its course sections since Spring 2024: UC 100% (77 sections).
 AFST,Africana Studies,AS,department,College proposed 2026-10-04 from its course sections since Spring 2024: AS 100% (176 sections).
 AMST,American Studies,AS,department,College proposed 2026-10-04 from its course sections since Spring 2024: AS 100% (736 sections).
 ANES,Anesthesiology,ME,department,College proposed 2026-10-04 from its course sections since Spring 2024: ME 100% (78 sections).
@@ -109,7 +109,6 @@ MEDL,Medical Laboratory Sciences,ME,department,College proposed 2026-10-04 from 
 MFGT,Manufacturing,AD,department,"College proposed 2026-10-04 from subjects.csv, where all its subjects sit under AD; no sections under it since Spring 2024 and no programs."
 MGMT,Management,MG,department,"College proposed 2026-10-04 from its course sections since Spring 2024: MG 100%, AD 0% (2183 sections)."
 MKTG,Marketing,MG,department,College proposed 2026-10-04 from its course sections since Spring 2024: MG 100% (16 sections).
-MLSL,Military Science & Leadership,UC,department,College proposed 2026-10-04 from its course sections since Spring 2024: UC 100% (119 sections).
 MLT,Medical Laboratory Technology,AD,department,College proposed 2026-10-04 from its course sections since Spring 2024: AD 100% (37 sections).
 MPHY,Medical Physics,ME,department,College proposed 2026-10-04 from its course sections since Spring 2024: ME 100% (21 sections).
 MSET,"Math, Science & Technology Education",EH,department,College proposed 2026-10-04 from its course sections since Spring 2024: EH 100% (82 sections).
@@ -123,7 +122,6 @@ NSME,Nanoscience & Microsystems Engineering,EN,department,College proposed 2026-
 NUCM,Nuclear Medicine,ME,department,College proposed 2026-10-04 from its course sections since Spring 2024: ME 100% (48 sections).
 NURS,Nursing,NU,department,College proposed 2026-10-04 from its course sections since Spring 2024: NU 100% (1575 sections).
 NUTR,Nutrition,EH,department,College proposed 2026-10-04 from its course sections since Spring 2024: EH 100% (434 sections).
-NVSC,Naval Science,UC,department,"College proposed 2026-10-04 from its course sections since Spring 2024: UC 84%, PA 16% (64 sections)."
 NWOB,Non-Credit / Workforce,AD,department,College proposed 2026-10-04 from its course sections since Spring 2024: AD 100% (2 sections).
 OBT,Office Business Technology,AD,department,"College proposed 2026-10-04 from subjects.csv, where all its subjects sit under AD; no sections under it since Spring 2024 and no programs."
 OCTH,Occupational Therapy,ME,department,"College proposed 2026-10-04 from its course sections since Spring 2024: ME 99%, GP 1% (279 sections)."
@@ -146,6 +144,7 @@ RADS,Radiologic Sciences,ME,department,College proposed 2026-10-04 from its cour
 RCTB,Recreation & Tourism,AD,department,"College proposed 2026-10-04 from subjects.csv, where all its subjects sit under AD; no sections under it since Spring 2024 and no programs."
 RELG,Religious Studies,AS,department,College proposed 2026-10-04 from its course sections since Spring 2024: AS 100% (236 sections).
 ROBO,Robotics,AD,department,College proposed 2026-10-04 from its course sections since Spring 2024: AD 100% (6 sections).
+ROTC,"ROTC (Army, Navy, Air Force)",UC,department,"The three ROTC programs as one department: Army (MLSL), Naval Science (NVSC) and Air Force Aerospace Studies (AFAS) courses, and the minors built on them (Military Studies, Naval Science). Replaces the units AFAS, MLSL and NVSC. Decided 2026-10-12."
 SHS,Speech and Hearing Sciences,AS,department,College proposed 2026-10-04 from its course sections since Spring 2024: AS 100% (629 sections).
 SLRT,Sign Language,AD,department,"College proposed 2026-10-04 from subjects.csv, where all its subjects sit under AD; no sections under it since Spring 2024 and no programs."
 SOCI,Sociology,AS,department,College proposed 2026-10-04 from its course sections since Spring 2024: AS 100% (995 sections).

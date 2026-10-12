@@ -198,16 +198,20 @@ cedar_programs |> dplyr::filter(college_basis == "banner") |> dplyr::count(major
 
 ## Resolving one mapping, start to finish
 
-Worked example: **Military Studies (`MLST`)**, a minor whose row is still
-proposed, so its students count toward no department.
+Worked example: **Military Studies (`MLST`)**, a minor whose row sat proposed,
+so its students counted toward no department. Decided 2026-10-12.
 
 ### 1. Decide what it should be
 
 Two possible answers, and they are not the same:
 
 - **It has an owner.** Find the real unit code in `units.csv`. The assistant
-  suggests NVSC (its students take Naval Science courses); MLSL (Military
-  Science & Leadership) also exists. Someone who knows the program decides.
+  suggested NVSC, because its students take Naval Science courses at the
+  highest *rate*. But they take all three ROTC programs' courses, Army's most,
+  and the minor is offered through ROTC. Someone who knew the program decided:
+  ROTC, a new unit owning all three. A suggestion is a lead, not an answer.
+  Check, too, what else carries the name: Banner also records a Military
+  Studies *concentration* in LAIS, as a separate row with no code.
 - **Nothing owns it.** Non-Degree and Undecided are the clear cases. Then its
   row gets `basis = no_unit` and no unit.
 
@@ -216,7 +220,7 @@ Do not guess between these. A wrong department is invisible once written.
 ```r
 source("scripts/cedar-repl.R")
 units <- cedar_institution_files$units
-units[grepl("milit|naval", units$unit_name, ignore.case = TRUE), ]
+units[grepl("milit|naval|navy|rotc", units$unit_name, ignore.case = TRUE), ]
 cedar_programs |> dplyr::filter(major_code == "MLST") |>
   dplyr::summarise(students = dplyr::n_distinct(student_id),
                    first = min(term), last = max(term))

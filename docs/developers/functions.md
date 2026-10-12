@@ -2164,7 +2164,7 @@ This is a simplified plotting function that creates a single view. For more deta
 
 **Label Department Program Headcount Rows for Display**
 
-Label Department Program Headcount Rows for Display  A department can own several programs at one level -- PADM's graduate majors are the MPA, MHA, MPP, and a Public Policy certificate. Colouring the Dept Trends headcount charts by program_type stacked them all into one unlabelled "Major" series, so no program could be read off the chart. Each row is labelled with its program instead.  `degree` identifies the program only on a primary Major row. On a second major or a minor it is the student's primary degree from another program (a History minor carries "BS in Computer Science"), so those rows are labelled by program name and type, never by degree. A primary major's degree is appended only when one program name carries more than one degree in the table (History MA vs PhD; Public Policy MPP vs certificate).
+Label Department Program Headcount Rows for Display  A department can own several programs at one level -- PADM's graduate majors include the MPA and the MHA. Colouring the Dept Trends headcount charts by program_type stacked them all into one unlabelled "Major" series, so no program could be read off the chart. Each row is labelled with its program instead.  `degree` identifies the program only on a primary Major row. On a second major or a minor it is the student's primary degree from another program (a History minor carries "BS in Computer Science"), so those rows are labelled by program name and type, never by degree. A primary major's degree is appended only when one program name carries more than one degree in the table (History MA vs PhD; Public Policy MPP vs certificate).
 
 **Parameters:**
 

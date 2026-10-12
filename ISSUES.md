@@ -29,6 +29,7 @@ recurrence is recognizable.
 
 | ID | Kind | Summary |
 |---|---|---|
+| [I20](#i20--cedar_programs-holds-almost-no-branch-campus-students) | Defect | `cedar_programs` holds 1–3% of branch-campus students; branch program counts read near zero |
 | [I18](#i18--cedar_degrees-holds-no-associate-degrees-so-branch-campus-completions-read-zero) | Defect | `cedar_degrees` holds no associate degrees: branch-campus completions read zero |
 | [I16](#i16--bottleneck-waitlist-pressure-ignores-term-so-later-registration-erases-earlier-waiting) | Defect | `get_bottlenecks()` waitlist pressure ignores term: ~6% under true demand (RStudio only; no page shows it) |
 | [I8](#i8--a-timing-log-row-is-silently-dropped-when-the-write-lock-times-out) | Defect | A timing-log row is dropped when the write lock times out |
@@ -1320,6 +1321,9 @@ If so, request the branch campuses' awards and add them; if not, find where
 they are dropped. Until then, say on any degree count that it excludes the
 branch campuses.
 
+Academic Studies is missing the same students (I20), and mrgather sets no campus
+on either report, so the two likely share a cause.
+
 ---
 
 ## I19 — The morning refresh could never publish projections, and blamed a stale lock
@@ -1368,6 +1372,63 @@ docker compose run --rm --no-deps -T \
   --entrypoint Rscript cedar-shiny --vanilla -e 'dir.create("output/probe")' </dev/null
 # FALSE, with "Read-only file system"; no lock directory exists
 ```
+
+---
+
+## I20 — cedar_programs holds almost no branch-campus students
+
+**Status:** open
+**Found:** 2026-10-12, reviewing the Taos subject HHHA: class lists show 99
+students declared in its certificate, and `cedar_programs` has one of their 226
+student-terms.
+**Severity:** high for anything about branch-campus students, none for
+Albuquerque. Every count is far too low and reads as real: a branch program
+shows 2 students where class lists show 99.
+**Affects:** `cedar_programs`, and everything reading it for branch students:
+Headcount and Dept Trends headcounts for branch units, Pathways populations,
+program counts on Admin > Mappings, demographics, and each student's major
+college for branch students.
+
+### What is wrong
+
+Class lists cover every campus. Academic Studies, which builds `cedar_programs`,
+covers the main campus only. Share of class-list student-terms (Fall 2018 –
+Fall 2026, by home campus) with any `cedar_programs` row:
+
+| Home campus | Student-terms | In `cedar_programs` |
+|---|---:|---:|
+| ABQ | 391,357 | 95.1% |
+| Gallup | 28,038 | 1.2% |
+| Valencia | 23,492 | 2.1% |
+| Taos | 14,692 | 0.7% |
+| Los Alamos | 8,264 | 2.9% |
+
+Taos sits under 1% in every year, so this is not a recent change.
+
+The likely cause is in the fetch, not the transform. In
+`mrgather/mrgather.js`, `getASs()` and `getDegs()` choose terms and fields but
+never a campus, so the report form's default applies; `getAADs()` picks `ABQ`
+explicitly. A main-campus default would explain this and I18 together. Not yet
+confirmed: open the Academic Study Detail form in MyReports and read its campus
+selector.
+
+### Reproduce
+
+```r
+source("scripts/cedar-repl.R")
+cl <- dplyr::distinct(cedar_students, student_id, term, student_campus)
+pr <- dplyr::distinct(cedar_programs, student_id, term) |> dplyr::mutate(found = TRUE)
+dplyr::left_join(cl, pr, by = c("student_id", "term")) |>
+  dplyr::group_by(student_campus) |>
+  dplyr::summarise(n = dplyr::n(), pct = 100 * mean(!is.na(found)))
+```
+
+### What a fix requires
+
+Confirm the form's campus default. If it is Albuquerque, have mrgather select
+every campus for Academic Studies and Degrees, re-pull the history, and rebuild.
+Until then, branch-campus program counts are not usable, including the counts
+the mapping review shows for branch codes.
 
 ---
 
