@@ -55,23 +55,42 @@ try {
   check('on-demand usage summary renders', overview.includes('Active sessions') || overview.includes('No usage data'));
 
   // Mapping decisions link what to supply to the line (or file) that takes it;
-  // the decision is an edit there, never in the running app. Other problems
-  // no mapping can fix are a separate table.
+  // the decision is an edit there, never in the running app. Programs, course
+  // subjects and college values are separate tabs; other problems no mapping
+  // can fix are a separate table.
   await openSubTab(page, 'Mappings');
-  await page.waitForFunction(() => {
-    const ready = id => { const el = document.getElementById(id);
-      return el && el.innerText.trim().length > 0 && !el.classList.contains('recalculating'); };
-    return ready('mapping_decisions_table') && ready('mapping_other_summary');
-  }, { timeout: 180000 });
+  const readyAll = ids => page.waitForFunction((ids) => ids.every(id => {
+    const el = document.getElementById(id);
+    return el && el.innerText.trim().length > 0 && !el.classList.contains('recalculating');
+  }), { timeout: 180000 }, ids);
+  await readyAll(['mapping_decisions_programs_table', 'mapping_other_summary']);
+  const linksIn = id => page.evaluate((id) =>
+    [...document.querySelectorAll(`#${id} a`)].map(a => a.href), id);
+  const linkOk = href => /\/edit\/.+\.csv$/.test(href) || /\.csv\?plain=1#L\d+$/.test(href);
   const work = await page.evaluate(() => ({
     summary: document.getElementById('mapping_decisions_summary').innerText,
-    links: [...document.querySelectorAll('#mapping_decisions_table a')].map(a => a.href),
     other: document.getElementById('mapping_other_summary').innerText,
   }));
+  const programLinks = await linksIn('mapping_decisions_programs_table');
   check('mapping decisions summarise what is waiting', /mapping decision\(s\)|No mapping decisions/.test(work.summary));
-  check('each decision links to the line or file that takes it', work.links.length > 0 &&
-    work.links.every(href => /\/edit\/.+\.csv$/.test(href) || /\.csv\?plain=1#L\d+$/.test(href)));
+  check('each program decision links to the line or file that takes it',
+    programLinks.length > 0 && programLinks.every(linkOk));
+  await openSubTab(page, 'Course subjects');
+  await readyAll(['mapping_decisions_subjects_table']);
+  // Headers display in capitals, and innerText reports what is displayed.
+  const subjects = await page.evaluate(() =>
+    document.getElementById('mapping_decisions_subjects_table').innerText);
+  const subjectLinks = await linksIn('mapping_decisions_subjects_table');
+  check('course subjects have their own table, by teaching college',
+    /taught in college/i.test(subjects) || subjects.includes('No course subject decisions'));
+  check('each subject decision links to the line or file that takes it', subjectLinks.every(linkOk));
   check('other problems are listed separately', /other problem\(s\)/.test(work.other));
+  await openSubTab(page, 'Program to Dept');
+  await readyAll(['program_dept_mapping_table']);
+  const programRef = await page.evaluate(() =>
+    document.getElementById('program_dept_mapping_table').innerText);
+  check('program mappings show program and department names',
+    /program name/i.test(programRef) && /dept name/i.test(programRef));
   await page.screenshot({ path: '/tmp/cedar-admin-mappings.png', fullPage: true });
 
   await clickNavTab(page, 'Projections');

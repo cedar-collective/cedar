@@ -226,6 +226,7 @@ build_mapping_worklist <- function(files, programs, issues, audit, source_depart
   pr_row <- files$programs[from_file$line - 1L, ]
   unit_name <- function(code) files$units$unit_name[match(code, files$units$unit_code)]
   programs_part <- tibble::tibble(
+    group = "programs",
     needs = dplyr::if_else(nzchar(from_file$suggested_unit),
                            paste0("Confirm the suggested department, ", from_file$suggested_unit, ", or replace it"),
                            "A department: nothing settled it"),
@@ -247,22 +248,48 @@ build_mapping_worklist <- function(files, programs, issues, audit, source_depart
                   college_disagreement = "College check", unit_college = "Unit college")
   sj <- files$subjects
   proposed_row <- ifelse(work$kind == "subject" & !is.na(work$line), work$line - 1L, NA_integer_)
+  # A subject's context is "college AD" or "college AS, EH", plus a note.
+  taught_codes <- sub("^college ([^;]+).*$", "\\1", work$context)
+  # Sections carry the college code Banner used that term, so translate it as
+  # the transform does: ED, Education before 2021, is named as EH.
+  college_label <- function(codes) {
+    vapply(strsplit(codes, ", ", fixed = TRUE), function(cc) {
+      code <- dplyr::coalesce(translate_source_college(cc, files), cc)
+      nm <- files$colleges$college_name[match(code, files$colleges$college_code)]
+      paste(ifelse(is.na(nm), cc, paste0(cc, " (", nm, ")")), collapse = ", ")
+    }, character(1))
+  }
+  disagreement <- "^mapped (\\S+), Banner Translated College (.+)$"
   audit_part <- tibble::tibble(
+    group = dplyr::case_when(
+      work$kind == "subject" ~ "subjects",
+      work$kind %in% c("program_code", "college_disagreement") ~ "programs",
+      TRUE ~ "colleges"),
     needs = work$needs, file = work$file, line = work$line,
     kind = unname(kind_label[work$kind]), code = work$value,
-    # "taught in college AD" reads better than the audit's working context.
-    name = dplyr::if_else(work$kind == "subject",
-                          sub("^college ([^;]+).*$", "taught in college \\1", work$context),
-                          work$context),
+    # Name is the code's own name, or nothing: a program's from programs.csv
+    # (else the name its records most often carry), a unit's from units.csv. A
+    # course subject has none, and a college value no file names has none yet.
+    name = dplyr::case_when(
+      work$kind == "college_disagreement" ~
+        files$programs$program_name[match(work$value, files$programs$program_code)],
+      work$kind == "program_code" ~ .program_data_names(work$value, programs),
+      work$kind == "unit_college" ~ unit_name(work$value),
+      TRUE ~ NA_character_),
+    taught_in = dplyr::if_else(work$kind == "subject", college_label(taught_codes), NA_character_),
     size = work$rows,
     size_unit = dplyr::if_else(work$kind == "subject", "enrollments", "rows"),
     # A subject with no confirmed row has no department (ADR-002 Stage 3), and
-    # reports the college Banner gives its sections, labelled (Stage 3b).
-    reported_today = dplyr::if_else(
-      work$kind == "subject",
-      paste0("none; college ", sub("^college ([^;]+).*$", "\\1", work$context), " from Banner"),
-      NA_character_),
+    # reports the college Banner gives its sections, labelled (Stage 3b). A
+    # college check reports the mapped college, which Banner's differs from.
+    reported_today = dplyr::case_when(
+      work$kind == "subject" ~ paste0("none; college ", taught_codes, " from Banner"),
+      work$kind == "college_disagreement" ~ sub(disagreement, "college \\1; Banner: \\2", work$context),
+      TRUE ~ NA_character_),
     reported_detail = NA_character_,
+    # Where the audit found it, for rows the name and kind do not place.
+    detail = dplyr::if_else(work$kind %in% c("subject", "college_disagreement"),
+                            NA_character_, work$context),
     suggested = dplyr::case_when(
       !is.na(proposed_row) ~ dplyr::na_if(sj$unit_code[proposed_row], ""),
       work$kind == "college_disagreement" ~ sub("^mapped (\\S+),.*$", "\\1", work$context),
@@ -295,6 +322,63 @@ build_mapping_worklist <- function(files, programs, issues, audit, source_depart
          dplyr::arrange(dplyr::desc(dplyr::coalesce(size, 0L))) %>% plain(),
        other = plain(other),
        n_expected = sum(audit$status == "expected"))
+}
+
+
+# The name a program code's records most often carry, for codes with no
+# programs.csv row to name them; NA for a code with no program rows.
+.program_data_names <- function(codes, programs) {
+  named <- programs %>%
+    dplyr::filter(major_code %in% codes, !grepl("Concentration", program_type),
+                  !is.na(program_name)) %>%
+    dplyr::count(major_code, program_name) %>%
+    dplyr::group_by(major_code) %>% dplyr::slice_max(n, n = 1, with_ties = FALSE) %>%
+    dplyr::ungroup()
+  named$program_name[match(codes, named$major_code)]
+}
+
+
+#' The mapping files as three code-to-department tables, with names
+#'
+#' What Admin > Mappings shows beneath the decisions: every confirmed program
+#' row and every confirmed subject row with the department (unit) it names,
+#' and every unit with its college. Read from the files, so each code carries
+#' its name -- a program its programs.csv name, a department its units.csv
+#' name. A course subject has no name. A row that applies only in one college
+#' (a branch campus's BADM) or at one level says so; a program no department
+#' owns (`basis = no_unit`) is listed with none.
+#'
+#' @param files Mapping files from read_institution_mappings().
+#' @return List of `programs`, `subjects` and `units` data frames.
+build_mapping_reference_tables <- function(files) {
+  unit_name <- function(code) files$units$unit_name[match(code, files$units$unit_code)]
+  college_label <- function(code) {
+    nm <- files$colleges$college_name[match(code, files$colleges$college_code)]
+    dplyr::case_when(!nzchar(code) ~ NA_character_,
+                     is.na(nm)     ~ code,
+                     TRUE          ~ paste0(code, " (", nm, ")"))
+  }
+  pr <- files$programs[files$programs$status == "confirmed", ]
+  sj <- files$subjects[files$subjects$status == "confirmed", ]
+  un <- files$units
+  plain <- function(df) dplyr::mutate(df, dplyr::across(dplyr::everything(), unname))
+  list(
+    programs = tibble::tibble(
+      program_code = pr$program_code, program_name = pr$program_name,
+      in_college = college_label(pr$in_college),
+      dept_code = dplyr::na_if(pr$unit_code, ""),
+      dept_name = dplyr::if_else(nzchar(pr$unit_code), unit_name(pr$unit_code),
+                                 "None: no department owns it")) %>%
+      dplyr::arrange(program_code, !is.na(in_college), in_college) %>% plain(),
+    subjects = tibble::tibble(
+      subject_code = sj$subject_code, in_college = college_label(sj$in_college),
+      in_level = dplyr::na_if(sj$in_level, ""),
+      dept_code = sj$unit_code, dept_name = unit_name(sj$unit_code)) %>%
+      dplyr::arrange(subject_code, !is.na(in_college), in_college, in_level) %>% plain(),
+    units = tibble::tibble(
+      dept_code = un$unit_code, dept_name = un$unit_name,
+      college = college_label(un$college_code), kind = un$kind) %>%
+      dplyr::arrange(dept_code) %>% plain())
 }
 
 

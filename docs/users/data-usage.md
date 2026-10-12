@@ -63,17 +63,24 @@ from the mapping files now deployed (**current**) or from older ones (**STALE**:
 the next data refresh or deploy rebuilds them).
 
 **Mapping decisions** lists everything settled by editing a mapping file,
-largest first: programs and course subjects awaiting a decision, codes in the
-data that no file covers, college names no file recognizes, and programs whose
-mapped college differs from Banner's. For each row:
+largest first, in three tabs:
+
+- **Programs**: programs awaiting a decision, program codes in the data that no
+  file covers, and programs whose mapped college differs from Banner's.
+- **Course subjects**: course subjects awaiting a decision.
+- **Colleges**: college names no file recognizes, and departments with no
+  home college.
+
+Each row opens with what it is, then what it needs:
 
 | Column | What it means |
 |---|---|
-| **Needs** | What to supply, as a link to the line in the file (or to the file, for a new row) |
-| **Where** | The same place as `file.csv:line`, for someone editing a local copy |
-| **Kind** | What the row is: a program (major, minor, both, or pre-major), a course subject, a college name, or a college check |
-| **Banner code** | The code Banner uses for it — a program's major or minor code (for example `ART`, the Art minor) or a course subject |
-| **Reported today as** | The department CEDAR shows now. Every department comes from the mapping files, so an undecided code reads *none*: its students count toward no department until the row is confirmed and the data is rebuilt. *Phantom*, a department named after the code itself, appears only in data built before October 2026 |
+| **Banner code** | The code Banner uses for it — a program's major or minor code (for example `ART`, the Art minor), a course subject, or a college value |
+| **Name** | The code's own name: a program's name in the mapping file, or for a code with no row, the name its records most often carry. A course subject has no name, so the Course subjects tab shows **Taught in college** instead |
+| **Kind** | What the row is: a program (major, minor, both, or pre-major), a program code with no row, a college check, a college name, or a department's college |
+| **Where** | The file and line, as `file.csv:line`, for someone editing a local copy |
+| **Needs** | What to supply, as a link to that line (or to the file, for a new row) |
+| **Reported today as** | What CEDAR shows now. Every department comes from the mapping files, so an undecided code reads *none*: its students count toward no department until the row is confirmed and the data is rebuilt. For a college check, the mapped college and Banner's |
 | **Suggested department** | The department (CEDAR unit) the mapping assistant thinks should own it, with its name — for example `ARTS — Art Studio` |
 | **Confidence** | How far to trust the suggestion. *Strong*: Banner's own department, matching names, or the program a pre-major leads to. *Plausible*: its students clearly take that department's courses. *Weak*: course-taking only, and not clear-cut, or the program sits in a catch-all Banner department. Hover for the full evidence |
 
@@ -89,10 +96,9 @@ Below those, subtabs show what *is* mapped today:
 
 | Subtab | What it shows |
 |---|---|
-| **Program to Dept** | Major/program code to department-code lookup used for home-major classification. |
-| **Subject to Dept** | Course subject prefixes mapped to CEDAR department codes. |
-| **Dept Names** | Department-code display names. |
-| **Reviewed Exceptions** | Program codes intentionally allowed to remain unmapped. |
+| **Program to Dept** | Every confirmed program: its code and name, the department (code and name) that owns it, and the college it applies in when it is not every college. A program no department owns says so. |
+| **Subject to Dept** | Every confirmed course subject: the department (code and name) that owns it, and the college or course level it applies to when it is not all of them. |
+| **Dept Names** | Every department: its code, name, home college, and kind (a department, a program, or a college-wide unit for courses no department owns). |
 
 A long decisions list does not mean the app is broken. It means some codes
 should be checked before someone treats a department or college total as

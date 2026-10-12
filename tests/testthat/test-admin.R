@@ -168,27 +168,36 @@ test_that("the program queue merges proposed rows with today's issues, most stud
 
 test_that("the mapping work list separates decisions from problems no mapping fixes", {
   # Scaffolding: the program files above, and an audit with one row of each
-  # kind of work -- a subject to decide, a college check to review, an expected
-  # pre-major difference, and a Banner organisation ID in the major code.
+  # kind of work -- a subject to decide (taught in a named college, one under
+  # an old code colleges.csv translates, and an unnamed one), a college check to review, an expected pre-major difference,
+  # a Banner organisation ID in the major code, a program code with no
+  # programs.csv row (FNRS, which HP01 names "Nursing"), and a unit with no
+  # home college.
   audit <- tibble::tibble(
-    kind = c("subject", "college_disagreement", "college_disagreement", "program_code"),
-    value = c("BIOL", "POLS-BA", "FBIO", "1084"),
-    context = c("college STEM", "mapped ARTS, Banner Translated College SOSC",
+    kind = c("subject", "college_disagreement", "college_disagreement", "program_code",
+             "program_code", "unit_college"),
+    value = c("BIOL", "NURS", "FBIO", "1084", "FNRS", "MEDL"),
+    context = c("college AS, ED, STEM", "mapped AS, Banner Translated College SOSC",
                 "mapped STEM, Banner Translated College UC",
-                "a Banner organisation ID in the major code column, not a program"),
-    rows = c(2L, 4L, 1L, 2L), first_term = NA_integer_, last_term = NA_integer_,
-    status = c("unmapped", "review", "expected", "unmapped"),
+                "a Banner organisation ID in the major code column, not a program",
+                "program record", "units.csv"),
+    rows = c(2L, 4L, 1L, 2L, 3L, NA), first_term = NA_integer_, last_term = NA_integer_,
+    status = c("unmapped", "review", "expected", "unmapped", "unmapped", "unmapped"),
     consequence = "", needs = c("A subjects.csv row: department and college",
                                 "A decision: confirm, or set the program's college_code",
                                 "Nothing: an expected difference",
-                                "Nothing to map: a source data error to report"),
-    file = c("subjects", "programs", "programs", "programs"), line = c(NA, 9L, 5L, NA))
+                                "Nothing to map: a source data error to report",
+                                "A programs.csv row: run propose-mappings.R --write",
+                                "A home college in units.csv"),
+    file = c("subjects", "programs", "programs", "programs", "programs", "units"),
+    line = c(NA, 2L, 5L, NA, NA, 4L))
   sd <- data.frame(source_name = "Catch-all", unit_code = "", kind = "bucket", notes = "")
   w <- build_mapping_worklist(c(review_files(), list(
     units = data.frame(unit_code = c("NURS", "RADS", "MEDL", "BIOL"),
                        unit_name = c("Nursing", "Radiologic Sciences", "Medical Lab", "Biology"),
                        college_code = "", kind = "department", notes = ""),
-    colleges = data.frame(college_code = "AS", college_name = "Arts and Sciences", source_names = ""),
+    colleges = data.frame(college_code = c("AS", "EH"), college_name = c("Arts and Sciences", "Education"),
+                          source_names = c("", "ED")),
     subjects = data.frame(
     subject_code = character(), in_college = character(), in_level = character(),
     unit_code = character(), college_code = character(), status = character(),
@@ -196,15 +205,70 @@ test_that("the mapping work list separates decisions from problems no mapping fi
   # FRAD is a pre-major in the file; ZZZZ has no program rows to say more.
   expect_setequal(paste(w$decisions$kind, w$decisions$code),
                   c("Program (pre-major) FRAD", "Program ZZZZ", "Course subject BIOL",
-                    "College check POLS-BA"))
-  frad <- w$decisions[w$decisions$code == "FRAD", ]
+                    "College check NURS", "Program code FNRS", "Unit college MEDL"))
+  row <- function(code) w$decisions[w$decisions$code == code, ]
+  frad <- row("FRAD")
   expect_equal(frad$suggested_name, "Radiologic Sciences")
   expect_equal(frad$confidence, "Strong: the program it leads to")
-  expect_equal(w$decisions$suggested[w$decisions$code == "POLS-BA"], "ARTS")
+  expect_equal(row("NURS")$suggested, "AS")
+  expect_equal(row("NURS")$suggested_name, "Arts and Sciences")
+  # One tab per kind of decision.
+  expect_equal(vapply(c("FRAD", "ZZZZ", "NURS", "FNRS", "BIOL", "MEDL"),
+                      function(code) row(code)$group, character(1), USE.NAMES = FALSE),
+               c("programs", "programs", "programs", "programs", "subjects", "colleges"))
+  # Name is the code's own name or nothing -- never the audit's working context.
+  expect_equal(frad$name, "Radiologic Sciences")          # programs.csv
+  expect_equal(row("NURS")$name, "Nursing")               # a college check names its program
+  expect_equal(row("FNRS")$name, "Nursing")               # no row: the name its records carry
+  expect_equal(row("MEDL")$name, "Medical Lab")           # units.csv
+  expect_true(is.na(row("BIOL")$name))                    # a subject has none
+  expect_equal(row("BIOL")$taught_in, "AS (Arts and Sciences), ED (Education), STEM")
+  expect_equal(row("BIOL")$reported_today, "none; college AS, ED, STEM from Banner")
+  expect_equal(row("NURS")$reported_today, "college AS; Banner: SOSC")
+  expect_equal(row("FNRS")$detail, "program record")
+  expect_equal(row("MEDL")$detail, "units.csv")
+  expect_true(is.na(row("NURS")$detail))
   expect_equal(paste(w$other$kind, w$other$code), "Program code 1084")
   expect_equal(w$n_expected, 1L)
   # Named columns reach the browser as JSON objects and break the table.
   expect_false(any(vapply(w$decisions, function(x) !is.null(names(x)), logical(1))))
+})
+
+# The reference tables under the decisions: every confirmed row, each code with
+# its name. Scaffolding: the program rows above (NURS confirmed, FRAD and ZZZZ
+# proposed) plus a no_unit program and a branch-only row, and subjects with an
+# every-college row and a college- and level-specific one.
+test_that("the mapping reference tables carry every confirmed row, with names", {
+  files <- review_files()
+  files$programs <- rbind(files$programs, data.frame(
+    program_code = c("NOND", "BADM"), in_college = c("", "AD"),
+    program_name = c("Non-Degree", "Business Administration"),
+    unit_code = c("", "BUSA"), college_code = "", is_pre_major = "FALSE", leads_to = "",
+    basis = c("no_unit", "decided"), status = "confirmed", evidence = "", notes = ""))
+  files$units <- data.frame(unit_code = c("NURS", "BUSA", "HLED", "HED"),
+                            unit_name = c("Nursing", "Business (Branch)", "Health Ed (Branch)", "Health Education"),
+                            college_code = c("NU", "AD", "AD", "EH"), kind = "department", notes = "")
+  files$colleges <- data.frame(college_code = c("AD", "EH"),
+                               college_name = c("Associate Degree", "Education"), source_names = "")
+  files$subjects <- data.frame(
+    subject_code = c("HLED", "HLED", "XXXX"), in_college = c("", "AD", ""), in_level = c("", "lower", ""),
+    unit_code = c("HED", "HLED", ""), college_code = "", status = c("confirmed", "confirmed", "proposed"),
+    evidence = "", notes = "")
+  ref <- build_mapping_reference_tables(files)
+
+  expect_equal(ref$programs$program_code, c("BADM", "NOND", "NURS"))   # confirmed only
+  expect_equal(ref$programs$program_name, c("Business Administration", "Non-Degree", "Nursing"))
+  expect_equal(ref$programs$in_college, c("AD (Associate Degree)", NA, NA))
+  expect_equal(ref$programs$dept_name, c("Business (Branch)", "None: no department owns it", "Nursing"))
+  expect_true(is.na(ref$programs$dept_code[2]))
+  # Both HLED rows, every-college first: the first row alone would hide the branch's.
+  expect_equal(ref$subjects$subject_code, c("HLED", "HLED"))
+  expect_equal(ref$subjects$in_college, c(NA, "AD (Associate Degree)"))
+  expect_equal(ref$subjects$in_level, c(NA, "lower"))
+  expect_equal(ref$subjects$dept_name, c("Health Education", "Health Ed (Branch)"))
+  expect_equal(ref$units$college[ref$units$dept_code == "HED"], "EH (Education)")
+  expect_equal(ref$units$college[ref$units$dept_code == "NURS"], "NU")   # a college no file names
+  for (tbl in ref) expect_false(any(vapply(tbl, function(x) !is.null(names(x)), logical(1))))
 })
 
 

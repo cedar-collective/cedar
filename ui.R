@@ -1855,10 +1855,26 @@ nav_panel(
           uiOutput("mapping_freshness"),
           card(
             card_header("Mapping decisions"),
-            p("Everything settled by editing a mapping file in institution/unm/: programs and course subjects awaiting a decision, codes the data uses that no file has, college values no file names, and mapped colleges Banner's Translated College disagrees with. Largest first. Banner code is the code Banner uses (a program's major or minor code, or a course subject); Suggested department is the department (CEDAR unit) the mapping assistant thinks should own it, and Confidence says how far to trust that, with the evidence on hover. Needs says what to supply and opens the line (or the file, for a new row); Where gives the same place for a local checkout. Reported today as is the department the stored tables carry now. They take every unit from these files (ADR-002 Stage 3), so an unconfirmed code reads none until its row is confirmed and the tables are rebuilt; phantom, a department named after the code itself, appears only in tables built before then.",
+            p("Everything settled by editing a mapping file in institution/unm/, largest first, in three tabs: programs (including mapped colleges Banner's Translated College disagrees with, and codes the data uses that no file has), course subjects, and college values no file names. Each row opens with what it is: Banner code, the code Banner uses; Name, the code's own name (a program's name in programs.csv; a course subject has none, so its tab shows the college that teaches it instead); Kind; Where, the file and line for a local checkout; and Needs, what to supply, which opens that line (or the file, for a new row). Reported today as is what the stored tables carry now: an unconfirmed code has no department until its row is confirmed and the tables are rebuilt. Suggested department is the department (CEDAR unit) the mapping assistant thinks should own it, and Confidence says how far to trust that, with the evidence on hover.",
               class = "text-hint"),
             uiOutput("mapping_decisions_summary"),
-            reactable::reactableOutput("mapping_decisions_table")
+            navset_tab(
+              nav_panel(
+                title = "Programs",
+                br(),
+                reactable::reactableOutput("mapping_decisions_programs_table")
+              ),
+              nav_panel(
+                title = "Course subjects",
+                br(),
+                reactable::reactableOutput("mapping_decisions_subjects_table")
+              ),
+              nav_panel(
+                title = "Colleges",
+                br(),
+                reactable::reactableOutput("mapping_decisions_colleges_table")
+              )
+            )
           ),
           card(
             card_header("Other problems in the data"),
@@ -1871,21 +1887,21 @@ nav_panel(
             nav_panel(
               title = "Program to Dept",
               br(),
-              p("Confirmed programs.csv rows that apply in every college: program code to department (unit). College-specific rows, such as branch-campus BADM and CRIM, are resolved separately.",
+              p("Every confirmed programs.csv row: program code and name to department (unit) code and name. A row that applies in only one college, such as branch-campus BADM and CRIM, says which; a program no department owns says so.",
                 class = "text-hint"),
               reactable::reactableOutput("program_dept_mapping_table")
             ),
             nav_panel(
               title = "Subject to Dept",
               br(),
-              p("Course subject prefixes mapped to Cedar department codes. Use this when interpreting course ownership.",
+              p("Every confirmed subjects.csv row: course subject to department (unit) code and name. A row that applies only to one college's sections or one course level says which. Use this when interpreting course ownership.",
                 class = "text-hint"),
               reactable::reactableOutput("subject_dept_mapping_table")
             ),
             nav_panel(
               title = "Dept Names",
               br(),
-              p("Department code display names derived from the subject/dept catalog.",
+              p("Every department (unit) in units.csv: its code, name, home college, and kind -- a department, a program, or a college-wide unit for courses no department owns.",
                 class = "text-hint"),
               reactable::reactableOutput("dept_name_mapping_table")
             )

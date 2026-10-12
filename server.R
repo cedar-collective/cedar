@@ -5697,20 +5697,6 @@ output$enrl_classlist_download <- downloadHandler(
   # ── Tab 1: Data Summary (uses pre-computed data from global.R) ────────────
   # Freshness and version are embedded as static HTML by dataStatusUI().
   # ── Tab 2: Mapping Transparency ───────────────────────────────────────
-  .named_lookup_table <- function(x, key_col, value_col) {
-    if (is.null(x) || length(x) == 0) {
-      return(data.frame(Message = "Lookup not available", stringsAsFactors = FALSE))
-    }
-    data.frame(
-      key = names(x),
-      value = as.character(x),
-      stringsAsFactors = FALSE
-    ) %>%
-      rename(!!key_col := key, !!value_col := value) %>%
-      filter(!is.na(.data[[key_col]]), nzchar(.data[[key_col]])) %>%
-      arrange(.data[[key_col]])
-  }
-
   # Startup exclusions PLUS the runtime screens. Regenerating program_map.qs no
   # longer stops on an unmapped code -- a handful of them must not block a data
   # refresh the whole app depends on -- so this page is where they have to be
@@ -5886,13 +5872,13 @@ output$enrl_classlist_download <- downloadHandler(
     if (nrow(decisions) == 0) {
       return(div(class = "alert alert-success", tags$strong("No mapping decisions are waiting.")))
     }
-    # By the kind of thing to decide: every program kind counts as a program.
-    by_kind <- table(sub(" \\(.*\\)$", "", decisions$kind))
+    # By tab, so the counts match the tables below.
+    groups <- c(programs = "program", subjects = "course subject", colleges = "college value")
+    n <- vapply(names(groups), function(g) sum(decisions$group == g), integer(1))
     div(
       class = "alert alert-warning",
       tags$strong(paste0(nrow(decisions), " mapping decision(s): ",
-                         paste(sprintf("%d %s%s", as.integer(by_kind), tolower(names(by_kind)),
-                                       ifelse(as.integer(by_kind) == 1, "", "s")),
+                         paste(sprintf("%d %s%s", n[n > 0], groups[n > 0], ifelse(n[n > 0] == 1, "", "s")),
                                collapse = ", "), ". ")),
       "To accept a suggestion, open its line and change status to confirmed. To ",
       "choose otherwise, also change unit_code (or college_code) and, in ",
@@ -5900,11 +5886,16 @@ output$enrl_classlist_download <- downloadHandler(
     )
   })
 
-  output$mapping_decisions_table <- reactable::renderReactable({
+  # One table per kind of decision, in tabs: programs (and their college
+  # checks), course subjects, and college values. Each opens with what the row
+  # is -- Banner code, Name, Kind, Where, Needs -- then the evidence. Name is
+  # the code's own name or nothing; a subject has none, and says instead which
+  # college teaches it.
+  .mapping_decisions_reactable <- function(group, empty) {
     decisions <- .mapping_worklist()$decisions
+    decisions <- decisions[decisions$group == group, ]
     if (nrow(decisions) == 0) {
-      return(.admin_reactable(data.frame(Message = "No mapping decisions are waiting"),
-                              pagination = FALSE, searchable = FALSE))
+      return(.admin_reactable(data.frame(Message = empty), pagination = FALSE, searchable = FALSE))
     }
     display <- decisions %>%
       # What to supply is the link: to the row to edit, or the file for a new row.
@@ -5915,28 +5906,35 @@ output$enrl_classlist_download <- downloadHandler(
              suggested = ifelse(is.na(suggested) | !nzchar(suggested), NA_character_,
                                 ifelse(is.na(suggested_name), suggested,
                                        paste0(suggested, " \u2014 ", suggested_name)))) %>%
-      select(needs, where, kind, banner_code = code, name, size, size_unit, reported_today,
-             suggested, confidence, needs_url, reported_detail, evidence) %>%
-      .admin_humanize_columns()
+      select(banner_code = code, name, taught_in, kind, where, needs, size, size_unit,
+             reported_today, suggested, confidence, detail, needs_url, reported_detail, evidence)
+    keep <- switch(group,
+      programs = setdiff(names(display), c("taught_in", "detail")),
+      subjects = setdiff(names(display), c("name", "kind", "detail")),
+      colleges = setdiff(names(display), c("taught_in", "reported_today", "suggested", "confidence")))
+    display <- display[, keep] %>% .admin_humanize_columns()
     .admin_reactable(
       display,
       columns = list(
+        # Banner's own code: a program's major or minor code, a course subject,
+        # or a college value.
+        `Banner Code` = reactable::colDef(minWidth = 80),
+        Name  = reactable::colDef(minWidth = 160, cell = .dash_if_blank),
+        `Taught in` = reactable::colDef(name = "Taught in college", minWidth = 170),
+        Kind  = reactable::colDef(minWidth = 120),
+        Where = reactable::colDef(minWidth = 140),
         Needs = reactable::colDef(minWidth = 190, cell = function(value, index) {
           tags$a(href = display$`Needs Url`[index], target = "_blank", rel = "noopener", value)
         }),
-        Where = reactable::colDef(minWidth = 150),
-        Kind  = reactable::colDef(minWidth = 120),
-        # Banner's own code: a program (major or minor) code, a course subject,
-        # or a college code or name, by Kind.
-        `Banner Code` = reactable::colDef(minWidth = 80),
-        Name  = reactable::colDef(minWidth = 150),
         Size  = reactable::colDef(minWidth = 110, align = "right", cell = function(value, index) {
           if (is.na(value)) return("\u2014")
-          paste(format(value, big.mark = ","), display$`Size Unit`[index])
+          unit <- display$`Size Unit`[index]
+          paste(format(value, big.mark = ","), if (value == 1) sub("s$", "", unit) else unit)
         }),
         `Size Unit` = reactable::colDef(show = FALSE),
         # What CEDAR shows now; the old checks' finding on hover, where there is one.
-        `Reported Today As` = reactable::colDef(minWidth = 120, cell = function(value, index) {
+        `Reported Today As` = reactable::colDef(name = "Reported today as", minWidth = 130,
+                                             cell = function(value, index) {
           if (is.na(value)) return("\u2014")
           detail <- display$`Reported Detail`[index]
           # Only rows the old checks reported have a hover text; an NA title
@@ -5955,13 +5953,24 @@ output$enrl_classlist_download <- downloadHandler(
           if (is.na(ev) || !nzchar(ev)) return(value)
           tags$span(title = ev, value)
         }),
+        # Where the audit found a college value, or the record a code came from.
+        Detail = reactable::colDef(name = "Found in", minWidth = 160, cell = .dash_if_blank),
         Evidence  = reactable::colDef(show = FALSE),
         `Needs Url` = reactable::colDef(show = FALSE),
         `Reported Detail` = reactable::colDef(show = FALSE)
-      ),
+      )[intersect(c("Banner Code", "Name", "Taught in", "Kind", "Where", "Needs", "Size",
+                    "Size Unit", "Reported Today As", "Suggested", "Confidence", "Detail",
+                    "Evidence", "Needs Url", "Reported Detail"), names(display))],
       page_size = 15L
     )
-  })
+  }
+
+  output$mapping_decisions_programs_table <- reactable::renderReactable(
+    .mapping_decisions_reactable("programs", "No program decisions are waiting"))
+  output$mapping_decisions_subjects_table <- reactable::renderReactable(
+    .mapping_decisions_reactable("subjects", "No course subject decisions are waiting"))
+  output$mapping_decisions_colleges_table <- reactable::renderReactable(
+    .mapping_decisions_reactable("colleges", "No college decisions are waiting"))
 
   output$mapping_other_summary <- renderUI({
     res <- .mapping_worklist()
@@ -5992,32 +6001,29 @@ output$enrl_classlist_download <- downloadHandler(
     )
   })
 
-  output$program_dept_mapping_table <- reactable::renderReactable({
-    .admin_reactable(
-      .named_lookup_table(get0("major_to_dept", ifnotfound = NULL),
-                          "major_code", "dept_code") %>%
-        .admin_humanize_columns(),
-      page_size = 25L
-    )
-  })
+  # The mapping files as code-to-department tables, each code with its name.
+  .mapping_reference <- reactive(build_mapping_reference_tables(cedar_institution_files))
+  .reference_columns <- list(
+    program_code = reactable::colDef(name = "Program code", minWidth = 90),
+    program_name = reactable::colDef(name = "Program name", minWidth = 200),
+    subject_code = reactable::colDef(name = "Subject code", minWidth = 90),
+    in_college   = reactable::colDef(name = "Only in college", minWidth = 170, na = "Every college"),
+    in_level     = reactable::colDef(name = "Only at level", minWidth = 100, na = "Every level"),
+    dept_code    = reactable::colDef(name = "Dept code", minWidth = 80, na = "\u2014"),
+    dept_name    = reactable::colDef(name = "Dept name", minWidth = 200),
+    college      = reactable::colDef(name = "College", minWidth = 220, na = "\u2014"),
+    kind         = reactable::colDef(name = "Kind", minWidth = 100)
+  )
+  .reference_reactable <- function(d) {
+    .admin_reactable(d, columns = .reference_columns[names(d)], page_size = 25L)
+  }
 
-  output$subject_dept_mapping_table <- reactable::renderReactable({
-    .admin_reactable(
-      .named_lookup_table(get0("subj_to_dept", ifnotfound = NULL),
-                          "subject_code", "dept_code") %>%
-        .admin_humanize_columns(),
-      page_size = 25L
-    )
-  })
-
-  output$dept_name_mapping_table <- reactable::renderReactable({
-    .admin_reactable(
-      .named_lookup_table(get0("dept_code_to_name", ifnotfound = NULL),
-                          "dept_code", "dept_name") %>%
-        .admin_humanize_columns(),
-      page_size = 25L
-    )
-  })
+  output$program_dept_mapping_table <- reactable::renderReactable(
+    .reference_reactable(.mapping_reference()$programs))
+  output$subject_dept_mapping_table <- reactable::renderReactable(
+    .reference_reactable(.mapping_reference()$subjects))
+  output$dept_name_mapping_table <- reactable::renderReactable(
+    .reference_reactable(.mapping_reference()$units))
 
   # ── Tab 2: Usage Overview (lazy loaded) ────────────────────────────────
   usage_overview_data <- reactiveVal(NULL)
