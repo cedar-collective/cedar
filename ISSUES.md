@@ -1409,21 +1409,26 @@ Fall 2026, by home campus) with any `cedar_programs` row:
 
 Taos sits under 1% in every year, so this is not a recent change.
 
-The export is scoped to students enrolled at the main campus that term. The
-branch students it does contain are almost exactly those who took a main-campus
-or online (ABQ or EA) course that term: of 1,163 branch-home program
-student-terms with class-list rows, 1,158 did (99.6%), where across the class
-lists only 1,645 of 74,486 branch-home student-terms (2.2%) include such a
-course. CEDAR does not drop them: parsing removes only empty rows and rows
-with a blank Academic Year, and the parsed file is already 99.7% Albuquerque.
-Checked 2026-10-14.
+The download itself lacks them. Neither mrgather nor CEDAR filters on campus:
+`getASs()` sets the term, all fields and Excel output, and the form has all
+campuses selected; parsing removes only empty rows, rows with a blank Academic
+Year and exact duplicates; the transform drops only empty program slots. The
+parsed file is already 99.7% Albuquerque. (Checked 2026-10-14.)
 
-The likely cause is in the fetch, not the transform. In
-`mrgather/mrgather.js`, `getASs()` and `getDegs()` choose terms and fields but
-never a campus, so the report form's default applies; `getAADs()` picks `ABQ`
-explicitly, so these forms have a campus selector. A main-campus default would
-explain this and I18 together. Not yet confirmed: open the Academic Study
-Detail form in MyReports and read its campus selector.
+Whether a student is in it depends on where they took courses that term, not
+their home campus. Share of class-list student-terms (Fall 2019 – Fall 2026)
+with any program record:
+
+| Took courses at | Albuquerque home | Branch home |
+|---|---:|---:|
+| Some ABQ | 97.9% | 63.2% |
+| Online (EA) only | 93.6% | 74.6% |
+| EA plus branch | 92.1% | 73.4% |
+| Branch campuses only | **4.7%** (8,384) | **0.0%** (72,841) |
+
+So the report's population behaves like "registered for a main-campus or
+online course", whatever its campus selector says. The Degrees report, with no
+associate degrees (I18), likely shares it.
 
 ### Reproduce
 
@@ -1438,8 +1443,12 @@ dplyr::left_join(cl, pr, by = c("student_id", "term")) |>
 
 ### What a fix requires
 
-Confirm the form's campus default. If it is Albuquerque, have mrgather select
-every campus for Academic Studies and Degrees, re-pull the history, and rebuild.
+Find what the report's population is: whether the campus selector's "All"
+includes Gallup, Los Alamos, Taos and Valencia; whether a branch campus picked
+explicitly returns its branch-only students (a term such as Fall 2025 should
+show hundreds of Taos rows, not dozens); or, failing both, ask the report's
+owner. Then change the pull (or request a report that covers the branches),
+re-pull the history, and rebuild.
 Until then, branch-campus program counts are not usable, including the counts
 the mapping review shows for branch codes.
 
