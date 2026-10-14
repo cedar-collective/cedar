@@ -29,7 +29,6 @@ recurrence is recognizable.
 
 | ID | Kind | Summary |
 |---|---|---|
-| [I22](#i22--a-mapping-deploy-is-served-from-the-tables-it-replaced-until-the-app-restarts) | Defect | A mapping deploy is served from the old tables until the app restarts (up to a day) |
 | [I20](#i20--cedar_programs-holds-almost-no-branch-campus-students) | Defect | `cedar_programs` holds 1–3% of branch-campus students; branch program counts read near zero |
 | [I18](#i18--cedar_degrees-holds-no-associate-degrees-so-branch-campus-completions-read-zero) | Defect | `cedar_degrees` holds no associate degrees: branch-campus completions read zero |
 | [I16](#i16--bottleneck-waitlist-pressure-ignores-term-so-later-registration-erases-earlier-waiting) | Defect | `get_bottlenecks()` waitlist pressure ignores term: ~6% under true demand (RStudio only; no page shows it) |
@@ -1502,7 +1501,16 @@ concentration by its stripped name.
 
 ## I22 — A mapping deploy is served from the tables it replaced until the app restarts
 
-**Status:** open
+**Status:** resolved 2026-10-14. When the gate rebuilds anything, the deploy
+puts the restart page back, restarts `cedar-shiny`, checks it again and clears
+the page, so the app serves the rebuilt tables. A deploy that changes no
+mapping file restarts once, as before. Running the gate before the first start
+was tried and dropped: it would run beside the old app, whose sessions have
+grown its memory, and a one-off rebuild beside a running app was killed for
+memory on a development VM. `test-mapping-provenance.R` runs the deploy's gate
+block with docker stubbed and fails without the restart. A bare
+`update-data.sh` run still leaves the app on its old tables until it restarts:
+the morning job's `restart-cedar.sh --update` restarts it.
 **Found:** 2026-10-14, reviewing why each mapping deploy needed a manual restart
 **Severity:** medium. Every mapping decision and transform fix reaches the
 stored tables at deploy but not the running app: production keeps showing the
@@ -1613,8 +1621,8 @@ reviewer: check the target's name.
 with their mapping provenance, and the gate rebuilds whichever are stale
 (`cedar_stale_mapped_tables()`), stopping if an export it needs is missing or a
 rebuilt table is still stale. Before, it rebuilt only `cedar_programs`, so a
-subject decision reached the course tables only at the next refresh. (The
-rebuilt tables still wait for an app restart to be served: I22.)
+subject decision reached the course tables only at the next refresh. A
+rebuild now restarts the app so it serves them (I22).
 
 ### Architecture rules (`AGENTS.md`)
 

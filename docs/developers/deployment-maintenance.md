@@ -30,6 +30,12 @@ The production deploy workflow supports the restart pattern:
 4. Replace the Shiny container.
 5. Poll the local Shiny health check.
 6. Remove the restart marker as soon as that health check passes.
+7. Rebuild any mapped table whose mapping files changed. If one was rebuilt,
+   put the marker back, restart the app, check it again and clear the marker:
+   the app keeps the tables it loaded until it restarts (`app_idle_timeout 0`),
+   so without the restart a rebuild reached production only at the morning
+   refresh (ISSUES.md I22).
+8. Rebuild the projection bundles if the projection model changed.
 
 ## The marker is cleared three times, deliberately
 

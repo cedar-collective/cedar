@@ -181,22 +181,20 @@ jobs:
             # starts, but the app isn't up until shiny-server serves the page
             # (and the first real request triggers the heavy global.R data
             # load). Poll for up to 5 minutes before calling the deploy good.
-            echo "Waiting for app to respond at http://localhost:3838/ ..."
-            APP_UP=false
-            for i in $(seq 1 60); do
-              if curl -fsS -o /dev/null --max-time 20 http://localhost:3838/; then
-                echo "Health check passed on attempt $i."
-                APP_UP=true
-                break
-              fi
-              sleep 5
-            done
-
-            if [ "$APP_UP" != true ]; then
+            wait_for_app() {
+              echo "Waiting for app to respond at http://localhost:3838/ ..."
+              for i in $(seq 1 60); do
+                if curl -fsS -o /dev/null --max-time 20 http://localhost:3838/; then
+                  echo "Health check passed on attempt $i."
+                  return 0
+                fi
+                sleep 5
+              done
               echo "Health check FAILED after 5 minutes. Recent container logs:"
               docker compose logs --tail 100 cedar-shiny
-              exit 1
-            fi
+              return 1
+            }
+            wait_for_app || exit 1
 
             # The app is serving, so the restart page has no purpose from here
             # on. Clear it at this point rather than leaving it to the EXIT
@@ -234,7 +232,7 @@ jobs:
             # the restart marker was cleared as soon as the health check passed.
             # This is by far the longest-running step when it does rebuild, so
             # it is also the likeliest place to lose the session.
-            # Rebuild cedar_programs when the MAPPING source changed.
+            # Rebuild the mapped tables when the MAPPING source changed.
             #
             # dept_code is derived at transform time, so editing a mapping list
             # changes nothing until the table is rebuilt -- and nothing says the
@@ -248,16 +246,40 @@ jobs:
             # the table, touching no CEDAR table, so a deploy that changed no
             # mapping costs about a second. Data-driven staleness stays with the
             # morning refresh.
+            #
+            # The app is already running when this rebuilds, and keeps the
+            # tables it loaded for as long as it runs (app_idle_timeout 0): a
+            # rebuild here reached production only at the morning restart
+            # (ISSUES.md I22). So a rebuild restarts the app, behind the
+            # restart page, and checks it again. Not before the first start: the
+            # rebuild would then run beside the old app, whose sessions have
+            # grown its memory, and a one-off rebuild beside a running app was
+            # killed for memory on a development VM.
             echo "Checking whether the mapping source changed in this deploy..."
+            MAPPING_LOG="$(mktemp)"
             if docker compose exec -T cedar-shiny \
                  Rscript --vanilla \
                  /srv/shiny-server/cedar/scripts/rebuild-programs-if-mappings-changed.R \
-                 < /dev/null; then
+                 < /dev/null > "$MAPPING_LOG" 2>&1; then
+              cat "$MAPPING_LOG"
               echo "Mapping check complete."
+              if grep -q '^\[mappings\] Rebuilt:' "$MAPPING_LOG"; then
+                echo "Mapped tables were rebuilt; restarting the app so it serves them."
+                if printf 'CEDAR deploy restart (rebuilt tables) started at %s\n' "$(date -Is)" \
+                     > "$RESTARTING_FLAG"; then
+                  RESTARTING_ENABLED=true
+                fi
+                docker compose restart cedar-shiny
+                wait_for_app || exit 1
+                clear_restarting
+                RESTARTING_ENABLED=false
+              fi
             else
-              echo "WARNING: mapping check or cedar_programs rebuild failed."
-              echo "The previous cedar_programs is retained; the next data refresh retries."
+              cat "$MAPPING_LOG"
+              echo "WARNING: mapping check or rebuild of the mapped tables failed."
+              echo "The previous tables are retained; the next data refresh retries."
             fi
+            rm -f "$MAPPING_LOG"
 
             echo "Checking whether the projection model changed in this deploy..."
             # cedar-projections, not cedar-shiny: the app service mounts output/
