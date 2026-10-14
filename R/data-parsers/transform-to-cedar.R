@@ -987,14 +987,17 @@ transform_programs <- function(academic_studies, data_dir, ext, maps) {
   }) %>%
     purrr::compact() %>%
     dplyr::bind_rows() %>%
-    # Fill missing major_codes via name → code map before dept lookup.
-    # Concentrations (code_col = NULL) and some older formats lack a Banner code column.
+    # Fill missing major_codes via name → code map before dept lookup, for
+    # older formats that lack a Banner code column. Never for a concentration:
+    # it has no code (code_col = NULL), and a concentration named like a major
+    # is not that major (ISSUES.md I21).
     # Strip "Pre-" prefix so "Pre-History" resolves the same as "History".
     dplyr::mutate(
+      .concentration = grepl("Concentration", program_type),
       # unname(): the lookup's names otherwise ride along on the whole column,
       # and a named column reaches the browser as a JSON object, not an array.
       major_code = unname(dplyr::if_else(
-        is.na(major_code) & !is.na(program_name) & nzchar(program_name),
+        !.concentration & is.na(major_code) & !is.na(program_name) & nzchar(program_name),
         major_name_to_major_code[stringr::str_trim(
           sub("^Pre[- ]+", "", program_name, ignore.case = TRUE)
         )],
@@ -1015,7 +1018,10 @@ transform_programs <- function(academic_studies, data_dir, ext, maps) {
       # Pre-Engineering) are associate degrees students are admitted to, so not
       # pre-majors (reviewed 2026-10-10). A code with no programs.csv row falls
       # back to Banner's own word, a "Pre-" program name, and says so in
-      # pre_major_basis.
+      # pre_major_basis. A concentration is never a pre-major: it is a track
+      # within a major, not a program a student is admitted to, so Banner's
+      # "Pre-Law" concentration keeps its name and its own row stays FALSE
+      # (ISSUES.md I21). A pre-major student's major row still says so.
       .pre_in_file = program_pre_major_flags(major_code, files$programs),
       .pre_by_name = grepl("^Pre[- ]", program_name, ignore.case = TRUE),
       # PHRD was the code for undergraduate pre-pharmacy before 202580 (FPHS
@@ -1023,6 +1029,7 @@ transform_programs <- function(academic_studies, data_dir, ext, maps) {
       # CEDAR_DATA_SEMANTICS as phrd-undergraduate-pre-pharmacy.
       .pre_by_phrd = major_code %in% "PHRD" & student_level %in% c("UG", "NG"),
       is_pre_major = dplyr::case_when(
+        .concentration       ~ FALSE,
         .pre_by_phrd         ~ TRUE,
         !is.na(.pre_in_file) ~ .pre_in_file,
         TRUE                 ~ .pre_by_name),
@@ -1033,9 +1040,10 @@ transform_programs <- function(academic_studies, data_dir, ext, maps) {
         !is.na(.pre_in_file) ~ "programs_csv",
         TRUE                 ~ "name_prefix"
       ),
-      # Strip "Pre-" prefix from program_name for clean display
+      # Strip "Pre-" prefix from a program's name for clean display; a
+      # concentration keeps Banner's name.
       program_name = dplyr::if_else(
-        grepl("^Pre[- ]", program_name, ignore.case = TRUE),
+        !.concentration & grepl("^Pre[- ]", program_name, ignore.case = TRUE),
         stringr::str_trim(sub("^Pre[- ]+", "", program_name, ignore.case = TRUE)),
         program_name
       ),
@@ -1050,7 +1058,7 @@ transform_programs <- function(academic_studies, data_dir, ext, maps) {
       ))
     ) %>%
     # Working columns; pre_major_basis carries what they decided.
-    dplyr::select(-dplyr::any_of(c(".pre_in_file", ".pre_by_name", ".pre_by_phrd")))
+    dplyr::select(-dplyr::any_of(c(".concentration", ".pre_in_file", ".pre_by_name", ".pre_by_phrd")))
 
   # Concentrations take the unit of the student's primary major that term
   # (ADR-002): a concentration sits under a major, and matching its name to a

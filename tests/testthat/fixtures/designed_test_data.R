@@ -203,6 +203,10 @@
 #   student's college is their primary major's -- EC14-A Pharmacy, EC14-B Arts
 #   & Sciences on every row, minors included -- and EC14-C, whose major is
 #   undecided, takes Banner's Translated College (Fine Arts), labelled "banner".
+#   Concentrations are not majors (ISSUES.md I21): EC14-A, a pre-major, also
+#   holds a "Pre-Law" concentration, which is not a pre-major and keeps its
+#   name; EC14-C's "History" concentration gets no program code from its name,
+#   so it is never the History major.
 #
 # EC-16 (separate cedar_programs_shared_name table):
 #   Two departments each own a major named "Engineering" at 202110: ENG (three
@@ -3671,7 +3675,7 @@ academic_studies_program_units <- tibble::tibble(
   `Program Code` = c("PHARMD-FPMD", "BA-HIST-AS", "BFA-ART-FA"),
   `First Minor` = c("Forensic Anthropology", "Art", NA),
   `First Minor Code` = c("FOAN", "ART", NA),
-  `First Concentration` = c(NA, "Public Policy", NA)
+  `First Concentration` = c("Pre-Law", "Public Policy", "History")
 )
 
 

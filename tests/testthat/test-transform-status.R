@@ -127,9 +127,11 @@ test_that("a program's unit comes from programs.csv; anything unconfirmed has no
     is_pre_major = c("TRUE", "FALSE", "FALSE", "FALSE"),
     leads_to = "", basis = c("decided", "decided", "source_department", "course_taking"),
     status = c("confirmed", "confirmed", "confirmed", "proposed"), evidence = "", notes = "")
+  # History names a major, so the name-to-code fill could reach EC14-C's
+  # History concentration if it applied to concentrations (I21).
   maps <- list(
     mapping_files = scaffold_mapping_files(programs_csv),
-    major_name_to_major_code = character(0)
+    major_name_to_major_code = c(History = "HIST")
   )
   env$transform_programs(academic_studies_program_units, output_dir, ".qs", maps = maps)
   programs <- qs2::qs_read(file.path(output_dir, "cedar_programs.qs"))
@@ -139,8 +141,10 @@ test_that("a program's unit comes from programs.csv; anything unconfirmed has no
   expect_equal(unname(dept[c("FPMD", "FOAN", "HIST")]), c("PHRM", "ANTH", "HIST"))
   expect_true(is.na(dept[["ART"]]))
   conc <- programs[grepl("Concentration", programs$program_type), ]
-  expect_equal(conc$program_name, "Public Policy")
-  expect_equal(conc$dept_code, "HIST")
+  conc <- conc[order(conc$program_name), ]
+  expect_equal(conc$program_name, c("History", "Pre-Law", "Public Policy"))
+  # Each takes its primary major's unit: none for EC14-C, whose ART is proposed.
+  expect_equal(conc$dept_code, c(NA, "PHRM", "HIST"))
 
   # Stage 3b colleges. Each row keeps its own program's college; the student's
   # college is their primary major's, on every row; an undecided major takes
@@ -167,6 +171,17 @@ test_that("a program's unit comes from programs.csv; anything unconfirmed has no
   expect_equal(row("EC14-A", "Major")$pre_major_basis, "programs_csv")
   expect_false(row("EC14-B", "Major")$is_pre_major)
   expect_false(row("EC14-B", "First Concentration")$is_pre_major)
+
+  # I21: concentrations are not majors. A pre-major's "Pre-Law" concentration
+  # is not a pre-major and keeps Banner's name; the student's major row is
+  # still one. A concentration named like a major gets no program code.
+  pre_law <- row("EC14-A", "First Concentration")
+  expect_equal(pre_law$program_name, "Pre-Law")
+  expect_false(pre_law$is_pre_major)
+  expect_true(is.na(pre_law$pre_major_basis))
+  expect_true(row("EC14-A", "Major")$is_pre_major)
+  expect_true(is.na(row("EC14-C", "First Concentration")$major_code))
+  expect_true(all(is.na(conc$major_code)))
 })
 
 test_that("a transform without the mapping files stops instead of guessing", {

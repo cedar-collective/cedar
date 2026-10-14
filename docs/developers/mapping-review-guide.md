@@ -161,7 +161,8 @@ EC-14 fails if that fallback returns.
 guess about naming, not a fact about programs: F did not mark every pre-major,
 and not every "Pre-" program is one. Check `pre_major_basis`: `programs_csv`
 means the file decided; `name_prefix` means the code has no row and Banner's
-name was used.
+name was used. A concentration is never a pre-major, whatever its name
+(ISSUES.md I21).
 
 **3. A drifted name.** `FMDL` is "Medical Laboratory Science", `MEDL` is
 "Medical Laboratory Sciences". Anything matching programs by name splits that
