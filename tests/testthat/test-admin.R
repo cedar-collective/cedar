@@ -315,7 +315,7 @@ test_that("a unit's scope names every confirmed subject and program row behind i
 # Scaffolding for build_counting_rules(): the transform's output columns the
 # rules read, as small frames. Programs: two concentration rows (one under an
 # undecided major, so no department, and flagged a pre-major by its name, as
-# the transform does to "Pre-Law": I21), one coded pre-major by name (FZZZ),
+# tables built before I21's fix show "Pre-Law"), one coded pre-major by name (FZZZ),
 # one PHRD undergraduate, rows reporting Banner's college. Sections: a cross-list
 # group spanning HIST and ENGL (home and partner) and one within HIST, an
 # excluded course, levels 3 lower / 1 upper / 1 grad. Students: S1-S3 in

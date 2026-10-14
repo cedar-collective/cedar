@@ -29,7 +29,6 @@ recurrence is recognizable.
 
 | ID | Kind | Summary |
 |---|---|---|
-| [I21](#i21--concentrations-named-pre-are-flagged-pre-majors-and-lose-the-pre) | Defect | Concentrations named "Pre-" (Pre-Law, Pre-Professional Architecture) are flagged pre-majors: inflated pre-major counts in five departments |
 | [I20](#i20--cedar_programs-holds-almost-no-branch-campus-students) | Defect | `cedar_programs` holds 1–3% of branch-campus students; branch program counts read near zero |
 | [I18](#i18--cedar_degrees-holds-no-associate-degrees-so-branch-campus-completions-read-zero) | Defect | `cedar_degrees` holds no associate degrees: branch-campus completions read zero |
 | [I16](#i16--bottleneck-waitlist-pressure-ignores-term-so-later-registration-erases-earlier-waiting) | Defect | `get_bottlenecks()` waitlist pressure ignores term: ~6% under true demand (RStudio only; no page shows it) |
@@ -1435,7 +1434,14 @@ the mapping review shows for branch codes.
 
 ## I21 — Concentrations named "Pre-" are flagged pre-majors and lose the "Pre-"
 
-**Status:** open
+**Status:** resolved 2026-10-14. `transform_programs()` never applies the name
+rules to a concentration: it is never a pre-major, keeps Banner's name, and
+gets no program code from its name (a "Mathematics" concentration had been
+given MATH: 950 rows). A pre-major student's major row still says so. EC-14
+holds a pre-major with a "Pre-Law" concentration and a "History" concentration;
+`test-transform-status.R` fails with the old rules. Rebuilt from the same
+export: only those four columns on concentration rows changed; no department
+or college moved.
 **Found:** 2026-10-12, reading the new Counting rules table on Admin > Mappings
 **Severity:** medium. Headcount and the Dept Dashboard report inflated
 pre-major figures for five departments, Architecture most, and two

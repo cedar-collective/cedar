@@ -450,7 +450,7 @@ build_counting_rules <- function(files, programs, sections, students) {
              "Program names to codes"),
     what = c(
       "A concentration has no code in Banner's report, so it counts with the department of the student's primary major that term.",
-      "A program row with no programs.csv row is a pre-major when Banner's name for it begins \"Pre-\", and is stored without the \"Pre-\". Every concentration is such a row, since concentrations have no code (ISSUES.md I21). A row in programs.csv states the flag instead.",
+      "A program code with no programs.csv row is a pre-major when Banner's name for it begins \"Pre-\", and is stored without the \"Pre-\". A row in programs.csv states the flag instead. A concentration is never a pre-major and keeps its name (ISSUES.md I21); tables built before that fix still show concentrations here.",
       "PHRD was undergraduate pre-pharmacy before Fall 2025; undergraduate PHRD rows are pre-majors whatever programs.csv says.",
       "A code with no confirmed row has no department, and reports the college Banner gives it, labelled college_basis = \"banner\".",
       sprintf("A course's level is read from the first digit of its number: %s. subjects.csv rows with in_level apply at one level only.",

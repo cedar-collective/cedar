@@ -321,7 +321,9 @@ vectors from the files (`major_to_dept` from confirmed every-college
 `premaj_canon` in the population groups); the transform reads each code's
 `is_pre_major` from `programs.csv`, keeping the PHRD undergraduate rule
 (row-level, in the data semantics) and falling back to Banner's "Pre-" name,
-labelled `pre_major_basis = name_prefix`, only for a code with no row.
+labelled `pre_major_basis = name_prefix`, only for a code with no row. A
+concentration has no code and never takes it: until 2026-10-14 it did, which
+made the "Pre-Law" concentration a pre-major (ISSUES.md I21).
 
 Rebuilt from the same exports and compared with Stage 3b: units and colleges
 identical except 5 program rows, undecided-major students whose blank
