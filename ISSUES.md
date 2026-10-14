@@ -1430,6 +1430,22 @@ So the report's population behaves like "registered for a main-campus or
 online course", whatever its campus selector says. The Degrees report, with no
 associate degrees (I18), likely shares it.
 
+Confirmed against a raw download (Fall 2026, pulled 2026-10-14 with all
+campuses selected: one sheet, 24,229 rows, 59 of them branch-campus), matched
+to the class lists through the same two hashes CEDAR applies:
+
+| Fall 2026 class-list students | Count | In the raw report |
+|---|---:|---:|
+| Took an ABQ or EA course | 24,821 | 24,209 (97.5%) |
+| Took only branch courses | 5,089 | 7 (0.1%) |
+
+Every one of its 59 branch-campus students also took an ABQ or EA course. Not
+all the missing students belong in a program report: about half of the
+branch-only students are concurrent-enrollment (dual-credit) or non-degree.
+But 2,873 of them had a degree major in the class lists that term, 1,452 in
+programs the mapping files place in branch units (General Studies, Liberal
+Arts, Welding Technology, ...), and the report has none of them.
+
 ### Reproduce
 
 ```r
