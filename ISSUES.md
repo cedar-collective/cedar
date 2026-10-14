@@ -29,13 +29,14 @@ recurrence is recognizable.
 
 | ID | Kind | Summary |
 |---|---|---|
+| [I22](#i22--a-mapping-deploy-is-served-from-the-tables-it-replaced-until-the-app-restarts) | Defect | A mapping deploy is served from the old tables until the app restarts (up to a day) |
 | [I20](#i20--cedar_programs-holds-almost-no-branch-campus-students) | Defect | `cedar_programs` holds 1–3% of branch-campus students; branch program counts read near zero |
 | [I18](#i18--cedar_degrees-holds-no-associate-degrees-so-branch-campus-completions-read-zero) | Defect | `cedar_degrees` holds no associate degrees: branch-campus completions read zero |
 | [I16](#i16--bottleneck-waitlist-pressure-ignores-term-so-later-registration-erases-earlier-waiting) | Defect | `get_bottlenecks()` waitlist pressure ignores term: ~6% under true demand (RStudio only; no page shows it) |
 | [I8](#i8--a-timing-log-row-is-silently-dropped-when-the-write-lock-times-out) | Defect | A timing-log row is dropped when the write lock times out |
 | [I6](#i6--a-killed-projection-rebuild-strands-its-lock-and-blocks-every-later-refresh) | Defect | A killed projection rebuild strands its lock |
 | [I4](#i4--pre-change-course-ratios-are-confounded-by-career-stage) | Defect | Pre-change course ratios confounded by career stage (deferred) |
-| M1–M26 | Improvement | See [Improvements](#improvements) |
+| M1–M28 | Improvement | See [Improvements](#improvements) |
 
 ---
 
@@ -534,6 +535,10 @@ lock is not safe either, because a deploy can overlap the morning refresh.
 
 Raising `command_timeout` to 60m (this change) reduces how often the kill
 happens; it does not fix the stranding.
+
+Since 2026-10-11 (I19) the error tells a held lock from an unwritable
+directory and says when the lock was created, so a stranded lock is easier to
+recognise; it still has to be removed by hand.
 
 ---
 
@@ -1495,9 +1500,50 @@ concentration by its stripped name.
 
 ---
 
+## I22 — A mapping deploy is served from the tables it replaced until the app restarts
+
+**Status:** open
+**Found:** 2026-10-14, reviewing why each mapping deploy needed a manual restart
+**Severity:** medium. Every mapping decision and transform fix reaches the
+stored tables at deploy but not the running app: production keeps showing the
+old departments for up to a day, and Admin > Data & Usage > Mappings says
+STALE meanwhile. Nothing is lost; it is late.
+**Affects:** the deploy script in `.github/workflows/deploy.yml`, with
+`shiny-server.conf`.
+
+### What is wrong
+
+The deploy starts the new container, then polls the app until it answers. That
+first request starts the app's R process, and `global.R` loads the tables then
+on disk. Only after that does the mapping gate
+(`scripts/rebuild-programs-if-mappings-changed.R`) rebuild the tables the new
+files changed. `shiny-server.conf` sets `app_idle_timeout 0`, so the R process
+never exits and keeps serving what it loaded until the container restarts,
+normally at the morning refresh (`restart-cedar.sh --update`).
+
+Every mapping deploy so far has done this: #125, #133, #135 rebuilt the four
+mapped tables after the health check.
+
+### Reproduce
+
+After a deploy whose log shows `[mappings] Rebuilt: ...`, open Admin > Data &
+Usage > Mappings: the banner says "Departments are STALE". `docker compose
+restart cedar-shiny` clears it.
+
+### What a fix requires
+
+When the gate rebuilt anything, restart `cedar-shiny` and run the health check
+again, inside the same guarded block so a failure leaves the previous app
+serving. Running the gate before `docker compose up` would avoid the second
+restart but needs the new image to run in a one-off container, as the
+projection publisher does.
+
+---
+
 # Improvements
 
-Short entries: **what**, **where**, **done when**. Counts measured 2026-10-07.
+Short entries: **what**, **where**, **done when**. Counts measured 2026-10-07;
+rechecked 2026-10-14, when only `server.R` had moved (6,356 lines).
 The recommended order before new features is in `ROADMAP.md`.
 
 ### Counting and definitions
@@ -1566,21 +1612,19 @@ reviewer: check the target's name.
 2026-10-10.* The transform stamps programs, degrees, sections and class lists
 with their mapping provenance, and the gate rebuilds whichever are stale
 (`cedar_stale_mapped_tables()`), stopping if an export it needs is missing or a
-rebuilt table is still stale. Since ADR-002 Stage 3
-`subjects.csv` decides every course's unit, but
-`scripts/rebuild-programs-if-mappings-changed.R` rebuilds only
-`cedar_programs` (and the lookups) when the mapping files change. A subject
-decision reaches `cedar_sections` and `cedar_students` only at the next refresh
-that transforms them, and until then the course tables carry the units of the
-previous files while the stamp says nothing about them. *Done when:* the gate
-rebuilds the course tables too when `subjects.csv`, `units.csv` or
-`colleges.csv` changed, or stamps them so the drift is reported.
+rebuilt table is still stale. Before, it rebuilt only `cedar_programs`, so a
+subject decision reached the course tables only at the next refresh. (The
+rebuilt tables still wait for an app restart to be served: I22.)
 
 ### Architecture rules (`AGENTS.md`)
 
 **M11 — Silent fallbacks.** 25 `tryCatch` blocks return NULL or an empty
 result: `R/modules/pathways.R` 11, `server.R` 6, `R/trunk/logging.R` 4,
 `R/modules/ui-helpers.R`, `R/cones/stopout.R`, `R/branches/data-edges.R`.
+One is in the data pipeline, where AGENTS.md calls it always a bug:
+`build_lookups()` in `R/data-parsers/transform-to-cedar.R` reads the saved
+`cedar_lookups` for `major_code_to_name` inside a `tryCatch` that returns NULL,
+so an unreadable file silently leaves the lookup empty. Fix that one first.
 *Done when:* only the two allowed kinds remain (a module error shown with
 `showNotification()`; a degenerate statistic returning `NA`).
 
@@ -1595,7 +1639,7 @@ result: `R/modules/pathways.R` 11, `server.R` 6, `R/trunk/logging.R` 4,
 `R/modules/gen-ed.R` 2. *Done when:* each calculation lives in the cone or
 branch that owns the question.
 
-**M14 — Inline surfaces in `server.R`.** 6,408 lines. *Done when:* the remaining
+**M14 — Inline surfaces in `server.R`.** 6,356 lines. *Done when:* the remaining
 inline tabs are modules (templates: `R/modules/headcount.R`,
 `R/modules/dept-trends.R`), with logic in branches/cones/features.
 
@@ -1621,6 +1665,13 @@ its repeated code extracted — alongside other work on the file.
 **M19 — Pathways heatmap legibility.** Long course labels and dense
 course-to-major views. *Done when:* labels are readable at the default size.
 
+**M27 — Headcount lists a department's programs by name.** Its program
+dropdown takes a department's programs from `cedar_lookups$program_name_lookup`
+(each program name's most common department), so a name two departments share
+lists under one. Counting is by each row's own department (I15); only the
+choices are affected. *Done when:* the choices come from the rows'
+`dept_code`, or from `unit_mapping_rows()`.
+
 ### Documentation and naming
 
 **M20 — Function reference can go stale.** *Done when:* CI regenerates it or
@@ -1636,8 +1687,15 @@ focused, tested patches.
 ### Data model
 
 **M23 — Campus vocabularies differ by table.** The same field name can hold codes
-in one table and labels in another. *Done when:* each campus field holds one
-vocabulary, documented.
+in one table and labels in another: `student_campus` is a name in
+`cedar_programs` ("Albuquerque/Main", "Taos") and a code in `cedar_students`
+("ABQ", "TA"), and no file maps one to the other, so headcounts filter on names
+and course figures on codes. `R/lists/campuses.R` gives no expansion for EW, EF,
+ELA and TAQ, and the data uses codes it does not define (05, EG, ET, TAP
+locally, a few sections each). Admin > Data & Usage > Mappings shows both
+(Counting rules; Campuses). *Done when:* each campus field holds one
+vocabulary, every code in the data is defined or reported as a source error,
+and the campus list moves to `institution/<id>/` (ROADMAP).
 
 **M24 — Enrollment lifecycle labels differ by tab.** The same class-list counts
 carry different names: `census_enrl` is "Census Estimate" (Enrollment),
@@ -1650,3 +1708,10 @@ reconstruction now exists — `first_day_enrl` (`calc_first_day_enrl()`, definit
 actively misleading beside it: rename `first_day_proxy` to an ever-registered
 name. *Done when:* each lifecycle column has one label, from
 `docs/_data/definitions.yml`, used everywhere it is shown.
+
+**M28 — The HR department list is a hand-kept R list.** `hr_org_desc_to_dept`
+(`R/lists/mappings.R`, 79 names to 32 departments) maps the HR report's
+organisation names to departments for faculty; organisations not on it are
+dropped at parse. The HR report is no longer pulled, so this is low priority.
+*Done when:* the list moves to `institution/<id>/` with a test that every
+department it names is in `units.csv`, or is retired with the faculty table.
