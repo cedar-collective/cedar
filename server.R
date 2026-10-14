@@ -4973,60 +4973,11 @@ output$enrl_classlist_download <- downloadHandler(
   # Subject selector — populated from cedar_sections for the selected dept
   # Subject dropdown removed: dashboard now only uses campus and department selectors
 
-  # Program transparency info box — shows which subject and program codes are
-  # matched for the selected department. Purely reactive; no heavy data load.
+  # Which codes the selected department counts, each with its name: the
+  # mapping-file rows behind it (unit_mapping_rows()), rendered by the shared
+  # unit_codes_scope() that Headcount uses too.
   dept_scope_info_ui <- function(dept) {
-    dept_name_label <- if (exists("dept_code_to_name") && dept %in% names(dept_code_to_name))
-      dept_code_to_name[[dept]] else dept
-
-    # Subject codes: course prefixes in cedar_sections that map to this dept
-    subj_codes <- if (exists("subj_dept_map")) {
-      sort(subj_dept_map$subject_code[!is.na(subj_dept_map$dept_code) &
-                                        subj_dept_map$dept_code == dept])
-    } else character(0)
-
-    # Program codes: the programs.csv rows confirmed to this unit (ADR-002), the
-    # same rows the transform assigns to it. Pre-majors as the file states them.
-    pr <- cedar_institution_files$programs
-    prog_rows <- pr[pr$status == "confirmed" & pr$unit_code == dept, ]
-    pre <- prog_rows$is_pre_major == "TRUE"
-    online <- grepl("^X", prog_rows$program_code)
-    degree_codes  <- sort(unique(prog_rows$program_code[!pre & !online]))
-    variant_codes <- sort(unique(prog_rows$program_code[!pre & online]))
-    premaj_codes  <- sort(unique(prog_rows$program_code[pre]))
-
-    code_pill <- function(code) {
-      tags$code(
-        class = "filter-context-code",
-        code
-      )
-    }
-
-    row_item <- function(label, codes) {
-      if (length(codes) == 0) return(NULL)
-      tags$div(
-        class = "filter-context-row filter-context-row-inline",
-        tags$span(label, class = "filter-context-label"),
-        lapply(codes, code_pill)
-      )
-    }
-
-    filter_scope_stripe(
-      div(
-        class = "scope-bar scope-bar--stacked",
-        div(
-          class = "filter-context-title",
-          paste0("Data scope for ", dept_name_label, " (dept code: ", dept, ")")
-        ),
-        div(
-          class = "filter-context-inline-list",
-          row_item("Course subject codes (cedar_sections):", subj_codes),
-          row_item("Program codes (programs.csv):",           degree_codes),
-          row_item("Accelerated online codes (X-prefix):",    variant_codes),
-          row_item("Pre-major codes:",                        premaj_codes)
-        )
-      )
-    )
+    filter_scope_stripe(unit_codes_scope(unit_mapping_rows(dept, cedar_institution_files)))
   }
 
   deptTrendsServer(
@@ -6024,6 +5975,42 @@ output$enrl_classlist_download <- downloadHandler(
     .reference_reactable(.mapping_reference()$subjects))
   output$dept_name_mapping_table <- reactable::renderReactable(
     .reference_reactable(.mapping_reference()$units))
+  output$college_mapping_table <- reactable::renderReactable(
+    .admin_reactable(.mapping_reference()$colleges, page_size = 25L, columns = list(
+      college_code = reactable::colDef(name = "College code", minWidth = 80),
+      college_name = reactable::colDef(name = "College name", minWidth = 220),
+      also_matches = reactable::colDef(name = "Also matches", minWidth = 260, na = "\u2014"),
+      depts        = reactable::colDef(name = "Departments", minWidth = 90, align = "right"))))
+
+  # Campus codes, and where each is counted. Sections and enrollments count the
+  # campus that taught them; home-campus rows the student's, as class lists
+  # code it.
+  output$campus_mapping_table <- reactable::renderReactable({
+    campuses <- build_campus_reference(data_objects[["cedar_sections"]],
+                                       data_objects[["cedar_students"]])
+    whole <- reactable::colFormat(separators = TRUE, digits = 0)
+    .admin_reactable(campuses, page_size = 25L, columns = list(
+      campus             = reactable::colDef(name = "Campus code", minWidth = 80),
+      label              = reactable::colDef(name = "Label", minWidth = 140, na = "\u2014"),
+      group              = reactable::colDef(name = "Group", minWidth = 110),
+      default_scope      = reactable::colDef(name = "In default scope", minWidth = 90,
+                                             cell = function(value) if (isTRUE(value)) "Yes" else "No"),
+      sections           = reactable::colDef(name = "Sections taught", minWidth = 100, format = whole),
+      enrollments_taught = reactable::colDef(name = "Enrollments taught", minWidth = 110, format = whole),
+      enrollments_home   = reactable::colDef(name = "Enrollments by home campus", minWidth = 130, format = whole)))
+  })
+
+  # The rules that place or drop rows without a mapping-file row, with what
+  # each touches in the loaded tables.
+  output$counting_rules_table <- reactable::renderReactable({
+    rules <- build_counting_rules(cedar_institution_files, data_objects[["cedar_programs"]],
+                                  data_objects[["cedar_sections"]], data_objects[["cedar_students"]])
+    .admin_reactable(rules, pagination = FALSE, searchable = FALSE, columns = list(
+      rule     = reactable::colDef(name = "Rule", minWidth = 130),
+      what     = reactable::colDef(name = "What CEDAR does", minWidth = 340),
+      affects  = reactable::colDef(name = "Affects now", minWidth = 280),
+      coded_in = reactable::colDef(name = "Coded in", minWidth = 200)))
+  })
 
   # ── Tab 2: Usage Overview (lazy loaded) ────────────────────────────────
   usage_overview_data <- reactiveVal(NULL)

@@ -409,6 +409,59 @@ headcount_scope_bar <- function(described, ...) {
       lapply(names(described), function(k) scope_chip(k, described[[k]])))
 }
 
+# The codes a department's figures are built from, each with its name: course
+# subjects, programs (accelerated online X-prefix codes apart) and pre-majors,
+# one block per unit, from unit_mapping_rows(). Shared by Dept Trends, the Dept
+# Dashboard and Headcount, so every scope bar names the same codes the mapping
+# files assign. Rows wrap (filter-context-row), since names make them long.
+unit_codes_scope <- function(rows) {
+  only <- function(college, level) {
+    parts <- c(if (!is.na(college)) paste(college, "only"),
+               if (!is.na(level)) paste(level, "only"))
+    if (length(parts)) paste0(" (", paste(parts, collapse = ", "), ")") else NULL
+  }
+  item <- function(code, label = NULL) {
+    tags$span(tags$code(class = "filter-context-code", code),
+              tags$span(class = "filter-context-name", label))
+  }
+  row_item <- function(label, items) {
+    if (length(items) == 0) return(NULL)
+    tags$div(class = "filter-context-row",
+             tags$span(label, class = "filter-context-label"), items)
+  }
+  blocks <- lapply(seq_len(nrow(rows$units)), function(i) {
+    u  <- rows$units[i, ]
+    sj <- rows$subjects[rows$subjects$unit_code == u$unit_code, ]
+    pr <- rows$programs[rows$programs$unit_code == u$unit_code, ]
+    online <- grepl("^X", pr$program_code)
+    program_items <- function(p) lapply(seq_len(nrow(p)), function(j) {
+      item(p$program_code[j], paste0(
+        p$program_name[j],
+        if (p$is_pre_major[j] && !is.na(p$leads_to[j])) paste0(" → ", p$leads_to[j]),
+        only(p$in_college[j], NA)))
+    })
+    college <- if (is.na(u$college_code)) "no home college" else
+      if (is.na(u$college_name)) u$college_code else u$college_name
+    tagList(
+      div(class = "filter-context-title",
+          paste0("Data scope for ", u$unit_name, " (dept code: ", u$unit_code, "), ", college)),
+      row_item("Course subject codes:",
+               lapply(seq_len(nrow(sj)), function(j)
+                 item(sj$subject_code[j], only(sj$in_college[j], sj$in_level[j])))),
+      row_item("Program codes:", program_items(pr[!pr$is_pre_major & !online, ])),
+      row_item("Accelerated online codes (X-prefix):", program_items(pr[!pr$is_pre_major & online, ])),
+      row_item("Pre-major codes:", program_items(pr[pr$is_pre_major, ]))
+    )
+  })
+  div(class = "scope-bar scope-bar--stacked",
+      blocks,
+      tags$div(class = "filter-context-row",
+               tags$span(class = "filter-context-label",
+                         paste("Concentrations count with the student's primary major.",
+                               "Every code is a row in the institution mapping files;",
+                               "see Admin > Data & Usage > Mappings."))))
+}
+
 # Shared campus + single-department selector formulation for department tabs.
 dept_selector_bar <- function(title, subtitle, campus_input, dept_input,
                               term_input = NULL, actions = NULL, scope_output = NULL) {

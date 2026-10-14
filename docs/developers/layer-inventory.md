@@ -72,6 +72,10 @@ College resolution lives with the files (`R/lists/institution_files.R`):
 `resolve_program_colleges(program_code, college_code, files)` (program → unit →
 college, with per-program and pre-major-target overrides),
 `translate_source_college(values, files)`, `college_value_is_known(values, files)`.
+`unit_mapping_rows(unit_codes, files)` lists the confirmed subject and program
+rows behind a unit, with names; the shared scope block `unit_codes_scope()`
+(`R/modules/ui-helpers.R`) renders it on Dept Trends, the Dept Dashboard and
+Headcount.
 
 Registry accessors (`R/lists/data_semantics.R`): `cedar_data_semantics(kind)`,
 `cedar_semantic_notes(table, values, terms)`, `cedar_semantic_caption(notes)`.
@@ -123,6 +127,10 @@ Features call multiple branches/cones and assemble payloads for visible app surf
 | File | Main function(s) | Purpose |
 |------|-----------------|---------|
 | `admin.R` | `build_admin_data_status(summary, current_term)` | Tiny freshness-table payload built only from the precomputed startup summary; never scans institutional tables |
+| | `build_mapping_worklist(files, programs, issues, audit, source_departments)` | Admin > Mappings decisions, each row with a `group` (programs, subjects, colleges) for its tab and a `name` that is only ever the code's own name |
+| | `build_mapping_reference_tables(files)` | The mapping files as code-to-department tables with names: programs, subjects, units, colleges; every confirmed row |
+| | `build_counting_rules(files, programs, sections, students)` | The rules that place or drop rows without a file row, with what each touches in the loaded tables and where it is coded |
+| | `build_campus_reference(sections, students)` | Every campus code (those `campuses.R` defines plus any the data adds) with its group, default scope, and where it is counted |
 | `course-report.R` | `create_course_base_data(data_objects, opt)`, `compute_cr_flows_tab()`, `compute_cr_outcomes_tab()`, `prepare_downstream_outcomes_display()`, `prepare_course_snapshot_tables()` | Assembles enrollment and rollcall data for the Course Dynamics tab; flows/outcomes computed lazily per sub-tab. The snapshot adapter returns formatted table specs, one per campus, for `cedar_snapshot_table()` (`R/modules/ui-helpers.R`). The downstream display helper keeps the full analytical audit intact while presenting one sortable `% (count)` column per outcome and omitting instructor-level censoring/course-order fields already summarized above the table |
 | `gen-ed.R` | `get_gen_ed_profile(students, sections, programs, degrees, opt)` | Gen Ed profile (scope filtering, outcome rates, grade distribution, major mix) for Explore > Gen Ed and the Dept Trends Gen Ed panel |
 | | `get_gen_ed_grad_profile(students, degrees, term_credits, opt)` | Gen Ed *consumed by* a department's own graduates — cohort meta, a `get_course_timing()` heatmap on the `unm_credit_band` axis, and the uptake table — for the graduate sections of Dept Trends > Gen Ed. The rest of that subtab measures the department as a Gen Ed provider; this one flips the population, which is why it needs the strict cohort |

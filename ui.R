@@ -1855,7 +1855,7 @@ nav_panel(
           uiOutput("mapping_freshness"),
           card(
             card_header("Mapping decisions"),
-            p("Everything settled by editing a mapping file in institution/unm/, largest first, in three tabs: programs (including mapped colleges Banner's Translated College disagrees with, and codes the data uses that no file has), course subjects, and college values no file names. Each row opens with what it is: Banner code, the code Banner uses; Name, the code's own name (a program's name in programs.csv; a course subject has none, so its tab shows the college that teaches it instead); Kind; Where, the file and line for a local checkout; and Needs, what to supply, which opens that line (or the file, for a new row). Reported today as is what the stored tables carry now: an unconfirmed code has no department until its row is confirmed and the tables are rebuilt. Suggested department is the department (CEDAR unit) the mapping assistant thinks should own it, and Confidence says how far to trust that, with the evidence on hover.",
+            p("Everything settled by editing a mapping file in institution/unm/, largest first, in three tabs: Programs (including mapped colleges Banner's Translated College disagrees with, and codes the data uses that no file has), Course subjects, and College values no file names. Each row opens with what it is: Banner code, the code Banner uses; Name, the code's own name (a program's name in programs.csv; a course subject has none, so its tab shows the college that teaches it instead); Kind; Where, the file and line for a local checkout; and Needs, what to supply, which opens that line (or the file, for a new row). Reported today as is what the stored tables carry now: an unconfirmed code has no department until its row is confirmed and the tables are rebuilt. Suggested department is the department (CEDAR unit) the mapping assistant thinks should own it, and Confidence says how far to trust that, with the evidence on hover.",
               class = "text-hint"),
             uiOutput("mapping_decisions_summary"),
             navset_tab(
@@ -1870,7 +1870,7 @@ nav_panel(
                 reactable::reactableOutput("mapping_decisions_subjects_table")
               ),
               nav_panel(
-                title = "Colleges",
+                title = "College values",
                 br(),
                 reactable::reactableOutput("mapping_decisions_colleges_table")
               )
@@ -1882,6 +1882,12 @@ nav_panel(
               class = "text-hint"),
             uiOutput("mapping_other_summary"),
             reactable::reactableOutput("mapping_other_table")
+          ),
+          card(
+            card_header("Counting rules"),
+            p("The rules that place or drop rows without a mapping-file row, with how many rows each touches in the loaded data and where it is coded. With the decisions above and the tables below, they account for every department, college and campus a count is assigned to.",
+              class = "text-hint"),
+            reactable::reactableOutput("counting_rules_table")
           ),
           navset_tab(
             nav_panel(
@@ -1904,6 +1910,20 @@ nav_panel(
               p("Every department (unit) in units.csv: its code, name, home college, and kind -- a department, a program, or a college-wide unit for courses no department owns.",
                 class = "text-hint"),
               reactable::reactableOutput("dept_name_mapping_table")
+            ),
+            nav_panel(
+              title = "Colleges",
+              br(),
+              p("Every college in colleges.csv: its code and name, the other values sources use for it, which the transform translates to its code (ED is EH), and how many departments it is home to.",
+                class = "text-hint"),
+              reactable::reactableOutput("college_mapping_table")
+            ),
+            nav_panel(
+              title = "Campuses",
+              br(),
+              p("Every campus code: the codes R/lists/campuses.R defines, and any the loaded data uses that it does not. Sections and enrollments count the campus that taught them; the last column counts students by their home campus, as class lists code it. Program records name the home campus instead (see Counting rules).",
+                class = "text-hint"),
+              reactable::reactableOutput("campus_mapping_table")
             )
           )
         )

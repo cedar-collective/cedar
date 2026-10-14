@@ -29,7 +29,7 @@ by the kind of work:
   `institution/unm/`, largest first, in three tabs: **Programs** (programs
   awaiting a decision, codes the data uses that no file has, and mapped
   colleges Banner's Translated College disagrees with), **Course subjects**,
-  and **Colleges** (college values no file names, units with no college).
+  and **College values** (college values no file names, units with no college).
   `build_mapping_worklist()` in `R/features/admin.R` sets each row's `group`.
   Columns, in order:
 
@@ -43,7 +43,7 @@ by the kind of work:
   | Reported today as | The unit the stored tables carry now. Since ADR-002 Stage 3 that comes from these files, so an unconfirmed code reads *none*; *phantom* (a department named after the code itself) appears only in tables built before Stage 3. A college check gives the mapped college and Banner's |
   | Suggested department | The unit the assistant suggests should own it, with its name |
   | Confidence | Strong (the source's own department, matching names or subject code, a pre-major's target), Plausible (clear course-taking: 5x the usual rate or more, over 100 or more enrolments), Weak (otherwise, or in a catch-all source department), with the evidence on hover. `.suggestion_confidence()` in `R/features/admin.R` |
-  | Found in | Colleges tab and codes with no row: where the audit found the value |
+  | Found in | College values tab and codes with no row: where the audit found the value |
 
   To accept a suggestion, change the row's `status` to `confirmed`; `basis`
   stays as the reason it was suggested. To choose otherwise, also change
