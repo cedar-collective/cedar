@@ -1409,12 +1409,21 @@ Fall 2026, by home campus) with any `cedar_programs` row:
 
 Taos sits under 1% in every year, so this is not a recent change.
 
+The export is scoped to students enrolled at the main campus that term. The
+branch students it does contain are almost exactly those who took a main-campus
+or online (ABQ or EA) course that term: of 1,163 branch-home program
+student-terms with class-list rows, 1,158 did (99.6%), where across the class
+lists only 1,645 of 74,486 branch-home student-terms (2.2%) include such a
+course. CEDAR does not drop them: parsing removes only empty rows and rows
+with a blank Academic Year, and the parsed file is already 99.7% Albuquerque.
+Checked 2026-10-14.
+
 The likely cause is in the fetch, not the transform. In
 `mrgather/mrgather.js`, `getASs()` and `getDegs()` choose terms and fields but
 never a campus, so the report form's default applies; `getAADs()` picks `ABQ`
-explicitly. A main-campus default would explain this and I18 together. Not yet
-confirmed: open the Academic Study Detail form in MyReports and read its campus
-selector.
+explicitly, so these forms have a campus selector. A main-campus default would
+explain this and I18 together. Not yet confirmed: open the Academic Study
+Detail form in MyReports and read its campus selector.
 
 ### Reproduce
 
