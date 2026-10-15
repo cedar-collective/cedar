@@ -76,3 +76,41 @@ test_that("every mapped table is checked, and each stale one is named with its r
                             c("programs.csv", "subjects.csv", "units.csv", "colleges.csv"))
                   %in% cedar_mapping_source_files()))
 })
+
+# ISSUES.md I22: the deploy's health check starts the app, which loads the
+# tables on disk and, with app_idle_timeout 0, keeps them until it restarts.
+# A gate that rebuilds them afterwards must restart the app, or the rebuild
+# reaches production only at the morning refresh. The deploy's own gate block
+# runs here with docker and the health check stubbed.
+test_that("a deploy that rebuilds mapped tables restarts the app to serve them", {
+  # The script's lines as written; bash ignores their YAML indentation.
+  deploy <- readLines("../../.github/workflows/deploy.yml", warn = FALSE)
+  first <- grep("Checking whether the mapping source changed", deploy, fixed = TRUE)
+  last <- grep('rm -f "$MAPPING_LOG"', deploy, fixed = TRUE)
+  expect_length(first, 1L)
+  expect_length(last, 1L)
+  # After the app's first start and health check, as before.
+  expect_lt(grep("docker compose up -d", deploy, fixed = TRUE), first)
+  expect_lt(grep("wait_for_app || exit 1", deploy, fixed = TRUE)[1], first)
+
+  run_gate <- function(output, rc = 0L) {
+    code <- paste(
+      paste0("GATE_OUTPUT=", shQuote(output), "; GATE_RC=", rc),
+      "RESTARTING_FLAG=$(mktemp); RESTARTING_ENABLED=false",
+      "docker() { if [ \"$2\" = exec ]; then printf '%s\\n' \"$GATE_OUTPUT\"; return $GATE_RC; fi; echo \"DOCKER:$*\"; }",
+      "wait_for_app() { echo WAIT; }",
+      "clear_restarting() { echo CLEAR; }",
+      paste(deploy[first:last], collapse = "\n"),
+      sep = "\n")
+    system2("bash", c("-c", shQuote(code)), stdout = TRUE, stderr = TRUE)
+  }
+  rebuilt <- run_gate("[mappings] Rebuilt: cedar_programs, cedar_students.")
+  expect_true("DOCKER:compose restart cedar-shiny" %in% rebuilt)
+  expect_lt(match("DOCKER:compose restart cedar-shiny", rebuilt), match("WAIT", rebuilt))
+  expect_true("CLEAR" %in% rebuilt)
+  unchanged <- run_gate("[mappings] Mapping source unchanged since cedar_programs were built; no rebuild.")
+  expect_false(any(grepl("restart", unchanged)))
+  failed <- run_gate("Error: an export is missing", rc = 1L)
+  expect_false(any(grepl("DOCKER:compose restart", failed)))
+  expect_true(any(grepl("WARNING: mapping check", failed, fixed = TRUE)))
+})

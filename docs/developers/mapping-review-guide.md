@@ -251,8 +251,11 @@ commit, through a pull request: the app never edits the files.
 
 ### 3. Rebuild — automatic on deploy and data refresh
 
-`scripts/rebuild-programs-if-mappings-changed.R` runs on every deploy and every
-`scripts/update-data.sh` run. It hashes the files that decide units and colleges
+`scripts/rebuild-programs-if-mappings-changed.R` runs on every deploy, which
+restarts the app when it rebuilt anything so the app serves the new tables,
+and on every `scripts/update-data.sh` run. The running app keeps the tables it loaded until
+it restarts: the morning job (`restart-cedar.sh --update`) restarts it, a bare
+`update-data.sh` run does not. It hashes the files that decide units and colleges
 (`cedar_mapping_source_files()`), compares them with the fingerprint stamped on
 each of `cedar_programs`, `cedar_degrees`, `cedar_sections` and
 `cedar_students`, and rebuilds only the tables that differ. It stops, rather

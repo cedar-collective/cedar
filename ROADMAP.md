@@ -182,7 +182,9 @@ because new features build most cleanly on the first two:
    (bottleneck waitlist pressure) is RStudio-only: decide its definition, or
    retire it. Each gets one helper or a documented difference, with a cross-tab
    test. Then M1–M3 and M24 (lifecycle labels).
-2. **Finish ADR-002** (below), which also closes I7, I9, I11, and I12.
+2. **Finish ADR-002** — done 2026-10-10: Stages 3–5 closed I7, I9, I11 and I12.
+   What remains is decisions (Admin → Mappings) and moving the other UNM lists
+   (below).
 3. **Architecture rules, file by file** — M11 (silent fallbacks) first, because
    they hide failures; then M12 (global reads) and M13 (logic in modules).
 4. **Interface consistency, one tab per PR** — M17, M18.

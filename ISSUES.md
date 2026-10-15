@@ -35,7 +35,7 @@ recurrence is recognizable.
 | [I8](#i8--a-timing-log-row-is-silently-dropped-when-the-write-lock-times-out) | Defect | A timing-log row is dropped when the write lock times out |
 | [I6](#i6--a-killed-projection-rebuild-strands-its-lock-and-blocks-every-later-refresh) | Defect | A killed projection rebuild strands its lock |
 | [I4](#i4--pre-change-course-ratios-are-confounded-by-career-stage) | Defect | Pre-change course ratios confounded by career stage (deferred) |
-| M1–M26 | Improvement | See [Improvements](#improvements) |
+| M1–M28 | Improvement | See [Improvements](#improvements) |
 
 ---
 
@@ -534,6 +534,10 @@ lock is not safe either, because a deploy can overlap the morning refresh.
 
 Raising `command_timeout` to 60m (this change) reduces how often the kill
 happens; it does not fix the stranding.
+
+Since 2026-10-11 (I19) the error tells a held lock from an unwritable
+directory and says when the lock was created, so a stranded lock is easier to
+recognise; it still has to be removed by hand.
 
 ---
 
@@ -1405,12 +1409,42 @@ Fall 2026, by home campus) with any `cedar_programs` row:
 
 Taos sits under 1% in every year, so this is not a recent change.
 
-The likely cause is in the fetch, not the transform. In
-`mrgather/mrgather.js`, `getASs()` and `getDegs()` choose terms and fields but
-never a campus, so the report form's default applies; `getAADs()` picks `ABQ`
-explicitly. A main-campus default would explain this and I18 together. Not yet
-confirmed: open the Academic Study Detail form in MyReports and read its campus
-selector.
+The download itself lacks them. Neither mrgather nor CEDAR filters on campus:
+`getASs()` sets the term, all fields and Excel output, and the form has all
+campuses selected; parsing removes only empty rows, rows with a blank Academic
+Year and exact duplicates; the transform drops only empty program slots. The
+parsed file is already 99.7% Albuquerque. (Checked 2026-10-14.)
+
+Whether a student is in it depends on where they took courses that term, not
+their home campus. Share of class-list student-terms (Fall 2019 – Fall 2026)
+with any program record:
+
+| Took courses at | Albuquerque home | Branch home |
+|---|---:|---:|
+| Some ABQ | 97.9% | 63.2% |
+| Online (EA) only | 93.6% | 74.6% |
+| EA plus branch | 92.1% | 73.4% |
+| Branch campuses only | **4.7%** (8,384) | **0.0%** (72,841) |
+
+So the report's population behaves like "registered for a main-campus or
+online course", whatever its campus selector says. The Degrees report, with no
+associate degrees (I18), likely shares it.
+
+Confirmed against a raw download (Fall 2026, pulled 2026-10-14 with all
+campuses selected: one sheet, 24,229 rows, 59 of them branch-campus), matched
+to the class lists through the same two hashes CEDAR applies:
+
+| Fall 2026 class-list students | Count | In the raw report |
+|---|---:|---:|
+| Took an ABQ or EA course | 24,821 | 24,209 (97.5%) |
+| Took only branch courses | 5,089 | 7 (0.1%) |
+
+Every one of its 59 branch-campus students also took an ABQ or EA course. Not
+all the missing students belong in a program report: about half of the
+branch-only students are concurrent-enrollment (dual-credit) or non-degree.
+But 2,873 of them had a degree major in the class lists that term, 1,452 in
+programs the mapping files place in branch units (General Studies, Liberal
+Arts, Welding Technology, ...), and the report has none of them.
 
 ### Reproduce
 
@@ -1425,8 +1459,12 @@ dplyr::left_join(cl, pr, by = c("student_id", "term")) |>
 
 ### What a fix requires
 
-Confirm the form's campus default. If it is Albuquerque, have mrgather select
-every campus for Academic Studies and Degrees, re-pull the history, and rebuild.
+Find what the report's population is: whether the campus selector's "All"
+includes Gallup, Los Alamos, Taos and Valencia; whether a branch campus picked
+explicitly returns its branch-only students (a term such as Fall 2025 should
+show hundreds of Taos rows, not dozens); or, failing both, ask the report's
+owner. Then change the pull (or request a report that covers the branches),
+re-pull the history, and rebuild.
 Until then, branch-campus program counts are not usable, including the counts
 the mapping review shows for branch codes.
 
@@ -1495,9 +1533,59 @@ concentration by its stripped name.
 
 ---
 
+## I22 — A mapping deploy is served from the tables it replaced until the app restarts
+
+**Status:** resolved 2026-10-14. When the gate rebuilds anything, the deploy
+puts the restart page back, restarts `cedar-shiny`, checks it again and clears
+the page, so the app serves the rebuilt tables. A deploy that changes no
+mapping file restarts once, as before. Running the gate before the first start
+was tried and dropped: it would run beside the old app, whose sessions have
+grown its memory, and a one-off rebuild beside a running app was killed for
+memory on a development VM. `test-mapping-provenance.R` runs the deploy's gate
+block with docker stubbed and fails without the restart. A bare
+`update-data.sh` run still leaves the app on its old tables until it restarts:
+the morning job's `restart-cedar.sh --update` restarts it.
+**Found:** 2026-10-14, reviewing why each mapping deploy needed a manual restart
+**Severity:** medium. Every mapping decision and transform fix reaches the
+stored tables at deploy but not the running app: production keeps showing the
+old departments for up to a day, and Admin > Data & Usage > Mappings says
+STALE meanwhile. Nothing is lost; it is late.
+**Affects:** the deploy script in `.github/workflows/deploy.yml`, with
+`shiny-server.conf`.
+
+### What is wrong
+
+The deploy starts the new container, then polls the app until it answers. That
+first request starts the app's R process, and `global.R` loads the tables then
+on disk. Only after that does the mapping gate
+(`scripts/rebuild-programs-if-mappings-changed.R`) rebuild the tables the new
+files changed. `shiny-server.conf` sets `app_idle_timeout 0`, so the R process
+never exits and keeps serving what it loaded until the container restarts,
+normally at the morning refresh (`restart-cedar.sh --update`).
+
+Every mapping deploy so far has done this: #125, #133, #135 rebuilt the four
+mapped tables after the health check.
+
+### Reproduce
+
+After a deploy whose log shows `[mappings] Rebuilt: ...`, open Admin > Data &
+Usage > Mappings: the banner says "Departments are STALE". `docker compose
+restart cedar-shiny` clears it.
+
+### What a fix requires
+
+When the gate rebuilt anything, restart `cedar-shiny` and run the health check
+again, inside the same guarded block so a failure leaves the previous app
+serving. Running the gate before `docker compose up` would avoid the second
+restart but needs the new image to run in a one-off container, as the
+projection publisher does.
+
+---
+
 # Improvements
 
-Short entries: **what**, **where**, **done when**. Counts measured 2026-10-07.
+Short entries: **what**, **where**, **done when**. Counts measured 2026-10-07;
+rechecked 2026-10-14, when only `server.R` had moved (6,356 lines).
 The recommended order before new features is in `ROADMAP.md`.
 
 ### Counting and definitions
@@ -1566,21 +1654,19 @@ reviewer: check the target's name.
 2026-10-10.* The transform stamps programs, degrees, sections and class lists
 with their mapping provenance, and the gate rebuilds whichever are stale
 (`cedar_stale_mapped_tables()`), stopping if an export it needs is missing or a
-rebuilt table is still stale. Since ADR-002 Stage 3
-`subjects.csv` decides every course's unit, but
-`scripts/rebuild-programs-if-mappings-changed.R` rebuilds only
-`cedar_programs` (and the lookups) when the mapping files change. A subject
-decision reaches `cedar_sections` and `cedar_students` only at the next refresh
-that transforms them, and until then the course tables carry the units of the
-previous files while the stamp says nothing about them. *Done when:* the gate
-rebuilds the course tables too when `subjects.csv`, `units.csv` or
-`colleges.csv` changed, or stamps them so the drift is reported.
+rebuilt table is still stale. Before, it rebuilt only `cedar_programs`, so a
+subject decision reached the course tables only at the next refresh. A
+rebuild now restarts the app so it serves them (I22).
 
 ### Architecture rules (`AGENTS.md`)
 
 **M11 — Silent fallbacks.** 25 `tryCatch` blocks return NULL or an empty
 result: `R/modules/pathways.R` 11, `server.R` 6, `R/trunk/logging.R` 4,
 `R/modules/ui-helpers.R`, `R/cones/stopout.R`, `R/branches/data-edges.R`.
+One is in the data pipeline, where AGENTS.md calls it always a bug:
+`build_lookups()` in `R/data-parsers/transform-to-cedar.R` reads the saved
+`cedar_lookups` for `major_code_to_name` inside a `tryCatch` that returns NULL,
+so an unreadable file silently leaves the lookup empty. Fix that one first.
 *Done when:* only the two allowed kinds remain (a module error shown with
 `showNotification()`; a degenerate statistic returning `NA`).
 
@@ -1595,7 +1681,7 @@ result: `R/modules/pathways.R` 11, `server.R` 6, `R/trunk/logging.R` 4,
 `R/modules/gen-ed.R` 2. *Done when:* each calculation lives in the cone or
 branch that owns the question.
 
-**M14 — Inline surfaces in `server.R`.** 6,408 lines. *Done when:* the remaining
+**M14 — Inline surfaces in `server.R`.** 6,356 lines. *Done when:* the remaining
 inline tabs are modules (templates: `R/modules/headcount.R`,
 `R/modules/dept-trends.R`), with logic in branches/cones/features.
 
@@ -1621,6 +1707,13 @@ its repeated code extracted — alongside other work on the file.
 **M19 — Pathways heatmap legibility.** Long course labels and dense
 course-to-major views. *Done when:* labels are readable at the default size.
 
+**M27 — Headcount lists a department's programs by name.** Its program
+dropdown takes a department's programs from `cedar_lookups$program_name_lookup`
+(each program name's most common department), so a name two departments share
+lists under one. Counting is by each row's own department (I15); only the
+choices are affected. *Done when:* the choices come from the rows'
+`dept_code`, or from `unit_mapping_rows()`.
+
 ### Documentation and naming
 
 **M20 — Function reference can go stale.** *Done when:* CI regenerates it or
@@ -1636,8 +1729,15 @@ focused, tested patches.
 ### Data model
 
 **M23 — Campus vocabularies differ by table.** The same field name can hold codes
-in one table and labels in another. *Done when:* each campus field holds one
-vocabulary, documented.
+in one table and labels in another: `student_campus` is a name in
+`cedar_programs` ("Albuquerque/Main", "Taos") and a code in `cedar_students`
+("ABQ", "TA"), and no file maps one to the other, so headcounts filter on names
+and course figures on codes. `R/lists/campuses.R` gives no expansion for EW, EF,
+ELA and TAQ, and the data uses codes it does not define (05, EG, ET, TAP
+locally, a few sections each). Admin > Data & Usage > Mappings shows both
+(Counting rules; Campuses). *Done when:* each campus field holds one
+vocabulary, every code in the data is defined or reported as a source error,
+and the campus list moves to `institution/<id>/` (ROADMAP).
 
 **M24 — Enrollment lifecycle labels differ by tab.** The same class-list counts
 carry different names: `census_enrl` is "Census Estimate" (Enrollment),
@@ -1650,3 +1750,10 @@ reconstruction now exists — `first_day_enrl` (`calc_first_day_enrl()`, definit
 actively misleading beside it: rename `first_day_proxy` to an ever-registered
 name. *Done when:* each lifecycle column has one label, from
 `docs/_data/definitions.yml`, used everywhere it is shown.
+
+**M28 — The HR department list is a hand-kept R list.** `hr_org_desc_to_dept`
+(`R/lists/mappings.R`, 79 names to 32 departments) maps the HR report's
+organisation names to departments for faculty; organisations not on it are
+dropped at parse. The HR report is no longer pulled, so this is low priority.
+*Done when:* the list moves to `institution/<id>/` with a test that every
+department it names is in `units.csv`, or is retired with the faculty table.
