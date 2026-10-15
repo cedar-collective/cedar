@@ -29,6 +29,7 @@ recurrence is recognizable.
 
 | ID | Kind | Summary |
 |---|---|---|
+| [I23](#i23--student-ids-are-hashed-with-the-built-in-default-salt) | Defect | Student IDs are hashed with the built-in default salt: the salt protects nothing |
 | [I20](#i20--cedar_programs-holds-almost-no-branch-campus-students) | Defect | `cedar_programs` holds 1–3% of branch-campus students; branch program counts read near zero |
 | [I18](#i18--cedar_degrees-holds-no-associate-degrees-so-branch-campus-completions-read-zero) | Defect | `cedar_degrees` holds no associate degrees: branch-campus completions read zero |
 | [I16](#i16--bottleneck-waitlist-pressure-ignores-term-so-later-registration-erases-earlier-waiting) | Defect | `get_bottlenecks()` waitlist pressure ignores term: ~6% under true demand (RStudio only; no page shows it) |
@@ -1325,8 +1326,10 @@ If so, request the branch campuses' awards and add them; if not, find where
 they are dropped. Until then, say on any degree count that it excludes the
 branch campuses.
 
-Academic Studies is missing the same students (I20), and mrgather sets no campus
-on either report, so the two likely share a cause.
+Academic Studies is missing the same students (I20): a raw download with all
+campuses selected holds only students registered for a main-campus or online
+course that term, and no code filters them. Check a raw Degrees download the
+same way (match it to the class lists); the two likely share a cause.
 
 ---
 
@@ -1381,7 +1384,10 @@ docker compose run --rm --no-deps -T \
 
 ## I20 — cedar_programs holds almost no branch-campus students
 
-**Status:** open
+**Status:** open, parked 2026-10-15. The fix is a change to the report's
+population, which needs whoever owns the MyReports Academic Study report; no
+CEDAR or mrgather change can recover the students. Until then, branch-campus
+program counts are not usable.
 **Found:** 2026-10-12, reviewing the Taos subject HHHA: class lists show 99
 students declared in its certificate, and `cedar_programs` has one of their 226
 student-terms.
@@ -1579,6 +1585,59 @@ again, inside the same guarded block so a failure leaves the previous app
 serving. Running the gate before `docker compose up` would avoid the second
 restart but needs the new image to run in a one-off container, as the
 projection publisher does.
+
+---
+
+## I23 — Student IDs are hashed with the built-in default salt
+
+**Status:** open
+**Found:** 2026-10-15, answering whether a salt change would split old and new
+terms
+**Severity:** medium for privacy; no number is wrong. The salt is meant to make
+CEDAR's student IDs impossible to link back to Banner IDs without a secret.
+With the default, anyone with the code and a Banner ID can compute the
+student's CEDAR ID.
+**Affects:** `encrypt_if_needed()` in `R/data-parsers/transform-to-cedar.R`,
+every table it builds with a `student_id`, and `docker-compose.yml`.
+
+### What is wrong
+
+IDs are hashed twice. Parsing stores the MD5 of the Banner ID, unsalted, in
+the exports (`class_lists.qs`, `academic_studies.qs`, ...). The transform then
+stores SHA-256 of that MD5 plus `CEDAR_STUDENT_SALT`, and falls back silently
+to the built-in `"cedar_default_salt_change_me"` when the variable is unset.
+
+It is unset everywhere CEDAR runs. Locally it is in neither `.env` nor
+`.Renviron` nor the shell; every R step runs `Rscript --vanilla`, which skips
+`.Renviron` anyway; and `docker-compose.yml` passes no environment to
+`cedar-shiny` or `cedar-projections`, so the containers never see it
+(confirmed in the local app container). Production uses the same compose file.
+
+The parse-stage MD5 is weak on its own: a 9-digit Banner ID can be recovered
+from its unsalted MD5 by trying every ID, so the stored exports are not
+pseudonymous whatever the salt.
+
+### Reproduce
+
+```bash
+docker exec cedar-shiny sh -c '[ -n "$CEDAR_STUDENT_SALT" ] && echo set || echo not set'
+Rscript --vanilla -e 'cat(nzchar(Sys.getenv("CEDAR_STUDENT_SALT")))'   # FALSE
+```
+
+### What a fix requires
+
+Set a secret salt in production's `.env`, pass it to both services
+(`environment: CEDAR_STUDENT_SALT: ${CEDAR_STUDENT_SALT}`), and make the
+transform stop when it is unset rather than use a default (the demo sets its
+own). A new salt changes every student ID, consistently across terms within a
+rebuilt table, since the transform rehashes every term from the stored MD5s.
+But tables built under different salts no longer join, so the change must be
+one complete rebuild of every table holding student IDs (`cedar_programs`,
+`cedar_degrees`, `cedar_students`, `cedar_grades`,
+`cedar_student_term_credits`, `cedar_next_term`, `cedar_applicants`; the
+course-flow and enrollment caches hold none), checked afterwards on Admin >
+Join Integrity. Salting the parse stage too means a one-time migration of the
+stored exports' MD5s, not a re-pull.
 
 ---
 
