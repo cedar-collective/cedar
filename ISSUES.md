@@ -29,6 +29,7 @@ recurrence is recognizable.
 
 | ID | Kind | Summary |
 |---|---|---|
+| [I24](#i24--cis-demo-browser-run-intermittently-loses-the-app-at-open-seats) | Defect | CI's demo browser run intermittently loses the app at Open Seats (passes on rerun) |
 | [I23](#i23--student-ids-are-hashed-with-the-built-in-default-salt) | Defect | Student IDs are hashed with the built-in default salt: the salt protects nothing |
 | [I20](#i20--cedar_programs-holds-almost-no-branch-campus-students) | Defect | `cedar_programs` holds 1–3% of branch-campus students; branch program counts read near zero |
 | [I18](#i18--cedar_degrees-holds-no-associate-degrees-so-branch-campus-completions-read-zero) | Defect | `cedar_degrees` holds no associate degrees: branch-campus completions read zero |
@@ -1638,6 +1639,43 @@ one complete rebuild of every table holding student IDs (`cedar_programs`,
 course-flow and enrollment caches hold none), checked afterwards on Admin >
 Join Integrity. Salting the parse stage too means a one-time migration of the
 stored exports' MD5s, not a re-pull.
+
+---
+
+## I24 — CI's demo browser run intermittently loses the app at Open Seats
+
+**Status:** open (suspected; intermittent)
+**Found:** 2026-10-15, its second occurrence
+**Severity:** low for users: CI only, and it passes on rerun. But a red check
+blocks a merge, and a habit of rerunning would hide a real failure.
+**Affects:** the `Synthetic checks` job (`.github/workflows/pr-checks.yml`),
+`./run-tests.sh --e2e demo`.
+
+### What is wrong
+
+Twice, every step passed until "Open Seats runs", which failed about 1.5
+seconds after the previous step with "the CEDAR app reloaded itself 7x
+mid-test": run 38259413583 (2026-10-12, #134) and run 38750323255
+(2026-10-15, #139, documentation only). Neither PR touched Open Seats; both
+passed on rerun.
+
+The app's log in the run's `cedar-synthetic-diagnostics` artifact ends at the
+step before (Pathways stop-outs): no error, no Open Seats request, no worker
+exit. The harness guesses an out-of-memory kill. Seven reloads in 1.5 seconds
+look more like the worker refusing or dropping the connection at once, but
+nothing kept can tell.
+
+### Reproduce
+
+Not on demand. `./run-tests.sh --e2e demo` against the synthetic stack,
+repeated.
+
+### What a fix requires
+
+First, capture enough to tell: on failure, add to the diagnostics artifact the
+app container's `OOMKilled`, exit code and restart count (`docker inspect`),
+`docker stats --no-stream`, the runner's free memory, and the Shiny Server log
+files inside the container. Then fix what they show.
 
 ---
 
