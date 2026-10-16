@@ -15,6 +15,8 @@ See `docs/developers/adr-002-explicit-mapping-files.md`.
 | `settings.csv` | institution setting | `setting`, `value` |
 | `campuses.csv` | campus code | `campus_code`, `campus_name`, `kind`, `default_scope` |
 | `course_levels.csv` | leading digit of a course number | `leading_digit`, `level` |
+| `gen_ed_courses.csv` | Gen Ed area membership of a course | `area`, `area_name`, `subject_course` |
+| `excluded_courses.csv` | course left out of course lists | `subject_course`, `notes` |
 
 **Every row is one line.** No blank lines and no line breaks inside a field:
 Admin > Mappings links to rows by line number, and the loader refuses a file
@@ -202,6 +204,26 @@ means: `lower`, `upper` or `grad`. UNM numbers courses with three digits
 (HIST 301) and, since the statewide renumbering, four (HIST 1110); both share
 the same leading-digit bands, which is why the rule is keyed on one digit and
 not on the number's value (ISSUES.md I5).
+
+## gen_ed_courses.csv
+
+One row per (area, course): the state Gen Ed area number, its name (the same
+on every row of the area; shown as "1: Communication"), and the course. Areas
+1, 2, 3, 4, 5 and 7 are listed; area 6 (second language) is not yet defined.
+A course listed under two areas counts under the first listed. Last reviewed
+against the catalog 2024-08-27. Many area 3 courses have associated labs that
+are not listed. The transform stamps `cedar_sections$gen_ed_area` from this
+file, so a change here takes effect at the next rebuild; Explore > Gen Ed and
+Dept Trends > Gen Ed read it live.
+
+## excluded_courses.csv
+
+Courses left out wherever a computation applies the excluded list
+(`opt$uel = TRUE`): thesis, dissertation, honors-credit, independent-study and
+similar special enrollments, whose counts are real (they stay in enrollment
+and credit-hour totals) but whose rows would otherwise dominate a list of
+courses. `notes` is free text for why a course is here. Converted from
+`R/lists/excluded_courses.R` on 2026-10-16 with three duplicate rows removed.
 
 ## Provenance
 

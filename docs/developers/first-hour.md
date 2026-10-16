@@ -166,10 +166,8 @@ the files to replace are exactly those whose first line reads
 
 | File | What it holds |
 |---|---|
-| `institution/<id>/*.csv` | subjects, programs, units and colleges: every department and college assignment, and which programs are pre-majors (plain CSV; ADR-002); campus codes and default scope (`campuses.csv`); course-level bands (`course_levels.csv`) |
+| `institution/<id>/*.csv` | subjects, programs, units and colleges: every department and college assignment, and which programs are pre-majors (plain CSV; ADR-002); campus codes and default scope (`campuses.csv`); course-level bands (`course_levels.csv`); Gen Ed areas (`gen_ed_courses.csv`); courses excluded from course lists (`excluded_courses.csv`) |
 | `R/lists/mappings.R` | name → code and HR-org → department text maps |
-| `R/lists/excluded_courses.R` | courses excluded from analytics |
-| `R/lists/gen_ed_courses.R` | Gen Ed area course lists |
 | `R/lists/enrollment_projection_groups.R` | monitored course groups |
 | `R/lists/population-presets.R` | named population groups |
 

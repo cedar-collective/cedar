@@ -113,7 +113,15 @@ CEDAR_CONFIG_FILE_SPECS <- list(
   # One row for each leading digit 0-9 of a course number; level is one of
   # CEDAR_COURSE_LEVELS. The rule is keyed on the leading digit, whatever the
   # number's length (ISSUES.md I5).
-  course_levels = c("leading_digit", "level")
+  course_levels = c("leading_digit", "level"),
+  # One row per (area, course). area is the institution's area number;
+  # area_name its name, the same on every row of the area. A course listed
+  # under two areas counts under the first listed.
+  gen_ed_courses = c("area", "area_name", "subject_course"),
+  # Courses left out of course lists and reviews when opt$uel = TRUE: thesis,
+  # dissertation, honors-credit, independent study and the like. notes is free
+  # text for why.
+  excluded_courses = c("subject_course", "notes")
 )
 CEDAR_CAMPUS_KINDS <- c("main", "online", "branch")
 
@@ -218,6 +226,48 @@ validate_course_levels <- function(df) {
                                                    paste(bad, collapse = ", ")))
   if (length(problems)) {
     stop("[institution_files.R] Invalid course_levels.csv:\n  ", paste(problems, collapse = "\n  "))
+  }
+  df
+}
+
+#' Check gen_ed_courses.csv
+#'
+#' @return The table with `area` as integer, if valid. Stops listing every
+#'   problem otherwise.
+validate_gen_ed_courses <- function(df) {
+  problems <- character(0)
+  blank <- function(x) is.na(x) | !nzchar(x)
+  if (any(!grepl("^[0-9]+$", df$area))) {
+    problems <- c(problems, paste("gen_ed_courses.csv: area must be a whole number; found",
+                                  paste(unique(df$area[!grepl("^[0-9]+$", df$area)]), collapse = ", ")))
+  }
+  if (any(blank(df$area_name))) problems <- c(problems, "gen_ed_courses.csv: blank area_name")
+  if (any(blank(df$subject_course))) problems <- c(problems, "gen_ed_courses.csv: blank subject_course")
+  names_per_area <- tapply(df$area_name, df$area, function(x) length(unique(x)))
+  multi <- names(names_per_area)[names_per_area > 1]
+  if (length(multi)) problems <- c(problems, paste("gen_ed_courses.csv: more than one area_name for area", paste(multi, collapse = ", ")))
+  key <- paste(df$area, df$subject_course)
+  d <- unique(df$subject_course[duplicated(key)])
+  if (length(d)) problems <- c(problems, paste("gen_ed_courses.csv: duplicate course in an area:", paste(d, collapse = ", ")))
+  if (length(problems)) {
+    stop("[institution_files.R] Invalid gen_ed_courses.csv:\n  ", paste(problems, collapse = "\n  "))
+  }
+  df$area <- as.integer(df$area)
+  df
+}
+
+#' Check excluded_courses.csv
+#'
+#' @return The table, if valid. Stops listing every problem otherwise.
+validate_excluded_courses <- function(df) {
+  problems <- character(0)
+  if (any(is.na(df$subject_course) | !nzchar(df$subject_course))) {
+    problems <- c(problems, "excluded_courses.csv: blank subject_course")
+  }
+  d <- unique(df$subject_course[duplicated(df$subject_course)])
+  if (length(d)) problems <- c(problems, paste("excluded_courses.csv: duplicate subject_course", paste(d, collapse = ", ")))
+  if (length(problems)) {
+    stop("[institution_files.R] Invalid excluded_courses.csv:\n  ", paste(problems, collapse = "\n  "))
   }
   df
 }

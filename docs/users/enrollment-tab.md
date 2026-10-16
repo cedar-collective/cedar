@@ -23,7 +23,7 @@ Campus, college, department, term, course, instructor, level, part of term, and 
 - **Campus / College / Department / Term / Course** — standard drill-down filters. Term defaults to the current term; use it to select another specific term or a term type (e.g., "Fall" to compare all fall semesters across years).
 - **Group by** — controls the DESR table's row grain. The default `term + subject_course` view produces course-campus-term rows. Whenever `subject_course` is grouped, CEDAR keeps `campus` in the grouping automatically so ABQ, EA, and branch-campus histories do not merge. It does not change the fixed Classlist grain.
 - **Instructor** — filter to a specific instructor; type to search.
-- **Exclude List** — when checked, removes independent studies, thesis credits, dissertation credits, honors credits, and similar special-enrollment courses. The list is in `R/lists/excluded_courses.R` and contains approximately 200 course codes. Uncheck to include them.
+- **Exclude List** — when checked, removes independent studies, thesis credits, dissertation credits, honors credits, and similar special-enrollment courses. The list is the institution's `institution/<id>/excluded_courses.csv` (about 200 course codes at UNM). Uncheck to include them.
 - **DESR Min / DESR Max** — filter the displayed DESR `DESR Enrl` value after the selected crosslist view is grouped. Min defaults to 1. These controls do not restrict Classlist, Low Enrollment, or Trend Explorer.
 
 Click **Gather Enrollments** after adjusting filters.
@@ -119,7 +119,7 @@ Each level has its own configurable threshold. Defaults (12 / 12 / 10 / 5 for lo
 
 ### Excluded courses
 
-Independent studies, thesis credits, dissertation credits, honors credits, and similar special-enrollment courses are excluded by default. These courses are expected to have very low or individually-arranged enrollment and would otherwise dominate the results. The excluded list is in `R/lists/excluded_courses.R` (approximately 200 course codes).
+Independent studies, thesis credits, dissertation credits, honors credits, and similar special-enrollment courses are excluded by default. These courses are expected to have very low or individually-arranged enrollment and would otherwise dominate the results. The excluded list is the institution's `institution/<id>/excluded_courses.csv` (about 200 course codes at UNM).
 
 ### Course levels
 
@@ -207,7 +207,7 @@ can differ.
 
 ## Data sources
 
-Sources: MyReports DESR and Class List data. Parsing: `R/data-parsers/parse-DESR.R` and `R/data-parsers/parse-data.R`. Transformation: `R/data-parsers/transform-to-cedar.R`. Home-row classification lives in the transform. Excluded courses: `R/lists/excluded_courses.R`. Low enrollment functions: `R/branches/enrl.R`.
+Sources: MyReports DESR and Class List data. Parsing: `R/data-parsers/parse-DESR.R` and `R/data-parsers/parse-data.R`. Transformation: `R/data-parsers/transform-to-cedar.R`. Home-row classification lives in the transform. Excluded courses: `institution/<id>/excluded_courses.csv`. Low enrollment functions: `R/branches/enrl.R`.
 
 ---
 

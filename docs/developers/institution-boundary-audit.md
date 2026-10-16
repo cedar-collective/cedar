@@ -46,8 +46,8 @@ Measured by institution-shaped content, not by intent:
 | `subj_dept_map.R` | 294 | Institution — subject → department |
 | `program_code_maps.R` | 223 | Institution — Banner code conventions |
 | `mappings.R` | 218 | Institution — name → code, HR org → dept |
-| `excluded_courses.R` | 226 | Institution |
-| `gen_ed_courses.R` | 151 | Institution |
+| `excluded_courses.R` | 226 | Institution (moved to `institution/<id>/excluded_courses.csv` 2026-10-16) |
+| `gen_ed_courses.R` | 151 | Institution (moved to `institution/<id>/gen_ed_courses.csv` 2026-10-16) |
 | `population-presets.R` | 174 | Institution — named program groups |
 | `enrollment_projection_groups.R` | 133 | Institution — monitored courses |
 | `campuses.R` | 101 | Institution (moved to `institution/<id>/campuses.csv` 2026-10-16; the file is now platform mechanism) |

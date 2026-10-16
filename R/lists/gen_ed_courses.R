@@ -1,152 +1,23 @@
-# CEDAR-INSTITUTION: Gen Ed area course lists
-############### GEN ED AREAS + COURSES #######################
-# all areas last reviewed 8/27/2024
+# CEDAR-PLATFORM: Gen Ed area course table from institution/<id>/gen_ed_courses.csv
+# The institution's Gen Ed areas and the courses in each come from its
+# gen_ed_courses.csv (read and validated here at load). This file names no
+# area and no course.
+#
+# CEDAR_GEN_ED_COURSES: one row per (area, course), in file order, with
+#   area (integer), area_name, area_label ("1: Communication") and subject_course.
+# gen_ed_all: every Gen Ed course once, as a list, for callers that only need
+#   membership (Pathways, the projection monitoring group).
+# A course listed under two areas counts under the first listed:
+# gen_ed_course_lookup() (R/features/gen-ed.R) and the transform both take the
+# first row per course.
 
-gen_ed_1_communication <- c("COMM 1130",
-                            "COMM 2121",
-                            "COMP 2225",
-                            "ENGL 1120",
-                            "ENGL 2120",
-                            "ENGL 2210",
-                            "GEOG 2115",
-                            "HNRS 2112",
-                            "IADL 1110",
-                            "PHIL 1120",
-                            "SPAN 2130")
+.cedar_gen_ed <- validate_gen_ed_courses(read_institution_file("gen_ed_courses"))
 
+CEDAR_GEN_ED_COURSES <- tibble::tibble(
+  area           = .cedar_gen_ed$area,
+  area_name      = .cedar_gen_ed$area_name,
+  area_label     = paste0(.cedar_gen_ed$area, ": ", .cedar_gen_ed$area_name),
+  subject_course = .cedar_gen_ed$subject_course
+)
 
-gen_ed_2_math_stat <- c("HNRS 2221",
-                        "MATH 1130",
-                        "MATH 1220",
-                        "MATH 1240",
-                        "MATH 1250",
-                        "MATH 1300",
-                        "MATH 1350",
-                        "MATH 1430",                   
-                        "MATH 1440",
-                        "MATH 1512",                   
-                        "MATH 1522",
-                        "MATH 2118")
-
-
-# many of the following courses also have associated labs listed in catalog.
-gen_ed_3_phys_nat_sci <- c("ANTH 1135",
-                           "ANTH 1170",
-                           "ANTH 1211",
-                           "ANTH 2190C",
-                           "ASTR 1115",
-                           "BIOL 1110",
-                           "BIOL 1140",
-                           "CHEM 1110C",                   
-                           "CHEM 1120C",
-                           "CHEM 1215",                   
-                           "CHEM 1225",
-                           "CS 108L",
-                           "ENVS 1130",
-                           "GEOG 1160",
-                           "GEOL 1110",
-                           "GEOG 2110",
-                           "HNRS 2331",
-                           "NTSC 1110",
-                           "NTSC 1120",
-                           "NTSC 2110",
-                           "PHYS 1115",
-                           "PHYS 1125",
-                           "PHYS 1230",
-                           "PHYS 1240",
-                           "PHYS 1310",
-                           "PHYS 1320")
-
-
-gen_ed_4_soc_behav_sci <- c("AMST 1110",
-                            "AMST 1140",
-                            "ANTH 1115",
-                            "ANTH 1140",
-                            "ANTH 2175",
-                            "ARCH 1210",
-                            "CCST 1110",
-                            "ECON 2110",
-                            "ECON 2120",
-                            "ENGN 200",
-                            "FCST 2130",
-                            "FDMA 1520",
-                            "GEOG 1165",                   
-                            "GEOG 2170",
-                            "HNRS 2364",
-                            "LING 2110",
-                            "LTAM 1110",
-                            "PADM 2110",
-                            "POLS 1120",
-                            "POLS 1140",
-                            "POLS 2110",
-                            "POLS 2120",
-                            "PSYC 1110",
-                            "PH 101",
-                            "PH 102",
-                            "SOCI 1110",
-                            "SOCI 2315",
-                            "SUST 1134")
-
-
-gen_ed_5_humanities <- c("AFST 1110",
-                         "AMST 1150",
-                         "ARCH 2125",
-                         "CCST 2110",
-                         "CLST 1110",
-                         "CLST 2110",
-                         "CLST 2120",
-                         "COMP 2222",
-                         "COMP 2240",
-                         "ENGL 1410",
-                         "ENGL 2650",                   
-                         "ENGL 2660",
-                         "GEOG 1175",
-                         "GRMN 2227",
-                         "HIST 1105",
-                         "HIST 1110", 
-                         "HIST 1120",
-                         "HIST 1150",
-                         "HIST 1160",
-                         "HIST 1170",
-                         "HIST 1180",
-                         "HNRS 1120",
-                         "HNRS 2167",
-                         "INST 1101",
-                         "LING 2151",
-                         "MLNG 1110",
-                         "NATV 1150",
-                         "PHIL 1115",
-                         "PHIL 2210",
-                         "PHIL 2225",
-                         "RELG 1110",
-                         "RELG 1550",
-                         "RELG 2110",
-                         "RELG 2120")
-
-
-# TODO: define language courses for area 6
-
-gen_ed_7_arts_design <- c("ARCH 1120",
-                          "ARCH 2151",
-                          "ARTH 1120",
-                          "ARTH 2110",
-                          "ARTH 2120",
-                          "ARTS 1143",
-                          "ARTS 1220",
-                          "ARTS 1410",
-                          "ARTS 1510",
-                          "ARTS 1610",
-                          "ARTS 1810",
-                          "CCST 1125",
-                          "DANC 1110",                   
-                          "DANC 1140",
-                          "DANC 1170",
-                          "FDMA 2110",
-                          "HNRS 2113",
-                          "MUSC 1120",
-                          "MUSC 1130",
-                          "MUSC 2790",
-                          "THEA 1110",
-                          "THEA 1220")
-
-gen_ed_all <- as.list(c(gen_ed_1_communication, gen_ed_2_math_stat, gen_ed_3_phys_nat_sci, gen_ed_4_soc_behav_sci, gen_ed_5_humanities, gen_ed_7_arts_design))
+gen_ed_all <- as.list(unique(CEDAR_GEN_ED_COURSES$subject_course))

@@ -1,16 +1,12 @@
 # Shared Gen Ed analytics for Explore and Dept Trends views.
 
 gen_ed_course_lookup <- function() {
-  # CAMPUS_ROLLUP: this is the campus-neutral catalog membership lookup.
-  dplyr::bind_rows(
-    tibble::tibble(subject_course = gen_ed_1_communication, area = 1L, area_label = "1: Communication"),
-    tibble::tibble(subject_course = gen_ed_2_math_stat,     area = 2L, area_label = "2: Math & Stat"),
-    tibble::tibble(subject_course = gen_ed_3_phys_nat_sci,  area = 3L, area_label = "3: Phys/Nat Sci"),
-    tibble::tibble(subject_course = gen_ed_4_soc_behav_sci, area = 4L, area_label = "4: Soc/Behav Sci"),
-    tibble::tibble(subject_course = gen_ed_5_humanities,    area = 5L, area_label = "5: Humanities"),
-    tibble::tibble(subject_course = gen_ed_7_arts_design,   area = 7L, area_label = "7: Arts & Design")
-  ) %>%
-    # CAMPUS_ROLLUP: de-duplicate the campus-neutral catalog lookup.
+  # CAMPUS_ROLLUP: this is the campus-neutral catalog membership lookup, from
+  # the institution's gen_ed_courses.csv (CEDAR_GEN_ED_COURSES).
+  CEDAR_GEN_ED_COURSES %>%
+    dplyr::select(subject_course, area, area_label) %>%
+    # CAMPUS_ROLLUP: de-duplicate the campus-neutral catalog lookup; a course
+    # listed under two areas counts under the first listed.
     dplyr::distinct(subject_course, .keep_all = TRUE)
 }
 
