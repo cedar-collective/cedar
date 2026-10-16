@@ -48,6 +48,14 @@ prepare_enrl_summary <- function(sections, terms) {
            gen_ed_area, enrolled, capacity, avail = available)
 }
 
+# The graded edge the seatfinder fixtures need: their terms run to 202580, past
+# the designed fixtures' own edge, so the cone is handed edges that match the
+# terms the helper below sets.
+seatfinder_test_edges <- list(
+  last_graded = 202580L, last_enrolled = 202680L,
+  last_enrolled_complete = 202580L
+)
+
 with_seatfinder_test_terms <- function(expr) {
   had_current_term <- exists("cedar_current_term", envir = .GlobalEnv, inherits = FALSE)
   old_current_term <- if (had_current_term) get("cedar_current_term", envir = .GlobalEnv) else NULL
@@ -519,7 +527,7 @@ test_that("seatfinder returns expected list structure", {
         seatfinder_grade_students(),
         test_sections_sf,
         test_faculty,
-        list(term = "202510", course_campus = "ABQ", level = "lower")
+        list(data_edges = seatfinder_test_edges, term = "202510", course_campus = "ABQ", level = "lower")
       )
     )
 
@@ -540,7 +548,7 @@ test_that("seatfinder parses single term correctly", {
       seatfinder_grade_students(),
       test_sections_sf,
       test_faculty,
-      list(term = "202510", course_campus = "ABQ", level = "lower")
+      list(data_edges = seatfinder_test_edges, term = "202510", course_campus = "ABQ", level = "lower")
     )
 
     expect_equal(unique(result$type_summary$term), 202510L)
@@ -564,7 +572,7 @@ test_that("seatfinder keeps topic titles distinct without many-to-many repeats",
       seatfinder_grade_students(sections),
       sections,
       test_faculty,
-      list(term = "202510", course_campus = "ABQ", dept_code = "HNRS", level = "lower")
+      list(data_edges = seatfinder_test_edges, term = "202510", course_campus = "ABQ", dept_code = "HNRS", level = "lower")
     )
 
     display <- result$type_summary %>%
@@ -593,7 +601,7 @@ test_that("seatfinder parses comma-separated terms correctly", {
       seatfinder_grade_students(),
       test_sections_sf,
       test_faculty,
-      list(term = "202480,202580", course_campus = "ABQ")
+      list(data_edges = seatfinder_test_edges, term = "202480,202580", course_campus = "ABQ")
     )
 
     expect_equal(unique(result$type_summary$term), 202580L)
@@ -614,7 +622,7 @@ test_that("seatfinder filters gen ed courses correctly", {
       seatfinder_grade_students(sections),
       sections,
       test_faculty,
-      list(term = "202510", course_campus = "ABQ", level = "lower")
+      list(data_edges = seatfinder_test_edges, term = "202510", course_campus = "ABQ", level = "lower")
     )
 
     expect_gt(nrow(result$gen_ed_summary), 0)
@@ -637,7 +645,7 @@ test_that("seatfinder merges DFW rates correctly", {
       seatfinder_grade_students(),
       test_sections_sf,
       test_faculty,
-      list(term = "202510", course_campus = "ABQ", level = "lower")
+      list(data_edges = seatfinder_test_edges, term = "202510", course_campus = "ABQ", level = "lower")
     )
 
     expect_true(is.numeric(result$type_summary$dfw_pct))
@@ -666,7 +674,7 @@ test_that("seatfinder delegates unfinished-term exclusion to the graded edge", {
       bind_rows(students, current_failure),
       test_sections_sf,
       test_faculty,
-      list(term = "202510", course_campus = "ABQ", level = "lower")
+      list(data_edges = seatfinder_test_edges, term = "202510", course_campus = "ABQ", level = "lower")
     )
 
     expect_equal(unique(result$type_summary$dfw_pct), 60)
@@ -679,7 +687,7 @@ test_that("seatfinder continues when no grade rows match", {
       seatfinder_grade_students()[0, ],
       test_sections_sf,
       test_faculty,
-      list(term = "202510", course_campus = "ABQ", level = "lower")
+      list(data_edges = seatfinder_test_edges, term = "202510", course_campus = "ABQ", level = "lower")
     )
 
     expect_gt(nrow(result$type_summary), 0)
@@ -693,7 +701,7 @@ test_that("seatfinder returns empty result when filters match no enrollment rows
       seatfinder_grade_students(),
       test_sections_sf,
       test_faculty,
-      list(term = "202510", course_campus = "ABQ", dept_code = "SHS", level = "lower")
+      list(data_edges = seatfinder_test_edges, term = "202510", course_campus = "ABQ", dept_code = "SHS", level = "lower")
     )
 
     expect_true(all(vapply(result, function(df) {

@@ -2581,6 +2581,8 @@ output$enrl_classlist_download <- downloadHandler(
     req(!is.null(data), !is.null(data$opt))
     opt <- data$opt
     opt$passing_grades <- dfw_passing_grades()
+    # Grade-based outcomes stop at the graded edge; the branch requires it.
+    opt$data_edges <- data_objects[["cedar_edges"]]
     campus_filter <- get_campus_filter()
     if (!is.null(campus_filter)) opt$course_campus <- campus_filter$values
 
@@ -2598,6 +2600,8 @@ output$enrl_classlist_download <- downloadHandler(
     students <- data_objects[["cedar_students"]]
     opt <- data$opt
     opt$passing_grades <- dfw_passing_grades()
+    # Grade-based outcomes stop at the graded edge; the branch requires it.
+    opt$data_edges <- data_objects[["cedar_edges"]]
     campus_filter <- get_campus_filter()
     if (!is.null(campus_filter)) opt$course_campus <- campus_filter$values
 
@@ -2637,6 +2641,8 @@ output$enrl_classlist_download <- downloadHandler(
     req(!is.null(data), !is.null(data$opt))
     opt <- data$opt
     opt$passing_grades <- dfw_passing_grades()
+    # Grade-based outcomes stop at the graded edge; the branch requires it.
+    opt$data_edges <- data_objects[["cedar_edges"]]
     campus_filter <- get_campus_filter()
     if (!is.null(campus_filter)) opt$course_campus <- campus_filter$values
 
@@ -4798,6 +4804,7 @@ output$enrl_classlist_download <- downloadHandler(
   # Open Seats tab (Shiny module)
   # ===========================================================================
   seatfinderServer("seatfinder", cedar_students, cedar_sections, cedar_faculty,
+                   edges = data_objects[["cedar_edges"]],
                    error_handler = handle_error)
 
   # ===========================================================================
@@ -4831,6 +4838,7 @@ output$enrl_classlist_download <- downloadHandler(
     sections = cedar_sections,
     programs = cedar_programs,
     degrees = cedar_degrees,
+    edges = data_objects[["cedar_edges"]],
     current_term = cedar_current_term
   )
 
