@@ -104,14 +104,14 @@ Those rows describe where seats are allocated and the prior comparable
 census/capacity. They are evidence about delivery mix, not
 independent campus-demand forecasts. Branch campuses never enter this market.
 
-A named course group is a monitoring scope. The initial `critical_courses`
-group contains the canonical `gen_ed_all` list plus the explicitly monitored
-FYEX and gateway courses. Its always-monitored core is FYEX 1010, 1030, and
-1110; MATH 1215, 1220, and 1350; BIOL 1140; CHEM 1215 and 1215L; and ENGL 1110
-and 1120. CHEM 1220 is not in the monitoring scope. The group is restricted to
-ABQ and EA. Course membership
-uses exact `subject_course` values; suffix variants are never included by
-prefix.
+A named course group is a monitoring scope, declared in the institution's
+`projection_groups.csv` and `projection_courses.csv`. UNM's `critical_courses`
+group contains the canonical Gen Ed list (`include_gen_ed`) plus the explicitly
+monitored FYEX and gateway courses. Its always-monitored core is FYEX 1010,
+1030, and 1110; MATH 1215, 1220, and 1350; BIOL 1140; CHEM 1215 and 1215L; and
+ENGL 1110 and 1120. CHEM 1220 is not in the monitoring scope. The group is
+restricted to ABQ and EA. Course membership uses exact `subject_course` values;
+suffix variants are never included by prefix.
 
 There is no implicit user scope because CEDAR has no login identity. A caller
 must supply courses, campuses, and a named market, directly or through a course
@@ -134,7 +134,9 @@ publishes a valid zero-row bundle.
 
 ## Comparable History Window
 
-The standard model window begins with Spring 2022 (`202210`). Earlier target
+The model window begins at the institution's `projection_history_start_term`
+(`settings.csv`; UNM: Spring 2022, `202210`); a course may start later through
+`projection_courses.csv`. Earlier target
 enrollments, capacities, transitions, and aftcasts are excluded so
 pandemic-era behavior cannot silently influence accuracy or method selection.
 The immediately preceding source term may still support a structural transition
@@ -220,7 +222,8 @@ number, corrected for what can actually be seen**.
 
 Reader-facing method descriptions live in
 `CEDAR_ENROLLMENT_PROJECTION_METHOD_GUIDE` beside the registry in
-`R/lists/enrollment_projection_groups.R`; the page generates its accordion from
+`R/lists/enrollment_projection_groups.R` (platform; the monitoring scopes it
+reads are the institution's files); the page generates its accordion from
 that catalog and a registry test keeps the two in step.
 
 ### Why this shape
@@ -523,7 +526,7 @@ multiplier.
 
 | Layer | File | Responsibility |
 |---|---|---|
-| List | `R/lists/enrollment_projection_groups.R` | Course groups, method registry, schema/model versions |
+| List | `R/lists/enrollment_projection_groups.R` | Method registry and schema/model versions; reads the institution's course groups from `projection_groups.csv` / `projection_courses.csv` and the window start from `settings.csv` |
 | Branch | `R/branches/enrollment-projections.R` | Inputs, the spine and adjusted candidates, pressure, aftcasts, rolling selection, recommendation, persistence |
 | Cone | `R/cones/enrollment-projections.R` | One question: projection and section need for the screened scope |
 | Feature | `R/features/enrollment-projections.R` | Explicit-cutoff orchestration, Spring-only publisher guard, artifact loader, filtered reusable view payload, content fingerprints, model-source provenance, and canonical text preview |

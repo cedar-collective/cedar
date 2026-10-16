@@ -1,0 +1,2 @@
+group_id,label,description,market_id,campuses,include_gen_ed
+critical_courses,Gen Ed + critical courses,Canonical Gen Ed courses plus selected gateway additions and three FYEX courses monitored on the Albuquerque and online campuses,abq_ea_course_market,ABQ|EA,TRUE

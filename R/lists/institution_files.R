@@ -92,7 +92,11 @@ CEDAR_REQUIRED_SETTINGS <- c("mapping_files_url", "source_files_url")
 #   source_values_without_college: `|`-separated source college values that
 #   deliberately name no college (UNM's "Non-Degree Status"), so the mapping
 #   audit does not list them as unknown.
-CEDAR_OPTIONAL_SETTINGS <- c("source_values_without_college")
+#   projection_history_start_term: the first term (YYYYSS) enrollment
+#   projections read history from, so an earlier regime (UNM: the pandemic
+#   terms before Spring 2022) cannot shape accuracy or selection. Without it the
+#   projection builder stops; the app still loads.
+CEDAR_OPTIONAL_SETTINGS <- c("source_values_without_college", "projection_history_start_term")
 
 CEDAR_UNIT_KINDS <- c("department", "program", "college")
 # Course levels as cedar_sections$level records them.
@@ -128,7 +132,20 @@ CEDAR_CONFIG_FILE_SPECS <- list(
   # CEDAR_POPULATION_GROUP_SURFACES; each surface at most once across the file.
   # Groups declare program NAMES, resolved to codes against cedar_programs at
   # run time (population_group_major_codes()).
-  population_groups = c("group", "description", "default_for", "program_name")
+  population_groups = c("group", "description", "default_for", "program_name"),
+  # Enrollment-projection monitoring scopes. campuses: |-separated codes from
+  # campuses.csv, the market the group projects (branch campuses never enter
+  # it). include_gen_ed: TRUE adds every gen_ed_courses.csv course to the group.
+  # market_id names the planning market saved on every row (the campus policy's
+  # documented exception).
+  projection_groups = c("group_id", "label", "description", "market_id", "campuses", "include_gen_ed"),
+  # Courses named explicitly in a group, beyond include_gen_ed. always_monitored
+  # TRUE skips the pressure screen. history_start_term and retention_min_terms
+  # are per-course overrides of the model window and the census-retention
+  # minimum (blank = the model default); a course's override is the same in
+  # every group that names it.
+  projection_courses = c("group_id", "subject_course", "always_monitored",
+                         "history_start_term", "retention_min_terms")
 )
 CEDAR_CAMPUS_KINDS <- c("main", "online", "branch")
 # Where a population group can be the preselected choice: the Pathways major
@@ -317,6 +334,61 @@ validate_population_groups <- function(df) {
   df
 }
 
+#' Check projection_groups.csv and projection_courses.csv together
+#'
+#' @param groups,courses The two tables as read.
+#' @param known_campuses Campus codes from campuses.csv.
+#' @return list(groups, courses) with `campuses` split into character vectors,
+#'   `include_gen_ed` and `always_monitored` logical, and the two overrides
+#'   integer (NA where blank), if valid. Stops listing every problem otherwise.
+validate_projection_groups <- function(groups, courses, known_campuses) {
+  problems <- character(0)
+  blank <- function(x) is.na(x) | !nzchar(x)
+  for (col in c("group_id", "label", "description", "market_id", "campuses")) {
+    if (any(blank(groups[[col]]))) problems <- c(problems, paste("projection_groups.csv: blank", col))
+  }
+  d <- unique(groups$group_id[duplicated(groups$group_id)])
+  if (length(d)) problems <- c(problems, paste("projection_groups.csv: duplicate group_id", paste(d, collapse = ", ")))
+  if (any(!grepl("^[a-z0-9_]+$", groups$group_id))) {
+    problems <- c(problems, "projection_groups.csv: group_id must be lowercase letters, digits and underscores")
+  }
+  campuses <- strsplit(groups$campuses, "|", fixed = TRUE)
+  bad <- setdiff(unlist(campuses), known_campuses)
+  if (length(bad)) problems <- c(problems, paste("projection_groups.csv: campuses not in campuses.csv:", paste(bad, collapse = ", ")))
+  gen_ed_flag <- .csv_flag(groups$include_gen_ed)
+  if (anyNA(gen_ed_flag)) problems <- c(problems, "projection_groups.csv: include_gen_ed must be TRUE or FALSE")
+
+  if (any(blank(courses$group_id))) problems <- c(problems, "projection_courses.csv: blank group_id")
+  if (any(blank(courses$subject_course))) problems <- c(problems, "projection_courses.csv: blank subject_course")
+  bad <- setdiff(courses$group_id, groups$group_id)
+  if (length(bad)) problems <- c(problems, paste("projection_courses.csv: group_id not in projection_groups.csv:", paste(bad, collapse = ", ")))
+  key <- paste(courses$group_id, courses$subject_course, sep = " / ")
+  d <- unique(key[duplicated(key)])
+  if (length(d)) problems <- c(problems, paste("projection_courses.csv: duplicate course in a group:", paste(d, collapse = "; ")))
+  monitored <- .csv_flag(courses$always_monitored)
+  if (anyNA(monitored)) problems <- c(problems, "projection_courses.csv: always_monitored must be TRUE or FALSE")
+  starts <- courses$history_start_term
+  bad <- unique(starts[!blank(starts) & !grepl("^[0-9]{4}(10|60|80)$", starts)])
+  if (length(bad)) problems <- c(problems, paste("projection_courses.csv: history_start_term must be a term code YYYYSS; found", paste(bad, collapse = ", ")))
+  mins <- courses$retention_min_terms
+  bad <- unique(mins[!blank(mins) & !grepl("^[0-9]+$", mins)])
+  if (length(bad)) problems <- c(problems, paste("projection_courses.csv: retention_min_terms must be a whole number; found", paste(bad, collapse = ", ")))
+  for (col in c("history_start_term", "retention_min_terms")) {
+    per_course <- tapply(courses[[col]], courses$subject_course, function(x) length(unique(x)))
+    multi <- names(per_course)[per_course > 1]
+    if (length(multi)) problems <- c(problems, paste0("projection_courses.csv: ", col, " differs between groups for ", paste(multi, collapse = ", ")))
+  }
+  if (length(problems)) {
+    stop("[institution_files.R] Invalid projection files:\n  ", paste(problems, collapse = "\n  "))
+  }
+  groups$campuses <- campuses
+  groups$include_gen_ed <- gen_ed_flag
+  courses$always_monitored <- monitored
+  courses$history_start_term <- suppressWarnings(as.integer(ifelse(blank(starts), NA, starts)))
+  courses$retention_min_terms <- suppressWarnings(as.integer(ifelse(blank(mins), NA, mins)))
+  list(groups = groups, courses = courses)
+}
+
 #' Check an institution's mapping files against each other
 #'
 #' @return The files as a named list of data frames, if valid. Stops listing
@@ -396,6 +468,11 @@ validate_mapping_files <- function(files) {
       problems <- c(problems, paste0("settings.csv: ", key, " must be a GitHub blob URL ",
                                      "(https://github.com/<org>/<repo>/blob/<branch>[/<path>]), got ", url))
     }
+  }
+  start <- files$settings$value[files$settings$setting == "projection_history_start_term"]
+  if (length(start) == 1 && !grepl("^[0-9]{4}(10|60|80)$", start)) {
+    problems <- c(problems, paste0("settings.csv: projection_history_start_term must be a term code ",
+                                   "YYYYSS (SS = 10, 60 or 80), got ", start))
   }
 
   if (length(problems)) {

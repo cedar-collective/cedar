@@ -18,6 +18,8 @@ See `docs/developers/adr-002-explicit-mapping-files.md`.
 | `gen_ed_courses.csv` | Gen Ed area membership of a course | `area`, `area_name`, `subject_course` |
 | `excluded_courses.csv` | course left out of course lists | `subject_course`, `notes` |
 | `population_groups.csv` | program name in a named population group | `group`, `description`, `default_for`, `program_name` |
+| `projection_groups.csv` | enrollment-projection monitoring scope | `group_id`, `label`, `description`, `market_id`, `campuses`, `include_gen_ed` |
+| `projection_courses.csv` | course named in a projection scope | `group_id`, `subject_course`, `always_monitored`, `history_start_term`, `retention_min_terms` |
 
 **Every row is one line.** No blank lines and no line breaks inside a field:
 Admin > Mappings links to rows by line number, and the loader refuses a file
@@ -29,7 +31,11 @@ awaiting a decision to its line here; a fork points it at its own repository.
 `source_files_url` is the repository root, for links to platform files that
 still hold mappings. Optional `source_values_without_college` lists source
 college values that deliberately name no college (`Non-Degree Status`), so the
-mapping audit does not report them as unknown.
+mapping audit does not report them as unknown. Optional
+`projection_history_start_term` (`202210`, Spring 2022) is the first term
+enrollment projections read history from, so pandemic-era terms cannot shape
+accuracy or method selection; without it the projection builder stops and the
+app still loads.
 
 ## Colleges are mapped, not read
 
@@ -244,6 +250,24 @@ Science" beside "Medical Laboratory Sciences"); `population_group_audit()`
 reports near misses so drift is found rather than silently dropped
 (ISSUES.md I7). Converted from `R/lists/population-presets.R` on 2026-10-16
 with no change to any group.
+
+## projection_groups.csv and projection_courses.csv
+
+A projection group is a monitoring scope for `scripts/build-enrollment-projections.R`
+(`--group critical_courses`). `projection_groups.csv` names each group, the
+planning market it projects (`market_id`, saved on every row; the campus
+policy's documented exception), the campuses in that market (`|`-separated,
+from `campuses.csv`; branch campuses never enter it) and whether every
+`gen_ed_courses.csv` course belongs (`include_gen_ed`). `projection_courses.csv`
+names the courses a group monitors beyond Gen Ed; `always_monitored` TRUE
+skips the pressure screen and is aftcast on every build. `history_start_term`
+and `retention_min_terms` are per-course overrides of the model window and the
+census-retention minimum (MATH 1215 starts at Fall 2025 with a one-term
+minimum, because it was renumbered); blank means the model default, and a
+course's override must agree across groups. Course membership is by exact
+`subject_course`; suffix variants are never included by prefix. Converted from
+`R/lists/enrollment_projection_groups.R` on 2026-10-16 with no change to any
+scope.
 
 ## Provenance
 

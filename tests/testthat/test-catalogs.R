@@ -97,9 +97,9 @@ program_rows <- function(program_code, unit_code = "HIST", in_college = "",
 }
 
 unm_settings <- data.frame(
-  setting = c("mapping_files_url", "source_files_url"),
+  setting = c("mapping_files_url", "source_files_url", "projection_history_start_term"),
   value   = c("https://github.com/org/repo/blob/main/institution/x",
-              "https://github.com/org/repo/blob/main"))
+              "https://github.com/org/repo/blob/main", "202210"))
 
 # Scaffolding: subjects.csv rows, defaults filled in.
 subject_rows <- function(subject_code, unit_code = "HIST", in_college = "AS", in_level = "",
@@ -721,4 +721,89 @@ test_that("the population group validator reports every problem at once", {
   expect_match(err, "duplicate program in a group: A / History")
   expect_match(err, "default_for must be pathways, scenario .*found sidebar")
   expect_match(err, "more than one group is default_for pathways")
+})
+
+
+# ---- Configuration files: projection_groups.csv and projection_courses.csv ---
+
+test_that("the projection groups and overrides are the institution's files", {
+  dir <- cedar_institution_dir(cedar_base_dir, "unm")
+  pj <- validate_projection_groups(read_institution_file("projection_groups", dir),
+                                   read_institution_file("projection_courses", dir),
+                                   known_campuses = c(CEDAR_CAMPUS_MAIN, CEDAR_CAMPUS_ONLINE, CEDAR_CAMPUS_BRANCH))
+  expect_equal(names(CEDAR_ENROLLMENT_PROJECTION_GROUPS), pj$groups$group_id)
+  for (i in seq_len(nrow(pj$groups))) {
+    g <- CEDAR_ENROLLMENT_PROJECTION_GROUPS[[pj$groups$group_id[[i]]]]
+    rows <- pj$courses[pj$courses$group_id == pj$groups$group_id[[i]], ]
+    expect_equal(g$label, pj$groups$label[[i]])
+    expect_equal(g$market_id, pj$groups$market_id[[i]])
+    expect_equal(g$campuses, pj$groups$campuses[[i]])
+    expect_setequal(g$always_monitored_courses, rows$subject_course[rows$always_monitored])
+    expect_true(all(rows$subject_course %in% g$courses))
+    if (pj$groups$include_gen_ed[[i]]) expect_true(all(unlist(gen_ed_all) %in% g$courses))
+  }
+  overrides <- pj$courses[!is.na(pj$courses$history_start_term), ]
+  expect_equal(unname(CEDAR_ENROLLMENT_PROJECTION_COURSE_HISTORY_START_TERMS[overrides$subject_course]),
+               overrides$history_start_term)
+  settings <- read_institution_file("settings", dir)
+  expect_equal(CEDAR_ENROLLMENT_PROJECTION_HISTORY_START_TERM,
+               as.integer(settings$value[settings$setting == "projection_history_start_term"]))
+  # The platform file names no course, campus or term.
+  code_lines <- grep("^\\s*#", readLines("../../R/lists/enrollment_projection_groups.R"), value = TRUE, invert = TRUE)
+  expect_false(any(grepl("\"[A-Z]{2,4} [0-9]{3,4}[A-Z]?\"|\\b20[0-9]{4}L?\\b|\"(ABQ|EA)\"", code_lines)))
+})
+
+test_that("the demo institution's projection files load and name fixture courses", {
+  dir <- cedar_institution_dir(cedar_base_dir, "demo")
+  campuses <- validate_campuses(read_institution_file("campuses", dir))
+  pj <- validate_projection_groups(read_institution_file("projection_groups", dir),
+                                   read_institution_file("projection_courses", dir),
+                                   known_campuses = campuses$campus_code)
+  expect_equal(pj$groups$group_id, "critical_courses")
+  expect_true(all(pj$courses$always_monitored))
+})
+
+test_that("the projection validator reports every problem at once", {
+  dir <- tempfile("institution-config-")
+  dir.create(dir)
+  utils::write.csv(data.frame(group_id = c("critical_courses", "critical_courses", "Bad-Id"),
+                              label = c("A", "A", ""), description = "d",
+                              market_id = "m", campuses = c("ABQ|XX", "ABQ", "EA"),
+                              include_gen_ed = c("TRUE", "maybe", "FALSE")),
+                   file.path(dir, "projection_groups.csv"), row.names = FALSE)
+  utils::write.csv(data.frame(group_id = c("critical_courses", "critical_courses", "ghost", "Bad-Id"),
+                              subject_course = c("MATH 1215", "MATH 1215", "ENGL 1110", "MATH 1215"),
+                              always_monitored = c("TRUE", "TRUE", "sometimes", "TRUE"),
+                              history_start_term = c("202580", "202580", "2025", "202480"),
+                              retention_min_terms = c("1", "1", "one", "1")),
+                   file.path(dir, "projection_courses.csv"), row.names = FALSE)
+  err <- tryCatch(validate_projection_groups(read_institution_file("projection_groups", dir),
+                                             read_institution_file("projection_courses", dir),
+                                             known_campuses = c("ABQ", "EA")),
+                  error = conditionMessage)
+  expect_match(err, "blank label")
+  expect_match(err, "duplicate group_id critical_courses")
+  expect_match(err, "group_id must be lowercase")
+  expect_match(err, "campuses not in campuses.csv: XX")
+  expect_match(err, "include_gen_ed must be TRUE or FALSE")
+  expect_match(err, "group_id not in projection_groups.csv: ghost")
+  expect_match(err, "duplicate course in a group: critical_courses / MATH 1215")
+  expect_match(err, "always_monitored must be TRUE or FALSE")
+  expect_match(err, "history_start_term must be a term code YYYYSS; found 2025")
+  expect_match(err, "retention_min_terms must be a whole number; found one")
+  expect_match(err, "history_start_term differs between groups for MATH 1215")
+})
+
+test_that("a settings.csv without a projection window stops the builder, not the app", {
+  withr::local_options(list())
+  old <- CEDAR_ENROLLMENT_PROJECTION_HISTORY_START_TERM
+  rlang::local_bindings(CEDAR_ENROLLMENT_PROJECTION_HISTORY_START_TERM = NA_integer_, .env = .GlobalEnv)
+  expect_error(enrollment_projection_model_config(), "projection_history_start_term")
+  expect_error(projection_course_history_starts("MATH 1215"), "projection_history_start_term")
+  expect_equal(enrollment_projection_model_config(list(history_start_term = old))$history_start_term, old)
+  # And the settings validator rejects a malformed value.
+  dir <- write_mapping_dir(one_unit$colleges, one_unit$units, one_unit$subjects,
+                           settings = data.frame(setting = c(unm_settings$setting),
+                                                 value = c(unm_settings$value[1:2], "Spring 2022")))
+  expect_error(read_institution_mappings(dir), "projection_history_start_term must be a term code")
 })

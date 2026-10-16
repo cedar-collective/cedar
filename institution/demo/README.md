@@ -17,7 +17,9 @@ Gen Ed areas contain, under those areas, and `excluded_courses.csv` the two
 fixture courses UNM excludes, so the demo's Gen Ed tab and excluded-list
 controls have something to show. `population_groups.csv` groups the fixtures'
 program names into four named populations for Pathways and the projections
-scenario.
+scenario. `projection_groups.csv` and `projection_courses.csv` declare one
+monitoring scope over the fixture Gen Ed courses, with the window start in
+`settings.csv`; the demo does not build projections, but the files must load.
 
 Every row is confirmed: the demo has no decisions waiting, so Admin > Mappings
 shows none. A fixture code with no row here would be listed there, as at any

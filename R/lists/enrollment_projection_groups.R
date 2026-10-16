@@ -1,7 +1,12 @@
-# CEDAR-INSTITUTION: monitored course groups and model config
-# Curated course groups for enrollment projections.
+# CEDAR-PLATFORM: projection model registry; monitored course groups from institution/<id>/
+# The model registry (versions, candidates, reader-facing method guide) is
+# CEDAR's. The monitoring scopes -- which courses, on which campuses, in which
+# market, with which per-course window overrides -- are the institution's, in
+# projection_groups.csv and projection_courses.csv, with the history window
+# start in settings.csv (projection_history_start_term). This file names no
+# course, campus or term.
 #
-# These are monitoring scopes. Projection rows use the named market and course;
+# Groups are monitoring scopes. Projection rows use the named market and course;
 # campus and part-term allocation remains in saved delivery components.
 
 # 0.20.0: the spine / floor / delta model. Prior same-season is the spine; the
@@ -11,39 +16,53 @@
 # census-based capacity signal, and census-equivalent section sizing.)
 CEDAR_ENROLLMENT_PROJECTION_MODEL_VERSION <- "0.20.0"
 CEDAR_ENROLLMENT_PROJECTION_SCHEMA_VERSION <- 20L
-CEDAR_ENROLLMENT_PROJECTION_HISTORY_START_TERM <- 202210L
-CEDAR_ENROLLMENT_PROJECTION_COURSE_HISTORY_START_TERMS <- c(
-  "MATH 1215" = 202580L
-)
-CEDAR_ENROLLMENT_PROJECTION_COURSE_RETENTION_MIN_TERMS <- c(
-  "MATH 1215" = 1L
+# The first term the model reads history from (settings.csv
+# projection_history_start_term), or NA when the institution has not set one:
+# the app loads, the projection builder stops.
+CEDAR_ENROLLMENT_PROJECTION_HISTORY_START_TERM <- local({
+  s <- cedar_institution_files$settings
+  v <- s$value[s$setting == "projection_history_start_term"]
+  if (length(v) == 1) as.integer(v) else NA_integer_
+})
+
+.cedar_projection <- validate_projection_groups(
+  read_institution_file("projection_groups"),
+  read_institution_file("projection_courses"),
+  known_campuses = c(CEDAR_CAMPUS_MAIN, CEDAR_CAMPUS_ONLINE, CEDAR_CAMPUS_BRANCH)
 )
 
-CEDAR_ENROLLMENT_PROJECTION_ALWAYS_MONITORED_COURSES <- c(
-  "FYEX 1010", "FYEX 1030", "FYEX 1110",
-  "MATH 1215", "MATH 1220", "MATH 1350",
-  "BIOL 1140",
-  "CHEM 1215", "CHEM 1215L",
-  "ENGL 1110", "ENGL 1120"
+# Per-course overrides, named by course, from the rows that set one.
+.cedar_projection_override <- function(col) {
+  rows <- .cedar_projection$courses[!is.na(.cedar_projection$courses[[col]]), ]
+  rows <- rows[!duplicated(rows$subject_course), ]
+  stats::setNames(as.integer(rows[[col]]), rows$subject_course)
+}
+CEDAR_ENROLLMENT_PROJECTION_COURSE_HISTORY_START_TERMS <- .cedar_projection_override("history_start_term")
+CEDAR_ENROLLMENT_PROJECTION_COURSE_RETENTION_MIN_TERMS <- .cedar_projection_override("retention_min_terms")
+
+# Every always-monitored course in any group: the core that skips the pressure
+# screen and is aftcast on every build.
+CEDAR_ENROLLMENT_PROJECTION_ALWAYS_MONITORED_COURSES <- unique(
+  .cedar_projection$courses$subject_course[.cedar_projection$courses$always_monitored]
 )
 
-CEDAR_ENROLLMENT_PROJECTION_GROUPS <- list(
-  critical_courses = list(
-    label = "Gen Ed + critical courses",
-    description = paste(
-      "Canonical Gen Ed courses, selected gateway additions, and three FYEX",
-      "courses monitored on the Albuquerque and online campuses."
-    ),
-    market_id = "abq_ea_course_market",
-    campuses = CEDAR_CAMPUS_DEFAULT,
-    always_monitored_courses =
-      CEDAR_ENROLLMENT_PROJECTION_ALWAYS_MONITORED_COURSES,
-    courses = sort(unique(c(
-      unlist(gen_ed_all, use.names = FALSE),
-      CEDAR_ENROLLMENT_PROJECTION_ALWAYS_MONITORED_COURSES
-    )))
-  )
-)
+CEDAR_ENROLLMENT_PROJECTION_GROUPS <- local({
+  g <- .cedar_projection$groups
+  stats::setNames(lapply(seq_len(nrow(g)), function(i) {
+    rows <- .cedar_projection$courses[.cedar_projection$courses$group_id == g$group_id[[i]], ]
+    list(
+      label = g$label[[i]],
+      description = g$description[[i]],
+      market_id = g$market_id[[i]],
+      campuses = g$campuses[[i]],
+      always_monitored_courses = rows$subject_course[rows$always_monitored],
+      courses = sort(unique(c(
+        if (g$include_gen_ed[[i]]) unlist(gen_ed_all, use.names = FALSE) else character(0),
+        rows$subject_course
+      )))
+    )
+  }), g$group_id)
+})
 
 # Two candidates. Prior same-season is the spine and the default; the adjusted
 # candidate adds a saturation floor and two Fall-enrollment deltas to it and
