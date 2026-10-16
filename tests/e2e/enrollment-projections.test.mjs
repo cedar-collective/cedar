@@ -83,15 +83,11 @@ function check(name, ok, detail = '') {
     methodGuide.initiallyOpen === false && methodGuide.summary.includes('Projection methods'),
     methodGuide.summary || '(missing)');
   check('method guide explains the three managed candidate families',
-    ['3 historical baselines', '3 diagnostic upstream indicators',
-      '3 selectable anchored blends', 'Raw upstream indicators never win']
+    ['2 candidates', 'Prior same-season is the default']
       .every((phrase) => methodGuide.text.includes(phrase)),
     methodGuide.text.slice(0, 700));
-  check('method guide describes all nine registered methods',
-    ['Prior same-season', 'Seasonal median', 'Seasonal trend',
-      'Spring population growth', 'Spring cohort flow', 'Feeder transitions',
-      'Prior season + population change', 'Prior season + cohort change',
-      'Prior season + feeder change']
+  check('method guide describes both registered methods',
+    ['Prior same-season', 'Prior same-season + floor + Fall deltas']
       .every((label) => methodGuide.text.includes(label)));
 
   const initialContext = await page.evaluate(() => {
@@ -196,22 +192,28 @@ function check(name, ok, detail = '') {
 
   let table = await readReactable(page, 'enrollment_projections-projection_table');
   const requiredHeaders = [
-    'Course', 'Projection', 'Expected census', 'Method', 'Aftcast accuracy',
-    'Stability', 'Depth', 'Accuracy', 'Planning sects',
+    'Course', 'Sections', 'Seats', 'Likely range', 'vs last', 'Flags', 'Trend',
+    'Stability', 'Depth', 'Accuracy', 'Registrations', 'Basis', 'Why',
   ];
   check(
-    'projection table exposes the audit columns',
-    requiredHeaders.every((header) => colIndex(table.headers, header) >= 0),
+    'projection table leads with the decision and keeps the evidence axes',
+    requiredHeaders.every((header) => colIndex(table.headers, header) >= 0) &&
+      colIndex(table.headers, 'Sections') < colIndex(table.headers, 'Stability'),
     table.headers.join(' | ')
   );
   check(
-    'summary replaces audit prose with four same-season enrollment/section columns',
+    'summary carries a trend sparkline instead of four history columns',
     table.headers.filter((header) =>
-      header.toLowerCase().includes('first day / sects')).length === 4 &&
-      !['Bias correction', 'Population fit', 'Recommendation']
+      header.toLowerCase().includes('first day / sects')).length === 0 &&
+      !['Saturation floor', 'Regime check', 'Recommendation']
         .some((header) => colIndex(table.headers, header) >= 0),
     table.headers.join(' | ')
   );
+  const deptTotals = await readReactable(page, 'enrollment_projections-department_table');
+  check('department subtotals render above the course table',
+    deptTotals.rows && deptTotals.rows.length > 0 &&
+      ['Dept', 'Sections to plan', 'Seats at census'].every((h) => colIndex(deptTotals.headers, h) >= 0),
+    (deptTotals.headers || []).join(' | '));
   check('saved projection rows render', table.rows.length > 0, `${table.rows.length} visible`);
   const naturalTableFlow = await page.evaluate(() => {
     const root = document.getElementById('enrollment_projections-projection_table');
@@ -389,15 +391,15 @@ function check(name, ok, detail = '') {
     return detail ? detail.innerText : '';
   });
   check('course detail retains planning, bias, and population-fit evidence',
-    ['Planning recommendation', 'Bias correction', 'Population fit']
+    ['Plan ', 'Planning recommendation', 'Saturation floor', 'Fall deltas', 'Regime check']
       .every((label) => detailSummaryText.includes(label)), detailSummaryText.slice(0, 500));
   await waitForSelector(page, '.enrollment-projection-back', { timeout: 60000 });
 
   const history = await readReactable(page, 'enrollment_projections-history_table');
   const expectedHistoryOrder = [
-    'Term', 'Aftcast', 'Raw error', 'Assessment',
+    'Term', 'Method that term', 'Aftcast', 'Raw error', 'Assessment',
     'First day / ever registered', 'Census', 'Final / last day',
-    'Sections', 'Capacity', 'Fill', 'Potential explanation',
+    'Sections', 'Capacity', 'Census fill', 'Potential explanation',
   ];
   check(
     'history places aftcast and error before actual enrollment',

@@ -240,7 +240,7 @@ For a computation-heavy feature, stabilize a canonical non-Shiny text preview
 before building or revising its Shiny surface. The preview must be a committed
 production formatter over the feature payload or validated saved artifact, not
 a scratch script and not a second implementation of the analysis. It should
-show the scope, terms, measures, selected method, confidence/caveats, and recent
+show the scope, terms, measures, selected method, evidence axes and caveats, and recent
 evidence that the UI is expected to expose.
 
 The formatter owns display formatting only. It never recomputes business logic,
@@ -265,15 +265,17 @@ Projection work has a stricter reusable-artifact boundary:
 - Capacity is an audit and planning comparison, never a demand predictor. A
   reached-capacity overprojection is labeled `Capacity-bounded`; never display
   its one-sided technical zero as ordinary 0% error.
-- Observed-enrollment methods select the published demand row. Broad population,
-  major/classification, and feeder methods are structural evidence and do not
-  silently replace or average with the selected observed method.
-- Every Spring population candidate must preserve matched/unmatched components,
-  use only preceding terms, and survive `validate_spring_cohort_rows()`.
-  Course-level broad-versus-major/classification coupling is saved with its
-  aftcast count and WAPE difference; the UI never derives it.
-- Weak rows remain visible with confidence `None` and a reason. Do not withhold
-  them, relabel them Low, or invent a reassuring default.
+- Observed-enrollment methods select the published demand row, and selection is
+  rolling: prior same-season is the default, a challenger must beat it on
+  earlier shared aftcasts, and the published accuracy is the realised record of
+  that rule. Broad population and major/classification methods are structural
+  evidence and do not silently replace or average with the selected method.
+- The adjusted candidate must reconcile: spine + floor uplift + repeat delta +
+  feeder delta is its projection, and `validate_spine_rows()` rejects any row
+  where it is not. Rates are learned only from pairs that precede the target;
+  the UI never derives a delta.
+- Weak rows remain visible with `Unrated` / `None` axis values and a reason. Do
+  not withhold them, relabel them, or invent a reassuring default.
 - Miss explanations say `Potential explanation` or `Potential contributor` and
   retain their underlying enrollment/capacity changes. They are not causal
   claims.

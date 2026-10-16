@@ -116,15 +116,40 @@ enrollmentProjectionsUI <- function(id) {
           )
         )
       ),
+      checkboxInput(
+        ns("attention_only"),
+        "Only courses that need a look: full last term, a big Fall change, or past forecasts more than 20% off",
+        value = FALSE
+      ),
       filter_scope_stripe(uiOutput(ns("scope"))),
       class = "enrollment-projection-filters"
     ),
     uiOutput(ns("bundle_status")),
+    tags$p(
+      class = "enrollment-projection-lead",
+      paste(
+        "Each row plans one course for the target term. Sections and seats",
+        "start from last year's same-term enrollment; a course that filled its",
+        "seats last time is treated as a floor, and a course whose enrollment",
+        "moved sharply in the term just finished is flagged for a look. The",
+        "range is where past forecasts for that course usually landed."
+      )
+    ),
     info_panel(
       "How projections work and how to read the table",
       cedar_definition_note("enrollment-projection"),
       tags$p(tags$strong("Table columns"), class = "mb-1"),
       tags$ul(
+        tags$li(tags$strong("Sections"),
+                " to plan: seats filled at census divided by the section size, rounded up. A course that filled its seats last term reads as a floor."),
+        tags$li(tags$strong("Seats"),
+                " expected to be filled at census, with the range past forecasts for this course usually landed in."),
+        tags$li(tags$strong("vs last"),
+                " is the change on last year's same-term registrations."),
+        tags$li(tags$strong("Flags"),
+                " are plain-language reasons to look at a row: full last term, students left waiting, a big change in the term just finished, a volatile history, or past forecasts that were well off."),
+        tags$li(tags$strong("Trend"),
+                " sketches the last four same-term enrollments; hover for the numbers and sections."),
         tags$li(tags$strong("Course / Dept"),
                 " identifies the projected course and its academic department."),
         tags$li(tags$strong("Projection"),
@@ -132,9 +157,14 @@ enrollmentProjectionsUI <- function(id) {
         tags$li(tags$strong("Expected census"),
                 " applies the course's historical census retention to the projection."),
         tags$li(tags$strong("Method"),
-                " is the approach selected from leakage-safe historical aftcasts."),
-        tags$li(tags$strong("Aftcast accuracy"),
-                " summarizes comparable historical predictions and their error."),
+                paste(
+                  " is prior same-season enrollment (the spine) unless the",
+                  "adjusted candidate beat it by a margin on earlier aftcasts.",
+                  "The adjusted candidate raises the spine to a floor when the",
+                  "prior term was saturated and adds the change in the course's",
+                  "own and its feeder courses' enrollment in the term just",
+                  "finished. The Why column gives that evidence."
+                )),
         tags$li(tags$strong("Stability"),
                 paste(
                   " asks whether the course is predictable from its own history",
@@ -152,9 +182,10 @@ enrollmentProjectionsUI <- function(id) {
         tags$li(tags$strong("Accuracy"),
                 paste(
                   " is how close those aftcasts landed: Close, Fair, Poor, or",
-                  "Unrated when there are too few to measure. It is reported",
-                  "separately from Depth because a well-observed course can",
-                  "still be forecast badly."
+                  "Unrated when there are too few to measure. The selection",
+                  "rule is replayed at each past term with only the evidence",
+                  "available then, so this is an out-of-sample record, not",
+                  "the fit of the winner on the terms that chose it."
                 )),
         tags$li(tags$strong("Evidence"),
                 " summarizes the three axes together with the most important qualification."),
@@ -162,14 +193,15 @@ enrollmentProjectionsUI <- function(id) {
                 " show first-day / ever-registered enrollment followed by scheduled sections for each of the four latest same-season terms; for example, 479 / 4 means 479 students across 4 sections."),
         tags$li(tags$strong("Planning sects"),
                 paste(
-                  "is projected demand divided by the target schedule's average",
+                  "is expected census divided by the target schedule's average",
                   "section size when available, otherwise the recent historical",
-                  "median, rounded up. It is a planning conversion—not a forecast",
-                  "of how many sections will actually be scheduled."
+                  "median, rounded up. Census, not ever-registered demand, is",
+                  "what occupies seats. It is a planning conversion—not a",
+                  "forecast of how many sections will actually be scheduled."
                 ))
       ),
       tags$p(
-        "Select a course for bias-correction, population-fit, capacity, and full method evidence."
+        "Select a course for the floor, Fall deltas, capacity, and full method evidence."
       ),
       cedar_docs_link("users/enrollment-projections"),
       description = "Methodology, the three evidence axes, and a guide to every displayed column.",
@@ -194,6 +226,16 @@ enrollmentProjectionsUI <- function(id) {
           class = "enrollment-projection-table-anchor",
           tabindex = "-1"
         ),
+        section_heading("By department"),
+        tags$p(
+          class = "text-muted",
+          "Sections and seats summed over the courses in view. The total is more reliable than any one course: errors across courses largely offset."
+        ),
+        tags$div(
+          class = "enrollment-projection-dept-totals",
+          reactable::reactableOutput(ns("department_table"), height = NULL)
+        ),
+        section_heading("By course"),
         tags$div(
           class = "enrollment-projection-table-flow",
           reactable::reactableOutput(ns("projection_table"), height = NULL)
@@ -381,41 +423,66 @@ enrollmentProjectionsServer <- function(id, bundles, load_bundle, programs) {
           departments = input$department,
           courses = input$course,
           stability = input$stability,
-          accuracy = input$accuracy
+          accuracy = input$accuracy,
+          attention_only = isTRUE(input$attention_only)
         )
       )
     })
 
+    # None/Unrated mean "not enough evidence", which is grey, never red: an
+    # unmeasured course has not failed anything.
     axis_cell <- function(value) {
-      colors <- switch(
+      tone <- switch(
         value,
-        # stability
-        Stable = c("#e4eee7", "#2d4336"),
-        Volatile = c("#f2e3de", "#7a2a1c"),
-        # depth
-        Deep = c("#e4eee7", "#2d4336"),
-        Thin = c("#f4e9d2", "#7a5010"),
-        # accuracy
-        Close = c("#e4eee7", "#2d4336"),
-        Fair = c("#edf0e2", "#4f5c2f"),
-        Poor = c("#f2e3de", "#7a2a1c"),
-        # shared: Moderate spans stability and depth; None/Unrated mean
-        # "not enough evidence", which is grey, never red — an unmeasured
-        # course has not failed anything.
-        Moderate = c("#edf0e2", "#4f5c2f"),
-        None = c("#eeeeee", "#555555"),
-        Unrated = c("#eeeeee", "#555555"),
-        c("#eeeeee", "#555555")
+        Stable = , Deep = , Close = "good",
+        Moderate = , Fair = "mid",
+        Thin = "thin",
+        Volatile = , Poor = "poor",
+        "none"
       )
       htmltools::span(
-        value,
-        style = paste0(
-          "display:inline-block;padding:2px 6px;border-radius:3px;",
-          "font-size:0.78rem;font-weight:600;background:", colors[[1]],
-          ";color:", colors[[2]], ";"
-        )
+        value, class = paste0("projection-axis projection-axis--", tone)
       )
     }
+
+    flag_cell <- function(value) {
+      if (is.na(value) || !nzchar(value)) return("\u2014")
+      flags <- strsplit(value, " | ", fixed = TRUE)[[1]]
+      htmltools::tagList(lapply(flags, function(flag) {
+        warn <- grepl("^Fall enrollment|^Past forecasts|Hard to predict", flag)
+        htmltools::span(
+          flag,
+          class = paste(c("projection-flag", if (warn) "projection-flag--warn"),
+                        collapse = " ")
+        )
+      }))
+    }
+
+    output$department_table <- reactable::renderReactable({
+      totals <- view()$department_totals
+      if (nrow(totals) == 0L) return(NULL)
+      reactable::reactable(
+        totals, theme = cedar_tbl_theme, compact = TRUE, striped = TRUE,
+        pagination = FALSE,
+        columns = list(
+          department = reactable::colDef(name = "Dept", maxWidth = 90),
+          courses = reactable::colDef(name = "Courses", align = "right", maxWidth = 90),
+          sections = reactable::colDef(
+            name = "Sections to plan", align = "right",
+            format = reactable::colFormat(separators = TRUE)
+          ),
+          seats = reactable::colDef(
+            name = "Seats at census", align = "right",
+            format = reactable::colFormat(separators = TRUE, digits = 0)
+          ),
+          registrations = reactable::colDef(
+            name = "Registrations", align = "right",
+            format = reactable::colFormat(separators = TRUE, digits = 0)
+          ),
+          flagged = reactable::colDef(name = "Need a look", align = "right", maxWidth = 110)
+        )
+      )
+    })
 
     output$bundle_status <- renderUI({
       saved <- saved_bundles()
@@ -509,30 +576,42 @@ enrollmentProjectionsServer <- function(id, bundles, load_bundle, programs) {
             cell = function(value) htmltools::strong(value)
           ),
           department = reactable::colDef(name = "Dept", maxWidth = 85),
-          projected_demand = reactable::colDef(
-            name = "Projection", align = "right", maxWidth = 95,
-            format = reactable::colFormat(separators = TRUE, digits = 0)
-          ),
-          expected_census = reactable::colDef(
-            name = "Expected census", align = "right", maxWidth = 115,
-            format = reactable::colFormat(separators = TRUE, digits = 0)
-          ),
           planning_sections = reactable::colDef(
-            name = "Planning sects", align = "right", maxWidth = 105,
+            name = "Sections", align = "right", maxWidth = 90,
             header = htmltools::span(
-              "Planning sects",
+              "Sections",
               title = paste(
-                "Projected demand divided by target average section size,",
-                "or recent median section size when the target schedule is unavailable"
+                "Seats filled at census divided by the section size,",
+                "rounded up; a floor when last term filled its seats"
               )
             ),
             format = reactable::colFormat(separators = TRUE, digits = 0),
             na = "—"
           ),
-          method = reactable::colDef(name = "Method", minWidth = 130),
-          aftcast_accuracy = reactable::colDef(
-            name = "Aftcast accuracy", minWidth = 115
+          expected_census = reactable::colDef(
+            name = "Seats", align = "right", maxWidth = 85,
+            header = htmltools::span("Seats", title = "Expected to be filled at census"),
+            format = reactable::colFormat(separators = TRUE, digits = 0)
           ),
+          seats_range = reactable::colDef(
+            name = "Likely range", align = "right", minWidth = 115, na = "—"
+          ),
+          change_vs_last = reactable::colDef(
+            name = "vs last", align = "right", maxWidth = 85,
+            format = reactable::colFormat(percent = TRUE, digits = 0), na = "—"
+          ),
+          flags = reactable::colDef(name = "Flags", minWidth = 210, cell = flag_cell),
+          attention = reactable::colDef(show = FALSE),
+          history_values = reactable::colDef(
+            name = "Trend", minWidth = 100, sortable = FALSE,
+            cell = function(value, index) {
+              htmltools::span(
+                title = data$history_text[[index]],
+                make_sparkline(value, current_idx = length(value))
+              )
+            }
+          ),
+          history_text = reactable::colDef(show = FALSE),
           stability = reactable::colDef(
             name = "Stability", maxWidth = 95, cell = axis_cell
           ),
@@ -545,15 +624,25 @@ enrollmentProjectionsServer <- function(id, bundles, load_bundle, programs) {
             name = "Accuracy", maxWidth = 95, cell = axis_cell
           ),
           accuracy_reason = reactable::colDef(show = FALSE),
-          # The three badge columns already say Stable / Deep / Close, so the
-          # brief would repeat them word for word in a 260px column and push
-          # Accuracy off the right edge. It stays in the payload for the text
-          # preview and the row detail, which have no badges.
+          projected_demand = reactable::colDef(
+            name = "Registrations", align = "right", maxWidth = 110,
+            header = htmltools::span(
+              "Registrations",
+              title = "Everyone expected to register, including students who later drop"
+            ),
+            format = reactable::colFormat(separators = TRUE, digits = 0)
+          ),
+          method = reactable::colDef(name = "Basis", minWidth = 130),
+          selection_evidence = reactable::colDef(name = "Why", minWidth = 150),
+          summary_sentence = reactable::colDef(show = FALSE),
           axis_brief = reactable::colDef(show = FALSE),
           axis_explanation = reactable::colDef(show = FALSE),
-          demand_signal = reactable::colDef(show = FALSE),
+          regime_alarm = reactable::colDef(show = FALSE),
           why_uncertain = reactable::colDef(show = FALSE)
-        ), history_columns)
+        ), lapply(history_columns, function(column) {
+          column$show <- FALSE
+          column
+        }))
       )
     })
 
@@ -619,19 +708,20 @@ enrollmentProjectionsServer <- function(id, bundles, load_bundle, programs) {
           tags$span("Back to projection table")
         ),
         section_heading(paste(current$subject_course, "projection evidence")),
+        tags$p(class = "enrollment-projection-lead", current$summary_sentence),
         tags$dl(
           class = "enrollment-projection-summary",
           tags$dt("Selected method"), tags$dd(current$method_label),
           tags$dt("Why selected"), tags$dd(current$selection_reason),
-          tags$dt("Upstream change"),
+          tags$dt("Adjusted candidate"),
           tags$dd(
-            if (current$method_role[[1]] == "anchored_upstream") {
-              dplyr::coalesce(
-                current$component_summary,
-                "Upstream component detail is unavailable"
+            if (isTRUE(current$adjusted_applicable[[1]])) {
+              paste0(
+                format(round(current$adjusted_projection[[1]]), big.mark = ","),
+                " (", current$adjusted_reason[[1]], ")"
               )
             } else {
-              "No upstream adjustment in the selected method"
+              dplyr::coalesce(current$adjusted_reason[[1]], "Not applicable")
             }
           ),
           tags$dt("Stability"), tags$dd(current$stability),
@@ -644,14 +734,17 @@ enrollmentProjectionsServer <- function(id, bundles, load_bundle, programs) {
               format(current$recommended_sections, big.mark = ",")
           ),
           tags$dt("Planning recommendation"), tags$dd(current$recommendation),
-          tags$dt("Bias correction"), tags$dd(current$bias_correction),
-          tags$dt("Population fit"),
-          tags$dd(paste(current$coupling_status, current$coupling_reason, sep = ": ")),
-          tags$dt("Demand signal"), tags$dd(current$demand_note),
+          tags$dt("Saturation floor"), tags$dd(current$floor_note),
+          tags$dt("Fall deltas"),
+          tags$dd(dplyr::coalesce(current$adjusted_delta_basis, "Not available")),
+          tags$dt("Regime check"), tags$dd(current$regime_note),
           tags$dt("Capacity check"), tags$dd(current$capacity_limit_note)
         ),
-        section_heading("Historical methods and enrollment lifecycle", level = "h3"),
-        tags$div(
+        section_heading("Recent same-season evidence", level = "h3"),
+        reactable::reactableOutput(session$ns("history_table")),
+        info_panel(
+          "Analyst detail: methods, movement diagnostic, and candidates",
+          tags$div(
           class = "alert-box alert-box--info",
           tags$strong("What is being compared"),
           "The lines recreate each forecasting method for prior ",
@@ -660,12 +753,11 @@ enrollmentProjectionsServer <- function(id, bundles, load_bundle, programs) {
             spring = "Spring", summer = "Summer", fall = "Fall",
             "same-term-type"
           ),
-          " terms only. Each upstream-anchored line is a fixed blend with prior ",
-          "same-term-type enrollment. Method choice and accuracy use ",
-          dplyr::if_else(
-            current$selection_uses_uncensored[[1]],
-            "unconstrained-term WAPE", "all-term WAPE"
-          ), " against the ",
+          " terms only. Each blended line is a fixed 50/50 mix with prior ",
+          "same-term-type enrollment. Method choice is rolling: at every past ",
+          "term the rule saw only earlier aftcasts, and the accuracy shown is ",
+          "the error of the method it would have published then, measured ",
+          "against the ",
           tags$strong("first day / ever registered proxy"),
           paste(
             ": unique non-waitlisted students found in the class-list extract.",
@@ -676,26 +768,23 @@ enrollmentProjectionsServer <- function(id, bundles, load_bundle, programs) {
         plotly::plotlyOutput(
           session$ns("method_history_plot"), height = "450px", fill = FALSE
         ),
-        section_heading("Recent same-season evidence", level = "h3"),
-        reactable::reactableOutput(session$ns("history_table")),
-        info_panel(
-          "Enrollment movement diagnostic",
-          tags$p(tags$strong("Schedule relationship. "),
-                 data$movement$schedule_summary),
-          tags$p(tags$strong("Upstream enrollment. "),
-                 data$movement$upstream_summary),
-          tags$p(tags$strong("DFW and repeat pressure. "),
-                 data$movement$dfw_summary),
-          tags$p(class = "text-muted", data$movement$caveat),
-          reactable::reactableOutput(session$ns("movement_table")),
+        section_heading("Enrollment movement diagnostic", level = "h4"),
+        tags$p(tags$strong("Schedule relationship. "),
+               data$movement$schedule_summary),
+        tags$p(tags$strong("Upstream enrollment. "),
+               data$movement$upstream_summary),
+        tags$p(tags$strong("DFW and repeat pressure. "),
+               data$movement$dfw_summary),
+        tags$p(class = "text-muted", data$movement$caveat),
+        reactable::reactableOutput(session$ns("movement_table")),
+        section_heading("Candidate methods", level = "h4"),
+        reactable::reactableOutput(session$ns("candidate_table")),
           description = paste(
-            "Compares course enrollment with capacity, preceding-term",
-            "university enrollment, incoming freshmen, and course DFW pressure."
+            "The method aftcast plot, the capacity and upstream movement",
+            "diagnostic, and both candidates with their evidence."
           ),
           class = "enrollment-projection-movement"
-        ),
-        section_heading("Candidate methods", level = "h3"),
-        reactable::reactableOutput(session$ns("candidate_table"))
+        )
       )
     })
 
@@ -769,6 +858,7 @@ enrollmentProjectionsServer <- function(id, bundles, load_bundle, programs) {
       table <- data$history %>%
         dplyr::transmute(
           term = history_term_label,
+          aftcast_method = dplyr::coalesce(aftcast_method_label, "—"),
           aftcast = round(aftcast_classlist_total),
           raw_error = aftcast_pct_error,
           assessment = dplyr::case_when(
@@ -781,7 +871,7 @@ enrollmentProjectionsServer <- function(id, bundles, load_bundle, programs) {
           final = round(actual_final_enrollment),
           sections = scheduled_sections,
           capacity = round(scheduled_capacity),
-          registration_fill,
+          census_fill,
           potential_explanation = potential_miss_explanation
         )
       reactable::reactable(
@@ -789,6 +879,9 @@ enrollmentProjectionsServer <- function(id, bundles, load_bundle, programs) {
         pagination = FALSE,
         columns = list(
           term = reactable::colDef(name = "Term", minWidth = 95),
+          aftcast_method = reactable::colDef(
+            name = "Method that term", minWidth = 130
+          ),
           aftcast = reactable::colDef(name = "Aftcast", align = "right"),
           raw_error = reactable::colDef(
             name = "Raw error", align = "right",
@@ -803,8 +896,8 @@ enrollmentProjectionsServer <- function(id, bundles, load_bundle, programs) {
           final = reactable::colDef(name = "Final / last day", align = "right"),
           sections = reactable::colDef(name = "Sections", align = "right"),
           capacity = reactable::colDef(name = "Capacity", align = "right"),
-          registration_fill = reactable::colDef(
-            name = "Fill", align = "right",
+          census_fill = reactable::colDef(
+            name = "Census fill", align = "right",
             format = reactable::colFormat(percent = TRUE, digits = 1)
           ),
           potential_explanation = reactable::colDef(
@@ -832,7 +925,7 @@ enrollmentProjectionsServer <- function(id, bundles, load_bundle, programs) {
           uncapped_wape = uncensored_wape,
           selected,
           applicable,
-          upstream_change = dplyr::coalesce(component_summary, "—"),
+          components = dplyr::coalesce(component_summary, "—"),
           evidence = applicability_reason
         )
       reactable::reactable(
@@ -853,8 +946,8 @@ enrollmentProjectionsServer <- function(id, bundles, load_bundle, programs) {
           ),
           selected = reactable::colDef(name = "Selected", maxWidth = 80),
           applicable = reactable::colDef(name = "Usable", maxWidth = 70),
-          upstream_change = reactable::colDef(
-            name = "Upstream change / components", minWidth = 280
+          components = reactable::colDef(
+            name = "Floor and delta components", minWidth = 280
           ),
           evidence = reactable::colDef(name = "Evidence", minWidth = 260)
         )
@@ -868,7 +961,16 @@ enrollmentProjectionsServer <- function(id, bundles, load_bundle, programs) {
         )
       },
       content = function(file) {
-        utils::write.csv(view()$table, file, row.names = FALSE, na = "")
+        export <- view()$table %>%
+          dplyr::select(-history_values) %>%
+          dplyr::rename(
+            sections_to_plan = planning_sections,
+            seats_at_census = expected_census,
+            registrations = projected_demand,
+            basis = method,
+            recent_terms = history_text
+          )
+        utils::write.csv(export, file, row.names = FALSE, na = "")
       }
     )
 

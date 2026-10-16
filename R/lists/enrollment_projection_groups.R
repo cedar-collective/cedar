@@ -4,10 +4,13 @@
 # These are monitoring scopes. Projection rows use the named market and course;
 # campus and part-term allocation remains in saved delivery components.
 
-# 0.17.0 rebuilds DFW/repeat-demand signals with late-drop audits excluded.
-CEDAR_ENROLLMENT_PROJECTION_MODEL_VERSION <- "0.18.0"
-CEDAR_ENROLLMENT_PROJECTION_SCHEMA_VERSION <- 18L
-CEDAR_ENROLLMENT_PROJECTION_CALIBRATION_FACTOR_BOUNDS <- c(0.75, 1.25)
+# 0.20.0: the spine / floor / delta model. Prior same-season is the spine; the
+# adjusted candidate adds a saturation floor and two Fall-enrollment deltas and
+# must beat the spine on rolling aftcasts. Every other candidate and the
+# bias-correction path are retired. (0.19.0 introduced rolling selection, the
+# census-based capacity signal, and census-equivalent section sizing.)
+CEDAR_ENROLLMENT_PROJECTION_MODEL_VERSION <- "0.20.0"
+CEDAR_ENROLLMENT_PROJECTION_SCHEMA_VERSION <- 20L
 CEDAR_ENROLLMENT_PROJECTION_HISTORY_START_TERM <- 202210L
 CEDAR_ENROLLMENT_PROJECTION_COURSE_HISTORY_START_TERMS <- c(
   "MATH 1215" = 202580L
@@ -42,60 +45,42 @@ CEDAR_ENROLLMENT_PROJECTION_GROUPS <- list(
   )
 )
 
+# Two candidates. Prior same-season is the spine and the default; the adjusted
+# candidate adds a saturation floor and two Fall-enrollment deltas to it and
+# must beat the spine on earlier rolling aftcasts before it is published.
+#
+# 0.20.0 retired the rest of the registry after the Spring 2027 audits: the
+# seasonal median, the raw and blended preceding-term ratio, both Spring
+# population methods and the anchored cohort blend sat within 0.3 WAPE points
+# of the spine (correlation 0.999 to 1.000) or lost to it rolling, and the
+# bias-correction path never fired on five Springs of history. The audit
+# figures are in docs/developers/forecasting-lessons.md.
 CEDAR_ENROLLMENT_PROJECTION_METHODS <- c(
   seasonal_last = "Prior same-season",
-  seasonal_median = "Seasonal median",
-  seasonal_trend = "Seasonal trend",
-  spring_population_growth = "Spring population growth",
-  spring_cohort_flow = "Spring cohort flow",
-  feeder = "Feeder transitions",
-  anchored_population = "Prior season + population change",
-  anchored_cohort = "Prior season + cohort change",
-  anchored_feeder = "Prior season + feeder change"
+  spine_adjusted = "Prior same-season + floor + Fall deltas"
 )
+
+CEDAR_ENROLLMENT_PROJECTION_DEFAULT_METHOD <- "seasonal_last"
 
 CEDAR_ENROLLMENT_PROJECTION_METHOD_ROLES <- c(
   seasonal_last = "observed_enrollment",
-  seasonal_median = "observed_enrollment",
-  seasonal_trend = "observed_enrollment",
-  spring_population_growth = "structural_demand",
-  spring_cohort_flow = "structural_demand",
-  feeder = "structural_demand",
-  anchored_population = "anchored_upstream",
-  anchored_cohort = "anchored_upstream",
-  anchored_feeder = "anchored_upstream"
+  spine_adjusted = "observed_enrollment"
 )
 
 # Canonical reader-facing distinctions between projection candidates. Keeping
 # this beside the method registry makes additions fail visibly in tests instead
 # of leaving an independently maintained UI explanation behind.
 CEDAR_ENROLLMENT_PROJECTION_METHOD_FAMILIES <- data.frame(
-  family_id = c(
-    "observed_enrollment", "structural_demand", "anchored_upstream"
+  family_id = "observed_enrollment",
+  family_label = "Observed enrollment",
+  description = paste(
+    "Both candidates start from the course's own prior same-season",
+    "enrollment. The adjusted one raises it to a floor when that term was",
+    "saturated and moves it by what changed in the term just finished."
   ),
-  family_label = c(
-    "Observed enrollment baselines",
-    "Upstream indicators",
-    "Anchored upstream candidates"
-  ),
-  description = c(
-    paste(
-      "Use only the course's recorded same-season enrollment. They differ in",
-      "whether they favor the latest level, a stable center, or a continuing trend."
-    ),
-    paste(
-      "Estimate demand from the students or pathways upstream of the course.",
-      "They remain visible as diagnostic evidence but cannot be selected directly."
-    ),
-    paste(
-      "Blend 50% prior same-season enrollment with 50% of one upstream estimate.",
-      "They preserve the latest course level while allowing structural change to move it."
-    )
-  ),
-  selection_note = c(
-    "Eligible for selection; CEDAR first finds the best-performing baseline.",
-    "Diagnostic only; these raw estimates explain the upstream signal and never become the published projection by themselves.",
-    "Eligible only when aftcast volume, source coverage, and error gates pass."
+  selection_note = paste(
+    "Prior same-season is the default; the adjusted candidate replaces it only",
+    "after beating it on earlier aftcasts."
   ),
   stringsAsFactors = FALSE
 )
@@ -103,32 +88,19 @@ CEDAR_ENROLLMENT_PROJECTION_METHOD_FAMILIES <- data.frame(
 CEDAR_ENROLLMENT_PROJECTION_METHOD_GUIDE <- data.frame(
   method_id = names(CEDAR_ENROLLMENT_PROJECTION_METHODS),
   family_id = unname(CEDAR_ENROLLMENT_PROJECTION_METHOD_ROLES),
-  concept_id = c(
-    "latest_level", "historical_center", "historical_direction",
-    "population_change", "cohort_change", "feeder_change",
-    "population_change", "cohort_change", "feeder_change"
-  ),
+  concept_id = c("latest_level", "adjusted_level"),
   basis = c(
     "Repeats enrollment from the most recent prior term of the same type.",
-    "Takes the median enrollment across recent terms of the same type.",
-    "Extends the linear direction of recent same-season enrollment.",
-    "Applies broad preceding-Fall population growth to the prior Spring course cohort.",
-    "Applies empirically shrunk major/classification growth to the prior Spring course cohort.",
-    "Uses learned student transitions from feeder courses, adjusted for historical feeder coverage.",
-    "Averages prior same-season enrollment with the broad-population estimate.",
-    "Averages prior same-season enrollment with the major/classification cohort estimate.",
-    "Averages prior same-season enrollment with the feeder-transition estimate."
+    paste(
+      "Starts from the same number, raises it to census plus waitlist when",
+      "that term was saturated, and adds the change in the course's own",
+      "enrollment and in its feeder courses during the term just finished,",
+      "each scaled by the share that historically carried into this course."
+    )
   ),
   distinction = c(
-    "Most responsive to the latest course level, but also most exposed to a one-term anomaly or seat ceiling.",
-    "Most resistant to an unusual term, but deliberately ignores whether demand is rising or falling.",
-    "The only historical baseline that carries direction forward; it needs enough history and can overreact to a short trend.",
-    "The broadest structural signal; it asks whether the total source population changed, not whether its academic mix changed.",
-    "The composition-sensitive structural signal; it follows the majors and classifications represented in the course.",
-    "The pathway-specific structural signal; it follows observed next-course behavior rather than population size alone.",
-    "The level-preserving version of Spring population growth.",
-    "The level-preserving version of Spring cohort flow.",
-    "The level-preserving version of feeder transitions."
+    "The default. Within 6% when the schedule holds still; a year old by the time the target is scheduled, and blind to a saturated ceiling.",
+    "Sees a saturated prior term and a Fall that moved. Uses Fall enrollments only, because grades are not posted when the schedule is built; the same terms can be re-read once they are."
   ),
   stringsAsFactors = FALSE
 )

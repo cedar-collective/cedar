@@ -221,6 +221,50 @@ details.enrollment-projection-method-guide {
   margin-top: 12px;
 }
 
+/* Plain-language flags in the projection summary, one chip per reason to look. */
+.projection-flag {
+  display: inline-block;
+  margin: 1px 4px 1px 0;
+  padding: 1px 7px;
+  border-radius: var(--radius-sm, 4px);
+  background: var(--juniper-blue-light, #A8BDD9);
+  color: var(--juniper-blue-dark, #2d4336);
+  font-size: 0.76rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.projection-flag--warn {
+  background: #f4e9d2;
+  color: #7a5010;
+}
+
+/* The three evidence axes as compact badges. */
+.projection-axis {
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  background: #eeeeee;
+  color: #555555;
+}
+
+.projection-axis--good { background: #e4eee7; color: #2d4336; }
+.projection-axis--mid  { background: #edf0e2; color: #4f5c2f; }
+.projection-axis--thin { background: #f4e9d2; color: #7a5010; }
+.projection-axis--poor { background: #f2e3de; color: #7a2a1c; }
+
+.enrollment-projection-lead {
+  font-size: 1.02rem;
+  margin: 0 0 12px;
+  max-width: 980px;
+}
+
+.enrollment-projection-dept-totals {
+  margin: 0 0 14px;
+}
+
 .enrollment-projection-method-family {
   border-top: 1px solid rgba(71, 105, 117, 0.22);
   margin-top: 12px;

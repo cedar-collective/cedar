@@ -427,13 +427,14 @@ population. Both are necessary, for different reasons.
 Enrollment projections should follow this sequence entirely outside Shiny:
 
 1. Prepare reusable class-list, census, registration-capacity, student-term,
-   target-roster, broad-population, major/classification, and feeder inputs.
+   target-roster, broad-population, and major/classification inputs, plus the
+   unfiltered preceding-term series.
 2. Apply the inexpensive pressure screen and retain its inclusion reasons.
 3. Run candidate projection methods only for the resulting course-market roster.
 4. Backtest each method using an explicit historical `as_of_term` cutoff.
 5. Audit WAPE, signed bias, error variability, and directional consistency.
-6. Rolling-test any proposed calibration using only earlier aftcasts.
-7. Select and explain the row-level method and any validated adjustment.
+6. Replay the selection rule at every fold using only earlier aftcasts.
+7. Select and explain the row-level method and its floor and delta evidence.
 8. Build a versioned projection bundle and validate its schema and metadata.
 9. Save and reload the bundle in a round-trip test before the app consumes it.
 
@@ -444,11 +445,12 @@ Before changing the projection module, inspect the saved bundle through
 green. The module should consume the same typed tables and labels, never the
 rendered Markdown text.
 The projection test suite should cover at least census semantics, cross-campus
-student deduplication, delivery-component reconciliation, feeder deduplication,
-Spring broad-population and cohort-flow reconciliation and applicability,
-historical leakage, pressure-screen
-inclusion, signed-error direction, rolling calibration leakage, structural
-capacity-censoring guards, method selection, and artifact round trips before a
+student deduplication, delivery-component reconciliation, rolling selection
+(a fixture whose in-sample winner fits 2% and whose honest record is 8%),
+spine / floor / delta reconciliation, the saturation floor and waitlist count,
+Fall delta carry-through rates, historical leakage, pressure-screen
+inclusion, signed-error direction, census-based capacity censoring, rolling
+method selection, and artifact round trips before a
 projection display contract changes in the app.
 
 The current publisher is runnable from the repository root:
@@ -473,10 +475,9 @@ Raw class-list WAPE, registration-cap-censored WAPE, and uncensored-term
 WAPE are stored separately; they answer different questions and must not be
 collapsed into one confidence score. WAPE remains unsigned and is paired with
 weighted signed bias, directional consistency, and the term-level signed error
-history. Raw and adjusted projections remain side by side, and calibration may
-be applied only after a leakage-safe rolling improvement test. Structural-demand
-calibration must fit and validate only on usable terms whose class-list
-registrations did not reach scheduled capacity.
+history. The spine and the adjusted candidate remain side by side, and the
+adjusted one is published only after beating the spine on earlier shared
+aftcasts under the rolling rule.
 The target term and exact method-specific aftcast terms must accompany row-level
 accuracy. See
 [Enrollment Projection Architecture](enrollment-projections.html) for the
