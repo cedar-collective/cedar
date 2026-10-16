@@ -13,6 +13,8 @@ See `docs/developers/adr-002-explicit-mapping-files.md`.
 | `programs.csv` | program code (optionally within a college) | `program_code`, `in_college`, `program_name`, `unit_code`, `college_code`, `is_pre_major`, `leads_to`, `basis`, `status`, `evidence`, `notes` |
 | `source_departments.csv` | department name as Banner exports it | `source_name`, `unit_code`, `kind`, `notes` |
 | `settings.csv` | institution setting | `setting`, `value` |
+| `campuses.csv` | campus code | `campus_code`, `campus_name`, `kind`, `default_scope` |
+| `course_levels.csv` | leading digit of a course number | `leading_digit`, `level` |
 
 **Every row is one line.** No blank lines and no line breaks inside a field:
 Admin > Mappings links to rows by line number, and the loader refuses a file
@@ -182,6 +184,24 @@ New rows go at the end.
 **A subject can appear under two colleges with different units.** Branch
 campuses reuse subject codes (for example `HLED`, `PH`, `SUST`) for units that
 differ from the main campus's.
+
+## campuses.csv
+
+One row per campus code as the class lists and DESR code it. `kind` is `main`
+(exactly one), `online` (at most one) or `branch`; `default_scope` is `TRUE`
+for the campuses a filter bar selects by default (ABQ and EA). `campus_name`
+is the documented expansion; it may be blank for a code the data uses without
+one (EW, EF, ELA, TAQ), which then displays as the bare code rather than a
+guessed name. Codes the data uses that are not listed here appear on
+Admin > Data & Usage > Mappings under "Not in campuses.csv" (ISSUES.md M23).
+
+## course_levels.csv
+
+One row for each leading digit 0–9 of a course number, with the level it
+means: `lower`, `upper` or `grad`. UNM numbers courses with three digits
+(HIST 301) and, since the statewide renumbering, four (HIST 1110); both share
+the same leading-digit bands, which is why the rule is keyed on one digit and
+not on the number's value (ISSUES.md I5).
 
 ## Provenance
 

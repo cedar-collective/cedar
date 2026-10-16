@@ -1,5 +1,7 @@
-# CEDAR-INSTITUTION: campus codes and default scope
-# Campus codes and the CEDAR-wide default scope.
+# CEDAR-PLATFORM: campus constants from institution/<id>/campuses.csv, and campus guards
+# The campus codes, their labels and the CEDAR-wide default scope come from the
+# institution's campuses.csv (read and validated here at load); the functions
+# below are the platform's campus guards. This file contains no campus code.
 #
 # UNM is not one campus. `cedar_students` carries ten campus codes, and roughly
 # 15% of enrollment rows come from branch campuses. 21% of courses are taught on
@@ -12,29 +14,30 @@
 # defined once rather than as a `c("ABQ", "EA")` literal in every filter bar,
 # which is how the app ends up with controls that quietly disagree.
 
-CEDAR_CAMPUS_MAIN   <- "ABQ"
-CEDAR_CAMPUS_ONLINE <- "EA"
+.cedar_campuses <- validate_campuses(read_institution_file("campuses"))
 
-# Branch campuses. GA/LA/TA/VA are the four named branches; the remainder are small codes that appear in the data
-# without a documented expansion, kept here so "branch" means the same thing
+# The one campus of kind main, and the online campus if the institution has one.
+CEDAR_CAMPUS_MAIN   <- .cedar_campuses$campus_code[.cedar_campuses$kind == "main"]
+CEDAR_CAMPUS_ONLINE <- .cedar_campuses$campus_code[.cedar_campuses$kind == "online"]
+
+# Branch campuses: every code of kind branch, including the ones that appear in
+# the data without a documented expansion, so "branch" means the same thing
 # everywhere it is tested.
-CEDAR_CAMPUS_BRANCH <- c("GA", "VA", "TA", "LA", "EW", "EF", "ELA", "TAQ")
+CEDAR_CAMPUS_BRANCH <- .cedar_campuses$campus_code[.cedar_campuses$kind == "branch"]
 
-# The default scope for a filter bar: main campus plus online. This is normally a
-# display scope, not a substitute for grouping. The named ABQ+EA enrollment-
-# projection market is a documented exception that retains delivery components.
-CEDAR_CAMPUS_DEFAULT <- c(CEDAR_CAMPUS_MAIN, CEDAR_CAMPUS_ONLINE)
+# The default scope for a filter bar (default_scope TRUE in the file; at UNM,
+# main campus plus online). This is normally a display scope, not a substitute
+# for grouping. The named ABQ+EA enrollment-projection market is a documented
+# exception that retains delivery components.
+CEDAR_CAMPUS_DEFAULT <- .cedar_campuses$campus_code[.cedar_campuses$default_scope]
 
-# Display labels for the codes whose expansion is documented. Codes absent from
-# this map fall back to the bare code rather than a guessed name.
-CEDAR_CAMPUS_LABELS <- c(
-  ABQ = "ABQ — Main",
-  EA  = "EA — Online",
-  GA  = "GA — Gallup",
-  LA  = "LA — Los Alamos",
-  TA  = "TA — Taos",
-  VA  = "VA — Valencia"
-)
+# Display labels for the codes whose expansion is documented (campus_name not
+# blank). Codes absent from this map fall back to the bare code rather than a
+# guessed name.
+CEDAR_CAMPUS_LABELS <- local({
+  named <- .cedar_campuses[nzchar(.cedar_campuses$campus_name), ]
+  stats::setNames(paste0(named$campus_code, " — ", named$campus_name), named$campus_code)
+})
 
 
 #' Campus choices for a selectInput, labelled where a label is known

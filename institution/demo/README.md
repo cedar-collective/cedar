@@ -10,6 +10,10 @@ and the colleges' `source_names` translate the fixtures' college groups
 (`ARTS`, `SOSC`, `STEM`, `BUS`, `NURS`, `EDU`, `POPH`). Columns and rules are
 the same as UNM's; see `institution/unm/README.md`.
 
+`campuses.csv` names the four campus codes the fixtures use (ABQ, EA, GA, VA)
+and `course_levels.csv` carries UNM's leading-digit bands, which the fixtures'
+course numbers follow.
+
 Every row is confirmed: the demo has no decisions waiting, so Admin > Mappings
 shows none. A fixture code with no row here would be listed there, as at any
 institution. `BUSA` is a program, not a pre-major: the fixtures flag a few BUSA

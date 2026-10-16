@@ -383,7 +383,7 @@ test_that("the campus table lists every defined code and any the data adds", {
   campuses <- build_campus_reference(t$sections, t$students)
   expect_equal(head(campuses$campus, 3), c("ABQ", "EA", "GA"))
   zz <- campuses[campuses$campus == "ZZ", ]
-  expect_equal(zz$group, "Not in campuses.R")                 # a code campuses.R lacks is shown
+  expect_equal(zz$group, "Not in campuses.csv")                 # a code campuses.R lacks is shown
   expect_true(is.na(zz$label))
   abq <- campuses[campuses$campus == "ABQ", ]
   expect_equal(c(abq$sections, abq$enrollments_taught, abq$enrollments_home), c(4L, 1L, 2L))
