@@ -465,38 +465,53 @@ architecture_error_handlers <- function(file) {
   text <- paste(readLines(file, warn = FALSE), collapse = "\n")
   starts <- gregexpr("error\\s*=\\s*function\\s*\\(\\s*[A-Za-z_.]*\\s*\\)", text)[[1]]
   if (length(starts) == 1L && starts[[1]] == -1L) return(character(0))
+  # Each result keeps its `error = function(<arg>)` prefix so the classifier
+  # can tell a handler that returns the condition itself from one returning
+  # a literal.
   vapply(starts, function(start) {
     rest <- substr(text, start, nchar(text))
-    after <- sub("^error\\s*=\\s*function\\s*\\([^)]*\\)\\s*", "", rest)
-    if (startsWith(after, "{")) {
+    prefix <- regmatches(rest, regexpr("^error\\s*=\\s*function\\s*\\([^)]*\\)\\s*", rest))
+    after <- substr(rest, nchar(prefix) + 1L, nchar(rest))
+    body <- if (startsWith(after, "{")) {
       depth <- 0L
       chars <- strsplit(after, "")[[1]]
+      end <- length(chars)
       for (i in seq_along(chars)) {
         if (chars[[i]] == "{") depth <- depth + 1L
         if (chars[[i]] == "}") {
           depth <- depth - 1L
-          if (depth == 0L) return(paste(chars[seq_len(i)], collapse = ""))
+          if (depth == 0L) { end <- i; break }
         }
       }
-      after
+      paste(chars[seq_len(end)], collapse = "")
     } else {
       sub("\n.*$", "", after)
     }
+    paste0(trimws(prefix), " ", body)
   }, character(1))
 }
 
 # A handler is a silent fallback when it hands the caller a value without
 # telling anyone. Showing the error (showNotification, the module helper
-# handle_error), re-raising it (stop), warning, or writing it to the log
-# (message, cedar_log_*) are not silent: someone can find out. A degenerate
+# handle_error), re-raising it (stop), warning, writing it to the log
+# (message, cedar_log_*), or handing the condition itself to the caller
+# (returning the error object or its conditionMessage, so the caller decides
+# and can say why) are not silent: someone can find out. A degenerate
 # statistic returning NA is the one sanctioned default.
 architecture_silent_fallback <- function(handler) {
-  body <- gsub("#[^\n]*", "", handler)
+  prefix <- "^error\\s*=\\s*function\\s*\\(\\s*([A-Za-z_.]*)\\s*\\)\\s*"
+  argument <- sub(paste0(prefix, ".*$"), "\\1", handler)
+  body <- gsub("#[^\n]*", "", sub(prefix, "", handler))
   reported <- paste0(
     "showNotification\\(|handle_error\\(|\\bstop\\(|\\bwarning\\(|",
-    "rlang::abort\\(|cli::cli_abort\\(|\\bmessage\\(|cedar_log[a-z_]*\\("
+    "rlang::abort\\(|cli::cli_abort\\(|\\bmessage\\(|cedar_log[a-z_]*\\(|",
+    "conditionMessage\\("
   )
   if (grepl(reported, body)) {
+    return(FALSE)
+  }
+  compact_body <- gsub("^\\{|\\}$|\\s+", "", body)
+  if (nzchar(argument) && identical(sub("\\)$", "", compact_body), argument)) {
     return(FALSE)
   }
   compact <- gsub("^\\{|\\}$|\\s+", "", body)
@@ -548,10 +563,6 @@ test_that("silent error fallbacks do not grow, and the backlog shrinks on record
   })
   # Measured 2026-10-16. Lower a number when you fix one; never raise one.
   allowance <- c(
-    "R/branches/data-edges.R" = 1L,
-    "R/branches/mapping-provenance.R" = 1L,
-    "R/features/enrollment-projection-refresh.R" = 2L,
-    "R/features/enrollment-projections.R" = 1L,
     "R/modules/dept-trends.R" = 1L,
     "R/modules/pathways.R" = 11L,
     "R/modules/regstats.R" = 1L,
@@ -560,7 +571,7 @@ test_that("silent error fallbacks do not grow, and the backlog shrinks on record
     "R/modules/waitlist.R" = 1L,
     "R/trunk/logging.R" = 7L,
     "global.R" = 1L,
-    "server.R" = 11L
+    "server.R" = 9L
   )
   architecture_expect_ratchet(measured, allowance, "silent fallback(s)")
 })

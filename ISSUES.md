@@ -1845,13 +1845,15 @@ rebuild now restarts the app so it serves them (I22).
 **M11 — Silent fallbacks.** *Enforced since 2026-10-16* by
 `tests/testthat/test-architecture.R` ("silent error fallbacks do not grow"):
 every `error = function(e)` handler that hands back a value without showing,
-re-raising, warning, or logging the error counts, and each file carries
-today's count as an allowance that may only go down. Measured: 40 across 13
-files — `R/modules/pathways.R` 11, `server.R` 11, `R/trunk/logging.R` 7,
-`R/features/enrollment-projection-refresh.R` 2, and one each in
-`R/branches/data-edges.R`, `R/branches/mapping-provenance.R`,
-`R/features/enrollment-projections.R`, `R/modules/dept-trends.R`,
-`regstats.R`, `seatfinder.R`, `ui-helpers.R`, `waitlist.R`, and `global.R`.
+re-raising, warning, logging, or propagating the error (returning the
+condition or its message to a caller that decides) counts, and each file
+carries today's count as an allowance that may only go down. Measured: 33
+across 9 files — `R/modules/pathways.R` 11, `server.R` 9, `R/trunk/logging.R`
+7, and one each in `R/modules/dept-trends.R`, `regstats.R`, `seatfinder.R`,
+`ui-helpers.R`, `waitlist.R`, and `global.R`. Nothing remains in the cones,
+branches, features, or data pipeline: `cedar_edge_note()` no longer drops its
+next-term sentence when `add_term()` fails (2026-10-16), and the git
+provenance capture logs why git was unavailable instead of saying nothing.
 The one in the data pipeline, where AGENTS.md calls it always a bug, was
 `build_lookups()` in `transform-to-cedar.R` reading the saved `cedar_lookups`
 inside a `tryCatch` that returned NULL, so an unreadable file silently left
