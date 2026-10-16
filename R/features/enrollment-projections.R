@@ -437,12 +437,9 @@ projection_axis_explanation <- function(stability, depth, accuracy,
                                         history_terms = NA_integer_,
                                         history_cv = NA_real_,
                                         history_median_yoy = NA_real_,
-                                        coverage_rate = NA_real_,
                                         term_type = NA_character_,
-                                        selection_basis = "All-term WAPE",
                                         pct_error_sd = NA_real_,
                                         capacity_constrained = FALSE,
-                                        selection_uses_uncensored = FALSE,
                                         n_capacity_reached = NA_integer_,
                                         n_capacity_unreached = NA_integer_,
                                         method_role = NA_character_,
@@ -451,9 +448,9 @@ projection_axis_explanation <- function(stability, depth, accuracy,
     length(stability), length(depth), length(accuracy),
     length(n_backtests), length(wape), length(history_terms),
     length(history_cv), length(history_median_yoy),
-    length(coverage_rate), length(term_type), length(selection_basis),
+    length(term_type),
     length(pct_error_sd), length(capacity_constrained),
-    length(selection_uses_uncensored), length(n_capacity_reached),
+    length(n_capacity_reached),
     length(n_capacity_unreached), length(method_role), length(methods_disagree)
   )
   stability <- rep_len(as.character(stability), size)
@@ -464,14 +461,9 @@ projection_axis_explanation <- function(stability, depth, accuracy,
   history_terms <- rep_len(as.integer(history_terms), size)
   history_cv <- rep_len(as.numeric(history_cv), size)
   history_median_yoy <- rep_len(as.numeric(history_median_yoy), size)
-  coverage_rate <- rep_len(as.numeric(coverage_rate), size)
   term_type <- rep_len(as.character(term_type), size)
-  selection_basis <- rep_len(as.character(selection_basis), size)
   pct_error_sd <- rep_len(as.numeric(pct_error_sd), size)
   capacity_constrained <- rep_len(as.logical(capacity_constrained), size)
-  selection_uses_uncensored <- rep_len(
-    as.logical(selection_uses_uncensored), size
-  )
   n_capacity_reached <- rep_len(as.integer(n_capacity_reached), size)
   n_capacity_unreached <- rep_len(as.integer(n_capacity_unreached), size)
   method_role <- rep_len(as.character(method_role), size)
@@ -481,16 +473,11 @@ projection_axis_explanation <- function(stability, depth, accuracy,
     n <- dplyr::coalesce(n_backtests[[i]], 0L)
     error <- wape[[i]]
     variation <- pct_error_sd[[i]]
-    coverage <- coverage_rate[[i]]
     season <- switch(
       term_type[[i]], spring = "Spring", summer = "Summer", fall = "Fall",
       "same-term-type"
     )
-    basis_suffix <- if (identical(selection_basis[[i]], "Unconstrained-term WAPE")) {
-      "WAPE (unconstrained terms)"
-    } else {
-      "WAPE (all terms)"
-    }
+    basis_suffix <- "WAPE"
 
     stability_text <- switch(
       stability[[i]],
@@ -526,7 +513,7 @@ projection_axis_explanation <- function(stability, depth, accuracy,
       depth[[i]],
       Deep = paste0(
         "Depth: ", n, " comparable ", season,
-        " aftcasts stand behind the selected method."
+        " aftcasts stand behind the selection rule."
       ),
       Moderate = paste0(
         "Depth: ", n, " comparable ", season,
@@ -537,13 +524,16 @@ projection_axis_explanation <- function(stability, depth, accuracy,
         " aftcast", if (n == 1L) "" else "s",
         ", so any accuracy figure rests on very little evidence."
       ),
-      "Depth: no comparable aftcast for the selected method."
+      "Depth: no comparable aftcast for the selection rule."
     )
 
+    # The accuracy figure is the realised error of the selection rule replayed
+    # at each past term with only earlier evidence, so it is an out-of-sample
+    # record rather than the fit of the winner on the terms that chose it.
     accuracy_text <- switch(
       accuracy[[i]],
       Close = paste0(
-        "Accuracy: aftcasts landed within ",
+        "Accuracy: rolling-selection aftcasts landed within ",
         scales::percent(error, accuracy = 0.1), " ", basis_suffix,
         if (is.finite(variation)) paste0(
           ", varying ", scales::percent(variation, accuracy = 0.1),
@@ -551,12 +541,12 @@ projection_axis_explanation <- function(stability, depth, accuracy,
         ) else "", "."
       ),
       Fair = paste0(
-        "Accuracy: aftcasts averaged ",
+        "Accuracy: rolling-selection aftcasts averaged ",
         scales::percent(error, accuracy = 0.1), " ", basis_suffix,
         " — usable for planning, not for a precise seat count."
       ),
       Poor = paste0(
-        "Accuracy: aftcasts averaged ",
+        "Accuracy: rolling-selection aftcasts averaged ",
         scales::percent(error, accuracy = 0.1), " ", basis_suffix,
         ". Treat this projection as a rough scale, not a number to schedule to."
       ),
@@ -567,30 +557,12 @@ projection_axis_explanation <- function(stability, depth, accuracy,
     if (isTRUE(capacity_constrained[[i]])) {
       reached <- dplyr::coalesce(n_capacity_reached[[i]], 0L)
       unreached <- dplyr::coalesce(n_capacity_unreached[[i]], 0L)
-      caveats <- c(caveats, if (isTRUE(selection_uses_uncensored[[i]])) {
-        paste0(
-          "Capacity caveat: ", reached,
-          " capacity-reached term(s) are excluded from this accuracy basis; ",
-          unreached, " unconstrained term(s) determine it."
-        )
-      } else {
-        paste0(
-          "Capacity caveat: ", reached, " of ", reached + unreached,
-          " capacity-observed aftcast term(s) reached the registration ceiling. ",
-          "Accuracy describes fit to observed enrollment, not proof of ",
-          "unconstrained demand."
-        )
-      })
-    }
-    if (identical(method_role[[i]], "anchored_upstream")) {
-      coverage_text <- if (is.finite(coverage)) paste0(
-        " with ", scales::percent(coverage, accuracy = 0.1),
-        " source coverage"
-      ) else ""
       caveats <- c(caveats, paste0(
-        "Upstream caveat: the selected method applies an observed upstream ",
-        "population change", coverage_text,
-        "; this is an observational planning relationship, not a causal estimate."
+        "Capacity caveat: census enrollment reached the scheduled seats in ",
+        reached, " of ", reached + unreached,
+        " capacity-observed aftcast term(s). ",
+        "Accuracy describes fit to observed enrollment, not proof of ",
+        "unconstrained demand."
       ))
     }
     if (isTRUE(methods_disagree[[i]])) {
@@ -608,28 +580,24 @@ projection_axis_explanation <- function(stability, depth, accuracy,
 projection_axis_brief <- function(stability, depth, accuracy,
                                   capacity_constrained = FALSE,
                                   methods_disagree = FALSE,
-                                  method_role = NA_character_,
-                                  coverage_rate = NA_real_) {
+                                  regime_alarm = FALSE) {
   size <- max(
     length(stability), length(depth), length(accuracy),
     length(capacity_constrained), length(methods_disagree),
-    length(method_role), length(coverage_rate)
+    length(regime_alarm)
   )
   stability <- rep_len(as.character(stability), size)
   depth <- rep_len(as.character(depth), size)
   accuracy <- rep_len(as.character(accuracy), size)
   capacity_constrained <- rep_len(as.logical(capacity_constrained), size)
   methods_disagree <- rep_len(as.logical(methods_disagree), size)
-  method_role <- rep_len(as.character(method_role), size)
-  coverage_rate <- rep_len(as.numeric(coverage_rate), size)
+  regime_alarm <- rep_len(as.logical(regime_alarm), size)
 
   vapply(seq_len(size), function(i) {
     qualifier <- dplyr::case_when(
+      isTRUE(regime_alarm[[i]]) ~ "regime check",
       isTRUE(capacity_constrained[[i]]) ~ "capacity-limited",
       isTRUE(methods_disagree[[i]]) ~ "methods differ",
-      identical(method_role[[i]], "anchored_upstream") &&
-        is.finite(coverage_rate[[i]]) && coverage_rate[[i]] < 0.60 ~
-        "limited upstream coverage",
       TRUE ~ NA_character_
     )
     parts <- c(
@@ -759,27 +727,30 @@ build_enrollment_projection_method_guide <- function(
     summary = sprintf(
       paste0(
         "%d candidates: %d historical baselines, %d diagnostic upstream ",
-        "indicators, and %d selectable anchored blends."
+        "indicators, and %d selectable anchored blend%s."
       ),
       n_candidates,
       family_count("observed_enrollment"),
       family_count("structural_demand"),
-      family_count("anchored_upstream")
+      family_count("anchored_upstream"),
+      if (family_count("anchored_upstream") == 1L) "" else "s"
     ),
     overview = sprintf(
       paste0(
-        "The %d labels represent %d underlying ideas. %d upstream signals ",
-        "appear twice: once raw for diagnosis and once as a 50/50 blend with ",
+        "The %d labels represent %d underlying ideas. %d signals ",
+        "appear twice: once raw and once as a 50/50 blend with ",
         "prior same-season enrollment."
       ),
       n_candidates, n_ideas, repeated_ideas
     ),
     selection_process = paste(
-      "CEDAR does not treat every row as an equal choice. It first identifies",
-      "the best observed-enrollment baseline and the best eligible anchored",
-      "candidate, then compares those two. Raw upstream indicators never win",
-      "directly. Anchored candidates must clear minimum aftcast, coverage, and",
-      "error requirements before they can compete."
+      "Prior same-season is the default for every course. Another candidate",
+      "replaces it only after beating it by a margin on earlier aftcast terms",
+      "the two share, and the rule is replayed at every past term with only",
+      "the evidence available then, so the accuracy shown is what that rule",
+      "would actually have delivered. Raw upstream indicators never win",
+      "directly, and the anchored candidate must clear aftcast, coverage, and",
+      "error gates before it can challenge."
     ),
     families = families
   )
@@ -800,27 +771,8 @@ build_enrollment_projection_view <- function(bundle, opt = list()) {
   depth <- depth[!is.na(depth) & nzchar(depth)]
   accuracy <- as.character(opt$accuracy %||% character(0))
   accuracy <- accuracy[!is.na(accuracy) & nzchar(accuracy)]
-  min_calibration_validation <- as.integer(
-    bundle$model_config$calibration_min_validation_terms %||% 2L
-  )
-
   projections <- bundle$projections %>%
     dplyr::filter(subject_course %in% .env$group_courses)
-  if (!"coverage_rate" %in% names(projections)) {
-    projections$coverage_rate <- rep(NA_real_, nrow(projections))
-  }
-  if (!"selection_pct_error_sd" %in% names(projections)) {
-    projections$selection_pct_error_sd <- rep(NA_real_, nrow(projections))
-  }
-  if (!"n_capacity_reached" %in% names(projections)) {
-    projections$n_capacity_reached <- rep(NA_integer_, nrow(projections))
-  }
-  if (!"method_role" %in% names(projections)) {
-    projections$method_role <- rep(NA_character_, nrow(projections))
-  }
-  if (!"methods_disagree" %in% names(projections)) {
-    projections$methods_disagree <- rep(FALSE, nrow(projections))
-  }
   if (length(departments) > 0L) {
     projections <- dplyr::filter(
       projections, department %in% .env$departments
@@ -843,31 +795,25 @@ build_enrollment_projection_view <- function(bundle, opt = list()) {
   projections <- projections %>%
     dplyr::arrange(department, subject_course) %>%
     dplyr::mutate(
-      bias_correction = projection_preview_bias_correction(
-        applied = dplyr::coalesce(calibration_applied, FALSE),
-        factor = calibration_factor,
-        adjustment = calibration_adjustment,
-        candidate = dplyr::coalesce(calibration_candidate, FALSE),
-        n_validation = n_calibrated_backtests,
-        reason = calibration_reason,
-        n_backtests = n_backtests,
-        min_validation = .env$min_calibration_validation
-      ),
-      aftcast_accuracy = dplyr::case_when(
-        dplyr::coalesce(selection_n_backtests, 0L) == 0L ~ "No aftcasts",
-        TRUE ~ paste0(
-          selection_n_backtests, " at ",
-          projection_preview_percent(selection_wape), " ", selection_basis
-        )
+      # Why this method is live: the default, or the challenger evidence that
+      # displaced it. The accuracy figures themselves live on the axes.
+      selection_evidence = dplyr::case_when(
+        method_id == "none" ~ "No applicable method",
+        is.finite(selection_common_n) ~ paste0(
+          "Beat prior same-season on ", selection_common_n,
+          " earlier shared aftcasts (",
+          projection_preview_percent(selection_challenger_wape), " vs ",
+          projection_preview_percent(selection_default_wape), ")"
+        ),
+        TRUE ~ "Default; no challenger beat it on earlier aftcasts"
       ),
       axis_explanation = projection_axis_explanation(
         stability, depth, accuracy, n_backtests, wape,
         history_terms = history_terms,
         history_cv = history_cv,
         history_median_yoy = history_median_yoy_change,
-        coverage_rate = coverage_rate,
-        term_type, selection_basis, selection_pct_error_sd,
-        capacity_constrained_history, selection_uses_uncensored,
+        term_type, selection_pct_error_sd,
+        capacity_constrained_history,
         n_capacity_reached, n_capacity_unreached, method_role,
         methods_disagree
       ),
@@ -875,9 +821,9 @@ build_enrollment_projection_view <- function(bundle, opt = list()) {
         stability, depth, accuracy,
         capacity_constrained = capacity_constrained_history,
         methods_disagree = methods_disagree,
-        method_role = method_role,
-        coverage_rate = coverage_rate
-      )
+        regime_alarm = dplyr::coalesce(adjusted_regime_alarm, FALSE)
+      ),
+      regime_alarm = dplyr::coalesce(adjusted_regime_alarm, FALSE)
     )
   selected_keys <- projections %>%
     dplyr::select(market_id, subject_course, term_type, target_term)
@@ -922,7 +868,7 @@ build_enrollment_projection_view <- function(bundle, opt = list()) {
       expected_census = projected_census_equivalent,
       planning_sections = recommended_sections,
       method = method_label,
-      aftcast_accuracy,
+      selection_evidence,
       stability,
       stability_reason,
       history_terms,
@@ -934,7 +880,7 @@ build_enrollment_projection_view <- function(bundle, opt = list()) {
       accuracy_reason,
       axis_brief,
       axis_explanation,
-      demand_signal,
+      regime_alarm,
       why_uncertain
     ) %>%
     dplyr::left_join(history_summary$data, by = "course") %>%
@@ -947,8 +893,8 @@ build_enrollment_projection_view <- function(bundle, opt = list()) {
       stability, stability_reason, depth, depth_reason,
       accuracy, accuracy_reason,
       dplyr::all_of(paste0("history_", 1:4)), planning_sections,
-      method, aftcast_accuracy,
-      axis_brief, axis_explanation, demand_signal, why_uncertain
+      method, selection_evidence,
+      axis_brief, axis_explanation, regime_alarm, why_uncertain
     )
 
   list(
@@ -1337,43 +1283,6 @@ projection_preview_percent <- function(x, signed = FALSE) {
 }
 
 
-projection_preview_bias_correction <- function(
-  applied, factor, adjustment, candidate, n_validation, reason, n_backtests,
-  min_validation = 2L
-) {
-  vapply(seq_along(applied), function(i) {
-    if (isTRUE(applied[[i]])) {
-      rounded_adjustment <- as.integer(round(adjustment[[i]]))
-      student_label <- if (abs(rounded_adjustment) == 1L) "student" else "students"
-      return(paste0(
-        "Applied x", format(round(factor[[i]], 3), nsmall = 3),
-        " (", sprintf("%+d", rounded_adjustment), " ", student_label, ")"
-      ))
-    }
-
-    validation_n <- n_validation[[i]]
-    if (isTRUE(candidate[[i]]) && is.finite(validation_n) &&
-        validation_n < min_validation) {
-      return(paste0(
-        "Pending validation: ", validation_n, "/", min_validation, " trials"
-      ))
-    }
-
-    row_reason <- reason[[i]]
-    if (!is.na(row_reason) && nzchar(row_reason)) {
-      row_reason <- paste0(
-        tolower(substr(row_reason, 1L, 1L)), substr(row_reason, 2L, nchar(row_reason))
-      )
-      return(paste0("Not applied: ", row_reason))
-    }
-    if (!is.finite(n_backtests[[i]]) || n_backtests[[i]] == 0L) {
-      return("Not assessed: no eligible aftcasts")
-    }
-    "Not applied: no validated correction"
-  }, character(1))
-}
-
-
 projection_preview_markdown_table <- function(data, right_align = character()) {
   if (nrow(data) == 0L) return(character(0))
   cells <- lapply(data, function(x) {
@@ -1413,9 +1322,6 @@ projection_preview_markdown_table <- function(data, right_align = character()) {
 
 format_enrollment_projection_preview <- function(bundle, courses = NULL) {
   validate_enrollment_projection_bundle(bundle)
-  min_calibration_validation <- as.integer(
-    bundle$model_config$calibration_min_validation_terms %||% 2L
-  )
   selected_courses <- if (is.null(courses)) {
     bundle$projections$subject_course
   } else {
@@ -1461,16 +1367,25 @@ format_enrollment_projection_preview <- function(bundle, courses = NULL) {
         accuracy %in% c("Unrated", "Poor") | stability == "Volatile",
         why_uncertain, "--"
       ),
-      Coupling = coupling_status,
-      `Bias correction` = projection_preview_bias_correction(
-        applied = dplyr::coalesce(calibration_applied, FALSE),
-        factor = calibration_factor,
-        adjustment = calibration_adjustment,
-        candidate = dplyr::coalesce(calibration_candidate, FALSE),
-        n_validation = n_calibrated_backtests,
-        reason = calibration_reason,
-        n_backtests = n_backtests,
-        min_validation = .env$min_calibration_validation
+      Spine = projection_preview_integer(observed_baseline),
+      Adjusted = projection_preview_integer(adjusted_projection),
+      Floor = dplyr::case_when(
+        adjusted_saturated_prior %in% TRUE & adjusted_floor_uplift > 0 ~
+          paste0("Saturated; +", round(adjusted_floor_uplift)),
+        adjusted_saturated_prior %in% TRUE ~ "Saturated; spine is a floor",
+        adjusted_saturated_prior %in% FALSE ~ "Not saturated",
+        TRUE ~ "Unknown"
+      ),
+      `Fall deltas` = dplyr::if_else(
+        adjusted_applicable %in% TRUE,
+        paste0(
+          "repeat ", sprintf("%+.0f", adjusted_delta_repeat), ", feeder ",
+          sprintf("%+.0f", adjusted_delta_feeder)
+        ),
+        "--"
+      ),
+      `Regime check` = dplyr::if_else(
+        adjusted_regime_alarm %in% TRUE, "Review", "--"
       ),
       Recommendation = recommendation
     )
@@ -1478,6 +1393,7 @@ format_enrollment_projection_preview <- function(bundle, courses = NULL) {
     dplyr::transmute(
       Course = subject_course,
       Term = history_term_label,
+      `Aftcast method` = dplyr::coalesce(aftcast_method_label, "--"),
       Aftcast = projection_preview_integer(aftcast_classlist_total),
       `Raw error` = projection_preview_percent(aftcast_pct_error, signed = TRUE),
       `Error assessment` = dplyr::case_when(
@@ -1492,7 +1408,7 @@ format_enrollment_projection_preview <- function(bundle, courses = NULL) {
       `Final / last day` = projection_preview_integer(actual_final_enrollment),
       Sections = projection_preview_integer(scheduled_sections),
       Capacity = projection_preview_integer(scheduled_capacity),
-      `Registration fill` = projection_preview_percent(registration_fill),
+      `Census fill` = projection_preview_percent(census_fill),
       `Capacity status` = dplyr::case_when(
         !capacity_usable ~ "No capacity",
         capacity_reached ~ "Reached",
@@ -1523,14 +1439,14 @@ format_enrollment_projection_preview <- function(bundle, courses = NULL) {
     current_table,
     right_align = c(
       "Class-list demand", "Expected census", "Aftcasts", "Raw WAPE",
-      "Uncensored WAPE", "Bias"
+      "Uncensored WAPE", "Bias", "Spine", "Adjusted"
     )
   )
   history_lines <- projection_preview_markdown_table(
     history_table,
     right_align = c(
       "First day / ever registered", "Census", "Final / last day",
-      "Sections", "Capacity", "Registration fill",
+      "Sections", "Capacity", "Census fill",
       "Aftcast", "Raw error"
     )
   )
@@ -1548,12 +1464,14 @@ format_enrollment_projection_preview <- function(bundle, courses = NULL) {
       history_lines,
     "",
     paste(
-      "Historical predictions are leakage-safe aftcasts of the current selected",
-      "method; they are not claims about a forecast published at that time."
+      "Historical predictions are leakage-safe aftcasts of the method the",
+      "rolling selection rule would have published that term; they are not",
+      "claims about a forecast published at that time."
     ),
     paste(
       "Capacity-bounded means overprojection cannot be measured because",
-      "registration reached capacity; it is not a claim of zero error."
+      "census enrollment reached scheduled capacity; it is not a claim of",
+      "zero error."
     )
   )
 }

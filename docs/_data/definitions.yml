@@ -536,8 +536,44 @@ definitions:
             functions: [get_true_waitlisted_rows, summarize_waitlist_demand]
 
   - id: enrollment-projection
-    current_version: "1.0.0"
+    current_version: "1.2.0"
     versions:
+      - version: "1.2.0"
+        title: Saved enrollment projections
+        summary: Saved Spring and Fall projections estimate first-day / ever-registered class-list demand for the pooled Albuquerque and online market as prior same-season demand, raised to a floor when that term was saturated and moved by Fall enrollment changes where they beat the plain baseline on earlier aftcasts; expected census applies historical retention and sizes planning sections.
+        population: Monitored course-market groups in the saved projection bundle.
+        unit: Course and target term in the pooled ABQ/EA market.
+        numerator: Prior same-season enrollment (the spine), or the spine plus a saturation floor (census plus true waitlist when census filled 90% or more of the seats) plus repeat and feeder deltas read from the term just finished, when that candidate beat the spine on at least three earlier shared aftcasts; planning sections convert expected census using the bundle's section-size assumptions.
+        denominator: Historical actual demand for error measures; expected section size for the planning-section conversion.
+        campus: ABQ and EA are pooled deliberately, not presented as separate campus forecasts.
+        time_window: The saved target term, as-of term, build timestamp, and historical evaluation windows are displayed from the bundle.
+        exclusions: Unmonitored courses and unsupported target seasons are outside this model. Shiny does not fit or select models during a session. Fall deltas use enrollments, never grades.
+        limitations:
+          - Stability, depth, and accuracy are reported as three separate axes; Unrated and None remain visible. Accuracy is the realised error of the selection rule replayed at each past term, so it is out of sample but still no guarantee of future coverage.
+          - A saturated prior term with no retained waitlist rows reports the spine as its own floor; class lists retain waitlist rows only from Summer 2026.
+          - The definition version describes the metric. The bundle's separate model_version and schema_version identify the actual calculation and artifact format.
+        guide: users/enrollment-projections
+        implementation:
+          - file: R/features/enrollment-projections.R
+            functions: [build_enrollment_projection_view, load_latest_enrollment_projection_bundle]
+      - version: "1.1.0"
+        title: Saved enrollment projections
+        summary: Saved Spring and Fall projections estimate first-day / ever-registered class-list demand for the pooled Albuquerque and online market; expected census applies historical retention, and planning sections are sized from expected census.
+        population: Monitored course-market groups in the saved projection bundle.
+        unit: Course and target term in the pooled ABQ/EA market.
+        numerator: Prior same-season enrollment unless another candidate beat it on earlier shared aftcasts (rolling selection); planning sections convert expected census using the bundle's section-size assumptions.
+        denominator: Historical actual demand for error measures; expected section size for the planning-section conversion.
+        campus: ABQ and EA are pooled deliberately, not presented as separate campus forecasts.
+        time_window: The saved target term, as-of term, build timestamp, and historical evaluation windows are displayed from the bundle.
+        exclusions: Unmonitored courses and unsupported target seasons are outside this model. Shiny does not fit or select models during a session.
+        limitations:
+          - Stability, depth, and accuracy are reported as three separate axes; Unrated and None remain visible. Accuracy is the realised error of the selection rule replayed at each past term, so it is out of sample but still no guarantee of future coverage.
+          - Capacity-bounded is judged on census occupancy, not ever-registered demand; a bias correction is disabled until the comparable history can validate one.
+          - The definition version describes the metric. The bundle's separate model_version and schema_version identify the actual calculation and artifact format.
+        guide: users/enrollment-projections
+        implementation:
+          - file: R/features/enrollment-projections.R
+            functions: [build_enrollment_projection_view, load_latest_enrollment_projection_bundle]
       - version: "1.0.0"
         title: Saved enrollment projections
         summary: Saved Spring projections estimate first-day / ever-registered class-list demand for the pooled Albuquerque and online market; expected census applies historical retention.

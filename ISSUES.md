@@ -29,6 +29,8 @@ recurrence is recognizable.
 
 | ID | Kind | Summary |
 |---|---|---|
+| [I26](#i26--projection-capacity-reached-was-judged-on-ever-registered-demand) | Defect | Projection "capacity reached" was judged on ever-registered demand: 72% of course-terms flagged full when census filled 17% (resolved) |
+| [I25](#i25--projection-method-selection-was-in-sample-and-lost-to-the-default) | Defect | Projection method selection was in-sample on two folds and lost to doing nothing; reported 13.7% WAPE, honest 16.5% (resolved) |
 | [I24](#i24--cis-demo-browser-run-intermittently-loses-the-app-at-open-seats) | Defect | CI's demo browser run intermittently loses the app at Open Seats (passes on rerun) |
 | [I23](#i23--student-ids-are-hashed-with-the-built-in-default-salt) | Defect | Student IDs are hashed with the built-in default salt: the salt protects nothing |
 | [I20](#i20--cedar_programs-holds-almost-no-branch-campus-students) | Defect | `cedar_programs` holds 1–3% of branch-campus students; branch program counts read near zero |
@@ -1676,6 +1678,89 @@ First, capture enough to tell: on failure, add to the diagnostics artifact the
 app container's `OOMKilled`, exit code and restart count (`docker inspect`),
 `docker stats --no-stream`, the runner's free memory, and the Shiny Server log
 files inside the container. Then fix what they show.
+
+---
+
+## I25 — Projection method selection was in-sample, and lost to the default
+
+**Status:** resolved 2026-10-16, model 0.19.0. `select_projection_methods()`
+now publishes prior same-season unless a challenger beat it by two WAPE points
+on at least three earlier shared aftcasts, replays that rule at every historical
+fold, and reports the realised error of what the rule would have picked.
+`test-enrollment-projections.R` holds a fixture whose in-sample winner fits 2%
+and whose honest record is 8%; the old code reports 2%. Two shared folds were
+tried first: on the rebuilt bundle the 26 challengers they admitted on the 2026
+fold scored 11.4% against the default's 8.2% on the same courses.
+**Found:** 2026-10-16, auditing the Spring 2027 bundle (model 0.18.0)
+**Severity:** high for the page's credibility — every Accuracy badge was a fit
+to the folds that chose the method, and the selection itself made projections
+worse than publishing last Spring's number.
+**Affects:** `R/branches/enrollment-projections.R` selection; every published
+`wape`, Depth and Accuracy axis, and prediction interval in both saved bundles.
+
+### What was wrong
+
+Nine candidates were ranked by WAPE on the folds every eligible method shared.
+The seasonal-trend candidate needs three prior Springs, so with a 2022 history
+floor the shared window was Spring 2025 and 2026 for 80 of 83 courses: the
+winner was chosen on two folds, then its WAPE on those two folds was reported
+as its accuracy. Measured on the bundle's own backtests:
+
+| Strategy | Folds | WAPE |
+|---|---:|---:|
+| Published selection, scored on the folds that chose it | 273 | 13.7% |
+| The same rule applied rolling (choose only from earlier folds) | 311 | 16.5% |
+| Prior same-season everywhere, no selection | 311 | 15.9% |
+
+Depth read "Deep" from the winner's four own folds while the choice rested on
+two. `forecasting-lessons.md` had already noted the problem for structural
+switching; the code did it for every row.
+
+### Reproduction
+
+Against the 0.18.0 Spring 2027 bundle, join `projections` to `backtests` on the
+selected method and pool `abs_error / actual_classlist_total`; then re-pick per
+fold using only earlier folds and pool again. The two figures above differ by
+2.8 points in the wrong direction.
+
+---
+
+## I26 — Projection "capacity reached" was judged on ever-registered demand
+
+**Status:** resolved 2026-10-16, model 0.19.0. `projection_capacity_metrics()`
+takes census occupancy (registered + late drops), or the students registered
+now for a target still filling. Planning sections and seat gaps are sized from
+`projected_census_equivalent` for the same reason.
+**Found:** 2026-10-16, auditing the Spring 2027 bundle (model 0.18.0)
+**Severity:** moderate — the flag fed the Capacity-bounded label, the capacity
+caveat, the demand signal, the five-point selection margin, and the pressure
+screen, all of which read seat churn as seat pressure.
+**Affects:** `add_projection_capacity_censoring()`,
+`build_projection_pressure_screen()`, `projection_capacity_context()`,
+`build_projection_recent_history()`, `add_projection_recommendations()`.
+
+### What was wrong
+
+`classlist_total >= scheduled_capacity` was the test. Ever-registered counts
+every student who ever held a seat, so a course whose seats turned over once
+reads as over capacity. On 284 Spring folds with usable capacity:
+
+| Measure vs scheduled seats | Median fill | Flagged "reached" |
+|---|---:|---:|
+| Ever-registered (the old test) | 105% | 72% |
+| Census | 94% | 17% |
+| Final enrollment | 86% | 6% |
+
+In 87 of the 284 "reached" folds, final fill was under 85%. The pressure screen
+passed all 72 non-forced courses on "chronic fill" alone, so it screened
+nothing. Sections were sized from the ever-registered headline, which runs 13%
+above census at the median: 596 sections recommended against 505 scheduled for
+the same courses, on a demand estimate only 5% above their capacity.
+
+### Reproduction
+
+From the 0.18.0 bundle's `backtests`, compare `mean(capacity_reached)` with
+`mean(actual_census >= scheduled_capacity)` on `seasonal_last` rows.
 
 ---
 

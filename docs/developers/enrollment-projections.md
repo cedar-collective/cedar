@@ -181,7 +181,7 @@ late drop wins over an early drop. This status priority makes the equations
 reconcile while preventing a section or modality change from becoming two units
 of demand. An unfamiliar non-waitlist status is retained in
 `other_non_waitlist` for audit rather than dropped or assumed to occupy a census
-seat. Projection WAPE, signed bias, calibration, and method selection all use
+seat. Projection WAPE, signed bias, and method selection all use
 `classlist_total`. Census and final enrollment are saved with each aftcast for
 historical lifecycle comparison, but they are not alternative scoring targets.
 
@@ -210,150 +210,105 @@ waitlist method against, so it cannot provide a defensible demand signal.
 
 ## Method Roles
 
-The page presents the registry as nine candidates but six underlying ideas:
-three observed-enrollment baselines, three raw upstream signals, and a fixed
-50/50 anchored version of each upstream signal. Raw upstream rows are diagnostic
-only. Selection compares the best observed baseline with the best anchored row
-that clears the evidence gates described below.
+Model 0.20.0 has two candidates and one idea: **seats needed is last year's
+number, corrected for what can actually be seen**.
+
+| Method | Role | What it is |
+|---|---|---|
+| Prior same-season | The spine, and the default | Last comparable season's class-list demand |
+| Prior same-season + floor + Fall deltas | Challenger | The spine, raised to a floor when that term was saturated, plus two deltas read from the term just finished |
 
 Reader-facing method descriptions live in
-`CEDAR_ENROLLMENT_PROJECTION_METHOD_GUIDE` beside the method and role registries
-in `R/lists/enrollment_projection_groups.R`. The Projections page generates its
-accordion from that catalog. Registry tests require a one-to-one method match so
-adding, removing, or renaming a method cannot silently leave the explanation
-behind.
+`CEDAR_ENROLLMENT_PROJECTION_METHOD_GUIDE` beside the registry in
+`R/lists/enrollment_projection_groups.R`; the page generates its accordion from
+that catalog and a registry test keeps the two in step.
 
-The candidate registry intentionally separates two analytical jobs:
+### Why this shape
 
-| Method | Role | Interpretation |
-|---|---|---|
-| Prior same-season | Observed enrollment | Last comparable season; the naive benchmark |
-| Seasonal median | Observed enrollment | Stable center of recent comparable seasons |
-| Seasonal trend | Observed enrollment | Linear trend across recent comparable seasons |
-| Spring population growth | Structural demand | Prior Spring matched cohort propagated by growth in all preceding-Fall students |
-| Spring cohort flow | Structural demand | Prior Spring course cohort propagated by preceding-Fall major/classification growth |
-| Feeder transitions | Structural demand | Student-level prior-course transitions, deduplicated across feeders |
+Two measurements on the 0.19.0 Spring 2027 bundle decided it (the full audit
+is in [Forecasting Lessons](forecasting-lessons.html)):
 
-Observed methods estimate the recorded class-list series. Structural methods ask
-whether the current student population implies more course taking than the
-recorded history alone suggests. They are not interchangeable targets.
+- **The error lives where the schedule moved.** Over 238 rolling aftcasts,
+  terms whose capacity held within 10% of the prior Spring aftcast at 6.1%
+  WAPE; terms with 10% or more seats added at 23% (enrollment followed the
+  seats, bias -22%); terms with seats cut at 39% (bias +38%). Seventy-seven
+  percent of all error sat in the moved-capacity terms. A same-season baseline
+  cannot see a schedule that has not been written, but it can see when the
+  previous one was full.
+- **A Spring roster is 86% continuing students, 7% new entrants, 5% repeaters
+  after a Fall DFW, 2% returners.** Last Spring's count already carries the
+  steady state of all four. Replacing the continuing block with population
+  times take-rate gained 0.6 points; the components only add information when
+  a Fall driver changed from the year before.
 
-The Spring cohort-flow model starts with the immediately prior Spring course
-roster. It looks up those students' major and classification in the preceding
-Fall, measures how each of those Fall population cells changed one year later,
-and applies empirically shrunk cell-growth ratios to the matched course cohort.
-Students in the baseline Spring course who were not present in the preceding
-Fall are carried forward as a separate component. This includes prior Spring
-entrants and returning-after-absence students without pretending that Fall
-population growth describes them.
+So the published number is the spine, moved only where something measurable
+moved: the prior term was clipped by its seats, the course's own Fall
+enrollment changed, or its feeders' Fall enrollment changed.
 
-The Spring population-growth model uses the same prior Spring matched and
-unmatched decomposition, but applies one growth ratio from all students in the
-preceding Fall instead of separate major/classification cells. It is a deliberate
-broad-population comparator. The bundle stores both methods' projections,
-aftcast counts, WAPE, and WAPE difference. `coupling_status` records whether the
-evidence favors `Broad population`, `Major/classification`, is `Mixed` within
-two WAPE points, or remains `Insufficient evidence`. This is saved evidence, not
-a UI-time model choice.
-
-The feeder model uses the maximum learned transition probability for a student
-appearing in multiple selected feeders, then adjusts for historical feeder
-coverage. No structural method uses frozen cumulative-credit fields.
-
-### Separate Spring and Fall Specifications
-
-The shared engine has season-specific candidates rather than one universal
-model. `spring_cohort_flow` is inapplicable to Fall and Summer targets. Its
-calculation is:
+### The adjusted candidate
 
 ```text
-projected matched cohort
-  = sum(prior Spring matched major/class count
-        x smoothed preceding-Fall population growth)
+seats needed = spine + floor uplift + repeat delta + feeder delta
 
-projected Spring class-list total
-  = projected matched cohort
-  + prior Spring unmatched count
+spine         prior same-season class-list total
+floor uplift  if census fill of that term >= 90% (the Regstats saturation
+              definition): max(0, census + waitlisted - spine); else 0
+repeat delta  (course enrollment in the preceding term
+               - same a year earlier) x repeat rate
+feeder delta  (distinct enrollment across the feeder set in the preceding term
+               - same a year earlier) x feeder rate
 ```
 
-The current Fall source includes all students appearing on class lists, including new
-Fall freshmen and transfers. Only students absent from that Fall need the
-unmatched component. The initial unmatched method is deliberately simple: carry
-forward the prior count. A separate Spring-entry model should be added only if
-blocked aftcasts show that the component is material, variable, and predictable.
+The rates are learned only from pairs (preceding term, following same-season
+term) that precede the target, over the last four such pairs and at least
+two. The repeat rate is the share of students in the course in the preceding
+term who were in it again the following same-season term. The feeder set is
+the up-to-eight courses whose preceding-term students most often took this
+course next (at least three transitions over at least two pairs), and the
+feeder rate is one pooled share across that set so a student in two feeders
+counts once. **Both deltas read enrollments, not grades**, because grades are
+not posted when the schedule is built; the rates embed the historical pass
+and repeat behaviour, and the same terms can be re-read once grades land.
 
-### What Fall ships as
+The waitlist in the floor is the canonical class-list true-waitlist count
+(`R/branches/waitlist-demand.R`), rolled up per market term. Class lists
+retain waitlist rows only from Summer 2026, so a saturated earlier term says
+"no waitlist rows retained" and the spine is itself the floor. The
+saturation test is `capacity_saturation_metrics()` from `R/branches/enrl.R`,
+the same function Regstats uses, so "saturated" means one thing in both
+places.
 
-Fall publishes from the same engine. `spring_population_growth` and
-`spring_cohort_flow` return a typed "applies only to Spring targets" candidate,
-which is the designed behavior: Fall demand includes incoming freshmen and
-transfers with no prior UNM record, exactly what a structural continuing-student
-model cannot reach, and the archived admissions/acceptance/NSO snapshots such a
-model needs are not retained. Observed-history methods absorb that cohort
-implicitly, because every prior Fall in the series already contains it.
+Beside a floor the bundle reports the market's **expansion response**: among
+same-season pairs before the target whose prior term was saturated and whose
+capacity then grew 10% or more, the median share of the added seats that
+filled (93% on the Spring 2027 build, 44 pairs). It is context for a reader
+deciding whether to add seats, not a multiplier, because the question is how
+many seats are needed rather than what a hypothetical expansion would fill.
 
-**The method set is decided by horizon, not by season.** The upstream-anchored
-and feeder methods read the population of the term immediately preceding the
-target. For a target one step past the settled edge that term is observed; for a
-target two steps out it is itself in the future, and every method depending on it
-returns "No feeder population in source term ...". Under the shipped policy the
-two targets are always one and two steps out, and which season holds which
-alternates through the year:
+A **regime check** flags any course whose own enrollment in the preceding term
+moved 25% or more from the year before. It does not change the number; it
+tells a reader to look (FDMA 2110 rebounded from 106 to 355 in Fall 2026 and
+the 0.18.0 engine published 106).
 
-| Settled edge | One step out (anchored methods available) | Two steps out (observed baselines only) |
+### What a Fall target gets
+
+The floor needs only the prior same-season term and applies to either season.
+The deltas read the term immediately before the target; two steps past the
+settled edge that term is unobserved, so a Fall bundle built from a Fall edge
+carries the spine and the floor and says "Preceding term ... is not observed
+yet" for the deltas. Which season holds which horizon alternates through the
+year:
+
+| Settled edge | One step out (deltas available) | Two steps out (spine and floor only) |
 |---|---|---|
 | a Fall term | next Spring | next Fall |
 | a Spring term | next Fall | next Spring |
 
-So a Fall bundle built from a Fall edge is **observed-baseline only**, and the
-same will be true of the Spring bundle once the edge advances to a Spring term.
-This is a property of the forecast horizon that was always in the engine; Fall
-made it visible.
-
-### Measured: Fall 2027 vs Spring 2027, both from data settled through Fall 2026
-
-The audit gating the first Fall publication (139-course `critical_courses`
-scope, `abq_ea_course_market`, model 0.18.0):
-
-| | Spring 2027 (1 step) | Fall 2027 (2 steps) |
-|---|---|---|
-| Published rows | 83 | 90 |
-| Candidates / backtests | 747 / 3546 | 810 / 3798 |
-| Selected: observed baselines | 45 | **90** |
-| Selected: upstream-anchored | 38 | **0** |
-| Median WAPE (selected) | 0.153 | **0.135** |
-| Mean / p90 WAPE | 0.187 / 0.356 | 0.185 / 0.396 |
-| Depth `Thin` | 12 | **25** |
-| Accuracy `Close` / `Poor` | 21 / 32 | 33 / 34 |
-| `demand_signal` other than "Not indicated" | 11 | **0** |
-
-Three findings worth carrying:
-
-1. **Fall accuracy is not worse.** On the 72 courses in both bundles the median
-   paired difference is -1.9 points in Fall's favour, and Fall is worse on 31 of
-   72. A two-step horizon with fewer methods did not cost accuracy here; the
-   observed baselines were already carrying most Spring rows.
-2. **Fall evidence is thinner, and says so.** `depth = Thin` doubles, because
-   fewer comparable aftcasts survive at the longer horizon. The axis reports it
-   per row; nothing is withheld.
-3. **A Fall bundle produces no structural demand signal at all.** "Possible
-   latent demand" and "Structural estimate uncorroborated" are derived by
-   comparing a structural estimate against the observed baseline. With no
-   applicable structural candidate there is nothing to compare, so every Fall row
-   reads "Not indicated". That is an absence of evidence, not evidence of no
-   latent demand, and must not be read as the latter.
-
-A structural Fall specification -- splitting the observed continuing population
-from the incoming cohort -- remains the eventual goal and needs retained
-admissions snapshots before it can be built. The two seasons share persistence,
-validation, and display contracts, not fitted formulas.
-
-**Both current targets are pre-schedule.** Spring 2027 and Fall 2027 alike carry
-`target_schedule_available = FALSE` for every row, because neither schedule
-exists yet in the DESR. Capacity-derived comparisons -- scheduled sections, fill,
-additional sections needed -- are then unavailable rather than zero, and the
-recommendation reads "Plan N section(s)". Read either bundle as demand evidence
-for schedule building, not as an audit against a schedule nobody has built.
+**Both current targets are pre-schedule.** Spring 2027 and Fall 2027 carry
+`target_schedule_available = FALSE` for every row, so capacity-derived
+comparisons are unavailable rather than zero and the recommendation reads
+"Plan N section(s)", or "Plan at least N section(s); prior term was saturated"
+when the floor applies.
 
 ## Capacity Censoring
 
@@ -371,16 +326,24 @@ CEDAR retains four accuracy views:
 | `capacity_censored_wape` | One-sided class-list error that does not penalize overprojection after registration reached capacity |
 | `uncensored_wape` | Class-list WAPE only on terms whose registrations remained below capacity |
 
-Historical registration capacity is marked reached when:
+Historical capacity is marked reached when census occupancy filled the seats:
 
 ```text
-classlist_total >= scheduled_capacity
+census_enrl >= scheduled_capacity          (census_enrl = registered + dr_late)
 ```
 
-This comparison deliberately ignores later census attrition. A course that
-filled during registration remains capacity reached even if many students
-dropped before day 15. Registrations above the nominal cap also remain capacity
-reached; overrides do not turn a bounded observation into an unbounded one.
+**It is deliberately not `classlist_total >= scheduled_capacity`.** The
+ever-registered total counts seat churn: every early drop freed a seat that
+someone else took, so it exceeds capacity whenever a course turns over. On the
+Spring 2027 audit it marked 72% of course-terms as capacity reached, while
+census marked 17% and final enrollment 6%, and in 87 of those 284 "reached"
+terms fewer than 85% of seats were still filled at the end. Every downstream
+reading of the flag (the Capacity-bounded label, the capacity caveat, the
+demand signal, the pressure screen's chronic-fill test) depends on it measuring
+real occupancy. For a target term still filling, which has no census, the
+students registered right now are its occupancy. Census above the nominal cap
+still counts as reached; overrides do not turn a bounded observation into an
+unbounded one.
 
 For a reached-capacity term, the observed class-list total is treated as a lower
 bound on demand. The one-sided scored projection is:
@@ -408,48 +371,20 @@ therefore CEDAR's operational historical ceiling signal, not a claim that the
 exact minute of constraint is known. Retained registration snapshots or usable
 waitlists would be required to measure blocked demand directly.
 
-## Anchored Upstream Evidence
+## Retired candidates
 
-CEDAR now evaluates fixed, leakage-safe upstream-anchored candidates. Each one
-puts 50% weight on the immediately prior same-term-type class-list enrollment
-and 50% on one upstream estimate: broad population change, major/classification
-cohort change, or feeder transitions. The fixed weight is a planning policy, not
-an estimated causal coefficient. It prevents an upstream estimate from fully
-overriding the latest course-specific level while allowing a changed source
-population to move a projection that would otherwise repeat a seat ceiling.
-
-The raw upstream candidates remain visible for diagnosis. They describe
-mechanisms with a plausible pathway into later course enrollment, but all are
-observational. Without an intervention, natural experiment, or identified
-causal design, CEDAR must not label their contribution a causal effect.
-
-Each published row instead carries:
-
-- the prior same-term-type enrollment anchor and best observed-enrollment comparator;
-- three fixed upstream-anchored candidates, when their source evidence is usable;
-- broad-population, Spring cohort-flow, and feeder estimates with all three
-  accuracy views;
-- the broad-versus-major/classification coupling label and WAPE difference;
-- recent usable and registration-capacity-reached term counts;
-- same-season enrollment slope;
-- evidence that enrollment followed a historical capacity increase;
-- a conservative demand-signal label and an explanation.
-
-`Possible latent demand` requires a structural estimate meaningfully above the
-seasonal baseline, at least two recent terms that reached registration capacity, and rising observed
-enrollment. Agreement by at least two structural methods produces a stronger label. A
-high structural estimate without capacity/growth corroboration is explicitly
-`Structural estimate uncorroborated`.
-
-A structural method can contribute to those labels only when it has at least
-three aftcasts, at least 40% cohort/feeder coverage, and no more than 20%
-class-list WAPE on either all observations or the unconstrained subset. A good
-cap-censored score alone never establishes credibility because an
-arbitrarily high estimate can fit a capped observation. Each method's
-credibility flag and the number of credible structural methods are saved.
-
-The selected projection describes a planning estimate of **class-list demand**.
-The demand signal remains separate corroborating evidence for human review.
+The registry once held nine candidates: three same-season baselines, a
+student-level feeder-transition estimator, two Spring population methods, and
+50/50 blends of each upstream signal with prior same-season. 0.19.0 retired the
+undamped trend (+11.7% bias), the feeder estimator (+35% bias) and its blend,
+and the population blend (a duplicate at correlation 1.000). 0.20.0 retired the
+seasonal median, the raw and blended preceding-term ratio, both Spring
+population methods and the anchored cohort blend: every one sat within 0.3 WAPE
+points of the spine or lost to it under rolling selection. The feeder idea
+survives as a delta, not a level estimator. The Spring cohort-cell preparation
+went with the population methods; `cohort_composition` stays because the
+growth scenario depends on it. The figures are in
+[Forecasting Lessons](forecasting-lessons.html).
 
 ## Aftcasting and Selection
 
@@ -463,25 +398,39 @@ separated `backtest_terms`, their readable labels, and `backtest_term_range`.
 Any UI showing WAPE must display this context at the row level; a percentage
 without its evaluated terms is not an interpretable accuracy claim.
 
-Selection first identifies the best observed-enrollment comparator and the best
-eligible upstream-anchored candidate. An anchored candidate needs at least three
-aftcasts, 40% source coverage, and selection WAPE no greater than 20%. It is
-preferred when its WAPE is no more than two percentage points worse than the
-observed comparator. In a mostly capacity-reached history, where copying the cap
-has an artificial advantage, the tolerance is five points.
+### Selection is rolling, and the published accuracy is out of sample
 
-When two or more eligible methods compete, their raw errors are rescored on the
-intersection of their aftcast target terms before ranking. Thus a method cannot
-win by having a private, easier evaluation window. If that shared window has too
-few terms, selection falls back to each method's own recorded evidence and says
-which basis it used.
+**Prior same-season is the default for every course.** A challenger replaces
+it for a target only when, on at least `selection_min_backtests` (3) earlier
+aftcast terms the two share, the challenger's WAPE was lower by at least
+`selection_challenger_margin` (two points). Three, not two: replayed on the
+0.19.0 Spring 2027 bundle with two shared folds, 26 challengers were live on
+the 2026 fold and scored 11.4% where the default scored 8.2% on the same
+courses; with three, the rule's realised record equals the default's.
 
-When a mostly capacity-reached history has at least two unconstrained aftcasts,
-selection uses `uncensored_wape` and its corresponding aftcast count. Otherwise
-selection uses ordinary all-term WAPE. Capacity limits qualify what the fit
-means; they do not automatically erase evidence that a method reproduces the
-observed enrollment series. Sparse rows fall back to the first applicable
-observed method and remain visible.
+**The same rule is replayed at every historical fold** with only the folds
+before it, and the accuracy published for a course (`n_backtests`, `wape`,
+the Depth and Accuracy axes, the prediction interval) is the realised error of
+the method the rule would have picked at each fold. The saved `backtests`
+carry `policy_selected`, and the recent-history table shows, for each past
+term, the method that would have been live then. The published row's
+`selection_common_n`, `selection_default_wape` and `selection_challenger_wape`
+record the evidence that made the current pick; a default pick has none.
+
+This replaced in-sample selection on 2026-10-16. The 0.18.0 engine chose the
+minimum-WAPE method on the folds all eligible methods shared, which the
+seasonal-trend candidate shrank to two terms for 80 of 83 courses, and then
+reported the winner's WAPE on those same folds. Measured on the Spring 2027
+bundle: the published picks scored 13.7% in-sample, the same rule replayed
+rolling scored 16.5%, and prior same-season alone scored 15.9%. A rule that
+cannot beat the default out of sample does not get to replace it, and a
+`selection_wape` that is lower than the rule could have delivered is not a
+number a reader should see. `tests/testthat/test-enrollment-projections.R`
+guards this with a fixture where the in-sample winner's fit is 2% and the
+honest record is 8%.
+
+Sparse rows (no prior same-season at all) fall back to the first applicable
+observed baseline and say so.
 
 ### Three axes, not one label
 
@@ -515,15 +464,15 @@ A `Volatile` rating is a finding, not a failure. A course whose enrollment
 swings 50% year to year is one where something is moving, and the swing is what
 deserves attention.
 
-**`depth` and `accuracy` read the selected method's own aftcast record**
-(`n_backtests`, `wape`) — never the common-fold columns
-(`selection_n_backtests`, `selection_wape`). The common-fold figures exist so
-competing methods are scored on the same terms, which is a fair-selection
-question, not a statement about how much evidence stands behind the winner.
-Conflating the two is what capped the retired label: the ladder compared a
-common-fold count that tops out at 2 against thresholds of 3 and 4 written for a
-per-method count that reaches 4, so Medium and High were unreachable for every
-course, no matter how accurate.
+**`depth` and `accuracy` read the rolling-selection record** (`n_backtests`,
+`wape` on the published row): how many folds the rule published and how far
+those published aftcasts missed. For a course where the default was never
+beaten that is prior same-season's own record; where a challenger took over it
+is the mixed record a reader would actually have lived through. Since 0.19.0
+`selection_wape` and `selection_n_backtests` are the same figures, so a row
+carries one accuracy number. (The retired single label failed in part by
+reading a common-fold count that topped out at 2 against thresholds written for
+a per-method count that reached 4, so Medium and High were unreachable.)
 
 `depth` is Deep at `depth_deep_min_aftcasts` (4) folds, Moderate at
 `depth_moderate_min_aftcasts` (3), Thin at 1-2, None at 0. `accuracy` is Close
@@ -536,22 +485,19 @@ inconsistent method is visible as such.
 **The axes are allowed to disagree, and usually do.** Deep evidence spans Close,
 Fair, and Poor accuracy; a Stable course may have Thin depth. The validator
 checks each axis against its own vocabulary separately, because a shared check
-would have to accept every value on every axis and would catch nothing. Method
-coverage still gates whether an upstream-anchored candidate is eligible, but it
-does not separately downgrade any axis.
+would have to accept every value on every axis and would catch nothing.
 
-Structural qualifications are reported beside, rather than folded invisibly
-into, these axes. A mostly capacity-reached history says that fit is to
-observed class-list enrollment and cannot validate latent demand. An
-upstream-anchored method reports source coverage and says that the relationship
-is observational, not causal. Material disagreement among candidate methods is
+Qualifications are reported beside, rather than folded invisibly into, these
+axes. A mostly capacity-reached history says that fit is to observed class-list
+enrollment and cannot validate latent demand. A regime check says the term just
+finished moved sharply. Material disagreement between the two candidates is
 also named. The summary table compresses this to a short phrase; the course
 spotlight preserves the full interpretation.
 Prediction intervals use the selected method's historical 80th-percentile
 absolute error. These are empirical planning intervals, not formal probabilistic
 confidence intervals.
 
-### Signed Error and Calibration
+### Signed error
 
 WAPE remains unsigned. It answers how far projections missed in aggregate and
 cannot honestly carry a plus or minus sign:
@@ -560,66 +506,25 @@ cannot honestly carry a plus or minus sign:
 WAPE = sum(abs(projected - actual)) / sum(actual)
 ```
 
-The companion `weighted_bias` records direction using the same denominator:
+The companion `weighted_bias` records direction using the same denominator.
+Each method row also stores the standard deviation of its term-level
+percentage errors, over- and underprediction rates, `direction_consistency`,
+and a readable `signed_error_history`. A row-level interface should show WAPE
+and bias together, followed by the exact aftcast terms.
 
-```text
-weighted_bias = sum(projected - actual) / sum(actual)
-```
-
-Positive bias means systematic overprojection; negative bias means
-underprojection. Each method row also stores the standard deviation of its
-term-level percentage errors, over- and underprediction rates,
-`direction_consistency`, and a readable `signed_error_history` such as
-`Spring 2023: +8.1%; Spring 2024: +7.4%`. Errors within one percentage point are
-neutral when direction consistency is calculated. A row-level interface should
-show WAPE and bias together, followed by the exact aftcast terms; WAPE alone
-cannot distinguish a correctable offset from an unstable model.
-
-Calibration is a guarded multiplicative adjustment, not an automatic bias
-subtraction. The proposed factor is:
-
-```text
-sum(actual classlist total) / sum(raw projected classlist total)
-```
-
-By default a course-method pair becomes a calibration candidate only with at
-least four eligible aftcasts, absolute weighted bias of at least 5%, at least
-75% of directional errors pointing the same way, and a factor between 0.75 and
-1.25. Historical calibrated aftcasts are strictly rolling: the factor for each
-target is fitted only on earlier targets. The current projection is adjusted
-only after at least two such rolling trials improve WAPE by at least one
-percentage point.
-
-Structural-demand and upstream-anchored methods have an additional censoring
-guard. Both factor fitting and rolling validation use only terms with usable
-capacity that did not reach the registration ceiling. Full terms may contain
-unmet demand, so they cannot teach or validate a downward correction to a
-major/classification, feeder, or anchored estimate. Observed-enrollment methods
-may use all terms because reproducing the observed class-list series is their
-stated job.
-
-The bundle always preserves `raw_projected_classlist_total` alongside the exact effective
-`calibrated_projected_classlist_total`, whole-student `projected_classlist_total`,
-`calibration_factor`, `calibration_adjustment`, validation metrics, and a
-human-readable reason. Method selection ranks the uncalibrated candidates using
-the capacity-aware accuracy basis above; calibration changes the selected
-method's current value only after its independent rolling check passes.
-
-The canonical preview labels this state `Bias correction`, never the ambiguous
-`Calibration: None`. An applied correction includes both its multiplier and
-whole-student adjustment, for example `Applied x0.912 (-42 students)`. Stable
-bias awaiting enough leakage-safe trials appears as
-`Pending validation: 0/2 trials`; other rows give the reason the correction was
-not applied. The displayed class-list demand is the corrected value when a
-correction has passed validation, while the bundle retains the raw value for
-audit.
+**Bias correction was retired in 0.20.0.** The rolling multiplicative
+calibration needed four training aftcasts plus two validation trials, and
+five comparable Springs never supplied them: zero rows were ever corrected.
+The floor and deltas correct the spine in the two places the audit found it
+wrong, which is a narrower and more defensible adjustment than a learned
+multiplier.
 
 ## Code Ownership
 
 | Layer | File | Responsibility |
 |---|---|---|
 | List | `R/lists/enrollment_projection_groups.R` | Course groups, method registry, schema/model versions |
-| Branch | `R/branches/enrollment-projections.R` | Inputs, methods, pressure, aftcasts, selection, demand context, persistence |
+| Branch | `R/branches/enrollment-projections.R` | Inputs, the spine and adjusted candidates, pressure, aftcasts, rolling selection, recommendation, persistence |
 | Cone | `R/cones/enrollment-projections.R` | One question: projection and section need for the screened scope |
 | Feature | `R/features/enrollment-projections.R` | Explicit-cutoff orchestration, Spring-only publisher guard, artifact loader, filtered reusable view payload, content fingerprints, model-source provenance, and canonical text preview |
 | Module | `R/modules/enrollment-projections.R` | Read-only Registration page over the saved feature payload |
@@ -631,14 +536,35 @@ recommendation pipeline.
 
 ## Saved Bundle
 
-Schema version 16 stores the named market, exact course and campus scopes,
+Schema 20 (model 0.20.0) has two candidates and no calibration columns. Each
+candidate row carries the model's audit fields (`spine`, `spine_term`,
+`saturated_prior`, `prior_census_fill`, `waitlisted_prior`, `floor_uplift`,
+`floor_basis`, `preceding_term`, `preceding_term_change`, `regime_alarm`,
+`delta_repeat`, `repeat_rate`, `delta_feeder`, `feeder_rate`,
+`feeder_courses`, `delta_basis`), and `validate_spine_rows()` rejects an
+adjusted row whose parts do not sum to its projection. Every published row
+carries the adjusted candidate's evidence as `adjusted_*` columns whichever
+candidate the rule selected, plus the expansion response and the floor and
+regime notes, so the detail can show them for every course. The inputs gain
+`waitlist_history`; `student_inputs$course_enrollments` returns for the
+deltas. Schema 19 (model 0.19.0) added `policy_selected` on `backtests`, the per-fold
+`aftcast_method_id` / `aftcast_method_label` on `recent_history`, the rolling
+selection evidence columns on `projections`, a `preceding_term_history` input,
+and renames the capacity columns to `capacity_fill` / `capacity_gap` (backtests)
+and `census_fill` / `census_capacity_gap` (recent history) because they now
+measure census occupancy. It drops `selection_uses_uncensored` and every
+`feeder_*` column. Published rows size `recommended_sections` and `seat_gap`
+from `projected_census_equivalent`, not the class-list headline: ever-registered
+runs about 13% above census at the median, and sizing from it had recommended
+596 sections against 505 scheduled for the same courses on a demand estimate
+only 5% above their capacity. Schema 16 and later store the named market, exact course and campus scopes,
 campus/part-term delivery components, metadata, source fingerprints, the full
 effective model configuration, the pressure screen, published projections,
 every current candidate, every aftcast row, method performance, and a normalized
 four-term `recent_history` audit table. Each audit row stores the actual
 first-day / ever-registered proxy, census enrollment, final/last-day enrollment,
-sections, capacity, registration fill, the current selected
-method's leakage-safe aftcast, calibration status, signed error, the
+sections, capacity, census fill, the aftcast the rolling rule would have
+published that term and which candidate it was, signed error, the
 capacity-censored flag and score, prior same-season enrollment/capacity changes,
 and a typed potential-miss explanation. Schema 16 also attaches the preceding
 term's all-campus university headcount, pooled projection-market headcount,
@@ -649,17 +575,12 @@ term; it is explicitly diagnostic and never enters a candidate formula. It is
 a recreated current-method aftcast, not a claim
 that CEDAR published that method in the historical term. Saving the effective
 configuration records defaults as well as caller overrides, including history
-floors, calibration thresholds, and factor bounds. Candidate rows mark the selected method and retain
-method role, applicability, evidence size, coverage, class-list WAPE,
-census-equivalent, cap-censored, and uncensored WAPE, signed bias and error history, raw and
-calibrated values, the calibration factor, and rolling validation evidence.
-They also retain typed Spring audit
-fields: baseline and source terms, baseline class-list total, matched and unmatched
-baseline counts, both projected contributions, source-population totals and
-growth, and the projection formula. The validator rejects a Spring row whose
-components do not reconcile or whose source terms do not precede its target. It
-also rejects a calibration whose raw value, factor, adjustment, and effective
-projection do not reconcile.
+floors and selection thresholds. Candidate rows mark the selected method and
+retain method role, applicability, evidence size, class-list WAPE,
+census-equivalent, cap-censored, and uncensored WAPE, signed bias and error
+history, and the spine / floor / delta audit fields listed above. The validator
+rejects an adjusted row whose components do not reconcile or whose spine term
+does not precede its target.
 
 The validator rejects cutoff/target inversions, rows outside the saved course,
 campus, or market scope, duplicate market rows, duplicate delivery components,
@@ -902,9 +823,12 @@ the live backlog remains in `ROADMAP.md`.
 - Structural estimates are signals, not identified latent-demand counts.
 - The class list has no registration timestamps, so capacity reached is an
   operational signal rather than a recovered peak-occupancy observation.
-- Method selection can be unstable with only two or three aftcasts; pooled or
-  hierarchical shrinkage should be evaluated before expanding the scope.
-- A damped seasonal trend or robust ensemble may improve class-list demand fit.
+- Method selection can be unstable with only two or three aftcasts; the rolling
+  rule limits the damage (a challenger needs two shared folds and a two-point
+  margin) but pooled or hierarchical shrinkage should be evaluated before
+  expanding the scope.
+- A robust ensemble of the observed baselines may improve class-list demand
+  fit; a damped trend was not tried after the undamped one was retired.
 - A censored count model is the principled next latent-demand candidate once
   the capacity contract is reliable.
 - Registration-pace models require retained historical snapshots; the current

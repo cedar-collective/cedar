@@ -1,3 +1,6 @@
+
+
+
 # Reusable enrollment-projection computations.
 #
 # This branch owns canonical inputs, pressure screening, candidate methods,
@@ -44,26 +47,8 @@ projection_course_group_market_id <- function(group_id) {
 }
 
 
-projection_max_finite <- function(x) {
-  finite <- x[is.finite(x)]
-  if (length(finite) == 0L) NA_real_ else max(finite)
-}
-
-
 enrollment_projection_model_config <- function(opt = list()) {
   defaults <- list(
-    seasonal_window = 4L,
-    seasonal_min_terms = 2L,
-    trend_window = 6L,
-    trend_min_terms = 3L,
-    transition_window = 5L,
-    transition_min_terms = 2L,
-    feeder_min_students = 3L,
-    feeder_max_courses = 8L,
-    transition_min_coverage = 0.10,
-    spring_source_min_population = 20L,
-    spring_source_min_coverage = 0.10,
-    spring_growth_prior_strength = 20,
     history_start_term = CEDAR_ENROLLMENT_PROJECTION_HISTORY_START_TERM,
     course_history_start_terms =
       CEDAR_ENROLLMENT_PROJECTION_COURSE_HISTORY_START_TERMS,
@@ -81,37 +66,52 @@ enrollment_projection_model_config <- function(opt = list()) {
     census_retention_min_terms = 2L,
     course_census_retention_min_terms =
       CEDAR_ENROLLMENT_PROJECTION_COURSE_RETENTION_MIN_TERMS,
-    calibration_min_terms = 4L,
-    calibration_min_abs_bias = 0.05,
-    calibration_min_direction_consistency = 0.75,
-    calibration_factor_bounds =
-      CEDAR_ENROLLMENT_PROJECTION_CALIBRATION_FACTOR_BOUNDS,
-    calibration_neutral_error = 0.01,
-    calibration_min_validation_terms = 2L,
-    calibration_min_wape_gain = 0.01,
-    selection_min_backtests = 2L,
-    uncensored_selection_min_backtests = 2L,
-    upstream_anchor_weight = 0.50,
-    upstream_tie_margin = 0.02,
-    upstream_capped_tie_margin = 0.05,
+    # Spine / floor / delta model (0.20.0).
+    #
+    # The spine is prior same-season class-list demand. The floor applies when
+    # that term was saturated by the Regstats definition (census fill at or
+    # above saturation_fill_threshold): demand is then at least census plus the
+    # distinct students left on the waitlist, because the observed count was
+    # clipped by the seats offered. The two deltas read the term immediately
+    # before the target -- the course's own enrollment change and its feeder
+    # courses' enrollment change -- each scaled by the share that historically
+    # carried into this course the following same-season term. Enrollment, not
+    # grades: grades are not posted when the schedule is built.
+    saturation_fill_threshold = 0.90,
+    delta_pairs_window = 4L,
+    delta_min_pairs = 2L,
+    feeder_max_courses = 8L,
+    feeder_min_students = 3L,
+    # Context, not a multiplier: among same-season pairs whose prior term was
+    # saturated and whose capacity grew by at least expansion_capacity_change,
+    # what share of the added seats filled. Needs expansion_min_pairs.
+    expansion_capacity_change = 0.10,
+    expansion_min_pairs = 5L,
+    regime_alarm_threshold = 0.25,
+    # Rolling selection: prior same-season is the default. A challenger
+    # replaces it for a target only when, on at least selection_min_backtests
+    # earlier aftcast terms both methods share, the challenger's WAPE was lower
+    # by at least selection_challenger_margin. The same rule is replayed at
+    # every historical fold, and the published accuracy is the error of the
+    # method the rule would have picked there -- never the error of the winner
+    # on the folds that crowned it. On the Spring 2027 audit (0.18.0) the
+    # in-sample winner scored 13.7% while the same rule applied rolling scored
+    # 16.5%, and prior same-season alone 15.9%.
+    #
+    # Three shared folds, not two. Replayed on the 0.19.0 Spring 2027 bundle
+    # with two, 26 challengers were live on the 2026 fold and scored 11.4%
+    # where the default scored 8.2% on the same courses; with three, the
+    # rule's record equals the default's (14.9%). Two folds still pick noise.
+    selection_min_backtests = 3L,
+    selection_challenger_margin = 0.02,
     capacity_constrained_share = 0.50,
-    # Three independent reader-facing axes replace the former single
-    # `confidence` label (2026-09-07). Each answers a different question and
-    # they are deliberately allowed to disagree:
-    #
-    #   stability — is this course predictable from its own history at all?
-    #               Measured with no model, from the comparable class-list
-    #               series. On the Spring 2027 build its coefficient of
-    #               variation correlates r = 0.69 with realised aftcast error,
-    #               and no course rated Stable was forecast poorly.
-    #   depth     — how much comparable aftcast evidence stands behind the
-    #               selected method, and how far back it reaches.
-    #   accuracy  — when we did aftcast this course, how close were we?
-    #
-    # The old ladder fused all three into one word, then gated it on
-    # `selection_n_backtests` (a common-fold count that tops out at 2 here)
-    # against thresholds written for a per-method fold count that reaches 4.
-    # Medium and High were unreachable for every course in the scope.
+    # Three independent reader-facing axes (2026-09-07):
+    #   stability -- is this course predictable from its own history at all?
+    #                Measured with no model, from the comparable class-list
+    #                series.
+    #   depth     -- how many rolling-selection aftcasts stand behind the
+    #                published row.
+    #   accuracy  -- how close those aftcasts landed.
     stability_stable_max_cv = 0.10,
     stability_moderate_max_cv = 0.25,
     stability_min_terms = 3L,
@@ -125,35 +125,27 @@ enrollment_projection_model_config <- function(opt = list()) {
     capacity_response_fraction = 0.50,
     demand_min_growth_per_year = 2,
     demand_min_growth_share = 0.02,
-    structural_min_backtests = 3L,
-    structural_min_coverage = 0.40,
-    structural_max_wape = 0.20,
     disagreement_threshold = 0.20,
-    demand_min_structural_gap = 10,
-    demand_min_structural_gap_share = 0.10,
     recommendation_min_seat_gap = 10
   )
   config <- utils::modifyList(defaults, opt)
-  bounds <- as.numeric(config$calibration_factor_bounds)
-  safety_bounds <- CEDAR_ENROLLMENT_PROJECTION_CALIBRATION_FACTOR_BOUNDS
-  if (length(bounds) != 2L || any(!is.finite(bounds)) ||
-      min(bounds) < min(safety_bounds) || max(bounds) > max(safety_bounds)) {
+  margin <- as.numeric(config$selection_challenger_margin)
+  if (length(margin) != 1L || !is.finite(margin) || margin < 0) {
     stop(
-      "[enrollment-projections.R] calibration_factor_bounds must stay within ",
-      paste(safety_bounds, collapse = " to "), ".",
+      "[enrollment-projections.R] selection_challenger_margin must be a non-negative number.",
       call. = FALSE
     )
   }
-  config$calibration_factor_bounds <- sort(bounds)
-  anchor_weight <- as.numeric(config$upstream_anchor_weight)
-  if (length(anchor_weight) != 1L || !is.finite(anchor_weight) ||
-      anchor_weight < 0 || anchor_weight > 1) {
+  config$selection_challenger_margin <- margin
+  saturation <- as.numeric(config$saturation_fill_threshold)
+  if (length(saturation) != 1L || !is.finite(saturation) || saturation <= 0 ||
+      saturation > 1.25) {
     stop(
-      "[enrollment-projections.R] upstream_anchor_weight must be between 0 and 1.",
+      "[enrollment-projections.R] saturation_fill_threshold must be a fill rate between 0 and 1.25.",
       call. = FALSE
     )
   }
-  config$upstream_anchor_weight <- anchor_weight
+  config$saturation_fill_threshold <- saturation
   history_start <- suppressWarnings(as.integer(config$history_start_term))
   if (length(history_start) != 1L || is.na(history_start)) {
     stop("[enrollment-projections.R] history_start_term must be one YYYYSS term.",
@@ -198,27 +190,40 @@ projection_require_columns <- function(data, required, caller) {
 }
 
 
-projection_registration_capacity_metrics <- function(
-    registrations, capacity, reached_threshold = 1) {
-  registrations <- as.numeric(registrations)
+# Occupancy against scheduled seats.
+#
+# `occupancy` is the count of students actually holding seats: census
+# enrollment (registered + late drops) for a finished term, or the students
+# registered right now for a term still filling. It is deliberately NOT the
+# ever-registered class-list total. Ever-registered counts seat churn -- every
+# early drop freed a seat someone else took -- so it exceeds capacity whenever a
+# course turns over. On the Spring 2027 audit it flagged 72% of course-terms as
+# capacity reached while census flagged 17% and final enrollment 6%, and in 87
+# of those 284 "reached" terms fewer than 85% of seats were still filled at the
+# end. Every downstream reading of capacity_reached (Capacity-bounded labels,
+# the capacity caveat, demand signals, the pressure screen) depends on this
+# measuring real occupancy.
+projection_capacity_metrics <- function(
+    occupancy, capacity, reached_threshold = 1) {
+  occupancy <- as.numeric(occupancy)
   capacity <- as.numeric(capacity)
-  registration_fill <- dplyr::if_else(
+  capacity_fill <- dplyr::if_else(
     is.finite(capacity) & capacity > 0,
-    registrations / capacity,
+    occupancy / capacity,
     NA_real_
   )
-  capacity_usable <- is.finite(registration_fill)
+  capacity_usable <- is.finite(capacity_fill)
 
   tibble::tibble(
-    registration_fill = registration_fill,
-    registration_capacity_gap = dplyr::if_else(
+    capacity_fill = capacity_fill,
+    capacity_gap = dplyr::if_else(
       capacity_usable,
-      capacity - registrations,
+      capacity - occupancy,
       NA_real_
     ),
     capacity_usable = capacity_usable,
     capacity_reached = capacity_usable &
-      registration_fill >= as.numeric(reached_threshold)
+      capacity_fill >= as.numeric(reached_threshold)
   )
 }
 
@@ -601,64 +606,6 @@ prepare_projection_delivery_components <- function(delivery_enrollment_history,
 }
 
 
-prepare_projection_spring_inputs <- function(student_terms, target_students) {
-  projection_require_columns(
-    student_terms,
-    c("student_id", "term", "major_code", "student_classification"),
-    "prepare_projection_spring_inputs() student_terms"
-  )
-  projection_require_columns(
-    target_students,
-    c("student_id", "term", "subject_course"),
-    "prepare_projection_spring_inputs() target_students"
-  )
-
-  source_populations <- student_terms %>%
-    dplyr::filter(term %% 100L == 80L) %>%
-    dplyr::count(
-      term, major_code, student_classification, name = "n_population"
-    )
-  spring_targets <- target_students %>%
-    dplyr::filter(term %% 100L == 10L) %>%
-    dplyr::transmute(
-      student_id, target_term = term, subject_course,
-      source_term = (term %/% 100L - 1L) * 100L + 80L
-    )
-  matched <- spring_targets %>%
-    dplyr::left_join(
-      student_terms %>%
-        dplyr::transmute(
-          student_id, source_term = term, major_code, student_classification
-        ),
-      by = c("student_id", "source_term")
-    ) %>%
-    dplyr::mutate(
-      source_matched = !is.na(major_code) & !is.na(student_classification)
-    )
-
-  list(
-    source_populations = source_populations,
-    cohort_cells = matched %>%
-      dplyr::filter(source_matched) %>%
-      dplyr::count(
-        subject_course, target_term, source_term,
-        major_code, student_classification,
-        name = "n_target_baseline"
-      ),
-    cohort_totals = matched %>%
-      # CAMPUS_ROLLUP: targets were deduplicated across the named market before
-      # this course-level matched/unmatched decomposition was prepared.
-      dplyr::group_by(subject_course, target_term, source_term) %>%
-      dplyr::summarise(
-        baseline_classlist_total = dplyr::n(),
-        matched_baseline = sum(source_matched),
-        unmatched_baseline = sum(!source_matched),
-        .groups = "drop"
-      )
-  )
-}
-
-
 # Baseline roster composition: who actually holds the seats the projection is
 # anchored on, counted by their SAME-TERM major and classification.
 #
@@ -817,7 +764,8 @@ prepare_projection_student_inputs <- function(students, target_courses,
     )
   }
 
-  # CAMPUS_ROLLUP: feeder membership is deduplicated across the declared market.
+  # CAMPUS_ROLLUP: course membership is deduplicated across the declared
+  # market; the feeder and repeat deltas read it per student-term-course.
   course_enrollments <- classlist_rows %>%
     dplyr::distinct(student_id, term, subject_course)
 
@@ -839,9 +787,8 @@ prepare_projection_student_inputs <- function(students, target_courses,
     )
 
   # CAMPUS_ROLLUP: a student taking the target in either delivery counts once.
-  target_students <- classlist_rows %>%
-    dplyr::filter(subject_course %in% .env$target_courses) %>%
-    dplyr::distinct(student_id, term, subject_course)
+  target_students <- course_enrollments %>%
+    dplyr::filter(subject_course %in% .env$target_courses)
 
   course_outcome_students <- classlist_rows %>%
     dplyr::filter(subject_course %in% .env$target_courses)
@@ -882,8 +829,6 @@ prepare_projection_student_inputs <- function(students, target_courses,
     dplyr::count(term, next_term, subject_course,
                  name = "dfw_next_term_repeaters")
 
-  spring <- prepare_projection_spring_inputs(student_terms, target_students)
-
   list(
     course_enrollments = course_enrollments,
     student_terms = student_terms,
@@ -891,9 +836,52 @@ prepare_projection_student_inputs <- function(students, target_courses,
     university_term_signals = university_term_signals,
     market_term_signals = market_term_signals,
     course_outcomes = course_outcomes,
-    course_repeat_pressure = course_repeat_pressure,
-    spring = spring
+    course_repeat_pressure = course_repeat_pressure
   )
+}
+
+
+# Distinct students left waiting on a course, per market term, by the canonical
+# class-list waitlist-demand rule (R/branches/waitlist-demand.R). Class lists
+# retain waitlist rows only from Summer 2026, so earlier terms report zero
+# rows here rather than zero demand; the floor says which.
+prepare_projection_waitlist_history <- function(students, courses, campuses,
+                                                market_id, through_term = NULL,
+                                                sections = NULL) {
+  projection_require_columns(
+    students,
+    c("student_id", "term", "campus", "subject_course",
+      "registration_status_code"),
+    "prepare_projection_waitlist_history()"
+  )
+  scoped <- students %>%
+    dplyr::ungroup() %>%
+    dplyr::filter(
+      campus %in% .env$campuses,
+      subject_course %in% .env$courses
+    ) %>%
+    dplyr::mutate(term = suppressWarnings(as.integer(as.character(term))))
+  if (!is.null(through_term) && length(through_term) > 0) {
+    scoped <- dplyr::filter(scoped, term <= as.integer(through_term[[1]]))
+  }
+  empty <- tibble::tibble(
+    market_id = character(), subject_course = character(), term = integer(),
+    waitlisted = integer()
+  )
+  if (nrow(scoped) == 0L) return(empty)
+
+  # CAMPUS_ROLLUP: the canonical rule removes anyone registered in the same
+  # course group; the market then counts each waiting student once across
+  # its pooled campuses.
+  get_true_waitlisted_rows(scoped, sections) %>%
+    dplyr::distinct(student_id, term, subject_course) %>%
+    dplyr::count(term, subject_course, name = "waitlisted") %>%
+    dplyr::mutate(
+      market_id = as.character(market_id),
+      waitlisted = as.integer(waitlisted),
+      .before = 1
+    ) %>%
+    dplyr::arrange(subject_course, term)
 }
 
 
@@ -948,6 +936,11 @@ prepare_enrollment_projection_inputs <- function(cl_enrls, sections, students,
   market_section_history <- prepare_projection_market_section_history(
     delivery_section_history, market_id = target_market_id
   )
+  # Every term of the market series, not just the comparable-season rows at or
+  # after the history floor. The Fall deltas read the term immediately before
+  # each target (Fall 2021 for Spring 2022), which the floor would drop. It is
+  # a source population, not an older target outcome.
+  preceding_term_history <- market_enrollment_history
   if (!is.null(history_start_term)) {
     delivery_enrollment_history <- projection_filter_history_window(
       delivery_enrollment_history, history_opt
@@ -967,6 +960,12 @@ prepare_enrollment_projection_inputs <- function(cl_enrls, sections, students,
 
   list(
     enrollment_history = market_enrollment_history,
+    preceding_term_history = preceding_term_history,
+    waitlist_history = prepare_projection_waitlist_history(
+      students, courses = target_courses, campuses = target_campuses,
+      market_id = target_market_id, through_term = enrollment_through_term,
+      sections = sections
+    ),
     target_registration_snapshot = prepare_projection_market_enrollment_history(
       students, courses = target_courses, campuses = target_campuses,
       market_id = target_market_id,
@@ -1072,22 +1071,37 @@ projection_linear_estimate <- function(values) {
 }
 
 
+projection_all_term_history_for_row <- function(history, row, before_term = NULL) {
+  result <- history %>%
+    dplyr::filter(
+      market_id == row$market_id,
+      subject_course == row$subject_course
+    )
+  if (!is.null(before_term)) result <- dplyr::filter(result, term < before_term)
+  dplyr::arrange(result, term)
+}
+
+
 projection_candidate <- function(method_id, estimate = NA_real_, applicable = FALSE,
                                  reason = "Insufficient evidence",
                                  n_history_terms = 0L, evidence_n = 0L,
-                                 coverage_rate = NA_real_, n_components = 0L,
+                                 n_components = 0L,
                                  component_summary = NA_character_,
-                                 baseline_term = NA_integer_,
-                                 prior_source_term = NA_integer_,
-                                 source_term = NA_integer_,
-                                 baseline_classlist_total = NA_real_,
-                                 matched_baseline = NA_real_,
-                                 unmatched_baseline = NA_real_,
-                                 matched_projection = NA_real_,
-                                 unmatched_projection = NA_real_,
-                                 source_population_previous = NA_real_,
-                                 source_population_current = NA_real_,
-                                 source_population_growth = NA_real_,
+                                 spine = NA_real_, spine_term = NA_integer_,
+                                 saturated_prior = NA,
+                                 prior_census_fill = NA_real_,
+                                 waitlisted_prior = NA_integer_,
+                                 floor_uplift = 0,
+                                 floor_basis = NA_character_,
+                                 preceding_term = NA_integer_,
+                                 preceding_term_enrollment = NA_real_,
+                                 preceding_term_change = NA_real_,
+                                 regime_alarm = NA,
+                                 delta_repeat = 0, repeat_rate = NA_real_,
+                                 delta_feeder = 0, feeder_rate = NA_real_,
+                                 feeder_courses = NA_character_,
+                                 feeder_change = NA_real_,
+                                 delta_basis = NA_character_,
                                  projection_formula = NA_character_) {
   tibble::tibble(
     method_id = method_id,
@@ -1103,20 +1117,26 @@ projection_candidate <- function(method_id, estimate = NA_real_, applicable = FA
     applicability_reason = as.character(reason),
     n_history_terms = as.integer(n_history_terms),
     evidence_n = as.integer(evidence_n),
-    coverage_rate = as.numeric(coverage_rate),
     n_components = as.integer(n_components),
     component_summary = as.character(component_summary),
-    baseline_term = as.integer(baseline_term),
-    prior_source_term = as.integer(prior_source_term),
-    source_term = as.integer(source_term),
-    baseline_classlist_total = as.numeric(baseline_classlist_total),
-    matched_baseline = as.numeric(matched_baseline),
-    unmatched_baseline = as.numeric(unmatched_baseline),
-    matched_projection = as.numeric(matched_projection),
-    unmatched_projection = as.numeric(unmatched_projection),
-    source_population_previous = as.numeric(source_population_previous),
-    source_population_current = as.numeric(source_population_current),
-    source_population_growth = as.numeric(source_population_growth),
+    spine = as.numeric(spine),
+    spine_term = as.integer(spine_term),
+    saturated_prior = as.logical(saturated_prior),
+    prior_census_fill = as.numeric(prior_census_fill),
+    waitlisted_prior = as.integer(waitlisted_prior),
+    floor_uplift = as.numeric(floor_uplift),
+    floor_basis = as.character(floor_basis),
+    preceding_term = as.integer(preceding_term),
+    preceding_term_enrollment = as.numeric(preceding_term_enrollment),
+    preceding_term_change = as.numeric(preceding_term_change),
+    regime_alarm = as.logical(regime_alarm),
+    delta_repeat = as.numeric(delta_repeat),
+    repeat_rate = as.numeric(repeat_rate),
+    delta_feeder = as.numeric(delta_feeder),
+    feeder_rate = as.numeric(feeder_rate),
+    feeder_courses = as.character(feeder_courses),
+    feeder_change = as.numeric(feeder_change),
+    delta_basis = as.character(delta_basis),
     projection_formula = as.character(projection_formula)
   )
 }
@@ -1141,485 +1161,319 @@ project_seasonal_last <- function(history, row, target_term, opt = list()) {
     evidence_n = prior$classlist_total[[1]],
     component_summary = paste(
       prior$term[[1]], prior$classlist_total[[1]], sep = ":"
-    )
+    ),
+    spine = prior$classlist_total[[1]],
+    spine_term = as.integer(prior$term[[1]]),
+    projection_formula = "prior same-season class-list total"
   )
 }
 
 
-project_seasonal_median <- function(history, row, target_term, opt = list()) {
-  window <- as.integer(opt$seasonal_window %||% 4L)
-  min_terms <- as.integer(opt$seasonal_min_terms %||% 2L)
-  prior <- projection_history_for_row(history, row, before_term = target_term) %>%
-    dplyr::slice_tail(n = window)
+# ---- The spine / floor / delta model ------------------------------------------
+#
+# seats needed = spine + floor uplift + repeat delta + feeder delta
+#
+#   spine          prior same-season class-list demand (the default itself)
+#   floor uplift   if that term was saturated (census fill >= 90%, the Regstats
+#                  definition), demand is at least census + students left on
+#                  the waitlist; the uplift is that floor minus the spine
+#   repeat delta   change in the course's own enrollment in the term just
+#                  finished, times the share of those students who historically
+#                  took the course again the following same-season term
+#   feeder delta   change in distinct enrollment across the course's feeder
+#                  courses in the term just finished, times the share of feeder
+#                  students who historically took the course next term
+#
+# Why this shape: 77% of the Spring 2027 aftcast error sat in terms where the
+# schedule moved, and the Spring roster decomposes into 86% continuing
+# students, 7% new entrants, 5% repeaters after a Fall DFW, 2% returners. The
+# spine already carries the steady state of all four; the adjustments move it
+# only where a Fall driver measurably changed or where the prior count was
+# clipped by the seats offered. Grades are not posted when the schedule is
+# built, so both deltas read enrollments; the rates they are scaled by embed
+# the historical pass and repeat behaviour.
 
-  if (nrow(prior) < min_terms) {
-    return(projection_candidate(
-      "seasonal_median", reason = paste("Needs", min_terms, "same-season terms"),
-      n_history_terms = nrow(prior), evidence_n = sum(prior$classlist_total)
-    ))
-  }
-
-  projection_candidate(
-    "seasonal_median",
-    estimate = stats::median(prior$classlist_total, na.rm = TRUE),
-    applicable = TRUE,
-    reason = paste("Median of", nrow(prior), "prior", row$term_type, "terms"),
-    n_history_terms = nrow(prior),
-    evidence_n = sum(prior$classlist_total, na.rm = TRUE),
-    component_summary = paste(
-      prior$term, prior$classlist_total, sep = ":", collapse = ", "
-    )
+projection_spine_floor <- function(spine_row, section_history, waitlist_history,
+                                   row, opt = list()) {
+  threshold <- as.numeric(opt$saturation_fill_threshold %||% 0.90)
+  spine_term <- as.integer(spine_row$term[[1]])
+  spine <- spine_row$classlist_total[[1]]
+  capacity <- projection_section_history_for_row(section_history, row) %>%
+    dplyr::filter(term == spine_term) %>%
+    dplyr::slice_head(n = 1)
+  capacity_value <- if (nrow(capacity) == 0) NA_real_ else
+    capacity$scheduled_capacity[[1]]
+  saturation <- capacity_saturation_metrics(
+    spine_row$census_enrl[[1]], capacity_value,
+    constrained_threshold = threshold
   )
-}
-
-
-project_seasonal_trend <- function(history, row, target_term, opt = list()) {
-  window <- as.integer(opt$trend_window %||% 6L)
-  min_terms <- as.integer(opt$trend_min_terms %||% 3L)
-  prior <- projection_history_for_row(history, row, before_term = target_term) %>%
-    dplyr::slice_tail(n = window)
-
-  estimate <- projection_linear_estimate(prior$classlist_total)
-  if (nrow(prior) < min_terms || !is.finite(estimate)) {
-    return(projection_candidate(
-      "seasonal_trend", reason = paste("Needs", min_terms, "same-season terms"),
-      n_history_terms = nrow(prior), evidence_n = sum(prior$classlist_total)
-    ))
-  }
-
-  projection_candidate(
-    "seasonal_trend",
-    estimate = estimate,
-    applicable = TRUE,
-    reason = paste("Linear trend over", nrow(prior), "prior", row$term_type, "terms"),
-    n_history_terms = nrow(prior),
-    evidence_n = sum(prior$classlist_total, na.rm = TRUE),
-    component_summary = paste(
-      prior$term, prior$classlist_total, sep = ":", collapse = ", "
-    )
-  )
-}
-
-
-projection_training_term_map <- function(history, row, target_term, opt = list()) {
-  window <- as.integer(opt$transition_window %||% 5L)
-  incl_summer <- isTRUE(opt$summer)
-  terms <- projection_history_for_row(history, row, before_term = target_term) %>%
-    dplyr::slice_tail(n = window) %>%
-    dplyr::pull(term)
-
-  tibble::tibble(
-    target_term = as.integer(terms),
-    source_term = vapply(
-      terms,
-      function(x) subtract_term(x, summer = incl_summer),
-      integer(1)
-    )
-  )
-}
-
-
-projection_target_students_for_row <- function(target_students, row, terms) {
-  target_students %>%
+  waiting <- waitlist_history %>%
     dplyr::filter(
-      subject_course == row$subject_course,
-      term %in% .env$terms
-    ) %>%
-    dplyr::transmute(student_id, target_term = term) %>%
-    dplyr::distinct()
+      market_id == row$market_id, subject_course == row$subject_course,
+      term == spine_term
+    )
+  waitlisted <- if (nrow(waiting) == 0) 0L else as.integer(waiting$waitlisted[[1]])
+  saturated <- isTRUE(saturation$capacity_constrained[[1]])
+
+  if (!isTRUE(saturation$capacity_usable[[1]])) {
+    return(list(
+      saturated = NA, fill = saturation$census_fill[[1]], waitlisted = waitlisted,
+      uplift = 0,
+      basis = paste("No usable capacity for", fmt_term(spine_term),
+                    "so saturation cannot be judged")
+    ))
+  }
+  if (!saturated) {
+    return(list(
+      saturated = FALSE, fill = saturation$census_fill[[1]],
+      waitlisted = waitlisted, uplift = 0,
+      basis = paste0(
+        fmt_term(spine_term), " was not saturated (census fill ",
+        scales::percent(saturation$census_fill[[1]], accuracy = 0.1), ")"
+      )
+    ))
+  }
+  floor_demand <- spine_row$census_enrl[[1]] + waitlisted
+  uplift <- max(0, floor_demand - spine)
+  list(
+    saturated = TRUE, fill = saturation$census_fill[[1]], waitlisted = waitlisted,
+    uplift = uplift,
+    basis = paste0(
+      fmt_term(spine_term), " was saturated (census fill ",
+      scales::percent(saturation$census_fill[[1]], accuracy = 0.1), "); ",
+      if (waitlisted > 0) {
+        paste0("floor is census + ", waitlisted, " waitlisted = ",
+               round(floor_demand))
+      } else {
+        "no waitlist rows retained for that term, so the floor is the spine itself"
+      }
+    )
+  )
 }
 
 
-project_from_feeders <- function(history, student_inputs, row, target_term,
-                                 opt = list()) {
-  term_map <- projection_training_term_map(history, row, target_term, opt)
-  min_terms <- as.integer(opt$transition_min_terms %||% 2L)
-  min_students <- as.integer(opt$feeder_min_students %||% 3L)
+# Historical carry-through rates for the two deltas, learned only from pairs
+# (preceding term p, following same-season term s) with s before the target.
+projection_delta_rates <- function(student_inputs, row, target_term,
+                                   opt = list()) {
+  window <- as.integer(opt$delta_pairs_window %||% 4L)
+  min_pairs <- as.integer(opt$delta_min_pairs %||% 2L)
   max_feeders <- as.integer(opt$feeder_max_courses %||% 8L)
-  min_coverage <- as.numeric(opt$transition_min_coverage %||% 0.10)
-
-  if (nrow(term_map) < min_terms) {
-    return(projection_candidate(
-      "feeder", reason = paste("Needs", min_terms, "historical transitions"),
-      n_history_terms = nrow(term_map)
-    ))
+  min_students <- as.integer(opt$feeder_min_students %||% 3L)
+  course <- row$subject_course
+  enrollments <- student_inputs$course_enrollments
+  targets <- student_inputs$target_students %>%
+    dplyr::filter(subject_course == course)
+  empty <- list(
+    n_pairs = 0L, repeat_rate = NA_real_, feeder_rate = NA_real_,
+    feeders = character(0), pairs = integer(0)
+  )
+  if (is.null(enrollments) || nrow(enrollments) == 0L || nrow(targets) == 0L) {
+    return(empty)
   }
 
-  targets <- projection_target_students_for_row(
-    student_inputs$target_students, row, term_map$target_term
-  )
-  sources <- student_inputs$course_enrollments %>%
-    dplyr::filter(term %in% term_map$source_term) %>%
-    dplyr::inner_join(term_map, by = c("term" = "source_term")) %>%
-    dplyr::transmute(student_id, target_term, source_course = subject_course) %>%
-    dplyr::filter(source_course != row$subject_course) %>%
+  season_terms <- targets %>%
+    dplyr::filter(term < target_term,
+                  vapply(term, get_term_type, character(1)) == row$term_type) %>%
+    dplyr::distinct(term) %>%
+    dplyr::arrange(term) %>%
+    dplyr::pull(term)
+  season_terms <- utils::tail(season_terms, window)
+  pairs <- tibble::tibble(
+    following = as.integer(season_terms),
+    preceding = vapply(season_terms, subtract_term, integer(1), summer = FALSE)
+  ) %>%
+    dplyr::filter(preceding %in% enrollments$term)
+  if (nrow(pairs) < min_pairs) return(utils::modifyList(empty, list(n_pairs = nrow(pairs))))
+
+  preceding_rows <- enrollments %>%
+    dplyr::inner_join(pairs, by = c("term" = "preceding"))
+  following_rows <- targets %>%
+    dplyr::inner_join(pairs, by = c("term" = "following")) %>%
+    dplyr::transmute(student_id, following = term, took_next = TRUE) %>%
     dplyr::distinct()
 
-  if (nrow(targets) == 0 || nrow(sources) == 0) {
-    return(projection_candidate(
-      "feeder", reason = "No historical source-to-target student pairs",
-      n_history_terms = nrow(term_map)
-    ))
-  }
+  # Repeat rate: students in the course in p who are in it again in s.
+  in_course <- preceding_rows %>%
+    dplyr::filter(subject_course == course) %>%
+    dplyr::distinct(student_id, following) %>%
+    dplyr::left_join(following_rows, by = c("student_id", "following"))
+  repeat_rate <- if (nrow(in_course) == 0L) NA_real_ else
+    mean(dplyr::coalesce(in_course$took_next, FALSE))
 
-  feeder_rates <- sources %>%
-    dplyr::count(source_course, name = "n_source") %>%
-    dplyr::left_join(
-      sources %>%
-        dplyr::inner_join(targets, by = c("student_id", "target_term")) %>%
-        dplyr::group_by(source_course) %>%
-        dplyr::summarise(
-          n_transition = dplyr::n(),
-          n_terms = dplyr::n_distinct(target_term),
-          .groups = "drop"
-        ),
-      by = "source_course"
-    ) %>%
-    dplyr::mutate(
-      n_transition = dplyr::coalesce(n_transition, 0L),
-      n_terms = dplyr::coalesce(n_terms, 0L),
-      transition_rate = n_transition / n_source
-    ) %>%
-    dplyr::filter(n_transition >= min_students, n_terms >= min_terms) %>%
-    dplyr::arrange(dplyr::desc(n_transition), dplyr::desc(transition_rate)) %>%
-    dplyr::slice_head(n = max_feeders)
-
-  if (nrow(feeder_rates) == 0) {
-    return(projection_candidate(
-      "feeder", reason = "No feeder course met the evidence threshold",
-      n_history_terms = nrow(term_map)
-    ))
-  }
-
-  selected_sources <- sources %>%
-    dplyr::filter(source_course %in% feeder_rates$source_course)
-  captured <- targets %>%
-    dplyr::semi_join(selected_sources, by = c("student_id", "target_term"))
-  coverage <- nrow(captured) / nrow(targets)
-  if (!is.finite(coverage) || coverage < min_coverage) {
-    return(projection_candidate(
-      "feeder",
-      reason = paste0("Selected feeders cover only ", round(100 * coverage, 1), "% of targets"),
-      n_history_terms = nrow(term_map),
-      evidence_n = sum(feeder_rates$n_transition),
-      coverage_rate = coverage,
-      n_components = nrow(feeder_rates)
-    ))
-  }
-
-  source_term <- subtract_term(target_term, summer = isTRUE(opt$summer))
-  current <- student_inputs$course_enrollments %>%
-    dplyr::filter(
-      term == source_term,
-      subject_course %in% feeder_rates$source_course
-    ) %>%
-    dplyr::inner_join(
-      dplyr::select(feeder_rates, source_course, transition_rate),
-      by = c("subject_course" = "source_course")
-    ) %>%
-    dplyr::group_by(student_id) %>%
+  # Feeders: the courses whose p students most often took this course in s,
+  # excluding the course itself. Then one pooled rate across the feeder set so
+  # a student in two feeders counts once.
+  # CAMPUS_ROLLUP: course_enrollments is already deduplicated across the named
+  # planning market, so a feeder is counted once per student whichever campus
+  # delivered it; a campus split here would double-count cross-campus students.
+  transitions <- preceding_rows %>%
+    dplyr::filter(subject_course != course) %>%
+    dplyr::distinct(student_id, following, subject_course) %>%
+    dplyr::inner_join(following_rows, by = c("student_id", "following")) %>%
+    dplyr::group_by(subject_course) %>%
     dplyr::summarise(
-      student_probability = projection_max_finite(transition_rate),
+      n_transition = dplyr::n(), n_pairs = dplyr::n_distinct(following),
       .groups = "drop"
     ) %>%
-    # A student with no finite learned rate cannot contribute probability.
-    # Failing here prevents an all-missing group from becoming -Inf and relying
-    # on a later validator to rescue an invalid intermediate estimate.
-    dplyr::filter(is.finite(student_probability))
-
-  if (nrow(current) == 0) {
-    return(projection_candidate(
-      "feeder", reason = paste("No feeder population in source term", source_term),
-      n_history_terms = nrow(term_map), coverage_rate = coverage,
-      n_components = nrow(feeder_rates)
-    ))
+    dplyr::filter(n_transition >= min_students, n_pairs >= min_pairs) %>%
+    dplyr::arrange(dplyr::desc(n_transition), subject_course) %>%
+    dplyr::slice_head(n = max_feeders)
+  feeders <- transitions$subject_course
+  feeder_rate <- if (length(feeders) == 0L) NA_real_ else {
+    pool <- preceding_rows %>%
+      dplyr::filter(subject_course %in% feeders) %>%
+      dplyr::distinct(student_id, following) %>%
+      dplyr::left_join(following_rows, by = c("student_id", "following"))
+    mean(dplyr::coalesce(pool$took_next, FALSE))
   }
 
-  top <- feeder_rates %>% dplyr::slice_head(n = 3)
-  summary <- paste0(
-    top$source_course, " ", round(100 * top$transition_rate, 1), "%",
-    collapse = "; "
-  )
-
-  projection_candidate(
-    "feeder",
-    estimate = sum(current$student_probability) / coverage,
-    applicable = TRUE,
-    reason = paste("Student-level transition model from", source_term),
-    n_history_terms = nrow(term_map),
-    evidence_n = sum(feeder_rates$n_transition),
-    coverage_rate = coverage,
-    n_components = nrow(feeder_rates),
-    component_summary = summary
+  list(
+    n_pairs = nrow(pairs), repeat_rate = repeat_rate, feeder_rate = feeder_rate,
+    feeders = feeders, pairs = pairs$following
   )
 }
 
 
-# method_id is a parameter because project_spring_population_growth() delegates
-# here. Every reason this function produces is shown to a reader beside a method
-# name, so it must report under the method that asked -- a Fall row explaining
-# "Spring cohort flow applies only to Spring targets" underneath *Spring
-# population growth* names the wrong method.
-project_spring_cohort_flow <- function(history, student_inputs, row,
-                                       target_term, opt = list(),
-                                       method_id = "spring_cohort_flow") {
-  method_label <- unname(CEDAR_ENROLLMENT_PROJECTION_METHODS[[method_id]])
+# Distinct students enrolled in any of `courses` in `term`, excluding those in
+# `exclude_course`, from the market's deduplicated course enrollments.
+projection_distinct_enrolled <- function(enrollments, term, courses,
+                                         exclude_course = NULL) {
+  rows <- enrollments %>%
+    dplyr::filter(term == .env$term, subject_course %in% courses)
+  if (!is.null(exclude_course)) {
+    excluded <- enrollments %>%
+      dplyr::filter(term == .env$term, subject_course == exclude_course) %>%
+      dplyr::distinct(student_id)
+    rows <- dplyr::anti_join(rows, excluded, by = "student_id")
+  }
+  dplyr::n_distinct(rows$student_id)
+}
+
+
+project_spine_adjusted <- function(history, preceding_term_history,
+                                   section_history, waitlist_history,
+                                   student_inputs, row, target_term,
+                                   opt = list()) {
   target_term <- as.integer(target_term)
-  if (get_term_type(target_term) != "spring") {
+  alarm_threshold <- as.numeric(opt$regime_alarm_threshold %||% 0.25)
+  spine_row <- projection_history_for_row(history, row, before_term = target_term) %>%
+    dplyr::slice_tail(n = 1)
+  if (nrow(spine_row) == 0) {
     return(projection_candidate(
-      method_id,
-      reason = paste(method_label, "applies only to Spring targets")
+      "spine_adjusted", reason = "Needs one prior same-season term"
     ))
   }
-
-  baseline <- projection_history_for_row(
-    history, row, before_term = target_term
-  ) %>% dplyr::slice_tail(n = 1)
-  if (nrow(baseline) == 0) {
-    return(projection_candidate(
-      method_id, reason = "Needs one prior Spring class-list term"
-    ))
-  }
-
-  baseline_term <- as.integer(baseline$term[[1]])
-  prior_source_term <- subtract_term(baseline_term)
-  source_term <- subtract_term(target_term)
-  min_population <- as.integer(opt$spring_source_min_population %||% 20L)
-  min_coverage <- as.numeric(opt$spring_source_min_coverage %||% 0.10)
-  prior_strength <- as.numeric(opt$spring_growth_prior_strength %||% 20)
-
-  spring_inputs <- student_inputs$spring %||%
-    prepare_projection_spring_inputs(
-      student_inputs$student_terms, student_inputs$target_students
-    )
-  cohort_total <- spring_inputs$cohort_totals %>%
-    dplyr::filter(
-      target_term == baseline_term,
-      subject_course == row$subject_course
-    ) %>%
-    dplyr::slice_head(n = 1)
-  cohort_cells <- spring_inputs$cohort_cells %>%
-    dplyr::filter(
-      target_term == baseline_term,
-      subject_course == row$subject_course
-    )
-  prior_source <- spring_inputs$source_populations %>%
-    dplyr::filter(term == prior_source_term) %>%
-    dplyr::transmute(
-      major_code, student_classification,
-      n_source_previous = n_population
-    )
-  current_source <- spring_inputs$source_populations %>%
-    dplyr::filter(term == source_term) %>%
-    dplyr::transmute(
-      major_code, student_classification,
-      n_source_current = n_population
-    )
-  prior_source_n <- sum(prior_source$n_source_previous)
-  current_source_n <- sum(current_source$n_source_current)
-
-  if (nrow(cohort_total) == 0) {
-    return(projection_candidate(
-      method_id, reason = paste("No course roster for", fmt_term(baseline_term)),
-      baseline_term = baseline_term, prior_source_term = prior_source_term,
-      source_term = source_term,
-      baseline_classlist_total = baseline$classlist_total[[1]]
-    ))
-  }
-  if (abs(
-    cohort_total$baseline_classlist_total[[1]] - baseline$classlist_total[[1]]
-  ) > 1e-8) {
-    return(projection_candidate(
-      method_id,
-      reason = paste(
-        "Course roster does not reconcile to",
-        fmt_term(baseline_term), "class-list total"
-      ),
-      evidence_n = cohort_total$baseline_classlist_total[[1]], baseline_term = baseline_term,
-      prior_source_term = prior_source_term, source_term = source_term,
-      baseline_classlist_total = baseline$classlist_total[[1]]
-    ))
-  }
-  if (prior_source_n < min_population || current_source_n < min_population) {
-    return(projection_candidate(
-      method_id,
-      reason = "Preceding-Fall source population is too small",
-      evidence_n = min(prior_source_n, current_source_n),
-      baseline_term = baseline_term, prior_source_term = prior_source_term,
-      source_term = source_term,
-      baseline_classlist_total = baseline$classlist_total[[1]],
-      source_population_previous = prior_source_n,
-      source_population_current = current_source_n
-    ))
-  }
-
-  matched_baseline <- cohort_total$matched_baseline[[1]]
-  unmatched_baseline <- cohort_total$unmatched_baseline[[1]]
-  coverage <- matched_baseline / cohort_total$baseline_classlist_total[[1]]
-  if (!is.finite(coverage) || coverage < min_coverage) {
-    return(projection_candidate(
-      method_id,
-      reason = paste0("Preceding Fall covers only ", round(100 * coverage, 1), "% of the baseline course"),
-      evidence_n = matched_baseline, coverage_rate = coverage,
-      baseline_term = baseline_term, prior_source_term = prior_source_term,
-      source_term = source_term,
-      baseline_classlist_total = baseline$classlist_total[[1]],
-      matched_baseline = matched_baseline,
-      unmatched_baseline = unmatched_baseline,
-      source_population_previous = prior_source_n,
-      source_population_current = current_source_n
-    ))
-  }
-
-  overall_growth <- current_source_n / prior_source_n
-  source_counts <- prior_source %>%
-    dplyr::full_join(
-      current_source,
-      by = c("major_code", "student_classification")
-    ) %>%
-    dplyr::mutate(
-      n_source_previous = dplyr::coalesce(n_source_previous, 0L),
-      n_source_current = dplyr::coalesce(n_source_current, 0L)
-    )
-
-  components <- cohort_cells %>%
-    dplyr::left_join(
-      source_counts,
-      by = c("major_code", "student_classification")
-    ) %>%
-    dplyr::mutate(
-      growth_ratio = (n_source_current + prior_strength * overall_growth) /
-        (n_source_previous + prior_strength),
-      projected_component = n_target_baseline * growth_ratio
-    )
-
-  matched_projection <- sum(components$projected_component)
-  unmatched_projection <- unmatched_baseline
-  estimate <- matched_projection + unmatched_projection
-  top <- components %>%
-    dplyr::arrange(dplyr::desc(n_target_baseline)) %>%
-    dplyr::slice_head(n = 3)
-  component_summary <- paste0(
-    top$major_code, " / ", top$student_classification, " ",
-    top$n_target_baseline, " x ", round(top$growth_ratio, 3),
-    collapse = "; "
+  spine <- spine_row$classlist_total[[1]]
+  spine_term <- as.integer(spine_row$term[[1]])
+  floor <- projection_spine_floor(
+    spine_row, section_history, waitlist_history, row, opt
   )
 
+  # Deltas need the term immediately before the target to be observed.
+  preceding_term <- subtract_term(target_term, summer = FALSE)
+  prior_preceding_term <- subtract_term(
+    subtract_term(preceding_term, summer = FALSE), summer = FALSE
+  )
+  all_terms <- projection_all_term_history_for_row(
+    preceding_term_history, row, before_term = target_term
+  )
+  now_row <- all_terms %>% dplyr::filter(term == preceding_term)
+  then_row <- all_terms %>% dplyr::filter(term == prior_preceding_term)
+  enrollments <- student_inputs$course_enrollments %||% NULL
+  preceding_observed <- nrow(now_row) == 1L &&
+    !is.null(enrollments) && preceding_term %in% enrollments$term
+
+  delta_repeat <- 0
+  delta_feeder <- 0
+  repeat_rate <- NA_real_
+  feeder_rate <- NA_real_
+  feeders <- character(0)
+  feeder_change <- NA_real_
+  change <- NA_real_
+  preceding_enrollment <- if (nrow(now_row) == 1L) now_row$classlist_total[[1]] else NA_real_
+  delta_basis <- if (!preceding_observed) {
+    paste("Preceding term", fmt_term(preceding_term),
+          "is not observed yet; no Fall deltas")
+  } else if (nrow(then_row) != 1L) {
+    paste("No", fmt_term(prior_preceding_term),
+          "enrollment to measure the change against; no Fall deltas")
+  } else {
+    rates <- projection_delta_rates(student_inputs, row, target_term, opt)
+    then_enrollment <- then_row$classlist_total[[1]]
+    change <- if (then_enrollment > 0) preceding_enrollment / then_enrollment - 1 else NA_real_
+    repeat_rate <- rates$repeat_rate
+    feeder_rate <- rates$feeder_rate
+    feeders <- rates$feeders
+    parts <- character(0)
+    if (is.finite(repeat_rate)) {
+      delta_repeat <- (preceding_enrollment - then_enrollment) * repeat_rate
+      parts <- c(parts, paste0(
+        "repeat: (", preceding_enrollment, " - ", then_enrollment, ") x ",
+        round(repeat_rate, 3), " = ", sprintf("%+.1f", delta_repeat)
+      ))
+    } else {
+      parts <- c(parts, paste0(
+        "repeat: no carry-through rate from ", rates$n_pairs, " prior pairs"
+      ))
+    }
+    if (is.finite(feeder_rate) && length(feeders) > 0L) {
+      feeder_now <- projection_distinct_enrolled(
+        enrollments, preceding_term, feeders, row$subject_course
+      )
+      feeder_then <- projection_distinct_enrolled(
+        enrollments, prior_preceding_term, feeders, row$subject_course
+      )
+      feeder_change <- feeder_now - feeder_then
+      delta_feeder <- feeder_change * feeder_rate
+      parts <- c(parts, paste0(
+        "feeders (", paste(feeders, collapse = ", "), "): (", feeder_now,
+        " - ", feeder_then, ") x ", round(feeder_rate, 3), " = ",
+        sprintf("%+.1f", delta_feeder)
+      ))
+    } else {
+      parts <- c(parts, "feeders: none met the evidence threshold")
+    }
+    paste(parts, collapse = "; ")
+  }
+  # Unknown when the preceding term is unobserved; never FALSE by default.
+  regime_alarm <- if (is.finite(change)) abs(change) >= alarm_threshold else NA
+
+  estimate <- max(0, spine + floor$uplift + delta_repeat + delta_feeder)
   projection_candidate(
-    method_id,
+    "spine_adjusted",
     estimate = estimate,
     applicable = TRUE,
-    reason = paste(
-      "Prior Spring cohort propagated from", fmt_term(prior_source_term),
-      "to", fmt_term(source_term), "with unmatched students carried forward"
+    reason = paste0(
+      "Prior same-season ", spine, " + floor ", round(floor$uplift),
+      " + repeat delta ", sprintf("%+.1f", delta_repeat),
+      " + feeder delta ", sprintf("%+.1f", delta_feeder)
     ),
     n_history_terms = 1L,
-    evidence_n = matched_baseline,
-    coverage_rate = coverage,
-    n_components = nrow(components) + 1L,
-    component_summary = component_summary,
-    baseline_term = baseline_term,
-    prior_source_term = prior_source_term,
-    source_term = source_term,
-    baseline_classlist_total = baseline$classlist_total[[1]],
-    matched_baseline = matched_baseline,
-    unmatched_baseline = unmatched_baseline,
-    matched_projection = matched_projection,
-    unmatched_projection = unmatched_projection,
-    source_population_previous = prior_source_n,
-    source_population_current = current_source_n,
-    source_population_growth = overall_growth,
-    projection_formula = paste(
-      "sum(prior Spring matched major/class count x smoothed Fall population growth)",
-      "+ prior Spring unmatched count"
-    )
+    evidence_n = spine,
+    n_components = 1L + (floor$uplift > 0) + (delta_repeat != 0) + (delta_feeder != 0),
+    component_summary = paste(floor$basis, delta_basis, sep = "; "),
+    spine = spine,
+    spine_term = spine_term,
+    saturated_prior = floor$saturated,
+    prior_census_fill = floor$fill,
+    waitlisted_prior = floor$waitlisted,
+    floor_uplift = floor$uplift,
+    floor_basis = floor$basis,
+    preceding_term = preceding_term,
+    preceding_term_enrollment = preceding_enrollment,
+    preceding_term_change = change,
+    regime_alarm = regime_alarm,
+    delta_repeat = delta_repeat,
+    repeat_rate = repeat_rate,
+    delta_feeder = delta_feeder,
+    feeder_rate = feeder_rate,
+    feeder_courses = if (length(feeders) == 0L) NA_character_ else
+      paste(feeders, collapse = ", "),
+    feeder_change = feeder_change,
+    delta_basis = delta_basis,
+    projection_formula = "spine + floor uplift + repeat delta + feeder delta"
   )
-}
-
-
-project_spring_population_growth <- function(history, student_inputs, row,
-                                             target_term, opt = list()) {
-  result <- project_spring_cohort_flow(
-    history, student_inputs, row, target_term, opt,
-    method_id = "spring_population_growth"
-  )
-  result$method_id <- "spring_population_growth"
-  result$method_label <- unname(
-    CEDAR_ENROLLMENT_PROJECTION_METHODS[["spring_population_growth"]]
-  )
-  result$method_role <- unname(
-    CEDAR_ENROLLMENT_PROJECTION_METHOD_ROLES[["spring_population_growth"]]
-  )
-
-  if (!isTRUE(result$applicable[[1]])) return(result)
-
-  result$matched_projection <-
-    result$matched_baseline * result$source_population_growth
-  result$projected_classlist_total <-
-    result$matched_projection + result$unmatched_projection
-  result$n_components <- 2L
-  result$component_summary <- paste0(
-    "All Fall students ", round(result$source_population_previous), " to ",
-    round(result$source_population_current), " (x",
-    round(result$source_population_growth, 3), "); unmatched Spring students ",
-    round(result$unmatched_projection), " carried forward"
-  )
-  result$applicability_reason <- paste(
-    "Prior Spring matched population propagated by total student growth from",
-    fmt_term(result$prior_source_term), "to", fmt_term(result$source_term),
-    "with unmatched students carried forward"
-  )
-  result$projection_formula <- paste(
-    "prior Spring matched count x total preceding-Fall population growth",
-    "+ prior Spring unmatched count"
-  )
-  result
-}
-
-
-project_anchored_upstream <- function(anchor, upstream, method_id,
-                                      opt = list()) {
-  upstream_weight <- as.numeric(opt$upstream_anchor_weight %||% 0.50)
-  result <- upstream
-  result$method_id <- method_id
-  result$method_label <- unname(CEDAR_ENROLLMENT_PROJECTION_METHODS[[method_id]])
-  result$method_role <- unname(
-    CEDAR_ENROLLMENT_PROJECTION_METHOD_ROLES[[method_id]]
-  )
-
-  anchor_ok <- isTRUE(anchor$applicable[[1]]) &&
-    is.finite(anchor$projected_classlist_total[[1]])
-  upstream_ok <- isTRUE(upstream$applicable[[1]]) &&
-    is.finite(upstream$projected_classlist_total[[1]])
-  if (!anchor_ok || !upstream_ok) {
-    result$applicable <- FALSE
-    result$projected_classlist_total <- NA_real_
-    result$applicability_reason <- paste(
-      "Needs both a prior same-season enrollment and usable upstream evidence;",
-      if (!anchor_ok) anchor$applicability_reason[[1]] else
-        upstream$applicability_reason[[1]]
-    )
-    return(result)
-  }
-
-  anchor_value <- anchor$projected_classlist_total[[1]]
-  upstream_value <- upstream$projected_classlist_total[[1]]
-  result$projected_classlist_total <-
-    (1 - upstream_weight) * anchor_value + upstream_weight * upstream_value
-  result$applicable <- TRUE
-  result$applicability_reason <- paste0(
-    scales::percent(1 - upstream_weight, accuracy = 1),
-    " prior same-season enrollment plus ",
-    scales::percent(upstream_weight, accuracy = 1),
-    " upstream estimate; ", upstream$applicability_reason[[1]]
-  )
-  result$baseline_classlist_total <- anchor_value
-  result$projection_formula <- paste0(
-    format(1 - upstream_weight, trim = TRUE),
-    " x prior same-season class-list enrollment + ",
-    format(upstream_weight, trim = TRUE), " x upstream estimate"
-  )
-  result
 }
 
 
@@ -1639,57 +1493,15 @@ project_course_method_candidates <- function(inputs, row, target_term,
     seasonal_last = function() {
       project_seasonal_last(inputs$enrollment_history, row, target_term, opt)
     },
-    seasonal_median = function() {
-      project_seasonal_median(inputs$enrollment_history, row, target_term, opt)
-    },
-    seasonal_trend = function() {
-      project_seasonal_trend(inputs$enrollment_history, row, target_term, opt)
-    },
-    spring_population_growth = function() {
-      project_spring_population_growth(
-        inputs$enrollment_history, inputs$students, row, target_term, opt
-      )
-    },
-    spring_cohort_flow = function() {
-      project_spring_cohort_flow(
-        inputs$enrollment_history, inputs$students, row, target_term, opt
-      )
-    },
-    feeder = function() {
-      project_from_feeders(
-        inputs$enrollment_history, inputs$students, row, target_term, opt
-      )
-    },
-    anchored_population = function() {
-      project_anchored_upstream(
-        get_candidate("seasonal_last"),
-        get_candidate("spring_population_growth"),
-        "anchored_population", opt
-      )
-    },
-    anchored_cohort = function() {
-      project_anchored_upstream(
-        get_candidate("seasonal_last"),
-        get_candidate("spring_cohort_flow"),
-        "anchored_cohort", opt
-      )
-    },
-    anchored_feeder = function() {
-      project_anchored_upstream(
-        get_candidate("seasonal_last"),
-        get_candidate("feeder"),
-        "anchored_feeder", opt
+    spine_adjusted = function() {
+      project_spine_adjusted(
+        inputs$enrollment_history, inputs$preceding_term_history,
+        inputs$section_history, inputs$waitlist_history, inputs$students,
+        row, target_term, opt
       )
     }
   )
-  candidate_cache <- new.env(parent = emptyenv())
-  get_candidate <- function(id) {
-    if (!exists(id, envir = candidate_cache, inherits = FALSE)) {
-      assign(id, builders[[id]](), envir = candidate_cache)
-    }
-    get(id, envir = candidate_cache, inherits = FALSE)
-  }
-  candidates <- dplyr::bind_rows(lapply(method_ids, get_candidate))
+  candidates <- dplyr::bind_rows(lapply(method_ids, function(id) builders[[id]]()))
   retention <- projection_census_retention_for_row(
     inputs$enrollment_history, row, target_term, opt
   )
@@ -1712,6 +1524,41 @@ project_course_method_candidates <- function(inputs, row, target_term,
       projected_census_equivalent =
         projected_classlist_total * census_retention_rate
     )
+}
+
+
+# Every applicable adjusted row must reconcile: spine + floor + deltas is the
+# raw projection (floored at zero), the floor never lowers the spine, and the
+# spine term precedes the target.
+validate_spine_rows <- function(data, caller) {
+  if (nrow(data) == 0 || !"method_id" %in% names(data)) return(invisible(TRUE))
+  rows <- data %>%
+    dplyr::filter(method_id == "spine_adjusted", applicable)
+  if (nrow(rows) == 0) return(invisible(TRUE))
+  projection_require_columns(
+    rows,
+    c("target_term", "projected_classlist_total", "spine", "spine_term",
+      "floor_uplift", "delta_repeat", "delta_feeder"),
+    caller
+  )
+  raw <- if ("raw_projected_classlist_total" %in% names(rows)) {
+    rows$raw_projected_classlist_total
+  } else {
+    rows$projected_classlist_total
+  }
+  expected <- pmax(
+    0, rows$spine + rows$floor_uplift + rows$delta_repeat + rows$delta_feeder
+  )
+  valid <- is.finite(rows$spine) & rows$spine_term < rows$target_term &
+    rows$floor_uplift >= 0 & is.finite(raw) & abs(raw - expected) <= 1e-6
+  if (any(!valid)) {
+    stop(
+      "[enrollment-projections.R] ", caller,
+      " has an invalid spine / floor / delta audit trail.",
+      call. = FALSE
+    )
+  }
+  invisible(TRUE)
 }
 
 
@@ -1824,13 +1671,13 @@ build_projection_pressure_screen <- function(enrollment_history, section_history
       )
     paired <- dplyr::bind_cols(
       paired,
-      projection_registration_capacity_metrics(
-        paired$classlist_total,
+      projection_capacity_metrics(
+        paired$census_enrl,
         paired$scheduled_capacity,
         reached_threshold = fill_threshold
       )
     ) %>%
-      dplyr::mutate(fill_rate = registration_fill)
+      dplyr::mutate(fill_rate = capacity_fill)
 
     target <- target_sections %>%
       dplyr::filter(
@@ -1855,12 +1702,15 @@ build_projection_pressure_screen <- function(enrollment_history, section_history
     target_components_n <- if (nrow(target) == 0) 0L else
       target$n_delivery_components[[1]]
     target_campuses_n <- if (nrow(target) == 0) 0L else target$n_campuses[[1]]
-    target_capacity_status <- projection_registration_capacity_metrics(
+    # A target term still filling has no census, so the students registered
+    # right now are its occupancy. Ever-registered to date is kept beside it
+    # as a demand count, not as the capacity test.
+    target_classlist_status <- projection_capacity_metrics(
       target_classlist_total,
       target_capacity,
       reached_threshold = capacity_threshold
     )
-    target_active_status <- projection_registration_capacity_metrics(
+    target_active_status <- projection_capacity_metrics(
       target_registered,
       target_capacity,
       reached_threshold = capacity_threshold
@@ -1908,7 +1758,7 @@ build_projection_pressure_screen <- function(enrollment_history, section_history
 
     fill_evidence <- paste0(
       high_fill_terms, " of ", recent_capacity_terms, " recent ", target_type,
-      " terms with class-list registrations at or above ",
+      " terms with census enrollment at or above ",
       round(fill_threshold * 100), "% of scheduled capacity"
     )
     flags <- c(
@@ -1964,12 +1814,10 @@ build_projection_pressure_screen <- function(enrollment_history, section_history
       target_other_status_to_date = if (nrow(registration) == 0) NA_real_ else
         as.numeric(registration$other_non_waitlist[[1]]),
       target_registration_observed = nrow(registration) > 0,
-      target_available_seats = pmax(
-        0, target_active_status$registration_capacity_gap
-      ),
-      target_classlist_fill = target_capacity_status$registration_fill,
-      target_active_fill = target_active_status$registration_fill,
-      target_capacity_reached = target_capacity_status$capacity_reached,
+      target_available_seats = pmax(0, target_active_status$capacity_gap),
+      target_classlist_fill = target_classlist_status$capacity_fill,
+      target_active_fill = target_active_status$capacity_fill,
+      target_capacity_reached = target_active_status$capacity_reached,
       historical_classlist_total = as.numeric(baseline),
       quick_trend_projection = as.numeric(trend),
       census_retention_rate = as.numeric(retention),
@@ -2002,7 +1850,7 @@ add_projection_capacity_censoring <- function(backtests, opt = list()) {
     "add_projection_capacity_censoring()"
   )
   derived <- c(
-    "registration_fill", "registration_capacity_gap", "capacity_usable",
+    "capacity_fill", "capacity_gap", "capacity_usable",
     "capacity_reached", "error", "abs_error",
     "pct_error", "abs_pct_error", "census_equivalent_error",
     "census_equivalent_abs_error", "capacity_censored_classlist_projection",
@@ -2011,8 +1859,10 @@ add_projection_capacity_censoring <- function(backtests, opt = list()) {
     "capacity_explained_share"
   )
   base <- dplyr::select(backtests, -dplyr::any_of(derived))
-  capacity_status <- projection_registration_capacity_metrics(
-    base$actual_classlist_total,
+  # Capacity reached is judged on census occupancy; the one-sided censor below
+  # still compares the class-list projection with the class-list actual.
+  capacity_status <- projection_capacity_metrics(
+    base$actual_census,
     base$scheduled_capacity,
     reached_threshold = as.numeric(
       opt$registration_capacity_threshold %||% 1.00
@@ -2092,7 +1942,9 @@ backtest_course_projection_methods <- function(inputs, roster, target_term,
 
   output <- dplyr::bind_rows(results)
   if (nrow(output) == 0) return(tibble::tibble())
-  add_projection_rolling_calibration(output, opt)
+  output %>%
+    dplyr::mutate(raw_projected_classlist_total = projected_classlist_total) %>%
+    dplyr::arrange(market_id, subject_course, target_term, method_id)
 }
 
 
@@ -2113,240 +1965,6 @@ projection_direction_consistency <- function(pct_errors, neutral = 0.01) {
 }
 
 
-projection_calibration_fit <- function(backtests, method_role, opt = list()) {
-  min_terms <- as.integer(opt$calibration_min_terms %||% 4L)
-  min_bias <- as.numeric(opt$calibration_min_abs_bias %||% 0.05)
-  min_consistency <- as.numeric(opt$calibration_min_direction_consistency %||% 0.75)
-  factor_bounds <- as.numeric(
-    opt$calibration_factor_bounds %||%
-      CEDAR_ENROLLMENT_PROJECTION_CALIBRATION_FACTOR_BOUNDS
-  )
-  neutral <- as.numeric(opt$calibration_neutral_error %||% 0.01)
-  raw_projection <- if ("raw_projected_classlist_total" %in% names(backtests)) {
-    backtests$raw_projected_classlist_total
-  } else {
-    backtests$projected_classlist_total
-  }
-  eligible <- backtests$applicable & is.finite(raw_projection) &
-    raw_projection > 0 & is.finite(backtests$actual_classlist_total) &
-    backtests$actual_classlist_total > 0
-  if (as.character(method_role) %in%
-      c("structural_demand", "anchored_upstream")) {
-    eligible <- eligible & backtests$capacity_usable &
-      !backtests$capacity_reached
-  }
-
-  actual <- backtests$actual_classlist_total[eligible]
-  projected <- raw_projection[eligible]
-  errors <- projected - actual
-  pct_errors <- errors / actual
-  n <- length(actual)
-  weighted_bias <- if (n > 0 && sum(actual) > 0) {
-    sum(errors) / sum(actual)
-  } else {
-    NA_real_
-  }
-  direction_consistency <- projection_direction_consistency(
-    pct_errors, neutral = neutral
-  )
-  proposed_factor <- if (n > 0 && sum(projected) > 0) {
-    sum(actual) / sum(projected)
-  } else {
-    NA_real_
-  }
-  enough_terms <- n >= min_terms
-  material_bias <- is.finite(weighted_bias) && abs(weighted_bias) >= min_bias
-  stable_direction <- is.finite(direction_consistency) &&
-    direction_consistency >= min_consistency
-  factor_in_bounds <- length(factor_bounds) == 2L &&
-    is.finite(proposed_factor) && proposed_factor >= min(factor_bounds) &&
-    proposed_factor <= max(factor_bounds)
-  applicable <- enough_terms && material_bias && stable_direction &&
-    factor_in_bounds
-  reason <- dplyr::case_when(
-    !enough_terms ~ paste("Needs", min_terms, "eligible prior aftcasts"),
-    !material_bias ~ "Weighted bias is below the calibration threshold",
-    !stable_direction ~ "Signed errors are not directionally consistent",
-    !factor_in_bounds ~ "Proposed calibration factor is outside safety bounds",
-    TRUE ~ "Stable signed bias is eligible for rolling validation"
-  )
-
-  list(
-    n = as.integer(n),
-    weighted_bias = as.numeric(weighted_bias),
-    direction_consistency = as.numeric(direction_consistency),
-    proposed_factor = as.numeric(proposed_factor),
-    applicable = isTRUE(applicable),
-    reason = as.character(reason)
-  )
-}
-
-
-add_projection_rolling_calibration <- function(backtests, opt = list()) {
-  if (nrow(backtests) == 0) return(backtests)
-  keys <- c(
-    "market_id", "college", "subject_course", "term_type", "method_id",
-    "method_label", "method_role"
-  )
-
-  backtests %>%
-    dplyr::group_by(dplyr::across(dplyr::all_of(keys))) %>%
-    dplyr::group_modify(function(.x, .y) {
-      rows <- dplyr::arrange(.x, target_term)
-      rows$raw_projected_classlist_total <- rows$projected_classlist_total
-      rows$calibration_training_n <- 0L
-      rows$calibration_training_bias <- NA_real_
-      rows$calibration_direction_consistency <- NA_real_
-      rows$calibration_factor <- NA_real_
-      rows$calibration_applied <- FALSE
-      rows$calibration_reason <- "No prior aftcasts"
-      rows$calibrated_projected_classlist_total <- rows$raw_projected_classlist_total
-
-      for (i in seq_len(nrow(rows))) {
-        prior <- if (i == 1L) rows[0, , drop = FALSE] else
-          rows[seq_len(i - 1L), , drop = FALSE]
-        fit <- projection_calibration_fit(prior, .y$method_role[[1]], opt)
-        rows$calibration_training_n[[i]] <- fit$n
-        rows$calibration_training_bias[[i]] <- fit$weighted_bias
-        rows$calibration_direction_consistency[[i]] <-
-          fit$direction_consistency
-        rows$calibration_factor[[i]] <- fit$proposed_factor
-        rows$calibration_applied[[i]] <- fit$applicable
-        rows$calibration_reason[[i]] <- fit$reason
-        if (fit$applicable && is.finite(rows$raw_projected_classlist_total[[i]])) {
-          rows$calibrated_projected_classlist_total[[i]] <-
-            rows$raw_projected_classlist_total[[i]] * fit$proposed_factor
-        }
-      }
-
-      rows %>%
-        dplyr::mutate(
-          calibrated_error = calibrated_projected_classlist_total - actual_classlist_total,
-          calibrated_abs_error = abs(calibrated_error),
-          calibrated_pct_error = dplyr::if_else(
-            actual_classlist_total > 0, calibrated_error / actual_classlist_total, NA_real_
-          )
-        )
-    }) %>%
-    dplyr::ungroup() %>%
-    dplyr::arrange(market_id, subject_course, target_term, method_id)
-}
-
-
-validate_spring_cohort_rows <- function(data, caller) {
-  if (nrow(data) == 0 || !"method_id" %in% names(data)) return(invisible(TRUE))
-  rows <- data %>%
-    dplyr::filter(
-      method_id %in% c("spring_population_growth", "spring_cohort_flow"),
-      applicable
-    )
-  if (nrow(rows) == 0) return(invisible(TRUE))
-
-  projection_require_columns(
-    rows,
-    c(
-      "term_type", "target_term", "projected_classlist_total", "baseline_term",
-      "prior_source_term", "source_term", "baseline_classlist_total",
-      "matched_baseline", "unmatched_baseline", "matched_projection",
-      "unmatched_projection", "source_population_previous",
-      "source_population_current", "source_population_growth"
-    ),
-    caller
-  )
-  expected_source <- vapply(rows$target_term, subtract_term, integer(1))
-  expected_prior_source <- vapply(rows$baseline_term, subtract_term, integer(1))
-  terms_valid <- rows$term_type == "spring" &
-    rows$baseline_term < rows$target_term &
-    rows$source_term == expected_source &
-    rows$prior_source_term == expected_prior_source &
-    rows$prior_source_term < rows$source_term &
-    rows$source_term < rows$target_term
-  baseline_valid <- abs(
-    rows$matched_baseline + rows$unmatched_baseline - rows$baseline_classlist_total
-  ) <= 1e-6
-  formula_projection <- if ("raw_projected_classlist_total" %in% names(rows)) {
-    rows$raw_projected_classlist_total
-  } else {
-    rows$projected_classlist_total
-  }
-  projection_valid <- abs(
-    rows$matched_projection + rows$unmatched_projection -
-      formula_projection
-  ) <= 1e-6
-  growth_valid <- rows$source_population_previous > 0 &
-    abs(
-      rows$source_population_current / rows$source_population_previous -
-        rows$source_population_growth
-    ) <= 1e-8
-
-  if (any(!terms_valid | !baseline_valid | !projection_valid | !growth_valid)) {
-    stop(
-      "[enrollment-projections.R] ", caller,
-      " has an invalid Spring population audit trail.",
-      call. = FALSE
-    )
-  }
-  invisible(TRUE)
-}
-
-
-validate_projection_calibration_rows <- function(data, caller,
-                                                 published = FALSE) {
-  if (nrow(data) == 0) return(invisible(TRUE))
-  effective_col <- if (published) {
-    if ("calibrated_projected_classlist_total" %in% names(data)) {
-      "calibrated_projected_classlist_total"
-    } else {
-      "projected_classlist_total"
-    }
-  } else {
-    "calibrated_projected_classlist_total"
-  }
-  required <- c(
-    "raw_projected_classlist_total", "calibration_factor", "calibration_applied",
-    effective_col
-  )
-  projection_require_columns(data, required, caller)
-
-  applied <- !is.na(data$calibration_applied) & data$calibration_applied
-  factor_bounds <- CEDAR_ENROLLMENT_PROJECTION_CALIBRATION_FACTOR_BOUNDS
-  invalid_factor <- applied & (
-    !is.finite(data$calibration_factor) |
-      data$calibration_factor < min(factor_bounds) |
-      data$calibration_factor > max(factor_bounds)
-  )
-  expected <- data$raw_projected_classlist_total
-  expected[applied] <- data$raw_projected_classlist_total[applied] *
-    data$calibration_factor[applied]
-  comparable <- is.finite(expected) & is.finite(data[[effective_col]])
-  invalid_value <- comparable & abs(data[[effective_col]] - expected) > 1e-8
-
-  if (published) {
-    invalid_default_factor <- !applied &
-      (!is.finite(data$calibration_factor) | data$calibration_factor != 1)
-    projection_require_columns(data, "calibration_adjustment", caller)
-    expected_adjustment <- data[[effective_col]] - data$raw_projected_classlist_total
-    adjustment_comparable <- is.finite(expected_adjustment) &
-      is.finite(data$calibration_adjustment)
-    invalid_adjustment <- adjustment_comparable &
-      abs(data$calibration_adjustment - expected_adjustment) > 1e-8
-  } else {
-    invalid_default_factor <- rep(FALSE, nrow(data))
-    invalid_adjustment <- rep(FALSE, nrow(data))
-  }
-
-  if (any(invalid_factor | invalid_value | invalid_default_factor |
-          invalid_adjustment)) {
-    stop(
-      "[enrollment-projections.R] ", caller,
-      " has an invalid projection calibration audit trail.",
-      call. = FALSE
-    )
-  }
-  invisible(TRUE)
-}
-
-
 validate_projection_capacity_rows <- function(data, caller) {
   if (nrow(data) == 0) return(invisible(TRUE))
   projection_require_columns(
@@ -2354,7 +1972,7 @@ validate_projection_capacity_rows <- function(data, caller) {
     c(
       "projected_classlist_total", "actual_classlist_total",
       "projected_census_equivalent", "actual_census", "scheduled_capacity",
-      "capacity_reached", "registration_capacity_gap",
+      "capacity_reached", "capacity_gap",
       "capacity_censored_classlist_projection", "capacity_censored_error",
       "abs_error",
       "capacity_censored_abs_error", "capacity_explained_classlist_error",
@@ -2433,13 +2051,174 @@ empty_projection_performance <- function() {
     pct_error_sd = numeric(), uncensored_pct_error_sd = numeric(),
     overprediction_rate = numeric(),
     underprediction_rate = numeric(), direction_consistency = numeric(),
-    signed_error_history = character(), calibration_training_n = integer(),
-    proposed_calibration_factor = numeric(), calibration_candidate = logical(),
-    n_calibrated_backtests = integer(), calibration_comparison_wape = numeric(),
-    calibrated_wape = numeric(), calibration_wape_gain = numeric(),
-    calibration_validated = logical(), calibration_recommended = logical(),
-    calibration_reason = character()
+    signed_error_history = character()
   )
+}
+
+
+summarize_projection_backtests <- function(backtests, opt = list()) {
+  if (nrow(backtests) == 0) return(empty_projection_performance())
+
+  capacity_fields <- c(
+    "capacity_gap", "capacity_censored_classlist_projection",
+    "capacity_censored_miss", "capacity_explained_classlist_error",
+    "capacity_explained_share"
+  )
+  if (!all(capacity_fields %in% names(backtests))) {
+    backtests <- add_projection_capacity_censoring(backtests, opt)
+  }
+  if (!"method_role" %in% names(backtests)) {
+    backtests$method_role <- unname(
+      CEDAR_ENROLLMENT_PROJECTION_METHOD_ROLES[backtests$method_id]
+    )
+  }
+  if (!"pct_error" %in% names(backtests)) {
+    backtests$pct_error <- dplyr::if_else(
+      backtests$actual_classlist_total > 0,
+      backtests$error / backtests$actual_classlist_total,
+      NA_real_
+    )
+  }
+
+  usable <- backtests %>%
+    dplyr::filter(applicable, is.finite(projected_classlist_total), is.finite(actual_classlist_total))
+  if (nrow(usable) == 0) return(empty_projection_performance())
+
+  keys <- c(
+    "market_id", "college", "subject_course", "term_type", "method_id",
+    "method_label"
+  )
+  neutral <- 0.01
+  usable %>%
+    dplyr::group_by(dplyr::across(dplyr::all_of(keys))) %>%
+    dplyr::group_modify(function(.x, .y) {
+      rows <- dplyr::arrange(.x, target_term)
+      directional <- rows$pct_error[
+        is.finite(rows$pct_error) & abs(rows$pct_error) > neutral
+      ]
+      uncensored <- rows$capacity_usable & !rows$capacity_reached
+      censored_terms <- sort(unique(rows$target_term[rows$capacity_censored_miss]))
+      tibble::tibble(
+        n_backtests = nrow(rows),
+        mae = mean(rows$abs_error),
+        rmse = sqrt(mean(rows$error^2)),
+        wape = projection_wape(rows$abs_error, rows$actual_classlist_total),
+        bias = mean(rows$error),
+        error_q80 = as.numeric(stats::quantile(rows$abs_error, 0.80, names = FALSE)),
+        backtest_start_term = min(rows$target_term),
+        backtest_end_term = max(rows$target_term),
+        backtest_terms = paste(sort(unique(rows$target_term)), collapse = ","),
+        backtest_term_labels = paste(
+          vapply(sort(unique(rows$target_term)), fmt_term, character(1)),
+          collapse = ", "
+        ),
+        backtest_term_range = if (min(rows$target_term) == max(rows$target_term)) {
+          fmt_term(min(rows$target_term))
+        } else {
+          paste(fmt_term(min(rows$target_term)), "to", fmt_term(max(rows$target_term)))
+        },
+        n_capacity_usable = sum(rows$capacity_usable),
+        n_capacity_reached = sum(rows$capacity_reached),
+        n_capacity_unreached = sum(uncensored),
+        census_equivalent_wape = projection_wape(
+          rows$census_equivalent_abs_error, rows$actual_census
+        ),
+        capacity_censored_wape = projection_wape(
+          rows$capacity_censored_abs_error, rows$actual_classlist_total
+        ),
+        uncensored_wape = projection_wape(
+          rows$abs_error[uncensored], rows$actual_classlist_total[uncensored]
+        ),
+        n_capacity_censored_misses = sum(rows$capacity_censored_miss, na.rm = TRUE),
+        capacity_explained_wape = projection_wape(
+          rows$capacity_explained_classlist_error, rows$actual_classlist_total
+        ),
+        capacity_explained_error_share = if (sum(rows$abs_error, na.rm = TRUE) > 0) {
+          sum(rows$capacity_explained_classlist_error, na.rm = TRUE) /
+            sum(rows$abs_error, na.rm = TRUE)
+        } else {
+          0
+        },
+        capacity_censored_terms = paste(censored_terms, collapse = ","),
+        capacity_censored_term_labels = paste(
+          vapply(censored_terms, fmt_term, character(1)), collapse = ", "
+        ),
+        weighted_bias = projection_wape(rows$error, rows$actual_classlist_total),
+        uncensored_weighted_bias = projection_wape(
+          rows$error[uncensored], rows$actual_classlist_total[uncensored]
+        ),
+        mean_pct_error = mean(rows$pct_error, na.rm = TRUE),
+        pct_error_sd = if (sum(is.finite(rows$pct_error)) >= 2L) {
+          stats::sd(rows$pct_error, na.rm = TRUE)
+        } else {
+          NA_real_
+        },
+        uncensored_pct_error_sd = if (
+          sum(uncensored & is.finite(rows$pct_error)) >= 2L
+        ) {
+          stats::sd(rows$pct_error[uncensored], na.rm = TRUE)
+        } else {
+          NA_real_
+        },
+        overprediction_rate = if (length(directional) > 0) {
+          mean(directional > 0)
+        } else {
+          NA_real_
+        },
+        underprediction_rate = if (length(directional) > 0) {
+          mean(directional < 0)
+        } else {
+          NA_real_
+        },
+        direction_consistency = projection_direction_consistency(
+          rows$pct_error, neutral
+        ),
+        signed_error_history = paste(
+          paste0(
+            vapply(rows$target_term, fmt_term, character(1)), ": ",
+            ifelse(
+              is.finite(rows$pct_error),
+              sprintf("%+.1f%%", 100 * rows$pct_error), "NA"
+            )
+          ),
+          collapse = "; "
+        )
+      )
+    }) %>%
+    dplyr::ungroup() %>%
+    dplyr::mutate(
+      capacity_miss_assessment = dplyr::case_when(
+        n_capacity_usable == 0L ~ "Insufficient capacity history",
+        n_capacity_censored_misses == 0L ~
+          "No aftcast misses are explained by the seat ceiling",
+        capacity_explained_error_share >= as.numeric(
+          opt$capacity_explained_share_threshold %||% 0.50
+        ) ~ "Capacity likely explains most of the apparent error",
+        TRUE ~ "Capacity may explain part of the apparent error"
+      )
+    ) %>%
+    dplyr::select(dplyr::all_of(names(empty_projection_performance())))
+}
+
+
+attach_projection_performance <- function(candidates, performance,
+                                          opt = list()) {
+  performance <- dplyr::bind_rows(
+    empty_projection_performance(), performance
+  )
+  candidates %>%
+    dplyr::left_join(
+      performance,
+      by = c(
+        "market_id", "college", "subject_course", "term_type",
+        "method_id", "method_label"
+      )
+    ) %>%
+    dplyr::mutate(
+      raw_projected_classlist_total = projected_classlist_total,
+      projected_census_equivalent =
+        projected_classlist_total * census_retention_rate
+    )
 }
 
 
@@ -2455,12 +2234,12 @@ empty_projection_recent_history <- function() {
     scheduled_capacity = numeric(), census_fill = numeric(),
     prior_classlist_total = numeric(), prior_scheduled_capacity = numeric(),
     classlist_change = numeric(), capacity_change = numeric(),
-    registration_fill = numeric(), registration_capacity_gap = numeric(),
+    census_capacity_gap = numeric(),
     capacity_usable = logical(), capacity_reached = logical(), method_id = character(),
-    method_label = character(), aftcast_applicable = logical(),
-    aftcast_reason = character(), raw_aftcast_classlist_total = numeric(),
-    aftcast_classlist_total = numeric(), calibration_applied = logical(),
-    calibration_factor = numeric(), aftcast_error = numeric(),
+    method_label = character(), aftcast_method_id = character(),
+    aftcast_method_label = character(), aftcast_applicable = logical(),
+    aftcast_reason = character(),
+    aftcast_classlist_total = numeric(), aftcast_error = numeric(),
     aftcast_pct_error = numeric(), aftcast_capacity_censored = logical(),
     aftcast_censored_error = numeric(), aftcast_censored_pct_error = numeric(),
     potential_miss_explanation = character(),
@@ -2624,7 +2403,7 @@ attach_projection_movement_signals <- function(
           sign(classlist_change) == sign(capacity_change) ~
             "Enrollment and scheduled capacity moved together",
         dplyr::coalesce(capacity_reached, FALSE) ~
-          "Registration reached scheduled capacity",
+          "Census enrollment reached scheduled capacity",
         is.finite(university_student_change) &
           abs(university_student_change) >= 0.05 ~
             "University enrollment also moved materially",
@@ -2646,10 +2425,10 @@ build_projection_recent_history <- function(projections, enrollment_history,
   }
 
   empty_aftcasts <- tibble::tibble(
-    history_term = integer(), aftcast_applicable = logical(),
-    aftcast_reason = character(), raw_aftcast_classlist_total = numeric(),
-    aftcast_classlist_total = numeric(), calibration_applied = logical(),
-    calibration_factor = numeric(), aftcast_capacity_censored = logical(),
+    history_term = integer(), aftcast_method_id = character(),
+    aftcast_method_label = character(), aftcast_applicable = logical(),
+    aftcast_reason = character(), aftcast_classlist_total = numeric(),
+    aftcast_capacity_censored = logical(),
     aftcast_censored_error = numeric(), aftcast_censored_pct_error = numeric()
   )
 
@@ -2665,25 +2444,32 @@ build_projection_recent_history <- function(projections, enrollment_history,
       section_history, projection, before_term = projection$target_term
     ) %>%
       dplyr::select(term, scheduled_sections, scheduled_capacity)
+    # The aftcast shown for a past term is the one the rolling selection rule
+    # would have published then (policy_selected), which may be a different
+    # method from today's pick. Showing today's method on every past term
+    # would restate the in-sample fit 0.19.0 retired.
     aftcasts <- if (nrow(backtests) == 0L || projection$method_id == "none") {
       empty_aftcasts
     } else {
+      projection_require_columns(
+        backtests, "policy_selected",
+        "build_projection_recent_history() backtests"
+      )
       backtests %>%
         dplyr::filter(
           market_id == projection$market_id,
           subject_course == projection$subject_course,
           term_type == projection$term_type,
-          method_id == projection$method_id,
+          policy_selected,
           target_term %in% history$term
         ) %>%
         dplyr::transmute(
           history_term = target_term,
+          aftcast_method_id = method_id,
+          aftcast_method_label = method_label,
           aftcast_applicable = applicable,
           aftcast_reason = applicability_reason,
-          raw_aftcast_classlist_total = raw_projected_classlist_total,
-          aftcast_classlist_total = calibrated_projected_classlist_total,
-          calibration_applied = dplyr::coalesce(calibration_applied, FALSE),
-          calibration_factor,
+          aftcast_classlist_total = projected_classlist_total,
           aftcast_capacity_censored = capacity_censored_miss,
           aftcast_censored_error = capacity_censored_error,
           aftcast_censored_pct_error = dplyr::if_else(
@@ -2697,8 +2483,8 @@ build_projection_recent_history <- function(projections, enrollment_history,
     joined <- history %>%
       dplyr::left_join(sections, by = "term") %>%
       dplyr::left_join(aftcasts, by = c("term" = "history_term"))
-    capacity_status <- projection_registration_capacity_metrics(
-      joined$classlist_total, joined$scheduled_capacity,
+    capacity_status <- projection_capacity_metrics(
+      joined$census_enrl, joined$scheduled_capacity,
       reached_threshold = opt$registration_capacity_threshold %||% 1.00
     )
 
@@ -2737,23 +2523,18 @@ build_projection_recent_history <- function(projections, enrollment_history,
         scheduled_capacity = as.numeric(scheduled_capacity),
         prior_classlist_total, prior_scheduled_capacity,
         classlist_change, capacity_change,
-        census_fill = dplyr::if_else(
-          scheduled_capacity > 0,
-          actual_census / scheduled_capacity,
-          NA_real_
-        ),
-        registration_fill, registration_capacity_gap, capacity_usable,
-        capacity_reached,
+        census_fill = capacity_fill,
+        census_capacity_gap = capacity_gap,
+        capacity_usable, capacity_reached,
         method_id = projection$method_id,
         method_label = projection$method_label,
+        aftcast_method_id,
+        aftcast_method_label,
         aftcast_applicable = dplyr::coalesce(aftcast_applicable, FALSE),
         aftcast_reason = dplyr::coalesce(
           aftcast_reason, projection$applicability_reason
         ),
-        raw_aftcast_classlist_total,
         aftcast_classlist_total,
-        calibration_applied = dplyr::coalesce(calibration_applied, FALSE),
-        calibration_factor,
         aftcast_error = aftcast_classlist_total - actual_classlist_total,
         aftcast_pct_error = dplyr::if_else(
           actual_classlist_total > 0,
@@ -2768,8 +2549,8 @@ build_projection_recent_history <- function(projections, enrollment_history,
             "No comparable aftcast",
           dplyr::coalesce(aftcast_capacity_censored, FALSE) ~
             paste(
-              "Registration reached capacity; observed demand is a lower bound",
-              "rather than a complete error measurement"
+              "Census enrollment reached scheduled capacity; observed demand",
+              "is a lower bound rather than a complete error measurement"
             ),
           is.finite(aftcast_pct_error) & abs(aftcast_pct_error) <= 0.10 ~
             "Aftcast was within 10% of observed class-list enrollment",
@@ -2823,8 +2604,7 @@ empty_projection_candidates <- function() {
       )
     ) %>%
     dplyr::mutate(
-      raw_projected_classlist_total = numeric(), calibration_factor = numeric(),
-      calibration_applied = logical(), calibration_adjustment = numeric(),
+      raw_projected_classlist_total = numeric(),
       selected = logical()
     )
 }
@@ -2834,9 +2614,10 @@ empty_enrollment_projections <- function() {
   empty_projection_candidates() %>%
     dplyr::select(-selected) %>%
     dplyr::mutate(
-      calibrated_projected_classlist_total = numeric(),
       interval_error = numeric(), projection_low = numeric(),
       projection_high = numeric(),
+      projection_low_census_equivalent = numeric(),
+      projection_high_census_equivalent = numeric(),
       stability = character(), stability_reason = character(),
       history_terms = integer(), history_first_term = integer(),
       history_last_term = integer(),
@@ -2848,7 +2629,8 @@ empty_enrollment_projections <- function() {
       selection_reason = character(),
       selection_wape = numeric(), selection_n_backtests = integer(),
       selection_pct_error_sd = numeric(),
-      selection_basis = character(), selection_uses_uncensored = logical(),
+      selection_basis = character(), selection_common_n = integer(),
+      selection_default_wape = numeric(), selection_challenger_wape = numeric(),
       capacity_constrained_history = logical(),
       department = character(),
       scheduled_sections = integer(), scheduled_capacity = numeric(),
@@ -2860,7 +2642,7 @@ empty_enrollment_projections <- function() {
       target_registration_observed = logical(),
       target_available_seats = numeric(), target_classlist_fill = numeric(),
       target_active_fill = numeric(),
-      target_capacity_reached = logical(), projected_census_equivalent = numeric(),
+      target_capacity_reached = logical(),
       projected_over_capacity = numeric(), capacity_limit_signal = logical(),
       capacity_limit_status = character(), capacity_limit_note = character(),
       inclusion_reason = character(), candidate_min = numeric(),
@@ -2870,410 +2652,213 @@ empty_enrollment_projections <- function() {
       additional_sections = integer(), methods_disagree = logical(),
       observed_baseline = numeric(), observed_method_id = character(),
       observed_method = character(), observed_wape = numeric(),
-      observed_n_backtests = integer(), structural_projection = numeric(),
-      structural_method_id = character(), structural_method = character(),
-      structural_observed_wape = numeric(), structural_capacity_wape = numeric(),
-      structural_uncensored_wape = numeric(), structural_coverage = numeric(),
-      population_projection = numeric(), population_observed_wape = numeric(),
-      population_capacity_wape = numeric(),
-      population_uncensored_wape = numeric(), population_coverage = numeric(),
-      population_n_backtests = integer(),
-      spring_flow_projection = numeric(), spring_flow_observed_wape = numeric(),
-      spring_flow_capacity_wape = numeric(),
-      spring_flow_uncensored_wape = numeric(), spring_flow_coverage = numeric(),
-      spring_flow_n_backtests = integer(),
-      feeder_projection = numeric(),
-      feeder_observed_wape = numeric(), feeder_capacity_wape = numeric(),
-      feeder_uncensored_wape = numeric(), feeder_coverage = numeric(),
-      feeder_n_backtests = integer(),
+      observed_n_backtests = integer(),
+      adjusted_projection = numeric(), adjusted_wape = numeric(),
+      adjusted_n_backtests = integer(), adjusted_applicable = logical(),
+      adjusted_reason = character(),
+      adjusted_saturated_prior = logical(), adjusted_prior_census_fill = numeric(),
+      adjusted_waitlisted_prior = integer(), adjusted_floor_uplift = numeric(),
+      adjusted_floor_basis = character(), adjusted_preceding_term = integer(),
+      adjusted_preceding_term_enrollment = numeric(),
+      adjusted_preceding_term_change = numeric(), adjusted_regime_alarm = logical(),
+      adjusted_delta_repeat = numeric(), adjusted_repeat_rate = numeric(),
+      adjusted_delta_feeder = numeric(), adjusted_feeder_rate = numeric(),
+      adjusted_feeder_courses = character(), adjusted_feeder_change = numeric(),
+      adjusted_delta_basis = character(),
+      expansion_pairs = integer(), expansion_fill_rate = numeric(),
+      expansion_note = character(), floor_note = character(),
+      regime_note = character(),
       capacity_data_quality = character(), recent_capacity_terms = integer(),
       recent_capacity_reached_terms = integer(),
-      last_registration_fill = numeric(),
+      last_census_fill = numeric(),
       observed_enrollment_slope = numeric(), observed_enrollment_rising = logical(),
       persistent_capacity_reached = logical(), capacity_increase_terms = integer(),
       demand_followed_capacity_terms = integer(),
-      structural_gap_threshold = numeric(), structural_high_projection = numeric(),
-      structural_gap = numeric(), n_structural_above_observed = integer(),
-      population_credible = logical(), spring_flow_credible = logical(),
-      feeder_credible = logical(),
-      n_credible_structural_methods = integer(),
-      coupling_n_backtests = integer(), coupling_wape_gain = numeric(),
-      coupling_status = character(), coupling_reason = character(),
       why_uncertain = character(),
-      demand_signal = character(), demand_signal_reason = character(),
-      recommendation = character(), demand_note = character()
+      recommendation = character()
     )
 }
 
 
-summarize_projection_backtests <- function(backtests, opt = list()) {
-  if (nrow(backtests) == 0) return(empty_projection_performance())
+# ---- Rolling method selection ------------------------------------------------
+#
+# Prior same-season is the default projection. A challenger replaces it for a
+# target only when, on earlier aftcast terms the two methods share, the
+# challenger's WAPE was lower by at least `selection_challenger_margin` across
+# at least `selection_min_backtests` such terms.
+#
+# The same rule is replayed at every historical fold using only the folds
+# before it, and the accuracy published for a course is the realised error of
+# the method the rule would have picked at each fold -- never the error of the
+# winner on the folds that crowned it. The 0.18.0 engine chose in-sample on two
+# common folds: it reported 13.7% WAPE for its picks, the same rule replayed
+# honestly scored 16.5%, and prior same-season alone scored 15.9%. A method
+# that cannot beat the default out of sample does not get to replace it.
 
-  capacity_fields <- c(
-    "registration_capacity_gap", "capacity_censored_classlist_projection",
-    "capacity_censored_miss", "capacity_explained_classlist_error",
-    "capacity_explained_share"
+projection_policy_record_columns <- function() {
+  c(
+    "n_backtests", "mae", "rmse", "wape", "bias", "error_q80",
+    "backtest_start_term", "backtest_end_term", "backtest_terms",
+    "backtest_term_labels", "backtest_term_range", "n_capacity_usable",
+    "n_capacity_reached", "n_capacity_unreached", "census_equivalent_wape",
+    "capacity_censored_wape", "uncensored_wape", "n_capacity_censored_misses",
+    "capacity_explained_wape", "capacity_explained_error_share",
+    "capacity_censored_terms", "capacity_censored_term_labels",
+    "capacity_miss_assessment", "weighted_bias", "uncensored_weighted_bias",
+    "mean_pct_error", "pct_error_sd", "uncensored_pct_error_sd",
+    "overprediction_rate", "underprediction_rate", "direction_consistency",
+    "signed_error_history"
   )
-  if (!all(capacity_fields %in% names(backtests))) {
-    backtests <- add_projection_capacity_censoring(backtests, opt)
-  }
-
-  if (!"method_role" %in% names(backtests)) {
-    backtests$method_role <- unname(
-      CEDAR_ENROLLMENT_PROJECTION_METHOD_ROLES[backtests$method_id]
-    )
-  }
-  if (!"pct_error" %in% names(backtests)) {
-    backtests$pct_error <- dplyr::if_else(
-      backtests$actual_classlist_total > 0,
-      backtests$error / backtests$actual_classlist_total,
-      NA_real_
-    )
-  }
-  if (!"calibration_applied" %in% names(backtests)) {
-    backtests <- add_projection_rolling_calibration(backtests, opt)
-  }
-
-  usable <- backtests %>%
-    dplyr::filter(applicable, is.finite(projected_classlist_total), is.finite(actual_classlist_total))
-  if (nrow(usable) == 0) return(empty_projection_performance())
-
-  keys <- c(
-    "market_id", "college", "subject_course", "term_type", "method_id",
-    "method_label"
-  )
-  base <- usable %>%
-    dplyr::group_by(
-      dplyr::across(dplyr::all_of(keys))
-    ) %>%
-    dplyr::summarise(
-      n_backtests = dplyr::n(),
-      mae = mean(abs_error),
-      rmse = sqrt(mean(error^2)),
-      wape = projection_wape(abs_error, actual_classlist_total),
-      bias = mean(error),
-      error_q80 = as.numeric(stats::quantile(abs_error, 0.80, names = FALSE)),
-      backtest_start_term = min(target_term),
-      backtest_end_term = max(target_term),
-      backtest_terms = paste(sort(unique(target_term)), collapse = ","),
-      backtest_term_labels = paste(
-        vapply(sort(unique(target_term)), fmt_term, character(1)),
-        collapse = ", "
-      ),
-      backtest_term_range = if (min(target_term) == max(target_term)) {
-        fmt_term(min(target_term))
-      } else {
-        paste(fmt_term(min(target_term)), "to", fmt_term(max(target_term)))
-      },
-      n_capacity_usable = sum(capacity_usable),
-      n_capacity_reached = sum(capacity_reached),
-      n_capacity_unreached = sum(capacity_usable & !capacity_reached),
-      census_equivalent_wape = projection_wape(
-        census_equivalent_abs_error, actual_census
-      ),
-      capacity_censored_wape = projection_wape(
-        capacity_censored_abs_error, actual_classlist_total
-      ),
-      uncensored_wape = projection_wape(
-        abs_error[capacity_usable & !capacity_reached],
-        actual_classlist_total[capacity_usable & !capacity_reached]
-      ),
-      n_capacity_censored_misses = sum(capacity_censored_miss, na.rm = TRUE),
-      capacity_explained_wape = projection_wape(
-        capacity_explained_classlist_error, actual_classlist_total
-      ),
-      capacity_explained_error_share =
-        if (sum(abs_error, na.rm = TRUE) > 0) {
-        sum(capacity_explained_classlist_error, na.rm = TRUE) /
-          sum(abs_error, na.rm = TRUE)
-      } else {
-        0
-      },
-      capacity_censored_terms = paste(
-        sort(unique(target_term[capacity_censored_miss])), collapse = ","
-      ),
-      capacity_censored_term_labels = paste(
-        vapply(
-          sort(unique(target_term[capacity_censored_miss])),
-          fmt_term,
-          character(1)
-        ),
-        collapse = ", "
-      ),
-      .groups = "drop"
-    ) %>%
-    dplyr::mutate(
-      capacity_miss_assessment = dplyr::case_when(
-        n_capacity_usable == 0L ~ "Insufficient capacity history",
-        n_capacity_censored_misses == 0L ~
-          "No aftcast misses are explained by the seat ceiling",
-        capacity_explained_error_share >= as.numeric(
-          opt$capacity_explained_share_threshold %||% 0.50
-        ) ~ "Capacity likely explains most of the apparent error",
-        TRUE ~ "Capacity may explain part of the apparent error"
-      )
-    )
-
-  neutral <- as.numeric(opt$calibration_neutral_error %||% 0.01)
-  min_validation <- as.integer(opt$calibration_min_validation_terms %||% 2L)
-  min_gain <- as.numeric(opt$calibration_min_wape_gain %||% 0.01)
-  diagnostics <- usable %>%
-    dplyr::group_by(
-      dplyr::across(dplyr::all_of(c(keys, "method_role")))
-    ) %>%
-    dplyr::group_modify(function(.x, .y) {
-      rows <- dplyr::arrange(.x, target_term)
-      fit <- projection_calibration_fit(rows, .y$method_role[[1]], opt)
-      directional <- rows$pct_error[
-        is.finite(rows$pct_error) & abs(rows$pct_error) > neutral
-      ]
-      calibrated <- rows %>%
-        dplyr::filter(
-          calibration_applied,
-          is.finite(calibrated_abs_error),
-          is.finite(actual_classlist_total)
-        )
-      if (.y$method_role[[1]] %in%
-          c("structural_demand", "anchored_upstream")) {
-        calibrated <- calibrated %>%
-          dplyr::filter(capacity_usable, !capacity_reached)
-      }
-      n_calibrated <- nrow(calibrated)
-      comparison_wape <- projection_wape(
-        calibrated$abs_error, calibrated$actual_classlist_total
-      )
-      calibrated_wape <- projection_wape(
-        calibrated$calibrated_abs_error, calibrated$actual_classlist_total
-      )
-      calibration_gain <- comparison_wape - calibrated_wape
-      validated <- n_calibrated >= min_validation &&
-        is.finite(calibration_gain) && calibration_gain >= min_gain
-      recommended <- fit$applicable && validated
-      reason <- dplyr::case_when(
-        !fit$applicable ~ fit$reason,
-        n_calibrated < min_validation ~ paste(
-          "Stable bias found; needs", min_validation,
-          "rolling calibration aftcasts"
-        ),
-        !is.finite(calibration_gain) || calibration_gain < min_gain ~
-          "Rolling calibration did not improve WAPE enough",
-        TRUE ~ paste0(
-          "Validated calibration improved WAPE by ",
-          scales::percent(calibration_gain, accuracy = 0.1)
-        )
-      )
-      uncensored <- rows$capacity_usable & !rows$capacity_reached
-
-      tibble::tibble(
-        weighted_bias = projection_wape(rows$error, rows$actual_classlist_total),
-        uncensored_weighted_bias = projection_wape(
-          rows$error[uncensored], rows$actual_classlist_total[uncensored]
-        ),
-        mean_pct_error = mean(rows$pct_error, na.rm = TRUE),
-        pct_error_sd = if (sum(is.finite(rows$pct_error)) >= 2L) {
-          stats::sd(rows$pct_error, na.rm = TRUE)
-        } else {
-          NA_real_
-        },
-        uncensored_pct_error_sd = if (
-          sum(uncensored & is.finite(rows$pct_error)) >= 2L
-        ) {
-          stats::sd(rows$pct_error[uncensored], na.rm = TRUE)
-        } else {
-          NA_real_
-        },
-        overprediction_rate = if (length(directional) > 0) {
-          mean(directional > 0)
-        } else {
-          NA_real_
-        },
-        underprediction_rate = if (length(directional) > 0) {
-          mean(directional < 0)
-        } else {
-          NA_real_
-        },
-        direction_consistency = projection_direction_consistency(
-          rows$pct_error, neutral
-        ),
-        signed_error_history = paste(
-          paste0(
-            vapply(rows$target_term, fmt_term, character(1)), ": ",
-            ifelse(
-              is.finite(rows$pct_error),
-              sprintf("%+.1f%%", 100 * rows$pct_error), "NA"
-            )
-          ),
-          collapse = "; "
-        ),
-        calibration_training_n = fit$n,
-        proposed_calibration_factor = fit$proposed_factor,
-        calibration_candidate = fit$applicable,
-        n_calibrated_backtests = as.integer(n_calibrated),
-        calibration_comparison_wape = comparison_wape,
-        calibrated_wape = calibrated_wape,
-        calibration_wape_gain = calibration_gain,
-        calibration_validated = validated,
-        calibration_recommended = recommended,
-        calibration_reason = reason
-      )
-    }) %>%
-    dplyr::ungroup() %>%
-    dplyr::select(-method_role)
-
-  base %>%
-    dplyr::left_join(diagnostics, by = keys)
 }
 
 
-attach_projection_performance <- function(candidates, performance,
-                                          opt = list()) {
-  performance <- dplyr::bind_rows(
-    empty_projection_performance(), performance
-  )
-  factor_bounds <- as.numeric(
-    opt$calibration_factor_bounds %||%
-      CEDAR_ENROLLMENT_PROJECTION_CALIBRATION_FACTOR_BOUNDS
-  )
-  factor_is_safe <- length(factor_bounds) == 2L &&
-    all(is.finite(factor_bounds))
-  factor_lower <- if (factor_is_safe) min(factor_bounds) else NA_real_
-  factor_upper <- if (factor_is_safe) max(factor_bounds) else NA_real_
-  candidates %>%
-    dplyr::left_join(
-      performance,
-      by = c(
-        "market_id", "college", "subject_course", "term_type",
-        "method_id", "method_label"
-      )
-    ) %>%
-    dplyr::mutate(
-      raw_projected_classlist_total = projected_classlist_total,
-      calibration_applied = dplyr::coalesce(
-        calibration_recommended, FALSE
-      ) & dplyr::coalesce(applicable, FALSE) &
-        is.finite(raw_projected_classlist_total) &
-        is.finite(proposed_calibration_factor) & factor_is_safe &
-        proposed_calibration_factor >= factor_lower &
-        proposed_calibration_factor <= factor_upper,
-      calibration_factor = dplyr::if_else(
-        calibration_applied, proposed_calibration_factor, 1
-      ),
-      projected_classlist_total = dplyr::if_else(
-        calibration_applied,
-        raw_projected_classlist_total * calibration_factor,
-        raw_projected_classlist_total
-      ),
-      calibration_adjustment =
-        projected_classlist_total - raw_projected_classlist_total,
-      projected_census_equivalent =
-        projected_classlist_total * census_retention_rate
+#' Replay the selection rule at every fold of one course's aftcasts
+#'
+#' @param backtests Aftcast rows for one course market and term type, every
+#'   method. Only rows with `target_term < current_term` are read.
+#' @param challengers Method ids allowed to challenge the default at
+#'   `current_term`.
+#' @param current_term The target being published.
+#' @return `current`: the pick for `current_term` with its evidence and reason.
+#'   `record`: the realised aftcast row the rule would have published at each
+#'   historical fold, with a `policy_reason`.
+projection_rolling_policy <- function(backtests, challengers, current_term,
+                                      opt = list()) {
+  default_method <- CEDAR_ENROLLMENT_PROJECTION_DEFAULT_METHOD
+  default_label <- unname(CEDAR_ENROLLMENT_PROJECTION_METHODS[[default_method]])
+  # Inline fallbacks mirror enrollment_projection_model_config().
+  min_folds <- as.integer(opt$selection_min_backtests %||% 3L)
+  margin <- as.numeric(opt$selection_challenger_margin %||% 0.02)
+  method_order <- names(CEDAR_ENROLLMENT_PROJECTION_METHODS)
+  current_term <- as.integer(current_term)
+  challengers <- setdiff(unique(as.character(challengers %||% character(0))),
+                         default_method)
+
+  usable <- if (nrow(backtests) == 0L) {
+    backtests
+  } else {
+    projection_require_columns(
+      backtests,
+      c("method_id", "target_term", "applicable", "abs_error",
+        "actual_classlist_total"),
+      "projection_rolling_policy()"
     )
-}
-
-
-projection_common_fold_scores <- function(candidates, group_key, backtests,
-                                          opt = list()) {
-  method_ids <- unique(as.character(
-    candidates$method_id[candidates$selection_eligible %in% TRUE]
-  ))
-  required <- c(
-    "market_id", "subject_course", "term_type", "method_id", "target_term",
-    "applicable", "actual_classlist_total", "abs_error", "pct_error"
-  )
-  if (length(method_ids) < 2L || nrow(backtests) == 0L ||
-      any(!required %in% names(backtests))) {
-    return(tibble::tibble())
-  }
-
-  scoped <- backtests
-  for (key in intersect(
-    c("market_id", "subject_course", "term_type"), names(group_key)
-  )) {
-    scoped <- scoped[scoped[[key]] == group_key[[key]][[1]], , drop = FALSE]
-  }
-  scoped <- scoped %>%
-    dplyr::filter(
-      method_id %in% .env$method_ids, applicable,
-      is.finite(actual_classlist_total), actual_classlist_total > 0
-    ) %>%
-    dplyr::mutate(
-      comparison_abs_error = abs_error,
-      comparison_pct_error = pct_error
-    ) %>%
-    dplyr::filter(
-      is.finite(comparison_abs_error), is.finite(comparison_pct_error)
-    )
-  if (nrow(scoped) == 0L) return(tibble::tibble())
-
-  common_terms <- scoped %>%
-    dplyr::distinct(method_id, target_term) %>%
-    dplyr::count(target_term, name = "n_methods") %>%
-    dplyr::filter(n_methods == length(method_ids)) %>%
-    dplyr::pull(target_term)
-  min_backtests <- as.integer(opt$selection_min_backtests %||% 2L)
-  if (length(common_terms) < min_backtests) return(tibble::tibble())
-  scoped <- dplyr::filter(scoped, target_term %in% .env$common_terms)
-
-  cap_limited <- any(candidates$capacity_constrained_history, na.rm = TRUE)
-  min_uncensored <- as.integer(
-    opt$uncensored_selection_min_backtests %||% 2L
-  )
-  has_capacity <- all(c("capacity_usable", "capacity_reached") %in% names(scoped))
-  uncensored_terms <- if (cap_limited && has_capacity) {
-    scoped %>%
-      dplyr::group_by(target_term) %>%
-      dplyr::summarise(
-        n_methods = dplyr::n_distinct(method_id),
-        all_unconstrained = all(capacity_usable & !capacity_reached),
-        .groups = "drop"
-      ) %>%
+    backtests %>%
       dplyr::filter(
-        n_methods == length(method_ids), all_unconstrained
-      ) %>%
-      dplyr::pull(target_term)
-  } else {
-    integer(0)
-  }
-  uses_uncensored <- length(uncensored_terms) >= min_uncensored
-  comparison_terms <- if (uses_uncensored) uncensored_terms else common_terms
-  basis <- if (uses_uncensored) {
-    "Common unconstrained-term WAPE"
-  } else {
-    "Common all-term WAPE"
+        applicable, is.finite(abs_error), is.finite(actual_classlist_total),
+        actual_classlist_total > 0, target_term < current_term
+      )
   }
 
-  scoped %>%
-    dplyr::filter(target_term %in% .env$comparison_terms) %>%
-    dplyr::group_by(method_id) %>%
-    dplyr::summarise(
-      common_selection_wape = projection_wape(
-        comparison_abs_error, actual_classlist_total
-      ),
-      common_selection_n_backtests = dplyr::n_distinct(target_term),
-      common_selection_pct_error_sd = if (
-        sum(is.finite(comparison_pct_error)) >= 2L
-      ) stats::sd(comparison_pct_error, na.rm = TRUE) else NA_real_,
-      .groups = "drop"
-    ) %>%
-    dplyr::mutate(
-      common_selection_basis = basis,
-      common_selection_uses_uncensored = uses_uncensored
+  default_reason <- paste0(
+    default_label, " is the default; no challenger beat it by at least ",
+    scales::percent(margin, accuracy = 0.1), " WAPE on ", min_folds,
+    " or more earlier shared aftcasts"
+  )
+
+  decide <- function(at_term) {
+    result <- list(
+      method_id = default_method, common_n = NA_integer_,
+      default_wape = NA_real_, challenger_wape = NA_real_,
+      reason = default_reason
     )
+    if (nrow(usable) == 0L || length(challengers) == 0L) return(result)
+    prior <- usable %>% dplyr::filter(target_term < at_term)
+    default_prior <- prior %>% dplyr::filter(method_id == default_method)
+    if (nrow(default_prior) == 0L) return(result)
+
+    scored <- dplyr::bind_rows(lapply(challengers, function(method) {
+      own <- prior %>% dplyr::filter(method_id == method)
+      common <- intersect(own$target_term, default_prior$target_term)
+      if (length(common) < min_folds) return(NULL)
+      shared_default <- default_prior %>%
+        dplyr::filter(target_term %in% common)
+      shared_own <- own %>% dplyr::filter(target_term %in% common)
+      tibble::tibble(
+        method_id = method,
+        common_n = length(common),
+        default_wape = projection_wape(
+          shared_default$abs_error, shared_default$actual_classlist_total
+        ),
+        challenger_wape = projection_wape(
+          shared_own$abs_error, shared_own$actual_classlist_total
+        )
+      )
+    }))
+    if (nrow(scored) == 0L) return(result)
+    winners <- scored %>%
+      dplyr::filter(
+        is.finite(default_wape), is.finite(challenger_wape),
+        challenger_wape <= default_wape - margin
+      ) %>%
+      dplyr::mutate(method_rank = match(method_id, method_order)) %>%
+      dplyr::arrange(challenger_wape, method_rank)
+    if (nrow(winners) == 0L) return(result)
+    winner <- winners[1, , drop = FALSE]
+    list(
+      method_id = winner$method_id,
+      common_n = as.integer(winner$common_n),
+      default_wape = winner$default_wape,
+      challenger_wape = winner$challenger_wape,
+      reason = paste0(
+        unname(CEDAR_ENROLLMENT_PROJECTION_METHODS[[winner$method_id]]),
+        " beat ", default_label, " on ", winner$common_n,
+        " earlier shared aftcasts (",
+        scales::percent(winner$challenger_wape, accuracy = 0.1), " vs ",
+        scales::percent(winner$default_wape, accuracy = 0.1), " WAPE)"
+      )
+    )
+  }
+
+  folds <- if (nrow(usable) == 0L) integer(0) else
+    sort(unique(usable$target_term))
+  record <- dplyr::bind_rows(lapply(folds, function(fold) {
+    pick <- decide(fold)
+    rows <- usable %>%
+      dplyr::filter(target_term == fold, method_id == pick$method_id)
+    # The rule may name a method that had no aftcast at this fold (the default
+    # before its first comparable term); that fold then has no realised row.
+    if (nrow(rows) == 0L) return(NULL)
+    dplyr::mutate(rows, policy_reason = pick$reason)
+  }))
+
+  list(current = decide(current_term), record = record)
 }
 
 
+# Flag the aftcast row the rolling rule would have published at each fold.
+mark_projection_policy_backtests <- function(backtests, policy_record) {
+  if (nrow(backtests) == 0L) return(backtests)
+  keys <- c("market_id", "subject_course", "term_type", "target_term",
+            "method_id")
+  picked <- if (is.null(policy_record) || nrow(policy_record) == 0L) {
+    backtests[0, keys, drop = FALSE]
+  } else {
+    policy_record %>% dplyr::distinct(dplyr::across(dplyr::all_of(keys)))
+  }
+  picked$policy_selected <- rep(TRUE, nrow(picked))
+  backtests %>%
+    dplyr::select(-dplyr::any_of("policy_selected")) %>%
+    dplyr::left_join(picked, by = keys) %>%
+    dplyr::mutate(policy_selected = dplyr::coalesce(policy_selected, FALSE))
+}
+
+
+#' Publish one method per course from leakage-safe rolling selection
+#'
+#' Returns the selected candidate rows. The realised fold-by-fold record the
+#' rule produced is attached as `attr(, "policy_record")` so the cone can mark
+#' `backtests$policy_selected` without replaying the rule.
 select_projection_methods <- function(candidates, performance, backtests,
                                       opt = list()) {
   if (nrow(candidates) == 0) return(tibble::tibble())
-  min_backtests <- as.integer(opt$selection_min_backtests %||% 2L)
-  min_uncensored <- as.integer(
-    opt$uncensored_selection_min_backtests %||% 2L
-  )
   constrained_share <- as.numeric(opt$capacity_constrained_share %||% 0.50)
   method_order <- names(CEDAR_ENROLLMENT_PROJECTION_METHODS)
-  keys <- c(
-    "market_id", "subject_course", "term_type", "target_term"
-  )
+  default_method <- CEDAR_ENROLLMENT_PROJECTION_DEFAULT_METHOD
+  default_label <- unname(CEDAR_ENROLLMENT_PROJECTION_METHODS[[default_method]])
+  keys <- c("market_id", "subject_course", "term_type", "target_term")
+  record_columns <- projection_policy_record_columns()
+  na_performance <- empty_projection_performance()[NA_integer_, , drop = FALSE]
 
   joined <- attach_projection_performance(candidates, performance, opt) %>%
     dplyr::mutate(
@@ -3281,113 +2866,81 @@ select_projection_methods <- function(candidates, performance, backtests,
       capacity_constrained_history =
         dplyr::coalesce(n_capacity_usable, 0L) >= 2L &
         dplyr::coalesce(n_capacity_reached / n_capacity_usable, 0) >=
-          constrained_share,
-      selection_uses_uncensored = capacity_constrained_history &
-        dplyr::coalesce(n_capacity_unreached, 0L) >= min_uncensored &
-        is.finite(uncensored_wape),
-      selection_wape = dplyr::if_else(
-        selection_uses_uncensored, uncensored_wape, wape
-      ),
-      selection_n_backtests = dplyr::if_else(
-        selection_uses_uncensored,
-        as.integer(n_capacity_unreached), as.integer(n_backtests)
-      ),
-      selection_pct_error_sd = dplyr::if_else(
-        selection_uses_uncensored, uncensored_pct_error_sd, pct_error_sd
-      ),
-      selection_basis = dplyr::if_else(
-        selection_uses_uncensored,
-        "Unconstrained-term WAPE", "All-term WAPE"
-      ),
-      upstream_evidence_eligible = method_role == "anchored_upstream" &
-        dplyr::coalesce(n_backtests, 0L) >=
-          as.integer(opt$structural_min_backtests %||% 3L) &
-        dplyr::coalesce(coverage_rate, 0) >=
-          as.numeric(opt$structural_min_coverage %||% 0.40) &
-        is.finite(selection_wape) & selection_wape <=
-          as.numeric(opt$structural_max_wape %||% 0.20),
-      selection_eligible =
-        method_role %in% c("observed_enrollment", "anchored_upstream") &
-        applicable & is.finite(projected_classlist_total) &
-        is.finite(selection_wape) &
-        dplyr::coalesce(selection_n_backtests, 0L) >= min_backtests &
-        (method_role == "observed_enrollment" | upstream_evidence_eligible)
+          constrained_share
     )
 
+  records <- list()
   selected <- joined %>%
     dplyr::group_by(dplyr::across(dplyr::all_of(keys))) %>%
     dplyr::group_modify(function(.x, .y) {
-      common_scores <- projection_common_fold_scores(
-        .x, .y, backtests, opt
-      )
-      if (nrow(common_scores) > 0L) {
-        .x <- .x %>%
-          dplyr::left_join(common_scores, by = "method_id") %>%
-          dplyr::mutate(
-            selection_wape = dplyr::coalesce(
-              common_selection_wape, selection_wape
-            ),
-            selection_n_backtests = dplyr::coalesce(
-              as.integer(common_selection_n_backtests), selection_n_backtests
-            ),
-            selection_pct_error_sd = dplyr::coalesce(
-              common_selection_pct_error_sd, selection_pct_error_sd
-            ),
-            selection_basis = dplyr::coalesce(
-              common_selection_basis, selection_basis
-            ),
-            selection_uses_uncensored = dplyr::coalesce(
-              common_selection_uses_uncensored, selection_uses_uncensored
-            ),
-            upstream_evidence_eligible = method_role == "anchored_upstream" &
-              dplyr::coalesce(n_backtests, 0L) >=
-                as.integer(opt$structural_min_backtests %||% 3L) &
-              dplyr::coalesce(coverage_rate, 0) >=
-                as.numeric(opt$structural_min_coverage %||% 0.40) &
-              is.finite(selection_wape) & selection_wape <=
-                as.numeric(opt$structural_max_wape %||% 0.20),
-            selection_eligible =
-              method_role %in% c("observed_enrollment", "anchored_upstream") &
-              applicable & is.finite(projected_classlist_total) &
-              is.finite(selection_wape) &
-              dplyr::coalesce(selection_n_backtests, 0L) >= min_backtests &
-              (method_role == "observed_enrollment" |
-                 upstream_evidence_eligible)
-          ) %>%
-          dplyr::select(-dplyr::starts_with("common_selection_"))
-      }
-      observed <- .x %>%
-        dplyr::filter(selection_eligible, method_role == "observed_enrollment") %>%
-        dplyr::arrange(selection_wape, mae, method_rank) %>%
-        dplyr::slice_head(n = 1)
-      upstream <- .x %>%
-        dplyr::filter(selection_eligible, method_role == "anchored_upstream") %>%
-        dplyr::arrange(selection_wape, mae, method_rank) %>%
-        dplyr::slice_head(n = 1)
-      if (nrow(observed) > 0L && nrow(upstream) > 0L) {
-        cap_limited <- any(.x$capacity_constrained_history, na.rm = TRUE)
-        margin <- if (cap_limited) {
-          as.numeric(opt$upstream_capped_tie_margin %||% 0.05)
-        } else {
-          as.numeric(opt$upstream_tie_margin %||% 0.02)
+      group_backtests <- backtests
+      if (nrow(backtests) > 0L) {
+        for (key in intersect(
+          c("market_id", "subject_course", "term_type"), names(backtests)
+        )) {
+          group_backtests <- group_backtests[
+            group_backtests[[key]] == .y[[key]][[1]], , drop = FALSE
+          ]
         }
-        if (upstream$selection_wape[[1]] <=
-            observed$selection_wape[[1]] + margin) upstream else observed
-      } else if (nrow(upstream) > 0L) {
-        upstream
-      } else if (nrow(observed) > 0L) {
-        observed
-      } else {
-        fallback <- dplyr::filter(
-          .x,
-          method_role == "observed_enrollment",
-          applicable,
+      }
+      challengers <- .x %>%
+        dplyr::filter(
+          method_id != default_method, applicable,
           is.finite(projected_classlist_total)
         ) %>%
+        dplyr::pull(method_id)
+      policy <- projection_rolling_policy(
+        group_backtests, challengers, .y$target_term[[1]], opt
+      )
+      pick <- policy$current
+      chosen <- .x %>%
+        dplyr::filter(
+          method_id == pick$method_id, applicable,
+          is.finite(projected_classlist_total)
+        )
+      selection_reason <- pick$reason
+      if (nrow(chosen) == 0L) {
+        fallback <- .x %>%
+          dplyr::filter(applicable, is.finite(projected_classlist_total)) %>%
           dplyr::arrange(method_rank)
-        if (nrow(fallback) == 0) .x[0, , drop = FALSE] else
-          dplyr::slice_head(fallback, n = 1)
+        if (nrow(fallback) == 0L) return(.x[0, , drop = FALSE])
+        chosen <- dplyr::slice_head(fallback, n = 1)
+        pick <- list(
+          common_n = NA_integer_, default_wape = NA_real_,
+          challenger_wape = NA_real_
+        )
+        selection_reason <- paste0(
+          "Fallback: ", default_label, " is not available for this target; ",
+          chosen$method_label, " is the first applicable candidate"
+        )
       }
+
+      realized <- policy$record
+      records[[length(records) + 1L]] <<- realized
+      summary <- if (nrow(realized) == 0L) {
+        na_performance
+      } else {
+        realized %>%
+          dplyr::mutate(
+            method_id = chosen$method_id, method_label = chosen$method_label,
+            method_role = chosen$method_role
+          ) %>%
+          summarize_projection_backtests(opt)
+      }
+      for (column in record_columns) {
+        chosen[[column]] <- summary[[column]][[1]]
+      }
+      chosen %>%
+        dplyr::mutate(
+          selection_basis = "Rolling selection",
+          selection_wape = wape,
+          selection_n_backtests = as.integer(n_backtests),
+          selection_pct_error_sd = pct_error_sd,
+          selection_common_n = as.integer(pick$common_n),
+          selection_default_wape = as.numeric(pick$default_wape),
+          selection_challenger_wape = as.numeric(pick$challenger_wape),
+          selection_reason = selection_reason
+        )
     }) %>%
     dplyr::ungroup()
 
@@ -3408,48 +2961,29 @@ select_projection_methods <- function(candidates, performance, backtests,
         method_label = "No applicable method",
         raw_projected_classlist_total = NA_real_,
         projected_classlist_total = NA_real_,
-        calibration_applied = FALSE,
-        calibration_factor = 1,
-        calibration_adjustment = NA_real_,
         applicable = FALSE,
         applicability_reason = "No candidate method has sufficient evidence",
-        selection_eligible = FALSE,
         n_backtests = NA_integer_,
         mae = NA_real_,
         rmse = NA_real_,
         wape = NA_real_,
         bias = NA_real_,
-        error_q80 = NA_real_
+        error_q80 = NA_real_,
+        selection_basis = "Rolling selection",
+        selection_wape = NA_real_,
+        selection_n_backtests = NA_integer_,
+        selection_pct_error_sd = NA_real_,
+        selection_common_n = NA_integer_,
+        selection_default_wape = NA_real_,
+        selection_challenger_wape = NA_real_,
+        selection_reason = "No candidate method has sufficient evidence"
       )
     selected <- dplyr::bind_rows(selected, placeholders)
   }
 
-  intervals <- if (nrow(backtests) == 0) {
-    tibble::tibble(
-      market_id = character(), subject_course = character(),
-      term_type = character(), method_id = character(), interval_error = numeric()
-    )
-  } else {
-    backtests %>%
-      dplyr::filter(applicable, is.finite(abs_error)) %>%
-      dplyr::group_by(
-        market_id, subject_course, term_type, method_id
-      ) %>%
-      dplyr::summarise(
-        interval_error = as.numeric(stats::quantile(abs_error, 0.80, names = FALSE)),
-        .groups = "drop"
-      )
-  }
-
-  selected %>%
-    dplyr::left_join(
-      intervals,
-      by = c(
-        "market_id", "subject_course", "term_type", "method_id"
-      )
-    ) %>%
+  published <- selected %>%
     dplyr::mutate(
-      calibrated_projected_classlist_total = projected_classlist_total,
+      interval_error = error_q80,
       projected_classlist_total = round(projected_classlist_total),
       projected_census_equivalent = round(
         projected_classlist_total * census_retention_rate
@@ -3462,13 +2996,8 @@ select_projection_methods <- function(candidates, performance, backtests,
       projection_high_census_equivalent = round(
         projection_high * census_retention_rate
       ),
-      # DEPTH and ACCURACY. Both read the selected method's OWN aftcast record
-      # (`n_backtests`, `wape`), not the common-fold columns
-      # (`selection_n_backtests`, `selection_wape`). The common-fold figures
-      # exist so competing methods are compared on the same terms, which is a
-      # fair-selection question; they are not a statement about how much
-      # evidence stands behind the method that won, and using them as one is
-      # what capped every course in the scope at the old "Low".
+      # DEPTH and ACCURACY read the realised rolling-selection record: how many
+      # folds the rule published and how far those published aftcasts missed.
       depth = dplyr::case_when(
         method_id == "none" ~ "None",
         dplyr::coalesce(n_backtests, 0L) >=
@@ -3479,13 +3008,12 @@ select_projection_methods <- function(candidates, performance, backtests,
         TRUE ~ "None"
       ),
       depth_reason = dplyr::case_when(
-        method_id == "none" ~ "No applicable observed-enrollment method",
+        method_id == "none" ~ "No applicable method",
         dplyr::coalesce(n_backtests, 0L) < 1L ~
-          "No comparable aftcast for the selected method",
+          "No comparable aftcast for the selection rule",
         TRUE ~ paste0(
-          n_backtests, " comparable aftcast",
-          dplyr::if_else(n_backtests == 1L, "", "s"),
-          " for ", method_label
+          n_backtests, " comparable rolling-selection aftcast",
+          dplyr::if_else(n_backtests == 1L, "", "s")
         )
       ),
       accuracy = dplyr::case_when(
@@ -3498,7 +3026,7 @@ select_projection_methods <- function(candidates, performance, backtests,
         TRUE ~ "Poor"
       ),
       accuracy_reason = dplyr::case_when(
-        method_id == "none" ~ "No applicable observed-enrollment method",
+        method_id == "none" ~ "No applicable method",
         dplyr::coalesce(n_backtests, 0L) <
           as.integer(opt$accuracy_min_aftcasts %||% 2L) ~ paste0(
             "Fewer than ", as.integer(opt$accuracy_min_aftcasts %||% 2L),
@@ -3507,8 +3035,8 @@ select_projection_methods <- function(candidates, performance, backtests,
         !is.finite(wape) ~ "No measurable aftcast accuracy",
         TRUE ~ paste0(
           scales::percent(wape, accuracy = 0.1),
-          " average aftcast error across ", n_backtests, " term",
-          dplyr::if_else(n_backtests == 1L, "", "s"),
+          " average rolling-selection aftcast error across ", n_backtests,
+          " term", dplyr::if_else(n_backtests == 1L, "", "s"),
           dplyr::if_else(
             is.finite(selection_pct_error_sd),
             paste0(
@@ -3519,144 +3047,10 @@ select_projection_methods <- function(candidates, performance, backtests,
             ""
           )
         )
-      ),
-      selection_reason = dplyr::if_else(
-        method_id == "none",
-        "No candidate method has sufficient evidence",
-        dplyr::if_else(
-          selection_eligible,
-          dplyr::if_else(
-            method_role == "anchored_upstream",
-            paste0(
-              "Upstream-anchored method is within the allowed evidence margin (",
-              selection_basis, " ",
-              scales::percent(selection_wape, accuracy = 0.1), "; n=",
-              selection_n_backtests, ")"
-            ),
-            paste0(
-              "Lowest historical WAPE among eligible methods (",
-              selection_basis, "; ",
-              scales::percent(selection_wape, accuracy = 0.1), "; n=",
-              selection_n_backtests, ")"
-            )
-          ),
-          "Fallback method; insufficient comparable backtests"
-        )
-      ),
-      selection_reason = dplyr::if_else(
-        calibration_applied,
-        paste0(
-          selection_reason, "; calibrated x",
-          format(round(calibration_factor, 3), nsmall = 3), " (bias ",
-          sprintf("%+.1f%%", 100 * weighted_bias), ")"
-        ),
-        selection_reason
       )
     )
-}
-
-
-projection_family_choice <- function(candidates, role, opt = list()) {
-  keys <- c(
-    "market_id", "subject_course", "term_type", "target_term"
-  )
-  family <- candidates %>%
-    dplyr::filter(
-      .data$method_role == .env$role,
-      applicable,
-      is.finite(projected_classlist_total)
-    ) %>%
-    dplyr::mutate(
-      method_rank = match(method_id, names(CEDAR_ENROLLMENT_PROJECTION_METHODS))
-    )
-  if (nrow(family) == 0) {
-    return(tibble::tibble(
-      market_id = character(), subject_course = character(),
-      term_type = character(), target_term = integer(),
-      method_id = character(), method_label = character(),
-      projected_classlist_total = numeric(), n_backtests = integer(), wape = numeric(),
-      capacity_censored_wape = numeric(), uncensored_wape = numeric(),
-      coverage_rate = numeric()
-    ))
-  }
-
-  min_backtests <- as.integer(opt$selection_min_backtests %||% 2L)
-  family %>%
-    dplyr::group_by(dplyr::across(dplyr::all_of(keys))) %>%
-    dplyr::group_modify(function(.x, .y) {
-      scored <- .x %>%
-        dplyr::filter(
-          is.finite(wape), dplyr::coalesce(n_backtests, 0L) >= min_backtests
-        ) %>%
-        dplyr::arrange(wape, method_rank)
-      if (nrow(scored) > 0) dplyr::slice_head(scored, n = 1) else
-        dplyr::slice_head(dplyr::arrange(.x, method_rank), n = 1)
-    }) %>%
-    dplyr::ungroup() %>%
-    dplyr::select(
-      dplyr::all_of(keys), method_id, method_label, projected_classlist_total,
-      n_backtests, wape, capacity_censored_wape, uncensored_wape, coverage_rate
-    )
-}
-
-
-projection_method_pairing <- function(candidates, opt = list()) {
-  keys <- c(
-    "market_id", "subject_course", "term_type", "target_term"
-  )
-  observed <- projection_family_choice(
-    candidates, "observed_enrollment", opt
-  ) %>%
-    dplyr::transmute(
-      dplyr::across(dplyr::all_of(keys)),
-      observed_baseline = projected_classlist_total,
-      observed_method_id = method_id,
-      observed_method = method_label,
-      observed_wape = wape,
-      observed_n_backtests = n_backtests
-    )
-  structural <- projection_family_choice(
-    candidates, "structural_demand", opt
-  ) %>%
-    dplyr::transmute(
-      dplyr::across(dplyr::all_of(keys)),
-      structural_projection = projected_classlist_total,
-      structural_method_id = method_id,
-      structural_method = method_label,
-      structural_observed_wape = wape,
-      structural_capacity_wape = capacity_censored_wape,
-      structural_uncensored_wape = uncensored_wape,
-      structural_coverage = coverage_rate
-    )
-  method_value <- function(method_id, prefix) {
-    candidates %>%
-      dplyr::filter(
-        .data$method_id == .env$method_id,
-        applicable,
-        is.finite(projected_classlist_total)
-      ) %>%
-      dplyr::transmute(
-        dplyr::across(dplyr::all_of(keys)),
-        "{prefix}_projection" := projected_classlist_total,
-        "{prefix}_observed_wape" := wape,
-        "{prefix}_capacity_wape" := capacity_censored_wape,
-        "{prefix}_uncensored_wape" := uncensored_wape,
-        "{prefix}_coverage" := coverage_rate,
-        "{prefix}_n_backtests" := n_backtests
-      )
-  }
-
-  candidates %>%
-    dplyr::distinct(dplyr::across(dplyr::all_of(keys))) %>%
-    dplyr::left_join(observed, by = keys) %>%
-    dplyr::left_join(structural, by = keys) %>%
-    dplyr::left_join(
-      method_value("spring_population_growth", "population"), by = keys
-    ) %>%
-    dplyr::left_join(
-      method_value("spring_cohort_flow", "spring_flow"), by = keys
-    ) %>%
-    dplyr::left_join(method_value("feeder", "feeder"), by = keys)
+  attr(published, "policy_record") <- dplyr::bind_rows(records)
+  published
 }
 
 
@@ -3678,7 +3072,7 @@ projection_enrollment_slope <- function(values) {
 #
 # It is also not merely descriptive. On the Spring 2027 build the coefficient of
 # variation correlates r = 0.69 with the selected method's realised aftcast
-# error, and no course rated Stable was forecast poorly (23 Close, 0 Fair,
+# error, and no course rated Stable was forecast poorly (13 Close, 2 Fair,
 # 0 Poor). Volatility here is a finding in its own right: a course whose
 # enrollment swings 50% year to year is not a forecasting failure, it is a
 # programme where something is moving and someone should look.
@@ -3795,8 +3189,8 @@ projection_capacity_context <- function(enrollment_history, section_history,
       dplyr::left_join(capacities, by = "term")
     paired <- dplyr::bind_cols(
       paired,
-      projection_registration_capacity_metrics(
-        paired$classlist_total,
+      projection_capacity_metrics(
+        paired$census_enrl,
         paired$scheduled_capacity,
         reached_threshold = capacity_threshold
       )
@@ -3829,8 +3223,8 @@ projection_capacity_context <- function(enrollment_history, section_history,
       capacity_data_quality = capacity_quality,
       recent_capacity_terms = as.integer(usable_terms),
       recent_capacity_reached_terms = as.integer(reached_terms),
-      last_registration_fill = if (nrow(recent) == 0) NA_real_ else
-        dplyr::last(recent$registration_fill),
+      last_census_fill = if (nrow(recent) == 0) NA_real_ else
+        dplyr::last(recent$capacity_fill),
       observed_enrollment_slope = slope,
       observed_enrollment_rising = is.finite(slope) && slope >= growth_threshold,
       persistent_capacity_reached = capacity_quality == "Usable" &&
@@ -3846,20 +3240,126 @@ projection_capacity_context <- function(enrollment_history, section_history,
 }
 
 
-projection_structural_credible <- function(projection, n_backtests, wape,
-                                           uncensored_wape, coverage_rate,
-                                           opt = list()) {
-  is.finite(projection) &
-    dplyr::coalesce(as.integer(n_backtests), 0L) >=
-      as.integer(opt$structural_min_backtests %||% 3L) &
-    dplyr::coalesce(as.numeric(coverage_rate), 0) >=
-      as.numeric(opt$structural_min_coverage %||% 0.40) &
-    (
-      dplyr::coalesce(as.numeric(wape), Inf) <=
-        as.numeric(opt$structural_max_wape %||% 0.20) |
-      dplyr::coalesce(as.numeric(uncensored_wape), Inf) <=
-        as.numeric(opt$structural_max_wape %||% 0.20)
+# The two candidates' values and audit fields, keyed per course, so every
+# published row carries both the spine and the adjustment evidence whichever
+# one the rule selected.
+projection_method_pairing <- function(candidates, opt = list()) {
+  keys <- c("market_id", "subject_course", "term_type", "target_term")
+  observed <- candidates %>%
+    dplyr::filter(method_id == CEDAR_ENROLLMENT_PROJECTION_DEFAULT_METHOD,
+                  applicable, is.finite(projected_classlist_total)) %>%
+    dplyr::transmute(
+      dplyr::across(dplyr::all_of(keys)),
+      observed_baseline = projected_classlist_total,
+      observed_method_id = method_id,
+      observed_method = method_label,
+      observed_wape = wape,
+      observed_n_backtests = n_backtests
     )
+  adjusted <- candidates %>%
+    dplyr::filter(method_id == "spine_adjusted") %>%
+    dplyr::transmute(
+      dplyr::across(dplyr::all_of(keys)),
+      adjusted_projection = dplyr::if_else(
+        applicable, projected_classlist_total, NA_real_
+      ),
+      adjusted_wape = wape,
+      adjusted_n_backtests = n_backtests,
+      adjusted_applicable = applicable,
+      adjusted_reason = applicability_reason,
+      adjusted_saturated_prior = saturated_prior,
+      adjusted_prior_census_fill = prior_census_fill,
+      adjusted_waitlisted_prior = waitlisted_prior,
+      adjusted_floor_uplift = floor_uplift,
+      adjusted_floor_basis = floor_basis,
+      adjusted_preceding_term = preceding_term,
+      adjusted_preceding_term_enrollment = preceding_term_enrollment,
+      adjusted_preceding_term_change = preceding_term_change,
+      adjusted_regime_alarm = regime_alarm,
+      adjusted_delta_repeat = delta_repeat,
+      adjusted_repeat_rate = repeat_rate,
+      adjusted_delta_feeder = delta_feeder,
+      adjusted_feeder_rate = feeder_rate,
+      adjusted_feeder_courses = feeder_courses,
+      adjusted_feeder_change = feeder_change,
+      adjusted_delta_basis = delta_basis
+    )
+  candidates %>%
+    dplyr::distinct(dplyr::across(dplyr::all_of(keys))) %>%
+    dplyr::left_join(observed, by = keys) %>%
+    dplyr::left_join(adjusted, by = keys)
+}
+
+
+# Context for a saturated floor: among same-season pairs in this market whose
+# prior term was saturated and whose capacity then grew by at least
+# `expansion_capacity_change`, what share of the added seats filled. Learned
+# only from pairs that precede the target. It is reported beside a floor so a
+# reader knows what happened the last times saturated courses were given
+# room; it is not applied as a multiplier, because the question is how many
+# seats are needed, not what a hypothetical expansion would fill.
+projection_expansion_response <- function(enrollment_history, section_history,
+                                          target_term, opt = list()) {
+  threshold <- as.numeric(opt$saturation_fill_threshold %||% 0.90)
+  min_change <- as.numeric(opt$expansion_capacity_change %||% 0.10)
+  min_pairs <- as.integer(opt$expansion_min_pairs %||% 5L)
+  target_term <- as.integer(target_term)
+  target_type <- get_term_type(target_term)
+  empty <- list(n_pairs = 0L, fill_rate = NA_real_,
+                note = "No expansion history to read")
+  if (nrow(enrollment_history) == 0L || nrow(section_history) == 0L) return(empty)
+
+  series <- enrollment_history %>%
+    dplyr::filter(term < target_term, term_type == target_type) %>%
+    dplyr::inner_join(
+      section_history %>%
+        dplyr::select(market_id, subject_course, term, scheduled_capacity),
+      by = c("market_id", "subject_course", "term")
+    ) %>%
+    dplyr::arrange(market_id, subject_course, term)
+  if (nrow(series) == 0L) return(empty)
+  saturation <- capacity_saturation_metrics(
+    series$census_enrl, series$scheduled_capacity,
+    constrained_threshold = threshold
+  )
+  # CAMPUS_ROLLUP: the market series pools the declared campuses by design;
+  # market_id names that rollup and the pairs are course-market pairs.
+  pairs <- series %>%
+    dplyr::mutate(saturated = saturation$capacity_constrained) %>%
+    dplyr::group_by(market_id, subject_course) %>%
+    dplyr::mutate(
+      prior_saturated = dplyr::lag(saturated),
+      prior_capacity = dplyr::lag(scheduled_capacity),
+      prior_total = dplyr::lag(classlist_total)
+    ) %>%
+    dplyr::ungroup() %>%
+    dplyr::filter(
+      prior_saturated %in% TRUE, is.finite(prior_capacity), prior_capacity > 0,
+      scheduled_capacity / prior_capacity - 1 >= min_change, prior_total > 0
+    ) %>%
+    dplyr::mutate(
+      fill_of_added = (classlist_total - prior_total) /
+        (scheduled_capacity - prior_capacity)
+    )
+  if (nrow(pairs) < min_pairs) {
+    return(list(
+      n_pairs = nrow(pairs), fill_rate = NA_real_,
+      note = paste0(
+        "Only ", nrow(pairs), " saturated-then-expanded pairs before ",
+        fmt_term(target_term), "; needs ", min_pairs
+      )
+    ))
+  }
+  rate <- stats::median(pairs$fill_of_added)
+  list(
+    n_pairs = nrow(pairs), fill_rate = rate,
+    note = paste0(
+      "When saturated courses in this market were given at least ",
+      scales::percent(min_change, accuracy = 1), " more seats (", nrow(pairs),
+      " cases before ", fmt_term(target_term), "), class-list demand grew by ",
+      scales::percent(rate, accuracy = 1), " of the added seats"
+    )
+  )
 }
 
 
@@ -3867,9 +3367,7 @@ add_projection_recommendations <- function(selected, candidates, pressure_screen
                                            enrollment_history, section_history,
                                            opt = list()) {
   if (nrow(selected) == 0) return(selected)
-  keys <- c(
-    "market_id", "subject_course", "term_type", "target_term"
-  )
+  keys <- c("market_id", "subject_course", "term_type", "target_term")
 
   spread_input <- candidates %>%
     dplyr::filter(applicable, is.finite(projected_classlist_total)) %>%
@@ -3893,11 +3391,12 @@ add_projection_recommendations <- function(selected, candidates, pressure_screen
       )
   }
   pairing <- projection_method_pairing(candidates, opt)
-  # Model-free axis: what the course's own comparable history looks like,
-  # independent of whether any method could aftcast it.
   stability <- projection_history_stability(enrollment_history, selected, opt)
   capacity_context <- projection_capacity_context(
     enrollment_history, section_history, selected, opt
+  )
+  expansion <- projection_expansion_response(
+    enrollment_history, section_history, selected$target_term[[1]], opt
   )
 
   selected %>%
@@ -3919,6 +3418,11 @@ add_projection_recommendations <- function(selected, candidates, pressure_screen
     dplyr::left_join(pairing, by = keys) %>%
     dplyr::left_join(capacity_context, by = keys) %>%
     dplyr::left_join(stability, by = keys) %>%
+    dplyr::mutate(
+      expansion_pairs = as.integer(expansion$n_pairs),
+      expansion_fill_rate = as.numeric(expansion$fill_rate),
+      expansion_note = as.character(expansion$note)
+    ) %>%
     dplyr::rowwise() %>%
     dplyr::mutate(
       reference_section_size = {
@@ -3937,7 +3441,10 @@ add_projection_recommendations <- function(selected, candidates, pressure_screen
         }
         if (!is.finite(target_size) || target_size <= 0) NA_real_ else target_size
       },
-      seat_gap = round(projected_classlist_total - scheduled_capacity),
+      # Seats are compared with EXPECTED CENSUS OCCUPANCY, not with the
+      # class-list demand headline: ever-registered runs about 13% above census
+      # because every early drop frees a seat someone else takes.
+      seat_gap = round(projected_census_equivalent - scheduled_capacity),
       projected_over_capacity = pmax(0, seat_gap),
       capacity_limit_signal = target_schedule_available &
         target_capacity_reached & projected_over_capacity > 0,
@@ -3945,7 +3452,9 @@ add_projection_recommendations <- function(selected, candidates, pressure_screen
         !target_schedule_available ~ "Target schedule unavailable",
         !is.finite(projected_classlist_total) ~
           "Insufficient history for a registration-demand estimate",
-        projected_over_capacity <= 0 ~ "Projection fits scheduled capacity",
+        !is.finite(projected_census_equivalent) ~
+          "Insufficient census history for a seat comparison",
+        projected_over_capacity <= 0 ~ "Expected census fits scheduled capacity",
         capacity_limit_signal ~ "Seat ceiling likely limits observed enrollment",
         TRUE ~ "Projected demand exceeds planned capacity"
       ),
@@ -3954,23 +3463,26 @@ add_projection_recommendations <- function(selected, candidates, pressure_screen
           "No target schedule is available for a seat-ceiling check",
         !is.finite(projected_classlist_total) ~
           "Class-list demand is not yet stable",
+        !is.finite(projected_census_equivalent) ~
+          "Census retention cannot be measured from the comparable history",
         projected_over_capacity <= 0 ~ paste(
-          round(scheduled_capacity - projected_classlist_total),
-          "planned seat(s) remain above projected class-list demand"
+          round(scheduled_capacity - projected_census_equivalent),
+          "planned seat(s) remain above expected census occupancy"
         ),
         capacity_limit_signal ~ paste0(
-          "Projection exceeds capacity by ", round(projected_over_capacity),
-          "; ", round(target_available_seats),
+          "Expected census exceeds capacity by ",
+          round(projected_over_capacity), "; ",
+          round(target_available_seats),
           " seat(s) are currently unoccupied"
         ),
         TRUE ~ paste0(
-          "Projection exceeds capacity by ", round(projected_over_capacity),
-          "; active registration fill is ",
+          "Expected census exceeds capacity by ",
+          round(projected_over_capacity), "; active registration fill is ",
           scales::percent(target_active_fill, accuracy = 0.1)
         )
       ),
       recommended_sections = projection_sections_for_demand(
-        projected_classlist_total, reference_section_size
+        projected_census_equivalent, reference_section_size
       ),
       additional_sections = projection_additional_sections(
         recommended_sections, scheduled_sections
@@ -3982,35 +3494,32 @@ add_projection_recommendations <- function(selected, candidates, pressure_screen
           as.numeric(opt$disagreement_threshold %||% 0.20),
         FALSE
       ),
-      coupling_n_backtests = pmin(
-        dplyr::coalesce(population_n_backtests, 0L),
-        dplyr::coalesce(spring_flow_n_backtests, 0L)
-      ),
-      coupling_wape_gain = population_observed_wape - spring_flow_observed_wape,
-      coupling_status = dplyr::case_when(
-        coupling_n_backtests < 3L |
-          !is.finite(coupling_wape_gain) ~ "Insufficient evidence",
-        coupling_wape_gain >= 0.02 ~ "Major/classification",
-        coupling_wape_gain <= -0.02 ~ "Broad population",
-        TRUE ~ "Mixed"
-      ),
-      coupling_reason = dplyr::case_when(
-        coupling_status == "Insufficient evidence" ~
-          "Needs at least three comparable aftcasts for both Spring population methods",
-        coupling_status == "Major/classification" ~ paste0(
-          "Major/classification improves WAPE by ",
-          scales::percent(coupling_wape_gain, accuracy = 0.1),
-          " versus broad population growth"
+      floor_note = dplyr::case_when(
+        is.na(adjusted_saturated_prior) ~ dplyr::coalesce(
+          adjusted_floor_basis, "Saturation of the prior term cannot be judged"
         ),
-        coupling_status == "Broad population" ~ paste0(
-          "Broad population improves WAPE by ",
-          scales::percent(-coupling_wape_gain, accuracy = 0.1),
-          " versus major/classification"
+        adjusted_saturated_prior & adjusted_floor_uplift > 0 ~ paste0(
+          "Floor: ", adjusted_floor_basis, ". ", expansion_note
+        ),
+        adjusted_saturated_prior ~ paste0(
+          "Floor: ", adjusted_floor_basis,
+          "; the projection is a lower bound. ", expansion_note
+        ),
+        TRUE ~ adjusted_floor_basis
+      ),
+      regime_note = dplyr::case_when(
+        is.na(adjusted_regime_alarm) ~ dplyr::coalesce(
+          adjusted_delta_basis, "Preceding term not observed"
+        ),
+        adjusted_regime_alarm ~ paste0(
+          "Regime check: enrollment in ", fmt_term(adjusted_preceding_term),
+          " moved ", sprintf("%+.0f%%", 100 * adjusted_preceding_term_change),
+          " from the year before; review this course before scheduling to the projection"
         ),
         TRUE ~ paste0(
-          "Methods are within ",
-          scales::percent(abs(coupling_wape_gain), accuracy = 0.1),
-          " WAPE"
+          "Enrollment in ", fmt_term(adjusted_preceding_term), " moved ",
+          sprintf("%+.0f%%", 100 * adjusted_preceding_term_change),
+          " from the year before"
         )
       ),
       why_uncertain = dplyr::case_when(
@@ -4028,84 +3537,18 @@ add_projection_recommendations <- function(selected, candidates, pressure_screen
         ),
         TRUE ~ paste0(accuracy_reason, "; ", stability_reason)
       ),
-      structural_gap_threshold = pmax(
-        as.numeric(opt$demand_min_structural_gap %||% 10),
-        as.numeric(opt$demand_min_structural_gap_share %||% 0.10) *
-          observed_baseline
-      ),
-      spring_flow_credible = projection_structural_credible(
-        spring_flow_projection, spring_flow_n_backtests,
-        spring_flow_observed_wape, spring_flow_uncensored_wape,
-        spring_flow_coverage, opt
-      ),
-      population_credible = projection_structural_credible(
-        population_projection, population_n_backtests,
-        population_observed_wape, population_uncensored_wape,
-        population_coverage, opt
-      ),
-      feeder_credible = projection_structural_credible(
-        feeder_projection, feeder_n_backtests, feeder_observed_wape,
-        feeder_uncensored_wape, feeder_coverage, opt
-      ),
-      n_credible_structural_methods = sum(
-        c(population_credible, spring_flow_credible, feeder_credible)
-      ),
-      structural_high_projection = {
-        estimates <- c(
-          if (population_credible) population_projection else NA_real_,
-          if (spring_flow_credible) spring_flow_projection else NA_real_,
-          if (feeder_credible) feeder_projection else NA_real_
-        )
-        if (any(is.finite(estimates))) max(estimates[is.finite(estimates)]) else
-          NA_real_
-      },
-      structural_gap = structural_high_projection - observed_baseline,
-      n_structural_above_observed = sum(
-        c(
-          if (population_credible) population_projection else NA_real_,
-          if (spring_flow_credible) spring_flow_projection else NA_real_,
-          if (feeder_credible) feeder_projection else NA_real_
-        ) >=
-          observed_baseline + structural_gap_threshold,
-        na.rm = TRUE
-      ),
-      demand_signal = dplyr::case_when(
-        n_structural_above_observed >= 2L & persistent_capacity_reached &
-          observed_enrollment_rising ~ "Strong structural signal",
-        n_structural_above_observed >= 1L & persistent_capacity_reached &
-          observed_enrollment_rising ~ "Possible latent demand",
-        is.finite(observed_baseline) & scheduled_capacity > 0 &
-          observed_baseline - scheduled_capacity >=
-            structural_gap_threshold & persistent_capacity_reached ~
-          "Observed capacity pressure",
-        n_structural_above_observed >= 1L ~
-          "Structural estimate uncorroborated",
-        TRUE ~ "Not indicated"
-      ),
-      demand_signal_reason = dplyr::case_when(
-        demand_signal == "Strong structural signal" ~ paste0(
-          "Multiple structural methods exceed the seasonal baseline; ",
-          recent_capacity_reached_terms, "/", recent_capacity_terms,
-          " recent terms reached registration capacity and enrollment is rising"
-        ),
-        demand_signal == "Possible latent demand" ~ paste0(
-          "One structural method exceeds the seasonal baseline; ",
-          recent_capacity_reached_terms, "/", recent_capacity_terms,
-          " recent terms reached registration capacity and enrollment is rising"
-        ),
-        demand_signal == "Observed capacity pressure" ~
-          "Seasonal class-list baseline exceeds scheduled capacity in a capacity-reached history",
-        demand_signal == "Structural estimate uncorroborated" ~
-          "A structural estimate is higher, but recent capacity history does not corroborate unmet demand",
-        TRUE ~ "No structural estimate clears the evidence threshold"
-      ),
       recommendation = dplyr::case_when(
         !is.finite(projected_classlist_total) ~ "Insufficient history",
         projected_classlist_total <= 0 ~ "No projected demand",
+        !is.finite(projected_census_equivalent) ~
+          "Insufficient census history",
+        !target_schedule_available & !is.na(recommended_sections) &
+          adjusted_saturated_prior %in% TRUE ~
+          paste("Plan at least", recommended_sections, "section(s); prior term was saturated"),
         !target_schedule_available & !is.na(recommended_sections) ~
           paste("Plan", recommended_sections, "section(s)"),
-        is.finite(projection_high) &
-          projection_high <= scheduled_capacity ~
+        is.finite(projection_high_census_equivalent) &
+          projection_high_census_equivalent <= scheduled_capacity ~
           "Capacity appears sufficient",
         !is.na(additional_sections) & additional_sections > 0 &
           (scheduled_sections == 0L |
@@ -4117,23 +3560,10 @@ add_projection_recommendations <- function(selected, candidates, pressure_screen
         seat_gap > 0 ~ paste("Open", seat_gap, "additional seat(s)"),
         methods_disagree ~ "Review method disagreement",
         TRUE ~ "Monitor near capacity"
-      ),
-      demand_note = dplyr::case_when(
-        demand_signal %in% c("Strong structural signal", "Possible latent demand") ~
-          paste0(
-            demand_signal, ": structural high ",
-            round(structural_high_projection), " vs seasonal baseline ",
-            round(observed_baseline)
-          ),
-        demand_signal == "Capacity data review" ~
-          "Review section capacity before inferring unmet demand",
-        TRUE ~ demand_signal_reason
       )
     ) %>%
     dplyr::ungroup() %>%
-    dplyr::select(
-      -method_rank, -selection_eligible, -upstream_evidence_eligible
-    )
+    dplyr::select(-method_rank)
 }
 
 
@@ -4340,17 +3770,14 @@ validate_enrollment_projection_bundle <- function(bundle) {
       "why_uncertain", "recommendation",
       "target_term_label", "backtest_terms", "backtest_term_range",
       "selection_wape", "selection_n_backtests", "selection_basis",
-      "selection_pct_error_sd",
-      "selection_uses_uncensored", "capacity_constrained_history",
-      "observed_baseline", "capacity_data_quality", "demand_signal",
+      "selection_pct_error_sd", "selection_common_n",
+      "selection_default_wape", "selection_challenger_wape",
+      "selection_reason", "capacity_constrained_history",
+      "observed_baseline", "capacity_data_quality",
       "target_schedule_available", "raw_projected_classlist_total",
-      "calibrated_projected_classlist_total", "calibration_factor",
       "census_retention_rate", "census_retention_n_terms",
       "census_retention_terms", "projected_census_equivalent",
-      "calibration_applied", "calibration_adjustment",
       "weighted_bias", "direction_consistency", "signed_error_history",
-      "proposed_calibration_factor", "calibration_recommended",
-      "calibrated_wape", "calibration_wape_gain", "calibration_reason",
       "capacity_censored_wape", "n_capacity_censored_misses",
       "capacity_explained_error_share", "capacity_miss_assessment",
       "target_classlist_total_to_date", "target_registered_now",
@@ -4360,11 +3787,13 @@ validate_enrollment_projection_bundle <- function(bundle) {
       "target_classlist_fill", "target_active_fill", "target_capacity_reached",
       "projected_over_capacity",
       "capacity_limit_signal", "capacity_limit_status",
-      "capacity_limit_note", "recommended_sections", "population_projection",
-      "population_observed_wape", "population_n_backtests",
-      "spring_flow_projection", "spring_flow_observed_wape",
-      "spring_flow_n_backtests", "coupling_n_backtests",
-      "coupling_wape_gain", "coupling_status", "coupling_reason"),
+      "capacity_limit_note", "recommended_sections",
+      "adjusted_projection", "adjusted_applicable", "adjusted_reason",
+      "adjusted_saturated_prior", "adjusted_floor_uplift",
+      "adjusted_floor_basis", "adjusted_delta_repeat", "adjusted_delta_feeder",
+      "adjusted_regime_alarm", "adjusted_delta_basis",
+      "expansion_pairs", "expansion_fill_rate", "expansion_note",
+      "floor_note", "regime_note"),
     "validate_enrollment_projection_bundle() projections"
   )
   projection_require_columns(
@@ -4377,10 +3806,11 @@ validate_enrollment_projection_bundle <- function(bundle) {
       "scheduled_sections", "scheduled_capacity", "method_id",
       "prior_classlist_total", "prior_scheduled_capacity",
       "classlist_change", "capacity_change",
-      "method_label", "aftcast_applicable", "aftcast_reason",
-      "raw_aftcast_classlist_total", "aftcast_classlist_total",
-      "calibration_applied", "calibration_factor", "aftcast_error",
-      "aftcast_pct_error", "registration_fill", "capacity_reached",
+      "method_label", "aftcast_method_id", "aftcast_method_label",
+      "aftcast_applicable", "aftcast_reason",
+      "aftcast_classlist_total", "aftcast_error",
+      "aftcast_pct_error", "census_fill", "census_capacity_gap",
+      "capacity_reached",
       "aftcast_capacity_censored", "aftcast_censored_error",
       "aftcast_censored_pct_error", "potential_miss_explanation",
       "source_term", "source_term_label", "prior_source_term",
@@ -4407,27 +3837,18 @@ validate_enrollment_projection_bundle <- function(bundle) {
       "target_term_label", "n_backtests", "backtest_terms",
       "backtest_term_range", "wape", "census_equivalent_wape",
       "capacity_censored_wape",
-      "uncensored_wape", "raw_projected_classlist_total", "calibration_factor",
-      "calibration_applied", "calibration_adjustment", "weighted_bias",
+      "uncensored_wape", "raw_projected_classlist_total", "weighted_bias",
       "pct_error_sd", "uncensored_pct_error_sd", "direction_consistency",
       "signed_error_history",
-      "proposed_calibration_factor", "calibration_recommended",
-      "calibrated_wape", "calibration_wape_gain", "calibration_reason",
-      "capacity_censored_wape", "n_capacity_censored_misses",
+      "n_capacity_censored_misses",
       "capacity_explained_wape", "capacity_explained_error_share",
-      "capacity_censored_terms", "capacity_miss_assessment"),
+      "capacity_censored_terms", "capacity_miss_assessment",
+      "spine", "spine_term", "saturated_prior", "prior_census_fill",
+      "waitlisted_prior", "floor_uplift", "floor_basis", "preceding_term",
+      "preceding_term_enrollment", "preceding_term_change", "regime_alarm",
+      "delta_repeat", "repeat_rate", "delta_feeder", "feeder_rate",
+      "feeder_courses", "feeder_change", "delta_basis", "projection_formula"),
     "validate_enrollment_projection_bundle() candidates"
-  )
-  projection_require_columns(
-    bundle$candidates,
-    c(
-      "baseline_term", "prior_source_term", "source_term",
-      "baseline_classlist_total", "matched_baseline", "unmatched_baseline",
-      "matched_projection", "unmatched_projection",
-      "source_population_previous", "source_population_current",
-      "source_population_growth", "projection_formula"
-    ),
-    "validate_enrollment_projection_bundle() candidate audit fields"
   )
   projection_require_columns(
     bundle$delivery_components,
@@ -4443,11 +3864,7 @@ validate_enrollment_projection_bundle <- function(bundle) {
       "method_label", "wape", "weighted_bias", "pct_error_sd",
       "uncensored_pct_error_sd",
       "direction_consistency", "signed_error_history",
-      "proposed_calibration_factor", "calibration_candidate",
-      "n_calibrated_backtests", "calibrated_wape", "calibration_wape_gain",
-      "calibration_validated", "calibration_recommended",
-      "calibration_reason", "capacity_censored_wape",
-      "census_equivalent_wape",
+      "capacity_censored_wape", "census_equivalent_wape",
       "n_capacity_censored_misses", "capacity_explained_wape",
       "capacity_explained_error_share", "capacity_censored_terms",
       "capacity_miss_assessment"
@@ -4458,14 +3875,10 @@ validate_enrollment_projection_bundle <- function(bundle) {
     projection_require_columns(
       bundle$backtests,
       c(
-        "method_role", "raw_projected_classlist_total", "calibration_training_n",
-        "calibration_training_bias", "calibration_direction_consistency",
-        "calibration_factor", "calibration_applied", "calibration_reason",
-        "calibrated_projected_classlist_total", "calibrated_error",
-        "calibrated_abs_error", "calibrated_pct_error",
+        "method_role", "raw_projected_classlist_total",
         "actual_classlist_total", "actual_census", "actual_final_enrollment",
-        "projected_census_equivalent", "registration_fill",
-        "registration_capacity_gap", "capacity_reached",
+        "projected_census_equivalent", "capacity_fill",
+        "capacity_gap", "capacity_reached", "policy_selected",
         "capacity_censored_classlist_projection",
         "capacity_censored_error", "capacity_censored_abs_error",
         "capacity_censored_miss", "capacity_explained_classlist_error",
@@ -4475,8 +3888,8 @@ validate_enrollment_projection_bundle <- function(bundle) {
     )
   }
   # Each reader-facing axis has its own vocabulary and is checked separately.
-  # They are allowed to disagree — a Stable course with Thin depth and Unrated
-  # accuracy is a real and common state — so a shared check would have to
+  # They are allowed to disagree -- a Stable course with Thin depth and Unrated
+  # accuracy is a real and common state -- so a shared check would have to
   # accept every value on every axis and would catch nothing.
   axis_values <- list(
     stability = c("Stable", "Moderate", "Volatile", "Unrated"),
@@ -4512,26 +3925,12 @@ validate_enrollment_projection_bundle <- function(bundle) {
     stop("[enrollment-projections.R] Projection bundle has duplicate candidates.",
          call. = FALSE)
   }
-  validate_spring_cohort_rows(
+  validate_spine_rows(
     bundle$candidates, "validate_enrollment_projection_bundle() candidates"
   )
-  validate_projection_calibration_rows(
-    bundle$projections,
-    "validate_enrollment_projection_bundle() projections",
-    published = TRUE
-  )
-  validate_projection_calibration_rows(
-    bundle$candidates,
-    "validate_enrollment_projection_bundle() candidates",
-    published = TRUE
-  )
   if (nrow(bundle$backtests) > 0) {
-    validate_spring_cohort_rows(
+    validate_spine_rows(
       bundle$backtests, "validate_enrollment_projection_bundle() backtests"
-    )
-    validate_projection_calibration_rows(
-      bundle$backtests,
-      "validate_enrollment_projection_bundle() backtests"
     )
     validate_projection_capacity_rows(
       bundle$backtests,
@@ -4659,7 +4058,6 @@ validate_enrollment_projection_bundle <- function(bundle) {
     dplyr::select(
       dplyr::all_of(projection_keys), method_id,
       published_projection = projected_classlist_total,
-      published_calibrated = calibrated_projected_classlist_total,
       published_raw = raw_projected_classlist_total
     ) %>%
     dplyr::inner_join(
@@ -4667,25 +4065,20 @@ validate_enrollment_projection_bundle <- function(bundle) {
         dplyr::filter(!is.na(selected), selected) %>%
         dplyr::select(
           dplyr::all_of(projection_keys), method_id,
-          candidate_calibrated = projected_classlist_total,
           candidate_raw = raw_projected_classlist_total
         ),
       by = c(projection_keys, "method_id")
     ) %>%
     dplyr::mutate(
-      calibrated_matches =
-        (is.na(published_calibrated) & is.na(candidate_calibrated)) |
-        dplyr::near(published_calibrated, candidate_calibrated, tol = 1e-8),
       rounded_matches =
-        (is.na(published_projection) & is.na(candidate_calibrated)) |
-        dplyr::near(published_projection, round(candidate_calibrated), tol = 1e-8),
+        (is.na(published_projection) & is.na(candidate_raw)) |
+        dplyr::near(published_projection, round(candidate_raw), tol = 1e-8),
       raw_matches =
         (is.na(published_raw) & is.na(candidate_raw)) |
         dplyr::near(published_raw, candidate_raw, tol = 1e-8)
     ) %>%
     dplyr::filter(
-      !dplyr::coalesce(calibrated_matches, FALSE) |
-        !dplyr::coalesce(rounded_matches, FALSE) |
+      !dplyr::coalesce(rounded_matches, FALSE) |
         !dplyr::coalesce(raw_matches, FALSE)
     )
   if (nrow(numeric_audit) > 0L) {

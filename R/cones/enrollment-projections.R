@@ -18,7 +18,8 @@ get_course_enrollment_projections <- function(inputs, target_term,
                                               force_courses = NULL,
                                               opt = list()) {
   required_inputs <- c(
-    "enrollment_history", "section_history", "students", "target_courses",
+    "enrollment_history", "preceding_term_history", "waitlist_history",
+    "section_history", "students", "target_courses",
     "target_campuses", "target_market_id", "delivery_components",
     # Fixes the composition baseline term. Not derivable from the history: the
     # newest term present is not necessarily the cutoff the caller intended.
@@ -88,6 +89,12 @@ get_course_enrollment_projections <- function(inputs, target_term,
   performance <- summarize_projection_backtests(backtests, opt)
   if (nrow(performance) == 0) performance <- empty_projection_performance()
   selected <- select_projection_methods(candidates, performance, backtests, opt)
+  # Which aftcast the rolling rule would have published at each fold. Recent
+  # history reads this flag so a past term shows the method that would have
+  # been live then, not today's pick replayed over the past.
+  backtests <- mark_projection_policy_backtests(
+    backtests, attr(selected, "policy_record")
+  )
   candidate_evidence <- attach_projection_performance(
     candidates, performance, opt
   ) %>%

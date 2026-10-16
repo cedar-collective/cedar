@@ -116,8 +116,8 @@ build_enrollment_projection_scenario <- function(bundle, programs = NULL,
   courses <- published %>%
     dplyr::select(
       subject_course, department, projected_classlist_total,
-      reference_section_size, scheduled_sections, target_schedule_available,
-      method_label, stability, depth, accuracy
+      census_retention_rate, reference_section_size, scheduled_sections,
+      target_schedule_available, method_label, stability, depth, accuracy
     ) %>%
     dplyr::left_join(cohort, by = "subject_course") %>%
     dplyr::mutate(
@@ -158,8 +158,12 @@ build_enrollment_projection_scenario <- function(bundle, programs = NULL,
           population_students = population_cohort * (1 + config$growth_rate)^(year - 1L),
           projected_classlist_total = projected_classlist_total +
             population_cohort * growth_multiple,
+          # Sections are sized from expected census occupancy, exactly as the
+          # published row sizes them, so year 1 at any rate reproduces it.
+          projected_census_equivalent =
+            projected_classlist_total * census_retention_rate,
           recommended_sections = projection_sections_for_demand(
-            projected_classlist_total, reference_section_size
+            projected_census_equivalent, reference_section_size
           ),
           additional_sections = projection_additional_sections(
             recommended_sections, scheduled_sections
@@ -170,7 +174,8 @@ build_enrollment_projection_scenario <- function(bundle, programs = NULL,
       dplyr::select(
         subject_course, department, year_index, target_term, target_term_label,
         basis, baseline_students, population_cohort, population_share,
-        population_students, projected_classlist_total, reference_section_size,
+        population_students, projected_classlist_total,
+        projected_census_equivalent, reference_section_size,
         scheduled_sections, target_schedule_available, recommended_sections,
         additional_sections, method_label, stability, depth, accuracy
       )

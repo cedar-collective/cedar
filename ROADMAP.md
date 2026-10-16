@@ -94,17 +94,19 @@ past term's extract keeps only students still waiting when it closed, so there
 is no history to fit or test a waitlist method against yet.
 
 The first shareable Spring-demand pass is implemented: an explicit monitored
-course registry, pressure screening, six raw methods plus three fixed
-upstream-anchored candidates, rolling-origin aftcasts, capacity-aware row-level
-method selection, bias correction,
-major/classification-versus-broad-population coupling evidence, confidence,
-capacity-aware error assessment, section recommendations, and versioned saved
-bundles with embedded model-source provenance. The same feature builder runs in
-the persistent R lab and the standalone publisher. Registration > Projections
-reads the validated saved bundle
-and defaults to the always-monitored group with course-group, department,
-course, and confidence filters, export, and navigable drill-down evidence
-without recomputing models in a Shiny session.
+course registry, pressure screening, two candidates (the prior same-season
+spine, and the spine plus a saturation floor and two Fall-enrollment deltas),
+rolling-origin aftcasts, leakage-safe rolling method selection whose published
+accuracy is out of sample, three evidence axes, census-based capacity
+assessment, a regime check on the term just finished, section recommendations
+sized from expected census, and versioned saved bundles with embedded
+model-source provenance. The retired candidates and their audit figures are in
+`docs/developers/forecasting-lessons.md`. The
+same feature builder runs in the persistent R lab and the standalone publisher.
+Registration > Projections reads the validated saved bundle and defaults to the
+always-monitored group with course-group, department, course, stability, and
+accuracy filters, export, and navigable drill-down evidence without recomputing
+models in a Shiny session.
 
 The projection contract and measured lessons are documented in
 `docs/developers/enrollment-projections.md` and
@@ -115,7 +117,7 @@ The projection contract and measured lessons are documented in
   working bundles, and permanently retained labeled official vintages.
 - [x] Publish Fall targets from the same engine: one bundle per season and a
   reader-chosen target term. The Spring structural methods stay inapplicable to
-  Fall by design; the anchored and feeder methods drop out at a two-step
+  Fall by design; the Fall deltas drop out at a two-step
   horizon, so the current Fall bundle is observed-baseline only. Measured no
   accuracy penalty against Spring, thinner depth, and no structural demand
   signal — see the audit in `docs/developers/enrollment-projections.md`.
@@ -132,8 +134,14 @@ The projection contract and measured lessons are documented in
 - [ ] Scenario extensions worth considering: more than one population at once,
   a per-population growth rate, and showing how a population's share of a
   course has moved over time rather than only at the baseline term.
-- [ ] Keep testing upstream signals and course-specific method selection without
-  weakening the common aftcast and audit contract.
+- [ ] Re-read the Fall deltas with posted grades in December (feeder
+  completions and DFW counts in place of enrollments) as a revision of the
+  published number for add/cancel decisions.
+- [ ] Retain one registration-to-date row per course per week during Spring
+  registration, so next year's Spring can be revised by pace against the same
+  week a year earlier. The single most valuable data addition for revision.
+- [ ] Any new candidate enters only as a challenger scored rolling against the
+  spine; none is added on in-sample fit.
 - [ ] Shape the reusable course-history spine so it supports section-needs
   projections as well as low-enrollment alerts.
 
