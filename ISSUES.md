@@ -1846,16 +1846,17 @@ rebuild now restarts the app so it serves them (I22).
 `tests/testthat/test-architecture.R` ("silent error fallbacks do not grow"):
 every `error = function(e)` handler that hands back a value without showing,
 re-raising, warning, or logging the error counts, and each file carries
-today's count as an allowance that may only go down. Measured: 41 across 14
+today's count as an allowance that may only go down. Measured: 40 across 13
 files — `R/modules/pathways.R` 11, `server.R` 11, `R/trunk/logging.R` 7,
 `R/features/enrollment-projection-refresh.R` 2, and one each in
 `R/branches/data-edges.R`, `R/branches/mapping-provenance.R`,
-`R/data-parsers/transform-to-cedar.R`, `R/features/enrollment-projections.R`,
-`R/modules/dept-trends.R`, `regstats.R`, `seatfinder.R`, `ui-helpers.R`,
-`waitlist.R`, and `global.R`. The one in the data pipeline, where AGENTS.md
-calls it always a bug, is `build_lookups()` in `transform-to-cedar.R` reading
-the saved `cedar_lookups` inside a `tryCatch` that returns NULL, so an
-unreadable file silently leaves the lookup empty. Fix that one first.
+`R/features/enrollment-projections.R`, `R/modules/dept-trends.R`,
+`regstats.R`, `seatfinder.R`, `ui-helpers.R`, `waitlist.R`, and `global.R`.
+The one in the data pipeline, where AGENTS.md calls it always a bug, was
+`build_lookups()` in `transform-to-cedar.R` reading the saved `cedar_lookups`
+inside a `tryCatch` that returned NULL, so an unreadable file silently left
+every major unnamed. Fixed 2026-10-16: an unreadable or wrong-shaped file now
+stops the rebuild, and `test-transform-status.R` proves it.
 *Done when:* the allowance list is empty; only the sanctioned kinds remain (a
 module error shown with `showNotification()` or `handle_error()`; a degenerate
 statistic returning `NA`; a logged failure in the logging layer itself).

@@ -1481,11 +1481,23 @@ build_lookups <- function(cedar_sections, cedar_programs, data_dir, ext, maps,
     )
     message("    ✅ major_code_to_name: ", length(cedar_lookups$major_code_to_name), " entries")
   } else {
+    # A lookups-only rebuild has no class lists to derive the names from, so
+    # the saved table is carried forward. A saved file that exists but cannot
+    # be read is an error, not an empty lookup: swallowing it once left every
+    # major unnamed with nothing in the log but a "skipping" line (ISSUES.md
+    # M11).
     existing_lookup_file <- file.path(data_dir, paste0("cedar_lookups", ext))
     existing_lookups <- if (file.exists(existing_lookup_file)) {
-      tryCatch(load_file(existing_lookup_file, ext), error = function(e) NULL)
+      load_file(existing_lookup_file, ext)
     } else {
       NULL
+    }
+    if (!is.null(existing_lookups) &&
+        (!is.list(existing_lookups) || is.data.frame(existing_lookups))) {
+      stop("[transform-to-cedar.R] ", existing_lookup_file,
+           " does not hold a cedar_lookups list; refusing to rebuild lookups ",
+           "over it. Delete the file or rebuild from class lists.",
+           call. = FALSE)
     }
 
     if (!is.null(existing_lookups$major_code_to_name)) {
@@ -1493,7 +1505,8 @@ build_lookups <- function(cedar_sections, cedar_programs, data_dir, ext, maps,
       message("    ✅ major_code_to_name preserved from existing cedar_lookups: ",
               length(cedar_lookups$major_code_to_name), " entries")
     } else {
-      message("    ⚠️  major_code_name_raw not available — skipping major_code_to_name")
+      message("    ⚠️  major_code_name_raw not available and no saved ",
+              "major_code_to_name to carry forward — skipping major_code_to_name")
     }
   }
 

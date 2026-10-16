@@ -550,7 +550,6 @@ test_that("silent error fallbacks do not grow, and the backlog shrinks on record
   allowance <- c(
     "R/branches/data-edges.R" = 1L,
     "R/branches/mapping-provenance.R" = 1L,
-    "R/data-parsers/transform-to-cedar.R" = 1L,
     "R/features/enrollment-projection-refresh.R" = 2L,
     "R/features/enrollment-projections.R" = 1L,
     "R/modules/dept-trends.R" = 1L,
