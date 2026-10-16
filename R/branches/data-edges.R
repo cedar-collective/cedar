@@ -233,7 +233,9 @@ cedar_edge_note <- function(edges, which = c("graded", "enrolled")) {
 
   if (which == "graded") {
     if (is.null(edges$last_graded)) return(NULL)
-    nxt <- tryCatch(add_term(edges$last_graded), error = function(e) NULL)
+    # The edge is a validated term code by the time it reaches here; a value
+    # add_term() cannot advance is a bug upstream, not a sentence to drop.
+    nxt <- add_term(edges$last_graded)
     paste0(
       "Through ", fmt_term(edges$last_graded),
       ", the most recent term with grades posted.",

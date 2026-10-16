@@ -121,6 +121,15 @@ test_that("the graded note names the term and says why the next one is absent", 
   expect_match(note, "Spring 2026")     # enrolled but not graded
 })
 
+test_that("a graded edge that cannot be advanced is an error, not a dropped sentence", {
+  # The next-term sentence used to vanish silently when add_term() failed on
+  # the edge. The edge is validated upstream, so a value it cannot advance is a
+  # bug to surface, not a clause to omit.
+  expect_error(
+    cedar_edge_note(list(last_graded = "nope", last_enrolled = 202680L), "graded")
+  )
+})
+
 test_that("the enrolled note names the enrollment edge", {
   note <- cedar_edge_note(cedar_data_edges(edge_students()), "enrolled")
   expect_match(note, "Fall 2026")
