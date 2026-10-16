@@ -576,11 +576,13 @@ test_that("silent error fallbacks do not grow, and the backlog shrinks on record
   architecture_expect_ratchet(measured, allowance, "silent fallback(s)")
 })
 
-test_that("cones and branches do not read global state, and the backlog shrinks on record (M12)", {
+test_that("cones and branches do not read global state (M12)", {
   # AGENTS.md: every table a cone needs is a parameter. No data_objects, no
   # exists("cedar_..."), no get() from the global environment. The two guards
   # that are allowed because they exist for standalone sourcing are
-  # exists("%||%") and exists("cedar_log_level").
+  # exists("%||%") and exists("cedar_log_level"). This began as a ratchet over
+  # a measured backlog (19 across 5 files); the backlog was cleared on
+  # 2026-10-16, so the allowance is empty and any match fails.
   files <- c(r_files_under("R", "cones"), r_files_under("R", "branches"))
   pattern <- paste0(
     "\\bdata_objects\\b|",
@@ -593,12 +595,5 @@ test_that("cones and branches do not read global state, and the backlog shrinks 
     lines <- lines[!grepl("^\\s*#", lines)]
     sum(grepl(pattern, lines, perl = TRUE))
   })
-  # Measured 2026-10-16. Lower a number when you fix one; never raise one.
-  allowance <- c(
-    "R/cones/course-demographics.R" = 1L,
-    "R/cones/sfr.R" = 0L,
-    "R/cones/waitlist.R" = 2L,
-    "R/branches/credit-hours.R" = 0L
-  )
-  architecture_expect_ratchet(measured, allowance, "global-state read(s)")
+  architecture_expect_ratchet(measured, integer(0), "global-state read(s)")
 })
