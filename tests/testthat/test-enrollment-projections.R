@@ -1650,3 +1650,60 @@ test_that("feature builder rejects an unsettled source term", {
     "as_of_term 202080 is not settled"
   )
 })
+
+test_that("the administrator summary says the decision in one sentence and flags why to look", {
+  row <- tibble::tibble(
+    subject_course = "TEST 101", term_type = "spring",
+    projected_classlist_total = 2179, projected_census_equivalent = 2080,
+    recommended_sections = 99L, observed_baseline = 2179,
+    adjusted_saturated_prior = TRUE, adjusted_prior_census_fill = 0.96,
+    adjusted_waitlisted_prior = 15L, adjusted_regime_alarm = FALSE,
+    adjusted_preceding_term = 202680L, adjusted_preceding_term_change = 0.02,
+    stability = "Moderate", accuracy = "Fair", methods_disagree = FALSE
+  )
+  sentence <- projection_summary_sentence(row)
+  expect_match(sentence, "^Plan at least 99 sections \\(2,080 seats filled at census, 2,179 registrations\\)\\.")
+  expect_match(sentence, "That is last year's level\\.")
+  expect_match(sentence, "filled 96% of its seats with 15 students waiting, so this is a floor\\.")
+  expect_match(sentence, "averaged 10 to 20% off\\.$")
+  expect_equal(projection_flags(row), "Full last term | 15 waiting")
+
+  moved <- dplyr::mutate(
+    row, adjusted_saturated_prior = FALSE, adjusted_waitlisted_prior = 0L,
+    adjusted_regime_alarm = TRUE, adjusted_preceding_term_change = 0.91,
+    projected_classlist_total = 2400, stability = "Volatile", accuracy = "Poor"
+  )
+  expect_match(projection_summary_sentence(moved), "^Plan 99 sections")
+  expect_match(projection_summary_sentence(moved), "That is \\+10% on last Spring\\.")
+  expect_match(projection_summary_sentence(moved), "Fall 2026 moved \\+91%")
+  expect_equal(
+    projection_flags(moved),
+    "Fall enrollment +91% | Hard to predict | Past forecasts off by 20%+"
+  )
+
+  sparse <- dplyr::mutate(row, projected_classlist_total = NA_real_)
+  expect_match(projection_summary_sentence(sparse), "^Not enough comparable history")
+})
+
+test_that("the view adds department totals and a needs-a-look filter without changing a number", {
+  bundle <- projection_fixture_bundle(202110L, 202080L, 202080L)
+  view <- build_enrollment_projection_view(bundle, list(group_id = "all_saved"))
+
+  expect_true(all(c("planning_sections", "expected_census", "seats_range",
+                    "change_vs_last", "flags", "history_values", "history_text",
+                    "summary_sentence", "attention") %in% names(view$table)))
+  expect_equal(view$table$expected_census, view$projections$projected_census_equivalent)
+  expect_equal(view$table$planning_sections, view$projections$recommended_sections)
+  expect_equal(
+    view$department_totals$sections,
+    sum(view$projections$recommended_sections, na.rm = TRUE)
+  )
+  expect_equal(view$department_totals$courses, nrow(view$projections))
+  expect_equal(view$meta$n_attention, sum(view$projections$attention))
+
+  flagged <- build_enrollment_projection_view(
+    bundle, list(group_id = "all_saved", attention_only = TRUE)
+  )
+  expect_true(all(flagged$projections$attention))
+  expect_lte(nrow(flagged$projections), nrow(view$projections))
+})

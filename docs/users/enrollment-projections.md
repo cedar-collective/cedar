@@ -83,17 +83,31 @@ then, so the accuracy you see is what that rule would actually have delivered,
 not the fit of the winner on the terms that chose it. The **Why** column gives
 the evidence behind the current method.
 
+The page opens with a **By department** table: sections and seats summed over
+the courses in view. That total is more reliable than any one course, because
+course errors largely offset, and it is the number a dean negotiates. The
+**Only courses that need a look** box narrows the course table to rows that
+were full last term, moved sharply in the term just finished, or whose past
+forecasts were more than 20% off.
+
 | Column | Meaning |
 |---|---|
-| **Projection** | First-day / ever-registered proxy: unique non-waitlisted students found in the class-list extract, including students who later dropped. This is the aftcast target, but it is not a frozen first-day roster. |
-| **Expected census** | Projection multiplied by the course's historical class-list-to-census retention |
-| **Method** | Prior same-season unless another candidate beat it on earlier shared aftcasts |
-| **Why** | The evidence behind the method: "Default" or the challenger's earlier record against prior same-season |
+| **Sections** | Seats filled at census divided by the section size (the target schedule's average when it exists, otherwise the recent median), rounded up. "Plan at least" when last term filled its seats. |
+| **Seats** | Students expected to be filled at census: registrations times the course's historical class-list-to-census retention. |
+| **Likely range** | Where past forecasts for this course usually landed, as seats at census. |
+| **vs last** | Change on last year's same-term registrations. |
+| **Flags** | Plain-language reasons to look: full last term, students left waiting, a big change in the term just finished, a volatile history, past forecasts well off, or the two candidates disagreeing. |
+| **Trend** | The last four same-term enrollments as a sparkline; hover for the numbers and sections. |
 | **Stability** | Stable, Moderate, Volatile, or Unrated: whether the course is predictable from its own history at all, measured with no model |
 | **Depth** | Deep, Moderate, Thin, or None: how many comparable rolling-selection aftcasts stand behind the published method |
 | **Accuracy** | Close, Fair, Poor, or Unrated: how close those aftcasts landed, as an out-of-sample record |
-| **Recent same-season terms** | Four compact columns showing first-day / ever-registered enrollment followed by scheduled sections. `479 / 4` means 479 students across 4 sections. |
-| **Planning sects** | Expected census divided by the target schedule's average section size when available, otherwise the recent historical median, rounded up. Census, not ever-registered demand, is what occupies seats. This is a planning conversion, not a forecast of the sections that will actually be scheduled. |
+| **Registrations** | First-day / ever-registered proxy: unique non-waitlisted students found in the class-list extract, including students who later dropped. This is the aftcast target, but it is not a frozen first-day roster. |
+| **Basis** | Prior same-season unless the adjusted candidate beat it on earlier shared aftcasts |
+| **Why** | The evidence behind the basis: "Default" or the challenger's earlier record against prior same-season |
+
+Selecting a row opens with one sentence that says what to plan and why, then
+the evidence behind it. The method plot, movement diagnostic, and candidate
+table sit under **Analyst detail**.
 
 Select a row to compare every forecasting method against historical first-day /
 ever-registered, census, and final/last-day enrollment. The plot is restricted

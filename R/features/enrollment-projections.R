@@ -611,6 +611,119 @@ projection_axis_brief <- function(stability, depth, accuracy,
 }
 
 
+# Plain-language flags for the summary table. Each one names a reason an
+# administrator should look at the row; none changes a number.
+projection_flags <- function(projections) {
+  vapply(seq_len(nrow(projections)), function(i) {
+    row <- projections[i, , drop = FALSE]
+    flags <- c(
+      if (isTRUE(row$adjusted_saturated_prior)) "Full last term",
+      if (isTRUE(row$adjusted_saturated_prior) &&
+          isTRUE(row$adjusted_waitlisted_prior > 0)) {
+        paste(row$adjusted_waitlisted_prior, "waiting")
+      },
+      if (isTRUE(row$adjusted_regime_alarm)) paste0(
+        "Fall enrollment ",
+        sprintf("%+.0f%%", 100 * row$adjusted_preceding_term_change)
+      ),
+      if (identical(row$stability, "Volatile")) "Hard to predict",
+      if (identical(row$accuracy, "Poor")) "Past forecasts off by 20%+",
+      if (isTRUE(row$methods_disagree)) "Candidates disagree"
+    )
+    if (length(flags) == 0L) "" else paste(flags, collapse = " | ")
+  }, character(1))
+}
+
+
+# One sentence an administrator can act on, built from the published fields.
+# The tables beneath it are supporting evidence, not the first thing a reader
+# meets.
+projection_summary_sentence <- function(projections) {
+  vapply(seq_len(nrow(projections)), function(i) {
+    row <- projections[i, , drop = FALSE]
+    if (!is.finite(row$projected_classlist_total)) {
+      return("Not enough comparable history to project this course.")
+    }
+    plan <- if (!is.na(row$recommended_sections)) {
+      paste0(
+        if (isTRUE(row$adjusted_saturated_prior)) "Plan at least " else "Plan ",
+        row$recommended_sections, " section",
+        if (row$recommended_sections == 1L) "" else "s", " (",
+        format(round(row$projected_census_equivalent), big.mark = ","),
+        " seats filled at census, ",
+        format(round(row$projected_classlist_total), big.mark = ","),
+        " registrations)."
+      )
+    } else {
+      paste0(
+        "Expect about ", format(round(row$projected_classlist_total), big.mark = ","),
+        " registrations; no section size is available to convert that to sections."
+      )
+    }
+    change <- if (is.finite(row$observed_baseline) && row$observed_baseline > 0) {
+      delta <- row$projected_classlist_total / row$observed_baseline - 1
+      if (abs(delta) < 0.005) {
+        " That is last year's level."
+      } else {
+        paste0(" That is ", sprintf("%+.0f%%", 100 * delta),
+               " on last ", switch(row$term_type, spring = "Spring",
+                                   fall = "Fall", "comparable term"), ".")
+      }
+    } else ""
+    full <- if (isTRUE(row$adjusted_saturated_prior)) {
+      paste0(
+        " Last ", switch(row$term_type, spring = "Spring", fall = "Fall", "term"),
+        " filled ", scales::percent(row$adjusted_prior_census_fill, accuracy = 1),
+        " of its seats",
+        if (isTRUE(row$adjusted_waitlisted_prior > 0)) {
+          paste0(" with ", row$adjusted_waitlisted_prior, " students waiting")
+        } else "",
+        ", so this is a floor."
+      )
+    } else ""
+    fall <- if (isTRUE(row$adjusted_regime_alarm)) {
+      paste0(
+        " Enrollment in ", fmt_term(row$adjusted_preceding_term), " moved ",
+        sprintf("%+.0f%%", 100 * row$adjusted_preceding_term_change),
+        " from the year before; review before scheduling to this number."
+      )
+    } else ""
+    trust <- switch(
+      row$accuracy,
+      Close = " Past forecasts for this course landed within 10%.",
+      Fair = " Past forecasts for this course averaged 10 to 20% off.",
+      Poor = " Past forecasts for this course were more than 20% off; treat it as a rough scale.",
+      " Too few past forecasts to say how reliable this is."
+    )
+    paste0(plan, change, full, fall, trust)
+  }, character(1))
+}
+
+
+# Department subtotals. The portfolio is far more predictable than any one
+# course (net error of 2 to 3% against course WAPE of 11 to 14% on the Spring
+# 2027 audit), and sections are negotiated by department.
+build_enrollment_projection_department_totals <- function(projections) {
+  if (nrow(projections) == 0L) {
+    return(tibble::tibble(
+      department = character(), courses = integer(), sections = integer(),
+      seats = numeric(), registrations = numeric(), flagged = integer()
+    ))
+  }
+  projections %>%
+    dplyr::group_by(department) %>%
+    dplyr::summarise(
+      courses = dplyr::n(),
+      sections = sum(recommended_sections, na.rm = TRUE),
+      seats = sum(projected_census_equivalent, na.rm = TRUE),
+      registrations = sum(projected_classlist_total, na.rm = TRUE),
+      flagged = sum(attention),
+      .groups = "drop"
+    ) %>%
+    dplyr::arrange(dplyr::desc(sections), department)
+}
+
+
 build_enrollment_projection_history_summary <- function(
     projections, history, n_terms = 4L) {
   n_terms <- as.integer(n_terms)
@@ -771,6 +884,7 @@ build_enrollment_projection_view <- function(bundle, opt = list()) {
   depth <- depth[!is.na(depth) & nzchar(depth)]
   accuracy <- as.character(opt$accuracy %||% character(0))
   accuracy <- accuracy[!is.na(accuracy) & nzchar(accuracy)]
+  attention_only <- isTRUE(opt$attention_only)
   projections <- bundle$projections %>%
     dplyr::filter(subject_course %in% .env$group_courses)
   if (length(departments) > 0L) {
@@ -791,6 +905,16 @@ build_enrollment_projection_view <- function(bundle, opt = list()) {
   }
   if (length(accuracy) > 0L) {
     projections <- dplyr::filter(projections, accuracy %in% .env$accuracy)
+  }
+  projections <- projections %>%
+    dplyr::mutate(
+      # Rows a chair should actually look at; the rest can be planned at last
+      # term's level.
+      attention = adjusted_saturated_prior %in% TRUE |
+        adjusted_regime_alarm %in% TRUE | accuracy == "Poor"
+    )
+  if (attention_only) {
+    projections <- dplyr::filter(projections, attention)
   }
   projections <- projections %>%
     dplyr::arrange(department, subject_course) %>%
@@ -823,7 +947,25 @@ build_enrollment_projection_view <- function(bundle, opt = list()) {
         methods_disagree = methods_disagree,
         regime_alarm = dplyr::coalesce(adjusted_regime_alarm, FALSE)
       ),
-      regime_alarm = dplyr::coalesce(adjusted_regime_alarm, FALSE)
+      regime_alarm = dplyr::coalesce(adjusted_regime_alarm, FALSE),
+      flags = projection_flags(dplyr::pick(dplyr::everything())),
+      summary_sentence = projection_summary_sentence(
+        dplyr::pick(dplyr::everything())
+      ),
+      change_vs_last = dplyr::if_else(
+        is.finite(observed_baseline) & observed_baseline > 0,
+        projected_classlist_total / observed_baseline - 1, NA_real_
+      ),
+      seats_range = dplyr::if_else(
+        is.finite(projection_low_census_equivalent) &
+          is.finite(projection_high_census_equivalent),
+        paste0(
+          format(round(projection_low_census_equivalent), big.mark = ",", trim = TRUE),
+          " to ",
+          format(round(projection_high_census_equivalent), big.mark = ",", trim = TRUE)
+        ),
+        NA_character_
+      )
     )
   selected_keys <- projections %>%
     dplyr::select(market_id, subject_course, term_type, target_term)
@@ -860,15 +1002,38 @@ build_enrollment_projection_view <- function(bundle, opt = list()) {
       names(CEDAR_ENROLLMENT_PROJECTION_METHODS)
   )
 
+  # Four same-season values per course for the summary sparkline, oldest first.
+  # CAMPUS_ROLLUP: recent_history is saved at the bundle's pooled planning
+  # market grain, one row per course and term, so a campus split here would
+  # have nothing to split.
+  history_values <- history %>%
+    dplyr::arrange(subject_course, history_term) %>%
+    dplyr::group_by(course = subject_course) %>%
+    dplyr::summarise(
+      history_values = list(as.numeric(actual_classlist_total)),
+      history_text = paste(
+        paste0(vapply(history_term, abbr_term, character(1)), " ",
+               format(round(actual_classlist_total), big.mark = ",", trim = TRUE),
+               "/", scheduled_sections),
+        collapse = "; "
+      ),
+      .groups = "drop"
+    )
+
   table <- projections %>%
     dplyr::transmute(
       course = subject_course,
       department,
-      projected_demand = projected_classlist_total,
-      expected_census = projected_census_equivalent,
       planning_sections = recommended_sections,
+      expected_census = projected_census_equivalent,
+      seats_range,
+      change_vs_last,
+      flags,
+      attention,
+      projected_demand = projected_classlist_total,
       method = method_label,
       selection_evidence,
+      summary_sentence,
       stability,
       stability_reason,
       history_terms,
@@ -884,16 +1049,19 @@ build_enrollment_projection_view <- function(bundle, opt = list()) {
       why_uncertain
     ) %>%
     dplyr::left_join(history_summary$data, by = "course") %>%
+    dplyr::left_join(history_values, by = "course") %>%
     dplyr::select(
-      # The three evidence axes sit immediately after the projection they
-      # qualify, not at the far right past four history columns and the method
-      # description. A reader scanning for "which of these can we actually
-      # forecast" should not have to scroll horizontally to find out.
-      course, department, projected_demand, expected_census,
+      # The decision first: sections to plan, seats at census and their range,
+      # the change on last term, and plain-language flags. The evidence axes
+      # follow; the method and the exact history sit at the right for readers
+      # who want them.
+      course, department, planning_sections, expected_census, seats_range,
+      change_vs_last, flags, history_values, history_text,
       stability, stability_reason, depth, depth_reason,
       accuracy, accuracy_reason,
-      dplyr::all_of(paste0("history_", 1:4)), planning_sections,
-      method, selection_evidence,
+      projected_demand, method, selection_evidence,
+      dplyr::all_of(paste0("history_", 1:4)),
+      summary_sentence, attention,
       axis_brief, axis_explanation, regime_alarm, why_uncertain
     )
 
@@ -912,11 +1080,13 @@ build_enrollment_projection_view <- function(bundle, opt = list()) {
       campuses = bundle$scope_campuses,
       group_id = group_id,
       n_rows = nrow(projections),
+      n_attention = sum(projections$attention),
       summary_history_columns = history_summary$columns,
       bundle_path = attr(bundle, "bundle_path") %||% NA_character_
     ),
     projections = projections,
     table = table,
+    department_totals = build_enrollment_projection_department_totals(projections),
     history = history,
     candidates = candidates,
     method_history = method_history,

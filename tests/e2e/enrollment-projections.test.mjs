@@ -192,22 +192,28 @@ function check(name, ok, detail = '') {
 
   let table = await readReactable(page, 'enrollment_projections-projection_table');
   const requiredHeaders = [
-    'Course', 'Projection', 'Expected census', 'Method', 'Why',
-    'Stability', 'Depth', 'Accuracy', 'Planning sects',
+    'Course', 'Sections', 'Seats', 'Likely range', 'vs last', 'Flags', 'Trend',
+    'Stability', 'Depth', 'Accuracy', 'Registrations', 'Basis', 'Why',
   ];
   check(
-    'projection table exposes the audit columns',
-    requiredHeaders.every((header) => colIndex(table.headers, header) >= 0),
+    'projection table leads with the decision and keeps the evidence axes',
+    requiredHeaders.every((header) => colIndex(table.headers, header) >= 0) &&
+      colIndex(table.headers, 'Sections') < colIndex(table.headers, 'Stability'),
     table.headers.join(' | ')
   );
   check(
-    'summary replaces audit prose with four same-season enrollment/section columns',
+    'summary carries a trend sparkline instead of four history columns',
     table.headers.filter((header) =>
-      header.toLowerCase().includes('first day / sects')).length === 4 &&
+      header.toLowerCase().includes('first day / sects')).length === 0 &&
       !['Saturation floor', 'Regime check', 'Recommendation']
         .some((header) => colIndex(table.headers, header) >= 0),
     table.headers.join(' | ')
   );
+  const deptTotals = await readReactable(page, 'enrollment_projections-department_table');
+  check('department subtotals render above the course table',
+    deptTotals.rows && deptTotals.rows.length > 0 &&
+      ['Dept', 'Sections to plan', 'Seats at census'].every((h) => colIndex(deptTotals.headers, h) >= 0),
+    (deptTotals.headers || []).join(' | '));
   check('saved projection rows render', table.rows.length > 0, `${table.rows.length} visible`);
   const naturalTableFlow = await page.evaluate(() => {
     const root = document.getElementById('enrollment_projections-projection_table');
@@ -385,7 +391,7 @@ function check(name, ok, detail = '') {
     return detail ? detail.innerText : '';
   });
   check('course detail retains planning, bias, and population-fit evidence',
-    ['Planning recommendation', 'Saturation floor', 'Fall deltas', 'Regime check']
+    ['Plan ', 'Planning recommendation', 'Saturation floor', 'Fall deltas', 'Regime check']
       .every((label) => detailSummaryText.includes(label)), detailSummaryText.slice(0, 500));
   await waitForSelector(page, '.enrollment-projection-back', { timeout: 60000 });
 
