@@ -1842,21 +1842,36 @@ rebuild now restarts the app so it serves them (I22).
 
 ### Architecture rules (`AGENTS.md`)
 
-**M11 — Silent fallbacks.** 25 `tryCatch` blocks return NULL or an empty
-result: `R/modules/pathways.R` 11, `server.R` 6, `R/trunk/logging.R` 4,
-`R/modules/ui-helpers.R`, `R/cones/stopout.R`, `R/branches/data-edges.R`.
-One is in the data pipeline, where AGENTS.md calls it always a bug:
-`build_lookups()` in `R/data-parsers/transform-to-cedar.R` reads the saved
-`cedar_lookups` for `major_code_to_name` inside a `tryCatch` that returns NULL,
-so an unreadable file silently leaves the lookup empty. Fix that one first.
-*Done when:* only the two allowed kinds remain (a module error shown with
-`showNotification()`; a degenerate statistic returning `NA`).
+**M11 — Silent fallbacks.** *Enforced since 2026-10-16* by
+`tests/testthat/test-architecture.R` ("silent error fallbacks do not grow"):
+every `error = function(e)` handler that hands back a value without showing,
+re-raising, warning, or logging the error counts, and each file carries
+today's count as an allowance that may only go down. Measured: 41 across 14
+files — `R/modules/pathways.R` 11, `server.R` 11, `R/trunk/logging.R` 7,
+`R/features/enrollment-projection-refresh.R` 2, and one each in
+`R/branches/data-edges.R`, `R/branches/mapping-provenance.R`,
+`R/data-parsers/transform-to-cedar.R`, `R/features/enrollment-projections.R`,
+`R/modules/dept-trends.R`, `regstats.R`, `seatfinder.R`, `ui-helpers.R`,
+`waitlist.R`, and `global.R`. The one in the data pipeline, where AGENTS.md
+calls it always a bug, is `build_lookups()` in `transform-to-cedar.R` reading
+the saved `cedar_lookups` inside a `tryCatch` that returns NULL, so an
+unreadable file silently leaves the lookup empty. Fix that one first.
+*Done when:* the allowance list is empty; only the sanctioned kinds remain (a
+module error shown with `showNotification()` or `handle_error()`; a degenerate
+statistic returning `NA`; a logged failure in the logging layer itself).
 
-**M12 — Cones and branches reading global data.** 16 reads of `data_objects` or
-`exists("cedar_…")`: `R/branches/course-attempts.R` 6, `R/cones/seatfinder.R` 3,
-`R/cones/sfr.R` 2 (including `get_sfr(data_objects)`),
-`R/cones/cancellations.R` 2, `R/branches/credit-hours.R` 2,
-`R/cones/waitlist.R` 1. *Done when:* every table is a parameter.
+**M12 — Cones and branches reading global data.** *Enforced since 2026-10-16*
+by `tests/testthat/test-architecture.R` ("cones and branches do not read
+global state"): any `data_objects`, `.GlobalEnv`, `get("cedar_…")`, or
+`exists("…")` in `R/cones` or `R/branches` counts, except the two standalone
+guards `exists("%||%")` and `exists("cedar_log_level")`, and each file's
+allowance may only go down. Measured: 19 across 5 files —
+`R/branches/course-attempts.R` 6 (the term edges), `R/cones/sfr.R` 6
+(`get_sfr(data_objects)` takes the whole bundle), `R/branches/credit-hours.R` 4
+(`credit_hours_by_fac(data_objects, …)` and `major_to_dept`),
+`R/cones/waitlist.R` 2 (`cedar_cl_enrls_base`), `R/cones/course-demographics.R`
+1 (`major_code_to_name`). *Done when:* the allowance list is empty; every table
+and edge is a parameter.
 
 **M13 — Business logic in modules.** `R/modules/pathways.R` 38
 `group_by`/`summarize` pipelines, `R/modules/cancellations.R` 10,

@@ -447,3 +447,149 @@ test_that("both transforms derive course level through course_level_from_number"
                info = "no hand-written level rule may return to the transform")
 })
 
+
+# ---- Ratcheted backlogs: M11 silent fallbacks, M12 global state ----------------
+#
+# These two tests enforce a rule that already exists in AGENTS.md but had no
+# guard: analytical code must not swallow an error into a default, and cones and
+# branches must not reach into global state for a table. Each file's allowance
+# is today's count. A file that grows fails. A file that shrinks also fails,
+# with the instruction to lower its allowance, so the number here is always
+# the real backlog and never a stale ceiling. Delete a file's entry when it
+# reaches zero.
+
+# Every `error = function(e)` handler in a file, with its body text. A brace
+# handler is read to its matching brace; a one-line handler to the end of the
+# line, which is enough to see what it returns.
+architecture_error_handlers <- function(file) {
+  text <- paste(readLines(file, warn = FALSE), collapse = "\n")
+  starts <- gregexpr("error\\s*=\\s*function\\s*\\(\\s*[A-Za-z_.]*\\s*\\)", text)[[1]]
+  if (length(starts) == 1L && starts[[1]] == -1L) return(character(0))
+  vapply(starts, function(start) {
+    rest <- substr(text, start, nchar(text))
+    after <- sub("^error\\s*=\\s*function\\s*\\([^)]*\\)\\s*", "", rest)
+    if (startsWith(after, "{")) {
+      depth <- 0L
+      chars <- strsplit(after, "")[[1]]
+      for (i in seq_along(chars)) {
+        if (chars[[i]] == "{") depth <- depth + 1L
+        if (chars[[i]] == "}") {
+          depth <- depth - 1L
+          if (depth == 0L) return(paste(chars[seq_len(i)], collapse = ""))
+        }
+      }
+      after
+    } else {
+      sub("\n.*$", "", after)
+    }
+  }, character(1))
+}
+
+# A handler is a silent fallback when it hands the caller a value without
+# telling anyone. Showing the error (showNotification, the module helper
+# handle_error), re-raising it (stop), warning, or writing it to the log
+# (message, cedar_log_*) are not silent: someone can find out. A degenerate
+# statistic returning NA is the one sanctioned default.
+architecture_silent_fallback <- function(handler) {
+  body <- gsub("#[^\n]*", "", handler)
+  reported <- paste0(
+    "showNotification\\(|handle_error\\(|\\bstop\\(|\\bwarning\\(|",
+    "rlang::abort\\(|cli::cli_abort\\(|\\bmessage\\(|cedar_log[a-z_]*\\("
+  )
+  if (grepl(reported, body)) {
+    return(FALSE)
+  }
+  compact <- gsub("^\\{|\\}$|\\s+", "", body)
+  if (grepl("^NA(_real_|_integer_|_character_|_logical_)?\\)?$", compact)) return(FALSE)
+  TRUE
+}
+
+architecture_count_by_file <- function(files, counter) {
+  counts <- vapply(files, counter, integer(1))
+  names(counts) <- vapply(files, relative_path, character(1))
+  counts[counts > 0L]
+}
+
+# Compare measured counts with the allowances and explain every mismatch.
+architecture_expect_ratchet <- function(measured, allowance, what) {
+  files <- union(names(measured), names(allowance))
+  problems <- character(0)
+  for (file in files) {
+    have <- if (file %in% names(measured)) measured[[file]] else 0L
+    allow <- if (file %in% names(allowance)) allowance[[file]] else 0L
+    if (have > allow) {
+      problems <- c(problems, sprintf(
+        "%s has %d %s (allowance %d): fix the new one, do not raise the allowance",
+        file, have, what, allow
+      ))
+    } else if (have < allow) {
+      problems <- c(problems, sprintf(
+        "%s has %d %s but an allowance of %d: lower the allowance to %d%s",
+        file, have, what, allow, have,
+        if (have == 0L) " by deleting its entry" else ""
+      ))
+    }
+  }
+  expect(length(problems) == 0L, paste(problems, collapse = "\n"))
+}
+
+test_that("silent error fallbacks do not grow, and the backlog shrinks on record (M11)", {
+  # AGENTS.md: tryCatch(..., error = function(e) NULL) around a data pipeline
+  # is always a bug. Two uses are allowed anywhere: an error shown to the user
+  # with showNotification(), and a degenerate statistic returning NA.
+  files <- c(
+    r_files_under("R"),
+    file.path(project_root, c("global.R", "server.R", "ui.R"))
+  )
+  files <- files[!grepl("/R/lists/", files)]
+  measured <- architecture_count_by_file(files, function(file) {
+    handlers <- architecture_error_handlers(file)
+    sum(vapply(handlers, architecture_silent_fallback, logical(1)))
+  })
+  # Measured 2026-10-16. Lower a number when you fix one; never raise one.
+  allowance <- c(
+    "R/branches/data-edges.R" = 1L,
+    "R/branches/mapping-provenance.R" = 1L,
+    "R/data-parsers/transform-to-cedar.R" = 1L,
+    "R/features/enrollment-projection-refresh.R" = 2L,
+    "R/features/enrollment-projections.R" = 1L,
+    "R/modules/dept-trends.R" = 1L,
+    "R/modules/pathways.R" = 11L,
+    "R/modules/regstats.R" = 1L,
+    "R/modules/seatfinder.R" = 1L,
+    "R/modules/ui-helpers.R" = 1L,
+    "R/modules/waitlist.R" = 1L,
+    "R/trunk/logging.R" = 7L,
+    "global.R" = 1L,
+    "server.R" = 11L
+  )
+  architecture_expect_ratchet(measured, allowance, "silent fallback(s)")
+})
+
+test_that("cones and branches do not read global state, and the backlog shrinks on record (M12)", {
+  # AGENTS.md: every table a cone needs is a parameter. No data_objects, no
+  # exists("cedar_..."), no get() from the global environment. The two guards
+  # that are allowed because they exist for standalone sourcing are
+  # exists("%||%") and exists("cedar_log_level").
+  files <- c(r_files_under("R", "cones"), r_files_under("R", "branches"))
+  pattern <- paste0(
+    "\\bdata_objects\\b|",
+    "\\.GlobalEnv|",
+    "\\bget\\(\\s*\"cedar_|",
+    "\\bexists\\(\\s*\"(?!%\\|\\|%\"|cedar_log_level\")"
+  )
+  measured <- architecture_count_by_file(files, function(file) {
+    lines <- readLines(file, warn = FALSE)
+    lines <- lines[!grepl("^\\s*#", lines)]
+    sum(grepl(pattern, lines, perl = TRUE))
+  })
+  # Measured 2026-10-16. Lower a number when you fix one; never raise one.
+  allowance <- c(
+    "R/cones/course-demographics.R" = 1L,
+    "R/cones/sfr.R" = 6L,
+    "R/cones/waitlist.R" = 2L,
+    "R/branches/course-attempts.R" = 6L,
+    "R/branches/credit-hours.R" = 4L
+  )
+  architecture_expect_ratchet(measured, allowance, "global-state read(s)")
+})
