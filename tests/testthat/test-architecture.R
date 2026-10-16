@@ -596,7 +596,7 @@ test_that("cones and branches do not read global state, and the backlog shrinks 
   # Measured 2026-10-16. Lower a number when you fix one; never raise one.
   allowance <- c(
     "R/cones/course-demographics.R" = 1L,
-    "R/cones/sfr.R" = 6L,
+    "R/cones/sfr.R" = 0L,
     "R/cones/waitlist.R" = 2L,
     "R/branches/credit-hours.R" = 4L
   )
