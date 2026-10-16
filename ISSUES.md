@@ -1949,9 +1949,10 @@ actively misleading beside it: rename `first_day_proxy` to an ever-registered
 name. *Done when:* each lifecycle column has one label, from
 `docs/_data/definitions.yml`, used everywhere it is shown.
 
-**M28 — The HR department list is a hand-kept R list.** `hr_org_desc_to_dept`
-(`R/lists/mappings.R`, 79 names to 32 departments) maps the HR report's
-organisation names to departments for faculty; organisations not on it are
-dropped at parse. The HR report is no longer pulled, so this is low priority.
-*Done when:* the list moves to `institution/<id>/` with a test that every
-department it names is in `units.csv`, or is retired with the faculty table.
+**M28 — The HR department list is a hand-kept R list.** **Done 2026-10-16.**
+`hr_org_desc_to_dept` (79 names to 32 departments) now comes from
+`institution/<id>/source_organizations.csv`, validated at load so every unit
+it names is in `units.csv` (`validate_text_maps()`; `test-catalogs.R`).
+Organisations not on it are still dropped when the HR report is parsed, and
+the report is no longer pulled, so retiring it with the faculty table remains
+open (see `docs/developers/source-to-cedar-manifest.md` §5).

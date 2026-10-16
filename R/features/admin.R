@@ -509,8 +509,8 @@ build_counting_rules <- function(files, programs, sections, students) {
       "institution/<id>/excluded_courses.csv (excluded_courses, R/lists/excluded_courses.R)",
       "the source exports (mrgather); ISSUES.md I18, I20",
       "institution/<id>/campuses.csv (R/lists/campuses.R)",
-      "hr_org_desc_to_dept, R/lists/mappings.R; R/data-parsers/parse-HRreport.R",
-      "major_name_to_major_code, R/lists/mappings.R"))
+      "institution/<id>/source_organizations.csv (hr_org_desc_to_dept, R/lists/mappings.R); R/data-parsers/parse-HRreport.R",
+      "institution/<id>/program_names.csv (major_name_to_major_code, R/lists/mappings.R)"))
 }
 
 #' Every campus code: its label, group, and where it is counted

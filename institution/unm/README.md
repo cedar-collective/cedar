@@ -20,6 +20,9 @@ See `docs/developers/adr-002-explicit-mapping-files.md`.
 | `population_groups.csv` | program name in a named population group | `group`, `description`, `default_for`, `program_name` |
 | `projection_groups.csv` | enrollment-projection monitoring scope | `group_id`, `label`, `description`, `market_id`, `campuses`, `include_gen_ed` |
 | `projection_courses.csv` | course named in a projection scope | `group_id`, `subject_course`, `always_monitored`, `history_start_term`, `retention_min_terms` |
+| `program_names.csv` | program name as an export writes it | `program_name`, `program_code` |
+| `program_name_aliases.csv` | variant program name | `source_name`, `program_name` |
+| `source_organizations.csv` | HR organisation name | `source_name`, `unit_code` |
 
 **Every row is one line.** No blank lines and no line breaks inside a field:
 Admin > Mappings links to rows by line number, and the loader refuses a file
@@ -28,8 +31,8 @@ where row and line disagree.
 `settings.csv` holds `mapping_files_url`, the GitHub location of this directory
 (a `blob` URL). Admin > Data & Usage > Mappings uses it to link each program
 awaiting a decision to its line here; a fork points it at its own repository.
-`source_files_url` is the repository root, for links to platform files that
-still hold mappings. Optional `source_values_without_college` lists source
+`source_files_url` is the repository root, for links to platform files.
+Optional `source_values_without_college` lists source
 college values that deliberately name no college (`Non-Degree Status`), so the
 mapping audit does not report them as unknown. Optional
 `projection_history_start_term` (`202210`, Spring 2022) is the first term
@@ -268,6 +271,22 @@ course's override must agree across groups. Course membership is by exact
 `subject_course`; suffix variants are never included by prefix. Converted from
 `R/lists/enrollment_projection_groups.R` on 2026-10-16 with no change to any
 scope.
+
+## The text maps: program_names.csv, program_name_aliases.csv, source_organizations.csv
+
+Free text from exports, translated to codes. `program_names.csv` maps a
+program name (without any "Pre-" prefix) to the program code the transform
+fills in when an export has a name column but no code column (older formats,
+some graduate data); the code need not be in `programs.csv`, since older
+exports use codes since retired. `program_name_aliases.csv` maps a variant or
+historical name to the canonical `program_name` stored in `cedar_programs`
+(Banner rename artifacts, X-prefix variants whose text differs).
+`source_organizations.csv` maps the HR report's "Home Organization Desc" to
+the unit a faculty member belongs to; every `unit_code` must be in
+`units.csv`, and organisations not listed are dropped when the report is
+parsed (ISSUES.md M28). Text maps rot when a source renames something:
+look for names that no longer appear in current exports. Converted from
+`R/lists/mappings.R` on 2026-10-16 with no change to any entry.
 
 ## Provenance
 

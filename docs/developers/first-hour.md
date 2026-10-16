@@ -161,13 +161,15 @@ contributor can test it without restricted data.
 ## Adopting CEDAR at another institution
 
 Everything above uses the synthetic institution. To point CEDAR at a real one,
-the files to replace are exactly those whose first line reads
-`# CEDAR-INSTITUTION:`:
+the files to replace are exactly the CSVs under `institution/<id>/` (ADR-002):
 
 | File | What it holds |
 |---|---|
-| `institution/<id>/*.csv` | subjects, programs, units and colleges: every department and college assignment, and which programs are pre-majors (plain CSV; ADR-002); campus codes and default scope (`campuses.csv`); course-level bands (`course_levels.csv`); Gen Ed areas (`gen_ed_courses.csv`); courses excluded from course lists (`excluded_courses.csv`); named population groups (`population_groups.csv`); projection monitoring scopes (`projection_groups.csv`, `projection_courses.csv`) |
-| `R/lists/mappings.R` | name → code and HR-org → department text maps |
+| `units.csv`, `colleges.csv`, `subjects.csv`, `programs.csv`, `source_departments.csv`, `settings.csv` | every department and college assignment, which programs are pre-majors, and the institution's settings |
+| `campuses.csv`, `course_levels.csv` | campus codes and default scope; course-level bands |
+| `gen_ed_courses.csv`, `excluded_courses.csv` | Gen Ed areas; courses excluded from course lists |
+| `population_groups.csv`, `projection_groups.csv`, `projection_courses.csv` | named population groups; projection monitoring scopes |
+| `program_names.csv`, `program_name_aliases.csv`, `source_organizations.csv` | name → code, name → canonical name, and HR organisation → unit text maps |
 
 Files marked `# CEDAR-PLATFORM:` are mechanism and policy you inherit: grade and
 status vocabulary, the lookup derivations, the anomaly screens, the semantics

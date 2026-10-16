@@ -20,6 +20,9 @@ program names into four named populations for Pathways and the projections
 scenario. `projection_groups.csv` and `projection_courses.csv` declare one
 monitoring scope over the fixture Gen Ed courses, with the window start in
 `settings.csv`; the demo does not build projections, but the files must load.
+The three text maps (`program_names.csv`, `program_name_aliases.csv`,
+`source_organizations.csv`) are headers only: the fixtures carry codes, and the
+demo parses no HR report.
 
 Every row is confirmed: the demo has no decisions waiting, so Admin > Mappings
 shows none. A fixture code with no row here would be listed there, as at any

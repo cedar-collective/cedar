@@ -86,7 +86,7 @@ CEDAR_MAPPING_FILE_SPECS <- list(
 #   the institution's directory, e.g. https://github.com/<org>/<repo>/blob/main/institution/<id>.
 #   The Admin > Mappings page links each row needing a decision to its line.
 #   source_files_url: the same repository's root, as a GitHub "blob" URL, for
-#   links to platform files (R/lists/mappings.R holds the text maps that remain).
+#   links to platform files.
 CEDAR_REQUIRED_SETTINGS <- c("mapping_files_url", "source_files_url")
 # Optional settings.
 #   source_values_without_college: `|`-separated source college values that
@@ -145,7 +145,17 @@ CEDAR_CONFIG_FILE_SPECS <- list(
   # minimum (blank = the model default); a course's override is the same in
   # every group that names it.
   projection_courses = c("group_id", "subject_course", "always_monitored",
-                         "history_start_term", "retention_min_terms")
+                         "history_start_term", "retention_min_terms"),
+  # Text maps for exports that carry a name but no code. program_names: a
+  # program name as a source writes it (without any "Pre-" prefix) to the
+  # program code the transform fills in when the export has none.
+  program_names = c("program_name", "program_code"),
+  # A variant or historical program name to the canonical program_name
+  # stored in cedar_programs (Banner rename artifacts, X-prefix variants).
+  program_name_aliases = c("source_name", "program_name"),
+  # The HR report's "Home Organization Desc" text to the unit a faculty member
+  # belongs to; organisations not listed are dropped when the report is parsed.
+  source_organizations = c("source_name", "unit_code")
 )
 CEDAR_CAMPUS_KINDS <- c("main", "online", "branch")
 # Where a population group can be the preselected choice: the Pathways major
@@ -387,6 +397,34 @@ validate_projection_groups <- function(groups, courses, known_campuses) {
   courses$history_start_term <- suppressWarnings(as.integer(ifelse(blank(starts), NA, starts)))
   courses$retention_min_terms <- suppressWarnings(as.integer(ifelse(blank(mins), NA, mins)))
   list(groups = groups, courses = courses)
+}
+
+#' Check the three text-map files together
+#'
+#' @param program_names,aliases,organizations The tables as read.
+#' @param known_units Unit codes from units.csv.
+#' @return list(program_names, aliases, organizations), if valid. Stops listing
+#'   every problem otherwise.
+validate_text_maps <- function(program_names, aliases, organizations, known_units) {
+  problems <- character(0)
+  blank <- function(x) is.na(x) | !nzchar(x)
+  check <- function(df, file, key, value) {
+    if (any(blank(df[[key]]))) problems <<- c(problems, paste0(file, ": blank ", key))
+    if (any(blank(df[[value]]))) problems <<- c(problems, paste0(file, ": blank ", value))
+    d <- unique(df[[key]][duplicated(df[[key]])])
+    if (length(d)) problems <<- c(problems, paste0(file, ": duplicate ", key, " ", paste(d, collapse = ", ")))
+  }
+  check(program_names, "program_names.csv", "program_name", "program_code")
+  check(aliases, "program_name_aliases.csv", "source_name", "program_name")
+  check(organizations, "source_organizations.csv", "source_name", "unit_code")
+  same <- aliases$source_name[aliases$source_name == aliases$program_name]
+  if (length(same)) problems <- c(problems, paste("program_name_aliases.csv: source_name equals program_name for", paste(same, collapse = ", ")))
+  bad <- setdiff(organizations$unit_code[!blank(organizations$unit_code)], known_units)
+  if (length(bad)) problems <- c(problems, paste("source_organizations.csv: unit_code not in units.csv:", paste(bad, collapse = ", ")))
+  if (length(problems)) {
+    stop("[institution_files.R] Invalid text-map files:\n  ", paste(problems, collapse = "\n  "))
+  }
+  list(program_names = program_names, aliases = aliases, organizations = organizations)
 }
 
 #' Check an institution's mapping files against each other

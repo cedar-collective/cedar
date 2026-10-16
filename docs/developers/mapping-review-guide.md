@@ -137,11 +137,12 @@ The authoritative unit list, each with its home college, and every spelling a
 source uses for a college (`source_names`). **Look for** a department you know
 exists that is not in the file, and a renamed college whose old name is missing.
 
-### `R/lists/mappings.R` — text → code
+### `program_names.csv`, `program_name_aliases.csv`, `source_organizations.csv` — text → code
 
-`major_name_to_major_code` and `hr_org_desc_to_dept` translate free text from
-Banner and HR exports. Text maps rot when the source system renames something.
-**Look for:** names that no longer appear in current exports.
+Free text from Banner and HR exports, translated to codes (read into
+`major_name_to_major_code`, `program_name_aliases` and `hr_org_desc_to_dept`
+by `R/lists/mappings.R`). Text maps rot when the source system renames
+something. **Look for:** names that no longer appear in current exports.
 
 ### `R/lists/data_semantics.R` — what the data means
 
