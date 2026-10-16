@@ -1053,6 +1053,23 @@ population_group_choices <- function() {
 }
 
 
+#' The group a surface preselects
+#'
+#' @param surface One of CEDAR_POPULATION_GROUP_SURFACES ("pathways", "scenario").
+#' @return The group id population_groups.csv marks default_for that surface,
+#'   else the first group in the file. Documented, not a silent fallback: a file
+#'   that names no default for a surface gets its first group.
+population_group_default <- function(surface) {
+  if (!surface %in% CEDAR_POPULATION_GROUP_SURFACES) {
+    stop("[population.R] Unknown population group surface: ", surface, call. = FALSE)
+  }
+  if (surface %in% names(CEDAR_POPULATION_GROUP_DEFAULTS)) {
+    return(unname(CEDAR_POPULATION_GROUP_DEFAULTS[[surface]]))
+  }
+  population_group_ids()[[1]]
+}
+
+
 population_group_program_names <- function(group_id) {
   group <- CEDAR_POPULATION_GROUPS[[group_id]]
   if (is.null(group)) {

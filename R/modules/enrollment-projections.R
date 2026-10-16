@@ -260,7 +260,7 @@ enrollmentProjectionsUI <- function(id) {
             selectInput(
               ns("scenario_population"), "Population",
               choices = population_group_choices(),
-              selected = "Health Professions (Clinical)"
+              selected = population_group_default("scenario")
             )
           ),
           column(

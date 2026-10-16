@@ -121,9 +121,19 @@ CEDAR_CONFIG_FILE_SPECS <- list(
   # Courses left out of course lists and reviews when opt$uel = TRUE: thesis,
   # dissertation, honors-credit, independent study and the like. notes is free
   # text for why.
-  excluded_courses = c("subject_course", "notes")
+  excluded_courses = c("subject_course", "notes"),
+  # One row per (group, program name). description is the same on every row of
+  # a group and is shown as the selector's option label. default_for names the
+  # surfaces this group is preselected on, |-separated from
+  # CEDAR_POPULATION_GROUP_SURFACES; each surface at most once across the file.
+  # Groups declare program NAMES, resolved to codes against cedar_programs at
+  # run time (population_group_major_codes()).
+  population_groups = c("group", "description", "default_for", "program_name")
 )
 CEDAR_CAMPUS_KINDS <- c("main", "online", "branch")
+# Where a population group can be the preselected choice: the Pathways major
+# group selector and the projections growth scenario.
+CEDAR_POPULATION_GROUP_SURFACES <- c("pathways", "scenario")
 
 # Evidence aid for the mapping assistant (scripts/propose-mappings.R). It says
 # what each source-system department means; the transform never reads it, so it
@@ -268,6 +278,41 @@ validate_excluded_courses <- function(df) {
   if (length(d)) problems <- c(problems, paste("excluded_courses.csv: duplicate subject_course", paste(d, collapse = ", ")))
   if (length(problems)) {
     stop("[institution_files.R] Invalid excluded_courses.csv:\n  ", paste(problems, collapse = "\n  "))
+  }
+  df
+}
+
+#' Check population_groups.csv
+#'
+#' @return The table, if valid. Stops listing every problem otherwise.
+validate_population_groups <- function(df) {
+  problems <- character(0)
+  blank <- function(x) is.na(x) | !nzchar(x)
+  if (any(blank(df$group))) problems <- c(problems, "population_groups.csv: blank group")
+  if (any(blank(df$program_name))) problems <- c(problems, "population_groups.csv: blank program_name")
+  one_per_group <- function(col) {
+    n <- tapply(df[[col]], df$group, function(x) length(unique(x)))
+    names(n)[n > 1]
+  }
+  multi <- one_per_group("description")
+  if (length(multi)) problems <- c(problems, paste("population_groups.csv: more than one description for group", paste(multi, collapse = ", ")))
+  if (any(blank(df$description))) problems <- c(problems, "population_groups.csv: blank description")
+  multi <- one_per_group("default_for")
+  if (length(multi)) problems <- c(problems, paste("population_groups.csv: default_for differs within group", paste(multi, collapse = ", ")))
+  key <- paste(df$group, df$program_name, sep = " / ")
+  d <- unique(key[duplicated(key)])
+  if (length(d)) problems <- c(problems, paste("population_groups.csv: duplicate program in a group:", paste(d, collapse = "; ")))
+  per_group <- df[!duplicated(df$group), c("group", "default_for")]
+  surfaces <- strsplit(per_group$default_for, "|", fixed = TRUE)
+  flat <- unlist(surfaces)
+  bad <- unique(flat[!flat %in% CEDAR_POPULATION_GROUP_SURFACES])
+  if (length(bad)) problems <- c(problems, paste0("population_groups.csv: default_for must be ",
+                                                   paste(CEDAR_POPULATION_GROUP_SURFACES, collapse = ", "),
+                                                   " (|-separated); found ", paste(bad, collapse = ", ")))
+  dup_surface <- unique(flat[duplicated(flat)])
+  if (length(dup_surface)) problems <- c(problems, paste("population_groups.csv: more than one group is default_for", paste(dup_surface, collapse = ", ")))
+  if (length(problems)) {
+    stop("[institution_files.R] Invalid population_groups.csv:\n  ", paste(problems, collapse = "\n  "))
   }
   df
 }

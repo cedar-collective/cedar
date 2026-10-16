@@ -17,6 +17,7 @@ See `docs/developers/adr-002-explicit-mapping-files.md`.
 | `course_levels.csv` | leading digit of a course number | `leading_digit`, `level` |
 | `gen_ed_courses.csv` | Gen Ed area membership of a course | `area`, `area_name`, `subject_course` |
 | `excluded_courses.csv` | course left out of course lists | `subject_course`, `notes` |
+| `population_groups.csv` | program name in a named population group | `group`, `description`, `default_for`, `program_name` |
 
 **Every row is one line.** No blank lines and no line breaks inside a field:
 Admin > Mappings links to rows by line number, and the loader refuses a file
@@ -224,6 +225,25 @@ similar special enrollments, whose counts are real (they stay in enrollment
 and credit-hour totals) but whose rows would otherwise dominate a list of
 courses. `notes` is free text for why a course is here. Converted from
 `R/lists/excluded_courses.R` on 2026-10-16 with three duplicate rows removed.
+
+## population_groups.csv
+
+Named population groups, shared by Pathways (the Major Group selector) and the
+projections growth scenario, so "health professions" means one thing across
+CEDAR. One row per (group, program name); `description` is the same on every
+row of a group and is the option label. `default_for` names the surfaces the
+group is preselected on (`pathways`, `scenario`, `|`-separated), each surface
+on at most one group; a surface no group claims preselects the first group in
+the file.
+
+Groups declare program **names**, resolved to Banner codes against
+`cedar_programs` when used, so a pre-major carrying its major's name (FRAD and
+RADS are both "Radiologic Sciences") resolves with it. Where a pre-major's name
+has drifted from its major's, list both spellings ("Medical Laboratory
+Science" beside "Medical Laboratory Sciences"); `population_group_audit()`
+reports near misses so drift is found rather than silently dropped
+(ISSUES.md I7). Converted from `R/lists/population-presets.R` on 2026-10-16
+with no change to any group.
 
 ## Provenance
 
