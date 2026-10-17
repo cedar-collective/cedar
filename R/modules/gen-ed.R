@@ -1141,7 +1141,7 @@ gen_ed_module_server <- function(input, output, session, students, sections, pro
 
 
 genEdExploreServer <- function(id, students, sections, programs, degrees = NULL,
-                               current_term = NULL) {
+                               edges, current_term = NULL) {
   moduleServer(id, function(input, output, session) {
     build_terms <- reactive({
       all_terms <- sort(unique(sections$term[!is.na(sections$term)]))
@@ -1158,6 +1158,7 @@ genEdExploreServer <- function(id, students, sections, programs, degrees = NULL,
         gen_ed_area = if (length(input$ge_gen_ed_area) > 0) input$ge_gen_ed_area else NULL,
         terms = build_terms(),
         min_n = GEN_ED_MIN_N,
+        data_edges = edges,
         # Course-major associations are a per-department recruitment signal and
         # are not comparable across departments, so they live only on the
         # department-scoped Gen Ed profile, not this aggregate Explore view.
@@ -1180,8 +1181,9 @@ genEdExploreServer <- function(id, students, sections, programs, degrees = NULL,
 #'   source — the program-record credit fields cannot answer the question. See
 #'   `R/features/gen-ed.R`.
 deptProfileGenEdServer <- function(id, students, sections, programs, degrees = NULL,
-                                   dept, campus = NULL, active = NULL, current_term = NULL,
-                                   dfw_password = NULL, term_credits = NULL) {
+                                   dept, edges, campus = NULL, active = NULL,
+                                   current_term = NULL, dfw_password = NULL,
+                                   term_credits = NULL) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
 
@@ -1202,6 +1204,7 @@ deptProfileGenEdServer <- function(id, students, sections, programs, degrees = N
         level = c("lower", "upper"),
         terms = build_terms(),
         min_n = 5L,
+        data_edges = edges,
         include_associations = TRUE,
         include_instructor_dfw = TRUE,
         association_group_cols = c("campus", "subject_course", "instructor_name")

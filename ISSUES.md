@@ -1868,13 +1868,14 @@ by `tests/testthat/test-architecture.R` ("cones and branches do not read
 global state"): any `data_objects`, `.GlobalEnv`, `get("cedar_…")`, or
 `exists("…")` in `R/cones` or `R/branches` counts, except the two standalone
 guards `exists("%||%")` and `exists("cedar_log_level")`, and each file's
-allowance may only go down. Measured: 19 across 5 files —
-`R/branches/course-attempts.R` 6 (the term edges), `R/cones/sfr.R` 6
+allowance may only go down. Measured: 13 across 4 files — `R/cones/sfr.R` 6
 (`get_sfr(data_objects)` takes the whole bundle), `R/branches/credit-hours.R` 4
 (`credit_hours_by_fac(data_objects, …)` and `major_to_dept`),
 `R/cones/waitlist.R` 2 (`cedar_cl_enrls_base`), `R/cones/course-demographics.R`
-1 (`major_code_to_name`). *Done when:* the allowance list is empty; every table
-and edge is a parameter.
+1 (`major_code_to_name`). `R/branches/course-attempts.R` cleared 2026-10-16:
+the graded edge is `opt$data_edges` (required, fails closed when undetermined)
+and the left edge is `opt$min_term`, never a global or a literal. *Done when:*
+the allowance list is empty; every table and edge is a parameter.
 
 **M13 — Business logic in modules.** `R/modules/pathways.R` 38
 `group_by`/`summarize` pipelines, `R/modules/cancellations.R` 10,

@@ -18,8 +18,42 @@ normalize_course_attempt_opt <- function(opt = list()) {
 
   opt
 }
+# The term window every grade-reading path shares.
+#
+# The GRADED edge, not the enrollment edge. Every consumer of these functions
+# reads final_grade, and a term whose grades have not posted contributes a full
+# denominator with almost no numerator: the newest term read 0.3% DFW against
+# 6-8% elsewhere before the edge was applied. See the right-edge policy in
+# AGENTS.md. The edges are a parameter (`opt$data_edges`, the output of
+# cedar_data_edges()), never a global: a cone must be callable from a script
+# that never ran global.R and must fail closed when the edge is unknown.
+course_attempt_term_window <- function(opt) {
+  edges <- opt$data_edges
+  if (is.null(edges) || !is.list(edges)) {
+    stop("[course-attempts.R] opt$data_edges (cedar_data_edges() output) is ",
+         "required to bound grade-based outcomes at the graded edge.",
+         call. = FALSE)
+  }
+  end <- edges$last_graded
+  if (is.null(end) || length(end) != 1L || is.na(end)) {
+    stop("[course-attempts.R] data_edges$last_graded is undetermined; refusing ",
+         "to read grades without a graded edge.", call. = FALSE)
+  }
+  start <- opt$min_term
+  if (!is.null(start) && (length(start) != 1L || is.na(start))) {
+    stop("[course-attempts.R] opt$min_term must be one term code or NULL.",
+         call. = FALSE)
+  }
+  list(start = if (is.null(start)) NULL else as.integer(start),
+       end = as.integer(end))
+}
 
 
+
+
+#' @param opt Filter options. `data_edges` (the output of [cedar_data_edges()])
+#'   is required: grade-based outcomes stop at `data_edges$last_graded`.
+#'   `min_term` optionally sets a left edge; there is no default literal.
 prepare_course_attempts <- function(students, opt = list()) {
   message("[course-attempts.R] Preparing course attempts from ", nrow(students), " rows")
   opt <- normalize_course_attempt_opt(opt)
@@ -37,27 +71,16 @@ prepare_course_attempts <- function(students, opt = list()) {
     return(tibble::tibble())
   }
 
-  # Left edge from config, not a literal. global.R already trims every table to
-  # cedar_min_term, so this is a safety net for standalone use — but a hardcoded
-  # 201980 silently disagrees with the config the moment the window moves.
-  .start <- if (exists("cedar_min_term") && !is.null(cedar_min_term)) cedar_min_term else 201980L
-  attempts <- attempts %>% dplyr::filter(term >= .start)
-
-  # The GRADED edge, not the enrollment edge. Every consumer of this function
-  # reads final_grade, and a term whose grades have not posted contributes a
-  # full denominator with almost no numerator: the newest term read 0.3% DFW
-  # against 6-8% elsewhere before this changed. See the right-edge policy in
-  # AGENTS.md. Falls back to the config end term when the edge is unavailable
-  # (standalone scripts that never ran global.R).
-  .end <- if (exists("cedar_graded_through") && !is.null(cedar_graded_through)) {
-    cedar_graded_through
-  } else if (exists("cedar_report_end_term")) {
-    cedar_report_end_term
-  } else NULL
-  if (!is.null(.end)) {
-    message("[course-attempts.R] Excluding terms after the graded edge: ", .end)
-    attempts <- attempts %>% dplyr::filter(term <= .end)
+  # Both edges come from the caller, never from global state (ISSUES.md M12).
+  # The left edge is optional: global.R already trims every table to its
+  # configured start, and a standalone caller passes opt$min_term when it
+  # wants one. The graded edge is required and fails closed.
+  window <- course_attempt_term_window(opt)
+  if (!is.null(window$start)) {
+    attempts <- attempts %>% dplyr::filter(term >= window$start)
   }
+  message("[course-attempts.R] Excluding terms after the graded edge: ", window$end)
+  attempts <- attempts %>% dplyr::filter(term <= window$end)
 
   if (nrow(attempts) == 0) {
     message("[course-attempts.R] No rows after term filtering.")
@@ -110,19 +133,13 @@ summarize_outcome_status_exclusions <- function(students, opt = list()) {
 
   if (nrow(scoped) == 0) return(tibble::tibble())
 
-  .start2 <- if (exists("cedar_min_term") && !is.null(cedar_min_term)) cedar_min_term else 201980L
-  scoped <- scoped %>% dplyr::filter(term >= .start2)
-
-  # Same graded edge as prepare_course_attempts() above — this path also reads
-  # final_grade, so it must not reach into an ungraded term.
-  .end2 <- if (exists("cedar_graded_through") && !is.null(cedar_graded_through)) {
-    cedar_graded_through
-  } else if (exists("cedar_report_end_term")) {
-    cedar_report_end_term
-  } else NULL
-  if (!is.null(.end2)) {
-    scoped <- scoped %>% dplyr::filter(term <= .end2)
+  # Same window as prepare_course_attempts(): this path also reads final_grade,
+  # so it must not reach into an ungraded term.
+  window <- course_attempt_term_window(opt)
+  if (!is.null(window$start)) {
+    scoped <- scoped %>% dplyr::filter(term >= window$start)
   }
+  scoped <- scoped %>% dplyr::filter(term <= window$end)
 
   if (nrow(scoped) == 0) return(tibble::tibble())
 

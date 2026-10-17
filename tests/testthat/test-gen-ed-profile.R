@@ -9,7 +9,7 @@ test_that("get_course_major_associations excludes prior affiliates and counts la
   result <- get_course_major_associations(
     gen_ed_assoc_students,
     gen_ed_assoc_programs,
-    opt = list(
+    opt = list(data_edges = data_objects$cedar_edges, 
       subject_code = "HIST",
       dept_codes = "HIST",
       gen_ed_only = TRUE,
@@ -37,7 +37,7 @@ test_that("get_course_major_associations supports aggregate course grouping", {
   result <- get_course_major_associations(
     gen_ed_assoc_students,
     gen_ed_assoc_programs,
-    opt = list(
+    opt = list(data_edges = data_objects$cedar_edges, 
       subject_code = "HIST",
       dept_codes = "HIST",
       gen_ed_only = TRUE,
@@ -61,7 +61,7 @@ test_that("get_course_major_associations rejects campus-free course groups", {
     get_course_major_associations(
       gen_ed_assoc_students,
       gen_ed_assoc_programs,
-      opt = list(
+      opt = list(data_edges = data_objects$cedar_edges, 
         subject_code = "HIST",
         dept_codes = "HIST",
         gen_ed_only = TRUE,
@@ -79,7 +79,7 @@ test_that("course-major association defaults separate delivery campuses", {
   result <- get_course_major_associations(
     gen_ed_assoc_students,
     gen_ed_assoc_programs,
-    opt = list(
+    opt = list(data_edges = data_objects$cedar_edges, 
       subject_code = "HIST",
       dept_codes = "HIST",
       gen_ed_only = TRUE,
@@ -104,7 +104,7 @@ test_that("get_gen_ed_profile runs all-Gen-Ed default without department selecti
     gen_ed_assoc_students,
     gen_ed_assoc_sections,
     gen_ed_assoc_programs,
-    opt = list(min_n = 1L, campus = "ABQ")
+    opt = list(data_edges = data_objects$cedar_edges, min_n = 1L, campus = "ABQ")
   )
 
   expect_equal(result$summary$n_courses, 1L)
@@ -143,7 +143,7 @@ test_that("get_gen_ed_profile applies core filters consistently", {
     gen_ed_assoc_students,
     gen_ed_assoc_sections,
     gen_ed_assoc_programs,
-    opt = list(
+    opt = list(data_edges = data_objects$cedar_edges, 
       campus = "ABQ",
       terms = 202010L,
       gen_ed_area = 5L,
@@ -171,7 +171,7 @@ test_that("get_gen_ed_profile can have section enrollment without qualifying stu
     no_matching_students,
     gen_ed_assoc_sections,
     gen_ed_assoc_programs,
-    opt = list(dept_code = "HIST", min_n = 5L)
+    opt = list(data_edges = data_objects$cedar_edges, dept_code = "HIST", min_n = 5L)
   )
 
   expect_gt(result$summary$total_enrl, 0)
@@ -188,7 +188,7 @@ test_that("get_gen_ed_profile can include chair-facing instructor DFW rows", {
     gen_ed_assoc_students,
     gen_ed_assoc_sections,
     gen_ed_assoc_programs,
-    opt = list(
+    opt = list(data_edges = data_objects$cedar_edges, 
       dept_code = "HIST",
       min_n = 1L,
       campus = "ABQ",

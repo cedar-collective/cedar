@@ -65,7 +65,8 @@ seatfinderUI <- function(id, sections, default_term, dept_choices) {
   )
 }
 
-seatfinderServer <- function(id, students, sections, faculty, error_handler = NULL) {
+seatfinderServer <- function(id, students, sections, faculty, edges,
+                             error_handler = NULL) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
 
@@ -348,7 +349,10 @@ seatfinderServer <- function(id, students, sections, faculty, error_handler = NU
           term           = input$sf_term,
           pt             = input$sf_pt,
           im             = input$sf_im,
-          level          = input$sf_level
+          level          = input$sf_level,
+          # The graded edge bounds the DFW rates; it is part of the cache key
+          # because a new graded term changes them.
+          data_edges     = edges
         )
 
         cedar_debug("[seatfinder] Cache check - campus:", paste(opt$course_campus, collapse=","),
