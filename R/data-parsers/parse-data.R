@@ -331,6 +331,7 @@ if (is_docker()) {
 }
 
 message("sourcing include files...")
+source(file.path(R_dir,"lists/institution_files.R"))  # reads institution/<id>/ for the two lists below
 source(file.path(R_dir,"lists/mappings.R"))
 source(file.path(R_dir,"lists/gen_ed_courses.R"))
 source(file.path(R_dir,"trunk/utils.R"))

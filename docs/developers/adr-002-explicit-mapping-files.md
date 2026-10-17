@@ -294,7 +294,7 @@ Staged, each stage compared against the previous output before it ships.
 | 3b | Colleges reported through program → unit → college, and through subject rows for courses | **Done 2026-10-10.** Units unchanged from Stage 3; colleges differ only as decided. See Stage 3b results |
 | 4 | Retire `generate_program_map()`, `program_map.qs`, and the lists it fed | **Done 2026-10-10.** Tests pass with the lists gone; units and colleges identical to Stage 3b; pre-major flags differ only as reviewed. See Stage 4 results |
 | 5 | Give the synthetic demo its own `institution/demo/` files | **Done 2026-10-10.** The demo builds with `institution/unm/` absent; its course units and colleges are identical to the UNM-files build. See Stage 5 results |
-| 6 | Move the remaining UNM R lists to configuration files under `institution/<id>/` (`CEDAR_CONFIG_FILE_SPECS`), one list at a time | **In progress.** 2026-10-16: `campuses.csv`, `course_levels.csv`, `gen_ed_courses.csv`, `excluded_courses.csv`, `population_groups.csv`, `projection_groups.csv`, `projection_courses.csv`; the constants they build are unchanged, so no number moves. Remaining: `mappings.R` |
+| 6 | Move the remaining UNM R lists to configuration files under `institution/<id>/` (`CEDAR_CONFIG_FILE_SPECS`), one list at a time | **Done 2026-10-16.** `campuses.csv`, `course_levels.csv`, `gen_ed_courses.csv`, `excluded_courses.csv`, `population_groups.csv`, `projection_groups.csv`, `projection_courses.csv`, `program_names.csv`, `program_name_aliases.csv`, `source_organizations.csv`; every `R/lists/` file is now platform, and the constants they build are unchanged, so no number moves |
 
 ### Stage 5 results (2026-10-10)
 
@@ -307,10 +307,10 @@ files had no row for a fixture code (GES, PSYC, PSYC-MIN and the business
 codes now have units) and in BUSA's few fixture pre-major rows, since a flag is
 stated per code. `test-demo-data.R` fails if the generator reads UNM's files.
 
-**Not yet institution files:** UNM's `mappings.R` (text maps) still loads
-for every institution, the demo included. Moving it to `institution/<id>/` is
-the last of Stage 6; campuses, course levels, Gen Ed areas, the excluded list,
-the population groups and the projection scopes moved on 2026-10-16. A configuration file differs from a mapping file in who
+**Stage 6 (2026-10-16):** every remaining UNM R list moved to
+`institution/<id>/` as a configuration file -- campuses, course levels, Gen Ed
+areas, the excluded list, the population groups, the projection scopes and the
+three text maps -- and the demo institution carries its own copy of each. A configuration file differs from a mapping file in who
 reads it: the R/lists file that builds its constant reads and validates it at
 load (`CEDAR_CONFIG_FILE_SPECS`), and the platform code that reads the
 constant does not change.

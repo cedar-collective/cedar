@@ -146,12 +146,13 @@ pre-major, the program it `leads_to`, and why. It replaced `premaj_canon`,
 | `major_to_dept` | major_code → dept_code | transform time fallback; runtime reverse lookup |
 | `dept_code_to_name` | dept_code → dept_name | display |
 
-### `R/lists/mappings.R`
+### `institution/<id>/` text maps (read by `R/lists/mappings.R`)
 
-| Map | Purpose | When used |
-|-----|---------|-----------|
-| `hr_org_desc_to_dept` | HR org description → dept_code | faculty data |
-| `program_code_to_name` | program_code → display name | student composition charts |
+| File | Map | Purpose | When used |
+|-----|-----|---------|-----------|
+| `source_organizations.csv` | `hr_org_desc_to_dept` | HR org description → unit code | faculty data |
+| `program_names.csv` | `major_name_to_major_code` | program name → program code | transform, when an export has no code column |
+| `program_name_aliases.csv` | `program_name_aliases` | variant name → canonical program_name | transform |
 
 ### `data/cedar_lookups.qs` (built at transform time)
 

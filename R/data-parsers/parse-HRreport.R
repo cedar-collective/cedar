@@ -17,6 +17,7 @@ pacman::p_load(tidyverse, readxl,dplyr,rvest,lubridate,fs,stringr, data.table,fo
 
 # load basic includes 
 source("../includes/config.R")
+source(paste0(cedar_base_dir,"/R/lists/institution_files.R"))  # reads institution/<id>/ for the two lists below
 source(paste0(cedar_base_dir,"/R/lists/mappings.R"))
 source(paste0(cedar_base_dir,"/R/lists/gen_ed_courses.R"))
 source(paste0(cedar_base_dir,"/R/trunk/utils.R"))

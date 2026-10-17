@@ -45,7 +45,7 @@ Measured by institution-shaped content, not by intent:
 | `data_semantics.R` | 155 | **Mixed** — registry mechanism plus UNM entries |
 | `subj_dept_map.R` | 294 | Institution — subject → department |
 | `program_code_maps.R` | 223 | Institution — Banner code conventions |
-| `mappings.R` | 218 | Institution — name → code, HR org → dept |
+| `mappings.R` | 218 | Institution — name → code, HR org → dept (moved to `institution/<id>/program_names.csv`, `program_name_aliases.csv`, `source_organizations.csv` 2026-10-16) |
 | `excluded_courses.R` | 226 | Institution (moved to `institution/<id>/excluded_courses.csv` 2026-10-16) |
 | `gen_ed_courses.R` | 151 | Institution (moved to `institution/<id>/gen_ed_courses.csv` 2026-10-16) |
 | `population-presets.R` | 174 | Institution — named program groups (moved to `institution/<id>/population_groups.csv` 2026-10-16) |

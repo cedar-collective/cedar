@@ -72,7 +72,7 @@ set_payload <- function(dept_code, prog_focus = NULL) {
     unique(x[!is.na(x) & nzchar(x)])
   }
 
-  message("[dept-trends.R] Setting program codes and names from mappings.R...")
+  message("[dept-trends.R] Setting program codes and names from the mapping files...")
   if (!is.null(prog_focus)) {
     prog_codes <- clean_codes(prog_focus)
   } else {

@@ -1,219 +1,39 @@
-# CEDAR-INSTITUTION: name → code and HR-org → department text maps
+# CEDAR-PLATFORM: text → code maps from institution/<id>/ (program names, aliases, HR organisations)
 # mappings.R
 #
-# Hand-curated text/name lookup maps that cannot be derived from the institution mapping files.
+# Hand-curated text lookups for exports that carry a name but no code. Which
+# names map to what is the institution's, in three files read and validated
+# here at load; this file names no program, code or organisation.
 #
-# Contents:
-#   major_name_to_major_code — Major name text → Banner major code.
-#                             Used in transform-to-cedar.R to fill major_code when Banner
-#                             exports provide a text name but no code column (old data formats).
-#   hr_org_desc_to_dept      — HR "Home Organization Desc" text → dept_code.
-#                             Used in parse-HRreport.R and Dept Trends support.
+#   major_name_to_major_code — program_names.csv. Program name text → program
+#                             code, used by the transform to fill major_code
+#                             when an export has a name column but no code
+#                             column (old formats, some graduate data).
+#   program_name_aliases     — program_name_aliases.csv. Variant or historical
+#                             program_name → the canonical name stored in
+#                             cedar_programs (Banner rename artifacts, X-prefix
+#                             variants whose text differs).
+#   hr_org_desc_to_dept      — source_organizations.csv. HR "Home Organization
+#                             Desc" → unit code, used by parse-HRreport.R and
+#                             Dept Trends. Every unit it names is in units.csv.
 #
-# SUPERSEDED — do NOT re-add these; they are now derived automatically and loaded by
-# catalog_lookups.R (from the institution mapping files):
-#   subj_to_dept          → catalog_lookups.R (from subj_dept_map)
-#   college_name_to_code  → catalog_lookups.R (from subj_dept_map)
-#   dept_code_to_name     → catalog_lookups.R (from subj_dept_map dept_name)
-#   major_to_dept         → catalog_lookups.R (from programs.csv)
-#   major_college_to_dept → retired at ADR-002 Stage 4; use resolve_program_units()
-#   old_code_to_new_code  → subj_dept_map subject_code → dept_code mappings
+# SUPERSEDED — do NOT re-add these; they are derived from the mapping files by
+# catalog_lookups.R: subj_to_dept, college_name_to_code, dept_code_to_name,
+# major_to_dept (major_college_to_dept and old_code_to_new_code were retired at
+# ADR-002 Stage 4; use resolve_program_units() and subj_dept_map).
 
-
-# Maps major name text to Banner major codes.
-# Used when Banner exports provide a program name but no major code column (e.g., some
-# grad data, older export formats). Values are major codes, not dept codes.
-major_name_to_major_code <- c(
-  "American Studies"="AMST",
-  "Africana Studies"="AFST",
-  "African American Studies"="AFST",
-  "Anthropology"="ANTH",
-  "American Sign Language"="ASL",
-  "Arabic"="ARBC",
-  "Asian Studies"="EAS",
-  "Astrophyics"="ASTR",
-  "Biology"="BIOL",
-  "Biology/Biological Sciences"="BIOL",
-  "Biochemistry"="BIOC",
-  "Chemistry"="CHEM",
-  "Chicana and Chicano Studies"="CCS",
-  "Chicana Chicano Studies"="CCS",
-  "Chicana/o Studies"="CCS",
-  "Chinese"="CHIN",
-  "Classical Studies"="CLST",
-  "Communication Journalism"="CJ",
-  "Communication & Journalism"="CJ",
-  "Communication"="COMM",
-  "Comp Lit & Cultural Stds"="CLCS",
-  "Comp Lit & Cultural Studies"="CLCS",
-  "Comparative Literature"="CLCS",
-  "Criminology"="CRIM",
-  "Creative Writing"="CRWR",
-  "Earth & Planetary Sciences"="EPS",
-  "East Asian Studies"="EAS",
-  "Economics"="ECON",
-  "English"="ENGL",
-  "English Studies"="ENGS",
-  "English-Philosophy"="ENGP",
-  "Environmental Science"="ENSC",
-  "French"="FREN",
-  "French Studies"="FRNS",
-  "Foreign Languages Literatures"="LCL",
-  "Forensic Anthropology"="ANTH",
-  "Forensic Science"="ANTH",
-  "Geography"="GEOG",
-  "German"="GRMN",
-  "German Studies"="GRMS",
-  "Greek"="GREK",
-  "Health,Medicine & Human Values"="HMHV",
-  "History"="HIST",
-  "International Studies"="ISI",
-  "Italian"="ITAL",
-  "Japanese"="JAPN",
-  "Journal & Mass Comm"="JOUR",
-  "Journalism"="JOUR",
-  "Journalism & Mass Comm"="JOUR",
-  "Languages Cultures & Literatures"="LCL",
-  "Languages"="LANG",
-  "Latin"="LATN",
-  "Latin American Studies"="LTAM",
-  "Linguistics"="LING",
-  "Mass Communication"="COMM",
-  "Mathematics"="MATH",
-  "Mathematics Statistics"="MATH",
-  "Museum Studies"="MSST",
-  "Native American Studies"="NATV",
-  "Navajo Language & Linguistics"="NVJO",
-  "Philosophy"="PHIL",
-  "Physics"="PHYS",
-  "Physics & Astrophysics"="PHYS",
-  "Physics Astronomy"="PHYS",
-  "Astrophysics"="ASTR",
-  "Political Science"="POLS",
-  "Political Science Gen Admin"="POLS",
-  "Portuguese"="PORT",
-  "School of Public Admin"="PADM",
-  "School of Public Administration"="PADM",
-  "Public Administration"="PADM",
-  "Psychology"="PSYC",
-  "Religious Studies Prgm"="RELG",
-  "Religious Studies"="RELG",
-  "Russian"="RUSS",
-  "Russian Studies"="RUSS",
-  "Signed Language Interpreting"="SIGN",
-  "Signed Language Interpret"="SIGN",
-  "Sociology"="SOCI",
-  "Spanish"="SPAN",
-  "Spanish Portuguese"="SPAN",
-  "Spanish & Portuguese"="SPAN",
-  "Speech & Hearing Sciences"="SHS",
-  "Speech and Hearing Sciences"="SHS",
-  "Speech-Language Pathology"="SHS",
-  "Statistics"="STAT",
-  "Sustainability Studies"="SUST",
-  "Sustainability Studies Program"="SUST",
-  "Technical & Professional Comm"="TCOM",
-  "Women Studies"="WGSS",
-  "Womens Studies"="WGSS",
-  "Wmn, Gndr, Sexlty Studies"="WGSS",
-  "Women, Gndr, Sexuality Studies"="WGSS")
-
-
-# Maps variant/historical program_name strings to the current canonical display name.
-# Applied during transform_programs to consolidate Banner rename artifacts and
-# X-prefix variant codes that carry a slightly different name text.
-# Key   = the variant string as it appears in the Banner "Major" column
-# Value = the canonical name to use in cedar_programs$program_name
-#
-# When Banner renames a program or introduces an X-prefix variant whose text
-# differs from the primary code's text, add an entry here.
-program_name_aliases <- c(
-  # XCCS is Banner's X-prefix variant for CCS; its text differs from the primary CCS name
-  "Chicana Chicano Studies"       = "Chicana and Chicano Studies",
-  # Older Banner exports used "Chicana/o Studies" for the same program
-  "Chicana/o Studies"             = "Chicana and Chicano Studies"
+.cedar_text_maps <- validate_text_maps(
+  read_institution_file("program_names"),
+  read_institution_file("program_name_aliases"),
+  read_institution_file("source_organizations"),
+  known_units = read_institution_file("units")$unit_code
 )
 
+major_name_to_major_code <- stats::setNames(.cedar_text_maps$program_names$program_code,
+                                            .cedar_text_maps$program_names$program_name)
 
-# Maps HR "Home Organization Desc" field to dept codes.
-# Used in parse-HRreport.R and Dept Trends support.
-hr_org_desc_to_dept <- c(
-  "American Studies"="AMST",
-  "AS American Studies"="AMST",
-  "Africana Studies"="AFST",
-  "African American Studies"="AFST",
-  "African American Studies Gen Admin"="AFST",
-  "AS Anthropology"="ANTH",
-  "Anthropology"="ANTH",
-  "AS Biology"="BIOL",
-  "AS Biology General Administrative"="BIOL",
-  "AS BA/MD Program"="HMHV",
-  "Biology"="BIOL",
-  "Biology/Biological Sciences"="BIOL",
-  "Biochemistry"="BIOC",
-  "Chemistry"="CHEM",
-  "AS Chemistry"="CHEM",
-  "Chicana / Chicano Studies"="CCS",
-  "Chicana and Chicano Studies"="CCS",
-  "AS Chicana and Chicano Studies"="CCS",
-  "Communication Journalism"="CJ",
-  "Communication & Journalism"="CJ",
-  "Earth & Planetary Sciences Dept"="EPS",
-  "Earth and Planetary Sciences Dept"="EPS",
-  "Earth and Planetary Sciences E PS"="EPS",
-  "Earth & Planetary Sciences"="EPS",
-  "AS Economics"="ECON",
-  "Economics"="ECON",
-  "English"="ENGL",
-  "AS English"="ENGL",
-  "English Studies"="ENGL",
-  "English General Administrative"="ENGL",
-  "Environmental Science"="EPS",
-  "Geography"="GES",
-  "Geography and Environmental Studies"="GES",
-  "Health,Medicine & Human Values"="HMHV",
-  "History"="HIST",
-  "AS History"="HIST",
-  "International Studies"="ISI",
-  "International Studies Institute ISI"="ISI",
-  "Mass Communication"="CJ",
-  "Foreign Language Lit Gen Admin"="LCL",
-  "Languages Cultures & Literatures"="LCL",
-  "Languages Cultures & Lit Gen Admin"="LCL",
-  "Foreign Languages Literatures"="LCL",
-  "Latin American Studies"="LTAM",
-  "Linguistics"="LING",
-  "AS Linguistics"="LING",
-  "Mathematics Statistics"="MATH",
-  "AS Mathematics Statistics"="MATH",
-  "Museum Studies"="MSST",
-  "Native American Studies"="NATV",
-  "AS Native American Studies"="NATV",
-  "Philosophy"="PHIL",
-  "AS Philosophy"="PHIL",
-  "Physics"="PHYS",
-  "Physics Astronomy"="PHYS",
-  "AS Physics Astronomy"="PHYS",
-  "CAS/CQuIC"="PHYS",
-  "Physics Astronomy Gen Admin"="PHYS",
-  "Political Science"="POLS",
-  "AS Political Science"="POLS",
-  "Political Science Gen Admin"="POLS",
-  "School of Public Administration"="PADM",
-  "Psychology"="PSYC",
-  "AS Psychology"="PSYC",
-  "Religious Studies Prgm"="RELG",
-  "Religious Studies"="RELG",
-  "Sociology"="SOCI",
-  "AS Sociology"="SOCI",
-  "Spanish Portuguese" = "SPAN",
-  "Spanish & Portuguese" = "SPAN",
-  "AS Spanish Portuguese" = "SPAN",
-  "Speech and Hearing Sciences" = "SHS",
-  "Speech & Hearing Sciences" = "SHS",
-  "AS Speech and Hearing Sciences" = "SHS",
-  "Speech Hearing Sciences Gen Admin" = "SHS",
-  "Sustainability Studies Program" = "SUST",
-  "Women Gender and Sexuality Studies" = "WGSS",
-  "AS Women Gender and Sexuality Studies" = "WGSS",
-  "Womens Studies"="WGSS")
+program_name_aliases <- stats::setNames(.cedar_text_maps$aliases$program_name,
+                                        .cedar_text_maps$aliases$source_name)
+
+hr_org_desc_to_dept <- stats::setNames(.cedar_text_maps$organizations$unit_code,
+                                       .cedar_text_maps$organizations$source_name)
