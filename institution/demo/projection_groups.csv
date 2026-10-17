@@ -1,0 +1,2 @@
+group_id,label,description,market_id,campuses,include_gen_ed
+critical_courses,Gen Ed + critical courses,The fixture Gen Ed courses plus two always-monitored gateway courses on the main and online campuses,abq_ea_course_market,ABQ|EA,TRUE

@@ -48,6 +48,10 @@ projection_course_group_market_id <- function(group_id) {
 
 
 enrollment_projection_model_config <- function(opt = list()) {
+  if (is.null(opt$history_start_term) && is.na(CEDAR_ENROLLMENT_PROJECTION_HISTORY_START_TERM)) {
+    stop("[enrollment-projections.R] No history window: set projection_history_start_term ",
+         "in institution/<id>/settings.csv or pass opt$history_start_term.", call. = FALSE)
+  }
   defaults <- list(
     history_start_term = CEDAR_ENROLLMENT_PROJECTION_HISTORY_START_TERM,
     course_history_start_terms =
@@ -248,6 +252,10 @@ projection_course_history_starts <- function(courses, opt = list()) {
   global_start <- as.integer(
     opt$history_start_term %||% CEDAR_ENROLLMENT_PROJECTION_HISTORY_START_TERM
   )
+  if (is.na(global_start)) {
+    stop("[enrollment-projections.R] No history window: set projection_history_start_term ",
+         "in institution/<id>/settings.csv or pass opt$history_start_term.", call. = FALSE)
+  }
   overrides <- opt$course_history_start_terms %||%
     CEDAR_ENROLLMENT_PROJECTION_COURSE_HISTORY_START_TERMS
   vapply(

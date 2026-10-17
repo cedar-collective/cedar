@@ -1,0 +1,12 @@
+group_id,subject_course,always_monitored,history_start_term,retention_min_terms
+critical_courses,FYEX 1010,TRUE,,
+critical_courses,FYEX 1030,TRUE,,
+critical_courses,FYEX 1110,TRUE,,
+critical_courses,MATH 1215,TRUE,202580,1
+critical_courses,MATH 1220,TRUE,,
+critical_courses,MATH 1350,TRUE,,
+critical_courses,BIOL 1140,TRUE,,
+critical_courses,CHEM 1215,TRUE,,
+critical_courses,CHEM 1215L,TRUE,,
+critical_courses,ENGL 1110,TRUE,,
+critical_courses,ENGL 1120,TRUE,,

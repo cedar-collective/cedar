@@ -1,0 +1,3 @@
+group_id,subject_course,always_monitored,history_start_term,retention_min_terms
+critical_courses,ENGL 1120,TRUE,,
+critical_courses,MATH 1430,TRUE,,

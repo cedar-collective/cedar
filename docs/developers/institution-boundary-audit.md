@@ -49,7 +49,7 @@ Measured by institution-shaped content, not by intent:
 | `excluded_courses.R` | 226 | Institution (moved to `institution/<id>/excluded_courses.csv` 2026-10-16) |
 | `gen_ed_courses.R` | 151 | Institution (moved to `institution/<id>/gen_ed_courses.csv` 2026-10-16) |
 | `population-presets.R` | 174 | Institution — named program groups (moved to `institution/<id>/population_groups.csv` 2026-10-16) |
-| `enrollment_projection_groups.R` | 133 | Institution — monitored courses |
+| `enrollment_projection_groups.R` | 133 | Institution — monitored courses (moved to `institution/<id>/projection_groups.csv` and `projection_courses.csv` 2026-10-16; the file keeps the platform model registry) |
 | `campuses.R` | 101 | Institution (moved to `institution/<id>/campuses.csv` 2026-10-16; the file is now platform mechanism) |
 
 Ten of twelve files are institution configuration. Nothing says so. `AGENTS.md`
