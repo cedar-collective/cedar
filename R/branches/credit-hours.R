@@ -1035,6 +1035,11 @@ plot_chd_by_level <- function(by_period, subj_codes, palette) {
 #'
 #' @param students cedar_students data frame (pre-filtered to this department)
 #' @param dept_code Department code (e.g., "BIOL")
+#' @param major_codes Character vector of the department's home program codes
+#'   (the caller resolves them, e.g. Dept Trends' `base$prog_codes` from
+#'   `major_to_dept`). A student on one of these is a home major; everyone else
+#'   is an outside major. May be empty for a unit with no degree programs; never
+#'   guessed from `dept_code`.
 #' @param term_start,term_end Integer term codes for the analysis window (inclusive)
 #' @param include_all_ug Whether to build the additional all-undergraduate plots.
 #' @param include_wide_table Whether to build the all-level wide export table.
@@ -1045,7 +1050,7 @@ plot_chd_by_level <- function(by_period, subj_codes, palette) {
 #'            sch_outside_pct_plot, sch_dept_pct_plot
 #'   $tables: credit_hours_data_w, sch_major_trends_lower, sch_outside_full_lower,
 #'            sch_major_trends_upper, sch_outside_full_upper
-credit_hours_by_major <- function(students, dept_code, term_start, term_end,
+credit_hours_by_major <- function(students, dept_code, major_codes, term_start, term_end,
                                   include_all_ug = TRUE,
                                   include_wide_table = TRUE) {
 
@@ -1060,18 +1065,15 @@ credit_hours_by_major <- function(students, dept_code, term_start, term_end,
 
   message("[credit-hours.R] credit_hours_by_major for dept: ", dept_code)
 
-  # Derive home major codes from major_to_dept (loaded by catalog_lookups.R).
-  # This replaces the explicit major_codes parameter: any major code that the
-  # catalog maps to this dept is "home." If the dept has no catalog entries,
-  # fall back to a direct code match (dept_code == major_code).
-  major_codes <- if (exists("major_to_dept") && length(major_to_dept) > 0) {
-    raw_codes <- names(major_to_dept)[!is.na(major_to_dept) & major_to_dept == dept_code]
-    raw_codes <- as.character(raw_codes)
-    unique(raw_codes[!is.na(raw_codes) & nzchar(raw_codes)])
-  } else {
-    dept_code
+  # Home major codes come from the caller (M12: a branch reads no global
+  # lookup). An empty vector is a unit with no degree programs, so every
+  # student is an outside major; a missing or NULL vector is an error, and the
+  # department code is never used as a stand-in major code.
+  if (missing(major_codes) || is.null(major_codes) || !is.character(major_codes)) {
+    stop("[credit-hours.R] credit_hours_by_major() requires major_codes, ",
+         "a character vector of the department's home program codes (may be empty)")
   }
-  if (length(major_codes) == 0) major_codes <- dept_code
+  major_codes <- unique(major_codes[!is.na(major_codes) & nzchar(major_codes)])
 
   # Filter to the term range, SCH rows, and normalized college names
   all_data <- build_major_level_data(students, term_start, term_end)
@@ -1222,19 +1224,6 @@ credit_hours_by_major <- function(students, dept_code, term_start, term_end,
 }
 
 
-#' Credit Hours by Faculty Category
-#'
-#' Shows how SCH production is distributed across faculty job categories —
-#' tenure-track, lecturer, adjunct, etc. Requires the cedar_faculty table,
-#' which is built from HR data and is not always available.
-#'
-#' @param data_objects List containing cedar_students and cedar_faculty
-#' @param dept_code Department code
-#' @param subj_codes Subject codes for plot titles
-#' @param term_start,term_end Integer term codes (inclusive)
-#' @param palette RColorBrewer palette name
-#' @return list($plots): chd_by_fac_facet_plot (breakdown by level),
-#'   chd_by_fac_plot (totals stacked by job category)
 plot_chd_by_fac_faceted <- function(by_level, subj_codes, palette) {
   if (nrow(by_level) == 0) return("Insufficient data.")
   levels_present <- unique(by_level$level)
@@ -1272,16 +1261,35 @@ plot_chd_by_fac_stacked <- function(by_total, subj_codes, palette) {
 }
 
 
-credit_hours_by_fac <- function(data_objects, dept_code, subj_codes, term_start, term_end, palette) {
+#' Credit Hours by Faculty Category
+#'
+#' Shows how SCH production is distributed across faculty job categories —
+#' tenure-track, lecturer, adjunct, etc. Requires the cedar_faculty table,
+#' which is built from HR data and is not always available. Not displayed by
+#' Dept Trends today (see `compute_dept_credit_hours_tab()`).
+#'
+#' @param students cedar_students data frame
+#' @param faculty cedar_faculty data frame (term, instructor_id, department,
+#'   job_category). An empty table returns the two "No faculty data available"
+#'   placeholders; NULL is an error.
+#' @param dept_code Department code
+#' @param subj_codes Subject codes for plot titles
+#' @param term_start,term_end Integer term codes (inclusive)
+#' @param palette RColorBrewer palette name
+#' @return list($plots): chd_by_fac_facet_plot (breakdown by level),
+#'   chd_by_fac_plot (totals stacked by job category); $tables:
+#'   chd_fac_by_level, chd_fac_by_total
+credit_hours_by_fac <- function(students, faculty, dept_code, subj_codes, term_start, term_end, palette) {
   message("[credit-hours.R] credit_hours_by_fac for dept: ", dept_code)
 
-  students    <- data_objects[["cedar_students"]]
-  fac_by_term <- data_objects[["cedar_faculty"]]
-
+  if (is.null(students)) {
+    stop("[credit-hours.R] credit_hours_by_fac() requires the cedar_students table; got NULL")
+  }
   # cedar_faculty comes from HR data — it may genuinely not exist yet
-  if (is.null(fac_by_term)) {
+  if (is.null(faculty)) {
     stop("[credit-hours.R] cedar_faculty is NULL — run transform-hr-to-cedar.R to create it")
   }
+  fac_by_term <- faculty
 
   if (nrow(fac_by_term) == 0) {
     return(list(plots = list(

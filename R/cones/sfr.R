@@ -13,7 +13,8 @@
 #'     \item \code{department} - Department code (lowercase)
 #'     \item \code{total} - FTE count (sum of appointment percentages)
 #'   }
-#'   Returns NULL if cedar_faculty is NULL, empty, or missing required columns.
+#'   Returns NULL when the faculty table has no rows (no HR data loaded).
+#'   Stops if the table is NULL or missing a required column.
 #'
 #' @details
 #' Permanent faculty categories included in FTE calculation:
@@ -47,9 +48,11 @@
 #' @seealso \code{\link{get_sfr}} for student-faculty ratio calculation
 get_perm_faculty_count <- function(cedar_faculty) {
 
-  # Check if we have faculty data
-  if (is.null(cedar_faculty) || nrow(cedar_faculty) == 0) {
-    message("[sfr.R] No cedar_faculty data found or cedar_faculty is empty")
+  if (is.null(cedar_faculty)) {
+    stop("[sfr.R] get_perm_faculty_count() requires the cedar_faculty table; got NULL")
+  }
+  if (nrow(cedar_faculty) == 0) {
+    message("[sfr.R] cedar_faculty has no rows; no permanent faculty count")
     return(NULL)
   }
 
@@ -60,8 +63,8 @@ get_perm_faculty_count <- function(cedar_faculty) {
   required_cols <- c("term", "department", "job_category", "appointment_pct")
   missing_cols <- required_cols[!required_cols %in% colnames(cedar_faculty)]
   if (length(missing_cols) > 0) {
-    message("[sfr.R] ERROR: Missing required columns: ", paste(missing_cols, collapse=", "))
-    return(NULL)
+    stop("[sfr.R] cedar_faculty is missing required column(s): ",
+         paste(missing_cols, collapse = ", "))
   }
 
   # Sum appointment percentages by term, department, and job category
@@ -100,11 +103,9 @@ get_perm_faculty_count <- function(cedar_faculty) {
 #' permanent faculty FTE counts. Separates majors and minors for detailed
 #' analysis.
 #'
-#' @param data_objects Named list containing:
-#'   \itemize{
-#'     \item \code{academic_studies} - Academic study data for headcount calculation
-#'     \item \code{cedar_faculty} - CEDAR faculty table with normalized columns
-#'   }
+#' @param programs The \code{cedar_programs} table (one row per student-term
+#'   program declaration) used for the headcount.
+#' @param faculty The \code{cedar_faculty} table used for permanent faculty FTE.
 #'
 #' @return Data frame with columns:
 #'   \itemize{
@@ -145,11 +146,7 @@ get_perm_faculty_count <- function(cedar_faculty) {
 #' @examples
 #' \dontrun{
 #' # Calculate SFRs
-#' data_objects <- list(
-#'   academic_studies = academic_studies_data,
-#'   cedar_faculty = cedar_faculty
-#' )
-#' sfr_data <- get_sfr(data_objects)
+#' sfr_data <- get_sfr(cedar_programs, cedar_faculty)
 #'
 #' # View undergraduate major SFRs for Fall 2025
 #' sfr_data %>%
@@ -163,32 +160,31 @@ get_perm_faculty_count <- function(cedar_faculty) {
 #' \code{\link{get_sfr_data_for_dept_report}} for legacy department-level SFR analysis
 #'
 #' @export
-get_sfr <- function (data_objects) {
+get_sfr <- function(programs, faculty) {
   message("[sfr.R] welcome to get_sfr!")
 
-  # Use CEDAR data with lowercase naming
-  cedar_programs <- data_objects[["cedar_programs"]]
-
-  if (is.null(cedar_programs)) {
-    stop("[sfr.R] Could not find required CEDAR dataset: cedar_programs. ",
-         "Found data_objects keys: ", paste(names(data_objects), collapse = ", "))
+  if (is.null(programs)) {
+    stop("[sfr.R] get_sfr() requires the cedar_programs table; got NULL")
+  }
+  if (is.null(faculty)) {
+    stop("[sfr.R] get_sfr() requires the cedar_faculty table; got NULL")
   }
 
   # Validate CEDAR data structure
   required_cols <- c("student_id", "term", "student_level", "program_type", "program_name", "dept_code")
-  missing_cols <- setdiff(required_cols, colnames(cedar_programs))
+  missing_cols <- setdiff(required_cols, colnames(programs))
   if (length(missing_cols) > 0) {
     stop("[sfr.R] Missing required CEDAR columns in programs data: ",
          paste(missing_cols, collapse = ", "),
          "\n  Expected CEDAR format with lowercase column names.",
-         "\n  Found columns: ", paste(colnames(cedar_programs), collapse = ", "))
+         "\n  Found columns: ", paste(colnames(programs), collapse = ", "))
   }
 
   message("[sfr.R] calling get_headcount to count heads...")
   # Use get_headcount with custom grouping for SFR needs
   # Group by term, department, student_level, program_type, program_name
   result <- get_headcount(
-    programs = cedar_programs,
+    programs = programs,
     opt = list(),
     group_by = c("term", "dept_code", "student_level", "program_type", "program_name")
   )
@@ -208,7 +204,7 @@ get_sfr <- function (data_objects) {
   # headcount_all <- headcount_all %>% filter(program_type %in% allowed_types)
 
   message("[sfr.R] getting permanent faculty headcount...")
-  perm_faculty_count <- get_perm_faculty_count(data_objects[["cedar_faculty"]])
+  perm_faculty_count <- get_perm_faculty_count(faculty)
 
   if (is.null(perm_faculty_count) || nrow(perm_faculty_count) == 0) {
     message("[sfr.R] ERROR: No permanent faculty count data returned")
@@ -229,7 +225,10 @@ get_sfr <- function (data_objects) {
 
   # filter out summer, which is meaningless for sfr purposes
   message("[sfr.R] filtering out summer for sfr purposes...")
-  studfac_ratios <- studfac_ratios %>% filter (!str_detect(as.character(term), "60"))
+  studfac_ratios <- studfac_ratios %>%
+    add_term_type_col(term) %>%
+    filter(term_type != "summer") %>%
+    select(-term_type)
 
   message("[sfr.R] After filtering summer, studfac_ratios has ", nrow(studfac_ratios), " rows")
 
@@ -282,8 +281,10 @@ get_sfr <- function (data_objects) {
 #' Creates separate visualizations for undergraduate and graduate students, plus
 #' a scatter plot showing the department in context of the full college.
 #'
-#' @param data_objects Named list containing cedar_programs and cedar_faculty data.
-#' @param dept_code Character. Department code (e.g., "HIST", "MATH").
+#' @param programs The \code{cedar_programs} table.
+#' @param faculty The \code{cedar_faculty} table.
+#' @param opt Named list. \code{dept_code} (required): the department to
+#'   highlight, e.g. \code{"HIST"}.
 #'
 #' @return List with structure:
 #'   list(
@@ -320,11 +321,8 @@ get_sfr <- function (data_objects) {
 #' @examples
 #' \dontrun{
 #' # Generate SFR plots for History department
-#' data_objects <- list(
-#'   academic_studies = academic_studies_data,
-#'   cedar_faculty = cedar_faculty
-#' )
-#' result <- get_sfr_data_for_dept_report(data_objects, "HIST")
+#' result <- get_sfr_data_for_dept_report(cedar_programs, cedar_faculty,
+#'                                        opt = list(dept_code = "HIST"))
 #' print(result$plots$ug_sfr_plot)
 #' print(result$plots$grad_sfr_plot)
 #' print(result$plots$sfr_scatterplot)
@@ -335,10 +333,15 @@ get_sfr <- function (data_objects) {
 #' \code{\link{get_perm_faculty_count}} for faculty FTE
 #'
 #' @export
-get_sfr_data_for_dept_report <- function(data_objects, dept_code) {
+get_sfr_data_for_dept_report <- function(programs, faculty, opt = list()) {
   message("[sfr.R] Welcome to Starting get_sfr_data_for_dept_report!")
 
-  studfac_ratios <- get_sfr(data_objects)
+  dept_code <- opt$dept_code
+  if (is.null(dept_code) || length(dept_code) != 1L || is.na(dept_code) || !nzchar(dept_code)) {
+    stop("[sfr.R] get_sfr_data_for_dept_report() requires opt$dept_code (one department code)")
+  }
+
+  studfac_ratios <- get_sfr(programs, faculty)
 
   if (is.null(studfac_ratios) || nrow(studfac_ratios) == 0) {
     message("ERROR: No SFR data returned from get_sfr()")

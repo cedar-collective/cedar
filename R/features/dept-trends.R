@@ -601,6 +601,7 @@ compute_dept_credit_hours_tab <- function(base, data_objects,
   sch_major <- credit_hours_by_major(
     filtered_cl,
     base$dept_code,
+    base$prog_codes,
     base$term_start,
     base$term_end,
     include_all_ug = FALSE,
