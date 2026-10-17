@@ -6,8 +6,9 @@
 # Reference values (from designed_test_data.R fixtures):
 #   get_perm_faculty_count(test_faculty) → 28 rows, depts: ANTH, BIOL, ENGL, HIST, MATH, NURS, PSYC
 #   (MGMT and POLS have only Term Teacher rows — excluded as non-permanent)
-#   get_sfr(data_objects)               → no summer terms, program_types: all_majors, all_minors
-#   get_sfr_data_for_dept_report(HIST)  → plots: ug_sfr_plot, grad_sfr_plot, sfr_scatterplot
+#   get_sfr(test_programs, test_faculty) → no summer terms, program_types: all_majors, all_minors
+#   get_sfr_data_for_dept_report(test_programs, test_faculty, opt = list(dept_code = "HIST"))
+#                                        → plots: ug_sfr_plot, grad_sfr_plot, sfr_scatterplot
 
 context("SFR")
 
@@ -61,8 +62,7 @@ test_that("get_perm_faculty_count raw faculty has multiple job categories", {
 # =============================================================================
 
 test_that("get_sfr returns correct structure", {
-  do     <- list(cedar_programs = test_programs, cedar_faculty = test_faculty)
-  result <- get_sfr(do)
+  result <- get_sfr(test_programs, test_faculty)
 
   expect_s3_class(result, "data.frame")
   expect_true("term"          %in% names(result))
@@ -75,23 +75,20 @@ test_that("get_sfr returns correct structure", {
 })
 
 test_that("get_sfr excludes summer terms", {
-  do     <- list(cedar_programs = test_programs, cedar_faculty = test_faculty)
-  result <- get_sfr(do)
+  result <- get_sfr(test_programs, test_faculty)
 
   expect_false(any(grepl("60$", as.character(result$term))))
 })
 
 test_that("get_sfr separates all_majors and all_minors program types", {
-  do     <- list(cedar_programs = test_programs, cedar_faculty = test_faculty)
-  result <- get_sfr(do)
+  result <- get_sfr(test_programs, test_faculty)
 
   expect_true("all_majors" %in% result$program_type)
   expect_true("all_minors" %in% result$program_type)
 })
 
 test_that("get_sfr dept_code column contains known CEDAR department codes", {
-  do     <- list(cedar_programs = test_programs, cedar_faculty = test_faculty)
-  result <- get_sfr(do)
+  result <- get_sfr(test_programs, test_faculty)
 
   dept_codes <- unique(na.omit(result$dept_code))
   # Programs fixture spans many departments; HIST, ANTH, MATH are guaranteed
@@ -106,8 +103,7 @@ test_that("get_sfr dept_code column contains known CEDAR department codes", {
 # =============================================================================
 
 test_that("get_sfr_data_for_dept_report returns three plot keys for HIST", {
-  do     <- list(cedar_programs = test_programs, cedar_faculty = test_faculty)
-  result <- get_sfr_data_for_dept_report(do, "HIST")
+  result <- get_sfr_data_for_dept_report(test_programs, test_faculty, opt = list(dept_code = "HIST"))
 
   expect_true("plots"          %in% names(result))
   expect_true("ug_sfr_plot"    %in% names(result$plots))
@@ -116,17 +112,30 @@ test_that("get_sfr_data_for_dept_report returns three plot keys for HIST", {
 })
 
 test_that("get_sfr_data_for_dept_report produces at least one plotly plot for HIST", {
-  do     <- list(cedar_programs = test_programs, cedar_faculty = test_faculty)
-  result <- get_sfr_data_for_dept_report(do, "HIST")
+  result <- get_sfr_data_for_dept_report(test_programs, test_faculty, opt = list(dept_code = "HIST"))
 
   has_plotly <- any(sapply(result$plots, function(p) inherits(p, "plotly")))
   expect_true(has_plotly)
 })
 
 test_that("get_sfr_data_for_dept_report still returns plot keys for unknown department", {
-  do     <- list(cedar_programs = test_programs, cedar_faculty = test_faculty)
-  result <- get_sfr_data_for_dept_report(do, "FAKE_DEPT")
+  result <- get_sfr_data_for_dept_report(test_programs, test_faculty, opt = list(dept_code = "FAKE_DEPT"))
 
   expect_true("plots"       %in% names(result))
   expect_true("ug_sfr_plot" %in% names(result$plots))
+})
+
+test_that("get_sfr_data_for_dept_report requires opt$dept_code and never guesses one", {
+  expect_error(get_sfr_data_for_dept_report(test_programs, test_faculty),
+               "opt\\$dept_code")
+  expect_error(get_sfr_data_for_dept_report(test_programs, test_faculty, opt = list(dept_code = NA)),
+               "opt\\$dept_code")
+})
+
+test_that("get_sfr and get_perm_faculty_count stop on a missing table or column", {
+  # M12: every table is a parameter. A missing one is an error, not a silent empty result.
+  expect_error(get_sfr(NULL, test_faculty), "cedar_programs")
+  expect_error(get_sfr(test_programs, NULL), "cedar_faculty")
+  expect_error(get_perm_faculty_count(select(test_faculty, -appointment_pct)),
+               "appointment_pct")
 })

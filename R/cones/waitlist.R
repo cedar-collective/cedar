@@ -111,29 +111,31 @@ scope_waitlist_enrollment_base <- function(enrl_base, count_df) {
 #' Regstats matches to DESR scheduled capacity for saturation. It is not a frozen
 #' census roster.
 #'
-#' Enrollment history comes from the precomputed \code{cedar_cl_enrls_base} table
-#' (built in global.R) when it is in scope; outside the running app (tests,
-#' standalone scripts) it is recomputed via \code{\link{calc_cl_enrls}}, scoped to just the courses in
-#' the overview so the fallback stays cheap.
+#' Enrollment history comes from \code{enrl_base}, the app's precomputed
+#' course-term enrollment table (\code{cedar_cl_enrls_base}, built in global.R
+#' and handed down by the caller). Without one (tests, standalone scripts) it is
+#' recomputed via \code{\link{calc_cl_enrls}}, scoped to just the courses in
+#' the overview so the recompute stays cheap. The cone never looks the table up
+#' by name.
 #'
 #' @param count_df Waitlist course-overview table (one row per campus/college/
 #'   term/part_term/subject_course) from \code{\link{get_unique_waitlisted}}.
 #' @param students Student enrollment rows, used to recompute enrollment history
-#'   when no precomputed base table is available.
+#'   when no precomputed base table is passed.
+#' @param enrl_base Optional precomputed course-term enrollment rows
+#'   (\code{calc_cl_enrls(students, by_part_term = TRUE)} over the whole class
+#'   list). NULL recomputes from \code{students}.
 #' @return \code{count_df} with added columns \code{census_enrl} (current-term
 #'   census enrollment), \code{census_enrl_mean} (historical average, viewed term
 #'   excluded), \code{n_hist_terms} (reference terms behind the average), and the
 #'   \code{trend_hist} / \code{trend_terms} list-columns the module renders as a
 #'   sparkline. Returned unchanged when no enrollment source is available.
 #' @keywords internal
-attach_enrollment_history <- function(count_df, students) {
+attach_enrollment_history <- function(count_df, students, enrl_base = NULL) {
   if (is.null(count_df) || nrow(count_df) == 0) return(count_df)
 
-  # Prefer the app's precomputed base; fall back to a scoped recompute so tests
-  # and standalone-script callers (no global base) still get enrollment context.
-  enrl_base <- if (exists("cedar_cl_enrls_base", inherits = TRUE))
-    get("cedar_cl_enrls_base", inherits = TRUE) else NULL
-
+  # Use the caller's precomputed base when given; otherwise a scoped recompute
+  # so tests and standalone-script callers still get enrollment context.
   if (is.null(enrl_base)) {
     raw_match_keys <- intersect(
       c("campus", "college", "subject_course", "part_term"),
@@ -210,6 +212,10 @@ attach_enrollment_history <- function(count_df, students) {
 #'     \item \code{subject} - Subject code(s) (e.g., "MATH")
 #'     \item Other filtering options supported by \code{filter_class_list()}
 #'   }
+#' @param enrl_base Optional precomputed course-term enrollment table
+#'   (\code{cedar_cl_enrls_base}); passed on to
+#'   \code{\link{attach_enrollment_history}}, which recomputes a scoped base
+#'   from \code{students} when this is NULL.
 #' @param sections Optional cedar_sections table; only needed if students
 #'   lacks a course_title column (titles are joined by term/subject_course)
 #'
@@ -272,7 +278,7 @@ attach_enrollment_history <- function(count_df, students) {
 #' \code{\link{get_unique_waitlisted}} for unique student counts
 #'
 #' @export
-inspect_waitlist <- function(students, opt, sections = NULL) {
+inspect_waitlist <- function(students, opt, sections = NULL, enrl_base = NULL) {
 
   message("[waitlist.R] Welcome to inspect_waitlist!")
 
@@ -343,7 +349,8 @@ inspect_waitlist <- function(students, opt, sections = NULL) {
 
   # Add enrollment context (current enrollment, historical average, trend series)
   # so each waitlist row reads against how full the course usually runs.
-  waitlist_data[["count"]] <- attach_enrollment_history(waitlist_data[["count"]], students)
+  waitlist_data[["count"]] <- attach_enrollment_history(waitlist_data[["count"]], students,
+                                                        enrl_base = enrl_base)
 
   message("[waitlist.R] Returning waitlist data...")
 
