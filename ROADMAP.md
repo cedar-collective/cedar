@@ -225,9 +225,10 @@ Plan: [ADR-002](docs/developers/adr-002-explicit-mapping-files.md).
   the files. Closed I9.
 - Done 2026-10-10: **Stage 5** — the demo runs on its own `institution/demo/`
   files, with UNM's absent. ADR-002 is complete.
-- [ ] Move the remaining UNM R lists (`mappings.R`, campuses, Gen Ed and
-  excluded-course lists, population and projection groups) into
-  `institution/<id>/`, so an adopter replaces files only.
+- [ ] Move the remaining UNM R lists into `institution/<id>/`, so an adopter
+  replaces files only. Done 2026-10-16: campuses (`campuses.csv`) and course
+  levels (`course_levels.csv`). Remaining: Gen Ed and excluded-course lists,
+  population and projection groups, `mappings.R`.
 - [ ] **Code history on Admin → Mappings:** each unit's program codes and course
   subjects, old and new, with when each was in use and which code replaced
   which.

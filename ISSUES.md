@@ -1945,12 +1945,12 @@ focused, tested patches.
 in one table and labels in another: `student_campus` is a name in
 `cedar_programs` ("Albuquerque/Main", "Taos") and a code in `cedar_students`
 ("ABQ", "TA"), and no file maps one to the other, so headcounts filter on names
-and course figures on codes. `R/lists/campuses.R` gives no expansion for EW, EF,
+and course figures on codes. `institution/unm/campuses.csv` gives no expansion for EW, EF,
 ELA and TAQ, and the data uses codes it does not define (05, EG, ET, TAP
 locally, a few sections each). Admin > Data & Usage > Mappings shows both
-(Counting rules; Campuses). *Done when:* each campus field holds one
-vocabulary, every code in the data is defined or reported as a source error,
-and the campus list moves to `institution/<id>/` (ROADMAP).
+(Counting rules; Campuses). The campus list moved to `institution/<id>/campuses.csv`
+on 2026-10-16. *Done when:* each campus field holds one vocabulary and every
+code in the data is defined or reported as a source error.
 
 **M24 — Enrollment lifecycle labels differ by tab.** The same class-list counts
 carry different names: `census_enrl` is "Census Estimate" (Enrollment),

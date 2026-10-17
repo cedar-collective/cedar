@@ -539,3 +539,82 @@ test_that("set_payload prog_focus restricts to single program code", {
   expect_equal(d$prog_codes, "HIST")
   expect_equal(d$prog_focus, "HIST")
 })
+
+
+# ---- Configuration files: campuses.csv and course_levels.csv ------------------
+
+write_config_dir <- function(campuses, course_levels) {
+  dir <- tempfile("institution-config-")
+  dir.create(dir)
+  utils::write.csv(campuses, file.path(dir, "campuses.csv"), row.names = FALSE)
+  utils::write.csv(course_levels, file.path(dir, "course_levels.csv"), row.names = FALSE)
+  dir
+}
+
+good_levels <- data.frame(leading_digit = as.character(0:9),
+                          level = c(rep("lower", 3), rep("upper", 2), rep("grad", 5)))
+
+test_that("the campus constants are the institution's campuses.csv", {
+  files <- validate_campuses(read_institution_file("campuses", cedar_institution_dir(cedar_base_dir, "unm")))
+  expect_equal(CEDAR_CAMPUS_MAIN, files$campus_code[files$kind == "main"])
+  expect_length(CEDAR_CAMPUS_MAIN, 1L)
+  expect_equal(CEDAR_CAMPUS_ONLINE, files$campus_code[files$kind == "online"])
+  expect_setequal(CEDAR_CAMPUS_BRANCH, files$campus_code[files$kind == "branch"])
+  expect_equal(CEDAR_CAMPUS_DEFAULT, files$campus_code[files$default_scope])
+  # A documented name labels the code; an undocumented one leaves the bare code.
+  named <- files$campus_code[nzchar(files$campus_name)]
+  expect_setequal(names(CEDAR_CAMPUS_LABELS), named)
+  bare <- setdiff(files$campus_code, named)
+  if (length(bare)) {
+    choices <- cedar_campus_choices()
+    expect_equal(unname(names(choices)[choices %in% bare]), bare)
+  }
+  # No campus code is written into the platform file that reads the CSV
+  # (comments may name one to explain the rule; code may not).
+  code_lines <- grep("^\\s*#", readLines("../../R/lists/campuses.R"), value = TRUE, invert = TRUE)
+  expect_false(any(grepl(paste0('"', files$campus_code, '"', collapse = "|"), code_lines)))
+})
+
+test_that("the course-level rule is the institution's course_levels.csv", {
+  levels <- validate_course_levels(read_institution_file("course_levels", cedar_institution_dir(cedar_base_dir, "unm")))
+  expect_equal(unname(COURSE_LEVEL_BY_LEADING_DIGIT[levels$leading_digit]), levels$level)
+  expect_setequal(names(COURSE_LEVEL_BY_LEADING_DIGIT), as.character(0:9))
+})
+
+test_that("the demo institution's configuration files load and validate", {
+  dir <- cedar_institution_dir(cedar_base_dir, "demo")
+  campuses <- validate_campuses(read_institution_file("campuses", dir))
+  expect_true(all(c("ABQ", "EA", "GA", "VA") %in% campuses$campus_code))
+  expect_equal(nrow(validate_course_levels(read_institution_file("course_levels", dir))), 10L)
+})
+
+test_that("the configuration validators report every problem at once", {
+  dir <- write_config_dir(
+    campuses = data.frame(campus_code = c("ABQ", "EA", "GA", "GA"),
+                          campus_name = c("Main", "Online", "Gallup", "Gallup"),
+                          kind = c("main", "main", "satellite", "branch"),
+                          default_scope = c("TRUE", "yes", "FALSE", "FALSE")),
+    course_levels = data.frame(leading_digit = c(as.character(0:8), "9", "9"),
+                               level = c(rep("lower", 3), rep("upper", 2), rep("grad", 4), "doctoral", "grad"))
+  )
+  err <- tryCatch(validate_campuses(read_institution_file("campuses", dir)), error = conditionMessage)
+  expect_match(err, "duplicate campus_code GA")
+  expect_match(err, "kind must be main, online, branch; found satellite")
+  expect_match(err, "exactly one campus must have kind main; found 2")
+  expect_match(err, "default_scope must be TRUE or FALSE for EA")
+
+  err <- tryCatch(validate_course_levels(read_institution_file("course_levels", dir)), error = conditionMessage)
+  expect_match(err, "duplicate leading_digit 9")
+  expect_match(err, "level must be lower, upper, grad; found doctoral")
+
+  short <- write_config_dir(
+    campuses = data.frame(campus_code = "ABQ", campus_name = "Main", kind = "main", default_scope = "TRUE"),
+    course_levels = good_levels[-1, ]
+  )
+  expect_error(validate_course_levels(read_institution_file("course_levels", short)),
+               "no row for leading_digit 0")
+  # One main campus with no online campus is a valid institution.
+  one <- validate_campuses(read_institution_file("campuses", short))
+  expect_equal(one$campus_code[one$kind == "online"], character(0))
+  expect_true(one$default_scope)
+})

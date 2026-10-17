@@ -98,6 +98,25 @@ CEDAR_UNIT_KINDS <- c("department", "program", "college")
 # Course levels as cedar_sections$level records them.
 CEDAR_COURSE_LEVELS <- c("lower", "upper", "grad")
 
+# Configuration files: the institution's own lists that platform code reads
+# through a named constant (AGENTS.md, "Platform vs institution"). Each is read
+# and validated by the R/lists file that builds its constant, at load, so a
+# malformed file stops the app with every problem listed. They are not part of
+# read_institution_mappings(), which is the set the transform decides units and
+# colleges from.
+CEDAR_CONFIG_FILE_SPECS <- list(
+  # kind: main (exactly one), online (at most one) or branch. default_scope:
+  # TRUE for the campuses a filter bar selects by default (CEDAR_CAMPUS_DEFAULT).
+  # campus_name may be blank for a code whose expansion is not documented; it
+  # then displays as the bare code rather than a guessed name.
+  campuses = c("campus_code", "campus_name", "kind", "default_scope"),
+  # One row for each leading digit 0-9 of a course number; level is one of
+  # CEDAR_COURSE_LEVELS. The rule is keyed on the leading digit, whatever the
+  # number's length (ISSUES.md I5).
+  course_levels = c("leading_digit", "level")
+)
+CEDAR_CAMPUS_KINDS <- c("main", "online", "branch")
+
 # Evidence aid for the mapping assistant (scripts/propose-mappings.R). It says
 # what each source-system department means; the transform never reads it, so it
 # is not part of read_institution_mappings(). unit_code holds one unit for a
@@ -119,7 +138,8 @@ CEDAR_PROGRAM_STATUSES <- c("confirmed", "proposed")
 
 read_institution_file <- function(name, dir = cedar_institution_dir()) {
   spec <- if (name == "source_departments") CEDAR_SOURCE_DEPARTMENT_SPEC
-          else CEDAR_MAPPING_FILE_SPECS[[name]]
+          else if (name %in% names(CEDAR_MAPPING_FILE_SPECS)) CEDAR_MAPPING_FILE_SPECS[[name]]
+          else CEDAR_CONFIG_FILE_SPECS[[name]]
   if (is.null(spec)) stop("[institution_files.R] Unknown mapping file: ", name)
   path <- file.path(dir, paste0(name, ".csv"))
   if (!file.exists(path)) stop("[institution_files.R] Missing mapping file: ", path)
@@ -138,6 +158,66 @@ read_institution_file <- function(name, dir = cedar_institution_dir()) {
     stop("[institution_files.R] ", path, " has ", n_lines, " lines for ", nrow(df),
          " rows. Every row must be exactly one line: remove blank lines and line ",
          "breaks inside fields.")
+  }
+  df
+}
+
+# A TRUE/FALSE column as the files write it. Anything else is a problem the
+# caller reports; the result is logical with NA where the value was bad.
+.csv_flag <- function(x) {
+  out <- rep(NA, length(x))
+  out[x %in% "TRUE"] <- TRUE
+  out[x %in% "FALSE"] <- FALSE
+  out
+}
+
+#' Check campuses.csv
+#'
+#' @return The table with `default_scope` as logical, if valid. Stops listing
+#'   every problem otherwise.
+validate_campuses <- function(df) {
+  problems <- character(0)
+  blank <- function(x) is.na(x) | !nzchar(x)
+  if (any(blank(df$campus_code))) problems <- c(problems, "campuses.csv: blank campus_code")
+  d <- unique(df$campus_code[duplicated(df$campus_code)])
+  if (length(d)) problems <- c(problems, paste("campuses.csv: duplicate campus_code", paste(d, collapse = ", ")))
+  bad <- unique(df$kind[!df$kind %in% CEDAR_CAMPUS_KINDS])
+  if (length(bad)) problems <- c(problems, paste0("campuses.csv: kind must be ",
+                                                   paste(CEDAR_CAMPUS_KINDS, collapse = ", "), "; found ",
+                                                   paste(bad, collapse = ", ")))
+  n_main <- sum(df$kind == "main")
+  if (n_main != 1L) problems <- c(problems, paste0("campuses.csv: exactly one campus must have kind main; found ", n_main))
+  if (sum(df$kind == "online") > 1L) problems <- c(problems, "campuses.csv: at most one campus may have kind online")
+  flag <- .csv_flag(df$default_scope)
+  if (anyNA(flag)) problems <- c(problems, paste("campuses.csv: default_scope must be TRUE or FALSE for",
+                                                 paste(df$campus_code[is.na(flag)], collapse = ", ")))
+  if (!anyNA(flag) && !any(flag)) problems <- c(problems, "campuses.csv: no campus has default_scope TRUE")
+  if (length(problems)) {
+    stop("[institution_files.R] Invalid campuses.csv:\n  ", paste(problems, collapse = "\n  "))
+  }
+  df$default_scope <- flag
+  df
+}
+
+#' Check course_levels.csv
+#'
+#' @return The table, if valid: one row per digit 0-9, each level one of
+#'   CEDAR_COURSE_LEVELS. Stops listing every problem otherwise.
+validate_course_levels <- function(df) {
+  problems <- character(0)
+  digits <- as.character(0:9)
+  missing <- setdiff(digits, df$leading_digit)
+  if (length(missing)) problems <- c(problems, paste("course_levels.csv: no row for leading_digit", paste(missing, collapse = ", ")))
+  extra <- setdiff(df$leading_digit, digits)
+  if (length(extra)) problems <- c(problems, paste("course_levels.csv: leading_digit must be a single digit 0-9; found", paste(extra, collapse = ", ")))
+  d <- unique(df$leading_digit[duplicated(df$leading_digit)])
+  if (length(d)) problems <- c(problems, paste("course_levels.csv: duplicate leading_digit", paste(d, collapse = ", ")))
+  bad <- unique(df$level[!df$level %in% CEDAR_COURSE_LEVELS])
+  if (length(bad)) problems <- c(problems, paste0("course_levels.csv: level must be ",
+                                                   paste(CEDAR_COURSE_LEVELS, collapse = ", "), "; found ",
+                                                   paste(bad, collapse = ", ")))
+  if (length(problems)) {
+    stop("[institution_files.R] Invalid course_levels.csv:\n  ", paste(problems, collapse = "\n  "))
   }
   df
 }

@@ -31,16 +31,18 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
 
   # 1. Lists (static data, no dependencies)
   message("[load-funcs.R] Loading lists...")
+  # institution_files.R first: every list built from institution/<id>/ reads
+  # its file through it.
+  source_file("lists/institution_files.R")  # reads and validates institution/<id>/ CSVs
   source_file("lists/excluded_courses.R")
   source_file("lists/gen_ed_courses.R")
   source_file("lists/grades.R")
-  source_file("lists/institution_files.R")  # reads and validates institution/<id>/ CSVs
   source_file("lists/subj_dept_map.R")      # college → dept → subject hierarchy
   source_file("lists/catalog_lookups.R")   # runtime lookup vectors from the mapping files
   source_file("lists/mappings.R")          # text/name maps not derivable from catalogs
   source_file("lists/status_codes.R")
-  source_file("lists/course_numbering.R")   # course level by leading digit
-  source_file("lists/campuses.R")           # campus codes, default scope, campus guards
+  source_file("lists/course_numbering.R")   # course level by leading digit, from course_levels.csv
+  source_file("lists/campuses.R")           # campus constants from campuses.csv, campus guards
   source_file("lists/enrollment_projection_groups.R")
 
   # 2. Trunk (pure infrastructure — no cedar domain knowledge)

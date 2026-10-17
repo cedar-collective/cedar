@@ -1,0 +1,5 @@
+campus_code,campus_name,kind,default_scope
+ABQ,Main,main,TRUE
+EA,Online,online,TRUE
+GA,Gallup,branch,FALSE
+VA,Valencia,branch,FALSE

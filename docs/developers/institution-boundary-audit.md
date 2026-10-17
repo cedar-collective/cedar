@@ -50,7 +50,7 @@ Measured by institution-shaped content, not by intent:
 | `gen_ed_courses.R` | 151 | Institution |
 | `population-presets.R` | 174 | Institution — named program groups |
 | `enrollment_projection_groups.R` | 133 | Institution — monitored courses |
-| `campuses.R` | 101 | Institution |
+| `campuses.R` | 101 | Institution (moved to `institution/<id>/campuses.csv` 2026-10-16; the file is now platform mechanism) |
 
 Ten of twelve files are institution configuration. Nothing says so. `AGENTS.md`
 describes the directory as "static constants, domain lookups", and

@@ -33,7 +33,9 @@ library(digest)
 source("R/trunk/utils.R")        # academic_period_to_term, add_next_term_col, etc.
 source("R/lists/grades.R")       # GRADES_DFW, GRADES_PASS
 source("R/lists/status_codes.R") # STATUS_REGISTERED, STATUS_DROP_EARLY
-source("R/lists/course_numbering.R") # COURSE_LEVEL_BY_LEADING_DIGIT
+# COURSE_LEVEL_BY_LEADING_DIGIT comes from institution/<id>/course_levels.csv
+# through load_funcs() (R/lists/institution_files.R then course_numbering.R);
+# course_level_from_number() stops if it is not loaded.
 
 
 # ── Helper functions ──────────────────────────────────────────────────────────

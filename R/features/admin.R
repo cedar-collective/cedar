@@ -504,18 +504,18 @@ build_counting_rules <- function(files, programs, sections, students) {
       "transform_programs(), R/data-parsers/transform-to-cedar.R",
       "transform_programs(); CEDAR_DATA_SEMANTICS (R/lists/data_semantics.R)",
       "add_program_colleges() and .course_colleges(), R/data-parsers/transform-to-cedar.R",
-      "COURSE_LEVEL_BY_LEADING_DIGIT, R/lists/course_numbering.R",
+      "institution/<id>/course_levels.csv (COURSE_LEVEL_BY_LEADING_DIGIT, R/lists/course_numbering.R)",
       "keep_home_sections(), R/trunk/filter.R; transform_sections()",
       "excluded_courses, R/lists/excluded_courses.R",
       "the source exports (mrgather); ISSUES.md I18, I20",
-      "R/lists/campuses.R",
+      "institution/<id>/campuses.csv (R/lists/campuses.R)",
       "hr_org_desc_to_dept, R/lists/mappings.R; R/data-parsers/parse-HRreport.R",
       "major_name_to_major_code, R/lists/mappings.R"))
 }
 
 #' Every campus code: its label, group, and where it is counted
 #'
-#' The codes R/lists/campuses.R defines, plus any code the loaded data uses
+#' The codes the institution's campuses.csv defines, plus any code the loaded data uses
 #' that it does not, so an unexplained code is visible rather than silently
 #' grouped. Sections and enrollments count where a course was taught
 #' (`campus`); home-campus rows count the student's home campus as class lists
@@ -539,7 +539,7 @@ build_campus_reference <- function(sections, students) {
     group = dplyr::case_when(codes %in% CEDAR_CAMPUS_MAIN ~ "Main",
                              codes %in% CEDAR_CAMPUS_ONLINE ~ "Online",
                              codes %in% CEDAR_CAMPUS_BRANCH ~ "Branch",
-                             TRUE ~ "Not in campuses.R"),
+                             TRUE ~ "Not in campuses.csv"),
     default_scope = codes %in% CEDAR_CAMPUS_DEFAULT,
     sections = count_in(sections$campus),
     enrollments_taught = count_in(students$campus),
