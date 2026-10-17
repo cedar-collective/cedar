@@ -213,3 +213,31 @@ test_that("calc_cl_enrls returns a row per course for HIST department", {
   expect_true("HIST 1110" %in% result$subject_course)
   expect_true("HIST 327"  %in% result$subject_course)
 })
+
+
+# =============================================================================
+# get_course_major_mix(): the major-code lookup is opt$major_code_to_name (M12)
+# =============================================================================
+
+test_that("get_course_major_mix labels enrollment-row majors from opt$major_code_to_name, never a global", {
+  # test_students carries no major_code on its course rows; stamp one on HIST 1110
+  # so an enrollment-row code without a same-term program record exists. Local
+  # scaffolding for this contract; the shared fixture stays unchanged.
+  st <- test_students
+  st$major_code[st$subject_course == "HIST 1110"] <- "ZZZ-BA"
+  opt <- list(course = "HIST 1110", min_n = 1L, top_n = 50L)
+
+  plain <- get_course_major_mix(st, test_programs, opt)
+  expect_true("ZZZ-BA" %in% plain$major_label)
+
+  named <- get_course_major_mix(st, test_programs,
+                                c(opt, list(major_code_to_name = c("ZZZ-BA" = "Zed Studies"))))
+  expect_true("Zed Studies" %in% named$major_label)
+  expect_false("ZZZ-BA" %in% named$major_label)
+
+  # A global of the same name is not consulted.
+  rlang::local_bindings(major_code_to_name = c("ZZZ-BA" = "Should not appear"), .env = .GlobalEnv)
+  ignored <- get_course_major_mix(st, test_programs, opt)
+  expect_false("Should not appear" %in% ignored$major_label)
+  expect_equal(ignored$major_label, plain$major_label)
+})

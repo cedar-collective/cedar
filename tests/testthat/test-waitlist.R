@@ -203,10 +203,11 @@ test_that("inspect_waitlist structure is correct", {
 
   expect_true(exists("inspect_waitlist"))
 
-  # Function should take students, opt, and an optional sections table
-  # (sections is only needed when students lack a course_title column)
+  # Function should take students, opt, an optional sections table (only needed
+  # when students lack a course_title column) and an optional precomputed
+  # enrollment base (M12: never looked up by name).
   args <- formals(inspect_waitlist)
-  expect_equal(names(args), c("students", "opt", "sections"))
+  expect_equal(names(args), c("students", "opt", "sections", "enrl_base"))
 
   message("  inspect_waitlist function signature verified")
 })
@@ -378,6 +379,21 @@ test_that("attach_enrollment_history adds census enrollment context", {
   expect_equal(res$n_hist_terms, 2L)                    # two prior same-type terms
   expect_equal(res$trend_terms[[1]], c(202080L, 202180L, 202280L))
   expect_equal(res$trend_hist[[1]], c(3, 4, 8))         # census series, oldest → newest
+
+  # A precomputed base passed in gives the same answer as the scoped recompute,
+  # and a global of the same name is not consulted (M12): a bogus
+  # cedar_cl_enrls_base in the global environment must change nothing.
+  base <- calc_cl_enrls(students, by_part_term = TRUE)
+  res_base <- attach_enrollment_history(count_df, students, enrl_base = base)
+  expect_equal(res_base$census_enrl, res$census_enrl)
+  expect_equal(res_base$census_enrl_mean, res$census_enrl_mean)
+  expect_equal(res_base$trend_hist[[1]], res$trend_hist[[1]])
+
+  bogus <- base %>% dplyr::mutate(registered = registered * 100L)
+  rlang::local_bindings(cedar_cl_enrls_base = bogus, .env = .GlobalEnv)
+  res_global <- attach_enrollment_history(count_df, students)
+  expect_equal(res_global$census_enrl, 8)
+  expect_equal(res_global$trend_hist[[1]], c(3, 4, 8))
 })
 
 test_that("waitlist.R uses consistent message prefixes", {

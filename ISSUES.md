@@ -1863,25 +1863,31 @@ stops the rebuild, and `test-transform-status.R` proves it.
 module error shown with `showNotification()` or `handle_error()`; a degenerate
 statistic returning `NA`; a logged failure in the logging layer itself).
 
-**M12 — Cones and branches reading global data.** *Enforced since 2026-10-16*
-by `tests/testthat/test-architecture.R` ("cones and branches do not read
-global state"): any `data_objects`, `.GlobalEnv`, `get("cedar_…")`, or
-`exists("…")` in `R/cones` or `R/branches` counts, except the two standalone
-guards `exists("%||%")` and `exists("cedar_log_level")`, and each file's
-allowance may only go down. Measured: 3 across 2 files —
-`R/cones/waitlist.R` 2 (`cedar_cl_enrls_base`), `R/cones/course-demographics.R`
-1 (`major_code_to_name`). Cleared 2026-10-16: `R/branches/course-attempts.R`
-(the graded edge is `opt$data_edges`, required, fails closed when undetermined;
-the left edge is `opt$min_term`, never a global or a literal); `R/cones/sfr.R`
-(`get_sfr(programs, faculty)` and `get_sfr_data_for_dept_report(programs,
-faculty, opt)` take their two tables, with `opt$dept_code` required; the cone
-has no app caller — see `docs/developers/source-to-cedar-manifest.md` §5);
-`R/branches/credit-hours.R` (`credit_hours_by_major()` takes `major_codes`
-from the caller — Dept Trends passes `base$prog_codes`, the same set the
-module labels as home majors — instead of reading `major_to_dept` behind an
-`exists()` guard that fell back to the department code as a major code;
-`credit_hours_by_fac(students, faculty, …)` names its two tables). *Done when:*
-the allowance list is empty; every table and edge is a parameter.
+**M12 — Cones and branches reading global data.** **Done 2026-10-16.**
+`tests/testthat/test-architecture.R` ("cones and branches do not read global
+state") now fails on any `data_objects`, `.GlobalEnv`, `get("cedar_…")`, or
+`exists("…")` in `R/cones` or `R/branches`, except the two standalone guards
+`exists("%||%")` and `exists("cedar_log_level")`; the allowance it ratcheted
+over (19 across 5 files when enforcement began) is empty. What each fix did:
+`R/branches/course-attempts.R` — the graded edge is `opt$data_edges`
+(required, fails closed when undetermined) and the left edge `opt$min_term`,
+never a global or a literal. `R/cones/sfr.R` — `get_sfr(programs, faculty)`
+and `get_sfr_data_for_dept_report(programs, faculty, opt)` take their two
+tables, `opt$dept_code` required (the cone has no app caller; see
+`docs/developers/source-to-cedar-manifest.md` §5). `R/branches/credit-hours.R`
+— `credit_hours_by_major()` takes `major_codes` from the caller (Dept Trends
+passes `base$prog_codes`, the set the module labels as home majors) instead of
+reading `major_to_dept` behind an `exists()` guard that fell back to the
+department code as a major code; `credit_hours_by_fac(students, faculty, …)`
+names its tables. `R/cones/waitlist.R` — `inspect_waitlist(students, opt,
+sections, enrl_base)` and `attach_enrollment_history()` take the precomputed
+`cedar_cl_enrls_base` from the Waitlists module, which gets it from `server.R`.
+`R/cones/course-demographics.R` — `get_course_major_mix()` reads the
+code-to-name table from `opt$major_code_to_name`, threaded from
+`data_objects[["cedar_lookups"]]` through the Gen Ed module's `lookups`
+argument. The two feature-layer reads of the same globals
+(`R/features/regstats.R` `cedar_cl_enrls_base`, `R/features/dept-dashboard.R`
+`major_code_to_name`) are outside the rule's scope and remain.
 
 **M13 — Business logic in modules.** `R/modules/pathways.R` 38
 `group_by`/`summarize` pipelines, `R/modules/cancellations.R` 10,

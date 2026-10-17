@@ -94,7 +94,7 @@ Registry accessors (`R/lists/data_semantics.R`): `cedar_data_semantics(kind)`,
 | `course-neighbors.R` | `plot_course_sankey_by_term_with_flow_counts(to_courses, from_courses, opt)` | — | Sankey diagram of before/after course flows |
 | | `plot_concurrent_course_treemap(concurrent_courses, opt)` | — | Treemap of the most common same-campus, same-term companion courses |
 | `seatfinder.R` | `seatfinder(students, courses, cedar_faculty, opt)` | — | Seat availability analysis across terms; returns named list of course comparison tibbles |
-| `waitlist.R` | `inspect_waitlist(students, opt, sections = NULL)` | — | Waitlist counts by course/major; `sections` only needed if students lack `course_title` |
+| `waitlist.R` | `inspect_waitlist(students, opt, sections = NULL, enrl_base = NULL)` | — | Waitlist counts by course/major; `sections` only needed if students lack `course_title`; `enrl_base` is the app's precomputed `cedar_cl_enrls_base` (recomputed, scoped, when NULL) |
 | `course-outcomes.R` | `get_course_outcomes(students, cedar_faculty, opt)` | — | Returns named list: `dfw_trend` (DFW rate by term), `instructor_dfw` (per-instructor vs. course avg). `cedar_faculty` is optional; omitting it skips instructor breakdown |
 | | `get_course_persistence(students, degrees, opt, context = NULL)` | — | Course Dynamics → Retention's outcome table: selects the course's rows in scope, then `next_term_persistence()` |
 | | `next_term_persistence(filtered, all_students, degrees, opt, context = NULL)` | — | By outcome (pass, fail, late drop, early drop), share who returned next fall/spring. "Returned" is retention's definition (registered or graduated), computed by `.compute_retention()`; pass the retention trend's `build_retention_context()` to share it. Degrees are required |
@@ -111,7 +111,7 @@ Registry accessors (`R/lists/data_semantics.R`): `cedar_data_semantics(kind)`,
 | `course-retention.R` | `get_retention_comparison(students, opt, degrees)` | — | Descriptive next-term retention rates compared across courses (raw rates, not treatment/control) |
 | | `get_retention_trend(students, opt, degrees)` | — | One course's retention rate over time |
 | | `get_dept_retention_trend(students, opt, degrees)` | — | Dept-level retention trend |
-| `course-demographics.R` | `get_course_demographics(students, opt)` | — | Major/classification breakdown per course |
+| `course-demographics.R` | `get_course_demographics(students, opt)`, `get_course_major_mix(students, programs, opt)` | — | Major/classification breakdown per course; program mix of a course scope (`opt$major_code_to_name` optionally names enrollment-row codes with no program record) |
 | `sfr.R` | `get_perm_faculty_count(cedar_faculty)`, `get_sfr(programs, faculty)`, `get_sfr_data_for_dept_report(programs, faculty, opt)` | — | Permanent faculty FTE by dept; student–faculty ratios, college-wide and for one department (`opt$dept_code`, required). No app surface reads it today (see [source-to-cedar-manifest.md](source-to-cedar-manifest.md) §5) |
 | `cancellations.R` | `get_cancellations(sections, opt)` | — | Cancelled sections (section status "C") plus summary tables for Explore > Cancellations; related non-active statuses counted separately for context |
 | `gen-ed-grads.R` | `get_gen_ed_grad_cohort(students, degrees, opt)` | — | Graduates of a department whose ENTIRE UNM record sits inside the data window (first enrolled after the data begins, awarded degree before it ends). Deliberately a small sample — read the block comment at the top of the file before using it |
