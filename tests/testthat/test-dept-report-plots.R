@@ -466,8 +466,7 @@ test_that("plot_chd_by_fac_stacked returns a plotly bar chart", {
 # ===========================================================================
 
 test_that("get_sfr_data_for_dept_report plots are plotly not ggplot for HIST", {
-  do     <- list(cedar_programs = test_programs, cedar_faculty = test_faculty)
-  result <- get_sfr_data_for_dept_report(do, "HIST")
+  result <- get_sfr_data_for_dept_report(test_programs, test_faculty, opt = list(dept_code = "HIST"))
   has_plotly <- any_plotly(result$plots)
   has_ggplot <- any(sapply(result$plots, function(p) inherits(p, "ggplot")))
   expect_true(has_plotly,
