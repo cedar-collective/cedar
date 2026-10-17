@@ -618,3 +618,58 @@ test_that("the configuration validators report every problem at once", {
   expect_equal(one$campus_code[one$kind == "online"], character(0))
   expect_true(one$default_scope)
 })
+
+
+# ---- Configuration files: gen_ed_courses.csv and excluded_courses.csv --------
+
+test_that("the Gen Ed table and the excluded list are the institution's files", {
+  dir <- cedar_institution_dir(cedar_base_dir, "unm")
+  ge <- validate_gen_ed_courses(read_institution_file("gen_ed_courses", dir))
+  expect_equal(CEDAR_GEN_ED_COURSES$subject_course, ge$subject_course)
+  expect_equal(CEDAR_GEN_ED_COURSES$area, ge$area)
+  expect_equal(CEDAR_GEN_ED_COURSES$area_label, paste0(ge$area, ": ", ge$area_name))
+  expect_setequal(unlist(gen_ed_all), unique(ge$subject_course))
+  lu <- gen_ed_course_lookup()
+  expect_equal(nrow(lu), length(unique(ge$subject_course)))
+  expect_true(all(c("subject_course", "area", "area_label") %in% names(lu)))
+
+  ex <- validate_excluded_courses(read_institution_file("excluded_courses", dir))
+  expect_equal(excluded_courses, ex$subject_course)
+  expect_false(any(duplicated(excluded_courses)))
+  # The platform files name no course.
+  for (f in c("gen_ed_courses.R", "excluded_courses.R")) {
+    code_lines <- grep("^\\s*#", readLines(file.path("../../R/lists", f)), value = TRUE, invert = TRUE)
+    expect_false(any(grepl("\"[A-Z]{2,4} [0-9]{3,4}[A-Z]?\"", code_lines)), info = f)
+  }
+})
+
+test_that("the demo institution's Gen Ed and excluded files load and cover fixture courses", {
+  dir <- cedar_institution_dir(cedar_base_dir, "demo")
+  ge <- validate_gen_ed_courses(read_institution_file("gen_ed_courses", dir))
+  expect_true(all(c("HIST 1110", "MATH 1430", "ENGL 1120") %in% ge$subject_course))
+  # The demo's areas are UNM's, restricted to courses the fixtures use.
+  unm <- validate_gen_ed_courses(read_institution_file("gen_ed_courses", cedar_institution_dir(cedar_base_dir, "unm")))
+  expect_true(all(paste(ge$area, ge$subject_course) %in% paste(unm$area, unm$subject_course)))
+  expect_lt(nrow(ge), nrow(unm))
+  ex <- validate_excluded_courses(read_institution_file("excluded_courses", dir))
+  expect_true("AMST 499" %in% ex$subject_course)
+})
+
+test_that("the Gen Ed and excluded validators report every problem at once", {
+  dir <- tempfile("institution-config-")
+  dir.create(dir)
+  utils::write.csv(data.frame(area = c("1", "1", "one", "2", "2"),
+                              area_name = c("Communication", "Communications", "Math", "Math", ""),
+                              subject_course = c("ENGL 1120", "ENGL 1120", "MATH 1430", "MATH 1220", "MATH 1250")),
+                   file.path(dir, "gen_ed_courses.csv"), row.names = FALSE)
+  utils::write.csv(data.frame(subject_course = c("HIST 499", "HIST 499", ""), notes = ""),
+                   file.path(dir, "excluded_courses.csv"), row.names = FALSE)
+  err <- tryCatch(validate_gen_ed_courses(read_institution_file("gen_ed_courses", dir)), error = conditionMessage)
+  expect_match(err, "area must be a whole number; found one")
+  expect_match(err, "blank area_name")
+  expect_match(err, "more than one area_name for area 1, 2")
+  expect_match(err, "duplicate course in an area: ENGL 1120")
+  err <- tryCatch(validate_excluded_courses(read_institution_file("excluded_courses", dir)), error = conditionMessage)
+  expect_match(err, "blank subject_course")
+  expect_match(err, "duplicate subject_course HIST 499")
+})

@@ -12,7 +12,10 @@ the same as UNM's; see `institution/unm/README.md`.
 
 `campuses.csv` names the four campus codes the fixtures use (ABQ, EA, GA, VA)
 and `course_levels.csv` carries UNM's leading-digit bands, which the fixtures'
-course numbers follow.
+course numbers follow. `gen_ed_courses.csv` lists the fixture courses UNM's
+Gen Ed areas contain, under those areas, and `excluded_courses.csv` the two
+fixture courses UNM excludes, so the demo's Gen Ed tab and excluded-list
+controls have something to show.
 
 Every row is confirmed: the demo has no decisions waiting, so Admin > Mappings
 shows none. A fixture code with no row here would be listed there, as at any

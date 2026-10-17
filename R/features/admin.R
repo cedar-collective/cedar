@@ -506,7 +506,7 @@ build_counting_rules <- function(files, programs, sections, students) {
       "add_program_colleges() and .course_colleges(), R/data-parsers/transform-to-cedar.R",
       "institution/<id>/course_levels.csv (COURSE_LEVEL_BY_LEADING_DIGIT, R/lists/course_numbering.R)",
       "keep_home_sections(), R/trunk/filter.R; transform_sections()",
-      "excluded_courses, R/lists/excluded_courses.R",
+      "institution/<id>/excluded_courses.csv (excluded_courses, R/lists/excluded_courses.R)",
       "the source exports (mrgather); ISSUES.md I18, I20",
       "institution/<id>/campuses.csv (R/lists/campuses.R)",
       "hr_org_desc_to_dept, R/lists/mappings.R; R/data-parsers/parse-HRreport.R",

@@ -250,19 +250,14 @@ transform_sections <- function(desrs, data_dir, ext, maps) {
       )
     )
 
-  if (length(gen_ed[["1"]]) > 0) {
-    desrs <- desrs %>%
-      mutate(gen_ed_area = dplyr::case_when(
-        SUBJ_CRSE %in% gen_ed[["1"]] ~ 1L,
-        SUBJ_CRSE %in% gen_ed[["2"]] ~ 2L,
-        SUBJ_CRSE %in% gen_ed[["3"]] ~ 3L,
-        SUBJ_CRSE %in% gen_ed[["4"]] ~ 4L,
-        SUBJ_CRSE %in% gen_ed[["5"]] ~ 5L,
-        SUBJ_CRSE %in% gen_ed[["7"]] ~ 7L
-      ))
+  # Gen Ed area from the institution's gen_ed_courses.csv; a course listed
+  # under two areas counts under the first listed, every other course is NA.
+  if (!is.null(gen_ed) && nrow(gen_ed) > 0) {
+    first_area <- gen_ed[!duplicated(gen_ed$subject_course), ]
+    desrs$gen_ed_area <- as.integer(first_area$area[match(desrs$SUBJ_CRSE, first_area$subject_course)])
   } else {
     desrs$gen_ed_area <- NA_integer_
-    message("  ⚠️  gen_ed vectors not found — gen_ed_area will be NA")
+    message("  ⚠️  gen_ed_courses.csv has no rows — gen_ed_area will be NA")
   }
 
   # Unit from subjects.csv (ADR-002): the most specific confirmed row for the
@@ -1579,10 +1574,9 @@ transform_to_cedar <- function(data_dir = NULL, use_qs = NULL, tables = NULL) {
   # institution mapping files (ADR-002). program_map.qs and the lists that fed
   # it were retired at Stage 4. Script mode, the deploy gate and the demo
   # generator all load CEDAR's functions first; anything else must too.
-  gen_ed_names <- paste0("gen_ed_", c("1_communication", "2_math_stat", "3_phys_nat_sci",
-                                      "4_soc_behav_sci", "5_humanities", "7_arts_design"))
   needed <- c("read_institution_mappings", "subj_dept_map", "college_name_to_code",
-              "dept_code_to_name", "major_name_to_major_code", "hr_org_desc_to_dept", gen_ed_names)
+              "dept_code_to_name", "major_name_to_major_code", "hr_org_desc_to_dept",
+              "CEDAR_GEN_ED_COURSES")
   missing <- needed[!vapply(needed, exists, logical(1))]
   if (length(missing)) {
     stop("[transform-to-cedar.R] CEDAR's lists are not loaded (run load_funcs() first); missing: ",
@@ -1609,7 +1603,7 @@ transform_to_cedar <- function(data_dir = NULL, use_qs = NULL, tables = NULL) {
     subj_dept_map             = subj_dept_map,
     hr_org_desc_to_dept       = hr_org_desc_to_dept,
     dept_code_to_name_catalog = dept_code_to_name,
-    gen_ed = stats::setNames(lapply(gen_ed_names, get), c("1", "2", "3", "4", "5", "7"))
+    gen_ed = CEDAR_GEN_ED_COURSES
   )
 
   # Initialize results tracking

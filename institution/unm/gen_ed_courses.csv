@@ -1,0 +1,134 @@
+area,area_name,subject_course
+1,Communication,COMM 1130
+1,Communication,COMM 2121
+1,Communication,COMP 2225
+1,Communication,ENGL 1120
+1,Communication,ENGL 2120
+1,Communication,ENGL 2210
+1,Communication,GEOG 2115
+1,Communication,HNRS 2112
+1,Communication,IADL 1110
+1,Communication,PHIL 1120
+1,Communication,SPAN 2130
+2,Math & Stat,HNRS 2221
+2,Math & Stat,MATH 1130
+2,Math & Stat,MATH 1220
+2,Math & Stat,MATH 1240
+2,Math & Stat,MATH 1250
+2,Math & Stat,MATH 1300
+2,Math & Stat,MATH 1350
+2,Math & Stat,MATH 1430
+2,Math & Stat,MATH 1440
+2,Math & Stat,MATH 1512
+2,Math & Stat,MATH 1522
+2,Math & Stat,MATH 2118
+3,Phys/Nat Sci,ANTH 1135
+3,Phys/Nat Sci,ANTH 1170
+3,Phys/Nat Sci,ANTH 1211
+3,Phys/Nat Sci,ANTH 2190C
+3,Phys/Nat Sci,ASTR 1115
+3,Phys/Nat Sci,BIOL 1110
+3,Phys/Nat Sci,BIOL 1140
+3,Phys/Nat Sci,CHEM 1110C
+3,Phys/Nat Sci,CHEM 1120C
+3,Phys/Nat Sci,CHEM 1215
+3,Phys/Nat Sci,CHEM 1225
+3,Phys/Nat Sci,CS 108L
+3,Phys/Nat Sci,ENVS 1130
+3,Phys/Nat Sci,GEOG 1160
+3,Phys/Nat Sci,GEOL 1110
+3,Phys/Nat Sci,GEOG 2110
+3,Phys/Nat Sci,HNRS 2331
+3,Phys/Nat Sci,NTSC 1110
+3,Phys/Nat Sci,NTSC 1120
+3,Phys/Nat Sci,NTSC 2110
+3,Phys/Nat Sci,PHYS 1115
+3,Phys/Nat Sci,PHYS 1125
+3,Phys/Nat Sci,PHYS 1230
+3,Phys/Nat Sci,PHYS 1240
+3,Phys/Nat Sci,PHYS 1310
+3,Phys/Nat Sci,PHYS 1320
+4,Soc/Behav Sci,AMST 1110
+4,Soc/Behav Sci,AMST 1140
+4,Soc/Behav Sci,ANTH 1115
+4,Soc/Behav Sci,ANTH 1140
+4,Soc/Behav Sci,ANTH 2175
+4,Soc/Behav Sci,ARCH 1210
+4,Soc/Behav Sci,CCST 1110
+4,Soc/Behav Sci,ECON 2110
+4,Soc/Behav Sci,ECON 2120
+4,Soc/Behav Sci,ENGN 200
+4,Soc/Behav Sci,FCST 2130
+4,Soc/Behav Sci,FDMA 1520
+4,Soc/Behav Sci,GEOG 1165
+4,Soc/Behav Sci,GEOG 2170
+4,Soc/Behav Sci,HNRS 2364
+4,Soc/Behav Sci,LING 2110
+4,Soc/Behav Sci,LTAM 1110
+4,Soc/Behav Sci,PADM 2110
+4,Soc/Behav Sci,POLS 1120
+4,Soc/Behav Sci,POLS 1140
+4,Soc/Behav Sci,POLS 2110
+4,Soc/Behav Sci,POLS 2120
+4,Soc/Behav Sci,PSYC 1110
+4,Soc/Behav Sci,PH 101
+4,Soc/Behav Sci,PH 102
+4,Soc/Behav Sci,SOCI 1110
+4,Soc/Behav Sci,SOCI 2315
+4,Soc/Behav Sci,SUST 1134
+5,Humanities,AFST 1110
+5,Humanities,AMST 1150
+5,Humanities,ARCH 2125
+5,Humanities,CCST 2110
+5,Humanities,CLST 1110
+5,Humanities,CLST 2110
+5,Humanities,CLST 2120
+5,Humanities,COMP 2222
+5,Humanities,COMP 2240
+5,Humanities,ENGL 1410
+5,Humanities,ENGL 2650
+5,Humanities,ENGL 2660
+5,Humanities,GEOG 1175
+5,Humanities,GRMN 2227
+5,Humanities,HIST 1105
+5,Humanities,HIST 1110
+5,Humanities,HIST 1120
+5,Humanities,HIST 1150
+5,Humanities,HIST 1160
+5,Humanities,HIST 1170
+5,Humanities,HIST 1180
+5,Humanities,HNRS 1120
+5,Humanities,HNRS 2167
+5,Humanities,INST 1101
+5,Humanities,LING 2151
+5,Humanities,MLNG 1110
+5,Humanities,NATV 1150
+5,Humanities,PHIL 1115
+5,Humanities,PHIL 2210
+5,Humanities,PHIL 2225
+5,Humanities,RELG 1110
+5,Humanities,RELG 1550
+5,Humanities,RELG 2110
+5,Humanities,RELG 2120
+7,Arts & Design,ARCH 1120
+7,Arts & Design,ARCH 2151
+7,Arts & Design,ARTH 1120
+7,Arts & Design,ARTH 2110
+7,Arts & Design,ARTH 2120
+7,Arts & Design,ARTS 1143
+7,Arts & Design,ARTS 1220
+7,Arts & Design,ARTS 1410
+7,Arts & Design,ARTS 1510
+7,Arts & Design,ARTS 1610
+7,Arts & Design,ARTS 1810
+7,Arts & Design,CCST 1125
+7,Arts & Design,DANC 1110
+7,Arts & Design,DANC 1140
+7,Arts & Design,DANC 1170
+7,Arts & Design,FDMA 2110
+7,Arts & Design,HNRS 2113
+7,Arts & Design,MUSC 1120
+7,Arts & Design,MUSC 1130
+7,Arts & Design,MUSC 2790
+7,Arts & Design,THEA 1110
+7,Arts & Design,THEA 1220

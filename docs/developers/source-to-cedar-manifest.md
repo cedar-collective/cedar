@@ -93,7 +93,7 @@ The course schedule. One row per section per term.
 | `section_id` | `TERM-CRN` |
 | `level` | from course number (lower / upper / grad) |
 | `term_type` | from term code (fall / spring / summer) |
-| `gen_ed_area` | lookup: `gen_ed_courses.R` |
+| `gen_ed_area` | lookup: `institution/<id>/gen_ed_courses.csv` |
 | `is_combined` | `CRSE` ends in `C` |
 | `is_topics` | title begins `T:` |
 | `total_enrl` | crosslist-aware combined enrollment |
