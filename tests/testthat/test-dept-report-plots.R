@@ -474,3 +474,39 @@ test_that("get_sfr_data_for_dept_report plots are plotly not ggplot for HIST", {
   expect_false(has_ggplot,
                info = "No SFR plot should be a ggplot after conversion")
 })
+
+
+# ===========================================================================
+# credit_hours_by_fac() — tables are parameters (M12), not the data_objects bundle
+# ===========================================================================
+
+test_that("credit_hours_by_fac takes students and faculty as parameters", {
+  # HIST course rows in test_students have no instructor_id; stamp the fixture's
+  # HIST faculty member (INS001, Associate Professor in every term) so the
+  # instructor join resolves. Local scaffolding over the shared fixture.
+  st <- test_students
+  st$instructor_id[st$department == "HIST"] <- "INS001"
+
+  result <- credit_hours_by_fac(st, test_faculty, "HIST", "HIST",
+                                cedar_report_start_term, cedar_report_end_term,
+                                palette = "Set2")
+  expect_setequal(names(result$plots), c("chd_by_fac_facet_plot", "chd_by_fac_plot"))
+  expect_true(is_plotly(result$plots$chd_by_fac_plot))
+  totals <- result$tables$chd_fac_by_total
+  expect_gt(nrow(totals), 0)
+  expect_true(all(totals$job_category == "Associate Professor"))
+  expect_true(all(totals$total_hours > 0))
+
+  # An empty faculty table is the documented "no HR data" state.
+  empty <- credit_hours_by_fac(st, test_faculty[0, ], "HIST", "HIST",
+                               cedar_report_start_term, cedar_report_end_term,
+                               palette = "Set2")
+  expect_equal(empty$plots$chd_by_fac_plot, "No faculty data available")
+
+  # A missing table is an error, never a silent empty result.
+  expect_error(
+    credit_hours_by_fac(st, NULL, "HIST", "HIST",
+                        cedar_report_start_term, cedar_report_end_term, palette = "Set2"),
+    "cedar_faculty"
+  )
+})

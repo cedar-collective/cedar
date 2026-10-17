@@ -1868,16 +1868,19 @@ by `tests/testthat/test-architecture.R` ("cones and branches do not read
 global state"): any `data_objects`, `.GlobalEnv`, `get("cedar_…")`, or
 `exists("…")` in `R/cones` or `R/branches` counts, except the two standalone
 guards `exists("%||%")` and `exists("cedar_log_level")`, and each file's
-allowance may only go down. Measured: 7 across 3 files —
-`R/branches/credit-hours.R` 4 (`credit_hours_by_fac(data_objects, …)` and
-`major_to_dept`), `R/cones/waitlist.R` 2 (`cedar_cl_enrls_base`),
-`R/cones/course-demographics.R` 1 (`major_code_to_name`). Cleared 2026-10-16:
-`R/branches/course-attempts.R` (the graded edge is `opt$data_edges`, required,
-fails closed when undetermined; the left edge is `opt$min_term`, never a global
-or a literal) and `R/cones/sfr.R` (`get_sfr(programs, faculty)` and
-`get_sfr_data_for_dept_report(programs, faculty, opt)` take their two tables,
-with `opt$dept_code` required; the cone has no app caller — see
-`docs/developers/source-to-cedar-manifest.md` §5). *Done when:*
+allowance may only go down. Measured: 3 across 2 files —
+`R/cones/waitlist.R` 2 (`cedar_cl_enrls_base`), `R/cones/course-demographics.R`
+1 (`major_code_to_name`). Cleared 2026-10-16: `R/branches/course-attempts.R`
+(the graded edge is `opt$data_edges`, required, fails closed when undetermined;
+the left edge is `opt$min_term`, never a global or a literal); `R/cones/sfr.R`
+(`get_sfr(programs, faculty)` and `get_sfr_data_for_dept_report(programs,
+faculty, opt)` take their two tables, with `opt$dept_code` required; the cone
+has no app caller — see `docs/developers/source-to-cedar-manifest.md` §5);
+`R/branches/credit-hours.R` (`credit_hours_by_major()` takes `major_codes`
+from the caller — Dept Trends passes `base$prog_codes`, the same set the
+module labels as home majors — instead of reading `major_to_dept` behind an
+`exists()` guard that fell back to the department code as a major code;
+`credit_hours_by_fac(students, faculty, …)` names its two tables). *Done when:*
 the allowance list is empty; every table and edge is a parameter.
 
 **M13 — Business logic in modules.** `R/modules/pathways.R` 38

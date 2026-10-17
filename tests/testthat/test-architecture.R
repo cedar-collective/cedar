@@ -598,7 +598,7 @@ test_that("cones and branches do not read global state, and the backlog shrinks 
     "R/cones/course-demographics.R" = 1L,
     "R/cones/sfr.R" = 0L,
     "R/cones/waitlist.R" = 2L,
-    "R/branches/credit-hours.R" = 4L
+    "R/branches/credit-hours.R" = 0L
   )
   architecture_expect_ratchet(measured, allowance, "global-state read(s)")
 })
