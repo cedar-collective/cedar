@@ -16,7 +16,8 @@ ge_profile <- function(min_n = 1L, instructor = TRUE) {
     test_students, test_sections, test_programs, NULL,
     list(min_n = min_n,
          include_instructor_dfw = instructor,
-         include_associations = FALSE)
+         include_associations = FALSE,
+         data_edges = data_objects$cedar_edges)
   ))
 }
 
@@ -28,7 +29,7 @@ ge_two_campus_profile <- function(min_n = 1L) {
     gen_ed_assoc_students,
     gen_ed_assoc_sections,
     gen_ed_assoc_programs,
-    opt = list(dept_code = "HIST", min_n = min_n, include_instructor_dfw = TRUE)
+    opt = list(data_edges = data_objects$cedar_edges, dept_code = "HIST", min_n = min_n, include_instructor_dfw = TRUE)
   ))
 }
 

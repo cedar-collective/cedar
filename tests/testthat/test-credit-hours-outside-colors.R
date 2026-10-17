@@ -17,8 +17,13 @@ ch_fixture <- function() {
   st
 }
 
+# Home major codes the way Dept Trends resolves them (set_payload's prog_codes).
+hist_major_codes <- function() {
+  names(major_to_dept)[!is.na(major_to_dept) & major_to_dept == "HIST"]
+}
+
 ch_result <- function() {
-  credit_hours_by_major(ch_fixture(), "HIST",
+  credit_hours_by_major(ch_fixture(), "HIST", hist_major_codes(),
                         cedar_report_start_term, cedar_report_end_term)
 }
 
@@ -57,4 +62,49 @@ test_that("Other keeps the reserved neutral and is not a palette colour", {
   skip_if(is.null(lo) || !"Other" %in% names(lo), "no Other slice in the fixture")
 
   expect_equal(unname(lo[["Other"]]), unname(CEDAR_SEMANTIC_COLORS["other"]))
+})
+
+# HIST course rows in test_students carry no major_code, so the raw fixture
+# cannot tell a home major from an outside one. Stamp one here: HIST students
+# sorted by id, first half "HIST-BA" (home), second half "BIOL-BS" (outside).
+# Local scaffolding for this contract; the shared course rows stay unchanged.
+ch_fixture_with_majors <- function() {
+  st <- ch_fixture()
+  is_hist  <- st$department == "HIST"
+  ids      <- sort(unique(st$student_id[is_hist]))
+  home_ids <- ids[seq_len(ceiling(length(ids) / 2))]
+  st$major_code[is_hist] <- ifelse(st$student_id[is_hist] %in% home_ids, "HIST-BA", "BIOL-BS")
+  st$major_name <- st$major_code
+  st
+}
+
+test_that("credit_hours_by_major takes its home major codes from the caller (M12)", {
+  # No major_codes: an error, never a lookup of major_to_dept or dept_code as a major code.
+  expect_error(
+    credit_hours_by_major(ch_fixture(), "HIST",
+                          term_start = cedar_report_start_term, term_end = cedar_report_end_term),
+    "major_codes"
+  )
+  expect_error(
+    credit_hours_by_major(ch_fixture(), "HIST", NULL,
+                          cedar_report_start_term, cedar_report_end_term),
+    "major_codes"
+  )
+
+  st   <- ch_fixture_with_majors()
+  run  <- function(codes) {
+    credit_hours_by_major(st, "HIST", codes, cedar_report_start_term, cedar_report_end_term,
+                          include_all_ug = FALSE, include_wide_table = FALSE)
+  }
+  outside_hours <- function(r) {
+    sum(r$tables$sch_outside_full_lower$total_hours, na.rm = TRUE) +
+      sum(r$tables$sch_outside_full_upper$total_hours, na.rm = TRUE)
+  }
+  home <- run("HIST-BA")
+  # An empty vector is a unit with no degree programs: every student is outside.
+  none <- run(character(0))
+
+  expect_false("HIST-BA" %in% home$tables$sch_outside_full_lower$major_code)
+  expect_true("HIST-BA" %in% none$tables$sch_outside_full_lower$major_code)
+  expect_gt(outside_hours(none), outside_hours(home))
 })

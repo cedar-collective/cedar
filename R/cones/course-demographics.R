@@ -63,7 +63,11 @@ abbreviate_classification <- function(classification) {
 #' @param students Data frame of student enrollments from cedar_students.
 #' @param programs Data frame of program records from cedar_programs.
 #' @param opt Options list. Supports course/term/campus/college filters accepted
-#'   by filter_class_list(), plus min_n and top_n for display grouping.
+#'   by filter_class_list(), plus min_n and top_n for display grouping, and
+#'   optionally major_code_to_name (the cedar_lookups table of the same name,
+#'   a named character vector) to label an enrollment-row major code that has
+#'   no same-term program record. Codes it does not cover, or all codes when it
+#'   is absent, are named from \code{programs}.
 #' @return Tibble with major_label, n_enrollments, n_students, pct_enrollments.
 get_course_major_mix <- function(students, programs, opt = list()) {
   if (is.null(students) || nrow(students) == 0) {
@@ -134,7 +138,8 @@ get_course_major_mix <- function(students, programs, opt = list()) {
     )
 
   joined$class_major_label <- joined$class_major_code
-  if (exists("major_code_to_name") && length(major_code_to_name) > 0) {
+  major_code_to_name <- opt$major_code_to_name
+  if (!is.null(major_code_to_name) && length(major_code_to_name) > 0) {
     translated <- unname(major_code_to_name[as.character(joined$class_major_code)])
     has_translation <- !is.na(translated) & translated != ""
     joined$class_major_label[has_translation] <- translated[has_translation]
