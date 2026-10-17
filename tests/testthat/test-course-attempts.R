@@ -18,10 +18,11 @@ test_that("AUD is excluded across classifiers without erasing genuine withdrawal
   expect_setequal(direct$student_id[which(direct$is_denominator_attempt)], expected_ids)
   expect_false(any(direct$is_dfw_legacy[direct$student_id %in% audit_ids]))
 
-  prepared <- prepare_course_attempts(students, list(course = "HIST 1110"))
+  edges <- data_objects$cedar_edges
+  prepared <- prepare_course_attempts(students, list(course = "HIST 1110", data_edges = edges))
   classified <- classify_attempt_outcomes(prepared)
   expect_setequal(classified$student_id[which(classified$is_denominator_attempt)], expected_ids)
-  rate <- get_course_outcome_rates(students, list(course = "HIST 1110"))
+  rate <- get_course_outcome_rates(students, list(course = "HIST 1110", data_edges = edges))
   expect_equal(rate$n_attempts, 5L)
   expect_equal(rate$n_dfw, 4L)
   expect_equal(rate$n_pass, 1L)
@@ -32,7 +33,9 @@ test_that("AUD is excluded across classifiers without erasing genuine withdrawal
 
 
 test_that("recycled CRNs preserve later attempts while same-term duplicates collapse", {
-  attempts <- prepare_course_attempts(test_students_reused_crn, list(subj = "HIST"))
+  attempts <- prepare_course_attempts(
+    test_students_reused_crn, list(subj = "HIST", data_edges = data_objects$cedar_edges)
+  )
 
   expect_equal(nrow(attempts), 4L)
   repeated <- attempts %>% filter(student_id == "EC08-A", subject_course == "HIST 1110")
@@ -44,7 +47,8 @@ test_that("recycled CRNs preserve later attempts while same-term duplicates coll
 
 
 test_that("course outcomes reconcile across term partitions and wider course scope", {
-  opt <- list(course = "HIST 1110", course_campus = "ABQ")
+  opt <- list(course = "HIST 1110", course_campus = "ABQ",
+              data_edges = data_objects$cedar_edges)
   pooled <- get_course_outcome_rates(test_students_reused_crn, opt)
   expect_equal(pooled$n_attempts, 3L)
   expect_equal(pooled$n_pass, 2L)
@@ -61,7 +65,9 @@ test_that("course outcomes reconcile across term partitions and wider course sco
   expect_equal(sum(separate_terms$n_attempts), pooled$n_attempts)
   expect_equal(sum(separate_terms$n_dfw), pooled$n_dfw)
 
-  wider <- get_course_outcome_rates(test_students_reused_crn, list(subj = "HIST"))
+  wider <- get_course_outcome_rates(
+    test_students_reused_crn, list(subj = "HIST", data_edges = data_objects$cedar_edges)
+  )
   expect_equal(filter(wider, subject_course == "HIST 1110"), pooled)
   expect_equal(wider$n_attempts[wider$subject_course == "HIST 1120"], 1L)
   expect_equal(wider$n_dfw[wider$subject_course == "HIST 1120"], 1L)
@@ -151,7 +157,9 @@ test_that("prepare_course_attempts normalizes drops, excludes audits, and dedupl
     )
   )
 
-  result <- prepare_course_attempts(designed, opt = list(course = "HIST 1110"))
+  result <- prepare_course_attempts(
+    designed, opt = list(course = "HIST 1110", data_edges = data_objects$cedar_edges)
+  )
 
   expect_false("attempt-aud" %in% result$student_id)
   expect_false("attempt-wl" %in% result$student_id)
@@ -187,7 +195,9 @@ test_that("summarize_outcome_status_exclusions reports excluded status rows and 
     )
   )
 
-  result <- summarize_outcome_status_exclusions(designed, opt = list(course = "HIST 1110"))
+  result <- summarize_outcome_status_exclusions(
+    designed, opt = list(course = "HIST 1110", data_edges = data_objects$cedar_edges)
+  )
 
   expect_setequal(result$status_code, c("WL", "ZZ"))
   expect_equal(result$nonblank_grade_rows[result$status_code == "WL"], 0L)
@@ -199,7 +209,7 @@ test_that("summarize_outcome_status_exclusions reports excluded status rows and 
 test_that("get_course_outcome_rates exposes nuanced DFW components", {
   result <- get_course_outcome_rates(
     test_students,
-    opt = list(course = "HIST 1110"),
+    opt = list(course = "HIST 1110", data_edges = data_objects$cedar_edges),
     group_cols = "subject_course",
     min_n = 1L
   )
@@ -254,7 +264,7 @@ test_that("get_course_dfw_demographics summarizes rate and composition", {
 
   result <- get_course_dfw_demographics(
     designed,
-    opt = list(course = "HIST 1110"),
+    opt = list(course = "HIST 1110", data_edges = data_objects$cedar_edges),
     group_col = "major_name"
   )
 
@@ -293,7 +303,8 @@ test_that("get_course_dfw_demographics honors caller-supplied passing grades", {
     designed,
     opt = list(
       course = "HIST 1110",
-      passing_grades = GRADES_PASS_SUB_C_OPT_IN
+      passing_grades = GRADES_PASS_SUB_C_OPT_IN,
+      data_edges = data_objects$cedar_edges
     ),
     group_col = "student_classification"
   )
@@ -345,7 +356,7 @@ test_that("get_course_dfw_context summarizes same-term DFW uniqueness", {
 
   result <- get_course_dfw_context(
     designed,
-    opt = list(course = "HIST 1110"),
+    opt = list(course = "HIST 1110", data_edges = data_objects$cedar_edges),
     min_cell = 1L
   )
 
@@ -390,7 +401,7 @@ test_that("get_course_dfw_context suppresses small context displays", {
 
   result <- get_course_dfw_context(
     designed,
-    opt = list(course = "HIST 1110"),
+    opt = list(course = "HIST 1110", data_edges = data_objects$cedar_edges),
     min_cell = 5L
   )
 
@@ -433,7 +444,7 @@ test_that("get_course_dfw_context merges thin buckets instead of hiding the pane
 
   result <- get_course_dfw_context(
     dplyr::bind_rows(focal_only, paired),
-    opt = list(course = "HIST 1110"),
+    opt = list(course = "HIST 1110", data_edges = data_objects$cedar_edges),
     min_cell = 5L
   )
 
@@ -450,7 +461,7 @@ test_that("get_course_dfw_context merges thin buckets instead of hiding the pane
 test_that("get_grade_distribution returns counts and percentages", {
   result <- get_grade_distribution(
     test_students,
-    opt = list(course = "HIST 1110"),
+    opt = list(course = "HIST 1110", data_edges = data_objects$cedar_edges),
     group_cols = "subject_course",
     min_n = 1L
   )
@@ -465,7 +476,7 @@ test_that("get_grade_distribution returns counts and percentages", {
 test_that("get_course_outcome_rates computes expected course averages", {
   modern <- get_course_outcome_rates(
     test_students,
-    opt = list(course = "HIST 1110"),
+    opt = list(course = "HIST 1110", data_edges = data_objects$cedar_edges),
     group_cols = c("campus", "college", "subject_course"),
     min_n = 1L
   ) %>%

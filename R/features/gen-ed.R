@@ -313,7 +313,8 @@ get_gen_ed_profile <- function(students, sections, programs, degrees = NULL, opt
   major_mix <- get_course_major_mix(
     ge_students,
     programs,
-    opt = list(min_n = min_n, top_n = opt$major_mix_top_n %||% 10L)
+    opt = list(min_n = min_n, top_n = opt$major_mix_top_n %||% 10L,
+               major_code_to_name = opt$major_code_to_name)
   )
 
   instructor_dfw <- NULL

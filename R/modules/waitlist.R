@@ -5,7 +5,7 @@
 #
 # Exported functions:
 #   waitlistUI(id, sections, default_term, dept_choices)
-#   waitlistServer(id, students, parent_session)
+#   waitlistServer(id, students, parent_session, sections, enrl_base)
 #
 # Cross-tab note: the regstats tab triggers navigation here via
 # Shiny.setInputValue('waitlist-wl_navigate', ...) — the namespace prefix is
@@ -201,7 +201,8 @@ waitlistUI <- function(id, sections, default_term, dept_choices) {
   )
 }
 
-waitlistServer <- function(id, students, parent_session, sections = NULL) {
+waitlistServer <- function(id, students, parent_session, sections = NULL,
+                           enrl_base = NULL) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
 
@@ -292,7 +293,7 @@ waitlistServer <- function(id, students, parent_session, sections = NULL) {
       # end_report_timer also feed the shared report-timing log).
       timer <- start_report_timer("waitlist", list(course = course, term = term))
       waitlist_data <- tryCatch(
-        inspect_waitlist(students, opt, sections),
+        inspect_waitlist(students, opt, sections, enrl_base = enrl_base),
         error = function(e) {
           message("[waitlist] Error: ", conditionMessage(e))
           showNotification(paste("Waitlist error:", conditionMessage(e)),
