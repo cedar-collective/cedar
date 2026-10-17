@@ -74,7 +74,13 @@ capture_enrollment_projection_git <- function(root, args) {
     suppressWarnings(system2(
       "git", c("-C", shQuote(root), args), stdout = TRUE, stderr = TRUE
     )),
-    error = function(error) structure(character(0), status = 1L)
+    error = function(error) {
+      # No git on this machine: provenance records NA and the page says so,
+      # but the build log should say why rather than nothing.
+      message("[enrollment-projections.R] git unavailable: ",
+              conditionMessage(error))
+      structure(character(0), status = 1L)
+    }
   )
   status <- attr(output, "status")
   if (!is.null(status) && status != 0L) return(NULL)
