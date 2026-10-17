@@ -48,7 +48,7 @@ A per-function index of `R/branches/`, `R/cones/`, and `R/features/`. `AGENTS.md
 
 | Function | Purpose |
 |---|---|
-| `population_group_ids()` / `population_group_choices()` | The shared group registry (`CEDAR_POPULATION_GROUPS`, `R/lists/population-presets.R`) as ids or selectize choices |
+| `population_group_ids()` / `population_group_choices()` / `population_group_default(surface)` | The shared group registry (`CEDAR_POPULATION_GROUPS`, from `institution/<id>/population_groups.csv`) as ids or selectize choices, and the group a surface preselects (`default_for` in the file, else the first group) |
 | `population_group_program_names(group_id)` | The program names a group declares |
 | `population_group_major_codes(group_id, programs, include_pre_majors)` | Resolves a group to Banner major codes through name matching **and** each pre-major's `leads_to` (programs.csv), because each alone misses real pre-majors. `include_pre_majors` takes `build_population()`'s vocabulary: `lump` / `majors_only` / `pre_only` |
 | `population_group_audit(group_id, programs)` | `codes`, `unmatched_names`, and `near_miss` — the drifted names a name-declared group would otherwise drop silently. Run it when adding a group |

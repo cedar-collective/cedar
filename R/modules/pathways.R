@@ -141,7 +141,7 @@ populationSelectorUI <- function(id, campus_choices, program_choices = character
           selectInput(
             ns("preset"), "Major Group",
             choices  = names(CEDAR_POPULATION_GROUPS),
-            selected = "All Health Programs",
+            selected = population_group_default("pathways"),
             width    = "100%"
           )
         ),
@@ -262,7 +262,7 @@ populationSelectorServer <- function(id, programs, degrees = NULL, students = NU
 
       opt <- if (type == "preset") {
         preset <- CEDAR_POPULATION_GROUPS[[input$preset]]
-        programs_selected <- preset$programs %||% DEFAULT_MAJOR_GROUP_PROGRAMS
+        programs_selected <- preset$programs
         req(length(programs_selected) > 0)
         list(type = "preset", program_names = programs_selected,
              outcomes = scope_outcomes)

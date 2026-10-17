@@ -712,7 +712,7 @@ at 0% growth cannot disagree with the projection it is anchored on.
 
 ### Named populations
 
-Groups live in `CEDAR_POPULATION_GROUPS` (`R/lists/population-presets.R`) and are
+Groups live in `CEDAR_POPULATION_GROUPS` (`institution/<id>/population_groups.csv`, read by `R/lists/population-presets.R`) and are
 shared with Pathways, so "health professions" means one thing across CEDAR. They
 declare **program names**; `population_group_major_codes()` resolves those to
 Banner codes through two mechanisms, because neither is complete:

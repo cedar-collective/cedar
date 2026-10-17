@@ -1,0 +1,130 @@
+group,description,default_for,program_name
+Top 10 by Enrollment,Ten largest health programs by avg fall headcount (declared majors),,Nursing
+Top 10 by Enrollment,Ten largest health programs by avg fall headcount (declared majors),,Dental Hygiene
+Top 10 by Enrollment,Ten largest health programs by avg fall headcount (declared majors),,Emergency Medical Services
+Top 10 by Enrollment,Ten largest health programs by avg fall headcount (declared majors),,Doctor of Pharmacy
+Top 10 by Enrollment,Ten largest health programs by avg fall headcount (declared majors),,Radiologic Sciences
+Top 10 by Enrollment,Ten largest health programs by avg fall headcount (declared majors),,Medical Laboratory Sciences
+Top 10 by Enrollment,Ten largest health programs by avg fall headcount (declared majors),,Population Health
+Top 10 by Enrollment,Ten largest health programs by avg fall headcount (declared majors),,Biomedical Sciences
+Top 10 by Enrollment,Ten largest health programs by avg fall headcount (declared majors),,Physical Therapy
+Top 10 by Enrollment,Ten largest health programs by avg fall headcount (declared majors),,Nursing Practice
+All Health Programs,All health-related programs,pathways,Nursing
+All Health Programs,All health-related programs,pathways,Family Nurse Practitioner
+All Health Programs,All health-related programs,pathways,Nurse Admin Leadership
+All Health Programs,All health-related programs,pathways,Nurse Midwifery
+All Health Programs,All health-related programs,pathways,Nursing Administration
+All Health Programs,All health-related programs,pathways,Nursing Education
+All Health Programs,All health-related programs,pathways,Nursing Exec. Org. Leadership
+All Health Programs,All health-related programs,pathways,Nursing Practice
+All Health Programs,All health-related programs,pathways,Pediatric Nurse Prac-PC PNP-PC
+All Health Programs,All health-related programs,pathways,Psychiatric Mental Health NP
+All Health Programs,All health-related programs,pathways,Clinical Laboratory Sciences
+All Health Programs,All health-related programs,pathways,Medical Laboratory Sciences
+All Health Programs,All health-related programs,pathways,Medical Laboratory Science
+All Health Programs,All health-related programs,pathways,Medical Lab Technology
+All Health Programs,All health-related programs,pathways,Physician Assistant Studies
+All Health Programs,All health-related programs,pathways,Occupational Therapy
+All Health Programs,All health-related programs,pathways,Physical Therapy
+All Health Programs,All health-related programs,pathways,Radiologic Sciences
+All Health Programs,All health-related programs,pathways,Medical Imaging
+All Health Programs,All health-related programs,pathways,Nuclear Medicine
+All Health Programs,All health-related programs,pathways,Dental Hygiene
+All Health Programs,All health-related programs,pathways,Dental Assisting
+All Health Programs,All health-related programs,pathways,Emergency Medical Services
+All Health Programs,All health-related programs,pathways,Emergency Med Svcs EMT-Basic
+All Health Programs,All health-related programs,pathways,Doctor of Pharmacy
+All Health Programs,All health-related programs,pathways,Pharmaceutical Sciences
+All Health Programs,All health-related programs,pathways,BS Pharmaceutical Sciences
+All Health Programs,All health-related programs,pathways,Toxicol & Pharmaceu Sciences
+All Health Programs,All health-related programs,pathways,Public Health
+All Health Programs,All health-related programs,pathways,Community Health
+All Health Programs,All health-related programs,pathways,Community Health Education
+All Health Programs,All health-related programs,pathways,Community Health Intervention
+All Health Programs,All health-related programs,pathways,School Health Education
+All Health Programs,All health-related programs,pathways,Maternal Child Health
+All Health Programs,All health-related programs,pathways,Population Health
+All Health Programs,All health-related programs,pathways,Health Education
+All Health Programs,All health-related programs,pathways,Health Administration
+All Health Programs,All health-related programs,pathways,Health Policy
+All Health Programs,All health-related programs,pathways,Health Policy and Admin
+All Health Programs,All health-related programs,pathways,Health Systems Svcs & Policy
+All Health Programs,All health-related programs,pathways,General Healthcare Admin
+All Health Programs,All health-related programs,pathways,Health Information Technology
+All Health Programs,All health-related programs,pathways,Biomedical Sciences
+All Health Programs,All health-related programs,pathways,Prof Health Sciences
+All Health Programs,All health-related programs,pathways,Health Professions
+All Health Programs,All health-related programs,pathways,Health Equity Sciences
+All Health Programs,All health-related programs,pathways,Health Scholars
+Health Professions (Clinical),Clinical and licensure programs that produce practitioners,scenario,Nursing
+Health Professions (Clinical),Clinical and licensure programs that produce practitioners,scenario,Family Nurse Practitioner
+Health Professions (Clinical),Clinical and licensure programs that produce practitioners,scenario,Nurse Admin Leadership
+Health Professions (Clinical),Clinical and licensure programs that produce practitioners,scenario,Nurse Midwifery
+Health Professions (Clinical),Clinical and licensure programs that produce practitioners,scenario,Nursing Administration
+Health Professions (Clinical),Clinical and licensure programs that produce practitioners,scenario,Nursing Education
+Health Professions (Clinical),Clinical and licensure programs that produce practitioners,scenario,Nursing Exec. Org. Leadership
+Health Professions (Clinical),Clinical and licensure programs that produce practitioners,scenario,Nursing Practice
+Health Professions (Clinical),Clinical and licensure programs that produce practitioners,scenario,Pediatric Nurse Prac-PC PNP-PC
+Health Professions (Clinical),Clinical and licensure programs that produce practitioners,scenario,Psychiatric Mental Health NP
+Health Professions (Clinical),Clinical and licensure programs that produce practitioners,scenario,Clinical Laboratory Sciences
+Health Professions (Clinical),Clinical and licensure programs that produce practitioners,scenario,Medical Laboratory Sciences
+Health Professions (Clinical),Clinical and licensure programs that produce practitioners,scenario,Medical Laboratory Science
+Health Professions (Clinical),Clinical and licensure programs that produce practitioners,scenario,Medical Lab Technology
+Health Professions (Clinical),Clinical and licensure programs that produce practitioners,scenario,Physician Assistant Studies
+Health Professions (Clinical),Clinical and licensure programs that produce practitioners,scenario,Physical Therapy
+Health Professions (Clinical),Clinical and licensure programs that produce practitioners,scenario,Occupational Therapy
+Health Professions (Clinical),Clinical and licensure programs that produce practitioners,scenario,Radiologic Sciences
+Health Professions (Clinical),Clinical and licensure programs that produce practitioners,scenario,Medical Imaging
+Health Professions (Clinical),Clinical and licensure programs that produce practitioners,scenario,Nuclear Medicine
+Health Professions (Clinical),Clinical and licensure programs that produce practitioners,scenario,Dental Hygiene
+Health Professions (Clinical),Clinical and licensure programs that produce practitioners,scenario,Dental Assisting
+Health Professions (Clinical),Clinical and licensure programs that produce practitioners,scenario,Emergency Medical Services
+Health Professions (Clinical),Clinical and licensure programs that produce practitioners,scenario,Emergency Med Svcs EMT-Basic
+Health Professions (Clinical),Clinical and licensure programs that produce practitioners,scenario,Doctor of Pharmacy
+Health Professions (Clinical),Clinical and licensure programs that produce practitioners,scenario,Pharmaceutical Sciences
+Health Professions (Clinical),Clinical and licensure programs that produce practitioners,scenario,BS Pharmaceutical Sciences
+Nursing,Nursing programs only,,Nursing
+Nursing,Nursing programs only,,Family Nurse Practitioner
+Nursing,Nursing programs only,,Nurse Admin Leadership
+Nursing,Nursing programs only,,Nurse Midwifery
+Nursing,Nursing programs only,,Nursing Administration
+Nursing,Nursing programs only,,Nursing Education
+Nursing,Nursing programs only,,Nursing Exec. Org. Leadership
+Nursing,Nursing programs only,,Nursing Practice
+Nursing,Nursing programs only,,Pediatric Nurse Prac-PC PNP-PC
+Nursing,Nursing programs only,,Psychiatric Mental Health NP
+Allied Health & Clinical,Allied health and clinical programs,,Clinical Laboratory Sciences
+Allied Health & Clinical,Allied health and clinical programs,,Medical Laboratory Sciences
+Allied Health & Clinical,Allied health and clinical programs,,Medical Lab Technology
+Allied Health & Clinical,Allied health and clinical programs,,Physician Assistant Studies
+Allied Health & Clinical,Allied health and clinical programs,,Physical Therapy
+Allied Health & Clinical,Allied health and clinical programs,,Radiologic Sciences
+Allied Health & Clinical,Allied health and clinical programs,,Medical Imaging
+Allied Health & Clinical,Allied health and clinical programs,,Nuclear Medicine
+Allied Health & Clinical,Allied health and clinical programs,,Dental Hygiene
+Allied Health & Clinical,Allied health and clinical programs,,Dental Assisting
+Allied Health & Clinical,Allied health and clinical programs,,Emergency Medical Services
+Allied Health & Clinical,Allied health and clinical programs,,Emergency Med Svcs EMT-Basic
+Pharmacy,Pharmacy and pharmaceutical sciences,,Doctor of Pharmacy
+Pharmacy,Pharmacy and pharmaceutical sciences,,Pharmaceutical Sciences
+Pharmacy,Pharmacy and pharmaceutical sciences,,BS Pharmaceutical Sciences
+Pharmacy,Pharmacy and pharmaceutical sciences,,Toxicol & Pharmaceu Sciences
+Public Health,Public and community health programs,,Public Health
+Public Health,Public and community health programs,,Community Health
+Public Health,Public and community health programs,,Community Health Education
+Public Health,Public and community health programs,,Community Health Intervention
+Public Health,Public and community health programs,,School Health Education
+Public Health,Public and community health programs,,Maternal Child Health
+Public Health,Public and community health programs,,Population Health
+Public Health,Public and community health programs,,Health Education
+Health Administration & Policy,Health administration and policy programs,,Health Administration
+Health Administration & Policy,Health administration and policy programs,,Health Policy
+Health Administration & Policy,Health administration and policy programs,,Health Policy and Admin
+Health Administration & Policy,Health administration and policy programs,,Health Systems Svcs & Policy
+Health Administration & Policy,Health administration and policy programs,,General Healthcare Admin
+Health Administration & Policy,Health administration and policy programs,,Health Information Technology
+Health Sciences,Health sciences and biomedical programs,,Biomedical Sciences
+Health Sciences,Health sciences and biomedical programs,,Prof Health Sciences
+Health Sciences,Health sciences and biomedical programs,,Health Professions
+Health Sciences,Health sciences and biomedical programs,,Health Equity Sciences
+Health Sciences,Health sciences and biomedical programs,,Health Scholars
