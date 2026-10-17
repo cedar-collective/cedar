@@ -235,6 +235,10 @@ cedar_edge_note <- function(edges, which = c("graded", "enrolled")) {
     if (is.null(edges$last_graded)) return(NULL)
     # The edge is a validated term code by the time it reaches here; a value
     # add_term() cannot advance is a bug upstream, not a sentence to drop.
+    if (!grepl("^[0-9]{4}(10|60|80)$", as.character(edges$last_graded))) {
+      stop("[data-edges.R] cedar_edge_note(): last_graded must be a term code ",
+           "YYYYSS, got '", edges$last_graded, "'", call. = FALSE)
+    }
     nxt <- add_term(edges$last_graded)
     paste0(
       "Through ", fmt_term(edges$last_graded),

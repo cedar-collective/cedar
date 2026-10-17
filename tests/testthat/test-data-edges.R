@@ -126,7 +126,8 @@ test_that("a graded edge that cannot be advanced is an error, not a dropped sent
   # the edge. The edge is validated upstream, so a value it cannot advance is a
   # bug to surface, not a clause to omit.
   expect_error(
-    cedar_edge_note(list(last_graded = "nope", last_enrolled = 202680L), "graded")
+    cedar_edge_note(list(last_graded = "nope", last_enrolled = 202680L), "graded"),
+    "last_graded must be a term code"
   )
 })
 
