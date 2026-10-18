@@ -103,17 +103,6 @@ enrollmentProjectionsUI <- function(id) {
             ns("accuracy"), "Aftcast accuracy", multiple = TRUE,
             choices = c("Close", "Fair", "Poor", "Unrated")
           )
-        ),
-        column(
-          1,
-          tags$div(
-            class = "enrollment-projection-export",
-            downloadButton(
-              ns("download"), label = NULL, icon = icon("download"),
-              title = "Export filtered projections",
-              class = "btn-outline-secondary btn-sm"
-            )
-          )
         )
       ),
       checkboxInput(
@@ -919,25 +908,6 @@ enrollmentProjectionsServer <- function(id, bundles, load_bundle, programs) {
         )
       )
     })
-
-    output$download <- downloadHandler(
-      filename = function() {
-        paste0(
-          "cedar-enrollment-projections-", view()$meta$target_term, ".csv"
-        )
-      },
-      content = function(file) {
-        export <- view()$table %>%
-          dplyr::select(-recent_first_day, -recent_sections) %>%
-          dplyr::rename(
-            sections_to_plan = planning_sections,
-            seats_on_first_day = expected_first_day,
-            registrations = projected_demand,
-            basis = method
-          )
-        utils::write.csv(export, file, row.names = FALSE, na = "")
-      }
-    )
 
     # ---- Scenario sub-tab ---------------------------------------------------
     # Inputs in, feature call, render out. The arithmetic, the guards, and the

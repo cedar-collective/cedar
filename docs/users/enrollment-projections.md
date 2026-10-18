@@ -32,7 +32,7 @@ The page opens to **Always monitored**. Use **Target term**, **Course group**,
 **Department**, **Course**, **Stability**, and **Aftcast accuracy** to narrow the
 saved rows. The table expands to
 show every matching row and scrolls with the page. These controls do not fit or
-rerun a model. The download button exports the current filtered table. Expand
+rerun a model. Expand
 **How projections work and how to read the table** for an in-page methodology
 and column guide.
 
