@@ -651,20 +651,32 @@ projection_summary_sentence <- function(projections) {
     if (!is.finite(row$projected_classlist_total)) {
       return("Not enough comparable history to project this course.")
     }
+    count <- function(x) format(round(x), big.mark = ",")
+    bumped <- isTRUE(row$pressure_bump > 0)
+    first_day <- if (is.finite(row$projected_first_day_equivalent)) {
+      paste0(
+        " (about ", count(row$projected_first_day_equivalent),
+        if (bumped) paste0(" of the projected ", count(row$projected_classlist_total)) else "",
+        " in seats on the first day)"
+      )
+    } else ""
     plan <- if (!is.na(row$recommended_sections)) {
       paste0(
         if (isTRUE(row$adjusted_saturated_prior)) "Plan at least " else "Plan ",
         row$recommended_sections, " section",
-        if (row$recommended_sections == 1L) "" else "s", " (",
-        format(round(row$projected_first_day_equivalent), big.mark = ","),
-        " seats filled on the first day, ",
-        format(round(row$projected_classlist_total), big.mark = ","),
-        " registrations)."
+        if (row$recommended_sections == 1L) "" else "s", " for ",
+        count(row$planned_registrations), " registrations",
+        if (bumped) {
+          paste0(": ", count(row$projected_classlist_total),
+                 " projected plus a pressure bump of ", count(row$pressure_bump))
+        } else "",
+        first_day, "."
       )
     } else {
       paste0(
-        "Expect about ", format(round(row$projected_classlist_total), big.mark = ","),
-        " registrations; no section size is available to convert that to sections."
+        "Expect about ", count(row$projected_classlist_total), " registrations",
+        if (bumped) paste0(", ", count(row$planned_registrations), " with the pressure bump") else "",
+        "; no section size is available to convert that to sections."
       )
     }
     change <- if (is.finite(row$observed_baseline) && row$observed_baseline > 0) {
@@ -688,6 +700,12 @@ projection_summary_sentence <- function(projections) {
         ", so this is a floor."
       )
     } else ""
+    # A course full last term with no bump says why, so a reader does not
+    # take the missing bump for an oversight.
+    no_bump <- if (isTRUE(row$adjusted_saturated_prior) &&
+                   isFALSE(row$pressure_bump_applied)) {
+      paste0(" ", row$pressure_bump_note, ".")
+    } else ""
     fall <- if (isTRUE(row$adjusted_regime_alarm)) {
       paste0(
         " Enrollment in ", fmt_term(row$adjusted_preceding_term), " moved ",
@@ -702,8 +720,49 @@ projection_summary_sentence <- function(projections) {
       Poor = " Past forecasts for this course were more than 20% off; treat it as a rough scale.",
       " Too few past forecasts to say how reliable this is."
     )
-    paste0(plan, change, full, fall, trust)
+    paste0(plan, change, full, no_bump, fall, trust)
   }, character(1))
+}
+
+
+# What the pressure bump adds across the rows shown, and one sentence saying
+# so, so the page states how much it raised the plan. Rows without a
+# projection carry a zero bump and no sections, and are left out of the
+# section total.
+projection_pressure_bump_summary <- function(projections, share) {
+  if (!is.numeric(share) || length(share) != 1L || !is.finite(share)) {
+    stop("[enrollment-projections.R] The bundle's model_config has no ",
+         "pressure_bump_share.", call. = FALSE)
+  }
+  applied <- projections$pressure_bump_applied %in% TRUE
+  registrations <- sum(projections$pressure_bump[applied])
+  projected <- sum(projections$projected_classlist_total[applied])
+  sections <- sum(projections$pressure_bump_sections[applied], na.rm = TRUE)
+  n_courses <- sum(applied)
+  sentence <- if (n_courses == 0L) {
+    paste(
+      "No course shown gets a pressure bump: none was near full on the first",
+      "day in every recent same-season term with a first-day count."
+    )
+  } else {
+    paste0(
+      "The pressure bump adds ", format(round(registrations), big.mark = ","),
+      " registrations (", scales::percent(registrations / projected, accuracy = 0.1),
+      " of those courses' projections) and ", format(sections, big.mark = ","),
+      " section", if (sections == 1L) "" else "s", " across ", n_courses,
+      " of the ", nrow(projections), " courses shown. They were near full on ",
+      "the first day in every recent same-season term with a first-day count, ",
+      "so their registrations were capped by their seats. The bump is ",
+      scales::percent(share, accuracy = 1), ", or the students left waiting if ",
+      "that is more, and it will be measured from waitlists as they accumulate."
+    )
+  }
+  list(
+    n_courses = as.integer(n_courses),
+    registrations = as.numeric(registrations),
+    sections = as.integer(sections),
+    sentence = sentence
+  )
 }
 
 
@@ -939,13 +998,13 @@ build_enrollment_projection_view <- function(bundle, opt = list()) {
         is.finite(observed_baseline) & observed_baseline > 0,
         projected_classlist_total / observed_baseline - 1, NA_real_
       ),
-      seats_range = dplyr::if_else(
-        is.finite(projection_low_first_day_equivalent) &
-          is.finite(projection_high_first_day_equivalent),
+      # The range is in registrations, the unit sections are sized from.
+      demand_range = dplyr::if_else(
+        is.finite(projection_low) & is.finite(projection_high),
         paste0(
-          format(round(projection_low_first_day_equivalent), big.mark = ",", trim = TRUE),
+          format(round(projection_low), big.mark = ",", trim = TRUE),
           " to ",
-          format(round(projection_high_first_day_equivalent), big.mark = ",", trim = TRUE)
+          format(round(projection_high), big.mark = ",", trim = TRUE)
         ),
         NA_character_
       )
@@ -990,8 +1049,11 @@ build_enrollment_projection_view <- function(bundle, opt = list()) {
       course = subject_course,
       department,
       planning_sections = recommended_sections,
+      pressure_bump,
+      pressure_bump_sections,
+      pressure_bump_note,
       expected_first_day = projected_first_day_equivalent,
-      seats_range,
+      demand_range,
       change_vs_last,
       flags,
       attention,
@@ -1015,12 +1077,14 @@ build_enrollment_projection_view <- function(bundle, opt = list()) {
     ) %>%
     dplyr::left_join(history_summary$data, by = "course") %>%
     dplyr::select(
-      # The decision first: sections to plan, first-day seats and their range,
-      # registrations and their change on last term, the recent first days and
+      # The decision first: sections to plan, how much of them the pressure
+      # bump added, the registrations they are sized from with their range and
+      # change on last term, first-day seats, the recent first days and
       # sections, and plain-language flags. The evidence axes follow; the
       # method and its evidence are for the course detail.
-      course, department, planning_sections, expected_first_day, seats_range,
-      projected_demand, change_vs_last,
+      course, department, planning_sections, pressure_bump,
+      pressure_bump_sections, pressure_bump_note, projected_demand,
+      demand_range, change_vs_last, expected_first_day,
       recent_first_day, recent_sections, recent_terms, flags,
       stability, stability_reason, depth, depth_reason,
       accuracy, accuracy_reason,
@@ -1049,6 +1113,9 @@ build_enrollment_projection_view <- function(bundle, opt = list()) {
       group_id = group_id,
       n_rows = nrow(projections),
       n_attention = sum(projections$attention),
+      pressure_bump = projection_pressure_bump_summary(
+        projections, bundle$model_config$pressure_bump_share
+      ),
       summary_history_columns = history_summary$columns,
       bundle_path = attr(bundle, "bundle_path") %||% NA_character_
     ),
@@ -1486,6 +1553,11 @@ format_enrollment_projection_preview <- function(bundle, courses = NULL) {
       Course = subject_course,
       Target = target_term_label,
       `Class-list demand` = projection_preview_integer(projected_classlist_total),
+      `Pressure bump` = dplyr::if_else(
+        pressure_bump > 0, paste0("+", projection_preview_integer(pressure_bump)), "--"
+      ),
+      Planned = projection_preview_integer(planned_registrations),
+      `Planned sections` = projection_preview_integer(recommended_sections),
       `First-day seats` = projection_preview_integer(projected_first_day_equivalent),
       Method = method_label,
       Aftcasts = projection_preview_integer(n_backtests),
@@ -1534,6 +1606,7 @@ format_enrollment_projection_preview <- function(bundle, courses = NULL) {
       `Regime check` = dplyr::if_else(
         adjusted_regime_alarm %in% TRUE, "Review", "--"
       ),
+      `Pressure bump basis` = pressure_bump_note,
       Recommendation = recommendation
     )
   history_table <- history %>%
@@ -1586,7 +1659,8 @@ format_enrollment_projection_preview <- function(bundle, courses = NULL) {
   current_lines <- projection_preview_markdown_table(
     current_table,
     right_align = c(
-      "Class-list demand", "First-day seats", "Aftcasts", "Raw WAPE",
+      "Class-list demand", "Pressure bump", "Planned", "Planned sections",
+      "First-day seats", "Aftcasts", "Raw WAPE",
       "Uncensored WAPE", "Bias", "Spine", "Adjusted"
     )
   )

@@ -70,9 +70,44 @@ holding a seat when classes began, reconstructed from each student's
 registration and drop dates. A course counts as full when 98% or more of its
 seats were taken that day. Census comes on the 15th day of classes (the third
 Friday), after three weeks of drops, so a course that turned students away on
-day one can read 95% at census. Sections
-are planned for first-day seats for the same reason: everyone in the room on
-day one needs one. Some terms' class lists were exported without status dates,
+day one can read 95% at census.
+
+### Sections are planned for registrations
+
+Sections are planned for everyone expected to register, not only the students
+expected in their seats on the first day. Registrations run about 8% above the
+first day, because a student who drops early frees a seat someone else takes.
+That margin is deliberate: running short of seats costs more than an empty
+one. In past terms, planning for first-day seats alone would have fallen short
+of the seats actually filled on day one in 61% of courses; planning for
+registrations, in 32%. Expected first-day seats are shown beside the plan.
+
+### The pressure bump
+
+A course that is always full turns students away, so last year's registrations
+undercount what it would draw. When near-full courses were given 10% or more
+seats, the new seats filled; when their seats were held flat, registrations
+stayed flat; when seats were cut, registrations fell by the cut.
+
+So a course near full on the first day in every recent same-season term with a
+first-day count (at least two of the last three) is planned for **10% more**
+than it registered last time, or for the students left waiting if that is
+more. It is not bumped if its feeder courses' enrollment fell 5% or more in the
+term just finished. When that term has not happened yet, the feeder check
+cannot run and the course's note says to recheck.
+
+The bump is an allowance, not a measurement, and it is always shown
+separately:
+
+- The **Pressure bump** column gives the registrations added and, beneath them,
+  the sections that adds.
+- The line above the table totals what the bump adds across the courses shown.
+- A course's detail says why it got the bump, or why not.
+- The registration forecast and its accuracy never include it.
+
+As waitlists accumulate, the flat 10% will be replaced by a measured allowance.
+
+Some terms' class lists were exported without status dates,
 so their first day is unknown; **Admin > Data & Usage** lists which. Those terms
 show a dash and are never judged full or not full; they are not filled in from
 census.
@@ -107,9 +142,10 @@ The table is sized to fit a laptop window:
 | Column | Meaning |
 |---|---|
 | **Course** | The course, with its department beneath. |
-| **Sections** | Day-1 seats divided by the section size (the target schedule's average when it exists, otherwise the recent median), rounded up. "Plan at least" when last term filled its seats. |
-| **Seats (day 1)** | Students expected to hold a seat when classes begin: registrations times the share of this course's registrants still enrolled on the first day in recent terms. Beneath it, the range past forecasts for this course usually landed in. |
-| **Registrations** | Everyone expected to sign up, including students who drop before or after classes begin: the class-list demand the model forecasts. Beneath it, the change on the last same-season term's registrations. |
+| **Sections** | Registrations plus any pressure bump, divided by the section size (the target schedule's average when it exists, otherwise the recent median), rounded up. "Plan at least" when last term filled its seats. |
+| **Pressure bump** | Registrations added to the plan because the course was near full on the first day in every recent same-season term, and beneath them the sections that adds. A dash means no bump; the course's detail says why. |
+| **Registrations** | Everyone expected to sign up, including students who drop before or after classes begin: the class-list demand the model forecasts, and the number sections are planned for. Beneath it, the range past forecasts for this course usually landed in and the change on the last same-season term's registrations. |
+| **Seats (day 1)** | Students expected to hold a seat when classes begin: registrations times the share of this course's registrants still enrolled on the first day in recent terms. Context, not the planning number. |
 | **First day / sections** | The last four same-season terms: students enrolled on the first day over the sections scheduled. A dash means the course was not offered, or the first day cannot be reconstructed; hover for which. |
 | **Flags** | Plain-language reasons to look: near full last term (90% of seats filled on the first day), students left waiting, a big change in the term just finished, a volatile history, past forecasts well off, or the two candidates disagreeing. |
 | **Stability** | Stable, Moderate, Volatile, or Unrated: whether the course is predictable from its own history at all, measured with no model |

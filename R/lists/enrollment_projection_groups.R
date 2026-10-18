@@ -9,6 +9,14 @@
 # Groups are monitoring scopes. Projection rows use the named market and course;
 # campus and part-term allocation remains in saved delivery components.
 
+# 0.23.0 (schema 22): planning sections, the seat gap and the recommendation
+# are sized for registrations, not expected first-day seats. Registrations run
+# a median 8% above the first day, and that margin is kept on purpose: sized on
+# the first day, 61% of 207 past aftcasts planned fewer seats than were filled
+# on day one; sized on registrations, 32%. A course near full in every recent
+# same-season term is planned for a pressure bump on top (10%, or the students
+# left waiting if more) unless its feeders just fell; the forecast itself is
+# unchanged.
 # 0.22.0: the saturation floor is the spine plus the students still waiting who
 # are on no campus's class list in the market. It was first-day enrollment
 # plus the waitlist, which the early-drop churn absorbed (ISSUES.md I27).
@@ -21,8 +29,8 @@
 # saturation floor and two Fall-enrollment deltas and must beat the spine on
 # rolling aftcasts. (0.19.0 introduced rolling selection and the
 # occupancy-based capacity signal.)
-CEDAR_ENROLLMENT_PROJECTION_MODEL_VERSION <- "0.22.0"
-CEDAR_ENROLLMENT_PROJECTION_SCHEMA_VERSION <- 21L
+CEDAR_ENROLLMENT_PROJECTION_MODEL_VERSION <- "0.23.0"
+CEDAR_ENROLLMENT_PROJECTION_SCHEMA_VERSION <- 22L
 # Capacity is reached at CEDAR_FULL_FILL first-day fill and a prior term is
 # saturated at CEDAR_NEAR_FULL_FILL; both levels live in R/lists/seat_fill.R.
 # The first term the model reads history from (settings.csv

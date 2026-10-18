@@ -199,10 +199,54 @@ seat. Projection WAPE, signed bias, and method selection all use
 aftcast for historical lifecycle comparison, but they are not alternative
 scoring targets.
 
-First-day enrollment is what seats are planned for: everyone in the room on day
-one needs one. For each aftcast or current projection, CEDAR estimates a
-leakage-safe same-season retention rate from earlier terms only, skipping any
-term whose first day cannot be reconstructed:
+Sections and seat gaps are planned for registrations, not first-day seats
+(0.23.0): projected registrations plus any pressure bump (below). Registrations run a median 8% above the first day, because a
+student who drops early frees a seat someone else takes, and the margin is kept
+on purpose: running short of seats costs more than an empty one. Over 207 past
+aftcasts with a known first day, sizing on the first day would have planned
+fewer seats than were filled on day one 61% of the time; sizing on
+registrations, 32%, with seats short (3,877) and spare (3,867) in balance.
+Most of those course-terms filled their seats, so the first day undercounts
+what they needed; see `forecasting-lessons.md`.
+
+### Pressure bump
+
+A course near full on the first day (`saturation_fill_threshold`, 90%) in every
+one of its last `pressure_bump_window` (3) same-season offerings with a known
+first day, at least `pressure_bump_min_terms` (2) of them, is planned for more
+than it registered last time:
+
+```text
+unserved          = max(pressure_bump_share x spine, students left waiting)
+pressure_bump     = max(0, unserved - floor already in the published projection)
+planned_registrations = projected_classlist_total + pressure_bump
+recommended_sections  = ceiling(planned_registrations / reference_section_size)
+```
+
+`pressure_bump_share` is 0.10. The bump is withheld when the course's feeder
+courses' enrollment fell `pressure_bump_feeder_decline` (5%) or more in the term
+just finished; when that term is not observed yet (the two-step horizon), the
+check cannot run, the bump stands, and the note says to recheck. A term whose
+first day is unknown is skipped, never read as full or not full.
+
+The reason is that a near-full course's registrations follow its seats: given
+10% or more seats they filled them (89 course-terms), held flat they stayed
+flat (139), cut they fell by the cut (51). The 10% is an allowance, not a
+measurement, and every row says which. `projection_pressure_bump()` writes
+`pressure_judged_terms`, `pressure_full_terms`, `pressure_bump_applied`,
+`pressure_bump`, and `pressure_bump_note` (why it applies or why not);
+`add_projection_recommendations()` adds `planned_registrations` and
+`pressure_bump_sections` (the sections it adds). The forecast, WAPE and the
+accuracy axes never include it, because a full course's registrations are
+capped and would score any allowance as over-projection.
+`validate_pressure_bump_rows()` rejects a bundle whose plan is not projection
+plus bump or whose sections are not sized from the plan. The page states the
+total above the table (`projection_pressure_bump_summary()`).
+
+Expected first-day seats are still shown beside the plan, as context. For each
+aftcast or current projection, CEDAR estimates a leakage-safe same-season
+retention rate from earlier terms only, skipping any term whose first day
+cannot be reconstructed:
 
 ```text
 first_day_retention_rate = sum(first_day_enrl) / sum(classlist_total)
@@ -212,9 +256,8 @@ projected_first_day_equivalent = projected_classlist_total
 
 The default uses up to four prior same-season terms with a known first day and
 requires two. This converts gross registration demand into expected first-day
-occupancy; it does not
-change the forecast target, determine whether registration was constrained, or
-reduce the seats recommended for registration. The target term's class-list snapshot is
+occupancy; it does not change the forecast target, determine whether
+registration was constrained, or set the sections recommended. The target term's class-list snapshot is
 kept outside training and supplies `target_classlist_total_to_date`,
 `target_registered_now`, and drop counts to date. DESR supplies the schedule and
 capacity only; its `total_enrl` is not a projection input or live-demand check.
@@ -592,6 +635,17 @@ bundle. They must not reproduce a model, backtest, pressure calculation, or
 recommendation pipeline.
 
 ## Saved Bundle
+
+Schema 22 (model 0.23.0) sizes `recommended_sections`, `seat_gap`,
+`projected_over_capacity`, the capacity notes, and the recommendation from
+`planned_registrations` (registrations plus the pressure bump) instead of
+expected first-day seats; `projected_first_day_equivalent` and its range columns
+are unchanged and shown as context. Published rows gain
+`pressure_judged_terms`, `pressure_full_terms`, `pressure_bump_applied`,
+`pressure_bump`, `pressure_bump_note`, `planned_registrations`, and
+`pressure_bump_sections`; candidates gain `feeder_change_rate` and
+`feeder_check`, published as `adjusted_feeder_change_rate` and
+`adjusted_feeder_check`.
 
 Model 0.22.0 keeps schema 21. Its `floor_uplift` is the spine-unit floor, and
 `waitlisted_prior` counts only students on no campus's class list in the

@@ -837,11 +837,12 @@ test_that("an unavailable target schedule produces a planning recommendation", {
   expect_true(result$adjusted_saturated_prior)
 })
 
-test_that("planning sections are sized from expected first-day enrollment, not census or ever-registered demand", {
+test_that("planning sections are sized from projected registrations, not first-day seats or census", {
   # 100 students were ever registered, 90 held seats on the first day, and 60
-  # were left at census. Sections follow the 90: everyone in the room on day
-  # one needs a seat. With 32-seat sections the three readings disagree --
-  # census would plan 2 sections and the ever-registered headline 4.
+  # were left at census. Sections follow the 100 (plus any pressure bump): the
+  # margin above the first day is kept on purpose, because running short of
+  # seats costs more than an empty one (0.23.0). With 32-seat sections the
+  # three readings disagree -- the first day would plan 3 sections and census 2.
   history <- projection_test_history(
     c(100, 100, 100), terms = c(202180L, 202280L, 202380L)
   ) %>% dplyr::mutate(first_day_enrl = 90, census_enrl = 60, registered = 60)
@@ -881,9 +882,119 @@ test_that("planning sections are sized from expected first-day enrollment, not c
   expect_equal(result$projected_classlist_total, 100)
   expect_equal(result$first_day_retention_rate, 0.9)
   expect_equal(result$projected_first_day_equivalent, 90)
-  # ceiling(90 / 32) = 3; census (60) would say 2, the 100 headline 4.
-  expect_equal(result$recommended_sections, 3L)
-  expect_equal(result$recommendation, "Plan 3 section(s)")
+  # ceiling(100 / 32) = 4; the first day (90) would say 3, census (60) 2.
+  expect_equal(result$recommended_sections, 4L)
+  expect_equal(result$recommendation, "Plan 4 section(s)")
+  # 90 of 96 seats taken on both judged first days is near full, so the plan
+  # carries a 10-student pressure bump; ceiling(110 / 32) is still 4, and the
+  # forecast is untouched.
+  expect_true(result$pressure_bump_applied)
+  expect_equal(result$pressure_bump, 10)
+  expect_equal(result$planned_registrations, 110)
+  expect_equal(result$pressure_bump_sections, 0L)
+})
+
+test_that("an always-full course gets a pressure bump on its plan, never on its forecast", {
+  # Three Falls of 200 registrations against 200 seats. First-day fill, not
+  # registrations, decides near full: 190, 196 and 180 seated are 95%, 98%
+  # and 90%.
+  history <- projection_test_history(
+    c(200, 200, 200), terms = c(202180L, 202280L, 202380L)
+  ) %>% dplyr::mutate(first_day_enrl = c(190, 196, 180))
+  sections <- tibble::tibble(
+    market_id = "abq_ea_course_market", subject_course = "TEST 101",
+    term = c(202180L, 202280L, 202380L), term_type = "fall",
+    scheduled_capacity = 200
+  )
+  row <- tibble::tibble(
+    market_id = "abq_ea_course_market", subject_course = "TEST 101",
+    term_type = "fall", target_term = 202480L, method_id = "seasonal_last",
+    observed_baseline = 200, projected_classlist_total = 200,
+    adjusted_waitlisted_prior = 0L, adjusted_floor_uplift = 0,
+    adjusted_preceding_term = 202410L, adjusted_feeder_check = "measured",
+    adjusted_feeder_courses = "FEED 1", adjusted_feeder_change_rate = 0.02
+  )
+  bump <- function(r = row, h = history) {
+    projection_pressure_bump(h, sections, r)
+  }
+
+  full <- bump()
+  expect_true(full$pressure_bump_applied)
+  expect_equal(full$pressure_judged_terms, 3L)
+  expect_equal(full$pressure_full_terms, 3L)
+  expect_equal(full$pressure_bump, 20)
+  expect_match(full$pressure_bump_note, paste0(
+    "^Pressure bump \\+20: near full on the first day in every recent Fall ",
+    "with a first-day count \\(Fall 2021, Fall 2022, Fall 2023\\)"
+  ))
+  expect_match(full$pressure_bump_note, "Feeder courses moved \\+2\\.0% in Spring 2024\\.$")
+
+  # More students left waiting than 10%: the bump is the waiting count.
+  waiting <- bump(dplyr::mutate(row, adjusted_waitlisted_prior = 31L))
+  expect_equal(waiting$pressure_bump, 31)
+  expect_match(waiting$pressure_bump_note, "planned for the 31 students left waiting")
+
+  # A floor the published method already added counts toward the bump.
+  floored <- bump(dplyr::mutate(
+    row, method_id = "spine_adjusted", adjusted_waitlisted_prior = 12L,
+    adjusted_floor_uplift = 12, projected_classlist_total = 212
+  ))
+  expect_equal(floored$pressure_bump, 8)
+
+  # One judged Fall below the near-full line is not always full.
+  roomy <- bump(h = dplyr::mutate(history, first_day_enrl = c(190, 196, 170)))
+  expect_false(roomy$pressure_bump_applied)
+  expect_equal(roomy$pressure_bump, 0)
+  expect_match(roomy$pressure_bump_note, "^No pressure bump: Fall 2023 filled 85\\.0% of its seats")
+
+  # A Fall with no first-day count is skipped, never read as full or not
+  # full; two judged Falls are enough, one is not.
+  gap <- bump(h = dplyr::mutate(history, first_day_enrl = c(NA, 196, 180)))
+  expect_true(gap$pressure_bump_applied)
+  expect_equal(gap$pressure_judged_terms, 2L)
+  thin <- bump(h = dplyr::mutate(history, first_day_enrl = c(NA, NA, 180)))
+  expect_false(thin$pressure_bump_applied)
+  expect_match(
+    thin$pressure_bump_note,
+    "1 of the last 3 Fall offerings has a first-day count \\(Fall 2023\\), and the bump needs 2"
+  )
+  new_course <- bump(h = dplyr::filter(history, term == 202380L))
+  expect_false(new_course$pressure_bump_applied)
+  expect_match(
+    new_course$pressure_bump_note,
+    "only 1 Fall offering on record, and the bump needs 2 with a first-day count"
+  )
+
+  # Feeders that just fell 5% or more cancel it; feeders not observed yet do
+  # not, and the note says to recheck.
+  fell <- bump(dplyr::mutate(row, adjusted_feeder_change_rate = -0.08))
+  expect_false(fell$pressure_bump_applied)
+  expect_match(fell$pressure_bump_note, "but feeder courses moved -8\\.0% in Spring 2024")
+  unseen <- bump(dplyr::mutate(
+    row, adjusted_feeder_check = "term_not_observed",
+    adjusted_feeder_courses = NA_character_, adjusted_feeder_change_rate = NA_real_
+  ))
+  expect_true(unseen$pressure_bump_applied)
+  expect_match(unseen$pressure_bump_note, "Feeder courses in Spring 2024 are not observed yet")
+})
+
+test_that("the bundle validator rejects a plan that is not its projection plus its bump", {
+  rows <- tibble::tibble(
+    projected_classlist_total = c(100, NA), pressure_bump = c(10, 0),
+    pressure_bump_applied = c(TRUE, FALSE), planned_registrations = c(110, NA),
+    reference_section_size = 25, recommended_sections = c(5L, NA)
+  )
+  expect_silent(validate_pressure_bump_rows(rows, "test"))
+  message <- "not its projection plus its pressure bump"
+  expect_error(validate_pressure_bump_rows(
+    dplyr::mutate(rows, planned_registrations = c(100, NA)), "test"
+  ), message)
+  expect_error(validate_pressure_bump_rows(
+    dplyr::mutate(rows, recommended_sections = c(4L, NA)), "test"
+  ), message)
+  expect_error(validate_pressure_bump_rows(
+    dplyr::mutate(rows, pressure_bump_applied = c(FALSE, FALSE)), "test"
+  ), message)
 })
 
 test_that("the pressure screen reads first-day fill, so neither seat churn nor census drops decide pressure", {
@@ -1793,6 +1904,9 @@ test_that("the administrator summary says the decision in one sentence and flags
   row <- tibble::tibble(
     subject_course = "TEST 101", term_type = "spring",
     projected_classlist_total = 2179, projected_first_day_equivalent = 2080,
+    pressure_bump = 218, pressure_bump_applied = TRUE,
+    pressure_bump_note = "Pressure bump +218: near full in every recent Spring",
+    planned_registrations = 2397,
     recommended_sections = 99L, observed_baseline = 2179,
     adjusted_saturated_prior = TRUE, adjusted_prior_first_day_fill = 0.988,
     adjusted_waitlisted_prior = 15L, adjusted_regime_alarm = FALSE,
@@ -1800,7 +1914,24 @@ test_that("the administrator summary says the decision in one sentence and flags
     stability = "Moderate", accuracy = "Fair", methods_disagree = FALSE
   )
   sentence <- projection_summary_sentence(row)
-  expect_match(sentence, "^Plan at least 99 sections \\(2,080 seats filled on the first day, 2,179 registrations\\)\\.")
+  # The plan says how much of it is the pressure bump, and the first-day
+  # seats are read off the projection, not the bumped plan.
+  expect_match(sentence, paste0(
+    "^Plan at least 99 sections for 2,397 registrations: 2,179 projected plus ",
+    "a pressure bump of 218 \\(about 2,080 of the projected 2,179 in seats on ",
+    "the first day\\)\\."
+  ))
+  expect_false(grepl("No pressure bump", sentence))
+
+  # A full course denied the bump says why.
+  denied <- dplyr::mutate(
+    row, pressure_bump = 0, pressure_bump_applied = FALSE,
+    planned_registrations = 2179,
+    pressure_bump_note = "No pressure bump: feeder courses moved -9% in Fall 2026"
+  )
+  denied_sentence <- projection_summary_sentence(denied)
+  expect_match(denied_sentence, "^Plan at least 99 sections for 2,179 registrations \\(about 2,080 in seats on the first day\\)\\.")
+  expect_match(denied_sentence, "so this is a floor\\. No pressure bump: feeder courses moved -9% in Fall 2026\\.")
   expect_match(sentence, "That is last year's level\\.")
   # One decimal: whole percents turned 98.8% into "99%" and read as full.
   expect_match(sentence, "filled 98\\.8% of its seats on the first day with 15 students waiting, so this is a floor\\.")
@@ -1810,7 +1941,10 @@ test_that("the administrator summary says the decision in one sentence and flags
   moved <- dplyr::mutate(
     row, adjusted_saturated_prior = FALSE, adjusted_waitlisted_prior = 0L,
     adjusted_regime_alarm = TRUE, adjusted_preceding_term_change = 0.91,
-    projected_classlist_total = 2400, stability = "Volatile", accuracy = "Poor"
+    projected_classlist_total = 2400, pressure_bump = 0,
+    pressure_bump_applied = FALSE, planned_registrations = 2400,
+    pressure_bump_note = "No pressure bump: Fall 2026 filled 80.0% of its seats",
+    stability = "Volatile", accuracy = "Poor"
   )
   expect_match(projection_summary_sentence(moved), "^Plan 99 sections")
   expect_match(projection_summary_sentence(moved), "That is \\+10% on last Spring\\.")
@@ -1828,13 +1962,28 @@ test_that("the view adds a needs-a-look filter without changing a number", {
   bundle <- projection_fixture_bundle(202110L, 202080L, 202080L)
   view <- build_enrollment_projection_view(bundle, list(group_id = "all_saved"))
 
-  expect_true(all(c("planning_sections", "expected_first_day", "seats_range",
+  expect_true(all(c("planning_sections", "expected_first_day", "demand_range",
                     "change_vs_last", "flags", "recent_first_day", "recent_sections",
                     "recent_terms",
                     "summary_sentence", "attention") %in% names(view$table)))
   expect_equal(view$table$expected_first_day, view$projections$projected_first_day_equivalent)
   expect_equal(view$table$planning_sections, view$projections$recommended_sections)
   expect_equal(view$meta$n_attention, sum(view$projections$attention))
+
+  # The range is in registrations, the unit sections are sized from. The
+  # fixture has too few aftcasts for an interval, so one is set on row 1;
+  # its first-day range is narrower and must not be what the page shows.
+  ranged_bundle <- bundle
+  ranged_bundle$projections$projection_low[[1]] <- 1100
+  ranged_bundle$projections$projection_high[[1]] <- 1300
+  ranged_bundle$projections$projection_low_first_day_equivalent[[1]] <- 990
+  ranged_bundle$projections$projection_high_first_day_equivalent[[1]] <- 1170
+  ranged <- build_enrollment_projection_view(
+    ranged_bundle, list(group_id = "all_saved")
+  )
+  course <- ranged_bundle$projections$subject_course[[1]]
+  expect_equal(ranged$table$demand_range[ranged$table$course == course], "1,100 to 1,300")
+  expect_true(all(is.na(ranged$table$demand_range[ranged$table$course != course])))
 
   flagged <- build_enrollment_projection_view(
     bundle, list(group_id = "all_saved", attention_only = TRUE)
