@@ -57,9 +57,12 @@ while earned credit counts only once. Coverage and review must gate planning use
 
 `build_degree_roadmap(catalog, roadmaps, catalog_id, math_start, english_start)`
 selects one program plus its entry routes. `build_degree_roadmap_view()` adds
-presentation text; `cedar_semester_roadmap()` renders the same payload as an HTML
-semester board. Shared CSS/JavaScript draw connections and handle course focus;
-the browser makes no scheduling decisions. `format_degree_explorer_preview()`
+presentation text; `degree_semester_board()` (`R/modules/degree-explorer.R`)
+renders the same payload as an HTML semester board. `www/cedar-roadmap.js` draws
+connections and handles hover and focus; it makes no scheduling decisions and
+does not walk the graph: `get_degree_chain_metrics()` exports each course's
+`upstream_ids` and `downstream_ids`, and `qualifying_ids` names a course-count
+condition's pool. `format_degree_explorer_preview()`
 formats that production payload for analysts without Shiny.
 
 After scheduling, `assign_degree_roadmap_rows(nodes)` adds a positive integer
@@ -162,9 +165,11 @@ Hover and keyboard focus preview named upstream/downstream chains and their
 course labels locally, without a history request. The floating preview is
 hoverable, dismisses with Escape and restores the last clicked chain on leave.
 Count conditions and unresolved alternatives retain their distinct semantics.
-Course clicks open a native modal dialog with enrollment history first, catalog
-links at the top and complete requirement evidence below. Escape or either close control returns focus to the
-tile without scrolling the page. Semester headers use identical fixed tracks.
+Course clicks open the standard CEDAR modal (`cedar_info_modal(scrollable = TRUE)`),
+rendered by the server from `degree_roadmap_tile_detail(view, node_id)`: catalog
+links at the top, enrollment history first and complete requirement evidence
+below. Escape or either close control returns focus to the tile without
+scrolling the page. Semester headers use identical fixed tracks.
 
 `get_course_planning_history(sections, students, subject_courses, edges)` returns
 `pressure` at course/campus/college/part-term/term grain, plus `terms`, seasonal
@@ -187,10 +192,11 @@ section-start or pull dates withhold the whole group's first-day count. Banner's
 current-status-only dates can overcount late additions that later dropped.
 
 `build_degree_course_history()` resolves explicit course components and assembles
-one typed table. `cedar_degree_history_table()` uses the shared Reactable theme,
-numeric counts/rates, course/campus filters and `cedar_pot_coldef()`. Source-covered
-absence is Not offered (zero scheduled seats); missing coverage stays unknown.
-`cedar_degree_course_history(history, table_id)` provides the table output slot
+one typed table. `degree_history_table()` uses the shared Reactable theme,
+`cedar_count_coldef()` / `cedar_percent_coldef()`, course/campus filters and
+`cedar_pot_coldef()`. Source-covered absence is Not offered (zero scheduled
+seats); missing coverage stays unknown.
+`degree_course_history_ui(history, table_id)` provides the table output slot
 and explanation; the module renders `course_history_table` separately.
 Unresolved course groups and new identifiers show explicit missing states.
 History is lazy and cached per clicked program/node in the Shiny session.

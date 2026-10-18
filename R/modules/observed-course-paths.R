@@ -6,7 +6,7 @@ observedCoursePathsUI <- function(id, campuses) {
     filter_bar("Course paths", "Use delivery campuses and the number of observed enrolled terms to set the view.",
       fluidRow(
         column(6, selectizeInput(ns("campus"), "Delivery campus", choices = campuses,
-          selected = intersect(CEDAR_CAMPUS_DEFAULT, campuses), multiple = TRUE)),
+          selected = intersect(CEDAR_CAMPUS_DEFAULT, unname(campuses)), multiple = TRUE)),
         column(3, numericInput(ns("max_terms"), "Enrolled terms", value = 8, min = 1, max = 16)),
         column(3, actionButton(ns("button"), "Show course paths", class = "btn-primary")))),
     cedar_loading_overlay(id, "button", report_type = "degree-paths", fresh_default = 5,
@@ -34,15 +34,15 @@ observedCoursePathsServer <- function(id, students, population, description, edg
     output$path_courses <- reactable::renderReactable({
       req(paths())
       display <- degree_path_course_table(paths(), input$detail_group %||% "all") %>%
-        dplyr::select(campus, relative_term, group_label, subject_course, n_students, n_eligible, pct_students)
+        select(campus, relative_term, group_label, subject_course, n_students, n_eligible, pct_students)
       reactable::reactable(display, theme = cedar_tbl_theme, compact = TRUE, searchable = TRUE,
         defaultPageSize = 20, columns = list(
           campus = reactable::colDef(name = "Campus"),
           relative_term = reactable::colDef(name = "Enrolled term", format = reactable::colFormat(digits = 0)),
           group_label = reactable::colDef(name = "Course group"),
           subject_course = reactable::colDef(name = "Course"),
-          n_students = reactable::colDef(name = "Students"),
-          n_eligible = reactable::colDef(name = "Students at term"),
+          n_students = cedar_count_coldef("Students"),
+          n_eligible = cedar_count_coldef("Students at term"),
           pct_students = reactable::colDef(name = "% at term", format = reactable::colFormat(digits = 1))))
     })
 

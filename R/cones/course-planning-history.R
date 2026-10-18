@@ -13,9 +13,9 @@ get_course_planning_history <- function(sections, students, subject_courses, edg
       "crn", "student_id", "registration_status_code", "registration_date", "as_of_date"))
   for (name in names(required)) {
     missing <- setdiff(required[[name]], names(if (name == "sections") sections else students))
-    if (length(missing)) stop("Course history ", name, " missing: ", paste(missing, collapse = ", "))
+    if (length(missing)) stop("[course-planning-history.R] Course history ", name, " missing: ", paste(missing, collapse = ", "))
   }
-  if (!is.finite(min_n) || min_n < 10) stop("Course history minimum cell size must be at least 10")
+  if (!is.finite(min_n) || min_n < 10) stop("[course-planning-history.R] Course history minimum cell size must be at least 10")
   year <- as.integer(substr(as.character(edge), 1, 4))
   possible <- as.integer(names(make_term_sequence(year - 3L, year)))
   window <- tail(possible[possible <= edge], 9L)
@@ -94,14 +94,14 @@ get_course_planning_history <- function(sections, students, subject_courses, edg
 #' Recent lower-level Gen Ed options for a season, retaining the first-day grain.
 #' History is supplied by the feature; this cone never calls another cone.
 get_gen_ed_planning_options <- function(sections, history, gen_ed, season, slot_credits) {
-  if (length(season) != 1L || !season %in% c("fall", "spring")) stop("Select a fall or spring suggestion season")
-  if (length(slot_credits) != 1L || !is.finite(slot_credits) || slot_credits <= 0) stop("Supply the usual allowance course credits")
+  if (length(season) != 1L || !season %in% c("fall", "spring")) stop("[course-planning-history.R] Select a fall or spring suggestion season")
+  if (length(slot_credits) != 1L || !is.finite(slot_credits) || slot_credits <= 0) stop("[course-planning-history.R] Supply the usual allowance course credits")
   required <- c("campus", "college", "subject_course", "term", "part_term", "crn",
     "course_title", "credits_min", "credits_max", "level", "is_topics", "status")
   missing <- setdiff(required, names(sections))
-  if (length(missing)) stop("Gen Ed options missing: ", paste(missing, collapse = ", "))
-  if (history$state != "ready") stop("Gen Ed options need ready course history")
-  if (!all(c("subject_course", "area_label") %in% names(gen_ed))) stop("Gen Ed options need area membership")
+  if (length(missing)) stop("[course-planning-history.R] Gen Ed options missing: ", paste(missing, collapse = ", "))
+  if (history$state != "ready") stop("[course-planning-history.R] Gen Ed options need ready course history")
+  if (!all(c("subject_course", "area_label") %in% names(gen_ed))) stop("[course-planning-history.R] Gen Ed options need area membership")
   keys <- c("campus", "college", "subject_course", "term", "part_term")
   rows <- history$pressure %>% add_term_type_col("term") %>% filter(term_type == season)
   # CAMPUS_ROLLUP: this is catalog membership, not an enrollment aggregate.

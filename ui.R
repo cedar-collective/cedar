@@ -886,7 +886,7 @@ nav_panel(
     ])),
     program_choices = cedar_pathways_choices$program_choices,
     dept_choices = cedar_pathways_choices$dept_choices,
-    course_campus_choices = sort(unique(cedar_students$campus))
+    course_campus_choices = cedar_campus_choices(cedar_students)
   )
 ), # end Pathways nav_panel
 

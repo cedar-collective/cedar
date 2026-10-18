@@ -13,6 +13,11 @@
   --juniper-blue:       #4D6FA8;   /* accent / action / focus                 */
   --juniper-blue-dark:  #344D77;   /* active buttons, links                   */
   --juniper-blue-light: #A8BDD9;   /* badges, chips, highlights               */
+  /* plum — CEDAR_PALETTE slot 7, for marks that must read as distinct from
+     both green and blue (Degree Explorer conditions and downstream chains). */
+  --cedar-plum:         #8B5A9C;   /* lines, borders, outlines                */
+  --cedar-plum-dark:    #695082;   /* readable plum text, 6.8:1 on white      */
+  --cedar-plum-bg:      #F1EAF5;   /* plum surface                            */
   /* action-green — THE action colour. Every button that starts work uses it:
      the per-tab fetch buttons ("Run", "Get Stats", "Find Seats") and the
      scope-setting commit (Pathways "Define Population") alike. They are the

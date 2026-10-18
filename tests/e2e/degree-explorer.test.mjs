@@ -24,9 +24,11 @@ const choose = async (id, value) => {
   if (!rendered) throw new Error(`Roadmap did not redraw after ${id} changed`);
   await waitForIdle(page);
 };
+// The popup is the standard CEDAR modal, rendered by the server for each click.
+const MODAL = '#shiny-modal .modal-content';
 const waitForPopup = async id => {
-  await waitForSelector(page, '.cedar-roadmap-dialog[open]');
-  await waitForSelector(page, `.cedar-roadmap-dialog [data-history-node="${id}"]`, { timeout: 60000 });
+  await waitForSelector(page, `#shiny-modal.show [data-dialog-node="${id}"]`);
+  await waitForSelector(page, `#shiny-modal [data-history-node="${id}"]`, { timeout: 60000 });
   if (await page.$eval(`[data-history-node="${id}"]`, el => el.dataset.historyState === 'ready')) {
     await waitForSelector(page, '#degree_explorer-course_history_table .rt-table', { timeout: 60000 });
     await waitForIdle(page);
@@ -43,7 +45,7 @@ const hoverCourse = async id => {
 };
 const closePopup = async () => {
   await page.keyboard.press('Escape');
-  if (!await waitFor(page, () => !document.querySelector('.cedar-roadmap-dialog[open]'))) throw new Error('Course popup did not close');
+  if (!await waitFor(page, () => !document.querySelector('#shiny-modal'))) throw new Error('Course popup did not close');
 };
 const alignedHeaders = () => page.evaluate(() => {
   const headers = [...document.querySelectorAll('.cedar-roadmap-semester-header')].map(el => el.getBoundingClientRect());
@@ -99,7 +101,7 @@ try {
     el.querySelector('.cedar-roadmap-hover-after').innerText.includes('CSCI 2260')) &&
     await page.$eval('[data-node="computing0"]', el => el.classList.contains('is-before')) &&
     await page.$eval('[data-node="java2"]', el => el.classList.contains('is-after')) &&
-    await page.$$eval('.cedar-roadmap-dialog[open], .cedar-roadmap-history [data-history-node]', els => els.length === 0),
+    await page.$$eval('#shiny-modal, [data-history-node]', els => els.length === 0),
     'hover previews prerequisites and dependent courses without opening a modal or loading enrollment history');
   await page.screenshot({ path: '/tmp/cedar-degree-hover-chain.png', fullPage: false });
   await page.hover('.cedar-roadmap-hover');
@@ -142,7 +144,7 @@ try {
     'the history popup uses a single CEDAR table with first-day measures');
   check(await page.$eval('.cedar-roadmap-history', el => !el.innerText.includes('student_id')),
     'history payload contains aggregate information only');
-  await (await page.$('.cedar-roadmap-dialog')).screenshot({ path: '/tmp/cedar-degree-course-popup.png' });
+  await (await page.$(MODAL)).screenshot({ path: '/tmp/cedar-degree-course-popup.png' });
   await closePopup();
   check(await page.$eval('[data-node="calc1"]', el => document.activeElement === el),
     'Escape closes the popup and returns keyboard focus to its course');
@@ -182,15 +184,15 @@ try {
     ['Gen Ed area', 'Credits', 'Seats offered', 'Filled · first day', 'Campus', 'PoT'].every(name => colIndex(suggestions.headers, name) >= 0) &&
     lastOffered >= 0 && suggestions.rows.every(row => row[lastOffered].toLowerCase().includes(allowanceSeason)),
     'allowance popup lists matching-season Gen Ed choices with credits, seats, first-day enrollments and campus/session context');
-  check(await page.$eval('.cedar-roadmap-detail', el => el.hidden) &&
+  check(await page.$$eval('.cedar-roadmap-dialog .cedar-roadmap-detail', els => els.length === 0) &&
     await page.$eval('.cedar-roadmap-history', el => el.innerText.includes('not major-specific recommendations') && !el.innerText.includes('student_id')),
     'suggestions have no borrowed catalog quote and clearly disclose their historical, unreviewed status');
-  await (await page.$('.cedar-roadmap-dialog')).screenshot({ path: '/tmp/cedar-degree-gened-suggestions.png' });
+  await (await page.$(MODAL)).screenshot({ path: '/tmp/cedar-degree-gened-suggestions.png' });
   await page.setViewport({ width: 390, height: 844 });
-  check(await page.$eval('.cedar-roadmap-dialog', el => {
+  check(await page.$eval(MODAL, el => {
     const r = el.getBoundingClientRect(); return r.top >= 0 && r.left >= 0 && r.bottom <= window.innerHeight && r.right <= window.innerWidth;
   }), 'the Gen Ed suggestion popup stays inside a narrow screen with its own scrolling');
-  await (await page.$('.cedar-roadmap-dialog')).screenshot({ path: '/tmp/cedar-degree-gened-suggestions-mobile.png' });
+  await (await page.$(MODAL)).screenshot({ path: '/tmp/cedar-degree-gened-suggestions-mobile.png' });
   await page.setViewport({ width: 1440, height: 1000 });
   await closePopup();
   await choose('degree_explorer-dx_start_season', 'fall');
@@ -260,12 +262,12 @@ try {
       getComputedStyle(el).webkitLineClamp === '3' && el.scrollHeight > el.clientHeight),
     'science choices keep a three-line preview, aligned rows and contained scrolling on narrow screens');
   await popup('science1');
-  check(await page.$eval('.cedar-roadmap-dialog', el => {
+  check(await page.$eval(MODAL, el => {
     const r = el.getBoundingClientRect();
     return r.left >= 0 && r.right <= window.innerWidth && r.top >= 0 && r.bottom <= window.innerHeight &&
       el.querySelectorAll('.cedar-roadmap-option-detail a').length === 19;
   }), 'the narrow science popup preserves all lecture and lab options within its own scroll area');
-  await (await page.$('.cedar-roadmap-dialog')).screenshot({ path: '/tmp/cedar-degree-science-mobile.png' });
+  await (await page.$(MODAL)).screenshot({ path: '/tmp/cedar-degree-science-mobile.png' });
   await closePopup();
   await page.setViewport({ width: 1440, height: 1000 });
   check(await semester('linear') === 6 && await semester('numerical') === 7,
@@ -325,14 +327,14 @@ try {
   check(await alignedCourses(['englX', 'englY', 'engl2']) && await soundRows(),
     'stretch English stays in one aligned row on narrow screens without clipping wrapped course details');
   await popup('calc1');
-  check(await page.$eval('.cedar-roadmap-dialog', el => {
+  check(await page.$eval(MODAL, el => {
     const r = el.getBoundingClientRect(); return r.top >= 0 && r.bottom <= window.innerHeight && r.left >= 0 && r.right <= window.innerWidth;
   }), 'mobile popup stays within the screen with its own scroll area');
-  await (await page.$('.cedar-roadmap-dialog')).screenshot({ path: '/tmp/cedar-degree-course-popup-mobile.png' });
-  await page.$eval('.cedar-roadmap-dialog-body', el => { el.scrollTop = el.scrollHeight; });
+  await (await page.$(MODAL)).screenshot({ path: '/tmp/cedar-degree-course-popup-mobile.png' });
+  await page.$eval('#shiny-modal .modal-body', el => { el.scrollTop = el.scrollHeight; });
   await closePopup();
   await popup('calc1');
-  check(await page.$eval('.cedar-roadmap-dialog-body', el => el.scrollTop === 0),
+  check(await page.$eval('#shiny-modal .modal-body', el => el.scrollTop === 0),
     'reopening a scrolled popup starts at enrollment history');
   await closePopup();
   await page.screenshot({ path: '/tmp/cedar-degree-roadmap-mobile.png', fullPage: false });
@@ -344,6 +346,20 @@ try {
     await semester('calc1') === 3 && await semester('engl2') === 1 &&
     await page.$eval('[data-roadmap]', el => el.dataset.startSeason === 'spring'),
     'deep links restore the degree, both starting points and starting season without a run button');
+  // Capture what the copy button writes instead of reading the system clipboard.
+  await page.evaluate(() => {
+    window.cedarCopiedLink = null;
+    navigator.clipboard.writeText = text => { window.cedarCopiedLink = text; return Promise.resolve(); };
+  });
+  await page.click('#degree_explorer-dx_copy_url');
+  const copiedLink = await waitFor(page, () => !!window.cedarCopiedLink)
+    ? new URL(await page.evaluate(() => window.cedarCopiedLink)) : null;
+  check(!!copiedLink && copiedLink.searchParams.get('tab') === 'degree-explorer' &&
+    copiedLink.searchParams.get('catalog_id') === 'biology-bs-2026' &&
+    copiedLink.searchParams.get('math_start') === 'algebra' &&
+    copiedLink.searchParams.get('english_start') === 'composition2' &&
+    copiedLink.searchParams.get('start_season') === 'spring',
+    'the copy button shares the degree, both starting points and the starting season');
 
   await choose('degree_explorer-dx_math_start', 'intermediate');
   const addedPrograms = [
@@ -393,7 +409,7 @@ try {
       check(await page.$eval('.cedar-roadmap-condition-detail', el => el.innerText.includes('permission') &&
         el.innerText.includes('a minimum of two upper-division courses')),
         'condition details cite course-count and departmental-permission requirements separately');
-      await (await page.$('.cedar-roadmap-dialog')).screenshot({ path: '/tmp/cedar-degree-history-condition-popup.png' });
+      await (await page.$(MODAL)).screenshot({ path: '/tmp/cedar-degree-history-condition-popup.png' });
     }
     if (id === 'philosophy-ba-2026') {
       check(await page.$eval('[data-node="philbuddhist"]', el => el.innerText.includes('Choose 1 of 3 courses') &&
@@ -417,7 +433,7 @@ try {
       check(optionHistory === 'empty' || (optionHistory === 'ready' &&
         await page.$eval('[data-history-node="philbuddhist"]', el => el.innerText.includes('alternatives'))),
         'course-set history identifies the alternatives rather than treating them as a required bundle');
-      await (await page.$('.cedar-roadmap-dialog')).screenshot({ path: '/tmp/cedar-degree-philosophy-options-popup.png' });
+      await (await page.$(MODAL)).screenshot({ path: '/tmp/cedar-degree-philosophy-options-popup.png' });
       await closePopup();
       await page.screenshot({ path: '/tmp/cedar-degree-philosophy-options.png', fullPage: true });
       // Narrow semester columns exercise the three-line ellipsis treatment on a

@@ -12,7 +12,7 @@ A per-function index of `R/branches/`, `R/cones/`, and `R/features/`. `AGENTS.md
 
 | File | Main function(s) | Purpose |
 |------|-----------------|---------|
-| `degree-requirements.R` | `degree_rule_outline(catalog, catalog_ids)`, `degree_math_start_choices(roadmaps, catalog_id)`, `build_degree_roadmap(catalog, roadmaps, catalog_id, math_start, english_start)`, `assign_degree_roadmap_rows(nodes)`, `build_degree_allowance_slots(nodes, terms, slot_credits)`, `degree_semester_seasons(semesters, start_season)`, `get_degree_chain_metrics(nodes, links, conditions = NULL)`, `attach_degree_roadmap_evidence(nodes, roadmaps, catalog, catalog_id)`, `attach_pathway_groups(rows, groups)`, `degree_path_course_table(paths, group_id)` | Preserve rule trees, select program-specific math routes, schedule complete workloads with early foundations, later upper-level courses, semester floors and credit limits, align authored course families without rescheduling, compute prerequisite chains, resolve quoted evidence, and classify descriptive coursework; no eligibility inference |
+| `degree-requirements.R` | `degree_rule_outline(catalog, catalog_ids)`, `degree_math_start_choices(roadmaps, catalog_id)`, `build_degree_roadmap(catalog, roadmaps, catalog_id, math_start, english_start)` (built from `resolve_degree_entry_routes()`, `prepare_degree_roadmap_nodes()`, `schedule_degree_roadmap(nodes, links, conditions, max_load)` and `allocate_degree_semester_credits(nodes, loads, policy, completed_credits)`), `assign_degree_roadmap_rows(nodes)`, `build_degree_allowance_slots(nodes, terms, slot_credits)`, `degree_semester_seasons(semesters, start_season)`, `get_degree_chain_metrics(nodes, links, conditions = NULL)` (counts plus `upstream_ids` / `downstream_ids`, so the browser never walks the graph), `attach_degree_roadmap_evidence(nodes, roadmaps, catalog, catalog_id)`, `attach_pathway_groups(rows, groups)`, `degree_path_course_table(paths, group_id)` | Preserve rule trees, select program-specific math routes, schedule complete workloads with early foundations, later upper-level courses, semester floors and credit limits, align authored course families without rescheduling, compute prerequisite chains, resolve quoted evidence, and classify descriptive coursework; no eligibility inference |
 | `population.R` | `build_population(programs, degrees, students, opt)` | Build student populations for analysis; returns tibble with `student_id` + classification columns. The central cohort-building function. |
 | | `get_focal_programs(programs, opt)` | Resolve program names/codes to canonical list for population filters |
 | | `build_demographic_population(programs, opt)` | Population scoped by demographic characteristics |
@@ -92,7 +92,7 @@ band/cell guards. The enrolled-term clock precedes campus scope.
 `features/degree-explorer.R`: `build_degree_roadmap_view(catalog, roadmaps,
 catalog_id, math_start, english_start, start_season = "fall")` and
 `build_population_course_paths(students, population, groups, opt, description)`
-assemble typed payloads, including complete enumerated course alternatives and option-specific prerequisite citations. `format_degree_explorer_preview(view)` formats semesters;
+assemble typed payloads, including complete enumerated course alternatives and option-specific prerequisite citations. `degree_roadmap_tile_detail(view, node_id)` resolves one tile's popup content (citation, conditions, alternatives) from that payload. `format_degree_explorer_preview(view)` formats semesters;
 `plot_grouped_student_paths(paths)` plots already-suppressed aggregates.
 
 | File | Main function(s) | Takes cohort? | Purpose |
@@ -189,7 +189,7 @@ Moved from `AGENTS.md`. Always check these before writing equivalent logic in a 
 | `term_code_to_str(term_code)` | Alternate term label formatter |
 | `academic_period_to_term(label)` | `"Fall 2025"` → `202580` |
 | `make_term_sequence(start_year, end_year)` | Vector of term codes for a year range |
-| `course_level_from_number(subject_course)` | **The one course-level rule** (`lower`/`upper`/`grad`) for both transforms: leading digit of the course number via `COURSE_LEVEL_BY_LEADING_DIGIT` (`institution/<id>/course_levels.csv`, read by `R/lists/course_numbering.R`), for 3- and 4-digit numbers alike |
+| `course_level_from_number(subject_course)` | **The one course-level rule** (`lower`/`upper`/`grad`) for both transforms: leading digit of the course number via `COURSE_LEVEL_BY_LEADING_DIGIT` (`institution/<id>/course_levels.csv`), for 3- and 4-digit numbers alike. Defined in `R/lists/course_numbering.R` beside its lookup, so the Degree Explorer catalog validators can use it at load time |
 | `mark_plotly_terms(p, term_labels, text)` | Shades and labels given term categories on a plotly term axis; returns charts without those terms unchanged, so it can be applied to every chart on a page |
 | `get_dept_from_course(course)` | `"BIOL 2310"` → `"BIOL"` |
 | `validate_population(population, caller)` | Validates population has required columns; call at top of any cone that accepts a population argument |

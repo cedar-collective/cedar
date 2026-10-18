@@ -1,4 +1,10 @@
-# Shared catalog presentation and descriptive grouping; no student eligibility inference.
+# Degree Explorer planning: rule outlines, semester scheduling, row layout and
+# prerequisite-chain metrics for one selected route.
+#
+# Planning reads catalog and roadmap metadata only. Nothing here reads a student
+# record, infers eligibility or audits a degree. Rules:
+# docs/developers/degree-explorer-rules.md; contract:
+# docs/developers/degree-requirements.md.
 
 degree_catalog_choices <- function(catalog) {
   stats::setNames(catalog$catalogs$catalog_id,
@@ -12,48 +18,53 @@ degree_math_start_choices <- function(roadmaps, catalog_id) {
 
 #' One row per rule; nested alternatives retain their depth and timing language
 degree_rule_outline <- function(catalog, catalog_ids) {
-  if (!length(catalog_ids) || any(!catalog_ids %in% catalog$catalogs$catalog_id)) stop("Select known catalog IDs")
-  r <- catalog$rules[catalog$rules$catalog_id %in% catalog_ids, ]
-  x <- catalog$courses
-  r$depth <- integer(nrow(r)); r$text <- character(nrow(r))
+  if (!length(catalog_ids) || any(!catalog_ids %in% catalog$catalogs$catalog_id)) {
+    stop("[degree-requirements.R] Select known catalog IDs")
+  }
+  rules <- catalog$rules[catalog$rules$catalog_id %in% catalog_ids, ]
+  rules$depth <- vapply(rules$parent_id, function(parent) {
+    depth <- 0L
+    while (nzchar(parent)) {
+      depth <- depth + 1L
+      parent <- rules$parent_id[match(parent, rules$rule_id)]
+    }
+    depth
+  }, integer(1), USE.NAMES = FALSE)
+
   phrases <- c(all = "Take all", choose_n = "Choose at least", course = "Take",
     credits = "Earn at least", condition = "Condition", none = "Not required",
-    prior = "Complete before", concurrent = "Take concurrently", prior_or_concurrent = "Complete before or take concurrently")
-  for (i in seq_len(nrow(r))) {
-    parent <- r$parent_id[i]
-    while (nzchar(parent)) {
-      r$depth[i] <- r$depth[i] + 1L
-      parent <- r$parent_id[match(parent, r$rule_id)]
-    }
-    value <- if (r$operator[i] == "choose_n") paste0(" ", r$minimum[i], if (r$minimum[i] == "1") " option" else " options")
-             else if (r$operator[i] == "credits") paste0(" ", r$minimum[i], " credits") else ""
-    title <- r$label[i]
-    course <- x[x$rule_id == r$rule_id[i], ]
-    if (nrow(course)) title <- paste0(course$subject_course, " — ", course$course_title,
-                                     " (", course$credits, " credits)")
-    grade <- if (nzchar(r$min_grade[i])) paste0("; minimum grade ", r$min_grade[i]) else ""
-    target <- if (nzchar(r$target_course[i])) paste0(" [for ", r$target_course[i], "]") else ""
-    r$text[i] <- paste0(title, target, ": ", phrases[[r$operator[i]]], value, grade,
-                       if (nzchar(r$detail[i])) paste0(". ", r$detail[i]) else "",
-                       if (r$review_status[i] == "conflict") " [SOURCE CONFLICT]" else "")
-  }
+    prior = "Complete before", concurrent = "Take concurrently",
+    prior_or_concurrent = "Complete before or take concurrently")
+  course <- catalog$courses[match(rules$rule_id, catalog$courses$rule_id), ]
+  title <- ifelse(is.na(course$rule_id), rules$label,
+    paste0(course$subject_course, " — ", course$course_title, " (", course$credits, " credits)"))
+  amount <- ifelse(rules$operator == "choose_n",
+    paste0(" ", rules$minimum, ifelse(rules$minimum == "1", " option", " options")),
+    ifelse(rules$operator == "credits", paste0(" ", rules$minimum, " credits"), ""))
+  target <- ifelse(nzchar(rules$target_course), paste0(" [for ", rules$target_course, "]"), "")
+  grade <- ifelse(nzchar(rules$min_grade), paste0("; minimum grade ", rules$min_grade), "")
+  detail <- ifelse(nzchar(rules$detail), paste0(". ", rules$detail), "")
+  conflict <- ifelse(rules$review_status == "conflict", " [SOURCE CONFLICT]", "")
+  rules$text <- paste0(title, target, ": ", unname(phrases[rules$operator]), amount, grade, detail,
+                       conflict, recycle0 = TRUE)
+
   # File order is not assumed to be a pre-order traversal.
-  ordered <- character()
-  walk <- function(id) {
-    ordered <<- c(ordered, id)
-    for (child in r$rule_id[r$parent_id == id]) walk(child)
+  preorder <- function(id) {
+    children <- rules$rule_id[rules$parent_id == id]
+    c(id, unlist(lapply(children, preorder), use.names = FALSE))
   }
-  for (id in r$rule_id[!nzchar(r$parent_id)]) walk(id)
-  r[match(ordered, r$rule_id), ]
+  ordered <- unlist(lapply(rules$rule_id[!nzchar(rules$parent_id)], preorder), use.names = FALSE)
+  rules[match(ordered, rules$rule_id), ]
 }
 
 #' Classify a course once for descriptive pathways, never as degree fulfillment
 attach_pathway_groups <- function(rows, groups) {
   groups <- validate_pathway_subject_groups(groups)
-  out <- rows %>% dplyr::mutate(subject_code = sub(" .*", "", subject_course)) %>%
-    dplyr::left_join(groups, by = "subject_code")
-  out %>% dplyr::mutate(group_id = dplyr::coalesce(group_id, "unmapped"),
-                        group_label = dplyr::coalesce(group_label, "Unmapped coursework"))
+  rows %>%
+    mutate(subject_code = sub(" .*", "", subject_course)) %>%
+    left_join(groups, by = "subject_code", relationship = "many-to-one") %>%
+    mutate(group_id = coalesce(group_id, "unmapped"),
+           group_label = coalesce(group_label, "Unmapped coursework"))
 }
 
 degree_path_course_table <- function(paths, group_id = "all") {
@@ -62,218 +73,323 @@ degree_path_course_table <- function(paths, group_id = "all") {
 }
 
 #' Schedule one selected route using prerequisite timing and authored semester floors
-#' Metadata only: no transcript, admission, availability or degree-audit inference.
+#'
+#' Metadata only: no transcript, admission, availability or degree-audit
+#' inference. Courses are placed by prerequisite timing, course-count
+#' conditions, the upper-level planning stage and the credit maximum; other
+#' degree work then fills each semester toward the usual load.
 build_degree_roadmap <- function(catalog, roadmaps, catalog_id, math_start, english_start) {
-  if (length(catalog_id) != 1L || !catalog_id %in% catalog$catalogs$catalog_id) stop("Select one known degree")
-  if (length(math_start) != 1L || length(english_start) != 1L) stop("Select one starting point per subject")
+  if (length(catalog_id) != 1L || !catalog_id %in% catalog$catalogs$catalog_id) {
+    stop("[degree-requirements.R] Select one known degree")
+  }
+  if (length(math_start) != 1L || length(english_start) != 1L) {
+    stop("[degree-requirements.R] Select one starting point per subject")
+  }
   policy <- roadmaps$plans[roadmaps$plans$catalog_id == catalog_id, ]
-  if (nrow(policy) != 1L) stop("Select a degree with planning rules")
-  normal_load <- as.numeric(policy$normal_load); max_load <- as.numeric(policy$max_load)
-  n <- roadmaps$nodes
-  selected <- character(); routes <- list(); completed_credits <- 0
+  if (nrow(policy) != 1L) stop("[degree-requirements.R] Select a degree with planning rules")
+
   starts <- c(math = math_start, english = english_start)
-  for (track in names(starts)) {
-    s <- roadmaps$starts[roadmaps$starts$track == track & roadmaps$starts$start_id == starts[[track]], ]
-    if (nrow(s) != 1L) stop("Select a known ", track, " starting point")
-    route <- s$node_ids
-    if (track == "math") {
-      route <- roadmaps$math_routes$node_ids[roadmaps$math_routes$catalog_id == catalog_id &
-        roadmaps$math_routes$start_id == math_start]
-      if (length(route) != 1L) stop("Select a known program math starting route")
-    }
-    routes[[track]] <- if (nzchar(route)) strsplit(route, "|", fixed = TRUE)[[1]] else character()
-    selected <- c(selected, routes[[track]])
-    completed_credits <- completed_credits + as.numeric(s$completed_degree_credits)
-  }
-  n <- n[n$catalog_id == catalog_id | (n$catalog_id == "*" & n$node_id %in% selected), ]
-  n$credits <- as.numeric(n$credits); n$base_semester <- as.integer(n$semester)
-  # This is an authored planning preference, distinct from catalog prerequisites.
-  # Choice groups carry explicit levels; never parse a display label to infer one.
-  upper_start <- as.integer(policy$upper_level_from_semester)
-  n$earliest_semester <- pmax(n$base_semester,
-    ifelse(n$course_level == "upper", upper_start, 1L))
-  n$semester <- n$base_semester
-  n$bundle <- n$bundle == "1"
-  l <- roadmaps$links[roadmaps$links$catalog_id %in% c("*", catalog_id), ]
+  entry <- resolve_degree_entry_routes(roadmaps, catalog_id, starts)
+  nodes <- prepare_degree_roadmap_nodes(roadmaps$nodes, catalog_id, unlist(entry$routes),
+                                        as.integer(policy$upper_level_from_semester))
   # Shared entry courses omitted by placement are already satisfied for this scenario.
-  l <- l[l$from %in% n$node_id & l$to %in% n$node_id, ]
-  conditions <- roadmaps$conditions[roadmaps$conditions$catalog_id == catalog_id, ]
-  proof <- catalog$evidence[match(conditions$evidence_id, catalog$evidence$evidence_id), ]
-  for (field in c("section", "quote", "source_url")) conditions[[field]] <- proof[[field]]
-  pools <- lapply(conditions$eligible_node_ids, function(x)
-    if (nzchar(x)) strsplit(x, "|", fixed = TRUE)[[1]] else character())
-  counts <- which(conditions$kind == "course_count")
-  remaining <- n$node_id; loads <- numeric(0)
-  while (length(remaining)) {
-    ready <- setdiff(remaining, l$to[l$from %in% remaining])
-    scheduled <- setdiff(n$node_id, remaining)
-    ready <- ready[vapply(ready, function(id) all(vapply(counts[conditions$node_id[counts] == id],
-      function(k) sum(pools[[k]] %in% scheduled) >= as.integer(conditions$minimum[k]), logical(1))), logical(1))]
-    if (!length(ready)) stop("Cycle or unsatisfied course-count condition in selected roadmap")
-    # Schedule foundation slots first, then upper-level work. File order breaks ties.
-    ready <- ready[order(n$earliest_semester[match(ready, n$node_id)])]
-    id <- ready[1]; i <- match(id, n$node_id)
-    incoming <- l[l$to == id, ]
-    earliest <- n$earliest_semester[i]
-    if (nrow(incoming)) earliest <- max(earliest,
-      n$semester[match(incoming$from, n$node_id)] + as.integer(incoming$timing == "before"))
-    # A threshold over a pool is not an AND edge from every possible member.
-    # Use the earliest qualifying completions in the actual scheduled scenario.
-    for (k in counts[conditions$node_id[counts] == id]) {
-      terms <- sort(n$semester[match(intersect(pools[[k]], scheduled), n$node_id)])
-      earliest <- max(earliest, terms[as.integer(conditions$minimum[k])] + 1L)
-    }
-    while (length(loads) >= earliest && !is.na(loads[earliest]) && loads[earliest] + n$credits[i] > max_load)
-      earliest <- earliest + 1L
-    if (length(loads) < earliest) loads <- c(loads, rep(0, earliest - length(loads)))
-    loads[earliest] <- loads[earliest] + n$credits[i]
-    n$semester[i] <- earliest
-    remaining <- setdiff(remaining, id)
-  }
-  n$moved <- n$semester > n$base_semester & n$catalog_id == catalog_id
-  n <- assign_degree_roadmap_rows(n)
-  n <- n[order(n$semester, match(n$track, c("math", "english", "main")), n$base_semester), ]
-  degree_credits <- as.numeric(policy$degree_credit_target)
-  preparation_credits <- sum(n$credits[n$kind == "preparation"])
-  horizon <- max(as.integer(policy$baseline_semesters), n$semester,
-    ceiling((degree_credits - completed_credits + preparation_credits) / max_load))
-  loads <- c(loads, rep(0, horizon - length(loads)))
-  # Fill toward the usual load first; the permitted maximum can absorb the remainder.
-  # The workload-derived horizon grows before allocation rather than forcing eight terms.
-  remaining <- degree_credits - completed_credits - sum(n$credits[n$kind != "preparation"])
-  if (remaining < 0) stop("Shown degree courses exceed the planning credit target")
-  other <- numeric(horizon)
-  for (limit in c(normal_load, max_load)) {
-    for (at in seq_along(loads)) {
-      amount <- min(remaining, max(0, limit - loads[at]))
-      other[at] <- other[at] + amount; loads[at] <- loads[at] + amount
-      remaining <- remaining - amount
-    }
-  }
-  if (remaining > 0) stop("Planning workload exceeds the available semester budget")
-  terms <- data.frame(semester = seq_along(loads), known_credits = loads - other,
-    other_credits = other, planned_credits = loads)
-  terms$year <- ceiling(terms$semester / 2)
-  terms$other_phase <- ifelse(terms$semester < upper_start, "foundation", "advanced")
-  metrics <- get_degree_chain_metrics(n, l, conditions)
-  n <- cbind(n, metrics[match(n$node_id, metrics$node_id), setdiff(names(metrics), "node_id")])
-  n <- attach_degree_roadmap_evidence(n, roadmaps, catalog, catalog_id)
+  links <- roadmaps$links[roadmaps$links$catalog_id %in% c("*", catalog_id), ]
+  links <- links[links$from %in% nodes$node_id & links$to %in% nodes$node_id, ]
+  conditions <- attach_degree_condition_evidence(
+    roadmaps$conditions[roadmaps$conditions$catalog_id == catalog_id, ], catalog)
+
+  schedule <- schedule_degree_roadmap(nodes, links, conditions, as.numeric(policy$max_load))
+  nodes <- schedule$nodes
+  nodes$moved <- nodes$semester > nodes$base_semester & nodes$catalog_id == catalog_id
+  nodes <- assign_degree_roadmap_rows(nodes)
+  nodes <- nodes[order(nodes$semester, match(nodes$track, c("math", "english", "main")), nodes$base_semester), ]
+  terms <- allocate_degree_semester_credits(nodes, schedule$loads, policy, entry$completed_credits)
+
+  metrics <- get_degree_chain_metrics(nodes, links, conditions)
+  nodes <- cbind(nodes, metrics[match(nodes$node_id, metrics$node_id), setdiff(names(metrics), "node_id")])
+  nodes <- attach_degree_roadmap_evidence(nodes, roadmaps, catalog, catalog_id)
+  cedar_debug("[degree-requirements.R] ", catalog_id, ": ", nrow(nodes), " courses over ",
+              nrow(terms), " semesters (math ", math_start, ", English ", english_start, ").")
 
   list(catalog = catalog$catalogs[match(catalog_id, catalog$catalogs$catalog_id), ],
-    nodes = n, links = l, conditions = conditions, terms = terms, starts = starts, policy = policy,
-    degree_credits = degree_credits, preparation_credits = preparation_credits, completed_credits = completed_credits,
-    n_preparation = sum(n$kind == "preparation"), n_moved = sum(n$moved),
-    math_target = n[n$node_id == tail(routes$math, 1), ])
+    nodes = nodes, links = links, conditions = conditions, terms = terms, starts = starts, policy = policy,
+    degree_credits = as.numeric(policy$degree_credit_target),
+    preparation_credits = sum(nodes$credits[nodes$kind == "preparation"]),
+    completed_credits = entry$completed_credits,
+    n_preparation = sum(nodes$kind == "preparation"), n_moved = sum(nodes$moved),
+    math_target = nodes[nodes$node_id == tail(entry$routes$math, 1), ])
 }
 
-#' Align authored course families after scheduling; never change their semesters.
-#' Reserve math/writing rows. Other families may share a row only outside each
-#' other's full semester span, so gaps inside a sequence remain visible.
+#' The entry courses each starting point adds, and the degree credit it already earned
+#'
+#' Math placement resolves per program: a statistics major never inherits the
+#' calculus sequence. English routes are shared by every program.
+resolve_degree_entry_routes <- function(roadmaps, catalog_id, starts) {
+  routes <- list()
+  completed_credits <- 0
+  for (track in names(starts)) {
+    start <- roadmaps$starts[roadmaps$starts$track == track & roadmaps$starts$start_id == starts[[track]], ]
+    if (nrow(start) != 1L) stop("[degree-requirements.R] Select a known ", track, " starting point")
+    route <- start$node_ids
+    if (track == "math") {
+      math_routes <- roadmaps$math_routes
+      route <- math_routes$node_ids[math_routes$catalog_id == catalog_id & math_routes$start_id == starts[[track]]]
+      if (length(route) != 1L) stop("[degree-requirements.R] Select a known program math starting route")
+    }
+    routes[[track]] <- degree_split_ids(route)
+    completed_credits <- completed_credits + as.numeric(start$completed_degree_credits)
+  }
+  list(routes = routes, completed_credits = completed_credits)
+}
+
+#' The program's tiles plus the shared entry courses its routes use, typed for scheduling
+prepare_degree_roadmap_nodes <- function(nodes, catalog_id, entry_ids, upper_start) {
+  nodes <- nodes[nodes$catalog_id == catalog_id | (nodes$catalog_id == "*" & nodes$node_id %in% entry_ids), ]
+  nodes$credits <- as.numeric(nodes$credits)
+  nodes$base_semester <- as.integer(nodes$semester)
+  # An authored planning preference, distinct from catalog prerequisites. Choice
+  # groups carry explicit levels; a display label is never parsed for one.
+  nodes$earliest_semester <- pmax(nodes$base_semester, ifelse(nodes$course_level == "upper", upper_start, 1L))
+  nodes$semester <- nodes$base_semester
+  nodes$bundle <- nodes$bundle == "1"
+  nodes
+}
+
+attach_degree_condition_evidence <- function(conditions, catalog) {
+  evidence <- catalog$evidence[match(conditions$evidence_id, catalog$evidence$evidence_id), ]
+  for (field in c("section", "quote", "source_url")) conditions[[field]] <- evidence[[field]]
+  conditions
+}
+
+#' Place each course in the earliest semester its constraints allow
+#'
+#' A course is ready once every prerequisite is placed and each of its
+#' course-count conditions has enough pool members placed. Foundation courses
+#' go first and file order breaks ties. A course then waits for its
+#' prerequisites (a "before" link adds a semester), for the earliest qualifying
+#' pool completions, and for a semester with room under `max_load`.
+#' @return list(nodes with `semester` set, loads = credits per semester).
+schedule_degree_roadmap <- function(nodes, links, conditions, max_load) {
+  # A threshold over a pool is not an AND edge from every possible member.
+  count_conditions <- conditions[conditions$kind == "course_count", ]
+  pools <- lapply(count_conditions$eligible_node_ids, degree_split_ids)
+  pool_minimums <- as.integer(count_conditions$minimum)
+  pool_met <- function(id, scheduled) {
+    own <- which(count_conditions$node_id == id)
+    all(vapply(own, function(k) sum(pools[[k]] %in% scheduled) >= pool_minimums[k], logical(1)))
+  }
+
+  unscheduled <- nodes$node_id
+  loads <- numeric(0)
+  while (length(unscheduled)) {
+    scheduled <- setdiff(nodes$node_id, unscheduled)
+    ready <- setdiff(unscheduled, links$to[links$from %in% unscheduled])
+    ready <- ready[vapply(ready, pool_met, logical(1), scheduled = scheduled)]
+    if (!length(ready)) {
+      stop("[degree-requirements.R] Cycle or unsatisfied course-count condition in selected roadmap")
+    }
+    ready <- ready[order(nodes$earliest_semester[match(ready, nodes$node_id)])]
+    id <- ready[1]
+    i <- match(id, nodes$node_id)
+
+    semester <- nodes$earliest_semester[i]
+    incoming <- links[links$to == id, ]
+    if (nrow(incoming)) {
+      prerequisite_terms <- nodes$semester[match(incoming$from, nodes$node_id)]
+      semester <- max(semester, prerequisite_terms + as.integer(incoming$timing == "before"))
+    }
+    # Use the earliest qualifying completions in the actual scheduled scenario.
+    for (k in which(count_conditions$node_id == id)) {
+      qualifying_terms <- sort(nodes$semester[match(intersect(pools[[k]], scheduled), nodes$node_id)])
+      semester <- max(semester, qualifying_terms[pool_minimums[k]] + 1L)
+    }
+    while (semester <= length(loads) && loads[semester] + nodes$credits[i] > max_load) {
+      semester <- semester + 1L
+    }
+    if (semester > length(loads)) loads <- c(loads, rep(0, semester - length(loads)))
+    loads[semester] <- loads[semester] + nodes$credits[i]
+    nodes$semester[i] <- semester
+    unscheduled <- setdiff(unscheduled, id)
+  }
+  list(nodes = nodes, loads = loads)
+}
+
+#' Per-semester credits: shown courses plus other degree work
+#'
+#' Other degree work fills each semester toward the usual load first; the
+#' permitted maximum absorbs the remainder. The horizon grows with the workload
+#' rather than forcing the baseline number of semesters.
+allocate_degree_semester_credits <- function(nodes, loads, policy, completed_credits) {
+  normal_load <- as.numeric(policy$normal_load)
+  max_load <- as.numeric(policy$max_load)
+  degree_credits <- as.numeric(policy$degree_credit_target)
+  upper_start <- as.integer(policy$upper_level_from_semester)
+  preparation_credits <- sum(nodes$credits[nodes$kind == "preparation"])
+  workload <- degree_credits - completed_credits + preparation_credits
+  horizon <- max(as.integer(policy$baseline_semesters), nodes$semester, ceiling(workload / max_load))
+  loads <- c(loads, rep(0, horizon - length(loads)))
+
+  unallocated <- degree_credits - completed_credits - sum(nodes$credits[nodes$kind != "preparation"])
+  if (unallocated < 0) stop("[degree-requirements.R] Shown degree courses exceed the planning credit target")
+  other <- numeric(horizon)
+  for (limit in c(normal_load, max_load)) {
+    for (semester in seq_len(horizon)) {
+      amount <- min(unallocated, max(0, limit - loads[semester]))
+      other[semester] <- other[semester] + amount
+      loads[semester] <- loads[semester] + amount
+      unallocated <- unallocated - amount
+    }
+  }
+  if (unallocated > 0) stop("[degree-requirements.R] Planning workload exceeds the available semester budget")
+
+  semesters <- seq_len(horizon)
+  data.frame(semester = semesters, known_credits = loads - other, other_credits = other,
+    planned_credits = loads, year = ceiling(semesters / 2),
+    other_phase = ifelse(semesters < upper_start, "foundation", "advanced"))
+}
+
+#' Align authored course families after scheduling; never change their semesters
+#'
+#' Math and writing rows are reserved. Other families may share a row only
+#' outside each other's full semester span, so gaps inside a sequence remain
+#' visible.
 assign_degree_roadmap_rows <- function(nodes) {
-  groups <- unique(nodes$row_group)
-  foundation <- intersect(c("math", "writing"), groups)
-  groups <- c(foundation, setdiff(groups, foundation))
-  occupied <- list(); reserved <- 0L
+  families <- unique(nodes$row_group)
+  foundation <- intersect(c("math", "writing"), families)
+  families <- c(foundation, setdiff(families, foundation))
+  row_spans <- list()
+  n_reserved <- 0L
   nodes$row <- integer(nrow(nodes))
-  for (group in groups) {
-    members <- which(nodes$row_group == group)
-    # A family can contain parallel courses. Match the first, second, ... slot
-    # in each semester to separate rows rather than stacking or overlapping.
+  for (family in families) {
+    members <- which(nodes$row_group == family)
+    # A family can contain parallel courses. The first, second, ... course of the
+    # family in each semester go to separate rows rather than overlapping.
     slot <- ave(nodes$semester[members], nodes$semester[members], FUN = seq_along)
     for (subrow in seq_len(max(slot))) {
       ids <- members[slot == subrow]
       span <- seq.int(min(nodes$semester[ids]), max(nodes$semester[ids]))
-      row <- reserved + 1L
-      if (group %in% foundation) row <- length(occupied) + 1L
-      else while (row <= length(occupied) && any(span %in% occupied[[row]])) row <- row + 1L
-      if (row > length(occupied)) occupied[[row]] <- integer()
-      occupied[[row]] <- c(occupied[[row]], span)
+      if (family %in% foundation) {
+        row <- length(row_spans) + 1L
+      } else {
+        row <- n_reserved + 1L
+        while (row <= length(row_spans) && any(span %in% row_spans[[row]])) row <- row + 1L
+      }
+      if (row > length(row_spans)) row_spans[[row]] <- integer()
+      row_spans[[row]] <- c(row_spans[[row]], span)
       nodes$row[ids] <- row
     }
-    if (group %in% foundation) reserved <- length(occupied)
+    if (family %in% foundation) n_reserved <- length(row_spans)
   }
   nodes
 }
 
-#' Break early planning allowances into course-sized slots without adding credit.
+#' Break early planning allowances into course-sized slots without adding credit
+#'
 #' Keep family gaps and the reserved math/writing rows intact. Suggestions have
 #' no prerequisite edges and never become catalog requirement nodes.
 build_degree_allowance_slots <- function(nodes, terms, slot_credits) {
   slots <- data.frame(node_id = character(), semester = integer(), credits = numeric(), row = integer())
-  occupied <- vector("list", max(nodes$row))
-  for (key in unique(paste(nodes$row, nodes$row_group))) {
-    members <- nodes[paste(nodes$row, nodes$row_group) == key, ]
-    row <- members$row[1]
-    span <- if (members$row_group[1] %in% c("math", "writing")) terms$semester
-      else seq.int(min(members$semester), max(members$semester))
-    occupied[[row]] <- unique(c(occupied[[row]], span))
+  row_spans <- vector("list", max(nodes$row))
+  family_key <- paste(nodes$row, nodes$row_group)
+  for (key in unique(family_key)) {
+    family <- nodes[family_key == key, ]
+    row <- family$row[1]
+    span <- if (family$row_group[1] %in% c("math", "writing")) terms$semester
+            else seq.int(min(family$semester), max(family$semester))
+    row_spans[[row]] <- unique(c(row_spans[[row]], span))
   }
   for (i in which(terms$other_phase == "foundation" & terms$other_credits > 0)) {
-    remaining <- terms$other_credits[i]; index <- 0L
-    while (remaining > 0) {
+    semester <- terms$semester[i]
+    unallocated <- terms$other_credits[i]
+    index <- 0L
+    while (unallocated > 0) {
       # Permit a one-credit extension of a usual slot (e.g. 3 + 4), while
       # leaving small remainders explicit rather than rounding the budget up.
-      amount <- if (remaining <= slot_credits + 1) remaining else slot_credits
+      amount <- if (unallocated <= slot_credits + 1) unallocated else slot_credits
       row <- 1L
-      while (row <= length(occupied) && terms$semester[i] %in% occupied[[row]]) row <- row + 1L
-      if (row > length(occupied)) occupied[[row]] <- integer()
-      occupied[[row]] <- c(occupied[[row]], terms$semester[i]); index <- index + 1L
-      slots[nrow(slots) + 1L, ] <- list(paste0("allowance-", terms$semester[i], "-", index),
-        terms$semester[i], amount, row)
-      remaining <- remaining - amount
+      while (row <= length(row_spans) && semester %in% row_spans[[row]]) row <- row + 1L
+      if (row > length(row_spans)) row_spans[[row]] <- integer()
+      row_spans[[row]] <- c(row_spans[[row]], semester)
+      index <- index + 1L
+      slots[nrow(slots) + 1L, ] <- list(paste0("allowance-", semester, "-", index), semester, amount, row)
+      unallocated <- unallocated - amount
     }
   }
   slots
 }
 
 degree_semester_seasons <- function(semesters, start_season) {
-  if (length(start_season) != 1L || !start_season %in% c("fall", "spring")) stop("Select a fall or spring starting semester")
+  if (length(start_season) != 1L || !start_season %in% c("fall", "spring")) {
+    stop("[degree-requirements.R] Select a fall or spring starting semester")
+  }
   second <- if (start_season == "fall") "spring" else "fall"
   ifelse(semesters %% 2L == 1L, start_season, second)
 }
 
 #' Prerequisite burden and downstream reach on the selected route, not readiness
+#'
+#' Counts unique direct and indirect prerequisite courses (a lecture/lab pair
+#' counts twice), the longest chain of earlier semesters, and the courses that
+#' depend on each one. `upstream_ids` / `downstream_ids` carry the same chains
+#' to the browser, which draws them without walking the graph itself.
 get_degree_chain_metrics <- function(nodes, links, conditions = NULL) {
   ids <- nodes$node_id
   ancestors <- descendants <- stats::setNames(vector("list", length(ids)), ids)
-  before <- after <- stats::setNames(integer(length(ids)), ids)
-  remaining <- ids; order <- character()
-  while (length(remaining)) {
-    ready <- setdiff(remaining, links$to[links$from %in% remaining])
-    if (!length(ready)) stop("Cycle in selected prerequisite route")
+  depth_before <- depth_after <- stats::setNames(integer(length(ids)), ids)
+  unvisited <- ids
+  topological <- character()
+  while (length(unvisited)) {
+    ready <- setdiff(unvisited, links$to[links$from %in% unvisited])
+    if (!length(ready)) stop("[degree-requirements.R] Cycle in selected prerequisite route")
     for (id in ready) {
       incoming <- links[links$to == id, ]
       ancestors[[id]] <- unique(c(incoming$from, unlist(ancestors[incoming$from], use.names = FALSE)))
-      if (nrow(incoming)) before[[id]] <- max(before[incoming$from] + as.integer(incoming$timing == "before"))
+      if (nrow(incoming)) {
+        depth_before[[id]] <- max(depth_before[incoming$from] + as.integer(incoming$timing == "before"))
+      }
     }
-    order <- c(order, ready); remaining <- setdiff(remaining, ready)
+    topological <- c(topological, ready)
+    unvisited <- setdiff(unvisited, ready)
   }
-  for (id in rev(order)) {
+  for (id in rev(topological)) {
     outgoing <- links[links$from == id, ]
     descendants[[id]] <- unique(c(outgoing$to, unlist(descendants[outgoing$to], use.names = FALSE)))
-    if (nrow(outgoing)) after[[id]] <- max(after[outgoing$to] + as.integer(outgoing$timing == "before"))
+    if (nrow(outgoing)) {
+      depth_after[[id]] <- max(depth_after[outgoing$to] + as.integer(outgoing$timing == "before"))
+    }
   }
-  weights <- stats::setNames(ifelse(nodes$bundle, 2L, 1L), ids)
+
   # A lecture/lab pair occupies one graph node but represents two actual courses.
-  count <- vapply(ancestors, function(x) sum(weights[x]), integer(1))
-  n_conditions <- vapply(ids, function(id) sum(conditions$node_id == id), integer(1))
-  data.frame(node_id = ids, n_prerequisites = unname(count),
-    n_direct = vapply(ids, function(id) sum(weights[links$from[links$to == id]]), integer(1), USE.NAMES = FALSE),
-    prereq_depth = unname(before), n_downstream = unname(vapply(descendants, function(x) sum(weights[x]), integer(1))),
-    chain_terms = unname(before + after + 1L), n_conditions = n_conditions,
-    planning_level = ifelse(nodes$kind == "choice", "unresolved",
-      ifelse(count == 0L & n_conditions > 0L, "conditional",
-        ifelse(count == 0L, "green", ifelse(count <= 2L, "yellow", "red")))))
+  weights <- stats::setNames(ifelse(nodes$bundle, 2L, 1L), ids)
+  n_prerequisites <- unname(vapply(ancestors, function(chain) sum(weights[chain]), integer(1)))
+  n_direct <- vapply(ids, function(id) sum(weights[links$from[links$to == id]]), integer(1), USE.NAMES = FALSE)
+  n_downstream <- unname(vapply(descendants, function(chain) sum(weights[chain]), integer(1)))
+  n_conditions <- vapply(ids, function(id) sum(conditions$node_id == id), integer(1), USE.NAMES = FALSE)
+  data.frame(node_id = ids, n_prerequisites = n_prerequisites, n_direct = n_direct,
+    prereq_depth = unname(depth_before), n_downstream = n_downstream,
+    chain_terms = unname(depth_before + depth_after + 1L), n_conditions = n_conditions,
+    upstream_ids = unname(vapply(ancestors, paste, character(1), collapse = "|")),
+    downstream_ids = unname(vapply(descendants, paste, character(1), collapse = "|")),
+    planning_level = case_when(
+      nodes$kind == "choice" ~ "unresolved",
+      n_prerequisites == 0L & n_conditions > 0L ~ "conditional",
+      n_prerequisites == 0L ~ "green",
+      n_prerequisites <= 2L ~ "yellow",
+      TRUE ~ "red"))
 }
 
 #' Resolve why a tile is present against a year-specific program or requisite citation
 attach_degree_roadmap_evidence <- function(nodes, roadmaps, catalog, catalog_id) {
-  b <- roadmaps$basis[roadmaps$basis$catalog_id == catalog_id, ]
-  b <- b[match(nodes$node_id, b$node_id), ]
-  e <- catalog$evidence[match(b$evidence_id, catalog$evidence$evidence_id), ]
-  if (anyNA(b$node_id) || anyNA(e$evidence_id)) stop("Missing roadmap provenance")
-  nodes$basis <- b$basis; nodes$basis_explanation <- b$explanation
-  for (field in c("section", "quote", "source_url", "catalog_year", "retrieved_on", "review_status", "note"))
-    nodes[[paste0("evidence_", field)]] <- e[[field]]
+  basis <- roadmaps$basis[roadmaps$basis$catalog_id == catalog_id, ]
+  basis <- basis[match(nodes$node_id, basis$node_id), ]
+  evidence <- catalog$evidence[match(basis$evidence_id, catalog$evidence$evidence_id), ]
+  if (anyNA(basis$node_id) || anyNA(evidence$evidence_id)) {
+    stop("[degree-requirements.R] Missing roadmap provenance")
+  }
+  nodes$basis <- basis$basis
+  nodes$basis_explanation <- basis$explanation
+  for (field in c("section", "quote", "source_url", "catalog_year", "retrieved_on", "review_status", "note")) {
+    nodes[[paste0("evidence_", field)]] <- evidence[[field]]
+  }
   nodes
 }
