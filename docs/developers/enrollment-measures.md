@@ -72,11 +72,14 @@ capacity standard.
 To compare like-for-like occupancy, derive fill rate from classlist headcounts at
 a single explicit lifecycle point rather than the DESR `enrolled` snapshot.
 Census `registered + dr_late` is the right denominator for census occupancy and
-attrition reporting, but **not** for deciding whether registration hit a seat
-ceiling. Enrollment projections use `classlist_total >= scheduled_capacity` as
-the historical registration-capacity signal; later drops cannot erase an
-earlier registration constraint, and over-cap overrides do not make the signal
-false. Because the class list has no registration timestamps, this is an
-operational proxy rather than a recovered peak-occupancy snapshot. Reporting
-class-list registrations, census enrollment, and final enrollment together
+attrition reporting, but **not** for deciding whether a course was full: census
+is the 15th day of instruction, and three weeks of drops separate it from the
+first day (the term calendar is stated once, in AGENTS.md's Enrollment Measures
+section). Enrollment projections (0.21.0) count capacity reached at
+`first_day_enrl / scheduled_capacity >= 0.98`, with `first_day_enrl` from
+`calc_first_day_enrl()`; over-cap overrides still count as reached. The
+ever-registered `classlist_total` is not an occupancy at all, because seats
+that turned over were never all held at once. Where the class lists carry no
+status dates there is no first-day count and the term is not judged. Reporting
+class-list registrations, first-day, census, and final enrollment together
 keeps those lifecycle questions separate.

@@ -1730,7 +1730,12 @@ fold using only earlier folds and pool again. The two figures above differ by
 **Status:** resolved 2026-10-16, model 0.19.0. `projection_capacity_metrics()`
 takes census occupancy (registered + late drops), or the students registered
 now for a target still filling. Planning sections and seat gaps are sized from
-`projected_census_equivalent` for the same reason.
+`projected_census_equivalent` for the same reason. **Superseded 2026-10-17,
+model 0.21.0:** occupancy is first-day enrollment (`calc_first_day_enrl()`),
+because census, the 15th day of instruction, follows three weeks of drops — on 598 ABQ+EA course-terms, 199 were
+full on the first day but under capacity at census — and sections are sized
+from `projected_first_day_equivalent`. A term without status dates is not
+judged.
 **Found:** 2026-10-16, auditing the Spring 2027 bundle (model 0.18.0)
 **Severity:** moderate — the flag fed the Capacity-bounded label, the capacity
 caveat, the demand signal, the five-point selection margin, and the pressure

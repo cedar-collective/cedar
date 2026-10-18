@@ -169,7 +169,7 @@ CEDAR_CONFIG_FILE_SPECS <- list(
   projection_groups = c("group_id", "label", "description", "market_id", "campuses", "include_gen_ed"),
   # Courses named explicitly in a group, beyond include_gen_ed. always_monitored
   # TRUE skips the pressure screen. history_start_term and retention_min_terms
-  # are per-course overrides of the model window and the census-retention
+  # are per-course overrides of the model window and the first-day-retention
   # minimum (blank = the model default); a course's override is the same in
   # every group that names it.
   projection_courses = c("group_id", "subject_course", "always_monitored",

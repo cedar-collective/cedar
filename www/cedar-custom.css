@@ -163,10 +163,6 @@
   padding-inline: 0;
 }
 
-.enrollment-projection-table-anchor {
-  scroll-margin-top: 76px;
-}
-
 /* Reactable's html-widget output is a fill item even when its declared height
    is auto. In a page-fill navbar that creates a circular 100%-of-auto height
    and collapses an unpaginated table to zero. Break that fill chain here so
@@ -178,24 +174,16 @@
   max-height: none !important;
 }
 
+/* A reactable whose rows open a detail view on click. */
+.cedar-clickable-rows .rt-tbody .rt-tr {
+  cursor: pointer;
+}
+
 .enrollment-projection-model-info {
   cursor: help;
   display: inline-flex;
   margin-left: 5px;
   vertical-align: middle;
-}
-
-.enrollment-projection-back {
-  align-items: center;
-  display: inline-flex;
-  font-weight: 600;
-  gap: 6px;
-  margin: 0 0 12px;
-  text-decoration: none;
-}
-
-.enrollment-projection-back:hover {
-  text-decoration: underline;
 }
 
 .enrollment-projection-summary {
@@ -255,14 +243,26 @@ details.enrollment-projection-method-guide {
 .projection-axis--thin { background: #f4e9d2; color: #7a5010; }
 .projection-axis--poor { background: #f2e3de; color: #7a2a1c; }
 
+/* Recent same-season terms in one projections-table cell: first-day
+   enrollment over sections, one column per term, aligned under the term
+   labels in the header. */
+.projection-history-grid {
+  column-gap: 6px;
+  display: grid;
+  font-variant-numeric: tabular-nums;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  text-align: right;
+}
+
+.projection-history-grid > span {
+  display: flex;
+  flex-direction: column;
+}
+
 .enrollment-projection-lead {
   font-size: 1.02rem;
   margin: 0 0 12px;
   max-width: 980px;
-}
-
-.enrollment-projection-dept-totals {
-  margin: 0 0 14px;
 }
 
 .enrollment-projection-method-family {

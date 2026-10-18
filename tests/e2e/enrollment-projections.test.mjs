@@ -14,6 +14,23 @@ function check(name, ok, detail = '') {
   console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${detail ? `  - ${detail}` : ''}`);
 }
 
+// A row click opens the course's evidence in a modal over the table.
+function evidenceShown() {
+  const modal = document.querySelector('.modal.show');
+  const title = modal ? modal.querySelector('.modal-title') : null;
+  return !!(title && /projection evidence/i.test(title.innerText) &&
+    document.getElementById('enrollment_projections-detail'));
+}
+
+async function closeEvidence(page) {
+  await page.evaluate(() => {
+    const close = document.querySelector('.modal.show .modal-footer button');
+    if (close) close.click();
+  });
+  await waitFor(page, () => !document.querySelector('.modal.show') &&
+    !document.querySelector('.modal-backdrop'), { timeout: 10000 });
+}
+
 (async () => {
   const { browser, page, jsErrors } = await launch({ width: 1440, height: 1000 });
   await connect(page, { tab: 'projections', expect: 'Projections', settle: 4500 });
@@ -26,7 +43,6 @@ function check(name, ok, detail = '') {
     'enrollment_projections-stability',
     'enrollment_projections-accuracy',
     'enrollment_projections-download',
-    'enrollment_projections-projection_table_anchor',
     'enrollment_projections-projection_table',
     'enrollment_projections-scenario_population',
     'enrollment_projections-scenario_growth',
@@ -159,19 +175,10 @@ function check(name, ok, detail = '') {
       return true;
     });
     await waitForIdle(page, { timeout: 60000 });
-    const otherOpened = otherDetail && await waitFor(page, () => {
-      const detail = document.getElementById('enrollment_projections-detail');
-      return detail && /projection evidence/i.test(detail.innerText);
-    }, { timeout: 30000 });
+    const otherOpened = otherDetail && await waitFor(page, evidenceShown, { timeout: 30000 });
     check(`a row opens its evidence on ${otherSeason.label} as well`,
       otherOpened, otherDetail ? '' : '(no row to click)');
-    if (otherOpened) {
-      await page.evaluate(() => {
-        const back = document.querySelector('.enrollment-projection-back');
-        if (back) back.click();
-      });
-      await waitForIdle(page, { timeout: 60000 });
-    }
+    if (otherOpened) await closeEvidence(page);
     // Restore the opening season; every later check reads that bundle.
     await setInput(page, 'enrollment_projections-target_term', initialContext.target);
     await waitForIdle(page);
@@ -192,8 +199,8 @@ function check(name, ok, detail = '') {
 
   let table = await readReactable(page, 'enrollment_projections-projection_table');
   const requiredHeaders = [
-    'Course', 'Sections', 'Seats', 'Likely range', 'vs last', 'Flags', 'Trend',
-    'Stability', 'Depth', 'Accuracy', 'Registrations', 'Basis', 'Why',
+    'Course', 'Sections', 'Seats (day 1)', 'Registrations', 'Flags',
+    'Stability', 'Depth', 'Accuracy',
   ];
   check(
     'projection table leads with the decision and keeps the evidence axes',
@@ -201,19 +208,54 @@ function check(name, ok, detail = '') {
       colIndex(table.headers, 'Sections') < colIndex(table.headers, 'Stability'),
     table.headers.join(' | ')
   );
+  // The method and its evidence live in the course modal; the department sits
+  // under the course and the change under the registrations, so the table
+  // fits a laptop window.
   check(
-    'summary carries a trend sparkline instead of four history columns',
-    table.headers.filter((header) =>
-      header.toLowerCase().includes('first day / sects')).length === 0 &&
-      !['Saturation floor', 'Regime check', 'Recommendation']
-        .some((header) => colIndex(table.headers, header) >= 0),
+    'the summary keeps method detail and secondary values out of their own columns',
+    !['Basis', 'Why', 'Dept', 'vs last', 'Likely range', 'Trend',
+      'Saturation floor', 'Regime check', 'Recommendation']
+      .some((header) => colIndex(table.headers, header) >= 0),
     table.headers.join(' | ')
   );
-  const deptTotals = await readReactable(page, 'enrollment_projections-department_table');
-  check('department subtotals render above the course table',
-    deptTotals.rows && deptTotals.rows.length > 0 &&
-      ['Dept', 'Sections to plan', 'Seats at census'].every((h) => colIndex(deptTotals.headers, h) >= 0),
-    (deptTotals.headers || []).join(' | '));
+  // Four recent same-season terms in one cell: first-day enrollment over
+  // sections, under the four term labels in the header.
+  const historyCells = await page.evaluate(() => {
+    const root = document.getElementById('enrollment_projections-projection_table');
+    if (!root) return null;
+    const header = [...root.querySelectorAll('.rt-thead .rt-th')]
+      .find((cell) => /first day \/ sections/i.test(cell.innerText));
+    const grids = [...root.querySelectorAll('.rt-tbody .projection-history-grid')];
+    return {
+      header: header ? header.innerText.replace(/\s+/g, ' ').trim() : null,
+      headerTerms: header ? header.querySelectorAll('.projection-history-grid > span').length : 0,
+      rows: root.querySelectorAll('.rt-tbody .rt-tr').length,
+      grids: grids.length,
+      slots: grids.every((grid) => grid.children.length === 4),
+      sections: grids.some((grid) => /\d+ sec/.test(grid.innerText)),
+      markupAsText: [...root.querySelectorAll('.rt-tbody .rt-td')]
+        .some((cell) => /<(svg|span|div)/.test(cell.innerText)),
+    };
+  });
+  check('recent first days and sections sit in one compact column',
+    historyCells && historyCells.headerTerms === 4 &&
+      historyCells.grids === historyCells.rows && historyCells.slots &&
+      historyCells.sections && !historyCells.markupAsText,
+    JSON.stringify(historyCells));
+  // The table must fit a laptop window: no horizontal scroll at 1440 or 1366.
+  const tableOverflow = async () => page.evaluate(() => {
+    const table = document.querySelector('#enrollment_projections-projection_table .rt-table');
+    return table ? table.scrollWidth - table.clientWidth : null;
+  });
+  const overflowWide = await tableOverflow();
+  await page.setViewport({ width: 1366, height: 1000 });
+  await waitForIdle(page);
+  const overflowLaptop = await tableOverflow();
+  await page.setViewport({ width: 1440, height: 1000 });
+  await waitForIdle(page);
+  check('the projection table fits a laptop window without horizontal scrolling',
+    overflowWide !== null && overflowWide <= 1 && overflowLaptop <= 1,
+    `overflow 1440: ${overflowWide}px, 1366: ${overflowLaptop}px`);
   check('saved projection rows render', table.rows.length > 0, `${table.rows.length} visible`);
   const naturalTableFlow = await page.evaluate(() => {
     const root = document.getElementById('enrollment_projections-projection_table');
@@ -247,15 +289,12 @@ function check(name, ok, detail = '') {
     return course;
   });
   await waitForIdle(page, { timeout: 60000 });
-  const detailOpened = await waitFor(page, () => {
-    const detail = document.getElementById('enrollment_projections-detail');
-    return detail && /projection evidence/i.test(detail.innerText);
-  }, { timeout: 30000 });
+  const detailOpened = await waitFor(page, evidenceShown, { timeout: 30000 });
   check('clicking a row in the unfiltered table opens its evidence',
     detailOpened, detailFromRow || '(no row to click)');
-  // Rendering the evidence is not the same as showing it. If the panel opens far
-  // below the fold and nothing moves the viewport, clicking a row looks like it
-  // did nothing at all -- which is indistinguishable from broken.
+  // Rendering the evidence is not the same as showing it. Evidence that opened
+  // far below the fold, with nothing moving the viewport, looked like a click
+  // that did nothing (reported twice); the modal must be on screen.
   const detailPlacement = await page.evaluate(() => {
     const detail = document.getElementById('enrollment_projections-detail');
     if (!detail) return null;
@@ -270,13 +309,7 @@ function check(name, ok, detail = '') {
   check('the evidence panel is reachable without hunting for it',
     detailPlacement && !detailPlacement.offscreen,
     detailPlacement ? JSON.stringify(detailPlacement) : '(no detail element)');
-  if (detailOpened) {
-    await page.evaluate(() => {
-      const back = document.querySelector('.enrollment-projection-back');
-      if (back) back.click();
-    });
-    await waitForIdle(page, { timeout: 60000 });
-  }
+  if (detailOpened) await closeEvidence(page);
 
   await setInput(page, 'enrollment_projections-group', 'all_saved');
   await waitFor(page, () => {
@@ -291,8 +324,19 @@ function check(name, ok, detail = '') {
       const root = document.getElementById('enrollment_projections-projection_table');
       return root && !root.querySelector('.rt-pagination');
     }));
+  const allSavedRows = table.rows.length;
   await setInput(page, 'enrollment_projections-group', 'always_monitored');
   await waitForIdle(page, { timeout: 60000 });
+  await waitFor(page, (n) => {
+    const root = document.getElementById('enrollment_projections-projection_table');
+    const rows = root ? root.querySelectorAll('.rt-tbody .rt-tr').length : 0;
+    return rows > 0 && rows < n;
+  }, { timeout: 60000, args: [allSavedRows] });
+  const monitored = await readReactable(page, 'enrollment_projections-projection_table');
+  const monitoredStability = colIndex(monitored.headers, 'Stability');
+  const monitoredOffset = monitored.rows[0].length - monitored.headers.length;
+  const expectedVolatile = monitored.rows.filter((row) =>
+    row[monitoredStability + monitoredOffset].trim().toLowerCase() === 'volatile').length;
 
   await setInput(page, 'enrollment_projections-stability', ['Volatile']);
   await waitFor(page, () => {
@@ -319,12 +363,13 @@ function check(name, ok, detail = '') {
 
   // The axes are independent: filtering to Volatile must not also filter the
   // evidence axes, or the table would be quietly answering a narrower question.
-  const accuracyIndex = colIndex(table.headers, 'Accuracy');
-  const depthIndex = colIndex(table.headers, 'Depth');
+  // So the filter keeps every Volatile row the unfiltered group showed. (This
+  // once asked for mixed Depth or Accuracy values among the Volatile rows,
+  // which is a property of the data: Spring 2027's three are all Deep / Poor.)
   check(
-    'volatile rows still span more than one depth or accuracy value',
-    new Set(table.rows.map((row) => row[depthIndex + selectionOffset].trim())).size > 1 ||
-      new Set(table.rows.map((row) => row[accuracyIndex + selectionOffset].trim())).size > 1
+    'the stability filter keeps every volatile row and drops no other axis',
+    expectedVolatile > 0 && table.rows.length === expectedVolatile,
+    `${table.rows.length} shown, ${expectedVolatile} volatile before filtering`
   );
 
   await setInput(page, 'enrollment_projections-stability', null);
@@ -350,6 +395,20 @@ function check(name, ok, detail = '') {
     '#enrollment_projections-history_table .rt-tbody .rt-tr',
     { timeout: 60000 }
   );
+  // The method plot, movement diagnostic, and candidate table sit in the
+  // collapsed Analyst detail accordion, and Shiny renders nothing inside it
+  // until it opens -- so open it before waiting on any of them.
+  const movementPanel = await page.evaluate(() => {
+    const panel = document.querySelector('details.enrollment-projection-movement');
+    if (panel) panel.open = true;
+    return {
+      found: !!panel,
+      title: panel ? panel.querySelector('summary')?.innerText.trim() : '',
+    };
+  });
+  check('course detail includes the analyst detail accordion',
+    movementPanel.found && movementPanel.title.includes('movement diagnostic'),
+    movementPanel.title || '(missing)');
   await waitForSelector(
     page,
     '#enrollment_projections-candidate_table .rt-tbody .rt-tr',
@@ -364,17 +423,6 @@ function check(name, ok, detail = '') {
     '#enrollment_projections-method_history_plot .main-svg',
     { timeout: 60000, nonEmpty: false }
   );
-  const movementPanel = await page.evaluate(() => {
-    const panel = document.querySelector('details.enrollment-projection-movement');
-    if (panel) panel.open = true;
-    return {
-      found: !!panel,
-      title: panel ? panel.querySelector('summary')?.innerText.trim() : '',
-    };
-  });
-  check('course detail includes the enrollment movement accordion',
-    movementPanel.found && movementPanel.title.includes('Enrollment movement diagnostic'),
-    movementPanel.title || '(missing)');
   await waitForSelector(
     page,
     '#enrollment_projections-movement_table .rt-tbody .rt-tr',
@@ -393,13 +441,13 @@ function check(name, ok, detail = '') {
   check('course detail retains planning, bias, and population-fit evidence',
     ['Plan ', 'Planning recommendation', 'Saturation floor', 'Fall deltas', 'Regime check']
       .every((label) => detailSummaryText.includes(label)), detailSummaryText.slice(0, 500));
-  await waitForSelector(page, '.enrollment-projection-back', { timeout: 60000 });
+  await waitForSelector(page, '.modal.show .modal-footer button', { timeout: 60000 });
 
   const history = await readReactable(page, 'enrollment_projections-history_table');
   const expectedHistoryOrder = [
     'Term', 'Method that term', 'Aftcast', 'Raw error', 'Assessment',
-    'First day / ever registered', 'Census', 'Final / last day',
-    'Sections', 'Capacity', 'Census fill', 'Potential explanation',
+    'Ever registered', 'First day', 'Census', 'Final / last day',
+    'Sections', 'Capacity', 'First-day fill', 'Potential explanation',
   ];
   check(
     'history places aftcast and error before actual enrollment',
@@ -407,9 +455,32 @@ function check(name, ok, detail = '') {
       history.headers[i] && history.headers[i].toLowerCase() === name.toLowerCase()),
     history.headers.join(' | ')
   );
+  // Capacity-bounded is an overprojection on a term whose first day filled
+  // 98% of the seats or more. Check that property row by row rather than
+  // expecting one particular course to have such a term: CHEM 1215 filled
+  // 98.8% in Spring 2026, but its aftcasts there did not overshoot.
+  const historyOffset = history.rows.length
+    ? history.rows[0].length - history.headers.length : 0;
+  const historyCell = (row, name) =>
+    row[colIndex(history.headers, name) + historyOffset].trim();
+  const percentValue = (text) => {
+    const value = Number.parseFloat(text.replace(/[^0-9.+-]/g, ''));
+    return Number.isFinite(value) ? value : null;
+  };
+  const boundedMismatches = history.rows.filter((row) => {
+    const bounded = historyCell(row, 'Assessment') === 'Capacity-bounded';
+    const error = percentValue(historyCell(row, 'Raw error'));
+    const fill = percentValue(historyCell(row, 'First-day fill'));
+    const over = error !== null && error > 0;
+    if (bounded) return !over || fill === null || fill < 98;
+    // 98.0% can be a rounded 97.96%; only an unambiguous fill must be labeled.
+    return over && fill !== null && fill >= 98.1 &&
+      historyCell(row, 'Assessment') !== 'No aftcast';
+  });
   check(
-    'capacity-bounded history is labeled rather than shown as zero error',
-    history.rows.some((row) => row.join(' ').includes('Capacity-bounded'))
+    'capacity-bounded labels exactly the overprojected terms that filled 98% on day one',
+    history.rows.length > 0 && boundedMismatches.length === 0,
+    boundedMismatches.map((row) => row.join(' | ')).join(' / ') || `${history.rows.length} rows`
   );
 
   const detailEvidence = await page.evaluate(() => {
@@ -419,14 +490,16 @@ function check(name, ok, detail = '') {
       .map((node) => node.textContent.trim()) : [];
     return { text: detail ? detail.innerText : '', traces };
   });
-  check('detail says aftcasts are scored against the first-day proxy',
-    detailEvidence.text.includes('against the first day / ever registered proxy'));
+  check('detail says aftcasts are scored against ever-registered demand',
+    detailEvidence.text.includes('against ever-registered demand') &&
+      detailEvidence.text.includes('judged on the first day of classes'));
   check('detail explains all three axes separately for CHEM 1215',
     detailEvidence.text.includes('Stability:') &&
       detailEvidence.text.includes('Depth:') &&
       detailEvidence.text.includes('Accuracy:'));
   check('historical plot includes all enrollment lifecycle measures',
-    ['First day / ever registered (model target)', 'Census', 'Final / last day']
+    ['Ever registered (model target)', 'First day (seats judged here)', 'Census',
+      'Final / last day']
       .every((name) => detailEvidence.traces.includes(name)),
     detailEvidence.traces.join(' | '));
   check('historical plot highlights the selected method',
@@ -435,29 +508,23 @@ function check(name, ok, detail = '') {
 
   const candidates = await readReactable(page, 'enrollment_projections-candidate_table');
   const candidateText = candidates.rows.flat().join(' ');
-  check('broad-population candidate is visible', candidateText.includes('Spring population growth'));
-  check('major/classification candidate is visible', candidateText.includes('Spring cohort flow'));
-  check('all nine candidates are inspectable', candidates.rows.length === 9,
-    `${candidates.rows.length} rows`);
+  // 0.20.0 retired every candidate but the spine and its adjusted form.
+  check('both candidates are inspectable',
+    candidates.rows.length === 2 &&
+      candidateText.includes('Prior same-season + floor + Fall deltas'),
+    `${candidates.rows.length} rows: ${candidateText.slice(0, 200)}`);
 
-  await page.evaluate(() => {
-    document.querySelector('.enrollment-projection-back').click();
-  });
-  const returnedToTable = await waitFor(page, () =>
-    {
-      const firstRow = document.querySelector(
-        '#enrollment_projections-projection_table .rt-tbody .rt-tr'
-      );
-      const detail = document.getElementById('enrollment_projections-detail');
-      const rowRect = firstRow ? firstRow.getBoundingClientRect() : null;
-      return location.hash === '#enrollment_projections-projection_table_anchor' &&
-        document.activeElement &&
-        document.activeElement.id === 'enrollment_projections-projection_table_anchor' &&
-        rowRect && rowRect.top >= 0 && rowRect.top < window.innerHeight &&
-        detail && detail.innerText.includes('Select a projection row');
-    },
-  { timeout: 10000 });
-  check('projection evidence includes navigation back to the table', returnedToTable);
+  // Closing the modal returns the reader to the table exactly where they were.
+  const scrollBefore = await page.evaluate(() => Math.round(window.scrollY));
+  await closeEvidence(page);
+  const returnedToTable = await page.evaluate((before) => {
+    const firstRow = document.querySelector(
+      '#enrollment_projections-projection_table .rt-tbody .rt-tr');
+    return !document.querySelector('.modal.show') &&
+      !document.querySelector('.modal-backdrop') &&
+      !!firstRow && Math.abs(Math.round(window.scrollY) - before) <= 1;
+  }, scrollBefore);
+  check('closing the evidence returns to the same place in the table', returnedToTable);
 
   // ---- Scenario sub-tab --------------------------------------------------
   await openSubTab(page, 'Scenario');
@@ -515,12 +582,10 @@ function check(name, ok, detail = '') {
     return true;
   });
   await waitForIdle(page, { timeout: 60000 });
-  const reopened = detailAfterScenario && await waitFor(page, () => {
-    const detail = document.getElementById('enrollment_projections-detail');
-    return detail && /projection evidence/i.test(detail.innerText);
-  }, { timeout: 30000 });
+  const reopened = detailAfterScenario && await waitFor(page, evidenceShown, { timeout: 30000 });
   check('a row still opens its evidence after visiting the Scenario sub-tab',
     reopened, detailAfterScenario ? '' : '(no row to click)');
+  if (reopened) await closeEvidence(page);
 
   await clickNavTab(page, 'Enrollment');
   await waitFor(page, () => location.search === '?tab=enrollment', { timeout: 30000 });

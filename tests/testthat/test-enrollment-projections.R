@@ -21,6 +21,7 @@ projection_test_history <- function(values = c(100, 110, 120, 130),
     dr_early = 0,
     dr_late = 0,
     classlist_total = values,
+    first_day_enrl = values,
     census_enrl = values
   )
 }
@@ -61,11 +62,20 @@ projection_test_row <- function(course = "TEST 101") {
 
 # A published bundle over the designed fixtures, for tests that need real saved
 # artifacts rather than a hand-assembled payload. Terms are settled by
-# construction so the feature builder's data-edge check passes.
+# construction so the feature builder's data-edge check passes. The designed
+# class lists carry no status dates, so they are dated here: late drops after
+# the first class day, every other row before it. First-day enrollment then
+# equals census on this fixture; the tests that separate the two build their
+# own frames.
 projection_fixture_bundle <- function(target_term, as_of_term,
                                       history_start_term) {
   settled_students <- test_students %>%
-    dplyr::mutate(as_of_date = .cedar_term_start(term) + 30L)
+    dplyr::mutate(
+      as_of_date = .cedar_term_start(term) + 30L,
+      registration_date = .cedar_term_start(term) + dplyr::if_else(
+        registration_status_code %in% STATUS_DROP_LATE, 20L, -10L
+      )
+    )
   build_enrollment_projection_bundle(
     cl_enrls = calc_cl_enrls(settled_students, by_part_term = TRUE),
     sections = test_sections,
@@ -116,8 +126,9 @@ projection_summary_backtests <- function(
     method_label = method_label,
     method_role = method_role, applicable = TRUE,
     projected_classlist_total = projected, actual_classlist_total = actual,
-    census_retention_rate = 1,
-    projected_census_equivalent = projected, actual_census = actual,
+    first_day_retention_rate = 1,
+    projected_first_day_equivalent = projected, actual_first_day = actual,
+    actual_census = actual,
     scheduled_capacity = capacity, capacity_fill = actual / capacity,
     capacity_usable = TRUE, capacity_reached = constrained,
     error = error, abs_error = abs(error),
@@ -128,30 +139,46 @@ projection_summary_backtests <- function(
   )
 }
 
-test_that("capacity censoring follows census occupancy, not ever-registered demand", {
-  # Rows 1 and 4 have ever-registered demand at or over the 500 seats but
-  # census well under them: seats turned over, they were never full. Only row
-  # 3, where census filled the seats, is capacity-bounded.
+test_that("capacity censoring follows first-day occupancy, not census or ever-registered demand", {
+  # Row 1 has ever-registered demand at the 500 seats but 420 on the first
+  # day: seats turned over, they were never full. Row 3 filled every seat on
+  # the first day and read 94% at census after three weeks of drops: it is
+  # capacity-bounded, and a census test would miss it. Row 4 has no
+  # reconstructable first day; census says full, but an unknown first day is
+  # unknown occupancy, so it is not judged at all. Rows 5 and 6 sit either side
+  # of the 98% line: ten empty seats of 500 is full, fifteen is not.
   backtests <- tibble::tibble(
-    projected_classlist_total = c(600, 480, 600, 600),
-    actual_classlist_total = c(500, 450, 450, 520),
-    projected_census_equivalent = c(450, 400, 500, 450),
-    actual_census = c(400, 450, 500, 400),
-    scheduled_capacity = c(500, 500, 500, 500)
+    projected_classlist_total = c(600, 480, 600, 600, 600, 600),
+    actual_classlist_total = c(500, 450, 450, 520, 495, 495),
+    projected_first_day_equivalent = c(450, 400, 500, 450, 495, 495),
+    actual_first_day = c(420, 450, 500, NA, 490, 485),
+    actual_census = c(400, 450, 470, 500, 470, 470),
+    scheduled_capacity = c(500, 500, 500, 500, 500, 500)
   ) %>%
     add_projection_capacity_censoring()
 
-  expect_equal(backtests$capacity_fill, c(0.8, 0.9, 1.0, 0.8))
-  expect_equal(backtests$capacity_gap, c(100, 50, 0, 100))
-  expect_equal(backtests$capacity_reached, c(FALSE, FALSE, TRUE, FALSE))
-  expect_equal(backtests$abs_error, c(100, 30, 150, 80))
+  expect_equal(backtests$capacity_fill, c(0.84, 0.9, 1.0, NA, 0.98, 0.97))
+  expect_equal(backtests$capacity_gap, c(80, 50, 0, NA, 10, 15))
+  expect_equal(
+    backtests$capacity_usable, c(TRUE, TRUE, TRUE, FALSE, TRUE, TRUE)
+  )
+  expect_equal(
+    backtests$capacity_reached, c(FALSE, FALSE, TRUE, FALSE, TRUE, FALSE)
+  )
+  expect_equal(backtests$abs_error, c(100, 30, 150, 80, 105, 105))
   expect_equal(
     backtests$capacity_censored_classlist_projection,
-    c(600, 480, 450, 600)
+    c(600, 480, 450, 600, 495, 600)
   )
-  expect_equal(backtests$capacity_censored_abs_error, c(100, 30, 0, 80))
-  expect_equal(backtests$capacity_explained_classlist_error, c(0, 0, 150, 0))
-  expect_equal(backtests$capacity_censored_miss, c(FALSE, FALSE, TRUE, FALSE))
+  expect_equal(
+    backtests$capacity_censored_abs_error, c(100, 30, 0, 80, 0, 105)
+  )
+  expect_equal(
+    backtests$capacity_explained_classlist_error, c(0, 0, 150, 0, 105, 0)
+  )
+  expect_equal(
+    backtests$capacity_censored_miss, c(FALSE, FALSE, TRUE, FALSE, TRUE, FALSE)
+  )
 })
 
 test_that("Gen Ed and FYEX monitoring group has an explicit campus scope", {
@@ -194,7 +221,7 @@ test_that("Gen Ed and FYEX monitoring group has an explicit campus scope", {
   config <- enrollment_projection_model_config()
   expect_equal(config$history_start_term, 202210L)
   expect_equal(config$course_history_start_terms[["MATH 1215"]], 202580L)
-  expect_equal(config$course_census_retention_min_terms[["MATH 1215"]], 1L)
+  expect_equal(config$course_first_day_retention_min_terms[["MATH 1215"]], 1L)
   expect_equal(config$saturation_fill_threshold, 0.90)
   expect_equal(config$projection_methods, names(CEDAR_ENROLLMENT_PROJECTION_METHODS))
   expect_identical(
@@ -282,51 +309,76 @@ test_that("projection preparation filters campuses and matches course codes exac
 })
 
 test_that("course-market class-list demand includes drops and deduplicates delivery", {
+  # Classes begin 2023-08-21. s5 dropped in the first week (DR dated after the
+  # start): on the first day, gone by census -- the case that separates the
+  # two counts. s6 dropped before classes began. Fall 2024 has an undated row,
+  # so its first day is unknown rather than a partial count.
   students <- tibble::tribble(
-    ~student_id, ~term, ~campus, ~college, ~subject_course, ~registration_status_code,
-    "s1", 202380L, "ABQ", "AS", "MATH 1215", "RE",
-    "s1", 202380L, "EA",  "AS", "MATH 1215", "RE",
-    "s2", 202380L, "ABQ", "AS", "MATH 1215", "DW",
-    "s5", 202380L, "EA",  "AS", "MATH 1215", "DR",
-    "s6", 202380L, "ABQ", "AS", "MATH 1215", "DD",
-    "s7", 202380L, "EA",  "AS", "MATH 1215", "DG",
-    "s8", 202380L, "ABQ", "AS", "MATH 1215", "WL",
-    "s9", 202380L, "EA",  "AS", "MATH 1215", "XX",
-    "s3", 202380L, "GA",  "AS", "MATH 1215", "RE",
-    "s4", 202380L, "ABQ", "AS", "MATH 1215Z", "RE"
+    ~student_id, ~term, ~campus, ~college, ~subject_course, ~registration_status_code, ~crn, ~registration_date,
+    "s1", 202380L, "ABQ", "AS", "MATH 1215", "RE", "A1", "2023-08-01",
+    "s1", 202380L, "EA",  "AS", "MATH 1215", "RE", "E1", "2023-08-01",
+    "s2", 202380L, "ABQ", "AS", "MATH 1215", "DW", "A1", "2023-10-15",
+    "s5", 202380L, "EA",  "AS", "MATH 1215", "DR", "E1", "2023-08-25",
+    "s6", 202380L, "ABQ", "AS", "MATH 1215", "DD", "A1", "2023-08-10",
+    "s7", 202380L, "EA",  "AS", "MATH 1215", "DG", "E1", "2023-10-01",
+    "s8", 202380L, "ABQ", "AS", "MATH 1215", "WL", "A1", NA,
+    "s9", 202380L, "EA",  "AS", "MATH 1215", "XX", "E1", "2023-08-01",
+    "s3", 202380L, "GA",  "AS", "MATH 1215", "RE", "G1", "2023-08-01",
+    "s4", 202380L, "ABQ", "AS", "MATH 1215Z", "RE", "Z1", "2023-08-01",
+    "s1", 202480L, "ABQ", "AS", "MATH 1215", "RE", "A2", "2024-08-01",
+    "s2", 202480L, "ABQ", "AS", "MATH 1215", "RE", "A2", NA
+  ) %>%
+    dplyr::mutate(
+      registration_date = as.Date(registration_date),
+      as_of_date = as.Date(dplyr::if_else(term == 202380L, "2023-12-20", "2024-12-20"))
+    )
+  sections <- tibble::tibble(
+    term = c(202380L, 202380L, 202380L, 202380L, 202480L),
+    crn = c("A1", "E1", "G1", "Z1", "A2"),
+    start_date = as.Date(c(rep("2023-08-21", 4), "2024-08-19"))
   )
 
   history <- prepare_projection_market_enrollment_history(
-    students,
+    students, sections,
     courses = "MATH 1215",
     campuses = c("ABQ", "EA"),
     market_id = "abq_ea_course_market"
   )
+  fall_2023 <- dplyr::filter(history, term == 202380L)
 
-  expect_equal(nrow(history), 1L)
-  expect_equal(history$registered, 1L)
-  expect_equal(history$dr_early, 2L)
-  expect_equal(history$dr_late, 2L)
-  expect_equal(history$other_non_waitlist, 1L)
-  expect_equal(history$classlist_total, 6L)
-  expect_equal(history$census_enrl, 3L)
-  expect_equal(history$census_retention_rate, 1 / 2)
+  expect_equal(nrow(history), 2L)
+  expect_equal(fall_2023$registered, 1L)
+  expect_equal(fall_2023$dr_early, 2L)
+  expect_equal(fall_2023$dr_late, 2L)
+  expect_equal(fall_2023$other_non_waitlist, 1L)
+  expect_equal(fall_2023$classlist_total, 6L)
+  expect_equal(fall_2023$census_enrl, 3L)
+  # s1 once across both campuses, plus s2, s5 and s7.
+  expect_equal(fall_2023$first_day_enrl, 4)
+  expect_equal(fall_2023$first_day_retention_rate, 4 / 6)
+  expect_true(is.na(history$first_day_enrl[history$term == 202480L]))
+  expect_true(is.na(history$first_day_retention_rate[history$term == 202480L]))
 })
 
-test_that("census retention uses only prior same-season class-list outcomes", {
+test_that("first-day retention reads prior same-season first days and skips unknown ones", {
+  # Fall 2020 has no reconstructable first day: it is skipped, not read as
+  # census. Census runs lower throughout, so a census rate would be 0.70.
   history <- projection_test_history(
-    c(100, 100, 100), terms = c(202080L, 202180L, 202280L)
+    c(100, 100, 100, 100), terms = c(201980L, 202080L, 202180L, 202280L)
   ) %>%
-    dplyr::mutate(census_enrl = c(80, 90, 100))
+    dplyr::mutate(
+      first_day_enrl = c(80, NA, 90, 100),
+      census_enrl = c(60, 70, 80, 95)
+    )
 
-  result <- projection_census_retention_for_row(
+  result <- projection_first_day_retention_for_row(
     history, projection_test_row(), 202280L,
-    opt = list(census_retention_min_terms = 2L)
+    opt = list(first_day_retention_min_terms = 2L)
   )
 
-  expect_equal(result$census_retention_rate, 0.85)
-  expect_equal(result$census_retention_n_terms, 2L)
-  expect_equal(result$census_retention_terms, "202080,202180")
+  expect_equal(result$first_day_retention_rate, 0.85)
+  expect_equal(result$first_day_retention_n_terms, 2L)
+  expect_equal(result$first_day_retention_terms, "201980,202180")
 })
 
 test_that("course-market capacity pools campus and part-term components", {
@@ -407,7 +459,7 @@ test_that("recent history pairs actuals and sections with current-method aftcast
   expect_equal(recent$scheduled_sections, c(4L, 4L, 3L))
   expect_equal(recent$aftcast_classlist_total, c(120, 110, 100))
   expect_equal(recent$aftcast_method_label, rep("Prior same-season", 3))
-  expect_equal(recent$census_fill, c(130 / 135, 120 / 125, 110 / 115))
+  expect_equal(recent$first_day_fill, c(130 / 135, 120 / 125, 110 / 115))
   expect_equal(round(recent$aftcast_pct_error, 3), c(-0.077, -0.083, -0.091))
   expect_equal(
     round(recent$classlist_change, 3),
@@ -423,24 +475,28 @@ test_that("movement diagnostics attach upstream, capacity, and canonical DFW con
       subject_course = "TEST 101", term_type = "fall",
       projection_target_term = 202480L, history_term = 202280L,
       history_term_label = "Fall 2022", recency_rank = 2L,
-      actual_classlist_total = 100, actual_census = 95,
+      actual_classlist_total = 100, actual_first_day = NA_real_,
+      actual_census = 95,
       actual_final_enrollment = 90, scheduled_sections = 3L,
       scheduled_capacity = 105, prior_classlist_total = 80,
       prior_scheduled_capacity = 85, classlist_change = 0.25,
-      capacity_change = 20 / 85, census_fill = 95 / 105,
-      capacity_reached = FALSE, potential_miss_explanation = "Test"
+      capacity_change = 20 / 85, first_day_fill = NA_real_,
+      capacity_usable = FALSE, capacity_reached = FALSE,
+      potential_miss_explanation = "Test"
     ) %>%
     tibble::add_row(
       market_id = "abq_ea_course_market", college = "AS", department = "TEST",
       subject_course = "TEST 101", term_type = "fall",
       projection_target_term = 202480L, history_term = 202380L,
       history_term_label = "Fall 2023", recency_rank = 1L,
-      actual_classlist_total = 130, actual_census = 125,
+      actual_classlist_total = 130, actual_first_day = 135,
+      actual_census = 125,
       actual_final_enrollment = 120, scheduled_sections = 4L,
       scheduled_capacity = 135, prior_classlist_total = 100,
       prior_scheduled_capacity = 105, classlist_change = 0.30,
-      capacity_change = 30 / 105, census_fill = 125 / 135,
-      capacity_reached = TRUE, potential_miss_explanation = "Test"
+      capacity_change = 30 / 105, first_day_fill = 1,
+      capacity_usable = TRUE, capacity_reached = TRUE,
+      potential_miss_explanation = "Test"
     )
   signals <- list(
     university_term_signals = tibble::tibble(
@@ -479,6 +535,13 @@ test_that("movement diagnostics attach upstream, capacity, and canonical DFW con
   detail <- build_enrollment_projection_movement_detail(attached)
   expect_equal(nrow(detail$data), 2L)
   expect_match(detail$schedule_summary, "too few comparable movements")
+  # Fall 2022 has no reconstructable first day: it is not a usable term, so
+  # it can count neither as reached nor as one of the terms judged.
+  expect_match(
+    detail$schedule_summary,
+    "reached scheduled capacity (98% of seats or more) in 1 of 1 terms where first day and capacity are both known",
+    fixed = TRUE
+  )
   expect_match(detail$upstream_summary, "enrolled-student population changed")
   expect_match(detail$dfw_summary, "10 of them then enrolled")
   expect_match(detail$caveat, "not causal attribution")
@@ -491,6 +554,8 @@ test_that("movement diagnostics attach upstream, capacity, and canonical DFW con
 })
 
 test_that("projection summary history aligns four same-season terms", {
+  # TEST 201 was not offered in Fall 2021, and Fall 2022's class lists carry no
+  # status dates: both read as missing, never as zero or as another count.
   projections <- tibble::tibble(
     subject_course = c("TEST 101", "TEST 201")
   )
@@ -506,28 +571,36 @@ test_that("projection summary history aligns four same-season terms", {
       "Fall 2020", "Fall 2022", "Fall 2023"
     ),
     actual_classlist_total = c(100, 110, 120, 130, 50, 60, 70),
+    actual_first_day = c(95, 104, NA, 1210, 48, NA, 66),
     scheduled_sections = c(3L, 3L, 4L, 4L, 2L, 2L, 3L)
   )
 
   summary <- build_enrollment_projection_history_summary(
     projections, history
   )
+  first <- summary$data[summary$data$course == "TEST 101", ]
+  second <- summary$data[summary$data$course == "TEST 201", ]
 
   expect_equal(summary$columns$term, c(202080L, 202180L, 202280L, 202380L))
-  expect_equal(summary$columns$header, paste0(
-    c("Fa20", "Fa21", "Fa22", "Fa23"), ": first day / sects"
-  ))
+  expect_equal(summary$columns$abbr, c("Fa20", "Fa21", "Fa22", "Fa23"))
+  expect_equal(first$recent_first_day[[1]], c(95, 104, NA, 1210))
+  expect_equal(first$recent_sections[[1]], c(3, 3, 4, 4))
+  expect_equal(second$recent_first_day[[1]], c(48, NA, NA, 66))
+  expect_equal(second$recent_sections[[1]], c(2, NA, 2, 3))
   expect_equal(
-    unname(unlist(
-      summary$data[
-        summary$data$course == "TEST 101", paste0("history_", 1:4)
-      ],
-      use.names = FALSE
-    )),
-    c("100 / 3", "110 / 3", "120 / 4", "130 / 4")
+    first$recent_terms,
+    paste(
+      "Fa20 95 first day / 3 sections; Fa21 104 first day / 3 sections;",
+      "Fa22 \u2014 first day / 4 sections; Fa23 1,210 first day / 4 sections"
+    )
   )
-  expect_true(is.na(summary$data$history_2[summary$data$course == "TEST 201"]))
   expect_equal(enrollment_projection_model_config()$recent_history_terms, 4L)
+  expect_error(
+    build_enrollment_projection_history_summary(
+      projections, dplyr::select(history, -actual_first_day)
+    ),
+    "actual_first_day"
+  )
 })
 
 test_that("the three axes are explained separately and may disagree", {
@@ -592,6 +665,10 @@ test_that("historical-method plot compares one term type with lifecycle actuals"
       actual_classlist_total = c(205, 215, 225)[match(
         target_term, c(202410L, 202510L, 202610L)
       )],
+      # Spring 2025 carries no status dates: its first day is a gap.
+      actual_first_day = dplyr::if_else(
+        target_term == 202510L, NA_real_, actual_classlist_total - 5
+      ),
       actual_census = actual_classlist_total - 10,
       actual_final_enrollment = actual_classlist_total - 15
     )
@@ -603,11 +680,14 @@ test_that("historical-method plot compares one term type with lifecycle actuals"
   trace_names <- vapply(built$x$data, function(trace) trace$name, character(1))
 
   expect_s3_class(plot, "plotly")
-  expect_true("First day / ever registered (model target)" %in% trace_names)
+  expect_true("Ever registered (model target)" %in% trace_names)
+  expect_true("First day (seats judged here)" %in% trace_names)
   expect_true("Census" %in% trace_names)
   expect_true("Final / last day" %in% trace_names)
   expect_true("Prior same-season + floor + Fall deltas (selected)" %in% trace_names)
-  expect_equal(length(trace_names), 5L)
+  expect_equal(length(trace_names), 6L)
+  first_day_trace <- built$x$data[[which(trace_names == "First day (seats judged here)")]]
+  expect_true(is.na(first_day_trace$y[[2]]))
 
   mixed <- dplyr::bind_rows(
     history,
@@ -707,7 +787,7 @@ test_that("pressure exclusions report the comparable-term evidence", {
   expect_match(
     screen$inclusion_reason,
     paste(
-      "Not selected: 1 of 3 recent fall terms with census enrollment",
+      "Not selected: 1 of 3 recent fall terms with first-day enrollment",
       "at or above 90% of scheduled capacity"
     )
   )
@@ -757,19 +837,21 @@ test_that("an unavailable target schedule produces a planning recommendation", {
   expect_true(result$adjusted_saturated_prior)
 })
 
-test_that("planning sections are sized from expected census, not ever-registered demand", {
-  # Every early drop freed a seat someone else took: 110 students were ever
-  # registered but 88 held seats at census. Sections follow the 88.
+test_that("planning sections are sized from expected first-day enrollment, not census or ever-registered demand", {
+  # 100 students were ever registered, 90 held seats on the first day, and 60
+  # were left at census. Sections follow the 90: everyone in the room on day
+  # one needs a seat. With 32-seat sections the three readings disagree --
+  # census would plan 2 sections and the ever-registered headline 4.
   history <- projection_test_history(
-    c(90, 100, 110), terms = c(202180L, 202280L, 202380L)
-  ) %>% dplyr::mutate(census_enrl = c(72, 80, 88), registered = census_enrl)
+    c(100, 100, 100), terms = c(202180L, 202280L, 202380L)
+  ) %>% dplyr::mutate(first_day_enrl = 90, census_enrl = 60, registered = 60)
   sections <- tibble::tibble(
     market_id = "abq_ea_course_market", college = "AS", department = "TEST",
     course_title = "Test Course", subject_course = "TEST 101",
     term = c(202280L, 202380L), term_type = "fall",
-    scheduled_sections = c(3L, 3L), scheduled_enrl = c(80, 88),
-    scheduled_capacity = c(105, 105), n_delivery_components = 2L,
-    n_campuses = 2L, capacity_per_section = 35
+    scheduled_sections = c(3L, 3L), scheduled_enrl = c(60, 60),
+    scheduled_capacity = c(96, 96), n_delivery_components = 2L,
+    n_campuses = 2L, capacity_per_section = 32
   )
   inputs <- list(
     enrollment_history = history,
@@ -796,21 +878,21 @@ test_that("planning sections are sized from expected census, not ever-registered
     opt = list(projection_methods = "seasonal_last")
   )$projections
 
-  expect_equal(result$projected_classlist_total, 110)
-  expect_equal(result$census_retention_rate, 0.8)
-  expect_equal(result$projected_census_equivalent, 88)
-  # ceiling(88 / 35) = 3; sizing from the 110 headline would say 4.
+  expect_equal(result$projected_classlist_total, 100)
+  expect_equal(result$first_day_retention_rate, 0.9)
+  expect_equal(result$projected_first_day_equivalent, 90)
+  # ceiling(90 / 32) = 3; census (60) would say 2, the 100 headline 4.
   expect_equal(result$recommended_sections, 3L)
   expect_equal(result$recommendation, "Plan 3 section(s)")
 })
 
-test_that("the pressure screen reads census fill, so seat churn is not demand pressure", {
+test_that("the pressure screen reads first-day fill, so neither seat churn nor census drops decide pressure", {
   # 120 students ever registered against 100 seats every term, but only 80
-  # held seats at census: the course never filled. Under the retired
+  # held seats on the first day: the course never filled. Under the retired
   # ever-registered rule this would have passed as chronically full.
   history <- projection_test_history(
     c(120, 120, 120), terms = c(202180L, 202280L, 202380L)
-  ) %>% dplyr::mutate(census_enrl = 80, registered = 80)
+  ) %>% dplyr::mutate(first_day_enrl = 80, census_enrl = 70, registered = 70)
   sections <- tibble::tibble(
     market_id = "abq_ea_course_market", college = "AS", department = "TEST",
     course_title = "Test Course", subject_course = "TEST 101",
@@ -825,14 +907,24 @@ test_that("the pressure screen reads census fill, so seat churn is not demand pr
 
   expect_false(screen$included)
   expect_equal(screen$recent_high_fill_terms, 0L)
-  expect_match(screen$inclusion_reason, "0 of 3 recent fall terms with census enrollment")
+  expect_match(screen$inclusion_reason, "0 of 3 recent fall terms with first-day enrollment")
 
+  # Full on the first day (95%) and 80% at census after week-one drops: a
+  # census rule would not call this chronic.
   full <- build_projection_pressure_screen(
-    dplyr::mutate(history, census_enrl = 95), sections, 202480L,
-    scope_courses = "TEST 101"
+    dplyr::mutate(history, first_day_enrl = 95, census_enrl = 80),
+    sections, 202480L, scope_courses = "TEST 101"
   )
   expect_true(full$included)
   expect_true(full$pressure_chronic_fill)
+
+  # A first day that cannot be reconstructed is no evidence either way.
+  unknown <- build_projection_pressure_screen(
+    dplyr::mutate(history, first_day_enrl = NA_real_, census_enrl = 95),
+    sections, 202480L, scope_courses = "TEST 101"
+  )
+  expect_false(unknown$pressure_chronic_fill)
+  expect_equal(unknown$recent_capacity_terms, 0L)
 })
 
 test_that("capacity context distinguishes saturation, growth, and added-seat response", {
@@ -894,7 +986,7 @@ test_that("target class-list snapshot drives the active seat check", {
       registered = 500, dr_early = 20, dr_late = 0,
       other_non_waitlist = 0,
       classlist_total = 520, census_enrl = 500,
-      census_retention_rate = 500 / 520
+      first_day_retention_rate = 500 / 520
     ),
     students = empty_students, target_courses = "TEST 101",
     target_campuses = c("ABQ", "EA"),
@@ -914,7 +1006,7 @@ test_that("target class-list snapshot drives the active seat check", {
   # are its occupancy; ever-registered to date is a demand count beside it.
   expect_equal(result$method_id, "seasonal_last")
   expect_equal(result$projected_classlist_total, 600)
-  expect_equal(result$projected_census_equivalent, 600)
+  expect_equal(result$projected_first_day_equivalent, 600)
   expect_equal(result$target_classlist_total_to_date, 520)
   expect_equal(result$target_registered_now, 500)
   expect_equal(result$target_available_seats, 0)
@@ -1068,21 +1160,39 @@ test_that("Fall deltas scale enrollment changes by the historical carry-through"
   expect_true(is.na(far$regime_alarm))
 })
 
-test_that("a saturated prior term raises the spine to census plus the waitlist", {
-  # Spring 2023: census 24 of 25 seats (96%, over the 90% Regstats line) with
-  # 3 students left waiting. Demand was at least 27; the spine says 24.
+test_that("a prior term full on the first day raises the spine to first day plus the waitlist", {
+  # Spring 2023: 24 of 25 seats held on the first day (96%, over the 90% line)
+  # with 3 students left waiting; two dropped in week one, so census read 22
+  # (88%) and a census rule would call the term unsaturated. Demand was at
+  # least 27; the spine says 24.
   s <- projection_spine_scenario(spring_capacity = 25, waitlisted = 3L)
+  s$enrollment_history <- dplyr::mutate(
+    s$enrollment_history,
+    census_enrl = dplyr::if_else(term == 202310L, 22, census_enrl)
+  )
   result <- project_spine_adjusted(
     s$enrollment_history, s$preceding_term_history, s$section_history,
     s$waitlist_history, s$students, s$row, 202410L
   )
 
   expect_true(result$saturated_prior)
-  expect_equal(result$prior_census_fill, 24 / 25)
+  expect_equal(result$prior_first_day_fill, 24 / 25)
   expect_equal(result$waitlisted_prior, 3L)
   expect_equal(result$floor_uplift, 3)
-  expect_match(result$floor_basis, "census \\+ 3 waitlisted = 27")
+  expect_match(result$floor_basis, "first-day fill 96.0%")
+  expect_match(result$floor_basis, "first day \\+ 3 waitlisted = 27")
   expect_equal(result$projected_classlist_total, 24 + 3 + 1 + 5)
+
+  # No reconstructable first day for the spine term: saturation is unknown,
+  # and census is not consulted in its place.
+  undated <- project_spine_adjusted(
+    dplyr::mutate(s$enrollment_history, first_day_enrl = NA_real_),
+    s$preceding_term_history, s$section_history,
+    s$waitlist_history, s$students, s$row, 202410L
+  )
+  expect_true(is.na(undated$saturated_prior))
+  expect_equal(undated$floor_uplift, 0)
+  expect_match(undated$floor_basis, "First-day enrollment for Spring 2023 cannot be reconstructed")
 
   # Saturated with no waitlist rows retained: the spine is itself the floor.
   none <- project_spine_adjusted(
@@ -1138,11 +1248,17 @@ test_that("waitlist history counts distinct truly waiting students per market te
 })
 
 test_that("the expansion response reads what saturated courses did when given room", {
-  course <- function(name, prior_total, prior_census, prior_cap, next_total, next_cap) {
+  # Saturation is read on the first day; census sits ten seats lower, so a
+  # census rule would find no saturated course here.
+  course <- function(name, prior_total, prior_first_day, prior_cap, next_total, next_cap) {
     list(
       history = projection_test_history(
         c(prior_total, next_total), terms = c(202210L, 202310L), course = name
-      ) %>% dplyr::mutate(term_type = "spring", census_enrl = c(prior_census, next_total)),
+      ) %>% dplyr::mutate(
+        term_type = "spring",
+        first_day_enrl = c(prior_first_day, next_total),
+        census_enrl = first_day_enrl - 10
+      ),
       sections = tibble::tibble(
         market_id = "abq_ea_course_market", college = "AS", department = "TEST",
         course_title = name, subject_course = name,
@@ -1182,7 +1298,7 @@ test_that("the expansion response reads what saturated courses did when given ro
 projection_policy_backtests <- function(method_id, projected, actual,
                                         terms = seq(202080L, by = 100L,
                                                     length.out = length(projected)),
-                                        census = actual, capacity = 2 * actual,
+                                        first_day = actual, capacity = 2 * actual,
                                         course = "TEST 101",
                                         opt = list()) {
   # Resolved before tibble() so the column named method_id cannot mask the
@@ -1198,9 +1314,10 @@ projection_policy_backtests <- function(method_id, projected, actual,
     method_role = method_role,
     applicable = TRUE, applicability_reason = "test",
     projected_classlist_total = projected,
-    census_retention_rate = 1, projected_census_equivalent = projected,
-    actual_classlist_total = actual, actual_census = census,
-    actual_final_enrollment = census, scheduled_capacity = capacity
+    first_day_retention_rate = 1, projected_first_day_equivalent = projected,
+    actual_classlist_total = actual, actual_first_day = first_day,
+    actual_census = first_day, actual_final_enrollment = first_day,
+    scheduled_capacity = capacity
   ) %>%
     add_projection_capacity_censoring(opt) %>%
     dplyr::mutate(raw_projected_classlist_total = projected_classlist_total)
@@ -1291,11 +1408,11 @@ test_that("a challenger inside the margin leaves the default in place", {
 })
 
 test_that("capacity-bounded fit retains fit confidence with a demand caveat", {
-  # Census filled the seats in three of four folds. Accuracy is still the fit
-  # to what was observed; the caveat says so rather than downgrading it.
+  # The first day filled the seats in three of four folds. Accuracy is still
+  # the fit to what was observed; the caveat says so rather than downgrading it.
   backtests <- projection_policy_backtests(
     "seasonal_last", c(101, 99, 102, 98), rep(100, 4),
-    census = c(100, 100, 100, 90), capacity = rep(100, 4)
+    first_day = c(100, 100, 100, 90), capacity = rep(100, 4)
   )
   candidates <- projection_policy_candidates("seasonal_last", 100)
 
@@ -1321,7 +1438,7 @@ test_that("capacity-bounded fit retains fit confidence with a demand caveat", {
     method_role = selected$method_role, methods_disagree = TRUE
   )
   expect_match(explanation, "3 of 4", fixed = TRUE)
-  expect_match(explanation, "census enrollment reached", fixed = TRUE)
+  expect_match(explanation, "first-day enrollment reached", fixed = TRUE)
   expect_match(explanation, "not proof of unconstrained demand", fixed = TRUE)
   expect_match(explanation, "candidate projections differ", fixed = TRUE)
 })
@@ -1352,8 +1469,9 @@ test_that("backtests separate raw from registration-cap-censored accuracy", {
     method_label = "Prior same-season + floor + Fall deltas",
     applicable = TRUE, projected_classlist_total = c(150, 120),
     actual_classlist_total = c(100, 100),
-    census_retention_rate = 1,
-    projected_census_equivalent = c(150, 120),
+    first_day_retention_rate = 1,
+    projected_first_day_equivalent = c(150, 120),
+    actual_first_day = c(100, 100),
     actual_census = c(100, 100),
     scheduled_capacity = c(100, 200),
     method_role = "observed_enrollment"
@@ -1362,7 +1480,7 @@ test_that("backtests separate raw from registration-cap-censored accuracy", {
   result <- summarize_projection_backtests(backtests)
 
   expect_equal(result$wape, 0.35)
-  expect_equal(result$census_equivalent_wape, 0.35)
+  expect_equal(result$first_day_equivalent_wape, 0.35)
   expect_equal(result$capacity_censored_wape, 0.10)
   expect_equal(result$uncensored_wape, 0.20)
   expect_equal(result$n_capacity_reached, 1L)
@@ -1654,17 +1772,17 @@ test_that("feature builder rejects an unsettled source term", {
 test_that("the administrator summary says the decision in one sentence and flags why to look", {
   row <- tibble::tibble(
     subject_course = "TEST 101", term_type = "spring",
-    projected_classlist_total = 2179, projected_census_equivalent = 2080,
+    projected_classlist_total = 2179, projected_first_day_equivalent = 2080,
     recommended_sections = 99L, observed_baseline = 2179,
-    adjusted_saturated_prior = TRUE, adjusted_prior_census_fill = 0.96,
+    adjusted_saturated_prior = TRUE, adjusted_prior_first_day_fill = 0.96,
     adjusted_waitlisted_prior = 15L, adjusted_regime_alarm = FALSE,
     adjusted_preceding_term = 202680L, adjusted_preceding_term_change = 0.02,
     stability = "Moderate", accuracy = "Fair", methods_disagree = FALSE
   )
   sentence <- projection_summary_sentence(row)
-  expect_match(sentence, "^Plan at least 99 sections \\(2,080 seats filled at census, 2,179 registrations\\)\\.")
+  expect_match(sentence, "^Plan at least 99 sections \\(2,080 seats filled on the first day, 2,179 registrations\\)\\.")
   expect_match(sentence, "That is last year's level\\.")
-  expect_match(sentence, "filled 96% of its seats with 15 students waiting, so this is a floor\\.")
+  expect_match(sentence, "filled 96% of its seats on the first day with 15 students waiting, so this is a floor\\.")
   expect_match(sentence, "averaged 10 to 20% off\\.$")
   expect_equal(projection_flags(row), "Full last term | 15 waiting")
 
@@ -1685,20 +1803,16 @@ test_that("the administrator summary says the decision in one sentence and flags
   expect_match(projection_summary_sentence(sparse), "^Not enough comparable history")
 })
 
-test_that("the view adds department totals and a needs-a-look filter without changing a number", {
+test_that("the view adds a needs-a-look filter without changing a number", {
   bundle <- projection_fixture_bundle(202110L, 202080L, 202080L)
   view <- build_enrollment_projection_view(bundle, list(group_id = "all_saved"))
 
-  expect_true(all(c("planning_sections", "expected_census", "seats_range",
-                    "change_vs_last", "flags", "history_values", "history_text",
+  expect_true(all(c("planning_sections", "expected_first_day", "seats_range",
+                    "change_vs_last", "flags", "recent_first_day", "recent_sections",
+                    "recent_terms",
                     "summary_sentence", "attention") %in% names(view$table)))
-  expect_equal(view$table$expected_census, view$projections$projected_census_equivalent)
+  expect_equal(view$table$expected_first_day, view$projections$projected_first_day_equivalent)
   expect_equal(view$table$planning_sections, view$projections$recommended_sections)
-  expect_equal(
-    view$department_totals$sections,
-    sum(view$projections$recommended_sections, na.rm = TRUE)
-  )
-  expect_equal(view$department_totals$courses, nrow(view$projections))
   expect_equal(view$meta$n_attention, sum(view$projections$attention))
 
   flagged <- build_enrollment_projection_view(

@@ -238,9 +238,20 @@ add_classlist_lifecycle_enrl <- function(df) {
 #'   `campus`, `college`, `term`, `subject_course` grouping columns.
 #' @param sections Section rows supplying each `(term, crn)`'s `start_date`.
 #' @param by_part_term Retain each session as its own enrollment count.
-#' @return One row per campus, college, term, and course with `first_day_enrl`.
-calc_first_day_enrl <- function(students, sections, by_part_term = FALSE) {
-  group_cols <- c("campus", "college", "term", "subject_course")
+#' @param pool_campuses Count each student once per term and course across
+#'   every campus and college in `students`, for a named planning market whose
+#'   rows the caller has already restricted to its declared campuses.
+#' @return One row per campus, college, term, and course with `first_day_enrl`
+#'   (per term and course when `pool_campuses`).
+calc_first_day_enrl <- function(students, sections, by_part_term = FALSE,
+                                pool_campuses = FALSE) {
+  # CAMPUS_ROLLUP: pool_campuses serves enrollment projections' named market,
+  # which prefilters to its campuses and counts each student-course once.
+  group_cols <- if (pool_campuses) {
+    c("term", "subject_course")
+  } else {
+    c("campus", "college", "term", "subject_course")
+  }
   if (by_part_term) group_cols <- c(group_cols, "part_term")
   missing <- setdiff(
     c(group_cols, "student_id", "crn", "registration_status_code",

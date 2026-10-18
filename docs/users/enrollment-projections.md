@@ -63,77 +63,86 @@ A course whose population cohort is too small to scale is listed underneath with
 the reason rather than dropped, so a thin population reads as thin evidence and
 not as an absence of demand.
 
-Below the summary table, expand **Projection methods** for the method map.
-There are two candidates:
+### Seats are judged on the first day of classes
+
+Whether a course was full is read on the **first day of classes**: the students
+holding a seat when classes began, reconstructed from each student's
+registration and drop dates. A course counts as full when 98% or more of its
+seats were taken that day. Census comes on the 15th day of classes (the third
+Friday), after three weeks of drops, so a course that turned students away on
+day one can read 95% at census. Sections
+are planned for first-day seats for the same reason: everyone in the room on
+day one needs one. Two recent terms (Fall 2024 and Spring 2025) have class
+lists with no status dates, so their first day is unknown. Those terms show a
+dash and are never judged full or not full; they are not filled in from census.
+
+Below the table, expand **Projection methods** for the method map. There are
+two candidates:
 
 - **Prior same-season**, the spine and the default: last comparable season's
   class-list demand. When the schedule holds still it is within about 6%.
 - **Prior same-season + floor + Fall deltas**: the same number, raised to
-  census plus the waitlist when that term was saturated (census filled 90% or
-  more of the seats), plus the change in the course's own enrollment and in
-  its feeder courses' enrollment during the term just finished, each scaled by
-  the share that historically carried into this course. It uses Fall
-  enrollments, not grades, because grades are not posted when the schedule is
-  built.
+  first-day enrollment plus the waitlist when that term was saturated (90% or
+  more of the seats filled on the first day), plus the change in the course's
+  own enrollment and in its feeder courses' enrollment during the term just
+  finished, each scaled by the share that historically carried into this
+  course. It uses Fall enrollments, not grades, because grades are not posted
+  when the schedule is built.
 
 **Prior same-season is the default for every course.** The adjusted candidate
 replaces it only after beating it by a margin on earlier aftcast terms the two
 share. The rule is replayed at every past term with only the evidence available
 then, so the accuracy you see is what that rule would actually have delivered,
-not the fit of the winner on the terms that chose it. The **Why** column gives
-the evidence behind the current method.
+not the fit of the winner on the terms that chose it. A course's detail gives
+the evidence behind its current method.
 
-The page opens with a **By department** table: sections and seats summed over
-the courses in view. That total is more reliable than any one course, because
-course errors largely offset, and it is the number a dean negotiates. The
-**Only courses that need a look** box narrows the course table to rows that
-were full last term, moved sharply in the term just finished, or whose past
-forecasts were more than 20% off.
+The **Only courses that need a look** box narrows the course table to rows that
+were full on the first day last term, moved sharply in the term just finished,
+or whose past forecasts were more than 20% off.
+
+The table is sized to fit a laptop window:
 
 | Column | Meaning |
 |---|---|
-| **Sections** | Seats filled at census divided by the section size (the target schedule's average when it exists, otherwise the recent median), rounded up. "Plan at least" when last term filled its seats. |
-| **Seats** | Students expected to be filled at census: registrations times the course's historical class-list-to-census retention. |
-| **Likely range** | Where past forecasts for this course usually landed, as seats at census. |
-| **vs last** | Change on last year's same-term registrations. |
+| **Course** | The course, with its department beneath. |
+| **Sections** | Day-1 seats divided by the section size (the target schedule's average when it exists, otherwise the recent median), rounded up. "Plan at least" when last term filled its seats. |
+| **Seats (day 1)** | Students expected to hold a seat when classes begin: registrations times the share of this course's registrants still enrolled on the first day in recent terms. Beneath it, the range past forecasts for this course usually landed in. |
+| **Registrations** | Everyone expected to sign up, including students who drop before or after classes begin: the class-list demand the model forecasts. Beneath it, the change on the last same-season term's registrations. |
+| **First day / sections** | The last four same-season terms: students enrolled on the first day over the sections scheduled. A dash means the course was not offered, or the first day cannot be reconstructed; hover for which. |
 | **Flags** | Plain-language reasons to look: full last term, students left waiting, a big change in the term just finished, a volatile history, past forecasts well off, or the two candidates disagreeing. |
-| **Trend** | The last four same-term enrollments as a sparkline; hover for the numbers and sections. |
 | **Stability** | Stable, Moderate, Volatile, or Unrated: whether the course is predictable from its own history at all, measured with no model |
 | **Depth** | Deep, Moderate, Thin, or None: how many comparable rolling-selection aftcasts stand behind the published method |
 | **Accuracy** | Close, Fair, Poor, or Unrated: how close those aftcasts landed, as an out-of-sample record |
-| **Registrations** | First-day / ever-registered proxy: unique non-waitlisted students found in the class-list extract, including students who later dropped. This is the aftcast target, but it is not a frozen first-day roster. |
-| **Basis** | Prior same-season unless the adjusted candidate beat it on earlier shared aftcasts |
-| **Why** | The evidence behind the basis: "Default" or the challenger's earlier record against prior same-season |
 
-Selecting a row opens with one sentence that says what to plan and why, then
-the evidence behind it. The method plot, movement diagnostic, and candidate
-table sit under **Analyst detail**.
+Clicking a row opens the course's evidence in a window over the table; close it
+to return to the same place in the list. The evidence opens with one sentence
+that says what to plan and why, then the selected method and why it was
+selected, the three axes, the planning recommendation, and the floor, Fall
+delta, regime, and capacity checks. The method plot, movement diagnostic, and
+candidate table sit under **Analyst detail**.
 
-Select a row to compare every forecasting method against historical first-day /
-ever-registered, census, and final/last-day enrollment. The plot is restricted
-to the selected target's term type: Spring is compared only with prior Spring
-terms, Fall only with Fall, and Summer only with Summer. Method selection, WAPE,
-and the accuracy axis are judged against the first-day / ever-registered proxy;
-census and final enrollment provide lifecycle context rather than alternative
-accuracy targets.
+The plot compares every forecasting method against historical ever-registered,
+first-day, census, and final/last-day enrollment. It is restricted to the
+selected target's term type: Spring is compared only with prior Spring terms,
+Fall only with Fall, and Summer only with Summer. Method selection, WAPE, and
+the accuracy axis are judged against ever-registered demand; first-day, census
+and final enrollment provide lifecycle context rather than alternative accuracy
+targets.
 
-The detail also shows the last four same-season enrollments, sections,
-capacity, census fill, the method the selection rule would have published that
-term and its aftcast, signed error, capacity-bounded status, and potential
-explanation. Three rows describe the adjustment whichever candidate was
-published: **Saturation floor** (whether the prior term was full, the waitlist
-left on it, and what happened the last times saturated courses in this market
-were given more seats), **Fall deltas** (the enrollment changes and
-carry-through rates behind the repeat and feeder terms), and **Regime check**,
-which flags a course whose own enrollment in the term just finished moved 25%
-or more from the year before. The check changes nothing; it says look. Its full **What this means** text separates historical fit from
-structural caveats: a method can fit observed enrollment consistently while a
-seat ceiling still prevents that fit from proving unconstrained demand.
-The detail summary also retains the full planning recommendation, bias-correction
-status, and population-fit evidence removed from the compact summary table.
-The candidate-method table beneath it shows every
-observed and structural estimate, including methods that were not selected.
-Use **Back to projection table** above the evidence to return to the main list.
+The detail also shows the last four same-season terms' registrations,
+first-day enrollment, census, sections, capacity, first-day fill, the method
+the selection rule would have published that term and its aftcast, signed
+error, capacity-bounded status, and potential explanation. Three rows describe
+the adjustment whichever candidate was published: **Saturation floor**
+(whether the prior term was full on the first day, the waitlist left on it,
+and what happened the last times saturated courses in this market were given
+more seats), **Fall deltas** (the enrollment changes and carry-through rates
+behind the repeat and feeder terms), and **Regime check**, which flags a
+course whose own enrollment in the term just finished moved 25% or more from
+the year before. The check changes nothing; it says look. Its full **What this
+means** text separates historical fit from structural caveats: a method can
+fit observed enrollment consistently while a seat ceiling still prevents that
+fit from proving unconstrained demand.
 
 Expand **Enrollment movement diagnostic** in the course detail to compare each
 same-season enrollment movement with scheduled capacity and three possible
@@ -157,9 +166,11 @@ scope, and model version. Hover the information icon beside the model version
 to see its Git state. The saved artifact carries hashes and the exact normalized
 model source for analyst audit and future comparisons.
 
-`Capacity-bounded` means census enrollment filled the scheduled seats that
-term, so an estimate above the observed first-day / ever-registered proxy
-cannot be fully judged as an error. It does not mean zero error, and
+`Capacity-bounded` means first-day enrollment filled 98% or more of the
+scheduled seats that term (a few empty seats spread over many section times
+still leave the course full to a student choosing one), so an estimate above the observed ever-registered demand cannot be fully
+judged as an error. A term whose first day cannot be reconstructed is never
+capacity-bounded. It does not mean zero error, and
 ever-registered demand above capacity on its own does not make a term
 capacity-bounded: seats that turned over were never all occupied at once. `Potential explanation` identifies measured changes
 that coincide with a miss; it is not a causal claim.

@@ -154,7 +154,7 @@ with Fall 2025 (`202580`), when the current high-enrollment curriculum appears.
 Earlier small MATH 1215 offerings are not comparable, and MATH 1215X/Y/Z are
 not folded into the base course. For a Spring 2027 forecast this leaves Spring
 2026 as the only same-season MATH 1215 observation. The prior-Spring method and
-its one-term census retention are permitted, but the row has `accuracy`
+its one-term first-day retention are permitted, but the row has `accuracy`
 `Unrated` and `depth` `Thin` until the current curriculum accumulates at least
 two aftcasts.
 
@@ -173,9 +173,18 @@ registration-demand measure:
 
 ```text
 classlist_total = registered + dr_early + dr_late + other_non_waitlist
-census_enrl = registered + dr_late
-final_enrl = registered
+first_day_enrl  = calc_first_day_enrl(): students holding a seat when classes began
+census_enrl     = registered + dr_late
+final_enrl      = registered
 ```
+
+`first_day_enrl` is reconstructed from each row's Registration Status Date
+against its section's first class day (`calc_first_day_enrl(..., pool_campuses
+= TRUE)`, each student-course once across the pooled market). It is the
+occupancy every seat judgment reads (0.21.0). It is `NA`, never a partial count,
+for a course-term whose class lists carry no status dates (Fall 2024 and
+Spring 2025 on the current extracts) or whose rows were all pulled before a
+section began (late-starting part-of-term sections in Fall 2026).
 
 Before market aggregation, repeated ABQ/EA rows are collapsed to one
 student-course-term. A currently registered record wins over a drop record; a
@@ -184,21 +193,24 @@ reconcile while preventing a section or modality change from becoming two units
 of demand. An unfamiliar non-waitlist status is retained in
 `other_non_waitlist` for audit rather than dropped or assumed to occupy a census
 seat. Projection WAPE, signed bias, and method selection all use
-`classlist_total`. Census and final enrollment are saved with each aftcast for
-historical lifecycle comparison, but they are not alternative scoring targets.
+`classlist_total`. First-day, census, and final enrollment are saved with each
+aftcast for historical lifecycle comparison, but they are not alternative
+scoring targets.
 
-Census enrollment remains a secondary occupancy measure. For each aftcast or
-current projection, CEDAR estimates a leakage-safe same-season retention rate
-from earlier terms only:
+First-day enrollment is what seats are planned for: everyone in the room on day
+one needs one. For each aftcast or current projection, CEDAR estimates a
+leakage-safe same-season retention rate from earlier terms only, skipping any
+term whose first day cannot be reconstructed:
 
 ```text
-census_retention_rate = sum(census_enrl) / sum(classlist_total)
-projected_census_equivalent = projected_classlist_total
-                              x census_retention_rate
+first_day_retention_rate = sum(first_day_enrl) / sum(classlist_total)
+projected_first_day_equivalent = projected_classlist_total
+                              x first_day_retention_rate
 ```
 
-The default uses up to four prior same-season terms and requires two. This
-converts gross registration demand into expected census occupancy; it does not
+The default uses up to four prior same-season terms with a known first day and
+requires two. This converts gross registration demand into expected first-day
+occupancy; it does not
 change the forecast target, determine whether registration was constrained, or
 reduce the seats recommended for registration. The target term's class-list snapshot is
 kept outside training and supplies `target_classlist_total_to_date`,
@@ -254,8 +266,9 @@ enrollment changed, or its feeders' Fall enrollment changed.
 seats needed = spine + floor uplift + repeat delta + feeder delta
 
 spine         prior same-season class-list total
-floor uplift  if census fill of that term >= 90% (the Regstats saturation
-              definition): max(0, census + waitlisted - spine); else 0
+floor uplift  if first-day fill of that term >= 90%:
+              max(0, first day + waitlisted - spine); else 0
+              (unknown first day: saturation cannot be judged, uplift 0)
 repeat delta  (course enrollment in the preceding term
                - same a year earlier) x repeat rate
 feeder delta  (distinct enrollment across the feeder set in the preceding term
@@ -277,9 +290,10 @@ The waitlist in the floor is the canonical class-list true-waitlist count
 (`R/branches/waitlist-demand.R`), rolled up per market term. Class lists
 retain waitlist rows only from Summer 2026, so a saturated earlier term says
 "no waitlist rows retained" and the spine is itself the floor. The
-saturation test is `capacity_saturation_metrics()` from `R/branches/enrl.R`,
-the same function Regstats uses, so "saturated" means one thing in both
-places.
+saturation test is `enrollment_capacity_metrics()` from `R/branches/enrl.R`
+applied to first-day enrollment. Regstats' Saturation report still reads census
+through `capacity_saturation_metrics()`, the same arithmetic on a different
+lifecycle point; the two pages each say which they use.
 
 Beside a floor the bundle reports the market's **expansion response**: among
 same-season pairs before the target whose prior term was saturated and whose
@@ -325,15 +339,32 @@ CEDAR retains four accuracy views:
 | Metric | Meaning |
 |---|---|
 | `wape` | Ordinary error against actual class-list total; used when the history is not mostly capacity-reached |
-| `census_equivalent_wape` | Error between projected census-equivalent load and actual census enrollment |
+| `first_day_equivalent_wape` | Error between projected first-day load and actual first-day enrollment, on terms where it is known |
 | `capacity_censored_wape` | One-sided class-list error that does not penalize overprojection after registration reached capacity |
 | `uncensored_wape` | Class-list WAPE only on terms whose registrations remained below capacity |
 
-Historical capacity is marked reached when census occupancy filled the seats:
+Historical capacity is marked reached when first-day occupancy filled 98% of
+the seats or more:
 
 ```text
-census_enrl >= scheduled_capacity          (census_enrl = registered + dr_late)
+first_day_enrl / scheduled_capacity >= 0.98    (calc_first_day_enrl())
 ```
+
+**98%, not 100%** (`CEDAR_ENROLLMENT_PROJECTION_CAPACITY_REACHED_FILL`).
+Capacity is pooled over every section, and a course with a few seats open
+across many section times is full to the student choosing one: CHEM 1215
+filled 682 of 690 seats on the first day of Spring 2026 (98.8%). At 98% a
+50-seat course with one empty seat is full. On the 0.21.0 bundles the line
+adds 12 Spring and 17 Fall course-terms of recent history to the reached set.
+
+**It is not census either (0.21.0).** Census is the 15th day of instruction,
+three weeks after the first day (the term calendar in `AGENTS.md`), and the
+drops in between empty seats that were full on day one: on 598 ABQ+EA course-terms with a known first day, median fill was
+98.9% on the first day and 95.6% at census, 46% of course-terms were full on
+the first day against 15% at census, and 199 were full on day one but under
+capacity at census. An unknown first day is unknown occupancy:
+`capacity_usable` is FALSE and the term is neither reached nor unreached, so it
+leaves `uncensored_wape` rather than counting as an unconstrained term.
 
 **It is deliberately not `classlist_total >= scheduled_capacity`.** The
 ever-registered total counts seat churn: every early drop freed a seat that
@@ -343,9 +374,9 @@ census marked 17% and final enrollment 6%, and in 87 of those 284 "reached"
 terms fewer than 85% of seats were still filled at the end. Every downstream
 reading of the flag (the Capacity-bounded label, the capacity caveat, the
 demand signal, the pressure screen's chronic-fill test) depends on it measuring
-real occupancy. For a target term still filling, which has no census, the
-students registered right now are its occupancy. Census above the nominal cap
-still counts as reached; overrides do not turn a bounded observation into an
+real occupancy. For a target term still filling, which has no first day yet,
+the students registered right now are its occupancy. First-day enrollment above
+the nominal cap still counts as reached; overrides do not turn a bounded observation into an
 unbounded one.
 
 For a reached-capacity term, the observed class-list total is treated as a lower
@@ -539,9 +570,20 @@ recommendation pipeline.
 
 ## Saved Bundle
 
+Schema 21 (model 0.21.0) judges and sizes seats on the first day of classes.
+The market enrollment history gains `first_day_enrl` (and its
+`prepare_projection_market_enrollment_history()` takes `sections` for the start
+dates); aftcasts and `recent_history` carry `actual_first_day` beside
+`actual_census`; `recent_history` fills become `first_day_fill` /
+`first_day_capacity_gap`; and every `census_retention_*` and
+`*_census_equivalent*` column is renamed `first_day_retention_*` /
+`*_first_day_equivalent*`, because sections are now sized for day-one
+occupancy. The per-campus `delivery_components` keep their census columns,
+which are labelled as census and only audit the market rollup.
+
 Schema 20 (model 0.20.0) has two candidates and no calibration columns. Each
 candidate row carries the model's audit fields (`spine`, `spine_term`,
-`saturated_prior`, `prior_census_fill`, `waitlisted_prior`, `floor_uplift`,
+`saturated_prior`, `prior_first_day_fill`, `waitlisted_prior`, `floor_uplift`,
 `floor_basis`, `preceding_term`, `preceding_term_change`, `regime_alarm`,
 `delta_repeat`, `repeat_rate`, `delta_feeder`, `feeder_rate`,
 `feeder_courses`, `delta_basis`), and `validate_spine_rows()` rejects an
@@ -554,10 +596,10 @@ deltas. Schema 19 (model 0.19.0) added `policy_selected` on `backtests`, the per
 `aftcast_method_id` / `aftcast_method_label` on `recent_history`, the rolling
 selection evidence columns on `projections`, a `preceding_term_history` input,
 and renames the capacity columns to `capacity_fill` / `capacity_gap` (backtests)
-and `census_fill` / `census_capacity_gap` (recent history) because they now
-measure census occupancy. It drops `selection_uses_uncensored` and every
+and `census_fill` / `census_capacity_gap` (recent history) because they then
+measured census occupancy. It drops `selection_uses_uncensored` and every
 `feeder_*` column. Published rows size `recommended_sections` and `seat_gap`
-from `projected_census_equivalent`, not the class-list headline: ever-registered
+from the occupancy equivalent, not the class-list headline: ever-registered
 runs about 13% above census at the median, and sizing from it had recommended
 596 sections against 505 scheduled for the same courses on a demand estimate
 only 5% above their capacity. Schema 16 and later store the named market, exact course and campus scopes,
@@ -565,8 +607,8 @@ campus/part-term delivery components, metadata, source fingerprints, the full
 effective model configuration, the pressure screen, published projections,
 every current candidate, every aftcast row, method performance, and a normalized
 four-term `recent_history` audit table. Each audit row stores the actual
-first-day / ever-registered proxy, census enrollment, final/last-day enrollment,
-sections, capacity, census fill, the aftcast the rolling rule would have
+ever-registered total, first-day enrollment, census enrollment, final/last-day
+enrollment, sections, capacity, first-day fill, the aftcast the rolling rule would have
 published that term and which candidate it was, signed error, the
 capacity-censored flag and score, prior same-season enrollment/capacity changes,
 and a typed potential-miss explanation. Schema 16 also attaches the preceding
@@ -580,7 +622,7 @@ that CEDAR published that method in the historical term. Saving the effective
 configuration records defaults as well as caller overrides, including history
 floors and selection thresholds. Candidate rows mark the selected method and
 retain method role, applicability, evidence size, class-list WAPE,
-census-equivalent, cap-censored, and uncensored WAPE, signed bias and error
+first-day-equivalent, cap-censored, and uncensored WAPE, signed bias and error
 history, and the spine / floor / delta audit fields listed above. The validator
 rejects an adjusted row whose components do not reconcile or whose spine term
 does not precede its target.
