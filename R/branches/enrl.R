@@ -215,6 +215,32 @@ add_classlist_lifecycle_enrl <- function(df) {
     )
 }
 
+#' Which terms' class lists carry Registration Status Dates
+#'
+#' First-day enrollment (calc_first_day_enrl()) needs a status date on every
+#' registered or dropped row; waitlist rows never count. A class list exported
+#' without the column has none, so a whole term lacks first-day counts until it
+#' is re-pulled. Surfaces report that from here instead of naming terms in prose,
+#' which goes stale the day the term is re-pulled.
+#'
+#' @param students cedar_students (term, registration_status_code, registration_date).
+#' @return Tibble: term, n_rows (registered or dropped rows), n_dated,
+#'   coverage ("none", "partial" or "complete"), one row per term.
+class_list_status_date_coverage <- function(students) {
+  required <- c("term", "registration_status_code", "registration_date")
+  missing <- setdiff(required, names(students))
+  if (length(missing)) {
+    stop("[enrl.R] class_list_status_date_coverage needs column(s): ", paste(missing, collapse = ", "))
+  }
+  students %>%
+    ungroup() %>%
+    filter(registration_status_code %in% c(STATUS_REGISTERED, STATUS_DROP_ALL)) %>%
+    group_by(term) %>%
+    summarize(n_rows = n(), n_dated = sum(!is.na(registration_date)), .groups = "drop") %>%
+    mutate(coverage = case_when(n_dated == 0L ~ "none", n_dated < n_rows ~ "partial", TRUE ~ "complete")) %>%
+    arrange(term)
+}
+
 #' Reconstruct first-class-day enrollment from class-list status dates
 #'
 #' Unlike `first_day_proxy` (everyone ever registered), this reads each row's
@@ -237,9 +263,22 @@ add_classlist_lifecycle_enrl <- function(df) {
 #'   `registration_status_code`, `registration_date`, `as_of_date`, and the
 #'   `campus`, `college`, `term`, `subject_course` grouping columns.
 #' @param sections Section rows supplying each `(term, crn)`'s `start_date`.
-#' @return One row per campus, college, term, and course with `first_day_enrl`.
-calc_first_day_enrl <- function(students, sections) {
-  group_cols <- c("campus", "college", "term", "subject_course")
+#' @param by_part_term Retain each session as its own enrollment count.
+#' @param pool_campuses Count each student once per term and course across
+#'   every campus and college in `students`, for a named planning market whose
+#'   rows the caller has already restricted to its declared campuses.
+#' @return One row per campus, college, term, and course with `first_day_enrl`
+#'   (per term and course when `pool_campuses`).
+calc_first_day_enrl <- function(students, sections, by_part_term = FALSE,
+                                pool_campuses = FALSE) {
+  # CAMPUS_ROLLUP: pool_campuses serves enrollment projections' named market,
+  # which prefilters to its campuses and counts each student-course once.
+  group_cols <- if (pool_campuses) {
+    c("term", "subject_course")
+  } else {
+    c("campus", "college", "term", "subject_course")
+  }
+  if (by_part_term) group_cols <- c(group_cols, "part_term")
   missing <- setdiff(
     c(group_cols, "student_id", "crn", "registration_status_code",
       "registration_date", "as_of_date"),
@@ -374,29 +413,38 @@ summarize_listing_overlap <- function(students) {
 #' @return A tibble with census fill, remaining census seats, and capacity
 #'   quality/constraint flags.
 capacity_saturation_metrics <- function(census_enrl, capacity,
-                                        constrained_threshold = 0.90,
+                                        constrained_threshold = CEDAR_NEAR_FULL_FILL,
                                         max_plausible_fill = 1.25) {
-  census_enrl <- as.numeric(census_enrl)
+  enrollment_capacity_metrics(census_enrl, capacity, constrained_threshold, max_plausible_fill) %>%
+    dplyr::rename(census_fill = fill_rate, census_available_seats = available_seats)
+}
+
+#' Compare an explicitly selected enrollment lifecycle point with scheduled seats
+#' Callers own the numerator's meaning; first day and census must remain labelled.
+enrollment_capacity_metrics <- function(enrollment, capacity,
+                                        constrained_threshold = CEDAR_NEAR_FULL_FILL,
+                                        max_plausible_fill = 1.25) {
+  enrollment <- as.numeric(enrollment)
   capacity <- as.numeric(capacity)
-  census_fill <- dplyr::if_else(
+  fill_rate <- dplyr::if_else(
     is.finite(capacity) & capacity > 0,
-    census_enrl / capacity,
+    enrollment / capacity,
     NA_real_
   )
-  capacity_usable <- is.finite(census_fill) &
-    census_fill <= as.numeric(max_plausible_fill)
+  capacity_usable <- is.finite(fill_rate) &
+    fill_rate <= as.numeric(max_plausible_fill)
 
   tibble::tibble(
-    census_fill = census_fill,
-    census_available_seats = dplyr::if_else(
-      is.finite(capacity) & capacity > 0 & is.finite(census_enrl),
-      pmax(0, capacity - census_enrl),
+    fill_rate = fill_rate,
+    available_seats = dplyr::if_else(
+      is.finite(capacity) & capacity > 0 & is.finite(enrollment),
+      pmax(0, capacity - enrollment),
       NA_real_
     ),
     capacity_usable = capacity_usable,
-    capacity_anomaly = is.finite(census_fill) & !capacity_usable,
+    capacity_anomaly = is.finite(fill_rate) & !capacity_usable,
     capacity_constrained = capacity_usable &
-      census_fill >= as.numeric(constrained_threshold)
+      fill_rate >= as.numeric(constrained_threshold)
   )
 }
 

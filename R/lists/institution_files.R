@@ -109,6 +109,34 @@ CEDAR_COURSE_LEVELS <- c("lower", "upper", "grad")
 # read_institution_mappings(), which is the set the transform decides units and
 # colleges from.
 CEDAR_CONFIG_FILE_SPECS <- list(
+  # Versioned, explicitly partial catalog snapshots; never student degree audits.
+  degree_catalogs = c("catalog_id", "program_name", "degree_label", "catalog_year",
+                      "source_url", "retrieved_on", "coverage", "notes"),
+  # A rule tree. Parent/child groups preserve alternatives and course bundles.
+  degree_rules = c("rule_id", "catalog_id", "parent_id", "phase", "area",
+                   "target_course", "label", "operator", "minimum", "min_grade",
+                   "review_status", "detail"),
+  degree_rule_courses = c("rule_id", "subject_course", "course_title", "credits"),
+  # Authored semester templates, selected prerequisite routes and starting points.
+  degree_roadmap_nodes = c("catalog_id", "node_id", "track", "code", "title", "credits",
+                            "semester", "kind", "bundle", "detail", "source_url", "course_level", "row_group", "requirement_summary"),
+  degree_roadmap_links = c("catalog_id", "from", "to", "timing", "detail", "source_url", "evidence_id"),
+  degree_roadmap_courses = c("catalog_id", "node_id", "subject_course"),
+  # Options are OR choices; rows sharing option_id are required AND components.
+  degree_roadmap_options = c("catalog_id", "node_id", "option_id", "minimum", "subject_course", "course_title",
+                              "credits_min", "credits_max", "source_url", "evidence_id", "requisite_evidence_id"),
+  degree_catalog_evidence = c("evidence_id", "catalog_year", "source_type", "source_url",
+                               "section", "quote", "retrieved_on", "review_status", "note"),
+  degree_roadmap_basis = c("catalog_id", "node_id", "basis", "evidence_id", "explanation"),
+  degree_roadmap_plans = c("catalog_id", "degree_credit_target", "normal_load", "max_load",
+                           "baseline_semesters", "evidence_id", "assumption", "upper_level_from_semester",
+                           "allowance_slot_credits", "gen_ed_source_url"),
+  degree_roadmap_starts = c("track", "start_id", "label", "node_ids", "completed_degree_credits"),
+  degree_roadmap_math_routes = c("catalog_id", "start_id", "label", "node_ids"),
+  degree_roadmap_conditions = c("condition_id", "catalog_id", "node_id", "kind", "minimum",
+                                 "eligible_node_ids", "label", "evidence_id"),
+  # Descriptive categories, independent of degree eligibility and Gen Ed credit.
+  pathway_subject_groups = c("subject_code", "group_id", "group_label"),
   # kind: main (exactly one), online (at most one) or branch. default_scope:
   # TRUE for the campuses a filter bar selects by default (CEDAR_CAMPUS_DEFAULT).
   # campus_name may be blank for a code whose expansion is not documented; it
@@ -141,7 +169,7 @@ CEDAR_CONFIG_FILE_SPECS <- list(
   projection_groups = c("group_id", "label", "description", "market_id", "campuses", "include_gen_ed"),
   # Courses named explicitly in a group, beyond include_gen_ed. always_monitored
   # TRUE skips the pressure screen. history_start_term and retention_min_terms
-  # are per-course overrides of the model window and the census-retention
+  # are per-course overrides of the model window and the first-day-retention
   # minimum (blank = the model default); a course's override is the same in
   # every group that names it.
   projection_courses = c("group_id", "subject_course", "always_monitored",

@@ -23,8 +23,8 @@
 #   R/cones/gen-ed-conversion.R — get_course_major_associations()
 #
 # Exported functions:
-#   pathwaysUI(id, campus_choices, program_choices, dept_choices)
-#   pathwaysServer(id, students, programs, degrees, cedar_student_term_credits, lookups, program_choices, dept_choices)
+#   pathwaysUI(id, campus_choices, program_choices, dept_choices, course_campus_choices)
+#   pathwaysServer(id, students, programs, degrees, cedar_student_term_credits, lookups, program_choices, dept_choices, edges, pathway_groups)
 #
 # Internal sub-module:
 #   populationSelectorUI(id, campus_choices, program_choices, dept_choices)
@@ -374,7 +374,7 @@ populationSelectorServer <- function(id, programs, degrees = NULL, students = NU
 # =============================================================================
 
 pathwaysUI <- function(id, campus_choices, program_choices = character(),
-                       dept_choices = character()) {
+                       dept_choices = character(), course_campus_choices = character()) {
   ns <- NS(id)
 
   tagList(
@@ -405,6 +405,8 @@ pathwaysUI <- function(id, campus_choices, program_choices = character(),
           cedar_definition_panel("pathways-population"),
           uiOutput(ns("pop_audit_ui"))
         ),
+
+        nav_panel("Course paths", observedCoursePathsUI(ns("course_paths"), course_campus_choices)),
 
         # ---- Roadblocks ----
         nav_panel("Roadblocks",
@@ -965,7 +967,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
                            cedar_grades = NULL, cedar_student_term_credits = NULL,
                            cedar_next_term = NULL,
                            lookups = list(), program_choices = character(),
-                           dept_choices = character()) {
+                           dept_choices = character(), edges, pathway_groups) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
 
@@ -1087,6 +1089,9 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
     get_analysis_population <- reactive({
       get_population()
     })
+
+    observedCoursePathsServer("course_paths", students, get_analysis_population,
+      reactive(get_description()), edges, pathway_groups)
 
     # TRUE once population has been successfully built
     population_built <- reactive({

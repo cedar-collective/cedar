@@ -1,0 +1,15 @@
+rule_id,catalog_id,parent_id,phase,area,target_course,label,operator,minimum,min_grade,review_status,detail
+bio-core,demo-biology-bs-2026,,degree,core,,Biology core,all,,,verified,
+bio-core-1,demo-biology-bs-2026,bio-core,degree,core,,BIOL 2110C,course,,C,verified,
+bio-core-2,demo-biology-bs-2026,bio-core,degree,core,,BIOL 2120C,course,,C,verified,
+bio-intermediate,demo-biology-bs-2026,,degree,core,,Intermediate biology,choose_n,2,,draft,Choose two; the lecture/lab pair counts as one choice.
+bio-genetics,demo-biology-bs-2026,bio-intermediate,degree,core,,BIOL 2305,course,,,draft,
+bio-evolution,demo-biology-bs-2026,bio-intermediate,degree,core,,BIOL 304C,course,,,draft,
+bio-microbiology,demo-biology-bs-2026,bio-intermediate,degree,core,,Microbiology with lab,all,,,draft,
+bio-micro-lecture,demo-biology-bs-2026,bio-microbiology,degree,core,,BIOL 2525,course,,,draft,
+bio-micro-lab,demo-biology-bs-2026,bio-microbiology,degree,core,,BIOL 2525L,course,,,draft,
+bio-physiology-req,demo-biology-bs-2026,,prerequisite,requisites,BIOL 3200,Evolution before or with Physiology,prior_or_concurrent,,,verified,
+bio-chem-lab-req,demo-biology-bs-2026,,corequisite,requisites,CHEM 1215,Laboratory with the lecture,concurrent,,,verified,
+bio-total,demo-biology-bs-2026,,degree,completion,,Total credits,credits,120,,conflict,Degree Hours says 120; Grand Total Credits says 122-127.
+hist-capstone,demo-history-ba-2026,,degree,core,,HIST 490,course,,,draft,
+hist-total,demo-history-ba-2026,,degree,completion,,Total credits,credits,120,,verified,

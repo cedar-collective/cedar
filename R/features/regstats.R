@@ -355,7 +355,7 @@ get_dashboard_regstats_thresholds <- function(base_thresholds = NULL) {
     base_thresholds <- list(
       min_impacted      = 20,
       pct_sd            = 1,
-      chronic_fill_rate = 0.90,
+      chronic_fill_rate = CEDAR_NEAR_FULL_FILL,
       min_wait          = 20,
       min_sat_terms     = 3,
       section_proximity = 0.3
@@ -556,7 +556,7 @@ attach_regstats_titles <- function(flagged, courses) {
 #' \itemize{
 #'   \item \code{min_impacted} = 20 (minimum student impact for bumps/dips/drops)
 #'   \item \code{pct_sd} = 1 (minimum standard deviations for flagging)
-#'   \item \code{chronic_fill_rate} = 0.90 (fill rate above which a course is chronically capacity-constrained)
+#'   \item \code{chronic_fill_rate} = CEDAR_NEAR_FULL_FILL (fill rate above which a course is chronically capacity-constrained)
 #'   \item \code{min_sat_terms} = 3 (minimum prior same-type terms at/above chronic_fill_rate to flag chronic)
 #'   \item \code{min_wait} = 20 (minimum waitlist size)
 #'   \item \code{section_proximity} = 0.3 (proximity threshold for sections)
@@ -649,7 +649,7 @@ get_reg_stats <- function(students, courses, opt) {
     default_thresholds <- list(
       min_impacted      = 20,
       pct_sd            = 1,
-      chronic_fill_rate = 0.90,
+      chronic_fill_rate = CEDAR_NEAR_FULL_FILL,
       min_wait          = 20,
       min_sat_terms     = 3,
       section_proximity = 0.3
@@ -931,7 +931,7 @@ flagged[["bumps"]] <- bumps %>% arrange(across(all_of(std_arrange_cols)))
   # Single chronic ceiling (UI slider) governs BOTH the current-term flag and the
   # count of prior near-full terms. A course is chronic only if it's genuinely maxed
   # (>= this fill) now AND in min_sat_terms+ past same-type terms — filters out noise.
-  chronic_threshold      <- thresholds[["chronic_fill_rate"]] %||% 0.90
+  chronic_threshold      <- thresholds[["chronic_fill_rate"]] %||% CEDAR_NEAR_FULL_FILL
   min_sat_terms          <- as.integer(thresholds[["min_sat_terms"]] %||% 3L)
 
   # Seats/capacity come from the DESR sections (crosslist-corrected by get_enrl).

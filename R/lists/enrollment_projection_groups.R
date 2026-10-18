@@ -9,13 +9,19 @@
 # Groups are monitoring scopes. Projection rows use the named market and course;
 # campus and part-term allocation remains in saved delivery components.
 
-# 0.20.0: the spine / floor / delta model. Prior same-season is the spine; the
-# adjusted candidate adds a saturation floor and two Fall-enrollment deltas and
-# must beat the spine on rolling aftcasts. Every other candidate and the
-# bias-correction path are retired. (0.19.0 introduced rolling selection, the
-# census-based capacity signal, and census-equivalent section sizing.)
-CEDAR_ENROLLMENT_PROJECTION_MODEL_VERSION <- "0.20.0"
-CEDAR_ENROLLMENT_PROJECTION_SCHEMA_VERSION <- 20L
+# 0.21.0: seats are judged and sized on the first day of classes. Saturation,
+# capacity reached, and section sizing read reconstructed first-day enrollment
+# (calc_first_day_enrl()) instead of census; a term whose first day cannot be
+# reconstructed is not judged. Capacity reached is 98% first-day fill, not 100%.
+# 0.20.0 introduced the spine / floor / delta
+# model: prior same-season is the spine; the adjusted candidate adds a
+# saturation floor and two Fall-enrollment deltas and must beat the spine on
+# rolling aftcasts. (0.19.0 introduced rolling selection and the
+# occupancy-based capacity signal.)
+CEDAR_ENROLLMENT_PROJECTION_MODEL_VERSION <- "0.21.0"
+CEDAR_ENROLLMENT_PROJECTION_SCHEMA_VERSION <- 21L
+# Capacity is reached at CEDAR_FULL_FILL first-day fill and a prior term is
+# saturated at CEDAR_NEAR_FULL_FILL; both levels live in R/lists/seat_fill.R.
 # The first term the model reads history from (settings.csv
 # projection_history_start_term), or NA when the institution has not set one:
 # the app loads, the projection builder stops.
@@ -111,8 +117,8 @@ CEDAR_ENROLLMENT_PROJECTION_METHOD_GUIDE <- data.frame(
   basis = c(
     "Repeats enrollment from the most recent prior term of the same type.",
     paste(
-      "Starts from the same number, raises it to census plus waitlist when",
-      "that term was saturated, and adds the change in the course's own",
+      "Starts from the same number, raises it to first-day enrollment plus",
+      "waitlist when that term was saturated, and adds the change in the course's own",
       "enrollment and in its feeder courses during the term just finished,",
       "each scaled by the share that historically carried into this course."
     )

@@ -1,0 +1,27 @@
+catalog_id,node_id,subject_course
+*,math1215,MATH 1215
+*,math1220,MATH 1220
+*,math1250,MATH 1250
+*,calc1,MATH 1512
+*,math1350,MATH 1350
+*,englX,ENGL 1110X
+*,englY,ENGL 1110Y
+*,engl1,ENGL 1110
+*,engl2,ENGL 1120
+demo-biology-bs-2026,bio1,BIOL 2110C
+demo-biology-bs-2026,bio2,BIOL 2120C
+demo-biology-bs-2026,genetics,BIOL 2305
+demo-biology-bs-2026,molecular,BIOL 300C
+demo-biology-bs-2026,evolution,BIOL 304C
+demo-biology-bs-2026,physiology,BIOL 3200
+demo-biology-bs-2026,biocap,BIOL 499
+demo-biology-bs-2026,chem1,CHEM 1215
+demo-biology-bs-2026,chem1,CHEM 1215L
+demo-biology-bs-2026,chem2,CHEM 1225
+demo-biology-bs-2026,chem2,CHEM 1225L
+demo-biology-bs-2026,phys1,PHYS 1310
+demo-history-ba-2026,hist1,HIST 1110
+demo-history-ba-2026,hist2,HIST 1120
+demo-history-ba-2026,histmethods,HIST 300
+demo-history-ba-2026,historiography,HIST 490
+demo-history-ba-2026,histsenior,HIST 499

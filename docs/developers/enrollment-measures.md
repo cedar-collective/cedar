@@ -36,7 +36,7 @@ Reconstruct any lifecycle point from classlist status codes — all emitted by `
 
 - **Early drops (`DR`/`DD`, `STATUS_DROP_EARLY`)** occur *before* the grade-consequence deadline → absent from both census and final counts (registration churn / melt). `DD` is treated like `DR`: a drop/delete with full tuition refund.
 - **Late drops (`DG`/`DW`, `STATUS_DROP_LATE`)** occur *after* census → **counted at census, gone from the final count.** These are what make a course look *less* saturated at term end than it was at census.
-- **First day needs dates, not just statuses.** `first_day_enrl` reads each row's Registration Status Date (`registration_date`) against its section's `start_date`. Coverage is all-or-nothing by pull: a class list exported without the status-date column gives NA for every course in that term until it is re-pulled. Check coverage with `cedar_students %>% group_by(term) %>% summarize(mean(is.na(registration_date)))`. Banner keeps only the current status's date, so a student who added after day one and later dropped counts as present. `first_day_proxy` (`registered + dr_all`, "Ever Registered Proxy") is a different measure: it also counts students who dropped before classes began.
+- **First day needs dates, not just statuses.** `first_day_enrl` reads each row's Registration Status Date (`registration_date`) against its section's `start_date`. Coverage is all-or-nothing by pull: a class list exported without the status-date column gives NA for every course in that term until it is re-pulled. `class_list_status_date_coverage(students)` reports it per term (Admin > Data & Usage shows the undated terms). Banner keeps only the current status's date, so a student who added after day one and later dropped counts as present. `first_day_proxy` (`registered + dr_all`, "Ever Registered Proxy") is a different measure: it also counts students who dropped before classes began.
 - **One student, one bucket.** `calc_cl_enrls` counts each student once per campus, college, term, and course. When a caller merges listings (a crosslist family counted under one code), a student can arrive with several rows, and the row kept follows `STATUS_PRECEDENCE`: registered, then late drop, then waitlisted, then early drop. Left to data order, students who dropped CS 375 and re-registered as MATH 375 in the same shared section were counted as drops, and Course Dynamics showed 58 and 59 for MATH 375 in Spring and Fall 2026 against DESR totals of 60 and 61.
 
 **Canonical census helpers (use these, don't re-derive the formula):** `add_census_enrl(df)` adds `census_enrl = registered + dr_late`. `calc_census_enrl_baselines(df, target_terms, keys, prior_only)` lives alongside it in `R/branches/enrl.R`. Regstats uses `prior_only = TRUE`: each course/term gets a mean, population SD, and count from strictly earlier matching terms. The default `FALSE` preserves the Waitlists all-history reference, excluding selected targets but potentially including later terms. Its count is reference terms, not necessarily prior terms. Both modes retain the full series for sparkline context. Neither reconstruction recovers a frozen census or peak-occupancy snapshot.
@@ -72,11 +72,14 @@ capacity standard.
 To compare like-for-like occupancy, derive fill rate from classlist headcounts at
 a single explicit lifecycle point rather than the DESR `enrolled` snapshot.
 Census `registered + dr_late` is the right denominator for census occupancy and
-attrition reporting, but **not** for deciding whether registration hit a seat
-ceiling. Enrollment projections use `classlist_total >= scheduled_capacity` as
-the historical registration-capacity signal; later drops cannot erase an
-earlier registration constraint, and over-cap overrides do not make the signal
-false. Because the class list has no registration timestamps, this is an
-operational proxy rather than a recovered peak-occupancy snapshot. Reporting
-class-list registrations, census enrollment, and final enrollment together
+attrition reporting, but **not** for deciding whether a course was full: census
+is the 15th day of instruction, and three weeks of drops separate it from the
+first day (the term calendar is stated once, in AGENTS.md's Enrollment Measures
+section). Enrollment projections (0.21.0) count capacity reached at
+`first_day_enrl / scheduled_capacity >= 0.98`, with `first_day_enrl` from
+`calc_first_day_enrl()`; over-cap overrides still count as reached. The
+ever-registered `classlist_total` is not an occupancy at all, because seats
+that turned over were never all held at once. Where the class lists carry no
+status dates there is no first-day count and the term is not judged. Reporting
+class-list registrations, first-day, census, and final enrollment together
 keeps those lifecycle questions separate.

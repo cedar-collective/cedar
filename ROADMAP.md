@@ -263,6 +263,54 @@ Plan: [ADR-002](docs/developers/adr-002-explicit-mapping-files.md).
 
 ## Future Product Bets
 
+### Degree Explorer and curriculum-informed demand
+
+- [x] Prototype: one degree at a time on an adaptive semester board, math/English
+  starting points, visible prerequisite connections and paired lecture/lab tiles.
+  Consistent interface for Computer Science B.S., Biology B.S., History B.A.,
+  Philosophy B.A., Business Administration B.B.A., Anthropology B.A. and Physics
+  B.S. using the 2026–2027 catalog. Selected concentrations/example routes are
+  explicit; light spaces accommodate other requirements.
+- [x] Program-specific math entry routes: calculus for the STEM examples,
+  required statistics for Business, illustrative Gen Ed statistics for the B.A.
+  examples. Degree changes preserve placement; each tile retains program evidence.
+- [x] Budget the complete planning workload at 15 credits usual / 16 maximum,
+  allowing additional semesters; show quoted, year-specific degree/prerequisite
+  evidence and distinct planning colors with ancestor and downstream counts.
+- [x] Prioritize Gen Ed/foundations in years 1–2 and upper-level requirements
+  from semester 5; distinguish early and later elective allowances.
+- [x] Separate Pathways > Course paths subtab uses the shared population, campus
+  keys, settled edge, coverage notes and small-cell guards.
+- [x] Course popups contain catalog evidence, prerequisite detail and historical
+  seasonal frequency, seats and first-day pressure by teaching campus in one
+  standard CEDAR table. Missing first-day dates remain unavailable.
+  Semester headers align across the full board, including extended plans.
+- [x] Separate coursework-count/permission conditions from named-course arrows;
+  visibly distinguish suggested Gen Ed courses from program requirements.
+- [x] Compact course-set previews with complete popup options. Group required
+  lecture/lab components within each alternative. CS's shared 14-credit science
+  block shows two lab-science slots and two additional science slots, with its
+  complete listed introductory pool; advanced options remain open for review.
+- [x] Early Gen Ed allowances occupy clickable course-sized slots, preserving
+  credit remainders and sequence alignment. Fall/spring examples list observed
+  courses, credits, seats and first-day enrollment, with explicit credit fit.
+  The first-semester season is selectable and shareable.
+- [ ] Add reviewed major-specific guidance for elective suggestions, separate
+  from mandatory catalog rules; consider institution Markdown guidance files.
+- [ ] Add selectable elective/science routes, all course restrictions, admission
+  milestones, offering constraints and transfer-credit scenarios.
+- [ ] Review complete programs with different entry rules, elective structures
+  and concentrations; reconcile source conflicts and course equivalences.
+- [ ] Establish applicable catalog year and transfer/waiver evidence before
+  evaluating progress or additional coursework for a major switch.
+- [ ] Explore frequent observed term portfolios and paths without inventing an
+  order among concurrent classes; measure remaining variety after grouping.
+- [ ] Evaluate a requirement-informed demand challenger through the rolling
+  projection contract. The prototype does not change published forecasts.
+
+Contracts: [degree-requirements.md](docs/developers/degree-requirements.md);
+interface: [degree-explorer.md](docs/users/degree-explorer.md).
+
 These are not scheduled until the cleanup above is done.
 
 - **Standard CSV/spreadsheet export** across user-facing tables through a shared

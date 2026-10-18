@@ -166,7 +166,9 @@ CEDAR is designed for internal exploration, planning, and methodological transpa
 ### What's the census date?
 
 The official census date is set by the institution and term; consult the
-registrar or Institutional Research calendar for the certified date. DESR fields
+registrar or Institutional Research calendar for the certified date. At UNM it
+is the 15th day of instruction, the third Friday of a Fall or Spring term, and
+each section carries its own date. DESR fields
 such as `census1` and `census2` are dates, not stored enrollment counts. CEDAR
 does not contain a census-frozen roster.
 

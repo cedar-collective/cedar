@@ -43,7 +43,9 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
   source_file("lists/status_codes.R")
   source_file("lists/course_numbering.R")   # course level by leading digit, from course_levels.csv
   source_file("lists/campuses.R")           # campus constants from campuses.csv, campus guards
+  source_file("lists/seat_fill.R")          # near full / full seat fill levels
   source_file("lists/enrollment_projection_groups.R")
+  source_file("lists/degree_catalog.R")
 
   # 2. Trunk (pure infrastructure — no cedar domain knowledge)
   message("[load-funcs.R] Loading trunk...")
@@ -91,6 +93,7 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
   source_file("branches/relative-terms.R")          # assign_relative_terms(); consumed by the timing and pair cones
   source_file("branches/comparison.R")         # treatment/control group builder for observational analyses
   source_file("branches/pathways.R")           # pure helpers for Pathways module analysis scoping
+  source_file("branches/degree-requirements.R")
   source_file("lists/data_semantics.R")       # what CEDAR knows that the data does not say
   source_file("lists/population-presets.R")    # defines CEDAR_POPULATION_GROUPS, shared by Pathways and projections
 
@@ -120,6 +123,8 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
   source_file("cones/gen-ed-grads.R")          # gen ed uptake among a dept's readable graduates
   source_file("cones/data-integrity.R")        # cross-table student ID space checks
   source_file("cones/enrollment-projections.R")
+  source_file("cones/grouped-student-paths.R")
+  source_file("cones/course-planning-history.R")
 
   # 5. Features (app-facing orchestration — call multiple branches/cones)
   message("[load-funcs.R] Loading features...")
@@ -133,6 +138,7 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
   source_file("features/enrollment-projection-refresh.R")
   source_file("features/enrollment-projections.R")
   source_file("features/enrollment-projection-scenario.R")
+  source_file("features/degree-explorer.R")
 
   # 6. Shiny modules (depend on branches + cones)
   if (modules) {
@@ -147,8 +153,10 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
     source_file("modules/admin.R")
     source_file("modules/gen-ed.R")
     source_file("modules/dept-trends.R")
+    source_file("modules/observed-course-paths.R")
     source_file("modules/pathways.R")
     source_file("modules/retention.R")
+    source_file("modules/degree-explorer.R")
   } else {
     message("[load-funcs.R] Skipping Shiny modules (modules = FALSE).")
   }

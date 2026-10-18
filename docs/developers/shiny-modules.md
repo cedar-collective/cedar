@@ -6,6 +6,21 @@ nav_order: 26
 
 # Shiny Module Detail
 
+`R/modules/degree-explorer.R` mounts `degreeExplorerUI/Server(id, catalog, roadmaps)`
+at Explore > Degree Explorer. It displays one adaptive semester board
+(`degree_semester_board()`, in the same file) with `www/cedar-roadmap.css` and
+`www/cedar-roadmap.js`. Math and English starting points redraw immediately;
+URL state restores them and the copy button shares them. A tile click opens the
+standard `cedar_info_modal()`, rendered by the server from
+`degree_roadmap_tile_detail()`; the script handles hover previews and connectors
+only, reading every chain from the board's JSON payload.
+`observedCoursePathsUI(id, campuses)` and
+`observedCoursePathsServer(id, students, population, description, edges, groups)`
+are mounted under Pathways > Course paths. `population` and `description` are
+reactives from the shared population selector. `pathwaysUI()` also receives
+`course_campus_choices`; `pathwaysServer()` receives `edges` and `pathway_groups`.
+Course counts retain delivery campus and enrolled term.
+
 The long-form companion to the Shiny Module Pattern section of `AGENTS.md`: table and plot gotchas, selectize/CSS traps, the shareable-URL registry, and the page-structure heading contract.
 
 ## Module UI Gotchas From Cancellations

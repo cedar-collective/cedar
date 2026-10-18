@@ -1,0 +1,9 @@
+track,start_id,label,node_ids,completed_degree_credits
+math,calculus,Ready for Calculus I,,0
+math,precalculus,Start with Trig / Pre-Calculus (MATH 1250),,0
+math,algebra,Start with College Algebra (MATH 1220),,0
+math,intermediate,Start with Intermediate Algebra (MATH 1215),,0
+english,composition,Start with Composition I (ENGL 1110),engl1|engl2,0
+english,stretch,Start with Composition I Stretch (ENGL 1110X),englX|englY|engl2,0
+english,composition2,Ready for Composition II (ENGL 1120),engl2,0
+english,complete,Composition I and II already completed,,6

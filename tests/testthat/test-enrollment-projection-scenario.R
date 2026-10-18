@@ -113,7 +113,7 @@ test_that("sections round up from unrounded demand and never go negative", {
 
   # Sections are sized from expected census occupancy, as the published row is.
   expected <- projection_sections_for_demand(
-    rows$projected_census_equivalent, rows$reference_section_size
+    rows$projected_first_day_equivalent, rows$reference_section_size
   )
   expect_equal(rows$recommended_sections, expected)
   expect_true(all(rows$additional_sections >= 0L, na.rm = TRUE))

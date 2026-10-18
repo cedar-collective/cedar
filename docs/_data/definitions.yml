@@ -85,6 +85,30 @@ definitions:
           - file: R/branches/enrl.R
             functions: [calc_first_day_enrl]
 
+  - id: seat-fill
+    current_version: "1.0.0"
+    versions:
+      - version: "1.0.0"
+        title: Seat fill, near full and full
+        summary: Fill is enrollment at one named point in the term divided by scheduled seats. A course is near full at 90% or more and full at 98% or more of its seats on the first day of classes; every CEDAR page uses these two levels.
+        population: Course offerings with usable scheduled capacity, grouped by course and delivery campus (and part of term where the page keeps it).
+        unit: Course offering in a term.
+        numerator: Enrollment at the stated lifecycle point — first-day enrollment, or reconstructed census where a page says so.
+        denominator: Scheduled seats (DESR enrollment plus available seats) for the same sections.
+        campus: Course delivery campus.
+        time_window: The term being described; the numerator's lifecycle point is always named beside the rate.
+        exclusions: Offerings with unknown, zero or implausible capacity (fill above 125%) are not scored.
+        limitations:
+          - Full is 98%, not 100%, because capacity pools every section; a course with a few seats open across many section times is full to the students choosing one.
+          - Near full (90%) marks demand pressing on the seats. Regstats' chronic-fill setting starts there but can be changed on its page.
+          - A first-day count is a reconstruction from status dates; a term whose class lists carry no status dates has no first-day fill.
+        guide: users/understanding-data
+        implementation:
+          - file: R/branches/enrl.R
+            functions: [enrollment_capacity_metrics]
+          - file: R/branches/enrollment-projections.R
+            functions: [projection_capacity_metrics]
+
   - id: dfw
     current_version: "3.0.0"
     versions:
@@ -536,8 +560,28 @@ definitions:
             functions: [get_true_waitlisted_rows, summarize_waitlist_demand]
 
   - id: enrollment-projection
-    current_version: "1.2.0"
+    current_version: "1.3.0"
     versions:
+      - version: "1.3.0"
+        title: Saved enrollment projections
+        summary: Saved Spring and Fall projections estimate ever-registered class-list demand for the pooled Albuquerque and online market as prior same-season demand, raised to a floor when that term was full on the first day of classes and moved by Fall enrollment changes where they beat the plain baseline on earlier aftcasts; expected first-day enrollment applies the course's first-day retention and sizes planning sections.
+        population: Monitored course-market groups in the saved projection bundle.
+        unit: Course and target term in the pooled ABQ/EA market.
+        numerator: Prior same-season enrollment (the spine), or the spine plus a saturation floor (first-day enrollment plus true waitlist when 90% or more of the seats were filled on the first day) plus repeat and feeder deltas read from the term just finished, when that candidate beat the spine on at least three earlier shared aftcasts; planning sections convert expected first-day enrollment using the bundle's section-size assumptions.
+        denominator: Historical actual demand for error measures; expected section size for the planning-section conversion.
+        campus: ABQ and EA are pooled deliberately, not presented as separate campus forecasts.
+        time_window: The saved target term, as-of term, build timestamp, and historical evaluation windows are displayed from the bundle.
+        exclusions: Unmonitored courses and unsupported target seasons are outside this model. Shiny does not fit or select models during a session. Fall deltas use enrollments, never grades.
+        limitations:
+          - Stability, depth, and accuracy are reported as three separate axes; Unrated and None remain visible. Accuracy is the realised error of the selection rule replayed at each past term, so it is out of sample but still no guarantee of future coverage.
+          - First-day enrollment is reconstructed from registration status dates. A term whose class lists carry no status dates (Fall 2024 and Spring 2025) has no first-day count; it is not judged full or not full, and census is not substituted.
+          - Capacity counts as reached, and an overprojection as Capacity-bounded, when first-day enrollment filled 98% or more of the scheduled seats; seats pooled over many sections rarely fill to the last one.
+          - A saturated prior term with no retained waitlist rows reports the spine as its own floor; class lists retain waitlist rows only from Summer 2026.
+          - The definition version describes the metric. The bundle's separate model_version and schema_version identify the actual calculation and artifact format.
+        guide: users/enrollment-projections
+        implementation:
+          - file: R/features/enrollment-projections.R
+            functions: [build_enrollment_projection_view, load_latest_enrollment_projection_bundle]
       - version: "1.2.0"
         title: Saved enrollment projections
         summary: Saved Spring and Fall projections estimate first-day / ever-registered class-list demand for the pooled Albuquerque and online market as prior same-season demand, raised to a floor when that term was saturated and moved by Fall enrollment changes where they beat the plain baseline on earlier aftcasts; expected census applies historical retention and sizes planning sections.
@@ -628,3 +672,26 @@ definitions:
         implementation:
           - file: R/branches/credit-hours.R
             functions: [get_credit_hours]
+
+  - id: grouped-student-paths
+    current_version: "1.0.0"
+    versions:
+      - version: "1.0.0"
+        title: Observed course-group participation
+        summary: Share of students in an observed enrolled term and delivery campus taking each broad kind of coursework; concurrent groups remain visible.
+        population: Declared undergraduate major population built with the shared population builder, with its enrollment ceiling enforced.
+        unit: Student within course group, observed enrolled term, and delivery campus.
+        numerator: Distinct students registered or late-dropped in at least one course in the group.
+        denominator: Distinct population students participating in any undergraduate course at that delivery campus and observed enrolled term.
+        campus: Delivery campus remains in every aggregate and course detail key; the enrollment clock is anchored before campus filtering.
+        time_window: Through last_enrolled_complete; term one is first observed undergraduate enrollment, summer counts, and gaps do not advance the enrolled-term clock.
+        exclusions: Early drops and waitlists are excluded. Cells require at least 20 students at the campus/term and 10 in a positive group cell. Course details use the same guards.
+        limitations:
+          - Groups may overlap within a student's term, so percentages across groups can exceed 100 percent. Courses within one group count the student once.
+          - Students at the left data boundary can have earlier study missing. This is observed coursework, not a complete career or a degree audit.
+          - Broad subject categories do not establish degree or Gen Ed eligibility. Unmapped coursework remains visible.
+          - The latest catalog is not imposed on historical students; catalog year, transfer equivalence, waivers, admission and requirement completion are not inferred.
+        guide: users/degree-explorer
+        implementation:
+          - file: R/cones/grouped-student-paths.R
+            functions: [get_grouped_student_paths]

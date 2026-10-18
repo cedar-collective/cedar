@@ -1,5 +1,64 @@
 context("Pathways branch helpers")
 
+# The population below is intermediate membership scaffolding, not authored raw
+# enrollment data. MC02 supplies all course rows, including concurrent labs,
+# repeat attempts and a student moving between delivery campuses.
+grouped_path_population <- function() {
+  test_students_mc %>% distinct(student_id) %>%
+    mutate(population_label = "All", relevant_until = NA_integer_)
+}
+grouped_path_opt <- function(...) {
+  modifyList(list(data_edges = list(first_enrolled = 202010L,
+    last_enrolled_complete = 202110L), min_n = 1L, min_band_n = 1L), list(...))
+}
+
+test_that("grouped paths count concurrent same-category courses once per student and campus", {
+  p <- get_grouped_student_paths(test_students_mc, grouped_path_population(),
+    CEDAR_PATHWAY_SUBJECT_GROUPS, grouped_path_opt())
+  first <- p$cells %>% filter(relative_term == 1, group_id == "languages")
+  expect_equal(first$n_students[first$campus == "ABQ"], 4L)
+  expect_equal(first$n_students[first$campus == "GA"], 2L)
+  second <- p$cells %>% filter(relative_term == 2, campus == "ABQ", group_id == "languages")
+  expect_equal(second$n_students, 4L)
+  expect_equal(second$n_eligible, 5L)
+  # Campus filtering must not re-anchor MC_G1 at term 1 after moving to ABQ.
+  scoped <- get_grouped_student_paths(test_students_mc, grouped_path_population(),
+    CEDAR_PATHWAY_SUBJECT_GROUPS, grouped_path_opt(campus = "ABQ"))
+  expect_equal(scoped$cells, filter(p$cells, campus == "ABQ"))
+  expect_equal(nrow(filter(p$courses, subject_course == "SPAN 201", campus == "ABQ")), 2L)
+})
+
+test_that("grouped paths suppress thin bands and cells without leaking their counts", {
+  p <- get_grouped_student_paths(test_students_mc, grouped_path_population(),
+    CEDAR_PATHWAY_SUBJECT_GROUPS, grouped_path_opt(min_n = 3L, min_band_n = 4L))
+  thin_band <- p$cells %>% filter(campus == "GA" | relative_term == 3)
+  expect_true(all(is.na(thin_band$n_students)))
+  expect_true(all(is.na(thin_band$n_eligible)))
+  thin_cell <- p$cells %>% filter(campus == "ABQ", relative_term == 2, group_id == "humanities")
+  expect_true(thin_cell$cell_suppressed)
+  expect_true(is.na(thin_cell$pct_students))
+  expect_true(is.na(thin_cell$n_students))
+  expect_false(any(p$courses$subject_course == "PHIL 105"))
+  expect_false("student_id" %in% names(p$courses))
+  expect_true(all(p$courses$n_students >= 3 & p$courses$n_eligible >= 4))
+})
+
+test_that("grouped paths honor population ceilings and the settled observation edge", {
+  pop <- grouped_path_population()
+  pop$relevant_until[pop$student_id == "MC_A1"] <- 202010L
+  p <- get_grouped_student_paths(test_students_mc, pop, CEDAR_PATHWAY_SUBJECT_GROUPS,
+    grouped_path_opt(data_edges = list(first_enrolled = 202010L, last_enrolled_complete = 202080L)))
+  second <- p$cells %>% filter(campus == "ABQ", relative_term == 2, group_id == "languages")
+  expect_equal(second$n_students, 3L)
+  expect_false(any(p$cells$relative_term > 2))
+  expect_error(get_grouped_student_paths(test_students_mc, pop, CEDAR_PATHWAY_SUBJECT_GROUPS,
+    list(data_edges = list())), "settled enrollment edge")
+  partial <- CEDAR_PATHWAY_SUBJECT_GROUPS %>% filter(subject_code != "PHIL")
+  unmapped <- get_grouped_student_paths(test_students_mc, grouped_path_population(), partial, grouped_path_opt())
+  expect_equal(unmapped$meta$n_unmapped_rows, 1L)
+  expect_true("Unmapped coursework" %in% unmapped$cells$group_label)
+})
+
 
 test_that("pathways_level_filter translates UI values to CEDAR level values", {
   expect_null(pathways_level_filter("all"))

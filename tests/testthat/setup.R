@@ -40,12 +40,19 @@ test_programs_concurrent <<- cedar_programs_concurrent # EC-10: same-term progra
 test_programs_hp <<- cedar_programs_hp            # HP01: named population groups -> Banner codes
 test_students_regstats <<- cedar_students_regstats # EC-11: prior-only anomaly baselines
 test_sections_regstats <<- cedar_sections_regstats
+test_sections_course_history <<- cedar_sections_course_history
+test_students_course_history <<- cedar_students_course_history
 test_students_roadblocks <<- cedar_students_roadblocks # EC-12: first eligible outcomes
 test_programs_many_programs <<- cedar_programs_many_programs # EC-13: dept over the rollup threshold
 test_degrees_roadblocks <<- cedar_degrees_roadblocks
 test_sections_xl_switch <<- cedar_sections_xl_switch # EC-15: listing switch in a crosslist
 test_students_xl_switch <<- cedar_students_xl_switch
 test_degrees     <<- cedar_degrees
+# Degree Explorer: the demo institution's designed catalog (institution/demo/),
+# two synthetic programs whose schedules are worked by hand in
+# test-degree-explorer.R. Independent of any real institution's annual catalog.
+test_degree_catalog  <<- read_degree_catalog(cedar_institution_dir(cedar_base_dir, "demo"))
+test_degree_roadmaps <<- read_degree_roadmaps(test_degree_catalog, cedar_institution_dir(cedar_base_dir, "demo"))
 test_faculty     <<- cedar_faculty
 test_dept_codes  <- sort(unique(test_programs$dept_code[!is.na(test_programs$dept_code)]))
 test_lookups     <<- list(

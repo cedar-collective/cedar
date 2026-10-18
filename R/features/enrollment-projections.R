@@ -38,6 +38,7 @@ projection_table_fingerprint <- function(data) {
 enrollment_projection_model_source_files <- function() {
   c(
     "R/lists/enrollment_projection_groups.R",
+    "R/lists/seat_fill.R",
     "R/lists/grades.R",
     "R/lists/status_codes.R",
     "R/lists/campuses.R",
@@ -564,7 +565,7 @@ projection_axis_explanation <- function(stability, depth, accuracy,
       reached <- dplyr::coalesce(n_capacity_reached[[i]], 0L)
       unreached <- dplyr::coalesce(n_capacity_unreached[[i]], 0L)
       caveats <- c(caveats, paste0(
-        "Capacity caveat: census enrollment reached the scheduled seats in ",
+        "Capacity caveat: first-day enrollment reached the scheduled seats in ",
         reached, " of ", reached + unreached,
         " capacity-observed aftcast term(s). ",
         "Accuracy describes fit to observed enrollment, not proof of ",
@@ -623,7 +624,7 @@ projection_flags <- function(projections) {
   vapply(seq_len(nrow(projections)), function(i) {
     row <- projections[i, , drop = FALSE]
     flags <- c(
-      if (isTRUE(row$adjusted_saturated_prior)) "Full last term",
+      if (isTRUE(row$adjusted_saturated_prior)) "Near full last term",
       if (isTRUE(row$adjusted_saturated_prior) &&
           isTRUE(row$adjusted_waitlisted_prior > 0)) {
         paste(row$adjusted_waitlisted_prior, "waiting")
@@ -655,8 +656,8 @@ projection_summary_sentence <- function(projections) {
         if (isTRUE(row$adjusted_saturated_prior)) "Plan at least " else "Plan ",
         row$recommended_sections, " section",
         if (row$recommended_sections == 1L) "" else "s", " (",
-        format(round(row$projected_census_equivalent), big.mark = ","),
-        " seats filled at census, ",
+        format(round(row$projected_first_day_equivalent), big.mark = ","),
+        " seats filled on the first day, ",
         format(round(row$projected_classlist_total), big.mark = ","),
         " registrations)."
       )
@@ -679,8 +680,8 @@ projection_summary_sentence <- function(projections) {
     full <- if (isTRUE(row$adjusted_saturated_prior)) {
       paste0(
         " Last ", switch(row$term_type, spring = "Spring", fall = "Fall", "term"),
-        " filled ", scales::percent(row$adjusted_prior_census_fill, accuracy = 1),
-        " of its seats",
+        " filled ", scales::percent(row$adjusted_prior_first_day_fill, accuracy = 0.1),
+        " of its seats on the first day",
         if (isTRUE(row$adjusted_waitlisted_prior > 0)) {
           paste0(" with ", row$adjusted_waitlisted_prior, " students waiting")
         } else "",
@@ -706,30 +707,12 @@ projection_summary_sentence <- function(projections) {
 }
 
 
-# Department subtotals. The portfolio is far more predictable than any one
-# course (net error of 2 to 3% against course WAPE of 11 to 14% on the Spring
-# 2027 audit), and sections are negotiated by department.
-build_enrollment_projection_department_totals <- function(projections) {
-  if (nrow(projections) == 0L) {
-    return(tibble::tibble(
-      department = character(), courses = integer(), sections = integer(),
-      seats = numeric(), registrations = numeric(), flagged = integer()
-    ))
-  }
-  projections %>%
-    dplyr::group_by(department) %>%
-    dplyr::summarise(
-      courses = dplyr::n(),
-      sections = sum(recommended_sections, na.rm = TRUE),
-      seats = sum(projected_census_equivalent, na.rm = TRUE),
-      registrations = sum(projected_classlist_total, na.rm = TRUE),
-      flagged = sum(attention),
-      .groups = "drop"
-    ) %>%
-    dplyr::arrange(dplyr::desc(sections), department)
-}
-
-
+# The latest `n_terms` same-season terms in the view, oldest first, and for
+# each course its first-day enrollment and scheduled sections in each: the
+# at-a-glance history the summary table shows. First-day enrollment is NA where
+# the class lists carry no status dates, and both are NA in a term the course
+# was not offered; a reader-facing surface shows either as an em dash, never as
+# zero or as another lifecycle count.
 build_enrollment_projection_history_summary <- function(
     projections, history, n_terms = 4L) {
   n_terms <- as.integer(n_terms)
@@ -739,62 +722,56 @@ build_enrollment_projection_history_summary <- function(
       call. = FALSE
     )
   }
+  required <- c(
+    "subject_course", "history_term", "history_term_label",
+    "actual_first_day", "scheduled_sections"
+  )
+  missing <- setdiff(required, names(history))
+  if (length(missing) > 0L) {
+    stop(
+      "[enrollment-projections.R] Summary history needs column(s): ",
+      paste(missing, collapse = ", "), call. = FALSE
+    )
+  }
 
-  column_names <- paste0("history_", seq_len(n_terms))
   # CAMPUS_ROLLUP: subject_course is unique inside the bundle's explicitly named
   # pooled planning market (currently ABQ + EA); campus components were already
   # reconciled into that market before publication and must stay combined here.
-  summary <- projections %>%
-    dplyr::distinct(course = subject_course)
-  for (column_name in column_names) summary[[column_name]] <- NA_character_
-
-  if (nrow(summary) == 0L || nrow(history) == 0L) {
-    return(list(data = summary, columns = tibble::tibble(
-      name = character(), term = integer(), term_label = character(),
-      header = character()
-    )))
-  }
-
+  courses <- unique(as.character(projections$subject_course))
   terms <- history %>%
     dplyr::distinct(term = history_term, term_label = history_term_label) %>%
     dplyr::arrange(dplyr::desc(term)) %>%
     dplyr::slice_head(n = n_terms) %>%
     dplyr::arrange(term) %>%
-    dplyr::mutate(
-      name = column_names[seq_len(dplyr::n())],
-      header = paste0(
-        vapply(term, abbr_term, character(1)), ": first day / sects"
-      )
-    )
+    dplyr::mutate(abbr = vapply(term, abbr_term, character(1)))
 
-  for (i in seq_len(nrow(terms))) {
-    column_name <- terms$name[[i]]
-    values <- history %>%
-      dplyr::filter(history_term == terms$term[[i]]) %>%
-      dplyr::transmute(
-        course = subject_course,
-        value = dplyr::if_else(
-          is.finite(actual_classlist_total) & !is.na(scheduled_sections),
-          paste0(
-            format(
-              round(actual_classlist_total), big.mark = ",",
-              scientific = FALSE, trim = TRUE
-            ),
-            " / ", scheduled_sections
-          ),
-          NA_character_
-        )
-      )
-    summary <- summary %>%
-      dplyr::select(-dplyr::all_of(column_name)) %>%
-      dplyr::left_join(values, by = "course")
-    names(summary)[names(summary) == "value"] <- column_name
+  slot <- function(course, column) {
+    rows <- history[history$subject_course == course, , drop = FALSE]
+    as.numeric(rows[[column]][match(terms$term, rows$history_term)])
   }
+  first_day <- lapply(courses, slot, column = "actual_first_day")
+  sections <- lapply(courses, slot, column = "scheduled_sections")
+  text <- vapply(seq_along(courses), function(i) {
+    if (nrow(terms) == 0L) return(NA_character_)
+    paste(paste0(
+      terms$abbr, " ",
+      ifelse(is.finite(first_day[[i]]),
+             format(round(first_day[[i]]), big.mark = ",", trim = TRUE),
+             "\u2014"),
+      " first day / ",
+      ifelse(is.finite(sections[[i]]), sections[[i]], "\u2014"),
+      " sections"
+    ), collapse = "; ")
+  }, character(1))
 
   list(
-    data = summary,
-    columns = terms %>%
-      dplyr::select(name, term, term_label, header)
+    data = tibble::tibble(
+      course = courses,
+      recent_first_day = first_day,
+      recent_sections = sections,
+      recent_terms = text
+    ),
+    columns = terms
   )
 }
 
@@ -963,12 +940,12 @@ build_enrollment_projection_view <- function(bundle, opt = list()) {
         projected_classlist_total / observed_baseline - 1, NA_real_
       ),
       seats_range = dplyr::if_else(
-        is.finite(projection_low_census_equivalent) &
-          is.finite(projection_high_census_equivalent),
+        is.finite(projection_low_first_day_equivalent) &
+          is.finite(projection_high_first_day_equivalent),
         paste0(
-          format(round(projection_low_census_equivalent), big.mark = ",", trim = TRUE),
+          format(round(projection_low_first_day_equivalent), big.mark = ",", trim = TRUE),
           " to ",
-          format(round(projection_high_census_equivalent), big.mark = ",", trim = TRUE)
+          format(round(projection_high_first_day_equivalent), big.mark = ",", trim = TRUE)
         ),
         NA_character_
       )
@@ -1008,30 +985,12 @@ build_enrollment_projection_view <- function(bundle, opt = list()) {
       names(CEDAR_ENROLLMENT_PROJECTION_METHODS)
   )
 
-  # Four same-season values per course for the summary sparkline, oldest first.
-  # CAMPUS_ROLLUP: recent_history is saved at the bundle's pooled planning
-  # market grain, one row per course and term, so a campus split here would
-  # have nothing to split.
-  history_values <- history %>%
-    dplyr::arrange(subject_course, history_term) %>%
-    dplyr::group_by(course = subject_course) %>%
-    dplyr::summarise(
-      history_values = list(as.numeric(actual_classlist_total)),
-      history_text = paste(
-        paste0(vapply(history_term, abbr_term, character(1)), " ",
-               format(round(actual_classlist_total), big.mark = ",", trim = TRUE),
-               "/", scheduled_sections),
-        collapse = "; "
-      ),
-      .groups = "drop"
-    )
-
   table <- projections %>%
     dplyr::transmute(
       course = subject_course,
       department,
       planning_sections = recommended_sections,
-      expected_census = projected_census_equivalent,
+      expected_first_day = projected_first_day_equivalent,
       seats_range,
       change_vs_last,
       flags,
@@ -1055,18 +1014,17 @@ build_enrollment_projection_view <- function(bundle, opt = list()) {
       why_uncertain
     ) %>%
     dplyr::left_join(history_summary$data, by = "course") %>%
-    dplyr::left_join(history_values, by = "course") %>%
     dplyr::select(
-      # The decision first: sections to plan, seats at census and their range,
-      # the change on last term, and plain-language flags. The evidence axes
-      # follow; the method and the exact history sit at the right for readers
-      # who want them.
-      course, department, planning_sections, expected_census, seats_range,
-      change_vs_last, flags, history_values, history_text,
+      # The decision first: sections to plan, first-day seats and their range,
+      # registrations and their change on last term, the recent first days and
+      # sections, and plain-language flags. The evidence axes follow; the
+      # method and its evidence are for the course detail.
+      course, department, planning_sections, expected_first_day, seats_range,
+      projected_demand, change_vs_last,
+      recent_first_day, recent_sections, recent_terms, flags,
       stability, stability_reason, depth, depth_reason,
       accuracy, accuracy_reason,
-      projected_demand, method, selection_evidence,
-      dplyr::all_of(paste0("history_", 1:4)),
+      method, selection_evidence,
       summary_sentence, attention,
       axis_brief, axis_explanation, regime_alarm, why_uncertain
     )
@@ -1075,6 +1033,10 @@ build_enrollment_projection_view <- function(bundle, opt = list()) {
     meta = list(
       target_term = bundle$target_term,
       target_term_label = fmt_term(bundle$target_term),
+      season_label = switch(
+        get_term_type(bundle$target_term),
+        spring = "Spring", summer = "Summer", fall = "Fall"
+      ),
       as_of_term = bundle$as_of_term,
       as_of_term_label = fmt_term(bundle$as_of_term),
       history_start_term = bundle$model_config$history_start_term,
@@ -1092,7 +1054,6 @@ build_enrollment_projection_view <- function(bundle, opt = list()) {
     ),
     projections = projections,
     table = table,
-    department_totals = build_enrollment_projection_department_totals(projections),
     history = history,
     candidates = candidates,
     method_history = method_history,
@@ -1151,7 +1112,7 @@ build_enrollment_projection_movement_detail <- function(history) {
   required <- c(
     "history_term", "history_term_label", "actual_classlist_total",
     "classlist_change", "scheduled_sections", "scheduled_capacity",
-    "capacity_change", "capacity_reached", "source_term_label",
+    "capacity_change", "capacity_usable", "capacity_reached", "source_term_label",
     "university_students", "university_student_change",
     "university_incoming_first_sem", "university_incoming_change",
     "market_students", "market_student_change", "source_outcomes_complete",
@@ -1189,8 +1150,10 @@ build_enrollment_projection_movement_detail <- function(history) {
   } else {
     NA_real_
   }
-  reached_n <- sum(ordered$capacity_reached %in% TRUE, na.rm = TRUE)
-  usable_n <- sum(!is.na(ordered$capacity_reached))
+  # A term counts only where first-day occupancy and capacity are both known;
+  # capacity_reached is FALSE, not NA, for a term that cannot be judged.
+  reached_n <- sum(ordered$capacity_reached %in% TRUE)
+  usable_n <- sum(ordered$capacity_usable %in% TRUE)
   schedule_summary <- paste0(
     if (is.finite(movement_correlation)) {
       paste0(
@@ -1201,8 +1164,10 @@ build_enrollment_projection_movement_detail <- function(history) {
     } else {
       "There are too few comparable movements for a stable correlation. "
     },
-    "Registration reached scheduled capacity in ", reached_n, " of ",
-    usable_n, " terms with usable capacity."
+    "First-day enrollment reached scheduled capacity (",
+    scales::percent(CEDAR_FULL_FILL),
+    " of seats or more) in ", reached_n, " of ",
+    usable_n, " terms where first day and capacity are both known."
   )
 
   movement_row <- ordered %>%
@@ -1304,7 +1269,7 @@ build_enrollment_projection_method_history_plot <- function(
   required <- c(
     "subject_course", "term_type", "method_id", "method_label", "target_term",
     "applicable", "raw_projected_classlist_total", "actual_classlist_total",
-    "actual_census", "actual_final_enrollment"
+    "actual_first_day", "actual_census", "actual_final_enrollment"
   )
   missing <- setdiff(required, names(method_history))
   if (length(missing) > 0L) {
@@ -1331,7 +1296,7 @@ build_enrollment_projection_method_history_plot <- function(
   )
   actuals <- method_history %>%
     dplyr::distinct(
-      target_term, actual_classlist_total, actual_census,
+      target_term, actual_classlist_total, actual_first_day, actual_census,
       actual_final_enrollment
     ) %>%
     dplyr::arrange(target_term)
@@ -1345,9 +1310,15 @@ build_enrollment_projection_method_history_plot <- function(
   plot <- plotly::plot_ly()
   actual_specs <- list(
     list(
-      label = "First day / ever registered (model target)",
+      label = "Ever registered (model target)",
       column = "actual_classlist_total", color = unname(CEDAR_COLORS["green_dark"]),
       width = 4L, symbol = "circle"
+    ),
+    # Gaps where the class lists carry no status dates: an unknown first day
+    # is drawn as missing, not as zero or as census.
+    list(
+      label = "First day (seats judged here)", column = "actual_first_day",
+      color = unname(CEDAR_COLORS["amber"]), width = 3L, symbol = "triangle-up"
     ),
     list(
       label = "Census", column = "actual_census",
@@ -1515,7 +1486,7 @@ format_enrollment_projection_preview <- function(bundle, courses = NULL) {
       Course = subject_course,
       Target = target_term_label,
       `Class-list demand` = projection_preview_integer(projected_classlist_total),
-      `Expected census` = projection_preview_integer(projected_census_equivalent),
+      `First-day seats` = projection_preview_integer(projected_first_day_equivalent),
       Method = method_label,
       Aftcasts = projection_preview_integer(n_backtests),
       `Accuracy terms` = backtest_term_range,
@@ -1578,14 +1549,15 @@ format_enrollment_projection_preview <- function(bundle, courses = NULL) {
           "Capacity-bounded",
         TRUE ~ "Observed"
       ),
-      `First day / ever registered` =
-        projection_preview_integer(actual_classlist_total),
+      `Ever registered` = projection_preview_integer(actual_classlist_total),
+      `First day` = projection_preview_integer(actual_first_day),
       Census = projection_preview_integer(actual_census),
       `Final / last day` = projection_preview_integer(actual_final_enrollment),
       Sections = projection_preview_integer(scheduled_sections),
       Capacity = projection_preview_integer(scheduled_capacity),
-      `Census fill` = projection_preview_percent(census_fill),
+      `First-day fill` = projection_preview_percent(first_day_fill),
       `Capacity status` = dplyr::case_when(
+        !is.finite(actual_first_day) ~ "First day unknown",
         !capacity_usable ~ "No capacity",
         capacity_reached ~ "Reached",
         TRUE ~ "Not reached"
@@ -1614,15 +1586,15 @@ format_enrollment_projection_preview <- function(bundle, courses = NULL) {
   current_lines <- projection_preview_markdown_table(
     current_table,
     right_align = c(
-      "Class-list demand", "Expected census", "Aftcasts", "Raw WAPE",
+      "Class-list demand", "First-day seats", "Aftcasts", "Raw WAPE",
       "Uncensored WAPE", "Bias", "Spine", "Adjusted"
     )
   )
   history_lines <- projection_preview_markdown_table(
     history_table,
     right_align = c(
-      "First day / ever registered", "Census", "Final / last day",
-      "Sections", "Capacity", "Census fill",
+      "Ever registered", "First day", "Census", "Final / last day",
+      "Sections", "Capacity", "First-day fill",
       "Aftcast", "Raw error"
     )
   )
@@ -1646,8 +1618,11 @@ format_enrollment_projection_preview <- function(bundle, courses = NULL) {
     ),
     paste(
       "Capacity-bounded means overprojection cannot be measured because",
-      "census enrollment reached scheduled capacity; it is not a claim of",
-      "zero error."
+      paste0(
+        "first-day enrollment reached scheduled capacity (",
+        scales::percent(CEDAR_FULL_FILL),
+        " of seats or more); it is not a claim of zero error."
+      )
     )
   )
 }

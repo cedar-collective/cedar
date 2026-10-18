@@ -1,0 +1,37 @@
+catalog_id,node_id,basis,evidence_id,explanation
+demo-biology-bs-2026,bio1,degree,degree-bio-bio1,Degree requirement
+demo-biology-bs-2026,bio2,degree,degree-bio-bio2,Degree requirement
+demo-biology-bs-2026,genetics,degree,degree-bio-genetics,Degree requirement
+demo-biology-bs-2026,molecular,degree,degree-bio-molecular,Degree requirement
+demo-biology-bs-2026,evolution,degree,degree-bio-evolution,Degree requirement
+demo-biology-bs-2026,physiology,degree,degree-bio-physiology,Degree requirement
+demo-biology-bs-2026,biocap,degree,degree-bio-biocap,Degree requirement
+demo-biology-bs-2026,chem1,degree,degree-bio-chem1,Degree requirement
+demo-biology-bs-2026,chem2,degree,degree-bio-chem2,Degree requirement
+demo-biology-bs-2026,phys1,degree,degree-bio-phys1,Degree requirement
+demo-biology-bs-2026,calc1,degree,degree-bio-calc1,Degree requirement
+demo-biology-bs-2026,biosci,degree,degree-bio-biosci,Degree requirement: one listed option
+demo-biology-bs-2026,bioelective,degree,degree-bio-bioelective,Degree requirement: any qualifying elective
+demo-biology-bs-2026,math1215,prerequisite,route-math1215-math1220,"Preparation for MATH 1220, added by this starting route; not a separately listed major requirement."
+demo-biology-bs-2026,math1220,prerequisite,route-math1220-math1250,"Preparation for MATH 1250, added by this starting route; not a separately listed major requirement."
+demo-biology-bs-2026,math1250,prerequisite,route-math1250-calc1,"Preparation for MATH 1512, added by this starting route; not a separately listed major requirement."
+demo-biology-bs-2026,englX,prerequisite,route-englX-englY,"Preparation for ENGL 1110Y, added by this starting route; not a separately listed major requirement."
+demo-biology-bs-2026,englY,general,degree-bio-english,General education route (illustrative)
+demo-biology-bs-2026,engl1,general,degree-bio-english,General education route (illustrative)
+demo-biology-bs-2026,engl2,general,degree-bio-english,General education route (illustrative)
+demo-history-ba-2026,hist1,degree,degree-hist-hist1,Degree requirement
+demo-history-ba-2026,hist2,degree,degree-hist-hist2,Degree requirement
+demo-history-ba-2026,histmethods,degree,degree-hist-histmethods,Degree requirement
+demo-history-ba-2026,historiography,degree,degree-hist-historiography,Degree requirement
+demo-history-ba-2026,histsenior,degree,degree-hist-histsenior,Degree requirement
+demo-history-ba-2026,histupper1,degree,degree-hist-upper,Degree requirement: any qualifying elective
+demo-history-ba-2026,histupper2,degree,degree-hist-upper,Degree requirement: any qualifying elective
+demo-history-ba-2026,histupper3,degree,degree-hist-upper,Degree requirement: any qualifying elective
+demo-history-ba-2026,histupper4,degree,degree-hist-upper,Degree requirement: any qualifying elective
+demo-history-ba-2026,histchoice,degree,degree-hist-choice,Degree requirement: one listed option
+demo-history-ba-2026,math1350,general,degree-hist-math1350,Illustrative Gen Ed math choice
+demo-history-ba-2026,math1215,prerequisite,route-math1215-math1350,"Preparation for MATH 1350, added by this starting route; not a separately listed major requirement."
+demo-history-ba-2026,englX,prerequisite,route-englX-englY,"Preparation for ENGL 1110Y, added by this starting route; not a separately listed major requirement."
+demo-history-ba-2026,englY,general,degree-hist-english,General education route (illustrative)
+demo-history-ba-2026,engl1,general,degree-hist-english,General education route (illustrative)
+demo-history-ba-2026,engl2,general,degree-hist-english,General education route (illustrative)

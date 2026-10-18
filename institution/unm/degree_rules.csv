@@ -1,0 +1,70 @@
+rule_id,catalog_id,parent_id,phase,area,target_course,label,operator,minimum,min_grade,review_status,detail
+cs-admit,cs-bs-2026,,admission,entry,,Admission coursework,all,,,draft,Also fulfill School of Engineering admission requirements; that separate policy is not encoded in this excerpt.
+cs-admit-math,cs-bs-2026,cs-admit,admission,entry,,MATH 1512,course,,B-,draft,
+cs-admit-choice,cs-bs-2026,cs-admit,admission,entry,,Introductory computing,choose_n,1,,draft,
+cs-admit-cs,cs-bs-2026,cs-admit-choice,admission,entry,,CS 152L,course,,B-,draft,
+cs-admit-eng,cs-bs-2026,cs-admit-choice,admission,entry,,ENG 130L,course,,B-,draft,
+cs-core,cs-bs-2026,,degree,core,,Computer science major,condition,,,draft,"51 major credits, including required computing courses and 9 technical elective credits. Full course list not yet encoded; catalog uses new CSCI identifiers."
+cs-math,cs-bs-2026,,degree,supporting,,Mathematics sequence,all,,,draft,
+cs-calculus1,cs-bs-2026,cs-math,degree,supporting,,MATH 1512,course,,,draft,
+cs-calculus2,cs-bs-2026,cs-math,degree,supporting,,MATH 1522,course,,,draft,
+cs-statistics,cs-bs-2026,cs-math,degree,supporting,,STAT 345,course,,,draft,
+cs-linear,cs-bs-2026,cs-math,degree,supporting,,Linear algebra,choose_n,1,,draft,
+cs-linear-a,cs-bs-2026,cs-linear,degree,supporting,,MATH 314,course,,,draft,
+cs-linear-b,cs-bs-2026,cs-linear,degree,supporting,,MATH 321,course,,,draft,
+cs-sciences,cs-bs-2026,,degree,supporting,,Laboratory science,credits,14,,draft,"Four science courses of at least 3 credits each; include two lectures with matching labs. The roadmap enumerates eleven introductory lecture/combined choices and eight separate labs, grouped into complete alternatives. Remaining credits may also use advanced science in the chosen sequence discipline; advanced eligibility, distinct selections and prerequisite routes still need review."
+cs-electives,cs-bs-2026,,degree,electives,,Technical electives,credits,9,B,draft,Advisor-approved computing and eligible electrical/computer engineering offerings; minimum B. Eligibility list and exclusions need review.
+cs-gened,cs-bs-2026,,degree,general_education,,Communication and general education,condition,,,draft,9 communication credits plus applicable general education and nontechnical breadth requirements; overlaps are not yet evaluated.
+cs-minor,cs-bs-2026,,degree,minor,,Minor required,condition,,,draft,Complete an approved minor. Department-specific overlap restrictions apply; no automatic credit total is inferred.
+cs-total,cs-bs-2026,,degree,completion,,Degree minimums,condition,,,draft,120 total credits; at least 42 credits in courses numbered 300 or above. Grade and residency restrictions require review.
+bio-entry,biology-bs-2026,,admission,entry,,Admission conditions,condition,,,draft,"At least 26 credits (23 acceptable toward graduation); 2.00 cumulative GPA and transfer/institutional GPA as applicable; Communication, Mathematics and Statistics, and Second Language Gen Ed requirements."
+bio-admit-courses,biology-bs-2026,,admission,entry,,Biology admission coursework,all,,,draft,
+bio-admit-2101,biology-bs-2026,bio-admit-courses,admission,entry,,BIOL 2101,course,,C,draft,
+bio-admit-2102,biology-bs-2026,bio-admit-courses,admission,entry,,BIOL 2102,course,,C,draft,
+bio-admit-2103L,biology-bs-2026,bio-admit-courses,admission,entry,,BIOL 2103L,course,,C,draft,
+bio-core,biology-bs-2026,,degree,core,,Introductory core,all,,,draft,
+bio-core-2101,biology-bs-2026,bio-core,degree,core,,BIOL 2101,course,,,draft,
+bio-core-2102,biology-bs-2026,bio-core,degree,core,,BIOL 2102,course,,,draft,
+bio-core-2103L,biology-bs-2026,bio-core,degree,core,,BIOL 2103L,course,,,draft,
+bio-core-300C,biology-bs-2026,bio-core,degree,core,,BIOL 300C,course,,,draft,
+bio-intermediate,biology-bs-2026,,degree,core,,Intermediate biology,choose_n,3,,draft,The microbiology lecture and lab together count as one option.
+bio-option-301C,biology-bs-2026,bio-intermediate,degree,core,,BIOL 301C,course,,,draft,
+bio-option-302C,biology-bs-2026,bio-intermediate,degree,core,,BIOL 302C,course,,,draft,
+bio-option-304C,biology-bs-2026,bio-intermediate,degree,core,,BIOL 304C,course,,,draft,
+bio-option-310C,biology-bs-2026,bio-intermediate,degree,core,,BIOL 310C,course,,,draft,
+bio-microbiology,biology-bs-2026,bio-intermediate,degree,core,,Microbiology lecture and lab,all,,,draft,Both courses form one intermediate option.
+bio-option-351,biology-bs-2026,bio-microbiology,degree,core,,BIOL 351,course,,,draft,
+bio-option-352L,biology-bs-2026,bio-microbiology,degree,core,,BIOL 352L,course,,,draft,
+bio-support,biology-bs-2026,,degree,supporting,,Supporting mathematics and sciences,condition,,,draft,Calculus choice plus statistics; one approved physics/earth-science pair; general chemistry I and II with labs. Full alternatives still need encoding.
+bio-upper,biology-bs-2026,,degree,electives,,Upper-division breadth and electives,condition,,,conflict,At least six 400-level biology courses distributed across the required breadth categories; additional biology-related electives and seminar choices. Source language needs reconciliation before calculation.
+bio-gened,biology-bs-2026,,degree,general_education,,University and college requirements,condition,,,draft,Applicable university General Education and college requirements; overlapping courses are not additive credit.
+bio-minor,biology-bs-2026,,degree,minor,,No minor required,none,,,draft,The B.S. in Biology states no minor study is required.
+bio-total,biology-bs-2026,,degree,completion,,Degree totals need review,condition,,,conflict,Minimum Major Hours 49; Degree Hours 120; source also gives Grand Total Credits 122-127. Do not compute an audited remaining-credit total.
+bio351-prereq,biology-bs-2026,,prerequisite,requisites,BIOL 351,Prerequisite alternatives,choose_n,1,,draft,Source: https://catalog.unm.edu/#/courses/view/67b8facd95a9962a1d82b408
+bio351-intro,biology-bs-2026,bio351-prereq,prerequisite,requisites,BIOL 351,Complete prerequisite option,all,,,draft,
+bio351-intro-2101,biology-bs-2026,bio351-intro,prerequisite,requisites,BIOL 351,BIOL 2101,prior,,C,draft,
+bio351-intro-2102,biology-bs-2026,bio351-intro,prerequisite,requisites,BIOL 351,BIOL 2102,prior,,C,draft,
+bio351-intro-2103L,biology-bs-2026,bio351-intro,prerequisite,requisites,BIOL 351,BIOL 2103L,prior,,C,draft,
+bio351-legacy,biology-bs-2026,bio351-prereq,prerequisite,requisites,BIOL 351,Complete prerequisite option,all,,,draft,
+bio351-legacy-2102,biology-bs-2026,bio351-legacy,prerequisite,requisites,BIOL 351,BIOL 2102,prior,,C,draft,
+bio351-legacy-2110C,biology-bs-2026,bio351-legacy,prerequisite,requisites,BIOL 351,BIOL 2110C,prior,,C,draft,
+bio351-advanced,biology-bs-2026,bio351-prereq,prerequisite,requisites,BIOL 351,Complete prerequisite option,all,,,draft,
+bio351-advanced-302C,biology-bs-2026,bio351-advanced,prerequisite,requisites,BIOL 351,BIOL 302C,prior,,C,draft,
+bio351-coreq,biology-bs-2026,,corequisite,requisites,BIOL 351,BIOL 352L,concurrent,,,draft,
+bio352-requisite,biology-bs-2026,,prerequisite,requisites,BIOL 352L,BIOL 351,prior_or_concurrent,,C,draft,Source: https://catalog.unm.edu/#/courses/view/654002db2398b0bb57b1a5b4
+history-ba-2026-total,history-ba-2026,,degree,completion,,Minimum degree credits,credits,120,,draft,Latest program Degree Hours field. This excerpt is not a degree audit.
+philosophy-ba-2026-total,philosophy-ba-2026,,degree,completion,,Minimum degree credits,credits,120,,draft,Latest program Degree Hours field. This excerpt is not a degree audit.
+business-bba-2026-total,business-bba-2026,,degree,completion,,Minimum degree credits,credits,120,,draft,Latest program Degree Hours field. This excerpt is not a degree audit.
+anthropology-ba-2026-total,anthropology-ba-2026,,degree,completion,,Minimum degree credits,credits,120,,draft,Latest program Degree Hours field. This excerpt is not a degree audit.
+physics-bs-2026-total,physics-bs-2026,,degree,completion,,Minimum degree credits,credits,120,,draft,Latest program Degree Hours field. This excerpt is not a degree audit.
+history-major,history-ba-2026,,degree,core,,History major,credits,36,C,draft,"12 lower-division credits (one survey pair plus two other courses) and 24 upper-division credits, including HIST 491 and HIST 492; major/minor GPA 2.25."
+history-entry,history-ba-2026,,admission,entry,,Admission review,condition,,,draft,No separate admission section is provided on this program page. College/university admission conditions are not fully encoded; absence of a section is not a waiver.
+philosophy-major,philosophy-ba-2026,,degree,core,,Philosophy major,credits,30,C,draft,"Six course categories and four electives, two at the 400-level; at least 15 major credits at UNM. This selected logic option is 3 credits."
+philosophy-admission,philosophy-ba-2026,,admission,entry,,Program admission,condition,,,draft,"26 credits, 23 acceptable toward graduation; cumulative/transfer/institutional GPA rules of 2.0; Gen Ed Communication, Math/Statistics and Second Language; two specified admission courses with C or better. This example includes PHIL 1120 and PHIL 2220; eligibility is not evaluated."
+anthropology-major,anthropology-ba-2026,,degree,core,,General Anthropology major,credits,36,,draft,"Two subfield core sequences, one 200-/300-/400-level course in the remaining subfield, at least 18 upper-division credits, and electives. This example selects 37 major credits. The concentration flag conflicts with the explicit general-major option."
+anthropology-admission,anthropology-ba-2026,,admission,entry,,Program admission,condition,,,draft,"26 credits, 23 acceptable toward graduation; cumulative/transfer/institutional GPA rules of 2.0; Gen Ed Communication, Math/Statistics and Second Language; one specified introductory ANTH option with C or better. Eligibility is not evaluated."
+business-phase1,business-bba-2026,,admission,entry,,Phase I and admission,condition,,,draft,21 Phase I credits with C or higher and 2.5 Phase I GPA; continuing UNM cumulative GPA at least 2.0. Transfer students establish 2.5 GPA in their first UNM semester. Completion moves Pre-BBA to BBA; prototype does not determine eligibility.
+business-core,business-bba-2026,,degree,core,,Management Core,credits,33,,draft,Eleven listed 3-credit courses total 33; prose says 31. Uses listed courses; conflict is unresolved.
+business-general,business-bba-2026,,degree,minor,,General Management option,credits,12,,draft,Twelve general management elective credits in the no-concentration option. Concentration flag conflicts with that text; concentration/free electives heading 44 also conflicts with embedded 41. Full allocation remains unresolved.
+physics-major,physics-bs-2026,,degree,core,,Physics core and concentration,credits,83,,draft,"62-credit common core plus the structured 21-credit General Physics concentration; introductory prose says 18 concentration credits, unresolved. No minor required."
+physics-admission,physics-bs-2026,,admission,entry,,Program admission,condition,,,draft,PHYS 1310 or a more advanced physics course with C or higher. Advisement is required each semester; all required courses and prerequisites must be completed within three attempts. Eligibility is not evaluated.

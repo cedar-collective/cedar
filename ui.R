@@ -885,7 +885,8 @@ nav_panel(
       !is.na(cedar_programs$student_campus) & nzchar(cedar_programs$student_campus)
     ])),
     program_choices = cedar_pathways_choices$program_choices,
-    dept_choices = cedar_pathways_choices$dept_choices
+    dept_choices = cedar_pathways_choices$dept_choices,
+    course_campus_choices = cedar_campus_choices(cedar_students)
   )
 ), # end Pathways nav_panel
 
@@ -1767,7 +1768,13 @@ nav_panel(
       title = "Gen Ed",
       icon = icon("layer-group"),
       genEdExploreUI("gen_ed", cedar_sections, .dept_choices, cedar_current_term, cedar_default_term)
-    ) # end gen ed nav_panel
+    ), # end gen ed nav_panel
+
+    nav_panel(
+      title = "Degree Explorer",
+      icon = icon("graduation-cap"),
+      degreeExplorerUI("degree_explorer", CEDAR_DEGREE_CATALOG, CEDAR_DEGREE_ROADMAPS)
+    )
 
     # RETENTION (inside Explore) — hidden until cross-course comparison
     # is ready. Course-level retention trend lives in Course Dynamics tab.

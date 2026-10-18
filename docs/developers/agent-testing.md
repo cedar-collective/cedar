@@ -12,6 +12,14 @@ The complete test-infrastructure reference, moved out of `AGENTS.md` so it does 
 
 All test data is hand-crafted tribbles in `tests/testthat/fixtures/designed_test_data.R` — that single file IS the test database and the source of truth. `setup.R` sources it and exposes the tables as `test_sections`, `test_sections_sf` (seatfinder-specific 2024/2025 terms), `test_students`, `test_programs`, `test_degrees`, `test_faculty`, plus `test_lookups` and a `data_objects` list. Every expected value is traceable to explicit rows in that file — no sampling, no binary fixtures, no regeneration step.
 
+**Institution configuration is the one exception.** Files an institution
+authors (rather than rows its data produces) are tested against the demo
+institution's own files: the Degree Explorer suite reads the designed catalog in
+`institution/demo/degree_*.csv` through `test_degree_catalog` /
+`test_degree_roadmaps`, so a real institution's annual catalog review never
+breaks a unit test. Its schedules are worked by hand in the header of
+`test-degree-explorer.R`; edit the two together.
+
 **Pinned counts:** the header of `designed_test_data.R` is a large comment block of expected values (row counts by dept/term/campus/status/level, crosslist scenario summaries, regstats design values, etc.) that test files hard-code against. When you add or change rows, update the pinned counts in that header AND the hard-coded expected values in affected test files, in the same change.
 
 **Stable terms:** 202010, 202060, 202080, 202110 (Spring/Summer/Fall 2020, Spring 2021). `test_sections_sf` additionally uses 2024/2025 terms for seatfinder tests.

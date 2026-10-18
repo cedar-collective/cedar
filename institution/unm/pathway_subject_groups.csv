@@ -1,0 +1,59 @@
+subject_code,group_id,group_label
+ENGL,writing,English and writing
+MATH,math,Mathematics and statistics
+STAT,math,Mathematics and statistics
+HIST,humanities,Humanities
+PHIL,humanities,Humanities
+AMST,humanities,Humanities
+AFST,humanities,Humanities
+CLST,humanities,Humanities
+COMP,humanities,Humanities
+RELG,humanities,Humanities
+SPAN,languages,Languages
+FREN,languages,Languages
+GRMN,languages,Languages
+ITAL,languages,Languages
+PORT,languages,Languages
+CHIN,languages,Languages
+JAPN,languages,Languages
+ARBC,languages,Languages
+RUSS,languages,Languages
+SIGN,languages,Languages
+ANTH,social,Social sciences
+SOCI,social,Social sciences
+PSYC,social,Social sciences
+ECON,social,Social sciences
+POLS,social,Social sciences
+GEOG,social,Social sciences
+LING,social,Social sciences
+BIOL,science,Natural sciences
+CHEM,science,Natural sciences
+BIOC,science,Natural sciences
+PHYS,science,Natural sciences
+ASTR,science,Natural sciences
+EPS,science,Natural sciences
+GEOL,science,Natural sciences
+ENVS,science,Natural sciences
+CS,computing,Computing and engineering
+CSCI,computing,Computing and engineering
+ECE,computing,Computing and engineering
+ENG,computing,Computing and engineering
+CE,computing,Computing and engineering
+ME,computing,Computing and engineering
+CHME,computing,Computing and engineering
+ARTH,arts,Arts and design
+ARTS,arts,Arts and design
+MUS,arts,Arts and design
+MUSE,arts,Arts and design
+THEA,arts,Arts and design
+DANC,arts,Arts and design
+FDMA,arts,Arts and design
+COMM,communication,Communication
+CJ,communication,Communication
+NURS,professional,Professional studies
+MGMT,professional,Professional studies
+HED,professional,Professional studies
+EDUC,professional,Professional studies
+PH,professional,Professional studies
+EMS,professional,Professional studies
+SHS,professional,Professional studies

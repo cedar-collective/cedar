@@ -1,0 +1,20 @@
+catalog_id,from,to,timing,detail,source_url,evidence_id
+*,math1215,math1220,before,Minimum C.,https://catalog.example.edu/courses/MATH-1220,route-math1215-math1220
+*,math1220,math1250,before,Minimum C.,https://catalog.example.edu/courses/MATH-1250,route-math1220-math1250
+*,math1250,calc1,before,Minimum C.,https://catalog.example.edu/courses/MATH-1512,route-math1250-calc1
+*,math1215,math1350,before,Minimum C.,https://catalog.example.edu/courses/MATH-1350,route-math1215-math1350
+*,engl1,engl2,before,Minimum C.,https://catalog.example.edu/courses/ENGL-1120,route-engl1-engl2
+*,englX,englY,before,Minimum C.,https://catalog.example.edu/courses/ENGL-1110Y,route-englX-englY
+*,englY,engl2,before,Minimum C.,https://catalog.example.edu/courses/ENGL-1120,route-englY-engl2
+demo-biology-bs-2026,bio1,bio2,before,Minimum C.,https://catalog.example.edu/courses/BIOL-2120C,req-bio1-bio2
+demo-biology-bs-2026,bio2,genetics,before,Minimum C.,https://catalog.example.edu/courses/BIOL-2305,req-bio2-genetics
+demo-biology-bs-2026,chem1,genetics,before,Lecture and lab.,https://catalog.example.edu/courses/BIOL-2305,req-chem1-genetics
+demo-biology-bs-2026,genetics,molecular,before,Minimum C.,https://catalog.example.edu/courses/BIOL-300C,req-genetics-molecular
+demo-biology-bs-2026,chem2,molecular,before,Lecture and lab.,https://catalog.example.edu/courses/BIOL-300C,req-chem2-molecular
+demo-biology-bs-2026,bio2,evolution,before,Minimum C.,https://catalog.example.edu/courses/BIOL-304C,req-bio2-evolution
+demo-biology-bs-2026,evolution,physiology,before_or_same,Prior or concurrent enrollment.,https://catalog.example.edu/courses/BIOL-3200,req-evolution-physiology
+demo-biology-bs-2026,molecular,biocap,before,Minimum C.,https://catalog.example.edu/courses/BIOL-499,req-molecular-biocap
+demo-biology-bs-2026,chem1,chem2,before,Lecture and lab.,https://catalog.example.edu/courses/CHEM-1225,req-chem1-chem2
+demo-biology-bs-2026,calc1,phys1,before,Minimum C.,https://catalog.example.edu/courses/PHYS-1310,req-calc1-phys1
+demo-history-ba-2026,hist1,histmethods,before,Minimum C.,https://catalog.example.edu/courses/HIST-300,req-hist1-methods
+demo-history-ba-2026,histmethods,histsenior,before,Minimum C.,https://catalog.example.edu/courses/HIST-499,req-methods-senior

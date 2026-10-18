@@ -205,15 +205,18 @@ cedar_snapshot_table <- function(spec) {
 
 # Standard informational modal. Use for explanations, warnings, and read-only
 # detail views that can be dismissed without taking an app action.
+# scrollable = TRUE keeps a long dialog inside the screen and scrolls its body.
 cedar_info_modal <- function(title, ..., size = "m", close_label = "Close",
-                             easyClose = TRUE) {
-  modalDialog(
+                             easyClose = TRUE, scrollable = FALSE) {
+  modal <- modalDialog(
     title = title,
     ...,
     size = size,
     easyClose = easyClose,
     footer = modalButton(close_label)
   )
+  if (!scrollable) return(modal)
+  htmltools::tagQuery(modal)$find(".modal-dialog")$addClass("modal-dialog-scrollable")$allTags()
 }
 
 # Standard confirmation modal. Use for destructive or expensive actions where
@@ -600,6 +603,20 @@ cedar_pot_coldef <- function(name = "PoT", maxWidth = 52, align = "center") {
       else htmltools::span(class = "fw-semibold", v)
     }
   )
+}
+
+# Count and rate columns for reactable tables (AGENTS.md, Numeric precision):
+# whole counts with thousands separators, rates as percentages at one decimal,
+# and an em dash where the value is unknown, never 0. Values stay numeric, so
+# the columns sort and filter on the number.
+cedar_count_coldef <- function(name, ...) {
+  reactable::colDef(name = name, align = "right", na = "\u2014",
+                    format = reactable::colFormat(separators = TRUE), ...)
+}
+
+cedar_percent_coldef <- function(name, ...) {
+  reactable::colDef(name = name, align = "right", na = "\u2014",
+                    format = reactable::colFormat(percent = TRUE, digits = 1), ...)
 }
 
 # ── Shared loading overlay ───────────────────────────────────────────────────

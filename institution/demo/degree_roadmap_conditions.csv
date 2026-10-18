@@ -1,0 +1,3 @@
+condition_id,catalog_id,node_id,kind,minimum,eligible_node_ids,label,evidence_id
+historiography-count,demo-history-ba-2026,historiography,course_count,2,histupper1|histupper2|histupper3|histupper4,2+ upper-level History courses,condition-historiography-count
+historiography-permission,demo-history-ba-2026,historiography,permission,,,Department permission,condition-historiography-permission
