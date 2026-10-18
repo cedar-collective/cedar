@@ -269,7 +269,8 @@ seats needed = spine + floor uplift + repeat delta + feeder delta
 
 spine         prior same-season class-list total
 floor uplift  if first-day fill of that term >= 90%:
-              max(0, first day + waitlisted - spine); else 0
+              students still waiting at close who are on no campus's
+              class list in the market; else 0
               (unknown first day: saturation cannot be judged, uplift 0)
 repeat delta  (course enrollment in the preceding term
                - same a year earlier) x repeat rate
@@ -288,10 +289,30 @@ counts once. **Both deltas read enrollments, not grades**, because grades are
 not posted when the schedule is built; the rates embed the historical pass
 and repeat behaviour, and the same terms can be re-read once grades land.
 
-The waitlist in the floor is the canonical class-list true-waitlist count
-(`R/branches/waitlist-demand.R`), rolled up per market term. Class lists
-retain waitlist rows only from Summer 2026, so a saturated earlier term says
-"no waitlist rows retained" and the spine is itself the floor. The
+**The floor is in the spine's units (0.22.0).** The spine is the
+ever-registered total, which already counts everyone who held a seat at any
+point, early drops included. A student still waiting at close never held one,
+so demand was at least the spine plus those students, and the uplift is
+exactly their number. Until 0.22.0 the floor was first-day enrollment plus the
+waitlist, compared with the spine. First-day enrollment leaves out the early
+drops the spine counts, so the floor rose above the spine only when the
+waitlist outnumbered the term's early-drop churn: on Fall 2027, 245 waiting
+students in 36 saturated courses lifted the projection by 77, and 24 of those
+courses not at all (ISSUES.md I27). `validate_spine_rows()` now rejects any
+adjusted row whose uplift is not its waiting count when saturated and zero
+otherwise.
+
+The waiting count starts from the canonical class-list true-waitlist rule
+(`R/branches/waitlist-demand.R`), which removes anyone registered in the same
+delivery group. The market then removes anyone with a non-waitlist row on
+either campus, because the class-list total already counts them: a student
+holding an EA seat while waiting at ABQ survives the per-campus rule but is
+not waiting in the pooled market (6 of 331 on Fall 2026). Class lists retain
+waitlist rows only from Summer 2026, so a saturated earlier term says "no
+waitlist rows retained" and the spine is itself the floor. That leaves the
+floor almost no aftcast record: on the 0.22.0 bundles a handful of stray
+Spring 2023 waitlist rows lift two Spring 2024 aftcasts by two students each,
+and nothing else in either season's history reaches it. The
 saturation test is `enrollment_capacity_metrics()` from `R/branches/enrl.R`
 applied to first-day enrollment. Regstats' Saturation report still reads census
 through `capacity_saturation_metrics()`, the same arithmetic on a different
@@ -571,6 +592,10 @@ bundle. They must not reproduce a model, backtest, pressure calculation, or
 recommendation pipeline.
 
 ## Saved Bundle
+
+Model 0.22.0 keeps schema 21. Its `floor_uplift` is the spine-unit floor, and
+`waitlisted_prior` counts only students on no campus's class list in the
+market (ISSUES.md I27); `validate_spine_rows()` enforces that the two agree.
 
 Schema 21 (model 0.21.0) judges and sizes seats on the first day of classes.
 The market enrollment history gains `first_day_enrl` (and its
@@ -875,7 +900,11 @@ the live backlog remains in `ROADMAP.md`.
   margin) but pooled or hierarchical shrinkage should be evaluated before
   expanding the scope.
 - A robust ensemble of the observed baselines may improve class-list demand
-  fit; a damped trend was not tried after the undamped one was retired.
+  fit. A damped trend and a pooled growth factor were tested on the 0.21.0
+  aftcasts and both did worse than prior same-season (Forecasting Lessons).
+- About two-thirds of the aftcast error moves with the schedule, one
+  registrant per seat. A projection conditioned on the submitted draft
+  schedule is the largest open improvement; it needs that schedule archived.
 - A censored count model is the principled next latent-demand candidate once
   the capacity contract is reliable.
 - Registration-pace models require retained historical snapshots; the current

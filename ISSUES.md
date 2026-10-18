@@ -29,6 +29,7 @@ recurrence is recognizable.
 
 | ID | Kind | Summary |
 |---|---|---|
+| [I27](#i27--the-projection-floor-adds-a-waitlist-to-first-day-enrollment-and-compares-it-with-ever-registered-demand) | Defect | The projection floor mixed units: 245 unserved waitlisted students lifted Fall 2027 by 77 (resolved) |
 | [I26](#i26--projection-capacity-reached-was-judged-on-ever-registered-demand) | Defect | Projection "capacity reached" was judged on ever-registered demand: 72% of course-terms flagged full when census filled 17% (resolved) |
 | [I25](#i25--projection-method-selection-was-in-sample-and-lost-to-the-default) | Defect | Projection method selection was in-sample on two folds and lost to doing nothing; reported 13.7% WAPE, honest 16.5% (resolved) |
 | [I24](#i24--cis-demo-browser-run-intermittently-loses-the-app-at-open-seats) | Defect | CI's demo browser run intermittently loses the app at Open Seats (passes on rerun) |
@@ -39,7 +40,7 @@ recurrence is recognizable.
 | [I8](#i8--a-timing-log-row-is-silently-dropped-when-the-write-lock-times-out) | Defect | A timing-log row is dropped when the write lock times out |
 | [I6](#i6--a-killed-projection-rebuild-strands-its-lock-and-blocks-every-later-refresh) | Defect | A killed projection rebuild strands its lock |
 | [I4](#i4--pre-change-course-ratios-are-confounded-by-career-stage) | Defect | Pre-change course ratios confounded by career stage (deferred) |
-| M1–M30 | Improvement | See [Improvements](#improvements) |
+| M1–M32 | Improvement | See [Improvements](#improvements) |
 
 ---
 
@@ -1767,6 +1768,68 @@ the same courses, on a demand estimate only 5% above their capacity.
 From the 0.18.0 bundle's `backtests`, compare `mean(capacity_reached)` with
 `mean(actual_census >= scheduled_capacity)` on `seasonal_last` rows.
 
+## I27 — The projection floor adds a waitlist to first-day enrollment and compares it with ever-registered demand
+
+**Status:** resolved 2026-10-18, model 0.22.0. `projection_spine_floor()`
+adds the waiting students to the spine; `prepare_projection_waitlist_history()`
+removes waiting students already on the market class list on either campus;
+`validate_spine_rows()` rejects a row whose uplift is not its waiting count
+when saturated and zero otherwise. Rebuilt Fall 2027: 35 saturated courses,
+243 students waiting, uplift 243 (was 77), 35 courses lifted (was 12); 6
+waiting students removed as already on the class list. Spring 2027 has no
+waiting students to add. Two Spring 2024 aftcasts moved by two students each
+(stray Spring 2023 waitlist rows); the published rule's WAPE is unchanged in
+both seasons. `test-enrollment-projections.R` holds a saturated term whose
+waitlist is smaller than its early-drop churn (it failed on the old formula)
+and the WL01 market-waitlist scenario.
+**Found:** 2026-10-18, auditing the Spring and Fall 2027 bundles (model 0.21.0)
+**Severity:** moderate — it understates the one adjustment meant to correct for
+capacity clipping. On Fall 2027, the 36 saturated courses with students still
+waitlisted at close held 245 of them; the floor added 77, and 24 of the 36
+courses got no uplift at all.
+**Affects:** `projection_spine_floor()` in `R/branches/enrollment-projections.R`;
+`floor_uplift`, `floor_basis` and the "Plan at least N" recommendation; the
+adjusted-candidate formula in `docs/developers/enrollment-projections.md`.
+
+### What is wrong
+
+The floor is `first_day_enrl + waitlisted`, and the uplift is that minus the
+spine. The spine is the prior term's ever-registered class-list total, which
+counts every early drop; first-day enrollment does not. So the floor lifts the
+spine only when the waitlist is larger than the term's early-drop churn, and a
+course with real unserved demand reads as having none:
+
+| Course (Fall 2026) | Spine | First day | Churn | Waitlisted | Floor | Uplift |
+|---|---:|---:|---:|---:|---:|---:|
+| ARTS 1610 | 177 | 159 | 18 | 18 | 177 | 0 |
+| ARTH 1120 | 294 | 264 | 30 | 16 | 280 | 0 |
+| FYEX 1010 | 1,435 | 1,373 | 62 | 13 | 1,386 | 0 |
+| MATH 1220 | 770 | 723 | 47 | 11 | 734 | 0 |
+| ARTS 1510 | 105 | 97 | 8 | 22 | 119 | 14 |
+
+True-waitlisted students are almost never in the class-list total: 6 of 331 on
+Fall 2026 (pooled ABQ+EA), each registered on one campus and waitlisted on the
+other. So the lower bound on what the term would have registered with more
+seats is, in the spine's own units, the spine plus the waitlisted students not
+already on the market class list. Those 6 also show that the waitlist should be
+deduplicated against the pooled market, not per campus.
+
+Under this formula no historical fold reached the floor (class lists keep
+waitlist rows only from Summer 2026, apart from a few stray Spring 2023 rows the
+churn absorbed), so the fix barely touches the aftcast record.
+
+*Done when:* the floor is spine + market-deduplicated waitlist; a designed
+fixture holds a saturated course whose waitlist is smaller than its early-drop
+churn, and its test fails on the current formula; the model version is bumped.
+
+### Reproduction
+
+From `enrollment-projections-202780-latest.qs`, take `candidates` rows with
+`method_id == "spine_adjusted"`, `saturated_prior`, and `waitlisted_prior > 0`,
+and join `recent_history$actual_first_day` on `history_term == spine_term`.
+`sum(waitlisted_prior)` is 245, `sum(floor_uplift)` 77; every zero-uplift row
+has `spine - actual_first_day >= waitlisted_prior`.
+
 ---
 
 # Improvements
@@ -1988,6 +2051,26 @@ reconstruction now exists — `first_day_enrl` (`calc_first_day_enrl()`, definit
 actively misleading beside it: rename `first_day_proxy` to an ever-registered
 name. *Done when:* each lifecycle column has one label, from
 `docs/_data/definitions.yml`, used everywhere it is shown.
+
+**M31 — Projection `recent_history` saves a join collision.** In
+`attach_projection_movement_signals()` (`R/branches/enrollment-projections.R`),
+`market_prior` renames `market_students` but not `market_incoming_first_sem`, so
+saved bundles carry `market_incoming_first_sem.x` (the source term) and `.y`
+(the prior term). Nothing reads either, and the validator does not reject
+extra columns. *Done when:* the prior column is named
+`prior_market_incoming_first_sem` or dropped, and the validator rejects
+`.x`/`.y` suffixes in saved tables.
+
+**M32 — One class-list term per season carries no status dates.** For one
+Fall and one Spring term in the projection window (and a Summer between them,
+which projections do not read) every class-list row lacks a Registration
+Status Date, so `calc_first_day_enrl()` returns `NA` for every course and the
+projection cannot judge saturation, capacity reached, or the floor for the
+aftcast that reads them: one of the four history terms in each season. Admin >
+Data & Usage and `class_list_status_date_coverage()` list which; prose does not
+name them, because re-pulling a term's class list fills its dates in. *Done
+when:* both are re-pulled, the coverage report shows dates for every term from
+`projection_history_start_term` on, and the projection bundles are rebuilt.
 
 **M28 — The HR department list is a hand-kept R list.** **Done 2026-10-16.**
 `hr_org_desc_to_dept` (79 names to 32 departments) now comes from

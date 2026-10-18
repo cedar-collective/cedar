@@ -75,9 +75,10 @@ enrollment_projection_defaults <- function() {
     #
     # The spine is prior same-season class-list demand. The floor applies when
     # that term was saturated (first-day fill at or above
-    # saturation_fill_threshold): demand is then at least first-day enrollment
-    # plus the distinct students left on the waitlist, because the observed
-    # count was clipped by the seats offered. Seats are judged on the first
+    # saturation_fill_threshold): demand is then at least the spine plus the
+    # distinct students left waiting who are on no campus's class list in the
+    # market, because the observed count was clipped by the seats offered
+    # (0.22.0; ISSUES.md I27). Seats are judged on the first
     # day, not at census: three weeks of drops (census is the 15th day of
     # instruction; the term calendar in AGENTS.md) let a course full on day
     # one read 95% at census (0.21.0). The two deltas read the term immediately
@@ -892,10 +893,12 @@ prepare_projection_student_inputs <- function(students, target_courses,
 }
 
 
-# Distinct students left waiting on a course, per market term, by the canonical
-# class-list waitlist-demand rule (R/branches/waitlist-demand.R). Class lists
-# retain waitlist rows only from Summer 2026, so earlier terms report zero
-# rows here rather than zero demand; the floor says which.
+# Distinct students left waiting on a course, per market term, who are on no
+# campus's class list in the market. Starts from the canonical class-list
+# waitlist-demand rule (R/branches/waitlist-demand.R), then removes anyone the
+# market's class-list total already counts. Class lists retain waitlist rows
+# only from Summer 2026, so earlier terms report zero rows here rather than
+# zero demand; the floor says which.
 prepare_projection_waitlist_history <- function(students, courses, campuses,
                                                 market_id, through_term = NULL,
                                                 sections = NULL) {
@@ -921,11 +924,20 @@ prepare_projection_waitlist_history <- function(students, courses, campuses,
   )
   if (nrow(scoped) == 0L) return(empty)
 
-  # CAMPUS_ROLLUP: the canonical rule removes anyone registered in the same
-  # course group; the market then counts each waiting student once across
-  # its pooled campuses.
+  # The canonical rule removes anyone registered in the same delivery group,
+  # so a student holding an EA seat while waiting at ABQ survives it. The
+  # floor adds these students to the market's class-list total, which already
+  # counts anyone with a non-waitlist row on either campus (registered, or an
+  # earlier drop), so they are removed first (ISSUES.md I27).
+  on_class_list <- scoped %>%
+    dplyr::filter(!registration_status_code %in% STATUS_WAITLIST) %>%
+    # CAMPUS_ROLLUP: membership of the pooled market's class list, either campus.
+    dplyr::distinct(student_id, term, subject_course)
+  # CAMPUS_ROLLUP: the market counts each waiting student once across its
+  # pooled campuses.
   get_true_waitlisted_rows(scoped, sections) %>%
     dplyr::distinct(student_id, term, subject_course) %>%
+    dplyr::anti_join(on_class_list, by = c("student_id", "term", "subject_course")) %>%
     dplyr::count(term, subject_course, name = "waitlisted") %>%
     dplyr::mutate(
       market_id = as.character(market_id),
@@ -1227,9 +1239,10 @@ project_seasonal_last <- function(history, row, target_term, opt = list()) {
 # seats needed = spine + floor uplift + repeat delta + feeder delta
 #
 #   spine          prior same-season class-list demand (the default itself)
-#   floor uplift   if that term was saturated (first-day fill >= 90%), demand
-#                  is at least first-day enrollment + students left on the
-#                  waitlist; the uplift is that floor minus the spine
+#   floor uplift   if that term was saturated (first-day fill >= 90%), the
+#                  students still waiting at close who never held a seat; the
+#                  spine already counts everyone who registered, so demand was
+#                  at least spine + those students
 #   repeat delta   change in the course's own enrollment in the term just
 #                  finished, times the share of those students who historically
 #                  took the course again the following same-season term
@@ -1294,17 +1307,20 @@ projection_spine_floor <- function(spine_row, section_history, waitlist_history,
       )
     ))
   }
-  floor_demand <- first_day + waitlisted
-  uplift <- max(0, floor_demand - spine)
+  # The floor is in the spine's units: the ever-registered total plus the
+  # waiting students, none of whom is on the market class list. Adding the
+  # waitlist to first-day enrollment instead let the term's early-drop churn
+  # absorb it, so 245 waiting students lifted Fall 2027 by 77 (ISSUES.md I27).
+  floor_demand <- spine + waitlisted
   list(
     saturated = TRUE, fill = saturation$fill_rate[[1]], waitlisted = waitlisted,
-    uplift = uplift,
+    uplift = as.numeric(waitlisted),
     basis = paste0(
       fmt_term(spine_term), " was saturated (first-day fill ",
       scales::percent(saturation$fill_rate[[1]], accuracy = 0.1), "); ",
       if (waitlisted > 0) {
-        paste0("floor is first day + ", waitlisted, " waitlisted = ",
-               round(floor_demand))
+        paste0("floor is spine ", round(spine), " + ", waitlisted,
+               " still waiting = ", round(floor_demand))
       } else {
         "no waitlist rows retained for that term, so the floor is the spine itself"
       }
@@ -1589,8 +1605,9 @@ project_course_method_candidates <- function(inputs, row, target_term,
 
 
 # Every applicable adjusted row must reconcile: spine + floor + deltas is the
-# raw projection (floored at zero), the floor never lowers the spine, and the
-# spine term precedes the target.
+# raw projection (floored at zero), the spine term precedes the target, and
+# the floor is exactly the waiting students when the prior term was saturated
+# and zero otherwise, so it stays in the spine's units (ISSUES.md I27).
 validate_spine_rows <- function(data, caller) {
   if (nrow(data) == 0 || !"method_id" %in% names(data)) return(invisible(TRUE))
   rows <- data %>%
@@ -1599,8 +1616,12 @@ validate_spine_rows <- function(data, caller) {
   projection_require_columns(
     rows,
     c("target_term", "projected_classlist_total", "spine", "spine_term",
-      "floor_uplift", "delta_repeat", "delta_feeder"),
+      "floor_uplift", "saturated_prior", "waitlisted_prior", "delta_repeat",
+      "delta_feeder"),
     caller
+  )
+  floor_expected <- ifelse(
+    rows$saturated_prior %in% TRUE, as.numeric(rows$waitlisted_prior), 0
   )
   raw <- if ("raw_projected_classlist_total" %in% names(rows)) {
     rows$raw_projected_classlist_total
@@ -1611,7 +1632,9 @@ validate_spine_rows <- function(data, caller) {
     0, rows$spine + rows$floor_uplift + rows$delta_repeat + rows$delta_feeder
   )
   valid <- is.finite(rows$spine) & rows$spine_term < rows$target_term &
-    rows$floor_uplift >= 0 & is.finite(raw) & abs(raw - expected) <= 1e-6
+    is.finite(floor_expected) & floor_expected >= 0 &
+    abs(rows$floor_uplift - floor_expected) <= 1e-6 &
+    is.finite(raw) & abs(raw - expected) <= 1e-6
   if (any(!valid)) {
     stop(
       "[enrollment-projections.R] ", caller,

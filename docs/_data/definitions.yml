@@ -560,8 +560,29 @@ definitions:
             functions: [get_true_waitlisted_rows, summarize_waitlist_demand]
 
   - id: enrollment-projection
-    current_version: "1.3.0"
+    current_version: "1.4.0"
     versions:
+      - version: "1.4.0"
+        title: Saved enrollment projections
+        summary: Saved Spring and Fall projections estimate ever-registered class-list demand for the pooled Albuquerque and online market as prior same-season demand, plus the students still waiting when that term was full on the first day of classes, moved by Fall enrollment changes where they beat the plain baseline on earlier aftcasts; expected first-day enrollment applies the course's first-day retention and sizes planning sections.
+        population: Monitored course-market groups in the saved projection bundle.
+        unit: Course and target term in the pooled ABQ/EA market.
+        numerator: Prior same-season enrollment (the spine), or the spine plus a saturation floor (the students still waiting at the end of that term who are on no campus's class list in the market, when 90% or more of the seats were filled on the first day) plus repeat and feeder deltas read from the term just finished, when that candidate beat the spine on at least three earlier shared aftcasts; planning sections convert expected first-day enrollment using the bundle's section-size assumptions.
+        denominator: Historical actual demand for error measures; expected section size for the planning-section conversion.
+        campus: ABQ and EA are pooled deliberately, not presented as separate campus forecasts.
+        time_window: The saved target term, as-of term, build timestamp, and historical evaluation windows are displayed from the bundle.
+        exclusions: Unmonitored courses and unsupported target seasons are outside this model. Shiny does not fit or select models during a session. Fall deltas use enrollments, never grades. A waiting student already on the market's class list on either campus is counted once, in the spine.
+        limitations:
+          - Stability, depth, and accuracy are reported as three separate axes; Unrated and None remain visible. Accuracy is the realised error of the selection rule replayed at each past term, so it is out of sample but still no guarantee of future coverage.
+          - First-day enrollment is reconstructed from registration status dates. A term whose class lists carry no status dates (Fall 2024 and Spring 2025) has no first-day count; it is not judged full or not full, and census is not substituted.
+          - Capacity counts as reached, and an overprojection as Capacity-bounded, when first-day enrollment filled 98% or more of the scheduled seats; seats pooled over many sections rarely fill to the last one.
+          - A saturated prior term with no retained waitlist rows reports the spine as its own floor; class lists retain waitlist rows only from Summer 2026, so the floor has almost no past-term aftcasts to be tested against.
+          - The waiting students are a lower bound on unserved demand, not an estimate of it; a student who gave up without joining a waitlist leaves no record.
+          - The definition version describes the metric. The bundle's separate model_version and schema_version identify the actual calculation and artifact format.
+        guide: users/enrollment-projections
+        implementation:
+          - file: R/features/enrollment-projections.R
+            functions: [build_enrollment_projection_view, load_latest_enrollment_projection_bundle]
       - version: "1.3.0"
         title: Saved enrollment projections
         summary: Saved Spring and Fall projections estimate ever-registered class-list demand for the pooled Albuquerque and online market as prior same-season demand, raised to a floor when that term was full on the first day of classes and moved by Fall enrollment changes where they beat the plain baseline on earlier aftcasts; expected first-day enrollment applies the course's first-day retention and sizes planning sections.

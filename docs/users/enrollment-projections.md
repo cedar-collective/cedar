@@ -82,9 +82,10 @@ two candidates:
 
 - **Prior same-season**, the spine and the default: last comparable season's
   class-list demand. When the schedule holds still it is within about 6%.
-- **Prior same-season + floor + Fall deltas**: the same number, raised to
-  first-day enrollment plus the waitlist when that term was saturated (90% or
-  more of the seats filled on the first day), plus the change in the course's
+- **Prior same-season + floor + Fall deltas**: the same number, plus the
+  students still waiting for a seat at the end of that term when it was
+  saturated (90% or more of the seats filled on the first day), plus the change
+  in the course's
   own enrollment and in its feeder courses' enrollment during the term just
   finished, each scaled by the share that historically carried into this
   course. It uses Fall enrollments, not grades, because grades are not posted
