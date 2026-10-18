@@ -978,3 +978,224 @@ signal_load_complete <- function(session, id, duration_sec = NULL,
     error        = isTRUE(error)
   ))
 }
+
+#' Reusable semester-board adapter; scheduling and graph metrics stay in branches
+cedar_semester_roadmap <- function(view, id, history_id = paste0(id, "-history"), select_id = paste0(id, "-select")) {
+  nodes <- view$nodes; terms <- view$terms
+  legend <- c(green = "0 prerequisite courses", yellow = "1–2 prerequisite courses",
+              red = "3+ prerequisite courses", unresolved = "Choice: prerequisites vary",
+              conditional = "◇ Coursework / permission condition", suggested = "Suggested Gen Ed course")
+  json_script <- function(data, class) {
+    json <- jsonlite::toJSON(data, dataframe = "rows", auto_unbox = TRUE)
+    tags$script(type = "application/json", class = class,
+      htmltools::HTML(gsub("<", "\\u003c", json, fixed = TRUE)))
+  }
+  tagList(
+    subtab_header(view$title, "A semester-by-semester picture · hover for prerequisites · click for enrollment history"),
+    div(class = "cedar-roadmap-summary", role = "status",
+      tags$strong(view$math_note), tags$span(view$change_note),
+      tags$span(class = "cedar-roadmap-prototype", "Planning prototype")),
+    div(id = id, class = "cedar-roadmap", `data-roadmap` = "true",
+      `data-select-input` = select_id,
+      `data-upper-level-from` = view$policy$upper_level_from_semester,
+      `data-catalog` = view$catalog$catalog_id,
+      `data-math-start` = view$starts[["math"]], `data-english-start` = view$starts[["english"]],
+      `data-start-season` = view$start_season,
+      div(class = "cedar-roadmap-legend", lapply(names(legend), function(level)
+        tags$span(class = paste("cedar-roadmap-key", paste0("cedar-roadmap-key--", level)), legend[[level]])),
+        tags$span("Counts name courses in the chain; ◇ conditions are separate. ↔ = lecture + lab together.")),
+      tags$p(class = "text-hint", "Hover or focus a course to preview its prerequisite chain and the courses that depend on it. Blue lines lead in; purple lines lead out. Click for first-day seats and enrollment history. Related courses line up across semesters."),
+      tags$p(class = "text-hint cedar-roadmap-timing", view$timing_note),
+      div(id = paste0(id, "-hover"), class = "cedar-roadmap-hover", role = "tooltip", hidden = TRUE,
+        tags$strong(class = "cedar-roadmap-hover-title"),
+        div(class = "cedar-roadmap-hover-upstream",
+          tags$strong("Prerequisite / corequisite chain"), tags$p(class = "cedar-roadmap-hover-before")),
+        tags$p(class = "cedar-roadmap-hover-conditions", hidden = TRUE),
+        div(class = "cedar-roadmap-hover-downstream",
+          tags$strong("Courses that depend on it"), tags$p(class = "cedar-roadmap-hover-after")),
+        tags$p(class = "cedar-roadmap-hover-options", hidden = TRUE),
+        tags$small("This selected route only. Click for enrollment history and catalog evidence.")),
+      tags$dialog(id = paste0(id, "-dialog"), class = "cedar-roadmap-dialog", `aria-labelledby` = paste0(id, "-course-title"),
+        div(class = "cedar-roadmap-dialog-header",
+          tags$h3(id = paste0(id, "-course-title"), class = "cedar-roadmap-detail-title", "Course details"),
+          tags$button(type = "button", class = "cedar-roadmap-close", `aria-label` = "Close course details", "×")),
+        div(class = "cedar-roadmap-dialog-body",
+        div(class = "cedar-roadmap-detail-heading",
+          div(class = "cedar-roadmap-detail-actions",
+            tags$a(class = "cedar-roadmap-program-source", href = view$catalog$source_url,
+              target = "_blank", rel = "noopener noreferrer", "Degree requirements ↗"),
+            tags$a(class = "cedar-roadmap-detail-course", href = view$catalog$source_url,
+              target = "_blank", rel = "noopener noreferrer", "Course description ↗"))),
+        tags$p(class = "text-hint cedar-roadmap-dialog-summary", hidden = TRUE),
+        uiOutput(history_id, class = "cedar-roadmap-history", `aria-live` = "polite"),
+      div(class = "cedar-roadmap-detail",
+        tags$h4("Catalog requirements & course details"),
+        div(class = "cedar-roadmap-evidence",
+          tags$strong(class = "cedar-roadmap-evidence-basis"),
+          tags$a(class = "cedar-roadmap-evidence-location", target = "_blank", rel = "noopener noreferrer"),
+          tags$q(class = "cedar-roadmap-evidence-quote"),
+          tags$span(class = "cedar-roadmap-evidence-stamp"),
+          tags$span(class = "cedar-roadmap-evidence-note")),
+        div(class = "cedar-roadmap-chain-detail"),
+        div(class = "cedar-roadmap-condition-detail"),
+        div(class = "cedar-roadmap-option-detail"),
+        tags$p(class = "cedar-roadmap-detail-text"))),
+        div(class = "cedar-roadmap-dialog-footer",
+          tags$button(type = "button", class = "btn btn-secondary cedar-roadmap-close", "Back to roadmap"))),
+      div(class = "cedar-roadmap-scroll", tabindex = "0", role = "region", `aria-label` = "Semester roadmap; scroll horizontally to see later semesters",
+        div(class = "cedar-roadmap-board", style = paste0("--roadmap-terms:", nrow(terms), ";--roadmap-rows:", view$n_rows),
+          lapply(seq_len(nrow(terms)), function(i) {
+            t <- terms[i, ]; courses <- nodes[nodes$semester == t$semester, ]
+            allowances <- view$allowances[view$allowances$semester == t$semester, ]
+            tags$section(class = "cedar-roadmap-semester", `aria-label` = paste("Semester", t$semester),
+              `data-planned-credits` = t$planned_credits,
+              div(class = "cedar-roadmap-semester-header",
+                tags$span(class = "cedar-roadmap-year", paste("Year", t$year, "·", tools::toTitleCase(t$season))),
+                tags$strong(paste("Semester", t$semester)),
+                tags$span(class = "cedar-roadmap-load", paste(t$planned_credits, "credits planned"))),
+              div(class = "cedar-roadmap-courses", lapply(seq_len(nrow(courses)), function(j) {
+                c <- courses[j, ]
+                alternatives <- view$option_groups[view$option_groups$node_id == c$node_id, ]
+                tags$button(type = "button", class = paste("cedar-roadmap-course",
+                    paste0("cedar-roadmap-course--", c$kind), paste0("cedar-roadmap-course--", c$planning_level)),
+                  `data-node` = c$node_id, `data-card-type` = "course", `data-kind` = c$kind, `data-semester` = c$semester,
+                  `data-row` = c$row, `data-row-group` = c$row_group, style = paste0("grid-row:", c$row),
+                  `data-course-level` = c$course_level,
+                  `data-credits` = c$credits,
+                  `data-option-count` = c$option_count,
+                  `data-basis` = c$basis, `data-conditions` = c$n_conditions,
+                  `data-title` = paste(c$code, "·", c$title), `data-planning-level` = c$planning_level,
+                  `data-prerequisites` = c$n_prerequisites, `data-downstream` = c$n_downstream,
+                  `aria-pressed` = "false",
+                  `aria-haspopup` = "dialog", `aria-controls` = paste0(id, "-dialog"),
+                  tags$span(class = "cedar-roadmap-course-code", if (c$option_count) c$option_label else c$code),
+                  if (nzchar(c$requirement_summary)) tags$span(class = "cedar-roadmap-requirement-summary", c$requirement_summary),
+                  if (c$option_count) tags$span(class = "cedar-roadmap-option-preview", title = c$option_codes,
+                    lapply(seq_len(nrow(alternatives)), function(k) {
+                      codes <- view$options$subject_course[view$options$node_id == c$node_id &
+                        view$options$option_id == alternatives$option_id[k]]
+                      tagList(lapply(seq_along(codes), function(j)
+                        tagList(tags$span(class = "cedar-roadmap-option-code", codes[j]),
+                          if (j < length(codes)) " + " else if (k < nrow(alternatives)) ", " else "")))
+                    })),
+                  tags$span(class = "cedar-roadmap-course-title", c$title),
+                  tags$span(class = "cedar-roadmap-category", c$kind_label, if (c$bundle) " · ↔ Paired"),
+                  tags$span(class = "cedar-roadmap-prereq-count",
+                    c$prerequisite_label),
+                  if (nzchar(c$condition_label)) tags$span(class = "cedar-roadmap-condition-badge", paste("◇", c$condition_label)),
+                  tags$span(class = "cedar-roadmap-chain-badge", c$chain_badge),
+                  tags$span(class = "cedar-roadmap-course-meta", paste(c$credits, if (c$option_count) "cr planned" else "cr"),
+                    if (c$moved) tags$span(class = "cedar-roadmap-moved", "Shifted")))
+              }), lapply(seq_len(nrow(allowances)), function(j) {
+                a <- allowances[j, ]
+                tags$button(type = "button", class = "cedar-roadmap-course cedar-roadmap-course--allowance",
+                  `data-node` = a$node_id, `data-card-type` = "allowance", `data-kind` = "allowance",
+                  `data-semester` = a$semester, `data-season` = a$season,
+                  `data-credits` = a$credits,
+                  `data-row` = a$row, `data-row-group` = paste0("allowance_", a$semester),
+                  style = paste0("grid-row:", a$row), `data-allowance-phase` = "foundation",
+                  `data-title` = paste(a$code, "·", a$credits, "credits"),
+                  `aria-pressed` = "false", `aria-haspopup` = "dialog", `aria-controls` = paste0(id, "-dialog"),
+                  tags$span(class = "cedar-roadmap-course-code", "Gen Ed / lower-level elective"),
+                  tags$span(class = "cedar-roadmap-course-title", a$title),
+                  tags$span(class = "cedar-roadmap-category", "Suggested options"),
+                  tags$span(class = "cedar-roadmap-chain-badge", paste("Browse", a$season_label, "courses")),
+                  tags$span(class = "cedar-roadmap-course-meta", paste(a$credits, "cr planned")))
+              })),
+              if (t$other_credits >= 1 && t$other_phase == "advanced") div(class = "cedar-roadmap-flex", `data-allowance-phase` = t$other_phase,
+                `data-credits` = t$other_credits,
+                tags$span(t$other_label), tags$strong(paste(t$other_credits, "cr planned"))))
+          }))),
+      json_script(view$links[c("from", "to", "timing")], "cedar-roadmap-links"),
+      json_script(view$conditions, "cedar-roadmap-conditions"),
+      json_script(view$options, "cedar-roadmap-options"),
+      json_script(view$option_groups, "cedar-roadmap-option-groups"),
+      json_script(view$allowances, "cedar-roadmap-allowance-data"),
+      json_script(nodes, "cedar-roadmap-node-data")),
+    tags$p(class = "text-hint mt-2", view$workload_note),
+    tags$p(class = "text-hint", view$note, " ",
+      tags$a(href = view$catalog$source_url, target = "_blank", rel = "noopener noreferrer", "Degree catalog source"),
+      " · saved ", view$catalog$catalog_year, " excerpt, retrieved ", view$catalog$retrieved_on, "."))
+}
+
+#' Course history rendering only; all counts and summaries arrive from a feature.
+cedar_degree_course_history <- function(history, table_id) {
+  div(`data-history-node` = history$node_id, `data-history-state` = history$state,
+    tags$h4("Offering history & first-day seats"),
+    tags$p(class = "text-hint", history$note),
+    if (history$state == "empty") tags$p("No active offering history under this exact course code in this window. Renamed courses are not automatically combined."),
+    if (history$state == "ready") tagList(
+      tags$p(class = "text-hint", "Seats offered → filled at first class day → fill %. Filter Course or Campus to compare the same offering over time. Season frequency counts source-covered terms only."),
+      reactable::reactableOutput(table_id),
+      if (length(history$missing_courses)) tags$p("No history for: ", paste(history$missing_courses, collapse = ", "), ". Components are checked separately."),
+      tags$p(class = "text-hint", "Near full = at least 90% filled at first day. Missing dates are unavailable; counts below 10 are suppressed. History does not guarantee future seats."),
+      info_panel("How first-day enrollment is measured",
+        tags$p("Source: scheduled seats from DESR and first-day enrollment reconstructed from class-list status dates against each section’s start date. This uses CEDAR’s shared first-day helper; it does not substitute census or ever-registered counts."),
+        tags$p("Banner retains only the current status date. A student who added after day one and later dropped can be counted as present, so this is a reconstruction, not a frozen first-day roster. Scheduled capacity is the retained snapshot."),
+        tags$p("Lecture/lab, teaching campuses, colleges and parts of term stay separate. Incomplete source matches, missing dates, cells below 10 and implausible fill above 125% are unscored. Not offered means source-covered absence; Source unavailable means the campus has no retained source term."))))
+}
+
+#' Shared seats, first-day enrollment and coverage columns for planning tables.
+cedar_degree_seat_coldefs <- function() {
+  number <- function(value) if (is.na(value)) "—" else format(value, big.mark = ",", trim = TRUE)
+  list(
+    capacity = reactable::colDef(name = "Seats offered", align = "right", minWidth = 85, cell = number),
+    first_day_enrl = reactable::colDef(name = "Filled · first day", align = "right", minWidth = 95, cell = number),
+    first_day_fill = reactable::colDef(name = "First-day fill", align = "right", minWidth = 85,
+      cell = function(value) if (is.na(value)) "—" else scales::percent(value, accuracy = 1)),
+    pressure_status = reactable::colDef(name = "Pressure / coverage", minWidth = 140,
+      style = function(value) if (value == "Near full") list(background = "#F4E9D2", fontWeight = "600") else list()),
+    season_frequency = reactable::colDef(name = "Season frequency", minWidth = 100))
+}
+
+#' Standard CEDAR table; counts stay numeric for sorting and formatting.
+cedar_degree_history_table <- function(history) {
+  reactable::reactable(history$table, theme = cedar_tbl_theme, striped = TRUE,
+    highlight = TRUE, compact = TRUE, filterable = TRUE,
+    defaultColDef = reactable::colDef(filterable = FALSE), defaultPageSize = 9,
+    showPageSizeOptions = TRUE, pageSizeOptions = c(9, 18, 36),
+    columns = c(list(
+      term = reactable::colDef(name = "Term", minWidth = 95, cell = fmt_term),
+      term_label = reactable::colDef(show = FALSE),
+      subject_course = reactable::colDef(name = "Course", minWidth = 100, filterable = TRUE),
+      campus = reactable::colDef(name = "Campus", minWidth = 65, filterable = TRUE),
+      college = reactable::colDef(name = "College", minWidth = 65),
+      part_term = cedar_pot_coldef()), cedar_degree_seat_coldefs()))
+}
+
+cedar_degree_allowance_history <- function(history, table_id) {
+  div(`data-history-node` = history$node_id, `data-history-state` = history$state,
+    `data-history-season` = history$season,
+    section_heading(paste(tools::toTitleCase(history$season), "Gen Ed suggestions"), level = "h4"),
+    tags$p(class = "text-hint", history$note),
+    tags$p(class = "text-hint", history$credit_note),
+    tags$p(class = "text-hint", "Historical examples, not major-specific recommendations or audited requirements. Check prerequisites and current Gen Ed approval."),
+    if (history$state != "ready") tags$p("No matching-season Gen Ed options with usable course metadata were found."),
+    if (history$state == "ready") tagList(
+      tags$p(class = "text-hint", "Latest matching-season offering per course/campus/college/session. Seats offered → filled at first class day → fill %. Filter Gen Ed area, Course or Campus."),
+      reactable::reactableOutput(table_id),
+      tags$p(class = "text-hint", "First-day counts are reconstructed; missing dates remain unavailable and counts below 10 are suppressed. Near full means at least 90% filled. Historical offerings do not guarantee future seats."),
+      info_panel("How suggestions are chosen",
+        tags$p("Lower-level courses come from CEDAR's institution Gen Ed list, with course-sized credit ranges and usable historical metadata. Courses already represented by entry routes, requirements and enumerated choice pools are excluded. This does not identify a student's remaining Gen Ed areas."),
+        tags$p("The history window ends at settled enrollment. Rows show the latest matching-season offering at each course/campus/college/session; frequent offerings sort first, followed by first-day enrollment. Season frequency counts source-covered terms, not missing terms."),
+        tags$p("Scheduled seats come from DESR; first-day enrollment uses the shared class-list reconstruction. Missing matches and dates stay unknown. Banner retains only the current status date, so late additions later dropped may be counted at first day. Census counts are not substituted."))))
+}
+
+cedar_degree_allowance_table <- function(history) {
+  reactable::reactable(history$table, theme = cedar_tbl_theme, striped = TRUE,
+    highlight = TRUE, compact = TRUE, filterable = TRUE,
+    defaultColDef = reactable::colDef(filterable = FALSE), defaultPageSize = 12,
+    showPageSizeOptions = TRUE, pageSizeOptions = c(12, 24, 48),
+    columns = c(list(
+      area_label = reactable::colDef(name = "Gen Ed area", minWidth = 125, filterable = TRUE),
+      subject_course = reactable::colDef(name = "Course", minWidth = 100, filterable = TRUE),
+      course_title = reactable::colDef(name = "Title", minWidth = 190, filterable = TRUE),
+      credits_min = reactable::colDef(show = FALSE), credits_max = reactable::colDef(show = FALSE),
+      credit_label = reactable::colDef(name = "Credits", minWidth = 60),
+      credit_fit = reactable::colDef(name = "Credit fit", minWidth = 125, filterable = TRUE),
+      campus = reactable::colDef(name = "Campus", minWidth = 65, filterable = TRUE),
+      college = reactable::colDef(name = "College", minWidth = 65),
+      part_term = cedar_pot_coldef(),
+      term = reactable::colDef(name = "Last offered", minWidth = 95, cell = fmt_term)),
+      cedar_degree_seat_coldefs()))
+}

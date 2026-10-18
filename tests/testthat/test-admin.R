@@ -2,6 +2,101 @@
 
 context("Admin modules")
 
+test_that("Degree Explorer renders student starting points and a visual semester board", {
+  withr::local_package("shiny")
+  withr::local_package("bslib")
+  load_funcs(cedar_base_dir, modules = TRUE)
+  ui <- degreeExplorerUI("degree_explorer", CEDAR_DEGREE_CATALOG, CEDAR_DEGREE_ROADMAPS)
+  html <- as.character(ui)
+  expect_match(html, "degree_explorer-dx_math_start", fixed = TRUE)
+  expect_match(html, "degree_explorer-dx_english_start", fixed = TRUE)
+  view <- build_degree_roadmap_view(CEDAR_DEGREE_CATALOG, CEDAR_DEGREE_ROADMAPS,
+    "biology-bs-2026", "intermediate", "stretch")
+  board <- as.character(cedar_semester_roadmap(view, "board"))
+  expect_match(board, "data-roadmap", fixed = TRUE)
+  expect_match(board, "Semester 8", fixed = TRUE)
+  expect_match(board, "MATH 1215", fixed = TRUE)
+  expect_match(board, "CHEM 1215 + 1215L", fixed = TRUE)
+  expect_match(board, "↔ Paired", fixed = TRUE)
+  expect_match(board, "cedar-roadmap-evidence-quote", fixed = TRUE)
+  expect_match(board, "Degree requirements ↗", fixed = TRUE)
+  expect_match(board, "data-planned-credits", fixed = TRUE)
+  expect_match(board, "3+ prerequisite courses", fixed = TRUE)
+  philosophy <- build_degree_roadmap_view(CEDAR_DEGREE_CATALOG, CEDAR_DEGREE_ROADMAPS,
+    "philosophy-ba-2026", "calculus", "composition")
+  choices <- as.character(cedar_semester_roadmap(philosophy, "choice_board"))
+  expect_match(choices, "Choose 1 of 3 courses", fixed = TRUE)
+  expect_match(choices, "PHIL 333, PHIL 334, PHIL 336", fixed = TRUE)
+  expect_match(choices, "cedar-roadmap-option-detail", fixed = TRUE)
+  expect_match(board, 'data-card-type="allowance"', fixed = TRUE)
+  expect_match(board, "Browse Fall courses", fixed = TRUE)
+  expect_match(as.character(observedCoursePathsUI("paths", unique(test_students$campus))),
+    "paths-button", fixed = TRUE)
+})
+
+test_that("allowance popup renders one standard suggestion table with first-day seats", {
+  withr::local_package("shiny")
+  v <- build_degree_roadmap_view(CEDAR_DEGREE_CATALOG, CEDAR_DEGREE_ROADMAPS,
+    "cs-bs-2026", "calculus", "composition")
+  selection <- list(type = "allowance", catalog_id = "cs-bs-2026", math_start = "calculus",
+    english_start = "composition", start_season = "fall", node_id = v$allowances$node_id[1])
+  membership <- data.frame(subject_course = "SOCI 100", area_label = "4: Social sciences")
+  h <- build_degree_popup_history(test_sections_regstats, test_students_regstats,
+    list(last_enrolled_complete = 202080L), CEDAR_DEGREE_CATALOG, CEDAR_DEGREE_ROADMAPS, membership, selection)
+  expect_s3_class(cedar_degree_allowance_table(h), "reactable")
+  html <- as.character(cedar_degree_allowance_history(h, "suggestion_table"))
+  expect_match(html, "Fall Gen Ed suggestions", fixed = TRUE)
+  expect_match(html, "suggestion_table", fixed = TRUE)
+  expect_match(html, "rather than a complete course", fixed = TRUE)
+  expect_match(html, "first class day", fixed = TRUE)
+})
+
+# Authored node metadata redirects a tile to EC-11's known institutional rows;
+# no raw enrollment or section records are invented in this presentation test.
+test_that("course history popup renders every campus and explicit unknown states", {
+  withr::local_package("shiny")
+  r <- CEDAR_DEGREE_ROADMAPS
+  r$courses$subject_course[r$courses$node_id == "calc1"] <- "SOCI 100"
+  r$nodes$code[r$nodes$node_id == "calc1"] <- "SOCI 100"
+  h <- build_degree_course_history(test_sections_regstats, test_students_regstats,
+    list(last_enrolled_complete = 202080L), r, "cs-bs-2026", "calc1")
+  expect_setequal(h$table$campus, c("ABQ", "EA"))
+  expect_true(is.numeric(h$table$capacity))
+  expect_true(is.numeric(h$table$first_day_enrl))
+  html <- as.character(cedar_degree_course_history(h, "history_table"))
+  expect_match(html, "filled at first class day", fixed = TRUE)
+  expect_match(html, "history_table", fixed = TRUE)
+  expect_match(html, "Near full", fixed = TRUE)
+  expect_match(html, 'data-history-node="calc1"', fixed = TRUE)
+  expect_false(grepl("cedar-roadmap-season-table", html, fixed = TRUE))
+  widget <- cedar_degree_history_table(h)
+  expect_s3_class(widget, "reactable")
+  # Lecture and lab may have different teaching-campus histories. Do not create
+  # an empty course/campus panel by crossing their separate campus sets.
+  r$courses$subject_course[r$courses$node_id == "chem1"] <- c("SOCI 100", "SOCI 101")
+  bundle <- build_degree_course_history(test_sections_regstats, test_students_regstats,
+    list(last_enrolled_complete = 202080L), r, "biology-bs-2026", "chem1")
+  expect_equal(nrow(distinct(bundle$table, subject_course, campus)), 3L)
+  expect_no_error(cedar_degree_course_history(bundle, "history_table"))
+})
+
+# Redirect authored option metadata to EC-11's raw course histories. This tests
+# alternative-set orchestration without constructing institutional records.
+test_that("history for a course set keeps every alternative at its own course/campus/session grain", {
+  r <- CEDAR_DEGREE_ROADMAPS
+  r$options$subject_course[r$options$node_id == "philbuddhist"] <- c("SOCI 100", "SOCI 101", "SOCI 104")
+  h <- build_degree_course_history(test_sections_regstats, test_students_regstats,
+    list(last_enrolled_complete = 202080L), r, "philosophy-ba-2026", "philbuddhist")
+  expect_equal(h$state, "ready")
+  expect_match(h$note, "alternatives", fixed = TRUE)
+  expect_setequal(unique(h$table$subject_course), c("SOCI 100", "SOCI 101", "SOCI 104"))
+  full <- h$table[h$table$subject_course == "SOCI 100" & h$table$campus == "ABQ" &
+    h$table$part_term == "1" & h$table$term == 202080L, ]
+  expect_equal(full$capacity, 100)
+  expect_equal(full$first_day_enrl, 107)
+  expect_false(anyDuplicated(h$table[c("term", "subject_course", "campus", "college", "part_term")]) > 0L)
+})
+
 suppressPackageStartupMessages({
   library(shiny)
   library(bslib)

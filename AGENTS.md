@@ -271,6 +271,22 @@ Full reasoning and the 1.0 inventory: [campus-policy.md](docs/developers/campus-
 
 ## Cone Architecture
 
+**Before changing Degree Explorer, read [degree-explorer-rules.md](docs/developers/degree-explorer-rules.md).** It records the visual interface, course-family row alignment, early Gen Ed/later upper-level timing, 15/16-credit workload policy, planning colors and catalog evidence contract.
+
+Degree Explorer adds `R/branches/degree-requirements.R` (rule outlines, semester scheduling and descriptive
+grouping), `R/cones/grouped-student-paths.R` (`get_grouped_student_paths()`),
+`R/features/degree-explorer.R` (semester-roadmap and observed-path payloads), and
+`R/modules/degree-explorer.R` (`degreeExplorerUI/Server()`, Explore > Degree Explorer).
+`R/modules/observed-course-paths.R` mounts `observedCoursePathsUI/Server()` in
+Pathways > Course paths, sharing that tab's population. Degree Explorer displays
+one program and adapts its semester board to math/English starting points.
+Course-count/permission conditions are separate from named-course arrows; suggested
+Gen Ed tiles are labelled and lighter. Its popup uses one standard CEDAR table
+with reconstructed first-day enrollment, not a census substitute.
+Its versioned catalog excerpts, authored roadmap templates and subject groups live under `institution/<id>/`;
+they are not student audits or forecast inputs. Contract:
+[degree-requirements.md](docs/developers/degree-requirements.md).
+
 Each cone is a focused file in `R/cones/` answering one analytical question. Cones take CEDAR tables plus `opt = list()` and return a tibble or named list. No Shiny dependencies, no side effects, no calls to other cones.
 
 **Before writing anything, read [layer-inventory.md](docs/developers/layer-inventory.md)** — the per-function index of branches, cones, features, and trunk helpers, with the parameters and behavioral caveats this file no longer carries. An existing function may already answer your question; `grep` the source for the authoritative signature.

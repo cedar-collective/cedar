@@ -628,3 +628,26 @@ definitions:
         implementation:
           - file: R/branches/credit-hours.R
             functions: [get_credit_hours]
+
+  - id: grouped-student-paths
+    current_version: "1.0.0"
+    versions:
+      - version: "1.0.0"
+        title: Observed course-group participation
+        summary: Share of students in an observed enrolled term and delivery campus taking each broad kind of coursework; concurrent groups remain visible.
+        population: Declared undergraduate major population built with the shared population builder, with its enrollment ceiling enforced.
+        unit: Student within course group, observed enrolled term, and delivery campus.
+        numerator: Distinct students registered or late-dropped in at least one course in the group.
+        denominator: Distinct population students participating in any undergraduate course at that delivery campus and observed enrolled term.
+        campus: Delivery campus remains in every aggregate and course detail key; the enrollment clock is anchored before campus filtering.
+        time_window: Through last_enrolled_complete; term one is first observed undergraduate enrollment, summer counts, and gaps do not advance the enrolled-term clock.
+        exclusions: Early drops and waitlists are excluded. Cells require at least 20 students at the campus/term and 10 in a positive group cell. Course details use the same guards.
+        limitations:
+          - Groups may overlap within a student's term, so percentages across groups can exceed 100 percent. Courses within one group count the student once.
+          - Students at the left data boundary can have earlier study missing. This is observed coursework, not a complete career or a degree audit.
+          - Broad subject categories do not establish degree or Gen Ed eligibility. Unmapped coursework remains visible.
+          - The latest catalog is not imposed on historical students; catalog year, transfer equivalence, waivers, admission and requirement completion are not inferred.
+        guide: users/degree-explorer
+        implementation:
+          - file: R/cones/grouped-student-paths.R
+            functions: [get_grouped_student_paths]

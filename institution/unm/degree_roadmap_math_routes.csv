@@ -1,0 +1,29 @@
+catalog_id,start_id,label,node_ids
+cs-bs-2026,calculus,Ready for Calculus I,calc1
+cs-bs-2026,precalculus,Start with Trig / Pre-Calculus (MATH 1250),math1250|calc1
+cs-bs-2026,algebra,Start with College Algebra (MATH 1220),math1220|math1250|calc1
+cs-bs-2026,intermediate,Start with Intermediate Algebra (MATH 1215),math1215|math1220|math1250|calc1
+biology-bs-2026,calculus,Ready for Calculus I,calc1
+biology-bs-2026,precalculus,Start with Trig / Pre-Calculus (MATH 1250),math1250|calc1
+biology-bs-2026,algebra,Start with College Algebra (MATH 1220),math1220|math1250|calc1
+biology-bs-2026,intermediate,Start with Intermediate Algebra (MATH 1215),math1215|math1220|math1250|calc1
+history-ba-2026,calculus,Calculus-ready · statistics route,math1350
+history-ba-2026,precalculus,Pre-calculus-ready · statistics route,math1350
+history-ba-2026,algebra,College-algebra-ready · statistics route,math1350
+history-ba-2026,intermediate,"Start with MATH 1215, then statistics",math1215|math1350
+philosophy-ba-2026,calculus,Calculus-ready · statistics route,math1350
+philosophy-ba-2026,precalculus,Pre-calculus-ready · statistics route,math1350
+philosophy-ba-2026,algebra,College-algebra-ready · statistics route,math1350
+philosophy-ba-2026,intermediate,"Start with MATH 1215, then statistics",math1215|math1350
+business-bba-2026,calculus,Calculus-ready · statistics route,math1350
+business-bba-2026,precalculus,Pre-calculus-ready · statistics route,math1350
+business-bba-2026,algebra,College-algebra-ready · statistics route,math1350
+business-bba-2026,intermediate,"Start with MATH 1215, then statistics",math1215|math1350
+anthropology-ba-2026,calculus,Calculus-ready · statistics route,math1350
+anthropology-ba-2026,precalculus,Pre-calculus-ready · statistics route,math1350
+anthropology-ba-2026,algebra,College-algebra-ready · statistics route,math1350
+anthropology-ba-2026,intermediate,"Start with MATH 1215, then statistics",math1215|math1350
+physics-bs-2026,calculus,Ready for Calculus I,calc1
+physics-bs-2026,precalculus,Start with Trig / Pre-Calculus (MATH 1250),math1250|calc1
+physics-bs-2026,algebra,Start with College Algebra (MATH 1220),math1220|math1250|calc1
+physics-bs-2026,intermediate,Start with Intermediate Algebra (MATH 1215),math1215|math1220|math1250|calc1

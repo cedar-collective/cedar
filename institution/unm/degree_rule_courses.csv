@@ -1,0 +1,30 @@
+rule_id,subject_course,course_title,credits
+cs-admit-math,MATH 1512,Calculus I,4
+cs-admit-cs,CS 152L,Computer Programming Fundamentals,3
+cs-admit-eng,ENG 130L,Introduction to Engineering Computing,3
+cs-calculus1,MATH 1512,Calculus I,4
+cs-calculus2,MATH 1522,Calculus II,4
+cs-statistics,STAT 345,Elements of Mathematical Statistics and Probability Theory,3
+cs-linear-a,MATH 314,Linear Algebra with Applications,3
+cs-linear-b,MATH 321,Linear Algebra,3
+bio-admit-2101,BIOL 2101,Principles of Biology: Molecules to Cells,3
+bio-admit-2102,BIOL 2102,Principles of Biology: Organisms to Ecosystems,3
+bio-admit-2103L,BIOL 2103L,Principles of Biology: Introductory Laboratory,1
+bio-core-2101,BIOL 2101,Principles of Biology: Molecules to Cells,3
+bio-core-2102,BIOL 2102,Principles of Biology: Organisms to Ecosystems,3
+bio-core-2103L,BIOL 2103L,Principles of Biology: Introductory Laboratory,1
+bio-core-300C,BIOL 300C,Evolution,4
+bio-option-301C,BIOL 301C,Molecular and Cellular Biology,4
+bio-option-302C,BIOL 302C,Genes to Genomes: Lecture and Laboratory,4
+bio-option-304C,BIOL 304C,Physiological Diversity and Function in Plants and Animals,4
+bio-option-310C,BIOL 310C,Principles of Ecology,4
+bio-option-351,BIOL 351,General Microbiology,3
+bio-option-352L,BIOL 352L,General Microbiology Laboratory,1
+bio351-intro-2101,BIOL 2101,Principles of Biology: Molecules to Cells,3
+bio351-intro-2102,BIOL 2102,Principles of Biology: Organisms to Ecosystems,3
+bio351-intro-2103L,BIOL 2103L,Principles of Biology: Introductory Laboratory,1
+bio351-legacy-2102,BIOL 2102,Principles of Biology: Organisms to Ecosystems,3
+bio351-legacy-2110C,BIOL 2110C,Principles of Biology: Cellular and Molecular Lecture and Laboratory,4
+bio351-advanced-302C,BIOL 302C,Genes to Genomes: Lecture and Laboratory,4
+bio351-coreq,BIOL 352L,General Microbiology Laboratory,1
+bio352-requisite,BIOL 351,General Microbiology,3

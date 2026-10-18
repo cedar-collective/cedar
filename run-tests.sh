@@ -74,7 +74,7 @@ fi
 export CEDAR_TEST_PROJECT_LIBRARY="$PROJECT_LIBRARY"
 
 # Validate selection before spending time on R or starting an app.
-suites=(harness admin reports-smoke nav enrollment-projections course-dynamics-deeplink waitlist-deeplink waitlist-reconciliation gen-ed-grads credit-timeline course-impact-covariates demo)
+suites=(harness admin reports-smoke nav enrollment-projections course-dynamics-deeplink waitlist-deeplink waitlist-reconciliation gen-ed-grads credit-timeline course-impact-covariates degree-explorer demo)
 REPORT_SCOPE=smoke
 
 # ── --changed: pick the smallest defensible set of checks for this diff ───────

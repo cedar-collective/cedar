@@ -37,6 +37,10 @@
 # keeps working exactly as before.
 
 CEDAR_SHARE_SPECS <- list(
+  "Degree Explorer" = list(
+    slug = "degree-explorer", prefix = "degree_explorer-dx", sep = "_", run = NULL,
+    fields = c("catalog_id", "math_start", "english_start", "start_season")
+  ),
   "Open Seats" = list(
     slug = "open-seats", prefix = "seatfinder-sf", sep = "_", run = "button",
     fields = c("campus", "college", "dept", "term", "pt", "im", "level"),
@@ -133,6 +137,7 @@ CEDAR_TAB_SLUGS <- c(
   "headcount"          = "Headcount",
   "course-dynamics"    = "Course Dynamics",
   "gen-ed"             = "Gen Ed",
+  "degree-explorer"    = "Degree Explorer",
   "pathways"           = "Pathways",
   "registration"       = "Regstats",
   "open-seats"         = "Open Seats",

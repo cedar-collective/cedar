@@ -237,9 +237,11 @@ add_classlist_lifecycle_enrl <- function(df) {
 #'   `registration_status_code`, `registration_date`, `as_of_date`, and the
 #'   `campus`, `college`, `term`, `subject_course` grouping columns.
 #' @param sections Section rows supplying each `(term, crn)`'s `start_date`.
+#' @param by_part_term Retain each session as its own enrollment count.
 #' @return One row per campus, college, term, and course with `first_day_enrl`.
-calc_first_day_enrl <- function(students, sections) {
+calc_first_day_enrl <- function(students, sections, by_part_term = FALSE) {
   group_cols <- c("campus", "college", "term", "subject_course")
+  if (by_part_term) group_cols <- c(group_cols, "part_term")
   missing <- setdiff(
     c(group_cols, "student_id", "crn", "registration_status_code",
       "registration_date", "as_of_date"),
@@ -376,27 +378,36 @@ summarize_listing_overlap <- function(students) {
 capacity_saturation_metrics <- function(census_enrl, capacity,
                                         constrained_threshold = 0.90,
                                         max_plausible_fill = 1.25) {
-  census_enrl <- as.numeric(census_enrl)
+  enrollment_capacity_metrics(census_enrl, capacity, constrained_threshold, max_plausible_fill) %>%
+    dplyr::rename(census_fill = fill_rate, census_available_seats = available_seats)
+}
+
+#' Compare an explicitly selected enrollment lifecycle point with scheduled seats
+#' Callers own the numerator's meaning; first day and census must remain labelled.
+enrollment_capacity_metrics <- function(enrollment, capacity,
+                                        constrained_threshold = 0.90,
+                                        max_plausible_fill = 1.25) {
+  enrollment <- as.numeric(enrollment)
   capacity <- as.numeric(capacity)
-  census_fill <- dplyr::if_else(
+  fill_rate <- dplyr::if_else(
     is.finite(capacity) & capacity > 0,
-    census_enrl / capacity,
+    enrollment / capacity,
     NA_real_
   )
-  capacity_usable <- is.finite(census_fill) &
-    census_fill <= as.numeric(max_plausible_fill)
+  capacity_usable <- is.finite(fill_rate) &
+    fill_rate <= as.numeric(max_plausible_fill)
 
   tibble::tibble(
-    census_fill = census_fill,
-    census_available_seats = dplyr::if_else(
-      is.finite(capacity) & capacity > 0 & is.finite(census_enrl),
-      pmax(0, capacity - census_enrl),
+    fill_rate = fill_rate,
+    available_seats = dplyr::if_else(
+      is.finite(capacity) & capacity > 0 & is.finite(enrollment),
+      pmax(0, capacity - enrollment),
       NA_real_
     ),
     capacity_usable = capacity_usable,
-    capacity_anomaly = is.finite(census_fill) & !capacity_usable,
+    capacity_anomaly = is.finite(fill_rate) & !capacity_usable,
     capacity_constrained = capacity_usable &
-      census_fill >= as.numeric(constrained_threshold)
+      fill_rate >= as.numeric(constrained_threshold)
   )
 }
 

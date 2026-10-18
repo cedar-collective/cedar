@@ -149,6 +149,14 @@ test_that("run triggers fail when observer wiring drifts from the registry", {
   )
 })
 
+test_that("Degree Explorer restores a single degree and starting points without a run button", {
+  spec <- CEDAR_SHARE_SPECS[["Degree Explorer"]]
+  expect_null(spec$run)
+  expect_equal(spec$fields, c("catalog_id", "math_start", "english_start", "start_season"))
+  state <- cedar_parse_link_state("?tab=degree-explorer&catalog_id=biology-bs-2026&math_start=algebra&english_start=stretch")
+  expect_equal(cedar_link_value(state, "Degree Explorer", "math_start"), "algebra")
+})
+
 test_that("linked server select reads the shared parsed state", {
   state <- cedar_parse_link_state(
     "?tab=course-dynamics&autorun=true&course=CHEM%201215L"

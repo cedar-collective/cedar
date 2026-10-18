@@ -175,6 +175,14 @@
 #   SOCI 101: prior census mean=70/SD=10, target=10, Outside SD=50 for a dip.
 #   SOCI 102/103/104: flat / single / no prior history => no SD flags.
 #   Target 202080 unscored groups: enrollment=3, early=6, late=6, fill=3.
+# EC-11b (separate course_history tables, 22 sections):
+#   SOCI 100 ABQ Fall: offered 3/3 source-covered terms, median 200 seats;
+#     one of three fully matched terms has a near-full session. The 202080
+#     full-term census is 100/100, half-term 30/100; EA is separately 60/100.
+#   SOCI 104 appears in one of three observed falls; no summer source exists.
+#   EA 201880 has only five census students and is suppressed; ABQ Spring 2020
+#     is implausible at 180%. SOCI 102's target is cancelled, 103 lacks capacity,
+#     104 lacks a class-list match, and 101 has a second unmatched section.
 #
 # EC-12 (separate cedar_students_roadblocks table):
 #   ECON 100 ABQ first eligible outcomes: population 5 pass / 5 DFW,
@@ -3525,6 +3533,10 @@ cedar_programs_concurrent <- dplyr::bind_rows(
 # Each count is expanded into actual registered/early-drop/late-drop class-list
 # rows; section snapshots retain the registered (post-drop) count as independent
 # DESR context while saturation uses the class-list census numerator.
+# Status dates: all but the last two RE rows predate first day; half of early
+# drops occur after first day; late drops occur later. At 202080, SOCI 100 ABQ
+# full-term first day = 78 + 9 + 20 = 107, versus census 100 and final 80;
+# half-term first day = 28, and online = 58. Their counts must never be pooled.
 .rs_history <- tibble::tribble(
   ~course,    ~campus, ~part_term, ~term,   ~registered, ~early, ~late,
   "SOCI 100", "ABQ", "1", 201880L, 40L,  2L,  4L,
@@ -3557,6 +3569,12 @@ cedar_students_regstats <- dplyr::bind_rows(lapply(seq_len(nrow(.rs_history)), f
     dplyr::mutate(part_term = row$part_term, registration_status_code = statuses,
                   registration_status = dplyr::case_when(
                     statuses == "RE" ~ "Registered", TRUE ~ "Drop"),
+                  registration_date = as.Date(paste0(row$term %/% 100, "-01-15")) +
+                    dplyr::case_when(statuses == "RE" & dplyr::row_number() <= row$registered - 2L ~ -10L,
+                      statuses == "RE" ~ 5L,
+                      statuses == "DR" & dplyr::row_number() <= row$registered + row$early %/% 2L ~ -3L,
+                      statuses == "DR" ~ 7L, TRUE ~ 50L),
+                  as_of_date = as.Date("2022-01-15"),
                   crn = paste0("EC11-", i), section_id = paste0("EC11-", i))
 }))
 cedar_sections_regstats <- dplyr::bind_rows(lapply(seq_len(nrow(.rs_history)), function(i) {
@@ -3575,6 +3593,23 @@ cedar_sections_regstats <- dplyr::bind_rows(lapply(seq_len(nrow(.rs_history)), f
       end_date = as.Date(paste0(row$term %/% 100, "-12-15")),
       as_of_date = as.Date("2022-01-15"))
 }))
+
+# EC-11b — Course planning history has unmatched, missing-capacity and cancelled
+# offerings in addition to EC-11's multi-campus/session, small-cell and >125%
+# fill examples. A zero-classlist match is unknown, never zero enrollment.
+cedar_sections_course_history <- cedar_sections_regstats %>%
+  dplyr::mutate(status = ifelse(subject_course == "SOCI 102" & term == 202080L, "C", status),
+    available = ifelse(subject_course == "SOCI 103" & term == 202080L, NA_real_, available))
+cedar_students_course_history <- cedar_students_regstats %>%
+  dplyr::filter(!(subject_course == "SOCI 104" & term == 202080L)) %>%
+  # One undated status withholds the entire first-day group, not a partial count.
+  dplyr::mutate(registration_date = dplyr::if_else(subject_course == "SOCI 101" &
+    term == 201980L & student_id == "EC11-13-1", as.Date(NA), registration_date))
+# SOCI 101 has one extra active section without any class-list rows. A match
+# for its other section must not make this partial numerator look complete.
+cedar_sections_course_history <- dplyr::bind_rows(cedar_sections_course_history,
+  cedar_sections_regstats %>% dplyr::filter(subject_course == "SOCI 101", term == 202080L) %>%
+    dplyr::mutate(crn = "EC11B-NOMATCH", section_id = "EC11B-NOMATCH"))
 
 # ── EC-12 — Roadblocks first eligible student/course/campus observations ────
 cedar_students_roadblocks <- dplyr::bind_rows(

@@ -12,6 +12,7 @@ A per-function index of `R/branches/`, `R/cones/`, and `R/features/`. `AGENTS.md
 
 | File | Main function(s) | Purpose |
 |------|-----------------|---------|
+| `degree-requirements.R` | `degree_rule_outline(catalog, catalog_ids)`, `degree_math_start_choices(roadmaps, catalog_id)`, `build_degree_roadmap(catalog, roadmaps, catalog_id, math_start, english_start)`, `assign_degree_roadmap_rows(nodes)`, `build_degree_allowance_slots(nodes, terms, slot_credits)`, `degree_semester_seasons(semesters, start_season)`, `get_degree_chain_metrics(nodes, links, conditions = NULL)`, `attach_degree_roadmap_evidence(nodes, roadmaps, catalog, catalog_id)`, `attach_pathway_groups(rows, groups)`, `degree_path_course_table(paths, group_id)` | Preserve rule trees, select program-specific math routes, schedule complete workloads with early foundations, later upper-level courses, semester floors and credit limits, align authored course families without rescheduling, compute prerequisite chains, resolve quoted evidence, and classify descriptive coursework; no eligibility inference |
 | `population.R` | `build_population(programs, degrees, students, opt)` | Build student populations for analysis; returns tibble with `student_id` + classification columns. The central cohort-building function. |
 | | `get_focal_programs(programs, opt)` | Resolve program names/codes to canonical list for population filters |
 | | `build_demographic_population(programs, opt)` | Population scoped by demographic characteristics |
@@ -19,7 +20,8 @@ A per-function index of `R/branches/`, `R/cones/`, and `R/features/`. `AGENTS.md
 | | `get_entry_pathways()`, `classify_origin()`, `classify_entry_method()`, `classify_entry_status()` | Entry-type classification helpers |
 | `comparison.R` | `build_comparison(treatment_ids, pool_ids, programs, ..., term_credits)` | Build treatment/control groups for observational analyses. Demographic and standing covariates come from `cedar_programs` at each student's covariate term; the **matched** academic-position covariates (`cum_gpa_entering`, `unm_credits_entering`, `total_credits_entering`) are reconstructed via `build_gpa_timeline()` / `build_credit_timeline()`. `current_unm_gpa` (Banner Institution GPA) rides along for the **profile only** — see the descriptive-vs-matched split below. Never add a pull-stamped field to `continuous_cols` |
 | | `compute_balance(groups)` | Report covariate balance between treatment and control |
-| `enrl.R` | `calc_cl_enrls(students)`, `get_enrl(sections, opt)`, `calc_first_day_enrl(students, sections)`, `add_first_day_enrl(cl_enrls, students, sections)`, `summarize_listing_overlap(students)` | Enrollment counts and stats; first-day enrollment reconstructed from class-list status dates; students listed under more than one crosslisted code |
+| `enrl.R` | `calc_cl_enrls(students)`, `get_enrl(sections, opt)`, `calc_first_day_enrl(students, sections, by_part_term = FALSE)`, `add_first_day_enrl(cl_enrls, students, sections)`, `summarize_listing_overlap(students)` | Enrollment counts and stats; first-day enrollment reconstructed from class-list status dates; students listed under more than one crosslisted code |
+| | `enrollment_capacity_metrics(enrollment, capacity)`, `capacity_saturation_metrics(census_enrl, capacity)` | Shared numeric fill/quality/constraint calculations; census wrapper retains its named output contract, while first-day callers label their own lifecycle point. |
 | | `get_course_section_counts(sections)` | Active section count + total enrollment per course, crosslist-deduplicated. Returns one row per (term, subject_course, course_title, campus). Join on those four columns. Reusable in any tab, feature, or RStudio analysis that needs a "how many sections / how many students" summary without running a full enrollment pipeline. |
 | | `prepare_enrollment_trend_history()`, `get_enrollment_momentum()`, `prepare_enrollment_trend_plot_series()` | Enrollment Trend Signals helpers. Keep plot prep and campus-specific series handling here, not in dashboard/report modules. |
 | | `get_low_enrollment_courses(courses, opt, threshold)` | Sections below a threshold, filtered and deduplicated via `filter_DESRs()` |
@@ -82,8 +84,20 @@ Registry accessors (`R/lists/data_semantics.R`): `cedar_data_semantics(kind)`,
 
 ## Cones — Single-Question Analyses (`R/cones/`)
 
+`grouped-student-paths.R`: `get_grouped_student_paths(students, population, groups,
+opt)` returns safe group/campus/enrolled-term cells and course detail. Requires
+`opt$data_edges`; applies the population ceiling, settled edge and independent
+band/cell guards. The enrolled-term clock precedes campus scope.
+
+`features/degree-explorer.R`: `build_degree_roadmap_view(catalog, roadmaps,
+catalog_id, math_start, english_start, start_season = "fall")` and
+`build_population_course_paths(students, population, groups, opt, description)`
+assemble typed payloads, including complete enumerated course alternatives and option-specific prerequisite citations. `format_degree_explorer_preview(view)` formats semesters;
+`plot_grouped_student_paths(paths)` plots already-suppressed aggregates.
+
 | File | Main function(s) | Takes cohort? | Purpose |
 |------|-----------------|---------------|---------|
+| `course-planning-history.R` | `get_course_planning_history(sections, students, subject_courses, edges)` | — | Source-covered seasonal frequency, seats and first-class-day seat pressure; retains delivery campus, college and session |
 | `bottleneck.R` | `get_bottlenecks(cohort, students, opt)` | ✓ | Waitlist pressure / unmet enrollment demand |
 | `stopout.R` | `get_stopout(students, cohort, opt)` | ✓ | Stop-out rate gap after DFW vs. passing |
 | `pathway.R` | `get_course_timing(students, cohort, opt, students_full, term_credits)` | ✓ | When population students take each course. The `cohort` parameter name is legacy; pass the `build_population()` output. `opt$x_axis` picks the axis; `opt$subject_course` restricts to an explicit course list; `opt$group_campus = FALSE` drops campus from the key (trajectory questions only — see the campus-policy exceptions above) |
@@ -93,6 +107,7 @@ Registry accessors (`R/lists/data_semantics.R`): `cedar_data_semantics(kind)`,
 | `course-instructor-effect.R` | `get_instructor_effect(students, programs, applicants, opt, term_credits, data_edges)` | — | Descriptive downstream progression and outcomes by upstream instructor. Caps Y at the longitudinal grade edge, excludes right-censored X cohorts and strict-prior Y completers from the single-course continuation denominator, classifies grades canonically, and returns eligibility/unobserved-outcome audit counts for the UI. Outcomes attribute a student once to their first X instructor; course-order totals are instructor-neutral and aggregated by year. The balance diagnostic is optional context for comparing only the two largest instructor groups: it does not define, sample, match, or adjust the descriptive rates and belongs after those results in the UI |
 | `course-neighbors.R` | `plot_course_sankey_by_term_with_flow_counts(to_courses, from_courses, opt)` | — | Sankey diagram of before/after course flows |
 | | `plot_concurrent_course_treemap(concurrent_courses, opt)` | — | Treemap of the most common same-campus, same-term companion courses |
+| | `get_gen_ed_planning_options(sections, history, gen_ed, season, slot_credits)` | — | Latest matching-season lower-level Gen Ed examples, preserving campus/college/session, first-day suppression, source coverage and scheduled credit metadata |
 | `seatfinder.R` | `seatfinder(students, courses, cedar_faculty, opt)` | — | Seat availability analysis across terms; returns named list of course comparison tibbles |
 | `waitlist.R` | `inspect_waitlist(students, opt, sections = NULL, enrl_base = NULL)` | — | Waitlist counts by course/major; `sections` only needed if students lack `course_title`; `enrl_base` is the app's precomputed `cedar_cl_enrls_base` (recomputed, scoped, when NULL) |
 | `course-outcomes.R` | `get_course_outcomes(students, cedar_faculty, opt)` | — | Returns named list: `dfw_trend` (DFW rate by term), `instructor_dfw` (per-instructor vs. course avg). `cedar_faculty` is optional; omitting it skips instructor breakdown |
@@ -121,6 +136,12 @@ Registry accessors (`R/lists/data_semantics.R`): `cedar_data_semantics(kind)`,
 | `data-integrity.R` | `check_student_id_integrity(spine, tables, opt)` | — | Can the stored tables actually be joined on `student_id`? Compares each table term-by-term against a spine (pass `cedar_students`) and returns `by_term`, `by_table`, `spine`, `n_tables_split`. A term with records and **exactly zero** matches is the signature of a hash mismatch at ingest; a table covering a wider population sits partway in every term and never at zero, so only a mixture of zero-match and full-match terms is reported as `"split"`. Surfaced in Data & Usage → Join Integrity. Read ISSUES.md I1 before interpreting a `split` verdict |
 
 ## Features — App-Facing Orchestrators (`R/features/`)
+
+`features/degree-explorer.R`: `build_degree_course_history()` resolves exact tile
+components and assembles one typed popup table without guessing historical equivalences.
+`build_degree_popup_history(sections, students, edges, catalog, roadmaps, gen_ed, selection)`
+validates allowance selections and assembles seasonal Gen Ed examples;
+`format_degree_allowance_preview(history)` is its canonical aggregate text preview.
 
 Features call multiple branches/cones and assemble payloads for visible app surfaces. They follow different rules than cones: they may call other cones. They do not contain Shiny UI/server wiring; that lives in `R/modules/` or, for older surfaces not yet modularized, `server.R`.
 

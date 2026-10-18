@@ -1,0 +1,178 @@
+catalog_id,node_id,basis,evidence_id,explanation
+cs-bs-2026,math1215,prerequisite,route-*-math1215-math1220,"Preparation for MATH 1220, added by this starting route; not a separately listed major requirement."
+cs-bs-2026,math1220,prerequisite,route-*-math1220-math1250,"Preparation for MATH 1250, added by this starting route; not a separately listed major requirement."
+cs-bs-2026,math1250,prerequisite,route-*-math1250-calc1,"Preparation for MATH 1512, added by this starting route; not a separately listed major requirement."
+cs-bs-2026,calc1,degree,degree-cs-bs-2026-calc1,Degree requirement
+cs-bs-2026,englX,prerequisite,route-*-englX-englY,"Preparation for ENGL 1110Y, added by this starting route; not a separately listed major requirement."
+cs-bs-2026,englY,degree,degree-cs-bs-2026-englY,Selected Composition I option within the communications requirement.
+cs-bs-2026,engl1,degree,degree-cs-bs-2026-engl1,Selected Composition I option within the communications requirement.
+cs-bs-2026,engl2,degree,degree-cs-bs-2026-engl2,Degree requirement
+cs-bs-2026,computing0,prerequisite,route-cs-bs-2026-computing0-java1,"Preparation for CSCI 1260, added by this starting route; not a separately listed major requirement."
+cs-bs-2026,java1,degree,degree-cs-bs-2026-java1,Selected introductory computing option: CSCI 1260 or ENG 130L.
+cs-bs-2026,cprog,degree,degree-cs-bs-2026-cprog,Degree requirement
+cs-bs-2026,java2,degree,degree-cs-bs-2026-java2,Degree requirement
+cs-bs-2026,discrete,degree,degree-cs-bs-2026-discrete,Degree requirement
+cs-bs-2026,ethics,degree,degree-cs-bs-2026-ethics,Degree requirement
+cs-bs-2026,logic,degree,degree-cs-bs-2026-logic,Degree requirement
+cs-bs-2026,large,degree,degree-cs-bs-2026-large,Degree requirement
+cs-bs-2026,data1,degree,degree-cs-bs-2026-data1,Degree requirement
+cs-bs-2026,declarative,degree,degree-cs-bs-2026-declarative,Degree requirement
+cs-bs-2026,data2,degree,degree-cs-bs-2026-data2,Degree requirement
+cs-bs-2026,architecture,degree,degree-cs-bs-2026-architecture,Degree requirement
+cs-bs-2026,numerical,degree,degree-cs-bs-2026-numerical,Degree requirement
+cs-bs-2026,software,degree,degree-cs-bs-2026-software,Degree requirement
+cs-bs-2026,os,degree,degree-cs-bs-2026-os,Degree requirement
+cs-bs-2026,calc2,degree,degree-cs-bs-2026-calc2,Degree requirement
+cs-bs-2026,linear,degree,degree-cs-bs-2026-linear,Selected linear algebra option: MATH 314 or MATH 321.
+cs-bs-2026,stats,degree,degree-cs-bs-2026-stats,Degree requirement
+cs-bs-2026,science1,degree,degree-cs-bs-2026-science-labs,Part of a required course group; the specific course has not been chosen.
+cs-bs-2026,science2,degree,degree-cs-bs-2026-science-labs,Part of a required course group; the specific course has not been chosen.
+cs-bs-2026,science3,degree,degree-cs-bs-2026-science3,Part of a required course group; the specific course has not been chosen.
+cs-bs-2026,science4,degree,degree-cs-bs-2026-science4,Part of a required course group; the specific course has not been chosen.
+cs-bs-2026,communication,degree,degree-cs-bs-2026-communication,Part of a required course group; the specific course has not been chosen.
+cs-bs-2026,technical1,degree,degree-cs-bs-2026-technical1,Part of a required course group; the specific course has not been chosen.
+cs-bs-2026,technical2,degree,degree-cs-bs-2026-technical2,Part of a required course group; the specific course has not been chosen.
+cs-bs-2026,technical3,degree,degree-cs-bs-2026-technical3,Part of a required course group; the specific course has not been chosen.
+biology-bs-2026,math1215,prerequisite,route-*-math1215-math1220,"Preparation for MATH 1220, added by this starting route; not a separately listed major requirement."
+biology-bs-2026,math1220,prerequisite,route-*-math1220-math1250,"Preparation for MATH 1250, added by this starting route; not a separately listed major requirement."
+biology-bs-2026,math1250,prerequisite,route-*-math1250-calc1,"Preparation for MATH 1512, added by this starting route; not a separately listed major requirement."
+biology-bs-2026,calc1,degree,degree-biology-bs-2026-calc1,Selected math option: MATH 1512 or MATH 1430.
+biology-bs-2026,englX,prerequisite,route-*-englX-englY,"Preparation for ENGL 1110Y, added by this starting route; not a separately listed major requirement."
+biology-bs-2026,englY,general,degree-biology-bs-2026-englY,General education route (illustrative)
+biology-bs-2026,engl1,general,degree-biology-bs-2026-engl1,General education route (illustrative)
+biology-bs-2026,engl2,general,degree-biology-bs-2026-engl2,General education route (illustrative)
+biology-bs-2026,bio1,degree,degree-biology-bs-2026-bio1,Degree requirement
+biology-bs-2026,bio2,degree,degree-biology-bs-2026-bio2,Degree requirement
+biology-bs-2026,biolab,degree,degree-biology-bs-2026-biolab,Degree requirement
+biology-bs-2026,evolution,degree,degree-biology-bs-2026-evolution,Degree requirement
+biology-bs-2026,molecular,degree,degree-biology-bs-2026-molecular,Selected intermediate biology option; choose at least three.
+biology-bs-2026,genomes,degree,degree-biology-bs-2026-genomes,Selected intermediate biology option; choose at least three.
+biology-bs-2026,physiology,degree,degree-biology-bs-2026-physiology,Selected intermediate biology option; choose at least three.
+biology-bs-2026,biostats,degree,degree-biology-bs-2026-biostats,Degree requirement
+biology-bs-2026,chem1,degree,degree-biology-bs-2026-chem1,Degree requirement
+biology-bs-2026,chem2,degree,degree-biology-bs-2026-chem2,Degree requirement
+biology-bs-2026,physics1,degree,degree-biology-bs-2026-physics1,Part of a required course group; the specific course has not been chosen.
+biology-bs-2026,physics2,degree,degree-biology-bs-2026-physics2,Part of a required course group; the specific course has not been chosen.
+biology-bs-2026,seminar1,degree,degree-biology-bs-2026-seminar1,Part of a required course group; the specific course has not been chosen.
+biology-bs-2026,seminar2,degree,degree-biology-bs-2026-seminar2,Part of a required course group; the specific course has not been chosen.
+biology-bs-2026,breadth1,degree,degree-biology-bs-2026-breadth1,Part of a required course group; the specific course has not been chosen.
+biology-bs-2026,breadth2,degree,degree-biology-bs-2026-breadth2,Part of a required course group; the specific course has not been chosen.
+biology-bs-2026,breadth3,degree,degree-biology-bs-2026-breadth3,Part of a required course group; the specific course has not been chosen.
+biology-bs-2026,breadth4,degree,degree-biology-bs-2026-breadth4,Part of a required course group; the specific course has not been chosen.
+biology-bs-2026,breadth5,degree,degree-biology-bs-2026-breadth5,Part of a required course group; the specific course has not been chosen.
+biology-bs-2026,breadth6,degree,degree-biology-bs-2026-breadth6,Part of a required course group; the specific course has not been chosen.
+biology-bs-2026,related1,degree,degree-biology-bs-2026-related1,Part of a required course group; the specific course has not been chosen.
+biology-bs-2026,related2,degree,degree-biology-bs-2026-related2,Part of a required course group; the specific course has not been chosen.
+history-ba-2026,math1215,prerequisite,route-*-math1215-math1350,Preparation added by the selected math or English starting route; not a separately listed major requirement.
+history-ba-2026,math1350,general,degree-history-ba-2026-math1350,Illustrative Gen Ed math choice; this major does not specifically require MATH 1350.
+history-ba-2026,englX,prerequisite,route-*-englX-englY,Preparation added by the selected math or English starting route; not a separately listed major requirement.
+history-ba-2026,englY,general,degree-history-ba-2026-englY,Illustrative English route toward general communication requirements; full Gen Ed allocation is not encoded.
+history-ba-2026,engl1,general,degree-history-ba-2026-engl1,Illustrative English route toward general communication requirements; full Gen Ed allocation is not encoded.
+history-ba-2026,engl2,general,degree-history-ba-2026-engl2,Illustrative English route toward general communication requirements; full Gen Ed allocation is not encoded.
+philosophy-ba-2026,math1215,prerequisite,route-*-math1215-math1350,Preparation added by the selected math or English starting route; not a separately listed major requirement.
+philosophy-ba-2026,math1350,general,degree-philosophy-ba-2026-math1350,Illustrative Gen Ed math choice; this major does not specifically require MATH 1350.
+philosophy-ba-2026,englX,prerequisite,route-*-englX-englY,Preparation added by the selected math or English starting route; not a separately listed major requirement.
+philosophy-ba-2026,englY,general,degree-philosophy-ba-2026-englY,Illustrative English route toward general communication requirements; full Gen Ed allocation is not encoded.
+philosophy-ba-2026,engl1,general,degree-philosophy-ba-2026-engl1,Illustrative English route toward general communication requirements; full Gen Ed allocation is not encoded.
+philosophy-ba-2026,engl2,general,degree-philosophy-ba-2026-engl2,Illustrative English route toward general communication requirements; full Gen Ed allocation is not encoded.
+business-bba-2026,math1215,prerequisite,route-*-math1215-math1350,Preparation added by the selected math or English starting route; not a separately listed major requirement.
+business-bba-2026,math1350,degree,degree-business-bba-2026-math1350,Named degree requirement.
+business-bba-2026,englX,prerequisite,route-*-englX-englY,Preparation added by the selected math or English starting route; not a separately listed major requirement.
+business-bba-2026,englY,general,degree-business-bba-2026-englY,Illustrative English route toward general communication requirements; full Gen Ed allocation is not encoded.
+business-bba-2026,engl1,general,degree-business-bba-2026-engl1,Illustrative English route toward general communication requirements; full Gen Ed allocation is not encoded.
+business-bba-2026,engl2,degree,degree-business-bba-2026-engl2,Named degree requirement.
+anthropology-ba-2026,math1215,prerequisite,route-*-math1215-math1350,Preparation added by the selected math or English starting route; not a separately listed major requirement.
+anthropology-ba-2026,math1350,general,degree-anthropology-ba-2026-math1350,Illustrative Gen Ed math choice; this major does not specifically require MATH 1350.
+anthropology-ba-2026,englX,prerequisite,route-*-englX-englY,Preparation added by the selected math or English starting route; not a separately listed major requirement.
+anthropology-ba-2026,englY,general,degree-anthropology-ba-2026-englY,Illustrative English route toward general communication requirements; full Gen Ed allocation is not encoded.
+anthropology-ba-2026,engl1,general,degree-anthropology-ba-2026-engl1,Illustrative English route toward general communication requirements; full Gen Ed allocation is not encoded.
+anthropology-ba-2026,engl2,general,degree-anthropology-ba-2026-engl2,Illustrative English route toward general communication requirements; full Gen Ed allocation is not encoded.
+physics-bs-2026,math1215,prerequisite,route-*-math1215-math1220,Preparation added by the selected math or English starting route; not a separately listed major requirement.
+physics-bs-2026,math1220,prerequisite,route-*-math1220-math1250,Preparation added by the selected math or English starting route; not a separately listed major requirement.
+physics-bs-2026,math1250,prerequisite,route-*-math1250-calc1,Preparation added by the selected math or English starting route; not a separately listed major requirement.
+physics-bs-2026,calc1,degree,degree-physics-bs-2026-calc1,Named degree requirement.
+physics-bs-2026,englX,prerequisite,route-*-englX-englY,Preparation added by the selected math or English starting route; not a separately listed major requirement.
+physics-bs-2026,englY,general,degree-physics-bs-2026-englY,Illustrative English route toward general communication requirements; full Gen Ed allocation is not encoded.
+physics-bs-2026,engl1,general,degree-physics-bs-2026-engl1,Illustrative English route toward general communication requirements; full Gen Ed allocation is not encoded.
+physics-bs-2026,engl2,general,degree-physics-bs-2026-engl2,Illustrative English route toward general communication requirements; full Gen Ed allocation is not encoded.
+history-ba-2026,histus1,degree,degree-history-ba-2026-histus1,One selected option within the twelve lower-division major credits; not the only permitted course.
+history-ba-2026,histus2,degree,degree-history-ba-2026-histus2,One selected option within the twelve lower-division major credits; not the only permitted course.
+history-ba-2026,histmaking,degree,degree-history-ba-2026-histmaking,One selected option within the twelve lower-division major credits; not the only permitted course.
+history-ba-2026,histnm,degree,degree-history-ba-2026-histnm,One selected option within the twelve lower-division major credits; not the only permitted course.
+history-ba-2026,histupper1,degree,degree-history-ba-2026-histupper1,Selected course group; individual course prerequisites still need review.
+history-ba-2026,histupper2,degree,degree-history-ba-2026-histupper2,Selected course group; individual course prerequisites still need review.
+history-ba-2026,histupper3,degree,degree-history-ba-2026-histupper3,Selected course group; individual course prerequisites still need review.
+history-ba-2026,histupper4,degree,degree-history-ba-2026-histupper4,Selected course group; individual course prerequisites still need review.
+history-ba-2026,histupper5,degree,degree-history-ba-2026-histupper5,Selected course group; individual course prerequisites still need review.
+history-ba-2026,histupper6,degree,degree-history-ba-2026-histupper6,Selected course group; individual course prerequisites still need review.
+history-ba-2026,historiography,degree,degree-history-ba-2026-historiography,Degree requirement in this selected example.
+history-ba-2026,histsenior,degree,degree-history-ba-2026-histsenior,Degree requirement in this selected example.
+philosophy-ba-2026,phillogic,degree,degree-philosophy-ba-2026-phillogic,Choose one of 2 courses for the Logic (level / credits vary) requirement.
+philosophy-ba-2026,philgreek,degree,degree-philosophy-ba-2026-philgreek,Choose one of 2 courses for the Greek philosophy requirement.
+philosophy-ba-2026,philmodern,degree,degree-philosophy-ba-2026-philmodern,Selected course within the six required categories; see the degree page for alternatives.
+philosophy-ba-2026,philethics,degree,degree-philosophy-ba-2026-philethics,Choose one of 4 courses for the Ethics & political philosophy requirement.
+philosophy-ba-2026,philbuddhist,degree,degree-philosophy-ba-2026-philbuddhist,Choose one of 3 courses for the Asian philosophy requirement.
+philosophy-ba-2026,philknowledge,degree,degree-philosophy-ba-2026-philknowledge,"Choose one of 4 courses for the Knowledge, science & reality requirement."
+philosophy-ba-2026,philelective1,degree,degree-philosophy-ba-2026-philelective1,Selected course group; individual course prerequisites still need review.
+philosophy-ba-2026,philelective2,degree,degree-philosophy-ba-2026-philelective2,Selected course group; individual course prerequisites still need review.
+philosophy-ba-2026,philelective3,degree,degree-philosophy-ba-2026-philelective3,Selected course group; individual course prerequisites still need review.
+philosophy-ba-2026,philelective4,degree,degree-philosophy-ba-2026-philelective4,Selected course group; individual course prerequisites still need review.
+anthropology-ba-2026,antharch,degree,degree-anthropology-ba-2026-antharch,Archaeology is one of the two selected core subfields for the general major.
+anthropology-ba-2026,anthworld,degree,degree-anthropology-ba-2026-anthworld,One of the two selected core curriculum sequences under the B.A. without concentration option.
+anthropology-ba-2026,anthstrategy,degree,degree-anthropology-ba-2026-anthstrategy,One of the two selected core curriculum sequences under the B.A. without concentration option.
+anthropology-ba-2026,anthcultural,degree,degree-anthropology-ba-2026-anthcultural,One of the two selected core curriculum sequences under the B.A. without concentration option.
+anthropology-ba-2026,anthlanguage,degree,degree-anthropology-ba-2026-anthlanguage,One of the two selected core curriculum sequences under the B.A. without concentration option.
+anthropology-ba-2026,anthprinciples,degree,degree-anthropology-ba-2026-anthprinciples,One of the two selected core curriculum sequences under the B.A. without concentration option.
+anthropology-ba-2026,anthbiology,degree,degree-anthropology-ba-2026-anthbiology,Illustrative 2000-level course in the remaining biological/evolutionary subfield.
+anthropology-ba-2026,anthupper1,degree,degree-anthropology-ba-2026-anthupper1,Selected course group; individual course prerequisites still need review.
+anthropology-ba-2026,anthupper2,degree,degree-anthropology-ba-2026-anthupper2,Selected course group; individual course prerequisites still need review.
+anthropology-ba-2026,anthupper3,degree,degree-anthropology-ba-2026-anthupper3,Selected course group; individual course prerequisites still need review.
+anthropology-ba-2026,anthupper4,degree,degree-anthropology-ba-2026-anthupper4,Selected course group; individual course prerequisites still need review.
+anthropology-ba-2026,anthelective,degree,degree-anthropology-ba-2026-anthelective,Selected course group; individual course prerequisites still need review.
+business-bba-2026,busintro,degree,degree-business-bba-2026-busintro,Degree requirement in this selected example.
+business-bba-2026,busacct1,degree,degree-business-bba-2026-busacct1,Degree requirement in this selected example.
+business-bba-2026,busmacro,degree,degree-business-bba-2026-busmacro,Degree requirement in this selected example.
+business-bba-2026,busmicro,degree,degree-business-bba-2026-busmicro,Degree requirement in this selected example.
+business-bba-2026,businfo,degree,degree-business-bba-2026-businfo,Degree requirement in this selected example.
+business-bba-2026,buswriting,degree,degree-business-bba-2026-buswriting,Degree requirement in this selected example.
+business-bba-2026,buspsych,degree,degree-business-bba-2026-buspsych,Degree requirement in this selected example.
+business-bba-2026,bushumanities,degree,degree-business-bba-2026-bushumanities,Selected course group; individual course prerequisites still need review.
+business-bba-2026,busacct2,degree,degree-business-bba-2026-busacct2,Degree requirement in this selected example.
+business-bba-2026,busoperations,degree,degree-business-bba-2026-busoperations,Degree requirement in this selected example.
+business-bba-2026,busbehavior,degree,degree-business-bba-2026-busbehavior,Degree requirement in this selected example.
+business-bba-2026,busethics,degree,degree-business-bba-2026-busethics,Degree requirement in this selected example.
+business-bba-2026,buslegal,degree,degree-business-bba-2026-buslegal,Degree requirement in this selected example.
+business-bba-2026,busmarketing,degree,degree-business-bba-2026-busmarketing,Degree requirement in this selected example.
+business-bba-2026,busfinance,degree,degree-business-bba-2026-busfinance,Degree requirement in this selected example.
+business-bba-2026,businternational,degree,degree-business-bba-2026-businternational,Degree requirement in this selected example.
+business-bba-2026,buscareer,degree,degree-business-bba-2026-buscareer,Degree requirement in this selected example.
+business-bba-2026,bussystems,degree,degree-business-bba-2026-bussystems,Degree requirement in this selected example.
+business-bba-2026,buscapstone,degree,degree-business-bba-2026-buscapstone,Degree requirement in this selected example.
+business-bba-2026,busgeneral1,degree,degree-business-bba-2026-busgeneral1,Selected course group; individual course prerequisites still need review.
+business-bba-2026,busgeneral2,degree,degree-business-bba-2026-busgeneral2,Selected course group; individual course prerequisites still need review.
+business-bba-2026,busgeneral3,degree,degree-business-bba-2026-busgeneral3,Selected course group; individual course prerequisites still need review.
+business-bba-2026,busgeneral4,degree,degree-business-bba-2026-busgeneral4,Selected course group; individual course prerequisites still need review.
+physics-bs-2026,phys1,degree,degree-physics-bs-2026-phys1,Degree requirement in this selected example.
+physics-bs-2026,phys2,degree,degree-physics-bs-2026-phys2,Degree requirement in this selected example.
+physics-bs-2026,phys3,degree,degree-physics-bs-2026-phys3,Degree requirement in this selected example.
+physics-bs-2026,physchem,degree,degree-physics-bs-2026-physchem,Degree requirement in this selected example.
+physics-bs-2026,physcalc2,degree,degree-physics-bs-2026-physcalc2,Degree requirement in this selected example.
+physics-bs-2026,physcalc3,degree,degree-physics-bs-2026-physcalc3,Degree requirement in this selected example.
+physics-bs-2026,physode,degree,degree-physics-bs-2026-physode,Degree requirement in this selected example.
+physics-bs-2026,physcompute,degree,degree-physics-bs-2026-physcompute,Degree requirement in this selected example.
+physics-bs-2026,physlinear,degree,degree-physics-bs-2026-physlinear,Degree requirement in this selected example.
+physics-bs-2026,physmodern,degree,degree-physics-bs-2026-physmodern,Degree requirement in this selected example.
+physics-bs-2026,physmechanics,degree,degree-physics-bs-2026-physmechanics,Degree requirement in this selected example.
+physics-bs-2026,physlab1,degree,degree-physics-bs-2026-physlab1,Degree requirement in this selected example.
+physics-bs-2026,physmethods,degree,degree-physics-bs-2026-physmethods,Degree requirement in this selected example.
+physics-bs-2026,physthermo,degree,degree-physics-bs-2026-physthermo,Degree requirement in this selected example.
+physics-bs-2026,physem1,degree,degree-physics-bs-2026-physem1,Degree requirement in this selected example.
+physics-bs-2026,physquantum1,degree,degree-physics-bs-2026-physquantum1,Degree requirement in this selected example.
+physics-bs-2026,physcontemporary,degree,degree-physics-bs-2026-physcontemporary,Degree requirement in this selected example.
+physics-bs-2026,physlab2,degree,degree-physics-bs-2026-physlab2,Degree requirement in this selected example.
+physics-bs-2026,physem2,degree,degree-physics-bs-2026-physem2,Degree requirement in this selected example.
+physics-bs-2026,physquantum2,degree,degree-physics-bs-2026-physquantum2,Degree requirement in this selected example.
+physics-bs-2026,physstem,degree,degree-physics-bs-2026-physstem,Selected course group; individual course prerequisites still need review.
+physics-bs-2026,physastro,degree,degree-physics-bs-2026-physastro,Selected course group; individual course prerequisites still need review.
+physics-bs-2026,physupper1,degree,degree-physics-bs-2026-physupper1,Selected course group; individual course prerequisites still need review.
+physics-bs-2026,physupper2,degree,degree-physics-bs-2026-physupper2,Selected course group; individual course prerequisites still need review.
