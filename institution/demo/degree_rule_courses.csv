@@ -1,1 +1,10 @@
 rule_id,subject_course,course_title,credits
+bio-core-1,BIOL 2110C,Principles of Biology I,4
+bio-core-2,BIOL 2120C,Principles of Biology II,4
+bio-genetics,BIOL 2305,Genetics,3
+bio-evolution,BIOL 304C,Evolution,4
+bio-micro-lecture,BIOL 2525,Microbiology,3
+bio-micro-lab,BIOL 2525L,Microbiology Laboratory,1
+bio-physiology-req,BIOL 304C,Evolution,4
+bio-chem-lab-req,CHEM 1215L,General Chemistry I Laboratory,1
+hist-capstone,HIST 490,Historiography,3

@@ -1,1 +1,10 @@
 catalog_id,node_id,option_id,minimum,subject_course,course_title,credits_min,credits_max,source_url,evidence_id,requisite_evidence_id
+demo-biology-bs-2026,biosci,phys1230,1,PHYS 1230,Algebra-Based Physics I,3,3,https://catalog.example.edu/courses/PHYS-1230,degree-bio-biosci,req-phys1230
+demo-biology-bs-2026,biosci,phys1230,1,PHYS 1230L,Algebra-Based Physics I Lab,1,1,https://catalog.example.edu/courses/PHYS-1230L,degree-bio-biosci,
+demo-biology-bs-2026,biosci,geol1110,1,GEOL 1110,Physical Geology,3,3,https://catalog.example.edu/courses/GEOL-1110,degree-bio-biosci,
+demo-biology-bs-2026,biosci,geol1110,1,GEOL 1110L,Physical Geology Lab,1,1,https://catalog.example.edu/courses/GEOL-1110L,degree-bio-biosci,
+demo-biology-bs-2026,biosci,envs1110c,1,ENVS 1110C,Environmental Science,4,4,https://catalog.example.edu/courses/ENVS-1110C,degree-bio-biosci,
+demo-history-ba-2026,histchoice,hist1160,1,HIST 1160,World History I,3,3,https://catalog.example.edu/courses/HIST-1160,degree-hist-choice,
+demo-history-ba-2026,histchoice,hist327,1,HIST 327,Ancient Mediterranean World,3,3,https://catalog.example.edu/courses/HIST-327,degree-hist-choice,
+demo-history-ba-2026,histchoice,hist395,1,HIST 395,Modern Global History,3,3,https://catalog.example.edu/courses/HIST-395,degree-hist-choice,
+demo-history-ba-2026,histchoice,hist401,1,HIST 401,Advanced World History Seminar,3,4,https://catalog.example.edu/courses/HIST-401,degree-hist-choice,req-hist401

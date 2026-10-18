@@ -35,30 +35,6 @@ test_that("Gen Ed suggestions retain season, campus and session and suppress sma
     planning_gen_ed(), "fall", 3), "missing: credits_min")
 })
 
-test_that("allowance popups disclose credit fit and exclude courses already represented by the plan", {
-  v <- build_degree_roadmap_view(CEDAR_DEGREE_CATALOG, CEDAR_DEGREE_ROADMAPS,
-    "cs-bs-2026", "calculus", "composition")
-  selection <- list(type = "allowance", catalog_id = "cs-bs-2026", math_start = "calculus",
-    english_start = "composition", start_season = "fall", node_id = v$allowances$node_id[1])
-  membership <- rbind(planning_gen_ed(), data.frame(subject_course = c("MATH 1512", "ENGL 1120"),
-    area_label = c("2: Math", "1: Communication")))
-  h <- build_degree_popup_history(test_sections_regstats, test_students_regstats, history_edges,
-    CEDAR_DEGREE_CATALOG, CEDAR_DEGREE_ROADMAPS, membership, selection)
-  expect_equal(h$kind, "allowance")
-  expect_equal(h$season, "fall")
-  # The 123-credit workload uses the permitted 16-credit ceiling here: the
-  # first semester's 14 shown credits leave a two-credit remainder.
-  expect_equal(h$credits, 2)
-  expect_true(all(h$table$credit_fit == "Needs more credits"))
-  expect_false(any(c("MATH 1512", "ENGL 1120") %in% h$missing_courses))
-  expect_match(h$credit_note, "rather than a complete course", fixed = TRUE)
-  expect_match(format_degree_allowance_preview(h), "SOCI 100 · ABQ", fixed = TRUE)
-  expect_false(any(c("student_id", "crn") %in% names(h$table)))
-  selection$node_id <- "allowance-99-1"
-  expect_error(build_degree_popup_history(test_sections_regstats, test_students_regstats, history_edges,
-    CEDAR_DEGREE_CATALOG, CEDAR_DEGREE_ROADMAPS, membership, selection), "Unknown degree allowance")
-})
-
 test_that("course pressure retains campus, college and session and uses first-day capacity", {
   h <- course_history()
   full <- h$pressure %>% filter(campus == "ABQ", part_term == "1", term == 202080L)
@@ -133,22 +109,6 @@ test_that("unmatched, implausible, small and missing capacity histories fail clo
   expect_equal(get_course_planning_history(test_sections, test_students, "none", list())$state, "unavailable")
   expect_equal(course_history("CSCI 1260")$state, "empty")
   expect_error(course_history(sections = select(test_sections_regstats, -available)), "missing: available")
-})
-
-test_that("history components are explicit and unenumerated groups and renamed courses stay unresolved", {
-  r <- CEDAR_DEGREE_ROADMAPS
-  expect_setequal(r$courses$subject_course[r$courses$node_id == "chem1"], c("CHEM 1215", "CHEM 1215L"))
-  group <- build_degree_course_history(test_sections, test_students, history_edges, r, "cs-bs-2026", "communication")
-  expect_equal(group$state, "choice")
-  science <- build_degree_course_history(test_sections, test_students, history_edges, r, "cs-bs-2026", "science1")
-  expect_equal(science$state, "ready")
-  expect_setequal(union(science$missing_courses, science$table$subject_course),
-    r$options$subject_course[r$options$catalog_id == "cs-bs-2026" & r$options$node_id == "science1"])
-  course <- build_degree_course_history(test_sections, test_students, history_edges, r, "cs-bs-2026", "java1")
-  expect_equal(course$state, "empty")
-  expect_equal(course$missing_courses, "CSCI 1260")
-  bad <- r; bad$courses$subject_course[bad$courses$node_id == "java1"] <- "CS 152L"
-  expect_error(validate_degree_roadmaps(bad, CEDAR_DEGREE_CATALOG), "components disagree")
 })
 
 # Missing rows and source windows are fixture-backed; they are not zeros in a chart.

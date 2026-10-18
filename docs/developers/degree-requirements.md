@@ -276,7 +276,15 @@ eligibility rules. Resolve catalog version, transfer/waivers, equivalences,
 unresolved rules and overlap allocation before introducing a requirement-informed
 challenger in rolling aftcasts. Capacity remains an audit, never a predictor.
 
-Regression tests extend `test-pathways-helpers.R`; the standard
+Regression tests live in `tests/testthat/test-degree-explorer.R` and run on a
+designed catalog, not on any institution's real one: the demo institution's
+`institution/demo/degree_*.csv` hold two synthetic programs (a calculus-route
+Biology B.S. and a statistics-route History B.A.) built to exercise every
+planning rule, and the file's header works their schedules by hand. An annual
+catalog review therefore never breaks a unit test. One test still runs every
+starting scenario of the loaded institution's catalog (UNM by default) and checks
+the planning invariants — credit ceiling, prerequisite timing, upper-level stage,
+no overlapping tiles — as an integrity check on the authored files. The standard
 `degree-explorer` browser suite covers placement changes, dependency shifts,
 paired courses, complete semester budgets, source evidence, planning colors,
-mobile scrolling, URL restoration and the moved observed view.
+mobile scrolling, URL restoration and copying, and the moved observed view.

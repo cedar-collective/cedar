@@ -48,6 +48,11 @@ test_degrees_roadblocks <<- cedar_degrees_roadblocks
 test_sections_xl_switch <<- cedar_sections_xl_switch # EC-15: listing switch in a crosslist
 test_students_xl_switch <<- cedar_students_xl_switch
 test_degrees     <<- cedar_degrees
+# Degree Explorer: the demo institution's designed catalog (institution/demo/),
+# two synthetic programs whose schedules are worked by hand in
+# test-degree-explorer.R. Independent of any real institution's annual catalog.
+test_degree_catalog  <<- read_degree_catalog(cedar_institution_dir(cedar_base_dir, "demo"))
+test_degree_roadmaps <<- read_degree_roadmaps(test_degree_catalog, cedar_institution_dir(cedar_base_dir, "demo"))
 test_faculty     <<- cedar_faculty
 test_dept_codes  <- sort(unique(test_programs$dept_code[!is.na(test_programs$dept_code)]))
 test_lookups     <<- list(

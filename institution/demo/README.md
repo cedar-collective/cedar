@@ -20,6 +20,13 @@ program names into four named populations for Pathways and the projections
 scenario. `projection_groups.csv` and `projection_courses.csv` declare one
 monitoring scope over the fixture Gen Ed courses, with the window start in
 `settings.csv`; the demo does not build projections, but the files must load.
+The `degree_*.csv` files are a designed Degree Explorer catalog: two synthetic
+programs, Biology B.S. (calculus route, lecture/lab bundles, a converging chain,
+a concurrent link, a lecture/lab choice set) and History B.A. (statistics route,
+a course-count condition over an elective pool, a permission condition, a
+mixed-level choice set). Their URLs point at `example.edu`; their schedules are
+worked by hand in `tests/testthat/test-degree-explorer.R`, which reads these
+files as its fixture. Change a row there and update that test's header with it.
 The three text maps (`program_names.csv`, `program_name_aliases.csv`,
 `source_organizations.csv`) are headers only: the fixtures carry codes, and the
 demo parses no HR report.

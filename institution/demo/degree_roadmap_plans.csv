@@ -1,1 +1,3 @@
 catalog_id,degree_credit_target,normal_load,max_load,baseline_semesters,evidence_id,assumption,upper_level_from_semester,allowance_slot_credits,gen_ed_source_url
+demo-biology-bs-2026,120,15,16,8,total-bio,"Preparation is added to the degree-credit planning target. Transfer, elective overlap and substitutions may reduce the estimate.",5,3,https://gened.example.edu/
+demo-history-ba-2026,120,15,16,8,total-hist,"Preparation is added to the degree-credit planning target. Transfer, elective overlap and substitutions may reduce the estimate.",5,3,https://gened.example.edu/

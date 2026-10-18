@@ -1,1 +1,3 @@
 catalog_id,program_name,degree_label,catalog_year,source_url,retrieved_on,coverage,notes
+demo-biology-bs-2026,Biology,Biology B.S. (synthetic),2026-2027,https://catalog.example.edu/programs/demo-biology-bs,2026-10-17,excerpt,"Synthetic demo program. Designed to exercise a calculus entry route, lecture/lab bundles, a converging prerequisite chain, a concurrent link, parallel upper-level courses and a lecture/lab choice set."
+demo-history-ba-2026,History,History B.A. (synthetic),2026-2027,https://catalog.example.edu/programs/demo-history-ba,2026-10-17,excerpt,"Synthetic demo program. Designed to exercise a statistics entry route, a course-count condition over an elective pool, a permission condition and a single-course choice set with mixed levels and variable credits."

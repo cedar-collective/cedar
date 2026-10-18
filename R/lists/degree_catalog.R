@@ -153,12 +153,17 @@ validate_pathway_subject_groups <- function(groups) {
   groups
 }
 
-CEDAR_DEGREE_CATALOG <- validate_degree_catalog(list(
-  catalogs = read_institution_file("degree_catalogs"),
-  rules = read_institution_file("degree_rules"),
-  courses = read_institution_file("degree_rule_courses"),
-  evidence = read_institution_file("degree_catalog_evidence")
-))
+#' Read and validate an institution's degree catalog files
+read_degree_catalog <- function(dir = cedar_institution_dir()) {
+  validate_degree_catalog(list(
+    catalogs = read_institution_file("degree_catalogs", dir),
+    rules = read_institution_file("degree_rules", dir),
+    courses = read_institution_file("degree_rule_courses", dir),
+    evidence = read_institution_file("degree_catalog_evidence", dir)
+  ))
+}
+
+CEDAR_DEGREE_CATALOG <- read_degree_catalog()
 CEDAR_PATHWAY_SUBJECT_GROUPS <- validate_pathway_subject_groups(read_institution_file("pathway_subject_groups"))
 
 #' Node ids a program's roadmap can show
@@ -492,14 +497,13 @@ validate_degree_roadmaps <- function(roadmaps, catalog) {
   }
 }
 
-CEDAR_DEGREE_ROADMAPS <- validate_degree_roadmaps(list(
-  nodes = read_institution_file("degree_roadmap_nodes"),
-  links = read_institution_file("degree_roadmap_links"),
-  starts = read_institution_file("degree_roadmap_starts"),
-  math_routes = read_institution_file("degree_roadmap_math_routes"),
-  conditions = read_institution_file("degree_roadmap_conditions"),
-  basis = read_institution_file("degree_roadmap_basis"),
-  plans = read_institution_file("degree_roadmap_plans"),
-  courses = read_institution_file("degree_roadmap_courses"),
-  options = read_institution_file("degree_roadmap_options")
-), CEDAR_DEGREE_CATALOG)
+#' Read an institution's roadmap files and validate them against its catalog
+read_degree_roadmaps <- function(catalog, dir = cedar_institution_dir()) {
+  tables <- c("nodes", "links", "starts", "math_routes", "conditions", "basis", "plans", "courses", "options")
+  roadmaps <- lapply(stats::setNames(tables, tables), function(table) {
+    read_institution_file(paste0("degree_roadmap_", table), dir)
+  })
+  validate_degree_roadmaps(roadmaps, catalog)
+}
+
+CEDAR_DEGREE_ROADMAPS <- read_degree_roadmaps(CEDAR_DEGREE_CATALOG)
