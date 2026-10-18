@@ -12,19 +12,16 @@
 # 0.21.0: seats are judged and sized on the first day of classes. Saturation,
 # capacity reached, and section sizing read reconstructed first-day enrollment
 # (calc_first_day_enrl()) instead of census; a term whose first day cannot be
-# reconstructed is not judged. Capacity reached is 98% first-day fill, not 100%. 0.20.0 introduced the spine / floor / delta
+# reconstructed is not judged. Capacity reached is 98% first-day fill, not 100%.
+# 0.20.0 introduced the spine / floor / delta
 # model: prior same-season is the spine; the adjusted candidate adds a
 # saturation floor and two Fall-enrollment deltas and must beat the spine on
 # rolling aftcasts. (0.19.0 introduced rolling selection and the
 # occupancy-based capacity signal.)
 CEDAR_ENROLLMENT_PROJECTION_MODEL_VERSION <- "0.21.0"
 CEDAR_ENROLLMENT_PROJECTION_SCHEMA_VERSION <- 21L
-# Capacity is reached when first-day enrollment fills at least this share of
-# scheduled seats. Not 100%: capacity is pooled over every section, and a
-# course with a handful of seats open across many section times is full to the
-# students choosing one (CHEM 1215 Spring 2026: 682 of 690, 98.8%). At 98% a
-# 50-seat course with one empty seat is full.
-CEDAR_ENROLLMENT_PROJECTION_CAPACITY_REACHED_FILL <- 0.98
+# Capacity is reached at CEDAR_FULL_FILL first-day fill and a prior term is
+# saturated at CEDAR_NEAR_FULL_FILL; both levels live in R/lists/seat_fill.R.
 # The first term the model reads history from (settings.csv
 # projection_history_start_term), or NA when the institution has not set one:
 # the app loads, the projection builder stops.

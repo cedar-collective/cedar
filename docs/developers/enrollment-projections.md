@@ -182,9 +182,11 @@ final_enrl      = registered
 against its section's first class day (`calc_first_day_enrl(..., pool_campuses
 = TRUE)`, each student-course once across the pooled market). It is the
 occupancy every seat judgment reads (0.21.0). It is `NA`, never a partial count,
-for a course-term whose class lists carry no status dates (Fall 2024 and
-Spring 2025 on the current extracts) or whose rows were all pulled before a
-section began (late-starting part-of-term sections in Fall 2026).
+for a course-term whose class lists carry no status dates or whose rows were
+all pulled before a section began (late-starting part-of-term sections).
+`class_list_status_date_coverage()` reports which terms lack dates, and Admin >
+Data & Usage lists them; never name the terms in prose, because re-pulling a
+term's class list fills its dates in.
 
 Before market aggregation, repeated ABQ/EA rows are collapsed to one
 student-course-term. A currently registered record wins over a drop record; a
@@ -350,7 +352,7 @@ the seats or more:
 first_day_enrl / scheduled_capacity >= 0.98    (calc_first_day_enrl())
 ```
 
-**98%, not 100%** (`CEDAR_ENROLLMENT_PROJECTION_CAPACITY_REACHED_FILL`).
+**98%, not 100%** (`CEDAR_FULL_FILL`, `R/lists/seat_fill.R`, shared with every page that calls a course full).
 Capacity is pooled over every section, and a course with a few seats open
 across many section times is full to the student choosing one: CHEM 1215
 filled 682 of 690 seats on the first day of Spring 2026 (98.8%). At 98% a

@@ -39,7 +39,7 @@ recurrence is recognizable.
 | [I8](#i8--a-timing-log-row-is-silently-dropped-when-the-write-lock-times-out) | Defect | A timing-log row is dropped when the write lock times out |
 | [I6](#i6--a-killed-projection-rebuild-strands-its-lock-and-blocks-every-later-refresh) | Defect | A killed projection rebuild strands its lock |
 | [I4](#i4--pre-change-course-ratios-are-confounded-by-career-stage) | Defect | Pre-change course ratios confounded by career stage (deferred) |
-| M1–M28 | Improvement | See [Improvements](#improvements) |
+| M1–M30 | Improvement | See [Improvements](#improvements) |
 
 ---
 
@@ -1868,6 +1868,15 @@ stops the rebuild, and `test-transform-status.R` proves it.
 module error shown with `showNotification()` or `handle_error()`; a degenerate
 statistic returning `NA`; a logged failure in the logging layer itself).
 
+**M30 — Regstats restates its default thresholds.** `R/features/regstats.R`
+writes the default threshold list twice (`get_dashboard_regstats_thresholds()`
+and the run path), and when `cedar_regstats_thresholds` is missing it prints a
+WARNING and runs on that copy instead of stopping. Only the chronic fill rate
+reads a shared value (`CEDAR_NEAR_FULL_FILL`). The projection model had the
+same pattern (47 `opt$x %||% literal` sites); it now reads every default from
+`enrollment_projection_defaults()` through `projection_option()`. *Done when:*
+Regstats' defaults live once and a missing configuration stops loudly.
+
 **M12 — Cones and branches reading global data.** **Done 2026-10-16.**
 `tests/testthat/test-architecture.R` ("cones and branches do not read global
 state") now fails on any `data_objects`, `.GlobalEnv`, `get("cedar_…")`, or
@@ -1924,6 +1933,17 @@ its repeated code extracted — alongside other work on the file.
 
 **M19 — Pathways heatmap legibility.** Long course labels and dense
 course-to-major views. *Done when:* labels are readable at the default size.
+
+**M29 — Count and rate columns are formatted per tab.** The rule is whole
+counts with separators, rates at one decimal and an em dash for unknown
+(AGENTS.md, Numeric precision). `cedar_count_coldef()` and
+`cedar_percent_coldef()` (`R/modules/ui-helpers.R`) now carry it, and Degree
+Explorer and the projections percent columns use them. Projections' count
+columns, Regstats' fill bar (whole percents, hard-coded hex colors and inline
+styles in `fill_bar()`) and the other tabs' tables still format their own. The
+projections browser suite parses some count cells with `parseFloat`, which
+breaks on a thousands separator. *Done when:* every count and rate column uses
+the shared definitions, and the browser checks read the number, not the text.
 
 **M27 — Headcount lists a department's programs by name.** Its program
 dropdown takes a department's programs from `cedar_lookups$program_name_lookup`

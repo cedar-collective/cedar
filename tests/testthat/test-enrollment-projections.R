@@ -1774,7 +1774,7 @@ test_that("the administrator summary says the decision in one sentence and flags
     subject_course = "TEST 101", term_type = "spring",
     projected_classlist_total = 2179, projected_first_day_equivalent = 2080,
     recommended_sections = 99L, observed_baseline = 2179,
-    adjusted_saturated_prior = TRUE, adjusted_prior_first_day_fill = 0.96,
+    adjusted_saturated_prior = TRUE, adjusted_prior_first_day_fill = 0.988,
     adjusted_waitlisted_prior = 15L, adjusted_regime_alarm = FALSE,
     adjusted_preceding_term = 202680L, adjusted_preceding_term_change = 0.02,
     stability = "Moderate", accuracy = "Fair", methods_disagree = FALSE
@@ -1782,9 +1782,10 @@ test_that("the administrator summary says the decision in one sentence and flags
   sentence <- projection_summary_sentence(row)
   expect_match(sentence, "^Plan at least 99 sections \\(2,080 seats filled on the first day, 2,179 registrations\\)\\.")
   expect_match(sentence, "That is last year's level\\.")
-  expect_match(sentence, "filled 96% of its seats on the first day with 15 students waiting, so this is a floor\\.")
+  # One decimal: whole percents turned 98.8% into "99%" and read as full.
+  expect_match(sentence, "filled 98\\.8% of its seats on the first day with 15 students waiting, so this is a floor\\.")
   expect_match(sentence, "averaged 10 to 20% off\\.$")
-  expect_equal(projection_flags(row), "Full last term | 15 waiting")
+  expect_equal(projection_flags(row), "Near full last term | 15 waiting")
 
   moved <- dplyr::mutate(
     row, adjusted_saturated_prior = FALSE, adjusted_waitlisted_prior = 0L,

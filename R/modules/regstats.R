@@ -106,7 +106,7 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
     fill_bar <- function(value) {
       if (is.na(value)) return("")
       pct  <- round(value * 100)
-      col  <- if (value >= 0.90) "#A15D4E" else if (value >= 0.75) "#C7A96B" else "#6F8B78"
+      col  <- if (value >= CEDAR_NEAR_FULL_FILL) "#A15D4E" else if (value >= 0.75) "#C7A96B" else "#6F8B78"
       htmltools::div(
         style = "display:flex;align-items:center;gap:6px",
         htmltools::div(

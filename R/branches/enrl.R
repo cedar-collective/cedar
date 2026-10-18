@@ -215,6 +215,32 @@ add_classlist_lifecycle_enrl <- function(df) {
     )
 }
 
+#' Which terms' class lists carry Registration Status Dates
+#'
+#' First-day enrollment (calc_first_day_enrl()) needs a status date on every
+#' registered or dropped row; waitlist rows never count. A class list exported
+#' without the column has none, so a whole term lacks first-day counts until it
+#' is re-pulled. Surfaces report that from here instead of naming terms in prose,
+#' which goes stale the day the term is re-pulled.
+#'
+#' @param students cedar_students (term, registration_status_code, registration_date).
+#' @return Tibble: term, n_rows (registered or dropped rows), n_dated,
+#'   coverage ("none", "partial" or "complete"), one row per term.
+class_list_status_date_coverage <- function(students) {
+  required <- c("term", "registration_status_code", "registration_date")
+  missing <- setdiff(required, names(students))
+  if (length(missing)) {
+    stop("[enrl.R] class_list_status_date_coverage needs column(s): ", paste(missing, collapse = ", "))
+  }
+  students %>%
+    ungroup() %>%
+    filter(registration_status_code %in% c(STATUS_REGISTERED, STATUS_DROP_ALL)) %>%
+    group_by(term) %>%
+    summarize(n_rows = n(), n_dated = sum(!is.na(registration_date)), .groups = "drop") %>%
+    mutate(coverage = case_when(n_dated == 0L ~ "none", n_dated < n_rows ~ "partial", TRUE ~ "complete")) %>%
+    arrange(term)
+}
+
 #' Reconstruct first-class-day enrollment from class-list status dates
 #'
 #' Unlike `first_day_proxy` (everyone ever registered), this reads each row's
@@ -387,7 +413,7 @@ summarize_listing_overlap <- function(students) {
 #' @return A tibble with census fill, remaining census seats, and capacity
 #'   quality/constraint flags.
 capacity_saturation_metrics <- function(census_enrl, capacity,
-                                        constrained_threshold = 0.90,
+                                        constrained_threshold = CEDAR_NEAR_FULL_FILL,
                                         max_plausible_fill = 1.25) {
   enrollment_capacity_metrics(census_enrl, capacity, constrained_threshold, max_plausible_fill) %>%
     dplyr::rename(census_fill = fill_rate, census_available_seats = available_seats)
@@ -396,7 +422,7 @@ capacity_saturation_metrics <- function(census_enrl, capacity,
 #' Compare an explicitly selected enrollment lifecycle point with scheduled seats
 #' Callers own the numerator's meaning; first day and census must remain labelled.
 enrollment_capacity_metrics <- function(enrollment, capacity,
-                                        constrained_threshold = 0.90,
+                                        constrained_threshold = CEDAR_NEAR_FULL_FILL,
                                         max_plausible_fill = 1.25) {
   enrollment <- as.numeric(enrollment)
   capacity <- as.numeric(capacity)

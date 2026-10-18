@@ -118,7 +118,7 @@ enrollmentProjectionsUI <- function(id) {
       ),
       checkboxInput(
         ns("attention_only"),
-        "Only courses that need a look: full last term, a big Fall change, or past forecasts more than 20% off",
+        "Only courses that need a look: near full last term, a big Fall change, or past forecasts more than 20% off",
         value = FALSE
       ),
       filter_scope_stripe(uiOutput(ns("scope"))),
@@ -796,38 +796,23 @@ enrollmentProjectionsServer <- function(id, bundles, load_bundle, programs) {
         columns = list(
           term = reactable::colDef(name = "Term", minWidth = 95),
           enrollment = reactable::colDef(name = "Enrollment", align = "right"),
-          enrollment_change = reactable::colDef(
-            name = "Δ enrl", align = "right",
-            format = reactable::colFormat(percent = TRUE, digits = 1)
-          ),
+          enrollment_change = cedar_percent_coldef("Δ enrl"),
           sections = reactable::colDef(name = "Sects", align = "right"),
           capacity = reactable::colDef(name = "Capacity", align = "right"),
-          capacity_change = reactable::colDef(
-            name = "Δ cap", align = "right",
-            format = reactable::colFormat(percent = TRUE, digits = 1)
-          ),
+          capacity_change = cedar_percent_coldef("Δ cap"),
           source_term = reactable::colDef(name = "Upstream term", minWidth = 105),
           university_students = reactable::colDef(
             name = "University students", align = "right", minWidth = 125
           ),
-          university_change = reactable::colDef(
-            name = "Δ university", align = "right", minWidth = 105,
-            format = reactable::colFormat(percent = TRUE, digits = 1)
-          ),
+          university_change = cedar_percent_coldef("Δ university", minWidth = 105),
           incoming_first_sem = reactable::colDef(
             name = "Incoming freshmen", align = "right", minWidth = 125
           ),
-          incoming_change = reactable::colDef(
-            name = "Δ incoming", align = "right", minWidth = 100,
-            format = reactable::colFormat(percent = TRUE, digits = 1)
-          ),
+          incoming_change = cedar_percent_coldef("Δ incoming", minWidth = 100),
           market_students = reactable::colDef(
             name = "Market students", align = "right", minWidth = 110
           ),
-          market_change = reactable::colDef(
-            name = "Δ market", align = "right", minWidth = 90,
-            format = reactable::colFormat(percent = TRUE, digits = 1)
-          ),
+          market_change = cedar_percent_coldef("Δ market", minWidth = 90),
           prior_term_dfw = reactable::colDef(
             name = "Prior-term DFW (n / rate)", minWidth = 155,
             align = "right"
@@ -873,10 +858,7 @@ enrollmentProjectionsServer <- function(id, bundles, load_bundle, programs) {
             name = "Method that term", minWidth = 130
           ),
           aftcast = reactable::colDef(name = "Aftcast", align = "right"),
-          raw_error = reactable::colDef(
-            name = "Raw error", align = "right",
-            format = reactable::colFormat(percent = TRUE, digits = 1)
-          ),
+          raw_error = cedar_percent_coldef("Raw error"),
           assessment = reactable::colDef(name = "Assessment", minWidth = 115),
           ever_registered = reactable::colDef(
             name = "Ever registered", align = "right", minWidth = 120
@@ -889,10 +871,7 @@ enrollmentProjectionsServer <- function(id, bundles, load_bundle, programs) {
           final = reactable::colDef(name = "Final / last day", align = "right"),
           sections = reactable::colDef(name = "Sections", align = "right"),
           capacity = reactable::colDef(name = "Capacity", align = "right"),
-          first_day_fill = reactable::colDef(
-            name = "First-day fill", align = "right", na = "\u2014",
-            format = reactable::colFormat(percent = TRUE, digits = 1)
-          ),
+          first_day_fill = cedar_percent_coldef("First-day fill"),
           potential_explanation = reactable::colDef(
             name = "Potential explanation", minWidth = 270
           )
@@ -929,14 +908,8 @@ enrollmentProjectionsServer <- function(id, bundles, load_bundle, programs) {
           role = reactable::colDef(name = "Role", minWidth = 125),
           projection = reactable::colDef(name = "Projection", align = "right"),
           aftcasts = reactable::colDef(name = "Aftcasts", align = "right"),
-          all_term_wape = reactable::colDef(
-            name = "All-term WAPE", align = "right", minWidth = 115,
-            format = reactable::colFormat(percent = TRUE, digits = 1)
-          ),
-          uncapped_wape = reactable::colDef(
-            name = "Uncapped WAPE", align = "right", minWidth = 115,
-            format = reactable::colFormat(percent = TRUE, digits = 1)
-          ),
+          all_term_wape = cedar_percent_coldef("All-term WAPE", minWidth = 115),
+          uncapped_wape = cedar_percent_coldef("Uncapped WAPE", minWidth = 115),
           selected = reactable::colDef(name = "Selected", maxWidth = 80),
           applicable = reactable::colDef(name = "Usable", maxWidth = 70),
           components = reactable::colDef(
@@ -1057,10 +1030,7 @@ enrollmentProjectionsServer <- function(id, bundles, load_bundle, programs) {
             name = "In course", minWidth = 90,
             format = reactable::colFormat(separators = TRUE)
           ),
-          population_share = reactable::colDef(
-            name = "Share", minWidth = 80,
-            format = reactable::colFormat(percent = TRUE, digits = 1)
-          )
+          population_share = cedar_percent_coldef("Share", minWidth = 80)
         ),
         stats::setNames(
           lapply(year_columns, function(column) {

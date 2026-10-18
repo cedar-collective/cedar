@@ -341,7 +341,8 @@ try {
   await page.setViewport({ width: 1440, height: 1000 });
 
   await connect(page, { search: 'tab=degree-explorer&catalog_id=biology-bs-2026&math_start=algebra&english_start=composition2&start_season=spring' });
-  await waitForSelector(page, '[data-roadmap][data-ready][data-catalog="biology-bs-2026"][data-math-start="algebra"][data-english-start="composition2"]');
+  // The link restores its fields in order; the season is last, so wait for it too.
+  await waitForSelector(page, '[data-roadmap][data-ready][data-catalog="biology-bs-2026"][data-math-start="algebra"][data-english-start="composition2"][data-start-season="spring"]');
   check(await page.$eval('#degree_explorer-dx_catalog_id', el => el.selectize.getValue()) === 'biology-bs-2026' &&
     await semester('calc1') === 3 && await semester('engl2') === 1 &&
     await page.$eval('[data-roadmap]', el => el.dataset.startSeason === 'spring'),

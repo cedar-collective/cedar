@@ -72,9 +72,10 @@ seats were taken that day. Census comes on the 15th day of classes (the third
 Friday), after three weeks of drops, so a course that turned students away on
 day one can read 95% at census. Sections
 are planned for first-day seats for the same reason: everyone in the room on
-day one needs one. Two recent terms (Fall 2024 and Spring 2025) have class
-lists with no status dates, so their first day is unknown. Those terms show a
-dash and are never judged full or not full; they are not filled in from census.
+day one needs one. Some terms' class lists were exported without status dates,
+so their first day is unknown; **Admin > Data & Usage** lists which. Those terms
+show a dash and are never judged full or not full; they are not filled in from
+census.
 
 Below the table, expand **Projection methods** for the method map. There are
 two candidates:
@@ -109,7 +110,7 @@ The table is sized to fit a laptop window:
 | **Seats (day 1)** | Students expected to hold a seat when classes begin: registrations times the share of this course's registrants still enrolled on the first day in recent terms. Beneath it, the range past forecasts for this course usually landed in. |
 | **Registrations** | Everyone expected to sign up, including students who drop before or after classes begin: the class-list demand the model forecasts. Beneath it, the change on the last same-season term's registrations. |
 | **First day / sections** | The last four same-season terms: students enrolled on the first day over the sections scheduled. A dash means the course was not offered, or the first day cannot be reconstructed; hover for which. |
-| **Flags** | Plain-language reasons to look: full last term, students left waiting, a big change in the term just finished, a volatile history, past forecasts well off, or the two candidates disagreeing. |
+| **Flags** | Plain-language reasons to look: near full last term (90% of seats filled on the first day), students left waiting, a big change in the term just finished, a volatile history, past forecasts well off, or the two candidates disagreeing. |
 | **Stability** | Stable, Moderate, Volatile, or Unrated: whether the course is predictable from its own history at all, measured with no model |
 | **Depth** | Deep, Moderate, Thin, or None: how many comparable rolling-selection aftcasts stand behind the published method |
 | **Accuracy** | Close, Fair, Poor, or Unrated: how close those aftcasts landed, as an out-of-sample record |

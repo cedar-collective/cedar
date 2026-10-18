@@ -17,8 +17,14 @@ build_admin_data_status <- function(summary, current_term) {
   })
   display <- as.data.frame(do.call(rbind, rows), stringsAsFactors = FALSE)
   names(display) <- c("Dataset", "Rows", vapply(terms, fmt_term, character(1)))
+  # Terms whose class lists carry no status dates have no first-day counts.
+  coverage <- summary$students_status_dates
+  undated <- if (is.null(coverage)) integer() else coverage$term[coverage$coverage == "none"]
+  partial <- if (is.null(coverage)) integer() else coverage$term[coverage$coverage == "partial"]
   list(table = display, current_column = match(current_term, terms) + 2L,
-       computed_at = summary$computed_at)
+       computed_at = summary$computed_at,
+       undated_terms = vapply(undated, fmt_term, character(1)),
+       partly_dated_terms = vapply(partial, fmt_term, character(1)))
 }
 
 

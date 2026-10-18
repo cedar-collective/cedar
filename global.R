@@ -539,6 +539,7 @@ if (!is.null(data_objects[["cedar_sections"]]) && nrow(data_objects[["cedar_sect
 if (!is.null(data_objects[["cedar_students"]]) && nrow(data_objects[["cedar_students"]]) > 0) {
   cedar_data_summary$students_count      <- nrow(data_objects[["cedar_students"]])
   cedar_data_summary$students_term_dates <- .term_dates(data_objects[["cedar_students"]])
+  cedar_data_summary$students_status_dates <- class_list_status_date_coverage(data_objects[["cedar_students"]])
 } else {
   cedar_data_summary$students_count      <- 0L
   cedar_data_summary$students_term_dates <- list()

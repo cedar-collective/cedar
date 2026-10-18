@@ -18,6 +18,10 @@ test_that("data freshness is complete static HTML with honest missing states", {
     faculty_count = 0L,
     sections_term_dates = list("202080" = "2026-09-04"),
     students_term_dates = list("202080" = "2026-09-03", "202110" = NA_character_),
+    # class_list_status_date_coverage() output: the shape, not data.
+    students_status_dates = tibble::tibble(term = c(202480L, 202510L, 202580L, 202610L),
+      n_rows = c(900L, 950L, 980L, 990L), n_dated = c(0L, 0L, 970L, 990L),
+      coverage = c("none", "none", "partial", "complete")),
     computed_at = as.POSIXct("2026-09-04 08:00:00", tz = "UTC")
   )
   data <- build_admin_data_status(summary, 202080L)
@@ -33,6 +37,9 @@ test_that("data freshness is complete static HTML with honest missing states", {
   expect_match(html, "Not loaded", fixed = TRUE)
   expect_match(html, "Not available", fixed = TRUE)
   expect_match(html, "App snapshot loaded", fixed = TRUE)
+  expect_equal(data$undated_terms, c("Fall 2024", "Spring 2025"))
+  expect_match(html, "First-day enrollment is unavailable for Fall 2024, Spring 2025", fixed = TRUE)
+  expect_match(html, "Some class-list rows lack status dates in Fall 2025", fixed = TRUE)
   expect_false(grepl("reactable|shiny-html-output|html-widget-output", html))
   expect_false(grepl("202,080|202080\\.0", html))
 })

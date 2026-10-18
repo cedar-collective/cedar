@@ -43,6 +43,7 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
   source_file("lists/status_codes.R")
   source_file("lists/course_numbering.R")   # course level by leading digit, from course_levels.csv
   source_file("lists/campuses.R")           # campus constants from campuses.csv, campus guards
+  source_file("lists/seat_fill.R")          # near full / full seat fill levels
   source_file("lists/enrollment_projection_groups.R")
   source_file("lists/degree_catalog.R")
 

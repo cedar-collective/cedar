@@ -321,8 +321,9 @@ degree_course_history_ui <- function(history, table_id) {
       if (length(history$missing_courses)) {
         tags$p("No history for: ", paste(history$missing_courses, collapse = ", "), ". Components are checked separately.")
       },
-      tags$p(class = "text-hint", paste("Near full = at least 90% filled at first day. Missing dates are",
-        "unavailable; counts below 10 are suppressed. History does not guarantee future seats.")),
+      tags$p(class = "text-hint", paste("Near full = at least", scales::percent(CEDAR_NEAR_FULL_FILL),
+        "filled at first day. Missing dates are unavailable; counts below 10 are suppressed. History does",
+        "not guarantee future seats.")),
       info_panel("How first-day enrollment is measured",
         tags$p(paste("Source: scheduled seats from DESR and first-day enrollment reconstructed from class-list",
           "status dates against each section’s start date. This uses CEDAR’s shared first-day helper; it does",
@@ -351,8 +352,8 @@ degree_allowance_history_ui <- function(history, table_id) {
         "Seats offered → filled at first class day → fill %. Filter Gen Ed area, Course or Campus.")),
       reactable::reactableOutput(table_id),
       tags$p(class = "text-hint", paste("First-day counts are reconstructed; missing dates remain unavailable",
-        "and counts below 10 are suppressed. Near full means at least 90% filled. Historical offerings do",
-        "not guarantee future seats.")),
+        "and counts below 10 are suppressed. Near full means at least", scales::percent(CEDAR_NEAR_FULL_FILL),
+        "filled. Historical offerings do not guarantee future seats.")),
       info_panel("How suggestions are chosen",
         tags$p(paste("Lower-level courses come from CEDAR's institution Gen Ed list, with course-sized credit",
           "ranges and usable historical metadata. Courses already represented by entry routes, requirements",

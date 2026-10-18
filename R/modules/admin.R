@@ -26,9 +26,15 @@ dataStatusUI <- function(summary, current_term, version = get_cedar_version_info
         }))
       )
     ),
-    if (!is.null(data$computed_at)) tags$p(class = "text-hint",
+    if (length(data$undated_terms)) tags$p(class = "text-hint", paste0(
+      "First-day enrollment is unavailable for ", paste(data$undated_terms, collapse = ", "),
+      ": their class lists carry no status dates. Re-pulling those class lists fills it in.")),
+    if (length(data$partly_dated_terms)) tags$p(class = "text-hint", paste0(
+      "Some class-list rows lack status dates in ", paste(data$partly_dated_terms, collapse = ", "),
+      "; first-day counts there are shown only for courses whose rows are all dated.")),
+    if (!is.null(data$computed_at)) tags$p(class = "text-hint", paste0(
       "App snapshot loaded: ", format(data$computed_at, "%Y-%m-%d %H:%M %Z"),
-      ". The morning refresh reloads this snapshot; this table does not poll the source files.")
+      ". The morning refresh reloads this snapshot; this table does not poll the source files."))
   )
 }
 #

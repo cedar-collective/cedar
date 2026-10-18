@@ -59,6 +59,23 @@ test_that("course pressure retains campus, college and session and uses first-da
   expect_equal(nrow(h$pressure), 10L)
 })
 
+# The base class list was exported without status dates; EC-11 carries them on
+# every row, and EC-11b leaves one 201980 row undated.
+test_that("status-date coverage names undated terms from the data", {
+  expect_true(all(class_list_status_date_coverage(test_students)$coverage == "none"))
+  expect_true(all(class_list_status_date_coverage(test_students_regstats)$coverage == "complete"))
+  partial <- class_list_status_date_coverage(test_students_course_history)
+  expect_equal(partial$coverage[partial$term == 201980L], "partial")
+  expect_equal(partial$n_rows[partial$term == 201980L] - partial$n_dated[partial$term == 201980L], 1L)
+  expect_true(all(partial$coverage[partial$term != 201980L] == "complete"))
+  # Waitlist rows never need a date: an undated waitlist row leaves a term complete.
+  waiting <- test_students_regstats
+  waiting$registration_status_code[1] <- STATUS_WAITLIST
+  waiting$registration_date[1] <- NA
+  expect_true(all(class_list_status_date_coverage(waiting)$coverage == "complete"))
+  expect_error(class_list_status_date_coverage(select(test_students, -registration_date)), "registration_date")
+})
+
 test_that("frequency includes observed source terms when a course was absent", {
   h <- course_history("SOCI 104")
   fall <- h$frequency %>% filter(campus == "ABQ", term_type == "fall")

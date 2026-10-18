@@ -38,6 +38,7 @@ projection_table_fingerprint <- function(data) {
 enrollment_projection_model_source_files <- function() {
   c(
     "R/lists/enrollment_projection_groups.R",
+    "R/lists/seat_fill.R",
     "R/lists/grades.R",
     "R/lists/status_codes.R",
     "R/lists/campuses.R",
@@ -623,7 +624,7 @@ projection_flags <- function(projections) {
   vapply(seq_len(nrow(projections)), function(i) {
     row <- projections[i, , drop = FALSE]
     flags <- c(
-      if (isTRUE(row$adjusted_saturated_prior)) "Full last term",
+      if (isTRUE(row$adjusted_saturated_prior)) "Near full last term",
       if (isTRUE(row$adjusted_saturated_prior) &&
           isTRUE(row$adjusted_waitlisted_prior > 0)) {
         paste(row$adjusted_waitlisted_prior, "waiting")
@@ -679,7 +680,7 @@ projection_summary_sentence <- function(projections) {
     full <- if (isTRUE(row$adjusted_saturated_prior)) {
       paste0(
         " Last ", switch(row$term_type, spring = "Spring", fall = "Fall", "term"),
-        " filled ", scales::percent(row$adjusted_prior_first_day_fill, accuracy = 1),
+        " filled ", scales::percent(row$adjusted_prior_first_day_fill, accuracy = 0.1),
         " of its seats on the first day",
         if (isTRUE(row$adjusted_waitlisted_prior > 0)) {
           paste0(" with ", row$adjusted_waitlisted_prior, " students waiting")
@@ -1164,7 +1165,7 @@ build_enrollment_projection_movement_detail <- function(history) {
       "There are too few comparable movements for a stable correlation. "
     },
     "First-day enrollment reached scheduled capacity (",
-    scales::percent(CEDAR_ENROLLMENT_PROJECTION_CAPACITY_REACHED_FILL),
+    scales::percent(CEDAR_FULL_FILL),
     " of seats or more) in ", reached_n, " of ",
     usable_n, " terms where first day and capacity are both known."
   )
@@ -1619,7 +1620,7 @@ format_enrollment_projection_preview <- function(bundle, courses = NULL) {
       "Capacity-bounded means overprojection cannot be measured because",
       paste0(
         "first-day enrollment reached scheduled capacity (",
-        scales::percent(CEDAR_ENROLLMENT_PROJECTION_CAPACITY_REACHED_FILL),
+        scales::percent(CEDAR_FULL_FILL),
         " of seats or more); it is not a claim of zero error."
       )
     )

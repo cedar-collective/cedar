@@ -85,6 +85,30 @@ definitions:
           - file: R/branches/enrl.R
             functions: [calc_first_day_enrl]
 
+  - id: seat-fill
+    current_version: "1.0.0"
+    versions:
+      - version: "1.0.0"
+        title: Seat fill, near full and full
+        summary: Fill is enrollment at one named point in the term divided by scheduled seats. A course is near full at 90% or more and full at 98% or more of its seats on the first day of classes; every CEDAR page uses these two levels.
+        population: Course offerings with usable scheduled capacity, grouped by course and delivery campus (and part of term where the page keeps it).
+        unit: Course offering in a term.
+        numerator: Enrollment at the stated lifecycle point — first-day enrollment, or reconstructed census where a page says so.
+        denominator: Scheduled seats (DESR enrollment plus available seats) for the same sections.
+        campus: Course delivery campus.
+        time_window: The term being described; the numerator's lifecycle point is always named beside the rate.
+        exclusions: Offerings with unknown, zero or implausible capacity (fill above 125%) are not scored.
+        limitations:
+          - Full is 98%, not 100%, because capacity pools every section; a course with a few seats open across many section times is full to the students choosing one.
+          - Near full (90%) marks demand pressing on the seats. Regstats' chronic-fill setting starts there but can be changed on its page.
+          - A first-day count is a reconstruction from status dates; a term whose class lists carry no status dates has no first-day fill.
+        guide: users/understanding-data
+        implementation:
+          - file: R/branches/enrl.R
+            functions: [enrollment_capacity_metrics]
+          - file: R/branches/enrollment-projections.R
+            functions: [projection_capacity_metrics]
+
   - id: dfw
     current_version: "3.0.0"
     versions:

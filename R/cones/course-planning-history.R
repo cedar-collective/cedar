@@ -53,6 +53,7 @@ get_course_planning_history <- function(sections, students, subject_courses, edg
     rename(first_day_fill = fill_rate, first_day_available_seats = available_seats)
   pressure <- bind_cols(pressure, metrics) %>%
     mutate(pressure_known = capacity_usable & source_matched & first_day_known & !small_cell,
+      # Near full: CEDAR_NEAR_FULL_FILL, the default of enrollment_capacity_metrics().
       near_full = if_else(pressure_known, capacity_constrained, NA),
       capacity_constrained = near_full,
       # Suppress small counts and reconstructable percentages in every payload.
@@ -61,7 +62,7 @@ get_course_planning_history <- function(sections, students, subject_courses, edg
       first_day_available_seats = if_else(pressure_known, first_day_available_seats, NA_real_),
       pressure_status = case_when(!source_matched ~ "No class-list match", small_cell ~ "Suppressed (<10)",
         !first_day_known ~ "First-day dates unavailable", !capacity_usable ~ "Unreliable capacity",
-        near_full ~ "Near full", TRUE ~ "Below 90%"))
+        near_full ~ "Near full", TRUE ~ paste("Below", scales::percent(CEDAR_NEAR_FULL_FILL))))
   terms <- pressure %>% group_by(campus, subject_course, term) %>%
     summarize(capacity = if (all(is.finite(capacity))) sum(capacity) else NA_real_,
       sessions = n(), pressure_known = all(pressure_known),
