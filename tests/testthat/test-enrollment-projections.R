@@ -1160,28 +1160,38 @@ test_that("Fall deltas scale enrollment changes by the historical carry-through"
   expect_true(is.na(far$regime_alarm))
 })
 
-test_that("a prior term full on the first day raises the spine to first day plus the waitlist", {
-  # Spring 2023: 24 of 25 seats held on the first day (96%, over the 90% line)
-  # with 3 students left waiting; two dropped in week one, so census read 22
-  # (88%) and a census rule would call the term unsaturated. Demand was at
-  # least 27; the spine says 24.
-  s <- projection_spine_scenario(spring_capacity = 25, waitlisted = 3L)
+test_that("a prior term full on the first day adds its unserved waitlist to the spine", {
+  # Spring 2023: 24 students registered. Four dropped before classes began, so
+  # 20 of 22 seats were held on the first day (90.9%, over the 90% line); one
+  # more dropped in week one, so census read 19 (86%) and a census rule would
+  # call the term unsaturated. Three students were still waiting at close and
+  # never held a seat. Demand was at least 24 + 3 = 27. First day plus the
+  # waitlist is 23, below the ever-registered spine, so a floor built that way
+  # lets the early-drop churn absorb the waitlist (ISSUES.md I27).
+  s <- projection_spine_scenario(spring_capacity = 22, waitlisted = 3L)
   s$enrollment_history <- dplyr::mutate(
     s$enrollment_history,
-    census_enrl = dplyr::if_else(term == 202310L, 22, census_enrl)
+    registered = dplyr::if_else(term == 202310L, 19, registered),
+    dr_early = dplyr::if_else(term == 202310L, 5, dr_early),
+    first_day_enrl = dplyr::if_else(term == 202310L, 20, first_day_enrl),
+    census_enrl = dplyr::if_else(term == 202310L, 19, census_enrl)
   )
   result <- project_spine_adjusted(
     s$enrollment_history, s$preceding_term_history, s$section_history,
     s$waitlist_history, s$students, s$row, 202410L
   )
 
+  expect_equal(result$spine, 24)
   expect_true(result$saturated_prior)
-  expect_equal(result$prior_first_day_fill, 24 / 25)
+  expect_equal(result$prior_first_day_fill, 20 / 22)
   expect_equal(result$waitlisted_prior, 3L)
   expect_equal(result$floor_uplift, 3)
-  expect_match(result$floor_basis, "first-day fill 96.0%")
-  expect_match(result$floor_basis, "first day \\+ 3 waitlisted = 27")
+  expect_match(result$floor_basis, "first-day fill 90.9%")
+  expect_match(result$floor_basis, "spine 24 \\+ 3 still waiting = 27")
   expect_equal(result$projected_classlist_total, 24 + 3 + 1 + 5)
+  expect_true(validate_spine_rows(
+    result %>% dplyr::mutate(target_term = 202410L), "fixture"
+  ))
 
   # No reconstructable first day for the spine term: saturation is unknown,
   # and census is not consulted in its place.
@@ -1223,28 +1233,38 @@ test_that("the spine audit trail must reconcile", {
   lowered <- dplyr::mutate(result, floor_uplift = -1,
                            projected_classlist_total = projected_classlist_total - 1)
   expect_error(validate_spine_rows(lowered, "fixture"), "spine / floor / delta")
+
+  # The floor is the unserved waitlist, in the spine's own units. A saturated
+  # row lifted by anything else fails even when its parts sum, and so does an
+  # unsaturated row lifted at all.
+  partial <- dplyr::mutate(result, saturated_prior = TRUE, waitlisted_prior = 3L,
+                           floor_uplift = 1,
+                           projected_classlist_total = projected_classlist_total + 1)
+  expect_error(validate_spine_rows(partial, "fixture"), "spine / floor / delta")
+  unsaturated <- dplyr::mutate(result, waitlisted_prior = 2L, floor_uplift = 2,
+                               projected_classlist_total = projected_classlist_total + 2)
+  expect_error(validate_spine_rows(unsaturated, "fixture"), "spine / floor / delta")
 })
 
-test_that("waitlist history counts distinct truly waiting students per market term", {
-  students <- tibble::tribble(
-    ~student_id, ~term, ~campus, ~college, ~part_term, ~subject_course, ~course_title, ~registration_status_code,
-    "w1", 202680L, "ABQ", "AS", "1", "TEST 201", "Test Course", "WL",
-    "w1", 202680L, "EA",  "AS", "1", "TEST 201", "Test Course", "WL",
-    "w2", 202680L, "ABQ", "AS", "1", "TEST 201", "Test Course", "WL",
-    "w3", 202680L, "ABQ", "AS", "1", "TEST 201", "Test Course", "WL",
-    "w3", 202680L, "ABQ", "AS", "1", "TEST 201", "Test Course", "RE",
-    "w4", 202680L, "GA",  "AS", "1", "TEST 201", "Test Course", "WL",
-    "w5", 202680L, "ABQ", "AS", "1", "OTHER 1",  "Other",       "WL"
-  )
+test_that("the market waitlist counts only students on neither campus's class list", {
+  # WL01 (designed_test_data.R): seven students carry a waitlist row and two
+  # are waiting in the pooled ABQ+EA market. WL_A waits on both campuses and
+  # is one student; WL_C is registered; WL_F is a branch campus; WL_G another
+  # course. The canonical per-campus rule also keeps WL_D, who holds an EA
+  # seat, and WL_E, an early drop the class-list total already counts, so a
+  # floor built on it would count both twice.
   history <- prepare_projection_waitlist_history(
-    students, courses = "TEST 201", campuses = c("ABQ", "EA"),
+    test_students_wlmkt, courses = "PSYC 1110", campuses = c("ABQ", "EA"),
     market_id = "abq_ea_course_market"
   )
-  # w1 waits on both campuses but is one student; w3 also holds a registered
-  # row so is not truly waiting; w4 is a branch campus; w5 another course.
   expect_equal(nrow(history), 1L)
+  expect_equal(history$term, 202080L)
   expect_equal(history$waitlisted, 2L)
-  expect_equal(history$term, 202680L)
+
+  canonical <- get_true_waitlisted_rows(dplyr::filter(
+    test_students_wlmkt, campus %in% c("ABQ", "EA"), subject_course == "PSYC 1110"
+  ))
+  expect_equal(dplyr::n_distinct(canonical$student_id), 4L)
 })
 
 test_that("the expansion response reads what saturated courses did when given room", {

@@ -140,6 +140,21 @@ The projection contract and measured lessons are documented in
 - [ ] Retain one registration-to-date row per course per week during Spring
   registration, so next year's Spring can be revised by pace against the same
   week a year earlier. The single most valuable data addition for revision.
+- [ ] Project against the submitted draft schedule: "with these seats, expect
+  this; the last term was full; past expansions filled this share". About
+  two-thirds of aftcast error moves with the seats, one registrant per seat
+  (the 0.21.0 audit in `forecasting-lessons.md`). Needs the schedule archived
+  when departments submit it, which also separates planned seats from
+  sections added or cancelled during registration.
+- [ ] Rank feeders by lift rather than raw count, with one pooled rate, so the
+  feeder list a chair reads names prerequisites, not the largest freshman
+  courses.
+- [ ] Record known policy changes (placement cutoffs, redesigned sequences,
+  new requirements) under `institution/<id>/` with their reason, shown as a
+  labelled adjustment and scored against the actuals afterwards.
+- [ ] Carry a waitlist into the next term, as a change from the year before,
+  once two years of retained waitlists exist (27% of Summer 2026's unserved
+  students took the course in Fall 2026).
 - [ ] Any new candidate enters only as a challenger scored rolling against the
   spine; none is added on in-sample fit.
 - [ ] Shape the reusable course-history spine so it supports section-needs

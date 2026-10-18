@@ -40,6 +40,8 @@ between the two population models.
 
 | Model | Bundle schema | Calculation contract | Evidence |
 |---|---:|---|---|
+| `0.22.0` | 21 | The saturation floor is the spine plus the students still waiting who are on no campus's class list in the market; it was first-day enrollment plus the waitlist, which early-drop churn absorbed | [What the 0.21.0 audit found](#what-the-0210-audit-found-2026-10-18) below; ISSUES.md I27 |
+| `0.21.0` | 21 | Seats judged and sized on the first day of classes: saturation, capacity reached (98% first-day fill), and section sizing read reconstructed first-day enrollment | [Capacity Censoring](enrollment-projections.html#capacity-censoring); ISSUES.md I26 |
 | `0.20.0` | 20 | Two candidates: the prior same-season spine and spine + saturation floor + Fall enrollment deltas; rolling selection; every other candidate and bias correction retired | [Spring 2027 audit, 0.20.0](#spring-2027-audit-model-0200) below |
 | `0.19.0` | 19 | Seven candidates (preceding-term ratio added; trend, feeder, and two anchored blends retired); rolling leakage-safe selection with out-of-sample accuracy; census-based capacity; sections from expected census; bias correction shelved | [Spring 2027 audit, 0.19.0](#spring-2027-audit-model-0190) below |
 | `0.18.0` | 18 | Nine candidates; in-sample common-fold selection; ever-registered capacity flag; three evidence axes; Fall bundle; scenarios | [What the 0.18.0 audit found](#what-the-0180-audit-found-2026-10-16) |
@@ -237,6 +239,147 @@ Four readings:
    because only 3 of the 12 Fall students historically repeat and the feeder
    pool barely moved; the number is honest and the alarm is the response.
 
+## What the 0.21.0 audit found (2026-10-18)
+
+Measured on the 0.21.0 Spring 2027 and Fall 2027 bundles (data settled through
+Fall 2026, 139-course `critical_courses` scope) and on the class lists behind
+them. Every rate below was learned only from terms before the aftcast it
+scores; the scripts were session diagnostics, not committed code.
+
+**Enrollment follows the seats, one registrant per seat.** Same strata as the
+0.19.0 audit, now on the 0.21.0 aftcasts of prior same-season:
+
+| Seats vs prior same-season | Spring folds | WAPE | Bias | Share of error | Fall folds | WAPE | Bias | Share of error |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| Within 10% | 109 | 6.0% | -3.1% | 23% | 119 | 4.4% | -0.9% | 17% |
+| Added 10% or more | 64 | 22.9% | -22.3% | 55% | 66 | 23.3% | -21.6% | 56% |
+| Cut 10% or more | 42 | 39.7% | +38.2% | 22% | 41 | 39.2% | +39.2% | 27% |
+
+The change in class-list demand correlates 0.95 (Spring) and 0.93 (Fall) with
+the change in scheduled seats, at a slope of 1.00 and 0.98 registrants per
+seat. Prior same-season plus the seat change would aftcast at 4.9% and 4.1%
+WAPE against 14.8% and 14.3%: roughly two-thirds of the error is the schedule.
+That figure is an oracle, and an optimistic one. A past term's DESR capacity is
+its end-of-term schedule, which already holds sections added or cancelled
+after registration opened, so some of the link runs from demand to seats.
+Planned and reactive seats cannot be separated: the 265 cancelled sections in
+scope carry no capacity, and only 11 of 42 Spring (11 of 41 Fall) seat cuts
+coincide with a recorded cancellation. Nor can the schedule be anticipated
+from the data: after a term full on the first day the median capacity change
+was zero in both seasons, with seats added a third of the time in Spring and
+cut more than a quarter.
+
+**A demand signal cannot show up in a full course.** 53 of 58 Spring 2027 and
+56 of 62 Fall 2027 courses were at or above 90% first-day fill in their spine
+term. A course that cannot grow without seats cannot reward a model for
+predicting that more students wanted it, so every demand-side adjustment is
+scored against what is mostly a supply outcome. This is why the findings below
+are small, and why they do not show that demand shifts are unimportant.
+
+**Tested and rejected:**
+
+| Idea | Folds | Prior same-season | Candidate | Verdict |
+|---|---:|---:|---:|---|
+| Pooled growth factor: spine x (1 + market growth over earlier folds), Spring | 161 | 15.0% (bias -5.0%) | 17.2% (+6.3%) | Worse: the 2023–24 recovery (portfolio under-projected by 11–14%) stopped, and the factor kept projecting it |
+| Same, Fall | 169 | 13.2% (-2.2%) | 15.4% (+5.2%) | Worse |
+| Damped own trend, phi 0.25, Spring / Fall | 158 / 164 | 14.9% / 12.5% | 17.1% / 14.2% | Worse; phi 0.5 worse again (19.7% / 16.7%) |
+| Headcount change, flat-capacity folds | 109 / 119 | — | correlation -0.27 / 0.06 with the miss | No signal |
+| Gen Ed area pooling (students substitute within an area) | 24 area-terms per season | course 13.7% / 13.7% | area 9.2% / 7.8% | Aggregation, not substitution: random course groupings of the same sizes score 8.3% / 7.3% (median of 2,000 shuffles) |
+
+**Feeders: count, lift, majors, and an eligible pool.** The engine's feeder
+set is the up-to-eight courses whose preceding-term students most often took
+the target next. Ranked by count, that is the largest freshman courses: MATH
+1220's feeders are ENGL 1110, PSYC 1110 and ENGL 1110X ahead of MATH 1215X/Y/Z.
+Four variants were compared, each added with the repeat delta to the spine, on
+the 152 Spring folds (2024–2026) where the preceding term was observed:
+
+| Adjustment | All 53 courses | 44 courses fed mainly by prerequisites | Bias (all) |
+|---|---:|---:|---:|
+| None (prior same-season) | 14.7% | 13.7% | -4.7% |
+| Engine: count-ranked feeders, one pooled rate | 13.2% | 12.1% | -1.5% |
+| Prerequisite feeders (lift >= 3), one pooled rate | **12.9%** | **11.9%** | -2.0% |
+| Prerequisite feeders, a separate rate per major | 13.5% | 12.4% | -3.0% |
+| Eligible pool: preceding-term students without a pass, by segment (in a feeder, passed one in the last two years, earlier DFW in the target, other by major) | 13.5% | 12.5% | -1.0% |
+| Eligible pool as a level, no spine | 15.8% | 14.9% | -3.3% |
+
+Lift is a feeder student's rate of taking the target next over the rate for a
+typical market student, from at least 20 transitions over at least two pairs;
+the four prerequisite feeders carrying the most such students are kept. In
+Fall nothing beat prior same-season: 13.0% over 156 folds, and 6.2% on the 16
+courses fed mainly by prerequisites, which every adjustment made worse.
+
+Four readings:
+
+1. **Splitting the feeder change by major loses.** If the majors that take
+   the target grow, the feeder grows and the pooled count already sees it; the
+   split adds information only when the mix shifts toward majors more likely
+   to continue, and per-major rates estimated from two to four pairs add more
+   noise than that. The major-weighted delta's correlation with the residual
+   after the seat change is 0.13, against 0.25 for the pooled count.
+2. **The eligible pool's backlog is real and small**: students who passed a
+   prerequisite and have not yet taken the target added about 3.5 students per
+   course-term in Spring and 2 in Fall. An unbounded lookback roughly doubles
+   it artificially (the history lengthens with every later term), so any pool
+   needs a fixed window.
+3. **Every variant tracks the seat change** about twice as strongly as the
+   residual after it (correlation 0.47–0.54 against 0.13–0.25). Part of what a
+   feeder delta predicts is that departments add Spring seats after a large
+   Fall.
+4. **MATH 1220 is a placement case.** It fell from 1,166 to 948 (Fall 2025)
+   and to 770 (Fall 2026) as seats were cut by 127 and 238, and from 742 to 697
+   in Spring 2026, while every demand adjustment predicted growth. The MATH
+   1215 redesign placed students into 1215 who would have taken 1220 directly,
+   so a larger feeder meant a smaller target. No feeder model can see a
+   placement rule.
+
+**The floor had never fired, and was in the wrong units.** Class lists keep no
+waitlist rows before Summer 2026, so no historical aftcast has exercised the
+floor. On the Fall 2027 bundle, 36 saturated courses held 245 students still
+waiting at close; the floor added 77, and 24 of the 36 got nothing, because it
+added the waitlist to first-day enrollment and compared the sum with the
+ever-registered spine, which also counts early drops. Fixed in 0.22.0 (ISSUES.md
+I27). Of the students still waiting at the end of Summer 2026, 29 of 107 (27%)
+registered for the same course in Fall 2026: a turned-away student returns
+the next term, not a year later, which the same-season floor cannot see.
+
+**One history term per season cannot be judged.** Its class lists carry no
+status dates, so no course in it has a first-day count and saturation,
+capacity reached and the floor are unknown for the aftcast that reads it
+(ISSUES.md M32).
+
+## Rebuilt with model 0.22.0 (2026-10-18)
+
+The same data and cutoff as the 0.21.0 bundles above; only the floor changed.
+
+| Evidence | Spring 2027 | Fall 2027 |
+|---|---:|---:|
+| Saturated courses with students waiting | 0 | 36 → 35 |
+| Students waiting in them | 0 | 245 → 243 |
+| Floor uplift | 0 | 77 → 243 |
+| Courses the floor lifts | 0 | 12 → 35 |
+| Waiting students removed as already on the market class list | 0 | 6 |
+| Aftcasts that moved | 2 (+2 students each) | 0 |
+| Realised WAPE of the published rule | 14.7%, unchanged | 14.3%, unchanged |
+| Published rows that moved | 0 | 1 (ARTS 1510, 119 → 127, 6 → 7 sections) |
+
+Three readings:
+
+1. **The floor now counts every waiting student.** ARTS 1610, ARTH 1120,
+   FYEX 1010, MATH 1220 and BIOL 1140 each had students still waiting at the
+   end of Fall 2026 and had been lifted by nothing.
+2. **The published numbers barely move, because the published method is
+   mostly the spine.** The adjusted candidate is selected for 2 of 62 Fall
+   courses, so the corrected floor reaches the page mainly through the
+   adjusted candidate's evidence, the floor note, and "Plan at least N", which
+   every row carries. Whether the floor should apply to every saturated row
+   regardless of which candidate is selected is a selection question, not a
+   units one; the per-course rule cannot earn it on four aftcasts.
+3. **The two moved aftcasts are Spring 2024 rows** (CLST 1110 and IADL 1110),
+   lifted by stray waitlist rows retained from Spring 2023. Neither was the
+   published pick. They are the floor's entire aftcast record, which is why
+   its accuracy cannot be measured until Summer and Fall 2026 waitlists become
+   spine terms for Fall 2027 and later.
+
 ## Lessons From the Retired Experiments
 
 The retired forecasting code tried useful ideas, especially major and
@@ -331,17 +474,35 @@ or progression eligibility. Those require leakage-safe course-specific tests.
 
 ## What to Try Next
 
-1. Test a robust ensemble of the observed baselines against the rolling
-   default-plus-challenger rule; any candidate enters as a challenger and must
-   beat prior same-season out of sample.
-2. Evaluate hierarchical shrinkage so two-aftcast courses borrow strength
-   without erasing course differences.
-3. Add repeat-eligible candidates only where the course logic supports them;
+1. **Condition on the draft schedule.** Two-thirds of the error moves with the
+   seats (the 0.21.0 audit). A projection that reads the schedule a department
+   has submitted can say "with these seats, expect this; the last term was
+   full; past expansions filled this share", and archiving that schedule is
+   also what separates planned seats from reactive ones.
+2. **Rank feeders by lift, not count**, keeping one pooled rate. The accuracy
+   gain is small (0.2–0.3 points); the reason is that "ENGL 1110, PSYC 1110" is
+   not a credible feeder list for MATH 1220. Do not split the rate by major,
+   and do not build the eligible pool as a separate method.
+3. **Record known policy changes as data** (placement cutoffs, redesigned
+   sequences, new requirements) with their reason, shown as a labelled
+   adjustment and checked against the actuals afterwards. MATH 1220 and FYEX
+   1010 move for reasons no feeder or demand model can see.
+4. **Carry a waitlist into the next term** as a change from the year before,
+   once a second year of waitlists exists to measure the change against.
+5. Select between candidates over the pooled course set, not per course: three
+   or four aftcasts per course cannot separate a 1.2-point pooled gain from
+   noise, which is why the adjusted candidate leads pooled on Spring yet is
+   published for nine courses.
+6. Evaluate hierarchical shrinkage so two-aftcast courses borrow strength
+   without erasing course differences. A robust ensemble of observed baselines
+   remains untested; damped trends and pooled growth factors are tested and
+   rejected (above).
+7. Add repeat-eligible candidates only where the course logic supports them;
    do not add DFW as a universal multiplier, and do not revive the retired
    feeder-transition estimator without fixing its +35% bias.
-4. Build the separate Fall specification from continuing Spring students plus
+8. Build the separate Fall specification from continuing Spring students plus
    archived admissions, acceptance, and orientation snapshots for new students.
-5. Retain registration snapshots if pace or true peak-demand models become a
+9. Retain registration snapshots if pace or true peak-demand models become a
    priority. One final snapshot per term cannot recover blocked demand.
 
 Every new method follows the same gate: designed fixture, rolling aftcasts,

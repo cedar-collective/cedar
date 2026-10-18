@@ -69,6 +69,12 @@
 #          GA  cohort n=2 (MC_R3 returns AT ABQ, MC_R4 does not) -> ret_1 = 0.5
 #          A campus-blind grouping reports a single 0.75 and hides both facts.
 #
+#   WL01 — cedar_students_wlmkt (13 rows). PSYC 1110, Fall 2020, a waitlist in
+#          the pooled ABQ+EA projection market. 7 students carry a waitlist row;
+#          2 are waiting in the market. The canonical per-campus rule alone
+#          counts 4: it also keeps a student holding an EA seat and an early
+#          drop already on the class list (ISSUES.md I27).
+#
 # === CEDAR_SECTIONS (85 total: 71 base + 14 XL rows merged in) ===
 #
 # Base sections (non-XL):
@@ -3057,6 +3063,51 @@ cedar_students_mcret <- dplyr::bind_rows(
   .mc_row("MC_R2", 202180, "COMM 210", "ABQ", "CJ", "A", "MC_I3"),
   .mc_row("MC_R3", 202180, "COMM 210", "ABQ", "CJ", "B", "MC_I3")
   # MC_R4 does not return.
+)
+
+
+# ── WL01 — a waitlist in a pooled two-campus market ──────────────────────────
+# Enrollment projections pool ABQ and EA into one course market and add the
+# students still waiting when a saturated term closed to that market's
+# class-list total (ISSUES.md I27). A student is waiting in the market only
+# when they are on neither campus's class list. PSYC 1110, Fall 2020:
+#
+#   student  rows                       waiting in the ABQ+EA market?
+#   WL_A     WL at ABQ, WL at EA        yes, once
+#   WL_B     WL at ABQ                  yes
+#   WL_C     WL and RE at ABQ           no: registered (the canonical rule)
+#   WL_D     WL at ABQ, RS at EA        no: holds an EA seat, though the
+#                                       canonical per-campus rule keeps them
+#   WL_E     DR and WL at ABQ           no: an early drop, already in the
+#                                       class-list total
+#   WL_F     WL at GA                   no: a branch campus, outside the market
+#   WL_G     WL at ABQ on PSYC 2110     no: another course
+#   WL_R1/2  RE at ABQ / at EA          registered, never waiting
+#
+# Pinned: market waitlist 2 (WL_A, WL_B). The canonical rule over the market's
+# campuses, applied alone, gives 4 (adds WL_D and WL_E).
+
+.wl_row <- function(sid, campus, status, course = "PSYC 1110") {
+  .mc_row(sid, 202080L, course, campus, "PSYC") %>%
+    dplyr::mutate(
+      enrollment_id = paste("WL01", sid, campus, status, sep = "-"),
+      registration_status_code = status,
+      registration_status = dplyr::case_when(
+        status %in% c("RE", "RS") ~ "Registered",
+        status == "WL" ~ "Wait Listed",
+        TRUE ~ "Drop"
+      )
+    )
+}
+cedar_students_wlmkt <- dplyr::bind_rows(
+  .wl_row("WL_A", "ABQ", "WL"), .wl_row("WL_A", "EA", "WL"),
+  .wl_row("WL_B", "ABQ", "WL"),
+  .wl_row("WL_C", "ABQ", "WL"), .wl_row("WL_C", "ABQ", "RE"),
+  .wl_row("WL_D", "ABQ", "WL"), .wl_row("WL_D", "EA", "RS"),
+  .wl_row("WL_E", "ABQ", "DR"), .wl_row("WL_E", "ABQ", "WL"),
+  .wl_row("WL_F", "GA", "WL"),
+  .wl_row("WL_G", "ABQ", "WL", course = "PSYC 2110"),
+  .wl_row("WL_R1", "ABQ", "RE"), .wl_row("WL_R2", "EA", "RE")
 )
 
 
