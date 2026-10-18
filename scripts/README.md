@@ -417,6 +417,46 @@ for the complete workflow and evidence requirements.
 
 ---
 
+## pull-production-data.sh
+
+Copies production's prepared tables (`cedar_*.qs`, `cedar-status.json`) into
+your local `CEDAR_DATA_DIR`, so a development machine runs on the data
+production serves without re-running the MyReports pulls or the transform. With
+`--projections` it also copies the saved projection bundles into
+`output/projections/`. Nothing local is deleted: a replaced file is kept in a
+dated `.backup-YYYYMMDD-HHMMSS` folder beside it.
+
+Set the connection in `.env` (gitignored; never commit a host or a login):
+
+```bash
+CEDAR_PROD_SSH=yourlogin@production-host
+CEDAR_PROD_DATA_DIR=/root/shared-data      # production's CEDAR_DATA_DIR
+# CEDAR_PROD_OUTPUT_DIR=/root/cedar/output # only for --projections
+# CEDAR_PROD_SSH_PORT=22
+```
+
+```bash
+scripts/pull-production-data.sh --list          # what production has; copies nothing
+scripts/pull-production-data.sh --dry-run       # print the commands
+scripts/pull-production-data.sh                 # copy the prepared tables
+scripts/pull-production-data.sh --projections   # and the projection bundles
+scripts/restart-cedar.sh                        # so the app reads them
+```
+
+`--method auto` (the default) uses `rsync`, which copies only what changed,
+when the server allows a shell command; an account limited to file transfer
+gets `sftp`, which downloads every matching file. Force either with
+`--method rsync` or `--method sftp`. An SSH key saves typing the password for
+each connection. A draft schedule for an upcoming term reaches your machine
+this way once production's refresh has pulled that term's DESR.
+
+`scripts/cedar-repl.R` reads `<repo>/data`, which can be a separate copy from
+`CEDAR_DATA_DIR`; point `CEDAR_DATA_DIR` at it for one run
+(`CEDAR_DATA_DIR=$PWD/data scripts/pull-production-data.sh`) to refresh that
+copy too.
+
+---
+
 ## Other scripts (future)
 
 This directory is for utility scripts. Future additions might include:
