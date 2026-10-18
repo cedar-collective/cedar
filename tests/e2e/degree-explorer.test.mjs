@@ -162,7 +162,9 @@ try {
     'the roadmap is visible without opening requirement accordions');
   const originalCalcTerm = await semester('calc1');
   await choose('degree_explorer-dx_start_season', 'spring');
-  check(await page.$eval('.cedar-roadmap-year', el => el.innerText.includes('Spring')) &&
+  // textContent, not innerText: the year label is styled uppercase, and
+  // innerText returns the rendered "YEAR 1 · SPRING".
+  check(await page.$eval('.cedar-roadmap-year', el => el.textContent.includes('Spring')) &&
     await semester('calc1') === originalCalcTerm && await alignedHeaders(),
     'the start-season control labels the semesters without changing their course order or header alignment');
   const allowance = await page.$$eval('[data-card-type="allowance"]', els =>
