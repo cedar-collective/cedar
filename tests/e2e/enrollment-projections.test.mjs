@@ -79,8 +79,8 @@ async function closeEvidence(page) {
     pageChrome.title === 'Enrollment Projections', pageChrome.title || '(missing)');
   check('filter bar carries a brief page description',
     pageChrome.subtitle.includes('Saved course-demand projections'), pageChrome.subtitle);
-  check('methodology and column guide use a collapsed info panel',
-    pageChrome.guideTitle.includes('How projections work and how to read the table') &&
+  check('the column guide is a collapsed, purpose-labelled info panel',
+    pageChrome.guideTitle.includes('Reading the table: what each column means') &&
       pageChrome.guideOpen === false, pageChrome.guideTitle || '(missing)');
 
   const methodGuide = await page.evaluate(() => {
@@ -198,8 +198,8 @@ async function closeEvidence(page) {
 
   let table = await readReactable(page, 'enrollment_projections-projection_table');
   const requiredHeaders = [
-    'Course', 'Sections', 'Seats (day 1)', 'Registrations', 'Flags',
-    'Stability', 'Depth', 'Accuracy',
+    'Course', 'Sections', 'Pressure bump', 'Seats (day 1)', 'Registrations',
+    'Flags', 'Stability', 'Depth', 'Reliability', 'Seat consistency',
   ];
   check(
     'projection table leads with the decision and keeps the evidence axes',
@@ -363,8 +363,8 @@ async function closeEvidence(page) {
   // The axes are independent: filtering to Volatile must not also filter the
   // evidence axes, or the table would be quietly answering a narrower question.
   // So the filter keeps every Volatile row the unfiltered group showed. (This
-  // once asked for mixed Depth or Accuracy values among the Volatile rows,
-  // which is a property of the data: Spring 2027's three are all Deep / Poor.)
+  // once asked for mixed Depth or Reliability values among the Volatile rows,
+  // which is a property of the data: Spring 2027's three are all Deep / Low.)
   check(
     'the stability filter keeps every volatile row and drops no other axis',
     expectedVolatile > 0 && table.rows.length === expectedVolatile,
@@ -495,7 +495,7 @@ async function closeEvidence(page) {
   check('detail explains all three axes separately for CHEM 1215',
     detailEvidence.text.includes('Stability:') &&
       detailEvidence.text.includes('Depth:') &&
-      detailEvidence.text.includes('Accuracy:'));
+      detailEvidence.text.includes('Reliability:'));
   check('historical plot includes all enrollment lifecycle measures',
     ['Ever registered (model target)', 'First day (seats judged here)', 'Census',
       'Final / last day']

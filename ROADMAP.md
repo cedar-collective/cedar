@@ -140,12 +140,15 @@ The projection contract and measured lessons are documented in
 - [ ] Retain one registration-to-date row per course per week during Spring
   registration, so next year's Spring can be revised by pace against the same
   week a year earlier. The single most valuable data addition for revision.
+- [x] Compare the plan with the draft schedule (Registration > Projections >
+  Draft schedule, model 0.23.0): short of day-one seats, short of the plan,
+  covering it, beyond it, or missing from the draft.
 - [ ] Project against the submitted draft schedule: "with these seats, expect
-  this; the last term was full; past expansions filled this share". About
-  two-thirds of aftcast error moves with the seats, one registrant per seat
-  (the 0.21.0 audit in `forecasting-lessons.md`). Needs the schedule archived
-  when departments submit it, which also separates planned seats from
-  sections added or cancelled during registration.
+  this; the last term was full; past expansions filled this share". Most
+  aftcast error moves with the seats, one registrant per seat (77% of Spring
+  2027's aftcast error, 83% of Fall 2027's). Needs the schedule archived when departments submit it,
+  which also separates planned seats from sections added or cancelled during
+  registration.
 - [ ] Rank feeders by lift rather than raw count, with one pooled rate, so the
   feeder list a chair reads names prerequisites, not the largest freshman
   courses.

@@ -29,14 +29,73 @@ depth and no deltas — which means that evidence was unavailable, not that
 nothing changed.
 
 The page opens to **Always monitored**. Use **Target term**, **Course group**,
-**Department**, **Course**, **Stability**, and **Aftcast accuracy** to narrow the
+**Department**, **Course**, **Stability**, and **Reliability** to narrow the
 saved rows. The table expands to
 show every matching row and scrolls with the page. These controls do not fit or
-rerun a model. Expand
-**How projections work and how to read the table** for an in-page methodology
-and column guide.
+rerun a model.
+
+Four blue boxes above the table each answer one question; the title says which:
+
+| Box | Answers |
+|---|---|
+| **Reading the table: what each column means** | Every column, and how Reliability and Seat consistency read together |
+| **How a course's plan is built, step by step** | From last year's registrations to sections, and why each step is there |
+| **Where forecast error comes from** | Past misses by cause, measured on the loaded projection's past forecasts |
+| **Which courses are on this page** | The monitored list, the screen that adds near-full courses, and what is left out |
+
+Below the table, **Projection methods: the two forecasts, and how one is
+chosen** describes the two forecasting methods. The Draft schedule tab has its
+own box, **How the draft comparison works**.
 
 {% include definition-summary.html id="enrollment-projection" %}
+
+## Reliability and seat consistency
+
+Most past forecast error came from terms whose seats changed: a course that is
+always full registers about as many students as it has seats, so when the
+schedule adds or cuts seats, registrations follow and last year's number
+misses. **Reliability** says how close past forecasts landed; **Seat
+consistency** says whether the seats held steady in those same terms. Read
+them together:
+
+| Reliability | Seat consistency | What it means |
+|---|---|---|
+| High | any | Past forecasts landed close; plan to it. |
+| Low | Low or Moderate | The misses came when the seats moved. They follow the schedule more than demand, so the projection holds if the seats hold. |
+| Low | High | The course missed with steady seats. That miss is the forecast's: look before planning to it. Flagged "Off 20%+ with steady seats". |
+| Moderate | any | Usable for planning, not for a precise seat count. |
+| Unrated | — | Too few past forecasts to tell. |
+
+The **Where forecast error comes from** box gives the breakdown for the
+loaded projection: how much error came from seat changes, from missing data,
+from full courses whose seats held, and from courses with room whose seats
+held. Only that last group tests the forecast of demand itself.
+
+## Compare to the draft schedule
+
+The **Draft schedule** tab sets each course's plan beside the target term's
+schedule as it stands. The schedule is pulled from MyReports with the rest of
+the data, and the tab says when. It is a draft until registration settles:
+departments edit it, and the comparison follows at the next refresh.
+
+Each course gets one verdict:
+
+- **Short of day-one seats**: the draft has fewer seats than the students
+  expected in the room when classes begin. Fix these first.
+- **Covers day one, short of the plan**: only the planning margin or the
+  pressure bump is missing.
+- **Covers the plan**, or **seats beyond the plan** when it has more than a
+  section to spare. In a course that is always full, spare seats are likely to
+  fill: when such courses were given more seats, the new seats filled.
+- **Not in the draft schedule**: a monitored course with a projection and no
+  sections yet.
+
+The table also shows the draft's sections (with each campus's share), its
+seats, the expected day-one seats, the planned registrations (including any
+pressure bump), the plan's sections, the gap, students registered so far once
+registration opens, and the course's reliability and seat consistency. Click a
+course for its full evidence. Until the target term's schedule is in the data,
+the tab says so instead of showing a table.
 
 ## Scenario: growing a population
 
@@ -147,16 +206,18 @@ The table is sized to fit a laptop window:
 | **Registrations** | Everyone expected to sign up, including students who drop before or after classes begin: the class-list demand the model forecasts, and the number sections are planned for. Beneath it, the range past forecasts for this course usually landed in and the change on the last same-season term's registrations. |
 | **Seats (day 1)** | Students expected to hold a seat when classes begin: registrations times the share of this course's registrants still enrolled on the first day in recent terms. Context, not the planning number. |
 | **First day / sections** | The last four same-season terms: students enrolled on the first day over the sections scheduled. A dash means the course was not offered, or the first day cannot be reconstructed; hover for which. |
-| **Flags** | Plain-language reasons to look: near full last term (90% of seats filled on the first day), students left waiting, a big change in the term just finished, a volatile history, past forecasts well off, or the two candidates disagreeing. |
+| **Flags** | Plain-language reasons to look: near full last term (90% of seats filled on the first day), students left waiting, a big change in the term just finished, a volatile history, past forecasts more than 20% off ("with steady seats" or "as seats moved"), or the two candidates disagreeing. |
 | **Stability** | Stable, Moderate, Volatile, or Unrated: whether the course is predictable from its own history at all, measured with no model |
 | **Depth** | Deep, Moderate, Thin, or None: how many comparable rolling-selection aftcasts stand behind the published method |
-| **Accuracy** | Close, Fair, Poor, or Unrated: how close those aftcasts landed, as an out-of-sample record |
+| **Reliability** | High, Moderate, Low, or Unrated: how close past forecasts for this course landed (within 10%, 10 to 20%, more than 20%), each made with only the evidence available then |
+| **Seat consistency** | High, Moderate, Low, or Unrated: how steady the course's seats were in those same past terms (held within 10% every time, moved once, moved more) |
 
 Clicking a row opens the course's evidence in a window over the table; close it
 to return to the same place in the list. The evidence opens with one sentence
 that says what to plan and why, then the selected method and why it was
-selected, the three axes, the planning recommendation, and the floor, Fall
-delta, regime, and capacity checks. The method plot, movement diagnostic, and
+selected, the three axes, seat consistency and what it says beside
+reliability, why the course is listed, the pressure bump, the planning
+recommendation, and the floor, Fall delta, regime, and capacity checks. The method plot, movement diagnostic, and
 candidate table sit under **Analyst detail**.
 
 The plot compares every forecasting method against historical ever-registered,
@@ -214,5 +275,5 @@ capacity-bounded: seats that turned over were never all occupied at once. `Poten
 that coincide with a miss; it is not a causal claim.
 
 The page is a planning aid rather than an automatic scheduling decision. Review
-stability, depth, accuracy, capacity status, and recent evidence before acting
-on a section recommendation.
+stability, depth, reliability, seat consistency, capacity status, and recent
+evidence before acting on a section recommendation.
