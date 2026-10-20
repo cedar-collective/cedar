@@ -9,6 +9,10 @@
 # Groups are monitoring scopes. Projection rows use the named market and course;
 # campus and part-term allocation remains in saved delivery components.
 
+# 0.23.0 (schema 23): the saved bundle also carries what the reader needs to
+# judge a projection -- each aftcast's seat and data conditions and its error
+# source, a seat-consistency axis beside Reliability, and when the target
+# term's draft schedule was pulled. No calculation changed.
 # 0.23.0 (schema 22): planning sections, the seat gap and the recommendation
 # are sized for registrations, not expected first-day seats. Registrations run
 # a median 8% above the first day, and that margin is kept on purpose: sized on
@@ -30,7 +34,7 @@
 # rolling aftcasts. (0.19.0 introduced rolling selection and the
 # occupancy-based capacity signal.)
 CEDAR_ENROLLMENT_PROJECTION_MODEL_VERSION <- "0.23.0"
-CEDAR_ENROLLMENT_PROJECTION_SCHEMA_VERSION <- 22L
+CEDAR_ENROLLMENT_PROJECTION_SCHEMA_VERSION <- 23L
 # Capacity is reached at CEDAR_FULL_FILL first-day fill and a prior term is
 # saturated at CEDAR_NEAR_FULL_FILL; both levels live in R/lists/seat_fill.R.
 # The first term the model reads history from (settings.csv
