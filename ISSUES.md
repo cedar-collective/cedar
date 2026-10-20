@@ -29,6 +29,7 @@ recurrence is recognizable.
 
 | ID | Kind | Summary |
 |---|---|---|
+| [I28](#i28--one-late-starting-session-makes-a-whole-courses-first-day-unknown) | Defect | One late-starting session makes a whole course's first day unknown: 257 of 2,599 Fall 2026 courses, hiding ENGL 1120 and MATH 1350's saturated Fall from the Fall 2027 projection |
 | [I27](#i27--the-projection-floor-adds-a-waitlist-to-first-day-enrollment-and-compares-it-with-ever-registered-demand) | Defect | The projection floor mixed units: 245 unserved waitlisted students lifted Fall 2027 by 77 (resolved) |
 | [I26](#i26--projection-capacity-reached-was-judged-on-ever-registered-demand) | Defect | Projection "capacity reached" was judged on ever-registered demand: 72% of course-terms flagged full when census filled 17% (resolved) |
 | [I25](#i25--projection-method-selection-was-in-sample-and-lost-to-the-default) | Defect | Projection method selection was in-sample on two folds and lost to doing nothing; reported 13.7% WAPE, honest 16.5% (resolved) |
@@ -1829,6 +1830,75 @@ From `enrollment-projections-202780-latest.qs`, take `candidates` rows with
 and join `recent_history$actual_first_day` on `history_term == spine_term`.
 `sum(waitlisted_prior)` is 245, `sum(floor_uplift)` 77; every zero-uplift row
 has `spine - actual_first_day >= waitlisted_prior`.
+
+## I28 — One late-starting session makes a whole course's first day unknown
+
+**Status:** open
+**Found:** 2026-10-18, reading the Fall 2027 projection rows (model 0.22.0)
+for a transparency review
+**Severity:** moderate — a course that was full last term is shown as unknown,
+so its saturation flag, "Plan at least" wording and floor are withheld, and the
+stated reason points at the wrong cause.
+**Affects:** `calc_first_day_enrl()` in `R/branches/enrl.R` at course grain
+(`by_part_term = FALSE`): the projection's market history
+(`R/branches/enrollment-projections.R`, `pool_campuses = TRUE`) and
+`add_first_day_enrl()` callers such as `get_course_crosslist_classlist_enrl()`.
+`get_course_planning_history()` counts by part of term and is not affected.
+
+### What is wrong
+
+`calc_first_day_enrl()` returns `NA` for a course-term unless every
+non-waitlist row is `.known`, and a row is not known until the class list was
+pulled on or after its section's start date. The Fall 2026 class list was
+pulled on 2026-10-08. Second-half sessions began on 2026-10-12, and a few other
+late-start sections later still. So a course with a single 2H section has no
+first-day count at all, even though its full-term sections started on
+2026-08-17 and their count is complete.
+
+Every one of the 257 Fall 2026 ABQ/EA courses (of 2,599 with non-waitlist rows)
+whose first day reads unknown is unknown for this reason, and for no other:
+9,271 rows pulled before their section started (8,870 of them in 2H sessions),
+none missing a status date or a start date.
+
+In the Fall 2027 projection, three rows lose their judgment this way. The
+reason they show, "First-day enrollment for Fall 2026 cannot be reconstructed
+from the class lists", reads as missing status dates, which is the cause for
+Fall 2024 and Spring 2025 but not here. Counting only the sections that had
+started gives a lower bound on first-day fill, because it divides by all the
+scheduled seats:
+
+| Course | First day, started sections | Scheduled seats (all) | Fill, at least | True waitlist |
+|---|---:|---:|---:|---:|
+| ENGL 1120 | 1,192 | 1,260 | 94.6% | none retained |
+| MATH 1350 | 1,037 | 1,094 | 94.8% | 78 |
+| FYEX 1110 | 371 | 635 | 58.4% | 6 |
+
+ENGL 1120 and MATH 1350 were saturated by the 90% rule, and the page does not
+say so. The waitlist counts are the canonical rule before the market
+deduplication.
+
+The defect recurs every Fall and Spring for any build made between the start of
+the term and the start of its last late session, and it clears once a later
+pull covers every start date. Past terms were pulled after they ended, so the
+aftcast record is untouched.
+
+*Done when:* a session that has started has a first-day count whether or not
+a later session has; a course whose later sessions have not started is judged
+on what has started, labelled as such, or is reported unknown with the true
+reason (sessions not yet begun when the class list was pulled), never "cannot
+be reconstructed"; a designed fixture holds a course with a full-term and a
+not-yet-started 2H section, and its test fails on the current function.
+
+### Reproduction
+
+From `cedar_students`, take term 202680, campuses ABQ and EA, and every
+non-waitlist row. Join each row's section start date (the minimum
+`start_date` per `term`, `crn` in `cedar_sections`). 9,271 rows have
+`as_of_date < start_date`. They fall in 257 courses, and those 257 are exactly
+the courses with any unknown row. In the Fall 2027 bundle,
+`projections$adjusted_saturated_prior` is `NA` for ENGL 1120, FYEX 1110 and
+MATH 1350 with spine term Fall 2026. It is also `NA` for ENGL 2660 and HIST
+1150, whose spine term is Fall 2024, which has no status dates.
 
 ---
 

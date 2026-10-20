@@ -96,6 +96,22 @@ enrollment_projection_defaults <- function() {
     # what share of the added seats filled. Needs expansion_min_pairs.
     expansion_capacity_change = 0.10,
     expansion_min_pairs = 5L,
+    # Pressure bump (0.23.0): a planning allowance, not a forecast. A course
+    # near full on the first day (saturation_fill_threshold) in every one of
+    # its last pressure_bump_window same-season offerings with a known first
+    # day -- at least pressure_bump_min_terms of them -- is planned for
+    # pressure_bump_share more registrations than last time, or for the
+    # students left waiting if that is more, unless its feeder courses'
+    # enrollment fell by pressure_bump_feeder_decline or more in the term just
+    # finished. A near-full course's registrations follow its seats: given 10%
+    # or more seats they filled them (median 100%, 89 course-terms), held flat
+    # they stayed flat (139), cut they fell by the cut (51). The forecast and
+    # its accuracy are untouched, because a full course's registrations are
+    # capped and cannot score an allowance for the demand it turned away.
+    pressure_bump_share = 0.10,
+    pressure_bump_window = 3L,
+    pressure_bump_min_terms = 2L,
+    pressure_bump_feeder_decline = 0.05,
     regime_alarm_threshold = 0.25,
     # Rolling selection: prior same-season is the default. A challenger
     # replaces it for a target only when, on at least selection_min_backtests
@@ -173,6 +189,26 @@ enrollment_projection_model_config <- function(opt = list()) {
     )
   }
   config$saturation_fill_threshold <- saturation
+  for (field in c("pressure_bump_share", "pressure_bump_feeder_decline")) {
+    value <- as.numeric(config[[field]])
+    if (length(value) != 1L || !is.finite(value) || value < 0 || value > 1) {
+      stop("[enrollment-projections.R] ", field,
+           " must be a share between 0 and 1.", call. = FALSE)
+    }
+    config[[field]] <- value
+  }
+  bump_window <- suppressWarnings(as.integer(config$pressure_bump_window))
+  bump_min <- suppressWarnings(as.integer(config$pressure_bump_min_terms))
+  if (length(bump_window) != 1L || length(bump_min) != 1L ||
+      is.na(bump_window) || is.na(bump_min) || bump_min < 1L ||
+      bump_window < bump_min) {
+    stop(
+      "[enrollment-projections.R] pressure_bump_min_terms must be at least 1 ",
+      "and no larger than pressure_bump_window.", call. = FALSE
+    )
+  }
+  config$pressure_bump_window <- bump_window
+  config$pressure_bump_min_terms <- bump_min
   history_start <- suppressWarnings(as.integer(config$history_start_term))
   if (length(history_start) != 1L || is.na(history_start)) {
     stop("[enrollment-projections.R] history_start_term must be one YYYYSS term.",
@@ -377,10 +413,9 @@ prepare_projection_enrollment_history <- function(cl_enrls, courses = NULL,
 
 # `first_day_enrl` is the market's seats held when classes began
 # (calc_first_day_enrl(), each student-course once across the pooled campuses).
-# It is what "were the seats full" is judged on and what sections are sized
-# for: census, the 15th day of instruction, follows three weeks of drops, so a
-# course full on day one can read 95%
-# at census. It is NA, never a partial count, for a term whose class lists
+# It is what "were the seats full" is judged on: census, the 15th day of
+# instruction, follows three weeks of drops, so a course full on day one can
+# read 95% at census. Sections are sized for projected registrations (0.23.0). It is NA, never a partial count, for a term whose class lists
 # carry no status dates or were pulled before a section began.
 prepare_projection_market_enrollment_history <- function(students, sections,
                                                          courses, campuses,
@@ -1159,6 +1194,7 @@ projection_candidate <- function(method_id, estimate = NA_real_, applicable = FA
                                  floor_uplift = 0,
                                  floor_basis = NA_character_,
                                  preceding_term = NA_integer_,
+                                 feeder_check = NA_character_,
                                  preceding_term_enrollment = NA_real_,
                                  preceding_term_change = NA_real_,
                                  regime_alarm = NA,
@@ -1166,6 +1202,7 @@ projection_candidate <- function(method_id, estimate = NA_real_, applicable = FA
                                  delta_feeder = 0, feeder_rate = NA_real_,
                                  feeder_courses = NA_character_,
                                  feeder_change = NA_real_,
+                                 feeder_change_rate = NA_real_,
                                  delta_basis = NA_character_,
                                  projection_formula = NA_character_) {
   tibble::tibble(
@@ -1192,6 +1229,7 @@ projection_candidate <- function(method_id, estimate = NA_real_, applicable = FA
     floor_uplift = as.numeric(floor_uplift),
     floor_basis = as.character(floor_basis),
     preceding_term = as.integer(preceding_term),
+    feeder_check = as.character(feeder_check),
     preceding_term_enrollment = as.numeric(preceding_term_enrollment),
     preceding_term_change = as.numeric(preceding_term_change),
     regime_alarm = as.logical(regime_alarm),
@@ -1201,6 +1239,7 @@ projection_candidate <- function(method_id, estimate = NA_real_, applicable = FA
     feeder_rate = as.numeric(feeder_rate),
     feeder_courses = as.character(feeder_courses),
     feeder_change = as.numeric(feeder_change),
+    feeder_change_rate = as.numeric(feeder_change_rate),
     delta_basis = as.character(delta_basis),
     projection_formula = as.character(projection_formula)
   )
@@ -1467,6 +1506,7 @@ project_spine_adjusted <- function(history, preceding_term_history,
   feeder_rate <- NA_real_
   feeders <- character(0)
   feeder_change <- NA_real_
+  feeder_change_rate <- NA_real_
   change <- NA_real_
   preceding_enrollment <- if (nrow(now_row) == 1L) now_row$classlist_total[[1]] else NA_real_
   delta_basis <- if (!preceding_observed) {
@@ -1502,6 +1542,7 @@ project_spine_adjusted <- function(history, preceding_term_history,
         enrollments, prior_preceding_term, feeders, row$subject_course
       )
       feeder_change <- feeder_now - feeder_then
+      feeder_change_rate <- if (feeder_then > 0) feeder_change / feeder_then else NA_real_
       delta_feeder <- feeder_change * feeder_rate
       parts <- c(parts, paste0(
         "feeders (", paste(feeders, collapse = ", "), "): (", feeder_now,
@@ -1512,6 +1553,19 @@ project_spine_adjusted <- function(history, preceding_term_history,
       parts <- c(parts, "feeders: none met the evidence threshold")
     }
     paste(parts, collapse = "; ")
+  }
+  # Why a feeder change is or is not available, for the pressure bump's
+  # feeder check.
+  feeder_check <- if (is.null(enrollments) || !preceding_term %in% enrollments$term) {
+    "term_not_observed"
+  } else if (!preceding_observed || nrow(then_row) != 1L) {
+    "no_course_baseline"
+  } else if (length(feeders) == 0L || !is.finite(feeder_rate)) {
+    "no_feeders"
+  } else if (is.finite(feeder_change_rate)) {
+    "measured"
+  } else {
+    "unmeasurable"
   }
   # Unknown when the preceding term is unobserved; never FALSE by default.
   regime_alarm <- if (is.finite(change)) abs(change) >= alarm_threshold else NA
@@ -1538,6 +1592,7 @@ project_spine_adjusted <- function(history, preceding_term_history,
     floor_uplift = floor$uplift,
     floor_basis = floor$basis,
     preceding_term = preceding_term,
+    feeder_check = feeder_check,
     preceding_term_enrollment = preceding_enrollment,
     preceding_term_change = change,
     regime_alarm = regime_alarm,
@@ -1548,6 +1603,7 @@ project_spine_adjusted <- function(history, preceding_term_history,
     feeder_courses = if (length(feeders) == 0L) NA_character_ else
       paste(feeders, collapse = ", "),
     feeder_change = feeder_change,
+    feeder_change_rate = feeder_change_rate,
     delta_basis = delta_basis,
     projection_formula = "spine + floor uplift + repeat delta + feeder delta"
   )
@@ -1639,6 +1695,43 @@ validate_spine_rows <- function(data, caller) {
     stop(
       "[enrollment-projections.R] ", caller,
       " has an invalid spine / floor / delta audit trail.",
+      call. = FALSE
+    )
+  }
+  invisible(TRUE)
+}
+
+
+# Every published plan is its projection plus its pressure bump, the bump is
+# zero unless it applies, and sections are sized from the plan, so the page can
+# say exactly how much the bump raised it.
+validate_pressure_bump_rows <- function(rows, caller) {
+  if (nrow(rows) == 0L) return(invisible(TRUE))
+  projected <- rows$projected_classlist_total
+  bump <- rows$pressure_bump
+  planned <- rows$planned_registrations
+  expected_sections <- projection_sections_for_demand(
+    planned, rows$reference_section_size
+  )
+  sections_agree <- dplyr::if_else(
+    is.na(expected_sections),
+    is.na(rows$recommended_sections),
+    !is.na(rows$recommended_sections) &
+      rows$recommended_sections == expected_sections
+  )
+  valid <- is.finite(bump) & bump >= 0 &
+    !is.na(rows$pressure_bump_applied) &
+    (rows$pressure_bump_applied | bump == 0) &
+    dplyr::if_else(
+      is.finite(projected),
+      is.finite(planned) & abs(planned - (projected + bump)) <= 1e-6,
+      is.na(planned)
+    ) &
+    sections_agree
+  if (any(!valid)) {
+    stop(
+      "[enrollment-projections.R] ", caller,
+      " has a plan that is not its projection plus its pressure bump.",
       call. = FALSE
     )
   }
@@ -2747,12 +2840,18 @@ empty_enrollment_projections <- function() {
       adjusted_saturated_prior = logical(), adjusted_prior_first_day_fill = numeric(),
       adjusted_waitlisted_prior = integer(), adjusted_floor_uplift = numeric(),
       adjusted_floor_basis = character(), adjusted_preceding_term = integer(),
+      adjusted_feeder_check = character(),
       adjusted_preceding_term_enrollment = numeric(),
       adjusted_preceding_term_change = numeric(), adjusted_regime_alarm = logical(),
       adjusted_delta_repeat = numeric(), adjusted_repeat_rate = numeric(),
       adjusted_delta_feeder = numeric(), adjusted_feeder_rate = numeric(),
       adjusted_feeder_courses = character(), adjusted_feeder_change = numeric(),
+      adjusted_feeder_change_rate = numeric(),
       adjusted_delta_basis = character(),
+      pressure_judged_terms = integer(), pressure_full_terms = integer(),
+      pressure_bump_applied = logical(), pressure_bump = numeric(),
+      pressure_bump_note = character(), planned_registrations = numeric(),
+      pressure_bump_sections = integer(),
       expansion_pairs = integer(), expansion_fill_rate = numeric(),
       expansion_note = character(), floor_note = character(),
       regime_note = character(),
@@ -3361,6 +3460,7 @@ projection_method_pairing <- function(candidates, opt = list()) {
       adjusted_floor_uplift = floor_uplift,
       adjusted_floor_basis = floor_basis,
       adjusted_preceding_term = preceding_term,
+      adjusted_feeder_check = feeder_check,
       adjusted_preceding_term_enrollment = preceding_term_enrollment,
       adjusted_preceding_term_change = preceding_term_change,
       adjusted_regime_alarm = regime_alarm,
@@ -3370,6 +3470,7 @@ projection_method_pairing <- function(candidates, opt = list()) {
       adjusted_feeder_rate = feeder_rate,
       adjusted_feeder_courses = feeder_courses,
       adjusted_feeder_change = feeder_change,
+      adjusted_feeder_change_rate = feeder_change_rate,
       adjusted_delta_basis = delta_basis
     )
   candidates %>%
@@ -3453,6 +3554,183 @@ projection_expansion_response <- function(enrollment_history, section_history,
 }
 
 
+# The pressure bump: a planning allowance for a course that is always full.
+#
+# A course near full on the first day in every one of its last
+# `pressure_bump_window` same-season offerings with a known first day (at least
+# `pressure_bump_min_terms` of them) turned students away, and its
+# registrations were capped by the seats offered. It is planned for
+# `pressure_bump_share` more registrations than last time, or for the students
+# left waiting if that is more, unless its feeder courses' enrollment fell by
+# `pressure_bump_feeder_decline` or more in the term just finished. A floor the
+# published method already added counts toward the bump.
+#
+# `rows` are published rows joined to `projection_method_pairing()`. Returns
+# one row per course: the terms judged, the bump in registrations, and a note
+# that says why it applies or why not. The forecast is never changed here.
+projection_pressure_bump <- function(enrollment_history, section_history, rows,
+                                     opt = list()) {
+  keys <- c("market_id", "subject_course", "term_type", "target_term")
+  empty <- tibble::tibble(
+    market_id = character(), subject_course = character(),
+    term_type = character(), target_term = integer(),
+    pressure_judged_terms = integer(), pressure_full_terms = integer(),
+    pressure_bump_applied = logical(), pressure_bump = numeric(),
+    pressure_bump_note = character()
+  )
+  if (nrow(rows) == 0L) return(empty)
+  projection_require_columns(
+    rows,
+    c(keys, "method_id", "observed_baseline", "projected_classlist_total",
+      "adjusted_waitlisted_prior", "adjusted_floor_uplift",
+      "adjusted_preceding_term", "adjusted_feeder_check",
+      "adjusted_feeder_courses", "adjusted_feeder_change_rate"),
+    "projection_pressure_bump()"
+  )
+  threshold <- as.numeric(projection_option(opt, "saturation_fill_threshold"))
+  share <- as.numeric(projection_option(opt, "pressure_bump_share"))
+  window <- as.integer(projection_option(opt, "pressure_bump_window"))
+  min_terms <- as.integer(projection_option(opt, "pressure_bump_min_terms"))
+  decline <- as.numeric(projection_option(opt, "pressure_bump_feeder_decline"))
+  share_label <- scales::percent(share, accuracy = 1)
+
+  dplyr::bind_rows(lapply(seq_len(nrow(rows)), function(i) {
+    row <- rows[i, , drop = FALSE]
+    season <- switch(row$term_type, spring = "Spring", fall = "Fall", "term")
+    recent <- projection_history_for_row(
+      enrollment_history, row, before_term = row$target_term
+    ) %>%
+      dplyr::slice_tail(n = window) %>%
+      dplyr::left_join(
+        projection_section_history_for_row(
+          section_history, row, before_term = row$target_term
+        ) %>%
+          dplyr::select(term, scheduled_capacity),
+        by = "term"
+      )
+    fill <- projection_capacity_metrics(
+      recent$first_day_enrl, recent$scheduled_capacity,
+      reached_threshold = threshold
+    )
+    judged <- recent$term[fill$capacity_usable]
+    short <- fill$capacity_usable & !fill$capacity_reached
+    terms_text <- function(terms) {
+      paste(vapply(terms, fmt_term, character(1)), collapse = ", ")
+    }
+
+    spine <- row$observed_baseline
+    waiting <- dplyr::coalesce(as.integer(row$adjusted_waitlisted_prior), 0L)
+    rate <- row$adjusted_feeder_change_rate
+    preceding <- if (is.na(row$adjusted_preceding_term)) "the term just finished" else
+      fmt_term(row$adjusted_preceding_term)
+    always_full <- length(judged) >= min_terms && !any(short)
+    feeders_fell <- is.finite(rate) && rate <= -decline
+
+    applied <- is.finite(spine) && spine > 0 &&
+      is.finite(row$projected_classlist_total) && always_full && !feeders_fell
+    already <- if (identical(row$method_id, "spine_adjusted")) {
+      dplyr::coalesce(as.numeric(row$adjusted_floor_uplift), 0)
+    } else 0
+    unserved <- max(share * spine, waiting)
+    bump <- if (applied) round(max(0, unserved - already)) else 0
+
+    full_text <- paste0(
+      "near full on the first day in every recent ", season,
+      " with a first-day count (", terms_text(judged), ")"
+    )
+    feeder_text <- if (is.finite(rate)) {
+      # One decimal: a whole percent printed -5% on both sides of the line.
+      paste0("feeder courses moved ", sprintf("%+.1f%%", 100 * rate),
+             " in ", preceding)
+    } else {
+      switch(
+        dplyr::coalesce(row$adjusted_feeder_check, "unmeasurable"),
+        term_not_observed = paste0(
+          "feeder courses in ", preceding,
+          " are not observed yet; recheck when they settle"
+        ),
+        no_course_baseline = paste0(
+          "the feeder check needs the course's own enrollment in ", preceding,
+          " and a year before, so it could not run"
+        ),
+        no_feeders = "no feeder courses met the evidence threshold, so the feeder check could not run",
+        "the feeder change could not be measured, so the feeder check could not run"
+      )
+    }
+    sentence_case <- function(x) paste0(toupper(substr(x, 1, 1)), substring(x, 2))
+    note <- if (!is.finite(spine) || spine <= 0) {
+      "No pressure bump: no prior same-season registrations to raise"
+    } else if (!is.finite(row$projected_classlist_total)) {
+      "No pressure bump: no projection to raise"
+    } else if (nrow(recent) < min_terms) {
+      paste0(
+        "No pressure bump: only ", nrow(recent), " ", season, " offering",
+        if (nrow(recent) == 1L) "" else "s", " on record, and the bump needs ",
+        min_terms, " with a first-day count"
+      )
+    } else if (length(judged) < min_terms) {
+      paste0(
+        "No pressure bump: ", length(judged), " of the last ", nrow(recent), " ",
+        season, " offerings ha", if (length(judged) == 1L) "s" else "ve",
+        " a first-day count", if (length(judged) > 0L) {
+          paste0(" (", terms_text(judged), ")")
+        } else "",
+        ", and the bump needs ", min_terms
+      )
+    } else if (any(short)) {
+      paste0(
+        "No pressure bump: ",
+        paste0(
+          vapply(recent$term[short], fmt_term, character(1)), " filled ",
+          scales::percent(fill$capacity_fill[short], accuracy = 0.1),
+          collapse = " and "
+        ),
+        " of its seats on the first day, below the ",
+        scales::percent(threshold, accuracy = 1), " near-full line"
+      )
+    } else if (feeders_fell) {
+      paste0(
+        "No pressure bump: ", full_text, ", but ", feeder_text,
+        ", a fall of ", scales::percent(decline, accuracy = 1), " or more"
+      )
+    } else {
+      sized_by <- if (waiting > share * spine) {
+        paste0(
+          "planned for the ", waiting, " students left waiting, more than ",
+          share_label, " of last ", season, "'s ",
+          format(round(spine), big.mark = ","), " registrations"
+        )
+      } else {
+        paste0(
+          "planned for ", share_label, " more than last ", season, "'s ",
+          format(round(spine), big.mark = ","), " registrations",
+          if (waiting > 0L) paste0(" (", waiting, " students were left waiting)") else ""
+        )
+      }
+      paste0(
+        "Pressure bump +", format(bump, big.mark = ","), ": ", full_text,
+        ", so its registrations were capped by its seats; ", sized_by,
+        if (already > 0) {
+          paste0("; the published projection already adds ", round(already),
+                 " of them")
+        } else "",
+        ". ", sentence_case(feeder_text), "."
+      )
+    }
+
+    tibble::tibble(
+      market_id = row$market_id, subject_course = row$subject_course,
+      term_type = row$term_type, target_term = row$target_term,
+      pressure_judged_terms = as.integer(length(judged)),
+      pressure_full_terms = as.integer(sum(fill$capacity_reached)),
+      pressure_bump_applied = applied,
+      pressure_bump = as.numeric(bump),
+      pressure_bump_note = note
+    )
+  }))
+}
+
+
 add_projection_recommendations <- function(selected, candidates, pressure_screen,
                                            enrollment_history, section_history,
                                            opt = list()) {
@@ -3489,7 +3767,7 @@ add_projection_recommendations <- function(selected, candidates, pressure_screen
     enrollment_history, section_history, selected$target_term[[1]], opt
   )
 
-  selected %>%
+  joined <- selected %>%
     dplyr::left_join(
       dplyr::select(
         pressure_screen,
@@ -3507,7 +3785,13 @@ add_projection_recommendations <- function(selected, candidates, pressure_screen
     dplyr::left_join(spread, by = keys) %>%
     dplyr::left_join(pairing, by = keys) %>%
     dplyr::left_join(capacity_context, by = keys) %>%
-    dplyr::left_join(stability, by = keys) %>%
+    dplyr::left_join(stability, by = keys)
+  pressure <- projection_pressure_bump(
+    enrollment_history, section_history, joined, opt
+  )
+
+  joined %>%
+    dplyr::left_join(pressure, by = keys) %>%
     dplyr::mutate(
       expansion_pairs = as.integer(expansion$n_pairs),
       expansion_fill_rate = as.numeric(expansion$fill_rate),
@@ -3531,10 +3815,15 @@ add_projection_recommendations <- function(selected, candidates, pressure_screen
         }
         if (!is.finite(target_size) || target_size <= 0) NA_real_ else target_size
       },
-      # Seats are compared with EXPECTED FIRST-DAY OCCUPANCY, not with the
-      # class-list demand headline: ever-registered runs above the first day
-      # because every early drop frees a seat someone else takes.
-      seat_gap = round(projected_first_day_equivalent - scheduled_capacity),
+      # Seats are planned for REGISTRATIONS, not expected first-day occupancy
+      # (0.23.0): projected registrations plus any pressure bump. Registrations
+      # run above the first day because every early drop frees a seat someone
+      # else takes, and that margin is kept on purpose: running short of seats
+      # costs more than an empty one. Sized on the first day, 61% of 207 past
+      # aftcasts planned fewer seats than were filled on day one; sized on
+      # registrations, 32% (forecasting-lessons.md).
+      planned_registrations = projected_classlist_total + pressure_bump,
+      seat_gap = round(planned_registrations - scheduled_capacity),
       projected_over_capacity = pmax(0, seat_gap),
       capacity_limit_signal = target_schedule_available &
         target_capacity_reached & projected_over_capacity > 0,
@@ -3542,9 +3831,7 @@ add_projection_recommendations <- function(selected, candidates, pressure_screen
         !target_schedule_available ~ "Target schedule unavailable",
         !is.finite(projected_classlist_total) ~
           "Insufficient history for a registration-demand estimate",
-        !is.finite(projected_first_day_equivalent) ~
-          "Insufficient first-day history for a seat comparison",
-        projected_over_capacity <= 0 ~ "Expected first-day enrollment fits scheduled capacity",
+        projected_over_capacity <= 0 ~ "Planned registrations fit scheduled capacity",
         capacity_limit_signal ~ "Seat ceiling likely limits observed enrollment",
         TRUE ~ "Projected demand exceeds planned capacity"
       ),
@@ -3553,27 +3840,27 @@ add_projection_recommendations <- function(selected, candidates, pressure_screen
           "No target schedule is available for a seat-ceiling check",
         !is.finite(projected_classlist_total) ~
           "Class-list demand is not yet stable",
-        !is.finite(projected_first_day_equivalent) ~
-          "First-day retention cannot be measured from the comparable history",
         projected_over_capacity <= 0 ~ paste(
-          round(scheduled_capacity - projected_first_day_equivalent),
-          "planned seat(s) remain above expected first-day occupancy"
+          round(scheduled_capacity - planned_registrations),
+          "planned seat(s) remain above planned registrations"
         ),
         capacity_limit_signal ~ paste0(
-          "Expected first-day enrollment exceeds capacity by ",
+          "Planned registrations exceed capacity by ",
           round(projected_over_capacity), "; ",
           round(target_available_seats),
           " seat(s) are currently unoccupied"
         ),
         TRUE ~ paste0(
-          "Expected first-day enrollment exceeds capacity by ",
+          "Planned registrations exceed capacity by ",
           round(projected_over_capacity), "; active registration fill is ",
           scales::percent(target_active_fill, accuracy = 0.1)
         )
       ),
       recommended_sections = projection_sections_for_demand(
-        projected_first_day_equivalent, reference_section_size
+        planned_registrations, reference_section_size
       ),
+      pressure_bump_sections = recommended_sections -
+        projection_sections_for_demand(projected_classlist_total, reference_section_size),
       additional_sections = projection_additional_sections(
         recommended_sections, scheduled_sections
       ),
@@ -3630,15 +3917,13 @@ add_projection_recommendations <- function(selected, candidates, pressure_screen
       recommendation = dplyr::case_when(
         !is.finite(projected_classlist_total) ~ "Insufficient history",
         projected_classlist_total <= 0 ~ "No projected demand",
-        !is.finite(projected_first_day_equivalent) ~
-          "Insufficient first-day history",
         !target_schedule_available & !is.na(recommended_sections) &
           adjusted_saturated_prior %in% TRUE ~
           paste("Plan at least", recommended_sections, "section(s); prior term was saturated"),
         !target_schedule_available & !is.na(recommended_sections) ~
           paste("Plan", recommended_sections, "section(s)"),
-        is.finite(projection_high_first_day_equivalent) &
-          projection_high_first_day_equivalent <= scheduled_capacity ~
+        is.finite(projection_high) &
+          projection_high + pressure_bump <= scheduled_capacity ~
           "Capacity appears sufficient",
         !is.na(additional_sections) & additional_sections > 0 &
           (scheduled_sections == 0L |
@@ -3883,7 +4168,10 @@ validate_enrollment_projection_bundle <- function(bundle) {
       "adjusted_floor_basis", "adjusted_delta_repeat", "adjusted_delta_feeder",
       "adjusted_regime_alarm", "adjusted_delta_basis",
       "expansion_pairs", "expansion_fill_rate", "expansion_note",
-      "floor_note", "regime_note"),
+      "floor_note", "regime_note", "reference_section_size",
+      "pressure_judged_terms", "pressure_full_terms", "pressure_bump_applied",
+      "pressure_bump", "pressure_bump_note", "planned_registrations",
+      "pressure_bump_sections"),
     "validate_enrollment_projection_bundle() projections"
   )
   projection_require_columns(
@@ -4018,6 +4306,9 @@ validate_enrollment_projection_bundle <- function(bundle) {
   }
   validate_spine_rows(
     bundle$candidates, "validate_enrollment_projection_bundle() candidates"
+  )
+  validate_pressure_bump_rows(
+    bundle$projections, "validate_enrollment_projection_bundle() projections"
   )
   if (nrow(bundle$backtests) > 0) {
     validate_spine_rows(

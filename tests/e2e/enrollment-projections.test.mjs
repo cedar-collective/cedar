@@ -42,7 +42,6 @@ async function closeEvidence(page) {
     'enrollment_projections-course',
     'enrollment_projections-stability',
     'enrollment_projections-accuracy',
-    'enrollment_projections-download',
     'enrollment_projections-projection_table',
     'enrollment_projections-scenario_population',
     'enrollment_projections-scenario_growth',

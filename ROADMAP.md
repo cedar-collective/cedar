@@ -155,6 +155,10 @@ The projection contract and measured lessons are documented in
 - [ ] Carry a waitlist into the next term, as a change from the year before,
   once two years of retained waitlists exist (27% of Summer 2026's unserved
   students took the course in Fall 2026).
+- [ ] Measure the pressure bump instead of assuming it. It is a flat 10% (or
+  the students left waiting, if more) for a course always near full; once two
+  years of retained waitlists exist, size it per course from how many waiting
+  students came back and how far added seats filled, and score it.
 - [ ] Any new candidate enters only as a challenger scored rolling against the
   spine; none is added on in-sample fit.
 - [ ] Shape the reusable course-history spine so it supports section-needs

@@ -58,6 +58,9 @@ enrollment_projection_method_guide_ui <- function(guide) {
 
 enrollmentProjectionsUI <- function(id) {
   ns <- NS(id)
+  defaults <- enrollment_projection_defaults()
+  bump_share <- scales::percent(defaults$pressure_bump_share, accuracy = 1)
+  bump_decline <- scales::percent(defaults$pressure_bump_feeder_decline, accuracy = 1)
   tagList(
     filter_bar(
       "Enrollment Projections",
@@ -103,17 +106,6 @@ enrollmentProjectionsUI <- function(id) {
             ns("accuracy"), "Aftcast accuracy", multiple = TRUE,
             choices = c("Close", "Fair", "Poor", "Unrated")
           )
-        ),
-        column(
-          1,
-          tags$div(
-            class = "enrollment-projection-export",
-            downloadButton(
-              ns("download"), label = NULL, icon = icon("download"),
-              title = "Export filtered projections",
-              class = "btn-outline-secondary btn-sm"
-            )
-          )
         )
       ),
       checkboxInput(
@@ -128,11 +120,12 @@ enrollmentProjectionsUI <- function(id) {
     tags$p(
       class = "enrollment-projection-lead",
       paste(
-        "Each row plans one course for the target term. Sections and seats",
-        "start from last year's same-term enrollment; a course that filled its",
-        "seats last time is treated as a floor, and a course whose enrollment",
-        "moved sharply in the term just finished is flagged for a look. The",
-        "range is where past forecasts for that course usually landed."
+        "Each row plans one course for the target term. Sections are planned",
+        "for registrations, which start from last year's same-term",
+        "registrations; a course that is always full gets a pressure bump on",
+        "top, and a course whose enrollment moved sharply in the term just",
+        "finished is flagged for a look. The range is where past forecasts",
+        "for that course usually landed."
       )
     ),
     info_panel(
@@ -144,26 +137,41 @@ enrollmentProjectionsUI <- function(id) {
                 " with its academic department beneath."),
         tags$li(tags$strong("Sections"),
                 paste(
-                  " to plan: day-1 seats divided by the section size (the",
-                  "target schedule's average, otherwise the recent median),",
-                  "rounded up. It is a planning conversion, not a forecast of",
-                  "what will be scheduled. A course that filled its seats last",
-                  "term reads as a floor."
+                  " to plan: registrations plus any pressure bump, divided by",
+                  "the section size (the target schedule's average, otherwise",
+                  "the recent median), rounded up. It is a planning conversion,",
+                  "not a forecast of what will be scheduled. A course that",
+                  "filled its seats last term reads as a floor."
+                )),
+        tags$li(tags$strong("Pressure bump"),
+                paste(
+                  " is what the plan adds for a course near full on the first",
+                  "day in every recent same-season term with a first-day count:",
+                  "its registrations were capped by its seats, so it is planned",
+                  "for", bump_share, "more than last time, or for the students",
+                  "left waiting if that is more, unless its feeder courses just",
+                  "fell", bump_decline, "or more. When near-full courses were",
+                  "given 10% or more seats, the new seats filled. Beneath it,",
+                  "the sections the bump adds. The registration forecast and",
+                  "its accuracy do not include it."
+                )),
+        tags$li(tags$strong("Registrations"),
+                paste(
+                  " is everyone expected to sign up, including students who",
+                  "drop before or after classes begin: the class-list demand",
+                  "the model forecasts, and the number sections are planned",
+                  "for. It runs above first-day seats, and that margin is",
+                  "deliberate: running short of seats costs more than an",
+                  "empty one. Beneath it, the range past forecasts for this",
+                  "course usually landed in and the change on the last",
+                  "same-season term's registrations."
                 )),
         tags$li(tags$strong("Seats (day 1)"),
                 paste(
                   " is how many students are expected to hold a seat when",
                   "classes begin: registrations times the share of this",
                   "course's registrants still enrolled on the first day in",
-                  "recent terms. Sections are planned for this number. Beneath",
-                  "it, the range past forecasts for this course usually landed in."
-                )),
-        tags$li(tags$strong("Registrations"),
-                paste(
-                  " is everyone expected to sign up, including students who",
-                  "drop before or after classes begin: the class-list demand",
-                  "the model forecasts. Beneath it, the change on the last",
-                  "same-season term's registrations."
+                  "recent terms. It is context, not the planning number."
                 )),
         tags$li(tags$strong("First day / sections"),
                 paste(
@@ -236,6 +244,7 @@ enrollmentProjectionsUI <- function(id) {
             "deltas, capacity, and full method evidence."
           )
         ),
+        uiOutput(ns("pressure_summary")),
         tags$div(
           class = "enrollment-projection-table-flow cedar-clickable-rows",
           reactable::reactableOutput(ns("projection_table"), height = NULL)
@@ -467,6 +476,13 @@ enrollmentProjectionsServer <- function(id, bundles, load_bundle, programs) {
       empty_state("No validated enrollment projection bundle is available.")
     })
 
+    output$pressure_summary <- renderUI({
+      tags$p(
+        class = "enrollment-projection-lead",
+        view()$meta$pressure_bump$sentence
+      )
+    })
+
     output$scope <- renderUI({
       data <- view()
       provenance <- data$meta$model_provenance
@@ -528,8 +544,8 @@ enrollmentProjectionsServer <- function(id, bundles, load_bundle, programs) {
         session$ns("selected_course")
       ))
       # Sized to fit a laptop-width window without horizontal scrolling: the
-      # department sits under the course, the range under the seats, the change
-      # under the registrations, and the method and its evidence in the modal.
+      # department sits under the course, the range and the change under the
+      # registrations, and the method and its evidence in the modal.
       reactable::reactable(
         data,
         theme = cedar_tbl_theme,
@@ -555,45 +571,58 @@ enrollmentProjectionsServer <- function(id, bundles, load_bundle, programs) {
             header = htmltools::span(
               "Sections",
               title = paste(
-                "Sections to plan: day-1 seats divided by the section size,",
-                "rounded up; a floor when last term filled its seats"
+                "Sections to plan: registrations plus any pressure bump,",
+                "divided by the section size and rounded up; a floor when last",
+                "term filled its seats"
               )
             ),
             format = reactable::colFormat(separators = TRUE, digits = 0),
             na = "—"
           ),
-          expected_first_day = reactable::colDef(
-            name = "Seats (day 1)", align = "right", minWidth = 100,
+          pressure_bump = reactable::colDef(
+            name = "Pressure bump", align = "right", minWidth = 90,
             header = htmltools::span(
-              "Seats (day 1)",
+              "Pressure bump",
               title = paste(
-                "Students expected to hold a seat when classes begin, with the",
-                "range past forecasts for this course usually landed in"
+                "Registrations added to the plan because the course was near",
+                "full on the first day in every recent same-season term, and",
+                "the sections that adds. Click the course for why"
               )
             ),
             cell = function(value, index) {
+              if (!isTRUE(value > 0)) return("—")
+              added <- data$pressure_bump_sections[[index]]
               htmltools::tagList(
-                count_text(value),
-                if (!is.na(data$seats_range[[index]])) {
-                  htmltools::div(class = "text-note", data$seats_range[[index]])
+                paste0("+", count_text(value)),
+                if (isTRUE(added > 0)) {
+                  htmltools::div(
+                    class = "text-note",
+                    paste0("+", added, " section", if (added == 1L) "" else "s")
+                  )
                 }
               )
             }
           ),
-          seats_range = reactable::colDef(show = FALSE),
+          pressure_bump_sections = reactable::colDef(show = FALSE),
+          pressure_bump_note = reactable::colDef(show = FALSE),
           projected_demand = reactable::colDef(
             name = "Registrations", align = "right", minWidth = 105,
             header = htmltools::span(
               "Registrations",
               title = paste(
                 "Everyone expected to register, including students who later",
-                "drop, and the change on last", season, "term"
+                "drop: the number sections are planned for. Beneath it, the",
+                "range past forecasts for this course usually landed in and",
+                "the change on last", season, "term"
               )
             ),
             cell = function(value, index) {
               change <- data$change_vs_last[[index]]
               htmltools::tagList(
                 count_text(value),
+                if (!is.na(data$demand_range[[index]])) {
+                  htmltools::div(class = "text-note", data$demand_range[[index]])
+                },
                 if (is.finite(change)) {
                   htmltools::div(
                     class = "text-note",
@@ -603,7 +632,20 @@ enrollmentProjectionsServer <- function(id, bundles, load_bundle, programs) {
               )
             }
           ),
+          demand_range = reactable::colDef(show = FALSE),
           change_vs_last = reactable::colDef(show = FALSE),
+          expected_first_day = reactable::colDef(
+            name = "Seats (day 1)", align = "right", minWidth = 100,
+            header = htmltools::span(
+              "Seats (day 1)",
+              title = paste(
+                "Students expected to hold a seat when classes begin. Fewer",
+                "than registrations, because a student who drops early frees",
+                "a seat someone else takes"
+              )
+            ),
+            cell = function(value, index) count_text(value)
+          ),
           recent_first_day = reactable::colDef(
             name = paste("Last", season, "terms"), minWidth = 190,
             sortable = FALSE, searchable = FALSE,
@@ -720,6 +762,7 @@ enrollmentProjectionsServer <- function(id, bundles, load_bundle, programs) {
             if (is.na(current$recommended_sections)) "Unavailable" else
               format(current$recommended_sections, big.mark = ",")
           ),
+          tags$dt("Pressure bump"), tags$dd(current$pressure_bump_note),
           tags$dt("Planning recommendation"), tags$dd(current$recommendation),
           tags$dt("Saturation floor"), tags$dd(current$floor_note),
           tags$dt("Fall deltas"),
@@ -919,25 +962,6 @@ enrollmentProjectionsServer <- function(id, bundles, load_bundle, programs) {
         )
       )
     })
-
-    output$download <- downloadHandler(
-      filename = function() {
-        paste0(
-          "cedar-enrollment-projections-", view()$meta$target_term, ".csv"
-        )
-      },
-      content = function(file) {
-        export <- view()$table %>%
-          dplyr::select(-recent_first_day, -recent_sections) %>%
-          dplyr::rename(
-            sections_to_plan = planning_sections,
-            seats_on_first_day = expected_first_day,
-            registrations = projected_demand,
-            basis = method
-          )
-        utils::write.csv(export, file, row.names = FALSE, na = "")
-      }
-    )
 
     # ---- Scenario sub-tab ---------------------------------------------------
     # Inputs in, feature call, render out. The arithmetic, the guards, and the

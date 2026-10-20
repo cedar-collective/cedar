@@ -40,6 +40,7 @@ between the two population models.
 
 | Model | Bundle schema | Calculation contract | Evidence |
 |---|---:|---|---|
+| `0.23.0` | 22 | Planning sections, the seat gap and the recommendation are sized for registrations, not expected first-day seats, plus a pressure bump for a course always near full (10%, or its students left waiting if more) unless its feeders just fell 5% or more; the forecast and its accuracy are unchanged | [Sections sized for registrations again](#sections-sized-for-registrations-again-model-0230-2026-10-18) and [The pressure bump](#the-pressure-bump-model-0230-2026-10-18) below |
 | `0.22.0` | 21 | The saturation floor is the spine plus the students still waiting who are on no campus's class list in the market; it was first-day enrollment plus the waitlist, which early-drop churn absorbed | [What the 0.21.0 audit found](#what-the-0210-audit-found-2026-10-18) below; ISSUES.md I27 |
 | `0.21.0` | 21 | Seats judged and sized on the first day of classes: saturation, capacity reached (98% first-day fill), and section sizing read reconstructed first-day enrollment | [Capacity Censoring](enrollment-projections.html#capacity-censoring); ISSUES.md I26 |
 | `0.20.0` | 20 | Two candidates: the prior same-season spine and spine + saturation floor + Fall enrollment deltas; rolling selection; every other candidate and bias correction retired | [Spring 2027 audit, 0.20.0](#spring-2027-audit-model-0200) below |
@@ -380,6 +381,98 @@ Three readings:
    its accuracy cannot be measured until Summer and Fall 2026 waitlists become
    spine terms for Fall 2027 and later.
 
+## Sections sized for registrations again (model 0.23.0, 2026-10-18)
+
+0.19.0 stopped sizing sections from registrations because they recommended 596
+sections against 505 scheduled, and 0.21.0 moved the conversion from census to
+the first day. Both judged the plan against what had been *scheduled*. Judged
+against what was *filled*, the first-day plan runs short. On the 0.22.0
+bundles' 207 aftcasts with a known first day (104 Spring, 103 Fall), comparing
+the published rule's planned seats with the students actually seated on day
+one:
+
+| Planned seats | Short of day one | Seats short | Seats spare |
+|---|---:|---:|---:|
+| Expected first-day seats (0.21.0, 0.22.0) | 61% | 5,558 | 2,140 |
+| Projected registrations (0.23.0) | 32% | 3,877 | 3,867 |
+| Expected first-day seats + 10% | 33% | 3,442 | 4,706 |
+
+147 of the 207 course-terms were full on day one, where the first day is
+capped by the seats offered, so for them the shortfall is a minimum. The
+first-day plan is centred on last year's first day, and these courses were
+mostly growing (actual over planned, median 1.028) and mostly full. The
+registration margin is a median 8% (10th to 90th percentile, 4% to 16%); it is
+largest where early-drop churn is largest, not where the forecast is least
+certain, but it correlates 0.35 with how far the actual overshot, and it puts
+seats short and spare in balance. Running short of seats costs more than an
+empty one, so the margin is kept on purpose.
+
+Recomputed on the 0.22.0 bundles (no other number changes):
+
+| Evidence | Spring 2027 | Fall 2027 |
+|---|---:|---:|
+| Planning sections, first-day sizing | 449 | 524 |
+| Planning sections, registration sizing | 495 | 559 |
+| Planning sections, with the pressure bump (below) | 514 | 599 |
+| Rows whose sections change | 36 of 58 | 28 of 62 |
+| Sections in each course's latest same-season offering | 427 | 502 |
+
+A coverage level chosen as policy is the deliberate version of this margin:
+plan seats so that past forecasts would have covered, say, 8 terms in 10. On
+this record that is the first-day plan plus 21%. Registrations are the simpler
+rule and do as well as a flat 10%.
+
+## The pressure bump (model 0.23.0, 2026-10-18)
+
+A near-full course's registrations follow its seats, not its demand. On the
+0.22.0 bundles' aftcasts, 330 course-terms have both terms' capacity and a
+judged prior term:
+
+| After a near-full term (90%+ on day one), next term's seats | Course-terms | Median registration change | Share of the seat change registrations followed |
+|---|---:|---:|---:|
+| Up 10% or more | 89 | +28.6% | 100% |
+| Within 10% | 139 | 0.0% | — |
+| Down 10% or more | 51 | −33.3% | 100% |
+
+So last year's count understates what an always-full course would draw. Until
+retained waitlists can measure it, the plan adds a stated allowance: 10% (the
+smallest expansion that record counts), or the students left waiting if that is
+more, for a course near full on the first day in every one of its last three
+same-season offerings with a known first day (at least two), unless its feeder
+courses' enrollment fell 5% or more in the term just finished. The expansions
+were chosen by schedulers who probably knew where demand was, so the record
+shows that informed expansions filled, not how much the 139 held-flat courses
+turned away: the 10% is an allowance, not a measurement, and the page says so.
+
+It raises `planned_registrations` and the sections only. The forecast, WAPE and
+the accuracy axes are untouched, because a full course's registrations are
+capped and would score any allowance for the demand it turned away as
+over-projection. Rebuilt on the same data and cutoff:
+
+| Evidence | Spring 2027 | Fall 2027 |
+|---|---:|---:|
+| Courses bumped | 47 of 58 | 58 of 62 |
+| Registrations added | 778 (10.0% of their projections) | 1,392 (10.2%) |
+| Bumps sized by the students left waiting | 0 | 9 |
+| Sections added | 19, in 17 courses | 40, in 22 courses |
+| Denied: a recent term below 90% on day one | 6 | 1 |
+| Denied: feeders fell 5% or more | 4 | 0 |
+| Denied: too few terms with a first-day count | 1 | 3 |
+| Forecast and published WAPE | unchanged | unchanged |
+
+Three readings:
+
+1. **Fall 2027 cannot run the feeder check.** Its feeders' term, Spring 2027,
+   is not observed yet, so every Fall bump says so and asks for a recheck
+   when it settles; the check runs for Spring 2027, where it denied four.
+2. **The pressure screen selects full courses**, so most monitored rows get the
+   bump: it is close to a 10% raise on the always-full core, and the page
+   states the total above the table.
+3. **Two Fall denials are I28, not the course.** ENGL 1120 and MATH 1350 have
+   one Fall with a first-day count because the Fall 2026 class list was pulled
+   before their second-half sessions began (ISSUES.md I28); both were near full
+   in Fall 2025.
+
 ## Lessons From the Retired Experiments
 
 The retired forecasting code tried useful ideas, especially major and
@@ -488,7 +581,9 @@ or progression eligibility. Those require leakage-safe course-specific tests.
    adjustment and checked against the actuals afterwards. MATH 1220 and FYEX
    1010 move for reasons no feeder or demand model can see.
 4. **Carry a waitlist into the next term** as a change from the year before,
-   once a second year of waitlists exists to measure the change against.
+   once a second year of waitlists exists to measure the change against. The
+   same evidence should replace the pressure bump's flat 10% with a measured,
+   per-course allowance.
 5. Select between candidates over the pooled course set, not per course: three
    or four aftcasts per course cannot separate a 1.2-point pooled gain from
    noise, which is why the adjusted candidate leads pooled on Spring yet is

@@ -115,7 +115,7 @@ build_enrollment_projection_scenario <- function(bundle, programs = NULL,
 
   courses <- published %>%
     dplyr::select(
-      subject_course, department, projected_classlist_total,
+      subject_course, department, projected_classlist_total, pressure_bump,
       first_day_retention_rate, reference_section_size, scheduled_sections,
       target_schedule_available, method_label, stability, depth, accuracy
     ) %>%
@@ -158,12 +158,13 @@ build_enrollment_projection_scenario <- function(bundle, programs = NULL,
           population_students = population_cohort * (1 + config$growth_rate)^(year - 1L),
           projected_classlist_total = projected_classlist_total +
             population_cohort * growth_multiple,
-          # Sections are sized from expected first-day occupancy, exactly as the
-          # published row sizes them, so year 1 at any rate reproduces it.
+          # Sections are sized from registrations plus the published pressure
+          # bump, held at its published size, exactly as the published row
+          # sizes them, so year 1 at any rate reproduces it.
           projected_first_day_equivalent =
             projected_classlist_total * first_day_retention_rate,
           recommended_sections = projection_sections_for_demand(
-            projected_first_day_equivalent, reference_section_size
+            projected_classlist_total + pressure_bump, reference_section_size
           ),
           additional_sections = projection_additional_sections(
             recommended_sections, scheduled_sections
@@ -174,7 +175,7 @@ build_enrollment_projection_scenario <- function(bundle, programs = NULL,
       dplyr::select(
         subject_course, department, year_index, target_term, target_term_label,
         basis, baseline_students, population_cohort, population_share,
-        population_students, projected_classlist_total,
+        population_students, projected_classlist_total, pressure_bump,
         projected_first_day_equivalent, reference_section_size,
         scheduled_sections, target_schedule_available, recommended_sections,
         additional_sections, method_label, stability, depth, accuracy
@@ -218,7 +219,8 @@ build_enrollment_projection_scenario <- function(bundle, programs = NULL,
       "The population's headcount grows ",
       scales::percent(config$growth_rate, accuracy = 0.1),
       " a year and its students keep taking each course at today's rate. ",
-      "Everyone else in the course is held flat."
+      "Everyone else in the course is held flat. Sections include each ",
+      "course's published pressure bump, held at its published size."
     )
   )
 }
@@ -231,7 +233,8 @@ build_enrollment_projection_scenario <- function(bundle, programs = NULL,
     target_term_label = character(), basis = character(),
     baseline_students = integer(), population_cohort = integer(),
     population_share = numeric(), population_students = numeric(),
-    projected_classlist_total = numeric(), reference_section_size = numeric(),
+    projected_classlist_total = numeric(), pressure_bump = numeric(),
+    reference_section_size = numeric(),
     scheduled_sections = integer(), target_schedule_available = logical(),
     recommended_sections = integer(), additional_sections = integer(),
     method_label = character(), stability = character(),
