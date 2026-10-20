@@ -14,8 +14,8 @@
 #
 #   CEDAR_PROD_SSH          login@host for ssh/sftp                  (required)
 #   CEDAR_PROD_DATA_DIR     production's data directory              (required)
-#   CEDAR_PROD_OUTPUT_DIR   production's output directory, for --projections
-#                           (default: the data directory's sibling "output")
+#   CEDAR_PROD_OUTPUT_DIR   production's output directory (<repo>/output there);
+#                           required for --projections, never guessed
 #   CEDAR_PROD_SSH_PORT     ssh port                                 (default: 22)
 #   CEDAR_PROD_SSH_KEY      private key for that login, when it is not
 #                           one ssh offers by default         (default: none)
@@ -83,7 +83,8 @@ LOCAL_OUTPUT_DIR="$REPO_ROOT/output/projections"
 
 [[ -n "$CEDAR_PROD_SSH" ]] || die "Set CEDAR_PROD_SSH (login@host) in the environment or .env"
 [[ -n "$CEDAR_PROD_DATA_DIR" ]] || die "Set CEDAR_PROD_DATA_DIR (production's data directory) in the environment or .env"
-CEDAR_PROD_OUTPUT_DIR="${CEDAR_PROD_OUTPUT_DIR:-$(dirname "$CEDAR_PROD_DATA_DIR")/output}"
+! $PROJECTIONS || [[ -n "$CEDAR_PROD_OUTPUT_DIR" ]] ||
+  die "--projections needs CEDAR_PROD_OUTPUT_DIR (production's <repo>/output) in the environment or .env"
 [[ -d "$LOCAL_DATA_DIR" ]] || die "Local data directory does not exist: $LOCAL_DATA_DIR"
 
 KEY_OPTS=()
