@@ -112,6 +112,14 @@ enrollment_projection_defaults <- function() {
     pressure_bump_window = 3L,
     pressure_bump_min_terms = 2L,
     pressure_bump_feeder_decline = 0.05,
+    # Seat consistency (0.23.0): over the past forecast terms behind a
+    # course's reliability, how often its scheduled seats moved by
+    # seat_consistency_change or more from the previous same-season offering.
+    # None is High, up to seat_consistency_moderate_max_moves is Moderate,
+    # more is Low. Most past error came from terms whose seats moved, so a Low
+    # reliability with High seat consistency is a miss the forecast made.
+    seat_consistency_change = 0.10,
+    seat_consistency_moderate_max_moves = 1L,
     regime_alarm_threshold = 0.25,
     # Rolling selection: prior same-season is the default. A challenger
     # replaces it for a target only when, on at least selection_min_backtests
@@ -2852,6 +2860,8 @@ empty_enrollment_projections <- function() {
       pressure_bump_applied = logical(), pressure_bump = numeric(),
       pressure_bump_note = character(), planned_registrations = numeric(),
       pressure_bump_sections = integer(),
+      seat_consistency = character(), seat_consistency_reason = character(),
+      seat_consistency_terms = integer(), seat_consistency_moves = integer(),
       expansion_pairs = integer(), expansion_fill_rate = numeric(),
       expansion_note = character(), floor_note = character(),
       regime_note = character(),
@@ -3208,9 +3218,13 @@ select_projection_methods <- function(candidates, performance, backtests,
         dplyr::coalesce(n_backtests, 0L) <
           as.integer(projection_option(opt, "accuracy_min_aftcasts")) ~ "Unrated",
         !is.finite(wape) ~ "Unrated",
-        wape <= as.numeric(projection_option(opt, "accuracy_close_max_wape")) ~ "Close",
-        wape <= as.numeric(projection_option(opt, "accuracy_fair_max_wape")) ~ "Fair",
-        TRUE ~ "Poor"
+        # Shown to readers as Reliability: High, Moderate, Low (0.23.0; it
+        # was Close, Fair, Poor). Read it beside seat_consistency: a Low
+        # course whose seats kept moving missed with the schedule; a Low
+        # course whose seats held is a miss the forecast made.
+        wape <= as.numeric(projection_option(opt, "accuracy_close_max_wape")) ~ "High",
+        wape <= as.numeric(projection_option(opt, "accuracy_fair_max_wape")) ~ "Moderate",
+        TRUE ~ "Low"
       ),
       accuracy_reason = dplyr::case_when(
         method_id == "none" ~ "No applicable method",
@@ -3731,6 +3745,216 @@ projection_pressure_bump <- function(enrollment_history, section_history, rows,
 }
 
 
+# ---- Why past forecasts missed ------------------------------------------------
+#
+# Each past forecast term is tagged with the conditions it was made under: how
+# far the course's scheduled seats moved from its previous same-season
+# offering (fold_seat_change), and whether that previous offering was near
+# full on the first day (fold_prior_near_full; NA when its first day or seats
+# are unknown). A near-full course's registrations follow its seats, so these
+# two separate a miss the schedule caused from a miss the forecast made. They
+# feed seat consistency and the error-source summary.
+annotate_projection_fold_conditions <- function(backtests, enrollment_history,
+                                                section_history, opt = list()) {
+  if (nrow(backtests) == 0L) {
+    return(dplyr::mutate(
+      backtests, fold_seat_change = numeric(), fold_prior_near_full = logical()
+    ))
+  }
+  keys <- c("market_id", "subject_course", "term_type")
+  projection_require_columns(
+    backtests, c(keys, "target_term"), "annotate_projection_fold_conditions()"
+  )
+  threshold <- as.numeric(projection_option(opt, "saturation_fill_threshold"))
+  offerings <- section_history %>%
+    dplyr::distinct(dplyr::across(dplyr::all_of(c(keys, "term"))), scheduled_capacity) %>%
+    dplyr::left_join(
+      enrollment_history %>%
+        dplyr::select(dplyr::all_of(c(keys, "term")), first_day_enrl),
+      by = c(keys, "term")
+    ) %>%
+    dplyr::arrange(dplyr::across(dplyr::all_of(keys)), term) %>%
+    dplyr::group_by(dplyr::across(dplyr::all_of(keys))) %>%
+    dplyr::mutate(
+      prior_capacity = dplyr::lag(scheduled_capacity),
+      prior_first_day = dplyr::lag(first_day_enrl)
+    ) %>%
+    dplyr::ungroup()
+  prior_fill <- projection_capacity_metrics(
+    offerings$prior_first_day, offerings$prior_capacity,
+    reached_threshold = threshold
+  )
+  offerings <- offerings %>%
+    dplyr::mutate(
+      fold_seat_change = dplyr::if_else(
+        is.finite(prior_capacity) & prior_capacity > 0 &
+          is.finite(scheduled_capacity),
+        scheduled_capacity / prior_capacity - 1, NA_real_
+      ),
+      fold_prior_near_full = dplyr::if_else(
+        prior_fill$capacity_usable, prior_fill$capacity_reached, NA
+      )
+    ) %>%
+    dplyr::select(dplyr::all_of(keys), target_term = term,
+                  fold_seat_change, fold_prior_near_full)
+  backtests %>%
+    dplyr::select(-dplyr::any_of(c("fold_seat_change", "fold_prior_near_full"))) %>%
+    dplyr::left_join(offerings, by = c(keys, "target_term"))
+}
+
+
+# What a past forecast term's miss is attributable to, from its conditions.
+projection_fold_error_source <- function(seat_change, prior_near_full,
+                                         opt = list()) {
+  change <- as.numeric(projection_option(opt, "seat_consistency_change"))
+  dplyr::case_when(
+    is.finite(seat_change) & abs(seat_change) >= change ~ "seats_changed",
+    !is.finite(seat_change) | is.na(prior_near_full) ~ "data_missing",
+    prior_near_full ~ "seats_held_full",
+    TRUE ~ "seats_held_room"
+  )
+}
+
+
+# Seat consistency: over the past forecast terms behind a course's
+# reliability (the rolling rule's published aftcasts), how often its seats
+# moved by seat_consistency_change or more. Read beside reliability: a Low
+# reliability with Low seat consistency missed with the schedule; with High
+# seat consistency, the forecast itself missed.
+add_projection_seat_consistency <- function(projections, backtests,
+                                            opt = list()) {
+  keys <- c("market_id", "subject_course", "term_type")
+  change <- as.numeric(projection_option(opt, "seat_consistency_change"))
+  moderate_max <- as.integer(
+    projection_option(opt, "seat_consistency_moderate_max_moves")
+  )
+  change_label <- scales::percent(change, accuracy = 1)
+  policy <- if (nrow(backtests) == 0L) {
+    tibble::tibble(
+      market_id = character(), subject_course = character(),
+      term_type = character(), target_term = integer(),
+      fold_seat_change = numeric()
+    )
+  } else {
+    projection_require_columns(
+      backtests, c(keys, "target_term", "policy_selected", "fold_seat_change"),
+      "add_projection_seat_consistency()"
+    )
+    dplyr::filter(backtests, policy_selected)
+  }
+  per_course <- policy %>%
+    dplyr::arrange(target_term) %>%
+    dplyr::group_by(dplyr::across(dplyr::all_of(keys))) %>%
+    dplyr::summarise(
+      seat_consistency_terms = sum(is.finite(fold_seat_change)),
+      seat_consistency_moves = sum(
+        is.finite(fold_seat_change) & abs(fold_seat_change) >= change
+      ),
+      moved_text = paste0(
+        vapply(target_term[is.finite(fold_seat_change) &
+                             abs(fold_seat_change) >= change],
+               fmt_term, character(1)),
+        " ",
+        sprintf("%+.0f%%", 100 * fold_seat_change[
+          is.finite(fold_seat_change) & abs(fold_seat_change) >= change
+        ]),
+        collapse = ", "
+      ),
+      .groups = "drop"
+    )
+  projections %>%
+    dplyr::select(-dplyr::any_of(c(
+      "seat_consistency", "seat_consistency_reason",
+      "seat_consistency_terms", "seat_consistency_moves"
+    ))) %>%
+    dplyr::left_join(per_course, by = keys) %>%
+    dplyr::mutate(
+      seat_consistency_terms = dplyr::coalesce(seat_consistency_terms, 0L),
+      seat_consistency_moves = dplyr::coalesce(seat_consistency_moves, 0L),
+      seat_consistency = dplyr::case_when(
+        seat_consistency_terms == 0L ~ "Unrated",
+        seat_consistency_moves == 0L ~ "High",
+        seat_consistency_moves <= moderate_max ~ "Moderate",
+        TRUE ~ "Low"
+      ),
+      seat_consistency_reason = dplyr::case_when(
+        seat_consistency_terms == 0L ~
+          "No past forecast term has seat counts on both sides to compare",
+        seat_consistency_moves == 0L ~ paste0(
+          "Seats held within ", change_label, " in all ",
+          seat_consistency_terms, " past forecast term",
+          dplyr::if_else(seat_consistency_terms == 1L, "", "s")
+        ),
+        TRUE ~ paste0(
+          "Seats moved ", change_label, " or more in ", seat_consistency_moves,
+          " of ", seat_consistency_terms, " past forecast term",
+          dplyr::if_else(seat_consistency_terms == 1L, "", "s"),
+          " (", moved_text, ")"
+        )
+      )
+    ) %>%
+    dplyr::select(-moved_text)
+}
+
+
+# Where the published rule's past forecast error came from: each aftcast it
+# would have published is attributed to the conditions it was made under, and
+# the error is summed by source. Most of it follows schedule changes, which no
+# demand model can see; only the seats-held-with-room source tests the
+# forecast of demand itself.
+summarize_projection_error_sources <- function(backtests, opt = list()) {
+  change_label <- scales::percent(
+    as.numeric(projection_option(opt, "seat_consistency_change")), accuracy = 1
+  )
+  sources <- tibble::tibble(
+    source = c("seats_changed", "data_missing", "seats_held_full", "seats_held_room"),
+    label = c(
+      paste("Seats changed", change_label, "or more"),
+      "Seat or first-day data missing",
+      "Seats held; course was near full",
+      "Seats held; course had room"
+    ),
+    meaning = c(
+      "The schedule moved. A near-full course's registrations follow its seats, so the miss is the schedule's.",
+      "The term's seats or first-day count are not in the data, so the cause cannot be told.",
+      "The seats filled again. Close, but it cannot show how many students the course turned away.",
+      "The one case that tests the forecast of demand itself."
+    )
+  )
+  empty <- dplyr::mutate(
+    sources, folds = 0L, wape = NA_real_, share_of_error = NA_real_
+  )
+  if (nrow(backtests) == 0L) return(empty)
+  projection_require_columns(
+    backtests,
+    c("policy_selected", "abs_error", "actual_classlist_total",
+      "fold_seat_change", "fold_prior_near_full"),
+    "summarize_projection_error_sources()"
+  )
+  policy <- backtests %>%
+    dplyr::filter(
+      policy_selected, is.finite(abs_error),
+      is.finite(actual_classlist_total), actual_classlist_total > 0
+    )
+  if (nrow(policy) == 0L) return(empty)
+  total_error <- sum(policy$abs_error)
+  by_source <- policy %>%
+    dplyr::mutate(source = projection_fold_error_source(
+      fold_seat_change, fold_prior_near_full, opt
+    )) %>%
+    dplyr::group_by(source) %>%
+    dplyr::summarise(
+      folds = dplyr::n(),
+      wape = sum(abs_error) / sum(actual_classlist_total),
+      share_of_error = if (total_error > 0) sum(abs_error) / total_error else NA_real_,
+      .groups = "drop"
+    )
+  sources %>%
+    dplyr::left_join(by_source, by = "source") %>%
+    dplyr::mutate(folds = dplyr::coalesce(folds, 0L))
+}
+
+
 add_projection_recommendations <- function(selected, candidates, pressure_screen,
                                            enrollment_history, section_history,
                                            opt = list()) {
@@ -3904,10 +4128,10 @@ add_projection_recommendations <- function(selected, candidates, pressure_screen
           accuracy_reason, "; candidate methods also disagree materially"
         ),
         accuracy == "Unrated" ~ accuracy_reason,
-        accuracy == "Poor" & methods_disagree ~ paste0(
+        accuracy == "Low" & methods_disagree ~ paste0(
           accuracy_reason, "; candidate methods also disagree materially"
         ),
-        accuracy == "Poor" ~ accuracy_reason,
+        accuracy == "Low" ~ accuracy_reason,
         stability == "Volatile" ~ paste0(
           "Aftcasts land within ", accuracy, " range, but the course's own ",
           "history is volatile: ", stability_reason
@@ -4013,6 +4237,7 @@ new_enrollment_projection_bundle <- function(analysis, target_term, as_of_term,
                                              model_config =
                                                enrollment_projection_model_config(),
                                              source_fingerprint = list(),
+                                             target_schedule_as_of = as.Date(NA),
                                              built_at = Sys.time()) {
   bundle <- list(
     schema_version = CEDAR_ENROLLMENT_PROJECTION_SCHEMA_VERSION,
@@ -4026,6 +4251,9 @@ new_enrollment_projection_bundle <- function(analysis, target_term, as_of_term,
     model_config = model_config,
     model_provenance = model_provenance,
     source_fingerprint = source_fingerprint,
+    # When the target term's (draft) schedule was pulled; NA when the data
+    # holds no schedule for the target term yet.
+    target_schedule_as_of = as.Date(target_schedule_as_of),
     pressure_screen = analysis$pressure_screen,
     projections = analysis$projections,
     delivery_components = analysis$delivery_components,
@@ -4044,7 +4272,8 @@ validate_enrollment_projection_bundle <- function(bundle) {
   required <- c(
     "schema_version", "model_version", "built_at", "target_term", "as_of_term",
     "scope_courses", "scope_campuses", "scope_market_id", "model_config",
-    "model_provenance", "source_fingerprint", "pressure_screen", "projections",
+    "model_provenance", "source_fingerprint", "target_schedule_as_of",
+    "pressure_screen", "projections",
     "delivery_components", "candidates", "backtests", "method_performance",
     "recent_history", "cohort_composition"
   )
@@ -4052,6 +4281,11 @@ validate_enrollment_projection_bundle <- function(bundle) {
   if (length(missing) > 0) {
     stop("[enrollment-projections.R] Projection bundle is missing: ",
          paste(missing, collapse = ", "), call. = FALSE)
+  }
+  if (!inherits(bundle$target_schedule_as_of, "Date") ||
+      length(bundle$target_schedule_as_of) != 1L) {
+    stop("[enrollment-projections.R] target_schedule_as_of must be one Date ",
+         "(NA when no target schedule is loaded).", call. = FALSE)
   }
   if (!identical(as.integer(bundle$schema_version),
                  CEDAR_ENROLLMENT_PROJECTION_SCHEMA_VERSION)) {
@@ -4171,7 +4405,8 @@ validate_enrollment_projection_bundle <- function(bundle) {
       "floor_note", "regime_note", "reference_section_size",
       "pressure_judged_terms", "pressure_full_terms", "pressure_bump_applied",
       "pressure_bump", "pressure_bump_note", "planned_registrations",
-      "pressure_bump_sections"),
+      "pressure_bump_sections", "seat_consistency", "seat_consistency_reason",
+      "seat_consistency_terms", "seat_consistency_moves"),
     "validate_enrollment_projection_bundle() projections"
   )
   projection_require_columns(
@@ -4261,7 +4496,7 @@ validate_enrollment_projection_bundle <- function(bundle) {
         "capacity_censored_classlist_projection",
         "capacity_censored_error", "capacity_censored_abs_error",
         "capacity_censored_miss", "capacity_explained_classlist_error",
-        "capacity_explained_share"
+        "capacity_explained_share", "fold_seat_change", "fold_prior_near_full"
       ),
       "validate_enrollment_projection_bundle() backtests"
     )
@@ -4273,7 +4508,8 @@ validate_enrollment_projection_bundle <- function(bundle) {
   axis_values <- list(
     stability = c("Stable", "Moderate", "Volatile", "Unrated"),
     depth     = c("Deep", "Moderate", "Thin", "None"),
-    accuracy  = c("Close", "Fair", "Poor", "Unrated")
+    accuracy  = c("High", "Moderate", "Low", "Unrated"),
+    seat_consistency = c("High", "Moderate", "Low", "Unrated")
   )
   for (axis in names(axis_values)) {
     invalid <- setdiff(unique(bundle$projections[[axis]]), axis_values[[axis]])

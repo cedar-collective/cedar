@@ -39,7 +39,7 @@ enrollment_projection_method_guide_ui <- function(guide) {
   }))
 
   info_panel(
-    "Projection methods",
+    "Projection methods: the two forecasts, and how one is chosen",
     tags$p(guide$overview),
     family_sections,
     tags$p(
@@ -56,17 +56,233 @@ enrollment_projection_method_guide_ui <- function(guide) {
 }
 
 
+# ---- Explainers ----------------------------------------------------------------
+#
+# The page's blue info panels each answer one question, named in the title,
+# with the contents summarised in the description. Thresholds are read from
+# the model defaults and the seat-fill constants, never written as literals.
+
+projection_percent <- function(x) scales::percent(x, accuracy = 1)
+
+projection_columns_explainer <- function() {
+  item <- function(name, ...) tags$li(tags$strong(name), paste0(" ", paste(...)))
+  info_panel(
+    "Reading the table: what each column means",
+    tags$ul(
+      item("Course", "with its academic department beneath."),
+      item("Sections", "to plan: registrations plus any pressure bump,",
+           "divided by the section size (the target schedule's average,",
+           "otherwise the recent median), rounded up. \"Plan at least\" when",
+           "last term filled its seats."),
+      item("Pressure bump", "is the registrations added for a course that is",
+           "always full, and beneath them the sections that adds. A dash means",
+           "no bump; the course's detail says why."),
+      item("Registrations", "is everyone expected to sign up, including",
+           "students who drop: the number the model forecasts and sections are",
+           "planned for. Beneath it, the range past forecasts usually landed in",
+           "and the change on last year."),
+      item("Seats (day 1)", "is the students expected in a seat when classes",
+           "begin. It is context, not the planning number."),
+      item("First day / sections", "shows the last four same-season terms. A",
+           "dash means the course was not offered or its first day cannot be",
+           "reconstructed."),
+      item("Flags", "are plain-language reasons to look at a row."),
+      item("Stability", "asks whether the course's own enrollment history is",
+           "steady, using no model."),
+      item("Depth", "is how many past forecasts stand behind the course's",
+           "reliability: it says how much we know, not how good we are."),
+      item("Reliability", "is how close those past forecasts landed: High",
+           "within 10%, Moderate 10 to 20%, Low more than 20% off. Each was",
+           "made with only the evidence available at the time."),
+      item("Seat consistency", "is how steady the course's seats were in those",
+           "same terms: High when they held within 10% every time, Moderate",
+           "when they moved once, Low when they moved more.")
+    ),
+    tags$p(tags$strong("Reading reliability and seat consistency together"), class = "mb-1"),
+    tags$ul(
+      tags$li(tags$strong("Low reliability, low or moderate seat consistency:"),
+              " the misses came in terms when the seats moved. They follow the",
+              " schedule more than demand, so the projection holds if the seats do."),
+      tags$li(tags$strong("Low reliability, high seat consistency:"),
+              " the course missed with steady seats. That miss is the",
+              " forecast's: look before planning to it. Flagged \"Off 20%+",
+              " with steady seats\"."),
+      tags$li(tags$strong("High reliability:"), " past forecasts landed close."),
+      tags$li(tags$strong("Unrated:"), " too few past forecasts to tell.")
+    ),
+    description = "Every column, and how Reliability and Seat consistency read together.",
+    class = "enrollment-projection-guide"
+  )
+}
+
+projection_build_explainer <- function() {
+  defaults <- enrollment_projection_defaults()
+  info_panel(
+    "How a course's plan is built, step by step",
+    tags$ol(
+      tags$li(tags$strong("Last year's registrations."),
+              " The start is the same season last year: everyone who registered,",
+              " including students who dropped. When the schedule holds still it",
+              " lands within about 6%, and no other forecast tested beat it."),
+      tags$li(tags$strong("A floor for full courses."), paste0(
+        " When last term was near full (", projection_percent(CEDAR_NEAR_FULL_FILL),
+        " or more of the seats taken on the first day), the students still",
+        " waiting, who registered nowhere in the market, are added to it in",
+        " the adjusted forecast."
+      )),
+      tags$li(tags$strong("Fall changes."),
+              " The adjusted forecast also adds the change in the course's own",
+              " and its feeder courses' enrollment in the term just finished, times",
+              " the share that historically carried over. Two terms ahead, that",
+              " term has not happened yet, so the change is left out and the",
+              " course's detail says so."),
+      tags$li(tags$strong("Choosing a forecast."), paste0(
+        " Last year's number is used unless the adjusted forecast beat it by ",
+        defaults$selection_challenger_margin * 100, " points of error on at least ",
+        defaults$selection_min_backtests, " earlier past forecasts, judged at",
+        " each past term with only the evidence available then."
+      )),
+      tags$li(tags$strong("A pressure bump for courses always full."), paste0(
+        " A course near full on the first day in every recent same-season term",
+        " with a first-day count is planned for ",
+        projection_percent(defaults$pressure_bump_share),
+        " more, or for the students left waiting if that is more, unless its",
+        " feeder courses just fell ", projection_percent(defaults$pressure_bump_feeder_decline),
+        " or more. A full course's registrations follow its seats, so last",
+        " year's count understates what it would draw. It changes the plan,",
+        " never the forecast or its reliability."
+      )),
+      tags$li(tags$strong("Sections."),
+              " Registrations plus any bump, divided by the section size and",
+              " rounded up. Registrations run about 8% above the students in a",
+              " seat on day one, and that margin is deliberate: running short of",
+              " seats costs more than an empty one.")
+    ),
+    tags$p(paste0(
+      "Whether seats were full is judged on the first day of classes, from",
+      " each student's registration and drop dates: near full at ",
+      projection_percent(CEDAR_NEAR_FULL_FILL), ", full at ",
+      projection_percent(CEDAR_FULL_FILL), ". Census, three weeks later, follows",
+      " the drops, so a course full on day one can read below capacity there.",
+      " A term whose class lists carry no status dates is shown as unknown,",
+      " never filled in from census."
+    )),
+    cedar_definition_note("enrollment-projection"),
+    cedar_docs_link("users/enrollment-projections"),
+    description = "From last year's registrations to sections: every step, and why it is there.",
+    class = "enrollment-projection-build"
+  )
+}
+
+projection_scope_explainer <- function() {
+  defaults <- enrollment_projection_defaults()
+  info_panel(
+    "Which courses are on this page",
+    tags$ul(
+      tags$li(tags$strong("Always monitored:"),
+              " the first-year experience and gateway courses the institution",
+              " lists, every term."),
+      tags$li(tags$strong("Added when pressed:"), paste0(
+        " a Gen Ed course joins when it was near full on the first day in ",
+        defaults$pressure_chronic_terms, " of its last ",
+        defaults$pressure_history_window, " same-season terms, or, once the",
+        " target term's schedule is loaded, when its past or trend",
+        " registrations exceed that schedule's seats by ",
+        defaults$pressure_min_seat_gap, " or more."
+      )),
+      tags$li(tags$strong("One market:"),
+              " Albuquerque and online seats are pooled and each student is",
+              " counted once. Branch campuses are not included."),
+      tags$li(tags$strong("Spring and Fall only:"),
+              " Summer is a different pattern with too little comparable history.")
+    ),
+    tags$p("A course's detail says why it is listed."),
+    description = "The monitored list, the screen that adds near-full courses, and what is left out.",
+    class = "enrollment-projection-scope"
+  )
+}
+
+# Built from the bundle's saved aftcasts, so it is rendered in the server.
+projection_error_explainer <- function(error_sources) {
+  sources <- error_sources$table
+  rows <- lapply(seq_len(nrow(sources)), function(i) {
+    row <- sources[i, , drop = FALSE]
+    tags$li(
+      tags$strong(row$label), " \u2014 ",
+      if (row$folds > 0L) paste0(
+        format(row$folds, big.mark = ","), " past forecast",
+        if (row$folds == 1L) "" else "s", ", ",
+        scales::percent(row$wape, accuracy = 0.1), " off on average, ",
+        projection_percent(row$share_of_error), " of all the error. "
+      ) else "none. ",
+      row$meaning
+    )
+  })
+  info_panel(
+    "Where forecast error comes from",
+    tags$p(error_sources$sentence),
+    tags$ul(rows),
+    tags$p(tags$strong("What the projection cannot see"), class = "mb-1"),
+    tags$ul(
+      tags$li("Next year's schedule. Compare the plan with the draft on the",
+              " Draft schedule tab."),
+      tags$li("Policy changes, such as new placement cutoffs or requirements."),
+      tags$li("How many students a full course turned away. The pressure bump",
+              " stands in for it until waitlists can measure it."),
+      tags$li("Terms whose class lists carry no status dates.")
+    ),
+    tags$p(
+      "To judge one course, read its Reliability beside its Seat consistency:",
+      " a miss with steady seats is the forecast's; a miss as seats moved is",
+      " mostly the schedule's."
+    ),
+    description = paste0(
+      "Past misses by cause, from ", format(error_sources$n_folds, big.mark = ","),
+      " past forecasts: most follow schedule changes, not demand."
+    ),
+    class = "enrollment-projection-error-sources"
+  )
+}
+
+projection_draft_explainer <- function() {
+  info_panel(
+    "How the draft comparison works",
+    tags$ul(
+      tags$li(tags$strong("The draft"),
+              " is the target term's schedule as MyReports had it on the date",
+              " shown. Departments edit it until registration settles; the",
+              " comparison follows at the next refresh."),
+      tags$li(tags$strong("Planned registrations"),
+              " are the projection plus any pressure bump. They run above the",
+              " students expected in a seat on day one, on purpose."),
+      tags$li(tags$strong("Short of day-one seats:"),
+              " the draft has fewer seats than the students expected in the room",
+              " when classes begin. This is the one to fix first."),
+      tags$li(tags$strong("Covers day one, short of the plan:"),
+              " only the planning margin or the pressure bump is missing."),
+      tags$li(tags$strong("Covers the plan"), " or ", tags$strong("seats beyond the plan"),
+              ": the draft meets the plan, or exceeds it by more than a section.",
+              " In a course that is always full, spare seats are likely to fill:",
+              " when such courses were given more seats, the new seats filled."),
+      tags$li(tags$strong("Not in the draft:"),
+              " a monitored course with a projection and no sections yet.")
+    ),
+    tags$p("The campus split under the draft sections comes from the schedule;",
+           " the plan itself pools Albuquerque and online seats."),
+    description = "What the draft is, what \"short\" means, and why a spare seat in a full course is not waste.",
+    class = "enrollment-projection-draft-guide"
+  )
+}
+
+
 enrollmentProjectionsUI <- function(id) {
   ns <- NS(id)
-  defaults <- enrollment_projection_defaults()
-  bump_share <- scales::percent(defaults$pressure_bump_share, accuracy = 1)
-  bump_decline <- scales::percent(defaults$pressure_bump_feeder_decline, accuracy = 1)
   tagList(
     filter_bar(
       "Enrollment Projections",
       paste(
         "Saved course-demand projections with stability, evidence depth,",
-        "aftcast accuracy, planning guidance, and row-level detail."
+        "reliability, seat consistency, planning guidance, and row-level detail."
       ),
       fluidRow(
         column(
@@ -103,8 +319,8 @@ enrollmentProjectionsUI <- function(id) {
         column(
           2,
           selectInput(
-            ns("accuracy"), "Aftcast accuracy", multiple = TRUE,
-            choices = c("Close", "Fair", "Poor", "Unrated")
+            ns("accuracy"), "Reliability", multiple = TRUE,
+            choices = c("High", "Moderate", "Low", "Unrated")
           )
         )
       ),
@@ -128,108 +344,12 @@ enrollmentProjectionsUI <- function(id) {
         "for that course usually landed."
       )
     ),
-    info_panel(
-      "How projections work and how to read the table",
-      cedar_definition_note("enrollment-projection"),
-      tags$p(tags$strong("Table columns"), class = "mb-1"),
-      tags$ul(
-        tags$li(tags$strong("Course"),
-                " with its academic department beneath."),
-        tags$li(tags$strong("Sections"),
-                paste(
-                  " to plan: registrations plus any pressure bump, divided by",
-                  "the section size (the target schedule's average, otherwise",
-                  "the recent median), rounded up. It is a planning conversion,",
-                  "not a forecast of what will be scheduled. A course that",
-                  "filled its seats last term reads as a floor."
-                )),
-        tags$li(tags$strong("Pressure bump"),
-                paste(
-                  " is what the plan adds for a course near full on the first",
-                  "day in every recent same-season term with a first-day count:",
-                  "its registrations were capped by its seats, so it is planned",
-                  "for", bump_share, "more than last time, or for the students",
-                  "left waiting if that is more, unless its feeder courses just",
-                  "fell", bump_decline, "or more. When near-full courses were",
-                  "given 10% or more seats, the new seats filled. Beneath it,",
-                  "the sections the bump adds. The registration forecast and",
-                  "its accuracy do not include it."
-                )),
-        tags$li(tags$strong("Registrations"),
-                paste(
-                  " is everyone expected to sign up, including students who",
-                  "drop before or after classes begin: the class-list demand",
-                  "the model forecasts, and the number sections are planned",
-                  "for. It runs above first-day seats, and that margin is",
-                  "deliberate: running short of seats costs more than an",
-                  "empty one. Beneath it, the range past forecasts for this",
-                  "course usually landed in and the change on the last",
-                  "same-season term's registrations."
-                )),
-        tags$li(tags$strong("Seats (day 1)"),
-                paste(
-                  " is how many students are expected to hold a seat when",
-                  "classes begin: registrations times the share of this",
-                  "course's registrants still enrolled on the first day in",
-                  "recent terms. It is context, not the planning number."
-                )),
-        tags$li(tags$strong("First day / sections"),
-                paste(
-                  " shows the last four same-season terms: students enrolled on",
-                  "the first day over the sections scheduled. A dash means the",
-                  "course was not offered, or that term's class lists carry no",
-                  "status dates to reconstruct the first day from; hover for",
-                  "which."
-                )),
-        tags$li(tags$strong("Flags"),
-                " are plain-language reasons to look at a row: full on the first day last term, students left waiting, a big change in the term just finished, a volatile history, or past forecasts that were well off."),
-        tags$li(tags$strong("Stability"),
-                paste(
-                  " asks whether the course is predictable from its own history",
-                  "at all, using no model: Stable, Moderate, Volatile, or",
-                  "Unrated when too few comparable terms exist. A Volatile",
-                  "course is not a forecasting failure — it is a course where",
-                  "something is moving and worth investigating."
-                )),
-        tags$li(tags$strong("Depth"),
-                paste(
-                  " is how much comparable aftcast evidence stands behind the",
-                  "selected method: Deep, Moderate, Thin, or None. It says how",
-                  "much we know, not how good we are."
-                )),
-        tags$li(tags$strong("Accuracy"),
-                paste(
-                  " is how close those aftcasts landed: Close, Fair, Poor, or",
-                  "Unrated when there are too few to measure. The selection",
-                  "rule is replayed at each past term with only the evidence",
-                  "available then, so this is an out-of-sample record, not",
-                  "the fit of the winner on the terms that chose it."
-                ))
-      ),
-      tags$p(
-        paste(
-          "Click a course for its method: prior same-season enrollment (the",
-          "spine) unless the adjusted candidate beat it by a margin on earlier",
-          "aftcasts. The adjusted candidate raises the spine to a floor when",
-          "the prior term was full on the first day and adds the change in the",
-          "course's own and its feeder courses' enrollment in the term just",
-          "finished."
-        )
-      ),
-      tags$p(
-        paste(
-          "Whether seats were full is judged on the first day of classes,",
-          "reconstructed from each student's registration and drop dates;",
-          "a course counts as full at 98% of its seats. Census, on the 15th",
-          "day of classes, follows three weeks of drops, so a course full on",
-          "day one can read below capacity at census. Terms whose class lists carry no status",
-          "dates are shown as unknown, never filled in from census."
-        )
-      ),
-      cedar_docs_link("users/enrollment-projections"),
-      description = "Methodology, the three evidence axes, and a guide to every displayed column.",
-      class = "enrollment-projection-guide"
-    ),
+    # Each explainer answers one question a reader brings to the page, and
+    # its title says which. The methods guide sits below the table.
+    projection_columns_explainer(),
+    projection_build_explainer(),
+    uiOutput(ns("error_sources")),
+    projection_scope_explainer(),
     navset_tab(
       id = ns("projection_tabs"),
       selected = "Projections",
@@ -250,6 +370,24 @@ enrollmentProjectionsUI <- function(id) {
           reactable::reactableOutput(ns("projection_table"), height = NULL)
         ),
         uiOutput(ns("method_guide"))
+      ),
+
+      nav_panel(
+        "Draft schedule",
+        subtab_header(
+          "Compare to the draft schedule",
+          paste(
+            "The plan beside the target term's schedule as it stands, course by",
+            "course: where the draft falls short of the students expected on day",
+            "one, where it covers the plan, and which monitored courses it lacks."
+          )
+        ),
+        uiOutput(ns("draft_summary")),
+        projection_draft_explainer(),
+        tags$div(
+          class = "enrollment-projection-table-flow cedar-clickable-rows",
+          reactable::reactableOutput(ns("draft_table"), height = NULL)
+        )
       ),
 
       nav_panel(
@@ -442,10 +580,10 @@ enrollmentProjectionsServer <- function(id, bundles, load_bundle, programs) {
     axis_cell <- function(value) {
       tone <- switch(
         value,
-        Stable = , Deep = , Close = "good",
-        Moderate = , Fair = "mid",
+        Stable = , Deep = , High = "good",
+        Moderate = "mid",
         Thin = "thin",
-        Volatile = , Poor = "poor",
+        Volatile = , Low = "poor",
         "none"
       )
       htmltools::span(
@@ -688,9 +826,30 @@ enrollmentProjectionsServer <- function(id, bundles, load_bundle, programs) {
           ),
           depth_reason = reactable::colDef(show = FALSE),
           accuracy = reactable::colDef(
-            name = "Accuracy", minWidth = 85, cell = axis_cell
+            name = "Reliability", minWidth = 85, cell = axis_cell,
+            header = htmltools::span(
+              "Reliability",
+              title = paste(
+                "How close past forecasts for this course landed: High within",
+                "10%, Moderate 10 to 20%, Low more than 20% off. Read it beside",
+                "seat consistency"
+              )
+            )
           ),
           accuracy_reason = reactable::colDef(show = FALSE),
+          seat_consistency = reactable::colDef(
+            name = "Seat consistency", minWidth = 95, cell = axis_cell,
+            header = htmltools::span(
+              "Seat consistency",
+              title = paste(
+                "How steady the course's seats were in those same past terms. A",
+                "low reliability with steady seats is the forecast's miss; with",
+                "moving seats, mostly the schedule's"
+              )
+            )
+          ),
+          seat_consistency_reason = reactable::colDef(show = FALSE),
+          reliability_reading = reactable::colDef(show = FALSE),
           # The basis and its evidence are in the course modal.
           method = reactable::colDef(show = FALSE),
           selection_evidence = reactable::colDef(show = FALSE),
@@ -705,6 +864,115 @@ enrollmentProjectionsServer <- function(id, bundles, load_bundle, programs) {
 
     output$method_guide <- renderUI({
       enrollment_projection_method_guide_ui(view()$method_guide)
+    })
+
+    output$error_sources <- renderUI({
+      projection_error_explainer(view()$meta$error_sources)
+    })
+
+    # ---- Draft schedule sub-tab ---------------------------------------------
+    draft <- reactive(build_enrollment_projection_draft_comparison(view()))
+
+    output$draft_summary <- renderUI({
+      tags$p(class = "enrollment-projection-lead", draft()$sentence)
+    })
+
+    output$draft_table <- reactable::renderReactable({
+      data <- draft()
+      if (!isTRUE(data$available)) return(NULL)
+      table <- data$table
+      count_text <- function(value) {
+        if (is.finite(value)) format(round(value), big.mark = ",") else "\u2014"
+      }
+      select_course <- htmlwidgets::JS(sprintf(
+        paste0(
+          "function(rowInfo) {",
+          "Shiny.setInputValue('%s', rowInfo.values.course, {priority: 'event'});",
+          "}"
+        ),
+        session$ns("selected_course")
+      ))
+      reactable::reactable(
+        table,
+        theme = cedar_tbl_theme, compact = TRUE, striped = TRUE,
+        highlight = TRUE, searchable = TRUE, pagination = FALSE,
+        onClick = select_course,
+        columns = list(
+          course = reactable::colDef(
+            name = "Course", minWidth = 105,
+            cell = function(value, index) {
+              htmltools::tagList(
+                htmltools::strong(value),
+                htmltools::div(class = "text-note", table$department[[index]])
+              )
+            }
+          ),
+          department = reactable::colDef(show = FALSE, searchable = TRUE),
+          verdict = reactable::colDef(name = "Draft against the plan", minWidth = 220),
+          draft_sections = reactable::colDef(
+            name = "Draft sections", align = "right", minWidth = 95,
+            cell = function(value, index) {
+              htmltools::tagList(
+                if (is.na(value)) "\u2014" else format(value, big.mark = ","),
+                if (!is.na(table$campus_sections[[index]])) {
+                  htmltools::div(class = "text-note", table$campus_sections[[index]])
+                }
+              )
+            }
+          ),
+          draft_seats = reactable::colDef(
+            name = "Draft seats", align = "right", minWidth = 85,
+            cell = function(value) count_text(value)
+          ),
+          expected_first_day = reactable::colDef(
+            name = "Seats (day 1)", align = "right", minWidth = 85,
+            header = htmltools::span(
+              "Seats (day 1)",
+              title = "Students expected in a seat when classes begin"
+            ),
+            cell = function(value) count_text(value)
+          ),
+          planned_registrations = reactable::colDef(
+            name = "Planned registrations", align = "right", minWidth = 110,
+            cell = function(value, index) {
+              bump <- table$pressure_bump[[index]]
+              htmltools::tagList(
+                count_text(value),
+                if (isTRUE(bump > 0)) {
+                  htmltools::div(
+                    class = "text-note", paste0("incl. +", count_text(bump), " bump")
+                  )
+                }
+              )
+            }
+          ),
+          plan_sections = reactable::colDef(
+            name = "Plan sections", align = "right", minWidth = 80, na = "\u2014"
+          ),
+          seat_gap = reactable::colDef(
+            name = "Seats short (+) / spare (\u2212)", align = "right", minWidth = 110,
+            cell = function(value) {
+              if (!is.finite(value)) return("\u2014")
+              paste0(if (value > 0) "+" else "", format(round(value), big.mark = ","))
+            }
+          ),
+          registered_now = reactable::colDef(
+            name = "Registered so far", align = "right", minWidth = 90,
+            cell = function(value) count_text(value)
+          ),
+          reliability = reactable::colDef(
+            name = "Reliability", minWidth = 85, cell = axis_cell
+          ),
+          seat_consistency = reactable::colDef(
+            name = "Seat consistency", minWidth = 95, cell = axis_cell
+          ),
+          in_draft = reactable::colDef(show = FALSE),
+          campus_sections = reactable::colDef(show = FALSE),
+          pressure_bump = reactable::colDef(show = FALSE),
+          sections_to_add = reactable::colDef(show = FALSE),
+          status = reactable::colDef(show = FALSE)
+        )
+      )
     })
 
     selected_course_value <- reactiveVal(NULL)
@@ -755,8 +1023,12 @@ enrollmentProjectionsServer <- function(id, bundles, load_bundle, programs) {
           ),
           tags$dt("Stability"), tags$dd(current$stability),
           tags$dt("Depth"), tags$dd(current$depth),
-          tags$dt("Aftcast accuracy"), tags$dd(current$accuracy),
+          tags$dt("Reliability"), tags$dd(current$accuracy),
+          tags$dt("Seat consistency"),
+          tags$dd(paste0(current$seat_consistency, ": ", current$seat_consistency_reason)),
+          tags$dt("Reading the two together"), tags$dd(current$reliability_reading),
           tags$dt("What this means"), tags$dd(current$axis_explanation),
+          tags$dt("Why it is listed"), tags$dd(current$inclusion_reason),
           tags$dt("Estimated sections"),
           tags$dd(
             if (is.na(current$recommended_sections)) "Unavailable" else

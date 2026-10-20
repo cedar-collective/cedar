@@ -243,6 +243,52 @@ capped and would score any allowance as over-projection.
 plus bump or whose sections are not sized from the plan. The page states the
 total above the table (`projection_pressure_bump_summary()`).
 
+### Reliability, seat consistency, and where error comes from
+
+The `accuracy` axis is shown to readers as **Reliability** (High within 10%
+WAPE, Moderate to 20%, Low beyond; it was Close / Fair / Poor before 0.23.0).
+The column keeps its name; only the values and the label changed.
+
+`annotate_projection_fold_conditions()` tags every aftcast row with
+`fold_seat_change` (the fold term's scheduled seats over the course's previous
+same-season offering, minus one) and `fold_prior_near_full` (whether that
+previous offering was near full on the first day; `NA` when its first day or
+seats are unknown). Two summaries read them from the published rule's aftcasts
+(`policy_selected`):
+
+- `add_projection_seat_consistency()` gives each published row
+  `seat_consistency`: High when the seats held within `seat_consistency_change`
+  (10%) in every one of the course's reliability terms, Moderate when they moved
+  in up to `seat_consistency_moderate_max_moves` (1), Low beyond, Unrated when no
+  term can be compared; with `seat_consistency_reason`,
+  `seat_consistency_terms` and `seat_consistency_moves`. Low reliability with
+  High seat consistency is the forecast's own miss, flagged "Off 20%+ with
+  steady seats"; with moving seats it is "Off 20%+ as seats moved".
+- `summarize_projection_error_sources()` attributes each aftcast to one source
+  -- seats changed 10%+, seat or first-day data missing, seats held while near
+  full, seats held with room -- and sums the absolute error by source. The page
+  renders it in **Where forecast error comes from**
+  (`projection_error_sources_summary()`); the text preview prints it.
+
+On the Spring and Fall 2027 bundles, 77% and 83% of the published rule's
+aftcast error came from terms whose seats changed, and no Low-reliability
+course had High seat consistency (the breakdown is in
+`forecasting-lessons.md`).
+
+### Draft schedule comparison
+
+`build_enrollment_projection_draft_comparison(view)` sets each published row's
+`planned_registrations` beside the target term's schedule as the bundle
+captured it (`scheduled_sections`, `scheduled_capacity`, and per-campus
+`delivery_components`), dated by the bundle's `target_schedule_as_of` (the
+latest DESR `as_of_date` for the target term; `NA` when none is loaded). Each
+course is one of: short of day-one seats (draft seats below
+`projected_first_day_equivalent`), covering day one but short of the plan,
+covering the plan, more than a section beyond it, or not in the draft. It is
+arithmetic over saved rows: the bundle's refresh signature includes the
+target-term sections, so a changed draft rebuilds the bundle at the next
+refresh, and Shiny never refits to compare.
+
 Expected first-day seats are still shown beside the plan, as context. For each
 aftcast or current projection, CEDAR estimates a leakage-safe same-season
 retention rate from earlier terms only, skipping any term whose first day
@@ -544,7 +590,8 @@ five years and which aftcast to within 2%.
 |---|---|---|---|
 | `stability` | Is this course predictable from its own history at all? | Stable / Moderate / Volatile / Unrated | **No** |
 | `depth` | How much comparable aftcast evidence stands behind the selected method? | Deep / Moderate / Thin / None | No |
-| `accuracy` | When we did aftcast it, how close were we? | Close / Fair / Poor / Unrated | Yes |
+| `accuracy`, shown as Reliability | When we did aftcast it, how close were we? | High / Moderate / Low / Unrated | Yes |
+| `seat_consistency` | Did the seats hold steady in those same aftcast terms? | High / Moderate / Low / Unrated | No |
 
 **`stability` is measured with no model**, from the coefficient of variation of
 the course's own comparable class-list series over `demand_history_window`
@@ -558,7 +605,7 @@ aftcast machinery cannot rate at all, which on a build where the upstream
 population has not settled is most of the scope. It is also predictive rather
 than merely descriptive — on the Spring 2027 build its CV correlates r = 0.69
 with realised aftcast error, and **no course rated Stable was forecast Poorly**
-(13 Close, 2 Fair, 0 Poor).
+(13 Close, 2 Fair, 0 Poor, in the labels of the time).
 
 A `Volatile` rating is a finding, not a failure. A course whose enrollment
 swings 50% year to year is one where something is moving, and the swing is what
@@ -575,15 +622,15 @@ reading a common-fold count that topped out at 2 against thresholds written for
 a per-method count that reached 4, so Medium and High were unreachable.)
 
 `depth` is Deep at `depth_deep_min_aftcasts` (4) folds, Moderate at
-`depth_moderate_min_aftcasts` (3), Thin at 1-2, None at 0. `accuracy` is Close
-at or below `accuracy_close_max_wape` (10%), Fair at or below
-`accuracy_fair_max_wape` (20%), Poor above, and Unrated below
+`depth_moderate_min_aftcasts` (3), Thin at 1-2, None at 0. `accuracy` is High
+at or below `accuracy_close_max_wape` (10%), Moderate at or below
+`accuracy_fair_max_wape` (20%), Low above, and Unrated below
 `accuracy_min_aftcasts` (2) folds. Term-to-term error variation is reported in
 the reason text rather than collapsing the rating, so a close-on-average but
 inconsistent method is visible as such.
 
-**The axes are allowed to disagree, and usually do.** Deep evidence spans Close,
-Fair, and Poor accuracy; a Stable course may have Thin depth. The validator
+**The axes are allowed to disagree, and usually do.** Deep evidence spans High,
+Moderate, and Low reliability; a Stable course may have Thin depth. The validator
 checks each axis against its own vocabulary separately, because a shared check
 would have to accept every value on every axis and would catch nothing.
 
@@ -643,9 +690,12 @@ expected first-day seats; `projected_first_day_equivalent` and its range columns
 are unchanged and shown as context. Published rows gain
 `pressure_judged_terms`, `pressure_full_terms`, `pressure_bump_applied`,
 `pressure_bump`, `pressure_bump_note`, `planned_registrations`, and
-`pressure_bump_sections`; candidates gain `feeder_change_rate` and
-`feeder_check`, published as `adjusted_feeder_change_rate` and
-`adjusted_feeder_check`.
+`pressure_bump_sections`, and `seat_consistency`, `seat_consistency_reason`,
+`seat_consistency_terms`, `seat_consistency_moves`; candidates gain
+`feeder_change_rate` and `feeder_check`, published as
+`adjusted_feeder_change_rate` and `adjusted_feeder_check`; aftcasts gain
+`fold_seat_change` and `fold_prior_near_full`; the bundle gains
+`target_schedule_as_of`. The `accuracy` values become High / Moderate / Low.
 
 Model 0.22.0 keeps schema 21. Its `floor_uplift` is the spine-unit floor, and
 `waitlisted_prior` counts only students on no campus's class list in the

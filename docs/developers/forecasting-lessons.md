@@ -40,6 +40,7 @@ between the two population models.
 
 | Model | Bundle schema | Calculation contract | Evidence |
 |---|---:|---|---|
+| `0.23.0` | 23 | No calculation change. Accuracy is shown as Reliability (High / Moderate / Low) beside a new seat-consistency axis; aftcasts record the seat and data conditions they were made under, and the page breaks past error down by them; the bundle dates the target term's draft schedule | [Where the error comes from](#where-the-error-comes-from-model-0230-2026-10-18) below |
 | `0.23.0` | 22 | Planning sections, the seat gap and the recommendation are sized for registrations, not expected first-day seats, plus a pressure bump for a course always near full (10%, or its students left waiting if more) unless its feeders just fell 5% or more; the forecast and its accuracy are unchanged | [Sections sized for registrations again](#sections-sized-for-registrations-again-model-0230-2026-10-18) and [The pressure bump](#the-pressure-bump-model-0230-2026-10-18) below |
 | `0.22.0` | 21 | The saturation floor is the spine plus the students still waiting who are on no campus's class list in the market; it was first-day enrollment plus the waitlist, which early-drop churn absorbed | [What the 0.21.0 audit found](#what-the-0210-audit-found-2026-10-18) below; ISSUES.md I27 |
 | `0.21.0` | 21 | Seats judged and sized on the first day of classes: saturation, capacity reached (98% first-day fill), and section sizing read reconstructed first-day enrollment | [Capacity Censoring](enrollment-projections.html#capacity-censoring); ISSUES.md I26 |
@@ -473,6 +474,39 @@ Three readings:
    before their second-half sessions began (ISSUES.md I28); both were near full
    in Fall 2025.
 
+## Where the error comes from (model 0.23.0, 2026-10-18)
+
+Every aftcast now records the conditions it was made under: how far the
+course's seats moved from its previous same-season offering, and whether that
+offering was near full on the first day. Summing the published rule's absolute
+error by those conditions, on the 0.23.0 bundles (same data and cutoff as
+above):
+
+| Source of the miss | Spring 2027: terms | error | share of all error | Fall 2027: terms | error | share |
+|---|---:|---:|---:|---:|---:|---:|
+| Seats changed 10% or more | 106 | 25.9% | 77% | 107 | 26.7% | 83% |
+| Seat or first-day data missing | 33 | 5.2% | 7% | 32 | 5.2% | 5% |
+| Seats held; course was near full | 56 | 4.4% | 9% | 83 | 4.0% | 11% |
+| Seats held; course had room | 20 | 14.6% | 7% | 4 | 5.7% | 1% |
+
+Three readings:
+
+1. **The misses are mostly the schedule's.** A near-full course registers
+   about as many students as it has seats, so when seats move, registrations
+   follow and last year's number misses by the move.
+2. **The demand forecast proper is a small share.** Only seats-held-with-room
+   tests it, and that is 7% and 1% of the error. A better demand model has
+   little left to win; reading the draft schedule has most of it.
+3. **No course misses with steady seats.** Reliability was paired with a new
+   seat-consistency axis (how often seats moved 10% or more across the same
+   terms). In both seasons every Low-reliability course had Low or Moderate
+   seat consistency (24 of 24 in each), so none is flagged "Off 20%+ with steady
+   seats". A course that appears there later is the first evidence of a
+   model problem rather than a schedule one.
+
+The page shows this breakdown for whichever projection is loaded, in the
+"Where forecast error comes from" panel.
+
 ## Lessons From the Retired Experiments
 
 The retired forecasting code tried useful ideas, especially major and
@@ -567,11 +601,12 @@ or progression eligibility. Those require leakage-safe course-specific tests.
 
 ## What to Try Next
 
-1. **Condition on the draft schedule.** Two-thirds of the error moves with the
-   seats (the 0.21.0 audit). A projection that reads the schedule a department
-   has submitted can say "with these seats, expect this; the last term was
-   full; past expansions filled this share", and archiving that schedule is
-   also what separates planned seats from reactive ones.
+1. **Condition on the draft schedule.** Most of the error moves with the seats
+   (77% of Spring 2027's aftcast error, 83% of Fall 2027's). The Draft schedule tab now compares the
+   plan with the draft; the next step is a projection that reads the schedule a
+   department has submitted and says "with these seats, expect this; the last
+   term was full; past expansions filled this share". Archiving that schedule
+   is also what separates planned seats from reactive ones.
 2. **Rank feeders by lift, not count**, keeping one pooled rate. The accuracy
    gain is small (0.2–0.3 points); the reason is that "ENGL 1110, PSYC 1110" is
    not a credible feeder list for MATH 1220. Do not split the rate by major,

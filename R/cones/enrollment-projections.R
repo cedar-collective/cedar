@@ -85,7 +85,10 @@ get_course_enrollment_projections <- function(inputs, target_term,
 
   backtests <- backtest_course_projection_methods(
     inputs, roster, target_term, opt
-  )
+  ) %>%
+    annotate_projection_fold_conditions(
+      inputs$enrollment_history, inputs$section_history, opt
+    )
   performance <- summarize_projection_backtests(backtests, opt)
   if (nrow(performance) == 0) performance <- empty_projection_performance()
   selected <- select_projection_methods(candidates, performance, backtests, opt)
@@ -112,7 +115,8 @@ get_course_enrollment_projections <- function(inputs, target_term,
   projections <- add_projection_recommendations(
     selected, candidate_evidence, pressure_screen, inputs$enrollment_history,
     inputs$section_history, opt
-  )
+  ) %>%
+    add_projection_seat_consistency(backtests, opt)
   recent_history <- build_projection_recent_history(
     projections, inputs$enrollment_history, inputs$section_history,
     backtests, opt,

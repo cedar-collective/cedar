@@ -609,14 +609,14 @@ test_that("the three axes are explained separately and may disagree", {
   # Stability says "predictable", depth says "barely watched", accuracy says
   # "close so far". All three are true at once.
   explanation <- projection_axis_explanation(
-    stability = "Stable", depth = "Thin", accuracy = "Close",
+    stability = "Stable", depth = "Thin", accuracy = "High",
     n_backtests = 2L, wape = 0.045, history_terms = 5L, history_cv = 0.04,
     history_median_yoy = 0.03, term_type = "spring"
   )
 
   expect_match(explanation, "Stability:", fixed = TRUE)
   expect_match(explanation, "Depth:", fixed = TRUE)
-  expect_match(explanation, "Accuracy:", fixed = TRUE)
+  expect_match(explanation, "Reliability:", fixed = TRUE)
   expect_match(explanation, "moved only 4.0%", fixed = TRUE)
   expect_match(explanation, "only 2 comparable Spring aftcasts", fixed = TRUE)
   expect_match(explanation, "within 4.5% WAPE", fixed = TRUE)
@@ -624,7 +624,7 @@ test_that("the three axes are explained separately and may disagree", {
   # A volatile course says so plainly and frames the swing as the finding,
   # rather than reporting it as a failure of the forecast.
   volatile <- projection_axis_explanation(
-    stability = "Volatile", depth = "Deep", accuracy = "Poor",
+    stability = "Volatile", depth = "Deep", accuracy = "Low",
     n_backtests = 4L, wape = 0.42, history_terms = 5L, history_cv = 0.55,
     history_median_yoy = 0.48, term_type = "spring"
   )
@@ -636,15 +636,15 @@ test_that("the three axes are explained separately and may disagree", {
 
 test_that("the axis summary stays compact and names the main caveat", {
   brief <- projection_axis_brief(
-    stability = "Stable", depth = "Deep", accuracy = "Close",
+    stability = "Stable", depth = "Deep", accuracy = "High",
     capacity_constrained = TRUE, methods_disagree = TRUE
   )
 
   expect_equal(
-    brief, "Stable history · Deep evidence · Close aftcasts · capacity-limited"
+    brief, "Stable history · Deep evidence · High reliability · capacity-limited"
   )
   expect_match(
-    projection_axis_brief("Stable", "Deep", "Close", regime_alarm = TRUE),
+    projection_axis_brief("Stable", "Deep", "High", regime_alarm = TRUE),
     "regime check$"
   )
 })
@@ -976,6 +976,153 @@ test_that("an always-full course gets a pressure bump on its plan, never on its 
   ))
   expect_true(unseen$pressure_bump_applied)
   expect_match(unseen$pressure_bump_note, "Feeder courses in Spring 2024 are not observed yet")
+})
+
+test_that("each past forecast term records its seat change and whether the term before was full", {
+  # Fall offerings of 100, 100, 130 seats; the first two seated 95 and 70 on
+  # day one. Fall 2023 is a +30% seat change after a near-full Fall 2022;
+  # Fall 2022 held its seats after a Fall 2021 with room.
+  history <- projection_test_history(
+    c(100, 100, 120), terms = c(202180L, 202280L, 202380L)
+  ) %>% dplyr::mutate(first_day_enrl = c(70, 95, 118))
+  sections <- tibble::tibble(
+    market_id = "abq_ea_course_market", subject_course = "TEST 101",
+    term = c(202180L, 202280L, 202380L), term_type = "fall",
+    scheduled_capacity = c(100, 100, 130)
+  )
+  backtests <- tibble::tibble(
+    market_id = "abq_ea_course_market", subject_course = "TEST 101",
+    term_type = "fall", target_term = c(202180L, 202280L, 202380L)
+  )
+  folds <- annotate_projection_fold_conditions(backtests, history, sections)
+
+  expect_true(is.na(folds$fold_seat_change[[1]]))
+  expect_true(is.na(folds$fold_prior_near_full[[1]]))
+  expect_equal(folds$fold_seat_change[[2]], 0)
+  expect_false(folds$fold_prior_near_full[[2]])
+  expect_equal(folds$fold_seat_change[[3]], 0.30)
+  expect_true(folds$fold_prior_near_full[[3]])
+  expect_equal(
+    projection_fold_error_source(folds$fold_seat_change, folds$fold_prior_near_full),
+    c("data_missing", "seats_held_room", "seats_changed")
+  )
+})
+
+test_that("seat consistency counts how often seats moved in the terms behind reliability", {
+  projections <- tibble::tibble(
+    market_id = "abq_ea_course_market", term_type = "fall",
+    subject_course = c("STEADY 1", "ONCE 1", "OFTEN 1", "NEW 1")
+  )
+  # Only the rule's published aftcasts count; the other candidate's rows and
+  # a term with no seat comparison are ignored.
+  backtests <- tibble::tribble(
+    ~subject_course, ~target_term, ~policy_selected, ~fold_seat_change,
+    "STEADY 1", 202280L, TRUE,  0.02,
+    "STEADY 1", 202380L, TRUE, -0.05,
+    "STEADY 1", 202380L, FALSE,  0.50,
+    "ONCE 1",   202280L, TRUE,  0.25,
+    "ONCE 1",   202380L, TRUE,  0.00,
+    "OFTEN 1",  202180L, TRUE,  NA,
+    "OFTEN 1",  202280L, TRUE, -0.20,
+    "OFTEN 1",  202380L, TRUE,  0.15
+  ) %>% dplyr::mutate(market_id = "abq_ea_course_market", term_type = "fall")
+  result <- add_projection_seat_consistency(projections, backtests)
+
+  expect_equal(result$seat_consistency, c("High", "Moderate", "Low", "Unrated"))
+  expect_equal(result$seat_consistency_terms, c(2L, 2L, 2L, 0L))
+  expect_equal(result$seat_consistency_moves, c(0L, 1L, 2L, 0L))
+  expect_equal(result$seat_consistency_reason[[1]],
+               "Seats held within 10% in all 2 past forecast terms")
+  expect_equal(result$seat_consistency_reason[[3]], paste0(
+    "Seats moved 10% or more in 2 of 2 past forecast terms ",
+    "(Fall 2022 -20%, Fall 2023 +15%)"
+  ))
+
+  # Read together: a miss with steady seats is the forecast's.
+  reading <- projection_reliability_reading(
+    c("Low", "Low", "High", "Unrated"), c("High", "Low", "Low", "High")
+  )
+  expect_match(reading[[1]], "even though the seats held steady")
+  expect_match(reading[[2]], "follow the schedule more than demand")
+  expect_match(reading[[3]], "landed close")
+  expect_match(reading[[4]], "^Too few past forecasts")
+})
+
+test_that("past error is summed by what each miss is attributable to", {
+  backtests <- tibble::tribble(
+    ~policy_selected, ~abs_error, ~actual_classlist_total, ~fold_seat_change, ~fold_prior_near_full,
+    TRUE,  30, 100,  0.40, TRUE,
+    TRUE,  10, 100, -0.30, NA,
+    TRUE,   5, 100,  0.00, TRUE,
+    TRUE,  15, 100,  0.05, FALSE,
+    TRUE,  20, 100,  NA,   NA,
+    FALSE, 99, 100,  0.00, TRUE
+  )
+  sources <- summarize_projection_error_sources(backtests)
+
+  expect_equal(sources$source,
+               c("seats_changed", "data_missing", "seats_held_full", "seats_held_room"))
+  expect_equal(sources$folds, c(2L, 1L, 1L, 1L))
+  # 80 points of error in all, from the rule's published rows only.
+  expect_equal(sources$share_of_error, c(40, 20, 5, 15) / 80)
+  expect_equal(sources$wape, c(40 / 200, 20 / 100, 5 / 100, 15 / 100))
+  expect_equal(sources$label[[1]], "Seats changed 10% or more")
+
+  summary <- projection_error_sources_summary(backtests, list())
+  expect_equal(summary$n_folds, 5L)
+  expect_match(summary$sentence, "^Across 5 past forecasts, 50% of the error came from terms whose seats changed")
+  expect_match(summary$sentence, "and 19% from courses with room whose seats held \\(15\\.0% off on average\\)")
+})
+
+test_that("the draft comparison separates short of day one from short of the plan", {
+  projections <- tibble::tibble(
+    market_id = "abq_ea_course_market",
+    subject_course = c("DAY 1", "PLAN 1", "COVER 1", "SPARE 1", "MISSING 1"),
+    department = "TEST",
+    projected_classlist_total = 100,
+    planned_registrations = 110, pressure_bump = 10,
+    projected_first_day_equivalent = 90,
+    recommended_sections = 4L, reference_section_size = 30,
+    scheduled_sections = c(2L, 3L, 4L, 7L, 0L),
+    scheduled_capacity = c(50, 100, 115, 200, 0),
+    target_schedule_available = c(TRUE, TRUE, TRUE, TRUE, FALSE),
+    additional_sections = c(2L, 1L, 0L, 0L, NA),
+    target_registration_observed = FALSE, target_registered_now = NA_real_,
+    accuracy = "High", seat_consistency = "High"
+  )
+  components <- tibble::tibble(
+    market_id = "abq_ea_course_market", subject_course = "DAY 1",
+    campus = c("ABQ", "EA"), part_term = "1", scheduled_sections = c(1L, 1L)
+  )
+  view <- list(
+    projections = projections, delivery_components = components,
+    meta = list(target_schedule_as_of = as.Date("2026-10-08"),
+                target_term_label = "Spring 2027")
+  )
+  draft <- build_enrollment_projection_draft_comparison(view)
+  table <- draft$table
+
+  expect_true(draft$available)
+  expect_equal(table$course, c("DAY 1", "PLAN 1", "MISSING 1", "COVER 1", "SPARE 1"))
+  expect_equal(table$status,
+               c("short_day_one", "short_plan", "not_in_draft", "covers", "spare"))
+  expect_equal(table$verdict[[1]], "Short of day-one seats by 40; the plan needs 2 more sections")
+  expect_equal(table$verdict[[2]], "Covers day one; 10 short of the plan (1 section)")
+  expect_equal(table$verdict[[4]], "Covers the plan, 5 to spare")
+  expect_equal(table$verdict[[5]], "90 seats beyond the plan")
+  expect_equal(table$campus_sections[[1]], "ABQ 1 \u00b7 EA 1")
+  expect_match(draft$sentence, "^The draft schedule \\(pulled October 8, 2026\\) has 465 seats in 4 of the 5 courses shown")
+  expect_match(draft$sentence, "1 course is short of the students expected on day one \\(by 40 seats\\)")
+  expect_match(draft$sentence, "1 monitored course is not in the draft\\.$")
+
+  # No schedule for the target term: says so instead of an empty table.
+  none <- build_enrollment_projection_draft_comparison(list(
+    projections = dplyr::mutate(projections, target_schedule_available = FALSE),
+    delivery_components = components[0, ],
+    meta = list(target_schedule_as_of = as.Date(NA), target_term_label = "Spring 2027")
+  ))
+  expect_false(none$available)
+  expect_match(none$sentence, "^No schedule for Spring 2027 is in the data yet")
 })
 
 test_that("the bundle validator rejects a plan that is not its projection plus its bump", {
@@ -1492,7 +1639,7 @@ test_that("selection is rolling: a challenger wins only on earlier shared aftcas
   expect_equal(selected$selection_wape, 0.08)
   expect_equal(selected$selection_basis, "Rolling selection")
   expect_equal(selected$depth, "Deep")
-  expect_equal(selected$accuracy, "Close")
+  expect_equal(selected$accuracy, "High")
   expect_equal(selected$projected_classlist_total, 118)
 
   # The realised record names the method that was live at each fold.
@@ -1554,7 +1701,7 @@ test_that("capacity-bounded fit retains fit confidence with a demand caveat", {
   expect_equal(selected$method_id, "seasonal_last")
   expect_true(selected$capacity_constrained_history)
   expect_equal(selected$n_capacity_reached, 3L)
-  expect_equal(selected$accuracy, "Close")
+  expect_equal(selected$accuracy, "High")
   expect_match(selected$accuracy_reason, "varying 1.8% term to term")
 
   explanation <- projection_axis_explanation(
@@ -1586,7 +1733,7 @@ test_that("variable term errors are reported without downgrading accuracy", {
 
   # Accuracy is a WAPE statement. Term-to-term variation is surfaced in the
   # reason text rather than silently collapsing the rating.
-  expect_equal(selected$accuracy, "Close")
+  expect_equal(selected$accuracy, "High")
   expect_equal(selected$wape, 0.04)
   expect_match(selected$accuracy_reason, "varying 4.8% term to term")
 })
@@ -1911,7 +2058,8 @@ test_that("the administrator summary says the decision in one sentence and flags
     adjusted_saturated_prior = TRUE, adjusted_prior_first_day_fill = 0.988,
     adjusted_waitlisted_prior = 15L, adjusted_regime_alarm = FALSE,
     adjusted_preceding_term = 202680L, adjusted_preceding_term_change = 0.02,
-    stability = "Moderate", accuracy = "Fair", methods_disagree = FALSE
+    stability = "Moderate", accuracy = "Moderate", seat_consistency = "Unrated",
+    methods_disagree = FALSE
   )
   sentence <- projection_summary_sentence(row)
   # The plan says how much of it is the pressure bump, and the first-day
@@ -1944,7 +2092,7 @@ test_that("the administrator summary says the decision in one sentence and flags
     projected_classlist_total = 2400, pressure_bump = 0,
     pressure_bump_applied = FALSE, planned_registrations = 2400,
     pressure_bump_note = "No pressure bump: Fall 2026 filled 80.0% of its seats",
-    stability = "Volatile", accuracy = "Poor"
+    stability = "Volatile", accuracy = "Low"
   )
   expect_match(projection_summary_sentence(moved), "^Plan 99 sections")
   expect_match(projection_summary_sentence(moved), "That is \\+10% on last Spring\\.")
@@ -1952,6 +2100,16 @@ test_that("the administrator summary says the decision in one sentence and flags
   expect_equal(
     projection_flags(moved),
     "Fall enrollment +91% | Hard to predict | Past forecasts off by 20%+"
+  )
+  # A Low course whose seats held is the forecast's miss; one whose seats
+  # moved is mostly the schedule's.
+  expect_equal(
+    projection_flags(dplyr::mutate(moved, seat_consistency = "High")),
+    "Fall enrollment +91% | Hard to predict | Off 20%+ with steady seats"
+  )
+  expect_equal(
+    projection_flags(dplyr::mutate(moved, seat_consistency = "Low")),
+    "Fall enrollment +91% | Hard to predict | Off 20%+ as seats moved"
   )
 
   sparse <- dplyr::mutate(row, projected_classlist_total = NA_real_)
