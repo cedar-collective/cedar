@@ -433,6 +433,7 @@ CEDAR_PROD_SSH=yourlogin@production-host
 CEDAR_PROD_DATA_DIR=/root/shared-data      # production's CEDAR_DATA_DIR
 # CEDAR_PROD_OUTPUT_DIR=/root/cedar/output # only for --projections
 # CEDAR_PROD_SSH_PORT=22
+# CEDAR_PROD_SSH_KEY=~/.ssh/id_ed25519     # a key ssh does not offer by default
 ```
 
 ```bash
@@ -447,7 +448,8 @@ scripts/restart-cedar.sh                        # so the app reads them
 when the server allows a shell command; an account limited to file transfer
 gets `sftp`, which downloads every matching file. Force either with
 `--method rsync` or `--method sftp`. An SSH key saves typing the password for
-each connection. A draft schedule for an upcoming term reaches your machine
+each connection; name it in `CEDAR_PROD_SSH_KEY` when it is not one ssh offers
+by default. A draft schedule for an upcoming term reaches your machine
 this way once production's refresh has pulled that term's DESR.
 
 `scripts/cedar-repl.R` reads `<repo>/data`, which can be a separate copy from

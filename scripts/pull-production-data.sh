@@ -17,6 +17,8 @@
 #   CEDAR_PROD_OUTPUT_DIR   production's output directory, for --projections
 #                           (default: the data directory's sibling "output")
 #   CEDAR_PROD_SSH_PORT     ssh port                                 (default: 22)
+#   CEDAR_PROD_SSH_KEY      private key for that login, when it is not
+#                           one ssh offers by default         (default: none)
 #   CEDAR_DATA_DIR          local data directory       (default: <repo>/data)
 #
 # Usage:
@@ -73,6 +75,8 @@ CEDAR_PROD_DATA_DIR="${CEDAR_PROD_DATA_DIR:-$(env_value CEDAR_PROD_DATA_DIR)}"
 CEDAR_PROD_OUTPUT_DIR="${CEDAR_PROD_OUTPUT_DIR:-$(env_value CEDAR_PROD_OUTPUT_DIR)}"
 CEDAR_PROD_SSH_PORT="${CEDAR_PROD_SSH_PORT:-$(env_value CEDAR_PROD_SSH_PORT)}"
 CEDAR_PROD_SSH_PORT="${CEDAR_PROD_SSH_PORT:-22}"
+CEDAR_PROD_SSH_KEY="${CEDAR_PROD_SSH_KEY:-$(env_value CEDAR_PROD_SSH_KEY)}"
+CEDAR_PROD_SSH_KEY="${CEDAR_PROD_SSH_KEY/#\~/$HOME}"
 LOCAL_DATA_DIR="${CEDAR_DATA_DIR:-$(env_value CEDAR_DATA_DIR)}"
 LOCAL_DATA_DIR="${LOCAL_DATA_DIR:-$REPO_ROOT/data}"
 LOCAL_OUTPUT_DIR="$REPO_ROOT/output/projections"
@@ -82,8 +86,13 @@ LOCAL_OUTPUT_DIR="$REPO_ROOT/output/projections"
 CEDAR_PROD_OUTPUT_DIR="${CEDAR_PROD_OUTPUT_DIR:-$(dirname "$CEDAR_PROD_DATA_DIR")/output}"
 [[ -d "$LOCAL_DATA_DIR" ]] || die "Local data directory does not exist: $LOCAL_DATA_DIR"
 
-SSH_OPTS=(-p "$CEDAR_PROD_SSH_PORT" -o BatchMode=no -o ConnectTimeout=15)
-SFTP_OPTS=(-P "$CEDAR_PROD_SSH_PORT" -o ConnectTimeout=15)
+KEY_OPTS=()
+if [[ -n "$CEDAR_PROD_SSH_KEY" ]]; then
+  [[ -r "$CEDAR_PROD_SSH_KEY" ]] || die "CEDAR_PROD_SSH_KEY is not a readable file: $CEDAR_PROD_SSH_KEY"
+  KEY_OPTS=(-i "$CEDAR_PROD_SSH_KEY" -o IdentitiesOnly=yes)
+fi
+SSH_OPTS=(-p "$CEDAR_PROD_SSH_PORT" ${KEY_OPTS[@]+"${KEY_OPTS[@]}"} -o BatchMode=no -o ConnectTimeout=15)
+SFTP_OPTS=(-P "$CEDAR_PROD_SSH_PORT" ${KEY_OPTS[@]+"${KEY_OPTS[@]}"} -o ConnectTimeout=15)
 
 run() {
   if $DRY_RUN; then printf '  [dry-run]'; printf ' %q' "$@"; echo; else "$@"; fi
@@ -125,7 +134,7 @@ pull_dir() {
     local filters=()
     for p in "${patterns[@]}"; do filters+=(--include="$p"); done
     run rsync -av --partial --backup --backup-dir="$backup_dir" \
-      -e "ssh -p $CEDAR_PROD_SSH_PORT" "${filters[@]}" --exclude='*' \
+      -e "ssh $(printf '%q ' "${SSH_OPTS[@]}")" "${filters[@]}" --exclude='*' \
       "$CEDAR_PROD_SSH:$remote_dir/" "$local_dir/"
   else
     # sftp has no backup option: download into a staging folder, then move
