@@ -91,6 +91,11 @@ optional styling suggestions. The data/API contract is in
   for a planning allowance. Its popup links to the current Gen Ed course list.
 - Put observed student coursework at **Pathways > Course paths**, using the
   shared Pathways population. Never present observed order as a prerequisite.
+- A completed Course paths run must dismiss its blocking loading dialog and
+  reveal the plot. Use the full session namespace for loading-completion
+  messages from this nested module, including validation and error paths.
+  Browser checks must assert that the dialog closes, rather than merely find
+  a plot rendered behind it (ISSUES.md I31).
 
 ## Spatial layout
 

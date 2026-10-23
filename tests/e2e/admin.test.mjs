@@ -32,7 +32,17 @@ try {
     document.querySelector('.navbar [data-value="Data & Usage"]').click();
     await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
     const table = document.getElementById('data_status_table');
-    if (!table.checkVisibility()) throw new Error('Freshness table is hidden after Admin navigation');
+    if (!table.checkVisibility()) {
+      const ancestors = [];
+      for (let el = table; el; el = el.parentElement) {
+        const css = getComputedStyle(el);
+        if (el.classList.contains('tab-pane') || css.display === 'none') {
+          ancestors.push({ id: el.id, class: el.className, display: css.display, visibility: css.visibility });
+        }
+      }
+      throw new Error(`Freshness table is hidden after Admin navigation: ${JSON.stringify({ ancestors,
+        selected: [...document.querySelectorAll('[role="tab"][aria-selected="true"]')].map(el => el.textContent.trim()) })}`);
+    }
     return performance.now() - start;
   });
   check(`freshness reveals without network/server response (${Math.round(revealMs)} ms)`, revealMs < 1000);

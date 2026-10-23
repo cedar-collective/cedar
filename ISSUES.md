@@ -29,6 +29,9 @@ recurrence is recognizable.
 
 | ID | Kind | Summary |
 |---|---|---|
+| [I31](#i31--course-paths-finishes-behind-a-stuck-loading-dialog) | Defect | Nested Course paths report sends completion to the wrong loading-dialog channel (resolved) |
+| [I30](#i30--saved-r-workspaces-entered-the-docker-build-context) | Defect | Case-sensitive Docker ignore omitted `.RData`, copying an 89 MB workspace into app image layers (resolved) |
+| [I29](#i29--generated-navigation-ids-can-open-the-wrong-panel) | Defect | Generated nav-menu IDs collide, so Admin can open Gen Ed instead of Data & Usage (resolved) |
 | [I28](#i28--one-late-starting-session-makes-a-whole-courses-first-day-unknown) | Defect | One late-starting session makes a whole course's first day unknown: 257 of 2,599 Fall 2026 courses, hiding ENGL 1120 and MATH 1350's saturated Fall from the Fall 2027 projection |
 | [I27](#i27--the-projection-floor-adds-a-waitlist-to-first-day-enrollment-and-compares-it-with-ever-registered-demand) | Defect | The projection floor mixed units: 245 unserved waitlisted students lifted Fall 2027 by 77 (resolved) |
 | [I26](#i26--projection-capacity-reached-was-judged-on-ever-registered-demand) | Defect | Projection "capacity reached" was judged on ever-registered demand: 72% of course-terms flagged full when census filled 17% (resolved) |
@@ -46,6 +49,50 @@ recurrence is recognizable.
 ---
 
 # Defects
+
+## I31 — Course paths finishes behind a stuck loading dialog
+
+**Status: resolved (2026-10-19).** Pathways > Course paths could render its
+plot and table while its blocking loading dialog remains open. The nested UI
+listens on `pathways-course_paths_load_complete`, but the server passes its
+local module ID to `signal_load_complete()`, sending `course_paths_load_complete`.
+Custom-message channels are not automatically namespaced. The same mismatch
+affects validation and error dismissal. The existing browser check found the
+heatmap behind the dialog without asserting that the dialog closed.
+
+`observedCoursePathsServer()` now uses `session$ns(NULL)` for every completion
+signal. `node tests/e2e/degree-explorer.test.mjs --course-paths-only` reproduces
+the original failure (plot rendered, dialog never closed) and passes all six
+checks on the rebuilt image, including success, invalid campus input and a
+repeated run. The full R gate passes 6,818 assertions with one existing fixture
+skip. A first post-rebuild browser attempt hit its 60-second page-load timeout
+during cold application startup; the focused rerun followed a completed page
+load and passed with no JavaScript errors.
+
+## I30 — Saved R workspaces entered the Docker build context
+
+**Status: resolved (2026-10-19).** Rebuilt image inspection confirms no saved R
+workspace, and the Admin browser suite passes. The ignore
+file named `.Rdata`, but the host workspace is `.RData` (89 MB). Docker's
+case-sensitive matcher included it in COPY and the following ownership layer.
+Repeated local builds exhausted host space and Docker reported read-only
+BuildKit metadata. Both spellings are now excluded. The saved workspace itself
+is preserved; it is not an app dependency. Done when the rebuilt image omits it
+and the normal app/browser gate passes.
+
+## I29 — Generated navigation IDs can open the wrong panel
+
+**Status: resolved (2026-10-19).** All 15 navigation checks and 36 Admin browser
+checks pass, including forced primary-ID collisions. While verifying catalog milestones, Admin's
+Data & Usage link and Explore's Gen Ed panel both rendered as `tab-7367-3`.
+The link became selected but Bootstrap opened the first matching panel, Gen Ed.
+The offline freshness assertion failed before Catalog Review was exercised.
+The saved served HTML confirmed duplicate `tab-7367-1`, `-3` and `-4` IDs.
+
+bslib independently samples a four-digit prefix for each `nav_menu`. The fix
+assigns unique primary navbar link/panel IDs while retaining `data-value`
+bindings and nested tab IDs. `www/cedar-navigation.js` runs before URL navigation
+at DOM-ready; the forced collision and link/panel checks in `nav.test.mjs` guard it.
 
 ## I1 — `cedar_programs` and `cedar_degrees` were fragmented into seven student ID spaces
 

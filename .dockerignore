@@ -1,6 +1,7 @@
 # RStudio and system files
 .Rhistory
 .Rdata
+.RData
 .Rproj.user
 .DS_Store
 

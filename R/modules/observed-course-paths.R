@@ -22,6 +22,9 @@ observedCoursePathsUI <- function(id, campuses) {
 
 observedCoursePathsServer <- function(id, students, population, description, edges, groups) {
   moduleServer(id, function(input, output, session) {
+    # Custom-message channels do not inherit a parent module's namespace.
+    # Match the fully namespaced ID passed to the nested UI's loading overlay.
+    overlay_id <- session$ns(NULL)
     paths <- reactiveVal(NULL)
     # A changed population clears the old result; the chart always describes the current population.
     observeEvent(population(), { paths(NULL) }, ignoreInit = TRUE, ignoreNULL = FALSE)
@@ -49,12 +52,12 @@ observedCoursePathsServer <- function(id, students, population, description, edg
     observeEvent(input$button, {
       if (is.null(population()) || !nrow(population())) {
         showNotification("Define a nonempty population above first.", type = "warning")
-        signal_load_complete(session, id, error = TRUE)
+        signal_load_complete(session, overlay_id, error = TRUE)
         return()
       }
       if (!length(input$campus)) {
         showNotification("Select at least one delivery campus.", type = "warning")
-        signal_load_complete(session, id, error = TRUE)
+        signal_load_complete(session, overlay_id, error = TRUE)
         return()
       }
       timer <- start_report_timer("degree-paths")
@@ -67,12 +70,12 @@ observedCoursePathsServer <- function(id, students, population, description, edg
         updateSelectInput(session, "detail_group", choices = c("All groups" = "all",
           stats::setNames(result$groups$group_id, result$groups$group_label)), selected = "all")
         duration <- end_report_timer(timer, result = result)
-        signal_load_complete(session, id, duration_sec = duration)
+        signal_load_complete(session, overlay_id, duration_sec = duration)
       }, error = function(e) {
         paths(NULL)
         showNotification(conditionMessage(e), type = "error", duration = NULL)
         end_report_timer(timer, success = FALSE, error = e)
-        signal_load_complete(session, id, error = TRUE)
+        signal_load_complete(session, overlay_id, error = TRUE)
       })
     }, ignoreInit = TRUE)
   })
