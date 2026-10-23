@@ -11,11 +11,23 @@ cedar_use_qs <- TRUE
 cedar_data_dir <- file.path(cedar_base_dir, "data")
 cedar_output_dir <- file.path(cedar_base_dir, "output")
 
-# define the current term
+# ── Terms ────────────────────────────────────────────────────────────────────
+# Term codes are YYYYSS: 10 = Spring, 60 = Summer, 80 = Fall.
+#
+# Loading a new term's data needs no change here. Every term picker lists every
+# term in the section data, so a schedule pulled months ahead (a preliminary
+# Spring schedule in October, say) is selectable as soon as it is loaded.
+
+# The term the institution is in now. A later term with sections but no
+# enrollments is treated as upcoming: Enrollment's low-enrollment view compares
+# its scheduled courses with past offerings of the same season instead of
+# flagging every empty section. Enrollment's trend charts also stop here.
 cedar_current_term <- 202680
 
-# App-wide default for term inputs. Keep explicit when the preferred landing
-# term differs from calendar/current-term logic.
+# The term every term picker opens on (Enrollment, Open Seats, Waitlists,
+# Cancellations, Regstats, Dept Dashboard), and the term the Dept Dashboard
+# cache warmer uses. Setting it to a term with no registrations yet opens those
+# tabs on a term whose enrollment counts are all still zero.
 cedar_default_term <- 202680
 
 # Oldest term loaded into the app. Data before this term is dropped at startup
@@ -25,14 +37,9 @@ cedar_min_term <- 201980  # Fall 2019
 # First term shown in department and course history views.
 cedar_report_start_term <- 202180
 
-# cedar_report_end_term is derived automatically in global.R after load_funcs():
-#   cedar_report_end_term <- subtract_term(cedar_current_term)
-# This keeps history views focused on complete terms while current/future-term
-# surfaces can still use cedar_current_term and cedar_default_term.
-
-# Registration timing flag for future calendar-derived defaults. Term inputs
-# currently use cedar_default_term above.
-cedar_registration_underway <- FALSE
+# There is no end-term setting. global.R reads the right edges (last settled,
+# last graded, last enrolled) from the loaded data at startup with
+# cedar_report_edges(); see the right-edge policy in AGENTS.md.
 
 # Minimum group size for descriptive breakdowns (small-cell suppression).
 # Pathways and similar analytics hide any group/pathway smaller than this so

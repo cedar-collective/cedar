@@ -199,6 +199,24 @@ test_that("get_dashboard_enrollment_flags surfaces waitlists and threshold-based
   expect_equal(review$priority, "Warning")
   expect_equal(review$repeated, "Y")
   expect_equal(review$recent_history, "8, 9, 7, 8 (Sp20, Sp21, Sp22, Sp23)")
+
+  # A past snapshot's history stops at the snapshot term, whatever the app's
+  # current term is: Spring 2025 is later than the Spring 2024 snapshot, so it
+  # is not part of that snapshot's history.
+  later <- dplyr::bind_rows(
+    sections,
+    dplyr::mutate(dplyr::filter(sections, term == 202410L), term = 202510L)
+  )
+  later_history <- later %>%
+    dplyr::group_by(subject_course, course_title, campus, term) %>%
+    dplyr::summarize(enrolled = sum(enrolled), total_enrl = sum(total_enrl),
+                     .groups = "drop")
+  assign("cedar_current_term", 202510L, envir = globalenv())
+  withr::defer(rm("cedar_current_term", envir = globalenv()))
+  past <- get_dashboard_enrollment_flags(later, later_history, "HIST", 202410L,
+                                         campus = "ABQ")
+  expect_equal(format_dashboard_low_enrollment_review(past$low_enrollment)$recent_history,
+               "8, 9, 7, 8 (Sp20, Sp21, Sp22, Sp23)")
 })
 
 test_that("format_dashboard_early_drop_watch keeps high-direction regstats drops", {
@@ -313,6 +331,11 @@ test_that("dashboard payload includes headcount line data", {
     cedar_programs = test_programs,
     cedar_students = test_students,
     cedar_sections = test_sections
+  )
+
+  expect_error(
+    create_dept_dashboard_data(data_objects, list(dept_code = "HIST", campus = "ABQ")),
+    "opt\\$term is required"
   )
 
   dashboard <- create_dept_dashboard_data(

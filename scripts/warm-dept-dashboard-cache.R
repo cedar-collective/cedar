@@ -89,14 +89,12 @@ if (exists("cedar_min_term", inherits = TRUE)) {
   }
 }
 
-config_report_end_term <- subtract_term(cedar_current_term)
-cedar_edges <- cedar_data_edges(
-  data_objects[["cedar_students"]],
-  max_term = cedar_current_term
-)
-cedar_report_end_term <- cedar_edges$last_enrolled_complete %||% config_report_end_term
-message("[warm-dept-dashboard-cache] Enrollment reporting edge: ",
-        cedar_report_end_term, " (config arithmetic: ", config_report_end_term, ")")
+# The same edges global.R computes, so the cache keys match what the app asks for.
+report_edges <- cedar_report_edges(data_objects[["cedar_students"]])
+cedar_edges <- report_edges$edges
+cedar_graded_through <- report_edges$graded_through
+cedar_report_end_term <- report_edges$report_end_term
+cedar_report_latest_term <- report_edges$report_latest_term
 
 dashboard_cache_hash <- function(name) {
   value <- data_objects[[name]]

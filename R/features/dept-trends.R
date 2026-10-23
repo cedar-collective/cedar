@@ -90,7 +90,6 @@ set_payload <- function(dept_code, prog_focus = NULL) {
     ])),
     prog_focus = prog_focus,
     prog_codes = prog_codes,
-    current_term = if (exists("cedar_current_term")) cedar_current_term else cedar_report_end_term,
     term_start = cedar_report_start_term,
     # Charts run to the newest enrolled term; the in-progress tail is labelled
     # in the module. Trend signals (largest increases, perennial lows) compare
@@ -194,10 +193,12 @@ create_dept_report_base <- function(data_objects, opt) {
     incoming_dept
   }
 
-  cfg <- set_payload(dept_code, opt[["prog"]])
-  if (!is.null(opt[["current_term"]]) && length(opt[["current_term"]]) > 0) {
-    cfg$current_term <- as.integer(opt[["current_term"]][[1]])
+  if (is.null(opt[["current_term"]]) || length(opt[["current_term"]]) == 0) {
+    stop("[dept-trends.R] opt$current_term is required.")
   }
+
+  cfg <- set_payload(dept_code, opt[["prog"]])
+  cfg$current_term <- as.integer(opt[["current_term"]][[1]])
   cfg$dept_raw <- incoming_dept
 
   hc <- get_headcount_data_for_dept_report(

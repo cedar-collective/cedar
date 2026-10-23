@@ -17,7 +17,7 @@ Later enrollments remain available to the separate full-history return lookup.
 This Roadblocks-specific rule does not change CEDAR's all-attempt course DFW rates;
 `get_dfw_rates()` is a separate ever-DFW measure and must not supply Roadblocks context.
 
-**Never bound an analysis with `max(term)`, a hardcoded term, or arithmetic on `cedar_current_term`.** Use the edges computed once at startup by `cedar_data_edges()` (`R/branches/data-edges.R`). This is the same class of rule as the campus and DFW policies.
+**Never bound an analysis with `max(term)`, a hardcoded term, or arithmetic on `cedar_current_term`.** Use the edges computed once at startup by `cedar_report_edges()` (`R/branches/data-edges.R`). This is the same class of rule as the campus and DFW policies.
 
 ## Why an edge is not one number
 
@@ -41,7 +41,7 @@ So "the last term in the data" is at least two different terms depending on what
 | `last_enrolled` (`cedar_report_latest_term`) | descriptive current-registration charts — headcount, course enrollment, attempted SCH — **only with every term after `last_graded` labelled in progress** (`cedar_in_progress_terms()`, `mark_plotly_terms()`). Never a trend comparison, a longitudinal denominator, or a grade-based rate |
 | `last_degree` | completions |
 
-`cedar_report_end_term` is **no longer hand-maintained**. `global.R` derives it from `last_enrolled_complete`; the config value survives only as a fallback for a snapshot with no `as_of_date`. On current data the derived value matches what the config had been set to by hand, which is the check that it works.
+`cedar_report_end_term` is **no longer hand-maintained**, and has no config fallback. `cedar_report_edges()` derives all four edges at startup, for `global.R` and the cache-warming scripts alike, so the app and the caches it reads agree. When the derived value replaced the hand-set one, it matched what config had been set to by hand, which was the check that it works.
 
 ## Settled enrollment, and why not by size
 
@@ -64,8 +64,9 @@ Bounding a grade rate by the enrollment edge does not error — it returns a pla
 
 ## In practice
 
-- Grade-dependent code uses `cedar_graded_through`; enrollment reporting uses `cedar_report_end_term`. Both fall back to config only when `global.R` never ran (standalone scripts).
-- Startup prints all four edges, and says so when a derived value differs from what config arithmetic would have produced.
+- Grade-dependent code uses `cedar_graded_through`; enrollment reporting uses `cedar_report_end_term`. Neither falls back to config: if the data cannot determine the settled or graded edge, `cedar_report_edges()` stops startup, because some surfaces (Pathways' population window) read a `NULL` bound as no bound at all.
+- Nothing caps the edges at `cedar_current_term`. A term registering ahead of the current one reaches the descriptive charts, labelled in progress, the day it lands; the settled rule alone keeps it out of trend comparisons. A cap here used to hide each next term's registrations from Dept Trends until someone edited config.
+- Startup prints all four edges.
 - The threshold (`min_graded_share`, default 0.5) is not finely balanced — finished terms sit at 83–91% and in-flight terms at 0–7%, so anything from ~0.2 to ~0.8 picks the same edge.
 - An edge that cannot be determined is `NULL`, never a guess. Fail closed.
 - **Say which edge you used.** `cedar_edge_note()` produces the sentence. A capped view that does not explain itself reads as a stale pipeline; "Spring 2026 is enrolled but not yet graded" reads as a data state and tells the user when it will move.
