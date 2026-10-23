@@ -1,0 +1,2 @@
+source_id,provider,landing_url,api_base,level_field,undergraduate_level,graduate_level,untyped_exclusion_fields
+main,kuali,https://catalog.example.invalid/,https://catalog.example.invalid/api/v1/catalog,ugGrDegree,undergraduateProgram,graduateProgram,minorRequirements|certificateRequirements

@@ -1,0 +1,10 @@
+field,phase
+description,info
+degreeRequirements,degree
+minorRequirements,degree
+certificateRequirements,degree
+graduateAdmissionsRequirements,admission
+concentrationRequirements,degree
+prerequisites,prerequisite
+corequisites,corequisite
+program,prerequisite
