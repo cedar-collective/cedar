@@ -50,6 +50,13 @@ test_that("create_dept_report_base stops when all required keys are missing", {
   )
 })
 
+test_that("create_dept_report_base requires the current term", {
+  expect_error(
+    create_dept_report_base(make_data_objects(), list(dept_code = "HIST")),
+    regexp = "opt\\$current_term is required"
+  )
+})
+
 test_that("Dept Trends base no longer requires unused faculty data", {
   data_objects <- make_data_objects()
   data_objects$cedar_faculty <- NULL

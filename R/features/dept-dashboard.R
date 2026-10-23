@@ -826,7 +826,7 @@ get_dashboard_enrollment_flags <- function(cedar_sections, course_history, dept_
     include_buffer       = FALSE,
     add_history          = TRUE,
     history_limit        = 200L,
-    max_term             = if (exists("cedar_current_term")) cedar_current_term else current_term,
+    max_term             = current_term,
     add_perennial        = TRUE,
     min_prior_terms      = min_prior_terms,
     perennial_threshold  = perennial_threshold
@@ -1695,11 +1695,10 @@ create_dept_dashboard_data <- function(data_objects, opt) {
   )
 
   # Selected-term snapshot. The term picker (opt$term) drives every single-term
-  # section below. Falls back to cedar_current_term, then to the max term in
-  # history, when no term is supplied (tests, API, older callers).
+  # section below.
   current_term <- opt[["term"]]
   if (is.null(current_term) || length(current_term) == 0 || is.na(current_term)) {
-    current_term <- if (exists("cedar_current_term")) cedar_current_term else max(cedar_programs$term, na.rm = TRUE)
+    stop("[dept-dashboard.R] opt$term is required: pick the term to snapshot.")
   }
   current_term <- as.integer(current_term)
   message("[dept-dashboard.R] snapshot term: ", current_term)

@@ -74,8 +74,7 @@ cat(sprintf("✅ Current term: %s\n\n", current_term))
 
 cat("Data range for reports (how far back to include data):\n")
 report_start <- ask_text("Start term for reports", default = "201980")
-report_end <- ask_text("End term for reports", default = current_term)
-cat(sprintf("✅ Report range: %s to %s\n\n", report_start, report_end))
+cat(sprintf("✅ Reports start at %s; CEDAR reads where they end from the data\n\n", report_start))
 
 # Step 4: Data storage settings
 cat("──────────────────────────────────────────────────────\n")
@@ -133,7 +132,6 @@ cat("⚙️  Advanced Settings\n")
 cat("──────────────────────────────────────────────────────\n")
 
 use_qs <- ask_yes_no("Use fast .qs format for data files? (recommended)", default = "y")
-reg_underway <- ask_yes_no("Is registration currently underway?", default = "n")
 
 cat("\n")
 
@@ -171,10 +169,6 @@ config_lines <- c(
   "# Academic term settings",
   sprintf("cedar_current_term <- %s", current_term),
   sprintf("cedar_report_start_term <- %s", report_start),
-  sprintf("cedar_report_end_term <- %s", report_end),
-  "",
-  "# Registration status",
-  sprintf("cedar_registration_underway <- %s", toupper(as.character(reg_underway))),
   "",
   "# Registration statistics thresholds",
   "cedar_regstats_thresholds <- list()",

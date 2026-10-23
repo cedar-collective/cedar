@@ -1350,28 +1350,17 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
     # History analysis. Ongoing students (relevant_until = NA) are unrestricted.
     # The enrollment-side boundary for every Pathways analysis: population
     # windowing, Course Pairs censoring, and the scope strip. This is the settled
-    # -registration edge that global.R derives from the data — the last term
-    # whose registration has actually finished — not arithmetic on
-    # cedar_current_term. Both give Spring 2026 on current data, but the derived
-    # one self-corrects when the data moves and the config does not. See the
-    # right-edge policy in AGENTS.md. Grade-dependent boundaries use
-    # graded_through() below instead; the two are different terms.
-    analysis_through <- if (exists("cedar_report_end_term") && !is.null(cedar_report_end_term)) {
-      cedar_report_end_term
-    } else {
-      tryCatch(subtract_term(cedar_current_term), error = function(e) NULL)
-    }
+    # -registration edge global.R reads from the data at startup with
+    # cedar_report_edges() — the last term whose registration has actually
+    # finished. Startup stops if it cannot be determined, so it is never NULL
+    # here (a NULL would lift the window entirely). See the right-edge policy in
+    # AGENTS.md. Grade-dependent boundaries use graded_through() below instead;
+    # the two are different terms.
+    analysis_through <- cedar_report_end_term
 
-    # Grade-dependent outcomes are bounded by the graded edge, computed once at
-    # startup in global.R from the loaded data. See the right-edge policy in
-    # AGENTS.md. The fallback recomputes it for callers that never ran global.R.
-    graded_through <- reactive({
-      if (exists("cedar_graded_through") && !is.null(cedar_graded_through)) {
-        cedar_graded_through
-      } else {
-        cedar_data_edges(students, max_term = cedar_current_term)$last_graded
-      }
-    })
+    # Grade-dependent outcomes are bounded by the graded edge, computed at the
+    # same time.
+    graded_through <- reactive(cedar_graded_through)
 
     filtered_students <- reactive({
       pop <- tryCatch(population_rv()$population, error = function(e) NULL)

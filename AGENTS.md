@@ -218,7 +218,7 @@ Saved `cedar_grades` carries `cedar_outcome_policy_version`, checked by `validat
 
 ## CEDAR-wide right-edge policy
 
-**Never bound an analysis with `max(term)`, a hardcoded term, or arithmetic on `cedar_current_term`.** Use the edges computed once at startup by `cedar_data_edges()` (`R/branches/data-edges.R`). This is the same class of rule as the campus and DFW policies.
+**Never bound an analysis with `max(term)`, a hardcoded term, or arithmetic on `cedar_current_term`.** Use the edges computed once at startup by `cedar_report_edges()` (`R/branches/data-edges.R`). This is the same class of rule as the campus and DFW policies.
 
 CEDAR's local data runs behind the registrar, and a term does not arrive all at once — registration appears months early, grades land weeks late. So "the last term in the data" is at least two different terms depending on what you ask.
 
@@ -231,7 +231,9 @@ CEDAR's local data runs behind the registrar, and a term does not arrive all at 
 
 **Current enrollment is never hidden.** A term with registrations appears on descriptive charts the day it lands, labelled, rather than waiting to settle or be graded: hiding it made Fall 2026 vanish from Dept Trends for its first weeks, and earned-only SCH hid it until grades posted. That is why SCH is *attempted* hours (`filter_sch_rows()`, definition credit-hours 2.0.0) — a grade is an outcome, and outcomes keep their own edge.
 
-`cedar_report_end_term` is **no longer hand-maintained**; `global.R` derives it from `last_enrolled_complete`. A term counts as settled when the newest pull covering it happened at least `min_days_after_start` days (default 14) after the term began — **never by comparing row counts to prior years**, which cannot distinguish a real enrollment decline from an unfinished term. An edge that cannot be determined is `NULL`, never a guess: fail closed. **Say which edge you used** — `cedar_edge_note()` produces the sentence.
+**The edges are computed in one place.** `cedar_report_edges()` sets all four at startup, for `global.R` and the cache-warming scripts alike, so the app and the caches it reads agree; none is hand-maintained. A term counts as settled when the newest pull covering it happened at least `min_days_after_start` days (default 14) after the term began — **never by comparing row counts to prior years**, which cannot distinguish a real enrollment decline from an unfinished term. An edge `cedar_data_edges()` cannot determine is `NULL`, never a guess: fail closed. The app cannot run without the settled and graded edges (Pathways reads a `NULL` bound as no bound), so `cedar_report_edges()` stops startup without them rather than guess from the current term. **Say which edge you used** — `cedar_edge_note()` produces the sentence.
+
+**Term settings: two are set by hand, and neither is an edge.** `config/shiny_config.R` sets `cedar_current_term`, the term the institution is in — a later term with sections but no enrollments is upcoming, which puts Enrollment's low-enrollment view into comparing the schedule with each course's history — and `cedar_default_term`, the term every picker opens on. Loading a new term changes neither: pickers list every term in the data, and the edges move on their own. Nothing caps the edges at `cedar_current_term`, so a term registering ahead of it reaches the descriptive charts, labelled in progress, the day it lands. What each setting does in practice: `config/shiny_config_template.R`.
 
 ### Grade outcomes and longitudinal follow-up require two separate right edges
 

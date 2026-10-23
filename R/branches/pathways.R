@@ -30,7 +30,8 @@ pathways_level_filter <- function(level_choice) {
 #' look like non-returns / non-entries simply because the data ends.
 #'
 #' @param latest_complete_term Integer term code of the last complete data
-#'   term (typically `subtract_term(cedar_current_term)`).
+#'   term (`cedar_report_end_term`, the settled edge from
+#'   [cedar_report_edges()]).
 #' @param follow_up_terms Integer. How many complete regular (fall/spring)
 #'   terms of follow-up the analysis needs. 1 for next-term outcomes
 #'   (stop-out), the A-to-B gap for course pairs, etc.

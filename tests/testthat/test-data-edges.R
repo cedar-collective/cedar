@@ -205,6 +205,36 @@ test_that("min_days_after_start clears add/drop rather than the first day", {
                202680L)
 })
 
+test_that("the app's report edges are the data edges under their app names", {
+  r <- cedar_report_edges(settled_students())
+  expect_equal(r$edges, cedar_data_edges(settled_students()))
+  expect_equal(r$graded_through, 202580L)
+  expect_equal(r$report_end_term, 202610L)
+  expect_equal(r$report_latest_term, 202680L)
+})
+
+test_that("the app's report edges are not capped below the newest registrations", {
+  # A term registering ahead of the one the institution is in reaches the
+  # descriptive charts the day it lands; the settled rule alone keeps it out of
+  # trend comparisons.
+  ahead <- dplyr::bind_rows(
+    settled_students(),
+    tibble::tibble(term = rep(202710L, 40), final_grade = NA_character_,
+                   as_of_date = as.Date("2026-10-28"))
+  )
+  r <- cedar_report_edges(ahead)
+  expect_equal(r$report_latest_term, 202710L)
+  expect_equal(r$report_end_term, 202610L)
+  expect_true(202710L %in% cedar_in_progress_terms(r$edges)$term)
+})
+
+test_that("an undeterminable report edge stops startup instead of being guessed", {
+  no_dates <- dplyr::select(settled_students(), -as_of_date)
+  expect_error(cedar_report_edges(no_dates), "settled edge")
+  ungraded <- dplyr::mutate(settled_students(), final_grade = NA_character_)
+  expect_error(cedar_report_edges(ungraded), "graded edge")
+})
+
 test_that("without as_of_date the settled edge is NULL, not the raw maximum", {
   # Failing closed: silently returning the raw edge would reintroduce the
   # in-flight term into enrollment reports.

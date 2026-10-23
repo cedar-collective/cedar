@@ -106,12 +106,15 @@ if ("dept_name_lookup" %in% names(lookups) && nrow(lookups$dept_name_lookup) > 0
   )
 }
 
-cedar_edges <- cedar_data_edges(
+# The same edges global.R computes, so the cache keys match what the app asks for.
+report_edges <- cedar_report_edges(
   data_objects[["cedar_students"]],
-  max_term = cedar_current_term
+  degrees = data_objects[["cedar_degrees"]]
 )
-cedar_report_end_term <- cedar_edges$last_enrolled_complete %||% cedar_report_end_term
-cedar_report_latest_term <- cedar_edges$last_enrolled
+cedar_edges <- report_edges$edges
+cedar_graded_through <- report_edges$graded_through
+cedar_report_end_term <- report_edges$report_end_term
+cedar_report_latest_term <- report_edges$report_latest_term
 
 cedar_dept_source_hashes <- hash_dept_cache_sources(data_objects)
 

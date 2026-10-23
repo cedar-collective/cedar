@@ -36,13 +36,9 @@ cedar_current_term <- 202680
 # term differs from calendar/current-term logic.
 cedar_default_term <- 202680
 
-# these control how much data appears on dept-reports
+# First term shown in department and course history views. There is no end
+# term: the app reads its right edges from the data (cedar_report_edges()).
 cedar_report_start_term <- 201980
-cedar_report_end_term <- 202680
-
-# Registration timing flag for future calendar-derived defaults. Term inputs
-# currently use cedar_default_term above.
-cedar_registration_underway <- FALSE
 
 ########### Thresholds for various reports
 cedar_regstats_thresholds <- list()

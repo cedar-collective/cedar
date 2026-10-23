@@ -158,6 +158,52 @@ cedar_data_edges <- function(students, degrees = NULL,
 }
 
 
+#' The app's report edges, computed once at startup
+#'
+#' The one place global.R and the cache-warming scripts get their right edges,
+#' so the app and the caches it reads agree on them. Nothing caps them at
+#' `cedar_current_term`: a term with registrations is the newest enrolled term
+#' the day it lands, and the settled rule in [cedar_data_edges()] already keeps
+#' it out of trend comparisons until its registration has settled.
+#'
+#' The settled and graded edges are required. Several surfaces read a NULL
+#' bound as "no bound" (Pathways' population window, for one), so an edge the
+#' data cannot determine stops startup rather than being guessed from the
+#' configured current term or silently lifted.
+#'
+#' @param students Data frame. `cedar_students`.
+#' @param degrees Data frame or NULL. `cedar_degrees`, for `last_degree`.
+#' @return Named list: `edges` (the full [cedar_data_edges()] result),
+#'   `graded_through` (`last_graded`), `report_end_term`
+#'   (`last_enrolled_complete`) and `report_latest_term` (`last_enrolled`).
+cedar_report_edges <- function(students, degrees = NULL) {
+  edges <- cedar_data_edges(students, degrees = degrees)
+
+  if (is.null(edges$last_enrolled_complete)) {
+    stop("[data-edges.R] The settled edge cannot be determined: no term was pulled ",
+         edges$min_days_after_start, " or more days after it began",
+         if (!"as_of_date" %in% names(students)) " (cedar_students has no as_of_date)", ".")
+  }
+  if (is.null(edges$last_graded)) {
+    stop("[data-edges.R] The graded edge cannot be determined: no term has final ",
+         "grades on at least ", edges$min_graded_share * 100, "% of its rows.")
+  }
+
+  message(sprintf(
+    "[data-edges.R] Data edges: enrolled %s to %s | settled through %s | graded through %s | degrees through %s",
+    fmt_term(edges$first_enrolled), fmt_term(edges$last_enrolled),
+    fmt_term(edges$last_enrolled_complete), fmt_term(edges$last_graded),
+    if (is.null(edges$last_degree)) "n/a" else fmt_term(edges$last_degree)))
+
+  list(
+    edges = edges,
+    graded_through = edges$last_graded,
+    report_end_term = edges$last_enrolled_complete,
+    report_latest_term = edges$last_enrolled
+  )
+}
+
+
 
 #' Terms shown on descriptive charts that are not yet complete
 #'

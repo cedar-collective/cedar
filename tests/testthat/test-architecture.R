@@ -564,7 +564,7 @@ test_that("silent error fallbacks do not grow, and the backlog shrinks on record
   # Measured 2026-10-16. Lower a number when you fix one; never raise one.
   allowance <- c(
     "R/modules/dept-trends.R" = 1L,
-    "R/modules/pathways.R" = 11L,
+    "R/modules/pathways.R" = 10L,
     "R/modules/regstats.R" = 1L,
     "R/modules/seatfinder.R" = 1L,
     "R/modules/ui-helpers.R" = 1L,
