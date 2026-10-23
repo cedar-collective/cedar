@@ -1,3 +1,37 @@
 condition_id,catalog_id,node_id,kind,minimum,eligible_node_ids,label,evidence_id
 hist491-course-count,history-ba-2026,historiography,course_count,2,histupper1|histupper2|histupper3|histupper4|histupper5|histupper6,2+ upper-level History courses,condition-hist491-course-count
 hist491-permission,history-ba-2026,historiography,permission,,,Department permission,condition-hist491-permission
+medical-laboratory-bs-2026-mlmolecular-admission,medical-laboratory-bs-2026,mlmolecular,permission,,,Admission to Medical Laboratory Sciences required,gate-medical-laboratory-bs-2026-mlmolecular
+medical-laboratory-bs-2026-mlchem-admission,medical-laboratory-bs-2026,mlchem,permission,,,Admission to Medical Laboratory Sciences required,gate-medical-laboratory-bs-2026-mlchem
+medical-laboratory-bs-2026-mlserology-admission,medical-laboratory-bs-2026,mlserology,permission,,,Admission to Medical Laboratory Sciences required,gate-medical-laboratory-bs-2026-mlserology
+medical-laboratory-bs-2026-mlhem-admission,medical-laboratory-bs-2026,mlhem,permission,,,Admission to Medical Laboratory Sciences required,gate-medical-laboratory-bs-2026-mlhem
+medical-laboratory-bs-2026-mlmicrointro-admission,medical-laboratory-bs-2026,mlmicrointro,permission,,,Admission to Medical Laboratory Sciences required,gate-medical-laboratory-bs-2026-mlmicrointro
+medical-laboratory-bs-2026-mlimmuno-admission,medical-laboratory-bs-2026,mlimmuno,permission,,,Admission to Medical Laboratory Sciences required,gate-medical-laboratory-bs-2026-mlimmuno
+medical-laboratory-bs-2026-mlurine-admission,medical-laboratory-bs-2026,mlurine,permission,,,Admission to Medical Laboratory Sciences required,gate-medical-laboratory-bs-2026-mlurine
+medical-laboratory-bs-2026-mlparasite-admission,medical-laboratory-bs-2026,mlparasite,permission,,,Admission to Medical Laboratory Sciences required,gate-medical-laboratory-bs-2026-mlparasite
+medical-laboratory-bs-2026-mlmanagement-admission,medical-laboratory-bs-2026,mlmanagement,permission,,,Admission to Medical Laboratory Sciences required,gate-medical-laboratory-bs-2026-mlmanagement
+nursing-bsn-2026-nursing-level-1-admission,nursing-bsn-2026,nursing-level-1,permission,,,Admission to the pre-licensure BSN required,gate-nursing-bsn-2026-nursing-level-1
+nursing-bsn-2026-nursing-level-2-admission,nursing-bsn-2026,nursing-level-2,permission,,,Admission to the pre-licensure BSN required,gate-nursing-bsn-2026-nursing-level-2
+nursing-bsn-2026-nursing-level-3-admission,nursing-bsn-2026,nursing-level-3,permission,,,Admission to the pre-licensure BSN required,gate-nursing-bsn-2026-nursing-level-3
+nursing-bsn-2026-nursing-level-4-admission,nursing-bsn-2026,nursing-level-4,permission,,,Admission to the pre-licensure BSN required,gate-nursing-bsn-2026-nursing-level-4
+nursing-bsn-2026-nursing-level-5-admission,nursing-bsn-2026,nursing-level-5,permission,,,Admission to the pre-licensure BSN required,gate-nursing-bsn-2026-nursing-level-5
+radiologic-nuclear-bs-2026-rads378-admission,radiologic-nuclear-bs-2026,rads378,permission,,,Admission to Radiologic Sciences required,gate-radiologic-nuclear-bs-2026-rads378
+radiologic-nuclear-bs-2026-rads381-admission,radiologic-nuclear-bs-2026,rads381,permission,,,Admission to Radiologic Sciences required,gate-radiologic-nuclear-bs-2026-rads381
+radiologic-nuclear-bs-2026-rads398-admission,radiologic-nuclear-bs-2026,rads398,permission,,,Admission to Radiologic Sciences required,gate-radiologic-nuclear-bs-2026-rads398
+radiologic-nuclear-bs-2026-rads405-admission,radiologic-nuclear-bs-2026,rads405,permission,,,Admission to Radiologic Sciences required,gate-radiologic-nuclear-bs-2026-rads405
+radiologic-nuclear-bs-2026-rads406-admission,radiologic-nuclear-bs-2026,rads406,permission,,,Admission to Radiologic Sciences required,gate-radiologic-nuclear-bs-2026-rads406
+radiologic-nuclear-bs-2026-rads480-admission,radiologic-nuclear-bs-2026,rads480,permission,,,Admission to Radiologic Sciences required,gate-radiologic-nuclear-bs-2026-rads480
+radiologic-nuclear-bs-2026-rads481-admission,radiologic-nuclear-bs-2026,rads481,permission,,,Admission to Radiologic Sciences required,gate-radiologic-nuclear-bs-2026-rads481
+radiologic-nuclear-bs-2026-nucm315-admission,radiologic-nuclear-bs-2026,nucm315,permission,,,Admission to Radiologic Sciences required,gate-radiologic-nuclear-bs-2026-nucm315
+radiologic-nuclear-bs-2026-nucm320-admission,radiologic-nuclear-bs-2026,nucm320,permission,,,Admission to Radiologic Sciences required,gate-radiologic-nuclear-bs-2026-nucm320
+radiologic-nuclear-bs-2026-nucm354-admission,radiologic-nuclear-bs-2026,nucm354,permission,,,Admission to Radiologic Sciences required,gate-radiologic-nuclear-bs-2026-nucm354
+radiologic-nuclear-bs-2026-nucm360-admission,radiologic-nuclear-bs-2026,nucm360,permission,,,Admission to Radiologic Sciences required,gate-radiologic-nuclear-bs-2026-nucm360
+radiologic-nuclear-bs-2026-nucm365-admission,radiologic-nuclear-bs-2026,nucm365,permission,,,Admission to Radiologic Sciences required,gate-radiologic-nuclear-bs-2026-nucm365
+radiologic-nuclear-bs-2026-nucm375-admission,radiologic-nuclear-bs-2026,nucm375,permission,,,Admission to Radiologic Sciences required,gate-radiologic-nuclear-bs-2026-nucm375
+radiologic-nuclear-bs-2026-nucm385-admission,radiologic-nuclear-bs-2026,nucm385,permission,,,Admission to Radiologic Sciences required,gate-radiologic-nuclear-bs-2026-nucm385
+radiologic-nuclear-bs-2026-nucm392-admission,radiologic-nuclear-bs-2026,nucm392,permission,,,Admission to Radiologic Sciences required,gate-radiologic-nuclear-bs-2026-nucm392
+radiologic-nuclear-bs-2026-nucm396-admission,radiologic-nuclear-bs-2026,nucm396,permission,,,Admission to Radiologic Sciences required,gate-radiologic-nuclear-bs-2026-nucm396
+radiologic-nuclear-bs-2026-nucm400-admission,radiologic-nuclear-bs-2026,nucm400,permission,,,Admission to Radiologic Sciences required,gate-radiologic-nuclear-bs-2026-nucm400
+radiologic-nuclear-bs-2026-nucm412-admission,radiologic-nuclear-bs-2026,nucm412,permission,,,Admission to Radiologic Sciences required,gate-radiologic-nuclear-bs-2026-nucm412
+radiologic-nuclear-bs-2026-nucm415-admission,radiologic-nuclear-bs-2026,nucm415,permission,,,Admission to Radiologic Sciences required,gate-radiologic-nuclear-bs-2026-nucm415
+radiologic-nuclear-bs-2026-radpatient-admission,radiologic-nuclear-bs-2026,radpatient,permission,,,Admission to Radiologic Sciences required,gate-radiologic-nuclear-bs-2026-radpatient

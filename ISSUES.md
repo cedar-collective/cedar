@@ -44,7 +44,7 @@ recurrence is recognizable.
 | [I8](#i8--a-timing-log-row-is-silently-dropped-when-the-write-lock-times-out) | Defect | A timing-log row is dropped when the write lock times out |
 | [I6](#i6--a-killed-projection-rebuild-strands-its-lock-and-blocks-every-later-refresh) | Defect | A killed projection rebuild strands its lock |
 | [I4](#i4--pre-change-course-ratios-are-confounded-by-career-stage) | Defect | Pre-change course ratios confounded by career stage (deferred) |
-| M1–M32 | Improvement | See [Improvements](#improvements) |
+| M1–M33 | Improvement | See [Improvements](#improvements) |
 
 ---
 
@@ -2047,6 +2047,17 @@ stops the rebuild, and `test-transform-status.R` proves it.
 *Done when:* the allowance list is empty; only the sanctioned kinds remain (a
 module error shown with `showNotification()` or `handle_error()`; a degenerate
 statistic returning `NA`; a logged failure in the logging layer itself).
+
+**M33 — Generic degree allowances look like identified Gen Ed requirements.**
+Resolved 2026-10-20: annual shared rules now allocate illustrative Gen Ed
+coverage from selected courses before identifying remaining areas inside the
+existing allowance budget. Other slots say elective/minor, any level, Gen Ed
+not required. Course badges expose overlapping coverage; open choices do not
+satisfy areas automatically. Flexible coverage is visibly provisional pending
+source clarification. The standard upper-credit minimum is context, not an
+additional credit charge. Anthropology's default example has four identified
+area slots (12 credits); the other early slots represent elective/minor space.
+Student transcript evaluation and conditional approvals remain roadmap work.
 
 **M30 — Regstats restates its default thresholds.** `R/features/regstats.R`
 writes the default threshold list twice (`get_dashboard_regstats_thresholds()`

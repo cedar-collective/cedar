@@ -284,12 +284,15 @@ validate_degree_roadmaps <- function(roadmaps, catalog) {
   for (i in seq_len(nrow(nodes))) {
     codes <- components$subject_course[components$catalog_id == nodes$catalog_id[i] &
                                          components$node_id == nodes$node_id[i]]
-    expected <- if (nodes$kind[i] == "choice") 0L else if (nodes$bundle[i] == "1") 2L else 1L
+    cohort <- nodes$kind[i] == "cohort"
+    expected <- if (cohort) length(codes) else if (nodes$kind[i] == "choice") 0L else if (nodes$bundle[i] == "1") 2L else 1L
+    if (cohort && (expected < 2L || nodes$bundle[i] != "1")) stop("[degree_catalog.R] Required course blocks need at least two components")
     if (length(codes) != expected || (expected == 1L && codes != nodes$code[i])) {
       stop("[degree_catalog.R] Roadmap course components disagree with node: ", nodes$node_id[i])
     }
     levels <- course_level_from_number(codes)
-    if (anyNA(levels) || any(levels != nodes$course_level[i])) {
+    level_ok <- if (cohort) nodes$course_level[i] == if ("upper" %in% levels) "upper" else "lower" else all(levels == nodes$course_level[i])
+    if (anyNA(levels) || !level_ok) {
       stop("[degree_catalog.R] Roadmap course level disagrees with components: ", nodes$node_id[i])
     }
   }
@@ -303,7 +306,7 @@ validate_degree_roadmaps <- function(roadmaps, catalog) {
     stop("[degree_catalog.R] Unknown roadmap catalog")
   }
   if (any(!nodes$track %in% c("main", "math", "english")) ||
-      any(!nodes$kind %in% c("major", "support", "writing", "choice", "preparation"))) {
+      any(!nodes$kind %in% c("major", "support", "writing", "choice", "preparation", "cohort"))) {
     stop("[degree_catalog.R] Invalid roadmap track or kind")
   }
   if (any(!nodes$bundle %in% c("0", "1"))) stop("[degree_catalog.R] Invalid roadmap bundle")

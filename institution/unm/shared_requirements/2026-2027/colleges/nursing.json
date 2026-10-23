@@ -1,0 +1,22 @@
+{
+  "schema_version": "1.0.0",
+  "rule_set_id": "unm-nursing",
+  "catalog_year": "2026-2027",
+  "catalog_id": "68a34618094c97cf857f1ec1",
+  "title": "College of Nursing shared-rule coverage",
+  "scope": {
+    "level": "college",
+    "credential": "bachelors",
+    "college_code": "NU"
+  },
+  "coverage": "not_located_on_checked_overview",
+  "notes": [
+    "The college overview describes five distinct BSN completion routes and refers to the Nursing program. No separate common undergraduate graduation block is stated on this overview; BSN route rules remain program-specific. Recommended high-school preparation is explicitly not admission coursework.",
+    "An empty shared-rule list records this source coverage only; it does not establish that no additional requirements exist."
+  ],
+  "rules": [],
+  "attention": [],
+  "checked_source_ids": [
+    "nursing"
+  ]
+}

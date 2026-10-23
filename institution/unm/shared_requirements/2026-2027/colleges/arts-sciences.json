@@ -1,0 +1,417 @@
+{
+  "schema_version": "1.0.0",
+  "rule_set_id": "unm-arts-sciences",
+  "catalog_year": "2026-2027",
+  "catalog_id": "68a34618094c97cf857f1ec1",
+  "title": "College of Arts and Sciences bachelor rules",
+  "scope": {
+    "level": "college",
+    "credential": "bachelors",
+    "college_code": "AS"
+  },
+  "coverage": "selected_sections",
+  "notes": [
+    "Excerpts cover major-status admission, ordinary bachelor completion, overlap and the stated multilingual alternative. Distributed minors, second degrees, probation, honors and all special-curriculum detail are not exhaustively normalized.",
+    "Do not apply this set merely because a student takes an A&S course; the degree-awarding college must be A&S."
+  ],
+  "rules": [
+    {
+      "rule_id": "unm-arts-sciences.entry_credits",
+      "label": "Major-status credits",
+      "statement": "Complete at least 26 credits; transfer coursework may contribute.",
+      "phase": "admission",
+      "operator": "credits",
+      "role": "overlapping_subset",
+      "applies_when": "All students in this rule set scope.",
+      "review_status": "transcribed",
+      "source_refs": [
+        {
+          "source_id": "arts_sciences",
+          "pointer": "/body",
+          "anchor": "26"
+        }
+      ],
+      "minimum": 26,
+      "unit": "credit_hours"
+    },
+    {
+      "rule_id": "unm-arts-sciences.entry_gpa",
+      "label": "Major-status GPA",
+      "statement": "Meet the 2.0 cumulative GPA rules. Continuing students need a 2.0 UNM cumulative GPA; transfer students use their first UNM semester to establish a 2.0 GPA.",
+      "phase": "admission",
+      "operator": "condition",
+      "role": "condition",
+      "applies_when": "All students in this rule set scope.",
+      "review_status": "transcribed",
+      "source_refs": [
+        {
+          "source_id": "arts_sciences",
+          "pointer": "/body",
+          "anchor": "2.00"
+        }
+      ],
+      "minimum": 2,
+      "unit": "gpa"
+    },
+    {
+      "rule_id": "unm-arts-sciences.entry_areas",
+      "label": "Major-status Gen Ed areas",
+      "statement": "Complete Gen Ed Communication, Mathematics/Statistics and Second Language with C or CR or better.",
+      "phase": "admission",
+      "operator": "condition",
+      "role": "condition",
+      "applies_when": "All students in this rule set scope.",
+      "review_status": "transcribed",
+      "source_refs": [
+        {
+          "source_id": "arts_sciences",
+          "pointer": "/body",
+          "anchor": "Second Language"
+        }
+      ]
+    },
+    {
+      "rule_id": "unm-arts-sciences.entry_major",
+      "label": "Major admission coursework",
+      "statement": "Complete the major’s admission coursework with C or better; CR is not allowed for that major-admission coursework.",
+      "phase": "admission",
+      "operator": "condition",
+      "role": "condition",
+      "applies_when": "All students in this rule set scope.",
+      "review_status": "transcribed",
+      "source_refs": [
+        {
+          "source_id": "arts_sciences",
+          "pointer": "/body",
+          "anchor": "CR not allowed"
+        }
+      ]
+    },
+    {
+      "rule_id": "unm-arts-sciences.entry_transition",
+      "label": "Transition to major status",
+      "statement": "After college and major-specific conditions are satisfied, the college processes transition from pre-major to major. Internal transfers initiate the process with the intended major advisor. Meeting criteria and recorded major status remain distinct.",
+      "phase": "admission",
+      "operator": "condition",
+      "role": "milestone",
+      "applies_when": "All students in this rule set scope.",
+      "review_status": "transcribed",
+      "source_refs": [
+        {
+          "source_id": "arts_sciences",
+          "pointer": "/body",
+          "anchor": "automatically processed"
+        }
+      ]
+    },
+    {
+      "rule_id": "unm-arts-sciences.degree_credits",
+      "label": "Total degree credits",
+      "statement": "Complete 120 acceptable credits; these restate the University degree total, not another 120-credit block.",
+      "phase": "degree",
+      "operator": "credits",
+      "role": "restatement",
+      "applies_when": "All students in this rule set scope.",
+      "review_status": "transcribed",
+      "source_refs": [
+        {
+          "source_id": "arts_sciences",
+          "pointer": "/body",
+          "anchor": "120 acceptable"
+        }
+      ],
+      "minimum": 120,
+      "unit": "credit_hours"
+    },
+    {
+      "rule_id": "unm-arts-sciences.gpa",
+      "label": "College GPA",
+      "statement": "Meet at least a 2.0 GPA under the catalog grading definition.",
+      "phase": "degree",
+      "operator": "condition",
+      "role": "condition",
+      "applies_when": "All students in this rule set scope.",
+      "review_status": "transcribed",
+      "source_refs": [
+        {
+          "source_id": "arts_sciences",
+          "pointer": "/body",
+          "anchor": "grade point average of at least 2.00"
+        }
+      ],
+      "minimum": 2,
+      "unit": "gpa"
+    },
+    {
+      "rule_id": "unm-arts-sciences.as_credits",
+      "label": "A&S-taught credits",
+      "statement": "Normally complete at least 90 credits taught by A&S academic units. The source also names Honors-credit treatment; see the case below.",
+      "phase": "degree",
+      "operator": "credits",
+      "role": "overlapping_subset",
+      "applies_when": "A&S bachelor students using the standard 90-credit rule; the named Critical Studies in Mass Media exception uses as_credits_exception.",
+      "review_status": "transcribed",
+      "source_refs": [
+        {
+          "source_id": "arts_sciences",
+          "pointer": "/body",
+          "anchor": "90 credit"
+        }
+      ],
+      "minimum": 90,
+      "unit": "credit_hours"
+    },
+    {
+      "rule_id": "unm-arts-sciences.as_credits_exception",
+      "label": "A&S credit exception",
+      "statement": "The Critical Studies in Mass Media concentration in the Communication B.A. requires 80 A&S-taught credits instead of 90. Apply only to that named concentration.",
+      "phase": "degree",
+      "operator": "credits",
+      "role": "conditional_alternative",
+      "applies_when": "The first major/concentration is the named Critical Studies in Mass Media route.",
+      "review_status": "transcribed",
+      "source_refs": [
+        {
+          "source_id": "arts_sciences",
+          "pointer": "/body",
+          "anchor": "80 hours"
+        }
+      ],
+      "minimum": 80,
+      "unit": "credit_hours",
+      "alternative_to": "unm-arts-sciences.as_credits"
+    },
+    {
+      "rule_id": "unm-arts-sciences.study_combination",
+      "label": "Major/minor combination",
+      "statement": "Complete a major plus minor, a double major, or an approved special curriculum requiring no minor. The first major must be housed in A&S.",
+      "phase": "degree",
+      "operator": "choose_n",
+      "role": "condition",
+      "applies_when": "All students in this rule set scope.",
+      "review_status": "transcribed",
+      "source_refs": [
+        {
+          "source_id": "arts_sciences",
+          "pointer": "/body",
+          "anchor": "A major and minor"
+        }
+      ],
+      "minimum": 1,
+      "unit": "alternatives",
+      "children": [
+        {
+          "rule_id": "unm-arts-sciences.major_minor",
+          "label": "Major and minor",
+          "statement": "An A&S first major and an approved minor.",
+          "operator": "condition"
+        },
+        {
+          "rule_id": "unm-arts-sciences.two_majors",
+          "label": "Double major",
+          "statement": "Two majors, with the first housed in A&S.",
+          "operator": "condition"
+        },
+        {
+          "rule_id": "unm-arts-sciences.special_curriculum",
+          "label": "Approved special curriculum",
+          "statement": "An approved College special curriculum requiring no minor.",
+          "operator": "condition"
+        }
+      ]
+    },
+    {
+      "rule_id": "unm-arts-sciences.after_major_status",
+      "label": "Study after major-status transition",
+      "statement": "Complete one year of enrollment after transition to major status, earning at least 12 credits. Do not substitute two elapsed semesters or raw credit standing for the source’s one-year requirement.",
+      "phase": "degree",
+      "operator": "condition",
+      "role": "overlapping_subset",
+      "applies_when": "All students in this rule set scope.",
+      "review_status": "transcribed",
+      "source_refs": [
+        {
+          "source_id": "arts_sciences",
+          "pointer": "/body",
+          "anchor": "One year"
+        }
+      ],
+      "minimum": 12,
+      "unit": "credit_hours"
+    },
+    {
+      "rule_id": "unm-arts-sciences.upper_division",
+      "label": "Upper-division coursework",
+      "statement": "Normally complete at least 48 upper-division credits with at least a 2.0 GPA across upper-division credit accepted by A&S. This is a subset of degree credits.",
+      "phase": "degree",
+      "operator": "credits",
+      "role": "overlapping_subset",
+      "applies_when": "The ordinary upper-division route; an approved Multilingual Recognition Option uses the published multilingual alternative.",
+      "review_status": "transcribed",
+      "source_refs": [
+        {
+          "source_id": "arts_sciences",
+          "pointer": "/body",
+          "anchor": "48 credit"
+        }
+      ],
+      "minimum_gpa": 2,
+      "minimum": 48,
+      "unit": "credit_hours",
+      "planning_metric": "upper_credits"
+    },
+    {
+      "rule_id": "unm-arts-sciences.multilingual",
+      "label": "Multilingual alternative",
+      "statement": "An eligible Multilingual Recognition Option can use 42 upper-division credits with the required A&S language major/minor. Listed related interdisciplinary routes require advising confirmation; do not apply the reduction to every student.",
+      "phase": "degree",
+      "operator": "credits",
+      "role": "conditional_alternative",
+      "applies_when": "The student qualifies for the published Multilingual Recognition Option.",
+      "review_status": "transcribed",
+      "source_refs": [
+        {
+          "source_id": "arts_sciences",
+          "pointer": "/body",
+          "anchor": "42 credit"
+        }
+      ],
+      "minimum": 42,
+      "unit": "credit_hours",
+      "alternative_to": "unm-arts-sciences.upper_division"
+    },
+    {
+      "rule_id": "unm-arts-sciences.major_minor_grades",
+      "label": "Major/minor grades",
+      "statement": "Require C or better in major/minor work, subject to stated academic-unit exceptions. C-minus or lower can be elective credit when acceptable but does not satisfy ordinary major/minor work.",
+      "phase": "degree",
+      "operator": "condition",
+      "role": "condition",
+      "applies_when": "All students in this rule set scope.",
+      "review_status": "transcribed",
+      "source_refs": [
+        {
+          "source_id": "arts_sciences",
+          "pointer": "/body",
+          "anchor": "C-"
+        }
+      ],
+      "min_grade": "C"
+    },
+    {
+      "rule_id": "unm-arts-sciences.major_minor_crnc",
+      "label": "Major/minor CR/NC",
+      "statement": "Do not use CR/NC major/minor courses unless the courses are offered only on that grading basis, subject to unit-specific policies.",
+      "phase": "degree",
+      "operator": "condition",
+      "role": "allocation",
+      "applies_when": "All students in this rule set scope.",
+      "review_status": "transcribed",
+      "source_refs": [
+        {
+          "source_id": "arts_sciences",
+          "pointer": "/body",
+          "anchor": "Pass/Fail"
+        }
+      ]
+    },
+    {
+      "rule_id": "unm-arts-sciences.major_minor_overlap",
+      "label": "Major/minor overlap",
+      "statement": "Ordinarily a course does not satisfy both major and minor. A supportive-coursework exception can permit it; obtain advising confirmation and preserve each program’s full required credit total.",
+      "phase": "degree",
+      "operator": "condition",
+      "role": "allocation",
+      "applies_when": "All students in this rule set scope.",
+      "review_status": "transcribed",
+      "source_refs": [
+        {
+          "source_id": "arts_sciences",
+          "pointer": "/body",
+          "anchor": "Course Double-Dipping"
+        }
+      ]
+    },
+    {
+      "rule_id": "unm-arts-sciences.double_major_overlap",
+      "label": "Double-major overlap",
+      "statement": "For an A&S double major, at most 12 course credits can count toward both majors, and each major needs at least 24 unique credits. Count shared earned credits once toward the degree total.",
+      "phase": "degree",
+      "operator": "condition",
+      "role": "allocation",
+      "applies_when": "All students in this rule set scope.",
+      "review_status": "transcribed",
+      "source_refs": [
+        {
+          "source_id": "arts_sciences",
+          "pointer": "/body",
+          "anchor": "maximum of 12"
+        }
+      ],
+      "minimum_unique_per_major": 24,
+      "maximum": 12,
+      "unit": "credit_hours"
+    },
+    {
+      "rule_id": "unm-arts-sciences.residence",
+      "label": "Major/minor residence",
+      "statement": "Follow the University half-major and quarter-minor UNM residence rules; these are overlapping subsets, not additional degree credits.",
+      "phase": "degree",
+      "operator": "condition",
+      "role": "reference",
+      "applies_when": "All students in this rule set scope.",
+      "review_status": "transcribed",
+      "source_refs": [
+        {
+          "source_id": "arts_sciences",
+          "pointer": "/body",
+          "anchor": "At least half"
+        }
+      ]
+    },
+    {
+      "rule_id": "unm-arts-sciences.graduation_workshop",
+      "label": "Graduation planning workshop",
+      "statement": "Attend the Graduation Planning Workshop after completing 75 earned credits and submit the projected graduation date.",
+      "phase": "degree",
+      "operator": "condition",
+      "role": "milestone",
+      "applies_when": "All students in this rule set scope.",
+      "review_status": "transcribed",
+      "source_refs": [
+        {
+          "source_id": "arts_sciences",
+          "pointer": "/body",
+          "anchor": "75 earned"
+        }
+      ]
+    },
+    {
+      "rule_id": "unm-arts-sciences.gen_ed",
+      "label": "Gen Ed and cultures",
+      "statement": "Complete University Gen Ed and the University cultures requirement; use the shared University/Gen Ed sets rather than adding duplicate requirements here.",
+      "phase": "degree",
+      "operator": "condition",
+      "role": "reference",
+      "applies_when": "All students in this rule set scope.",
+      "review_status": "transcribed",
+      "source_refs": [
+        {
+          "source_id": "arts_sciences",
+          "pointer": "/body",
+          "anchor": "31 credit"
+        }
+      ],
+      "rule_set_ref": "unm-general-education"
+    }
+  ],
+  "attention": [
+    {
+      "case_id": "honors-treatment",
+      "statement": "The college page states that 18 Honors credits count as A&S credit but does not fully specify the interpretation of that allowance in this passage. Preserve it for advising; do not silently count unlimited Honors credits or manufacture an extra 18-credit requirement.",
+      "rule_ids": [
+        "unm-arts-sciences.as_credits"
+      ]
+    }
+  ]
+}

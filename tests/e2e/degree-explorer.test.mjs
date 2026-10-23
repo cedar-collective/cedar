@@ -71,6 +71,55 @@ const soundRows = () => page.evaluate(() => {
     return valid;
   });
 });
+const genEdRowsFirst = () => page.evaluate(() => {
+  const allowances = [...document.querySelectorAll('[data-card-type="allowance"]')];
+  const courses = [...document.querySelectorAll('[data-card-type="course"]')];
+  return allowances.length > 0 && courses.length > 0 &&
+    Math.max(...allowances.map(el => el.getBoundingClientRect().bottom)) <
+      Math.min(...courses.map(el => el.getBoundingClientRect().top)) &&
+    [...document.querySelectorAll('.cedar-roadmap-courses')].every(term =>
+      !term.querySelector('[data-card-type="allowance"]') || term.firstElementChild.dataset.cardType === 'allowance');
+});
+const checkCommunicationOverlap = async () => {
+  check(await page.$eval('[data-node="communication"]', el => el.dataset.optionCount === '3' &&
+    ['COMM 1130', 'ENGL 2120', 'ENGL 2210', 'May also meet Gen Ed'].every(text => el.innerText.includes(text))) &&
+    await page.$$eval('[data-purpose="gen_ed"][data-gen-ed-area="I"]', els =>
+      els.some(el => el.innerText.includes('May be covered by a program choice'))),
+    'CS Communication lists all three choices and identifies its potential overlap with the Gen Ed slot');
+};
+const checkAnthropologyCoverage = async () => {
+  const prior = await page.$eval('[data-roadmap]', el => ({math: el.dataset.mathStart, english: el.dataset.englishStart, season: el.dataset.startSeason}));
+  // Reset placement so this scenario matches the source-linked default
+  // example: four unfilled three-credit areas, other space stays elective.
+  await choose('degree_explorer-dx_math_start', 'calculus');
+  await choose('degree_explorer-dx_english_start', 'composition');
+  await choose('degree_explorer-dx_start_season', 'fall');
+  check(await page.$$eval('[data-purpose="gen_ed"]', els => els.length === 4 &&
+    els.reduce((sum, el) => sum + Number(el.dataset.credits), 0) === 12) &&
+    await page.$$eval('[data-purpose="elective"]', els => els.length > 0 &&
+      els.every(el => el.innerText.includes('Gen Ed not required') || Number(el.dataset.credits) < 3)),
+    'Anthropology identifies four Gen Ed areas; other early cards are elective/minor space');
+  check(await page.$eval('.cedar-roadmap-coverage', el => el.innerText.includes('19 of 31') &&
+    el.innerText.includes('48 credits') && el.innerText.includes('27 more needed')) &&
+    await page.$eval('[data-node="antharch"]', el => el.innerText.includes('Also Gen Ed')),
+    'the plan explains overlapping major/Gen Ed credits and the standard college upper-level balance');
+  const electiveId = await page.$$eval('[data-purpose="elective"]', els =>
+    els.find(el => Number(el.dataset.credits) >= 3).dataset.node);
+  await popup(electiveId);
+  await page.evaluate(() => Reactable.setFilter('degree_explorer-course_history_table', 'course_level', 'upper'));
+  await waitFor(page, () => [...document.querySelectorAll('#degree_explorer-course_history_table .rt-tbody .rt-tr')]
+    .some(row => row.innerText.includes('upper')));
+  const options = await readReactable(page, 'degree_explorer-course_history_table');
+  const levelColumn = colIndex(options.headers, 'Level');
+  check(!options.error && levelColumn >= 0 && options.rows.some(row => row[levelColumn] === 'upper') &&
+    await page.$eval('.cedar-roadmap-dialog-summary', el => el.innerText.includes('does not have to be Gen Ed or lower division')),
+    'elective options include upper-level courses and clearly state that Gen Ed is optional');
+  await closePopup();
+  await page.screenshot({ path: '/tmp/cedar-degree-anthropology-coverage.png', fullPage: true });
+  await choose('degree_explorer-dx_english_start', prior.english);
+  await choose('degree_explorer-dx_start_season', prior.season);
+  await choose('degree_explorer-dx_math_start', prior.math);
+};
 const checkDegreeExplorer = async () => {
   await connect(page, { tab: 'degree-explorer' });
   await waitForSelector(page, '[data-roadmap][data-ready]');
@@ -79,19 +128,23 @@ const checkDegreeExplorer = async () => {
   check(await page.$$eval('.cedar-roadmap-semester', els => els.every(el => Number(el.dataset.plannedCredits) <= 16)),
     'every semester stays at or below 16 credits including other degree work');
   check(await alignedHeaders(), 'all year/semester headers and first tile rows align');
+  await checkCommunicationOverlap();
+
   check(await alignedCourses(['engl1', 'engl2']) && await soundRows(),
     'English composition courses share a row and all course rows align without clipping');
   check(await page.$$eval('[data-course-level="upper"]', els =>
     els.length > 0 && els.every(el => Number(el.dataset.semester) >= 5)),
     'upper-level degree courses begin in year three or later');
   check(await page.$$eval('.cedar-roadmap-flex', els => els.every(el =>
-    Number(el.closest('.cedar-roadmap-semester').getAttribute('aria-label').split(' ')[1]) < 5
-      ? el.innerText.includes('Gen Ed / lower-level') : el.innerText.includes('Upper-level / minor'))),
-    'Gen Ed allowances appear early and later allowances identify upper-level work');
+    el.dataset.allowancePhase === 'advanced' && el.innerText.includes('Elective / minor'))),
+    'later allowance balances remain elective/minor credits, with upper-level options');
   check(await page.$$eval('[data-card-type="allowance"]', els => els.length > 0 && els.every(el =>
-    Number(el.dataset.semester) < 5 && el.tagName === 'BUTTON' && el.getAttribute('aria-haspopup') === 'dialog')) &&
+    (el.dataset.allowancePhase === "advanced" ? el.dataset.purpose === "gen_ed" : Number(el.dataset.semester) < 5) && el.tagName === 'BUTTON' && el.getAttribute('aria-haspopup') === 'dialog')) &&
     await page.$$eval('.cedar-roadmap-flex[data-allowance-phase="foundation"]', els => els.length === 0),
     'early Gen Ed allowances are clickable course slots in the shared grid');
+  check(await genEdRowsFirst(),
+    'Gen Ed options occupy the top rows and precede course sequences in keyboard reading order');
+  await page.screenshot({ path: '/tmp/cedar-degree-gen-ed-top.png', fullPage: true });
   check(await page.$$eval('.cedar-roadmap-semester', terms => terms.every(term =>
     [...term.querySelectorAll('.cedar-roadmap-course, .cedar-roadmap-flex')].reduce((sum, card) =>
       sum + Number(card.dataset.credits), 0) === Number(term.dataset.plannedCredits))),
@@ -119,6 +172,12 @@ const checkDegreeExplorer = async () => {
     'leaving an unselected course clears its temporary chain preview');
   await page.focus('.cedar-roadmap-scroll');
   await page.keyboard.press('Tab');
+  const firstOption = await page.$eval('.cedar-roadmap-courses [data-card-type="allowance"]', el => el.dataset.node);
+  check(await waitFor(page, id => document.querySelector('[data-roadmap]').dataset.previewNode === id,
+    { args: [firstOption] }) && await page.$eval(`[data-node="${firstOption}"]`, el =>
+      document.activeElement === el && !!el.getAttribute('aria-describedby')),
+    'keyboard entry reaches a foundational Gen Ed option with an accessible preview');
+  await page.focus('[data-node="calc1"]');
   check(await waitFor(page, () => document.querySelector('[data-roadmap]').dataset.previewNode === 'calc1') &&
     await page.$eval('[data-node="calc1"]', el => document.activeElement === el && !!el.getAttribute('aria-describedby')),
     'keyboard focus provides the same chain preview and accessible description');
@@ -182,7 +241,7 @@ const checkDegreeExplorer = async () => {
   const suggestions = await readReactable(page, 'degree_explorer-course_history_table');
   const lastOffered = colIndex(suggestions.headers, 'Last offered');
   check(!suggestions.error && suggestions.rows.length > 0 &&
-    ['Gen Ed area', 'Credits', 'Seats offered', 'Filled · first day', 'Campus', 'PoT'].every(name => colIndex(suggestions.headers, name) >= 0) &&
+    ['Gen Ed area', 'Level', 'Credits', 'Seats offered', 'Filled · first day', 'Campus', 'PoT'].every(name => colIndex(suggestions.headers, name) >= 0) &&
     lastOffered >= 0 && suggestions.rows.every(row => row[lastOffered].toLowerCase().includes(allowanceSeason)),
     'allowance popup lists matching-season Gen Ed choices with credits, seats, first-day enrollments and campus/session context');
   check(await page.$$eval('.cedar-roadmap-dialog .cedar-roadmap-detail', els => els.length === 0) &&
@@ -327,6 +386,7 @@ const checkDegreeExplorer = async () => {
   check(await alignedHeaders(), 'mobile year/semester headers retain identical heights');
   check(await alignedCourses(['englX', 'englY', 'engl2']) && await soundRows(),
     'stretch English stays in one aligned row on narrow screens without clipping wrapped course details');
+  check(await genEdRowsFirst(), 'Gen Ed options stay above aligned course sequences on narrow, extended plans');
   await popup('calc1');
   check(await page.$eval(MODAL, el => {
     const r = el.getBoundingClientRect(); return r.top >= 0 && r.bottom <= window.innerHeight && r.left >= 0 && r.right <= window.innerWidth;
@@ -390,6 +450,7 @@ const checkDegreeExplorer = async () => {
           document.querySelector('[data-node="physlinear"]').dataset.row),
         'Physics sequences stay horizontal while concurrent mathematics courses occupy separate rows');
     }
+    if (id === 'anthropology-ba-2026') await checkAnthropologyCoverage();
     if (id === 'history-ba-2026') {
       await hoverCourse('historiography');
       check(await page.$eval('.cedar-roadmap-hover-conditions', el => !el.hidden && el.innerText.includes('2+ upper-level History courses')) &&
@@ -488,12 +549,56 @@ const checkDegreeExplorer = async () => {
   await closePopup();
   await page.evaluate(() => window.scrollTo({ top: 0 }));
   await page.screenshot({ path: '/tmp/cedar-degree-history.png', fullPage: false });
+  await page.click('#degree_explorer-show_rules');
+  await waitForSelector(page, '#degree_explorer-plan_rules .rt-table');
+  check(await page.$eval('#degree_explorer-plan_rules', el => el.textContent.includes('Readable rule') && el.textContent.includes('History major')),
+    'the chart opens readable rules from its own active scenario');
+  await closePopup();
+  for (const [catalog, sample] of [
+    ['population-health-bs-2026', 'PH 475'],
+    ['medical-laboratory-bs-2026', 'MEDL 453'],
+    ['nursing-bsn-2026', 'NMNC 4510'],
+    ['radiologic-nuclear-bs-2026', 'NUCM 400']
+  ]) {
+    await choose('degree_explorer-dx_catalog_id', catalog);
+    check(await page.$eval('[data-roadmap]', (el, code) => el.innerText.includes(code), sample), `${catalog}: named health courses are visible`);
+    check(await page.$$eval('.cedar-roadmap-semester', els => els.every(el => Number(el.dataset.plannedCredits) <= 16)),
+      `${catalog}: all semester workloads stay within 16 credits`);
+    check(await alignedHeaders() && await soundRows(), `${catalog}: headers and course rows remain aligned`);
+    if (catalog === 'nursing-bsn-2026') {
+      check(await page.$eval('[data-node="nursing-level-1"]', el => el.innerText.includes('NMNC 3110') && el.innerText.includes('BIOL 2225')),
+        'Nursing retains the complete required same-level course block');
+      await page.screenshot({ path: '/tmp/cedar-degree-nursing.png', fullPage: false });
+    }
+    if (catalog === 'population-health-bs-2026') check(await page.$eval('[data-node="poph-missing-1"]', el => el.innerText.includes('unknown')),
+      'broken Population Health catalog entries stay visible as explicitly unresolved placeholders');
+    await choose('degree_explorer-dx_math_start', 'intermediate');
+    check(await page.$$eval('.cedar-roadmap-semester', els => els.every(el => Number(el.dataset.plannedCredits) <= 16)),
+      `${catalog}: additional math preparation also respects the credit maximum`);
+    await choose('degree_explorer-dx_math_start', 'algebra');
+  }
   await connect(page, { search: 'tab=degree-explorer&catalog_id=business-bba-2026&math_start=algebra&english_start=stretch' });
   await waitForSelector(page, '[data-roadmap][data-ready][data-catalog="business-bba-2026"][data-math-start="algebra"][data-english-start="stretch"]');
   check(await semester('math1350') === 1 && await semester('engl2') === 3 && await semester('buswriting') === 4,
     'a new-program deep link restores its statistics route and the full English-to-business-writing sequence');
 };
 try {
+  if (process.argv.includes('--shared-requirements-only')) {
+    await connect(page, { tab: 'degree-explorer' });
+    await waitForSelector(page, '[data-roadmap][data-ready]');
+    await checkCommunicationOverlap();
+    await (await page.$('[data-node="communication"]')).screenshot({ path: '/tmp/cedar-degree-communication-overlap.png' });
+    await choose('degree_explorer-dx_catalog_id', 'anthropology-ba-2026');
+    await checkAnthropologyCoverage();
+    check(await alignedHeaders() && await soundRows(), 'shared requirement cards preserve aligned headers and course rows');
+    check(await page.$$eval('.cedar-roadmap-semester', terms => terms.every(term =>
+      Number(term.dataset.plannedCredits) <= 16 &&
+      [...term.querySelectorAll('.cedar-roadmap-course, .cedar-roadmap-flex')].reduce((sum, card) =>
+        sum + Number(card.dataset.credits), 0) === Number(term.dataset.plannedCredits))),
+      'shared requirement cards preserve every semester credit and the 16-credit cap');
+    await (await page.$('[data-node="antharch"]')).screenshot({ path: '/tmp/cedar-degree-anthropology-overlap-card.png' });
+    check(jsErrors.length === 0, 'no uncaught JavaScript errors');
+  } else {
   if (!process.argv.includes('--course-paths-only')) await checkDegreeExplorer();
   await connect(page, { tab: 'pathways' });
   await setInput(page, 'pathways-population-population_type', 'dept');
@@ -529,6 +634,7 @@ try {
   await page.$eval('#pathways-course_paths-path_scope', el => el.scrollIntoView({ block: 'start' }));
   await page.screenshot({ path: '/tmp/cedar-course-paths.png', fullPage: false });
   check(jsErrors.length === 0, 'no uncaught JavaScript errors');
+  }
 } catch (error) {
   failures.push(error.message);
   console.error(error);

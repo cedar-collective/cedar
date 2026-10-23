@@ -176,3 +176,121 @@ physics-bs-2026,physstem,degree,degree-physics-bs-2026-physstem,Selected course 
 physics-bs-2026,physastro,degree,degree-physics-bs-2026-physastro,Selected course group; individual course prerequisites still need review.
 physics-bs-2026,physupper1,degree,degree-physics-bs-2026-physupper1,Selected course group; individual course prerequisites still need review.
 physics-bs-2026,physupper2,degree,degree-physics-bs-2026-physupper2,Selected course group; individual course prerequisites still need review.
+population-health-bs-2026,poph1110,degree,degree-population-health-bs-2026-poph1110,Listed requirement in the selected program/route.
+population-health-bs-2026,poph1120,degree,degree-population-health-bs-2026-poph1120,Listed requirement in the selected program/route.
+population-health-bs-2026,poph2210,degree,degree-population-health-bs-2026-poph2210,Listed requirement in the selected program/route.
+population-health-bs-2026,poph2400,degree,degree-population-health-bs-2026-poph2400,Listed requirement in the selected program/route.
+population-health-bs-2026,poph2410,degree,degree-population-health-bs-2026-poph2410,Listed requirement in the selected program/route.
+population-health-bs-2026,poph2330,degree,degree-population-health-bs-2026-poph2330,Listed requirement in the selected program/route.
+population-health-bs-2026,poph2010,degree,degree-population-health-bs-2026-poph2010,Listed requirement in the selected program/route.
+population-health-bs-2026,ph350,degree,degree-population-health-bs-2026-ph350,Listed requirement in the selected program/route.
+population-health-bs-2026,ph360,degree,degree-population-health-bs-2026-ph360,Listed requirement in the selected program/route.
+population-health-bs-2026,ph420,degree,degree-population-health-bs-2026-ph420,Listed requirement in the selected program/route.
+population-health-bs-2026,ph421,degree,degree-population-health-bs-2026-ph421,Listed requirement in the selected program/route.
+population-health-bs-2026,ph422,degree,degree-population-health-bs-2026-ph422,Listed requirement in the selected program/route.
+population-health-bs-2026,ph475,degree,degree-population-health-bs-2026-ph475,Listed requirement in the selected program/route.
+population-health-bs-2026,pophbiology,prerequisite,poph-biology-prerequisite,One selected prerequisite option for One Health; may overlap Gen Ed.
+population-health-bs-2026,popfocus,degree,degree-population-health-bs-2026-popfocus,Unresolved course choice within a listed program requirement. One of four planning slots toward 12 focus/minor credits; courses remain open.
+population-health-bs-2026,popfocus2,degree,degree-population-health-bs-2026-popfocus2,Unresolved course choice within a listed program requirement. Open focus/minor selection; 12 credits across four slots.
+population-health-bs-2026,popfocus3,degree,degree-population-health-bs-2026-popfocus3,Unresolved course choice within a listed program requirement. Open focus/minor selection; 12 credits across four slots.
+population-health-bs-2026,popfocus4,degree,degree-population-health-bs-2026-popfocus4,Unresolved course choice within a listed program requirement. Open focus/minor selection; 12 credits across four slots.
+population-health-bs-2026,englX,prerequisite,route-*-englX-englY,Preparation added by the selected entry route; not a separately listed major requirement.
+population-health-bs-2026,engl2,general,degree-population-health-bs-2026-engl2,Illustrative English route; complete Gen Ed allocation remains separate.
+population-health-bs-2026,math1215,prerequisite,route-*-math1215-math1220,Preparation added by the selected entry route; not a separately listed major requirement.
+population-health-bs-2026,englY,general,degree-population-health-bs-2026-englY,Illustrative English route; complete Gen Ed allocation remains separate.
+population-health-bs-2026,math1350,general,degree-population-health-bs-2026-math1350,Suggested Gen Ed mathematics; no named mathematics course is required by this major.
+population-health-bs-2026,engl1,general,degree-population-health-bs-2026-engl1,Illustrative English route; complete Gen Ed allocation remains separate.
+medical-laboratory-bs-2026,mlbio1,degree,degree-medical-laboratory-bs-2026-mlbio1,Listed requirement in the selected program/route.
+medical-laboratory-bs-2026,mlbio2,degree,degree-medical-laboratory-bs-2026-mlbio2,Listed requirement in the selected program/route.
+medical-laboratory-bs-2026,mlap1,degree,degree-medical-laboratory-bs-2026-mlap1,Listed requirement in the selected program/route.
+medical-laboratory-bs-2026,mlap2,degree,degree-medical-laboratory-bs-2026-mlap2,Listed requirement in the selected program/route.
+medical-laboratory-bs-2026,mlmicro,degree,degree-medical-laboratory-bs-2026-mlmicro,Listed requirement in the selected program/route.
+medical-laboratory-bs-2026,mlchem1,degree,degree-medical-laboratory-bs-2026-mlchem1,Listed requirement in the selected program/route.
+medical-laboratory-bs-2026,mlchem2,degree,degree-medical-laboratory-bs-2026-mlchem2,Listed requirement in the selected program/route.
+medical-laboratory-bs-2026,mlorganic,degree,degree-medical-laboratory-bs-2026-mlorganic,Listed requirement in the selected program/route.
+medical-laboratory-bs-2026,mlstats,degree,degree-medical-laboratory-bs-2026-mlstats,Listed requirement in the selected program/route.
+medical-laboratory-bs-2026,mlimmunology,degree,degree-medical-laboratory-bs-2026-mlimmunology,Listed requirement in the selected program/route.
+medical-laboratory-bs-2026,mlmolecular,degree,degree-medical-laboratory-bs-2026-mlmolecular,Listed requirement in the selected program/route.
+medical-laboratory-bs-2026,mlchem,degree,degree-medical-laboratory-bs-2026-mlchem,Listed requirement in the selected program/route.
+medical-laboratory-bs-2026,mlserology,degree,degree-medical-laboratory-bs-2026-mlserology,Listed requirement in the selected program/route.
+medical-laboratory-bs-2026,mlhem,degree,degree-medical-laboratory-bs-2026-mlhem,Listed requirement in the selected program/route.
+medical-laboratory-bs-2026,mlmicrointro,degree,degree-medical-laboratory-bs-2026-mlmicrointro,Listed requirement in the selected program/route.
+medical-laboratory-bs-2026,mlimmuno,degree,degree-medical-laboratory-bs-2026-mlimmuno,Listed requirement in the selected program/route.
+medical-laboratory-bs-2026,mlurine,degree,degree-medical-laboratory-bs-2026-mlurine,Listed requirement in the selected program/route.
+medical-laboratory-bs-2026,mladvancedchem,degree,degree-medical-laboratory-bs-2026-mladvancedchem,Listed requirement in the selected program/route.
+medical-laboratory-bs-2026,mladvancedhem,degree,degree-medical-laboratory-bs-2026-mladvancedhem,Listed requirement in the selected program/route.
+medical-laboratory-bs-2026,mladvancedmicro,degree,degree-medical-laboratory-bs-2026-mladvancedmicro,Listed requirement in the selected program/route.
+medical-laboratory-bs-2026,mlparasite,degree,degree-medical-laboratory-bs-2026-mlparasite,Listed requirement in the selected program/route.
+medical-laboratory-bs-2026,mladvancedimmuno,degree,degree-medical-laboratory-bs-2026-mladvancedimmuno,Listed requirement in the selected program/route.
+medical-laboratory-bs-2026,mlmanagement,degree,degree-medical-laboratory-bs-2026-mlmanagement,Listed requirement in the selected program/route.
+medical-laboratory-bs-2026,mlrotationchem,degree,degree-medical-laboratory-bs-2026-mlrotationchem,Listed requirement in the selected program/route.
+medical-laboratory-bs-2026,mlrotationhem,degree,degree-medical-laboratory-bs-2026-mlrotationhem,Listed requirement in the selected program/route.
+medical-laboratory-bs-2026,mlrotationurine,degree,degree-medical-laboratory-bs-2026-mlrotationurine,Listed requirement in the selected program/route.
+medical-laboratory-bs-2026,mladvancedrotationhem,degree,degree-medical-laboratory-bs-2026-mladvancedrotationhem,Listed requirement in the selected program/route.
+medical-laboratory-bs-2026,mlrotationmicro,degree,degree-medical-laboratory-bs-2026-mlrotationmicro,Listed requirement in the selected program/route.
+medical-laboratory-bs-2026,mlrotationimmuno,degree,degree-medical-laboratory-bs-2026-mlrotationimmuno,Listed requirement in the selected program/route.
+medical-laboratory-bs-2026,mladvancedrotationchem,degree,degree-medical-laboratory-bs-2026-mladvancedrotationchem,Listed requirement in the selected program/route.
+medical-laboratory-bs-2026,englX,prerequisite,route-*-englX-englY,Preparation added by the selected entry route; not a separately listed major requirement.
+medical-laboratory-bs-2026,engl2,general,degree-medical-laboratory-bs-2026-engl2,Illustrative English route; complete Gen Ed allocation remains separate.
+medical-laboratory-bs-2026,math1215,prerequisite,route-*-math1215-math1220,Preparation added by the selected entry route; not a separately listed major requirement.
+medical-laboratory-bs-2026,englY,general,degree-medical-laboratory-bs-2026-englY,Illustrative English route; complete Gen Ed allocation remains separate.
+medical-laboratory-bs-2026,math1220,degree,degree-medical-laboratory-bs-2026-math1220,Selected listed mathematics option.
+medical-laboratory-bs-2026,engl1,general,degree-medical-laboratory-bs-2026-engl1,Illustrative English route; complete Gen Ed allocation remains separate.
+nursing-bsn-2026,nursbio,degree,degree-nursing-bsn-2026-nursbio,Listed requirement in the selected program/route.
+nursing-bsn-2026,nurspsych,degree,degree-nursing-bsn-2026-nurspsych,Listed requirement in the selected program/route.
+nursing-bsn-2026,nurschem,degree,degree-nursing-bsn-2026-nurschem,Listed requirement in the selected program/route.
+nursing-bsn-2026,nursnutrition,degree,degree-nursing-bsn-2026-nursnutrition,Listed requirement in the selected program/route.
+nursing-bsn-2026,nursap,degree,degree-nursing-bsn-2026-nursap,Listed requirement in the selected program/route.
+nursing-bsn-2026,nursmicro,degree,degree-nursing-bsn-2026-nursmicro,Listed requirement in the selected program/route.
+nursing-bsn-2026,nursgrowth,degree,degree-nursing-bsn-2026-nursgrowth,Listed requirement in the selected program/route.
+nursing-bsn-2026,nurspatho,degree,degree-nursing-bsn-2026-nurspatho,Listed requirement in the selected program/route.
+nursing-bsn-2026,nursing-level-1,degree,degree-nursing-bsn-2026-nursing-level-1,Published Level 1 courses planned together. Specific cohort and clinical placement are not established by the prototype.
+nursing-bsn-2026,nursing-level-2,degree,degree-nursing-bsn-2026-nursing-level-2,Published Level 2 courses planned together. Specific cohort and clinical placement are not established by the prototype.
+nursing-bsn-2026,nursing-level-3,degree,degree-nursing-bsn-2026-nursing-level-3,Published Level 3 courses planned together. Specific cohort and clinical placement are not established by the prototype.
+nursing-bsn-2026,nursing-level-4,degree,degree-nursing-bsn-2026-nursing-level-4,Published Level 4 courses planned together. Specific cohort and clinical placement are not established by the prototype.
+nursing-bsn-2026,nursing-level-5,degree,degree-nursing-bsn-2026-nursing-level-5,Published Level 5 courses planned together. Specific cohort and clinical placement are not established by the prototype.
+nursing-bsn-2026,nursing-elective-1,degree,degree-nursing-bsn-2026-nursing-elective-1,Unresolved course choice within a listed program requirement. One of two 3-credit upper-level Nursing elective slots.
+nursing-bsn-2026,nursing-elective-2,degree,degree-nursing-bsn-2026-nursing-elective-2,Unresolved course choice within a listed program requirement. One of two 3-credit upper-level Nursing elective slots.
+nursing-bsn-2026,nursalgebra,degree,degree-nursing-bsn-2026-nursalgebra,The listed three-part algebra route is shown for intermediate placement. Higher placement is an illustrative waiver assumption requiring advising; the full degree-credit target remains.
+nursing-bsn-2026,englX,prerequisite,route-*-englX-englY,Preparation added by the selected entry route; not a separately listed major requirement.
+nursing-bsn-2026,engl2,general,degree-nursing-bsn-2026-engl2,Illustrative English route; complete Gen Ed allocation remains separate.
+nursing-bsn-2026,englY,general,degree-nursing-bsn-2026-englY,Illustrative English route; complete Gen Ed allocation remains separate.
+nursing-bsn-2026,math1350,degree,degree-nursing-bsn-2026-math1350,Selected listed mathematics option.
+nursing-bsn-2026,engl1,general,degree-nursing-bsn-2026-engl1,Illustrative English route; complete Gen Ed allocation remains separate.
+radiologic-nuclear-bs-2026,radbio,degree,degree-radiologic-nuclear-bs-2026-radbio,Listed requirement in the selected program/route.
+radiologic-nuclear-bs-2026,radchem,degree,degree-radiologic-nuclear-bs-2026-radchem,Listed requirement in the selected program/route.
+radiologic-nuclear-bs-2026,radap1,degree,degree-radiologic-nuclear-bs-2026-radap1,Listed requirement in the selected program/route.
+radiologic-nuclear-bs-2026,radap2,degree,degree-radiologic-nuclear-bs-2026-radap2,Listed requirement in the selected program/route.
+radiologic-nuclear-bs-2026,radmicro,degree,degree-radiologic-nuclear-bs-2026-radmicro,Listed requirement in the selected program/route.
+radiologic-nuclear-bs-2026,radstats,degree,degree-radiologic-nuclear-bs-2026-radstats,Listed requirement in the selected program/route.
+radiologic-nuclear-bs-2026,radphysics,degree,degree-radiologic-nuclear-bs-2026-radphysics,Listed requirement in the selected program/route.
+radiologic-nuclear-bs-2026,radpatient,degree,degree-radiologic-nuclear-bs-2026-radpatient,Listed requirement in the selected program/route.
+radiologic-nuclear-bs-2026,radphysics2,degree,degree-radiologic-nuclear-bs-2026-radphysics2,Unresolved course choice within a listed program requirement. Choose one; prerequisites and admission depend on the selection.
+radiologic-nuclear-bs-2026,rads378,degree,degree-radiologic-nuclear-bs-2026-rads378,Listed requirement in the selected program/route.
+radiologic-nuclear-bs-2026,rads381,degree,degree-radiologic-nuclear-bs-2026-rads381,Listed requirement in the selected program/route.
+radiologic-nuclear-bs-2026,rads398,degree,degree-radiologic-nuclear-bs-2026-rads398,Listed requirement in the selected program/route.
+radiologic-nuclear-bs-2026,rads405,degree,degree-radiologic-nuclear-bs-2026-rads405,Listed requirement in the selected program/route.
+radiologic-nuclear-bs-2026,rads406,degree,degree-radiologic-nuclear-bs-2026-rads406,Listed requirement in the selected program/route.
+radiologic-nuclear-bs-2026,rads480,degree,degree-radiologic-nuclear-bs-2026-rads480,Listed requirement in the selected program/route.
+radiologic-nuclear-bs-2026,rads481,degree,degree-radiologic-nuclear-bs-2026-rads481,Listed requirement in the selected program/route.
+radiologic-nuclear-bs-2026,nucm315,degree,degree-radiologic-nuclear-bs-2026-nucm315,Listed requirement in the selected program/route.
+radiologic-nuclear-bs-2026,nucm320,degree,degree-radiologic-nuclear-bs-2026-nucm320,Listed requirement in the selected program/route.
+radiologic-nuclear-bs-2026,nucm354,degree,degree-radiologic-nuclear-bs-2026-nucm354,Listed requirement in the selected program/route.
+radiologic-nuclear-bs-2026,nucm360,degree,degree-radiologic-nuclear-bs-2026-nucm360,Listed requirement in the selected program/route.
+radiologic-nuclear-bs-2026,nucm365,degree,degree-radiologic-nuclear-bs-2026-nucm365,Listed requirement in the selected program/route.
+radiologic-nuclear-bs-2026,nucm375,degree,degree-radiologic-nuclear-bs-2026-nucm375,Listed requirement in the selected program/route.
+radiologic-nuclear-bs-2026,nucm385,degree,degree-radiologic-nuclear-bs-2026-nucm385,Listed requirement in the selected program/route.
+radiologic-nuclear-bs-2026,nucm392,degree,degree-radiologic-nuclear-bs-2026-nucm392,Listed requirement in the selected program/route.
+radiologic-nuclear-bs-2026,nucm396,degree,degree-radiologic-nuclear-bs-2026-nucm396,Listed requirement in the selected program/route.
+radiologic-nuclear-bs-2026,nucm400,degree,degree-radiologic-nuclear-bs-2026-nucm400,Listed requirement in the selected program/route.
+radiologic-nuclear-bs-2026,nucm412,degree,degree-radiologic-nuclear-bs-2026-nucm412,Listed requirement in the selected program/route.
+radiologic-nuclear-bs-2026,nucm415,degree,degree-radiologic-nuclear-bs-2026-nucm415,Listed requirement in the selected program/route.
+radiologic-nuclear-bs-2026,englX,prerequisite,route-*-englX-englY,Preparation added by the selected entry route; not a separately listed major requirement.
+radiologic-nuclear-bs-2026,engl2,general,degree-radiologic-nuclear-bs-2026-engl2,Illustrative English route; complete Gen Ed allocation remains separate.
+radiologic-nuclear-bs-2026,math1215,prerequisite,route-*-math1215-math1220,Preparation added by the selected entry route; not a separately listed major requirement.
+radiologic-nuclear-bs-2026,englY,general,degree-radiologic-nuclear-bs-2026-englY,Illustrative English route; complete Gen Ed allocation remains separate.
+radiologic-nuclear-bs-2026,math1220,prerequisite,prepare-radiologic-nuclear-bs-2026-math1220,Preparation for the selected program-specific mathematics route.
+radiologic-nuclear-bs-2026,math1240,degree,degree-radiologic-nuclear-bs-2026-math1240,Selected listed mathematics option.
+radiologic-nuclear-bs-2026,engl1,general,degree-radiologic-nuclear-bs-2026-engl1,Illustrative English route; complete Gen Ed allocation remains separate.
+population-health-bs-2026,poph-missing-1,degree,degree-population-health-bs-2026-poph-missing-1,"The catalog core says Course Not Found. Identity, actual credits, level and prerequisites are unknown. This card reserves a provisional 3-credit planning slot; it is not an official course or credit value."
+population-health-bs-2026,poph-missing-2,degree,degree-population-health-bs-2026-poph-missing-2,"The catalog core says Course Not Found. Identity, actual credits, level and prerequisites are unknown. This card reserves a provisional 3-credit planning slot; it is not an official course or credit value."

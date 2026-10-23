@@ -6357,7 +6357,7 @@ output$enrl_classlist_download <- downloadHandler(
                  edges = data_objects[["cedar_edges"]], pathway_groups = CEDAR_PATHWAY_SUBJECT_GROUPS)
 
   degreeExplorerServer("degree_explorer", CEDAR_DEGREE_CATALOG, CEDAR_DEGREE_ROADMAPS,
-    sections = cedar_sections, students = cedar_students, edges = data_objects[["cedar_edges"]])
+    sections = cedar_sections, students = cedar_students, edges = data_objects[["cedar_edges"]], shared = CEDAR_SHARED_REQUIREMENTS)
 
   # =============================================================================
   # Retention tab — institution-level retention by course (Shiny module)

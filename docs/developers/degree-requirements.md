@@ -36,7 +36,46 @@ categories as `CEDAR_PATHWAY_SUBJECT_GROUPS`. The synthetic institution
 has empty catalog files rather than importing real university rules as synthetic
 facts; its fixture courses still have descriptive groups.
 
+## Readable rules behind a plan
+
+`build_degree_plan_rules(catalog, roadmaps, view)` in `R/features/degree-explorer.R`
+turns the actual selected view and saved metadata into a readable table: recorded
+catalog outlines, displayed courses/groups, finite alternatives, prerequisite
+edges, aggregate/permission conditions, credit budget, authored semester
+positions and other preferences. Underlying node IDs remain attached when
+identical elective slots share a row. Course-count conditions never become named
+prerequisite arrows. Catalog rows retain captured wording and links; CEDAR
+preferences have no invented catalog quote. Recorded admission/GPA rules are not
+student eligibility checks.
+
+The health pilot adds Population Health, Medical Laboratory Sciences, Nursing
+(Freshman Direct Entry) and Radiologic Sciences (Nuclear Medicine). These are
+catalog-derived authored excerpts in the existing institution CSVs. Clinical
+admission, capacity and cohort calendars are not evaluated. Population Health's
+two broken entries use explicitly provisional 3-credit slots, not invented
+identities/official credits. Published total conflicts stay visible.
+
+`kind = cohort` stores a required block with every component in
+`degree_roadmap_courses.csv`: at least two components, possibly mixed levels,
+upper-level if any component is upper-level. The complete block stays together
+under the credit cap. `component_count` makes chain metrics count five courses
+in a five-course block rather than treating every block as a two-course pair.
+This does not imply every component is a prerequisite of every later course;
+link details and quoted sources describe the selected grouped progression.
+
 ## Rule semantics
+
+The reference sets under `institution/<id>/shared_requirements/<year>/` separate
+University, Gen Ed and awarding-college policies from degree-specific trees.
+They reuse the operator vocabulary and add scope, overlapping-credit roles,
+bounds, source pointers and attention cases. `read_shared_requirement_bundle()`
+validates their data; an explicit capture directory additionally verifies
+source bytes and locators. `format_shared_requirement_preview()` produces the
+readable rulebook. `capture_shared_requirement_sources()` makes pinned-edition
+source candidates without modifying rules. The offline entry point is
+`scripts/shared-requirements.R`; the institution README documents the format
+and annual workflow. These files now supply illustrative semester allowance
+allocation and upper-credit context; they are not a transcript evaluator.
 
 `all` and `choose_n` preserve AND/OR trees. A two-course `all` child is one option
 of its parent's `choose_n`. Course leaves distinguish `course`, `prior`,
@@ -69,6 +108,7 @@ After scheduling, `assign_degree_roadmap_rows(nodes)` adds a positive integer
 `row` from the authored `row_group` family. Math and writing have reserved rows;
 parallel courses occupy separate rows. Other families can share a row only
 outside each other's complete semester span, preserving gaps within sequences.
+The planner shifts these rows together below the early Gen Ed allowance band.
 This step changes neither course semesters nor workload. The view adds `n_rows`;
 the renderer uses shared CSS grid tracks so each row grows to fit its tallest
 tile across every semester. Browser code still only draws actual graph edges.
@@ -118,24 +158,28 @@ is explicit, not an assertion that all preparation is ineligible for degree
 credit. Other work is the target minus shown non-preparation courses. The
 horizon grows to fit the workload and all scheduled courses. Other work fills
 toward the usual load (15), then uses the allowed maximum for the remainder.
-Semester totals include both named courses and other work. The latter remains
-an unaudited allowance until course allocation/overlap is implemented.
+Semester totals include both named courses and other work. The latter is a workload allowance, within which shared rules earmark
+source-identified Gen Ed needs; other capacity stays elective/minor space.
 
-`build_degree_allowance_slots()` splits early allowances into course-sized grid
+`build_degree_allowance_slots(terms, slot_credits)` splits early allowances into course-sized grid
 tiles, using the plan's `allowance_slot_credits` and preserving the exact budget.
 A usual slot can absorb one extra credit; smaller remainders remain explicit.
-It fills available rows without disturbing math/writing rows or interior course
-family spans. Later upper-level/minor allowances remain below the grid. The view
-returns these tiles separately in `allowances`, never as catalog graph nodes.
+It fills rows from the top of each semester. `build_degree_roadmap()` reserves
+the largest slot count as a shared top band and shifts all named course rows
+below it without disturbing math/writing alignment or interior course-family
+spans. A plan without early allowances reserves no extra rows. Later upper-level/
+minor allowances remain below the grid. The plan returns the slots separately
+in `allowances`, never as catalog graph nodes; the view adds their display labels.
 `start_season` defaults to fall and alternates fall/spring labels, with a selector
 and shared-URL field. It affects example offerings, not prerequisite scheduling.
 
 `build_degree_popup_history()` dispatches ordinary course cards to existing
 history and validates allowance clicks against the current plan. Suggestions
-use CEDAR's Gen Ed membership, excluding fixed/entry courses and finite option
-pools already represented in the program. `get_gen_ed_planning_options()` reads
+use the captured annual area membership for identified Gen Ed cards, or lower/
+upper undergraduate offerings for elective cards, excluding fixed/entry courses
+and finite option pools already represented in the program. `get_gen_ed_planning_options()` reads
 the explicitly supplied guarded history and section metadata; it never calls
-another cone. It selects lower-level, non-topic, course-sized options and the
+another cone. It selects non-topic, course-sized options from the supplied level scope and the
 latest matching-season row at each course/delivery-campus/college/session.
 Frequency denominators use source-covered terms only. Rows sort by frequency,
 then first-day enrollment; missing dates and suppressed counts stay unknown.
@@ -144,10 +188,10 @@ Credit fit is an allowance comparison, not enrollment eligibility. The canonical
 These are general historical examples, not a Gen Ed audit or curated advice for
 a major. Future major-specific Markdown guidance remains a separate extension.
 `terms$other_phase` distinguishes early foundation allowances from later advanced
-work. The feature labels early slots Gen Ed / lower-level electives and later
-slots upper-level / minor / electives. This prioritizes Gen Ed in years 1–2
-without inventing an audited Gen Ed credit requirement or claiming every later
-elective earns upper-division credit.
+work. The feature labels identified area needs as Gen Ed and other early slots as
+elective/minor, any level. Late footer balances remain elective/minor context;
+explicit late Gen Ed cards are subtracted from those balances. No generic
+allowance is called an extra Gen Ed requirement.
 
 Template positions and elective-group placements are planning suggestions.
 Course-specific options, offerings, admission, transfers, equivalences and the
@@ -288,3 +332,35 @@ no overlapping tiles — as an integrity check on the authored files. The standa
 `degree-explorer` browser suite covers placement changes, dependency shifts,
 paired courses, complete semester budgets, source evidence, planning colors,
 mobile scrolling, URL restoration and copying, and the moved observed view.
+
+## Shared requirement coverage in the semester board
+
+`load_degree_shared_requirements(catalog, institution_dir)` loads the pinned
+annual bundle once in `global.R` as `CEDAR_SHARED_REQUIREMENTS`. The server
+passes this explicitly to Degree Explorer.
+`degree_shared_coverage(view, roadmaps, reference)` in branches consumes selected
+course components once across typed Gen Ed base/flexible areas; unresolved
+options advertise potential coverage without satisfying a requirement. Related
+science bundles remain intact. Completed-English input supplies only writing
+coverage; preparation eligibility and transfer/approval waivers are not inferred.
+
+`allocate_shared_degree_slots(view, coverage)` earmarks named gaps within the
+existing per-term allowance budget, preserves remainders and exposes needs that
+cannot fit a whole slot. It shifts the common option band without altering named
+course timing or workload. `footer_credits` is the remaining late-term balance
+after any explicit late Gen Ed slots; rendering must not also count those slots
+in the footer. Other early cards are elective/minor space, any level.
+
+The shared payload also shows the standard college upper-credit minimum, named
+upper-level credits and the balance still to fit in existing elective/minor space.
+Mixed clinical blocks are not counted wholesale. Conditional alternatives are
+recorded rather than selected. Typed planning interpretation fields live next to
+their source-linked annual rules; see `shared_requirements/README.md`. Flexible
+coverage is visibly provisional until the catalog numbering conflict is resolved.
+This is an illustrative allocation, not an eligibility check or degree audit.
+
+The popup feature uses the selected area’s current captured memberships for a
+Gen Ed card, and all lower/upper undergraduate offerings for an elective card.
+`get_gen_ed_planning_options(..., levels)` retains campus/college/session grain
+and exposes course level. No enrollment metadata is treated as prerequisite
+evidence. Existing numeric Gen Ed analytics mappings remain separate.

@@ -1,0 +1,245 @@
+{
+  "schema_version": "1.0.0",
+  "rule_set_id": "unm-engineering",
+  "catalog_year": "2026-2027",
+  "catalog_id": "68a34618094c97cf857f1ec1",
+  "title": "School of Engineering bachelor rules",
+  "scope": {
+    "level": "college",
+    "credential": "bachelors",
+    "college_code": "EN"
+  },
+  "coverage": "selected_sections",
+  "notes": [
+    "Selected major-admission and bachelor-completion policies. Department-specific rules can be stricter. Upper-division credit totals are program-specific; A&S rules do not apply."
+  ],
+  "rules": [
+    {
+      "rule_id": "unm-engineering.entry_credits",
+      "label": "Major-status degree-applicable credit",
+      "statement": "Complete at least 26 credits applicable to the intended degree.",
+      "phase": "admission",
+      "operator": "credits",
+      "role": "overlapping_subset",
+      "applies_when": "All students in this rule set scope.",
+      "review_status": "transcribed",
+      "source_refs": [
+        {
+          "source_id": "engineering",
+          "pointer": "/body",
+          "anchor": "26 credit"
+        }
+      ],
+      "minimum": 26,
+      "unit": "credit_hours"
+    },
+    {
+      "rule_id": "unm-engineering.entry_technical",
+      "label": "Technical admission coursework",
+      "statement": "The page states at least 18 first-year technical credits and separately completion of the 19–25 technical credits in the first-year curriculum. Technical GPA is at least 2.5 and each technical grade at least C-minus; verify the applicable program threshold.",
+      "phase": "admission",
+      "operator": "condition",
+      "role": "condition",
+      "applies_when": "All students in this rule set scope.",
+      "review_status": "transcribed",
+      "source_refs": [
+        {
+          "source_id": "engineering",
+          "pointer": "/body",
+          "anchor": "19-25"
+        }
+      ],
+      "min_grade": "C-",
+      "review_case": "technical-admission-threshold"
+    },
+    {
+      "rule_id": "unm-engineering.entry_gpa",
+      "label": "Admission GPA",
+      "statement": "Meet at least a 2.30 GPA across coursework presented for major admission, plus the separate technical-course GPA rule. Programs can be stricter.",
+      "phase": "admission",
+      "operator": "condition",
+      "role": "condition",
+      "applies_when": "All students in this rule set scope.",
+      "review_status": "transcribed",
+      "source_refs": [
+        {
+          "source_id": "engineering",
+          "pointer": "/body",
+          "anchor": "2.30"
+        }
+      ],
+      "minimum": 2.3,
+      "unit": "gpa"
+    },
+    {
+      "rule_id": "unm-engineering.entry_writing",
+      "label": "Admission writing",
+      "statement": "Complete ENGL 1110 or its accepted equivalent. Do not infer legacy course equivalences from their labels.",
+      "phase": "admission",
+      "operator": "condition",
+      "role": "condition",
+      "applies_when": "All students in this rule set scope.",
+      "review_status": "transcribed",
+      "source_refs": [
+        {
+          "source_id": "engineering",
+          "pointer": "/body",
+          "anchor": "English 1110"
+        }
+      ]
+    },
+    {
+      "rule_id": "unm-engineering.degree_gpa",
+      "label": "Engineering GPA",
+      "statement": "Have at least a 2.0 GPA on UNM work counted toward the degree and at least a 2.0 GPA on all UNM work.",
+      "phase": "degree",
+      "operator": "condition",
+      "role": "condition",
+      "applies_when": "All students in this rule set scope.",
+      "review_status": "transcribed",
+      "source_refs": [
+        {
+          "source_id": "engineering",
+          "pointer": "/body",
+          "anchor": "2.00 GPA"
+        }
+      ],
+      "minimum": 2,
+      "unit": "gpa"
+    },
+    {
+      "rule_id": "unm-engineering.course_grades",
+      "label": "Required-course grades",
+      "statement": "Unless a stricter rule applies, required curriculum courses need at least C-minus. Gen Ed courses need at least C. This is a catalog eligibility rule, independent of CEDAR’s analytical DFW definition.",
+      "phase": "degree",
+      "operator": "condition",
+      "role": "condition",
+      "applies_when": "All students in this rule set scope.",
+      "review_status": "transcribed",
+      "source_refs": [
+        {
+          "source_id": "engineering",
+          "pointer": "/body",
+          "anchor": "C-"
+        }
+      ],
+      "min_grade": "C-"
+    },
+    {
+      "rule_id": "unm-engineering.attempt_limit",
+      "label": "Required-course attempts",
+      "statement": "Complete required graduation coursework within three attempts, including external courses. The source counts letter grades, W, CR, NC, I and audit as attempts.",
+      "phase": "degree",
+      "operator": "condition",
+      "role": "condition",
+      "applies_when": "All students in this rule set scope.",
+      "review_status": "transcribed",
+      "source_refs": [
+        {
+          "source_id": "engineering",
+          "pointer": "/body",
+          "anchor": "three attempts"
+        }
+      ],
+      "maximum": 3,
+      "unit": "attempts"
+    },
+    {
+      "rule_id": "unm-engineering.low_grade_hours",
+      "label": "Low-grade credit restriction",
+      "statement": "Students with 30 or more credits of D-plus, D, D-minus, F or NC cannot graduate in Engineering, except work removed through the applicable academic-renewal or repeat policy.",
+      "phase": "degree",
+      "operator": "condition",
+      "role": "condition",
+      "applies_when": "All students in this rule set scope.",
+      "review_status": "transcribed",
+      "source_refs": [
+        {
+          "source_id": "engineering",
+          "pointer": "/body",
+          "anchor": "30 or more"
+        }
+      ],
+      "maximum_exclusive": 30,
+      "unit": "credit_hours"
+    },
+    {
+      "rule_id": "unm-engineering.excluded_pe",
+      "label": "Physical education activity",
+      "statement": "Physical education activity courses do not count toward Engineering bachelor requirements.",
+      "phase": "degree",
+      "operator": "condition",
+      "role": "allocation",
+      "applies_when": "All students in this rule set scope.",
+      "review_status": "transcribed",
+      "source_refs": [
+        {
+          "source_id": "engineering",
+          "pointer": "/body",
+          "anchor": "Physical education activity"
+        }
+      ]
+    },
+    {
+      "rule_id": "unm-engineering.excluded_intro",
+      "label": "Introductory Studies",
+      "statement": "Introductory Studies courses do not count toward Engineering bachelor requirements.",
+      "phase": "degree",
+      "operator": "condition",
+      "role": "allocation",
+      "applies_when": "All students in this rule set scope.",
+      "review_status": "transcribed",
+      "source_refs": [
+        {
+          "source_id": "engineering",
+          "pointer": "/body",
+          "anchor": "Introductory Studies"
+        }
+      ]
+    },
+    {
+      "rule_id": "unm-engineering.gen_ed",
+      "label": "Gen Ed course restrictions",
+      "statement": "Complete University Gen Ed using any specific courses required by the Engineering program/accreditation curriculum.",
+      "phase": "degree",
+      "operator": "condition",
+      "role": "reference",
+      "applies_when": "All students in this rule set scope.",
+      "review_status": "transcribed",
+      "source_refs": [
+        {
+          "source_id": "engineering",
+          "pointer": "/body",
+          "anchor": "accreditation standards"
+        }
+      ],
+      "rule_set_ref": "unm-general-education"
+    },
+    {
+      "rule_id": "unm-engineering.degree_application",
+      "label": "Engineering degree application",
+      "statement": "File the degree application with the department during the second semester of junior year and no later than completing 100 degree-acceptable credits.",
+      "phase": "degree",
+      "operator": "condition",
+      "role": "milestone",
+      "applies_when": "All students in this rule set scope.",
+      "review_status": "transcribed",
+      "source_refs": [
+        {
+          "source_id": "engineering",
+          "pointer": "/body",
+          "anchor": "100 credit"
+        }
+      ]
+    }
+  ],
+  "attention": [
+    {
+      "case_id": "technical-admission-threshold",
+      "statement": "The same school page uses 18 technical credits and 19–25 first-year technical credits. Preserve both statements and require program-specific clarification before evaluating admission.",
+      "rule_ids": [
+        "unm-engineering.entry_technical"
+      ]
+    }
+  ]
+}

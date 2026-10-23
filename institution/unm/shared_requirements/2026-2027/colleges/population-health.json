@@ -1,0 +1,22 @@
+{
+  "schema_version": "1.0.0",
+  "rule_set_id": "unm-population-health",
+  "catalog_year": "2026-2027",
+  "catalog_id": "68a34618094c97cf857f1ec1",
+  "title": "College of Population Health shared-rule coverage",
+  "scope": {
+    "level": "college",
+    "credential": "bachelors",
+    "college_code": "PO"
+  },
+  "coverage": "not_located_on_checked_overview",
+  "notes": [
+    "The checked overview describes programs, honors and minors. It does not state a separate common bachelor graduation block. BSPH requirements remain degree-specific; honors thresholds are not graduation requirements.",
+    "An empty shared-rule list records this source coverage only; it does not establish that no additional requirements exist."
+  ],
+  "rules": [],
+  "attention": [],
+  "checked_source_ids": [
+    "population_health"
+  ]
+}

@@ -13,6 +13,8 @@ context("Degree Explorer")
 #   s5 molecular 4, evolution 4, physiology 3 (evolution before or with it) = 11
 #   s7 bioelective 3 (choice); s8 biocap 3 (after molecular)
 #   Shown 54; other degree work 66 fills every semester to 15.
+#   Early allowances: s3 has 3 + 3 + 2; s4 has five 3-credit slots. They occupy
+#   top rows 1–5; the aligned course families begin with math at row 6.
 #   molecular's ancestors: genetics, chem2 (2), bio2, chem1 (2), bio1 = 7 courses,
 #   chem1 counted once although both genetics and chem2 lead from it.
 #   physiology: prereq_depth 2, not 3 — a concurrent link adds no semester.
@@ -67,6 +69,40 @@ test_that("catalog trees preserve alternatives, bundles, timing and unresolved s
 })
 
 # ── Scheduling ───────────────────────────────────────────────────────────────
+
+test_that("readable plan rules expose the active graph and distinguish policy from scheduling", {
+  v <- view_of(HISTORY)
+  rules <- build_degree_plan_rules(catalog(), roadmaps(), v)
+  expect_match(rules$scenario, "Math: Calculus-ready: take statistics", fixed = TRUE)
+  rows <- rules$rows
+  expect_equal(sum(rows$kind == "Prerequisite arrow"), nrow(v$links))
+  expect_equal(sum(rows$kind == "Other enrollment condition"), nrow(v$conditions))
+  expect_true(any(grepl("2+ upper-level", rows$rule, fixed = TRUE)))
+  # Aggregate conditions must not turn the entire qualifying pool into arrows.
+  arrows <- rows[rows$kind == "Prerequisite arrow", ]
+  expect_false(any(startsWith(arrows$node_ids, "histupper")))
+  expect_true(all(nzchar(arrows$source_url) & nzchar(arrows$quote)))
+  preference <- rows[rows$kind == "Planning preference", ]
+  expect_true(any(grepl("15 credits; never more than 16", preference$rule, fixed = TRUE)))
+  expect_true(all(preference$source_url == "" & preference$quote == ""))
+  expect_true(any(rows$kind == "Suggested general coursework" & grepl("MATH 1350", rows$rule, fixed = TRUE)))
+  expect_true(all(grepl("not evaluated", rows$effect[rows$kind == "Recorded catalog requirement"], fixed = TRUE)))
+  prepared <- build_degree_plan_rules(catalog(), roadmaps(), view_of(HISTORY, "intermediate"))$rows
+  expect_true(any(prepared$kind == "Preparation" & grepl("MATH 1215", prepared$rule, fixed = TRUE)))
+  expect_false(any(rows$kind == "Preparation" & grepl("MATH 1215", rows$rule, fixed = TRUE)))
+  expect_setequal(setdiff(unique(unlist(strsplit(paste(rows$node_ids, collapse = "|"), "|", fixed = TRUE))), ""), c(v$nodes$node_id, v$allowances$node_id))
+})
+
+test_that("required blocks count actual component courses rather than assuming a two-course pair", {
+  nodes <- data.frame(node_id = c("clinical", "advanced"), kind = c("cohort", "major"),
+    bundle = c(TRUE, FALSE), component_count = c(5L, 1L))
+  links <- data.frame(from = "clinical", to = "advanced", timing = "before")
+  metrics <- get_degree_chain_metrics(nodes, links)
+  expect_equal(metrics$n_prerequisites[metrics$node_id == "advanced"], 5L)
+  expect_equal(metrics$n_direct[metrics$node_id == "advanced"], 5L)
+  expect_equal(metrics$prereq_depth[metrics$node_id == "advanced"], 1L)
+  expect_equal(metrics$n_downstream[metrics$node_id == "clinical"], 1L)
+})
 
 test_that("the calculus-ready biology plan matches its hand-worked schedule", {
   v <- plan()
@@ -170,8 +206,8 @@ test_that("upper-level courses wait for the institution's later planning stage",
   r$plans$upper_level_from_semester[r$plans$catalog_id == BIOLOGY] <- "7"
   late <- view_of(r = r)
   expect_equal(at(late, c("molecular", "evolution", "physiology", "bioelective", "biocap")), c(7L, 7L, 7L, 7L, 8L))
-  expect_true(all(late$terms$other_label[late$terms$semester < 7L] == "Gen Ed / lower-level electives"))
-  expect_true(all(late$terms$other_label[late$terms$semester >= 7L] == "Upper-level / minor / electives"))
+  expect_true(all(late$terms$other_label[late$terms$semester < 7L] == "Gen Ed where identified; other elective / minor credits"))
+  expect_true(all(late$terms$other_label[late$terms$semester >= 7L] == "Elective / minor · upper level may count"))
   expect_match(late$timing_note, "semester 7", fixed = TRUE)
   expect_true(all(late$terms$planned_credits <= 16))
 })
@@ -180,13 +216,13 @@ test_that("upper-level courses wait for the institution's later planning stage",
 
 test_that("course families align after scheduling and parallel courses take separate rows", {
   v <- plan()
-  expect_equal(at(v, c("calc1", "engl1", "engl2"), "row"), c(1L, 2L, 2L))
-  expect_equal(at(v, c("bio1", "bio2", "genetics", "molecular"), "row"), rep(3L, 4))
+  expect_equal(at(v, c("calc1", "engl1", "engl2"), "row"), c(6L, 7L, 7L))
+  expect_equal(at(v, c("bio1", "bio2", "genetics", "molecular"), "row"), rep(8L, 4))
   # Evolution and Physiology share Molecular Biology's semester and family.
-  expect_equal(at(v, c("evolution", "physiology"), "row"), c(4L, 5L))
+  expect_equal(at(v, c("evolution", "physiology"), "row"), c(9L, 10L))
   # Other families reuse a row outside each other's span.
-  expect_equal(at(v, c("biocap", "bioelective"), "row"), c(3L, 3L))
-  expect_equal(at(v, c("chem1", "chem2", "biosci", "phys1"), "row"), c(4L, 4L, 4L, 5L))
+  expect_equal(at(v, c("biocap", "bioelective"), "row"), c(8L, 8L))
+  expect_equal(at(v, c("chem1", "chem2", "biosci", "phys1"), "row"), c(9L, 9L, 9L, 10L))
   expect_false(anyDuplicated(paste(v$nodes$semester, v$nodes$row)) > 0L)
   # Layout metadata cannot change credit budgets, course timing or graph metrics.
   r <- roadmaps()
@@ -199,14 +235,15 @@ test_that("course families align after scheduling and parallel courses take sepa
   expect_error(validate_degree_roadmaps(r, catalog()), "row group")
 })
 
-test_that("early allowances fill free course slots without changing credits or family gaps", {
+test_that("early allowances occupy the top rows without changing credits or family gaps", {
   v <- view_of()
   expect_identical(v$nodes$row, plan()$nodes$row)
   expect_equal(v$allowances$semester, c(3L, 3L, 3L, 4L, 4L, 4L, 4L, 4L))
   expect_equal(v$allowances$credits, c(3, 3, 2, 3, 3, 3, 3, 3))
-  expect_equal(v$allowances$row, c(5L, 6L, 7L, 4L, 5L, 6L, 7L, 8L))
+  expect_equal(v$allowances$row, c(1L, 2L, 3L, 1L, 2L, 3L, 4L, 5L))
+  expect_lt(max(v$allowances$row), min(v$nodes$row))
   expect_equal(v$allowances$title[3], "Credits left to allocate")
-  expect_equal(v$n_rows, 8L)
+  expect_equal(v$n_rows, 10L)
   for (s in v$terms$semester[v$terms$other_phase == "foundation"]) {
     expect_equal(sum(v$allowances$credits[v$allowances$semester == s]), v$terms$other_credits[v$terms$semester == s])
   }
@@ -220,7 +257,9 @@ test_that("early allowances fill free course slots without changing credits or f
   expect_error(degree_semester_seasons(1:8, "summer"), "fall or spring")
   r <- roadmaps()
   r$plans$degree_credit_target[r$plans$catalog_id == BIOLOGY] <- "54"
-  expect_equal(nrow(view_of(r = r)$allowances), 0L)
+  no_allowances <- view_of(r = r)
+  expect_equal(nrow(no_allowances$allowances), 0L)
+  expect_equal(min(no_allowances$nodes$row), 1L)
 })
 
 # ── Programs: routes, conditions, choices and citations ──────────────────────
@@ -387,6 +426,9 @@ test_that("the loaded institution's roadmaps keep every planning rule in every s
           v$nodes$semester[match(v$links$from, v$nodes$node_id)] + as.integer(v$links$timing == "before")))
         expect_false(anyDuplicated(paste(v$nodes$semester, v$nodes$row)) > 0L)
         expect_lte(length(unique(v$nodes$row[v$nodes$row_group == "writing"])), 1L)
+        expect_lt(max(c(0L, v$allowances$row)), min(v$nodes$row))
+        expect_false(anyDuplicated(c(paste(v$nodes$semester, v$nodes$row),
+          paste(v$allowances$semester, v$allowances$row))) > 0L)
       }
     }
   }
@@ -487,7 +529,7 @@ test_that("the board and popups render the payload; catalog evidence lives in th
   expect_match(popup, "modal-dialog-scrollable", fixed = TRUE)
   allowance <- as.character(degree_tile_modal(degree_roadmap_tile_detail(v, v$allowances$node_id[1]), "history"))
   expect_false(grepl("cedar-roadmap-detail\"", allowance, fixed = TRUE))
-  expect_match(allowance, "Current Gen Ed course list ↗", fixed = TRUE)
+  expect_match(allowance, "Degree credit requirements ↗", fixed = TRUE)
   science <- as.character(degree_tile_modal(degree_roadmap_tile_detail(v, "biosci"), "history"))
   expect_equal(lengths(regmatches(science, gregexpr("<li data-option=", science, fixed = TRUE))), 3L)
   expect_match(science, "PHYS 1230 + PHYS 1230L · 4 credits together", fixed = TRUE)
@@ -518,7 +560,7 @@ test_that("popup history renders one standard table with first-day seats", {
     catalog(), roadmaps(), planning_gen_ed(), selection)
   expect_s3_class(degree_allowance_table(suggestions), "reactable")
   html <- as.character(degree_allowance_history_ui(suggestions, "suggestion_table"))
-  expect_match(html, "Fall Gen Ed suggestions", fixed = TRUE)
+  expect_match(html, "Fall course options", fixed = TRUE)
   expect_match(html, "first class day", fixed = TRUE)
   failed <- list(state = "error", kind = "allowance", node_id = "allowance-3-1", note = "Planner stopped")
   expect_match(as.character(degree_allowance_history_ui(failed, "suggestion_table")), "Planner stopped", fixed = TRUE)
