@@ -16,6 +16,11 @@ services:
       - shiny-net
     volumes:
       - ${CEDAR_DATA_DIR}:/srv/shiny-server/cedar/data
+      # Public catalog archives stay separate from Banner data. The app reads
+      # the scanner's repository-local output without modifying its evidence.
+      - ./data/catalog-scans:/srv/shiny-server/cedar/data/catalog-scans:ro
+      # AI exchanges and human review revisions are separate from source truth.
+      - ./data/catalog-normalizations:/srv/shiny-server/cedar/data/catalog-normalizations:rw
       # Projection artifacts are published by cedar-projections and consumed
       # read-only here.
       - ./output:/srv/shiny-server/cedar/output:ro

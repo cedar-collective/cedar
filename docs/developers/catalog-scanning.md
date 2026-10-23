@@ -181,6 +181,79 @@ directory**, including manifests and `sources/`, in the institution's durable
 archive. A hash cannot reconstruct an old source. `--output` can name that archive
 directly. Capture directories can be copied together without changing source bytes.
 
+## Reviewing inside CEDAR
+
+Catalog Review opens **Visualization rules**, generated directly from the saved
+metadata and selected graph used by Degree Explorer. It explains what drives the
+chart, with catalog wording and links; it is not an approval queue. Optional AI
+proposals remain under **Draft interpretations** ([workflow](catalog-normalization.md)).
+The interfaces below are **Extraction diagnostics**. Unsupported-language flags
+are parser limitations, not failures in the running chart or requests to approve
+every clause manually.
+
+**Admin > Data & Usage > Catalog Review** reads completed local analyses under
+`data/catalog-scans/<institution>/`. Select a saved analysis, then filter by degree,
+record type or requirement type. A degree scope includes its concentrations and
+the transitive closure of captured course references; it does not claim every
+linked course is required. Cycles are visited once. Program-only scans have no
+course records to inspect.
+
+- **Requirements to interpret** lists narrative nodes the extractor could not
+  fully represent as draft rules. A flag indicates an extraction gap, not
+  necessarily an error or ambiguous language in the catalog. A literal
+  **Course Not Found** gets its own reason and an action to verify the source.
+- **Source checks** lists inclusion flags, missing degree sections and ambiguous
+  credential classifications. Current checks run on the saved records, including
+  older analyses created before `source-issues.csv` was added; nothing is fetched.
+- **Milestones** lists cited uses of shared standing/admission gates, following
+  the degree/type filters. Inspect preserves the complete rule and shared ID;
+  admission uses also show the linked program's frozen policy, independently
+  hash-verified on Inspect. Older saved analyses explicitly explain that they
+  predate milestone extraction instead of claiming no milestones exist.
+- **All requirement sections** includes parsed lists that still need validation.
+- **Program coverage** counts program-level sections/flags, excluding embedded
+  concentrations and course records. It follows the degree filter; record/type
+  filters apply to the review queues.
+
+**Inspect** shows the selected excerpt, what to decide, its full captured section
+with list nesting preserved, and the draft structure. Evidence includes capture
+time, JSON field pointer, SHA-256, a public API record link and a published catalog
+page link. The saved section is frozen; the live links can change. Catalog markup
+is rendered with a restricted tag vocabulary and no attributes, scripts or active
+embeds. Structured source fields are displayed as JSON.
+
+Review-artifact hashes and the capture-manifest hash are checked before loading
+or looking up prepared data. Original source bytes are checked on every Inspect,
+so opening a ten-row queue does not read thousands of individual source files.
+Offline capture and analysis retain full-source verification; comparisons retain
+artifact verification. The page
+states this distinction. Corrupt/missing inspected evidence is an explicit error;
+a missing optional archive has a separate setup message.
+
+Prepared review data is shared in Shiny's bounded, app-level memory cache. Its key
+covers the archive location, verified analysis metadata/content hashes and a
+manual review-payload version. Actual artifact bytes are checked before cache
+lookup, so corruption cannot be hidden by a warm entry or unchanged timestamps.
+The cache stores data and frozen provenance, not widgets or live presentation
+settings. Bump the version in `catalog_review_cache_key()` when preparation logic
+or its result shape changes.
+
+Returning to the tab preserves the loaded snapshot, degree filter and table
+state. **Refresh scans** rediscovers analyses and rechecks artifacts; unchanged
+verified inputs reuse their prepared data. The browser renders previews and
+Inspect buttons for visible rows, avoiding thousands of R HTML-cell renders.
+No catalog archive or Banner table is loaded merely by opening another Admin subtab.
+
+Download the filtered queue as CSV to coordinate review. Like Mappings, this page
+is an inspection surface: decisions belong in reviewed, versioned files. It does
+not save approval states, edit archives or compile runtime degree plans.
+
+Production Compose mounts repository-local `data/catalog-scans/` read-only over
+the corresponding app data subdirectory, separate from the external Banner data
+mount. Keep each analysis with its capture's `source-manifest.json` and `sources/`
+so archives remain portable across host/container paths. Refresh scans to discover
+new completed analyses without restarting Shiny.
+
 ## Offline rebuilding and annual review
 
 Re-extract frozen inputs into a new analysis directory without network calls:
@@ -202,6 +275,14 @@ require matching program/course scope and verify generated artifact hashes.
 explicit list structure and formatting, with before/after source URLs and hashes.
 Wording-only does not establish equivalent academic requirements. The comparison
 manifest separately flags changed extractor code/package provenance or configuration.
+
+AI exchange packets and human-reviewed canonical exports are implemented in the
+separate [normalization workflow](catalog-normalization.md). It preserves source,
+prompt/schema identity, model attribution, original response and human revisions.
+API automation and compilation into semester templates remain future work.
+Queue text is a locator, not a standalone prompt: interpretation must include
+the enclosing captured section and its AND/OR context, retrieved through the
+saved source pointer and hash.
 
 Tests extend `test-degree-explorer.R` using the demo institution's authored
 `catalog-source-fixture.json`: nested OR/AND, changed counts/credits, prose and

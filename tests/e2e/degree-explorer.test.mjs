@@ -120,6 +120,22 @@ const checkAnthropologyCoverage = async () => {
   await choose('degree_explorer-dx_start_season', prior.season);
   await choose('degree_explorer-dx_math_start', prior.math);
 };
+const checkAdminSharedRules = async () => {
+  await connect(page, { tab: 'data-usage' });
+  await openSubTab(page, 'Catalog Review');
+  await waitForSelector(page, '#catalog_review-rules-table .rt-table');
+  await page.$eval('#catalog_review-rules-catalog', el => el.selectize.setValue('anthropology-ba-2026'));
+  await waitForIdle(page);
+  await page.evaluate(() => Reactable.setSearch('catalog_review-rules-table', 'Shared Gen Ed allocation'));
+  await waitFor(page, () => document.getElementById('catalog_review-rules-table').innerText.includes('Shared Gen Ed allocation'));
+  const sharedRules = await readReactable(page, 'catalog_review-rules-table');
+  check(!sharedRules.error && sharedRules.rows.length === 8 &&
+    sharedRules.rows.every(row => row.join(' ').includes('Shared Gen Ed allocation')) &&
+    await page.$eval('#catalog_review-rules-table', el => [...el.querySelectorAll('a')]
+      .some(link => link.href.includes('/programs/Sk0wRqKHs'))),
+    'Admin exposes the same eight source-linked Gen Ed allocation rules as the degree graph');
+  await page.screenshot({ path: '/tmp/cedar-degree-admin-shared-rules.png', fullPage: false });
+};
 const checkDegreeExplorer = async () => {
   await connect(page, { tab: 'degree-explorer' });
   await waitForSelector(page, '[data-roadmap][data-ready]');
@@ -581,6 +597,7 @@ const checkDegreeExplorer = async () => {
   await waitForSelector(page, '[data-roadmap][data-ready][data-catalog="business-bba-2026"][data-math-start="algebra"][data-english-start="stretch"]');
   check(await semester('math1350') === 1 && await semester('engl2') === 3 && await semester('buswriting') === 4,
     'a new-program deep link restores its statistics route and the full English-to-business-writing sequence');
+  await checkAdminSharedRules();
 };
 try {
   if (process.argv.includes('--shared-requirements-only')) {
@@ -597,6 +614,7 @@ try {
         sum + Number(card.dataset.credits), 0) === Number(term.dataset.plannedCredits))),
       'shared requirement cards preserve every semester credit and the 16-credit cap');
     await (await page.$('[data-node="antharch"]')).screenshot({ path: '/tmp/cedar-degree-anthropology-overlap-card.png' });
+    await checkAdminSharedRules();
     check(jsErrors.length === 0, 'no uncaught JavaScript errors');
   } else {
   if (!process.argv.includes('--course-paths-only')) await checkDegreeExplorer();

@@ -35,6 +35,231 @@ scan_fetcher <- function(fixture = scan_fixture(), observer = function(url) NULL
   }
 }
 
+# Pipeline-shaped AI response scaffolding, deliberately unresolved throughout.
+# Source facts remain in the authored demo catalog; no model is called in tests.
+normalization_proposal <- function(request) {
+  nodes <- lapply(seq_along(request$source_blocks), function(i) {
+    block <- request$source_blocks[[i]]
+    list(id = paste0("rule-", i), parent_id = "", entity_id = block$entity_id,
+      phase = if (block$phase == "info") "information" else block$phase,
+      kind = "unresolved", label = block$text, minimum = NULL, maximum = NULL,
+      unit = "none", comparison = "none", value = "Designed unresolved passage", minimum_grade = "",
+      course_refs = list(), program_ref = "", timing = "not_applicable",
+      citations = list(list(block_id = block$id, quote = block$text)))
+  })
+  list(schema_version = "1.0.0", nodes = nodes,
+    coverage = lapply(seq_along(nodes), function(i) list(block_id = request$source_blocks[[i]]$id,
+      disposition = "unresolved", node_ids = list(nodes[[i]]$id), explanation = "Designed unresolved interpretation")),
+    questions = list())
+}
+
+normalization_fixture <- function(root) {
+  config <- scan_config(); capture <- file.path(root, "captures", "designed")
+  capture_degree_catalog(config$source, config$credentials, config$fields, capture, fetch = scan_fetcher(), pause = 0)
+  analyze_degree_catalog(capture)
+  payload <- load_catalog_review(dirname(capture), "designed/analysis")
+  store <- file.path(root, "reviews")
+  path <- prepare_catalog_normalization(payload, "biology", store,
+    paste(readLines(file.path(cedar_base_dir, "config/catalog-normalization-prompt.txt")), collapse = "\n"),
+    read_source_json(file.path(cedar_base_dir, "config/catalog-normalization.schema.json")))
+  program <- load_catalog_normalization_program(store, basename(path))
+  list(program = program, root = store, payload = payload, capture = capture,
+    unit = program$packet$units[[1]])
+}
+
+test_that("AI packets preserve complete source context and keep course units separate", {
+  root <- tempfile("catalog-normalization-"); withr::defer(unlink(root, recursive = TRUE))
+  f <- normalization_fixture(root); unit <- f$unit
+  expect_length(f$program$packet$units, 4)
+  expect_setequal(unlist(unit$request$target_entities), c("programs:biology", "specializations:cellular"))
+  blocks <- unit$request$source_blocks
+  round_trip <- jsonlite::fromJSON(rawToChar(source_json_bytes(unit$request)), simplifyVector = FALSE)
+  expect_null(names(round_trip$source_blocks))
+  expect_null(names(round_trip$context_blocks))
+  expect_null(names(round_trip$documents))
+  expect_true(any(vapply(blocks, function(x) grepl("two upper-level courses", x$text, fixed = TRUE), logical(1))))
+  expect_true(any(vapply(blocks, function(x) x$source_pointer == "/specializations/0/concentrationRequirements", logical(1))))
+  expect_true(any(vapply(blocks, function(x) x$source_pointer == "/degreeHours", logical(1))))
+  expect_true(any(vapply(blocks, function(x) grepl("BIOL2110L", x$text, fixed = TRUE), logical(1))))
+  expect_false("tree" %in% names(unit$request))
+  expect_true(all(vapply(blocks, function(x) nzchar(x$dom_path) && nzchar(x$source_sha256), logical(1))))
+  expect_silent(verify_catalog_normalization_sources(f$program, unit, dirname(f$capture)))
+  expect_equal(nrow(list_catalog_normalization_programs(f$root)), 1)
+  # Same sources/instructions reproduce the same identity, without replacing files.
+  expect_identical(basename(prepare_catalog_normalization(f$payload, "biology", f$root,
+    unit$request$instructions, unit$request$response_schema)), f$program$meta$key)
+  changed <- prepare_catalog_normalization(f$payload, "biology", f$root,
+    paste(unit$request$instructions, "Changed instruction"), unit$request$response_schema)
+  expect_false(identical(basename(changed), f$program$meta$key))
+  # The same specialization can be embedded under multiple programs. A parent
+  # join must select this program's occurrence, not the first matching pid.
+  other <- Filter(function(x) x$kind == "specializations", f$payload$records)[[1]]
+  other$parent_program_id <- "another-program"
+  alternate <- f$payload; alternate$records <- c(list(other), alternate$records)
+  scoped <- prepare_catalog_normalization(alternate, "biology", file.path(root, "scoped"), unit$request$instructions, unit$request$response_schema)
+  scoped <- load_catalog_normalization_program(file.path(root, "scoped"), basename(scoped))
+  concentration <- Filter(function(x) x$id == "specializations:cellular", scoped$packet$units[[1]]$request$documents)[[1]]
+  expect_match(concentration$catalog_url, "#/programs/biology", fixed = TRUE)
+  response <- normalization_proposal(unit$request)
+  expect_silent(validate_catalog_normalization(response, unit$request))
+  bad <- response; bad$coverage <- bad$coverage[-1]
+  expect_error(validate_catalog_normalization(bad, unit$request), "every requested block")
+  bad <- response; bad$nodes[[1]]$citations[[1]]$quote <- "A quotation the catalog never published"
+  expect_error(validate_catalog_normalization(bad, unit$request), "Citation does not match")
+  bad <- response; bad$nodes[[1]]$entity_id <- "courses:course-one"
+  expect_error(validate_catalog_normalization(bad, unit$request), "context-only entity")
+  bad <- response; bad$nodes[[1]]$course_refs <- list("courses:not-captured")
+  expect_error(validate_catalog_normalization(bad, unit$request), "Unknown or duplicate course")
+  bad <- response; bad$nodes[[1]]$extra <- "not in schema"
+  expect_error(validate_catalog_normalization(bad, unit$request), "missing/extra fields")
+  bad <- response; bad$coverage[[1]]$disposition <- "information"
+  expect_error(validate_catalog_normalization(bad, unit$request), "classified as information")
+  bad <- response; bad$nodes[[1]]$citations[[1]]$block_id <- blocks[[2]]$id
+  expect_error(validate_catalog_normalization(bad, unit$request), "Citation does not match")
+  # A missing original blob must also fail when a derived packet remains valid.
+  doc <- unit$request$documents[[1]]
+  writeBin(charToRaw("modified"), file.path(f$capture, doc$receipt$file))
+  expect_error(verify_catalog_normalization_sources(f$program, unit, dirname(f$capture)), "hash mismatch")
+})
+
+test_that("normalization preserves nested science bundles, grade scope and standing predicates", {
+  root <- tempfile("catalog-ai-rules-"); withr::defer(unlink(root, recursive = TRUE))
+  f <- normalization_fixture(root); request <- f$unit$request
+  proposal <- normalization_proposal(request)
+  texts <- vapply(request$source_blocks, function(x) x$text, character(1))
+  find <- function(pattern) { i <- which(grepl(pattern, texts, fixed = TRUE)); expect_length(i, 1); i }
+  choice <- find("Complete at least 1 of the following:")
+  lecture <- find("BIOL2110 - Biology I (3)")
+  lab <- find("BIOL2110L - Biology I Lab (1)")
+  combined <- which(texts == "BIOL200 - Combined Biology (4)" & vapply(request$source_blocks, function(x) x$entity_id == "programs:biology", logical(1)))
+  bundle <- which(texts == "Complete the following:" & vapply(request$source_blocks, function(x) x$entity_id == "programs:biology", logical(1)))
+  expect_length(bundle, 1); expect_length(combined, 1)
+  proposal$nodes[[choice]]$kind <- "choose_n"; proposal$nodes[[choice]]$minimum <- 1
+  proposal$nodes[[choice]]$unit <- "courses"; proposal$nodes[[choice]]$minimum_grade <- "C-"
+  proposal$nodes[[bundle]]$kind <- "all"; proposal$nodes[[bundle]]$parent_id <- proposal$nodes[[choice]]$id
+  for (i in c(lecture, lab, combined)) {
+    proposal$nodes[[i]]$kind <- "course"
+    proposal$nodes[[i]]$parent_id <- proposal$nodes[[if (i == combined) choice else bundle]]$id
+  }
+  proposal$nodes[[lecture]]$course_refs <- list("courses:course-one")
+  proposal$nodes[[lab]]$course_refs <- list("courses:course-lab")
+  proposal$nodes[[combined]]$course_refs <- list("courses:course-two")
+  expect_silent(validate_catalog_normalization(proposal, request))
+  expect_equal(sum(vapply(proposal$nodes, function(x) x$parent_id == proposal$nodes[[choice]]$id, logical(1))), 2)
+  expect_equal(proposal$nodes[[choice]]$minimum_grade, "C-")
+  bad <- proposal; bad$nodes[[choice]]$minimum <- 3
+  expect_error(validate_catalog_normalization(bad, request), "Invalid choice count")
+  bad <- proposal; bad$nodes[[choice]]$parent_id <- proposal$nodes[[bundle]]$id
+  expect_error(validate_catalog_normalization(bad, request), "cycle")
+  bad <- proposal; bad$nodes[[lab]]$phase <- "admission"
+  expect_error(validate_catalog_normalization(bad, request), "phase boundary")
+  course <- f$program$packet$units[[2]]
+  if (!"courses:course-one" %in% unlist(course$request$target_entities)) course <- Filter(function(x) "courses:course-one" %in% unlist(x$request$target_entities), f$program$packet$units)[[1]]
+  standing <- normalization_proposal(course$request)
+  i <- which(vapply(course$request$source_blocks, function(x) x$text == "Must have a class standing of Junior", logical(1)))
+  expect_length(i, 1)
+  standing$nodes[[i]]$kind <- "class_standing"; standing$nodes[[i]]$comparison <- "equals"; standing$nodes[[i]]$value <- "Junior"
+  expect_silent(validate_catalog_normalization(standing, course$request))
+  expect_match(catalog_normalization_node_summary(standing$nodes[[i]], course$request$reference_registry), "equals Junior", fixed = TRUE)
+})
+
+test_that("human reviews retain original AI output, reset edited approvals and reject stale writers", {
+  root <- tempfile("catalog-ai-review-"); withr::defer(unlink(root, recursive = TRUE))
+  f <- normalization_fixture(root); unit <- f$unit
+  proposal <- normalization_proposal(unit$request)
+  path <- file.path(root, "response.json"); write_source_json(proposal, path)
+  key <- import_catalog_normalization(f$root, unit, path, "Designed AI response fixture")
+  imported <- load_catalog_normalization_proposal(f$root, unit, key)
+  expect_identical(imported$original, proposal)
+  expect_length(list_catalog_normalization_proposals(f$root, unit), 1)
+  state <- read_catalog_normalization_review(f$root, unit, imported)
+  expect_false(catalog_normalization_approved(state))
+  id <- proposal$nodes[[1]]$id; block <- proposal$coverage[[1]]$block_id
+  expect_error(catalog_normalization_decision(state, "nodes", id, "approved", ""), "unresolved")
+  expect_error(catalog_normalization_decision(state, "blocks", block, "needs_clarification", ""), "Explain")
+  next_state <- catalog_normalization_decision(state, "blocks", block, "needs_clarification", "Check the course count")
+  expect_error(save_catalog_normalization_review(f$root, unit, imported, next_state, "", state$head), "your name")
+  saved <- save_catalog_normalization_review(f$root, unit, imported, next_state, "Designed reviewer", state$head)
+  expect_equal(saved$revision, 1)
+  expect_equal(saved$blocks[[block]], "needs_clarification")
+  expect_identical(saved$last_review$reviewer, "Designed reviewer")
+  expect_error(save_catalog_normalization_review(f$root, unit, imported, next_state, "Other reviewer", state$head), "another session")
+  expect_error(export_catalog_normalization(f$program, unit, imported, saved), "sign off the complete unit")
+  expect_error(approve_catalog_normalization(saved), "open review cases")
+  expect_equal(nrow(catalog_normalization_issues(saved)), length(proposal$nodes) + 1L)
+  resolved <- edit_catalog_normalization_node(state, id, list(kind = "restriction", value = "Corrected predicate"), unit$request)
+  expect_equal(resolved$proposal$coverage[[1]]$disposition, "requirements")
+  expect_equal(nrow(catalog_normalization_issues(resolved)), length(proposal$nodes) - 1L)
+  expect_error(clear_catalog_normalization_flag(state, "nodes", id, "Checked"), "edit an unresolved")
+  # This fixture tests the review/export contract, not an academic judgment:
+  # a reviewer explicitly changes every unresolved item to informational.
+  edited <- proposal
+  edited$nodes <- lapply(edited$nodes, function(x) { x$kind <- "information"; x })
+  edited$coverage <- lapply(edited$coverage, function(x) { x$disposition <- "information"; x })
+  changed <- edit_catalog_normalization(saved, edited, unit$request)
+  expect_true(all(unlist(changed$blocks) == "pending"))
+  expect_equal(nrow(catalog_normalization_issues(changed)), 0)
+  expect_false(catalog_normalization_approved(changed))
+  changed <- approve_catalog_normalization(changed)
+  approved <- save_catalog_normalization_review(f$root, unit, imported, changed, "Designed reviewer", saved$head)
+  expect_true(catalog_normalization_approved(approved))
+  expect_true(all(unlist(approved$nodes) == "approved"))
+  expect_true(all(unlist(approved$blocks) == "confirmed"))
+  flagged <- catalog_normalization_decision(approved, "nodes", names(approved$nodes)[1], "needs_clarification", "Check scope")
+  expect_false(catalog_normalization_approved(flagged))
+  expect_equal(nrow(catalog_normalization_issues(flagged)), 1)
+  expect_error(approve_catalog_normalization(flagged), "open review cases")
+  expect_error(clear_catalog_normalization_flag(flagged, "nodes", names(flagged$nodes)[1], ""), "explain")
+  cleared <- clear_catalog_normalization_flag(flagged, "nodes", names(flagged$nodes)[1], "Scope checked against full section")
+  expect_false(catalog_normalization_approved(cleared))
+  expect_true(catalog_normalization_approved(approve_catalog_normalization(cleared)))
+  questioned <- changed; questioned$proposal$questions <- list(list(block_id = block, question = "What is the scope?"))
+  expect_error(approve_catalog_normalization(questioned), "open review cases")
+  exported <- export_catalog_normalization(f$program, unit, imported, approved)
+  expect_equal(exported$status, "human_reviewed")
+  expect_identical(exported$requirements, edited)
+  expect_identical(load_catalog_normalization_proposal(f$root, unit, key)$original, proposal)
+  reset <- edit_catalog_normalization_node(approved, edited$nodes[[1]]$id, list(label = "Corrected explanation"), unit$request)
+  expect_false(catalog_normalization_approved(reset))
+  expect_true(all(unlist(reset$nodes) == "pending"))
+  history <- list.files(file.path(f$root, "reviews", key), full.names = TRUE)
+  writeBin(charToRaw("changed"), history[1])
+  expect_error(read_catalog_normalization_review(f$root, unit, imported))
+})
+
+test_that("versioned local drafts stage automatically without creating human approvals", {
+  root <- tempfile("catalog-local-draft-"); withr::defer(unlink(root, recursive = TRUE))
+  f <- normalization_fixture(root); directory <- file.path(root, "drafts"); dir.create(directory)
+  proposal <- normalization_proposal(f$unit$request)
+  artifact <- list(schema_version = "1.0.0", version = 1L, producer = "Designed maintainer draft",
+    program_id = f$program$packet$program_id, catalog_id = f$program$packet$catalog_id,
+    unit_key = f$unit$key, proposal = proposal)
+  path <- file.path(directory, "biology.v1.json"); write_source_json(artifact, path)
+  first <- stage_catalog_normalization_drafts(f$root, directory, dirname(f$capture))
+  expect_length(first, 1)
+  expect_identical(stage_catalog_normalization_drafts(f$root, directory, dirname(f$capture)), first)
+  expect_length(list_catalog_normalization_proposals(f$root, f$unit), 1)
+  original <- load_catalog_normalization_proposal(f$root, f$unit, first[[1]])
+  expect_match(original$meta$model, "draft v1", fixed = TRUE)
+  state <- read_catalog_normalization_review(f$root, f$unit, original)
+  expect_equal(state$revision, 0)
+  expect_false(catalog_normalization_approved(state))
+  # One unresolved interpretation is one case even when multiple passages cite it.
+  expect_equal(nrow(catalog_normalization_issues(state)), length(proposal$nodes))
+  artifact$version <- 2L
+  artifact$proposal$nodes[[1]]$label <- "Corrected interpretation"
+  write_source_json(artifact, file.path(directory, "biology.v2.json"))
+  next_keys <- stage_catalog_normalization_drafts(f$root, directory, dirname(f$capture))
+  expect_length(unique(next_keys), 2)
+  expect_identical(load_catalog_normalization_proposal(f$root, f$unit, first[[1]])$original, proposal)
+  artifact$proposal$nodes[[1]]$citations[[1]]$quote <- "Invented evidence"
+  write_source_json(artifact, file.path(directory, "biology.v2.json"))
+  expect_error(stage_catalog_normalization_drafts(f$root, directory, dirname(f$capture)), "Citation does not match")
+  artifact$unit_key <- strrep("a", 64)
+  write_source_json(artifact, file.path(directory, "biology.v2.json"))
+  expect_error(stage_catalog_normalization_drafts(f$root, directory, dirname(f$capture)), "matching source packet")
+})
+
 test_that("catalog extraction preserves OR options containing AND course bundles", {
   fixture <- scan_fixture()
   tree <- extract_catalog_rule_tree(fixture$programs$biology$degreeRequirements)
@@ -58,6 +283,40 @@ test_that("catalog extraction preserves OR options containing AND course bundles
   bad <- fixture$index; bad[[1]]$degreeType$name <- "Unclassified new credential"
   expect_error(catalog_program_scope(bad, scan_config()$credentials), "Unclassified degree types")
   expect_error(catalog_program_scope(fixture$index, scan_config()$credentials["degree_type"]), "credential classification")
+})
+
+test_that("standard grade rules retain threshold, selection and nested course scope", {
+  fixture <- scan_fixture()
+  all <- extract_catalog_rule_tree(fixture$courses$biolab$corequisites)
+  expect_false(all$requires_review)
+  rule <- all$children[[1]]
+  expect_equal(rule$operator, "all")
+  expect_equal(rule$minimum_grade, "C")
+  expect_equal(rule$children[[1]]$course_references[[1]]$code, "BIOL2110")
+  expect_match(paste(catalog_review_tree_text(all), collapse = "\n"), "[minimum grade C]", fixed = TRUE)
+  choice <- extract_catalog_rule_tree(fixture$parser_cases$grade_choice)
+  rule <- choice$children[[1]]
+  expect_false(choice$requires_review)
+  expect_equal(rule$operator, "choose_n")
+  expect_equal(rule$minimum, 1)
+  expect_equal(rule$minimum_grade, "C-")
+  expect_length(rule$children, 2)
+  expect_equal(rule$children[[1]]$operator, "all")
+  expect_length(rule$children[[1]]$children, 2)
+  # The threshold applies to the option group; a lecture/lab AND bundle stays
+  # one option, with its two courses retained. No grade is guessed for a leaf.
+  expect_null(rule$children[[1]]$children[[1]]$minimum_grade)
+  higher <- all; higher$children[[1]]$minimum_grade <- "C-"
+  expect_false(identical(catalog_rule_structure(all), catalog_rule_structure(higher)))
+  for (name in c("grade_qualified", "grade_empty", "grade_impossible", "grade_concurrent")) {
+    unresolved <- extract_catalog_rule_tree(fixture$parser_cases[[name]])
+    expect_true(unresolved$requires_review, info = name)
+    expect_equal(unresolved$children[[1]]$operator, "condition", info = name)
+  }
+  missing <- extract_catalog_rule_tree(fixture$parser_cases$missing_course)
+  expect_true(missing$requires_review)
+  expect_equal(missing$children[[1]]$minimum_grade, "C")
+  expect_equal(missing$children[[1]]$children[[1]]$operator, "condition")
 })
 
 test_that("catalog option wrappers preserve every group and distinguish headings from conditions", {
@@ -114,6 +373,49 @@ test_that("standing milestones preserve literal statuses, exclusions and OR cont
     expect_equal(unresolved$children[[1]]$operator, "condition", info = name)
     expect_true(unresolved$requires_review, info = name)
   }
+})
+
+test_that("program milestones resolve source links, retain policy evidence and share definitions", {
+  fixture <- scan_fixture(); config <- scan_config(); root <- tempfile("catalog-milestones-")
+  out <- file.path(root, "capture")
+  withr::defer(unlink(root, recursive = TRUE))
+  capture_degree_catalog(config$source, config$credentials, config$fields, out, fetch = scan_fetcher(), pause = 0)
+  analyze_degree_catalog(out)
+  payload <- load_catalog_review(root, "capture/analysis")
+  expect_true(payload$milestone_support)
+  expect_equal(payload$meta$counts$milestones, 3)
+  expect_equal(payload$meta$counts$milestone_uses, 4)
+  definitions <- payload$milestones
+  junior <- definitions[definitions$milestone_id == "class_standing:is:Junior", ]
+  expect_equal(junior$rule_uses, "2")
+  expect_equal(junior$course_records, "2")
+  admission <- definitions[definitions$type == "program_admission", ]
+  expect_equal(admission$milestone_id, "program_admission:biology")
+  expect_equal(admission$target_program_id, "biology")
+  expect_identical(admission$admission_text, catalog_html_text(fixture$programs$biology$graduateAdmissionsRequirements))
+  views <- filter_catalog_review(payload)
+  expect_equal(nrow(views$milestones), 4)
+  expect_true(all(views$milestones$review_status == "Unreviewed"))
+  use <- views$milestones[views$milestones$milestone_id == admission$milestone_id, ]
+  detail <- catalog_review_detail(payload, use$item_id)
+  expect_match(detail$tree, "program_admission:biology", fixed = TRUE)
+  expect_length(detail$admission_evidence, 1)
+  expect_identical(detail$admission_evidence[[1]]$value, fixture$programs$biology$graduateAdmissionsRequirements)
+  expect_equal(detail$admission_evidence[[1]]$pointer, "/graduateAdmissionsRequirements")
+  # The reference and its policy are independently verified on every Inspect.
+  program <- Filter(function(x) x$kind == "programs", payload$records)[[1]]
+  writeBin(charToRaw("changed"), file.path(out, program$source$file))
+  expect_error(catalog_review_detail(payload, use$item_id), "hash mismatch")
+  # A program outside the frozen undergraduate capture is not guessed from its
+  # label, nor does the scanner expand scope to capture another credential.
+  missing <- fixture
+  missing$courses$bio1$program <- fixture$parser_cases$admission_missing
+  other <- file.path(root, "missing-target")
+  capture_degree_catalog(config$source, config$credentials, config$fields, other, fetch = scan_fetcher(missing), pause = 0)
+  analyze_degree_catalog(other)
+  unresolved <- load_catalog_review(root, "missing-target/analysis")
+  expect_equal(unresolved$meta$counts$milestones, 2)
+  expect_true(any(grepl("Admitted to BS Biology", filter_catalog_review(unresolved)$interpretation$excerpt, fixed = TRUE)))
 })
 
 test_that("catalog capture inventories every entry and follows course links without looping", {
@@ -179,6 +481,90 @@ test_that("failed captures resume from verified bytes and tampering blocks extra
   receipt <- manifest$requests[["program:biology"]]
   writeBin(charToRaw("changed"), file.path(out, receipt$file))
   expect_error(analyze_degree_catalog(out), "hash mismatch")
+})
+
+test_that("catalog review connects flagged language to full immutable source context", {
+  config <- scan_config(); root <- tempfile("catalog-review-"); out <- file.path(root, "capture")
+  withr::defer(unlink(root, recursive = TRUE))
+  expect_equal(nrow(list_catalog_review_scans(root)), 0)
+  capture_degree_catalog(config$source, config$credentials, config$fields, out, fetch = scan_fetcher(), pause = 0)
+  analyze_degree_catalog(out)
+  index <- list_catalog_review_scans(root)
+  expect_equal(index$scan_id, "capture/analysis")
+  payload <- load_catalog_review(root, index$scan_id)
+  key <- catalog_review_cache_key(root, index$scan_id)
+  expect_identical(catalog_review_cache_key(root, index$scan_id), key)
+  report_path <- file.path(out, "analysis", "REPORT.md")
+  report_bytes <- readBin(report_path, "raw", n = file.info(report_path)$size)
+  # A changed artifact cannot enter a warm cache, even at the same byte length.
+  changed_report <- report_bytes; changed_report[1] <- charToRaw("!")
+  writeBin(changed_report, report_path)
+  expect_error(catalog_review_cache_key(root, index$scan_id), "modified analysis artifact")
+  writeBin(report_bytes, report_path)
+  expect_identical(catalog_review_cache_key(root, index$scan_id), key)
+  views <- filter_catalog_review(payload, program = "biology")
+  # One program, its concentration, and three cyclically linked courses: once each.
+  expect_setequal(catalog_review_program_entities(payload$records, "biology"),
+    c("programs:biology", "specializations:cellular", "courses:course-one", "courses:course-two", "courses:course-lab"))
+  expect_length(catalog_review_program_entities(payload$records, "biology"), 5)
+  expect_equal(nrow(views$source), 1)
+  expect_match(views$source$next_step, "does not establish cancellation", fixed = TRUE)
+  expect_true(all(views$items$review_status == "Unreviewed"))
+  admission <- filter_catalog_review(payload, kind = "Degree", phase = "Admission")$interpretation
+  expect_equal(nrow(admission), 1)
+  detail <- catalog_review_detail(payload, admission$item_id)
+  expect_identical(detail$source, scan_fixture()$programs$biology$graduateAdmissionsRequirements)
+  expect_equal(detail$item$source_pointer, "/graduateAdmissionsRequirements")
+  expect_equal(detail$catalog_url, paste0(config$source$landing_url, "#/programs/biology"))
+  concentration <- views$sections[views$sections$kind == "Concentration", ]
+  detail <- catalog_review_detail(payload, concentration$item_id)
+  expect_identical(detail$source, scan_fixture()$programs$biology$specializations[[1]]$concentrationRequirements)
+  expect_equal(detail$item$source_pointer, "/specializations/0/concentrationRequirements")
+  expect_match(detail$catalog_url, "#/programs/biology", fixed = TRUE)
+  program <- views$sections[views$sections$kind == "Degree" & views$sections$phase == "Degree", ]
+  detail <- catalog_review_detail(payload, program$item_id)
+  expect_match(detail$tree, "Choose at least 1", fixed = TRUE)
+  expect_match(detail$tree, "BIOL2110L", fixed = TRUE)
+  expect_identical(detail$source, scan_fixture()$programs$biology$degreeRequirements)
+  lab <- views$sections[views$sections$entity == "courses:course-lab" & views$sections$phase == "Corequisite", ]
+  expect_match(catalog_review_detail(payload, lab$item_id)$tree, "[minimum grade C]", fixed = TRUE)
+  expect_false(any(views$interpretation$entity == "courses:course-lab"))
+  expect_identical(catalog_review_detail(payload, views$source$item_id)$source, FALSE)
+  expect_error(load_catalog_review(root, "../elsewhere"), "Select an available")
+  expect_error(catalog_review_detail(payload, "missing-id"), "Select one available")
+  expect_error(source_json_pointer(scan_fixture(), "/programs/biology/not-a-field"), "does not resolve")
+  # Early schema-1.0.0 analyses lack the later source-issues report. The same
+  # source checks still run against frozen records; missing facts are not zeros.
+  meta_path <- file.path(out, "analysis", "analysis-manifest.json")
+  meta <- read_source_json(meta_path)
+  meta$files$`source-issues.csv` <- NULL; meta$counts$source_issues <- NULL
+  write_source_json(meta, meta_path)
+  unlink(file.path(out, "analysis", "source-issues.csv"))
+  expect_equal(load_catalog_review(root, index$scan_id)$source_check_count, 1)
+  expect_false(identical(catalog_review_cache_key(root, index$scan_id), key))
+  # Evidence is checked again on Inspect, even after a page payload was loaded.
+  receipt <- payload$records[[1]]$source
+  writeBin(charToRaw("changed"), file.path(out, receipt$file))
+  # The queue uses verified derived artifacts; original blobs are checked only
+  # when read as evidence. Full offline verification still checks every blob.
+  expect_equal(nrow(load_catalog_review(root, index$scan_id)$items), nrow(payload$items))
+  expect_error(catalog_capture_manifest(out), "hash mismatch")
+  expect_error(catalog_review_detail(payload, program$item_id), "hash mismatch")
+})
+
+test_that("catalog evidence renderer preserves nesting and cannot execute source markup", {
+  withr::local_package("shiny")
+  withr::local_package("bslib")
+  load_funcs(cedar_base_dir, modules = TRUE)
+  html <- as.character(catalog_review_source_view('<ul onclick="bad()"><li><a href="javascript:bad()">One</a><ul><li>Two &amp; three</li></ul></li></ul><script>bad()</script><img src="x" onerror="bad()">'))
+  expect_match(html, "<ul>", fixed = TRUE)
+  expect_match(html, "Two &amp; three", fixed = TRUE)
+  expect_false(grepl("script|onclick|onerror|javascript:|src=|bad\\(", html))
+  ui <- as.character(catalogReviewUI("catalog_review", test_degree_catalog, test_degree_roadmaps))
+  expect_match(ui, "Visualization rules", fixed = TRUE)
+  expect_match(ui, "not a checklist for approving the visualization", fixed = TRUE)
+  expect_match(ui, "catalog_review-interpretation", fixed = TRUE)
+  expect_match(ui, "Program coverage", fixed = TRUE)
 })
 
 test_that("catalog comparisons separate choice changes, formatting and missing scope", {

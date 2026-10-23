@@ -1,0 +1,216 @@
+{
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "enum": [
+        "1.0.0"
+      ]
+    },
+    "nodes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "parent_id": {
+            "type": "string"
+          },
+          "entity_id": {
+            "type": "string"
+          },
+          "phase": {
+            "type": "string",
+            "enum": [
+              "admission",
+              "degree",
+              "prerequisite",
+              "corequisite",
+              "policy",
+              "information",
+              "unclassified"
+            ]
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "all",
+              "any",
+              "choose_n",
+              "credits",
+              "course",
+              "course_pool",
+              "grade",
+              "gpa",
+              "class_standing",
+              "program_admission",
+              "permission",
+              "restriction",
+              "unresolved",
+              "information"
+            ]
+          },
+          "label": {
+            "type": "string"
+          },
+          "minimum": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "maximum": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "unit": {
+            "type": "string",
+            "enum": [
+              "none",
+              "courses",
+              "credits",
+              "gpa"
+            ]
+          },
+          "comparison": {
+            "type": "string",
+            "enum": [
+              "none",
+              "equals",
+              "at_least",
+              "at_most",
+              "is_not"
+            ]
+          },
+          "value": {
+            "type": "string"
+          },
+          "minimum_grade": {
+            "type": "string"
+          },
+          "course_refs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "program_ref": {
+            "type": "string"
+          },
+          "timing": {
+            "type": "string",
+            "enum": [
+              "not_applicable",
+              "prior",
+              "concurrent",
+              "prior_or_concurrent"
+            ]
+          },
+          "citations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "block_id": {
+                  "type": "string"
+                },
+                "quote": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "block_id",
+                "quote"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "id",
+          "parent_id",
+          "entity_id",
+          "phase",
+          "kind",
+          "label",
+          "minimum",
+          "maximum",
+          "unit",
+          "comparison",
+          "value",
+          "minimum_grade",
+          "course_refs",
+          "program_ref",
+          "timing",
+          "citations"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "coverage": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "block_id": {
+            "type": "string"
+          },
+          "disposition": {
+            "type": "string",
+            "enum": [
+              "requirements",
+              "information",
+              "unresolved"
+            ]
+          },
+          "node_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "explanation": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "block_id",
+          "disposition",
+          "node_ids",
+          "explanation"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "questions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "block_id": {
+            "type": "string"
+          },
+          "question": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "block_id",
+          "question"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "schema_version",
+    "nodes",
+    "coverage",
+    "questions"
+  ],
+  "additionalProperties": false
+}

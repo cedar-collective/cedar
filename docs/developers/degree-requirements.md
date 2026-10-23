@@ -48,6 +48,11 @@ prerequisite arrows. Catalog rows retain captured wording and links; CEDAR
 preferences have no invented catalog quote. Recorded admission/GPA rules are not
 student eligibility checks.
 
+`degreePlanRulesUI/Server(id, catalog, roadmaps)` mounts as Admin Catalog Review's
+default **Visualization rules** view. Degree Explorer's **Rules behind this plan**
+dialog uses the same payload/table, as does the CSV download. This explanation
+requires no individual approvals or independent parser/AI proposal.
+
 The health pilot adds Population Health, Medical Laboratory Sciences, Nursing
 (Freshman Direct Entry) and Radiologic Sciences (Nuclear Medicine). These are
 catalog-derived authored excerpts in the existing institution CSVs. Clinical
@@ -342,7 +347,7 @@ mobile scrolling, URL restoration and copying, and the moved observed view.
 
 `load_degree_shared_requirements(catalog, institution_dir)` loads the pinned
 annual bundle once in `global.R` as `CEDAR_SHARED_REQUIREMENTS`. The server
-passes this explicitly to Degree Explorer.
+passes this explicitly to Degree Explorer and Admin Visualization rules.
 `degree_shared_coverage(view, roadmaps, reference)` in branches consumes selected
 course components once across typed Gen Ed base/flexible areas; unresolved
 options advertise potential coverage without satisfying a requirement. Related

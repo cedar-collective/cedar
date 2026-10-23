@@ -197,7 +197,8 @@ on historical students. Neither prototype changes enrollment forecasts.
 
 ## See the rules behind the picture
 
-Choose **Rules behind this plan** above the roadmap. Generated from the same course
+Choose **Rules behind this plan** above the roadmap, or open **Admin > Data &
+Usage > Catalog Review > Visualization rules**. Generated from the same course
 lists and graph as the picture, this list shows readable requirements, catalog
 wording and links, and how course placement and credit loads are determined.
 CEDAR planning preferences are labeled separately. No individual approvals are

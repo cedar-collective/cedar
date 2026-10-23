@@ -99,6 +99,8 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
   source_file("branches/catalog-extraction.R")
   source_file("branches/catalog-milestones.R")
   source_file("branches/catalog-comparison.R")
+  source_file("branches/catalog-review.R")
+  source_file("branches/catalog-normalization.R")
   source_file("lists/data_semantics.R")       # what CEDAR knows that the data does not say
   source_file("lists/population-presets.R")    # defines CEDAR_POPULATION_GROUPS, shared by Pathways and projections
 
@@ -147,6 +149,8 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
   source_file("features/shared-requirements.R")
   source_file("features/catalog-capture.R")
   source_file("features/catalog-analysis.R")
+  source_file("features/catalog-review.R")
+  source_file("features/catalog-normalization.R")
 
   # 6. Shiny modules (depend on branches + cones)
   if (modules) {
@@ -159,6 +163,8 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
     source_file("modules/waitlist.R")
     source_file("modules/regstats.R")
     source_file("modules/admin.R")
+    source_file("modules/catalog-review.R")
+    source_file("modules/catalog-normalization.R")
     source_file("modules/gen-ed.R")
     source_file("modules/dept-trends.R")
     source_file("modules/observed-course-paths.R")

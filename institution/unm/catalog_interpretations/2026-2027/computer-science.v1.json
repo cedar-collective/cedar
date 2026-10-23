@@ -1,0 +1,3341 @@
+{
+  "schema_version": "1.0.0",
+  "version": 1,
+  "catalog_id": "68a34618094c97cf857f1ec1",
+  "program_id": "HJZpXxQ9s9",
+  "unit_key": "ca31ee29424db5fc8160733e3927ab0fc7f671d51dc3e47a7c0af728a1691b6d",
+  "producer": "Codex (GPT-6); source interpretation in the CEDAR development session, 2026-10-19; no API call",
+  "scope": "Program and embedded concentrations only. Linked course prerequisite units are not yet interpreted. Draft; no human academic approval.",
+  "proposal": {
+    "schema_version": "1.0.0",
+    "nodes": [
+      {
+        "id": "minor-description",
+        "parent_id": "",
+        "entity_id": "programs:HJZpXxQ9s9",
+        "phase": "degree",
+        "kind": "restriction",
+        "label": "The BSCS requires a minor outside Computer Science",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "The BSCS requires a minor outside Computer Science",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-b629c3a58ab52f2e56f8638c",
+            "quote": "The primary goal of the Bachelor of Science in Computer Science (B.S.C.S.) program is to provide students the foundations for future work and careers in computation-based problem solving. These foundations support both a successful career path in computing as well as provide appropriate qualifications for further degree work in computation related disciplines. The undergraduate degree emphasizes development of analytical skills, acquisition of knowledge and understanding of systems, languages and tools required for effective computation-based problem solving. The department's program core courses offer a broad base so that students who end their studies with the bachelor’s degree can continue to acquire new skills and advance in an always-evolving professional workplace. The department's program core courses also strive to cultivate the sophistication and insights needed for further study at the graduate level. The department accomplishes these goals by placing it's baccalaureate program in the context of the General Education curriculum requirements of the University of New Mexico, by requiring a minor degree outside of computer science and by insisting on a strong overall grade point average."
+          }
+        ]
+      },
+      {
+        "id": "admit-application",
+        "parent_id": "",
+        "entity_id": "programs:HJZpXxQ9s9",
+        "phase": "admission",
+        "kind": "restriction",
+        "label": "Apply for admission or transfer to the Computer Science department; transfer grades are evaluated for eligibility",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "Apply for admission or transfer to the Computer Science department; transfer grades are evaluated for eligibility",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-677c6ce80d5cab43bbed1ac1",
+            "quote": "Students wishing to enroll in the B.S.C.S. program must apply for admission or transfer to the Computer Science Department, School of Engineering. The admission process is initiated through the Office of Admissions for students wishing to transfer to the University of New Mexico from other institutions. Grades earned in equivalent courses at other institutions are used in determining eligibility for admission to the department. Students transferring to the Computer Science program from another college at the University of New Mexico should initiate the paperwork at the office of the Computer Science department. Students transferring to the Computer Science program from another department within the School of Engineering should initiate the paperwork in their present department office. Students denied entrance to the department due to lack of sufficient credit hours or specific courses may enroll in computer science classes and reapply at a later time when they meet the entrance requirements. The criteria for admission to the department are:"
+          }
+        ]
+      },
+      {
+        "id": "admit-courses",
+        "parent_id": "",
+        "entity_id": "programs:HJZpXxQ9s9",
+        "phase": "admission",
+        "kind": "restriction",
+        "label": "Admission: B- or better in MATH1512 and one of ENG130L or CS152L",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "Admission: B- or better in MATH1512 and one of ENG130L or CS152L",
+        "minimum_grade": "B-",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-d0cc8d5f7c4eb9f324893140",
+            "quote": "Completion of the following courses with a grade of \"B-\" or better: MATH 1512, and one of ENG 130L or CS 152L."
+          }
+        ]
+      },
+      {
+        "id": "admit-engineering",
+        "parent_id": "",
+        "entity_id": "programs:HJZpXxQ9s9",
+        "phase": "admission",
+        "kind": "unresolved",
+        "label": "School of Engineering admission criteria need linked policy",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "This captured program requires School of Engineering admission, but does not state its complete criteria here.",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-a2159fed4a93367c6123f9c4",
+            "quote": "Fulfill requirements for admission to the School of Engineering."
+          }
+        ]
+      },
+      {
+        "id": "ap-policy",
+        "parent_id": "",
+        "entity_id": "programs:HJZpXxQ9s9",
+        "phase": "policy",
+        "kind": "restriction",
+        "label": "Advanced placement credit follows School of Engineering policy",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "Advanced placement credit follows School of Engineering policy",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-f337748054ca8c7b80bb4dcd",
+            "quote": "The department subscribes to the general policy of the School of Engineering with regard to advanced placement credit earned by examination."
+          }
+        ]
+      },
+      {
+        "id": "transfer-evaluation",
+        "parent_id": "",
+        "entity_id": "programs:HJZpXxQ9s9",
+        "phase": "policy",
+        "kind": "restriction",
+        "label": "The department evaluates transfer courses individually; unaccepted CS credit may count as general electives at advisor discretion",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "The department evaluates transfer courses individually; unaccepted CS credit may count as general electives at advisor discretion",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-d8a89ef01364fd95e7081699",
+            "quote": "Students with university level coursework from other institutions will have their academic records evaluated by an undergraduate advisor from the department on an individual basis. The student should be aware that the department has the final say about which transfer credit hours can be applied toward the graduation requirements listed below. Because computer science programs vary greatly, students transferring from other institutions should not assume that computer science courses they have taken elsewhere can be applied toward the 51 credit hour computer science coursework graduation requirement. Courses not accepted toward the 51 credit hours may be applied toward the 120 credit hour graduation requirement as general electives at the discretion of an undergraduate advisor."
+          }
+        ]
+      },
+      {
+        "id": "advising",
+        "parent_id": "",
+        "entity_id": "programs:HJZpXxQ9s9",
+        "phase": "policy",
+        "kind": "restriction",
+        "label": "See a departmental undergraduate advisor each semester before registration; breadth-course applicability may need advisor review",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "See a departmental undergraduate advisor each semester before registration; breadth-course applicability may need advisor review",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-7c8c19c482504e9520b90aa2",
+            "quote": "Students are required to see an undergraduate advisor within the department each semester prior to registering for classes. Students not subject to the General Education curriculum requirements at UNM should check with an advisor about the admissibility of classes used to satisfy graduation requirement 6 (which still applies), as some courses offered by other departments do not meet the spirit of this breadth requirement."
+          }
+        ]
+      },
+      {
+        "id": "graduation-general",
+        "parent_id": "",
+        "entity_id": "programs:HJZpXxQ9s9",
+        "phase": "degree",
+        "kind": "restriction",
+        "label": "Satisfy general UNM baccalaureate regulations; minimum C- except stronger scoped requirements",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "Satisfy general UNM baccalaureate regulations; minimum C- except stronger scoped requirements",
+        "minimum_grade": "C-",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-0df9d04f18cdf7bfc7a75558",
+            "quote": "To receive the Bachelor of Science in Computer Science, a student must satisfy all general University of New Mexico regulations concerning baccalaureate programs and must complete all work defined by the following groups. Only courses with a grade of \"C-\" or better may be used to satisfy any of the requirements defined herein. The following courses cannot be used to satisfy any of the requirements listed below: Reserve Officers Training (ROTC), recreational physical education (PE-NP), Introductory Studies courses (e.g., ISE 100) and mathematics courses prior to calculus. If in doubt about the applicability of a course, contact an undergraduate advisor in the Computer Science Department. Graduation criteria for the B.S.C.S. is as follows:"
+          }
+        ]
+      },
+      {
+        "id": "excluded-courses",
+        "parent_id": "",
+        "entity_id": "programs:HJZpXxQ9s9",
+        "phase": "degree",
+        "kind": "restriction",
+        "label": "ROTC, recreational PE-NP, Introductory Studies and mathematics before calculus cannot satisfy the listed graduation requirements",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "ROTC, recreational PE-NP, Introductory Studies and mathematics before calculus cannot satisfy the listed graduation requirements",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-0df9d04f18cdf7bfc7a75558",
+            "quote": "To receive the Bachelor of Science in Computer Science, a student must satisfy all general University of New Mexico regulations concerning baccalaureate programs and must complete all work defined by the following groups. Only courses with a grade of \"C-\" or better may be used to satisfy any of the requirements defined herein. The following courses cannot be used to satisfy any of the requirements listed below: Reserve Officers Training (ROTC), recreational physical education (PE-NP), Introductory Studies courses (e.g., ISE 100) and mathematics courses prior to calculus. If in doubt about the applicability of a course, contact an undergraduate advisor in the Computer Science Department. Graduation criteria for the B.S.C.S. is as follows:"
+          }
+        ]
+      },
+      {
+        "id": "degree-total",
+        "parent_id": "",
+        "entity_id": "programs:HJZpXxQ9s9",
+        "phase": "degree",
+        "kind": "credits",
+        "label": "Complete at least 120 degree credits",
+        "minimum": 120,
+        "maximum": null,
+        "unit": "credits",
+        "comparison": "at_least",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-e4abd2b6ff5bdc757aa64bb4",
+            "quote": "1. Completion of 120 credit hours."
+          },
+          {
+            "block_id": "b-42895d6c62b8914f7887643f",
+            "quote": "Grand Total Credits: 120 - 121"
+          },
+          {
+            "block_id": "b-f92481a0dbdd368178c57660",
+            "quote": "\"120\""
+          }
+        ]
+      },
+      {
+        "id": "upper-total",
+        "parent_id": "",
+        "entity_id": "programs:HJZpXxQ9s9",
+        "phase": "degree",
+        "kind": "credits",
+        "label": "At least 42 credits in courses numbered 300 or above",
+        "minimum": 42,
+        "maximum": null,
+        "unit": "credits",
+        "comparison": "at_least",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-1779e511215918aa63b96c71",
+            "quote": "2. Completion of at least 42 credit hours in courses numbered 300 or above."
+          },
+          {
+            "block_id": "b-1ddbd9b9aa526b2c7a051760",
+            "quote": "Students must earn at least 42 credit hours in courses numbered 300 or above."
+          }
+        ]
+      },
+      {
+        "id": "cs-total",
+        "parent_id": "",
+        "entity_id": "programs:HJZpXxQ9s9",
+        "phase": "degree",
+        "kind": "credits",
+        "label": "51 credits of CS requirements and electives, each C or better",
+        "minimum": 51,
+        "maximum": null,
+        "unit": "credits",
+        "comparison": "at_least",
+        "value": "",
+        "minimum_grade": "C",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-be398519633549ec8dc53189",
+            "quote": "3. Completion of 51 credit hours of required computer science courses (see below) and electives, completed with a grade of \"C\" (not \"C-\") or better."
+          },
+          {
+            "block_id": "b-588c522d49ecc9243e09897f",
+            "quote": "\"51\""
+          }
+        ]
+      },
+      {
+        "id": "math-communications",
+        "parent_id": "",
+        "entity_id": "programs:HJZpXxQ9s9",
+        "phase": "degree",
+        "kind": "restriction",
+        "label": "Complete the mathematics sequence and 9 communication-skills credits",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "Complete the mathematics sequence and 9 communication-skills credits",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-6c2d0f14bea7cb8ac4c3a7e8",
+            "quote": "4. Completion of the Mathematics sequence. 5. 9 credit hours of communications skills."
+          }
+        ]
+      },
+      {
+        "id": "gened",
+        "parent_id": "",
+        "entity_id": "programs:HJZpXxQ9s9",
+        "phase": "degree",
+        "kind": "restriction",
+        "label": "Complete UNM General Education with C or better",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "Complete UNM General Education with C or better",
+        "minimum_grade": "C",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-0f7ae73757a46bf84d9a3483",
+            "quote": "6. Satisfaction of General Education curriculum requirements at UNM with a grade of \"C\" or better ."
+          }
+        ]
+      },
+      {
+        "id": "science-count",
+        "parent_id": "",
+        "entity_id": "programs:HJZpXxQ9s9",
+        "phase": "degree",
+        "kind": "course_pool",
+        "label": "Four science courses for science and engineering majors, each at least 3 credits",
+        "minimum": 4,
+        "maximum": null,
+        "unit": "courses",
+        "comparison": "at_least",
+        "value": "Science/engineering major science courses, each at least 3 credit hours; paired-lab rules also apply",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-b78f1cf2563b87ca9e8f13c0",
+            "quote": "7. Four (3 or more credit hours) science courses taken by science and engineering majors."
+          }
+        ]
+      },
+      {
+        "id": "minor",
+        "parent_id": "",
+        "entity_id": "programs:HJZpXxQ9s9",
+        "phase": "degree",
+        "kind": "restriction",
+        "label": "Complete the requirements of an approved minor",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "Complete the requirements of an approved minor",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-2393c1edfd88d30a0368ad7b",
+            "quote": "8. Coursework sufficient to satisfy requirements of a minor."
+          }
+        ]
+      },
+      {
+        "id": "cs-substitution",
+        "parent_id": "",
+        "entity_id": "programs:HJZpXxQ9s9",
+        "phase": "degree",
+        "kind": "restriction",
+        "label": "CS259L can replace CS152L and CS251L for 5 credits; CS total becomes 50 credits, degree total remains 120",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "CS259L can replace CS152L and CS251L for 5 credits; CS total becomes 50 credits, degree total remains 120",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-0dd24316d823c8ae9de40b8e",
+            "quote": "CS 259L may be substituted for CS 152L and CS 251L but only 5 credit hours credit is awarded. The computer science credit hour requirement is reduced to 50, but the overall graduation requirement remains at 120."
+          }
+        ]
+      },
+      {
+        "id": "technical-exclusions",
+        "parent_id": "",
+        "entity_id": "programs:HJZpXxQ9s9",
+        "phase": "degree",
+        "kind": "restriction",
+        "label": "CS department courses below 300 level and CS494 cannot be technical electives",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "CS department courses below 300 level and CS494 cannot be technical electives",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-5613b38e90285d871d409677",
+            "quote": "Department offerings below the 300-level cannot be used as technical electives. The following course also cannot be used as a technical elective: CS **494."
+          }
+        ]
+      },
+      {
+        "id": "cs499-cap",
+        "parent_id": "",
+        "entity_id": "programs:HJZpXxQ9s9",
+        "phase": "degree",
+        "kind": "restriction",
+        "label": "At most 3 credits of CS499 may count toward the CS requirement",
+        "minimum": null,
+        "maximum": 3,
+        "unit": "credits",
+        "comparison": "at_most",
+        "value": "At most 3 credits of CS499 may count toward the CS requirement",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-2027ad600173b5b13470f42f",
+            "quote": "At most, 3 credit hours of CS 499 may be used toward satisfaction of this requirement."
+          }
+        ]
+      },
+      {
+        "id": "faculty-residency",
+        "parent_id": "",
+        "entity_id": "programs:HJZpXxQ9s9",
+        "phase": "degree",
+        "kind": "credits",
+        "label": "At least 15 credits at 300 level or above for the CS requirement must be from full-time UNM CS faculty",
+        "minimum": 15,
+        "maximum": null,
+        "unit": "credits",
+        "comparison": "at_least",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-798421643870aacd521ae5e5",
+            "quote": "At least 15 credit hours at or above the 300-level used to satisfy this requirement must be taken from full-time University of New Mexico Computer Science Department faculty."
+          }
+        ]
+      },
+      {
+        "id": "cs-residency",
+        "parent_id": "",
+        "entity_id": "programs:HJZpXxQ9s9",
+        "phase": "degree",
+        "kind": "credits",
+        "label": "At least 18 credits taken in the UNM Computer Science department",
+        "minimum": 18,
+        "maximum": null,
+        "unit": "credits",
+        "comparison": "at_least",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-89688674de084d3ad1c2ace3",
+            "quote": "At least 18 credit hours must be taken in the Computer Science Department at the University of New Mexico."
+          }
+        ]
+      },
+      {
+        "id": "minor-approval",
+        "parent_id": "",
+        "entity_id": "programs:HJZpXxQ9s9",
+        "phase": "degree",
+        "kind": "restriction",
+        "label": "Arts and Sciences minors generally acceptable; a designed interdisciplinary minor needs at least 24 credits and Undergraduate Curriculum Committee approval",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "Arts and Sciences minors generally acceptable; a designed interdisciplinary minor needs at least 24 credits and Undergraduate Curriculum Committee approval",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-2e9e20eba534e41f20373810",
+            "quote": "Minors approved by the College of Arts and Sciences are generally acceptable for Computer Science majors. The UNM Catalog should be consulted for the requirements for completing a minor in various fields of study. An interdisciplinary minor of not less than 24 credit hours can be developed to suit the goals of individual students; such a minor must be approved by the Undergraduate Curriculum Committee of the department."
+          }
+        ]
+      },
+      {
+        "id": "math-minor-overlap",
+        "parent_id": "",
+        "entity_id": "programs:HJZpXxQ9s9",
+        "phase": "degree",
+        "kind": "restriction",
+        "label": "Required CS mathematics may not count toward the mathematics minor",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "Required CS mathematics may not count toward the mathematics minor",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-1ae3d58b7e89e6f0d569c3c8",
+            "quote": "No course included in the mathematics requirement for Computer Science majors (STAT **345, MATH **314 or **321, and **375) may be applied toward the mathematics minor."
+          }
+        ]
+      },
+      {
+        "id": "minor-exclusions",
+        "parent_id": "",
+        "entity_id": "programs:HJZpXxQ9s9",
+        "phase": "degree",
+        "kind": "restriction",
+        "label": "Mathematics minor excludes courses for teachers and MATH317/327; statistics minor replaces MATH1350 with 3 advanced statistics credits",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "Mathematics minor excludes courses for teachers and MATH317/327; statistics minor replaces MATH1350 with 3 advanced statistics credits",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-d3b2c412fd290c046356747f",
+            "quote": "Mathematics minors may not use Department of Mathematics courses for teachers and education students in constructing the minor. MATH **317 and MATH **327 cannot be used in constructing the minor. Statistics minors must substitute 3 credit hours of advance statistics for MATH 1350 (not accepted by the department)."
+          }
+        ]
+      },
+      {
+        "id": "business-minor",
+        "parent_id": "",
+        "entity_id": "programs:HJZpXxQ9s9",
+        "phase": "degree",
+        "kind": "restriction",
+        "label": "Business minors exclude MIS and listed computing/application courses",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "Business minors exclude MIS and listed computing/application courses",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-a8c0a741fe6a77da8791d9c5",
+            "quote": "Students minoring in business cannot minor in Management Information Systems (MIS). In particular, the following courses cannot be used in constructing the minor: MGMT 329, 330, 331, 336, 337 and 437, 449, 450, 459; STAT 245; or any course related to Computer Science or computer applications."
+          }
+        ]
+      },
+      {
+        "id": "minor-double-counting",
+        "parent_id": "",
+        "entity_id": "programs:HJZpXxQ9s9",
+        "phase": "degree",
+        "kind": "restriction",
+        "label": "Minor courses can also meet graduation categories 1, 2, 5, 6 and 7",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "Minor courses can also meet graduation categories 1, 2, 5, 6 and 7",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-46b23ccf5b1c75cbeaf7cfcc",
+            "quote": "Courses taken to satisfy the requirements for a minor may also be used to satisfy the requirements of categories 1, 2, 5, 6 and 7."
+          }
+        ]
+      },
+      {
+        "id": "crnc",
+        "parent_id": "",
+        "entity_id": "programs:HJZpXxQ9s9",
+        "phase": "degree",
+        "kind": "restriction",
+        "label": "Advisor final approval; at most 24 CR/NC credits, usable only for the overall 120-credit requirement",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "Advisor final approval; at most 24 CR/NC credits, usable only for the overall 120-credit requirement",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-561c8690dc061b6e780ced45",
+            "quote": "All courses taken to satisfy the graduation requirements are subject to final approval by an undergraduate advisor. At most, 24 credit hours taken on a Credit/No Credit basis \"CR/NC\" may be applied toward the baccalaureate degree. Courses taken for CR/NC may only be used to satisfy graduation requirement 1 (completion of 120 credit hours)."
+          }
+        ]
+      },
+      {
+        "id": "no-double-counting",
+        "parent_id": "",
+        "entity_id": "programs:HJZpXxQ9s9",
+        "phase": "degree",
+        "kind": "restriction",
+        "label": "One course cannot satisfy more than one of categories 3 (CS), 4 (math) and 8 (minor)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "One course cannot satisfy more than one of categories 3 (CS), 4 (math) and 8 (minor)",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-6f5cf00e5160d3f308601be4",
+            "quote": "No one course may be used to satisfy more than one requirement of categories 3, 4, and 8. Due to the cross listing of various courses within the University and the different requirements for the minor from department to department, this has a number of implications. For example, mathematics minors cannot count the required sequence in mathematics toward the minor in mathematics, and computer engineering minors cannot use ECE *438 as a technical elective in fulfilling requirement 3."
+          }
+        ]
+      },
+      {
+        "id": "cs-core",
+        "parent_id": "",
+        "entity_id": "programs:HJZpXxQ9s9",
+        "phase": "degree",
+        "kind": "all",
+        "label": "Required CS core",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "C",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-e39e51b337a216bf8e5d3dff",
+            "quote": "Required computer science courses"
+          },
+          {
+            "block_id": "b-e38324e9a4143af671ae3952",
+            "quote": "Complete all of the following"
+          },
+          {
+            "block_id": "b-f945094dac10f253dde1e0e2",
+            "quote": "Complete the following:"
+          }
+        ]
+      },
+      {
+        "id": "course-43",
+        "parent_id": "cs-core",
+        "entity_id": "programs:HJZpXxQ9s9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CSCI1230 - C Programming (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "C",
+        "course_refs": [
+          "courses:B1JpsfFm0"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-acf8152604e7bbe7ffab1f6c",
+            "quote": "CSCI1230 - C Programming (3)"
+          }
+        ]
+      },
+      {
+        "id": "course-44",
+        "parent_id": "cs-core",
+        "entity_id": "programs:HJZpXxQ9s9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CSCI2260 - Computer Programming Fundamentals: Java 2 (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "C",
+        "course_refs": [
+          "courses:BJsRnztQC"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-68e0196b9a38741c072f8556",
+            "quote": "CSCI2260 - Computer Programming Fundamentals: Java 2 (3)"
+          }
+        ]
+      },
+      {
+        "id": "course-45",
+        "parent_id": "cs-core",
+        "entity_id": "programs:HJZpXxQ9s9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CSCI2310 - Discrete Mathematics for Computer Science (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "C",
+        "course_refs": [
+          "courses:r1e1adt7A"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-fb0607997e2949d4f3ac0c94",
+            "quote": "CSCI2310 - Discrete Mathematics for Computer Science (3)"
+          }
+        ]
+      },
+      {
+        "id": "course-46",
+        "parent_id": "cs-core",
+        "entity_id": "programs:HJZpXxQ9s9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CSCI2293 - Social and Ethical Issues in Computing (1)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "C",
+        "course_refs": [
+          "courses:SyhH_tYXA"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-1462037c032e4a0bc0944e7a",
+            "quote": "CSCI2293 - Social and Ethical Issues in Computing (1)"
+          }
+        ]
+      },
+      {
+        "id": "course-47",
+        "parent_id": "cs-core",
+        "entity_id": "programs:HJZpXxQ9s9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CS341L - Introduction to Computer Architecture and Organization (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "C",
+        "course_refs": [
+          "courses:rkGfP9N9jq"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-b521a9cfc5a8a20065e767cf",
+            "quote": "CS341L - Introduction to Computer Architecture and Organization (3)"
+          }
+        ]
+      },
+      {
+        "id": "course-48",
+        "parent_id": "cs-core",
+        "entity_id": "programs:HJZpXxQ9s9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CS357L - Declarative Programming (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "C",
+        "course_refs": [
+          "courses:Hy-91i4qj9"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-0a8b4ead496dbee95719d62c",
+            "quote": "CS357L - Declarative Programming (3)"
+          }
+        ]
+      },
+      {
+        "id": "course-49",
+        "parent_id": "cs-core",
+        "entity_id": "programs:HJZpXxQ9s9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CS361L - Data Structures and Algorithms (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "C",
+        "course_refs": [
+          "courses:S1g8p9Vqj5"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-962c9e44353a3f97aeefc726",
+            "quote": "CS361L - Data Structures and Algorithms (3)"
+          }
+        ]
+      },
+      {
+        "id": "course-50",
+        "parent_id": "cs-core",
+        "entity_id": "programs:HJZpXxQ9s9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CS362 - Data Structures and Algorithms II (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "C",
+        "course_refs": [
+          "courses:ByxOG9Ncjq"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-59a586b12064343609c56013",
+            "quote": "CS362 - Data Structures and Algorithms II (3)"
+          }
+        ]
+      },
+      {
+        "id": "course-51",
+        "parent_id": "cs-core",
+        "entity_id": "programs:HJZpXxQ9s9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CS375 - Introduction to Numerical Computing (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "C",
+        "course_refs": [
+          "courses:H1mpyiE9j5"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-792e4b7e94ee718d7835d875",
+            "quote": "CS375 - Introduction to Numerical Computing (3)"
+          }
+        ]
+      },
+      {
+        "id": "course-52",
+        "parent_id": "cs-core",
+        "entity_id": "programs:HJZpXxQ9s9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CS460 - Software Engineering (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "C",
+        "course_refs": [
+          "courses:SyUa545j9"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-b8442278770d509b0e7c1e75",
+            "quote": "CS460 - Software Engineering (3)"
+          }
+        ]
+      },
+      {
+        "id": "course-53",
+        "parent_id": "cs-core",
+        "entity_id": "programs:HJZpXxQ9s9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CS351L - Design of Large Programs (4)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "C",
+        "course_refs": [
+          "courses:BJgK1j49s5"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-e048f0039021d3d437a700ef",
+            "quote": "CS351L - Design of Large Programs (4)"
+          }
+        ]
+      },
+      {
+        "id": "course-54",
+        "parent_id": "cs-core",
+        "entity_id": "programs:HJZpXxQ9s9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CS481 - Computer Operating Systems (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "C",
+        "course_refs": [
+          "courses:Byg4McEqi9"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-065c14aedf46992b0b99cd39",
+            "quote": "CS481 - Computer Operating Systems (3)"
+          }
+        ]
+      },
+      {
+        "id": "course-55",
+        "parent_id": "cs-core",
+        "entity_id": "programs:HJZpXxQ9s9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "ECE238L - Computer Logic Design (4)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "C",
+        "course_refs": [
+          "courses:Sye9fcV5i9"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-8fe8782c7b4658dbed6c5326",
+            "quote": "ECE238L - Computer Logic Design (4)"
+          }
+        ]
+      },
+      {
+        "id": "intro",
+        "parent_id": "cs-core",
+        "entity_id": "programs:HJZpXxQ9s9",
+        "phase": "degree",
+        "kind": "choose_n",
+        "label": "Introductory programming: CSCI1260 or ENG130L",
+        "minimum": 1,
+        "maximum": null,
+        "unit": "courses",
+        "comparison": "at_least",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-1d68d12024b68110a581ab2a",
+            "quote": "Complete at least 1 of the following:"
+          },
+          {
+            "block_id": "b-0c6436506470761660e9f61c",
+            "quote": "Students must earn a grade of \"B\" or higher in the above course."
+          }
+        ]
+      },
+      {
+        "id": "course-57",
+        "parent_id": "intro",
+        "entity_id": "programs:HJZpXxQ9s9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CSCI1260 - Computer Programming Fundamentals: Java I (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "B",
+        "course_refs": [
+          "courses:B1xrqGKmA"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-9c98fdc98bae5e97fd84d537",
+            "quote": "CSCI1260 - Computer Programming Fundamentals: Java I (3)"
+          }
+        ]
+      },
+      {
+        "id": "course-58",
+        "parent_id": "intro",
+        "entity_id": "programs:HJZpXxQ9s9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "ENG130L - Introduction to Engineering Computing (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "B",
+        "course_refs": [
+          "courses:BkXP-5N9j9"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-1e72da395ddc302b586db1f7",
+            "quote": "ENG130L - Introduction to Engineering Computing (3)"
+          }
+        ]
+      },
+      {
+        "id": "course-renumbering",
+        "parent_id": "",
+        "entity_id": "programs:HJZpXxQ9s9",
+        "phase": "degree",
+        "kind": "unresolved",
+        "label": "Reconcile admission and degree-list course identifiers",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "Admission uses CS152L; the degree list uses CSCI1260 and CSCI2260 and says B, while admission says B-. Preserve separate scopes; verify catalog equivalences and substitution policy before compilation.",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-d0cc8d5f7c4eb9f324893140",
+            "quote": "Completion of the following courses with a grade of \"B-\" or better: MATH 1512, and one of ENG 130L or CS 152L."
+          },
+          {
+            "block_id": "b-0dd24316d823c8ae9de40b8e",
+            "quote": "CS 259L may be substituted for CS 152L and CS 251L but only 5 credit hours credit is awarded. The computer science credit hour requirement is reduced to 50, but the overall graduation requirement remains at 120."
+          },
+          {
+            "block_id": "b-acf8152604e7bbe7ffab1f6c",
+            "quote": "CSCI1230 - C Programming (3)"
+          },
+          {
+            "block_id": "b-68e0196b9a38741c072f8556",
+            "quote": "CSCI2260 - Computer Programming Fundamentals: Java 2 (3)"
+          },
+          {
+            "block_id": "b-9c98fdc98bae5e97fd84d537",
+            "quote": "CSCI1260 - Computer Programming Fundamentals: Java I (3)"
+          },
+          {
+            "block_id": "b-0c6436506470761660e9f61c",
+            "quote": "Students must earn a grade of \"B\" or higher in the above course."
+          }
+        ]
+      },
+      {
+        "id": "technical",
+        "parent_id": "",
+        "entity_id": "programs:HJZpXxQ9s9",
+        "phase": "degree",
+        "kind": "credits",
+        "label": "At least 9 credits in approved technical electives",
+        "minimum": 9,
+        "maximum": null,
+        "unit": "credits",
+        "comparison": "at_least",
+        "value": "",
+        "minimum_grade": "B",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-83d939533e431aeda69375c5",
+            "quote": "Earn at least 9 credits from the following types of courses:"
+          },
+          {
+            "block_id": "b-f3a08bb4745e4f5ab77c9191",
+            "quote": "Technical electives of the student's choosing to be taken from among the Computer Science Department offerings. Certain courses in the Department of Electrical and Computer Engineering are also acceptable as technical electives. All courses used as technical electives are subject to the approval of an undergraduate advisor and must be completed with a grade of \"B\" (not \"B-\") or better."
+          }
+        ]
+      },
+      {
+        "id": "technical-approval",
+        "parent_id": "technical",
+        "entity_id": "programs:HJZpXxQ9s9",
+        "phase": "degree",
+        "kind": "permission",
+        "label": "Technical electives are CS offerings or certain ECE courses, subject to undergraduate advisor approval",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "Technical electives are CS offerings or certain ECE courses, subject to undergraduate advisor approval",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-f3a08bb4745e4f5ab77c9191",
+            "quote": "Technical electives of the student's choosing to be taken from among the Computer Science Department offerings. Certain courses in the Department of Electrical and Computer Engineering are also acceptable as technical electives. All courses used as technical electives are subject to the approval of an undergraduate advisor and must be completed with a grade of \"B\" (not \"B-\") or better."
+          }
+        ]
+      },
+      {
+        "id": "math",
+        "parent_id": "",
+        "entity_id": "programs:HJZpXxQ9s9",
+        "phase": "degree",
+        "kind": "all",
+        "label": "Complete mathematics sequence",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-1a1f74bb6ff0df92cca44ae7",
+            "quote": "Mathematics sequence"
+          },
+          {
+            "block_id": "b-5edef2691df93b6e964e0ca9",
+            "quote": "Complete all of the following"
+          },
+          {
+            "block_id": "b-a2859dfe4940ecb337716da8",
+            "quote": "Complete the following:"
+          }
+        ]
+      },
+      {
+        "id": "course-65",
+        "parent_id": "math",
+        "entity_id": "programs:HJZpXxQ9s9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "MATH1512 - Calculus I (4)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:Hkf4V545s9"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-8b4a510c3ceb26b38c78a09b",
+            "quote": "MATH1512 - Calculus I (4)"
+          }
+        ]
+      },
+      {
+        "id": "course-66",
+        "parent_id": "math",
+        "entity_id": "programs:HJZpXxQ9s9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "MATH1522 - Calculus II (4)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:HyyUq45s9"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-abca53a2529ca07428602197",
+            "quote": "MATH1522 - Calculus II (4)"
+          }
+        ]
+      },
+      {
+        "id": "course-67",
+        "parent_id": "math",
+        "entity_id": "programs:HJZpXxQ9s9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "STAT345 - Elements of Mathematical Statistics and Probability Theory (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:BkgPvcV5sc"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-9132df17f4597f8b51984e6f",
+            "quote": "STAT345 - Elements of Mathematical Statistics and Probability Theory (3)"
+          }
+        ]
+      },
+      {
+        "id": "linear",
+        "parent_id": "math",
+        "entity_id": "programs:HJZpXxQ9s9",
+        "phase": "degree",
+        "kind": "choose_n",
+        "label": "Linear algebra: MATH314 or MATH321",
+        "minimum": 1,
+        "maximum": null,
+        "unit": "courses",
+        "comparison": "at_least",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-31deb1f21056e992968cd92e",
+            "quote": "Complete at least 1 of the following:"
+          }
+        ]
+      },
+      {
+        "id": "course-69",
+        "parent_id": "linear",
+        "entity_id": "programs:HJZpXxQ9s9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "MATH314 - Linear Algebra with Applications (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:rJ-NMj49sc"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-fe6377789d654e215c4d8913",
+            "quote": "MATH314 - Linear Algebra with Applications (3)"
+          }
+        ]
+      },
+      {
+        "id": "course-70",
+        "parent_id": "linear",
+        "entity_id": "programs:HJZpXxQ9s9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "MATH321 - Linear Algebra (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:S1yxiEqsq"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-a608c89f92651a1e7bc7152a",
+            "quote": "MATH321 - Linear Algebra (3)"
+          }
+        ]
+      },
+      {
+        "id": "communication",
+        "parent_id": "",
+        "entity_id": "programs:HJZpXxQ9s9",
+        "phase": "degree",
+        "kind": "all",
+        "label": "Complete communication-skills curriculum",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-e595138330ef3730e00fa2b9",
+            "quote": "Communications skills"
+          },
+          {
+            "block_id": "b-1bd3f1bd6c1150522c4d74e0",
+            "quote": "Complete all of the following"
+          }
+        ]
+      },
+      {
+        "id": "composition-one",
+        "parent_id": "communication",
+        "entity_id": "programs:HJZpXxQ9s9",
+        "phase": "degree",
+        "kind": "choose_n",
+        "label": "Composition I: ENGL1110Y, ENGL1110Z or ENGL1110",
+        "minimum": 1,
+        "maximum": null,
+        "unit": "courses",
+        "comparison": "at_least",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-3488762bc4f4d3953c4b33b2",
+            "quote": "Complete at least 1 of the following:"
+          }
+        ]
+      },
+      {
+        "id": "course-74",
+        "parent_id": "composition-one",
+        "entity_id": "programs:HJZpXxQ9s9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "ENGL1110Y - Composition I: Stretch II (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:rkzE4cVcs9"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-96d7692ecfb4425fecf5f6f9",
+            "quote": "ENGL1110Y - Composition I: Stretch II (3)"
+          }
+        ]
+      },
+      {
+        "id": "course-75",
+        "parent_id": "composition-one",
+        "entity_id": "programs:HJZpXxQ9s9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "ENGL1110Z - Enhanced Composition (4)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:BJZ1Gi49i5"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-2b1e46bd5eb49f2877f5df96",
+            "quote": "ENGL1110Z - Enhanced Composition (4)"
+          }
+        ]
+      },
+      {
+        "id": "course-76",
+        "parent_id": "composition-one",
+        "entity_id": "programs:HJZpXxQ9s9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "ENGL1110 - Composition I (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:ByePcqV5ic"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-506e9f5e995c67253d83e5e0",
+            "quote": "ENGL1110 - Composition I (3)"
+          }
+        ]
+      },
+      {
+        "id": "course-78",
+        "parent_id": "communication",
+        "entity_id": "programs:HJZpXxQ9s9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "ENGL1120 - Composition II (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:S1fVV5N5sq"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-beff7bf5a09128c2ca23bc40",
+            "quote": "ENGL1120 - Composition II (3)"
+          }
+        ]
+      },
+      {
+        "id": "communication-elective",
+        "parent_id": "communication",
+        "entity_id": "programs:HJZpXxQ9s9",
+        "phase": "degree",
+        "kind": "choose_n",
+        "label": "Communication: COMM1130, ENGL2120 or ENGL2210",
+        "minimum": 1,
+        "maximum": null,
+        "unit": "courses",
+        "comparison": "at_least",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-4d8bcbf0f9a197dda640e110",
+            "quote": "Complete at least 1 of the following:"
+          }
+        ]
+      },
+      {
+        "id": "course-80",
+        "parent_id": "communication-elective",
+        "entity_id": "programs:HJZpXxQ9s9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "COMM1130 - Public Speaking (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:H1VCqNqsq"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-b29f046f9b544dc507c35803",
+            "quote": "COMM1130 - Public Speaking (3)"
+          }
+        ]
+      },
+      {
+        "id": "course-81",
+        "parent_id": "communication-elective",
+        "entity_id": "programs:HJZpXxQ9s9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "ENGL2120 - Intermediate Composition (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:HJGHAqE9i9"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-945b813be9ed9012d3fc16ec",
+            "quote": "ENGL2120 - Intermediate Composition (3)"
+          }
+        ]
+      },
+      {
+        "id": "course-82",
+        "parent_id": "communication-elective",
+        "entity_id": "programs:HJZpXxQ9s9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "ENGL2210 - Professional and Technical Communication (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:ByliloVqjc"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-e690d5fc5e27deb80abba0b7",
+            "quote": "ENGL2210 - Professional and Technical Communication (3)"
+          }
+        ]
+      },
+      {
+        "id": "composition-waiver",
+        "parent_id": "",
+        "entity_id": "programs:HJZpXxQ9s9",
+        "phase": "degree",
+        "kind": "restriction",
+        "label": "Authorized proficiency examination can waive ENGL1110/1120 at the dated ACT/SAT thresholds stated in the catalog; overall minimum credits remain",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "Authorized proficiency examination can waive ENGL1110/1120 at the dated ACT/SAT thresholds stated in the catalog; overall minimum credits remain",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-1b1d1f25535d0e3710278940",
+            "quote": "Part of this requirement may be satisfied by passing an authorized proficiency examination. ENGL 1110 and 1120 are waived if the student obtains one of the following: an ACT score of 25 or higher (prior to October 1989) an ACT score of 29 or higher (after October 1989) an SAT score of 580 or higher (prior to April 1995) an SAT score of 650 or higher (after April 1995) When a student is exempted from ENGL 1110 and 1120, the student's total credit requirement is still the minimum required by the University for a bachelor's degree. Students may have to take additional credit hours to meet that minimum."
+          }
+        ]
+      },
+      {
+        "id": "science",
+        "parent_id": "",
+        "entity_id": "programs:HJZpXxQ9s9",
+        "phase": "degree",
+        "kind": "credits",
+        "label": "At least 14 science credits with four qualifying science courses and paired labs",
+        "minimum": 14,
+        "maximum": null,
+        "unit": "credits",
+        "comparison": "at_least",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-7ee3c36be417fcd18150cec2",
+            "quote": "Science courses"
+          },
+          {
+            "block_id": "b-6ed1a57b8426ac367c8adae2",
+            "quote": "Complete all of the following"
+          },
+          {
+            "block_id": "b-f219ecbe4046d655892e0f6a",
+            "quote": "Earn at least 14 credits from the following:"
+          },
+          {
+            "block_id": "b-d92bc52b73e2d302a5c5ed7c",
+            "quote": "Four courses for this requirement must be taken from the list above. The four courses must consist of two lectures paired with the appropriate labs. The remaining credit hours can be more advanced courses in the discipline chosen for the sequence or they can be additional introductory laboratory science credit hours."
+          }
+        ]
+      },
+      {
+        "id": "course-87",
+        "parent_id": "science",
+        "entity_id": "programs:HJZpXxQ9s9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "ASTR2110 - General Astronomy I (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:HyXFwqEqj5"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-df086bc0bb68b6a4523a5826",
+            "quote": "ASTR2110 - General Astronomy I (3)"
+          }
+        ]
+      },
+      {
+        "id": "course-88",
+        "parent_id": "science",
+        "entity_id": "programs:HJZpXxQ9s9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "ASTR2110L - General Astronomy I Laboratory (1)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:rkos5Vqsq"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-bc8129944edb911c90595fd2",
+            "quote": "ASTR2110L - General Astronomy I Laboratory (1)"
+          }
+        ]
+      },
+      {
+        "id": "course-89",
+        "parent_id": "science",
+        "entity_id": "programs:HJZpXxQ9s9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "ASTR2115 - General Astronomy II (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:SJZ_dcVci9"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-1c57c90ed38aba4c00fa4d88",
+            "quote": "ASTR2115 - General Astronomy II (3)"
+          }
+        ]
+      },
+      {
+        "id": "course-90",
+        "parent_id": "science",
+        "entity_id": "programs:HJZpXxQ9s9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "ASTR2115L - General Astronomy II Laboratory (1)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:H1e9r9V5oq"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-a3dc030a62e5fc860301d36e",
+            "quote": "ASTR2115L - General Astronomy II Laboratory (1)"
+          }
+        ]
+      },
+      {
+        "id": "course-91",
+        "parent_id": "science",
+        "entity_id": "programs:HJZpXxQ9s9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "BIOL2110C - Principles of Biology: Cellular and Molecular Lecture and Laboratory (4)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:B1WBIcE9iq"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-86437a2ecc068c5869d9f325",
+            "quote": "BIOL2110C - Principles of Biology: Cellular and Molecular Lecture and Laboratory (4)"
+          }
+        ]
+      },
+      {
+        "id": "course-92",
+        "parent_id": "science",
+        "entity_id": "programs:HJZpXxQ9s9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "BIOL2410C - Principles of Biology: Genetics Lecture and Laboratory (4)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:ryb-545s5"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-11c88963fbb83a5fdf59356a",
+            "quote": "BIOL2410C - Principles of Biology: Genetics Lecture and Laboratory (4)"
+          }
+        ]
+      },
+      {
+        "id": "course-93",
+        "parent_id": "science",
+        "entity_id": "programs:HJZpXxQ9s9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CHEM1215 - General Chemistry I for STEM Majors (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:SyFq5N9i9"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-7b119444aacfa9d692a5723b",
+            "quote": "CHEM1215 - General Chemistry I for STEM Majors (3)"
+          }
+        ]
+      },
+      {
+        "id": "course-94",
+        "parent_id": "science",
+        "entity_id": "programs:HJZpXxQ9s9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CHEM1215L - General Chemistry I for STEM Majors Laboratory (1)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:HJxj7cVqo9"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-ef21bbc9fdd9a5ddb855b9ed",
+            "quote": "CHEM1215L - General Chemistry I for STEM Majors Laboratory (1)"
+          }
+        ]
+      },
+      {
+        "id": "course-95",
+        "parent_id": "science",
+        "entity_id": "programs:HJZpXxQ9s9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CHEM1225 - General Chemistry II for STEM Majors (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:BJLYX5N9j5"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-0ffa92ad437635e6d84962bd",
+            "quote": "CHEM1225 - General Chemistry II for STEM Majors (3)"
+          }
+        ]
+      },
+      {
+        "id": "course-96",
+        "parent_id": "science",
+        "entity_id": "programs:HJZpXxQ9s9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CHEM1225L - General Chemistry II for STEM Majors Laboratory (1)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:r1yh54qs9"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-e6379233c06f3ae97653e834",
+            "quote": "CHEM1225L - General Chemistry II for STEM Majors Laboratory (1)"
+          }
+        ]
+      },
+      {
+        "id": "course-97",
+        "parent_id": "science",
+        "entity_id": "programs:HJZpXxQ9s9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "ENVS1130 - The Blue Planet (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:BybefqNcjq"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-cee886b69993a44b07632528",
+            "quote": "ENVS1130 - The Blue Planet (3)"
+          }
+        ]
+      },
+      {
+        "id": "course-98",
+        "parent_id": "science",
+        "entity_id": "programs:HJZpXxQ9s9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "ENVS1130L - The Blue Planet Laboratory (1)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:B1rC29V9oc"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-4303e4bfdfb7f5b50ccfa558",
+            "quote": "ENVS1130L - The Blue Planet Laboratory (1)"
+          }
+        ]
+      },
+      {
+        "id": "course-99",
+        "parent_id": "science",
+        "entity_id": "programs:HJZpXxQ9s9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "GEOL1110L - Physical Geology Lab (1)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:HylDV9Vqi5"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-e0215f66c8160fbbc1c0c9bc",
+            "quote": "GEOL1110L - Physical Geology Lab (1)"
+          }
+        ]
+      },
+      {
+        "id": "course-100",
+        "parent_id": "science",
+        "entity_id": "programs:HJZpXxQ9s9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "GEOL1110 - Physical Geology (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:ryM7Gq45s9"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-cb6a15434ac6ed3fb0db1ce7",
+            "quote": "GEOL1110 - Physical Geology (3)"
+          }
+        ]
+      },
+      {
+        "id": "course-101",
+        "parent_id": "science",
+        "entity_id": "programs:HJZpXxQ9s9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "GEOL2110C - Historical Geology Lecture and Laboratory (4)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:HJZaHqN5jq"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-c66a33faf12a0ebae3c1d03f",
+            "quote": "GEOL2110C - Historical Geology Lecture and Laboratory (4)"
+          }
+        ]
+      },
+      {
+        "id": "course-102",
+        "parent_id": "science",
+        "entity_id": "programs:HJZpXxQ9s9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "PHYS1310 - Calculus-Based Physics I (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:rJws9N9oc"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-18360e794c1df9c9da15da81",
+            "quote": "PHYS1310 - Calculus-Based Physics I (3)"
+          }
+        ]
+      },
+      {
+        "id": "course-103",
+        "parent_id": "science",
+        "entity_id": "programs:HJZpXxQ9s9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "PHYS1310L - Calculus-Based Physics I Laboratory (1)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:HJfCTKVqi9"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-717050ac5b3583ef62db6356",
+            "quote": "PHYS1310L - Calculus-Based Physics I Laboratory (1)"
+          }
+        ]
+      },
+      {
+        "id": "course-104",
+        "parent_id": "science",
+        "entity_id": "programs:HJZpXxQ9s9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "PHYS1320 - Calculus-Based Physics II (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:SkAa545oq"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-28e181502b8bb924fb48ab64",
+            "quote": "PHYS1320 - Calculus-Based Physics II (3)"
+          }
+        ]
+      },
+      {
+        "id": "course-105",
+        "parent_id": "science",
+        "entity_id": "programs:HJZpXxQ9s9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "PHYS1320L - Calculus-Based Physics II Laboratory (1)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:BJPScE9j9"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-dbfe7769bb33b82a0fa169c0",
+            "quote": "PHYS1320L - Calculus-Based Physics II Laboratory (1)"
+          }
+        ]
+      },
+      {
+        "id": "science-options",
+        "parent_id": "science",
+        "entity_id": "programs:HJZpXxQ9s9",
+        "phase": "degree",
+        "kind": "restriction",
+        "label": "The listed science courses are alternatives within the science requirement, not 19 individually required courses",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "The listed science courses are alternatives within the science requirement, not 19 individually required courses",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-d92bc52b73e2d302a5c5ed7c",
+            "quote": "Four courses for this requirement must be taken from the list above. The four courses must consist of two lectures paired with the appropriate labs. The remaining credit hours can be more advanced courses in the discipline chosen for the sequence or they can be additional introductory laboratory science credit hours."
+          }
+        ]
+      },
+      {
+        "id": "science-bundles",
+        "parent_id": "science",
+        "entity_id": "programs:HJZpXxQ9s9",
+        "phase": "degree",
+        "kind": "unresolved",
+        "label": "Confirm four-course science selections and lab pairing",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "Require four qualifying lecture/combined courses, at least two with appropriate labs, and at least 14 credits. Remaining credits may be advanced courses in the selected discipline or additional introductory lab science. Confirm eligible combinations and treatment of combined C courses.",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-b78f1cf2563b87ca9e8f13c0",
+            "quote": "7. Four (3 or more credit hours) science courses taken by science and engineering majors."
+          },
+          {
+            "block_id": "b-f219ecbe4046d655892e0f6a",
+            "quote": "Earn at least 14 credits from the following:"
+          },
+          {
+            "block_id": "b-d92bc52b73e2d302a5c5ed7c",
+            "quote": "Four courses for this requirement must be taken from the list above. The four courses must consist of two lectures paired with the appropriate labs. The remaining credit hours can be more advanced courses in the discipline chosen for the sequence or they can be additional introductory laboratory science credit hours."
+          }
+        ]
+      },
+      {
+        "id": "minor-credits",
+        "parent_id": "",
+        "entity_id": "programs:HJZpXxQ9s9",
+        "phase": "degree",
+        "kind": "credits",
+        "label": "Minor: structured list specifies at least 24 credits",
+        "minimum": 24,
+        "maximum": null,
+        "unit": "credits",
+        "comparison": "at_least",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-0d170593ceae77962c357519",
+            "quote": "Minor"
+          },
+          {
+            "block_id": "b-4db1b819eb8f9bbb6c5ac2df",
+            "quote": "Earn at least 24 credits from the following types of courses:"
+          },
+          {
+            "block_id": "b-66e8344a55c972249bf7c4ab",
+            "quote": "Coursework sufficient to satisfy requirements of a minor. Minors approved by the College of Arts and Sciences are generally acceptable for Computer Science majors. The UNM Catalog should be consulted for the requirements for completing a minor in various fields of study. An interdisciplinary minor of not less than 24 credit hours can be developed to suit the goals of individual students; such a minor must be approved by the Undergraduate Curriculum Committee of the department. The following minors in the Department of Electrical and Computer Engineering satisfy this requirement: Minor in Computer Engineering Minor in Electrical Engineering Please see minor entries in this Catalog for lists of required courses."
+          }
+        ]
+      },
+      {
+        "id": "minor-total-scope",
+        "parent_id": "",
+        "entity_id": "programs:HJZpXxQ9s9",
+        "phase": "degree",
+        "kind": "unresolved",
+        "label": "Does 24 credits apply to every minor or only an interdisciplinary minor?",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "The prose applies 24 credits to a designed interdisciplinary minor, while the structured minor heading applies it broadly. Confirm scope.",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-2e9e20eba534e41f20373810",
+            "quote": "Minors approved by the College of Arts and Sciences are generally acceptable for Computer Science majors. The UNM Catalog should be consulted for the requirements for completing a minor in various fields of study. An interdisciplinary minor of not less than 24 credit hours can be developed to suit the goals of individual students; such a minor must be approved by the Undergraduate Curriculum Committee of the department."
+          },
+          {
+            "block_id": "b-4db1b819eb8f9bbb6c5ac2df",
+            "quote": "Earn at least 24 credits from the following types of courses:"
+          },
+          {
+            "block_id": "b-66e8344a55c972249bf7c4ab",
+            "quote": "Coursework sufficient to satisfy requirements of a minor. Minors approved by the College of Arts and Sciences are generally acceptable for Computer Science majors. The UNM Catalog should be consulted for the requirements for completing a minor in various fields of study. An interdisciplinary minor of not less than 24 credit hours can be developed to suit the goals of individual students; such a minor must be approved by the Undergraduate Curriculum Committee of the department. The following minors in the Department of Electrical and Computer Engineering satisfy this requirement: Minor in Computer Engineering Minor in Electrical Engineering Please see minor entries in this Catalog for lists of required courses."
+          }
+        ]
+      },
+      {
+        "id": "additional",
+        "parent_id": "",
+        "entity_id": "programs:HJZpXxQ9s9",
+        "phase": "degree",
+        "kind": "credits",
+        "label": "At least 8 credits in additional degree requirements",
+        "minimum": 8,
+        "maximum": null,
+        "unit": "credits",
+        "comparison": "at_least",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-fbb165619c7efe237b53feee",
+            "quote": "Additional courses"
+          },
+          {
+            "block_id": "b-5b7b0d9b00d7eb6e3744fa33",
+            "quote": "Complete all of the following"
+          },
+          {
+            "block_id": "b-53f133f2a1dd19da89c21fd5",
+            "quote": "Earn at least 8 credits from the following types of courses:"
+          },
+          {
+            "block_id": "b-bfe24588bc9f2c3bd4bee540",
+            "quote": "In addition to the program-specific requirements outlined here, all undergraduate students are required to fulfill UNM's General Education Program requirements and other general undergraduate degree requirements to earn a minimum of 120 credits. In some instances, courses included in an undergraduate degree program’s requirement may also fulfill a General Education requirement. Please review the General Education Program in this Catalog for General Education information."
+          }
+        ]
+      },
+      {
+        "id": "general-reqs",
+        "parent_id": "",
+        "entity_id": "programs:HJZpXxQ9s9",
+        "phase": "degree",
+        "kind": "restriction",
+        "label": "Complete UNM General Education and other degree requirements; program/Gen Ed overlap is allowed where applicable",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "Complete UNM General Education and other degree requirements; program/Gen Ed overlap is allowed where applicable",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-bfe24588bc9f2c3bd4bee540",
+            "quote": "In addition to the program-specific requirements outlined here, all undergraduate students are required to fulfill UNM's General Education Program requirements and other general undergraduate degree requirements to earn a minimum of 120 credits. In some instances, courses included in an undergraduate degree program’s requirement may also fulfill a General Education requirement. Please review the General Education Program in this Catalog for General Education information."
+          }
+        ]
+      }
+    ],
+    "coverage": [
+      {
+        "block_id": "b-f7260bb4cd355c2aa0bd0f3e",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Program objectives, section headings or structural list introductions; no additional course/eligibility condition beyond the linked rules."
+      },
+      {
+        "block_id": "b-b629c3a58ab52f2e56f8638c",
+        "disposition": "requirements",
+        "node_ids": [
+          "minor-description"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-007436f9868041679dfb3f6f",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Program objectives, section headings or structural list introductions; no additional course/eligibility condition beyond the linked rules."
+      },
+      {
+        "block_id": "b-3c191a0c1748074b7f091ffa",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Program objectives, section headings or structural list introductions; no additional course/eligibility condition beyond the linked rules."
+      },
+      {
+        "block_id": "b-e8495eb483cf3a6ae328bb22",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Program objectives, section headings or structural list introductions; no additional course/eligibility condition beyond the linked rules."
+      },
+      {
+        "block_id": "b-0ad2eaa1fb5b5c3d47324597",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Program objectives, section headings or structural list introductions; no additional course/eligibility condition beyond the linked rules."
+      },
+      {
+        "block_id": "b-9958158c2ac410c6af0f4638",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Program objectives, section headings or structural list introductions; no additional course/eligibility condition beyond the linked rules."
+      },
+      {
+        "block_id": "b-ac1aa1c63f932f5442b867e6",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Program objectives, section headings or structural list introductions; no additional course/eligibility condition beyond the linked rules."
+      },
+      {
+        "block_id": "b-8eb762bf7a0168c01e485a3f",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Program objectives, section headings or structural list introductions; no additional course/eligibility condition beyond the linked rules."
+      },
+      {
+        "block_id": "b-677c6ce80d5cab43bbed1ac1",
+        "disposition": "requirements",
+        "node_ids": [
+          "admit-application"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-d0cc8d5f7c4eb9f324893140",
+        "disposition": "unresolved",
+        "node_ids": [
+          "admit-courses",
+          "course-renumbering"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-a2159fed4a93367c6123f9c4",
+        "disposition": "unresolved",
+        "node_ids": [
+          "admit-engineering"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-223320050fe154e698868fd8",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Program objectives, section headings or structural list introductions; no additional course/eligibility condition beyond the linked rules."
+      },
+      {
+        "block_id": "b-f337748054ca8c7b80bb4dcd",
+        "disposition": "requirements",
+        "node_ids": [
+          "ap-policy"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-d8a89ef01364fd95e7081699",
+        "disposition": "requirements",
+        "node_ids": [
+          "transfer-evaluation"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-ad9c1799ea84f35633d8335a",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Program objectives, section headings or structural list introductions; no additional course/eligibility condition beyond the linked rules."
+      },
+      {
+        "block_id": "b-7c8c19c482504e9520b90aa2",
+        "disposition": "requirements",
+        "node_ids": [
+          "advising"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-f902f8b55e4b6a222b0c9bca",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Program objectives, section headings or structural list introductions; no additional course/eligibility condition beyond the linked rules."
+      },
+      {
+        "block_id": "b-0df9d04f18cdf7bfc7a75558",
+        "disposition": "requirements",
+        "node_ids": [
+          "graduation-general",
+          "excluded-courses"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-e4abd2b6ff5bdc757aa64bb4",
+        "disposition": "requirements",
+        "node_ids": [
+          "degree-total"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-1779e511215918aa63b96c71",
+        "disposition": "requirements",
+        "node_ids": [
+          "upper-total"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-be398519633549ec8dc53189",
+        "disposition": "requirements",
+        "node_ids": [
+          "cs-total"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-6c2d0f14bea7cb8ac4c3a7e8",
+        "disposition": "requirements",
+        "node_ids": [
+          "math-communications"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-0f7ae73757a46bf84d9a3483",
+        "disposition": "requirements",
+        "node_ids": [
+          "gened"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-b78f1cf2563b87ca9e8f13c0",
+        "disposition": "unresolved",
+        "node_ids": [
+          "science-count",
+          "science-bundles"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-2393c1edfd88d30a0368ad7b",
+        "disposition": "requirements",
+        "node_ids": [
+          "minor"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-4a521e706493b299285be446",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Program objectives, section headings or structural list introductions; no additional course/eligibility condition beyond the linked rules."
+      },
+      {
+        "block_id": "b-0dd24316d823c8ae9de40b8e",
+        "disposition": "unresolved",
+        "node_ids": [
+          "cs-substitution",
+          "course-renumbering"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-5613b38e90285d871d409677",
+        "disposition": "requirements",
+        "node_ids": [
+          "technical-exclusions"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-2027ad600173b5b13470f42f",
+        "disposition": "requirements",
+        "node_ids": [
+          "cs499-cap"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-798421643870aacd521ae5e5",
+        "disposition": "requirements",
+        "node_ids": [
+          "faculty-residency"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-89688674de084d3ad1c2ace3",
+        "disposition": "requirements",
+        "node_ids": [
+          "cs-residency"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-2e9e20eba534e41f20373810",
+        "disposition": "unresolved",
+        "node_ids": [
+          "minor-approval",
+          "minor-total-scope"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-1ae3d58b7e89e6f0d569c3c8",
+        "disposition": "requirements",
+        "node_ids": [
+          "math-minor-overlap"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-d3b2c412fd290c046356747f",
+        "disposition": "requirements",
+        "node_ids": [
+          "minor-exclusions"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-a8c0a741fe6a77da8791d9c5",
+        "disposition": "requirements",
+        "node_ids": [
+          "business-minor"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-46b23ccf5b1c75cbeaf7cfcc",
+        "disposition": "requirements",
+        "node_ids": [
+          "minor-double-counting"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-561c8690dc061b6e780ced45",
+        "disposition": "requirements",
+        "node_ids": [
+          "crnc"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-6f5cf00e5160d3f308601be4",
+        "disposition": "requirements",
+        "node_ids": [
+          "no-double-counting"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-173879d3df665b26a2c1f58a",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Program objectives, section headings or structural list introductions; no additional course/eligibility condition beyond the linked rules."
+      },
+      {
+        "block_id": "b-e39e51b337a216bf8e5d3dff",
+        "disposition": "requirements",
+        "node_ids": [
+          "cs-core"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-e38324e9a4143af671ae3952",
+        "disposition": "requirements",
+        "node_ids": [
+          "cs-core"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-f945094dac10f253dde1e0e2",
+        "disposition": "requirements",
+        "node_ids": [
+          "cs-core"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-acf8152604e7bbe7ffab1f6c",
+        "disposition": "unresolved",
+        "node_ids": [
+          "course-43",
+          "course-renumbering"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-68e0196b9a38741c072f8556",
+        "disposition": "unresolved",
+        "node_ids": [
+          "course-44",
+          "course-renumbering"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-fb0607997e2949d4f3ac0c94",
+        "disposition": "requirements",
+        "node_ids": [
+          "course-45"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-1462037c032e4a0bc0944e7a",
+        "disposition": "requirements",
+        "node_ids": [
+          "course-46"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-b521a9cfc5a8a20065e767cf",
+        "disposition": "requirements",
+        "node_ids": [
+          "course-47"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-0a8b4ead496dbee95719d62c",
+        "disposition": "requirements",
+        "node_ids": [
+          "course-48"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-962c9e44353a3f97aeefc726",
+        "disposition": "requirements",
+        "node_ids": [
+          "course-49"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-59a586b12064343609c56013",
+        "disposition": "requirements",
+        "node_ids": [
+          "course-50"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-792e4b7e94ee718d7835d875",
+        "disposition": "requirements",
+        "node_ids": [
+          "course-51"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-b8442278770d509b0e7c1e75",
+        "disposition": "requirements",
+        "node_ids": [
+          "course-52"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-e048f0039021d3d437a700ef",
+        "disposition": "requirements",
+        "node_ids": [
+          "course-53"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-065c14aedf46992b0b99cd39",
+        "disposition": "requirements",
+        "node_ids": [
+          "course-54"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-8fe8782c7b4658dbed6c5326",
+        "disposition": "requirements",
+        "node_ids": [
+          "course-55"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-1d68d12024b68110a581ab2a",
+        "disposition": "requirements",
+        "node_ids": [
+          "intro"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-9c98fdc98bae5e97fd84d537",
+        "disposition": "unresolved",
+        "node_ids": [
+          "course-57",
+          "course-renumbering"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-1e72da395ddc302b586db1f7",
+        "disposition": "requirements",
+        "node_ids": [
+          "course-58"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-0c6436506470761660e9f61c",
+        "disposition": "unresolved",
+        "node_ids": [
+          "intro",
+          "course-renumbering"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-83d939533e431aeda69375c5",
+        "disposition": "requirements",
+        "node_ids": [
+          "technical"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-f3a08bb4745e4f5ab77c9191",
+        "disposition": "requirements",
+        "node_ids": [
+          "technical",
+          "technical-approval"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-1a1f74bb6ff0df92cca44ae7",
+        "disposition": "requirements",
+        "node_ids": [
+          "math"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-5edef2691df93b6e964e0ca9",
+        "disposition": "requirements",
+        "node_ids": [
+          "math"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-a2859dfe4940ecb337716da8",
+        "disposition": "requirements",
+        "node_ids": [
+          "math"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-8b4a510c3ceb26b38c78a09b",
+        "disposition": "requirements",
+        "node_ids": [
+          "course-65"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-abca53a2529ca07428602197",
+        "disposition": "requirements",
+        "node_ids": [
+          "course-66"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-9132df17f4597f8b51984e6f",
+        "disposition": "requirements",
+        "node_ids": [
+          "course-67"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-31deb1f21056e992968cd92e",
+        "disposition": "requirements",
+        "node_ids": [
+          "linear"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-fe6377789d654e215c4d8913",
+        "disposition": "requirements",
+        "node_ids": [
+          "course-69"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-a608c89f92651a1e7bc7152a",
+        "disposition": "requirements",
+        "node_ids": [
+          "course-70"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-e595138330ef3730e00fa2b9",
+        "disposition": "requirements",
+        "node_ids": [
+          "communication"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-1bd3f1bd6c1150522c4d74e0",
+        "disposition": "requirements",
+        "node_ids": [
+          "communication"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-3488762bc4f4d3953c4b33b2",
+        "disposition": "requirements",
+        "node_ids": [
+          "composition-one"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-96d7692ecfb4425fecf5f6f9",
+        "disposition": "requirements",
+        "node_ids": [
+          "course-74"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-2b1e46bd5eb49f2877f5df96",
+        "disposition": "requirements",
+        "node_ids": [
+          "course-75"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-506e9f5e995c67253d83e5e0",
+        "disposition": "requirements",
+        "node_ids": [
+          "course-76"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-dfaf1376419c09db43ccbf3a",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Program objectives, section headings or structural list introductions; no additional course/eligibility condition beyond the linked rules."
+      },
+      {
+        "block_id": "b-beff7bf5a09128c2ca23bc40",
+        "disposition": "requirements",
+        "node_ids": [
+          "course-78"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-4d8bcbf0f9a197dda640e110",
+        "disposition": "requirements",
+        "node_ids": [
+          "communication-elective"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-b29f046f9b544dc507c35803",
+        "disposition": "requirements",
+        "node_ids": [
+          "course-80"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-945b813be9ed9012d3fc16ec",
+        "disposition": "requirements",
+        "node_ids": [
+          "course-81"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-e690d5fc5e27deb80abba0b7",
+        "disposition": "requirements",
+        "node_ids": [
+          "course-82"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-1b1d1f25535d0e3710278940",
+        "disposition": "requirements",
+        "node_ids": [
+          "composition-waiver"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-7ee3c36be417fcd18150cec2",
+        "disposition": "requirements",
+        "node_ids": [
+          "science"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-6ed1a57b8426ac367c8adae2",
+        "disposition": "requirements",
+        "node_ids": [
+          "science"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-f219ecbe4046d655892e0f6a",
+        "disposition": "unresolved",
+        "node_ids": [
+          "science",
+          "science-bundles"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-df086bc0bb68b6a4523a5826",
+        "disposition": "requirements",
+        "node_ids": [
+          "course-87"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-bc8129944edb911c90595fd2",
+        "disposition": "requirements",
+        "node_ids": [
+          "course-88"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-1c57c90ed38aba4c00fa4d88",
+        "disposition": "requirements",
+        "node_ids": [
+          "course-89"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-a3dc030a62e5fc860301d36e",
+        "disposition": "requirements",
+        "node_ids": [
+          "course-90"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-86437a2ecc068c5869d9f325",
+        "disposition": "requirements",
+        "node_ids": [
+          "course-91"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-11c88963fbb83a5fdf59356a",
+        "disposition": "requirements",
+        "node_ids": [
+          "course-92"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-7b119444aacfa9d692a5723b",
+        "disposition": "requirements",
+        "node_ids": [
+          "course-93"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-ef21bbc9fdd9a5ddb855b9ed",
+        "disposition": "requirements",
+        "node_ids": [
+          "course-94"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-0ffa92ad437635e6d84962bd",
+        "disposition": "requirements",
+        "node_ids": [
+          "course-95"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-e6379233c06f3ae97653e834",
+        "disposition": "requirements",
+        "node_ids": [
+          "course-96"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-cee886b69993a44b07632528",
+        "disposition": "requirements",
+        "node_ids": [
+          "course-97"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-4303e4bfdfb7f5b50ccfa558",
+        "disposition": "requirements",
+        "node_ids": [
+          "course-98"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-e0215f66c8160fbbc1c0c9bc",
+        "disposition": "requirements",
+        "node_ids": [
+          "course-99"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-cb6a15434ac6ed3fb0db1ce7",
+        "disposition": "requirements",
+        "node_ids": [
+          "course-100"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-c66a33faf12a0ebae3c1d03f",
+        "disposition": "requirements",
+        "node_ids": [
+          "course-101"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-18360e794c1df9c9da15da81",
+        "disposition": "requirements",
+        "node_ids": [
+          "course-102"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-717050ac5b3583ef62db6356",
+        "disposition": "requirements",
+        "node_ids": [
+          "course-103"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-28e181502b8bb924fb48ab64",
+        "disposition": "requirements",
+        "node_ids": [
+          "course-104"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-dbfe7769bb33b82a0fa169c0",
+        "disposition": "requirements",
+        "node_ids": [
+          "course-105"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-d92bc52b73e2d302a5c5ed7c",
+        "disposition": "unresolved",
+        "node_ids": [
+          "science",
+          "science-options",
+          "science-bundles"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-0d170593ceae77962c357519",
+        "disposition": "requirements",
+        "node_ids": [
+          "minor-credits"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-4db1b819eb8f9bbb6c5ac2df",
+        "disposition": "unresolved",
+        "node_ids": [
+          "minor-credits",
+          "minor-total-scope"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-66e8344a55c972249bf7c4ab",
+        "disposition": "unresolved",
+        "node_ids": [
+          "minor-credits",
+          "minor-total-scope"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-fbb165619c7efe237b53feee",
+        "disposition": "requirements",
+        "node_ids": [
+          "additional"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-5b7b0d9b00d7eb6e3744fa33",
+        "disposition": "requirements",
+        "node_ids": [
+          "additional"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-53f133f2a1dd19da89c21fd5",
+        "disposition": "requirements",
+        "node_ids": [
+          "additional"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-bfe24588bc9f2c3bd4bee540",
+        "disposition": "requirements",
+        "node_ids": [
+          "additional",
+          "general-reqs"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-1ddbd9b9aa526b2c7a051760",
+        "disposition": "requirements",
+        "node_ids": [
+          "upper-total"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-42895d6c62b8914f7887643f",
+        "disposition": "requirements",
+        "node_ids": [
+          "degree-total"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-d0827a27972ef98dab1bcc55",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this field."
+      },
+      {
+        "block_id": "b-34e1712f3805d7ad56d6c4ff",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this field."
+      },
+      {
+        "block_id": "b-fb956da2229be48f8ff6d2d6",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this field."
+      },
+      {
+        "block_id": "b-745404064c893cad7d59897c",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this field."
+      },
+      {
+        "block_id": "b-cdc2c52e025f6b4d84b0efc7",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this field."
+      },
+      {
+        "block_id": "b-5114ad9e40143944bd8b069c",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this field."
+      },
+      {
+        "block_id": "b-577121cbd4e599c965018376",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this field."
+      },
+      {
+        "block_id": "b-588c522d49ecc9243e09897f",
+        "disposition": "requirements",
+        "node_ids": [
+          "cs-total"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-f92481a0dbdd368178c57660",
+        "disposition": "requirements",
+        "node_ids": [
+          "degree-total"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-4cf8d70a19c51f4e36e700bb",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this field."
+      },
+      {
+        "block_id": "b-172bcdaff83275fd7b3bad5f",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this field."
+      },
+      {
+        "block_id": "b-ace02140cc2f043f462fd6d3",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this field."
+      },
+      {
+        "block_id": "b-7912e060a6b47407f1e6550f",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "The program does not mandate a concentration; optional concentration requirements are scoped separately."
+      },
+      {
+        "block_id": "b-d5d25e8e5a0b624c7ca0d114",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this field."
+      }
+    ],
+    "questions": []
+  }
+}

@@ -1808,11 +1808,14 @@ nav_panel(
       h1("Data Status & Usage Analytics")
     ),
 
-    # Data Note (shown above tabs)
-    div(
-      class = "text-hint",
-      "Data presented here is MyReports data — not official institutional data — and should not be used for required reporting purposes. ",
-      "CEDAR tables are updated nightly for the current semester and +/- 1-2 terms."
+    # The catalog review page carries its own public-source provenance.
+    conditionalPanel(
+      condition = "input.data_usage_tabs !== 'Catalog Review'",
+      div(
+        class = "text-hint",
+        "Data presented here is MyReports data — not official institutional data — and should not be used for required reporting purposes. ",
+        "CEDAR tables are updated nightly for the current semester and +/- 1-2 terms."
+      )
     ),
 
     br(),
@@ -1935,6 +1938,11 @@ nav_panel(
             )
           )
         )
+      ),
+
+      nav_panel(
+        title = "Catalog Review",
+        catalogReviewUI("catalog_review", CEDAR_DEGREE_CATALOG, CEDAR_DEGREE_ROADMAPS)
       ),
 
       # ── Tab 2: Usage Overview (lazy loaded) ────────────────────────────

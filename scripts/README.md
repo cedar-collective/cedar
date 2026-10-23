@@ -502,3 +502,18 @@ loads editor changes, `test` runs the standard gate in Docker, `logs` follows
 diagnostics, and `down` stops the demo while preserving its volumes. No mrgather,
 institutional data, or production configuration is needed. See
 [Your First Change](../docs/developers/first-hour.md).
+# Catalog interpretation pilot
+
+`normalize-degree-catalog.R prepare --analysis ANALYSIS --programs ID,ID --output
+ data/catalog-normalizations/<institution>` prepares complete-program/concentration
+and separate linked-course source packets. Versioned maintainer drafts live in
+`institution/<id>/catalog_interpretations/<edition>/` and stage automatically in
+Admin > Data & Usage > Catalog Review > Program review. The page compares catalog
+and interpretation, focuses attention on unresolved cases, and records a single
+whole-unit sign-off. Upload controls are commented out for future shared use.
+
+For an explicit validation/staging run, use `stage --root REVIEW_ROOT --drafts
+DIRECTORY --capture-root CAPTURE_ROOT`. The retained `import` command uses the
+same validation boundary for maintenance or future API responses. No API calls
+run now. Review exports are not yet compiled into semester plans.
+See [catalog-normalization.md](../docs/developers/catalog-normalization.md).

@@ -179,6 +179,6 @@ notifications, and a screenshot if it fails.
 `node tests/e2e/degree-explorer.test.mjs --shared-requirements-only` focuses on
 shared-rule integration: CS's source-listed Communication choices and potential
 Gen Ed overlap, Anthropology's four remaining areas, any-level elective examples,
-standard college upper-credit context, and unchanged semester budgets/alignment.
-It saves screenshots for course-card visual review. The full suite calls the
-same scenarios.
+standard college upper-credit context, unchanged semester budgets/alignment,
+and the same source-linked allocation rows in Admin. It saves screenshots for
+course-card and Admin visual review. The full suite calls the same scenarios.
