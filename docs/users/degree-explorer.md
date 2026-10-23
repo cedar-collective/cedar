@@ -28,7 +28,8 @@ identify major, supporting, English and preparation courses. A paired lecture
 and lab share a tile. Light tiles reserve workload for Gen Ed, a minor where
 required, or other requirements.
 
-Early **Gen Ed / lower-level elective** allowances now occupy course-sized slots.
+Early **Gen Ed / lower-level elective** allowances occupy course-sized slots at
+the top of the board, above the aligned math, writing and program sequences.
 Click one to browse typical fall or spring offerings, with course titles, Gen Ed
 areas, credits, seats and first-day enrollments. Choose **First semester** to set
 a fall or spring start; semester labels and suggestions follow that choice.
@@ -193,3 +194,32 @@ the same guards. Student identifiers do not enter the browser payload.
 These groups describe coursework, not Gen Ed eligibility or completion. This
 view does not infer individual transition paths or impose today's degree rules
 on historical students. Neither prototype changes enrollment forecasts.
+
+## See the rules behind the picture
+
+Choose **Rules behind this plan** above the roadmap. Generated from the same course
+lists and graph as the picture, this list shows readable requirements, catalog
+wording and links, and how course placement and credit loads are determined.
+CEDAR planning preferences are labeled separately. No individual approvals are
+needed to read this explanation.
+
+Health examples include Population Health, Medical Laboratory Sciences, Nursing
+(Freshman Direct Entry) and Radiologic Sciences (Nuclear Medicine). These are
+specific route examples; clinical admission, placements and cohort calendars need
+program advising. Unknown courses and conflicting totals remain visible.
+
+## Gen Ed and elective space
+
+A box named **Gen Ed · [area]** earmarks an area still missing from the
+illustrative course selection. **Also Gen Ed** on a course shows overlapping
+coverage without adding its credits twice. Open course choices may also count;
+choosing an approved option can free matching Gen Ed space for electives.
+Flexible-area coverage is provisional pending catalog wording clarification.
+
+Other boxes say **Elective / minor — Any level · Gen Ed not required**. An
+upper-level course can use this space when its prerequisites and restrictions
+allow. The popup includes course level, seasonal offerings and first-day seat
+counts; it does not verify eligibility. The plan summary shows the standard
+college upper-level minimum and remaining credits where configured. These
+credits overlap the degree total. Grades, transfer, approvals and the final
+degree audit still require advising.

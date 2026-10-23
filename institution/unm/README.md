@@ -5,6 +5,10 @@ program belongs to. Edit them here; no code changes are needed. They are validat
 and a malformed file stops the app with every problem listed.
 See `docs/developers/adr-002-explicit-mapping-files.md`.
 
+University, Gen Ed and college references are separate from unit mappings and
+degree-specific rules. Start with [shared_requirements/README.md](shared_requirements/README.md)
+and the generated [2026–2027 rules](shared_requirements/2026-2027/RULES.md).
+
 | File | One row per | Columns |
 |---|---|---|
 | `colleges.csv` | college | `college_code`, `college_name`, `source_names` |

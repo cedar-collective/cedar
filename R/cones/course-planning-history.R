@@ -92,9 +92,9 @@ get_course_planning_history <- function(sections, students, subject_courses, edg
     offerings = offerings, missing_courses = setdiff(subject_courses, selected$subject_course), coverage = coverage)
 }
 
-#' Recent lower-level Gen Ed options for a season, retaining the first-day grain.
+#' Recent options from an explicit course pool, retaining the first-day grain.
 #' History is supplied by the feature; this cone never calls another cone.
-get_gen_ed_planning_options <- function(sections, history, gen_ed, season, slot_credits) {
+get_gen_ed_planning_options <- function(sections, history, gen_ed, season, slot_credits, levels = "lower") {
   if (length(season) != 1L || !season %in% c("fall", "spring")) stop("[course-planning-history.R] Select a fall or spring suggestion season")
   if (length(slot_credits) != 1L || !is.finite(slot_credits) || slot_credits <= 0) stop("[course-planning-history.R] Supply the usual allowance course credits")
   required <- c("campus", "college", "subject_course", "term", "part_term", "crn",
@@ -110,7 +110,8 @@ get_gen_ed_planning_options <- function(sections, history, gen_ed, season, slot_
   metadata <- sections %>% ungroup() %>%
     semi_join(rows, by = keys) %>% filter(status == "A") %>% arrange(term, crn) %>%
     group_by(across(all_of(keys))) %>%
-    summarize(eligible = all(level == "lower" & !is.na(is_topics) & !is_topics & !is_topics_course(course_title)),
+    summarize(eligible = all(level %in% levels & !is.na(is_topics) & !is_topics & !is_topics_course(course_title)),
+      course_level = paste(sort(unique(level)), collapse = "/"),
       course_title = last(course_title),
       credits_min = if (all(is.finite(credits_min))) min(credits_min) else NA_real_,
       credits_max = if (all(is.finite(credits_max))) max(credits_max) else NA_real_,
@@ -131,7 +132,7 @@ get_gen_ed_planning_options <- function(sections, history, gen_ed, season, slot_
     left_join(coverage, by = "campus", relationship = "many-to-one") %>%
     mutate(season_frequency = paste(season_offerings, "of", source_terms)) %>%
     arrange(desc(season_offerings), desc(first_day_enrl), area_label, subject_course, campus, college, part_term) %>%
-    select(area_label, subject_course, course_title, credits_min, credits_max,
+    select(area_label, subject_course, course_title, course_level, credits_min, credits_max,
       campus, college, part_term, term, capacity, first_day_enrl, first_day_fill,
       pressure_status, season_frequency)
 }

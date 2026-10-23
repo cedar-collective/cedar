@@ -175,3 +175,10 @@ set `CEDAR_URL` to the demo instance. See the developer Testing guide for the
 complete build/start/test commands. The real-data Gen Ed graduate suite uses
 the shared Shiny-idle and visible-subtab helpers, and captures selected scope,
 notifications, and a screenshot if it fails.
+
+`node tests/e2e/degree-explorer.test.mjs --shared-requirements-only` focuses on
+shared-rule integration: CS's source-listed Communication choices and potential
+Gen Ed overlap, Anthropology's four remaining areas, any-level elective examples,
+standard college upper-credit context, and unchanged semester budgets/alignment.
+It saves screenshots for course-card visual review. The full suite calls the
+same scenarios.

@@ -56,6 +56,7 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
   source_file("trunk/utils.R")
   source_file("trunk/history-stats.R")
   source_file("trunk/cache.R")
+  source_file("trunk/source-snapshots.R")
   source_file("trunk/changelog.R")
   source_file("trunk/data.R")
   source_file("trunk/datatable_helpers.R")
@@ -94,6 +95,7 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
   source_file("branches/comparison.R")         # treatment/control group builder for observational analyses
   source_file("branches/pathways.R")           # pure helpers for Pathways module analysis scoping
   source_file("branches/degree-requirements.R")
+  source_file("branches/shared-requirements.R")
   source_file("lists/data_semantics.R")       # what CEDAR knows that the data does not say
   source_file("lists/population-presets.R")    # defines CEDAR_POPULATION_GROUPS, shared by Pathways and projections
 
@@ -139,6 +141,7 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
   source_file("features/enrollment-projections.R")
   source_file("features/enrollment-projection-scenario.R")
   source_file("features/degree-explorer.R")
+  source_file("features/shared-requirements.R")
 
   # 6. Shiny modules (depend on branches + cones)
   if (modules) {

@@ -92,6 +92,8 @@ build_degree_roadmap <- function(catalog, roadmaps, catalog_id, math_start, engl
   entry <- resolve_degree_entry_routes(roadmaps, catalog_id, starts)
   nodes <- prepare_degree_roadmap_nodes(roadmaps$nodes, catalog_id, unlist(entry$routes),
                                         as.integer(policy$upper_level_from_semester))
+  nodes$component_count <- vapply(seq_len(nrow(nodes)), function(i) as.integer(max(1L,
+    sum(roadmaps$courses$catalog_id == nodes$catalog_id[i] & roadmaps$courses$node_id == nodes$node_id[i]))), integer(1))
   # Shared entry courses omitted by placement are already satisfied for this scenario.
   links <- roadmaps$links[roadmaps$links$catalog_id %in% c("*", catalog_id), ]
   links <- links[links$from %in% nodes$node_id & links$to %in% nodes$node_id, ]
@@ -104,6 +106,9 @@ build_degree_roadmap <- function(catalog, roadmaps, catalog_id, math_start, engl
   nodes <- assign_degree_roadmap_rows(nodes)
   nodes <- nodes[order(nodes$semester, match(nodes$track, c("math", "english", "main")), nodes$base_semester), ]
   terms <- allocate_degree_semester_credits(nodes, schedule$loads, policy, entry$completed_credits)
+  allowances <- build_degree_allowance_slots(terms, as.numeric(policy$allowance_slot_credits))
+  # Keep every course family aligned below the same foundational Gen Ed band.
+  nodes$row <- nodes$row + max(c(0L, allowances$row))
 
   metrics <- get_degree_chain_metrics(nodes, links, conditions)
   nodes <- cbind(nodes, metrics[match(nodes$node_id, metrics$node_id), setdiff(names(metrics), "node_id")])
@@ -112,7 +117,8 @@ build_degree_roadmap <- function(catalog, roadmaps, catalog_id, math_start, engl
               nrow(terms), " semesters (math ", math_start, ", English ", english_start, ").")
 
   list(catalog = catalog$catalogs[match(catalog_id, catalog$catalogs$catalog_id), ],
-    nodes = nodes, links = links, conditions = conditions, terms = terms, starts = starts, policy = policy,
+    nodes = nodes, allowances = allowances, links = links, conditions = conditions,
+    terms = terms, starts = starts, policy = policy,
     degree_credits = as.numeric(policy$degree_credit_target),
     preparation_credits = sum(nodes$credits[nodes$kind == "preparation"]),
     completed_credits = entry$completed_credits,
@@ -285,19 +291,10 @@ assign_degree_roadmap_rows <- function(nodes) {
 
 #' Break early planning allowances into course-sized slots without adding credit
 #'
-#' Keep family gaps and the reserved math/writing rows intact. Suggestions have
-#' no prerequisite edges and never become catalog requirement nodes.
-build_degree_allowance_slots <- function(nodes, terms, slot_credits) {
+#' Fill a shared band at the top of the board. Suggestions have no prerequisite
+#' edges and never become catalog requirement nodes.
+build_degree_allowance_slots <- function(terms, slot_credits) {
   slots <- data.frame(node_id = character(), semester = integer(), credits = numeric(), row = integer())
-  row_spans <- vector("list", max(nodes$row))
-  family_key <- paste(nodes$row, nodes$row_group)
-  for (key in unique(family_key)) {
-    family <- nodes[family_key == key, ]
-    row <- family$row[1]
-    span <- if (family$row_group[1] %in% c("math", "writing")) terms$semester
-            else seq.int(min(family$semester), max(family$semester))
-    row_spans[[row]] <- unique(c(row_spans[[row]], span))
-  }
   for (i in which(terms$other_phase == "foundation" & terms$other_credits > 0)) {
     semester <- terms$semester[i]
     unallocated <- terms$other_credits[i]
@@ -306,12 +303,8 @@ build_degree_allowance_slots <- function(nodes, terms, slot_credits) {
       # Permit a one-credit extension of a usual slot (e.g. 3 + 4), while
       # leaving small remainders explicit rather than rounding the budget up.
       amount <- if (unallocated <= slot_credits + 1) unallocated else slot_credits
-      row <- 1L
-      while (row <= length(row_spans) && semester %in% row_spans[[row]]) row <- row + 1L
-      if (row > length(row_spans)) row_spans[[row]] <- integer()
-      row_spans[[row]] <- c(row_spans[[row]], semester)
       index <- index + 1L
-      slots[nrow(slots) + 1L, ] <- list(paste0("allowance-", semester, "-", index), semester, amount, row)
+      slots[nrow(slots) + 1L, ] <- list(paste0("allowance-", semester, "-", index), semester, amount, index)
       unallocated <- unallocated - amount
     }
   }
@@ -360,7 +353,7 @@ get_degree_chain_metrics <- function(nodes, links, conditions = NULL) {
   }
 
   # A lecture/lab pair occupies one graph node but represents two actual courses.
-  weights <- stats::setNames(ifelse(nodes$bundle, 2L, 1L), ids)
+  weights <- stats::setNames(if ("component_count" %in% names(nodes)) as.integer(nodes$component_count) else ifelse(nodes$bundle, 2L, 1L), ids)
   n_prerequisites <- unname(vapply(ancestors, function(chain) sum(weights[chain]), integer(1)))
   n_direct <- vapply(ids, function(id) sum(weights[links$from[links$to == id]]), integer(1), USE.NAMES = FALSE)
   n_downstream <- unname(vapply(descendants, function(chain) sum(weights[chain]), integer(1)))

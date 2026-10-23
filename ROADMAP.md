@@ -319,6 +319,21 @@ Plan: [ADR-002](docs/developers/adr-002-explicit-mapping-files.md).
   The first-semester season is selectable and shareable.
 - [ ] Add reviewed major-specific guidance for elective suggestions, separate
   from mandatory catalog rules; consider institution Markdown guidance files.
+- [x] Add Nursing (Freshman Direct Entry), Population Health, Medical Laboratory
+  Sciences and Radiologic Sciences (Nuclear Medicine) prototypes, preserving
+  source gaps/conflicts, required clinical blocks and the semester credit cap.
+- [x] Record annual University, Gen Ed and awarding-college reference rules
+  separately from degree-specific files, with one format, readable rulebook,
+  explicit program profiles, source hashes/locators and unresolved cases.
+- [x] Use annual shared rules for illustrative Gen Ed coverage, named area gaps,
+  overlap badges and standard upper-credit context. Elective/minor slots remain
+  any-level space; no additional credit is charged for overlapping requirements.
+  Flexible coverage is provisional while the policy-numbering conflict remains.
+- [ ] Extend illustrative allocation into an advising-reviewed transcript audit:
+  conditional alternatives, transfer, grades, minor/residence/college constraints,
+  selectable choices and confirmed flexible-area interpretation. Nursing can
+  expose Gen Ed needs that do not fit whole existing allowance slots; redistribute
+  the cohort template without silently adding credits or certifying completion.
 - [ ] Add selectable elective/science routes, all course restrictions, admission
   milestones, offering constraints and transfer-credit scenarios.
 - [ ] Review complete programs with different entry rules, elective structures

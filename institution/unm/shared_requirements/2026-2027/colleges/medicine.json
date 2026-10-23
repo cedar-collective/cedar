@@ -1,0 +1,22 @@
+{
+  "schema_version": "1.0.0",
+  "rule_set_id": "unm-medicine",
+  "catalog_year": "2026-2027",
+  "catalog_id": "68a34618094c97cf857f1ec1",
+  "title": "School of Medicine shared-rule coverage",
+  "scope": {
+    "level": "college",
+    "credential": "bachelors",
+    "college_code": "ME"
+  },
+  "coverage": "not_located_on_checked_overview",
+  "notes": [
+    "The overview covers MD, graduate and Health Professions programs. It does not state common bachelor graduation requirements for MLS or Radiologic Sciences. MD/graduate requirements must not be applied to those bachelor programs.",
+    "An empty shared-rule list records this source coverage only; it does not establish that no additional requirements exist."
+  ],
+  "rules": [],
+  "attention": [],
+  "checked_source_ids": [
+    "medicine"
+  ]
+}

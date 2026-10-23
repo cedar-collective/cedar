@@ -1,0 +1,230 @@
+{
+  "schema_version": "1.0.0",
+  "rule_set_id": "unm-business",
+  "catalog_year": "2026-2027",
+  "catalog_id": "68a34618094c97cf857f1ec1",
+  "title": "Business school bachelor policies",
+  "scope": {
+    "level": "college",
+    "credential": "bachelors",
+    "college_code": "MG"
+  },
+  "coverage": "selected_sections",
+  "notes": [
+    "The current catalog names the James and Gail Ellis School of Business Leadership, formerly Anderson. Keep the institutional college code; this does not rename Banner mappings.",
+    "Only common policies and BBA major-status conditions are transcribed here. Course-by-course BBA curriculum remains in the degree-specific files. The college page and existing program snapshot have differences that need comparison."
+  ],
+  "rules": [
+    {
+      "rule_id": "unm-business.entry_credits",
+      "label": "Major-status Phase I credits",
+      "statement": "Complete the 21-credit BBA Phase I admission block, with transfer work permitted where accepted.",
+      "phase": "admission",
+      "operator": "credits",
+      "role": "overlapping_subset",
+      "applies_when": "All students in this rule set scope.",
+      "review_status": "transcribed",
+      "source_refs": [
+        {
+          "source_id": "business",
+          "pointer": "/body",
+          "anchor": "21 credit"
+        }
+      ],
+      "minimum": 21,
+      "unit": "credit_hours"
+    },
+    {
+      "rule_id": "unm-business.entry_gpa",
+      "label": "Phase I GPA",
+      "statement": "The major-status section requires a 2.5 Phase I GPA and C or better in each Phase I course. The graduation section contains a conflicting GPA value; see the case below.",
+      "phase": "admission",
+      "operator": "condition",
+      "role": "condition",
+      "applies_when": "All students in this rule set scope.",
+      "review_status": "transcribed",
+      "source_refs": [
+        {
+          "source_id": "business",
+          "pointer": "/body",
+          "anchor": "2.5"
+        }
+      ],
+      "min_grade": "C",
+      "review_case": "phase-i-gpa",
+      "minimum": 2.5,
+      "unit": "gpa"
+    },
+    {
+      "rule_id": "unm-business.entry_institutional_gpa",
+      "label": "UNM GPA at admission",
+      "statement": "Continuing students need a 2.0 cumulative UNM GPA; the source gives transfer students a first-semester opportunity to establish 2.5. Preserve the distinct statements.",
+      "phase": "admission",
+      "operator": "condition",
+      "role": "condition",
+      "applies_when": "All students in this rule set scope.",
+      "review_status": "transcribed",
+      "source_refs": [
+        {
+          "source_id": "business",
+          "pointer": "/body",
+          "anchor": "Continuing UNM"
+        }
+      ]
+    },
+    {
+      "rule_id": "unm-business.entry_transition",
+      "label": "BBA major transition",
+      "statement": "The school describes automatic pre-BBA to BBA transition after its Phase I requirements are met. Completion and recorded admission remain separate states for a student evaluator.",
+      "phase": "admission",
+      "operator": "condition",
+      "role": "milestone",
+      "applies_when": "All students in this rule set scope.",
+      "review_status": "transcribed",
+      "source_refs": [
+        {
+          "source_id": "business",
+          "pointer": "/body",
+          "anchor": "automatically admit"
+        }
+      ]
+    },
+    {
+      "rule_id": "unm-business.school_residence",
+      "label": "School residence",
+      "statement": "Complete at least 24 credits in residence at the business school, alongside University residence requirements.",
+      "phase": "degree",
+      "operator": "credits",
+      "role": "overlapping_subset",
+      "applies_when": "All students in this rule set scope.",
+      "review_status": "transcribed",
+      "source_refs": [
+        {
+          "source_id": "business",
+          "pointer": "/body",
+          "anchor": "24 credit"
+        }
+      ],
+      "minimum": 24,
+      "unit": "credit_hours"
+    },
+    {
+      "rule_id": "unm-business.crnc",
+      "label": "Business CR/NC restrictions",
+      "statement": "Do not apply CR/NC coursework to General Education, prerequisites, upper-division humanities, the school core or a concentration under this school policy.",
+      "phase": "degree",
+      "operator": "condition",
+      "role": "allocation",
+      "applies_when": "All students in this rule set scope.",
+      "review_status": "transcribed",
+      "source_refs": [
+        {
+          "source_id": "business",
+          "pointer": "/body",
+          "anchor": "Credit/No Credit"
+        }
+      ]
+    },
+    {
+      "rule_id": "unm-business.core_grades",
+      "label": "Core/concentration grades",
+      "statement": "The school page specifies C-minus or better for school core and concentration courses; Phase I, other prerequisites and Gen Ed have C thresholds. Preserve program-specific stricter rules or conflicts.",
+      "phase": "degree",
+      "operator": "condition",
+      "role": "condition",
+      "applies_when": "All students in this rule set scope.",
+      "review_status": "transcribed",
+      "source_refs": [
+        {
+          "source_id": "business",
+          "pointer": "/body",
+          "anchor": "C-"
+        }
+      ],
+      "min_grade": "C-"
+    },
+    {
+      "rule_id": "unm-business.pe",
+      "label": "Physical education cap",
+      "statement": "Count no more than one physical-education credit toward the BBA.",
+      "phase": "degree",
+      "operator": "credits",
+      "role": "overlapping_subset",
+      "applies_when": "All students in this rule set scope.",
+      "review_status": "transcribed",
+      "source_refs": [
+        {
+          "source_id": "business",
+          "pointer": "/body",
+          "anchor": "Only 1 credit"
+        }
+      ],
+      "maximum": 1,
+      "unit": "credit_hours"
+    },
+    {
+      "rule_id": "unm-business.total",
+      "label": "Degree total and GPA",
+      "statement": "Complete 120 degree credits with a cumulative GPA of at least 2.0; the 120-credit total restates the University floor.",
+      "phase": "degree",
+      "operator": "credits",
+      "role": "restatement",
+      "applies_when": "All students in this rule set scope.",
+      "review_status": "transcribed",
+      "source_refs": [
+        {
+          "source_id": "business",
+          "pointer": "/body",
+          "anchor": "120 credits"
+        }
+      ],
+      "minimum_gpa": 2,
+      "minimum": 120,
+      "unit": "credit_hours"
+    },
+    {
+      "rule_id": "unm-business.gen_ed",
+      "label": "Gen Ed",
+      "statement": "Complete University Gen Ed with the school’s course and grade restrictions. The college page’s remaining-credit subtotal is not a universal extra block.",
+      "phase": "degree",
+      "operator": "condition",
+      "role": "reference",
+      "applies_when": "All students in this rule set scope.",
+      "review_status": "transcribed",
+      "source_refs": [
+        {
+          "source_id": "business",
+          "pointer": "/body",
+          "anchor": "31 credit"
+        }
+      ],
+      "rule_set_ref": "unm-general-education"
+    },
+    {
+      "rule_id": "unm-business.graduation_application",
+      "label": "Graduation application",
+      "statement": "Apply during the semester before expected graduation under school deadlines.",
+      "phase": "degree",
+      "operator": "condition",
+      "role": "milestone",
+      "applies_when": "All students in this rule set scope.",
+      "review_status": "transcribed",
+      "source_refs": [
+        {
+          "source_id": "business",
+          "pointer": "/body",
+          "anchor": "semester prior"
+        }
+      ]
+    }
+  ],
+  "attention": [
+    {
+      "case_id": "phase-i-gpa",
+      "statement": "The major-status section specifies 2.5; the graduation list literally specifies a Phase I GPA of 5. Do not treat 5 as an executable threshold or silently repair it. The same page repeats MATH 1350 across blocks; curriculum/credit allocation needs a separate program comparison.",
+      "rule_ids": [
+        "unm-business.entry_gpa"
+      ]
+    }
+  ]
+}

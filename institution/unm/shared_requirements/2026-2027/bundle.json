@@ -1,0 +1,142 @@
+{
+  "schema_version": "1.0.0",
+  "catalog_year": "2026-2027",
+  "catalog_id": "68a34618094c97cf857f1ec1",
+  "rule_files": [
+    "university.json",
+    "general-education.json",
+    "colleges/arts-sciences.json",
+    "colleges/engineering.json",
+    "colleges/business.json",
+    "colleges/nursing.json",
+    "colleges/population-health.json",
+    "colleges/medicine.json"
+  ],
+  "profiles": [
+    {
+      "catalog_id": "biology-bs-2026",
+      "college_code": "AS",
+      "rule_set_ids": [
+        "unm-university",
+        "unm-general-education",
+        "unm-arts-sciences"
+      ],
+      "status": "illustrative_planning"
+    },
+    {
+      "catalog_id": "history-ba-2026",
+      "college_code": "AS",
+      "rule_set_ids": [
+        "unm-university",
+        "unm-general-education",
+        "unm-arts-sciences"
+      ],
+      "status": "illustrative_planning"
+    },
+    {
+      "catalog_id": "philosophy-ba-2026",
+      "college_code": "AS",
+      "rule_set_ids": [
+        "unm-university",
+        "unm-general-education",
+        "unm-arts-sciences"
+      ],
+      "status": "illustrative_planning"
+    },
+    {
+      "catalog_id": "anthropology-ba-2026",
+      "college_code": "AS",
+      "rule_set_ids": [
+        "unm-university",
+        "unm-general-education",
+        "unm-arts-sciences"
+      ],
+      "status": "illustrative_planning"
+    },
+    {
+      "catalog_id": "physics-bs-2026",
+      "college_code": "AS",
+      "rule_set_ids": [
+        "unm-university",
+        "unm-general-education",
+        "unm-arts-sciences"
+      ],
+      "status": "illustrative_planning"
+    },
+    {
+      "catalog_id": "cs-bs-2026",
+      "college_code": "EN",
+      "rule_set_ids": [
+        "unm-university",
+        "unm-general-education",
+        "unm-engineering"
+      ],
+      "status": "illustrative_planning"
+    },
+    {
+      "catalog_id": "business-bba-2026",
+      "college_code": "MG",
+      "rule_set_ids": [
+        "unm-university",
+        "unm-general-education",
+        "unm-business"
+      ],
+      "status": "illustrative_planning"
+    },
+    {
+      "catalog_id": "nursing-bsn-2026",
+      "college_code": "NU",
+      "rule_set_ids": [
+        "unm-university",
+        "unm-general-education",
+        "unm-nursing"
+      ],
+      "status": "illustrative_planning"
+    },
+    {
+      "catalog_id": "population-health-bs-2026",
+      "college_code": "PO",
+      "rule_set_ids": [
+        "unm-university",
+        "unm-general-education",
+        "unm-population-health"
+      ],
+      "status": "illustrative_planning"
+    },
+    {
+      "catalog_id": "medical-laboratory-bs-2026",
+      "college_code": "ME",
+      "rule_set_ids": [
+        "unm-university",
+        "unm-general-education",
+        "unm-medicine"
+      ],
+      "status": "illustrative_planning"
+    },
+    {
+      "catalog_id": "radiologic-nuclear-bs-2026",
+      "college_code": "ME",
+      "rule_set_ids": [
+        "unm-university",
+        "unm-general-education",
+        "unm-medicine"
+      ],
+      "status": "illustrative_planning"
+    }
+  ],
+  "composition_policy": [
+    "Combine the University, Gen Ed, awarding-college and degree-specific rule sets. Preserve each source and scope.",
+    "A degree total is a minimum; applicable higher degree-specific totals still apply. Gen Ed/college/upper-division/residency constraints are overlapping subsets, not credits to add to that total.",
+    "Satisfy all applicable policies; a stricter scope refines a general allowance. Do not silently overwrite conflicts or assume that one rule replaces another without evidence.",
+    "A course may satisfy approved requirements in more than one layer, but earned credits count once. Flexible credits are additional Gen Ed coursework; do not fill them by reusing credits already allocated to a base area. Any other cross-area overlap requires explicit policy evidence.",
+    "Apply only source-supported alternatives and waivers. Placement is not earned credit. Admission milestones, grades, approvals and transfer exemptions need evidence.",
+    "Unallocated degree-credit capacity must not be labeled as an identified Gen Ed requirement. Scheduling preferences (15 usual / 16 maximum; early Gen Ed) remain separate from catalog requirements."
+  ],
+  "runtime_status": "Illustrative planned Gen Ed coverage and standard upper-division credit context. Not a student degree audit; approvals, transfer, grades and conditional alternatives are not evaluated.",
+  "producer": {
+    "method": "assistant_authored_catalog_transcription",
+    "authored_on": "2026-10-20",
+    "academic_review_status": "not_reviewed",
+    "note": "Human-readable paraphrases and typed reference fields were authored from captured public catalog documents. Source acquisition and integrity checks are deterministic; normalization is not a phrase-parser result."
+  }
+}

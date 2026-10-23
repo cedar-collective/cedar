@@ -27,3 +27,19 @@ physics-bs-2026,calculus,Ready for Calculus I,calc1
 physics-bs-2026,precalculus,Start with Trig / Pre-Calculus (MATH 1250),math1250|calc1
 physics-bs-2026,algebra,Start with College Algebra (MATH 1220),math1220|math1250|calc1
 physics-bs-2026,intermediate,Start with Intermediate Algebra (MATH 1215),math1215|math1220|math1250|calc1
+population-health-bs-2026,calculus,Ready for MATH 1350,math1350
+population-health-bs-2026,precalculus,Ready for MATH 1350,math1350
+population-health-bs-2026,algebra,Ready for MATH 1350,math1350
+population-health-bs-2026,intermediate,Start with Intermediate Algebra (MATH 1215),math1215|math1350
+medical-laboratory-bs-2026,calculus,Ready for MATH 1220,math1220
+medical-laboratory-bs-2026,precalculus,Ready for MATH 1220,math1220
+medical-laboratory-bs-2026,algebra,Ready for MATH 1220,math1220
+medical-laboratory-bs-2026,intermediate,Start with Intermediate Algebra (MATH 1215),math1215|math1220
+nursing-bsn-2026,calculus,Ready for MATH 1350,math1350
+nursing-bsn-2026,precalculus,Ready for MATH 1350,math1350
+nursing-bsn-2026,algebra,Ready for MATH 1350,math1350
+nursing-bsn-2026,intermediate,Start with the three-part intermediate algebra sequence,nursalgebra|math1350
+radiologic-nuclear-bs-2026,calculus,Ready for MATH 1240,math1240
+radiologic-nuclear-bs-2026,precalculus,Ready for MATH 1240,math1240
+radiologic-nuclear-bs-2026,algebra,Start with College Algebra (MATH 1220),math1220|math1240
+radiologic-nuclear-bs-2026,intermediate,Start with Intermediate Algebra (MATH 1215),math1215|math1220|math1240

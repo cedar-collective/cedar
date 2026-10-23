@@ -1,0 +1,393 @@
+{
+  "schema_version": "1.0.0",
+  "rule_set_id": "unm-general-education",
+  "catalog_year": "2026-2027",
+  "catalog_id": "68a34618094c97cf857f1ec1",
+  "title": "General Education: 31 credits",
+  "scope": {
+    "level": "university",
+    "credential": "bachelors",
+    "college_code": ""
+  },
+  "coverage": "requirements_and_enumerated_course_memberships",
+  "notes": [
+    "Area minima are portions of the 31-credit Gen Ed requirement, which itself is part of the degree total. Do not add parent and child minima together.",
+    "gen-ed-course-memberships.csv preserves explicitly listed membership only. Language and approved advanced studio alternatives are open pools. Science membership does not establish a valid lecture/lab pairing.",
+    "This is a source-derived rule set, not a remaining-requirement or transcript evaluator."
+  ],
+  "rules": [
+    {
+      "rule_id": "unm-general-education.total",
+      "label": "Gen Ed total",
+      "statement": "Complete at least 31 credits under the applicable Gen Ed rules.",
+      "phase": "degree",
+      "operator": "credits",
+      "role": "subset_total",
+      "applies_when": "All students in this rule set scope.",
+      "review_status": "transcribed",
+      "source_refs": [
+        {
+          "source_id": "gen_ed_program",
+          "pointer": "/degreeRequirements",
+          "anchor": "31"
+        }
+      ],
+      "minimum": 31,
+      "unit": "credit_hours"
+    },
+    {
+      "rule_id": "unm-general-education.area_i",
+      "label": "Area I: Communication",
+      "statement": "Complete ENGL 1120 and one approved additional Communication course; six credits total.",
+      "phase": "degree",
+      "operator": "credits",
+      "role": "gen_ed_area",
+      "applies_when": "All students in this rule set scope.",
+      "review_status": "transcribed",
+      "source_refs": [
+        {
+          "source_id": "gen_ed_program",
+          "pointer": "/degreeRequirements",
+          "anchor": "Area I:"
+        }
+      ],
+      "area": "I",
+      "minimum": 6,
+      "unit": "credit_hours",
+      "planning_parts": [
+        {
+          "label": "Writing",
+          "minimum": 3,
+          "subject_courses": [
+            "ENGL 1120"
+          ]
+        },
+        {
+          "label": "Communication",
+          "minimum": 3,
+          "subject_courses": [
+            "COMM 1130",
+            "COMM 2121",
+            "COMP 2225",
+            "ENGL 2120",
+            "ENGL 2210",
+            "GEOG 2115",
+            "HNRS 2112",
+            "IADL 1110",
+            "PHIL 1120",
+            "SPAN 2130"
+          ]
+        }
+      ]
+    },
+    {
+      "rule_id": "unm-general-education.area_ii",
+      "label": "Area II: Mathematics and Statistics",
+      "statement": "Complete at least three approved math/statistics credits.",
+      "phase": "degree",
+      "operator": "credits",
+      "role": "gen_ed_area",
+      "applies_when": "All students in this rule set scope.",
+      "review_status": "transcribed",
+      "source_refs": [
+        {
+          "source_id": "gen_ed_program",
+          "pointer": "/degreeRequirements",
+          "anchor": "Area II:"
+        }
+      ],
+      "area": "II",
+      "minimum": 3,
+      "unit": "credit_hours",
+      "planning_method": "listed_course"
+    },
+    {
+      "rule_id": "unm-general-education.area_iii",
+      "label": "Area III: Physical and Natural Sciences",
+      "statement": "Complete an approved science course with its related laboratory where applicable; at least four credits. A flat list of eligible labs does not permit arbitrary combinations.",
+      "phase": "degree",
+      "operator": "credits",
+      "role": "gen_ed_area",
+      "applies_when": "All students in this rule set scope.",
+      "review_status": "transcribed",
+      "source_refs": [
+        {
+          "source_id": "gen_ed_program",
+          "pointer": "/degreeRequirements",
+          "anchor": "Area III:"
+        }
+      ],
+      "area": "III",
+      "minimum": 4,
+      "unit": "credit_hours",
+      "planning_method": "related_science"
+    },
+    {
+      "rule_id": "unm-general-education.area_iv",
+      "label": "Area IV: Social and Behavioral Sciences",
+      "statement": "Complete an approved Social and Behavioral Sciences course; at least three credits.",
+      "phase": "degree",
+      "operator": "credits",
+      "role": "gen_ed_area",
+      "applies_when": "All students in this rule set scope.",
+      "review_status": "transcribed",
+      "source_refs": [
+        {
+          "source_id": "gen_ed_program",
+          "pointer": "/degreeRequirements",
+          "anchor": "Area IV:"
+        }
+      ],
+      "area": "IV",
+      "minimum": 3,
+      "unit": "credit_hours",
+      "planning_method": "listed_course"
+    },
+    {
+      "rule_id": "unm-general-education.area_va",
+      "label": "Area VA: Humanities",
+      "statement": "Complete an approved Humanities course; at least three credits.",
+      "phase": "degree",
+      "operator": "credits",
+      "role": "gen_ed_area",
+      "applies_when": "All students in this rule set scope.",
+      "review_status": "transcribed",
+      "source_refs": [
+        {
+          "source_id": "gen_ed_program",
+          "pointer": "/degreeRequirements",
+          "anchor": "Area VA:"
+        }
+      ],
+      "area": "VA",
+      "minimum": 3,
+      "unit": "credit_hours",
+      "planning_method": "listed_course"
+    },
+    {
+      "rule_id": "unm-general-education.area_vb",
+      "label": "Area VB: Second Language",
+      "statement": "Complete at least three eligible second-language credits, following departmental placement. Qualified students can use an approved 300-level-or-higher course taught in the language after placement/faculty evaluation.",
+      "phase": "degree",
+      "operator": "credits",
+      "role": "gen_ed_area",
+      "applies_when": "All students in this rule set scope.",
+      "review_status": "transcribed",
+      "source_refs": [
+        {
+          "source_id": "gen_ed_program",
+          "pointer": "/degreeRequirements",
+          "anchor": "Area VB:"
+        }
+      ],
+      "area": "VB",
+      "minimum": 3,
+      "unit": "credit_hours",
+      "planning_method": "listed_course"
+    },
+    {
+      "rule_id": "unm-general-education.area_vi",
+      "label": "Area VI: Arts and Design",
+      "statement": "Complete an approved Arts and Design course; at least three credits. An approved advanced studio course can substitute following formal faculty skill evaluation.",
+      "phase": "degree",
+      "operator": "credits",
+      "role": "gen_ed_area",
+      "applies_when": "All students in this rule set scope.",
+      "review_status": "transcribed",
+      "source_refs": [
+        {
+          "source_id": "gen_ed_program",
+          "pointer": "/degreeRequirements",
+          "anchor": "Area VI:"
+        }
+      ],
+      "area": "VI",
+      "minimum": 3,
+      "unit": "credit_hours",
+      "planning_method": "listed_course"
+    },
+    {
+      "rule_id": "unm-general-education.area_vii",
+      "label": "Area VII: Flexible Student Choice",
+      "statement": "Complete six additional Gen Ed credits across two different areas. The structured program specifies Areas I–VI; see the conflicting policy numbering case below.",
+      "phase": "degree",
+      "operator": "credits",
+      "role": "gen_ed_area",
+      "applies_when": "All students in this rule set scope.",
+      "review_status": "transcribed",
+      "source_refs": [
+        {
+          "source_id": "gen_ed_program",
+          "pointer": "/degreeRequirements",
+          "anchor": "Area VII:"
+        }
+      ],
+      "area": "VII",
+      "minimum": 6,
+      "unit": "credit_hours",
+      "planning_method": "distinct_areas",
+      "planning_course_count": 2
+    },
+    {
+      "rule_id": "unm-general-education.communication_options",
+      "label": "Additional Communication course",
+      "statement": "The additional Area I course is one of COMM 1130, COMM 2121, COMP 2225, ENGL 2120, ENGL 2210, GEOG 2115, HNRS 2112, IADL 1110, PHIL 1120 or SPAN 2130. ENGL 1120 is the other required component.",
+      "phase": "degree",
+      "operator": "condition",
+      "role": "course_pool",
+      "applies_when": "All students in this rule set scope.",
+      "review_status": "transcribed",
+      "source_refs": [
+        {
+          "source_id": "gen_ed_program",
+          "pointer": "/degreeRequirements",
+          "anchor": "COMM1130"
+        }
+      ]
+    },
+    {
+      "rule_id": "unm-general-education.flex_composition",
+      "label": "Composition I toward flexible credits",
+      "statement": "When ENGL 1110 preparation is needed before ENGL 1120, up to three flexible credits may come from ENGL 1110, ENGL 1110Y or ENGL 1110Z. The source does not list ENGL 1110X here; do not infer its equivalence.",
+      "phase": "degree",
+      "operator": "condition",
+      "role": "allocation",
+      "applies_when": "All students in this rule set scope.",
+      "review_status": "transcribed",
+      "source_refs": [
+        {
+          "source_id": "gen_ed_program",
+          "pointer": "/degreeRequirements",
+          "anchor": "English 1110"
+        }
+      ],
+      "subject_courses": [
+        "ENGL 1110",
+        "ENGL 1110Y",
+        "ENGL 1110Z"
+      ]
+    },
+    {
+      "rule_id": "unm-general-education.grades",
+      "label": "Gen Ed grade",
+      "statement": "Require C or better for letter-graded Gen Ed work. CR/NC use is subject to University, college and department rules.",
+      "phase": "degree",
+      "operator": "condition",
+      "role": "condition",
+      "applies_when": "All students in this rule set scope.",
+      "review_status": "transcribed",
+      "source_refs": [
+        {
+          "source_id": "general_education",
+          "pointer": "/body",
+          "anchor": "CR/NC"
+        }
+      ],
+      "min_grade": "C"
+    },
+    {
+      "rule_id": "unm-general-education.overlap",
+      "label": "Overlap with major",
+      "statement": "A listed major course may also satisfy its eligible Gen Ed area. Allocate only approved overlaps and count earned degree credits once.",
+      "phase": "degree",
+      "operator": "condition",
+      "role": "allocation",
+      "applies_when": "All students in this rule set scope.",
+      "review_status": "transcribed",
+      "source_refs": [
+        {
+          "source_id": "general_education",
+          "pointer": "/body",
+          "anchor": "Only some general education"
+        }
+      ]
+    },
+    {
+      "rule_id": "unm-general-education.restrictions",
+      "label": "Program-specific restrictions",
+      "statement": "College and department requirements may restrict which otherwise-approved Gen Ed courses a student can use.",
+      "phase": "degree",
+      "operator": "condition",
+      "role": "allocation",
+      "applies_when": "All students in this rule set scope.",
+      "review_status": "transcribed",
+      "source_refs": [
+        {
+          "source_id": "general_education",
+          "pointer": "/body",
+          "anchor": "Departments and colleges"
+        }
+      ]
+    },
+    {
+      "rule_id": "unm-general-education.transfer",
+      "label": "Completed New Mexico Gen Ed transfer",
+      "statement": "Verified completion of another New Mexico institution’s Gen Ed program normally satisfies UNM Gen Ed unless the student opts into UNM Gen Ed. The University writing and cultures requirements still apply. Incomplete transferred Gen Ed follows UNM requirements and advising.",
+      "phase": "degree",
+      "operator": "condition",
+      "role": "condition",
+      "applies_when": "A transfer student presents verified completion of a New Mexico Gen Ed program.",
+      "review_status": "transcribed",
+      "source_refs": [
+        {
+          "source_id": "general_education",
+          "pointer": "/body",
+          "anchor": "Transfer students"
+        }
+      ]
+    },
+    {
+      "rule_id": "unm-general-education.exam_credit",
+      "label": "Exam and substitution credit",
+      "statement": "AP, IB and CLEP may apply subject to the Admissions alternative-credit rules. Department/college substitutions and exceptions require approval; this bundle does not award such credit automatically.",
+      "phase": "degree",
+      "operator": "condition",
+      "role": "allocation",
+      "applies_when": "All students in this rule set scope.",
+      "review_status": "transcribed",
+      "source_refs": [
+        {
+          "source_id": "general_education",
+          "pointer": "/body",
+          "anchor": "AP, IB, or CLEP"
+        }
+      ]
+    },
+    {
+      "rule_id": "unm-general-education.early_math_writing",
+      "label": "Early math and communication",
+      "statement": "Completing Communication and Mathematics/Statistics in the first year is catalog guidance, not a fixed semester prerequisite or additional credit requirement.",
+      "phase": "policy",
+      "operator": "condition",
+      "role": "guidance",
+      "applies_when": "All students in this rule set scope.",
+      "review_status": "transcribed",
+      "source_refs": [
+        {
+          "source_id": "general_education",
+          "pointer": "/body",
+          "anchor": "first year"
+        }
+      ]
+    }
+  ],
+  "attention": [
+    {
+      "case_id": "flex-numbering",
+      "statement": "The policy body says flexible choices come from Areas 1–7 and refers to Area 8 for Composition I; the structured program says Areas 1–6 and Area 7. Illustrative planning follows the structured program’s area labels and marks flexible coverage as provisional. Clarification is still required before a student audit can certify flexible-area allocation.",
+      "rule_ids": [
+        "unm-general-education.area_vii",
+        "unm-general-education.flex_composition"
+      ]
+    }
+  ],
+  "planning": {
+    "preparation_rule_id": "unm-general-education.flex_composition",
+    "completed_courses_by_english_start": {
+      "complete": [
+        "ENGL 1120"
+      ]
+    },
+    "note": "Illustrative coverage follows the structured program’s area labels. The flexible-area numbering discrepancy remains a source question, not a verified student audit. Completed-English placement records writing only; preparation eligibility is not inferred."
+  }
+}

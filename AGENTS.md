@@ -300,6 +300,18 @@ Its versioned catalog excerpts, authored roadmap templates and subject groups li
 they are not student audits or forecast inputs. Contract:
 [degree-requirements.md](docs/developers/degree-requirements.md).
 
+Shared University/Gen Ed/awarding-college references are annual JSON sets under
+`institution/<id>/shared_requirements/<year>/`, separate from degree CSVs.
+`R/branches/shared-requirements.R` validates scope, rule structure and optional
+source proof; the companion feature renders readable rules and captures new
+pinned-source candidates. `scripts/shared-requirements.R` is the offline entry
+point. The same annual rules now drive illustrative Gen Ed coverage and named
+area allocation inside existing allowance budgets, plus standard upper-credit
+context. Elective/minor cards may use any undergraduate level; grades, transfer,
+approvals and conditional alternatives remain outside this prototype. Flexible
+coverage stays visibly provisional while the recorded source conflict remains.
+They are not a student audit.
+
 Each cone is a focused file in `R/cones/` answering one analytical question. Cones take CEDAR tables plus `opt = list()` and return a tibble or named list. No Shiny dependencies, no side effects, no calls to other cones.
 
 **Before writing anything, read [layer-inventory.md](docs/developers/layer-inventory.md)** — the per-function index of branches, cones, features, and trunk helpers, with the parameters and behavioral caveats this file no longer carries. An existing function may already answer your question; `grep` the source for the authoritative signature.

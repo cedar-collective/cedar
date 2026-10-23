@@ -1,0 +1,373 @@
+{
+  "schema_version": "1.0.0",
+  "rule_set_id": "unm-university",
+  "catalog_year": "2026-2027",
+  "catalog_id": "68a34618094c97cf857f1ec1",
+  "title": "University-wide bachelor requirements",
+  "scope": {
+    "level": "university",
+    "credential": "bachelors",
+    "college_code": ""
+  },
+  "coverage": "selected_sections",
+  "notes": [
+    "First bachelor degree completion and catalog-selection excerpts. Associate degrees, certificates, shared-credit graduate programs and second-degree policies are outside this set.",
+    "All thresholds constrain the same earned-credit record; they are not additive course blocks. These transcriptions do not evaluate a student."
+  ],
+  "rules": [
+    {
+      "rule_id": "unm-university.degree_credits",
+      "label": "Total degree credit",
+      "statement": "Earn at least 120 semester credits. A program can require a higher total.",
+      "phase": "degree",
+      "operator": "credits",
+      "role": "degree_total",
+      "applies_when": "All students in this rule set scope.",
+      "review_status": "transcribed",
+      "source_refs": [
+        {
+          "source_id": "graduation",
+          "pointer": "/body",
+          "anchor": "120"
+        }
+      ],
+      "minimum": 120,
+      "unit": "credit_hours"
+    },
+    {
+      "rule_id": "unm-university.awarding_college",
+      "label": "Admission to awarding college",
+      "statement": "Be admitted to the degree-awarding college at graduation.",
+      "phase": "degree",
+      "operator": "condition",
+      "role": "condition",
+      "applies_when": "All students in this rule set scope.",
+      "review_status": "transcribed",
+      "source_refs": [
+        {
+          "source_id": "graduation",
+          "pointer": "/body",
+          "anchor": "admitted"
+        }
+      ]
+    },
+    {
+      "rule_id": "unm-university.gen_ed",
+      "label": "General Education",
+      "statement": "Complete the applicable UNM General Education requirements; see unm-general-education.",
+      "phase": "degree",
+      "operator": "condition",
+      "role": "reference",
+      "applies_when": "All students in this rule set scope.",
+      "review_status": "transcribed",
+      "source_refs": [
+        {
+          "source_id": "graduation",
+          "pointer": "/body",
+          "anchor": "General Education"
+        }
+      ],
+      "rule_set_ref": "unm-general-education"
+    },
+    {
+      "rule_id": "unm-university.cultures",
+      "label": "University cultures requirement",
+      "statement": "Complete an approved 3-credit Critical Analyses of US and Global Cultures course with at least C. The requirement may overlap eligible Gen Ed or program coursework.",
+      "phase": "degree",
+      "operator": "credits",
+      "role": "overlapping_subset",
+      "applies_when": "All students in this rule set scope.",
+      "review_status": "transcribed",
+      "source_refs": [
+        {
+          "source_id": "cultures",
+          "pointer": "/body",
+          "anchor": "three-credit"
+        }
+      ],
+      "min_grade": "C",
+      "approved_pool": "Current University-approved cultures requirement course list; not enumerated in this bundle.",
+      "minimum": 3,
+      "unit": "credit_hours"
+    },
+    {
+      "rule_id": "unm-university.cultures_overlap",
+      "label": "Cultures overlap",
+      "statement": "An approved cultures course can also meet Gen Ed or program requirements when it meets their conditions; count its earned credits once toward the degree total.",
+      "phase": "degree",
+      "operator": "condition",
+      "role": "allocation",
+      "applies_when": "All students in this rule set scope.",
+      "review_status": "transcribed",
+      "source_refs": [
+        {
+          "source_id": "cultures",
+          "pointer": "/body",
+          "anchor": "double-count"
+        }
+      ]
+    },
+    {
+      "rule_id": "unm-university.resident_credits",
+      "label": "UNM residence",
+      "statement": "Earn at least 30 credits at UNM, excluding extension and correspondence independent-study credits.",
+      "phase": "degree",
+      "operator": "credits",
+      "role": "overlapping_subset",
+      "applies_when": "All students in this rule set scope.",
+      "review_status": "transcribed",
+      "source_refs": [
+        {
+          "source_id": "graduation",
+          "pointer": "/body",
+          "anchor": "30"
+        }
+      ],
+      "minimum": 30,
+      "unit": "credit_hours"
+    },
+    {
+      "rule_id": "unm-university.senior_residence",
+      "label": "Senior residence",
+      "statement": "Of the UNM residence credits, earn at least 15 after accumulating 92 earned credits. They need not be the final credits of the degree; summer attendance may qualify.",
+      "phase": "degree",
+      "operator": "credits",
+      "role": "overlapping_subset",
+      "applies_when": "All students in this rule set scope.",
+      "review_status": "transcribed",
+      "source_refs": [
+        {
+          "source_id": "graduation",
+          "pointer": "/body",
+          "anchor": "92"
+        }
+      ],
+      "minimum": 15,
+      "unit": "credit_hours"
+    },
+    {
+      "rule_id": "unm-university.gpa",
+      "label": "Cumulative GPA",
+      "statement": "Have a cumulative GPA of at least 2.0.",
+      "phase": "degree",
+      "operator": "condition",
+      "role": "condition",
+      "applies_when": "All students in this rule set scope.",
+      "review_status": "transcribed",
+      "source_refs": [
+        {
+          "source_id": "graduation",
+          "pointer": "/body",
+          "anchor": "2.0"
+        }
+      ],
+      "minimum": 2,
+      "unit": "gpa"
+    },
+    {
+      "rule_id": "unm-university.writing",
+      "label": "English writing competence",
+      "statement": "Complete ENGL 1120 with at least C, or meet the authorized proficiency-test alternative. A placement waiver does not itself award course credits.",
+      "phase": "degree",
+      "operator": "choose_n",
+      "role": "condition",
+      "applies_when": "All students in this rule set scope.",
+      "review_status": "transcribed",
+      "source_refs": [
+        {
+          "source_id": "graduation",
+          "pointer": "/body",
+          "anchor": "ENGL 1120"
+        }
+      ],
+      "minimum": 1,
+      "unit": "alternatives",
+      "children": [
+        {
+          "rule_id": "unm-university.writing_course",
+          "label": "Writing course",
+          "statement": "ENGL 1120 with C or better.",
+          "operator": "course",
+          "subject_course": "ENGL 1120",
+          "min_grade": "C"
+        },
+        {
+          "rule_id": "unm-university.writing_proficiency",
+          "label": "Authorized proficiency",
+          "statement": "Qualifying score on an authorized writing proficiency test before graduation.",
+          "operator": "condition"
+        }
+      ]
+    },
+    {
+      "rule_id": "unm-university.crnc",
+      "label": "CR/NC limit",
+      "statement": "Apply no more than 24 credits taken under the CR/NC grading option; college and program restrictions also apply.",
+      "phase": "degree",
+      "operator": "credits",
+      "role": "overlapping_subset",
+      "applies_when": "All students in this rule set scope.",
+      "review_status": "transcribed",
+      "source_refs": [
+        {
+          "source_id": "graduation",
+          "pointer": "/body",
+          "anchor": "24"
+        }
+      ],
+      "maximum": 24,
+      "unit": "credit_hours"
+    },
+    {
+      "rule_id": "unm-university.extension",
+      "label": "Extension and correspondence limit",
+      "statement": "Apply no more than 40 extension/correspondence credits, of which no more than 30 may be correspondence credits.",
+      "phase": "degree",
+      "operator": "credits",
+      "role": "overlapping_subset",
+      "applies_when": "All students in this rule set scope.",
+      "review_status": "transcribed",
+      "source_refs": [
+        {
+          "source_id": "graduation",
+          "pointer": "/body",
+          "anchor": "40"
+        }
+      ],
+      "correspondence_maximum": 30,
+      "maximum": 40,
+      "unit": "credit_hours"
+    },
+    {
+      "rule_id": "unm-university.major_residence",
+      "label": "Major residence",
+      "statement": "Complete at least half the minimum major credits as UNM class or laboratory work. A senior-transfer exception needs major-department approval and can reduce this to one quarter.",
+      "phase": "degree",
+      "operator": "condition",
+      "role": "overlapping_subset",
+      "applies_when": "All students in this rule set scope.",
+      "review_status": "transcribed",
+      "source_refs": [
+        {
+          "source_id": "graduation",
+          "pointer": "/body",
+          "anchor": "one-half"
+        }
+      ],
+      "minimum_fraction": 0.5,
+      "exception_fraction": 0.25
+    },
+    {
+      "rule_id": "unm-university.minor_residence",
+      "label": "Minor residence",
+      "statement": "When completing a minor, earn at least one quarter of its minimum credits as UNM class or laboratory work.",
+      "phase": "degree",
+      "operator": "condition",
+      "role": "overlapping_subset",
+      "applies_when": "A minor is part of the degree.",
+      "review_status": "transcribed",
+      "source_refs": [
+        {
+          "source_id": "graduation",
+          "pointer": "/body",
+          "anchor": "one-fourth"
+        }
+      ],
+      "minimum_fraction": 0.25
+    },
+    {
+      "rule_id": "unm-university.unresolved_grades",
+      "label": "Unresolved grades",
+      "statement": "Resolve all I and NR grades by the published end of the graduation semester.",
+      "phase": "degree",
+      "operator": "condition",
+      "role": "condition",
+      "applies_when": "All students in this rule set scope.",
+      "review_status": "transcribed",
+      "source_refs": [
+        {
+          "source_id": "graduation",
+          "pointer": "/body",
+          "anchor": "unresolved"
+        }
+      ]
+    },
+    {
+      "rule_id": "unm-university.graduation_application",
+      "label": "Graduation application",
+      "statement": "Apply for degree candidacy and contact the college before the last semester. College deadlines may be earlier.",
+      "phase": "degree",
+      "operator": "condition",
+      "role": "milestone",
+      "applies_when": "All students in this rule set scope.",
+      "review_status": "transcribed",
+      "source_refs": [
+        {
+          "source_id": "graduation",
+          "pointer": "/body",
+          "anchor": "Application"
+        }
+      ]
+    },
+    {
+      "rule_id": "unm-university.catalog_selection",
+      "label": "Catalog selection",
+      "statement": "Normally use the catalog in effect on admission to the degree-granting college; an internal college/program transfer uses the catalog in effect at transfer, subject to University changes.",
+      "phase": "policy",
+      "operator": "condition",
+      "role": "condition",
+      "applies_when": "All students in this rule set scope.",
+      "review_status": "transcribed",
+      "source_refs": [
+        {
+          "source_id": "regulations",
+          "pointer": "/body",
+          "anchor": "Catalog Requirements"
+        }
+      ]
+    },
+    {
+      "rule_id": "unm-university.readmission_catalog",
+      "label": "Readmission catalog",
+      "statement": "An interruption of three or more consecutive semesters, counting summer, requires the catalog in effect on re-enrollment.",
+      "phase": "policy",
+      "operator": "condition",
+      "role": "condition",
+      "applies_when": "All students in this rule set scope.",
+      "review_status": "transcribed",
+      "source_refs": [
+        {
+          "source_id": "regulations",
+          "pointer": "/body",
+          "anchor": "three or more"
+        }
+      ]
+    },
+    {
+      "rule_id": "unm-university.ten_year_catalog",
+      "label": "Ten-year catalog limit",
+      "statement": "A student taking more than ten years from original admission follows the catalog in effect in the intended graduation semester.",
+      "phase": "policy",
+      "operator": "condition",
+      "role": "condition",
+      "applies_when": "All students in this rule set scope.",
+      "review_status": "transcribed",
+      "source_refs": [
+        {
+          "source_id": "regulations",
+          "pointer": "/body",
+          "anchor": "10 years"
+        }
+      ]
+    }
+  ],
+  "attention": [
+    {
+      "case_id": "cultures-naming",
+      "statement": "The current cultures policy and Gen Ed program use Critical Analyses of US and Global Cultures; the graduation policy retains the earlier Diversity, Equity, Inclusion and Power wording. Preserve this naming discrepancy and verify the approved list; do not create two additional 3-credit requirements.",
+      "rule_ids": [
+        "unm-university.cultures"
+      ]
+    }
+  ]
+}

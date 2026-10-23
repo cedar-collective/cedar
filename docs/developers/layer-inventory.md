@@ -12,7 +12,7 @@ A per-function index of `R/branches/`, `R/cones/`, and `R/features/`. `AGENTS.md
 
 | File | Main function(s) | Purpose |
 |------|-----------------|---------|
-| `degree-requirements.R` | `degree_rule_outline(catalog, catalog_ids)`, `degree_math_start_choices(roadmaps, catalog_id)`, `build_degree_roadmap(catalog, roadmaps, catalog_id, math_start, english_start)` (built from `resolve_degree_entry_routes()`, `prepare_degree_roadmap_nodes()`, `schedule_degree_roadmap(nodes, links, conditions, max_load)` and `allocate_degree_semester_credits(nodes, loads, policy, completed_credits)`), `assign_degree_roadmap_rows(nodes)`, `build_degree_allowance_slots(nodes, terms, slot_credits)`, `degree_semester_seasons(semesters, start_season)`, `get_degree_chain_metrics(nodes, links, conditions = NULL)` (counts plus `upstream_ids` / `downstream_ids`, so the browser never walks the graph), `attach_degree_roadmap_evidence(nodes, roadmaps, catalog, catalog_id)`, `attach_pathway_groups(rows, groups)`, `degree_path_course_table(paths, group_id)` | Preserve rule trees, select program-specific math routes, schedule complete workloads with early foundations, later upper-level courses, semester floors and credit limits, align authored course families without rescheduling, compute prerequisite chains, resolve quoted evidence, and classify descriptive coursework; no eligibility inference |
+| `degree-requirements.R` | `degree_rule_outline(catalog, catalog_ids)`, `degree_math_start_choices(roadmaps, catalog_id)`, `build_degree_roadmap(catalog, roadmaps, catalog_id, math_start, english_start)` (built from `resolve_degree_entry_routes()`, `prepare_degree_roadmap_nodes()`, `schedule_degree_roadmap(nodes, links, conditions, max_load)` and `allocate_degree_semester_credits(nodes, loads, policy, completed_credits)`), `assign_degree_roadmap_rows(nodes)`, `build_degree_allowance_slots(terms, slot_credits)`, `degree_semester_seasons(semesters, start_season)`, `get_degree_chain_metrics(nodes, links, conditions = NULL)` (counts plus `upstream_ids` / `downstream_ids`, so the browser never walks the graph), `attach_degree_roadmap_evidence(nodes, roadmaps, catalog, catalog_id)`, `attach_pathway_groups(rows, groups)`, `degree_path_course_table(paths, group_id)` | Preserve rule trees, select program-specific math routes, schedule complete workloads with early foundations, later upper-level courses, semester floors and credit limits, align authored course families beneath Gen Ed options without rescheduling, compute prerequisite chains, resolve quoted evidence, and classify descriptive coursework; no eligibility inference |
 | `population.R` | `build_population(programs, degrees, students, opt)` | Build student populations for analysis; returns tibble with `student_id` + classification columns. The central cohort-building function. |
 | | `get_focal_programs(programs, opt)` | Resolve program names/codes to canonical list for population filters |
 | | `build_demographic_population(programs, opt)` | Population scoped by demographic characteristics |
@@ -138,6 +138,15 @@ assemble typed payloads, including complete enumerated course alternatives and o
 
 ## Features — App-Facing Orchestrators (`R/features/`)
 
+The offline shared-reference workflow uses
+`branches/shared-requirements.R`: `read_shared_requirement_bundle(directory,
+source_directory = NULL)` validates annual scoped rule files and optionally
+their original captured evidence; `shared_requirement_nodes()` preserves
+nested alternatives and inherited citations for display. Its feature companion
+exposes `format_shared_requirement_preview(reference)` and
+`capture_shared_requirement_sources(reference, directory, fetch)`. These are
+reference/candidate artifacts, not runtime scheduling or student audits.
+
 `features/degree-explorer.R`: `build_degree_course_history()` resolves exact tile
 components and assembles one typed popup table without guessing historical equivalences.
 `build_degree_popup_history(sections, students, edges, catalog, roadmaps, gen_ed, selection)`
@@ -176,6 +185,14 @@ Features call multiple branches/cones and assemble payloads for visible app surf
 
 Moved from `AGENTS.md`. Always check these before writing equivalent logic in a cone or branch.
 
+`R/trunk/source-snapshots.R`: `fetch_public_source(url)` performs explicit HTTPS
+acquisition; `capture_public_source(url, directory, kind, key, fetch,
+document_format)` saves immutable decoded bytes and a receipt;
+`read_captured_source(receipt, directory, json = TRUE)` verifies hashes before
+reading. `source_json_pointer(document, pointer)` resolves exact saved fields,
+including embedded array records. `source_sha256()`, `source_json_bytes()`, `write_source_json()` and
+`read_source_json()` supply the shared content-hash/JSON infrastructure.
+
 ## `R/trunk/utils.R`
 
 | Function | Purpose |
@@ -212,3 +229,10 @@ Moved from `AGENTS.md`. Always check these before writing equivalent logic in a 
 
 `filter_class_list()` handles the common pattern of filtering cedar_students by campus, dept, term, level, registration status, etc. Use it rather than reimplementing in cones.
 
+
+`branches/shared-requirements.R`: `degree_shared_coverage(view, roadmaps,
+reference)` computes illustrative course/area allocation from explicit parameters;
+`allocate_shared_degree_slots(view, coverage)` earmarks existing workload without
+adding credits. `features/degree-explorer.R` loads the annual bundle at startup
+and assembles cards/rules/popups from that same coverage. Elective examples can
+include upper-level courses; prerequisites are not inferred from section history.

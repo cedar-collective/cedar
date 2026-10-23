@@ -56,6 +56,8 @@ source("R/trunk/load-funcs.R")
 
 message("[global.R] Calling load_funcs...")
 load_funcs(cedar_base_dir)
+CEDAR_SHARED_REQUIREMENTS <- load_degree_shared_requirements(CEDAR_DEGREE_CATALOG,
+  cedar_institution_dir())
 
 
 # if running in a docker container, look for data in the usual data dir

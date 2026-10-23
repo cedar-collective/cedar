@@ -11,6 +11,41 @@ planner. These product rules record decisions made with the user; they are not
 optional styling suggestions. The data/API contract is in
 [degree-requirements.md](degree-requirements.md).
 
+## Explaining the running visualization
+
+- Shared University, Gen Ed and awarding-college rules live separately from
+  degree-specific rules, using one format and explicit program profiles under
+  `institution/<id>/shared_requirements/<year>/`. Preserve alternatives,
+  narrower college policies and source conflicts. The initial reference bundle
+  now supplies illustrative Gen Ed coverage and standard upper-credit context.
+  It is not a student audit; grades, transfer, approvals and conditional
+  alternatives remain unevaluated.
+- Degree totals, Gen Ed areas, college-taught credits, upper-division credits
+  and residence are overlapping constraints. Never add all thresholds or
+  duplicate earned credit. Allocate approved major/Gen Ed overlaps before
+  adding course slots. Unallocated degree capacity is not an identified Gen Ed
+  requirement. Allocate exact selected courses once across base and flexible
+  areas before earmarking remaining areas inside existing allowance credits.
+  Never duplicate credit or treat an open program choice as already selected.
+- Generate the readable rule list from the same saved catalog rules, courses,
+  alternatives, prerequisite edges, enrollment conditions and policy values used
+  by the selected roadmap. Do not require a second parser or an AI proposal to
+  explain an existing prototype.
+- Put captured wording and program/course links beside rules. Label each role:
+  recorded catalog policy, displayed course/choice, enforced ordering/budget
+  constraint, or CEDAR planning preference. Recording GPA/admission rules does
+  not mean the scheduler checks student eligibility.
+- This list explains the prototype and requires no individual approvals. Older
+  parser flags belong in **Extraction diagnostics**, labeled as parser limits;
+  they are not broken chart rules or a student/advisor approval checklist.
+  Optional future ingestion proposals stay under **Draft interpretations**.
+- Label entry routes/concentrations explicitly. Required same-level clinical
+  blocks may contain more than two courses and mixed levels; retain every
+  component, respect the semester maximum, and count actual components in chains.
+- Preserve catalog gaps visibly. Unknown identities/credits cannot become
+  invented courses. Label provisional credit reservations and timing assumptions.
+  An illustrative clinical sequence is not an approved cohort calendar.
+
 ## What students should see
 
 - Show one degree as a semester board. Use the same interface for every program.
@@ -69,7 +104,8 @@ optional styling suggestions. The data/API contract is in
 - Every semester header has identical height, including wrapped year/term labels
   and plans longer than eight semesters. First tile rows start at the same height.
 - Keep Gen Ed, minor and other degree work secondary, but include its workload.
-- Early Gen Ed / lower-level allowances are course-sized, clickable tiles in the
+- Identified Gen Ed area needs and elective/minor allowances are distinct,
+  course-sized, clickable tiles in the
   same grid as named courses. Split their existing budget using the institution
   plan's usual slot credits; preserve small remainders explicitly as credits
   left to allocate. Never round up, drop credits, or imply that a one-/two-credit
@@ -79,16 +115,40 @@ optional styling suggestions. The data/API contract is in
   and preserve that choice in shared URLs and degree switches. Season labels
   select historical examples; they do not change prerequisite scheduling or
   guarantee that named courses will be offered then.
-- Allowance popups show recent matching-season Gen Ed examples with titles,
-  course credits, delivery campus/college/session, last offered term, seats and
-  first-day enrollments. Use CEDAR's institution Gen Ed list and exclude entry
-  routes, fixed requirements and enumerated choice pools already represented in
-  the program. These are unreviewed examples, not an audit of remaining Gen Ed
-  areas or recommendations tailored to a major. Future major-specific Markdown
-  guidance may augment suggestions, separately from catalog requirement truth.
+- A Gen Ed slot names its area and links to the annual shared rules. Its popup
+  filters the captured area memberships. Elective/minor slots say **Any level ·
+  Gen Ed not required** and include lower- and upper-level undergraduate
+  offerings, with a visible Level column. Keep titles, credits, campus/college/
+  session, matching-season history, seats and first-day fills. Exclude entry
+  routes, fixed requirements and enumerated pools already represented.
+- A course can contribute to its major, Gen Ed and college requirements while
+  its degree credits count once. Show **Also Gen Ed** on selected courses and
+  **May also meet Gen Ed** on open choices. Open choices never reduce the
+  reported gap; explain that choosing an eligible option can turn a matching
+  Gen Ed slot into elective space. Unlisted language/studio approvals remain
+  open. Do not manufacture memberships or pair unrelated science/lab courses.
+- Use the structured Gen Ed program's flexible-area labels for an illustrative
+  allocation, consuming additional courses from different base areas. Mark
+  flexible coverage provisional on cards, in the summary and in readable rules
+  while the recorded policy-numbering discrepancy is unresolved. Placement is
+  not earned credit; an explicit completed-English start proves writing, but
+  does not establish eligibility for the preparation exception.
+- The standard college upper-credit minimum is an overlapping constraint shown
+  beside the plan, including the amount still to fit in existing elective/minor
+  space. Do not select conditional alternatives automatically or count an
+  entire mixed clinical block as upper level. Generic elective space does not
+  have to be Gen Ed or lower level. An upper-level course with no prerequisites
+  could fit; enrollment data alone cannot establish that it has no prerequisites.
+- Coverage estimates never change total workload or add Gen Ed on top of the
+  degree minimum. Fit whole area slots into existing semester allowances and
+  preserve remainders. If a need cannot fit, expose it for redistribution;
+  never silently drop it. Shared rules are loaded once per edition at startup
+  and passed explicitly to Degree Explorer.
 - Hovering an allowance explains that no course is selected. Do not invent
   prerequisite arrows, a green zero-prerequisite rating, or a catalog excerpt
-  for a planning allowance. Its popup links to the current Gen Ed course list.
+  for a planning allowance. Its popup links to the relevant area or degree
+  requirements. A missing shared profile leaves generic elective labels and an
+  explicit coverage-unknown note.
 - Put observed student coursework at **Pathways > Course paths**, using the
   shared Pathways population. Never present observed order as a prerequisite.
 - A completed Course paths run must dismiss its blocking loading dialog and
@@ -99,6 +159,12 @@ optional styling suggestions. The data/API contract is in
 
 ## Spatial layout
 
+- Put early Gen Ed / lower-level option tiles in the top rows, above math,
+  writing and program course sequences. Reserve one shared band across all
+  semesters, sized for the term with the most slots, so the course families
+  below stay aligned. Keep empty positions when a term has fewer options.
+  Render the options first in each semester's reading and keyboard order.
+  This visual foundation does not establish a prerequisite relationship.
 - Align related courses horizontally across semesters. ENGL 1110 → ENGL 1120
   and the stretch English route each stay in one row; algebra through calculus
   also stays aligned. Apply the same technique to program sequences and course
@@ -116,8 +182,9 @@ optional styling suggestions. The data/API contract is in
   move a course to make a family fit on one row.
 - Share row heights across all semester columns, sized to their tallest tile.
   Wrapped titles and condition badges must stay readable. Keep semester headers
-  equal in height. Place early allowance tiles in free grid slots, preserving
-  math/writing rows and interior gaps in every course family. Later upper-level,
+  equal in height. Place early allowance tiles in the reserved top rows,
+  preserving math/writing rows and interior gaps in every course family below.
+  Later upper-level,
   minor and elective allowances remain below the aligned rows.
 - Check actual rendered alignment for ordinary and extended plans, alternate
   math/English placements, and narrow screens. An assigned row number alone

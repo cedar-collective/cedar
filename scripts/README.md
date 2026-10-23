@@ -2,6 +2,18 @@
 
 Utility scripts for CEDAR data management and operations.
 
+## shared-requirements.R
+
+Read, validate and render annual University/Gen Ed/college reference rules,
+separately from degree-specific requirements. `check RULE_DIRECTORY` validates
+metadata; supplying a capture directory also verifies saved source bytes and
+locators. `render RULE_DIRECTORY` prints the readable Markdown rulebook.
+`recapture RULE_DIRECTORY NEW_DIRECTORY` captures pinned-edition source
+candidates and reports changed hashes without modifying authored rules.
+The initial data and examples live in
+[`institution/unm/shared_requirements/README.md`](../institution/unm/shared_requirements/README.md).
+No AI API key or live app is required.
+
 ## r-environment.R
 
 Shared, explicit dependency setup from `renv.lock`. It never activates the old
