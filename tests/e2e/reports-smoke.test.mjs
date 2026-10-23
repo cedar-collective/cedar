@@ -491,7 +491,13 @@ export async function runReportChecks({ scope = 'smoke', synthetic = false } = {
         { type: 'text', id: 'seatfinder-sf_output', disallowed: ['click Find Seats'] },
       ]);
       if (synthetic) {
-        assert.match(await page.$eval('#seatfinder-sf_output', el => el.innerText), /HIST 3010/);
+        // sf_output draws its column guide and tabs before the Courses table
+        // fills in, so the check above can pass on the empty shell. Wait for the
+        // row itself rather than reading the output once.
+        await page.waitForFunction(
+          () => /HIST 3010/.test(document.getElementById('seatfinder-type_summary')?.innerText || ''),
+          { timeout: STEP_TIMEOUT, polling: 500 },
+        );
       }
     });
 
