@@ -98,13 +98,13 @@ export async function launch({ width = 1440, height = 1000 } = {}) {
   await page.setViewport({ width, height });
   const jsErrors = [];
   page.on('pageerror', (e) => jsErrors.push(String(e)));
-  // Count main-frame navigations. connect() declares the ones a test performs,
-  // so anything left over is the app reloading itself — see explainAppReload().
+  // Count main-frame document loads. connect() declares the ones a test
+  // performs, so anything left over is the app reloading itself — see
+  // explainAppReload(). Not 'framenavigated': it also fires for the
+  // history.pushState the app uses on every tab switch, which is no reload.
   const state = { navigations: 0, expected: 0 };
   RELOADS.set(page, state);
-  page.on('framenavigated', (frame) => {
-    if (frame === page.mainFrame()) state.navigations += 1;
-  });
+  page.on('domcontentloaded', () => { state.navigations += 1; });
   return { browser, page, jsErrors };
 }
 

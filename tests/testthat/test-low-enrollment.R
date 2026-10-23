@@ -439,3 +439,69 @@ test_that("format_term_history renders values first and marks cancelled terms 'C
   # Empty series → sentinel string.
   expect_equal(format_term_history(integer(0), integer(0)), "No history")
 })
+
+
+# =============================================================================
+# Which view a selected term gets, and whether its counts are still moving
+# =============================================================================
+# Fixture DESR pulls are dated near each term's start (Spring 2021: 2021-01-19,
+# four days after the nominal Jan 15 start), so every term's registration is
+# unsettled until a scenario moves the pull later. Current term: Fall 2020.
+
+test_that("an upcoming term is a schedule until it has registrations, then labelled alerts", {
+  # Spring 2021 before registration opened: the same schedule, nobody enrolled yet.
+  schedule_only <- test_sections %>% mutate(enrolled = replace(enrolled, term == 202110L, 0))
+  before <- classify_low_enrollment_terms(schedule_only, "202110", current_term = 202080L,
+                                          min_days_after_start = 14L)
+  expect_equal(before$view, "concerns")
+  expect_true(before$upcoming)
+  expect_false(before$has_enrollment)
+
+  during <- classify_low_enrollment_terms(test_sections, "202110", current_term = 202080L,
+                                          min_days_after_start = 14L)
+  expect_equal(during$view, "alerts")
+  expect_true(during$upcoming)
+  expect_equal(during$pulled_on, as.Date("2021-01-19"))
+  expect_true(during$registration_open)
+})
+
+test_that("counts pulled after registration settled are not labelled; term types are never dated", {
+  # The same Fall 2020 rows pulled a month into the term, after add/drop.
+  later <- test_sections %>% mutate(as_of_date = as_of_date + 30L)
+  views <- classify_low_enrollment_terms(later, c("202080", "fall"), current_term = 202080L,
+                                         min_days_after_start = 14L)
+  expect_equal(views$term, c("202080", "fall"))
+  expect_equal(views$view, c("alerts", "alerts"))
+  expect_false(any(views$upcoming))
+  expect_equal(views$registration_open, c(FALSE, NA))
+  expect_true(is.na(views$pulled_on[2]))
+})
+
+test_that("a schedule-only term beside a registering term is reported as mixed views", {
+  schedule_only <- test_sections %>% mutate(enrolled = replace(enrolled, term == 202110L, 0))
+  views <- classify_low_enrollment_terms(schedule_only, c("202080", "202110"),
+                                         current_term = 202080L, min_days_after_start = 14L)
+  expect_equal(views$view, c("alerts", "concerns"))
+})
+
+test_that("classifying terms fails loudly without pull dates or a current term", {
+  expect_error(classify_low_enrollment_terms(select(test_sections, -as_of_date), "202110",
+                                             202080L, 14L), "as_of_date")
+  expect_error(classify_low_enrollment_terms(test_sections, "202110", NULL, 14L), "current_term")
+})
+
+test_that("a schedule-only term's concerns compare every scheduled course with its history", {
+  schedule_only <- test_sections %>% mutate(enrolled = replace(enrolled, term == 202110L, 0))
+  concerns <- get_enrollment_concerns(schedule_only, list(term = "202110"), n_history_terms = 4)
+  scheduled <- filter_DESRs(schedule_only, list(term = "202110", status = "A", uel = TRUE,
+                                                crosslist = "home")) %>%
+    ungroup() %>%
+    distinct(subject_course, course_title, campus)
+  expect_equal(nrow(concerns), nrow(scheduled))
+  # Spring 2021's same-season history in the fixture is Spring 2019 and Spring 2020.
+  with_history <- concerns %>% filter(n_prior_terms > 0)
+  expect_gt(nrow(with_history), 0)
+  history_terms <- unlist(strsplit(sub("^.*\\((.*)\\)$", "\\1", with_history$history_text), ", "))
+  expect_setequal(unique(history_terms), c("Sp19", "Sp20"))
+  expect_true(all(concerns$history_text[concerns$n_prior_terms == 0] == "No prior history"))
+})

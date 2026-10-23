@@ -72,6 +72,7 @@ Named atomic vectors can trigger jsonlite warnings such as `Input to asJSON(keep
 .selectize-input > input { border: none; padding: 0; box-shadow: none; }
 ```
 - When CSS differs across tabs, inspect the live generated DOM. The same Shiny input type can render with different copied classes depending on `selectInput()` vs `selectizeInput()` and module/server-side setup.
+- **Never hide an empty output with `display: none`** (`#x:empty { display: none; }`). Shiny suspends an output it sees as hidden and never renders it, so it stays empty and hidden for good. That rule kept Low Enrollment's summary cards and banner from ever appearing until 2026-10-23. Collapse it to zero height instead (no margin, padding or min-height).
 
 **Loading and empty states.**
 - Use the current modal/overlay pattern from Open Seats/Regstats; do not resurrect old notification-only loading protocols.

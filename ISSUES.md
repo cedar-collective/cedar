@@ -36,7 +36,7 @@ recurrence is recognizable.
 | [I27](#i27--the-projection-floor-adds-a-waitlist-to-first-day-enrollment-and-compares-it-with-ever-registered-demand) | Defect | The projection floor mixed units: 245 unserved waitlisted students lifted Fall 2027 by 77 (resolved) |
 | [I26](#i26--projection-capacity-reached-was-judged-on-ever-registered-demand) | Defect | Projection "capacity reached" was judged on ever-registered demand: 72% of course-terms flagged full when census filled 17% (resolved) |
 | [I25](#i25--projection-method-selection-was-in-sample-and-lost-to-the-default) | Defect | Projection method selection was in-sample on two folds and lost to doing nothing; reported 13.7% WAPE, honest 16.5% (resolved) |
-| [I24](#i24--cis-demo-browser-run-intermittently-loses-the-app-at-open-seats) | Defect | CI's demo browser run intermittently loses the app at Open Seats (passes on rerun) |
+| [I24](#i24--cis-demo-browser-run-intermittently-loses-the-app-at-open-seats) | Defect | CI's demo browser run intermittently loses the app at Open Seats (probably fixed 2026-10-23: a test race) |
 | [I23](#i23--student-ids-are-hashed-with-the-built-in-default-salt) | Defect | Student IDs are hashed with the built-in default salt: the salt protects nothing |
 | [I20](#i20--cedar_programs-holds-almost-no-branch-campus-students) | Defect | `cedar_programs` holds 1–3% of branch-campus students; branch program counts read near zero |
 | [I18](#i18--cedar_degrees-holds-no-associate-degrees-so-branch-campus-completions-read-zero) | Defect | `cedar_degrees` holds no associate degrees: branch-campus completions read zero |
@@ -44,7 +44,7 @@ recurrence is recognizable.
 | [I8](#i8--a-timing-log-row-is-silently-dropped-when-the-write-lock-times-out) | Defect | A timing-log row is dropped when the write lock times out |
 | [I6](#i6--a-killed-projection-rebuild-strands-its-lock-and-blocks-every-later-refresh) | Defect | A killed projection rebuild strands its lock |
 | [I4](#i4--pre-change-course-ratios-are-confounded-by-career-stage) | Defect | Pre-change course ratios confounded by career stage (deferred) |
-| M1–M33 | Improvement | See [Improvements](#improvements) |
+| M1–M34 | Improvement | See [Improvements](#improvements) |
 
 ---
 
@@ -1695,7 +1695,7 @@ stored exports' MD5s, not a re-pull.
 
 ## I24 — CI's demo browser run intermittently loses the app at Open Seats
 
-**Status:** open (suspected; intermittent)
+**Status:** probably fixed 2026-10-23 (#167); reopen if it recurs
 **Found:** 2026-10-15, its second occurrence
 **Severity:** low for users: CI only, and it passes on rerun. But a red check
 blocks a merge, and a habit of rerunning would hide a real failure.
@@ -1728,6 +1728,19 @@ app container's `OOMKilled`, exit code and restart count (`docker inspect`),
 `docker stats --no-stream`, the runner's free memory, and the Shiny Server log
 files inside the container. Then fix what they show.
 
+
+### Probable cause (2026-10-23)
+
+Two test faults, neither in the app. The reload counter counted every
+`history.pushState` as a reload, and the app runs one on each tab switch and
+run, so "reloaded itself 7x" was not a dropped session. And the Open Seats
+check passed as soon as `sf_output` drew its column guide and tabs, then read
+the output once, before the Courses table had filled in: a failure about 1.5
+seconds into the step, with no Open Seats work in the app log. PR #167's CI
+run 40001898661 hit the same step with the reload count fixed, and
+reported the true error: `sf_output` held only the guide and tab labels. The
+counter now counts page loads (`tests/e2e/lib.mjs`) and the check waits for
+HIST 3010 in the table.
 ---
 
 ## I25 — Projection method selection was in-sample, and lost to the default
@@ -1985,6 +1998,19 @@ grade edge. *Done when:* each such place has a visible note.
 **M6 — The usage overview is not yet glanceable.** *Done when:* Admin → Data &
 Usage → Usage Overview leads with key counts, unique users, departments, active
 tabs, and trend, with detail behind it.
+
+**M34 — Low Enrollment's schedule view rounds the history average before
+judging it.** `get_enrollment_concerns()` (`R/branches/enrl.R`) stores
+`avg_enrl` rounded to one decimal, and the severity rule in `server.R`
+(`enrl_val < .threshold`, concerns mode) compares that rounded value: a course
+averaging 11.96 against a threshold of 12 rounds to 12.0 and lands in "near
+threshold" instead of "watch". The severity `case_when` is also business logic
+in the server. Its alerts-mode summary also puts seven cards on a six-column
+grid, so "Avg Enrollment" wraps onto a row of its own (unseen until 2026-10-23,
+when a CSS rule that kept the cards from ever rendering was removed). *Done
+when:* the cone returns the unrounded average, the table rounds for display
+only, the severity rule moves into a tested branch helper, and the cards fit one
+row.
 
 ### Testing and pipeline safety
 

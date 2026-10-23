@@ -1628,7 +1628,8 @@ nav_panel(
           "own review rule. For current and past terms this reports what enrollment ",
           "actually was; for a future term there is no enrollment yet, so it ",
           "compares the schedule against each course's own history and flags what ",
-          "looks at risk \u2014 the banner tells you which mode you are in."
+          "looks at risk. Once registration opens, it reports the registrations so far ",
+          "and says when they were pulled \u2014 the banner tells you which mode you are in."
         ),
 
         # Mode banner — shown when a future term triggers concerns mode

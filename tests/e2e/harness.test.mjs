@@ -19,7 +19,7 @@
 //   node tests/e2e/harness.test.mjs      # exit code = pass/fail
 
 import {
-  launch, connect, activeTab, queryActive, clickSubTab, appReloads, explainAppReload,
+  launch, connect, activeTab, queryActive, clickSubTab, clickNavTab, appReloads, explainAppReload,
 } from './lib.mjs';
 
 let pass = 0, fail = 0;
@@ -65,6 +65,16 @@ try {
   appReloads(page) === 0
     ? ok('declared navigations are not counted as app reloads')
     : bad('declared navigations are not counted as app reloads', String(appReloads(page)));
+
+  // Switching tabs rewrites the address bar with history.pushState; no page
+  // loads. Counting that as a reload blamed an unrendered Low Enrollment panel
+  // on an OOM-killed worker that never existed (2026-10-23).
+  await clickNavTab(page, 'Home');
+  await page.waitForFunction(() => new URLSearchParams(location.search).get('tab') === 'home',
+    { timeout: 15000, polling: 250 });
+  appReloads(page) === 0
+    ? ok('an address-bar update is not counted as an app reload')
+    : bad('an address-bar update is not counted as an app reload', String(appReloads(page)));
 
   await page.reload({ waitUntil: 'domcontentloaded' });
   appReloads(page) === 1

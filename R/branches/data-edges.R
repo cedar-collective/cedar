@@ -120,7 +120,8 @@ cedar_data_edges <- function(students, degrees = NULL,
         days_after_start = as.integer(newest_pull - term_begins)
       )
     by_term <- dplyr::left_join(by_term, pulls, by = "term")
-    settled <- dplyr::filter(pulls, days_after_start >= min_days_after_start)
+    settled <- dplyr::filter(pulls,
+      cedar_registration_settled(term, newest_pull, min_days_after_start))
     if (nrow(settled) > 0) last_settled <- as.integer(max(settled$term))
   }
 
@@ -155,6 +156,27 @@ cedar_data_edges <- function(students, degrees = NULL,
   ss <- term %% 100L
   month <- dplyr::case_when(ss == 80L ~ 8L, ss == 10L ~ 1L, TRUE ~ 6L)
   as.Date(sprintf("%d-%02d-15", yr, month))
+}
+
+
+#' Whether a pull came after a term's registration settled
+#'
+#' The settled rule behind `last_enrolled_complete`, shared so every surface
+#' that labels moving counts uses the same test: a pull counts as settled once
+#' it came at least `min_days_after_start` days after the term began, which
+#' clears add/drop.
+#'
+#' @param term Integer term codes.
+#' @param pulled Dates of the pulls, parallel to `term`.
+#' @param min_days_after_start Integer. Pass the edges' `min_days_after_start`.
+#' @return Logical, parallel to `term`; NA where `term` or `pulled` is NA.
+cedar_registration_settled <- function(term, pulled, min_days_after_start) {
+  term <- as.integer(term)
+  settled <- rep(NA, length(term))
+  known <- !is.na(term) & !is.na(pulled)
+  settled[known] <- as.integer(pulled[known] - .cedar_term_start(term[known])) >=
+    min_days_after_start
+  settled
 }
 
 

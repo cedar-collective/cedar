@@ -351,6 +351,19 @@ export async function runReportChecks({ scope = 'smoke', synthetic = false } = {
           !!document.querySelector('[data-definition-id="registered"]') &&
           !!document.querySelector('[data-definition-id="census-enrollment"]');
       }, { timeout: STEP_TIMEOUT, polling: 500 });
+
+      // TERM has registrations, so Low Enrollment reports its sections (alerts),
+      // never the schedule-only history comparison meant for a term nobody has joined.
+      await clickSubTabIn(page, 'enrl_output_tabs', 'Low Enrollment');
+      await waitForOutput(page, 'Low Enrollment summary', [
+        { type: 'text', id: 'low_enrl_summary', disallowed: ['Gather Enrollments'] },
+      ]);
+      const lowEnrl = await page.evaluate(() => ({
+        summary: document.getElementById('low_enrl_summary')?.innerText || '',
+        banner: document.getElementById('enrl_mode_banner')?.innerText || '',
+      }));
+      assert.match(lowEnrl.summary, /Total Courses|No courses of concern/);
+      assert.doesNotMatch(lowEnrl.banner, /Schedule only/);
     });
 
     await withStep(page, [], 'Regstats runs', async () => {
@@ -478,7 +491,13 @@ export async function runReportChecks({ scope = 'smoke', synthetic = false } = {
         { type: 'text', id: 'seatfinder-sf_output', disallowed: ['click Find Seats'] },
       ]);
       if (synthetic) {
-        assert.match(await page.$eval('#seatfinder-sf_output', el => el.innerText), /HIST 3010/);
+        // sf_output draws its column guide and tabs before the Courses table
+        // fills in, so the check above can pass on the empty shell. Wait for the
+        // row itself rather than reading the output once.
+        await page.waitForFunction(
+          () => /HIST 3010/.test(document.getElementById('seatfinder-type_summary')?.innerText || ''),
+          { timeout: STEP_TIMEOUT, polling: 500 },
+        );
       }
     });
 

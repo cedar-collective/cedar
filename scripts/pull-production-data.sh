@@ -29,7 +29,8 @@
 #   --projections   also copy output/projections/*.qs into <repo>/output/projections
 #   --method        rsync copies only what changed; sftp works on accounts
 #                   limited to file transfer. auto (default) uses rsync when the
-#                   server allows a shell command, otherwise sftp.
+#                   server allows a shell command, otherwise sftp; it stops if
+#                   it cannot connect at all.
 #   --dry-run       print the commands without running them
 #
 # After a pull, restart the app (scripts/restart-cedar.sh) so it reads the new
@@ -100,11 +101,22 @@ run() {
 }
 
 if [[ "$METHOD" == auto ]]; then
-  if ssh "${SSH_OPTS[@]}" "$CEDAR_PROD_SSH" 'command -v rsync' >/dev/null 2>&1 &&
-     command -v rsync >/dev/null 2>&1; then
-    METHOD=rsync
-  else
+  # ssh exits 255 for its own failures (refused, timed out, key rejected) and
+  # otherwise with the remote command's status. Only the second means the
+  # account has no shell or no rsync; a failed connection stops here rather
+  # than becoming an sftp attempt that fails the same way with a vaguer message.
+  probe_err="$(ssh "${SSH_OPTS[@]}" "$CEDAR_PROD_SSH" 'command -v rsync' 2>&1 >/dev/null)"
+  probe_status=$?
+  if [[ $probe_status -eq 255 ]]; then
+    die "Could not connect to $CEDAR_PROD_SSH: ${probe_err:-ssh exited 255}"
+  elif [[ $probe_status -ne 0 ]]; then
+    warn "Production runs no rsync for this login; using sftp"
     METHOD=sftp
+  elif ! command -v rsync >/dev/null 2>&1; then
+    warn "rsync is not installed locally; using sftp"
+    METHOD=sftp
+  else
+    METHOD=rsync
   fi
 fi
 step "Production: $CEDAR_PROD_SSH:$CEDAR_PROD_DATA_DIR (method: $METHOD)"

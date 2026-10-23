@@ -2648,6 +2648,63 @@ format_term_history <- function(term, enrl, has_active = NULL) {
   paste0(paste(values, collapse = ", "), " (", paste(terms, collapse = ", "), ")")
 }
 
+#' Which Low Enrollment view each selected term gets
+#'
+#' A term after `current_term` whose sections show no enrollment yet is only a
+#' schedule, so it gets the "concerns" view: each course against its own
+#' history. Every other term gets per-section "alerts" on its actual counts,
+#' including an upcoming term once registration has begun, because those counts
+#' are what review decisions are made from. Counts from a DESR pulled before the
+#' term's registration settled ([cedar_registration_settled()], the rule behind
+#' the settled data edge) are still moving; `registration_open` lets the page
+#' say so instead of presenting them as final. A term type ("fall") is not a
+#' dated term and is never upcoming or labelled.
+#'
+#' @param sections cedar_sections; needs `term`, `enrolled`, `as_of_date`.
+#' @param terms Selected term values: six-digit codes or term types.
+#' @param current_term Integer. `cedar_current_term`.
+#' @param min_days_after_start Integer. The edges' `min_days_after_start`.
+#' @return Tibble, one row per selected term: `term` (as selected),
+#'   `upcoming`, `has_enrollment`, `view` ("concerns" or "alerts"),
+#'   `pulled_on` (newest DESR pull for the term; NA for a term type or a term
+#'   with no sections) and `registration_open` (NA when there is no pull date).
+classify_low_enrollment_terms <- function(sections, terms, current_term,
+                                          min_days_after_start) {
+  missing <- setdiff(c("term", "enrolled", "as_of_date"), names(sections))
+  if (length(missing) > 0) {
+    stop("[enrl.R] classify_low_enrollment_terms() needs sections column(s): ",
+         paste(missing, collapse = ", "))
+  }
+  if (length(terms) == 0) stop("[enrl.R] classify_low_enrollment_terms() needs at least one term.")
+  current_term <- suppressWarnings(as.integer(current_term))
+  if (length(current_term) != 1 || is.na(current_term)) {
+    stop("[enrl.R] classify_low_enrollment_terms() needs a single current_term.")
+  }
+
+  selected <- tibble::tibble(term = as.character(terms)) %>%
+    mutate(code = suppressWarnings(as.integer(if_else(grepl("^\\d{6}$", term), term, NA_character_))))
+
+  by_term <- sections %>%
+    filter(term %in% selected$code) %>%
+    group_by(term) %>%
+    summarize(
+      has_enrollment = any(enrolled > 0, na.rm = TRUE),
+      pulled_on = if (all(is.na(as_of_date))) as.Date(NA) else max(as_of_date, na.rm = TRUE),
+      .groups = "drop"
+    )
+
+  selected %>%
+    left_join(by_term, by = c(code = "term")) %>%
+    mutate(
+      upcoming = !is.na(code) & code > current_term,
+      # A selected term with no sections has no enrollment; that is the data, not a default.
+      has_enrollment = !is.na(has_enrollment) & has_enrollment,
+      view = if_else(upcoming & !has_enrollment, "concerns", "alerts"),
+      registration_open = !cedar_registration_settled(code, pulled_on, min_days_after_start)
+    ) %>%
+    select(term, upcoming, has_enrollment, view, pulled_on, registration_open)
+}
+
 #' Get enrollment concerns for a future term
 #'
 #' Analyzes a future term's scheduled courses against historical enrollment

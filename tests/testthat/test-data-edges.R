@@ -306,3 +306,11 @@ test_that("the in-progress note names the term, its pull date, and filling state
 test_that("in-progress terms fail loudly without edges", {
   expect_error(cedar_in_progress_terms(NULL), "last_enrolled")
 })
+
+test_that("a pull settles registration fourteen days after the nominal term start", {
+  # Fall 2020's nominal start is Aug 15; add/drop clears by Aug 29.
+  expect_equal(cedar_registration_settled(c(202080L, 202080L, NA, 202080L),
+                                          as.Date(c("2020-08-28", "2020-08-29", "2020-08-29", NA)),
+                                          14L),
+               c(FALSE, TRUE, NA, NA))
+})

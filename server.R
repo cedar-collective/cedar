@@ -1071,6 +1071,8 @@ output$enrl_classlist_download <- downloadHandler(
 
   # Mode tracker: "alerts" for current/past terms, "concerns" for future terms
   enrl_mode <- reactiveVal("alerts")
+  # Per-term view and pull date from classify_low_enrollment_terms(), for the banner
+  enrl_term_views <- reactiveVal(NULL)
 
   # Reactive for low enrollment course data - uses main enrollment filters.
   # Fetches all courses below the highest threshold in one pass, then level-specific
@@ -1113,17 +1115,14 @@ output$enrl_classlist_download <- downloadHandler(
     ))
 
     # --- Detect future vs current/past terms ---
-    selected_terms <- opt$term
     # A term is "future" (concerns mode) only if it's beyond cedar_current_term AND
     # has no actual enrollment yet. Once registration is active, use per-section alerts.
-    future_flags <- sapply(selected_terms, function(t) {
-      if (!grepl("^\\d+$", t)) return(FALSE)
-      t_int <- as.integer(t)
-      if (t_int <= cedar_current_term) return(FALSE)
-      !any(cedar_sections$term == t_int & cedar_sections$enrolled > 0, na.rm = TRUE)
-    })
-    has_future <- any(future_flags)
-    has_past   <- any(!future_flags)
+    term_views <- classify_low_enrollment_terms(
+      cedar_sections, opt$term, cedar_current_term,
+      min_days_after_start = data_objects[["cedar_edges"]]$min_days_after_start)
+    enrl_term_views(term_views)
+    has_future <- any(term_views$view == "concerns")
+    has_past   <- any(term_views$view == "alerts")
 
     # Mixed terms (future + current/past) not supported
     if (has_future && has_past) {
@@ -1244,26 +1243,41 @@ output$enrl_classlist_download <- downloadHandler(
   })
 
 
-  # Mode banner — shown above summary cards when in concerns mode
+  # Mode banner — shown above summary cards: concerns mode for a schedule with no
+  # registrations yet, or alerts whose counts were pulled before registration settled.
   output$enrl_mode_banner <- renderUI({
     req(low_enrl_data())
-    if (enrl_mode() != "concerns") return(NULL)
+    views <- req(enrl_term_views())
 
-    future_term_str <- tryCatch(
-      term_code_to_str(input$enrl_term),
-      error = function(e) input$enrl_term
-    )
-    term_type <- get_term_type(input$enrl_term)
+    if (enrl_mode() == "concerns") {
+      future_term_str <- tryCatch(
+        term_code_to_str(input$enrl_term),
+        error = function(e) input$enrl_term
+      )
+      term_type <- get_term_type(input$enrl_term)
+      return(div(
+        class = "alert alert-info",
+        icon("clock"), " ",
+        strong("Schedule only: no registrations yet. "),
+        paste0("Showing historical enrollment concerns for ", future_term_str, ". "),
+        paste0("Color coding is based on average enrollment from the last 4 same-type (",
+               term_type, ") terms, not current enrollment. "),
+        "Courses in the green band have historically met the threshold but are near the boundary."
+      ))
+    }
 
+    open <- views[views$view == "alerts" & views$registration_open %in% TRUE, ]
+    if (nrow(open) == 0) return(NULL)
+    pulls <- paste0(vapply(open$term, function(t) term_code_to_str(t), character(1)),
+                    " (pulled ", format(open$pulled_on, "%b "),
+                    as.integer(format(open$pulled_on, "%d")), format(open$pulled_on, ", %Y"), ")")
     div(
       class = "alert alert-info",
-      style = "margin: 10px 0; padding: 12px 20px;",
-      icon("clock"),
-      strong("FUTURE MODE! "),
-      paste0("Showing historical enrollment concerns for ", future_term_str, ". "),
-      paste0("Color coding is based on average enrollment from the last 4 same-type (",
-             term_type, ") terms, not current enrollment. "),
-      "Courses in the green band have historically met the threshold but are near the boundary."
+      icon("clock"), " ",
+      strong("Registration had not settled when these counts were pulled. "),
+      paste0("Counts for ", paste(pulls, collapse = " and "),
+             " come from a pull made before registration settled, so sections can still ",
+             "gain or lose students. Compare each section with its history before acting.")
     )
   })
 

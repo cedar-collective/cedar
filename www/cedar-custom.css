@@ -1279,13 +1279,14 @@ a:hover { color: var(--juniper-blue-dark); }
 #enrl_summary table.dataTable { font-size: 0.9em; }
 
 /* ── Empty uiOutput placeholders ─────────────────────────────────────────── */
+/* Collapse to zero height while empty, but never display:none — Shiny treats a
+   hidden output as suspended and never renders it, so it would stay empty. */
 #enrl_mode_banner, #low_enrl_summary {
   margin: 0 !important;
   padding: 0 !important;
   min-height: 0 !important;
   overflow: hidden;
 }
-#enrl_mode_banner:empty, #low_enrl_summary:empty { display: none; }
 
 /* ── Scope bars — shared base ─────────────────────────────────────────────── */
 /* .enrl-scope-bar and .rs-scope-bar share structure; only flex direction /

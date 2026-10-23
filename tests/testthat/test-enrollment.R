@@ -350,7 +350,7 @@ test_that("calc_cl_enrls preserves status counts, lifecycle totals, and seasonal
   expect_true(all(h1110$wl_all == 0))
 
   # Spring rows share the average of the two spring counts, never their sum.
-  springs <- h1110 %>% filter(term_type == "SP", campus == "ABQ")
+  springs <- h1110 %>% filter(term_type == "spring", campus == "ABQ")
   expect_equal(unique(springs$registered_mean), mean(springs$registered))
 })
 
@@ -574,7 +574,7 @@ test_that("calc_census_enrl_baselines computes historic census mean, count, and 
 
 test_that("census prior-only baselines keep each viewed term out of its own history", {
   df <- calc_cl_enrls(test_students_regstats, by_part_term = TRUE) %>% ungroup() %>%
-    filter(subject_course == "SOCI 100", campus == "ABQ", part_term == "1", term_type == "FA")
+    filter(subject_course == "SOCI 100", campus == "ABQ", part_term == "1", term_type == "fall")
   prior <- calc_census_enrl_baselines(df, prior_only = TRUE) %>% arrange(term)
   expect_equal(prior$census_mean, c(NA, 44, 54, 208 / 3))
   expect_equal(prior$census_sd[1:3], c(NA, NA, 10))
