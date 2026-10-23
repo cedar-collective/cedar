@@ -14,6 +14,23 @@ The initial data and examples live in
 [`institution/unm/shared_requirements/README.md`](../institution/unm/shared_requirements/README.md).
 No AI API key or live app is required.
 
+## scan-degree-catalog.R
+
+Capture the configured catalog's undergraduate degrees and linked courses,
+extract unreviewed requirement trees, and compare frozen editions. No student
+data, Shiny session or AI API key is required.
+
+```bash
+Rscript --vanilla scripts/scan-degree-catalog.R scan --institution unm \
+  --output data/catalog-scans/unm/current-full
+```
+
+`--programs-only` omits course acquisition; `--resume` continues an interrupted
+capture at its original output path; `--catalog-id` pins an edition. `analyze`
+rebuilds offline; `compare` reports source-language/structure differences.
+See [catalog-scanning.md](../docs/developers/catalog-scanning.md) for outputs,
+scope, source preservation and annual review.
+
 ## r-environment.R
 
 Shared, explicit dependency setup from `renv.lock`. It never activates the old

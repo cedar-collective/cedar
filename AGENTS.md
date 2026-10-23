@@ -312,6 +312,16 @@ approvals and conditional alternatives remain outside this prototype. Flexible
 coverage stays visibly provisional while the recorded source conflict remains.
 They are not a student audit.
 
+The offline catalog scanner adds `R/trunk/source-snapshots.R` (HTTP capture,
+hashes and verified reads), `R/branches/catalog-extraction.R` / `catalog-comparison.R`
+(draft trees and language differences), `R/branches/catalog-milestones.R`
+(shared standing/admission gates and captured program-link resolution), and `R/features/catalog-capture.R` /
+`catalog-analysis.R` (capture/resume and review artifacts). Its CLI is
+`scripts/scan-degree-catalog.R`; source, credential-scope and phase maps live in
+`institution/<id>/catalog_scan_*.csv`. Acquisition never runs in Shiny and never
+modifies reviewed degree files. Contract:
+[catalog-scanning.md](docs/developers/catalog-scanning.md).
+
 Each cone is a focused file in `R/cones/` answering one analytical question. Cones take CEDAR tables plus `opt = list()` and return a tibble or named list. No Shiny dependencies, no side effects, no calls to other cones.
 
 **Before writing anything, read [layer-inventory.md](docs/developers/layer-inventory.md)** — the per-function index of branches, cones, features, and trunk helpers, with the parameters and behavioral caveats this file no longer carries. An existing function may already answer your question; `grep` the source for the authoritative signature.

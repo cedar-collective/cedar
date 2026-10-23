@@ -283,6 +283,11 @@ retrieval date and review status record what was transcribed. Update the set as
 one reviewed annual change, retaining conflicts and checking degree/course
 pages independently. No live scraping or automatic inference runs in Shiny.
 
+The offline [catalog scanner](catalog-scanning.md) captures complete source
+records, extracts draft trees and compares frozen editions. Its output remains
+separate from these reviewed files and authored semester templates. Collection
+and recognized syntax never confer academic approval or complete degree coverage.
+
 ## Observed analysis
 
 `build_population_course_paths(students, population, groups, opt, description)`

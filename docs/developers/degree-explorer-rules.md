@@ -287,6 +287,31 @@ optional styling suggestions. The data/API contract is in
   Changing a year/date alone is not an annual review.
 - Live hash URLs can change with the catalog. The saved year and excerpt record
   what the graph was built from; a URL alone is insufficient provenance.
+- Annual source acquisition uses the offline catalog scanner and preserves its
+  complete capture directory. Verify source/artifact hashes and inspect both
+  wording and structure differences. Keep changed extractor/configuration
+  provenance separate from changed catalog language.
+- Scanner output is unreviewed staging data. Unsupported prose/structures remain
+  explicit review items; no scanner or AI proposal may overwrite approved
+  requirements, invent prerequisite edges or regenerate authored semester
+  suggestions without the applicable review. Contract: [catalog-scanning.md](catalog-scanning.md).
+- Preserve supported, tested patterns when reading legacy parser analyses;
+  new semantic interpretations use complete-program AI proposals with human
+  review. Do not maintain an ignore list. Preserve each grade threshold, selection count and its nested
+  course scope, including lecture/lab bundles. Standard grade/list headings do
+  not need separate interpretation flags once parsed; exceptions, unknown
+  children and incomplete lists still do. A flag describes an extraction gap,
+  not necessarily a defect in the catalog. Recognition never implies approval.
+- Treat class standing and program admission as shared status milestones,
+  separately from named-course prerequisite edges. Keep each use's source and
+  enclosing AND/OR logic: Junior or Senior must retain both allowed statuses.
+  Never turn Junior alone into Junior-or-higher, 60 credits, or semester 5.
+  Recorded standing is term-specific `student_classification`; neither elapsed
+  semesters nor pull-stamped cumulative credits establish it. Admission criteria
+  satisfied and admission recorded remain distinct; automatic admission requires
+  explicit program-policy evidence. Extracted gates stay in Catalog Review until
+  the reviewed compiler can add them to runtime plans; recognition alone does not
+  authorize eligibility decisions or automatic semester placement.
 - `transcribed` means saved from the source, not approved by an academic advisor.
   Preserve `conflict` until resolved. Human-reviewed rules may be marked
   `reviewed`; never infer that status from successful code tests.

@@ -319,6 +319,14 @@ Plan: [ADR-002](docs/developers/adr-002-explicit-mapping-files.md).
   The first-semester season is selectable and shareable.
 - [ ] Add reviewed major-specific guidance for elective suggestions, separate
   from mandatory catalog rules; consider institution Markdown guidance files.
+- [x] Offline undergraduate catalog scanner: immutable public-source captures,
+  explicit credential scope, draft AND/OR trees, unresolved prose review queue,
+  course-link closure, verified resume, offline extraction and edition diffs.
+  Contract: `docs/developers/catalog-scanning.md`. Scans do not update runtime
+  degree files or certify academic interpretation.
+- [x] Recognize standard minimum-grade/list rules without an ignore list;
+  preserve grade scope, wrapped named groups, source citations and unreviewed
+  status. Qualified language and unresolved courses remain actionable flags.
 - [x] Add Nursing (Freshman Direct Entry), Population Health, Medical Laboratory
   Sciences and Radiologic Sciences (Nuclear Medicine) prototypes, preserving
   source gaps/conflicts, required clinical blocks and the semester credit cap.

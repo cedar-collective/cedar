@@ -12,6 +12,9 @@ A per-function index of `R/branches/`, `R/cones/`, and `R/features/`. `AGENTS.md
 
 | File | Main function(s) | Purpose |
 |------|-----------------|---------|
+| `catalog-extraction.R` | `catalog_program_scope(index, credentials)`, `extract_catalog_rule_tree(html)`, `extract_catalog_record(record, kind, receipt, edition, schemas, fields)`, `catalog_rule_rows(record, section)` | Preserve captured list nesting, named wrappers, grade thresholds, source evidence and unresolved conditions; classify explicit credential scope |
+| `catalog-comparison.R` | `catalog_section_rows(record)`, `compare_catalog_sections(before, after)` | Compare source wording, explicit structure, formatting and metadata without eligibility/equivalence inference |
+| `catalog-milestones.R` | `resolve_catalog_milestones(records)`, `catalog_milestone_rows(records, rules)` | Shared standing/admission identities, program-link resolution and captured admission-policy context; preserves status predicates without inferring student eligibility, credits or semester placement |
 | `degree-requirements.R` | `degree_rule_outline(catalog, catalog_ids)`, `degree_math_start_choices(roadmaps, catalog_id)`, `build_degree_roadmap(catalog, roadmaps, catalog_id, math_start, english_start)` (built from `resolve_degree_entry_routes()`, `prepare_degree_roadmap_nodes()`, `schedule_degree_roadmap(nodes, links, conditions, max_load)` and `allocate_degree_semester_credits(nodes, loads, policy, completed_credits)`), `assign_degree_roadmap_rows(nodes)`, `build_degree_allowance_slots(terms, slot_credits)`, `degree_semester_seasons(semesters, start_season)`, `get_degree_chain_metrics(nodes, links, conditions = NULL)` (counts plus `upstream_ids` / `downstream_ids`, so the browser never walks the graph), `attach_degree_roadmap_evidence(nodes, roadmaps, catalog, catalog_id)`, `attach_pathway_groups(rows, groups)`, `degree_path_course_table(paths, group_id)` | Preserve rule trees, select program-specific math routes, schedule complete workloads with early foundations, later upper-level courses, semester floors and credit limits, align authored course families beneath Gen Ed options without rescheduling, compute prerequisite chains, resolve quoted evidence, and classify descriptive coursework; no eligibility inference |
 | `population.R` | `build_population(programs, degrees, students, opt)` | Build student populations for analysis; returns tibble with `student_id` + classification columns. The central cohort-building function. |
 | | `get_focal_programs(programs, opt)` | Resolve program names/codes to canonical list for population filters |
@@ -146,6 +149,15 @@ nested alternatives and inherited citations for display. Its feature companion
 exposes `format_shared_requirement_preview(reference)` and
 `capture_shared_requirement_sources(reference, directory, fetch)`. These are
 reference/candidate artifacts, not runtime scheduling or student audits.
+
+Offline catalog acquisition/review also uses this orchestration layer:
+`catalog-capture.R` exposes `capture_degree_catalog(source, credentials, fields,
+directory, catalog_id = NULL, include_courses = TRUE, resume = FALSE,
+fetch = fetch_public_source, pause = 0.1)` and verified
+`catalog_capture_manifest(directory, require_complete = TRUE, verify_sources = TRUE)`.
+`catalog-analysis.R` exposes `analyze_degree_catalog(directory, output)` and
+`compare_degree_catalog_scans(before, after, output)` and verified
+`read_catalog_analysis(path, read_sections = TRUE)`. These produce/read unreviewed
 
 `features/degree-explorer.R`: `build_degree_course_history()` resolves exact tile
 components and assembles one typed popup table without guessing historical equivalences.

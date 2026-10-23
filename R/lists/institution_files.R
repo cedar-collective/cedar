@@ -109,6 +109,10 @@ CEDAR_COURSE_LEVELS <- c("lower", "upper", "grad")
 # read_institution_mappings(), which is the set the transform decides units and
 # colleges from.
 CEDAR_CONFIG_FILE_SPECS <- list(
+  catalog_scan_sources = c("source_id", "provider", "landing_url", "api_base", "level_field",
+    "undergraduate_level", "graduate_level", "untyped_exclusion_fields"),
+  catalog_scan_credentials = c("degree_type", "scope"),
+  catalog_scan_fields = c("field", "phase"),
   # Versioned, explicitly partial catalog snapshots; never student degree audits.
   degree_catalogs = c("catalog_id", "program_name", "degree_label", "catalog_year",
                       "source_url", "retrieved_on", "coverage", "notes"),

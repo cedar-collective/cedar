@@ -1,5 +1,220 @@
 context("Degree Explorer")
 
+# Public-source ingestion uses an authored catalog fixture, just like the demo
+# CSVs below. It models nested alternatives/bundles, a prose condition, an
+# unlabeled minor, an excluded graduate credential, and cyclic course links.
+scan_fixture <- function() read_source_json(file.path(cedar_institution_dir(cedar_base_dir, "demo"), "catalog-source-fixture.json"))
+scan_config <- function() {
+  dir <- cedar_institution_dir(cedar_base_dir, "demo")
+  list(source = as.list(read_institution_file("catalog_scan_sources", dir)[1, ]),
+    credentials = read_institution_file("catalog_scan_credentials", dir),
+    fields = read_institution_file("catalog_scan_fields", dir))
+}
+scan_fetcher <- function(fixture = scan_fixture(), observer = function(url) NULL) {
+  force(fixture)
+  function(url) {
+    observer(url)
+    base <- scan_config()$source$api_base
+    edition <- fixture$edition$`_id`
+    if (identical(url, scan_config()$source$landing_url)) {
+      bytes <- charToRaw(paste0("<script>window.catalogId='", edition, "'</script>"))
+    } else {
+      path <- substring(url, nchar(base) + 1L)
+      value <- if (path == "/public/catalogs") list(fixture$edition)
+        else if (path == paste0("/public/catalogs/", edition)) fixture$edition
+        else if (path == paste0("/programs/", edition)) fixture$index
+        else if (startsWith(path, paste0("/schema/", edition, "/"))) fixture$schemas[[sub(".*/", "", path)]]
+        else if (startsWith(path, paste0("/program/", edition, "/"))) fixture$programs[[sub(".*/", "", path)]]
+        else if (startsWith(path, paste0("/course/byId/", edition, "/"))) fixture$courses[[sub(".*/", "", path)]]
+        else stop("Unexpected fixture URL: ", url)
+      if (is.null(value)) stop("Unexpected fixture record: ", url)
+      bytes <- source_json_bytes(value)
+    }
+    list(body = bytes, final_url = url, status_code = 200L, content_type = "application/json",
+      etag = "fixture-etag", last_modified = "")
+  }
+}
+
+test_that("catalog extraction preserves OR options containing AND course bundles", {
+  fixture <- scan_fixture()
+  tree <- extract_catalog_rule_tree(fixture$programs$biology$degreeRequirements)
+  choice <- tree$children[[1]]$children[[1]]
+  expect_identical(tree$children[[1]]$operator, "all")
+  expect_identical(choice$operator, "choose_n")
+  expect_equal(choice$minimum, 1)
+  expect_length(choice$children, 2)
+  expect_identical(choice$children[[1]]$operator, "all")
+  expect_length(choice$children[[1]]$children, 2)
+  expect_identical(choice$children[[1]]$children[[2]]$course_references[[1]]$code, "BIOL2110L")
+  expect_false(tree$requires_review)
+  condition <- extract_catalog_rule_tree(fixture$programs$biology$graduateAdmissionsRequirements)
+  expect_true(condition$requires_review)
+  expect_identical(condition$children[[1]]$operator, "condition")
+  expect_length(condition$children[[1]]$course_references, 0)
+  qualified <- extract_catalog_rule_tree('<ul><li><a href="#/courses/view/bio1">BIOL2110</a> - Biology I (3); minimum grade C</li></ul>')
+  expect_identical(qualified$children[[1]]$operator, "condition")
+  expect_true(qualified$requires_review)
+  expect_error(validate_catalog_index(list()), "nonempty")
+  bad <- fixture$index; bad[[1]]$degreeType$name <- "Unclassified new credential"
+  expect_error(catalog_program_scope(bad, scan_config()$credentials), "Unclassified degree types")
+  expect_error(catalog_program_scope(fixture$index, scan_config()$credentials["degree_type"]), "credential classification")
+})
+
+test_that("catalog option wrappers preserve every group and distinguish headings from conditions", {
+  fixture <- scan_fixture()
+  tree <- extract_catalog_rule_tree(fixture$parser_cases$wrapped_choice)
+  choice <- tree$children[[1]]
+  expect_false(tree$requires_review)
+  expect_equal(choice$operator, "choose_n")
+  expect_equal(choice$minimum, 1)
+  expect_length(choice$children, 2)
+  expect_equal(vapply(choice$children, function(x) x$text, character(1)), c("Major study", "Second major"))
+  expect_equal(choice$children[[1]]$operator, "group")
+  expect_equal(choice$children[[1]]$children[[1]]$operator, "all")
+  expect_length(choice$children[[1]]$children[[1]]$children, 2)
+  expect_equal(choice$children[[2]]$children[[1]]$children[[1]]$course_references[[1]]$code, "BIOL200")
+  qualified <- extract_catalog_rule_tree(fixture$parser_cases$qualified_wrapper)
+  expect_true(qualified$requires_review)
+  expect_equal(qualified$children[[1]]$operator, "condition")
+  expect_match(qualified$children[[1]]$text, "department permission", fixed = TRUE)
+  expect_length(qualified$children[[1]]$children, 1)
+  qualified <- extract_catalog_rule_tree(fixture$parser_cases$qualified_heading)
+  expect_true(qualified$requires_review)
+  expect_equal(qualified$children[[1]]$operator, "condition")
+  expect_match(qualified$children[[1]]$text, "permission required", fixed = TRUE)
+  direct <- extract_catalog_rule_tree(fixture$parser_cases$direct_list_text)
+  expect_true(direct$requires_review)
+  expect_equal(direct$children[[1]]$text, "Department permission required")
+  expect_equal(direct$children[[2]]$operator, "course")
+  orphan <- extract_catalog_rule_tree(fixture$parser_cases$orphan_list)
+  expect_true(orphan$requires_review)
+  expect_equal(orphan$children[[1]]$operator, "condition")
+  expect_equal(orphan$children[[1]]$course_references[[1]]$code, "BIOL200")
+})
+
+test_that("standing milestones preserve literal statuses, exclusions and OR context", {
+  fixture <- scan_fixture()
+  tree <- extract_catalog_rule_tree(fixture$courses$biolab$prerequisites)
+  choice <- tree$children[[1]]
+  expect_false(tree$requires_review)
+  expect_equal(choice$operator, "choose_n")
+  expect_equal(choice$minimum, 1)
+  expect_equal(vapply(choice$children, function(x) x$milestone$value, character(1)), c("Junior", "Senior"))
+  expect_true(all(vapply(choice$children, function(x) x$operator == "milestone", logical(1))))
+  expect_equal(choice$children[[1]]$milestone$relation, "is")
+  expect_equal(choice$children[[1]]$milestone$id, "class_standing:is:Junior")
+  expect_null(choice$children[[1]]$minimum)
+  expect_length(choice$children[[1]]$course_references, 0)
+  exclusion <- extract_catalog_rule_tree(fixture$parser_cases$standing_exclusion)$children[[1]]
+  expect_equal(exclusion$milestone$relation, "is_not")
+  expect_equal(exclusion$milestone$value, "Freshman")
+  for (name in c("standing_qualified", "standing_inline_choice", "standing_credits",
+    "admission_unlinked", "admission_qualified", "admission_negative", "admission_multiple")) {
+    unresolved <- extract_catalog_rule_tree(fixture$parser_cases[[name]])
+    expect_equal(unresolved$children[[1]]$operator, "condition", info = name)
+    expect_true(unresolved$requires_review, info = name)
+  }
+})
+
+test_that("catalog capture inventories every entry and follows course links without looping", {
+  config <- scan_config(); out <- tempfile("catalog-capture-")
+  withr::defer(unlink(out, recursive = TRUE))
+  capture_degree_catalog(config$source, config$credentials, config$fields, out, fetch = scan_fetcher(), pause = 0)
+  manifest <- catalog_capture_manifest(out)
+  inventory <- read.csv(file.path(out, "program-inventory.csv"))
+  expect_equal(nrow(inventory), 3)
+  expect_equal(inventory$scope, c("undergraduate_degree", "excluded", "excluded"))
+  expect_equal(unlist(manifest$program_ids), "biology")
+  expect_equal(sum(vapply(manifest$requests, function(x) x$kind == "course", logical(1))), 3)
+  expect_false("program:graduate" %in% names(manifest$requests))
+  unavailable <- function(url) { value <- scan_fetcher()(url); value$status_code <- 404L; value }
+  expect_error(capture_public_source(config$source$landing_url, tempfile(), "landing", "page",
+    fetch = unavailable, document_format = "html"), "Invalid source response")
+  expect_error(capture_degree_catalog(config$source, config$credentials, config$fields, out,
+    fetch = scan_fetcher(), pause = 0), "already exists")
+  analysis <- analyze_degree_catalog(out)
+  summary <- read_source_json(file.path(analysis, "analysis-manifest.json"))
+  expect_equal(summary$counts$degrees, 1)
+  expect_equal(summary$counts$specializations, 1)
+  expect_equal(summary$counts$course_requests, 3)
+  expect_equal(summary$counts$source_issues, 1)
+  issues <- read.csv(file.path(analysis, "source-issues.csv"))
+  expect_equal(issues$issue, "source_query_flag_false")
+  expect_equal(issues$entity, "courses:course-one")
+  sections <- read.csv(file.path(analysis, "sections.csv"))
+  expect_equal(sections$label[sections$field == "graduateAdmissionsRequirements"], "Admissions Requirements")
+  rules <- read.csv(file.path(analysis, "rule-nodes.csv"))
+  expect_true(all(rules$review_status == "unreviewed"))
+  prose <- rules[rules$field == "graduateAdmissionsRequirements" & rules$operator != "document", ]
+  expect_equal(prose$operator, "condition")
+  expect_equal(prose$course_codes, "")
+  expect_equal(rules$operator[rules$entity == "courses:course-two" & rules$field == "program" & rules$operator != "document"], "condition")
+  grade <- rules[rules$entity == "courses:course-lab" & rules$operator == "all", ]
+  expect_equal(grade$minimum_grade, "C")
+  expect_false(grade$requires_review)
+  queue <- lapply(readLines(file.path(analysis, "review-queue.jsonl")), jsonlite::fromJSON)
+  expect_false(any(vapply(queue, function(x) identical(x$node_id, grade$node_id), logical(1))))
+  expect_true(all(nzchar(rules$source_pointer)))
+  expect_match(readLines(file.path(analysis, "REPORT.md"))[1], "Designed Catalog")
+  expect_error(analyze_degree_catalog(out), "already exists")
+})
+
+test_that("failed captures resume from verified bytes and tampering blocks extraction", {
+  config <- scan_config(); out <- tempfile("catalog-resume-")
+  withr::defer(unlink(out, recursive = TRUE))
+  failed <- FALSE; calls <- character()
+  observe <- function(url) {
+    calls <<- c(calls, url)
+    if (endsWith(url, "/minor") && !failed) { failed <<- TRUE; stop("Network unavailable") }
+  }
+  fetch <- scan_fetcher(observer = observe)
+  expect_error(capture_degree_catalog(config$source, config$credentials, config$fields, out,
+    fetch = fetch, pause = 0), "Network unavailable")
+  expect_error(catalog_capture_manifest(out), "incomplete")
+  expect_error(analyze_degree_catalog(out), "incomplete")
+  capture_degree_catalog(config$source, config$credentials, config$fields, out,
+    resume = TRUE, fetch = fetch, pause = 0)
+  expect_equal(sum(endsWith(calls, "/program/demo-edition/biology")), 1)
+  manifest <- catalog_capture_manifest(out)
+  receipt <- manifest$requests[["program:biology"]]
+  writeBin(charToRaw("changed"), file.path(out, receipt$file))
+  expect_error(analyze_degree_catalog(out), "hash mismatch")
+})
+
+test_that("catalog comparisons separate choice changes, formatting and missing scope", {
+  config <- scan_config(); old <- tempfile("catalog-before-"); new <- tempfile("catalog-after-"); diff <- tempfile("catalog-diff-")
+  withr::defer(unlink(c(old, new, diff), recursive = TRUE))
+  capture_degree_catalog(config$source, config$credentials, config$fields, old, fetch = scan_fetcher(), pause = 0)
+  changed <- scan_fixture()
+  changed$edition$`_id` <- "demo-next-edition"
+  changed$edition$title <- "2027-2028 Designed Catalog"
+  changed$programs$biology$degreeRequirements <- sub("<span>1</span>", "<span>2</span>", changed$programs$biology$degreeRequirements, fixed = TRUE)
+  changed$courses$bio2$credits$value <- 5
+  changed$courses$biolab$corequisites <- sub("<span>C</span>", "<span>C-</span>", changed$courses$biolab$corequisites, fixed = TRUE)
+  changed$courses$bio1$prerequisites <- sub("Junior", "Sophomore", changed$courses$bio1$prerequisites, fixed = TRUE)
+  capture_degree_catalog(config$source, config$credentials, config$fields, new, fetch = scan_fetcher(changed), pause = 0)
+  before <- analyze_degree_catalog(old); after <- analyze_degree_catalog(new)
+  compare_degree_catalog_scans(before, after, diff)
+  changes <- read.csv(file.path(diff, "changes.csv"))
+  expect_equal(nrow(changes), 4)
+  expect_equal(changes$change[changes$field == "degreeRequirements"], "structure_and_wording_changed")
+  expect_equal(changes$change[changes$entity == "courses:course-two"], "metadata_changed")
+  expect_equal(changes$change[changes$entity == "courses:course-lab"], "structure_and_wording_changed")
+  expect_equal(changes$change[changes$entity == "courses:course-one"], "structure_and_wording_changed")
+  comparison <- read_source_json(file.path(diff, "comparison-manifest.json"))
+  expect_false(comparison$extractor_changed)
+  expect_false(comparison$configuration_changed)
+  expect_equal(comparison$after$catalog_title, "2027-2028 Designed Catalog")
+  same <- read.csv(file.path(before, "sections.csv"), colClasses = "character")
+  format_only <- same; format_only$html_sha256[1] <- "format-change"
+  expect_equal(compare_catalog_sections(same, format_only)$change, "formatting_only")
+  ambiguous <- rbind(same, same[1, ])
+  expect_error(compare_catalog_sections(same, ambiguous), "ambiguous")
+  meta <- read_source_json(file.path(after, "analysis-manifest.json")); meta$include_courses <- FALSE
+  write_source_json(meta, file.path(after, "analysis-manifest.json"))
+  expect_error(compare_degree_catalog_scans(before, after, tempfile()), "same program and course capture scope")
+})
+
 # The demo institution's designed catalog (institution/demo/degree_*.csv,
 # exposed by setup.R as test_degree_catalog / test_degree_roadmaps) holds two
 # synthetic programs built to exercise each planning rule. Every schedule below

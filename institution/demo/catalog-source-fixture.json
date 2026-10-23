@@ -1,0 +1,49 @@
+{
+  "edition": {"_id":"demo-edition","title":"2026-2027 Designed Catalog","startDate":"2026-08-08","endDate":"2027-07-31"},
+  "index": [
+    {"pid":"biology","id":"bio-revision","title":"Biology B.S.","degreeType":{"name":"Bachelor of Science"}},
+    {"pid":"graduate","id":"grad-revision","title":"Graduate Certificate","degreeType":{"name":"Certificate (graduate)"}},
+    {"pid":"minor","id":"minor-revision","title":"Biology Minor"}
+  ],
+  "schemas": {
+    "programs": {"degreeRequirements":{"type":"OmegaRules","label":"Requirements"},"graduateAdmissionsRequirements":{"type":"RichText","label":"Admissions Requirements"}},
+    "specializations": {"concentrationRequirements":{"type":"OmegaRules","label":"Concentration Requirements"}},
+    "courses": {"meta.linkedTo":"courses","prerequisites":{"type":"OmegaRules","label":"Prerequisites"},"corequisites":{"type":"OmegaRules","label":"Corequisites"},"program":{"type":"ProgramTypeahead","label":"Program restriction"}}
+  },
+  "programs": {
+    "biology": {
+      "pid":"biology","id":"bio-revision","title":"Biology B.S.","code":"BS Biology","ugGrDegree":"undergraduateProgram","degreeType":{"name":"Bachelor of Science"},"degreeHours":"120",
+      "graduateAdmissionsRequirements":"<p>At least two upper-level courses and department permission.</p>",
+      "degreeRequirements":"<div><ul><li><span>Complete all of the following</span><ul><li data-test=\"ruleView-A\"><div>Complete at least <span>1</span> of the following:<div><ul><li><span>Complete the following:</span><ul><li><a href=\"#/courses/view/bio1\">BIOL2110</a> - Biology I (3)</li><li><a href=\"#/courses/view/biolab\">BIOL2110L</a> - Biology I Lab (1)</li></ul></li><li><a href=\"#/courses/view/bio2\">BIOL200</a> - Combined Biology (4)</li></ul></div></div></li></ul></li></ul></div>",
+      "specializations":[{"pid":"cellular","id":"cell-revision","title":"Cellular Biology","concentrationRequirements":"<ul><li>Complete the following:<ul><li><a href=\"#/courses/view/bio2\">BIOL200</a> - Combined Biology (4)</li></ul></li></ul>"}]
+    },
+    "minor":{"pid":"minor","id":"minor-revision","title":"Biology Minor","ugGrDegree":"undergraduateProgram","minorRequirements":"<p>Complete 18 credits.</p>"}
+  },
+  "courses": {
+    "bio1":{"pid":"course-one","id":"bio1","title":"Biology I","__catalogCourseId":"BIOL2110","__passedCatalogQuery":false,"prerequisites":"<ul><li>Complete before enrolling:<ul><li><a href=\"#/courses/view/bio2\">BIOL200</a> - Combined Biology (4)</li></ul></li><li>Must have a class standing of Junior</li></ul>","program":"<ul><li>Admitted to <span><a href=\"#/programs/view/bio-revision\">BS Biology</a></span></li></ul>"},
+    "biolab":{"pid":"course-lab","id":"biolab","title":"Biology I Lab","__catalogCourseId":"BIOL2110L","prerequisites":"<div><ul><li>Complete 1 of the following<ul><li>Must have a class standing of <span>Junior</span></li><li>Must have a class standing of <span>Senior</span></li></ul></li></ul></div>","corequisites":"<ul><li>Earned a minimum grade of <span>C</span> in each of the following:<ul><li><a href=\"#/courses/view/bio1\">BIOL2110</a> - Biology I (3)</li></ul></li></ul>"},
+    "bio2":{"pid":"course-two","id":"bio2","title":"Combined Biology","__catalogCourseId":"BIOL200","credits":{"value":4},"program":{"name":"Biology"},"corequisites":"<ul><li>Complete the following:<ul><li><a href=\"#/courses/view/bio1\">BIOL2110</a> - Biology I (3)</li></ul></li></ul>"}
+  },
+  "parser_cases": {
+    "grade_choice":"<ul><li>Earned a minimum grade of <span>C-</span> in at least <span>1</span> of the following:<ul><li>Complete the following:<ul><li><a href=\"#/courses/view/bio1\">BIOL2110</a> - Biology I (3)</li><li><a href=\"#/courses/view/biolab\">BIOL2110L</a> - Biology I Lab (1)</li></ul></li><li><a href=\"#/courses/view/bio2\">BIOL200</a> - Combined Biology (4)</li></ul></li></ul>",
+    "grade_qualified":"<ul><li>Earned a minimum grade of C in each of the following, unless the department grants permission:<ul><li><a href=\"#/courses/view/bio1\">BIOL2110</a> - Biology I (3)</li></ul></li></ul>",
+    "grade_empty":"<ul><li>Earned a minimum grade of C in each of the following:</li></ul>",
+    "grade_impossible":"<ul><li>Earned a minimum grade of C in at least 2 of the following:<ul><li><a href=\"#/courses/view/bio1\">BIOL2110</a> - Biology I (3)</li></ul></li></ul>",
+    "grade_concurrent":"<ul><li>Completed with a minimum grade of C or concurrently enrolled in all of the following:<ul><li><a href=\"#/courses/view/bio1\">BIOL2110</a> - Biology I (3)</li></ul></li></ul>",
+    "wrapped_choice":"<ul><li>Complete 1 of the following<ul><div><span class=\"rules_groupHeader_37\">Major study</span><li>Complete all of the following<ul><li><a href=\"#/courses/view/bio1\">BIOL2110</a> - Biology I (3)</li><li><a href=\"#/courses/view/biolab\">BIOL2110L</a> - Biology I Lab (1)</li></ul></li></div><div><span class=\"rules_groupHeader_37\">Second major</span><li>Complete the following:<ul><li><a href=\"#/courses/view/bio2\">BIOL200</a> - Combined Biology (4)</li></ul></li></div></ul></li></ul>",
+    "qualified_wrapper":"<ul><div><span>Only with department permission</span><li>Complete the following:<ul><li><a href=\"#/courses/view/bio2\">BIOL200</a> - Combined Biology (4)</li></ul></li></div></ul>",
+    "missing_course":"<ul><li>Earned a minimum grade of C in each of the following:<ul><li>Course Not Found</li></ul></li></ul>",
+    "direct_list_text":"<ul>Department permission required<li><a href=\"#/courses/view/bio1\">BIOL2110</a> - Biology I (3)</li></ul>",
+    "qualified_heading":"<ul><div><span class=\"rules_groupHeader_37\">Major study</span><p>Department permission required</p><li>Complete the following:<ul><li><a href=\"#/courses/view/bio2\">BIOL200</a> - Combined Biology (4)</li></ul></li></div></ul>",
+    "orphan_list":"<ul><div><ul><li><a href=\"#/courses/view/bio2\">BIOL200</a> - Combined Biology (4)</li></ul></div></ul>",
+    "standing_exclusion":"<ul><li>Must not have a class standing of Freshman</li></ul>",
+    "standing_qualified":"<ul><li>Must have a class standing of Junior unless permission is granted</li></ul>",
+    "standing_inline_choice":"<ul><li>Must have a class standing of Junior or Senior</li></ul>",
+    "standing_credits":"<ul><li>Must have a class standing of Junior (60 credits)</li></ul>",
+    "admission_unlinked":"<ul><li>Admitted to BS Biology</li></ul>",
+    "admission_qualified":"<ul><li>Admitted to <a href=\"#/programs/view/bio-revision\">BS Biology</a> or department permission</li></ul>",
+    "admission_missing":"<ul><li>Admitted to <a href=\"#/programs/view/uncaptured\">BS Biology</a></li></ul>",
+    "admission_negative":"<ul><li>Not admitted to <a href=\"#/programs/view/bio-revision\">BS Biology</a></li></ul>",
+    "admission_multiple":"<ul><li>Admitted to <a href=\"#/programs/view/bio-revision\">BS Biology</a> or <a href=\"#/programs/view/uncaptured\">Other program</a></li></ul>"
+  }
+}
