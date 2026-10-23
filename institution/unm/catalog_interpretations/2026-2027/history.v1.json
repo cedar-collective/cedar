@@ -1,0 +1,1352 @@
+{
+  "schema_version": "1.0.0",
+  "version": 1,
+  "catalog_id": "68a34618094c97cf857f1ec1",
+  "program_id": "HkzhQeX5iq",
+  "unit_key": "8a971528c9efc45be4bc252117a551fa7eb0eb21c74782f644339cb0a069713a",
+  "producer": "Codex (GPT-6); source interpretation in the CEDAR development session, 2026-10-19; no API call",
+  "scope": "Program and embedded concentrations only. Linked course prerequisite units are not yet interpreted. Draft; no human academic approval.",
+  "proposal": {
+    "schema_version": "1.0.0",
+    "nodes": [
+      {
+        "id": "lower",
+        "parent_id": "",
+        "entity_id": "programs:HkzhQeX5iq",
+        "phase": "degree",
+        "kind": "credits",
+        "label": "12 lower-division History credits: one survey sequence and two other listed courses",
+        "minimum": 12,
+        "maximum": null,
+        "unit": "credits",
+        "comparison": "at_least",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-1a6b40bb71eb66a082e841d5",
+            "quote": "The History department allows students great latitude in creating a course of study that reflects their interests and career objectives. At the lower-division level (1000/2000) students must complete a total of 12 credit hours, including one survey series (1110/20, 1150/60, 1170/80, 2255/56), AND two other courses from the following list: 1105, 1110-1120, 1150-1160, 1170-1180, 1190, 2110, 2130, 2255-2256. At the upper division level (300/400), students must complete at least 24 credit hours, including HIST 491 (Historiography) and HIST 492 (Senior Seminar)."
+          }
+        ]
+      },
+      {
+        "id": "other-courses-distinct",
+        "parent_id": "",
+        "entity_id": "programs:HkzhQeX5iq",
+        "phase": "degree",
+        "kind": "restriction",
+        "label": "The two additional lower-division courses are other courses, separate from the selected survey sequence",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "The two additional lower-division courses are other courses, separate from the selected survey sequence",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-1a6b40bb71eb66a082e841d5",
+            "quote": "The History department allows students great latitude in creating a course of study that reflects their interests and career objectives. At the lower-division level (1000/2000) students must complete a total of 12 credit hours, including one survey series (1110/20, 1150/60, 1170/80, 2255/56), AND two other courses from the following list: 1105, 1110-1120, 1150-1160, 1170-1180, 1190, 2110, 2130, 2255-2256. At the upper division level (300/400), students must complete at least 24 credit hours, including HIST 491 (Historiography) and HIST 492 (Senior Seminar)."
+          }
+        ]
+      },
+      {
+        "id": "survey",
+        "parent_id": "",
+        "entity_id": "programs:HkzhQeX5iq",
+        "phase": "degree",
+        "kind": "choose_n",
+        "label": "Complete one 6-credit survey sequence",
+        "minimum": 1,
+        "maximum": null,
+        "unit": "courses",
+        "comparison": "at_least",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-65ee97a13fd88731bb89629e",
+            "quote": "6 Total Credits"
+          },
+          {
+            "block_id": "b-82c081a10e54bc66205ea0b7",
+            "quote": "Complete 1 of the following"
+          }
+        ]
+      },
+      {
+        "id": "survey-us",
+        "parent_id": "survey",
+        "entity_id": "programs:HkzhQeX5iq",
+        "phase": "degree",
+        "kind": "credits",
+        "label": "6-credit us History survey sequence",
+        "minimum": 6,
+        "maximum": null,
+        "unit": "credits",
+        "comparison": "at_least",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-fa212789a08120e4c23d05b3",
+            "quote": "Earn at least 6 credits from the following:"
+          }
+        ]
+      },
+      {
+        "id": "course-6",
+        "parent_id": "survey-us",
+        "entity_id": "programs:HkzhQeX5iq",
+        "phase": "degree",
+        "kind": "course",
+        "label": "HIST1110 - United States History I (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:H1mSq4cic"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-07561bbe40353fd39e9278ae",
+            "quote": "HIST1110 - United States History I (3)"
+          }
+        ]
+      },
+      {
+        "id": "course-7",
+        "parent_id": "survey-us",
+        "entity_id": "programs:HkzhQeX5iq",
+        "phase": "degree",
+        "kind": "course",
+        "label": "HIST1120 - United States History II (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:HkQuv5Vcic"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-a5dea73febc95a85fc05d455",
+            "quote": "HIST1120 - United States History II (3)"
+          }
+        ]
+      },
+      {
+        "id": "survey-west",
+        "parent_id": "survey",
+        "entity_id": "programs:HkzhQeX5iq",
+        "phase": "degree",
+        "kind": "credits",
+        "label": "6-credit west History survey sequence",
+        "minimum": 6,
+        "maximum": null,
+        "unit": "credits",
+        "comparison": "at_least",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-f0901eb100af7f5b36e0b111",
+            "quote": "Earn at least 6 credits from the following:"
+          }
+        ]
+      },
+      {
+        "id": "course-9",
+        "parent_id": "survey-west",
+        "entity_id": "programs:HkzhQeX5iq",
+        "phase": "degree",
+        "kind": "course",
+        "label": "HIST1150 - Western Civilization I (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:BkQBq4qj9"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-7b80f97b7fcf5ddfdc2de78c",
+            "quote": "HIST1150 - Western Civilization I (3)"
+          }
+        ]
+      },
+      {
+        "id": "course-10",
+        "parent_id": "survey-west",
+        "entity_id": "programs:HkzhQeX5iq",
+        "phase": "degree",
+        "kind": "course",
+        "label": "HIST1160 - Western Civilization II (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:Skl5pcVqi5"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-a45302a89a1272bc22c6c391",
+            "quote": "HIST1160 - Western Civilization II (3)"
+          }
+        ]
+      },
+      {
+        "id": "survey-latin",
+        "parent_id": "survey",
+        "entity_id": "programs:HkzhQeX5iq",
+        "phase": "degree",
+        "kind": "credits",
+        "label": "6-credit latin History survey sequence",
+        "minimum": 6,
+        "maximum": null,
+        "unit": "credits",
+        "comparison": "at_least",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-486dc5ba565cfab1c8ca9386",
+            "quote": "Earn at least 6 credits from the following:"
+          }
+        ]
+      },
+      {
+        "id": "course-12",
+        "parent_id": "survey-latin",
+        "entity_id": "programs:HkzhQeX5iq",
+        "phase": "degree",
+        "kind": "course",
+        "label": "HIST1170 - Survey of Early Latin America (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:r1b9a94qj9"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-013f0e7dc263ee1a2c3bf5d4",
+            "quote": "HIST1170 - Survey of Early Latin America (3)"
+          }
+        ]
+      },
+      {
+        "id": "course-13",
+        "parent_id": "survey-latin",
+        "entity_id": "programs:HkzhQeX5iq",
+        "phase": "degree",
+        "kind": "course",
+        "label": "HIST1180 - Survey of Modern Latin America (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:S19TtE9jq"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-3e0d06bf527ef1b8fba07468",
+            "quote": "HIST1180 - Survey of Modern Latin America (3)"
+          }
+        ]
+      },
+      {
+        "id": "survey-east",
+        "parent_id": "survey",
+        "entity_id": "programs:HkzhQeX5iq",
+        "phase": "degree",
+        "kind": "credits",
+        "label": "Eastern civilization sequence: 6 credits",
+        "minimum": 6,
+        "maximum": null,
+        "unit": "credits",
+        "comparison": "at_least",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-bf2b0c3f95ebb9cda65bf3b5",
+            "quote": "Earn at least 6 credits from the following:"
+          }
+        ]
+      },
+      {
+        "id": "course-15",
+        "parent_id": "survey-east",
+        "entity_id": "programs:HkzhQeX5iq",
+        "phase": "degree",
+        "kind": "course",
+        "label": "HIST2256 - Modern Eastern Civilization (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:rkZAqVqic"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-7ae9a64084524459a79db772",
+            "quote": "HIST2256 - Modern Eastern Civilization (3)"
+          }
+        ]
+      },
+      {
+        "id": "east-missing",
+        "parent_id": "survey-east",
+        "entity_id": "programs:HkzhQeX5iq",
+        "phase": "degree",
+        "kind": "unresolved",
+        "label": "Eastern civilization sequence is missing its first course",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "Description names HIST2255/2256, but the linked 6-credit sequence lists only HIST2256. Confirm the missing first course and current identifier.",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-1a6b40bb71eb66a082e841d5",
+            "quote": "The History department allows students great latitude in creating a course of study that reflects their interests and career objectives. At the lower-division level (1000/2000) students must complete a total of 12 credit hours, including one survey series (1110/20, 1150/60, 1170/80, 2255/56), AND two other courses from the following list: 1105, 1110-1120, 1150-1160, 1170-1180, 1190, 2110, 2130, 2255-2256. At the upper division level (300/400), students must complete at least 24 credit hours, including HIST 491 (Historiography) and HIST 492 (Senior Seminar)."
+          },
+          {
+            "block_id": "b-bf2b0c3f95ebb9cda65bf3b5",
+            "quote": "Earn at least 6 credits from the following:"
+          },
+          {
+            "block_id": "b-7ae9a64084524459a79db772",
+            "quote": "HIST2256 - Modern Eastern Civilization (3)"
+          }
+        ]
+      },
+      {
+        "id": "other-lower",
+        "parent_id": "",
+        "entity_id": "programs:HkzhQeX5iq",
+        "phase": "degree",
+        "kind": "credits",
+        "label": "6 credits in two additional listed History courses",
+        "minimum": 6,
+        "maximum": null,
+        "unit": "credits",
+        "comparison": "at_least",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-6eee68e9ecb74f04ff43faf5",
+            "quote": "Two courses from the following:"
+          },
+          {
+            "block_id": "b-e465c9bdf1aaa6368c5952b2",
+            "quote": "6 Total Credits"
+          },
+          {
+            "block_id": "b-20fe60ba3dcd96ed7d113776",
+            "quote": "Earn at least 6 credits from the following:"
+          }
+        ]
+      },
+      {
+        "id": "course-19",
+        "parent_id": "other-lower",
+        "entity_id": "programs:HkzhQeX5iq",
+        "phase": "degree",
+        "kind": "course",
+        "label": "HIST1105 - Making History (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:H1MKRqNcsc"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-e2da1692de4d83c9233f9de4",
+            "quote": "HIST1105 - Making History (3)"
+          }
+        ]
+      },
+      {
+        "id": "course-20",
+        "parent_id": "other-lower",
+        "entity_id": "programs:HkzhQeX5iq",
+        "phase": "degree",
+        "kind": "course",
+        "label": "HIST1190 - The Medieval World (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:ByK-oE9jq"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-e6a3b84664aa342f96ffb670",
+            "quote": "HIST1190 - The Medieval World (3)"
+          }
+        ]
+      },
+      {
+        "id": "course-21",
+        "parent_id": "other-lower",
+        "entity_id": "programs:HkzhQeX5iq",
+        "phase": "degree",
+        "kind": "course",
+        "label": "HIST2110 - Survey of New Mexico History (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:BkmGljVqoq"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-ad4d907031117b37ee92c6c1",
+            "quote": "HIST2110 - Survey of New Mexico History (3)"
+          }
+        ]
+      },
+      {
+        "id": "course-22",
+        "parent_id": "other-lower",
+        "entity_id": "programs:HkzhQeX5iq",
+        "phase": "degree",
+        "kind": "course",
+        "label": "HIST2130 - Survey of Native American History (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:ByM75Nco9"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-6e30f0b85bf7b002cbb15b41",
+            "quote": "HIST2130 - Survey of Native American History (3)"
+          }
+        ]
+      },
+      {
+        "id": "course-23",
+        "parent_id": "other-lower",
+        "entity_id": "programs:HkzhQeX5iq",
+        "phase": "degree",
+        "kind": "course",
+        "label": "HIST2256 - Modern Eastern Civilization (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:rkZAqVqic"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-b05c670cca52dc5056b39408",
+            "quote": "HIST2256 - Modern Eastern Civilization (3)"
+          }
+        ]
+      },
+      {
+        "id": "course-24",
+        "parent_id": "other-lower",
+        "entity_id": "programs:HkzhQeX5iq",
+        "phase": "degree",
+        "kind": "course",
+        "label": "HIST1110 - United States History I (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:H1mSq4cic"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-01c77f2bbb615fa6201eafac",
+            "quote": "HIST1110 - United States History I (3)"
+          }
+        ]
+      },
+      {
+        "id": "course-25",
+        "parent_id": "other-lower",
+        "entity_id": "programs:HkzhQeX5iq",
+        "phase": "degree",
+        "kind": "course",
+        "label": "HIST1150 - Western Civilization I (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:BkQBq4qj9"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-62e8f01b9aa9ca3ba0744179",
+            "quote": "HIST1150 - Western Civilization I (3)"
+          }
+        ]
+      },
+      {
+        "id": "course-26",
+        "parent_id": "other-lower",
+        "entity_id": "programs:HkzhQeX5iq",
+        "phase": "degree",
+        "kind": "course",
+        "label": "HIST1160 - Western Civilization II (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:Skl5pcVqi5"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-f917d3cd582dae425bc3ff22",
+            "quote": "HIST1160 - Western Civilization II (3)"
+          }
+        ]
+      },
+      {
+        "id": "course-27",
+        "parent_id": "other-lower",
+        "entity_id": "programs:HkzhQeX5iq",
+        "phase": "degree",
+        "kind": "course",
+        "label": "HIST1120 - United States History II (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:HkQuv5Vcic"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-f74040d6e59e63b8e097ed28",
+            "quote": "HIST1120 - United States History II (3)"
+          }
+        ]
+      },
+      {
+        "id": "course-28",
+        "parent_id": "other-lower",
+        "entity_id": "programs:HkzhQeX5iq",
+        "phase": "degree",
+        "kind": "course",
+        "label": "HIST1170 - Survey of Early Latin America (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:r1b9a94qj9"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-b676e50bce766798461962fa",
+            "quote": "HIST1170 - Survey of Early Latin America (3)"
+          }
+        ]
+      },
+      {
+        "id": "course-29",
+        "parent_id": "other-lower",
+        "entity_id": "programs:HkzhQeX5iq",
+        "phase": "degree",
+        "kind": "course",
+        "label": "HIST1180 - Survey of Modern Latin America (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:S19TtE9jq"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-b5ee5ef3130d3bf66b35005c",
+            "quote": "HIST1180 - Survey of Modern Latin America (3)"
+          }
+        ]
+      },
+      {
+        "id": "upper",
+        "parent_id": "",
+        "entity_id": "programs:HkzhQeX5iq",
+        "phase": "degree",
+        "kind": "credits",
+        "label": "At least 24 upper-division History credits, including HIST491 and HIST492",
+        "minimum": 24,
+        "maximum": null,
+        "unit": "credits",
+        "comparison": "at_least",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-1a6b40bb71eb66a082e841d5",
+            "quote": "The History department allows students great latitude in creating a course of study that reflects their interests and career objectives. At the lower-division level (1000/2000) students must complete a total of 12 credit hours, including one survey series (1110/20, 1150/60, 1170/80, 2255/56), AND two other courses from the following list: 1105, 1110-1120, 1150-1160, 1170-1180, 1190, 2110, 2130, 2255-2256. At the upper division level (300/400), students must complete at least 24 credit hours, including HIST 491 (Historiography) and HIST 492 (Senior Seminar)."
+          }
+        ]
+      },
+      {
+        "id": "upper-electives",
+        "parent_id": "upper",
+        "entity_id": "programs:HkzhQeX5iq",
+        "phase": "degree",
+        "kind": "credits",
+        "label": "At least 18 credits in HIST300–499",
+        "minimum": 18,
+        "maximum": null,
+        "unit": "credits",
+        "comparison": "at_least",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-74a60d67bf4a574cb285b589",
+            "quote": "Earned at least 18 credits from HIST 300 - 499"
+          }
+        ]
+      },
+      {
+        "id": "course-35",
+        "parent_id": "upper",
+        "entity_id": "programs:HkzhQeX5iq",
+        "phase": "degree",
+        "kind": "course",
+        "label": "HIST491 - Historiography (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:H1ZjWsN5oq"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-cfa90438eff7c7b3d71a2c6a",
+            "quote": "HIST491 - Historiography (3)"
+          }
+        ]
+      },
+      {
+        "id": "course-36",
+        "parent_id": "upper",
+        "entity_id": "programs:HkzhQeX5iq",
+        "phase": "degree",
+        "kind": "course",
+        "label": "HIST492 - Senior Seminar (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:HJP95cV9sc"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-64512ff1ff6b6deefff306c7",
+            "quote": "HIST492 - Senior Seminar (3)"
+          }
+        ]
+      },
+      {
+        "id": "major-grade",
+        "parent_id": "",
+        "entity_id": "programs:HkzhQeX5iq",
+        "phase": "degree",
+        "kind": "restriction",
+        "label": "Major/minor courses must earn C or better",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "Major/minor courses must earn C or better",
+        "minimum_grade": "C",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-0eba85c7e610cc31bd886f5b",
+            "quote": "The department accepts a grade of \"C\" as counting toward graduation and requires that the student achieve a minimum grade point average of 2.25 in major or minor studies."
+          }
+        ]
+      },
+      {
+        "id": "major-gpa",
+        "parent_id": "",
+        "entity_id": "programs:HkzhQeX5iq",
+        "phase": "degree",
+        "kind": "gpa",
+        "label": "At least 2.25 GPA in major or minor studies",
+        "minimum": 2.25,
+        "maximum": null,
+        "unit": "gpa",
+        "comparison": "at_least",
+        "value": "History major or minor studies",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-0eba85c7e610cc31bd886f5b",
+            "quote": "The department accepts a grade of \"C\" as counting toward graduation and requires that the student achieve a minimum grade point average of 2.25 in major or minor studies."
+          }
+        ]
+      },
+      {
+        "id": "other-degree",
+        "parent_id": "",
+        "entity_id": "programs:HkzhQeX5iq",
+        "phase": "degree",
+        "kind": "credits",
+        "label": "84 additional credits toward general university and college requirements",
+        "minimum": 84,
+        "maximum": null,
+        "unit": "credits",
+        "comparison": "at_least",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-c8cfec9483ed667e04c01faf",
+            "quote": "84 Total Credits"
+          },
+          {
+            "block_id": "b-9ae879b77d211b8807f91172",
+            "quote": "Earn at least 84 credits from the following types of courses:"
+          },
+          {
+            "block_id": "b-5894356869f6b5c6efd79e02",
+            "quote": "Completed at least 84 credits from the following types of courses: In addition to the program-specific requirements outlined here, all undergraduate students are required to fulfill UNM's General Education Program requirements. In some instances, courses included in an undergraduate degree program’s requirement may also fulfill a General Education requirement. Please review the General Education Program in this Catalog for General Education information. Students within the College of Arts and Sciences must also complete 1) a major and a minor; or 2) two majors; or 3) one of the special curricula of the College that requires no minor."
+          }
+        ]
+      },
+      {
+        "id": "general-education",
+        "parent_id": "",
+        "entity_id": "programs:HkzhQeX5iq",
+        "phase": "degree",
+        "kind": "restriction",
+        "label": "Complete UNM General Education; program courses may also fulfill Gen Ed",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "Complete UNM General Education; program courses may also fulfill Gen Ed",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-5894356869f6b5c6efd79e02",
+            "quote": "Completed at least 84 credits from the following types of courses: In addition to the program-specific requirements outlined here, all undergraduate students are required to fulfill UNM's General Education Program requirements. In some instances, courses included in an undergraduate degree program’s requirement may also fulfill a General Education requirement. Please review the General Education Program in this Catalog for General Education information. Students within the College of Arts and Sciences must also complete 1) a major and a minor; or 2) two majors; or 3) one of the special curricula of the College that requires no minor."
+          }
+        ]
+      },
+      {
+        "id": "college-combination",
+        "parent_id": "",
+        "entity_id": "programs:HkzhQeX5iq",
+        "phase": "degree",
+        "kind": "restriction",
+        "label": "Arts and Sciences: major and minor, two majors, or an approved special curriculum requiring no minor",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "Arts and Sciences: major and minor, two majors, or an approved special curriculum requiring no minor",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-5894356869f6b5c6efd79e02",
+            "quote": "Completed at least 84 credits from the following types of courses: In addition to the program-specific requirements outlined here, all undergraduate students are required to fulfill UNM's General Education Program requirements. In some instances, courses included in an undergraduate degree program’s requirement may also fulfill a General Education requirement. Please review the General Education Program in this Catalog for General Education information. Students within the College of Arts and Sciences must also complete 1) a major and a minor; or 2) two majors; or 3) one of the special curricula of the College that requires no minor."
+          }
+        ]
+      },
+      {
+        "id": "degree-total",
+        "parent_id": "",
+        "entity_id": "programs:HkzhQeX5iq",
+        "phase": "degree",
+        "kind": "credits",
+        "label": "At least 120 degree credits",
+        "minimum": 120,
+        "maximum": null,
+        "unit": "credits",
+        "comparison": "at_least",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-79bad02b11f104733b86d5b3",
+            "quote": "Grand Total Credits: 120"
+          },
+          {
+            "block_id": "b-f2d2d7bda78b2c1cd5ce2a8e",
+            "quote": "\"120\""
+          }
+        ]
+      }
+    ],
+    "coverage": [
+      {
+        "block_id": "b-1a6b40bb71eb66a082e841d5",
+        "disposition": "unresolved",
+        "node_ids": [
+          "lower",
+          "other-courses-distinct",
+          "east-missing",
+          "upper"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-0eba85c7e610cc31bd886f5b",
+        "disposition": "requirements",
+        "node_ids": [
+          "major-grade",
+          "major-gpa"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-d09bcbcae557c003121d6499",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Section heading or subtotal; the nested requirements are represented explicitly. The 108-credit section includes the 84-credit non-major section; it is not 108 upper-division major credits."
+      },
+      {
+        "block_id": "b-65ee97a13fd88731bb89629e",
+        "disposition": "requirements",
+        "node_ids": [
+          "survey"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-82c081a10e54bc66205ea0b7",
+        "disposition": "requirements",
+        "node_ids": [
+          "survey"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-fa212789a08120e4c23d05b3",
+        "disposition": "requirements",
+        "node_ids": [
+          "survey-us"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-07561bbe40353fd39e9278ae",
+        "disposition": "requirements",
+        "node_ids": [
+          "course-6"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-a5dea73febc95a85fc05d455",
+        "disposition": "requirements",
+        "node_ids": [
+          "course-7"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-f0901eb100af7f5b36e0b111",
+        "disposition": "requirements",
+        "node_ids": [
+          "survey-west"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-7b80f97b7fcf5ddfdc2de78c",
+        "disposition": "requirements",
+        "node_ids": [
+          "course-9"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-a45302a89a1272bc22c6c391",
+        "disposition": "requirements",
+        "node_ids": [
+          "course-10"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-486dc5ba565cfab1c8ca9386",
+        "disposition": "requirements",
+        "node_ids": [
+          "survey-latin"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-013f0e7dc263ee1a2c3bf5d4",
+        "disposition": "requirements",
+        "node_ids": [
+          "course-12"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-3e0d06bf527ef1b8fba07468",
+        "disposition": "requirements",
+        "node_ids": [
+          "course-13"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-bf2b0c3f95ebb9cda65bf3b5",
+        "disposition": "unresolved",
+        "node_ids": [
+          "survey-east",
+          "east-missing"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-7ae9a64084524459a79db772",
+        "disposition": "unresolved",
+        "node_ids": [
+          "course-15",
+          "east-missing"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-6eee68e9ecb74f04ff43faf5",
+        "disposition": "requirements",
+        "node_ids": [
+          "other-lower"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-e465c9bdf1aaa6368c5952b2",
+        "disposition": "requirements",
+        "node_ids": [
+          "other-lower"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-20fe60ba3dcd96ed7d113776",
+        "disposition": "requirements",
+        "node_ids": [
+          "other-lower"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-e2da1692de4d83c9233f9de4",
+        "disposition": "requirements",
+        "node_ids": [
+          "course-19"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-e6a3b84664aa342f96ffb670",
+        "disposition": "requirements",
+        "node_ids": [
+          "course-20"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-ad4d907031117b37ee92c6c1",
+        "disposition": "requirements",
+        "node_ids": [
+          "course-21"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-6e30f0b85bf7b002cbb15b41",
+        "disposition": "requirements",
+        "node_ids": [
+          "course-22"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-b05c670cca52dc5056b39408",
+        "disposition": "requirements",
+        "node_ids": [
+          "course-23"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-01c77f2bbb615fa6201eafac",
+        "disposition": "requirements",
+        "node_ids": [
+          "course-24"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-62e8f01b9aa9ca3ba0744179",
+        "disposition": "requirements",
+        "node_ids": [
+          "course-25"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-f917d3cd582dae425bc3ff22",
+        "disposition": "requirements",
+        "node_ids": [
+          "course-26"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-f74040d6e59e63b8e097ed28",
+        "disposition": "requirements",
+        "node_ids": [
+          "course-27"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-b676e50bce766798461962fa",
+        "disposition": "requirements",
+        "node_ids": [
+          "course-28"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-b5ee5ef3130d3bf66b35005c",
+        "disposition": "requirements",
+        "node_ids": [
+          "course-29"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-bd56cfcb25415c58a02b6fbe",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Section heading or subtotal; the nested requirements are represented explicitly. The 108-credit section includes the 84-credit non-major section; it is not 108 upper-division major credits."
+      },
+      {
+        "block_id": "b-e165e3bf2642f4a0afab99d1",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Section heading or subtotal; the nested requirements are represented explicitly. The 108-credit section includes the 84-credit non-major section; it is not 108 upper-division major credits."
+      },
+      {
+        "block_id": "b-cdc2795d83d6b06e64646556",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Section heading or subtotal; the nested requirements are represented explicitly. The 108-credit section includes the 84-credit non-major section; it is not 108 upper-division major credits."
+      },
+      {
+        "block_id": "b-74a60d67bf4a574cb285b589",
+        "disposition": "requirements",
+        "node_ids": [
+          "upper-electives"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-cfd98c9ef5dbc3c9b73df2cb",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Section heading or subtotal; the nested requirements are represented explicitly. The 108-credit section includes the 84-credit non-major section; it is not 108 upper-division major credits."
+      },
+      {
+        "block_id": "b-cfa90438eff7c7b3d71a2c6a",
+        "disposition": "requirements",
+        "node_ids": [
+          "course-35"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-64512ff1ff6b6deefff306c7",
+        "disposition": "requirements",
+        "node_ids": [
+          "course-36"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-458d81768b6e2e30a929bef8",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Section heading or subtotal; the nested requirements are represented explicitly. The 108-credit section includes the 84-credit non-major section; it is not 108 upper-division major credits."
+      },
+      {
+        "block_id": "b-c8cfec9483ed667e04c01faf",
+        "disposition": "requirements",
+        "node_ids": [
+          "other-degree"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-9ae879b77d211b8807f91172",
+        "disposition": "requirements",
+        "node_ids": [
+          "other-degree"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-5894356869f6b5c6efd79e02",
+        "disposition": "requirements",
+        "node_ids": [
+          "other-degree",
+          "general-education",
+          "college-combination"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-79bad02b11f104733b86d5b3",
+        "disposition": "requirements",
+        "node_ids": [
+          "degree-total"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-732740e0961895224ce99850",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this field."
+      },
+      {
+        "block_id": "b-888b98065337dc63caa6d607",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this field."
+      },
+      {
+        "block_id": "b-1d2fede6ca59cb7bf4293e30",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this field."
+      },
+      {
+        "block_id": "b-e00defa9b93f8c45b6f8ebc6",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this field."
+      },
+      {
+        "block_id": "b-4839c1cf71aa96392d13e78a",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this field."
+      },
+      {
+        "block_id": "b-18b67dc19d206b137bd7b17c",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this field."
+      },
+      {
+        "block_id": "b-d881b9820dd2e1f5aa5ec95e",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this field."
+      },
+      {
+        "block_id": "b-f2d2d7bda78b2c1cd5ce2a8e",
+        "disposition": "requirements",
+        "node_ids": [
+          "degree-total"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-cb5841884b67f3a582888360",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this field."
+      },
+      {
+        "block_id": "b-0d53bc977db908542ab65d56",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this field."
+      },
+      {
+        "block_id": "b-c29fd9f975ea08c860674bfe",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this field."
+      },
+      {
+        "block_id": "b-06d1ca555e1f06e070d595c2",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "The program does not mandate a concentration; optional concentration requirements are scoped separately."
+      },
+      {
+        "block_id": "b-dbffde57cfbf7cb2b84d0387",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this field."
+      }
+    ],
+    "questions": []
+  }
+}

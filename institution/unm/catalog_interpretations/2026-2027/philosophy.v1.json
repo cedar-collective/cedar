@@ -1,0 +1,2195 @@
+{
+  "schema_version": "1.0.0",
+  "version": 1,
+  "catalog_id": "68a34618094c97cf857f1ec1",
+  "program_id": "SkWn7eQ9o9",
+  "unit_key": "d07b52722dc878b606125254d393c825a44f96d2ada7b11a4fa92cdac91b47fb",
+  "producer": "Codex (GPT-6); source interpretation in the CEDAR development session, 2026-10-19; no API call",
+  "scope": "Program and embedded concentrations only. Linked course prerequisite units are not yet interpreted. Draft; no human academic approval.",
+  "proposal": {
+    "schema_version": "1.0.0",
+    "nodes": [
+      {
+        "id": "admit-attempted",
+        "parent_id": "",
+        "entity_id": "programs:SkWn7eQ9o9",
+        "phase": "admission",
+        "kind": "credits",
+        "label": "At least 26 credit hours before admission",
+        "minimum": 26,
+        "maximum": null,
+        "unit": "credits",
+        "comparison": "at_least",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-55ae03359475941e3c47f119",
+            "quote": "A minimum of 26 credit hours; 23 credit hours must be in courses acceptable toward graduation."
+          }
+        ]
+      },
+      {
+        "id": "admit-applicable",
+        "parent_id": "",
+        "entity_id": "programs:SkWn7eQ9o9",
+        "phase": "admission",
+        "kind": "credits",
+        "label": "At least 23 hours acceptable toward graduation",
+        "minimum": 23,
+        "maximum": null,
+        "unit": "credits",
+        "comparison": "at_least",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-55ae03359475941e3c47f119",
+            "quote": "A minimum of 26 credit hours; 23 credit hours must be in courses acceptable toward graduation."
+          }
+        ]
+      },
+      {
+        "id": "admit-gpa-cumulative",
+        "parent_id": "",
+        "entity_id": "programs:SkWn7eQ9o9",
+        "phase": "admission",
+        "kind": "gpa",
+        "label": "Minimum 2.00 All work GPA",
+        "minimum": 2,
+        "maximum": null,
+        "unit": "gpa",
+        "comparison": "at_least",
+        "value": "All work",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-697b8aafef43b26b1f21845b",
+            "quote": "A cumulative grade point average of at least 2.00 on all work."
+          }
+        ]
+      },
+      {
+        "id": "admit-gpa-transfer",
+        "parent_id": "",
+        "entity_id": "programs:SkWn7eQ9o9",
+        "phase": "admission",
+        "kind": "gpa",
+        "label": "Minimum 2.00 Transfer GPA, for transfer students GPA",
+        "minimum": 2,
+        "maximum": null,
+        "unit": "gpa",
+        "comparison": "at_least",
+        "value": "Transfer GPA, for transfer students",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-bba4ccdd895c0c61ab20ecfa",
+            "quote": "Transfer students must have a 2.00 transfer GPA."
+          }
+        ]
+      },
+      {
+        "id": "admit-gpa-continuing",
+        "parent_id": "",
+        "entity_id": "programs:SkWn7eQ9o9",
+        "phase": "admission",
+        "kind": "gpa",
+        "label": "Minimum 2.00 Institutional GPA, for continuing UNM students GPA",
+        "minimum": 2,
+        "maximum": null,
+        "unit": "gpa",
+        "comparison": "at_least",
+        "value": "Institutional GPA, for continuing UNM students",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-63d9ac11c798d7e81b473237",
+            "quote": "Continuing UNM students must have a 2.00 institutional GPA."
+          }
+        ]
+      },
+      {
+        "id": "admit-gened-6",
+        "parent_id": "",
+        "entity_id": "programs:SkWn7eQ9o9",
+        "phase": "admission",
+        "kind": "restriction",
+        "label": "Completion of General Education Curriculum: Communication.",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "Completion of General Education Curriculum: Communication.",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-72b2d195a6825ee602965b3d",
+            "quote": "Completion of General Education Curriculum: Communication."
+          }
+        ]
+      },
+      {
+        "id": "admit-gened-7",
+        "parent_id": "",
+        "entity_id": "programs:SkWn7eQ9o9",
+        "phase": "admission",
+        "kind": "restriction",
+        "label": "Completion of General Education Curriculum: Mathematics and Statistics.",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "Completion of General Education Curriculum: Mathematics and Statistics.",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-5d061d59eebcc60bffeec2ef",
+            "quote": "Completion of General Education Curriculum: Mathematics and Statistics."
+          }
+        ]
+      },
+      {
+        "id": "admit-gened-8",
+        "parent_id": "",
+        "entity_id": "programs:SkWn7eQ9o9",
+        "phase": "admission",
+        "kind": "restriction",
+        "label": "Completion of General Education Curriculum: Second Language.",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "Completion of General Education Curriculum: Second Language.",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-83fd11d474cdd65b71758691",
+            "quote": "Completion of General Education Curriculum: Second Language."
+          }
+        ]
+      },
+      {
+        "id": "admit-courses",
+        "parent_id": "",
+        "entity_id": "programs:SkWn7eQ9o9",
+        "phase": "admission",
+        "kind": "restriction",
+        "label": "Department admission course work: C or better in one of PHIL1115/1120/2210/2220/2225/2240 AND one of PHIL2210/2220/2225/2240",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "Department admission course work: C or better in one of PHIL1115/1120/2210/2220/2225/2240 AND one of PHIL2210/2220/2225/2240",
+        "minimum_grade": "C",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-973c84e5b05d224c6f5a5138",
+            "quote": "Completion of Department of Philosophy admission course work with grades of \"C\" or better:"
+          },
+          {
+            "block_id": "b-703fba180623039187d0f154",
+            "quote": "PHIL 1115 or PHIL 1120 or PHIL 2210 or PHIL 2220 or PHIL 2225 or PHIL 2240."
+          },
+          {
+            "block_id": "b-f952bc6e35259af277a25bb7",
+            "quote": "PHIL 2210 or PHIL 2220 or PHIL 2225 or PHIL 2240."
+          }
+        ]
+      },
+      {
+        "id": "admit-course-overlap",
+        "parent_id": "",
+        "entity_id": "programs:SkWn7eQ9o9",
+        "phase": "admission",
+        "kind": "unresolved",
+        "label": "Can one course satisfy both Philosophy admission lists?",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "The lists overlap. Confirm whether two distinct courses are required; PHIL1115 and PHIL2240 are named in prose but lack supplied linked course records.",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-973c84e5b05d224c6f5a5138",
+            "quote": "Completion of Department of Philosophy admission course work with grades of \"C\" or better:"
+          },
+          {
+            "block_id": "b-703fba180623039187d0f154",
+            "quote": "PHIL 1115 or PHIL 1120 or PHIL 2210 or PHIL 2220 or PHIL 2225 or PHIL 2240."
+          },
+          {
+            "block_id": "b-f952bc6e35259af277a25bb7",
+            "quote": "PHIL 2210 or PHIL 2220 or PHIL 2225 or PHIL 2240."
+          }
+        ]
+      },
+      {
+        "id": "major",
+        "parent_id": "",
+        "entity_id": "programs:SkWn7eQ9o9",
+        "phase": "degree",
+        "kind": "all",
+        "label": "Complete the Philosophy major curriculum",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-7fcd3de2497ea5546ad54b1b",
+            "quote": "Complete all of the following"
+          }
+        ]
+      },
+      {
+        "id": "course-14",
+        "parent_id": "major",
+        "entity_id": "programs:SkWn7eQ9o9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "PHIL2210 - Early Modern Philosophy (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:B1QAloN5s9"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-09a8ddfb92f081b54d91176c",
+            "quote": "PHIL2210 - Early Modern Philosophy (3)"
+          }
+        ]
+      },
+      {
+        "id": "ancient",
+        "parent_id": "major",
+        "entity_id": "programs:SkWn7eQ9o9",
+        "phase": "degree",
+        "kind": "choose_n",
+        "label": "At least one: Greek philosophy",
+        "minimum": 1,
+        "maximum": null,
+        "unit": "courses",
+        "comparison": "at_least",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-d8037a1f739544cdd32acc10",
+            "quote": "Complete at least 1 of the following:"
+          }
+        ]
+      },
+      {
+        "id": "course-16",
+        "parent_id": "ancient",
+        "entity_id": "programs:SkWn7eQ9o9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "PHIL2220 - Greek Philosophy (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:SyQhscE5s9"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-ceef1810e3aefeea64089e40",
+            "quote": "PHIL2220 - Greek Philosophy (3)"
+          }
+        ]
+      },
+      {
+        "id": "course-17",
+        "parent_id": "ancient",
+        "entity_id": "programs:SkWn7eQ9o9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "PHIL2225 - Greek Thought (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:HymzRqVcjc"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-749cdb08b59b693af08562d1",
+            "quote": "PHIL2225 - Greek Thought (3)"
+          }
+        ]
+      },
+      {
+        "id": "logic",
+        "parent_id": "major",
+        "entity_id": "programs:SkWn7eQ9o9",
+        "phase": "degree",
+        "kind": "choose_n",
+        "label": "At least one: Logic",
+        "minimum": 1,
+        "maximum": null,
+        "unit": "courses",
+        "comparison": "at_least",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-c65702c686a199861717ceb3",
+            "quote": "Complete at least 1 of the following:"
+          }
+        ]
+      },
+      {
+        "id": "course-19",
+        "parent_id": "logic",
+        "entity_id": "programs:SkWn7eQ9o9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "PHIL1120 - Logic, Reasoning, and Critical Thinking (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:S1-PH5Nqi5"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-ddceebfad0fb1234c224de65",
+            "quote": "PHIL1120 - Logic, Reasoning, and Critical Thinking (3)"
+          }
+        ]
+      },
+      {
+        "id": "course-20",
+        "parent_id": "logic",
+        "entity_id": "programs:SkWn7eQ9o9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "PHIL356 - Symbolic Logic (3 - 4)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:SyoGqE9o5"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-ae54960734487ad7bed26f09",
+            "quote": "PHIL356 - Symbolic Logic (3 - 4)"
+          }
+        ]
+      },
+      {
+        "id": "ethics",
+        "parent_id": "major",
+        "entity_id": "programs:SkWn7eQ9o9",
+        "phase": "degree",
+        "kind": "choose_n",
+        "label": "At least one: Ethical or social/political philosophy",
+        "minimum": 1,
+        "maximum": null,
+        "unit": "courses",
+        "comparison": "at_least",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-c18996397f53382bba9aabbe",
+            "quote": "Complete at least 1 of the following:"
+          }
+        ]
+      },
+      {
+        "id": "course-22",
+        "parent_id": "ethics",
+        "entity_id": "programs:SkWn7eQ9o9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "PHIL358 - Ethical Theory (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:HyjrcEcjc"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-6773480dc05a78d326c1ea17",
+            "quote": "PHIL358 - Ethical Theory (3)"
+          }
+        ]
+      },
+      {
+        "id": "course-23",
+        "parent_id": "ethics",
+        "entity_id": "programs:SkWn7eQ9o9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "PHIL371 - Classical Social and Political Philosophy (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:SJj05Eqi9"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-77aeae3a6d07c740d589f1be",
+            "quote": "PHIL371 - Classical Social and Political Philosophy (3)"
+          }
+        ]
+      },
+      {
+        "id": "course-24",
+        "parent_id": "ethics",
+        "entity_id": "programs:SkWn7eQ9o9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "PHIL372 - Modern Social and Political Philosophy (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:SyQCFV9jq"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-97a96624fa6f63dd7834fc1d",
+            "quote": "PHIL372 - Modern Social and Political Philosophy (3)"
+          }
+        ]
+      },
+      {
+        "id": "course-25",
+        "parent_id": "ethics",
+        "entity_id": "programs:SkWn7eQ9o9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "PHIL381 - Philosophy of Law and Morals (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:Bkx_k9N9jc"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-b732307f0f6924ea703ebcf6",
+            "quote": "PHIL381 - Philosophy of Law and Morals (3)"
+          }
+        ]
+      },
+      {
+        "id": "asian",
+        "parent_id": "major",
+        "entity_id": "programs:SkWn7eQ9o9",
+        "phase": "degree",
+        "kind": "choose_n",
+        "label": "At least one: Asian philosophy: PHIL333, PHIL334 or PHIL336",
+        "minimum": 1,
+        "maximum": null,
+        "unit": "courses",
+        "comparison": "at_least",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-d31ce14128ea4425c41512cc",
+            "quote": "Complete at least 1 of the following:"
+          }
+        ]
+      },
+      {
+        "id": "course-27",
+        "parent_id": "asian",
+        "entity_id": "programs:SkWn7eQ9o9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "PHIL333 - Buddhist Philosophy (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:SyVtoqV5sq"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-f964e30c97a5db133a36cdf0",
+            "quote": "PHIL333 - Buddhist Philosophy (3)"
+          }
+        ]
+      },
+      {
+        "id": "course-28",
+        "parent_id": "asian",
+        "entity_id": "programs:SkWn7eQ9o9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "PHIL334 - Indian Philosophy (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:ByUa85Vcic"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-26828cb25724b73c2ca34933",
+            "quote": "PHIL334 - Indian Philosophy (3)"
+          }
+        ]
+      },
+      {
+        "id": "course-29",
+        "parent_id": "asian",
+        "entity_id": "programs:SkWn7eQ9o9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "PHIL336 - Chinese Philosophy (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:H1Eu_5V9ic"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-3aa54cc1e383626c7da6d542",
+            "quote": "PHIL336 - Chinese Philosophy (3)"
+          }
+        ]
+      },
+      {
+        "id": "knowledge",
+        "parent_id": "major",
+        "entity_id": "programs:SkWn7eQ9o9",
+        "phase": "degree",
+        "kind": "choose_n",
+        "label": "At least one: Knowledge, metaphysics, science or mind",
+        "minimum": 1,
+        "maximum": null,
+        "unit": "courses",
+        "comparison": "at_least",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-24f8a883eaf61bfd1659f0d6",
+            "quote": "Complete at least 1 of the following:"
+          }
+        ]
+      },
+      {
+        "id": "course-31",
+        "parent_id": "knowledge",
+        "entity_id": "programs:SkWn7eQ9o9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "PHIL352 - Theory of Knowledge (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:BkeUD5N9jc"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-2a10cf43fea7f451a3986b4a",
+            "quote": "PHIL352 - Theory of Knowledge (3)"
+          }
+        ]
+      },
+      {
+        "id": "course-32",
+        "parent_id": "knowledge",
+        "entity_id": "programs:SkWn7eQ9o9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "PHIL354 - Metaphysics (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:BJXCKN5sc"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-8e68bccb48af405100f54d53",
+            "quote": "PHIL354 - Metaphysics (3)"
+          }
+        ]
+      },
+      {
+        "id": "course-33",
+        "parent_id": "knowledge",
+        "entity_id": "programs:SkWn7eQ9o9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "PHIL350 - Philosophy of Science (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:rkZtT9E5jq"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-d426d11565c1820857b189e0",
+            "quote": "PHIL350 - Philosophy of Science (3)"
+          }
+        ]
+      },
+      {
+        "id": "course-34",
+        "parent_id": "knowledge",
+        "entity_id": "programs:SkWn7eQ9o9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "PHIL455 - Philosophy of Mind (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:rkg6Lq4qi5"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-d5762d41c5965c52df24c43e",
+            "quote": "PHIL455 - Philosophy of Mind (3)"
+          }
+        ]
+      },
+      {
+        "id": "elective-credits",
+        "parent_id": "major",
+        "entity_id": "programs:SkWn7eQ9o9",
+        "phase": "degree",
+        "kind": "credits",
+        "label": "At least 6 additional elective credits",
+        "minimum": 6,
+        "maximum": null,
+        "unit": "credits",
+        "comparison": "at_least",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-bcbe5f9745103647ea366094",
+            "quote": "Earn at least this many additional elective credits: 6"
+          }
+        ]
+      },
+      {
+        "id": "elective-upper",
+        "parent_id": "major",
+        "entity_id": "programs:SkWn7eQ9o9",
+        "phase": "degree",
+        "kind": "credits",
+        "label": "At least 6 elective credits at the 400–499 level",
+        "minimum": 6,
+        "maximum": null,
+        "unit": "credits",
+        "comparison": "at_least",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-f2cbb874d80c6d324c299512",
+            "quote": "Earned at least 6 credits from 400 - 499"
+          }
+        ]
+      },
+      {
+        "id": "elective-count",
+        "parent_id": "major",
+        "entity_id": "programs:SkWn7eQ9o9",
+        "phase": "degree",
+        "kind": "course_pool",
+        "label": "Four Philosophy electives, two at the 400 level",
+        "minimum": 4,
+        "maximum": null,
+        "unit": "courses",
+        "comparison": "at_least",
+        "value": "Philosophy electives; at least two at the 400 level",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-027bf9fb60fc36d3f5549b1f",
+            "quote": "Four electives, two of which must be at the 400-level. (Normally, 100-level Philosophy courses apply only if taken prior to any 200- or higher level course.)"
+          }
+        ]
+      },
+      {
+        "id": "intro-order",
+        "parent_id": "major",
+        "entity_id": "programs:SkWn7eQ9o9",
+        "phase": "degree",
+        "kind": "restriction",
+        "label": "Normally, 100-level Philosophy courses apply only if taken before any course at the 200 level or higher",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "Normally, 100-level Philosophy courses apply only if taken before any course at the 200 level or higher",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-027bf9fb60fc36d3f5549b1f",
+            "quote": "Four electives, two of which must be at the 400-level. (Normally, 100-level Philosophy courses apply only if taken prior to any 200- or higher level course.)"
+          }
+        ]
+      },
+      {
+        "id": "elective-overlap",
+        "parent_id": "major",
+        "entity_id": "programs:SkWn7eQ9o9",
+        "phase": "degree",
+        "kind": "unresolved",
+        "label": "Reconcile elective count and credit wording",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "The prose requires four electives (two at 400 level); the structured list separately states 6 additional elective credits and 6 credits at 400 level. Confirm that these are the two parts of the same four-course elective requirement.",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-bcbe5f9745103647ea366094",
+            "quote": "Earn at least this many additional elective credits: 6"
+          },
+          {
+            "block_id": "b-f2cbb874d80c6d324c299512",
+            "quote": "Earned at least 6 credits from 400 - 499"
+          },
+          {
+            "block_id": "b-027bf9fb60fc36d3f5549b1f",
+            "quote": "Four electives, two of which must be at the 400-level. (Normally, 100-level Philosophy courses apply only if taken prior to any 200- or higher level course.)"
+          }
+        ]
+      },
+      {
+        "id": "major-grade",
+        "parent_id": "",
+        "entity_id": "programs:SkWn7eQ9o9",
+        "phase": "degree",
+        "kind": "restriction",
+        "label": "Only C or better, excluding C-, counts toward the Philosophy major",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "Only C or better, excluding C-, counts toward the Philosophy major",
+        "minimum_grade": "C",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-68084f3a50fb6094bfdb10c7",
+            "quote": "Note 1: Only courses in which a student has received a grade of \"C\" or better (not \"C-\") will be accepted toward the major."
+          }
+        ]
+      },
+      {
+        "id": "residency",
+        "parent_id": "",
+        "entity_id": "programs:SkWn7eQ9o9",
+        "phase": "degree",
+        "kind": "credits",
+        "label": "At least 15 credits of major course work completed at UNM",
+        "minimum": 15,
+        "maximum": null,
+        "unit": "credits",
+        "comparison": "at_least",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-3098e03a93d2b43f3846e621",
+            "quote": "Note 2: At least 15 credit hours of major coursework must be completed at UNM."
+          }
+        ]
+      },
+      {
+        "id": "other-degree",
+        "parent_id": "",
+        "entity_id": "programs:SkWn7eQ9o9",
+        "phase": "degree",
+        "kind": "credits",
+        "label": "At least 90 credits toward other degree requirements",
+        "minimum": 90,
+        "maximum": null,
+        "unit": "credits",
+        "comparison": "at_least",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-debfaebe3df1149a1163104c",
+            "quote": "Earn at least 90 credits from the following types of courses:"
+          },
+          {
+            "block_id": "b-051ed30878787dcf6a259c89",
+            "quote": "In addition to the program-specific requirements outlined here, all undergraduate students are required to fulfill UNM's General Education Program requirements and other general undergraduate degree requirements to earn a minimum of 120 credits. In some instances, courses included in an undergraduate degree program’s requirement may also fulfill a General Education requirement. Please review the General Education Program in this Catalog for General Education information. Students within the College of Arts and Sciences must also complete 1) a major and a minor; or 2) two majors; or 3) one of the special curricula of the College that requires no minor."
+          }
+        ]
+      },
+      {
+        "id": "general-ed",
+        "parent_id": "",
+        "entity_id": "programs:SkWn7eQ9o9",
+        "phase": "degree",
+        "kind": "restriction",
+        "label": "Complete UNM General Education and other general degree requirements; program courses may also fulfill Gen Ed",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "Complete UNM General Education and other general degree requirements; program courses may also fulfill Gen Ed",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-051ed30878787dcf6a259c89",
+            "quote": "In addition to the program-specific requirements outlined here, all undergraduate students are required to fulfill UNM's General Education Program requirements and other general undergraduate degree requirements to earn a minimum of 120 credits. In some instances, courses included in an undergraduate degree program’s requirement may also fulfill a General Education requirement. Please review the General Education Program in this Catalog for General Education information. Students within the College of Arts and Sciences must also complete 1) a major and a minor; or 2) two majors; or 3) one of the special curricula of the College that requires no minor."
+          }
+        ]
+      },
+      {
+        "id": "college-combination",
+        "parent_id": "",
+        "entity_id": "programs:SkWn7eQ9o9",
+        "phase": "degree",
+        "kind": "restriction",
+        "label": "Arts and Sciences: major/minor, two majors, or a special curriculum requiring no minor",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "Arts and Sciences: major/minor, two majors, or a special curriculum requiring no minor",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-051ed30878787dcf6a259c89",
+            "quote": "In addition to the program-specific requirements outlined here, all undergraduate students are required to fulfill UNM's General Education Program requirements and other general undergraduate degree requirements to earn a minimum of 120 credits. In some instances, courses included in an undergraduate degree program’s requirement may also fulfill a General Education requirement. Please review the General Education Program in this Catalog for General Education information. Students within the College of Arts and Sciences must also complete 1) a major and a minor; or 2) two majors; or 3) one of the special curricula of the College that requires no minor."
+          }
+        ]
+      },
+      {
+        "id": "degree-total",
+        "parent_id": "",
+        "entity_id": "programs:SkWn7eQ9o9",
+        "phase": "degree",
+        "kind": "credits",
+        "label": "At least 120 degree credits",
+        "minimum": 120,
+        "maximum": null,
+        "unit": "credits",
+        "comparison": "at_least",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-051ed30878787dcf6a259c89",
+            "quote": "In addition to the program-specific requirements outlined here, all undergraduate students are required to fulfill UNM's General Education Program requirements and other general undergraduate degree requirements to earn a minimum of 120 credits. In some instances, courses included in an undergraduate degree program’s requirement may also fulfill a General Education requirement. Please review the General Education Program in this Catalog for General Education information. Students within the College of Arts and Sciences must also complete 1) a major and a minor; or 2) two majors; or 3) one of the special curricula of the College that requires no minor."
+          },
+          {
+            "block_id": "b-82430845764c4917c7117657",
+            "quote": "Grand Total Credits: 120 - 121"
+          },
+          {
+            "block_id": "b-3cd30f944fe77d19a2f4972e",
+            "quote": "\"120\""
+          }
+        ]
+      },
+      {
+        "id": "prelaw",
+        "parent_id": "",
+        "entity_id": "specializations:B14OE7Ojsc",
+        "phase": "degree",
+        "kind": "all",
+        "label": "Pre-Law concentration curriculum",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-2519f51848ee8f70a350a66a",
+            "quote": "Complete all of the following"
+          }
+        ]
+      },
+      {
+        "id": "prelaw-logic",
+        "parent_id": "prelaw",
+        "entity_id": "specializations:B14OE7Ojsc",
+        "phase": "degree",
+        "kind": "choose_n",
+        "label": "Pre-Law: choose PHIL1120 or PHIL356",
+        "minimum": 1,
+        "maximum": null,
+        "unit": "courses",
+        "comparison": "at_least",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-7dc2a258ff0dbe693485555c",
+            "quote": "Complete at least 1 of the following:"
+          }
+        ]
+      },
+      {
+        "id": "course-60",
+        "parent_id": "prelaw-logic",
+        "entity_id": "specializations:B14OE7Ojsc",
+        "phase": "degree",
+        "kind": "course",
+        "label": "PHIL1120 - Logic, Reasoning, and Critical Thinking (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:S1-PH5Nqi5"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-4351832dbf4ccad58ba312a9",
+            "quote": "PHIL1120 - Logic, Reasoning, and Critical Thinking (3)"
+          }
+        ]
+      },
+      {
+        "id": "course-61",
+        "parent_id": "prelaw-logic",
+        "entity_id": "specializations:B14OE7Ojsc",
+        "phase": "degree",
+        "kind": "course",
+        "label": "PHIL356 - Symbolic Logic (3 - 4)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:SyoGqE9o5"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-3a49c47ab4021ff838b7145f",
+            "quote": "PHIL356 - Symbolic Logic (3 - 4)"
+          }
+        ]
+      },
+      {
+        "id": "course-63",
+        "parent_id": "prelaw",
+        "entity_id": "specializations:B14OE7Ojsc",
+        "phase": "degree",
+        "kind": "course",
+        "label": "PHIL2210 - Early Modern Philosophy (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:B1QAloN5s9"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-a64ef4129bde8a1e4e91c35a",
+            "quote": "PHIL2210 - Early Modern Philosophy (3)"
+          }
+        ]
+      },
+      {
+        "id": "course-64",
+        "parent_id": "prelaw",
+        "entity_id": "specializations:B14OE7Ojsc",
+        "phase": "degree",
+        "kind": "course",
+        "label": "PHIL352 - Theory of Knowledge (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:BkeUD5N9jc"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-44c74f64dd3df5842cc214ff",
+            "quote": "PHIL352 - Theory of Knowledge (3)"
+          }
+        ]
+      },
+      {
+        "id": "course-65",
+        "parent_id": "prelaw",
+        "entity_id": "specializations:B14OE7Ojsc",
+        "phase": "degree",
+        "kind": "course",
+        "label": "PHIL358 - Ethical Theory (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:HyjrcEcjc"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-3f5b926565ad1f26eb48aaba",
+            "quote": "PHIL358 - Ethical Theory (3)"
+          }
+        ]
+      },
+      {
+        "id": "course-66",
+        "parent_id": "prelaw",
+        "entity_id": "specializations:B14OE7Ojsc",
+        "phase": "degree",
+        "kind": "course",
+        "label": "PHIL381 - Philosophy of Law and Morals (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:Bkx_k9N9jc"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-5002b974cedd5c65276af2de",
+            "quote": "PHIL381 - Philosophy of Law and Morals (3)"
+          }
+        ]
+      },
+      {
+        "id": "prelaw-greek",
+        "parent_id": "prelaw",
+        "entity_id": "specializations:B14OE7Ojsc",
+        "phase": "degree",
+        "kind": "choose_n",
+        "label": "Pre-Law: PHIL2220 or PHIL2225",
+        "minimum": 1,
+        "maximum": null,
+        "unit": "courses",
+        "comparison": "at_least",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-354780c1fe5c487824d921af",
+            "quote": "Complete at least 1 of the following:"
+          }
+        ]
+      },
+      {
+        "id": "course-68",
+        "parent_id": "prelaw-greek",
+        "entity_id": "specializations:B14OE7Ojsc",
+        "phase": "degree",
+        "kind": "course",
+        "label": "PHIL2220 - Greek Philosophy (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:SyQhscE5s9"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-16601fa04ea5eacc632638a2",
+            "quote": "PHIL2220 - Greek Philosophy (3)"
+          }
+        ]
+      },
+      {
+        "id": "course-69",
+        "parent_id": "prelaw-greek",
+        "entity_id": "specializations:B14OE7Ojsc",
+        "phase": "degree",
+        "kind": "course",
+        "label": "PHIL2225 - Greek Thought (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:HymzRqVcjc"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-7c576bfa20ba5979d010d8dc",
+            "quote": "PHIL2225 - Greek Thought (3)"
+          }
+        ]
+      },
+      {
+        "id": "prelaw-political",
+        "parent_id": "prelaw",
+        "entity_id": "specializations:B14OE7Ojsc",
+        "phase": "degree",
+        "kind": "choose_n",
+        "label": "Pre-Law: PHIL371 or PHIL372",
+        "minimum": 1,
+        "maximum": null,
+        "unit": "courses",
+        "comparison": "at_least",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-98883dbb1f6ad536afc2af0d",
+            "quote": "Complete at least 1 of the following:"
+          }
+        ]
+      },
+      {
+        "id": "course-71",
+        "parent_id": "prelaw-political",
+        "entity_id": "specializations:B14OE7Ojsc",
+        "phase": "degree",
+        "kind": "course",
+        "label": "PHIL371 - Classical Social and Political Philosophy (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:SJj05Eqi9"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-3df681f34185d7e4721ad316",
+            "quote": "PHIL371 - Classical Social and Political Philosophy (3)"
+          }
+        ]
+      },
+      {
+        "id": "course-72",
+        "parent_id": "prelaw-political",
+        "entity_id": "specializations:B14OE7Ojsc",
+        "phase": "degree",
+        "kind": "course",
+        "label": "PHIL372 - Modern Social and Political Philosophy (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:SyQCFV9jq"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-1e16f5a014fd2e744c28e207",
+            "quote": "PHIL372 - Modern Social and Political Philosophy (3)"
+          }
+        ]
+      },
+      {
+        "id": "prelaw-electives",
+        "parent_id": "prelaw",
+        "entity_id": "specializations:B14OE7Ojsc",
+        "phase": "degree",
+        "kind": "credits",
+        "label": "Pre-Law: at least 9 elective credits",
+        "minimum": 9,
+        "maximum": null,
+        "unit": "credits",
+        "comparison": "at_least",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-9a06f14558e5ef093c432733",
+            "quote": "Earn at least 9 credits from the following types of courses:"
+          }
+        ]
+      },
+      {
+        "id": "prelaw-elective-count",
+        "parent_id": "prelaw",
+        "entity_id": "specializations:B14OE7Ojsc",
+        "phase": "degree",
+        "kind": "course_pool",
+        "label": "Pre-Law: three electives, including two at 300 level or above",
+        "minimum": 3,
+        "maximum": null,
+        "unit": "courses",
+        "comparison": "at_least",
+        "value": "Philosophy electives; at least two at the 300 level or above",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-f4d48a06eb891e4a39aee8aa",
+            "quote": "Three electives, two of which must be at the 300-level or above"
+          }
+        ]
+      },
+      {
+        "id": "prelaw-grade",
+        "parent_id": "",
+        "entity_id": "specializations:B14OE7Ojsc",
+        "phase": "degree",
+        "kind": "restriction",
+        "label": "Pre-Law major courses: C or better, excluding C-",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "Pre-Law major courses: C or better, excluding C-",
+        "minimum_grade": "C",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-90958fce18ee311559baedd2",
+            "quote": "Note 1: Only courses in which a student has received a grade of \"C\" or better (not \"C-\") will be accepted toward the major."
+          }
+        ]
+      },
+      {
+        "id": "prelaw-residency",
+        "parent_id": "",
+        "entity_id": "specializations:B14OE7Ojsc",
+        "phase": "degree",
+        "kind": "credits",
+        "label": "Pre-Law: 15 major credits at UNM",
+        "minimum": 15,
+        "maximum": null,
+        "unit": "credits",
+        "comparison": "at_least",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-fc30755f203bb63d624e4493",
+            "quote": "Note 2: At least 15 credit hours of major coursework must be completed at UNM."
+          }
+        ]
+      },
+      {
+        "id": "prelaw-total",
+        "parent_id": "",
+        "entity_id": "specializations:B14OE7Ojsc",
+        "phase": "degree",
+        "kind": "credits",
+        "label": "Pre-Law concentration: 30–31 credits",
+        "minimum": 30,
+        "maximum": 31,
+        "unit": "credits",
+        "comparison": "at_least",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-e3fa7ff6612d4ffcb32dddc0",
+            "quote": "Grand Total Credits: 30 - 31"
+          }
+        ]
+      },
+      {
+        "id": "concentration-scope",
+        "parent_id": "",
+        "entity_id": "specializations:B14OE7Ojsc",
+        "phase": "degree",
+        "kind": "unresolved",
+        "label": "How does Pre-Law replace the base major requirements?",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "Pre-Law lists a distinct complete 30–31 credit curriculum. Confirm which base-major requirements it replaces; do not add both complete curricula together.",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-2519f51848ee8f70a350a66a",
+            "quote": "Complete all of the following"
+          },
+          {
+            "block_id": "b-e3fa7ff6612d4ffcb32dddc0",
+            "quote": "Grand Total Credits: 30 - 31"
+          }
+        ]
+      }
+    ],
+    "coverage": [
+      {
+        "block_id": "b-7343a5e2d63d6fc3864304cf",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Program description or encouragement, not an additional required course. PHIL356 is recommended for graduate study, not separately mandated."
+      },
+      {
+        "block_id": "b-55ae03359475941e3c47f119",
+        "disposition": "requirements",
+        "node_ids": [
+          "admit-attempted",
+          "admit-applicable"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-697b8aafef43b26b1f21845b",
+        "disposition": "requirements",
+        "node_ids": [
+          "admit-gpa-cumulative"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-bba4ccdd895c0c61ab20ecfa",
+        "disposition": "requirements",
+        "node_ids": [
+          "admit-gpa-transfer"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-63d9ac11c798d7e81b473237",
+        "disposition": "requirements",
+        "node_ids": [
+          "admit-gpa-continuing"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-dac8fc4014b168455835e616",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Structural introduction to the following conditions; the conditions are represented individually."
+      },
+      {
+        "block_id": "b-72b2d195a6825ee602965b3d",
+        "disposition": "requirements",
+        "node_ids": [
+          "admit-gened-6"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-5d061d59eebcc60bffeec2ef",
+        "disposition": "requirements",
+        "node_ids": [
+          "admit-gened-7"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-83fd11d474cdd65b71758691",
+        "disposition": "requirements",
+        "node_ids": [
+          "admit-gened-8"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-973c84e5b05d224c6f5a5138",
+        "disposition": "unresolved",
+        "node_ids": [
+          "admit-courses",
+          "admit-course-overlap"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-703fba180623039187d0f154",
+        "disposition": "unresolved",
+        "node_ids": [
+          "admit-courses",
+          "admit-course-overlap"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-f952bc6e35259af277a25bb7",
+        "disposition": "unresolved",
+        "node_ids": [
+          "admit-courses",
+          "admit-course-overlap"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-7fcd3de2497ea5546ad54b1b",
+        "disposition": "requirements",
+        "node_ids": [
+          "major"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-c1a5d16d568399f06d20d2b2",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Structural introduction to the following conditions; the conditions are represented individually."
+      },
+      {
+        "block_id": "b-09a8ddfb92f081b54d91176c",
+        "disposition": "requirements",
+        "node_ids": [
+          "course-14"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-d8037a1f739544cdd32acc10",
+        "disposition": "requirements",
+        "node_ids": [
+          "ancient"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-ceef1810e3aefeea64089e40",
+        "disposition": "requirements",
+        "node_ids": [
+          "course-16"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-749cdb08b59b693af08562d1",
+        "disposition": "requirements",
+        "node_ids": [
+          "course-17"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-c65702c686a199861717ceb3",
+        "disposition": "requirements",
+        "node_ids": [
+          "logic"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-ddceebfad0fb1234c224de65",
+        "disposition": "requirements",
+        "node_ids": [
+          "course-19"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-ae54960734487ad7bed26f09",
+        "disposition": "requirements",
+        "node_ids": [
+          "course-20"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-c18996397f53382bba9aabbe",
+        "disposition": "requirements",
+        "node_ids": [
+          "ethics"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-6773480dc05a78d326c1ea17",
+        "disposition": "requirements",
+        "node_ids": [
+          "course-22"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-77aeae3a6d07c740d589f1be",
+        "disposition": "requirements",
+        "node_ids": [
+          "course-23"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-97a96624fa6f63dd7834fc1d",
+        "disposition": "requirements",
+        "node_ids": [
+          "course-24"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-b732307f0f6924ea703ebcf6",
+        "disposition": "requirements",
+        "node_ids": [
+          "course-25"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-d31ce14128ea4425c41512cc",
+        "disposition": "requirements",
+        "node_ids": [
+          "asian"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-f964e30c97a5db133a36cdf0",
+        "disposition": "requirements",
+        "node_ids": [
+          "course-27"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-26828cb25724b73c2ca34933",
+        "disposition": "requirements",
+        "node_ids": [
+          "course-28"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-3aa54cc1e383626c7da6d542",
+        "disposition": "requirements",
+        "node_ids": [
+          "course-29"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-24f8a883eaf61bfd1659f0d6",
+        "disposition": "requirements",
+        "node_ids": [
+          "knowledge"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-2a10cf43fea7f451a3986b4a",
+        "disposition": "requirements",
+        "node_ids": [
+          "course-31"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-8e68bccb48af405100f54d53",
+        "disposition": "requirements",
+        "node_ids": [
+          "course-32"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-d426d11565c1820857b189e0",
+        "disposition": "requirements",
+        "node_ids": [
+          "course-33"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-d5762d41c5965c52df24c43e",
+        "disposition": "requirements",
+        "node_ids": [
+          "course-34"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-bcbe5f9745103647ea366094",
+        "disposition": "unresolved",
+        "node_ids": [
+          "elective-credits",
+          "elective-overlap"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-f2cbb874d80c6d324c299512",
+        "disposition": "unresolved",
+        "node_ids": [
+          "elective-upper",
+          "elective-overlap"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-027bf9fb60fc36d3f5549b1f",
+        "disposition": "unresolved",
+        "node_ids": [
+          "elective-count",
+          "intro-order",
+          "elective-overlap"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-68084f3a50fb6094bfdb10c7",
+        "disposition": "requirements",
+        "node_ids": [
+          "major-grade"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-3098e03a93d2b43f3846e621",
+        "disposition": "requirements",
+        "node_ids": [
+          "residency"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-6b03218376e0cd465deb5d28",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Program description or encouragement, not an additional required course. PHIL356 is recommended for graduate study, not separately mandated."
+      },
+      {
+        "block_id": "b-debfaebe3df1149a1163104c",
+        "disposition": "requirements",
+        "node_ids": [
+          "other-degree"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-051ed30878787dcf6a259c89",
+        "disposition": "requirements",
+        "node_ids": [
+          "other-degree",
+          "general-ed",
+          "college-combination",
+          "degree-total"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-82430845764c4917c7117657",
+        "disposition": "requirements",
+        "node_ids": [
+          "degree-total"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-713947ff9967d20322fd2f55",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this field."
+      },
+      {
+        "block_id": "b-9fa3718cb25c57941282aff5",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this field."
+      },
+      {
+        "block_id": "b-cce0edf407a677ec5692f98e",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this field."
+      },
+      {
+        "block_id": "b-1d0689543f2d5984402a027f",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this field."
+      },
+      {
+        "block_id": "b-cd8c85eb85f96c4ee80affb2",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this field."
+      },
+      {
+        "block_id": "b-94464b2b93553f22a7c60896",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this field."
+      },
+      {
+        "block_id": "b-26af9b70d0f340c38625ee59",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this field."
+      },
+      {
+        "block_id": "b-3cd30f944fe77d19a2f4972e",
+        "disposition": "requirements",
+        "node_ids": [
+          "degree-total"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-22f7160a23bc54754ebc6409",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this field."
+      },
+      {
+        "block_id": "b-fa2c28c3a9770172b9296a3b",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this field."
+      },
+      {
+        "block_id": "b-a41c81ba73b41b709766fb3e",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this field."
+      },
+      {
+        "block_id": "b-89218d9f11f6cfb9c1e2f37e",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "The program does not mandate a concentration; optional concentration requirements are scoped separately."
+      },
+      {
+        "block_id": "b-1d80b1e420ed41c01b392591",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this field."
+      },
+      {
+        "block_id": "b-920efa6aa1ed04e2229de3bc",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Program description or encouragement, not an additional required course. PHIL356 is recommended for graduate study, not separately mandated."
+      },
+      {
+        "block_id": "b-2519f51848ee8f70a350a66a",
+        "disposition": "unresolved",
+        "node_ids": [
+          "prelaw",
+          "concentration-scope"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-7dc2a258ff0dbe693485555c",
+        "disposition": "requirements",
+        "node_ids": [
+          "prelaw-logic"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-4351832dbf4ccad58ba312a9",
+        "disposition": "requirements",
+        "node_ids": [
+          "course-60"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-3a49c47ab4021ff838b7145f",
+        "disposition": "requirements",
+        "node_ids": [
+          "course-61"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-334098436f564834aeaa589d",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Structural introduction to the following conditions; the conditions are represented individually."
+      },
+      {
+        "block_id": "b-a64ef4129bde8a1e4e91c35a",
+        "disposition": "requirements",
+        "node_ids": [
+          "course-63"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-44c74f64dd3df5842cc214ff",
+        "disposition": "requirements",
+        "node_ids": [
+          "course-64"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-3f5b926565ad1f26eb48aaba",
+        "disposition": "requirements",
+        "node_ids": [
+          "course-65"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-5002b974cedd5c65276af2de",
+        "disposition": "requirements",
+        "node_ids": [
+          "course-66"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-354780c1fe5c487824d921af",
+        "disposition": "requirements",
+        "node_ids": [
+          "prelaw-greek"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-16601fa04ea5eacc632638a2",
+        "disposition": "requirements",
+        "node_ids": [
+          "course-68"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-7c576bfa20ba5979d010d8dc",
+        "disposition": "requirements",
+        "node_ids": [
+          "course-69"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-98883dbb1f6ad536afc2af0d",
+        "disposition": "requirements",
+        "node_ids": [
+          "prelaw-political"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-3df681f34185d7e4721ad316",
+        "disposition": "requirements",
+        "node_ids": [
+          "course-71"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-1e16f5a014fd2e744c28e207",
+        "disposition": "requirements",
+        "node_ids": [
+          "course-72"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-9a06f14558e5ef093c432733",
+        "disposition": "requirements",
+        "node_ids": [
+          "prelaw-electives"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-f4d48a06eb891e4a39aee8aa",
+        "disposition": "requirements",
+        "node_ids": [
+          "prelaw-elective-count"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-90958fce18ee311559baedd2",
+        "disposition": "requirements",
+        "node_ids": [
+          "prelaw-grade"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-fc30755f203bb63d624e4493",
+        "disposition": "requirements",
+        "node_ids": [
+          "prelaw-residency"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-94d79e11c8b219bd8314f594",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Program description or encouragement, not an additional required course. PHIL356 is recommended for graduate study, not separately mandated."
+      },
+      {
+        "block_id": "b-e3fa7ff6612d4ffcb32dddc0",
+        "disposition": "unresolved",
+        "node_ids": [
+          "prelaw-total",
+          "concentration-scope"
+        ],
+        "explanation": "Interpretation preserves this passage in the linked requirement(s)."
+      },
+      {
+        "block_id": "b-83b77d092e9c071be4eb5aca",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this field."
+      },
+      {
+        "block_id": "b-9563fe486649cf0b90e59aab",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this field."
+      },
+      {
+        "block_id": "b-fe999ea7d34c2cf53b57b7b6",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this field."
+      },
+      {
+        "block_id": "b-d7f1ebabf37457c2e293191c",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this field."
+      },
+      {
+        "block_id": "b-095a63840a2a1801aee73b19",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this field."
+      }
+    ],
+    "questions": []
+  }
+}

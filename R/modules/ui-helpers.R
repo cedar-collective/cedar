@@ -207,13 +207,13 @@ cedar_snapshot_table <- function(spec) {
 # detail views that can be dismissed without taking an app action.
 # scrollable = TRUE keeps a long dialog inside the screen and scrolls its body.
 cedar_info_modal <- function(title, ..., size = "m", close_label = "Close",
-                             easyClose = TRUE, scrollable = FALSE) {
+                             easyClose = TRUE, scrollable = FALSE, footer = NULL) {
   modal <- modalDialog(
     title = title,
     ...,
     size = size,
     easyClose = easyClose,
-    footer = modalButton(close_label)
+    footer = if (is.null(footer)) modalButton(close_label) else footer
   )
   if (!scrollable) return(modal)
   htmltools::tagQuery(modal)$find(".modal-dialog")$addClass("modal-dialog-scrollable")$allTags()

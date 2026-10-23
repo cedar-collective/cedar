@@ -15,6 +15,8 @@ A per-function index of `R/branches/`, `R/cones/`, and `R/features/`. `AGENTS.md
 | `catalog-extraction.R` | `catalog_program_scope(index, credentials)`, `extract_catalog_rule_tree(html)`, `extract_catalog_record(record, kind, receipt, edition, schemas, fields)`, `catalog_rule_rows(record, section)` | Preserve captured list nesting, named wrappers, grade thresholds, source evidence and unresolved conditions; classify explicit credential scope |
 | `catalog-comparison.R` | `catalog_section_rows(record)`, `compare_catalog_sections(before, after)` | Compare source wording, explicit structure, formatting and metadata without eligibility/equivalence inference |
 | `catalog-milestones.R` | `resolve_catalog_milestones(records)`, `catalog_milestone_rows(records, rules)` | Shared standing/admission identities, program-link resolution and captured admission-policy context; preserves status predicates without inferring student eligibility, credits or semester placement |
+| `catalog-review.R` | `build_catalog_review_items(records, nodes, issues)`, `catalog_review_program_entities(records, program_id)`, `filter_catalog_review(payload, program, kind, phase)`, `catalog_review_tree_text(tree, level)` | Actionable unreviewed work list, program reference closure and draft structure display; references never establish requirements |
+| `catalog-normalization.R` | `catalog_normalization_blocks(html, section, record)`, `validate_catalog_normalization(proposal, request)`, `catalog_normalization_review_state(proposal)`, `edit_catalog_normalization(state, proposal, request)`, `catalog_normalization_decision(state, type, id, decision, note)`, `catalog_normalization_issues(state)`, `approve_catalog_normalization(state)`, `clear_catalog_normalization_flag(state, type, id, note)` | Faithful source passages, fixed normalized graph/evidence/coverage validation and pure human-review transitions; edits reset approvals |
 | `degree-requirements.R` | `degree_rule_outline(catalog, catalog_ids)`, `degree_math_start_choices(roadmaps, catalog_id)`, `build_degree_roadmap(catalog, roadmaps, catalog_id, math_start, english_start)` (built from `resolve_degree_entry_routes()`, `prepare_degree_roadmap_nodes()`, `schedule_degree_roadmap(nodes, links, conditions, max_load)` and `allocate_degree_semester_credits(nodes, loads, policy, completed_credits)`), `assign_degree_roadmap_rows(nodes)`, `build_degree_allowance_slots(terms, slot_credits)`, `degree_semester_seasons(semesters, start_season)`, `get_degree_chain_metrics(nodes, links, conditions = NULL)` (counts plus `upstream_ids` / `downstream_ids`, so the browser never walks the graph), `attach_degree_roadmap_evidence(nodes, roadmaps, catalog, catalog_id)`, `attach_pathway_groups(rows, groups)`, `degree_path_course_table(paths, group_id)` | Preserve rule trees, select program-specific math routes, schedule complete workloads with early foundations, later upper-level courses, semester floors and credit limits, align authored course families beneath Gen Ed options without rescheduling, compute prerequisite chains, resolve quoted evidence, and classify descriptive coursework; no eligibility inference |
 | `population.R` | `build_population(programs, degrees, students, opt)` | Build student populations for analysis; returns tibble with `student_id` + classification columns. The central cohort-building function. |
 | | `get_focal_programs(programs, opt)` | Resolve program names/codes to canonical list for population filters |
@@ -158,6 +160,29 @@ fetch = fetch_public_source, pause = 0.1)` and verified
 `catalog-analysis.R` exposes `analyze_degree_catalog(directory, output)` and
 `compare_degree_catalog_scans(before, after, output)` and verified
 `read_catalog_analysis(path, read_sections = TRUE)`. These produce/read unreviewed
+artifacts, never runtime requirement or planning edits.
+`catalog-review.R` exposes `list_catalog_review_scans(root)`,
+`catalog_review_cache_key(root, scan_id)`, `load_catalog_review(root, scan_id)`
+and `catalog_review_detail(payload, item_id)`.
+These discover local archives and retrieve full source fields through verified
+receipts and JSON pointers, including embedded concentrations. Review artifacts
+are verified before cache lookup; original source blobs are verified on Inspect.
+The read-only
+`catalogReviewUI(id, catalog, roadmaps)` / `catalogReviewServer(id, root, active, catalog, roadmaps,
+review_root, shared)` module mounts under Admin > Data & Usage.
+It defaults to `degreePlanRulesUI/Server(id, catalog, roadmaps)`, using
+`build_degree_plan_rules(catalog, roadmaps, view)` for the actual graph. Optional
+`catalogNormalizationUI(id)` / `catalogNormalizationServer(id, root, capture_root, active, draft_dir)` is under
+Draft interpretations;
+legacy extraction diagnostics remain lazy. `features/catalog-normalization.R`
+provides `prepare_catalog_normalization(payload, program_id, root, prompt, schema)`,
+`load_catalog_normalization_program(root, key)`, `import_catalog_normalization(root,
+unit, path, model)`, `read_catalog_normalization_review(root, unit, imported)`,
+`save_catalog_normalization_review(root, unit, imported, state, reviewer, expected_head)`,
+`stage_catalog_normalization_drafts(root, directory, capture_root)` and
+`export_catalog_normalization(program, unit, imported, state)`. Source-bound
+packets, original AI responses and attributed review revisions are separate
+files; no model calls or runtime compilation. See [catalog-normalization.md](catalog-normalization.md).
 
 `features/degree-explorer.R`: `build_degree_course_history()` resolves exact tile
 components and assembles one typed popup table without guessing historical equivalences.

@@ -324,9 +324,31 @@ Plan: [ADR-002](docs/developers/adr-002-explicit-mapping-files.md).
   course-link closure, verified resume, offline extraction and edition diffs.
   Contract: `docs/developers/catalog-scanning.md`. Scans do not update runtime
   degree files or certify academic interpretation.
+- [x] Admin > Data & Usage > Catalog Review: local scan selection, degree/type
+  filters, narrative and source queues, full captured evidence and draft
+  structure, all-section validation inventory, and CSV export. Read-only;
+  inspection never promotes a rule or edits an archive.
 - [x] Recognize standard minimum-grade/list rules without an ignore list;
   preserve grade scope, wrapped named groups, source citations and unreviewed
   status. Qualified language and unresolved courses remain actionable flags.
+- [x] Extract shared class-standing and program-admission milestones, preserving
+  Junior/Senior alternatives, explicit exclusions, source IDs and admission-policy
+  context. Admin Catalog Review lists their uses; status is not inferred from
+  semesters, credits or completed coursework. Runtime enforcement awaits review.
+- [x] Evidence-bound AI export/import pilot for complete programs and separate
+  shared course units: fixed schema, complete source-passage coverage, validated
+  imports and attributed append-only human reviews. Admin defaults to Program
+  review; the phrase parser remains available as Extraction diagnostics.
+  Contract: `docs/developers/catalog-normalization.md`. API calls are deferred.
+- [x] Solo-maintainer review: versioned AI-assisted drafts for the four pilot
+  programs load automatically beside catalog evidence. File exchange UI is
+  commented out; one whole-unit sign-off replaces individual rule/passage clicks.
+  Unresolved cases remain explicit and block sign-off. Linked-course drafts and
+  runtime compilation remain separate work.
+- [x] Explain Degree Explorer with a shared readable rule list in the graph and
+  Admin, generated from the actual saved courses, groups, edges, conditions and
+  settings, with catalog wording/links and labeled preferences. Parser diagnostics
+  and optional draft approvals remain separate advanced views.
 - [x] Add Nursing (Freshman Direct Entry), Population Health, Medical Laboratory
   Sciences and Radiologic Sciences (Nuclear Medicine) prototypes, preserving
   source gaps/conflicts, required clinical blocks and the semester credit cap.
@@ -342,6 +364,10 @@ Plan: [ADR-002](docs/developers/adr-002-explicit-mapping-files.md).
   selectable choices and confirmed flexible-area interpretation. Nursing can
   expose Gen Ed needs that do not fit whole existing allowance slots; redistribute
   the cohort template without silently adding credits or certifying completion.
+- [ ] Connect AI API automation to the same proposal/review boundary; evaluate
+  interpretations and omissions on the four-program pilot before scaling up.
+- [ ] Compile approved canonical catalog rules into runtime degree tables and
+  selected-route templates; review exports do not yet change degree plans.
 - [ ] Add selectable elective/science routes, all course restrictions, admission
   milestones, offering constraints and transfer-credit scenarios.
 - [ ] Review complete programs with different entry rules, elective structures

@@ -101,3 +101,12 @@ kept lazy because its independent provider/graduate analyses and protected
 instructor detail have different scopes. Never add plots or palette values to
 these cached payloads; extend the tab's data tables and `rebuild_*()` helper.
 
+Catalog Review uses Shiny's app-level bounded memory cache for its unfiltered
+prepared data. `catalog_review_cache_key(root, scan_id)` verifies actual artifact
+bytes before returning a key covering location, analysis hashes/provenance and a
+manual payload version. The frozen capture configuration is source provenance,
+not live app settings. Widgets, filters and presentation remain outside the
+cache. Original source blobs are verified on each Inspect; the full archive is
+verified by the offline scanner. Returning to the tab retains the session's
+snapshot; Refresh rechecks artifacts and can reuse the same content-keyed data.
+

@@ -31,6 +31,9 @@ optional styling suggestions. The data/API contract is in
   alternatives, prerequisite edges, enrollment conditions and policy values used
   by the selected roadmap. Do not require a second parser or an AI proposal to
   explain an existing prototype.
+- Admin > Data & Usage > Catalog Review opens **Visualization rules**. The graph
+  exposes the same list through **Rules behind this plan**. Keep one renderer
+  and payload so these views agree; provide a readable CSV download.
 - Put captured wording and program/course links beside rules. Label each role:
   recorded catalog policy, displayed course/choice, enforced ordering/budget
   constraint, or CEDAR planning preference. Recording GPA/admission rules does
@@ -143,7 +146,7 @@ optional styling suggestions. The data/API contract is in
   degree minimum. Fit whole area slots into existing semester allowances and
   preserve remainders. If a need cannot fit, expose it for redistribution;
   never silently drop it. Shared rules are loaded once per edition at startup
-  and passed explicitly to Degree Explorer.
+  and passed explicitly to both Degree Explorer and Admin Visualization rules.
 - Hovering an allowance explains that no course is selected. Do not invent
   prerequisite arrows, a green zero-prerequisite rating, or a catalog excerpt
   for a planning allowance. Its popup links to the relevant area or degree
@@ -258,6 +261,15 @@ optional styling suggestions. The data/API contract is in
 
 ## Evidence and annual updates
 
+- Interpret complete catalog programs with evidence-bound AI proposals and human
+  review. Retain deterministic source capture/validation; the phrase parser is
+  a diagnostic rather than the primary semantic interpreter. Every source
+  passage needs an explicit coverage decision, including informational prose,
+  so reviewers can detect omissions. Preserve the original response and human
+  revisions separately. Edits reset approvals; new source/prompt/schema inputs
+  need new review. No unreviewed proposal enters the planner or projections.
+  Contract: [catalog-normalization.md](catalog-normalization.md).
+
 - The catalog is the authority. Program pages establish degree requirements;
   course pages establish prerequisites/corequisites. A course description alone
   does not establish that the degree requires it.
@@ -295,6 +307,12 @@ optional styling suggestions. The data/API contract is in
   explicit review items; no scanner or AI proposal may overwrite approved
   requirements, invent prerequisite edges or regenerate authored semester
   suggestions without the applicable review. Contract: [catalog-scanning.md](catalog-scanning.md).
+- Admin catalog review must show each flagged excerpt with its full captured
+  section, next review action, field pointer and verified source hash. Preserve
+  list nesting; never send a fragment to an interpreter without its context.
+  Keep source checks separate from interpretation and expose parsed sections
+  for validation too. Opening or exporting a queue never marks anything reviewed
+  or edits the source archive or runtime requirement files.
 - Preserve supported, tested patterns when reading legacy parser analyses;
   new semantic interpretations use complete-program AI proposals with human
   review. Do not maintain an ignore list. Preserve each grade threshold, selection count and its nested
@@ -312,6 +330,22 @@ optional styling suggestions. The data/API contract is in
   explicit program-policy evidence. Extracted gates stay in Catalog Review until
   the reviewed compiler can add them to runtime plans; recognition alone does not
   authorize eligibility decisions or automatic semester placement.
+- The review queue must reuse prepared data when returning to its tab and render
+  controls only for visible rows. Verify review artifacts before cache lookup;
+  verify original source bytes on every Inspect instead of reading the entire
+  archive just to display a page. Label this verification boundary clearly.
+  Keep full verification in the offline scanner and preserve filters on return.
+- Keep AI interpretations in versioned institution JSON files, with producer,
+  catalog/unit identities, exact citations and complete passage coverage. Stage
+  them through validation into immutable proposals; never infer human approval
+  from staging. For the solo-maintainer workflow, file-exchange UI stays commented
+  out while drafts load automatically. Preserve that backend for future use.
+- Require one explicit sign-off per complete program/concentration or course
+  unit, rather than clicks for every routine rule and source passage. Show a
+  concise case list for unresolved meaning, conflicts, questions and human flags;
+  do not duplicate one case for every supporting passage. Review the complete
+  comparison initially; focus later detailed work on edge cases and changed
+  language. Edits reopen sign-off, and open cases block reviewed export.
 - `transcribed` means saved from the source, not approved by an academic advisor.
   Preserve `conflict` until resolved. Human-reviewed rules may be marked
   `reviewed`; never infer that status from successful code tests.

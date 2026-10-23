@@ -6343,6 +6343,10 @@ output$enrl_classlist_download <- downloadHandler(
   # Cache Management (Shiny module)
   # ===========================================================================
   cacheServer("cache")
+  catalogReviewServer("catalog_review", file.path(data_dir, "catalog-scans", cedar_institution_id()),
+    catalog = CEDAR_DEGREE_CATALOG, roadmaps = CEDAR_DEGREE_ROADMAPS, shared = CEDAR_SHARED_REQUIREMENTS,
+    active = reactive(identical(input$main_navbar, "Data & Usage") &&
+      identical(input$data_usage_tabs, "Catalog Review")))
 
   # =============================================================================
   # Pathways tab — population-aware curriculum analytics (Shiny module)
