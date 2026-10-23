@@ -44,7 +44,7 @@ recurrence is recognizable.
 | [I8](#i8--a-timing-log-row-is-silently-dropped-when-the-write-lock-times-out) | Defect | A timing-log row is dropped when the write lock times out |
 | [I6](#i6--a-killed-projection-rebuild-strands-its-lock-and-blocks-every-later-refresh) | Defect | A killed projection rebuild strands its lock |
 | [I4](#i4--pre-change-course-ratios-are-confounded-by-career-stage) | Defect | Pre-change course ratios confounded by career stage (deferred) |
-| M1–M33 | Improvement | See [Improvements](#improvements) |
+| M1–M34 | Improvement | See [Improvements](#improvements) |
 
 ---
 
@@ -1985,6 +1985,19 @@ grade edge. *Done when:* each such place has a visible note.
 **M6 — The usage overview is not yet glanceable.** *Done when:* Admin → Data &
 Usage → Usage Overview leads with key counts, unique users, departments, active
 tabs, and trend, with detail behind it.
+
+**M34 — Low Enrollment's schedule view rounds the history average before
+judging it.** `get_enrollment_concerns()` (`R/branches/enrl.R`) stores
+`avg_enrl` rounded to one decimal, and the severity rule in `server.R`
+(`enrl_val < .threshold`, concerns mode) compares that rounded value: a course
+averaging 11.96 against a threshold of 12 rounds to 12.0 and lands in "near
+threshold" instead of "watch". The severity `case_when` is also business logic
+in the server. Its alerts-mode summary also puts seven cards on a six-column
+grid, so "Avg Enrollment" wraps onto a row of its own (unseen until 2026-10-23,
+when a CSS rule that kept the cards from ever rendering was removed). *Done
+when:* the cone returns the unrounded average, the table rounds for display
+only, the severity rule moves into a tested branch helper, and the cards fit one
+row.
 
 ### Testing and pipeline safety
 

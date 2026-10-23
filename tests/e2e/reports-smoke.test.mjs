@@ -351,6 +351,19 @@ export async function runReportChecks({ scope = 'smoke', synthetic = false } = {
           !!document.querySelector('[data-definition-id="registered"]') &&
           !!document.querySelector('[data-definition-id="census-enrollment"]');
       }, { timeout: STEP_TIMEOUT, polling: 500 });
+
+      // TERM has registrations, so Low Enrollment reports its sections (alerts),
+      // never the schedule-only history comparison meant for a term nobody has joined.
+      await clickSubTabIn(page, 'enrl_output_tabs', 'Low Enrollment');
+      await waitForOutput(page, 'Low Enrollment summary', [
+        { type: 'text', id: 'low_enrl_summary', disallowed: ['Gather Enrollments'] },
+      ]);
+      const lowEnrl = await page.evaluate(() => ({
+        summary: document.getElementById('low_enrl_summary')?.innerText || '',
+        banner: document.getElementById('enrl_mode_banner')?.innerText || '',
+      }));
+      assert.match(lowEnrl.summary, /Total Courses|No courses of concern/);
+      assert.doesNotMatch(lowEnrl.banner, /Schedule only/);
     });
 
     await withStep(page, [], 'Regstats runs', async () => {
