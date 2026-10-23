@@ -373,6 +373,7 @@ ui <- page_navbar(
   id = "main_navbar",  # Add ID to enable tab switching
 
   tags$head(
+    tags$script(src = "cedar-navigation.js"),
     # Switch to the URL-requested tab immediately at DOM-ready, before the Shiny
     # WebSocket connects. This prevents the homepage from showing for 5-7 seconds
     # while Shiny initializes. The server observer still runs later to set filter

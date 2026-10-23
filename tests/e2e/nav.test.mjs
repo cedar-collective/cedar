@@ -57,6 +57,30 @@ const back = (page) => page.evaluate(() => history.back());
   console.log('navigating to', BASE);
   await page.goto(BASE, { waitUntil: 'domcontentloaded', timeout: 60000 });
 
+  const navTargets = await page.evaluate(() => [...document.querySelectorAll('.navbar a[data-value]:not(.dropdown-toggle)')].map(link => {
+    const target = link.getAttribute('href');
+    const panels = target?.startsWith('#') ? [...document.querySelectorAll('[id]')].filter(el => `#${el.id}` === target) : [];
+    return { value: link.dataset.value, matches: panels.length, panel: panels[0]?.dataset.value };
+  }));
+  check('every primary navigation link targets exactly its own panel',
+    navTargets.length > 0 && navTargets.every(x => x.matches === 1 && x.value === x.panel));
+  const collisionFixed = await page.evaluate(() => {
+    const links = [...document.querySelectorAll('#main_navbar a[data-value]:not(.dropdown-toggle)')];
+    const panels = links.map(link => document.getElementById(link.getAttribute('href').slice(1)));
+    // Reproduce the actual bslib collision, then require the production repair
+    // to restore every mapping without changing nested subtabs or active state.
+    const nested = [...document.querySelectorAll('.tab-pane .tab-pane')].map(panel => [panel, panel.id]);
+    const active = panels.map(panel => panel.classList.contains('active'));
+    panels.forEach(panel => { panel.id = 'forced-nav-collision'; });
+    links.forEach(link => link.setAttribute('href', '#forced-nav-collision'));
+    window.cedarEnsureNavTargets('main_navbar');
+    return links.every((link, i) => document.getElementById(link.getAttribute('href').slice(1)) === panels[i]) &&
+      new Set(panels.map(panel => panel.id)).size === panels.length &&
+      nested.every(([panel, id]) => panel.id === id) &&
+      panels.every((panel, i) => panel.classList.contains('active') === active[i]);
+  });
+  check('colliding menu IDs are repaired without changing nested tabs or selection', collisionFixed);
+
   // 1. Shiny connects and my code stamps the bare URL with ?tab=home.
   //    The first connection runs global.R (heavy data load) — allow time.
   const connected = await waitFor(page, () => location.search.includes('tab='),

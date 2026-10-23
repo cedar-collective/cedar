@@ -76,6 +76,10 @@ Named atomic vectors can trigger jsonlite warnings such as `Input to asJSON(keep
 **Loading and empty states.**
 - Use the current modal/overlay pattern from Open Seats/Regstats; do not resurrect old notification-only loading protocols.
 - Center loading overlays with a fixed-position overlay selector for the module ID.
+- Nested modules must pass `session$ns(NULL)` to `signal_load_complete()` so
+  its custom-message channel matches the full ID passed to the UI overlay.
+  Custom messages do not inherit Shiny's input/output namespaces. Verify that
+  the overlay actually closes after success and validation failure (I31).
 - Always show a clear blue info callout when a run succeeds but returns no rows for the selected criteria. If a secondary tab intentionally ignores one filter (e.g., Trends ignoring exact term codes), do not hide useful secondary results just because the primary table is empty.
 
 **User-facing polish review.**
@@ -150,6 +154,13 @@ Institutional filters apply first; department remains a program-row filter, so
 cross-department combinations leave it unselected. The returned rows follow the
 primary filter (major > minor > concentration). See the versioned
 `program-headcount` record and the EC-10 fixture.
+
+**Primary navigation targets.** `www/cedar-navigation.js` runs before URL navigation at DOM-ready.
+bslib's independently random four-digit nav-menu prefixes can collide: an Admin
+link once opened the Gen Ed panel because both had `tab-7367-3`. The shared
+helper assigns unique primary link/panel targets while preserving Shiny's
+`data-value` bindings and nested subtab IDs. The actual DOM target check and
+forced-collision scenario in `nav.test.mjs` guard this.
 
 
 ## Page structure — every section is a heading plus a description

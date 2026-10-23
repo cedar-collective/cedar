@@ -60,6 +60,12 @@ verifies the saved-artifact filters and audit columns, and checks the row-level
 history and six candidate methods. Run it alone with
 `./run-tests.sh --e2e enrollment-projections`.
 
+`node tests/e2e/degree-explorer.test.mjs --course-paths-only` checks the nested
+Pathways > Course paths report without running the semester-board scenarios.
+It builds the shared population, checks the plot and course table, and verifies
+that the blocking loading dialog closes after success, invalid campus input
+and a repeated run. Finding plot data behind a still-open dialog is a failure.
+
 ## Scope and failures
 
 Default smoke runs Enrollment and Course Dynamics only. Use `--e2e reports`

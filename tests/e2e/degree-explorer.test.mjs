@@ -1,4 +1,5 @@
 // Adaptive semester planning and the separate, population-aware Course paths subtab.
+// Use --course-paths-only for a focused check of the nested Pathways report.
 import {
   launch, connect, openSubTab, waitForIdle, waitForSelector, runAndWait,
   readReactable, colIndex, waitFor, setInput,
@@ -70,7 +71,7 @@ const soundRows = () => page.evaluate(() => {
     return valid;
   });
 });
-try {
+const checkDegreeExplorer = async () => {
   await connect(page, { tab: 'degree-explorer' });
   await waitForSelector(page, '[data-roadmap][data-ready]');
   check(await page.$$eval('.cedar-roadmap-semester', els => els.length === 8),
@@ -491,7 +492,9 @@ try {
   await waitForSelector(page, '[data-roadmap][data-ready][data-catalog="business-bba-2026"][data-math-start="algebra"][data-english-start="stretch"]');
   check(await semester('math1350') === 1 && await semester('engl2') === 3 && await semester('buswriting') === 4,
     'a new-program deep link restores its statistics route and the full English-to-business-writing sequence');
-
+};
+try {
+  if (!process.argv.includes('--course-paths-only')) await checkDegreeExplorer();
   await connect(page, { tab: 'pathways' });
   await setInput(page, 'pathways-population-population_type', 'dept');
   await setInput(page, 'pathways-population-dept_code', process.env.CEDAR_DEPT || 'HIST');
@@ -502,12 +505,27 @@ try {
   await openSubTab(page, 'Course paths');
   await runAndWait(page, 'pathways-course_paths-button', { timeout: 180000 });
   await waitForSelector(page, '#pathways-course_paths-path_plot .heatmaplayer', { nonEmpty: false });
+  const overlayClosed = () => waitFor(page, () => {
+    const overlay = document.getElementById('pathways-course_paths-loading-overlay');
+    return overlay && getComputedStyle(overlay).display === 'none';
+  }, { timeout: 10000 });
+  if (!await overlayClosed()) throw new Error('Course paths finished rendering but its loading dialog never closed');
+  check(true, 'Course paths closes its nested loading dialog and reveals the completed plot');
   const scope = await page.$eval('#pathways-course_paths-path_scope', el => el.innerText);
   check(scope.includes('observed students') && scope.includes('Through') && scope.includes('suppressed'),
     'Course paths uses the shared population and reports the data edge and suppression');
   const table = await readReactable(page, 'pathways-course_paths-path_courses');
   check(!table.error && table.rows.length > 0 && colIndex(table.headers, 'Campus') >= 0,
     'moved course detail retains observed data and delivery campus');
+  const selectedCampuses = await page.$eval('#pathways-course_paths-campus', el => el.selectize.getValue());
+  await setInput(page, 'pathways-course_paths-campus', []);
+  await runAndWait(page, 'pathways-course_paths-button');
+  check(await overlayClosed() && await page.$$eval('.shiny-notification', els =>
+    els.some(el => el.innerText.includes('Select at least one delivery campus'))),
+    'an invalid course-paths request closes its loading dialog and shows the reason');
+  await setInput(page, 'pathways-course_paths-campus', selectedCampuses);
+  await runAndWait(page, 'pathways-course_paths-button', { timeout: 180000 });
+  check(await overlayClosed(), 'a repeated Course paths run also dismisses its loading dialog');
   await page.$eval('#pathways-course_paths-path_scope', el => el.scrollIntoView({ block: 'start' }));
   await page.screenshot({ path: '/tmp/cedar-course-paths.png', fullPage: false });
   check(jsErrors.length === 0, 'no uncaught JavaScript errors');
