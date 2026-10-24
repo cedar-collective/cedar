@@ -503,5 +503,26 @@ test_that("a schedule-only term's concerns compare every scheduled course with i
   expect_gt(nrow(with_history), 0)
   history_terms <- unlist(strsplit(sub("^.*\\((.*)\\)$", "\\1", with_history$history_text), ", "))
   expect_setequal(unique(history_terms), c("Sp19", "Sp20"))
-  expect_true(all(concerns$history_text[concerns$n_prior_terms == 0] == "No prior history"))
+  # No same-season history never reads as an average of 0.
+  expect_true(all(is.na(concerns$avg_enrl[concerns$n_prior_terms == 0])))
+})
+
+test_that("a schedule check finds each course's history or lists its other offerings (SC01)", {
+  concerns <- get_enrollment_concerns(test_sections_schedule, list(term = "202110"),
+                                      n_history_terms = 4) %>%
+    arrange(subject_course)
+  expect_equal(concerns$subject_course,
+               c("HIST 411", "HIST 412", "HIST 413", "HIST 414", "HIST 415", "HIST 416"))
+  expect_equal(concerns$campus, c("ABQ", "ABQ", "EA", "ABQ", "ABQ", "ABQ"))
+
+  # A reworded regular course keeps its Spring history; the others have none.
+  expect_equal(concerns$n_prior_terms, c(1L, 0L, 0L, 0L, 0L, 0L))
+  expect_equal(concerns$avg_enrl, c(20, NA, NA, NA, NA, NA))
+  expect_equal(concerns$history_text,
+               c("20 (Sp20)", "None in spring on ABQ", "None in spring on EA",
+                 "None in spring on ABQ", "No earlier offering", "C (Sp20)"))
+  # Fall-only, new to EA, and a new topic each show where the course did run;
+  # a cancelled section never ran, so it is not repeated as another offering.
+  expect_equal(concerns$other_history_text,
+               c(NA, "16 (ABQ Fa20)", "14 (ABQ Sp20)", "12 (ABQ Sp20)", NA, NA))
 })

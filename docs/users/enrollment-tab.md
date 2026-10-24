@@ -111,7 +111,7 @@ In **alerts mode** (current or past terms): a section appears when `total_enrl <
 
 By default, alerts hide active zero-enrollment rows because these are usually schedule artifacts rather than viable low-enrollment sections. Set **Min enrolled** to `0` when you intentionally want to inspect them.
 
-In **concerns mode** (future terms): instead of flagging current enrollment, CEDAR identifies courses on the upcoming schedule whose historical enrollment pattern suggests they may fall short. A course appears when its historical average is below `threshold + 5` (the +5 buffer catches courses near the boundary), or when it has no prior history.
+In a **schedule check** (a future term nobody has registered for yet): instead of flagging current enrollment, CEDAR identifies courses on the upcoming schedule whose historical enrollment pattern suggests they may fall short. A course appears when its historical average is below `threshold + 5` (the +5 buffer catches courses near the boundary), or when it has no same-season history. **Min enrolled** filters registrations, so it is hidden here.
 
 ### Thresholds
 
@@ -136,22 +136,24 @@ Lab sections (course numbers ending in L, e.g., EDUC 331L) are classified by the
 
 The **Sects** column shows the number of active home sections of a course in the selected term and campus. **Course Total** is the sum of `total_enrl` across those sections. Both are computed from sections where `status = 'A'` and `crosslist_primary = TRUE`, grouped by term, course, and campus.
 
-### Historical averages (concerns mode)
+### Historical averages (schedule check)
 
 1. CEDAR identifies all prior terms of the same type (e.g., all past falls for a Fall 2026 schedule).
 2. For each course on the future schedule, it sums `total_enrl` across home sections in each prior term, then averages the **last 4 available terms**.
-3. Courses are matched by `subject_course` and `campus` — history for HIST 1105 at ABQ is computed separately from HIST 1105 at Valencia.
+3. Courses are matched by `subject_course` and `campus` — history for HIST 1105 at ABQ is computed separately from HIST 1105 at Valencia. A reworded title is the same course. A topics course (any section titled `T:`) is matched by title too, so each topic keeps its own history.
 4. Only active terms (at least one active section) contribute to the average. Cancelled terms appear in the history column as "C" but do not affect the average.
 
 History columns show counts first, followed by the matching terms in parentheses: `12, C, 10 (Fa22, Sp23, Fa23)`.
 
-**Excluded from history:** Shell/placeholder sections (active status with zero enrollment and no instructor assigned) are excluded. If a course was renumbered or moved between departments, prior history under the old number will not be linked.
+A course with no same-season history on its campus shows a dash for its average and lists its latest offerings that ran anywhere else — another season, another campus, another topic — with each campus named: `None in spring on EA; other offerings: 465, 81 (ABQ Fa26, GA Fa26)`. Those offerings are not comparable demand, so they never set the average or the color. A course with no earlier offering at all says so.
 
-### Trend detection (concerns mode)
+**Excluded from history:** Shell/placeholder sections (active status with zero enrollment and no instructor assigned) are excluded. If a course was renumbered or moved between departments, prior history under the old number will not be linked yet.
+
+### Trend detection (schedule check)
 
 A linear regression slope is computed across enrollment values from active historical terms. A slope greater than +1 student/term is labeled **↑ up**; less than −1 is **↓ down**; between −1 and +1 is **↔ stable**. If fewer than 2 active terms are available, trend shows **—** (insufficient data).
 
-### Color coding (concerns mode)
+### Color coding (schedule check)
 
 | Color | Meaning |
 |---|---|
@@ -159,12 +161,12 @@ A linear regression slope is computed across enrollment values from active histo
 | **Yellow** | Historical average 50–75% of threshold — borderline |
 | **Blue** | Historical average 75–100% of threshold — watch-list |
 | **Green** | Historical average meets or exceeds threshold (buffer zone, up to 5 students above) |
-| **Gray** | No prior history — new course or first offering of this term type |
+| **Gray** | No same-season history on this campus — see the other offerings it lists |
 
 ### Limitations
 
 - The analysis focuses on total enrollment per course, not individual section enrollment.
-- New courses with no prior history of the same term type always appear regardless of threshold.
+- Courses with no same-season history on their campus always appear regardless of threshold.
 - The analysis does not account for changes in number of sections, delivery method shifts, or curricular changes.
 
 ---

@@ -29,6 +29,8 @@ recurrence is recognizable.
 
 | ID | Kind | Summary |
 |---|---|---|
+| [I37](#i37--renumbered-courses-lose-their-history) | Defect | Renumbered courses lose their history: no crosswalk exists, so ACCT 3401 (was MGMT 340) and the other Fall 2026 ACCT, BUSA and POPH courses read as new |
+| [I36](#i36--low-enrollments-schedule-view-reports-no-prior-history-for-courses-that-have-it) | Defect | Low Enrollment's schedule view reports no prior history for courses that have it: 363 of 2,226 Spring 2027 ABQ/EA undergraduate courses, of which 40 were never offered under that number (resolved 2026-10-24) |
 | [I35](#i35--a-fall-projection-is-read-before-the-falls-intersession-has-registered) | Defect | A Fall projection is read before the Fall's intersession has registered: the Fall 2027 spine had none of Fall 2026's December demand (FYEX 1110: 168 of 801 Fall 2025 registrations were December) (fixed in model 0.24.0) |
 | [I34](#i34--a-projection-pressure-decision-flips-with-the-platforms-floating-point) | Defect | A projection pressure decision flips with the platform's floating point: NATV 1150 is included for Spring 2027 on Linux and excluded on macOS (fixed in model 0.24.0) |
 | [I33](#i33--a-crashed-myreports-download-is-recorded-as-a-successful-fetch) | Defect | A crashed MyReports download is recorded as a successful fetch: on Oct 23 class lists and applicants were never downloaded, and every step reported ✅ |
@@ -53,6 +55,94 @@ recurrence is recognizable.
 ---
 
 # Defects
+
+## I37 — Renumbered courses lose their history
+
+**Status:** open
+**Found:** 2026-10-24, with I36
+**Severity:** moderate — a history keyed on `subject_course` starts over at a
+renumbering, so a renumbered course reads as new.
+**Affects:** every lookup that follows a `subject_course` across terms. Measured
+only in Low Enrollment's schedule view (I36); Regstats baselines, Course
+Dynamics history and enrollment projections use the same key.
+
+### What is wrong
+
+In Fall 2026 Anderson renumbered its MGMT courses to ACCT and BUSA, and
+Population Health renumbered POPH (the change behind I5). ACCT 3401 Financial
+Accounting I was MGMT 340, and BUSA 3001 Operations Management was MGMT 300.
+CEDAR has no old-to-new crosswalk, so each new number's history begins in Fall
+2026. Of I36's 216 non-topics rows, 122 match an earlier offering with the same
+title under another number on the same campus: 63 BUSA, 17 POPH, 7 ACCT, 6 MUS,
+5 NURS. Title matching only proposes candidates: BIOL 429 matches BIOL 201L.
+
+*Done when:* an institution file records renumberings (old code, new code,
+first term), validated at startup; history lookups read through it; and I36's
+renumbered rows show their old offerings.
+
+*Plan (2026-10-24):* CEDAR keeps its own map. Each year, when the catalog
+publishes, the Degree Explorer catalog update also compares the edition's
+courses with the last edition's and proposes renumberings. Each term, a screen
+lists newly scheduled codes with no history whose title matches a retired
+code. Both produce candidates for review, never entries.
+
+## I36 — Low Enrollment's schedule view reports no prior history for courses that have it
+
+**Status:** resolved 2026-10-24
+**Found:** 2026-10-24, reviewing Spring 2027 in Low Enrollment (2026-10-23 pull)
+**Severity:** moderate — the view exists to flag risky courses before
+registration, and it shows courses with years of history as new, with a red
+average of 0.
+**Affects:** `get_enrollment_concerns()` in `R/branches/enrl.R` and the
+concerns table in `server.R`.
+
+### What is wrong
+
+`get_enrollment_concerns()` matches each scheduled course to earlier offerings
+with the same `subject_course`, `course_title` and `campus` in the same season,
+and each key drops real history. Of 2,226 Spring 2027 ABQ/EA undergraduate
+courses, 363 show "No prior history":
+
+| Why | Rows |
+|---|---:|
+| Offered in Spring on that campus under another title (126 topics, 50 reworded) | 176 |
+| Offered on that campus, never in Spring (79 of the 98 non-topics are renumbered, I37) | 112 |
+| Offered only on another campus (BIOL 2210 on EA; branches ran 48 online sections) | 26 |
+| Only cancelled Spring offerings | 9 |
+| Never offered under that number since Fall 2019 (15 renumbered) | 40 |
+
+The title key is the reverse of `get_course_enrollment_history()` in the same
+file, which narrows by title only for topics courses because regular titles get
+reworded. A course with no history shows an average of 0 in the red band rather
+than an em dash. In this mode the section-enrollment column is all zeros and
+the Min enrolled input does nothing.
+
+*Done when:* titles narrow history only for topics courses; a course with no
+same-season history shows its latest other-season or other-campus offerings,
+labelled as such; a missing average displays as an em dash; a designed fixture
+holds a reworded title, a Fall-only course and a course new to one campus, and
+its test fails on the current function.
+
+### Reproduction
+
+On the 2026-10-23 `cedar_sections`, run `get_enrollment_concerns(sections,
+list(term = "202710", course_campus = c("ABQ", "EA"), level = c("lower",
+"upper"), status = "A", uel = TRUE))`: 363 rows have `n_prior_terms == 0`.
+Classify each against the sections before 202710 after `keep_home_sections()`
+and `drop_shell_sections()`, by campus, then season, then title.
+
+### Fix
+
+Regular courses now match on number and campus; a course with any `T:` section
+keeps its title in the key. A course with no same-season history shows a dash
+and lists its latest offerings that ran anywhere else, each with its campus, and
+those never set the average. On the same pull 1,910 of 2,226 courses find
+same-season history (1,863 before). Of the 316 without, 263 list other
+offerings; 44 have no earlier offering that ran (40 never scheduled under that
+number, 15 of them renumbered, I37, and 4 only ever cancelled); and 9 have only
+cancelled Spring sections on their campus, 6 of which list offerings elsewhere.
+SC01 in `designed_test_data.R` fails when the title key returns, or when a
+cancelled section is listed as another offering.
 
 ## I35 — A Fall projection is read before the Fall's intersession has registered
 
