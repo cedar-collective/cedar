@@ -33,7 +33,7 @@ recurrence is recognizable.
 | [I36](#i36--low-enrollments-schedule-view-reports-no-prior-history-for-courses-that-have-it) | Defect | Low Enrollment's schedule view reports no prior history for courses that have it: 363 of 2,226 Spring 2027 ABQ/EA undergraduate courses, of which 40 were never offered under that number (resolved 2026-10-24) |
 | [I35](#i35--a-fall-projection-is-read-before-the-falls-intersession-has-registered) | Defect | A Fall projection is read before the Fall's intersession has registered: the Fall 2027 spine had none of Fall 2026's December demand (FYEX 1110: 168 of 801 Fall 2025 registrations were December) (fixed in model 0.24.0) |
 | [I34](#i34--a-projection-pressure-decision-flips-with-the-platforms-floating-point) | Defect | A projection pressure decision flips with the platform's floating point: NATV 1150 is included for Spring 2027 on Linux and excluded on macOS (fixed in model 0.24.0) |
-| [I33](#i33--a-crashed-myreports-download-is-recorded-as-a-successful-fetch) | Defect | A crashed MyReports download is recorded as a successful fetch: on Oct 23 class lists and applicants were never downloaded, and every step reported ✅ |
+| [I33](#i33--a-crashed-myreports-download-is-recorded-as-a-successful-fetch) | Defect | A crashed MyReports download is recorded as a successful fetch: on Oct 23 class lists and applicants were never downloaded, and every step reported ✅ (partly fixed) |
 | [I32](#i32--a-scheduled-refresh-waits-forever-when-myreports-asks-for-a-2fa-code) | Defect | A scheduled refresh waits forever when MyReports asks for a 2FA code: the Oct 11 run sat 12 days at the prompt, unreported |
 | [I31](#i31--course-paths-finishes-behind-a-stuck-loading-dialog) | Defect | Nested Course paths report sends completion to the wrong loading-dialog channel (resolved) |
 | [I30](#i30--saved-r-workspaces-entered-the-docker-build-context) | Defect | Case-sensitive Docker ignore omitted `.RData`, copying an 89 MB workspace into app image layers (resolved) |
@@ -218,7 +218,9 @@ without it, and its fixed-value assertion fails on any platform.
 
 ## I33 — A crashed MyReports download is recorded as a successful fetch
 
-**Status:** open
+**Status:** partly fixed 2026-10-24: a fetch that leaves a requested report
+with no file from today now fails and names it, so the transform is skipped
+(see Fix). `parse-data.R` and mrgather are unchanged.
 **Found:** 2026-10-23, reading the log of a manual production refresh
 (`restart-cedar.sh --mode production --update -s 202680 -e 202710`,
 `/var/log/cedar-update-20261023_192042.log`)
@@ -281,6 +283,29 @@ grep -nE "Fatal error during report gathering|Script complete|Fetch complete|No 
 
 To check any run: a requested report with no `Done processing file:` line for
 its signature was not refreshed by that run.
+
+### Fix
+
+After mrgather exits 0, `update-data.sh` checks each requested report for a
+file from today, with the same name patterns as the skip check before the
+fetch. A report without one fails the step: `mrgather fetch ❌ no file from
+today for: cl aa`. Every later step is already skipped after a failure, so the
+tables in place are kept. The same failure had struck a local run on
+2026-10-20: a MyReports login timeout, no download, and the morning's
+production tables replaced by ones built from Oct 8 exports. That was recorded
+only in work that was never merged. `test-data-update-pipeline.R` runs the
+script's own fetch block with a stubbed mrgather; without the check, three of
+its cases fail.
+
+Still open:
+
+- The check asks for a file from today, not from this run. On Oct 23 the
+  morning cron had already fetched the class lists, so that run would have
+  passed, rightly: the data was today's.
+- One Academic Study file satisfies the check. A run that gets the first file
+  and loses the second, as on Oct 23, still passes.
+- `parse-data.R` still passes a requested report that has no file.
+- mrgather still exits 0 after a fatal error.
 
 ---
 

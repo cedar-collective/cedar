@@ -55,7 +55,7 @@ Unified pipeline for updating CEDAR data from MyReports. Works in both productio
 
 Runs the complete data update workflow:
 1. **Check** — Verifies if today's MyReports files already exist (skips fetch if found)
-2. **Fetch** — Downloads data from MyReports via mrgather (only if needed)
+2. **Fetch** — Downloads data from MyReports via mrgather (only if needed). It fails, and the transform is skipped, if any requested report has no file from today afterward, even when mrgather exits 0
 3. **Parse** — Processes raw .xlsx files into R-readable format (parse-data.R)
 4. **Transform** — Converts to CEDAR data model (transform-to-cedar.R)
 5. **Restart** — (Docker only) Restarts Shiny app and warms it up
