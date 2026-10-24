@@ -301,7 +301,8 @@ prepared_inputs <- prepare_enrollment_projection_inputs(
   target_campuses = critical_campuses,
   target_market_id = critical_market,
   enrollment_through_term = 202660L,
-  section_through_term = 202680L
+  section_through_term = 202680L,
+  intersession_parts_of_term = CEDAR_INTERSESSION_PARTS_OF_TERM
 )
 result <- get_course_enrollment_projections(
   prepared_inputs,

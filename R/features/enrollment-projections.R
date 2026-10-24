@@ -254,7 +254,8 @@ build_enrollment_projection_bundle <- function(cl_enrls, sections, students,
     section_through_term = target_term,
     history_start_term = opt$history_start_term,
     course_history_start_terms = opt$course_history_start_terms,
-    graded_through_term = graded_through_term
+    graded_through_term = graded_through_term,
+    intersession_parts_of_term = opt$intersession_parts_of_term
   )
   provenance <- enrollment_projection_model_provenance()
   refresh_signature <- enrollment_projection_refresh_signature(

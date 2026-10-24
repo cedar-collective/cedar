@@ -29,10 +29,14 @@ recurrence is recognizable.
 
 | ID | Kind | Summary |
 |---|---|---|
+| [I35](#i35--a-fall-projection-is-read-before-the-falls-intersession-has-registered) | Defect | A Fall projection is read before the Fall's intersession has registered: the Fall 2027 spine had none of Fall 2026's December demand (FYEX 1110: 168 of 801 Fall 2025 registrations were December) (fixed in model 0.24.0) |
+| [I34](#i34--a-projection-pressure-decision-flips-with-the-platforms-floating-point) | Defect | A projection pressure decision flips with the platform's floating point: NATV 1150 is included for Spring 2027 on Linux and excluded on macOS (fixed in model 0.24.0) |
+| [I33](#i33--a-crashed-myreports-download-is-recorded-as-a-successful-fetch) | Defect | A crashed MyReports download is recorded as a successful fetch: on Oct 23 class lists and applicants were never downloaded, and every step reported ✅ |
+| [I32](#i32--a-scheduled-refresh-waits-forever-when-myreports-asks-for-a-2fa-code) | Defect | A scheduled refresh waits forever when MyReports asks for a 2FA code: the Oct 11 run sat 12 days at the prompt, unreported |
 | [I31](#i31--course-paths-finishes-behind-a-stuck-loading-dialog) | Defect | Nested Course paths report sends completion to the wrong loading-dialog channel (resolved) |
 | [I30](#i30--saved-r-workspaces-entered-the-docker-build-context) | Defect | Case-sensitive Docker ignore omitted `.RData`, copying an 89 MB workspace into app image layers (resolved) |
 | [I29](#i29--generated-navigation-ids-can-open-the-wrong-panel) | Defect | Generated nav-menu IDs collide, so Admin can open Gen Ed instead of Data & Usage (resolved) |
-| [I28](#i28--one-late-starting-session-makes-a-whole-courses-first-day-unknown) | Defect | One late-starting session makes a whole course's first day unknown: 257 of 2,599 Fall 2026 courses, hiding ENGL 1120 and MATH 1350's saturated Fall from the Fall 2027 projection |
+| [I28](#i28--one-late-starting-session-makes-a-whole-courses-first-day-unknown) | Defect | One late-starting session makes a whole course's first day unknown: 257 Fall 2026 courses on the Oct 8 pull, 17 on Oct 23. Intersession is now out of the forecast (model 0.24.0); a regular session not yet started, or one with no start date, still blanks it with a misleading reason |
 | [I27](#i27--the-projection-floor-adds-a-waitlist-to-first-day-enrollment-and-compares-it-with-ever-registered-demand) | Defect | The projection floor mixed units: 245 unserved waitlisted students lifted Fall 2027 by 77 (resolved) |
 | [I26](#i26--projection-capacity-reached-was-judged-on-ever-registered-demand) | Defect | Projection "capacity reached" was judged on ever-registered demand: 72% of course-terms flagged full when census filled 17% (resolved) |
 | [I25](#i25--projection-method-selection-was-in-sample-and-lost-to-the-default) | Defect | Projection method selection was in-sample on two folds and lost to doing nothing; reported 13.7% WAPE, honest 16.5% (resolved) |
@@ -49,6 +53,209 @@ recurrence is recognizable.
 ---
 
 # Defects
+
+## I35 — A Fall projection is read before the Fall's intersession has registered
+
+**Status:** resolved 2026-10-24 in model 0.24.0
+**Found:** 2026-10-23, comparing Fall 2027 bundles built from the same pull
+**Severity:** moderate, for the few courses with large December sessions.
+**Affects:** the Fall spine in `R/branches/enrollment-projections.R`.
+
+### What is wrong
+
+A Fall counts as settled 14 days after it begins, but its December
+intersession registers in November. On the 2026-10-23 pull no Fall 2026
+December section held students, so the Fall 2027 spine had none of the
+December demand that the Falls it is scored against had:
+
+| Course | Fall 2025 registrations | of them December | Fall 2026 so far |
+|---|---|---|---|
+| FYEX 1110 | 801 | 168 | 560 |
+| MUSC 1120 | 205 | 104 | 100 |
+| DANC 1110 | 166 | 83 | 107 |
+
+### Fix
+
+`prepare_enrollment_projection_inputs()` drops intersession sections and
+class-list rows before anything reads them, so every demand, seat and
+first-day count is the regular sessions'. December students are 2–3% of Fall
+registrations in the monitored courses (632 of 24,185 in Fall 2025). A design
+that kept them, by splitting the spine and borrowing a pending December from
+the previous Fall, was dropped as too much machinery for that share. The IS01
+test fails when either the sections or the class-list filter is removed.
+
+On the 2026-10-23 pull, against 0.23.0: Spring 2027 regains three pressure
+bumps (CHEM 1215L, COMM 1130, HNRS 2221) that a December-inflated feeder fall
+had vetoed (−5.6% to −6.3%, now −4.1% to −4.7%). Fall 2027 gains five courses
+(AFST 1110, ENGL 2210, MATH 1430, RELG 1110, THEA 1110) once December seats and
+first days stop hiding two near-full Falls.
+
+## I34 — A projection pressure decision flips with the platform's floating point
+
+**Status:** resolved 2026-10-24 in model 0.24.0
+**Found:** 2026-10-23, rebuilding production's Spring 2027 bundle on a Mac to
+audit the intersession change
+**Severity:** low. One course in one bundle. But the same tables and the same
+code published different course lists on different machines, so no rebuild
+could be checked against production.
+**Affects:** `build_projection_pressure_screen()` in
+`R/branches/enrollment-projections.R`.
+
+### What is wrong
+
+The screen includes a course when its trend demand exceeds next term's seats
+by at least `pressure_min_seat_gap` (10). The trend is an `lm()` fit, and its
+last bit depends on the BLAS. NATV 1150's last three Springs, 109, 120 and
+122, fit exactly 130 against 120 seats: the minimum, met. Production (Linux)
+computed 130.000000000000000 and included the course ("Trend demand exceeds
+scheduled capacity by 10 registrations"). R's reference BLAS on macOS computed
+129.999999999999972 and excluded it ("historical and trend demand remain within
+10 seats"). Every other number in the two bundles agreed.
+
+### Reproduction
+
+```r
+x <- 1:3; v <- c(109, 120, 122)
+sprintf("%.17g", predict(lm(v ~ x), data.frame(x = 4)))  # "129.99999999999997" on macOS
+```
+
+### Fix
+
+`projection_seat_gap_reached()` compares both seat gaps (historical shortfall
+and trend growth) with a tolerance of `sqrt(.Machine$double.eps)`. The test "a
+trend exactly at the seat gap counts on every platform (I34)" fails on macOS
+without it, and its fixed-value assertion fails on any platform.
+
+## I33 — A crashed MyReports download is recorded as a successful fetch
+
+**Status:** open
+**Found:** 2026-10-23, reading the log of a manual production refresh
+(`restart-cedar.sh --mode production --update -s 202680 -e 202710`,
+`/var/log/cedar-update-20261023_192042.log`)
+**Severity:** moderate. No number was wrong this time. But a refresh that
+fetches nothing new for a table reports a complete success. The app then serves
+the previous pull as if it were today's, and the as-of dates are the only sign.
+**Affects:** the fetch and parse steps of `scripts/update-data.sh`, and
+mrgather (`/root/mrgather`, a separate repository).
+
+### What is wrong
+
+mrgather downloaded the two DESR files, the two graduates files and the first
+Academic Study file. The second Academic Study download then timed out. Its
+error handler itself failed, and mrgather exited with status 0:
+
+```
+✗ Error fetching AS on attempt 1: Download timed out
+Fatal error during report gathering: TypeError: tracker.recordReportFetchError is not a function
+...
+Script complete. Exiting...
+✓ Fetch complete
+```
+
+The class list and applicants reports were never attempted. Every later step
+still reported success:
+
+- `update-data.sh` trusts the exit status. It recorded
+  `mrgather fetch ✅ fetched: desr deg as cl aa`, and that note lists the
+  reports requested, not the ones downloaded.
+- `parse-data.R` logged `No .xlsx files found ... matching signature:
+  Class_List_Guided_Adhoc` and the same for `S_Admissions_Applicants_Detail`,
+  then reported ✅.
+- The transform rebuilt `cedar_students` from the previous class-list export,
+  and the run ended `CEDAR Update Complete`.
+
+The data was not harmed this time, because that morning's cron run had already
+fetched the day's class lists. The 15 earlier refresh logs, 2026-10-10 to
+2026-10-23, show no other crash. But if the cron run itself failed this way,
+the class lists would quietly stay at the previous pull while the morning
+status said all was well.
+
+*Done when:*
+
+- A fetch that downloads fewer reports than were requested is recorded as
+  failed, and names the missing reports.
+- The fetch note lists the reports actually downloaded.
+- `parse-data.R` fails a requested report that has no file.
+- The tables built from a missing report are not rebuilt.
+- mrgather exits non-zero after a fatal error, and its tracker method exists.
+- `test-data-update-pipeline.R` covers the shell side.
+
+### Reproduction
+
+The timeout cannot be forced. Read the evidence from the log:
+
+```bash
+grep -nE "Fatal error during report gathering|Script complete|Fetch complete|No .xlsx files found|mrgather fetch" \
+  /var/log/cedar-update-20261023_192042.log
+```
+
+To check any run: a requested report with no `Done processing file:` line for
+its signature was not refreshed by that run.
+
+---
+
+## I32 — A scheduled refresh waits forever when MyReports asks for a 2FA code
+
+**Status:** open
+**Found:** 2026-10-23, while starting a manual production refresh
+**Severity:** moderate. No number is wrong. Later runs fetch normally, but a
+run that hits the prompt never ends and never reports failure. It keeps its
+headless browser container running, and the only sign is a log file nobody
+reads.
+**Affects:** the fetch step of `scripts/update-data.sh` in production mode
+(`docker compose ... run --rm mrgather node mrgather.js ...`). The prompt itself
+is in mrgather (`/root/mrgather`), a separate repository.
+
+### What is wrong
+
+The fetch runs mrgather with no time limit. If MyReports asks for a 2FA code,
+mrgather prompts for one on standard input and waits. Under cron nobody can
+answer, so the run waits forever.
+
+The 05:05 cron run on 2026-10-11 (`update-data.sh -s 202660 -e 202680`) was
+still running on 2026-10-23: three shell processes, a `docker compose run`
+client, and container `mrgather-mrgather-run-81498ef90ea8`, all started
+2026-10-11 10:05 UTC. Its log, `/var/log/cedar-update-20261011_100501.log`,
+ends:
+
+```
+Prompting for 2FA code...
+Screenshots and HTML saved to downloads folder (accessible outside Docker)
+⚠️  There was an error with 2FA - see detailed error above
+Please enter the 2FA code (or press Enter to take another screenshot):
+```
+
+The daily runs from 2026-10-12 on were not asked for 2FA and completed. So the
+refresh kept working while the stuck run went unnoticed. If MyReports asked on
+several days in a row, one stuck run would pile up for each day.
+
+Two things are needed. A time limit on the compose client is not enough on its
+own, because stopping the client need not remove a `--rm` container. And mrgather
+should fail at once, with a clear status, when nobody is there to type a code.
+
+*Done when:* a non-interactive fetch that meets a 2FA prompt exits non-zero
+within a bounded time. Its container is removed, and the step is recorded as
+`mrgather fetch FAILED` with "2FA required" in the note. The fetch also has an
+overall time limit, so any other hang ends the same way. Finally,
+`test-data-update-pipeline.R` fails if the production fetch command loses its
+time limit.
+
+### Reproduction
+
+This cannot be forced, because MyReports decides when to ask for 2FA. To see
+it, run the production fetch on the droplet from a shell with no terminal, on a
+day MyReports asks:
+
+```bash
+setsid /root/cedar/scripts/update-data.sh -s 202680 -e 202680 </dev/null >/tmp/fetch.log 2>&1 &
+# /tmp/fetch.log stops at "Please enter the 2FA code"; the process never exits
+```
+
+To check for runs already stuck:
+`pgrep -fa update-data.sh` and `docker ps --filter name=mrgather-mrgather-run`.
+Anything older than a day is one.
+
+---
 
 ## I31 — Course paths finishes behind a stuck loading dialog
 
@@ -1893,7 +2100,9 @@ has `spine - actual_first_day >= waitlisted_prior`.
 
 ## I28 — One late-starting session makes a whole course's first day unknown
 
-**Status:** open
+**Status:** open, partly fixed 2026-10-23: intersession is out of the
+forecast (model 0.24.0), so a December session no longer blanks the Fall first
+day
 **Found:** 2026-10-18, reading the Fall 2027 projection rows (model 0.22.0)
 for a transparency review
 **Severity:** moderate — a course that was full last term is shown as unknown,
@@ -1959,6 +2168,22 @@ the courses with any unknown row. In the Fall 2027 bundle,
 `projections$adjusted_saturated_prior` is `NA` for ENGL 1120, FYEX 1110 and
 MATH 1350 with spine term Fall 2026. It is also `NA` for ENGL 2660 and HIST
 1150, whose spine term is Fall 2024, which has no status dates.
+
+### Update 2026-10-23
+
+The 2026-10-23 pull is later than every 2H start, so ENGL 1120 and MATH 1350
+are judged saturated again. 17 of 2,602 Fall 2026 ABQ/EA courses still read
+unknown. Leaving intersession out of projections (model 0.24.0, I35) clears 7
+of them (BIOL 1140, ECON 2110, ECON 2120, FDMA 330, FDMA 430, MUS 375, RELG
+1110), and ENGL 2210's Fall 2025 first day, which a December section with no
+start date (CRN 79775) had blanked.
+
+The other 10 (ARTH 429, ARTH 529, HED 321, HLED 2210, LAW 550, MSST 529, NMNC
+4445, NMNC 4545, PAST 517, PHED 1620) are in no published projection. Each has
+sections with a blank part of term that start late (2026-11-06 to 2027-01-04)
+or have no start date. These, and any regular session not yet begun at the
+pull, still blank the course's first day under a reason that reads as missing
+status dates. The *done when* above stands for them.
 
 ---
 

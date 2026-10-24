@@ -96,7 +96,11 @@ CEDAR_REQUIRED_SETTINGS <- c("mapping_files_url", "source_files_url")
 #   projections read history from, so an earlier regime (UNM: the pandemic
 #   terms before Spring 2022) cannot shape accuracy or selection. Without it the
 #   projection builder stops; the app still loads.
-CEDAR_OPTIONAL_SETTINGS <- c("source_values_without_college", "projection_history_start_term")
+#   intersession_parts_of_term: `|`-separated part-of-term codes for sessions
+#   that run after a term's regular sessions (UNM's December intersession,
+#   INT). Enrollment projections leave them out. Without it, none are.
+CEDAR_OPTIONAL_SETTINGS <- c("source_values_without_college", "projection_history_start_term",
+                             "intersession_parts_of_term")
 
 CEDAR_UNIT_KINDS <- c("department", "program", "college")
 # Course levels as cedar_sections$level records them.
@@ -543,6 +547,11 @@ validate_mapping_files <- function(files) {
   if (length(start) == 1 && !grepl("^[0-9]{4}(10|60|80)$", start)) {
     problems <- c(problems, paste0("settings.csv: projection_history_start_term must be a term code ",
                                    "YYYYSS (SS = 10, 60 or 80), got ", start))
+  }
+  parts <- files$settings$value[files$settings$setting == "intersession_parts_of_term"]
+  if (length(parts) == 1 && !grepl("^[A-Za-z0-9]+(\\|[A-Za-z0-9]+)*$", parts)) {
+    problems <- c(problems, paste0("settings.csv: intersession_parts_of_term must be part-of-term ",
+                                   "codes separated by |, got ", parts))
   }
 
   if (length(problems)) {

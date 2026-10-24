@@ -66,6 +66,9 @@ enrollment_projection_defaults <- function() {
     pressure_history_window = 3L,
     backtest_terms = 6L,
     registration_capacity_threshold = CEDAR_FULL_FILL,
+    # Parts of term left out of every input (0.24.0); see
+    # prepare_enrollment_projection_inputs().
+    intersession_parts_of_term = CEDAR_INTERSESSION_PARTS_OF_TERM,
     capacity_explained_share_threshold = 0.50,
     first_day_retention_window = 4L,
     first_day_retention_min_terms = 2L,
@@ -1000,7 +1003,28 @@ prepare_enrollment_projection_inputs <- function(cl_enrls, sections, students,
                                                  history_start_term = NULL,
                                                  course_history_start_terms =
                                                    integer(0),
-                                                 graded_through_term = NULL) {
+                                                 graded_through_term = NULL,
+                                                 intersession_parts_of_term) {
+  # December intersession is out of the forecast (0.24.0). It starts weeks
+  # after the term's first day, so its seats left a course's first day unknown
+  # until December (ISSUES.md I28), and it registers after a Fall settles, so
+  # its students read the Fall spine from a partial Fall (I35). Its sections
+  # and class-list rows leave here, so no demand, seat or first-day count reads
+  # them. (cl_enrls only supplies prior counts for the target's sections.)
+  drop_intersession <- function(rows) {
+    if (length(intersession_parts_of_term) == 0L) return(rows)
+    projection_require_columns(rows, "part_term", "prepare_enrollment_projection_inputs()")
+    rows[!trimws(as.character(rows$part_term)) %in% intersession_parts_of_term, ,
+         drop = FALSE]
+  }
+  sections <- drop_intersession(sections)
+  # Only the class-list columns the helpers below read are copied: a second
+  # copy of the whole table ran the Docker build out of memory.
+  students <- drop_intersession(dplyr::select(students, dplyr::all_of(c(
+    "student_id", "term", "campus", "college", "subject_course", "part_term",
+    "crn", "registration_status_code", "registration_date", "as_of_date",
+    "major_code", "student_classification", "final_grade"
+  ))))
   if (is.null(target_courses) || length(target_courses) == 0) {
     stop("[enrollment-projections.R] target_courses is required.", call. = FALSE)
   }
@@ -1162,6 +1186,16 @@ projection_first_day_retention_for_row <- function(history, row, target_term,
       vapply(prior$term, fmt_term, character(1)), collapse = ", "
     )
   )
+}
+
+
+# Whether a demand-minus-seats gap reaches the screen's minimum. A fitted trend
+# carries floating-point noise that differs by platform: NATV 1150's
+# c(109, 120, 122) fits exactly 130, which Linux computed as 130 and macOS as
+# 129.99999999999997, so one seat gap included the course on one machine and
+# not the other (ISSUES.md I34). A gap within that noise of the minimum meets it.
+projection_seat_gap_reached <- function(gap, min_gap) {
+  gap >= min_gap - sqrt(.Machine$double.eps)
 }
 
 
@@ -1933,11 +1967,11 @@ build_projection_pressure_screen <- function(enrollment_history, section_history
     target_capacity_usable <- is.finite(target_capacity) && target_capacity > 0
     capacity_shortfall <- is.finite(baseline) &&
       target_capacity_usable &&
-      baseline - target_capacity >= min_gap
+      projection_seat_gap_reached(baseline - target_capacity, min_gap)
     chronic_fill <- high_fill_terms >= chronic_terms
     growth_pressure <- is.finite(trend) &&
       target_capacity_usable &&
-      trend - target_capacity >= min_gap
+      projection_seat_gap_reached(trend - target_capacity, min_gap)
     missing_schedule <- is_forced && !target_capacity_usable
     included <- is_forced || capacity_shortfall || chronic_fill || growth_pressure
 

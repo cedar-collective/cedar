@@ -9,6 +9,11 @@
 # Groups are monitoring scopes. Projection rows use the named market and course;
 # campus and part-term allocation remains in saved delivery components.
 
+# 0.24.0 (schema 23): intersession sections (settings.csv
+# intersession_parts_of_term) are left out of every projection input. Their
+# seats made a course's first day unknown until December (ISSUES.md I28), and
+# their students read the Fall spine from a partial Fall (I35). Pressure seat
+# gaps compare with a floating-point tolerance (I34).
 # 0.23.0 (schema 23): the saved bundle also carries what the reader needs to
 # judge a projection -- each aftcast's seat and data conditions and its error
 # source, a seat-consistency axis beside Reliability, and when the target
@@ -33,7 +38,7 @@
 # saturation floor and two Fall-enrollment deltas and must beat the spine on
 # rolling aftcasts. (0.19.0 introduced rolling selection and the
 # occupancy-based capacity signal.)
-CEDAR_ENROLLMENT_PROJECTION_MODEL_VERSION <- "0.23.0"
+CEDAR_ENROLLMENT_PROJECTION_MODEL_VERSION <- "0.24.0"
 CEDAR_ENROLLMENT_PROJECTION_SCHEMA_VERSION <- 23L
 # Capacity is reached at CEDAR_FULL_FILL first-day fill and a prior term is
 # saturated at CEDAR_NEAR_FULL_FILL; both levels live in R/lists/seat_fill.R.
@@ -44,6 +49,13 @@ CEDAR_ENROLLMENT_PROJECTION_HISTORY_START_TERM <- local({
   s <- cedar_institution_files$settings
   v <- s$value[s$setting == "projection_history_start_term"]
   if (length(v) == 1) as.integer(v) else NA_integer_
+})
+# Parts of term the projections leave out (settings.csv
+# intersession_parts_of_term, `|`-separated; UNM's December INT), or none.
+CEDAR_INTERSESSION_PARTS_OF_TERM <- local({
+  s <- cedar_institution_files$settings
+  v <- s$value[s$setting == "intersession_parts_of_term"]
+  if (length(v) == 1) strsplit(v, "|", fixed = TRUE)[[1]] else character(0)
 })
 
 .cedar_projection <- validate_projection_groups(

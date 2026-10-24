@@ -75,6 +75,13 @@
 #          counts 4: it also keeps a student holding an EA seat and an early
 #          drop already on the class list (ISSUES.md I27).
 #
+#   IS01 — cedar_sections_intersession (3 rows) + cedar_students_intersession
+#          (7 rows). BIOL 1140, Fall 2020, with a December intersession section
+#          at EA, pulled before it began. Projections leave intersession out:
+#          class-list total 4, first day 4, seats 50. Read as a regular
+#          session it makes the first day unknown, the seats 65 and the
+#          class-list total 5 (ISSUES.md I28, I35).
+#
 # === CEDAR_SECTIONS (85 total: 71 base + 14 XL rows merged in) ===
 #
 # Base sections (non-XL):
@@ -3108,6 +3115,83 @@ cedar_students_wlmkt <- dplyr::bind_rows(
   .wl_row("WL_F", "GA", "WL"),
   .wl_row("WL_G", "ABQ", "WL", course = "PSYC 2110"),
   .wl_row("WL_R1", "ABQ", "RE"), .wl_row("WL_R2", "EA", "RE")
+)
+
+
+# ── IS01 — intersession: out of the forecast ─────────────────────────────────
+# A December intersession belongs to the Fall term but starts weeks after its
+# first day and registers after the term settles; projections leave it out.
+# BIOL 1140, Fall 2020, pooled ABQ+EA market, every row pulled 2020-10-23:
+# after the regular sessions began (2020-08-17), before the intersession did
+# (2020-12-11).
+#
+#   section   campus  part  starts      enrolled  available  seats
+#   41001     ABQ     1     2020-08-17  2         28         30
+#   41002     EA      1     2020-08-17  1         19         20
+#   41003     EA      INT   2020-12-11  2         13         15
+#
+#   student  rows                          demand?  first day?
+#   IS_A     RE 41001                      yes      yes
+#   IS_B     RE 41002                      yes      yes
+#   IS_C     RE 41003 (intersession only)  no       no: not a regular session
+#   IS_D     RE 41001 and RE 41003         once     yes
+#   IS_E     DR 41001, dated after start   yes      yes: dropped after day one
+#   IS_F     WL 41003                      no: waiting for a December seat
+#
+# Pinned: class-list total 4 (registered 3, early drops 1); first day 4 (IS_A,
+# IS_B, IS_D, IS_E); no waiting students; seats 50 in 2 sections. Read as a
+# regular session, IS_C's and IS_D's December rows predate their section's
+# start, so the whole course's first day is unknown, the seats read 65, the
+# class-list total 5 and IS_F is 1 waiting student.
+cedar_sections_intersession <- cedar_sections_topics[c(2, 2, 2), ] %>%
+  dplyr::mutate(
+    section_id     = c("IS-41001", "IS-41002", "IS-41003"),
+    crn            = c("41001", "41002", "41003"),
+    subject        = "BIOL",
+    course_number  = "1140",
+    subject_course = "BIOL 1140",
+    section        = c("001", "002", "501"),
+    course_title   = "Biology for Health Sciences",
+    part_term      = c("1", "1", "INT"),
+    campus         = c("ABQ", "EA", "EA"),
+    department     = "BIOL",
+    instructor_name = "Rivera, Ana",
+    enrolled       = c(2L, 1L, 2L),
+    total_enrl     = c(2L, 1L, 2L),
+    capacity       = c(30L, 20L, 15L),
+    available      = c(28L, 19L, 13L),
+    level          = "lower",
+    is_topics      = FALSE,
+    start_date     = as.Date(c("2020-08-17", "2020-08-17", "2020-12-11")),
+    end_date       = as.Date(c("2020-12-11", "2020-12-11", "2021-01-08")),
+    as_of_date     = as.Date("2020-10-23")
+  )
+
+.is_row <- function(sid, section_crn, campus, status, status_date) {
+  .mc_row(sid, 202080L, "BIOL 1140", campus, "BIOL") %>%
+    dplyr::mutate(
+      enrollment_id = paste("IS01", sid, section_crn, sep = "-"),
+      section_id = paste0("IS-", section_crn),
+      crn = section_crn,
+      part_term = if (section_crn == "41003") "INT" else "1",
+      registration_status_code = status,
+      registration_status = dplyr::case_when(
+        status %in% c("RE", "RS") ~ "Registered",
+        status == "WL" ~ "Wait Listed",
+        TRUE ~ "Drop"
+      ),
+      registration_date = as.Date(status_date),
+      as_of_date = as.Date("2020-10-23")
+    )
+}
+cedar_students_intersession <- dplyr::bind_rows(
+  .is_row("IS_A", "41001", "ABQ", "RE", "2020-08-01"),
+  .is_row("IS_B", "41002", "EA",  "RE", "2020-08-01"),
+  .is_row("IS_C", "41003", "EA",  "RE", "2020-10-01"),
+  .is_row("IS_D", "41001", "ABQ", "RE", "2020-08-01"),
+  .is_row("IS_D", "41003", "EA",  "RE", "2020-10-05"),
+  .is_row("IS_E", "41001", "ABQ", "DR", "2020-08-25"),
+  .is_row("IS_F", "41003", "EA",  "WL", "2020-10-10")
 )
 
 

@@ -188,6 +188,16 @@ all pulled before a section began (late-starting part-of-term sections).
 Data & Usage lists them; never name the terms in prose, because re-pulling a
 term's class list fills its dates in.
 
+**Intersession is out of the forecast (0.24.0).** `prepare_enrollment_projection_inputs()`
+drops sections and class-list rows whose part of term is in
+`intersession_parts_of_term` (`institution/<id>/settings.csv`; UNM's `INT`,
+December sessions that belong to Fall) before anything reads them. A student in
+both a regular and a December section counts once, by the regular one. An
+intersession starts weeks after the term's first day, so its rows made a
+course's first day unknown until December (ISSUES.md I28), and it registers
+after a Fall settles, so its students read the Fall spine from a partial Fall
+(I35).
+
 Before market aggregation, repeated ABQ/EA rows are collapsed to one
 student-course-term. A currently registered record wins over a drop record; a
 late drop wins over an early drop. This status priority makes the equations

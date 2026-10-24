@@ -416,6 +416,46 @@ test_that("course-market capacity pools campus and part-term components", {
   expect_equal(components$capacity_share, c(0.64, 0.20, 0.16))
 })
 
+test_that("intersession is left out of every projection input (IS01)", {
+  prepare <- function(parts) {
+    prepare_enrollment_projection_inputs(
+      cl_enrls = calc_cl_enrls(test_students_intersession, by_part_term = TRUE),
+      sections = test_sections_intersession,
+      students = test_students_intersession,
+      target_courses = "BIOL 1140",
+      target_campuses = c("ABQ", "EA"),
+      target_market_id = "abq_ea_course_market",
+      enrollment_through_term = 202080L,
+      section_through_term = 202080L,
+      intersession_parts_of_term = parts
+    )
+  }
+
+  # IS_C registered only for December and IS_F waits for a December seat:
+  # neither is demand. IS_D counts once, by the regular seat.
+  inputs <- prepare("INT")
+  demand <- inputs$enrollment_history
+  expect_equal(demand$classlist_total, 4L)
+  expect_equal(demand$registered, 3L)
+  expect_equal(demand$dr_early, 1L)
+  expect_equal(demand$first_day_enrl, 4)
+  expect_equal(inputs$section_history$scheduled_capacity, 50)
+  expect_equal(inputs$delivery_components$part_term, c("1", "1"))
+  expect_setequal(inputs$students$target_students$student_id,
+                  c("IS_A", "IS_B", "IS_D", "IS_E"))
+  expect_equal(nrow(inputs$waitlist_history), 0L)
+
+  # Read as a regular session -- the defect -- the December rows pulled before
+  # it began leave the whole course's first day unknown, its seats join the
+  # term's, and its students join the demand.
+  pooled <- prepare(character(0))
+  expect_true(is.na(pooled$enrollment_history$first_day_enrl))
+  expect_equal(pooled$section_history$scheduled_capacity, 65)
+  expect_equal(pooled$enrollment_history$classlist_total, 5L)
+  expect_equal(pooled$waitlist_history$waitlisted, 1L)
+  expect_identical(CEDAR_INTERSESSION_PARTS_OF_TERM, "INT")
+})
+
 test_that("recent history pairs actuals and sections with current-method aftcasts", {
   projections <- projection_test_row() %>%
     dplyr::mutate(
@@ -793,6 +833,33 @@ test_that("pressure exclusions report the comparable-term evidence", {
   )
   expect_match(screen$inclusion_reason, "within 10 seats")
   expect_false(grepl("Below pressure thresholds", screen$inclusion_reason))
+})
+
+test_that("a trend exactly at the seat gap counts on every platform (I34)", {
+  # NATV 1150, Spring 2027: 109, 120, 122 fit exactly 130, which R's reference
+  # BLAS computes as 129.99999999999997. Against 120 seats that is the
+  # 10-seat minimum, met, so the course is included wherever it is built.
+  history <- projection_test_history(
+    c(109, 120, 122), terms = c(202180L, 202280L, 202380L)
+  )
+  sections <- tibble::tibble(
+    market_id = "abq_ea_course_market", college = "AS", department = "TEST",
+    course_title = "Test Course", subject_course = "TEST 101",
+    term = c(202180L, 202280L, 202380L, 202480L), term_type = "fall",
+    scheduled_sections = 5L, scheduled_enrl = c(109, 120, 122, 0),
+    scheduled_capacity = c(200, 200, 200, 120),
+    n_delivery_components = 2L, n_campuses = 2L, capacity_per_section = 40
+  )
+
+  screen <- build_projection_pressure_screen(
+    history, sections, 202480L, scope_courses = "TEST 101"
+  )
+
+  expect_true(screen$pressure_growth)
+  expect_true(screen$included)
+  expect_match(screen$inclusion_reason, "Trend demand exceeds scheduled capacity by 10")
+  expect_true(projection_seat_gap_reached(130 - 1e-13 - 120, 10))
+  expect_false(projection_seat_gap_reached(9.99, 10))
 })
 
 test_that("an unavailable target schedule produces a planning recommendation", {
