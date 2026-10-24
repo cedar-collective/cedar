@@ -264,6 +264,12 @@ details.enrollment-projection-method-guide {
   flex-direction: column;
 }
 
+/* The term labels under the history header sit on the dark header band. */
+.rt-th .projection-history-grid.text-note {
+  color: inherit;
+  opacity: 0.85;
+}
+
 .enrollment-projection-lead {
   font-size: 1.02rem;
   margin: 0 0 12px;

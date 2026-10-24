@@ -368,13 +368,14 @@ export function waitForSelector(page, sel, { timeout = 60000, nonEmpty = true } 
 // Read a reactable's header labels and the first `limit` data rows from #<outputId>.
 // Returns { headers: string[], rows: string[][] }. NOTE: header text often comes
 // back UPPERCASED by CSS (innerText reflects text-transform) — match columns with
-// colIndex() below, which is case-insensitive.
+// colIndex() below, which is case-insensitive. A label set on two lines
+// ("Seats" over "(day 1)") reads as one: "Seats (day 1)".
 export function readReactable(page, outputId, { limit = 30 } = {}) {
   return page.evaluate((id, lim) => {
     const root = document.getElementById(id);
     if (!root) return { error: `no #${id}` };
     const headers = [...root.querySelectorAll('.rt-th')]
-      .map((h) => h.innerText.trim()).filter(Boolean);
+      .map((h) => h.innerText.replace(/\s+/g, ' ').trim()).filter(Boolean);
     const rows = [...root.querySelectorAll('.rt-tbody .rt-tr')].slice(0, lim)
       .map((tr) => [...tr.querySelectorAll('.rt-td')].map((td) => td.innerText.trim()));
     return { headers, rows };

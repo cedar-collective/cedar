@@ -683,7 +683,9 @@ enrollmentProjectionsServer <- function(id, bundles, load_bundle, programs) {
       ))
       # Sized to fit a laptop-width window without horizontal scrolling: the
       # department sits under the course, the range and the change under the
-      # registrations, and the method and its evidence in the modal.
+      # registrations, and the method and its evidence in the modal. Course,
+      # Sections and Seats have fixed widths so a wide window stretches the
+      # evidence columns instead of them.
       reactable::reactable(
         data,
         theme = cedar_tbl_theme,
@@ -695,7 +697,7 @@ enrollmentProjectionsServer <- function(id, bundles, load_bundle, programs) {
         pagination = FALSE,
         columns = list(
           course = reactable::colDef(
-            name = "Course", minWidth = 105,
+            name = "Course", width = 100,
             cell = function(value, index) {
               htmltools::tagList(
                 htmltools::strong(value),
@@ -705,7 +707,8 @@ enrollmentProjectionsServer <- function(id, bundles, load_bundle, programs) {
           ),
           department = reactable::colDef(show = FALSE, searchable = TRUE),
           planning_sections = reactable::colDef(
-            name = "Sections", align = "right", minWidth = 75,
+            name = "Sections", align = "right", width = 80,
+            headerStyle = list(whiteSpace = "nowrap"),
             header = htmltools::span(
               "Sections",
               title = paste(
@@ -744,7 +747,8 @@ enrollmentProjectionsServer <- function(id, bundles, load_bundle, programs) {
           pressure_bump_sections = reactable::colDef(show = FALSE),
           pressure_bump_note = reactable::colDef(show = FALSE),
           projected_demand = reactable::colDef(
-            name = "Registrations", align = "right", minWidth = 105,
+            name = "Registrations", align = "right", minWidth = 120,
+            headerStyle = list(whiteSpace = "nowrap"),
             header = htmltools::span(
               "Registrations",
               title = paste(
@@ -773,9 +777,9 @@ enrollmentProjectionsServer <- function(id, bundles, load_bundle, programs) {
           demand_range = reactable::colDef(show = FALSE),
           change_vs_last = reactable::colDef(show = FALSE),
           expected_first_day = reactable::colDef(
-            name = "Seats (day 1)", align = "right", minWidth = 100,
+            name = "Seats (day 1)", align = "right", width = 64,
             header = htmltools::span(
-              "Seats (day 1)",
+              "Seats", htmltools::div("(day 1)"),
               title = paste(
                 "Students expected to hold a seat when classes begin. Fewer",
                 "than registrations, because a student who drops early frees",
@@ -788,9 +792,8 @@ enrollmentProjectionsServer <- function(id, bundles, load_bundle, programs) {
             name = paste("Last", season, "terms"), minWidth = 190,
             sortable = FALSE, searchable = FALSE,
             header = htmltools::tagList(
-              htmltools::div(paste0(
-                "First day / sections, last ", nrow(history_terms), " ", season, "s"
-              )),
+              htmltools::div("First day / sections"),
+              htmltools::div(paste0("(last ", nrow(history_terms), " ", season, "s)")),
               htmltools::div(
                 class = "projection-history-grid text-note",
                 lapply(history_terms$abbr, htmltools::span)
@@ -925,9 +928,9 @@ enrollmentProjectionsServer <- function(id, bundles, load_bundle, programs) {
             cell = function(value) count_text(value)
           ),
           expected_first_day = reactable::colDef(
-            name = "Seats (day 1)", align = "right", minWidth = 85,
+            name = "Seats (day 1)", align = "right", width = 64,
             header = htmltools::span(
-              "Seats (day 1)",
+              "Seats", htmltools::div("(day 1)"),
               title = "Students expected in a seat when classes begin"
             ),
             cell = function(value) count_text(value)
