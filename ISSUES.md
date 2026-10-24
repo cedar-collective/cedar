@@ -29,10 +29,12 @@ recurrence is recognizable.
 
 | ID | Kind | Summary |
 |---|---|---|
+| [I35](#i35--a-fall-projection-is-read-before-the-falls-intersession-has-registered) | Defect | A Fall projection is read before the Fall's intersession has registered: the Fall 2027 spine had none of Fall 2026's December demand (FYEX 1110: 168 of 801 Fall 2025 registrations were December) (fixed in model 0.24.0) |
+| [I34](#i34--a-projection-pressure-decision-flips-with-the-platforms-floating-point) | Defect | A projection pressure decision flips with the platform's floating point: NATV 1150 is included for Spring 2027 on Linux and excluded on macOS (fixed in model 0.24.0) |
 | [I31](#i31--course-paths-finishes-behind-a-stuck-loading-dialog) | Defect | Nested Course paths report sends completion to the wrong loading-dialog channel (resolved) |
 | [I30](#i30--saved-r-workspaces-entered-the-docker-build-context) | Defect | Case-sensitive Docker ignore omitted `.RData`, copying an 89 MB workspace into app image layers (resolved) |
 | [I29](#i29--generated-navigation-ids-can-open-the-wrong-panel) | Defect | Generated nav-menu IDs collide, so Admin can open Gen Ed instead of Data & Usage (resolved) |
-| [I28](#i28--one-late-starting-session-makes-a-whole-courses-first-day-unknown) | Defect | One late-starting session makes a whole course's first day unknown: 257 of 2,599 Fall 2026 courses, hiding ENGL 1120 and MATH 1350's saturated Fall from the Fall 2027 projection |
+| [I28](#i28--one-late-starting-session-makes-a-whole-courses-first-day-unknown) | Defect | One late-starting session makes a whole course's first day unknown: 257 Fall 2026 courses on the Oct 8 pull, 17 on Oct 23. Intersession is now out of the forecast (model 0.24.0); a regular session not yet started, or one with no start date, still blanks it with a misleading reason |
 | [I27](#i27--the-projection-floor-adds-a-waitlist-to-first-day-enrollment-and-compares-it-with-ever-registered-demand) | Defect | The projection floor mixed units: 245 unserved waitlisted students lifted Fall 2027 by 77 (resolved) |
 | [I26](#i26--projection-capacity-reached-was-judged-on-ever-registered-demand) | Defect | Projection "capacity reached" was judged on ever-registered demand: 72% of course-terms flagged full when census filled 17% (resolved) |
 | [I25](#i25--projection-method-selection-was-in-sample-and-lost-to-the-default) | Defect | Projection method selection was in-sample on two folds and lost to doing nothing; reported 13.7% WAPE, honest 16.5% (resolved) |
@@ -49,6 +51,78 @@ recurrence is recognizable.
 ---
 
 # Defects
+
+## I35 — A Fall projection is read before the Fall's intersession has registered
+
+**Status:** resolved 2026-10-24 in model 0.24.0
+**Found:** 2026-10-23, comparing Fall 2027 bundles built from the same pull
+**Severity:** moderate, for the few courses with large December sessions.
+**Affects:** the Fall spine in `R/branches/enrollment-projections.R`.
+
+### What is wrong
+
+A Fall counts as settled 14 days after it begins, but its December
+intersession registers in November. On the 2026-10-23 pull no Fall 2026
+December section held students, so the Fall 2027 spine had none of the
+December demand that the Falls it is scored against had:
+
+| Course | Fall 2025 registrations | of them December | Fall 2026 so far |
+|---|---|---|---|
+| FYEX 1110 | 801 | 168 | 560 |
+| MUSC 1120 | 205 | 104 | 100 |
+| DANC 1110 | 166 | 83 | 107 |
+
+### Fix
+
+`prepare_enrollment_projection_inputs()` drops intersession sections and
+class-list rows before anything reads them, so every demand, seat and
+first-day count is the regular sessions'. December students are 2–3% of Fall
+registrations in the monitored courses (632 of 24,185 in Fall 2025). A design
+that kept them, by splitting the spine and borrowing a pending December from
+the previous Fall, was dropped as too much machinery for that share. The IS01
+test fails when either the sections or the class-list filter is removed.
+
+On the 2026-10-23 pull, against 0.23.0: Spring 2027 regains three pressure
+bumps (CHEM 1215L, COMM 1130, HNRS 2221) that a December-inflated feeder fall
+had vetoed (−5.6% to −6.3%, now −4.1% to −4.7%). Fall 2027 gains five courses
+(AFST 1110, ENGL 2210, MATH 1430, RELG 1110, THEA 1110) once December seats and
+first days stop hiding two near-full Falls.
+
+## I34 — A projection pressure decision flips with the platform's floating point
+
+**Status:** resolved 2026-10-24 in model 0.24.0
+**Found:** 2026-10-23, rebuilding production's Spring 2027 bundle on a Mac to
+audit the intersession change
+**Severity:** low. One course in one bundle. But the same tables and the same
+code published different course lists on different machines, so no rebuild
+could be checked against production.
+**Affects:** `build_projection_pressure_screen()` in
+`R/branches/enrollment-projections.R`.
+
+### What is wrong
+
+The screen includes a course when its trend demand exceeds next term's seats
+by at least `pressure_min_seat_gap` (10). The trend is an `lm()` fit, and its
+last bit depends on the BLAS. NATV 1150's last three Springs, 109, 120 and
+122, fit exactly 130 against 120 seats: the minimum, met. Production (Linux)
+computed 130.000000000000000 and included the course ("Trend demand exceeds
+scheduled capacity by 10 registrations"). R's reference BLAS on macOS computed
+129.999999999999972 and excluded it ("historical and trend demand remain within
+10 seats"). Every other number in the two bundles agreed.
+
+### Reproduction
+
+```r
+x <- 1:3; v <- c(109, 120, 122)
+sprintf("%.17g", predict(lm(v ~ x), data.frame(x = 4)))  # "129.99999999999997" on macOS
+```
+
+### Fix
+
+`projection_seat_gap_reached()` compares both seat gaps (historical shortfall
+and trend growth) with a tolerance of `sqrt(.Machine$double.eps)`. The test "a
+trend exactly at the seat gap counts on every platform (I34)" fails on macOS
+without it, and its fixed-value assertion fails on any platform.
 
 ## I31 — Course paths finishes behind a stuck loading dialog
 
@@ -1893,7 +1967,9 @@ has `spine - actual_first_day >= waitlisted_prior`.
 
 ## I28 — One late-starting session makes a whole course's first day unknown
 
-**Status:** open
+**Status:** open, partly fixed 2026-10-23: intersession is out of the
+forecast (model 0.24.0), so a December session no longer blanks the Fall first
+day
 **Found:** 2026-10-18, reading the Fall 2027 projection rows (model 0.22.0)
 for a transparency review
 **Severity:** moderate — a course that was full last term is shown as unknown,
@@ -1959,6 +2035,22 @@ the courses with any unknown row. In the Fall 2027 bundle,
 `projections$adjusted_saturated_prior` is `NA` for ENGL 1120, FYEX 1110 and
 MATH 1350 with spine term Fall 2026. It is also `NA` for ENGL 2660 and HIST
 1150, whose spine term is Fall 2024, which has no status dates.
+
+### Update 2026-10-23
+
+The 2026-10-23 pull is later than every 2H start, so ENGL 1120 and MATH 1350
+are judged saturated again. 17 of 2,602 Fall 2026 ABQ/EA courses still read
+unknown. Leaving intersession out of projections (model 0.24.0, I35) clears 7
+of them (BIOL 1140, ECON 2110, ECON 2120, FDMA 330, FDMA 430, MUS 375, RELG
+1110), and ENGL 2210's Fall 2025 first day, which a December section with no
+start date (CRN 79775) had blanked.
+
+The other 10 (ARTH 429, ARTH 529, HED 321, HLED 2210, LAW 550, MSST 529, NMNC
+4445, NMNC 4545, PAST 517, PHED 1620) are in no published projection. Each has
+sections with a blank part of term that start late (2026-11-06 to 2027-01-04)
+or have no start date. These, and any regular session not yet begun at the
+pull, still blank the course's first day under a reason that reads as missing
+status dates. The *done when* above stands for them.
 
 ---
 

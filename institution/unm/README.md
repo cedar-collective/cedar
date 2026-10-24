@@ -42,7 +42,9 @@ mapping audit does not report them as unknown. Optional
 `projection_history_start_term` (`202210`, Spring 2022) is the first term
 enrollment projections read history from, so pandemic-era terms cannot shape
 accuracy or method selection; without it the projection builder stops and the
-app still loads.
+app still loads. Optional `intersession_parts_of_term` (`INT`) names the parts
+of term that run after a term's regular sessions, `|`-separated; enrollment
+projections leave them out.
 
 ## Colleges are mapped, not read
 

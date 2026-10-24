@@ -131,6 +131,14 @@ seats were taken that day. Census comes on the 15th day of classes (the third
 Friday), after three weeks of drops, so a course that turned students away on
 day one can read 95% at census.
 
+### December intersession is not included
+
+December intersession sections belong to the Fall term but start weeks after
+it, and register after the Fall is under way, so projections leave them out:
+their students, seats and first days are not in any number here. To see
+intersession sections, filter **Open Seats**, **Regstats** or **Enrollment** by
+part of term.
+
 ### Sections are planned for registrations
 
 Sections are planned for everyone expected to register, not only the students

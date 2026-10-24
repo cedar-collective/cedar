@@ -3,3 +3,4 @@ mapping_files_url,https://github.com/cedar-collective/cedar/blob/main/institutio
 source_files_url,https://github.com/cedar-collective/cedar/blob/main
 source_values_without_college,Non-Degree Status
 projection_history_start_term,202210
+intersession_parts_of_term,INT

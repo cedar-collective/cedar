@@ -22,6 +22,8 @@ test_students_mc     <<- cedar_students_mc       # MC02: sequence + co-req + rep
 test_programs_mc     <<- cedar_programs_mc       # MC02 covariates
 test_students_mcret  <<- cedar_students_mcret    # MC03: retention cohorts, incl. a campus move
 test_students_wlmkt  <<- cedar_students_wlmkt    # WL01: a waitlist in the pooled ABQ+EA market
+test_sections_intersession <<- cedar_sections_intersession # IS01: a December intersession, out of the forecast
+test_students_intersession <<- cedar_students_intersession # IS01
 test_students_rp     <<- cedar_students_rp       # RP01: next-term return, graduates and next-term drops
 test_degrees_rp      <<- cedar_degrees_rp        # RP01
 test_sections_topics <<- cedar_sections_topics  # rotating-topics history (test-low-enrollment.R)
