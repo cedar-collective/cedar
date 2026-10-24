@@ -1070,7 +1070,13 @@ output$enrl_classlist_download <- downloadHandler(
   #########################################
 
   # Mode tracker: "alerts" for current/past terms, "concerns" for future terms
+  # (shown to readers as the schedule check)
   enrl_mode <- reactiveVal("alerts")
+  # A schedule check has no registrations, so the Min enrolled filter is hidden.
+  output$low_enrl_schedule_check <- renderText({
+    if (enrl_mode() == "concerns") "true" else "false"
+  })
+  outputOptions(output, "low_enrl_schedule_check", suspendWhenHidden = FALSE)
   # Per-term view and pull date from classify_low_enrollment_terms(), for the banner
   enrl_term_views <- reactiveVal(NULL)
 
@@ -1258,11 +1264,11 @@ output$enrl_classlist_download <- downloadHandler(
       return(div(
         class = "alert alert-info",
         icon("clock"), " ",
-        strong("Schedule only: no registrations yet. "),
-        paste0("Showing historical enrollment concerns for ", future_term_str, ". "),
-        paste0("Color coding is based on average enrollment from the last 4 same-type (",
-               term_type, ") terms, not current enrollment. "),
-        "Courses in the green band have historically met the threshold but are near the boundary."
+        strong(paste0("Schedule check: ", future_term_str, " has no registrations yet. ")),
+        paste0("Each scheduled course is compared with its own enrollment in its last 4 ",
+               term_type, " terms on the same campus. "),
+        "Courses in the green band have met the threshold but sit near it. A course with ",
+        "no ", term_type, " history there lists where else it has run."
       ))
     }
 
@@ -1375,7 +1381,7 @@ output$enrl_classlist_download <- downloadHandler(
         div(class = "col-sm-2",
             div(class = "well text-center alert-box--neutral",
                 h4(no_history, class = "my-2"),
-                p("No Prior History", class = "my-1")
+                p("No Same-Season History", class = "my-1")
             )
         ),
         div(class = "col-sm-2",
@@ -1541,9 +1547,11 @@ output$enrl_classlist_download <- downloadHandler(
   .make_concern_rt <- function(data, threshold, show_split_info = FALSE) {
     if (is.null(data) || nrow(data) == 0) return(NULL)
 
+    # No same-season history is not an average of 0: it shows as a dash, sorts
+    # last, and the history column says where else the course has run.
     data <- data %>% mutate(
-      avg_enrl_display = coalesce(avg_enrl, 0),
-      history_text     = coalesce(history_text, "No prior history")
+      history_text = if_else(is.na(other_history_text), history_text,
+                             paste0(history_text, "; other offerings: ", other_history_text))
     )
 
     if (show_split_info && "split_sections" %in% names(data)) {
@@ -1551,21 +1559,23 @@ output$enrl_classlist_download <- downloadHandler(
         select(
           Campus = campus, Department = department, Course = subject_course,
           `Split Partners` = split_sections, Title = course_title,
-          Sects = n_sections, `Sect Enrl` = current_enrl,
-          `Hist Avg` = avg_enrl_display, Trend = trend,
+          Sects = n_sections, `Hist Avg` = avg_enrl, Trend = trend,
           `# Terms` = n_prior_terms, `Prior History` = history_text
         ) %>% arrange(`Hist Avg`)
     } else {
       display_data <- data %>%
         select(
           Campus = campus, Department = department, Course = subject_course,
-          Title = course_title, Sects = n_sections, `Sect Enrl` = current_enrl,
-          `Hist Avg` = avg_enrl_display, Trend = trend,
+          Title = course_title, Sects = n_sections, `Hist Avg` = avg_enrl, Trend = trend,
           `# Terms` = n_prior_terms, `Prior History` = history_text
         ) %>% arrange(`Hist Avg`)
     }
 
-    hist_style   <- .enrl_col_style(threshold, include_buffer = TRUE)
+    band_style   <- .enrl_col_style(threshold, include_buffer = TRUE)
+    # No same-season history means no average: gray, like its summary card.
+    hist_style   <- function(value, ...) {
+      if (is.na(value)) list(background = "var(--alert-neutral-bg)") else band_style(value)
+    }
     header_nowrap <- list(whiteSpace = "nowrap")
     trend_colors <- c("↑ up" = "#28a745", "↓ down" = "#dc3545",
                       "↔ stable" = "#6c757d")
@@ -1589,8 +1599,8 @@ output$enrl_classlist_download <- downloadHandler(
         split_cols,
         list(
           Sects       = reactable::colDef(minWidth = 66, maxWidth = 76, align = "right", headerStyle = header_nowrap),
-          `Sect Enrl` = reactable::colDef(minWidth = 90, maxWidth = 104, align = "right", headerStyle = header_nowrap),
-          `Hist Avg`  = reactable::colDef(minWidth = 86, maxWidth = 100, align = "right", style = hist_style, headerStyle = header_nowrap),
+          `Hist Avg`  = reactable::colDef(minWidth = 86, maxWidth = 100, align = "right", na = "—",
+                                          style = hist_style, headerStyle = header_nowrap),
           Trend       = reactable::colDef(maxWidth = 80, align = "center", headerStyle = header_nowrap,
             cell = function(v) {
               color <- trend_colors[v]

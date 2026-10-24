@@ -27,6 +27,7 @@ test_students_intersession <<- cedar_students_intersession # IS01
 test_students_rp     <<- cedar_students_rp       # RP01: next-term return, graduates and next-term drops
 test_degrees_rp      <<- cedar_degrees_rp        # RP01
 test_sections_topics <<- cedar_sections_topics  # rotating-topics history (test-low-enrollment.R)
+test_sections_schedule <<- cedar_sections_schedule  # SC01 schedule-check history (test-low-enrollment.R)
 test_students_pcc    <<- cedar_students_pcc      # PCC01: courses before a major switch, with a baseline
 test_programs_pcc    <<- cedar_programs_pcc      # PCC01: three switchers, three stayers
 test_population_pcc  <<- cedar_population_pcc    # PCC01: the six-student comparison universe

@@ -363,7 +363,7 @@ export async function runReportChecks({ scope = 'smoke', synthetic = false } = {
         banner: document.getElementById('enrl_mode_banner')?.innerText || '',
       }));
       assert.match(lowEnrl.summary, /Total Courses|No courses of concern/);
-      assert.doesNotMatch(lowEnrl.banner, /Schedule only/);
+      assert.doesNotMatch(lowEnrl.banner, /Schedule check/);
     });
 
     await withStep(page, [], 'Regstats runs', async () => {

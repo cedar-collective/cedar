@@ -1715,6 +1715,52 @@ cedar_sections_topics <- dplyr::bind_rows(
 )
 
 # =============================================================================
+# CEDAR_SECTIONS_SCHEDULE — SC01, Low Enrollment's schedule check (ISSUES.md I36)
+# =============================================================================
+# Spring 2021 as a schedule nobody has registered for (enrolled 0), beside each
+# course's earlier offerings. get_enrollment_concerns() must find same-season
+# history on the course's own campus, or else list the course's other offerings:
+#   HIST 411  Sp20 ABQ "Historical Methods" 20 -> Sp21 ABQ "Methods of History":
+#             a reworded regular course keeps its history, 20 (Sp20).
+#   HIST 412  Fa20 ABQ 16 -> Sp21 ABQ: never in spring; other offerings 16 (ABQ Fa20).
+#   HIST 413  Sp20 ABQ 14 -> Sp21 EA: new to EA; other offerings 14 (ABQ Sp20).
+#   HIST 414  Sp20 ABQ "T: Black Sports History" 12 -> Sp21 ABQ "T: Digital History":
+#             a new topic has no history of its own; other offerings 12 (ABQ Sp20).
+#   HIST 415  Sp21 ABQ only: no earlier offering.
+#   HIST 416  Sp20 ABQ cancelled -> Sp21 ABQ: history C (Sp20); a cancelled
+#             section never ran, so it is not listed as another offering.
+# Built from cedar_sections_topics row 4 (REG001) so every other column keeps a
+# valid value, as the shell rows above are.
+.sc01 <- tibble::tribble(
+  ~section_id, ~term,   ~crn,    ~course_number, ~course_title,             ~campus, ~enrolled, ~status,
+  "SC411A",    202010L, "36001", "411",          "Historical Methods",      "ABQ",   20L, "A",
+  "SC411B",    202110L, "36002", "411",          "Methods of History",      "ABQ",    0L, "A",
+  "SC412A",    202080L, "36003", "412",          "Public History",          "ABQ",   16L, "A",
+  "SC412B",    202110L, "36004", "412",          "Public History",          "ABQ",    0L, "A",
+  "SC413A",    202010L, "36005", "413",          "Oral History",            "ABQ",   14L, "A",
+  "SC413B",    202110L, "36006", "413",          "Oral History",            "EA",     0L, "A",
+  "SC414A",    202010L, "36007", "414",          "T: Black Sports History", "ABQ",   12L, "A",
+  "SC414B",    202110L, "36008", "414",          "T: Digital History",      "ABQ",    0L, "A",
+  "SC415B",    202110L, "36009", "415",          "History of Science",      "ABQ",    0L, "A",
+  "SC416A",    202010L, "36010", "416",          "Digital History",         "ABQ",    0L, "C",
+  "SC416B",    202110L, "36011", "416",          "Digital History",         "ABQ",    0L, "A"
+)
+cedar_sections_schedule <- cedar_sections_topics[rep(4, nrow(.sc01)), ] %>%
+  dplyr::select(-dplyr::all_of(names(.sc01))) %>%
+  dplyr::bind_cols(.sc01) %>%
+  dplyr::mutate(
+    subject_course = paste("HIST", course_number),
+    total_enrl     = enrolled,
+    available      = capacity - enrolled,
+    is_topics      = grepl("^T:", course_title),
+    term_type      = dplyr::if_else(term %% 100L == 10L, "spring", "fall"),
+    start_date     = as.Date(c(`202010` = "2020-01-13", `202080` = "2020-08-17",
+                               `202110` = "2021-01-19")[as.character(term)]),
+    end_date       = start_date + 116L,
+    as_of_date     = start_date
+  )
+
+# =============================================================================
 # CEDAR_STUDENTS — explicit hand-coded fixture (~102 rows)
 # =============================================================================
 # Only HIST, MATH, ANTH, BIOL, NURS have student rows.

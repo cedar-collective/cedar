@@ -2359,7 +2359,6 @@ filter_low_enrollment_level <- function(data, level_val, threshold,
 
   if (!"is_split" %in% names(data)) data$is_split <- FALSE
   if (!"level" %in% names(data)) data$level <- NA_character_
-  if (!".alert_enrl" %in% names(data)) data$.alert_enrl <- data$enrolled
 
   if (mode == "concerns") {
     if (isTRUE(is_split_filter)) {
@@ -2372,6 +2371,7 @@ filter_low_enrollment_level <- function(data, level_val, threshold,
                n_prior_terms == 0 | avg_enrl < threshold + 5)
     }
   } else {
+    if (!".alert_enrl" %in% names(data)) data$.alert_enrl <- data$enrolled
     fetch_limit <- ceiling(threshold * 1.25)
     if (isTRUE(is_split_filter)) {
       data %>% filter(coalesce(is_split, FALSE), .alert_enrl <= fetch_limit)
@@ -2639,12 +2639,15 @@ summarize_term_enrl_series <- function(sections, keys = character(0), n_terms = 
 #' @param enrl Active enrollment per term (vector, parallel to \code{term}).
 #' @param has_active Logical per term: did the term have an active section? \code{NULL}
 #'   treats every term as active (no cancelled "C" markers).
+#' @param campus Optional campus per term, prefixed to each term label
+#'   (\code{"14 (ABQ Sp20)"}) when a series spans campuses.
 #' @return A single string; \code{"No history"} when \code{term} is empty.
-format_term_history <- function(term, enrl, has_active = NULL) {
+format_term_history <- function(term, enrl, has_active = NULL, campus = NULL) {
   if (length(term) == 0) return("No history")
   if (is.null(has_active)) has_active <- rep(TRUE, length(term))
   values <- ifelse(has_active, as.character(enrl), "C")
   terms <- vapply(term, abbr_term, character(1))
+  if (!is.null(campus)) terms <- paste(campus, terms)
   paste0(paste(values, collapse = ", "), " (", paste(terms, collapse = ", "), ")")
 }
 
@@ -2716,10 +2719,16 @@ classify_low_enrollment_terms <- function(sections, terms, current_term,
 #' @param opt Options list with filters (term, course_campus, dept, etc.)
 #' @param n_history_terms Number of prior same-type terms to average (default 4)
 #'
-#' @return Data frame with schedule + historical stats per course
+#' @return Data frame with schedule + historical stats per course. A course with
+#'   no same-season history on its campus has `n_prior_terms` 0, `avg_enrl` NA,
+#'   and `other_history_text` listing its latest offerings that ran in other
+#'   seasons, on other campuses or as other topics (NA when there are none).
 get_enrollment_concerns <- function(courses, opt, n_history_terms = 4) {
   future_term <- opt$term
   cedar_debug("[enrl.R] Getting enrollment concerns for future term: ", future_term)
+  if (!"is_topics" %in% names(courses)) {
+    stop("[enrl.R] get_enrollment_concerns() needs sections column is_topics.")
+  }
 
   # 1. Get scheduled courses for the future term
   opt$status <- "A"
@@ -2744,6 +2753,7 @@ get_enrollment_concerns <- function(courses, opt, n_history_terms = 4) {
       split_sections = if ("split_sections" %in% names(.)) first(na.omit(split_sections)) else NA_character_,
       n_sections = n(),
       current_enrl = sum(total_enrl, na.rm = TRUE),
+      is_topics = any(is_topics %in% TRUE),
       .groups = "drop"
     )
 
@@ -2753,32 +2763,42 @@ get_enrollment_concerns <- function(courses, opt, n_history_terms = 4) {
   term_type <- get_term_type(future_term)
   cedar_debug("[enrl.R] Matching against historical '", term_type, "' terms.")
 
-  # 4. Pull historical data: same term_type, home sections, ALL statuses.
-  #    Including cancelled sections lets the history show when a course was
-  #    scheduled but later cancelled (displayed as "C" in history text).
-  #    Shell sections (active, 0 enrollment, unstaffed) are dropped — they are
-  #    placeholders left in the schedule build, not real offerings.
+  # 4. Pull earlier home sections, ALL statuses. Including cancelled sections
+  #    lets the history show when a course was scheduled but later cancelled
+  #    (displayed as "C" in history text). Shell sections (active, 0 enrollment,
+  #    unstaffed) are dropped — they are placeholders left in the schedule
+  #    build, not real offerings.
   hist_data <- courses %>%
     keep_home_sections() %>%
-    filter(
-      term_type == !!term_type,
-      term != as.integer(future_term)
-    ) %>%
+    filter(term < as.integer(future_term)) %>%
     drop_shell_sections()
 
-  # 5+6. Aggregate to a course-level per-term enrollment series, keyed by
-  #      subject_course + course_title + campus (course_title differentiates topics
-  #      courses), keeping the most recent n_history_terms per course.
+  #    A topics course keeps its title in the course key, so each rotating topic
+  #    has its own history; a regular course matches on number alone, because
+  #    its title gets reworded across terms. A course is a topics course when
+  #    any of its sections carries a "T:" title, some of its topics do not (the
+  #    rule get_course_enrollment_history() follows; ISSUES.md I36).
+  topics_courses <- unique(c(scheduled_courses$subject_course[scheduled_courses$is_topics],
+                             hist_data$subject_course[hist_data$is_topics %in% TRUE]))
+  with_topic_title <- function(df) {
+    mutate(df, topic_title = if_else(subject_course %in% topics_courses, course_title,
+                                     NA_character_))
+  }
+  scheduled_courses <- with_topic_title(scheduled_courses)
+  hist_data <- with_topic_title(hist_data)
+
+  # 5+6. Aggregate the same season to a course-level per-term enrollment
+  #      series, keeping the most recent n_history_terms per course.
   hist_recent <- summarize_term_enrl_series(
-    hist_data,
-    keys    = c("subject_course", "course_title", "campus"),
+    filter(hist_data, term_type == !!term_type),
+    keys    = c("subject_course", "topic_title", "campus"),
     n_terms = n_history_terms
   )
 
   # 7. Compute averages (active terms only), trend, and history text.
   #    Cancelled terms appear in history_text as "C" but don't affect avg/trend.
   hist_stats <- hist_recent %>%
-    group_by(subject_course, course_title, campus) %>%
+    group_by(subject_course, topic_title, campus) %>%
     summarize(
       avg_enrl = {
         active_enrl <- term_enrl[has_active]
@@ -2806,11 +2826,39 @@ get_enrollment_concerns <- function(courses, opt, n_history_terms = 4) {
 
   # 9. Join scheduled courses with historical stats
   result <- scheduled_courses %>%
-    left_join(hist_stats, by = c("subject_course", "course_title", "campus")) %>%
+    left_join(hist_stats, by = c("subject_course", "topic_title", "campus"),
+              na_matches = "na") %>%
+    mutate(n_prior_terms = coalesce(n_prior_terms, 0L))
+
+  # 10. A course with no same-season history on its campus may still have run
+  #     in another season, on another campus or as another topic. Those
+  #     offerings are not comparable demand, so they never set the average; they
+  #     are listed so a reader can see the course is not new. Only offerings that
+  #     ran are listed: a cancelled one already shows as "C" in its own history.
+  #     CAMPUS_ROLLUP: one display list per course across campuses; every entry
+  #     keeps its own campus label and no enrollment is summed across campuses.
+  other_offerings <- hist_data %>%
+    filter(subject_course %in% result$subject_course[result$n_prior_terms == 0L]) %>%
+    summarize_term_enrl_series(keys = c("subject_course", "campus")) %>%
+    filter(has_active) %>%
+    group_by(subject_course) %>%
+    slice_max(term, n = n_history_terms, with_ties = FALSE) %>%
+    arrange(term, campus, .by_group = TRUE) %>%
+    summarize(
+      other_history_text = format_term_history(term, term_enrl, campus = campus),
+      .groups = "drop"
+    )
+
+  result <- result %>%
+    # CAMPUS_ROLLUP: other_offerings is already one labelled list per course.
+    left_join(other_offerings, by = "subject_course") %>%
     mutate(
-      avg_enrl = coalesce(avg_enrl, NA_real_),
-      n_prior_terms = coalesce(n_prior_terms, 0L),
-      history_text = coalesce(history_text, "No prior history"),
+      other_history_text = if_else(n_prior_terms == 0L, other_history_text, NA_character_),
+      history_text = coalesce(
+        history_text,
+        if_else(is.na(other_history_text), "No earlier offering",
+                paste0("None in ", term_type, " on ", campus))
+      ),
       trend = coalesce(trend, "—")
     )
 

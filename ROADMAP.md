@@ -372,6 +372,11 @@ Plan: [ADR-002](docs/developers/adr-002-explicit-mapping-files.md).
   milestones, offering constraints and transfer-credit scenarios.
 - [ ] Review complete programs with different entry rules, elective structures
   and concentrations; reconcile source conflicts and course equivalences.
+- [ ] Keep a course renumbering map ([I37](ISSUES.md#i37--renumbered-courses-lose-their-history)).
+  Each year's catalog update proposes renumberings by comparing the edition's
+  courses with the last one; each term, a screen lists new codes whose title
+  matches a retired code. Reviewed entries go in an institution file that every
+  course-history lookup reads.
 - [ ] Establish applicable catalog year and transfer/waiver evidence before
   evaluating progress or additional coursework for a major switch.
 - [ ] Explore frequent observed term portfolios and paths without inventing an

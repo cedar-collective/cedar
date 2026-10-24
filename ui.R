@@ -1626,10 +1626,10 @@ nav_panel(
           "Sections running under the review thresholds, split by course level ",
           "because the bar differs for each. Set the thresholds below to match your ",
           "own review rule. For current and past terms this reports what enrollment ",
-          "actually was; for a future term there is no enrollment yet, so it ",
-          "compares the schedule against each course's own history and flags what ",
-          "looks at risk. Once registration opens, it reports the registrations so far ",
-          "and says when they were pulled \u2014 the banner tells you which mode you are in."
+          "actually was. A future term nobody has registered for gets a schedule ",
+          "check instead: each scheduled course against its own history, flagging ",
+          "what looks at risk. Once registration opens, it reports the registrations ",
+          "so far and says when they were pulled \u2014 the banner tells you which you are seeing."
         ),
 
         # Mode banner — shown when a future term triggers concerns mode
@@ -1653,8 +1653,11 @@ nav_panel(
           div(style = "width: 100px;",
             numericInput("low_enrl_threshold_grad", "Graduate", value = 5, min = 1, max = 100, step = 1)
           ),
-          div(style = "width: 100px;",
-            numericInput("low_enrl_min_enrl", "Min enrolled", value = 1, min = 0, max = 1000, step = 1)
+          conditionalPanel(
+            condition = "output.low_enrl_schedule_check !== 'true'",
+            div(style = "width: 100px;",
+              numericInput("low_enrl_min_enrl", "Min enrolled", value = 1, min = 0, max = 1000, step = 1)
+            )
           ),
           div(style = "padding-bottom: 6px;",
             uiOutput("low_enrl_download_ui"))
@@ -1668,13 +1671,13 @@ nav_panel(
             tags$li(tags$strong("XL Total"), " — for crosslisted sections, the combined count across all partner sections; equals Enrolled for non-crosslisted courses."),
             tags$li(tags$strong("Course Total"), " — sum of XL Total across all home sections of this course. Color-coded against the threshold.")
           ),
-          tags$p(tags$strong("Future terms (concerns mode):"), class = "mt-2 mb-1"),
+          tags$p(tags$strong("Schedule check (a future term with no registrations yet):"), class = "mt-2 mb-1"),
           tags$ul(
             tags$li(tags$strong("Sects"), " — number of scheduled home sections."),
-            tags$li(tags$strong("Sect Enrl"), " — current registration count for those sections."),
-            tags$li(tags$strong("Hist Avg"), " — average combined enrollment over the last 4 same-type terms. Color-coded against the threshold."),
+            tags$li(tags$strong("Hist Avg"), " — average combined enrollment over the course's last 4 same-season terms on the same campus. Color-coded against the threshold; a dash when there are none."),
             tags$li(tags$strong("Trend"), " — ↑ up / ↓ down / ↔ stable based on linear regression slope across prior terms."),
-            tags$li(tags$strong("# Terms"), " — how many prior terms contributed to the average.")
+            tags$li(tags$strong("# Terms"), " — how many prior terms contributed to the average."),
+            tags$li(tags$strong("Prior History"), " — those terms' enrollment. A course with none lists its latest offerings in other seasons, on other campuses or as other topics; they never set the average.")
           ),
           tags$p(tags$strong("Color bands:"), " red = below 50% of threshold; yellow = 50–75%; blue = 75–100%; green = meets or exceeds threshold.", class = "mt-2"),
           cedar_docs_link("users/enrollment-tab")
