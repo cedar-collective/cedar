@@ -22,6 +22,8 @@ projection_test_history <- function(values = c(100, 110, 120, 130),
     dr_late = 0,
     classlist_total = values,
     first_day_enrl = values,
+    first_day_basis = "complete",
+    first_day_started_enrl = values,
     census_enrl = values
   )
 }
@@ -108,6 +110,22 @@ empty_projection_test_components <- function() {
     capacity_share = numeric(), prior_comparable_term = integer(),
     prior_census_enrl = numeric(), prior_scheduled_capacity = numeric(),
     prior_census_fill = numeric()
+  )
+}
+
+# No delivery campus rows: these inputs test the pooled market alone.
+empty_projection_test_delivery_sections <- function() {
+  tibble::tibble(
+    campus = character(), college = character(), subject_course = character(),
+    part_term = character(), term = integer(), scheduled_sections = integer(),
+    scheduled_capacity = numeric()
+  )
+}
+
+empty_projection_test_delivery_first_day <- function() {
+  tibble::tibble(
+    campus = character(), term = integer(), subject_course = character(),
+    first_day_enrl = numeric(), first_day_basis = character()
   )
 }
 
@@ -891,7 +909,9 @@ test_that("an unavailable target schedule produces a planning recommendation", {
     target_courses = "TEST 101", target_campuses = c("ABQ", "EA"),
     target_market_id = "abq_ea_course_market",
     enrollment_through_term = 202380L,
-    delivery_components = empty_projection_test_components()
+    delivery_components = empty_projection_test_components(),
+    delivery_section_history = empty_projection_test_delivery_sections(),
+    delivery_first_day = empty_projection_test_delivery_first_day()
   )
 
   result <- get_course_enrollment_projections(
@@ -938,7 +958,9 @@ test_that("planning sections are sized from projected registrations, not first-d
     target_courses = "TEST 101", target_campuses = c("ABQ", "EA"),
     target_market_id = "abq_ea_course_market",
     enrollment_through_term = 202380L,
-    delivery_components = empty_projection_test_components()
+    delivery_components = empty_projection_test_components(),
+    delivery_section_history = empty_projection_test_delivery_sections(),
+    delivery_first_day = empty_projection_test_delivery_first_day()
   )
 
   result <- get_course_enrollment_projections(
@@ -1141,6 +1163,46 @@ test_that("past error is summed by what each miss is attributable to", {
   expect_match(summary$sentence, "and 19% from courses with room whose seats held \\(15\\.0% off on average\\)")
 })
 
+# ISSUES.md M35. Five published forecasts of 100 for one course; each range is
+# rebuilt from the earlier misses only (80th percentile, type 7):
+#   fold  actual  miss  earlier misses   half-width  seats   held?
+#   1     90      +10   none             --          --      not scored
+#   2     110     -10   10               10          +2%     yes
+#   3     95       +5   10, 10           10          +5%     yes
+#   4     130     -30   10, 10, 5        10          +30%    no, actual above
+#   5     100       0   10, 10, 5, 30    18          -3%     yes
+# A sixth fold the rule did not publish is never read.
+test_that("the range's rolling coverage is reported by whether seats held", {
+  backtests <- tibble::tibble(
+    market_id = "abq_ea_course_market", subject_course = "TEST 101",
+    term_type = "fall", target_term = seq(202080L, by = 100L, length.out = 6),
+    policy_selected = c(rep(TRUE, 5), FALSE),
+    projected_classlist_total = 100,
+    actual_classlist_total = c(90, 110, 95, 130, 100, 40),
+    fold_seat_change = c(NA, 0.02, 0.05, 0.30, -0.03, 0)
+  )
+  coverage <- summarize_projection_range_coverage(backtests)
+  expect_equal(coverage$seats, c("steady", "moved", "unknown"))
+  expect_equal(coverage$folds, c(3L, 1L, 0L))
+  expect_equal(coverage$covered, c(3L, 0L, 0L))
+  expect_equal(coverage$actual_above, c(0L, 1L, 0L))
+  expect_equal(coverage$coverage, c(1, 0, NA))
+
+  summary <- projection_range_coverage_summary(backtests, list())
+  expect_equal(summary$sentence, paste0(
+    "The range assumes seats like last year's. Rebuilt for each past forecast ",
+    "from the course's earlier ones only, it held 3 of 3 times when seats ",
+    "stayed within 10% of the year before, and 0 of 1 when they moved. Of its ",
+    "1 miss, 1 had registrations above it."
+  ))
+  none <- projection_range_coverage_summary(backtests[1, ], list())
+  expect_match(none$sentence, "cannot be shown yet\\.$")
+  expect_error(
+    summarize_projection_range_coverage(dplyr::select(backtests, -fold_seat_change)),
+    "fold_seat_change"
+  )
+})
+
 test_that("the draft comparison separates short of day one from short of the plan", {
   projections <- tibble::tibble(
     market_id = "abq_ea_course_market",
@@ -1317,7 +1379,9 @@ test_that("target class-list snapshot drives the active seat check", {
     target_campuses = c("ABQ", "EA"),
     target_market_id = "abq_ea_course_market",
     enrollment_through_term = 202380L,
-    delivery_components = empty_projection_test_components()
+    delivery_components = empty_projection_test_components(),
+    delivery_section_history = empty_projection_test_delivery_sections(),
+    delivery_first_day = empty_projection_test_delivery_first_day()
   )
 
   result <- get_course_enrollment_projections(
@@ -1373,7 +1437,9 @@ test_that("registrations over the recorded cap still count as capacity reached",
     target_campuses = c("ABQ", "EA"),
     target_market_id = "abq_ea_course_market",
     enrollment_through_term = 202380L,
-    delivery_components = empty_projection_test_components()
+    delivery_components = empty_projection_test_components(),
+    delivery_section_history = empty_projection_test_delivery_sections(),
+    delivery_first_day = empty_projection_test_delivery_first_day()
   )
 
   result <- get_course_enrollment_projections(
@@ -1485,6 +1551,96 @@ test_that("Fall deltas scale enrollment changes by the historical carry-through"
   expect_true(is.na(far$regime_alarm))
 })
 
+# ISSUES.md I28: a pending session's begun count is a lower bound, so it may
+# settle that a threshold was reached but never that it was not, and an
+# undated term has no bound at all.
+test_that("a first day still pending is judged only when its begun sessions already reach the threshold", {
+  judged <- projection_judged_first_day(
+    first_day = c(95, NA, NA, NA, NA),
+    started = c(95, 95, 80, 95, 95),
+    basis = c("complete", "sessions_pending", "sessions_pending", "undated", "sessions_pending"),
+    capacity = c(100, 100, 100, 100, NA),
+    threshold = .9
+  )
+  expect_equal(judged, c(95, 95, NA, NA, NA))
+})
+
+# EC-11's SOCI 100 at Fall 2020 is taught on two campuses: ABQ in a full-term
+# and a first-half session (107 + 28 on the first day, 200 seats) and EA
+# (58 of 100). Pooled, the market reads 193 of 300; each campus keeps its own.
+campus_history_scaffold <- function(history_term) tibble::tibble(
+  market_id = "abq_ea_course_market", subject_course = "SOCI 100",
+  projection_target_term = 202180L, history_term = history_term,
+  recency_rank = 1L
+)
+
+test_that("recent history is saved by delivery campus, each with its own first day", {
+  sections <- prepare_projection_section_history(
+    test_sections_regstats, courses = "SOCI 100", campuses = c("ABQ", "EA")
+  )
+  first_day <- prepare_projection_delivery_first_day(
+    test_students_regstats, test_sections_regstats, "SOCI 100", c("ABQ", "EA")
+  )
+  campus <- build_projection_recent_campus_history(
+    campus_history_scaffold(202080L), sections, first_day
+  )
+  abq <- campus %>% dplyr::filter(campus == "ABQ")
+  ea <- campus %>% dplyr::filter(campus == "EA")
+  expect_equal(nrow(campus), 2L)
+  expect_equal(abq$scheduled_sections, 2L)
+  expect_equal(abq$scheduled_capacity, 200)
+  expect_equal(abq$first_day_enrl, 135)
+  expect_equal(abq$first_day_fill, 0.675)
+  expect_equal(ea$first_day_enrl, 58)
+  expect_equal(ea$first_day_fill, 0.58)
+  expect_true(all(campus$first_day_basis == "complete"))
+  # Neither campus was full, so nothing is flagged.
+  expect_true(is.na(projection_campus_fill_flags(
+    tibble::tibble(market_id = "abq_ea_course_market", subject_course = "SOCI 100",
+                   target_term = 202180L),
+    campus
+  )))
+
+  # EC-11c: a campus whose later session had not begun has no first day.
+  pending <- prepare_projection_delivery_first_day(
+    test_students_pending_session, test_sections_pending_session, "SOCI 100", "ABQ"
+  )
+  expect_true(is.na(pending$first_day_enrl))
+  expect_equal(pending$first_day_basis, "sessions_pending")
+})
+
+test_that("a campus full on the first day beside one with room is flagged, never pooled away", {
+  projections <- tibble::tibble(
+    market_id = "abq_ea_course_market", subject_course = c("TEST 101", "TEST 102"),
+    target_term = 202480L
+  )
+  # Saved campus rows, as the bundle holds them: an analytical frame, not
+  # institutional data. TEST 101's online campus filled while ABQ had room.
+  history <- tibble::tibble(
+    market_id = "abq_ea_course_market",
+    subject_course = c("TEST 101", "TEST 101", "TEST 101", "TEST 102", "TEST 102"),
+    projection_target_term = 202480L,
+    recency_rank = c(1L, 1L, 2L, 1L, 1L),
+    campus = c("ABQ", "EA", "EA", "ABQ", "EA"),
+    first_day_basis = "complete",
+    first_day_fill = c(0.80, 1.00, 0.50, 0.95, 1.00)
+  )
+  expect_equal(
+    projection_campus_fill_flags(projections, history),
+    c("EA full last term, ABQ had room", NA)
+  )
+  # Near full is not room, and an incomplete first day is not compared.
+  pending <- dplyr::mutate(history, first_day_basis = dplyr::if_else(
+    campus == "EA" & recency_rank == 1L, "sessions_pending", first_day_basis
+  ))
+  expect_true(all(is.na(projection_campus_fill_flags(projections, pending))))
+  # Only the latest term counts: an older full term does not raise the flag.
+  older <- dplyr::mutate(history, first_day_fill = dplyr::if_else(
+    recency_rank == 1L & campus == "EA", 0.70, first_day_fill
+  ))
+  expect_true(all(is.na(projection_campus_fill_flags(projections, older))))
+})
+
 test_that("a prior term full on the first day adds its unserved waitlist to the spine", {
   # Spring 2023: 24 students registered. Four dropped before classes began, so
   # 20 of 22 seats were held on the first day (90.9%, over the 90% line); one
@@ -1527,7 +1683,35 @@ test_that("a prior term full on the first day adds its unserved waitlist to the 
   )
   expect_true(is.na(undated$saturated_prior))
   expect_equal(undated$floor_uplift, 0)
-  expect_match(undated$floor_basis, "First-day enrollment for Spring 2023 cannot be reconstructed")
+  expect_match(undated$floor_basis, "Spring 2023's class lists carry no registration status dates")
+
+  # Spring 2023's class list was pulled before a later session began (ISSUES.md
+  # I28). The sessions that had begun seat 20 of all 22 seats, 90.9%: the true
+  # fill can only be higher, so saturation is settled and the floor stands,
+  # labelled as a lower bound. Seating 15 (68.2%) settles nothing, and the
+  # reason names the pending session rather than missing dates.
+  pending <- function(started) dplyr::mutate(
+    s$enrollment_history,
+    first_day_enrl = dplyr::if_else(term == 202310L, NA_real_, first_day_enrl),
+    first_day_basis = dplyr::if_else(term == 202310L, "sessions_pending", first_day_basis),
+    first_day_started_enrl = dplyr::if_else(term == 202310L, started, first_day_started_enrl)
+  )
+  settled <- project_spine_adjusted(
+    pending(20), s$preceding_term_history, s$section_history,
+    s$waitlist_history, s$students, s$row, 202410L
+  )
+  expect_true(settled$saturated_prior)
+  expect_equal(settled$floor_uplift, 3)
+  expect_match(settled$floor_basis,
+               "first-day fill at least 90.9%, from the sessions that had begun")
+  open <- project_spine_adjusted(
+    pending(15), s$preceding_term_history, s$section_history,
+    s$waitlist_history, s$students, s$row, 202410L
+  )
+  expect_true(is.na(open$saturated_prior))
+  expect_equal(open$floor_uplift, 0)
+  expect_match(open$floor_basis, "Some of Spring 2023's sessions had not begun")
+  expect_match(open$floor_basis, "fill 68.2% of its seats")
 
   # Saturated with no waitlist rows retained: the spine is itself the floor.
   none <- project_spine_adjusted(
@@ -1898,7 +2082,9 @@ test_that("cone preserves candidate provenance when backtests are empty", {
     target_campuses = c("ABQ", "EA"),
     target_market_id = "abq_ea_course_market",
     enrollment_through_term = 202380L,
-    delivery_components = empty_projection_test_components()
+    delivery_components = empty_projection_test_components(),
+    delivery_section_history = empty_projection_test_delivery_sections(),
+    delivery_first_day = empty_projection_test_delivery_first_day()
   )
 
   analysis <- get_course_enrollment_projections(
@@ -1928,7 +2114,9 @@ test_that("pressure-only scopes can publish an explicit empty result", {
     target_campuses = c("ABQ", "EA"),
     target_market_id = "abq_ea_course_market",
     enrollment_through_term = 202380L,
-    delivery_components = empty_projection_test_components()
+    delivery_components = empty_projection_test_components(),
+    delivery_section_history = empty_projection_test_delivery_sections(),
+    delivery_first_day = empty_projection_test_delivery_first_day()
   )
 
   analysis <- get_course_enrollment_projections(
@@ -2123,6 +2311,7 @@ test_that("the administrator summary says the decision in one sentence and flags
     planned_registrations = 2397,
     recommended_sections = 99L, observed_baseline = 2179,
     adjusted_saturated_prior = TRUE, adjusted_prior_first_day_fill = 0.988,
+    adjusted_prior_first_day_basis = "complete", campus_fill_flag = NA_character_,
     adjusted_waitlisted_prior = 15L, adjusted_regime_alarm = FALSE,
     adjusted_preceding_term = 202680L, adjusted_preceding_term_change = 0.02,
     stability = "Moderate", accuracy = "Moderate", seat_consistency = "Unrated",
@@ -2151,7 +2340,28 @@ test_that("the administrator summary says the decision in one sentence and flags
   # One decimal: whole percents turned 98.8% into "99%" and read as full.
   expect_match(sentence, "filled 98\\.8% of its seats on the first day with 15 students waiting, so this is a floor\\.")
   expect_match(sentence, "averaged 10 to 20% off\\.$")
-  expect_equal(projection_flags(row), "Near full last term | 15 waiting")
+  # 98.8% on the first day is full, not merely near full: the flag uses the
+  # same two levels as every other page.
+  expect_equal(projection_flags(row), "Full last term | 15 waiting")
+  expect_equal(
+    projection_flags(dplyr::mutate(row, adjusted_prior_first_day_fill = 0.93)),
+    "Near full last term | 15 waiting"
+  )
+  # An unknown fill names its cause (ISSUES.md I28); one with no cause
+  # recorded (no prior term to read) adds nothing.
+  unknown <- function(basis) projection_flags(dplyr::mutate(
+    row, adjusted_saturated_prior = NA, adjusted_prior_first_day_fill = NA_real_,
+    adjusted_prior_first_day_basis = basis
+  ))
+  expect_equal(unknown("undated"), "Last term's fill unknown: no status dates")
+  expect_equal(unknown("sessions_pending"), "Last term's fill unknown: a session had not begun")
+  expect_equal(unknown("no_capacity"), "Last term's fill unknown: no seat count")
+  expect_equal(unknown(NA_character_), "")
+  expect_equal(
+    projection_flags(dplyr::mutate(row, campus_fill_flag = "EA full last term, ABQ had room")),
+    "Full last term | 15 waiting | EA full last term, ABQ had room"
+  )
+  expect_error(projection_flags(dplyr::select(row, -campus_fill_flag)), "campus_fill_flag")
 
   moved <- dplyr::mutate(
     row, adjusted_saturated_prior = FALSE, adjusted_waitlisted_prior = 0L,
@@ -2194,6 +2404,44 @@ test_that("the view adds a needs-a-look filter without changing a number", {
   expect_equal(view$table$expected_first_day, view$projections$projected_first_day_equivalent)
   expect_equal(view$table$planning_sections, view$projections$recommended_sections)
   expect_equal(view$meta$n_attention, sum(view$projections$attention))
+  # The campus history is saved per delivery campus, inside the saved scope,
+  # for each recent term; Spring 2020 is in the window when it opens there.
+  history_bundle <- projection_fixture_bundle(202110L, 202080L, 202010L)
+  expect_gt(nrow(history_bundle$recent_campus_history), 0L)
+  expect_true(all(history_bundle$recent_campus_history$campus %in% history_bundle$scope_campuses))
+  expect_setequal(history_bundle$recent_campus_history$history_term,
+                  history_bundle$recent_history$history_term)
+  history_view <- build_enrollment_projection_view(history_bundle, list(group_id = "all_saved"))
+  expect_true(all(history_view$campus_history$subject_course %in% history_view$projections$subject_course))
+  # A draft that moves the seats 10% or more from last year's same term says
+  # the range assumes steady seats; one within 10% says nothing.
+  last <- history_bundle$recent_history %>% dplyr::filter(recency_rank == 1L)
+  drafted <- history_bundle
+  drafted$projections <- drafted$projections %>%
+    dplyr::left_join(
+      dplyr::select(last, subject_course, last_capacity = scheduled_capacity),
+      by = "subject_course"
+    ) %>%
+    dplyr::mutate(
+      projection_low = 10, projection_high = 30,
+      target_schedule_available = TRUE,
+      scheduled_capacity = c(1.5, rep(1.05, dplyr::n() - 1L)) * last_capacity
+    ) %>%
+    dplyr::select(-last_capacity)
+  drafted_view <- build_enrollment_projection_view(drafted, list(group_id = "all_saved"))
+  moved_course <- drafted$projections$subject_course[[1]]
+  expect_equal(
+    drafted_view$table$range_note[drafted_view$table$course == moved_course],
+    paste0("Draft seats +50% on ", last$history_term_label[last$subject_course == moved_course],
+           ": the range assumes steady seats")
+  )
+  expect_true(all(is.na(drafted_view$table$range_note[drafted_view$table$course != moved_course])))
+  expect_match(drafted_view$meta$range_coverage$sentence, "^The range assumes seats like last year's\\.")
+  broken <- history_bundle
+  broken$recent_campus_history <- dplyr::bind_rows(
+    broken$recent_campus_history, broken$recent_campus_history[1, ]
+  )
+  expect_error(validate_enrollment_projection_bundle(broken), "Campus history")
 
   # The range is in registrations, the unit sections are sized from. The
   # fixture has too few aftcasts for an interval, so one is set on row 1;

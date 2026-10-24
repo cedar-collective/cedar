@@ -177,7 +177,10 @@ As waitlists accumulate, the flat 10% will be replaced by a measured allowance.
 Some terms' class lists were exported without status dates,
 so their first day is unknown; **Admin > Data & Usage** lists which. Those terms
 show a dash and are never judged full or not full; they are not filled in from
-census.
+census. A term pulled before one of its later sessions began, such as a
+second-half session, has no complete first day either until a later pull
+covers it. If the sessions that had begun already fill 90% of all the course's
+seats, it is still judged near full, and the note says "at least".
 
 Below the table, expand **Projection methods** for the method map. There are
 two candidates:
@@ -211,10 +214,10 @@ The table is sized to fit a laptop window:
 | **Course** | The course, with its department beneath. |
 | **Sections** | Registrations plus any pressure bump, divided by the section size (the target schedule's average when it exists, otherwise the recent median), rounded up. "Plan at least" when last term filled its seats. |
 | **Pressure bump** | Registrations added to the plan because the course was near full on the first day in every recent same-season term, and beneath them the sections that adds. A dash means no bump; the course's detail says why. |
-| **Registrations** | Everyone expected to sign up, including students who drop before or after classes begin: the class-list demand the model forecasts, and the number sections are planned for. Beneath it, the range past forecasts for this course usually landed in and the change on the last same-season term's registrations. |
+| **Registrations** | Everyone expected to sign up, including students who drop before or after classes begin: the class-list demand the model forecasts, and the number sections are planned for. Beneath it, the range past forecasts for this course usually landed in and the change on the last same-season term's registrations. The range assumes seats like last year's: on past forecasts it held about 8 or 9 times in 10 when seats stayed within 10%, and about 1 in 3 when they moved. When the draft schedule moves the seats 10% or more, the row says so under the range. |
 | **Seats (day 1)** | Students expected to hold a seat when classes begin: registrations times the share of this course's registrants still enrolled on the first day in recent terms. Context, not the planning number. |
 | **First day / sections** | The last four same-season terms: students enrolled on the first day over the sections scheduled. A dash means the course was not offered, or the first day cannot be reconstructed; hover for which. |
-| **Flags** | Plain-language reasons to look: near full last term (90% of seats filled on the first day), students left waiting, a big change in the term just finished, a volatile history, past forecasts more than 20% off ("with steady seats" or "as seats moved"), or the two candidates disagreeing. |
+| **Flags** | Plain-language reasons to look: full last term (98% of seats filled on the first day) or near full (90%), students left waiting, one campus full while another had room (online seats can fill while Albuquerque's do not, and the pooled plan hides it), last term's fill unknown and why, a big change in the term just finished, a volatile history, past forecasts more than 20% off ("with steady seats" or "as seats moved"), or the two candidates disagreeing. |
 | **Stability** | Stable, Moderate, Volatile, or Unrated: whether the course is predictable from its own history at all, measured with no model |
 | **Depth** | Deep, Moderate, Thin, or None: how many comparable rolling-selection aftcasts stand behind the published method |
 | **Reliability** | High, Moderate, Low, or Unrated: how close past forecasts for this course landed (within 10%, 10 to 20%, more than 20%), each made with only the evidence available then |
@@ -276,7 +279,7 @@ model source for analyst audit and future comparisons.
 `Capacity-bounded` means first-day enrollment filled 98% or more of the
 scheduled seats that term (a few empty seats spread over many section times
 still leave the course full to a student choosing one), so an estimate above the observed ever-registered demand cannot be fully
-judged as an error. A term whose first day cannot be reconstructed is never
+judged as an error. A term whose first day is unknown is never
 capacity-bounded. It does not mean zero error, and
 ever-registered demand above capacity on its own does not make a term
 capacity-bounded: seats that turned over were never all occupied at once. `Potential explanation` identifies measured changes

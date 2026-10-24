@@ -29,7 +29,7 @@ Reconstruct any lifecycle point from classlist status codes — all emitted by `
 
 | Lifecycle point | Formula | Includes |
 |-----------------|---------|----------|
-| **First class day** | `first_day_enrl` (`calc_first_day_enrl()`) | registered rows dated on or before the section's first class day, plus drops dated after it; NA where a group lacks status dates |
+| **First class day** | `first_day_enrl` (`calc_first_day_enrl()`) | registered rows dated on or before the section's first class day, plus drops dated after it; NA where a group lacks status dates or has a session not yet begun when the class list was pulled (`first_day_basis` says which) |
 | **Census / peak headcount** | `registered + dr_late` | everyone present at census (only early drops `DR` removed) |
 | **Final / end-of-term headcount** | `registered` | RE/RS/RR still enrolled |
 | Total ever-registered | `registered + dr_all` | + early drops |

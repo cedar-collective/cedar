@@ -12,7 +12,7 @@
 #' @param opt Projection method and threshold options.
 #' @return A list containing pressure screen, published projections, delivery
 #'   components, all current candidates, historical backtests, recent audit
-#'   history, and performance.
+#'   history pooled and by delivery campus, and performance.
 get_course_enrollment_projections <- function(inputs, target_term,
                                               scope_courses = NULL,
                                               force_courses = NULL,
@@ -21,6 +21,7 @@ get_course_enrollment_projections <- function(inputs, target_term,
     "enrollment_history", "preceding_term_history", "waitlist_history",
     "section_history", "students", "target_courses",
     "target_campuses", "target_market_id", "delivery_components",
+    "delivery_section_history", "delivery_first_day",
     # Fixes the composition baseline term. Not derivable from the history: the
     # newest term present is not necessarily the cutoff the caller intended.
     "enrollment_through_term"
@@ -73,6 +74,7 @@ get_course_enrollment_projections <- function(inputs, target_term,
       backtests = tibble::tibble(),
       method_performance = empty_projection_performance(),
       recent_history = empty_projection_recent_history(),
+      recent_campus_history = empty_projection_recent_campus_history(),
       cohort_composition = cohort_composition
     ))
   }
@@ -123,6 +125,9 @@ get_course_enrollment_projections <- function(inputs, target_term,
     student_inputs = inputs$students,
     graded_through_term = inputs$graded_through_term %||% NULL
   )
+  recent_campus_history <- build_projection_recent_campus_history(
+    recent_history, inputs$delivery_section_history, inputs$delivery_first_day
+  )
 
   list(
     pressure_screen = pressure_screen,
@@ -132,6 +137,7 @@ get_course_enrollment_projections <- function(inputs, target_term,
     backtests = backtests,
     method_performance = performance,
     recent_history = recent_history,
+    recent_campus_history = recent_campus_history,
     cohort_composition = cohort_composition
   )
 }

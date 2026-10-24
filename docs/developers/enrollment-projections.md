@@ -101,7 +101,8 @@ market_id + campus + college + subject_course + part_term + target_term
 ```
 
 Those rows describe where seats are allocated and the prior comparable
-census/capacity. They are evidence about delivery mix, not
+census/capacity. `recent_campus_history` (schema 24) holds each campus's own
+first day for the recent same-season terms, beside the pooled `recent_history`. They are evidence about delivery mix, not
 independent campus-demand forecasts. Branch campuses never enter this market.
 
 A named course group is a monitoring scope, declared in the institution's
@@ -182,8 +183,16 @@ final_enrl      = registered
 against its section's first class day (`calc_first_day_enrl(..., pool_campuses
 = TRUE)`, each student-course once across the pooled market). It is the
 occupancy every seat judgment reads (0.21.0). It is `NA`, never a partial count,
-for a course-term whose class lists carry no status dates or whose rows were
-all pulled before a section began (late-starting part-of-term sections).
+for a course-term whose class lists carry no status dates (`first_day_basis =
+"undated"`) or that has a session which had not begun when the class list was
+pulled (`"sessions_pending"`, such as a second-half session; ISSUES.md I28). A
+pending term also carries `first_day_started_enrl`, the count over the sessions
+that had begun. Divided by all the scheduled seats it is a lower bound on fill,
+so `projection_judged_first_day()` uses it only where it already reaches the
+level being judged (the saturation floor, the pressure bump, the expansion
+response), and the floor note says "at least"; below that level the term is
+unknown and the note names the session not yet begun (0.25.0). Aftcast actuals
+and displayed fills read `first_day_enrl` alone.
 `class_list_status_date_coverage()` reports which terms lack dates, and Admin >
 Data & Usage lists them; never name the terms in prose, because re-pulling a
 term's class list fills its dates in.
@@ -302,7 +311,7 @@ refresh, and Shiny never refits to compare.
 Expected first-day seats are still shown beside the plan, as context. For each
 aftcast or current projection, CEDAR estimates a leakage-safe same-season
 retention rate from earlier terms only, skipping any term whose first day
-cannot be reconstructed:
+is unknown:
 
 ```text
 first_day_retention_rate = sum(first_day_enrl) / sum(classlist_total)
@@ -652,7 +661,18 @@ also named. The summary table compresses this to a short phrase; the course
 spotlight preserves the full interpretation.
 Prediction intervals use the selected method's historical 80th-percentile
 absolute error. These are empirical planning intervals, not formal probabilistic
-confidence intervals.
+confidence intervals, and they assume seats like last year's (ISSUES.md M35).
+`summarize_projection_range_coverage()` rebuilds each past published forecast's
+range from the course's earlier published forecasts only and counts how often
+it held, split by whether that term's seats stayed within
+`seat_consistency_change` of the year before; the page states both rates. On
+the 2026-10-24 bundles (model 0.25.0) it held 86 of 105 Spring forecasts and
+98 of 115 Fall forecasts with steady seats. Where seats moved it held 40 of 99
+and 28 of 91. Most misses fell below the registrations. When the target's draft schedule moves the seats by that much
+from last year's same term, the row's range carries
+`projection_range_seat_notes()`'s "Draft seats +X% on <term>: the range assumes
+steady seats". The range is not re-centred on the draft: registrations follow a
+saturated course's seats, and no measured rule says by how much for the rest.
 
 ### Signed error
 
@@ -692,6 +712,20 @@ bundle. They must not reproduce a model, backtest, pressure calculation, or
 recommendation pipeline.
 
 ## Saved Bundle
+
+Schema 24 (model 0.25.0) adds `recent_campus_history`: the recent history's
+terms again, one row per delivery campus that offered the course, with that
+campus's `scheduled_sections`, `scheduled_capacity`, `first_day_enrl`,
+`first_day_basis` and `first_day_fill` (each student counted once within the
+campus). It never feeds a projection. It keeps a campus full on the first day
+visible beside one with room, which pooling the market hides (ISSUES.md M36):
+the summary flag "EA full last term, ABQ had room" compares the latest term's
+complete campus first days at the two seat-fill levels, read live. Published
+rows gain `adjusted_prior_first_day_basis` (`complete`, `sessions_begun`,
+`sessions_pending`, `undated`, `no_capacity`), so a prior term full on the
+first day is flagged full rather than near full, and an unknown prior fill
+names its cause. Validation requires each campus row to belong to a
+recent-history term, once.
 
 Schema 22 (model 0.23.0) sizes `recommended_sections`, `seat_gap`,
 `projected_over_capacity`, the capacity notes, and the recommendation from

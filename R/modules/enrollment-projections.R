@@ -79,8 +79,8 @@ projection_columns_explainer <- function() {
            "no bump; the course's detail says why."),
       item("Registrations", "is everyone expected to sign up, including",
            "students who drop: the number the model forecasts and sections are",
-           "planned for. Beneath it, the range past forecasts usually landed in",
-           "and the change on last year."),
+           "planned for. Beneath it, the range past forecasts usually landed in,",
+           "which assumes seats like last year's, and the change on last year."),
       item("Seats (day 1)", "is the students expected in a seat when classes",
            "begin. It is context, not the planning number."),
       item("First day / sections", "shows the last four same-season terms. A",
@@ -165,7 +165,9 @@ projection_build_explainer <- function() {
       projection_percent(CEDAR_FULL_FILL), ". Census, three weeks later, follows",
       " the drops, so a course full on day one can read below capacity there.",
       " A term whose class lists carry no status dates is shown as unknown,",
-      " never filled in from census."
+      " never filled in from census. So is a term pulled before one of its",
+      " later sessions began, unless the sessions that had begun already fill ",
+      projection_percent(CEDAR_NEAR_FULL_FILL), " of all its seats."
     )),
     cedar_definition_note("enrollment-projection"),
     cedar_docs_link("users/enrollment-projections"),
@@ -203,7 +205,7 @@ projection_scope_explainer <- function() {
 }
 
 # Built from the bundle's saved aftcasts, so it is rendered in the server.
-projection_error_explainer <- function(error_sources) {
+projection_error_explainer <- function(error_sources, range_coverage) {
   sources <- error_sources$table
   rows <- lapply(seq_len(nrow(sources)), function(i) {
     row <- sources[i, , drop = FALSE]
@@ -222,6 +224,8 @@ projection_error_explainer <- function(error_sources) {
     "Where forecast error comes from",
     tags$p(error_sources$sentence),
     tags$ul(rows),
+    tags$p(tags$strong("The range"), class = "mb-1"),
+    tags$p(range_coverage$sentence),
     tags$p(tags$strong("What the projection cannot see"), class = "mb-1"),
     tags$ul(
       tags$li("Next year's schedule. Compare the plan with the draft on the",
@@ -229,7 +233,8 @@ projection_error_explainer <- function(error_sources) {
       tags$li("Policy changes, such as new placement cutoffs or requirements."),
       tags$li("How many students a full course turned away. The pressure bump",
               " stands in for it until waitlists can measure it."),
-      tags$li("Terms whose class lists carry no status dates.")
+      tags$li("Terms whose class lists carry no status dates, or were pulled",
+              " before a later session began.")
     ),
     tags$p(
       "To judge one course, read its Reliability beside its Seat consistency:",
@@ -341,7 +346,8 @@ enrollmentProjectionsUI <- function(id) {
         "registrations; a course that is always full gets a pressure bump on",
         "top, and a course whose enrollment moved sharply in the term just",
         "finished is flagged for a look. The range is where past forecasts",
-        "for that course usually landed."
+        "for that course usually landed, and it assumes seats like last",
+        "year's."
       )
     ),
     # Each explainer answers one question a reader brings to the page, and
@@ -765,16 +771,22 @@ enrollmentProjectionsServer <- function(id, bundles, load_bundle, programs) {
                 if (!is.na(data$demand_range[[index]])) {
                   htmltools::div(class = "text-note", data$demand_range[[index]])
                 },
+                if (!is.na(data$range_note[[index]])) {
+                  htmltools::div(class = "text-note", data$range_note[[index]])
+                },
                 if (is.finite(change)) {
                   htmltools::div(
                     class = "text-note",
-                    sprintf("%+.0f%% vs last %s", 100 * change, season)
+                    # Rounded first, so a change under half a percent
+                    # reads +0%, never -0%.
+                    sprintf("%+d%% vs last %s", as.integer(round(100 * change)), season)
                   )
                 }
               )
             }
           ),
           demand_range = reactable::colDef(show = FALSE),
+          range_note = reactable::colDef(show = FALSE),
           change_vs_last = reactable::colDef(show = FALSE),
           expected_first_day = reactable::colDef(
             name = "Seats (day 1)", align = "right", width = 64,
@@ -789,7 +801,7 @@ enrollmentProjectionsServer <- function(id, bundles, load_bundle, programs) {
             cell = function(value, index) count_text(value)
           ),
           recent_first_day = reactable::colDef(
-            name = paste("Last", season, "terms"), minWidth = 190,
+            name = paste("Last", season, "terms"), minWidth = 220,
             sortable = FALSE, searchable = FALSE,
             header = htmltools::tagList(
               htmltools::div("First day / sections"),
@@ -870,7 +882,9 @@ enrollmentProjectionsServer <- function(id, bundles, load_bundle, programs) {
     })
 
     output$error_sources <- renderUI({
-      projection_error_explainer(view()$meta$error_sources)
+      projection_error_explainer(
+        view()$meta$error_sources, view()$meta$range_coverage
+      )
     })
 
     # ---- Draft schedule sub-tab ---------------------------------------------
@@ -1181,7 +1195,8 @@ enrollmentProjectionsServer <- function(id, bundles, load_bundle, programs) {
           ever_registered = reactable::colDef(
             name = "Ever registered", align = "right", minWidth = 120
           ),
-          # Unknown where the class lists carry no status dates.
+          # Unknown where the class lists carry no status dates or a session
+          # had not begun when they were pulled.
           first_day = reactable::colDef(
             name = "First day", align = "right", na = "\u2014"
           ),

@@ -9,6 +9,14 @@
 # Groups are monitoring scopes. Projection rows use the named market and course;
 # campus and part-term allocation remains in saved delivery components.
 
+# 0.25.0 (schema 24): a term pulled before one of its later sessions began
+# (ISSUES.md I28) is no longer read as undated. Its begun sessions' first day
+# is a lower bound on fill, so it settles saturation, the pressure bump and the
+# expansion response only where it already reaches their level, and an
+# unsettled term's note names the session not yet begun. The recent history is
+# saved by delivery campus too, so a campus full on the first day beside one
+# with room is flagged rather than pooled away; a prior term full on the first
+# day is flagged full, not near full; and an unknown prior fill says why.
 # 0.24.0 (schema 23): intersession sections (settings.csv
 # intersession_parts_of_term) are left out of every projection input. Their
 # seats made a course's first day unknown until December (ISSUES.md I28), and
@@ -38,8 +46,9 @@
 # saturation floor and two Fall-enrollment deltas and must beat the spine on
 # rolling aftcasts. (0.19.0 introduced rolling selection and the
 # occupancy-based capacity signal.)
-CEDAR_ENROLLMENT_PROJECTION_MODEL_VERSION <- "0.24.0"
-CEDAR_ENROLLMENT_PROJECTION_SCHEMA_VERSION <- 23L
+CEDAR_ENROLLMENT_PROJECTION_MODEL_VERSION <- "0.25.0"
+
+CEDAR_ENROLLMENT_PROJECTION_SCHEMA_VERSION <- 24L
 # Capacity is reached at CEDAR_FULL_FILL first-day fill and a prior term is
 # saturated at CEDAR_NEAR_FULL_FILL; both levels live in R/lists/seat_fill.R.
 # The first term the model reads history from (settings.csv
