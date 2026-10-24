@@ -348,20 +348,29 @@ SKIP_FETCH=true
 # Academic_Study_Detail_Guided, and `aa` was missing entirely), which made the
 # skip check permanently unable to fire for three of the five reports. Keep them
 # in sync when a report is added or MyReports renames an export.
-for report in "${REPORTS[@]}"; do
-    case "$(echo "$report" | tr '[:upper:]' '[:lower:]')" in
-        desr) file_glob="*Department_Enrollment_Status*${TODAY}*.xlsx" ;;
-        deg)  file_glob="*Graduates_and_Pending_Graduates*${TODAY}*.xlsx" ;;
-        as)   file_glob="*Academic_Study_Detail_Guided*${TODAY}*.xlsx" ;;
-        cl)   file_glob="*Class_List_Guided_Adhoc*${TODAY}*.xlsx" ;;
-        aa)   file_glob="*S_Admissions_Applicants_Detail*${TODAY}*.xlsx" ;;
-        # Unrecognized report: fetch rather than skip. Skipping on a check that
-        # could not run is how a stale file gets silently re-parsed.
-        *)    log_warning "Unknown report type: $report — will fetch"
-              SKIP_FETCH=false
-              continue ;;
+report_file_glob() {
+    case "$(echo "$1" | tr '[:upper:]' '[:lower:]')" in
+        desr) echo "*Department_Enrollment_Status*${TODAY}*.xlsx" ;;
+        deg)  echo "*Graduates_and_Pending_Graduates*${TODAY}*.xlsx" ;;
+        as)   echo "*Academic_Study_Detail_Guided*${TODAY}*.xlsx" ;;
+        cl)   echo "*Class_List_Guided_Adhoc*${TODAY}*.xlsx" ;;
+        aa)   echo "*S_Admissions_Applicants_Detail*${TODAY}*.xlsx" ;;
+        *)    return 1 ;;
     esac
-    if find "$MRGATHER_DATA_DIR" -maxdepth 1 -name "$file_glob" 2>/dev/null | grep -q .; then
+}
+has_todays_file() {
+    find "$MRGATHER_DATA_DIR" -maxdepth 1 -name "$1" 2>/dev/null | grep -q .
+}
+
+for report in "${REPORTS[@]}"; do
+    # Unrecognized report: fetch rather than skip. Skipping on a check that
+    # could not run is how a stale file gets silently re-parsed.
+    if ! file_glob=$(report_file_glob "$report"); then
+        log_warning "Unknown report type: $report — will fetch"
+        SKIP_FETCH=false
+        continue
+    fi
+    if has_todays_file "$file_glob"; then
         log_success "Found: $report"
     else
         log_warning "Missing: $report ($file_glob)"
@@ -384,7 +393,24 @@ else
             node mrgather.js "${REPORTS[@]}" -s "$START_TERM" -e "$END_TERM"
         FETCH_RC=$?
     fi
-    if [[ $FETCH_RC -eq 0 ]]; then
+    # mrgather can exit 0 having downloaded nothing, or only some reports: a
+    # MyReports login timeout, or a crash after a download timed out, is
+    # reported and the run still "completes". Parse then finds no new file and
+    # the transform would republish tables from older raw exports as today's
+    # (ISSUES.md I33). A requested report with no file from today fails the
+    # fetch, and the transform is skipped.
+    NOT_FETCHED=()
+    if [[ $FETCH_RC -eq 0 && "$DRY_RUN" != true ]]; then
+        for report in "${REPORTS[@]}"; do
+            file_glob=$(report_file_glob "$report") || continue
+            has_todays_file "$file_glob" || NOT_FETCHED+=("$report")
+        done
+    fi
+    if [[ $FETCH_RC -eq 0 && ${#NOT_FETCHED[@]} -gt 0 ]]; then
+        log_error "Fetch exited 0 but produced no file from today for: ${NOT_FETCHED[*]}"
+        FETCH_STATUS="FAILED"
+        FETCH_NOTE="no file from today for: ${NOT_FETCHED[*]}; see mrgather output"
+    elif [[ $FETCH_RC -eq 0 ]]; then
         log_success "Fetch complete"
         FETCH_STATUS="OK"
         FETCH_NOTE="fetched: ${REPORTS[*]}"
