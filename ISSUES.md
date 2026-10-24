@@ -38,7 +38,7 @@ recurrence is recognizable.
 | [I31](#i31--course-paths-finishes-behind-a-stuck-loading-dialog) | Defect | Nested Course paths report sends completion to the wrong loading-dialog channel (resolved) |
 | [I30](#i30--saved-r-workspaces-entered-the-docker-build-context) | Defect | Case-sensitive Docker ignore omitted `.RData`, copying an 89 MB workspace into app image layers (resolved) |
 | [I29](#i29--generated-navigation-ids-can-open-the-wrong-panel) | Defect | Generated nav-menu IDs collide, so Admin can open Gen Ed instead of Data & Usage (resolved) |
-| [I28](#i28--one-late-starting-session-makes-a-whole-courses-first-day-unknown) | Defect | One late-starting session makes a whole course's first day unknown: 257 Fall 2026 courses on the Oct 8 pull, 17 on Oct 23. Intersession is now out of the forecast (model 0.24.0); a regular session not yet started, or one with no start date, still blanks it with a misleading reason |
+| [I28](#i28--one-late-starting-session-makes-a-whole-courses-first-day-unknown) | Defect | One late-starting session makes a whole course's first day unknown: 257 Fall 2026 courses on the Oct 8 pull, 17 on Oct 23. Intersession is out of the forecast (model 0.24.0), and a session not yet begun is judged on its lower bound (model 0.25.0). A section with no start date still reads as having no status dates |
 | [I27](#i27--the-projection-floor-adds-a-waitlist-to-first-day-enrollment-and-compares-it-with-ever-registered-demand) | Defect | The projection floor mixed units: 245 unserved waitlisted students lifted Fall 2027 by 77 (resolved) |
 | [I26](#i26--projection-capacity-reached-was-judged-on-ever-registered-demand) | Defect | Projection "capacity reached" was judged on ever-registered demand: 72% of course-terms flagged full when census filled 17% (resolved) |
 | [I25](#i25--projection-method-selection-was-in-sample-and-lost-to-the-default) | Defect | Projection method selection was in-sample on two folds and lost to doing nothing; reported 13.7% WAPE, honest 16.5% (resolved) |
@@ -50,7 +50,7 @@ recurrence is recognizable.
 | [I8](#i8--a-timing-log-row-is-silently-dropped-when-the-write-lock-times-out) | Defect | A timing-log row is dropped when the write lock times out |
 | [I6](#i6--a-killed-projection-rebuild-strands-its-lock-and-blocks-every-later-refresh) | Defect | A killed projection rebuild strands its lock |
 | [I4](#i4--pre-change-course-ratios-are-confounded-by-career-stage) | Defect | Pre-change course ratios confounded by career stage (deferred) |
-| M1–M34 | Improvement | See [Improvements](#improvements) |
+| M1–M36 | Improvement | See [Improvements](#improvements) |
 
 ---
 
@@ -2190,9 +2190,11 @@ has `spine - actual_first_day >= waitlisted_prior`.
 
 ## I28 — One late-starting session makes a whole course's first day unknown
 
-**Status:** open, partly fixed 2026-10-23: intersession is out of the
-forecast (model 0.24.0), so a December session no longer blanks the Fall first
-day
+**Status:** open, mostly fixed. Intersession is out of the forecast (model
+0.24.0, 2026-10-23), so a December session no longer blanks the Fall first
+day. A session not yet begun is judged on its lower bound (model 0.25.0,
+2026-10-24; see *Fix* below). Still open: a section with no start date is
+filed with the terms that have no status dates, and its reason says so.
 **Found:** 2026-10-18, reading the Fall 2027 projection rows (model 0.22.0)
 for a transparency review
 **Severity:** moderate — a course that was full last term is shown as unknown,
@@ -2274,6 +2276,40 @@ sections with a blank part of term that start late (2026-11-06 to 2027-01-04)
 or have no start date. These, and any regular session not yet begun at the
 pull, still blank the course's first day under a reason that reads as missing
 status dates. The *done when* above stands for them.
+
+### Fix (model 0.25.0, 2026-10-24)
+
+`calc_first_day_enrl()` now returns `first_day_basis` (`complete`,
+`sessions_pending`, `undated`) and `first_day_started_enrl`, the count over the
+sessions that had begun. While any session is pending the course's
+`first_day_enrl` stays `NA`; it is never a partial count. Counted by part of
+term, a session that has begun keeps its own count. The projection reads the
+started count through `projection_judged_first_day()`. That settles
+saturation, the pressure bump and the expansion response only where the bound
+already reaches their level, and the floor note then says "at least".
+Otherwise the note names the session not yet begun. Course history reads
+"Session not yet begun". EC-11c in the designed fixture holds a full-term
+section and a 2H section not yet begun. Its tests in
+`test-course-planning-history.R` and `test-enrollment-projections.R` fail when
+the bound is ignored or trusted below the threshold.
+
+Measured on 2026-10-20, with the same change on an earlier branch, against
+the Oct 8 Fall 2026 class list:
+12 of the 65 Fall 2027 monitored courses offered in Fall 2026 were pending in
+the pooled market. The bound settled 5 as near full, ENGL 1120 (at least
+94.6%) and MATH 1350 (94.8%) among them. FYEX 1110 (58.4%) stayed unknown, with
+the pending session named. The published 0.25.0 bundles (2026-10-24) read the
+Oct 23 pull, by which every second-half session had begun. No published row
+is pending, and no projection, plan, section count, bump or range differs
+from 0.24.0 in either season.
+
+Still open:
+
+- `undated` covers both a missing status date (M32) and a missing start date.
+  Its reason reads "no status dates" for both. A missing start date is the
+  case of the 10 courses above that are in no projection.
+- Course Dynamics (`add_first_day_enrl()`) shows a pending term as a dash and
+  does not give the reason.
 
 ---
 
@@ -2540,6 +2576,53 @@ Data & Usage and `class_list_status_date_coverage()` list which; prose does not
 name them, because re-pulling a term's class list fills its dates in. *Done
 when:* both are re-pulled, the coverage report shows dates for every term from
 `projection_history_start_term` on, and the projection bundles are rebuilt.
+
+**M35 — The projection range covers two outcomes in three, and one in three
+when seats move.** `projection_low` / `projection_high` are the projection plus
+or minus the 80th percentile of the course's own absolute aftcast misses
+(`error_q80`, three or four folds). Rebuilt rolling on the 2026-10-20 bundles
+(each fold's range from earlier folds only), it covered 67% of 102 Spring and
+123 Fall aftcasts. Where seats stayed within 10% of the previous same-season
+offering it covered 88% (Spring) and 94% (Fall); where they moved, 40% and 33%.
+Most misses fell below the range (actual above it). The page claims no
+coverage level, but a reader takes a range as likely bounds. *Done when:* the
+range is conditioned on the seats (steady, or the draft schedule's change) or
+the page says plainly that it assumes steady seats, and a test pins the
+rolling coverage on a worked frame.
+*Done 2026-10-24 (model 0.25.0):* the page says the range assumes seats like
+last year's and states its rolling coverage by seat condition.
+`summarize_projection_range_coverage()` computes that live from the saved
+aftcasts: each past range comes from earlier forecasts only, under the
+published rule. A row whose draft moves the seats 10% or more from last year's
+same term says so under its range. On the 2026-10-24 bundles the range held
+for 86 of 105 (Spring) and 98 of 115 (Fall) with steady seats, and for 40 of 99
+and 28 of 91 where seats moved. The test pins the rolling count on a worked
+five-forecast frame. Conditioning the range itself on the seats remains
+undone.
+
+**M36 — Pooling ABQ and EA hides a full online campus.** The
+`abq_ea_course_market` treats online seats as a substitute for in-person ones.
+In Spring 2026, 33 scope courses were taught on both campuses. In 11 of them EA
+was full on the first day (98% or more) while ABQ had 10% or more room, and 10
+of those read under 90% full pooled. In Fall 2026 it was 4 of 40, CLST 1110
+among them with 68 students waiting for EA and 217 open ABQ seats. A pooled
+"capacity appears sufficient" or a draft-schedule "covers" is then wrong for
+the students who want the online section. *Done when:* each published row and
+each draft-schedule row flags a campus that was full on the first day while
+the other had room, without splitting the forecast itself.
+*Status, 2026-10-24 (model 0.25.0):* published rows done; draft-schedule rows
+remain, with the Draft tab redesign. The bundle saves `recent_campus_history`:
+each campus's own sections, seats and first day for the recent same-season
+terms. `delivery_components` could not serve, since it holds only the campuses
+in the target draft. The summary flags "EA full last term, ABQ had room".
+On the 2026-10-24 bundles (Oct 23 pull) it flags 9 of the 34 Spring 2027 rows
+taught on both campuses in Spring 2026, all EA full with ABQ under 90%. That
+is not the hand audit's 11 of 33: ECON 2110 and RELG 2110 EA read 97.8% and
+97.5%, just under full, and the difference was not traced. Fall 2027 flags 2:
+FYEX 1030 (EA full) and NATV 1150 (ABQ full, EA at 86%). CLST 1110 is not a
+published Fall 2027 row, so its flag cannot show. The flag reads only complete
+campus first days: on the Oct 8 class list it found 1 Fall course, because 16
+campus rows had a second-half session not yet begun.
 
 **M28 — The HR department list is a hand-kept R list.** **Done 2026-10-16.**
 `hr_org_desc_to_dept` (79 names to 32 departments) now comes from

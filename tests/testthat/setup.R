@@ -46,6 +46,8 @@ test_students_regstats <<- cedar_students_regstats # EC-11: prior-only anomaly b
 test_sections_regstats <<- cedar_sections_regstats
 test_sections_course_history <<- cedar_sections_course_history
 test_students_course_history <<- cedar_students_course_history
+test_sections_pending_session <<- cedar_sections_pending_session # EC-11c: a session not yet begun (I28)
+test_students_pending_session <<- cedar_students_pending_session
 test_students_roadblocks <<- cedar_students_roadblocks # EC-12: first eligible outcomes
 test_programs_many_programs <<- cedar_programs_many_programs # EC-13: dept over the rollup threshold
 test_degrees_roadblocks <<- cedar_degrees_roadblocks

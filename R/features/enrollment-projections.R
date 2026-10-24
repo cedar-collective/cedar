@@ -672,16 +672,42 @@ projection_reliability_reading <- function(reliability, seat_consistency) {
 
 
 # Plain-language flags for the summary table. Each one names a reason an
-# administrator should look at the row; none changes a number.
+# administrator should look at the row; none changes a number. Full and near
+# full are the two seat-fill levels (R/lists/seat_fill.R), read live.
 projection_flags <- function(projections) {
+  projection_require_columns(
+    projections,
+    c("adjusted_saturated_prior", "adjusted_prior_first_day_fill",
+      "adjusted_prior_first_day_basis", "adjusted_waitlisted_prior",
+      "adjusted_regime_alarm", "adjusted_preceding_term_change", "stability",
+      "accuracy", "seat_consistency", "methods_disagree", "campus_fill_flag"),
+    "projection_flags()"
+  )
   vapply(seq_len(nrow(projections)), function(i) {
     row <- projections[i, , drop = FALSE]
+    saturated <- row$adjusted_saturated_prior[[1]]
     flags <- c(
-      if (isTRUE(row$adjusted_saturated_prior)) "Near full last term",
-      if (isTRUE(row$adjusted_saturated_prior) &&
-          isTRUE(row$adjusted_waitlisted_prior > 0)) {
+      if (isTRUE(saturated)) {
+        if (isTRUE(row$adjusted_prior_first_day_fill >= CEDAR_FULL_FILL)) {
+          "Full last term"
+        } else {
+          "Near full last term"
+        }
+      },
+      if (isTRUE(saturated) && isTRUE(row$adjusted_waitlisted_prior > 0)) {
         paste(row$adjusted_waitlisted_prior, "waiting")
       },
+      # Unknown is said with its cause, never left blank (ISSUES.md I28).
+      if (is.na(saturated)) {
+        switch(
+          dplyr::coalesce(row$adjusted_prior_first_day_basis[[1]], ""),
+          undated = "Last term's fill unknown: no status dates",
+          sessions_pending = "Last term's fill unknown: a session had not begun",
+          no_capacity = "Last term's fill unknown: no seat count",
+          NULL
+        )
+      },
+      if (!is.na(row$campus_fill_flag)) row$campus_fill_flag,
       if (isTRUE(row$adjusted_regime_alarm)) paste0(
         "Fall enrollment ",
         sprintf("%+.0f%%", 100 * row$adjusted_preceding_term_change)
@@ -701,6 +727,49 @@ projection_flags <- function(projections) {
     )
     if (length(flags) == 0L) "" else paste(flags, collapse = " | ")
   }, character(1))
+}
+
+
+# One flag per projection where, in the latest recent term, a delivery campus
+# was full on the first day while another had room. The forecast pools the
+# campuses as one market; this keeps a full online campus from hiding behind
+# open seats elsewhere (ISSUES.md M36). Only complete first days with usable
+# seats are compared; NA where no campus pair qualifies.
+projection_campus_fill_flags <- function(projections, campus_history) {
+  projection_require_columns(
+    projections, c("market_id", "subject_course", "target_term"),
+    "projection_campus_fill_flags()"
+  )
+  projection_require_columns(
+    campus_history,
+    c("market_id", "subject_course", "projection_target_term", "recency_rank",
+      "campus", "first_day_basis", "first_day_fill"),
+    "projection_campus_fill_flags() campus history"
+  )
+  # CAMPUS_ROLLUP: one flag per pooled market row, naming each campus.
+  flags <- campus_history %>%
+    dplyr::filter(
+      recency_rank == 1L, first_day_basis == "complete",
+      is.finite(first_day_fill)
+    ) %>%
+    dplyr::group_by(market_id, subject_course, projection_target_term) %>%
+    dplyr::summarise(
+      full = paste(sort(campus[first_day_fill >= CEDAR_FULL_FILL]), collapse = " and "),
+      room = paste(sort(campus[first_day_fill < CEDAR_NEAR_FULL_FILL]), collapse = " and "),
+      .groups = "drop"
+    ) %>%
+    dplyr::filter(nzchar(full), nzchar(room)) %>%
+    dplyr::transmute(
+      market_id, subject_course, target_term = projection_target_term,
+      campus_fill_flag = paste0(full, " full last term, ", room, " had room")
+    )
+  projections %>%
+    dplyr::select(market_id, subject_course, target_term) %>%
+    dplyr::left_join(
+      flags, by = c("market_id", "subject_course", "target_term"),
+      relationship = "many-to-one"
+    ) %>%
+    dplyr::pull(campus_fill_flag)
 }
 
 
@@ -858,6 +927,98 @@ projection_error_sources_summary <- function(backtests, model_config) {
 }
 
 
+# How often the range held on past forecasts, by whether their seats held,
+# as a table and one sentence, from the bundle's saved aftcasts (ISSUES.md
+# M35). The range assumes steady seats and the page says so.
+projection_range_coverage_summary <- function(backtests, model_config) {
+  coverage <- summarize_projection_range_coverage(backtests, model_config)
+  change <- scales::percent(
+    as.numeric(projection_option(model_config, "seat_consistency_change")), accuracy = 1
+  )
+  steady <- coverage[coverage$seats == "steady", , drop = FALSE]
+  moved <- coverage[coverage$seats == "moved", , drop = FALSE]
+  above <- sum(coverage$actual_above)
+  below <- sum(coverage$actual_below)
+  held <- function(row) paste0(
+    format(row$covered, big.mark = ","), " of ", format(row$folds, big.mark = ",")
+  )
+  sentence <- if (steady$folds + moved$folds == 0L) {
+    paste(
+      "The range assumes seats like last year's. No past forecast has an",
+      "earlier one to build a range from, so how often it held cannot be shown",
+      "yet."
+    )
+  } else {
+    paste0(
+      "The range assumes seats like last year's. Rebuilt for each past ",
+      "forecast from the course's earlier ones only, it held ", held(steady),
+      " times when seats stayed within ", change, " of the year before, and ",
+      held(moved), " when they moved",
+      if (above + below > 0L) paste0(
+        ". Of its ", format(above + below, big.mark = ","),
+        if (above + below == 1L) " miss, " else " misses, ",
+        format(max(above, below), big.mark = ","), " had registrations ",
+        if (above >= below) "above" else "below", " it"
+      ) else "",
+      "."
+    )
+  }
+  list(table = coverage, sentence = sentence)
+}
+
+
+# Beside a row's range: when the draft schedule moves the seats from last
+# year's same term by the seat-consistency change or more, the range, which
+# assumes steady seats, says so (ISSUES.md M35). NA otherwise, including when
+# no draft is in the data.
+projection_range_seat_notes <- function(projections, recent_history, model_config) {
+  change <- as.numeric(projection_option(model_config, "seat_consistency_change"))
+  projection_require_columns(
+    projections,
+    c("market_id", "subject_course", "target_term", "target_schedule_available",
+      "scheduled_capacity"),
+    "projection_range_seat_notes()"
+  )
+  projection_require_columns(
+    recent_history,
+    c("market_id", "subject_course", "projection_target_term", "recency_rank",
+      "scheduled_capacity", "history_term_label"),
+    "projection_range_seat_notes() history"
+  )
+  last <- recent_history %>%
+    dplyr::filter(recency_rank == 1L) %>%
+    dplyr::transmute(
+      market_id, subject_course, target_term = projection_target_term,
+      last_capacity = scheduled_capacity, last_label = history_term_label
+    )
+  projections %>%
+    dplyr::select(
+      market_id, subject_course, target_term, target_schedule_available,
+      scheduled_capacity
+    ) %>%
+    dplyr::left_join(
+      last, by = c("market_id", "subject_course", "target_term"),
+      relationship = "many-to-one"
+    ) %>%
+    dplyr::mutate(
+      seat_change = dplyr::if_else(
+        target_schedule_available %in% TRUE & is.finite(last_capacity) &
+          last_capacity > 0 & is.finite(scheduled_capacity),
+        scheduled_capacity / last_capacity - 1, NA_real_
+      ),
+      note = dplyr::if_else(
+        is.finite(seat_change) & abs(seat_change) >= change,
+        sprintf(
+          "Draft seats %+.0f%% on %s: the range assumes steady seats",
+          100 * seat_change, last_label
+        ),
+        NA_character_
+      )
+    ) %>%
+    dplyr::pull(note)
+}
+
+
 # The published plan beside the target term's schedule as it stands -- a
 # draft until registration settles -- course by course. Arithmetic over saved
 # rows: the bundle captured the schedule when it was built, and a changed
@@ -1004,7 +1165,8 @@ build_enrollment_projection_draft_comparison <- function(view) {
 # The latest `n_terms` same-season terms in the view, oldest first, and for
 # each course its first-day enrollment and scheduled sections in each: the
 # at-a-glance history the summary table shows. First-day enrollment is NA where
-# the class lists carry no status dates, and both are NA in a term the course
+# the class lists carry no status dates or a session had not begun when they
+# were pulled, and both are NA in a term the course
 # was not offered; a reader-facing surface shows either as an em dash, never as
 # zero or as another lifecycle count.
 build_enrollment_projection_history_summary <- function(
@@ -1187,8 +1349,12 @@ build_enrollment_projection_view <- function(bundle, opt = list()) {
     dplyr::mutate(
       # Rows a chair should actually look at; the rest can be planned at last
       # term's level.
+      campus_fill_flag = projection_campus_fill_flags(
+        dplyr::pick(dplyr::everything()), bundle$recent_campus_history
+      ),
       attention = adjusted_saturated_prior %in% TRUE |
-        adjusted_regime_alarm %in% TRUE | accuracy == "Low"
+        adjusted_regime_alarm %in% TRUE | accuracy == "Low" |
+        !is.na(campus_fill_flag)
     )
   if (attention_only) {
     projections <- dplyr::filter(projections, attention)
@@ -1245,6 +1411,13 @@ build_enrollment_projection_view <- function(bundle, opt = list()) {
           format(round(projection_high), big.mark = ",", trim = TRUE)
         ),
         NA_character_
+      ),
+      range_note = dplyr::if_else(
+        is.na(demand_range), NA_character_,
+        projection_range_seat_notes(
+          dplyr::pick(dplyr::everything()), bundle$recent_history,
+          bundle$model_config
+        )
       )
     )
   selected_keys <- projections %>%
@@ -1292,6 +1465,7 @@ build_enrollment_projection_view <- function(bundle, opt = list()) {
       pressure_bump_note,
       expected_first_day = projected_first_day_equivalent,
       demand_range,
+      range_note,
       change_vs_last,
       flags,
       attention,
@@ -1325,7 +1499,7 @@ build_enrollment_projection_view <- function(bundle, opt = list()) {
       # method and its evidence are for the course detail.
       course, department, planning_sections, pressure_bump,
       pressure_bump_sections, pressure_bump_note, projected_demand,
-      demand_range, change_vs_last, expected_first_day,
+      demand_range, range_note, change_vs_last, expected_first_day,
       recent_first_day, recent_sections, recent_terms, flags,
       stability, stability_reason, depth, depth_reason,
       # Reliability (accuracy) sits beside seat consistency so the two read
@@ -1365,6 +1539,9 @@ build_enrollment_projection_view <- function(bundle, opt = list()) {
       error_sources = projection_error_sources_summary(
         bundle$backtests, bundle$model_config
       ),
+      range_coverage = projection_range_coverage_summary(
+        bundle$backtests, bundle$model_config
+      ),
       target_schedule_as_of = bundle$target_schedule_as_of,
       summary_history_columns = history_summary$columns,
       bundle_path = attr(bundle, "bundle_path") %||% NA_character_
@@ -1372,6 +1549,11 @@ build_enrollment_projection_view <- function(bundle, opt = list()) {
     projections = projections,
     table = table,
     delivery_components = bundle$delivery_components %>%
+      dplyr::semi_join(
+        dplyr::select(projections, market_id, subject_course),
+        by = c("market_id", "subject_course")
+      ),
+    campus_history = bundle$recent_campus_history %>%
       dplyr::semi_join(
         dplyr::select(projections, market_id, subject_course),
         by = c("market_id", "subject_course")

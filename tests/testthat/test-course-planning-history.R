@@ -76,6 +76,37 @@ test_that("status-date coverage names undated terms from the data", {
   expect_error(class_list_status_date_coverage(select(test_students, -registration_date)), "registration_date")
 })
 
+# EC-11c (ISSUES.md I28): every row is dated, but the 2H session began after the
+# pull. Its first day is pending, not undated, and the begun session's count is
+# kept as a lower bound rather than reported as the course's first day.
+test_that("a session not yet begun leaves the first day pending, with the begun count kept", {
+  course <- calc_first_day_enrl(test_students_pending_session, test_sections_pending_session)
+  expect_equal(nrow(course), 1L)
+  expect_true(is.na(course$first_day_enrl))
+  expect_equal(course$first_day_basis, "sessions_pending")
+  expect_equal(course$first_day_started_enrl, 8L)
+  by_session <- calc_first_day_enrl(test_students_pending_session, test_sections_pending_session,
+    by_part_term = TRUE)
+  begun <- by_session %>% filter(part_term == "1")
+  later <- by_session %>% filter(part_term == "2H")
+  expect_equal(begun$first_day_enrl, 8L)
+  expect_equal(begun$first_day_basis, "complete")
+  expect_true(is.na(later$first_day_enrl))
+  expect_equal(later$first_day_basis, "sessions_pending")
+  expect_equal(later$first_day_started_enrl, 0L)
+  # One undated row is a different failure: no lower bound, and no session to wait for.
+  undated <- calc_first_day_enrl(test_students_course_history, test_sections_course_history) %>%
+    filter(subject_course == "SOCI 101", term == 201980L)
+  expect_true(is.na(undated$first_day_enrl))
+  expect_equal(undated$first_day_basis, "undated")
+  expect_true(is.na(undated$first_day_started_enrl))
+  # Course history names the reason per session.
+  h <- get_course_planning_history(test_sections_pending_session, test_students_pending_session,
+    "SOCI 100", list(last_enrolled_complete = 202180L))
+  expect_equal(h$pressure$pressure_status[h$pressure$part_term == "2H"], "Session not yet begun")
+  expect_false(h$pressure$pressure_status[h$pressure$part_term == "1"] == "Session not yet begun")
+})
+
 test_that("frequency includes observed source terms when a course was absent", {
   h <- course_history("SOCI 104")
   fall <- h$frequency %>% filter(campus == "ABQ", term_type == "fall")

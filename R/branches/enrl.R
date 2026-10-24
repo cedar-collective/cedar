@@ -259,6 +259,14 @@ class_list_status_date_coverage <- function(students) {
 #' none. Waitlist rows are exempt: they never count, and CEDAR keeps
 #' waitlists from pulls taken before classes began.
 #'
+#' `first_day_basis` says which: `"complete"`, `"sessions_pending"` (every row
+#' is dated but some section had not begun when the class list was pulled --
+#' a second-half session during the term, ISSUES.md I28) or `"undated"` (a
+#' status or start date is missing, ISSUES.md M32). `first_day_started_enrl`
+#' counts the same way over the sections that had begun: equal to
+#' `first_day_enrl` when complete, a lower bound on it while sessions are
+#' pending, NA when undated.
+#'
 #' @param students Class-list rows with `student_id`, `crn`,
 #'   `registration_status_code`, `registration_date`, `as_of_date`, and the
 #'   `campus`, `college`, `term`, `subject_course` grouping columns.
@@ -267,8 +275,9 @@ class_list_status_date_coverage <- function(students) {
 #' @param pool_campuses Count each student once per term and course across
 #'   every campus and college in `students`, for a named planning market whose
 #'   rows the caller has already restricted to its declared campuses.
-#' @return One row per campus, college, term, and course with `first_day_enrl`
-#'   (per term and course when `pool_campuses`).
+#' @return One row per campus, college, term, and course with `first_day_enrl`,
+#'   `first_day_basis` and `first_day_started_enrl` (per term and course when
+#'   `pool_campuses`).
 calc_first_day_enrl <- function(students, sections, by_part_term = FALSE,
                                 pool_campuses = FALSE) {
   # CAMPUS_ROLLUP: pool_campuses serves enrollment projections' named market,
@@ -306,9 +315,11 @@ calc_first_day_enrl <- function(students, sections, by_part_term = FALSE,
     mutate(
       # A waitlist row never counts, so its dates cannot change the answer;
       # waitlists retained from a pre-term pull must not withhold the count.
-      .known = registration_status_code %in% STATUS_WAITLIST |
-        (!is.na(registration_date) & !is.na(start_date) &
-           !is.na(as_of_date) & as_of_date >= start_date),
+      .waitlist = registration_status_code %in% STATUS_WAITLIST,
+      .dated = .waitlist |
+        (!is.na(registration_date) & !is.na(start_date) & !is.na(as_of_date)),
+      .started = .dated & !.waitlist & as_of_date >= start_date,
+      .known = .waitlist | .started,
       .present = (registration_status_code %in% STATUS_REGISTERED &
                     registration_date <= start_date) |
         (registration_status_code %in% STATUS_DROP_ALL &
@@ -318,6 +329,16 @@ calc_first_day_enrl <- function(students, sections, by_part_term = FALSE,
     summarize(
       first_day_enrl = if (all(.known)) {
         dplyr::n_distinct(student_id[.present %in% TRUE])
+      } else {
+        NA_integer_
+      },
+      first_day_basis = dplyr::case_when(
+        all(.known) ~ "complete",
+        all(.dated) ~ "sessions_pending",
+        TRUE ~ "undated"
+      ),
+      first_day_started_enrl = if (all(.dated)) {
+        dplyr::n_distinct(student_id[.started & .present %in% TRUE])
       } else {
         NA_integer_
       },
@@ -336,7 +357,8 @@ add_first_day_enrl <- function(cl_enrls, students, sections) {
   cl_enrls %>%
     ungroup() %>%
     left_join(
-      calc_first_day_enrl(students, sections),
+      calc_first_day_enrl(students, sections) %>%
+        select(campus, college, term, subject_course, first_day_enrl),
       by = c("campus", "college", "term", "subject_course"),
       relationship = "one-to-one"
     )

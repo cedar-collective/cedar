@@ -78,7 +78,7 @@ definitions:
         exclusions: Waitlisted students, drops dated on or before the first day, and enrollments added after it.
         limitations:
           - The class list keeps only the date of each row's current status, so a student who added after the first day and later dropped counts as present.
-          - Shown only when every enrolled or dropped row in the group has a status date, its section has a start date, and the row was pulled on or after that day. Class lists pulled before status dates were exported have none, and those terms show no value rather than a partial count. Waitlist rows never count and do not need dates.
+          - Shown only when every enrolled or dropped row in the group has a status date, its section has a start date, and the row was pulled on or after that day. Class lists pulled before status dates were exported have none, and those terms show no value rather than a partial count. A course with a session that had not begun when its class list was pulled likewise shows no value until a later pull covers that session. Waitlist rows never count and do not need dates.
           - Unlike the Enrollment tab's "Ever Registered Proxy", this does not count students who registered and dropped before classes began.
         guide: users/course-reports#enrollment
         implementation:
@@ -597,7 +597,7 @@ definitions:
         exclusions: Unmonitored courses and unsupported target seasons are outside this model. Shiny does not fit or select models during a session. Fall deltas use enrollments, never grades. A waiting student already on the market's class list on either campus is counted once, in the spine.
         limitations:
           - Stability, depth, and reliability (the accuracy axis, High, Moderate, or Low) are reported as three separate axes, with seat consistency beside reliability; Unrated and None remain visible. Low reliability with steady seats is the forecast's own miss; with moving seats, most of the miss followed the schedule. Accuracy is the realised error of the selection rule replayed at each past term, so it is out of sample but still no guarantee of future coverage.
-          - First-day enrollment is reconstructed from registration status dates. A term whose class lists carry no status dates (Fall 2024 and Spring 2025) has no first-day count; it is not judged full or not full, and census is not substituted.
+          - First-day enrollment is reconstructed from registration status dates. A term whose class lists carry no status dates (Fall 2024 and Spring 2025) has no first-day count; it is not judged full or not full, and census is not substituted. A term pulled before one of its later sessions began has no complete first-day count either; it is judged near full only when the sessions that had begun already fill 90% of all its seats, and the note says "at least".
           - Capacity counts as reached, and an overprojection as Capacity-bounded, when first-day enrollment filled 98% or more of the scheduled seats; seats pooled over many sections rarely fill to the last one.
           - A saturated prior term with no retained waitlist rows reports the spine as its own floor; class lists retain waitlist rows only from Summer 2026, so the floor has almost no past-term aftcasts to be tested against.
           - The waiting students are a lower bound on unserved demand, not an estimate of it; a student who gave up without joining a waitlist leaves no record.

@@ -224,7 +224,9 @@ details.enrollment-projection-method-guide {
   color: var(--juniper-blue-dark, #2d4336);
   font-size: 0.76rem;
   font-weight: 600;
-  white-space: nowrap;
+  /* A long flag ("EA full last term, ABQ had room") wraps inside its chip
+     rather than being clipped by the column. */
+  max-width: 100%;
 }
 
 .projection-flag--warn {
@@ -262,6 +264,11 @@ details.enrollment-projection-method-guide {
 .projection-history-grid > span {
   display: flex;
   flex-direction: column;
+}
+
+/* "101 sec" stays on one line; the column is wide enough for it. */
+.projection-history-grid .text-note {
+  white-space: nowrap;
 }
 
 /* The term labels under the history header sit on the dark header band. */

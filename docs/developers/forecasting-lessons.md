@@ -40,6 +40,9 @@ between the two population models.
 
 | Model | Bundle schema | Calculation contract | Evidence |
 |---|---:|---|---|
+| `0.25.0` | 24 | No forecast change. The recent history is saved by delivery campus as well (`recent_campus_history`), and the summary flags a campus full on the first day while another had room, which the pooled market hides; a prior term at 98% or more is flagged full, not near full; an unknown prior fill names its cause. On the Oct 23 pull it flags 9 Spring 2027 rows, each EA full on the Spring 2026 first day with ABQ under 90%, and 2 Fall 2027 rows (FYEX 1030 EA full; NATV 1150 ABQ full with EA at 86%). The page states that the range assumes steady seats and how often it held, rebuilt from earlier forecasts only: Spring 86 of 105 with steady seats and 40 of 99 when they moved; Fall 98 of 115 and 28 of 91. A row whose draft moves the seats 10% or more says so under its range | [Re-audit on production data](#re-audit-on-production-data-model-0230-2026-10-20); ISSUES.md M36 |
+| `0.25.0` | 24 | A term pulled before one of its later sessions began is no longer read as undated. Its begun sessions' first day, divided by all the seats, is a lower bound on fill: it settles saturation, the pressure bump and the expansion response only where it already reaches their level, the floor note says "at least", and an unsettled term names the session not yet begun. On a Fall 2026 class list pulled Oct 8, four days before the second-half sessions began, 12 of the 65 Fall 2027 courses offered in Fall 2026 are pending in the pooled market; the bound settles 5 as near full (MATH 1350 at least 94.8%, ENGL 1120 94.6%, PHIL 1120 92.6%, COMM 1130 91.8%, PHIL 1115 90.2%), and the other 7 now name the pending session instead of missing status dates. Once a pull covers every session start, nothing is pending and nothing changes | ISSUES.md I28 |
+| `0.24.0` | 23 | December intersession (settings.csv `intersession_parts_of_term`) is left out of every projection input: it starts weeks after the term's first day, so it blanked first days (ISSUES.md I28), and it registers after a Fall settles, so the Fall spine read a partial Fall (I35). Pressure seat gaps compare with a floating-point tolerance (I34). | Spring 2027 regains pressure bumps for CHEM 1215L, COMM 1130 and HNRS 2221; Fall 2027 gains AFST 1110, ENGL 2210, MATH 1430, RELG 1110 and THEA 1110 (2026-10-23 pull). |
 | `0.23.0` | 23 | No calculation change. Accuracy is shown as Reliability (High / Moderate / Low) beside a new seat-consistency axis; aftcasts record the seat and data conditions they were made under, and the page breaks past error down by them; the bundle dates the target term's draft schedule | [Where the error comes from](#where-the-error-comes-from-model-0230-2026-10-18) below |
 | `0.23.0` | 22 | Planning sections, the seat gap and the recommendation are sized for registrations, not expected first-day seats, plus a pressure bump for a course always near full (10%, or its students left waiting if more) unless its feeders just fell 5% or more; the forecast and its accuracy are unchanged | [Sections sized for registrations again](#sections-sized-for-registrations-again-model-0230-2026-10-18) and [The pressure bump](#the-pressure-bump-model-0230-2026-10-18) below |
 | `0.22.0` | 21 | The saturation floor is the spine plus the students still waiting who are on no campus's class list in the market; it was first-day enrollment plus the waitlist, which early-drop churn absorbed | [What the 0.21.0 audit found](#what-the-0210-audit-found-2026-10-18) below; ISSUES.md I27 |
@@ -507,6 +510,69 @@ Three readings:
 The page shows this breakdown for whichever projection is loaded, in the
 "Where forecast error comes from" panel.
 
+## Re-audit on production data (model 0.23.0, 2026-10-20)
+
+Both bundles rebuilt from production's tables of 2026-10-20 (data settled
+through Fall 2026, 139-course `critical_courses` scope): 58 Spring 2027 rows
+over 215 published aftcasts, 71 Fall 2027 rows over 262. The scripts were
+session diagnostics, not committed code.
+
+**Where the record stands.**
+
+| | Spring 2027 | Fall 2027 |
+|---|---:|---:|
+| Published rule, WAPE / bias | 14.7% / -6.3% | 14.0% / -4.4% |
+| Seats within 10% of the prior offering | 6.0% / -2.8% (109) | 4.7% / -1.4% (136) |
+| Seats added 10% or more | 22.7% / -22.3% (64) | 22.7% / -21.2% (77) |
+| Seats cut 10% or more | 39.7% / +38.2% (42) | 36.0% / +36.0% (49) |
+| Portfolio net error by fold | -11.5%, -14.2%, +3.5%, -3.6% | -10.6%, +0.4%, -5.0%, -2.5% |
+| Aftcasts whose actual reached capacity (a lower bound on demand) | 107 of 215 | 127 of 262 |
+| Aftcasts whose first day cannot be judged (M32, I28) | 54 of 215 | 68 of 262 |
+| Published rows whose last offering was 98%+ full on day one / 90%+ | 42 / 53 of 58 | 48 / 66 of 71 |
+
+**The labels mean what they say.** Median realised WAPE by stability: Stable
+6.4% (both seasons), Moderate 14.8% / 13.0%, Volatile 33.5% / 36.2%; by seat
+consistency, High 4.2% / 5.5%, Moderate 11.6% / 10.8%, Low 26.8% / 21.4%. A
+reader who trusts "Stable" and distrusts "Volatile" is reading the evidence
+correctly.
+
+**The range does not.** Rebuilt rolling, the course's own 80th-percentile miss
+covered 67% of next-fold outcomes in each season: 88% / 94% where seats held,
+40% / 33% where they moved, mostly with the actual above the range (ISSUES.md
+M35).
+
+**Pooled selection does not help.** Choosing the adjusted candidate for every
+course whenever it led pooled on earlier folds scored 12.6% on the Spring 2025
+and 2026 folds, against 12.3% for the per-course rule and 12.4% for the spine;
+on Fall it never switched. What to Try Next item 5 is closed.
+
+**The schedule at registration opening carries most of the gain, in Spring.**
+Registration opens about 80 days before a Spring term and 140 before a Fall
+one. A section's first class-list status date shows when it first took a
+registrant; sections that first did so 14 or more days after opening hold 10%
+of final Spring capacity in scope. Adding the change from the prior offering's
+seats to the seats on sale in the first 30 days to the spine:
+
+| Spring aftcasts (2023, 2024, 2026; 109) | WAPE |
+|---|---:|
+| Spine (prior same-season) | 17.3% |
+| Spine + seat change, schedule of the first 14 days | 14.6% |
+| Spine + seat change, schedule of the first 30 days | 11.7% |
+| Spine + seat change, final schedule (oracle) | 5.6% |
+
+The same proxy fails for Fall (35.0% against the spine's 15.4%): 35% of Fall
+seats first take a registrant after opening because new students register at
+summer orientation, so a late first registrant there is not a late section.
+Fall needs archived schedules to be tested. The Spring result is the evidence
+behind What to Try Next item 1: a projection conditioned on the schedule a
+department has posted, published beside the spine.
+
+**Pooling ABQ and EA hides a full online campus.** In Spring 2026, 11 courses
+had EA full on the first day while ABQ had 10% or more room, 10 of them under
+90% full pooled; in Fall 2026, 4, CLST 1110 among them with 68 waiting for EA
+and 217 open ABQ seats (ISSUES.md M36). The pooled demand is still the right
+forecast target; the recommendation needs to say which delivery is short.
+
 ## Lessons From the Retired Experiments
 
 The retired forecasting code tried useful ideas, especially major and
@@ -605,8 +671,9 @@ or progression eligibility. Those require leakage-safe course-specific tests.
    (77% of Spring 2027's aftcast error, 83% of Fall 2027's). The Draft schedule tab now compares the
    plan with the draft; the next step is a projection that reads the schedule a
    department has submitted and says "with these seats, expect this; the last
-   term was full; past expansions filled this share". Archiving that schedule
-   is also what separates planned seats from reactive ones.
+   term was full; past expansions filled this share". On Spring the schedule of
+   registration's first 30 days took the spine from 17.3% to 11.7% (2026-10-20
+   re-audit above); Fall cannot be tested until schedules are archived.
 2. **Rank feeders by lift, not count**, keeping one pooled rate. The accuracy
    gain is small (0.2–0.3 points); the reason is that "ENGL 1110, PSYC 1110" is
    not a credible feeder list for MATH 1220. Do not split the rate by major,
@@ -619,10 +686,9 @@ or progression eligibility. Those require leakage-safe course-specific tests.
    once a second year of waitlists exists to measure the change against. The
    same evidence should replace the pressure bump's flat 10% with a measured,
    per-course allowance.
-5. Select between candidates over the pooled course set, not per course: three
-   or four aftcasts per course cannot separate a 1.2-point pooled gain from
-   noise, which is why the adjusted candidate leads pooled on Spring yet is
-   published for nine courses.
+5. ~~Select between candidates over the pooled course set.~~ Tested
+   2026-10-20: 12.6% against 12.3% per course and 12.4% for the spine on Spring;
+   no switch on Fall. Closed.
 6. Evaluate hierarchical shrinkage so two-aftcast courses borrow strength
    without erasing course differences. A robust ensemble of observed baselines
    remains untested; damped trends and pooled growth factors are tested and
@@ -632,8 +698,12 @@ or progression eligibility. Those require leakage-safe course-specific tests.
    feeder-transition estimator without fixing its +35% bias.
 8. Build the separate Fall specification from continuing Spring students plus
    archived admissions, acceptance, and orientation snapshots for new students.
-9. Retain registration snapshots if pace or true peak-demand models become a
-   priority. One final snapshot per term cannot recover blocked demand.
+9. **Archive a daily course-level snapshot of the schedule and of
+   registration.** Production pulls both every morning and keeps only the last.
+   A few thousand rows a day would give real planned-versus-reactive seats
+   (item 1, and the only way to test it on Fall), registration pace against the
+   same day a year earlier, and how waitlists rise and clear. One final snapshot
+   per term cannot recover blocked demand.
 
 Every new method follows the same gate: designed fixture, rolling aftcasts,
 real-data audit, schema and preview update, saved-bundle rebuild, full R suite,

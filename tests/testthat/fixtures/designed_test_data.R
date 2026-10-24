@@ -196,6 +196,10 @@
 #   EA 201880 has only five census students and is suppressed; ABQ Spring 2020
 #     is implausible at 180%. SOCI 102's target is cancelled, 103 lacks capacity,
 #     104 lacks a class-list match, and 101 has a second unmatched section.
+# EC-11c (separate pending_session tables, 2 sections, 40 class-list rows):
+#   SOCI 100 ABQ 202180, full-term first day 8 of 10 registered; a 2H section of
+#   30 begins after the pull. Course first day NA, basis "sessions_pending",
+#   started-session count 8; by session, full-term 8 complete, 2H pending.
 #
 # EC-12 (separate cedar_students_roadblocks table):
 #   ECON 100 ABQ first eligible outcomes: population 5 pass / 5 DFW,
@@ -3791,6 +3795,31 @@ cedar_students_course_history <- cedar_students_regstats %>%
 cedar_sections_course_history <- dplyr::bind_rows(cedar_sections_course_history,
   cedar_sections_regstats %>% dplyr::filter(subject_course == "SOCI 101", term == 202080L) %>%
     dplyr::mutate(crn = "EC11B-NOMATCH", section_id = "EC11B-NOMATCH"))
+
+# EC-11c (ISSUES.md I28) — a session that had not begun when the class list was
+# pulled. SOCI 100 ABQ 202180 keeps its EC-11 full-term section (10 registered,
+# begun 2021-01-15; first day 8, the last two having registered after it) and
+# gains a second-half section of 30 that begins 2022-03-01, after the
+# 2022-01-15 pull. Every row is dated, so the course's first day is pending,
+# not undated: unknown, with the begun session's 8 as a lower bound.
+.ec11c_full_term <- function(df) {
+  dplyr::filter(df, subject_course == "SOCI 100", campus == "ABQ", term == 202180L)
+}
+cedar_sections_pending_session <- dplyr::bind_rows(
+  .ec11c_full_term(cedar_sections_regstats),
+  .ec11c_full_term(cedar_sections_regstats) %>%
+    dplyr::mutate(section_id = "EC11C-2H", crn = "EC11C-2H", part_term = "2H",
+                  enrolled = 30L, total_enrl = 30L, capacity = 30L, available = 0L,
+                  start_date = as.Date("2022-03-01"), end_date = as.Date("2022-05-01"))
+)
+cedar_students_pending_session <- dplyr::bind_rows(
+  .ec11c_full_term(cedar_students_regstats),
+  .mc_row(paste0("EC11C-", 1:30), 202180, "SOCI 100", "ABQ", "SOCI") %>%
+    dplyr::mutate(part_term = "2H", registration_status = "Registered",
+                  registration_date = as.Date("2022-01-10"),
+                  as_of_date = as.Date("2022-01-15"),
+                  crn = "EC11C-2H", section_id = "EC11C-2H")
+)
 
 # ── EC-12 — Roadblocks first eligible student/course/campus observations ────
 cedar_students_roadblocks <- dplyr::bind_rows(

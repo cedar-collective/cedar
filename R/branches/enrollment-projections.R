@@ -310,6 +310,29 @@ projection_capacity_metrics <- function(
 }
 
 
+# The first-day occupancy a yes/no fill judgement may read. A complete count is
+# itself. While a term's later sessions have not begun (a second-half session
+# pulled mid-term, ISSUES.md I28), the sections that have begun give a lower
+# bound: if it already reaches the threshold against ALL the term's seats, the
+# true fill does too, so the bound settles the judgement and is returned.
+# Below the threshold it settles nothing and the term stays unknown. Never use
+# the result as a count: it exists to answer "at least this full?".
+projection_judged_first_day <- function(first_day, started, basis, capacity,
+                                        threshold) {
+  first_day <- as.numeric(first_day)
+  started <- as.numeric(started)
+  capacity <- as.numeric(capacity)
+  proves <- basis %in% "sessions_pending" & is.finite(started) &
+    is.finite(capacity) & capacity > 0 &
+    started / capacity >= as.numeric(threshold)
+  dplyr::case_when(
+    is.finite(first_day) ~ first_day,
+    proves ~ started,
+    TRUE ~ NA_real_
+  )
+}
+
+
 projection_mode_character <- function(x, missing = "Unknown") {
   x <- as.character(x)
   x <- x[!is.na(x) & nzchar(x)]
@@ -427,31 +450,17 @@ prepare_projection_enrollment_history <- function(cl_enrls, courses = NULL,
 # It is what "were the seats full" is judged on: census, the 15th day of
 # instruction, follows three weeks of drops, so a course full on day one can
 # read 95% at census. Sections are sized for projected registrations (0.23.0). It is NA, never a partial count, for a term whose class lists
-# carry no status dates or were pulled before a section began.
+# carry no status dates or were pulled before a section began;
+# `first_day_basis` says which, and `first_day_started_enrl` is the count over
+# the sections that had begun (ISSUES.md I28, projection_judged_first_day()).
 prepare_projection_market_enrollment_history <- function(students, sections,
                                                          courses, campuses,
                                                          market_id,
                                                          through_term = NULL) {
-  projection_require_columns(
-    students,
-    c("student_id", "term", "campus", "college", "subject_course",
-      "registration_status_code", "crn", "registration_date", "as_of_date"),
+  classlist_rows <- projection_market_classlist_rows(
+    students, courses, campuses, through_term,
     "prepare_projection_market_enrollment_history()"
   )
-
-  classlist_rows <- students %>%
-    dplyr::ungroup() %>%
-    dplyr::filter(
-      campus %in% .env$campuses,
-      subject_course %in% .env$courses,
-      !registration_status_code %in% STATUS_WAITLIST
-    ) %>%
-    dplyr::mutate(term = suppressWarnings(as.integer(as.character(term))))
-  if (!is.null(through_term) && length(through_term) > 0) {
-    classlist_rows <- dplyr::filter(
-      classlist_rows, term <= as.integer(through_term[[1]])
-    )
-  }
 
   # CAMPUS_ROLLUP: this named market is prefiltered to its declared campuses;
   # student-course rows are deduplicated here before ABQ and EA are pooled.
@@ -487,7 +496,10 @@ prepare_projection_market_enrollment_history <- function(students, sections,
     ) %>%
     dplyr::left_join(
       calc_first_day_enrl(classlist_rows, sections, pool_campuses = TRUE) %>%
-        dplyr::mutate(first_day_enrl = as.numeric(first_day_enrl)),
+        dplyr::mutate(
+          first_day_enrl = as.numeric(first_day_enrl),
+          first_day_started_enrl = as.numeric(first_day_started_enrl)
+        ),
       by = c("term", "subject_course"),
       relationship = "one-to-one"
     ) %>%
@@ -500,6 +512,61 @@ prepare_projection_market_enrollment_history <- function(students, sections,
       .before = 1
     ) %>%
     dplyr::arrange(subject_course, term)
+}
+
+
+# The market's non-waitlist class-list rows: its declared campuses and courses,
+# through the enrollment edge. Pooled and per-campus first days read the same
+# rows.
+projection_market_classlist_rows <- function(students, courses, campuses,
+                                             through_term, caller) {
+  projection_require_columns(
+    students,
+    c("student_id", "term", "campus", "college", "subject_course",
+      "registration_status_code", "crn", "registration_date", "as_of_date"),
+    caller
+  )
+  rows <- students %>%
+    dplyr::ungroup() %>%
+    dplyr::filter(
+      campus %in% .env$campuses,
+      subject_course %in% .env$courses,
+      !registration_status_code %in% STATUS_WAITLIST
+    ) %>%
+    dplyr::mutate(term = suppressWarnings(as.integer(as.character(term))))
+  if (!is.null(through_term) && length(through_term) > 0) {
+    rows <- dplyr::filter(rows, term <= as.integer(through_term[[1]]))
+  }
+  rows
+}
+
+
+# Each delivery campus's own first day, per course and term: distinct students
+# across that campus's colleges and sessions. The forecast pools the market;
+# this keeps a campus that filled on day one visible beside one that had room
+# (ISSUES.md M36). It never feeds a projection.
+prepare_projection_delivery_first_day <- function(students, sections, courses,
+                                                  campuses,
+                                                  through_term = NULL) {
+  classlist_rows <- projection_market_classlist_rows(
+    students, courses, campuses, through_term,
+    "prepare_projection_delivery_first_day()"
+  )
+  empty <- tibble::tibble(
+    campus = character(), term = integer(), subject_course = character(),
+    first_day_enrl = numeric(), first_day_basis = character()
+  )
+  if (nrow(classlist_rows) == 0L) return(empty)
+  # pool_campuses on one campus's rows counts each student-course once
+  # within that campus; nothing is pooled across campuses here.
+  dplyr::bind_rows(lapply(split(classlist_rows, classlist_rows$campus), function(rows) {
+    calc_first_day_enrl(rows, sections, pool_campuses = TRUE) %>%
+      dplyr::transmute(
+        campus = rows$campus[[1]], term = as.integer(term), subject_course,
+        first_day_enrl = as.numeric(first_day_enrl), first_day_basis
+      )
+  })) %>%
+    dplyr::arrange(subject_course, term, campus)
 }
 
 
@@ -1109,6 +1176,10 @@ prepare_enrollment_projection_inputs <- function(cl_enrls, sections, students,
       delivery_enrollment_history, delivery_section_history,
       target_term = section_through_term, market_id = target_market_id
     ),
+    delivery_first_day = prepare_projection_delivery_first_day(
+      students, sections, courses = target_courses, campuses = target_campuses,
+      through_term = enrollment_through_term
+    ),
     students = prepare_projection_student_inputs(
       students, target_courses = target_courses,
       campuses = target_campuses,
@@ -1232,6 +1303,7 @@ projection_candidate <- function(method_id, estimate = NA_real_, applicable = FA
                                  spine = NA_real_, spine_term = NA_integer_,
                                  saturated_prior = NA,
                                  prior_first_day_fill = NA_real_,
+                                 prior_first_day_basis = NA_character_,
                                  waitlisted_prior = NA_integer_,
                                  floor_uplift = 0,
                                  floor_basis = NA_character_,
@@ -1267,6 +1339,7 @@ projection_candidate <- function(method_id, estimate = NA_real_, applicable = FA
     spine_term = as.integer(spine_term),
     saturated_prior = as.logical(saturated_prior),
     prior_first_day_fill = as.numeric(prior_first_day_fill),
+    prior_first_day_basis = as.character(prior_first_day_basis),
     waitlisted_prior = as.integer(waitlisted_prior),
     floor_uplift = as.numeric(floor_uplift),
     floor_basis = as.character(floor_basis),
@@ -1350,7 +1423,27 @@ projection_spine_floor <- function(spine_row, section_history, waitlist_history,
     dplyr::slice_head(n = 1)
   capacity_value <- if (nrow(capacity) == 0) NA_real_ else
     capacity$scheduled_capacity[[1]]
-  first_day <- spine_row$first_day_enrl[[1]]
+  projection_require_columns(
+    spine_row, c("first_day_enrl", "first_day_started_enrl", "first_day_basis"),
+    "projection_spine_floor()"
+  )
+  # A term whose later sessions had not begun at the pull is judged on the
+  # sections that had, when they alone settle it (ISSUES.md I28).
+  first_day_basis <- spine_row$first_day_basis[[1]]
+  first_day <- projection_judged_first_day(
+    spine_row$first_day_enrl[[1]], spine_row$first_day_started_enrl[[1]],
+    first_day_basis, capacity_value, threshold
+  )
+  partial <- !is.finite(spine_row$first_day_enrl[[1]]) && is.finite(first_day)
+  # How the prior first day was read, as a code for flags: "complete",
+  # "sessions_begun" (judged on the lower bound), "sessions_pending",
+  # "undated", or "no_capacity".
+  read_as <- if (partial) "sessions_begun" else as.character(first_day_basis)
+  fill_text <- function(fill) paste0(
+    "first-day fill ", if (partial) "at least " else "",
+    scales::percent(fill, accuracy = 0.1),
+    if (partial) ", from the sessions that had begun when the class list was pulled" else ""
+  )
   saturation <- enrollment_capacity_metrics(
     first_day, capacity_value, constrained_threshold = threshold
   )
@@ -1363,11 +1456,27 @@ projection_spine_floor <- function(spine_row, section_history, waitlist_history,
   saturated <- isTRUE(saturation$capacity_constrained[[1]])
 
   if (!is.finite(first_day)) {
+    started_fill <- spine_row$first_day_started_enrl[[1]] / capacity_value
+    basis <- if (identical(first_day_basis, "sessions_pending")) {
+      paste0(
+        "Some of ", fmt_term(spine_term), "'s sessions had not begun when its ",
+        "class list was pulled, so its first day is not yet complete",
+        if (is.finite(started_fill)) paste0(
+          "; the sessions that had begun fill ",
+          scales::percent(started_fill, accuracy = 0.1), " of its seats, short of the ",
+          scales::percent(threshold, accuracy = 1), " that would settle saturation"
+        ) else ""
+      )
+    } else {
+      paste0(
+        fmt_term(spine_term), "'s class lists carry no registration status ",
+        "dates, so its first day cannot be counted and saturation cannot be ",
+        "judged; re-pulling that term's class list restores it"
+      )
+    }
     return(list(
       saturated = NA, fill = NA_real_, waitlisted = waitlisted, uplift = 0,
-      basis = paste("First-day enrollment for", fmt_term(spine_term),
-                    "cannot be reconstructed from the class lists,",
-                    "so saturation cannot be judged")
+      basis = basis, first_day_basis = read_as
     ))
   }
   if (!isTRUE(saturation$capacity_usable[[1]])) {
@@ -1375,7 +1484,8 @@ projection_spine_floor <- function(spine_row, section_history, waitlist_history,
       saturated = NA, fill = saturation$fill_rate[[1]], waitlisted = waitlisted,
       uplift = 0,
       basis = paste("No usable capacity for", fmt_term(spine_term),
-                    "so saturation cannot be judged")
+                    "so saturation cannot be judged"),
+      first_day_basis = "no_capacity"
     ))
   }
   if (!saturated) {
@@ -1383,9 +1493,10 @@ projection_spine_floor <- function(spine_row, section_history, waitlist_history,
       saturated = FALSE, fill = saturation$fill_rate[[1]],
       waitlisted = waitlisted, uplift = 0,
       basis = paste0(
-        fmt_term(spine_term), " was not saturated (first-day fill ",
-        scales::percent(saturation$fill_rate[[1]], accuracy = 0.1), ")"
-      )
+        fmt_term(spine_term), " was not saturated (",
+        fill_text(saturation$fill_rate[[1]]), ")"
+      ),
+      first_day_basis = read_as
     ))
   }
   # The floor is in the spine's units: the ever-registered total plus the
@@ -1395,10 +1506,10 @@ projection_spine_floor <- function(spine_row, section_history, waitlist_history,
   floor_demand <- spine + waitlisted
   list(
     saturated = TRUE, fill = saturation$fill_rate[[1]], waitlisted = waitlisted,
-    uplift = as.numeric(waitlisted),
+    uplift = as.numeric(waitlisted), first_day_basis = read_as,
     basis = paste0(
-      fmt_term(spine_term), " was saturated (first-day fill ",
-      scales::percent(saturation$fill_rate[[1]], accuracy = 0.1), "); ",
+      fmt_term(spine_term), " was saturated (",
+      fill_text(saturation$fill_rate[[1]]), "); ",
       if (waitlisted > 0) {
         paste0("floor is spine ", round(spine), " + ", waitlisted,
                " still waiting = ", round(floor_demand))
@@ -1630,6 +1741,7 @@ project_spine_adjusted <- function(history, preceding_term_history,
     spine_term = spine_term,
     saturated_prior = floor$saturated,
     prior_first_day_fill = floor$fill,
+    prior_first_day_basis = floor$first_day_basis,
     waitlisted_prior = floor$waitlisted,
     floor_uplift = floor$uplift,
     floor_basis = floor$basis,
@@ -2811,6 +2923,75 @@ build_projection_recent_history <- function(projections, enrollment_history,
 }
 
 
+empty_projection_recent_campus_history <- function() {
+  tibble::tibble(
+    market_id = character(), subject_course = character(),
+    projection_target_term = integer(), history_term = integer(),
+    recency_rank = integer(), campus = character(),
+    scheduled_sections = integer(), scheduled_capacity = numeric(),
+    first_day_enrl = numeric(), first_day_basis = character(),
+    first_day_fill = numeric()
+  )
+}
+
+
+# The recent history's terms again, one row per delivery campus that offered
+# the course: its own sections, seats and first day. The forecast pools the
+# market, so a campus full on the first day can hide behind one with room
+# (ISSUES.md M36). Fill is stored as arithmetic only; which fill counts as
+# full is read live from the seat-fill levels where the rows are shown.
+build_projection_recent_campus_history <- function(recent_history,
+                                                   delivery_section_history,
+                                                   delivery_first_day) {
+  projection_require_columns(
+    delivery_section_history,
+    c("campus", "subject_course", "term", "scheduled_sections",
+      "scheduled_capacity"),
+    "build_projection_recent_campus_history() sections"
+  )
+  projection_require_columns(
+    delivery_first_day,
+    c("campus", "subject_course", "term", "first_day_enrl", "first_day_basis"),
+    "build_projection_recent_campus_history() first day"
+  )
+  if (nrow(recent_history) == 0L) return(empty_projection_recent_campus_history())
+  seats <- delivery_section_history %>%
+    dplyr::group_by(campus, subject_course, term) %>%
+    dplyr::summarise(
+      scheduled_sections = as.integer(sum(scheduled_sections)),
+      scheduled_capacity = if (all(is.finite(scheduled_capacity))) {
+        sum(scheduled_capacity)
+      } else {
+        NA_real_
+      },
+      .groups = "drop"
+    )
+  rows <- recent_history %>%
+    dplyr::distinct(
+      market_id, subject_course, projection_target_term, history_term,
+      recency_rank
+    ) %>%
+    dplyr::inner_join(
+      seats, by = c("subject_course", "history_term" = "term"),
+      relationship = "one-to-many"
+    ) %>%
+    dplyr::left_join(
+      delivery_first_day,
+      by = c("campus", "subject_course", "history_term" = "term"),
+      relationship = "many-to-one"
+    ) %>%
+    dplyr::mutate(
+      # A campus whose sections have no class-list rows has no first day.
+      first_day_basis = dplyr::coalesce(first_day_basis, "no_classlist")
+    )
+  fill <- projection_capacity_metrics(rows$first_day_enrl, rows$scheduled_capacity)
+  rows %>%
+    dplyr::mutate(first_day_fill = fill$capacity_fill) %>%
+    dplyr::select(dplyr::all_of(names(empty_projection_recent_campus_history()))) %>%
+    dplyr::arrange(subject_course, projection_target_term, recency_rank, campus)
+}
+
+
 empty_projection_candidates <- function() {
   keys <- tibble::tibble(
     market_id = character(), college = character(), subject_course = character(),
@@ -2880,6 +3061,7 @@ empty_enrollment_projections <- function() {
       adjusted_n_backtests = integer(), adjusted_applicable = logical(),
       adjusted_reason = character(),
       adjusted_saturated_prior = logical(), adjusted_prior_first_day_fill = numeric(),
+      adjusted_prior_first_day_basis = character(),
       adjusted_waitlisted_prior = integer(), adjusted_floor_uplift = numeric(),
       adjusted_floor_basis = character(), adjusted_preceding_term = integer(),
       adjusted_feeder_check = character(),
@@ -3504,6 +3686,7 @@ projection_method_pairing <- function(candidates, opt = list()) {
       adjusted_reason = applicability_reason,
       adjusted_saturated_prior = saturated_prior,
       adjusted_prior_first_day_fill = prior_first_day_fill,
+      adjusted_prior_first_day_basis = prior_first_day_basis,
       adjusted_waitlisted_prior = waitlisted_prior,
       adjusted_floor_uplift = floor_uplift,
       adjusted_floor_basis = floor_basis,
@@ -3558,7 +3741,11 @@ projection_expansion_response <- function(enrollment_history, section_history,
   # Saturation on the first day, as the floor judges it; a term whose first
   # day is unknown is not a saturated term.
   saturation <- enrollment_capacity_metrics(
-    series$first_day_enrl, series$scheduled_capacity,
+    projection_judged_first_day(
+      series$first_day_enrl, series$first_day_started_enrl,
+      series$first_day_basis, series$scheduled_capacity, threshold
+    ),
+    series$scheduled_capacity,
     constrained_threshold = threshold
   )
   # CAMPUS_ROLLUP: the market series pools the declared campuses by design;
@@ -3657,7 +3844,11 @@ projection_pressure_bump <- function(enrollment_history, section_history, rows,
         by = "term"
       )
     fill <- projection_capacity_metrics(
-      recent$first_day_enrl, recent$scheduled_capacity,
+      projection_judged_first_day(
+        recent$first_day_enrl, recent$first_day_started_enrl,
+        recent$first_day_basis, recent$scheduled_capacity, threshold
+      ),
+      recent$scheduled_capacity,
       reached_threshold = threshold
     )
     judged <- recent$term[fill$capacity_usable]
@@ -3989,6 +4180,74 @@ summarize_projection_error_sources <- function(backtests, opt = list()) {
 }
 
 
+# How often the published range would have held, out of sample. Each past
+# forecast's range is rebuilt by the published rule from the course's earlier
+# published forecasts only: plus or minus the 80th percentile of their misses,
+# from one earlier miss on. Split by whether that term's seats held, because
+# the range assumes they do (ISSUES.md M35). Arithmetic over saved aftcasts.
+summarize_projection_range_coverage <- function(backtests, opt = list()) {
+  change <- as.numeric(projection_option(opt, "seat_consistency_change"))
+  empty <- tibble::tibble(
+    seats = c("steady", "moved", "unknown"), folds = 0L, covered = 0L,
+    actual_above = 0L, actual_below = 0L, coverage = NA_real_
+  )
+  if (nrow(backtests) == 0L) return(empty)
+  projection_require_columns(
+    backtests,
+    c("market_id", "subject_course", "term_type", "target_term",
+      "policy_selected", "projected_classlist_total", "actual_classlist_total",
+      "fold_seat_change"),
+    "summarize_projection_range_coverage()"
+  )
+  folds <- backtests %>%
+    dplyr::filter(
+      policy_selected, is.finite(projected_classlist_total),
+      is.finite(actual_classlist_total)
+    ) %>%
+    dplyr::mutate(error = projected_classlist_total - actual_classlist_total) %>%
+    dplyr::arrange(market_id, subject_course, term_type, target_term) %>%
+    # CAMPUS_ROLLUP: a course's range is the pooled market row's; its earlier
+    # misses are read within that market and season.
+    dplyr::group_by(market_id, subject_course, term_type) %>%
+    dplyr::mutate(half_width = vapply(seq_along(error), function(i) {
+      if (i < 2L) return(NA_real_)
+      as.numeric(stats::quantile(abs(error[seq_len(i - 1L)]), 0.80, names = FALSE))
+    }, numeric(1))) %>%
+    dplyr::ungroup() %>%
+    dplyr::filter(is.finite(half_width))
+  if (nrow(folds) == 0L) return(empty)
+  counted <- folds %>%
+    dplyr::mutate(
+      seats = dplyr::case_when(
+        !is.finite(fold_seat_change) ~ "unknown",
+        abs(fold_seat_change) >= change ~ "moved",
+        TRUE ~ "steady"
+      ),
+      covered = abs(error) <= half_width
+    ) %>%
+    dplyr::group_by(seats) %>%
+    dplyr::summarise(
+      folds = dplyr::n(),
+      covered_n = sum(covered),
+      # A forecast below the range means registrations came in above it.
+      actual_above = sum(!covered & error < 0),
+      actual_below = sum(!covered & error > 0),
+      .groups = "drop"
+    )
+  empty %>%
+    dplyr::select(seats) %>%
+    dplyr::left_join(counted, by = "seats") %>%
+    dplyr::transmute(
+      seats,
+      folds = dplyr::coalesce(folds, 0L),
+      covered = dplyr::coalesce(covered_n, 0L),
+      actual_above = dplyr::coalesce(actual_above, 0L),
+      actual_below = dplyr::coalesce(actual_below, 0L),
+      coverage = dplyr::if_else(folds > 0L, covered / folds, NA_real_)
+    )
+}
+
+
 add_projection_recommendations <- function(selected, candidates, pressure_screen,
                                            enrollment_history, section_history,
                                            opt = list()) {
@@ -4295,6 +4554,7 @@ new_enrollment_projection_bundle <- function(analysis, target_term, as_of_term,
     backtests = analysis$backtests,
     method_performance = analysis$method_performance,
     recent_history = analysis$recent_history,
+    recent_campus_history = analysis$recent_campus_history,
     cohort_composition = analysis$cohort_composition
   )
   validate_enrollment_projection_bundle(bundle)
@@ -4309,7 +4569,7 @@ validate_enrollment_projection_bundle <- function(bundle) {
     "model_provenance", "source_fingerprint", "target_schedule_as_of",
     "pressure_screen", "projections",
     "delivery_components", "candidates", "backtests", "method_performance",
-    "recent_history", "cohort_composition"
+    "recent_history", "recent_campus_history", "cohort_composition"
   )
   missing <- setdiff(required, names(bundle))
   if (length(missing) > 0) {
@@ -4368,7 +4628,7 @@ validate_enrollment_projection_bundle <- function(bundle) {
 
   scoped_tables <- c(
     "pressure_screen", "projections", "delivery_components", "candidates",
-    "backtests", "method_performance", "recent_history"
+    "backtests", "method_performance", "recent_history", "recent_campus_history"
   )
   for (table_name in scoped_tables) {
     data <- bundle[[table_name]]
@@ -4432,7 +4692,8 @@ validate_enrollment_projection_bundle <- function(bundle) {
       "capacity_limit_signal", "capacity_limit_status",
       "capacity_limit_note", "recommended_sections",
       "adjusted_projection", "adjusted_applicable", "adjusted_reason",
-      "adjusted_saturated_prior", "adjusted_floor_uplift",
+      "adjusted_saturated_prior", "adjusted_prior_first_day_fill",
+      "adjusted_prior_first_day_basis", "adjusted_floor_uplift",
       "adjusted_floor_basis", "adjusted_delta_repeat", "adjusted_delta_feeder",
       "adjusted_regime_alarm", "adjusted_delta_basis",
       "expansion_pairs", "expansion_fill_rate", "expansion_note",
@@ -4645,6 +4906,27 @@ validate_enrollment_projection_bundle <- function(bundle) {
       stop("[enrollment-projections.R] Recent history contains duplicate terms.",
            call. = FALSE)
     }
+  }
+  # Every campus row belongs to a pooled recent-history term, once.
+  projection_require_columns(
+    bundle$recent_campus_history,
+    names(empty_projection_recent_campus_history()),
+    "validate_enrollment_projection_bundle() recent_campus_history"
+  )
+  campus_terms <- bundle$recent_campus_history %>%
+    dplyr::anti_join(
+      bundle$recent_history,
+      by = c("market_id", "subject_course", "projection_target_term",
+             "history_term")
+    )
+  campus_duplicates <- bundle$recent_campus_history %>%
+    dplyr::count(
+      market_id, subject_course, projection_target_term, history_term, campus
+    ) %>%
+    dplyr::filter(n > 1L)
+  if (nrow(campus_terms) > 0L || nrow(campus_duplicates) > 0L) {
+    stop("[enrollment-projections.R] Campus history must hold each recent ",
+         "history term's campuses once.", call. = FALSE)
   }
   if (nrow(bundle$backtests) > 0L) {
     backtest_starts <- projection_course_history_starts(
