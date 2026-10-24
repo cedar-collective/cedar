@@ -31,6 +31,8 @@ recurrence is recognizable.
 |---|---|---|
 | [I35](#i35--a-fall-projection-is-read-before-the-falls-intersession-has-registered) | Defect | A Fall projection is read before the Fall's intersession has registered: the Fall 2027 spine had none of Fall 2026's December demand (FYEX 1110: 168 of 801 Fall 2025 registrations were December) (fixed in model 0.24.0) |
 | [I34](#i34--a-projection-pressure-decision-flips-with-the-platforms-floating-point) | Defect | A projection pressure decision flips with the platform's floating point: NATV 1150 is included for Spring 2027 on Linux and excluded on macOS (fixed in model 0.24.0) |
+| [I33](#i33--a-crashed-myreports-download-is-recorded-as-a-successful-fetch) | Defect | A crashed MyReports download is recorded as a successful fetch: on Oct 23 class lists and applicants were never downloaded, and every step reported ✅ |
+| [I32](#i32--a-scheduled-refresh-waits-forever-when-myreports-asks-for-a-2fa-code) | Defect | A scheduled refresh waits forever when MyReports asks for a 2FA code: the Oct 11 run sat 12 days at the prompt, unreported |
 | [I31](#i31--course-paths-finishes-behind-a-stuck-loading-dialog) | Defect | Nested Course paths report sends completion to the wrong loading-dialog channel (resolved) |
 | [I30](#i30--saved-r-workspaces-entered-the-docker-build-context) | Defect | Case-sensitive Docker ignore omitted `.RData`, copying an 89 MB workspace into app image layers (resolved) |
 | [I29](#i29--generated-navigation-ids-can-open-the-wrong-panel) | Defect | Generated nav-menu IDs collide, so Admin can open Gen Ed instead of Data & Usage (resolved) |
@@ -123,6 +125,137 @@ sprintf("%.17g", predict(lm(v ~ x), data.frame(x = 4)))  # "129.99999999999997" 
 and trend growth) with a tolerance of `sqrt(.Machine$double.eps)`. The test "a
 trend exactly at the seat gap counts on every platform (I34)" fails on macOS
 without it, and its fixed-value assertion fails on any platform.
+
+## I33 — A crashed MyReports download is recorded as a successful fetch
+
+**Status:** open
+**Found:** 2026-10-23, reading the log of a manual production refresh
+(`restart-cedar.sh --mode production --update -s 202680 -e 202710`,
+`/var/log/cedar-update-20261023_192042.log`)
+**Severity:** moderate. No number was wrong this time. But a refresh that
+fetches nothing new for a table reports a complete success. The app then serves
+the previous pull as if it were today's, and the as-of dates are the only sign.
+**Affects:** the fetch and parse steps of `scripts/update-data.sh`, and
+mrgather (`/root/mrgather`, a separate repository).
+
+### What is wrong
+
+mrgather downloaded the two DESR files, the two graduates files and the first
+Academic Study file. The second Academic Study download then timed out. Its
+error handler itself failed, and mrgather exited with status 0:
+
+```
+✗ Error fetching AS on attempt 1: Download timed out
+Fatal error during report gathering: TypeError: tracker.recordReportFetchError is not a function
+...
+Script complete. Exiting...
+✓ Fetch complete
+```
+
+The class list and applicants reports were never attempted. Every later step
+still reported success:
+
+- `update-data.sh` trusts the exit status. It recorded
+  `mrgather fetch ✅ fetched: desr deg as cl aa`, and that note lists the
+  reports requested, not the ones downloaded.
+- `parse-data.R` logged `No .xlsx files found ... matching signature:
+  Class_List_Guided_Adhoc` and the same for `S_Admissions_Applicants_Detail`,
+  then reported ✅.
+- The transform rebuilt `cedar_students` from the previous class-list export,
+  and the run ended `CEDAR Update Complete`.
+
+The data was not harmed this time, because that morning's cron run had already
+fetched the day's class lists. The 15 earlier refresh logs, 2026-10-10 to
+2026-10-23, show no other crash. But if the cron run itself failed this way,
+the class lists would quietly stay at the previous pull while the morning
+status said all was well.
+
+*Done when:*
+
+- A fetch that downloads fewer reports than were requested is recorded as
+  failed, and names the missing reports.
+- The fetch note lists the reports actually downloaded.
+- `parse-data.R` fails a requested report that has no file.
+- The tables built from a missing report are not rebuilt.
+- mrgather exits non-zero after a fatal error, and its tracker method exists.
+- `test-data-update-pipeline.R` covers the shell side.
+
+### Reproduction
+
+The timeout cannot be forced. Read the evidence from the log:
+
+```bash
+grep -nE "Fatal error during report gathering|Script complete|Fetch complete|No .xlsx files found|mrgather fetch" \
+  /var/log/cedar-update-20261023_192042.log
+```
+
+To check any run: a requested report with no `Done processing file:` line for
+its signature was not refreshed by that run.
+
+---
+
+## I32 — A scheduled refresh waits forever when MyReports asks for a 2FA code
+
+**Status:** open
+**Found:** 2026-10-23, while starting a manual production refresh
+**Severity:** moderate. No number is wrong. Later runs fetch normally, but a
+run that hits the prompt never ends and never reports failure. It keeps its
+headless browser container running, and the only sign is a log file nobody
+reads.
+**Affects:** the fetch step of `scripts/update-data.sh` in production mode
+(`docker compose ... run --rm mrgather node mrgather.js ...`). The prompt itself
+is in mrgather (`/root/mrgather`), a separate repository.
+
+### What is wrong
+
+The fetch runs mrgather with no time limit. If MyReports asks for a 2FA code,
+mrgather prompts for one on standard input and waits. Under cron nobody can
+answer, so the run waits forever.
+
+The 05:05 cron run on 2026-10-11 (`update-data.sh -s 202660 -e 202680`) was
+still running on 2026-10-23: three shell processes, a `docker compose run`
+client, and container `mrgather-mrgather-run-81498ef90ea8`, all started
+2026-10-11 10:05 UTC. Its log, `/var/log/cedar-update-20261011_100501.log`,
+ends:
+
+```
+Prompting for 2FA code...
+Screenshots and HTML saved to downloads folder (accessible outside Docker)
+⚠️  There was an error with 2FA - see detailed error above
+Please enter the 2FA code (or press Enter to take another screenshot):
+```
+
+The daily runs from 2026-10-12 on were not asked for 2FA and completed. So the
+refresh kept working while the stuck run went unnoticed. If MyReports asked on
+several days in a row, one stuck run would pile up for each day.
+
+Two things are needed. A time limit on the compose client is not enough on its
+own, because stopping the client need not remove a `--rm` container. And mrgather
+should fail at once, with a clear status, when nobody is there to type a code.
+
+*Done when:* a non-interactive fetch that meets a 2FA prompt exits non-zero
+within a bounded time. Its container is removed, and the step is recorded as
+`mrgather fetch FAILED` with "2FA required" in the note. The fetch also has an
+overall time limit, so any other hang ends the same way. Finally,
+`test-data-update-pipeline.R` fails if the production fetch command loses its
+time limit.
+
+### Reproduction
+
+This cannot be forced, because MyReports decides when to ask for 2FA. To see
+it, run the production fetch on the droplet from a shell with no terminal, on a
+day MyReports asks:
+
+```bash
+setsid /root/cedar/scripts/update-data.sh -s 202680 -e 202680 </dev/null >/tmp/fetch.log 2>&1 &
+# /tmp/fetch.log stops at "Please enter the 2FA code"; the process never exits
+```
+
+To check for runs already stuck:
+`pgrep -fa update-data.sh` and `docker ps --filter name=mrgather-mrgather-run`.
+Anything older than a day is one.
+
+---
 
 ## I31 — Course paths finishes behind a stuck loading dialog
 
