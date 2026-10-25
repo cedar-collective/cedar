@@ -70,17 +70,19 @@ projection_columns_explainer <- function() {
     "Reading the table: what each column means",
     tags$ul(
       item("Course", "with its academic department beneath."),
-      item("Sections", "to plan: registrations plus any pressure bump,",
+      item("Sections", "to plan: registrations plus what the plan adds,",
            "divided by the section size (the target schedule's average,",
            "otherwise the recent median), rounded up. \"Plan at least\" when",
            "last term filled its seats."),
-      item("Pressure bump", "is the registrations added for a course that is",
-           "always full, and beneath them the sections that adds. A dash means",
-           "no bump; the course's detail says why."),
+      item("Plan adds", "are the registrations the plan adds to the",
+           "projection: the change in the course's feeder courses in the term",
+           "just finished, up or down, and a pressure bump for a course that is",
+           "always full, with the sections they add beneath. A dash means",
+           "neither; the course's detail says why."),
       item("Registrations", "is everyone expected to sign up, including",
            "students who drop: the number the model forecasts and sections are",
            "planned for. Beneath it, the range past forecasts usually landed in,",
-           "which assumes seats like last year's, and the change on last year."),
+           "which assumes seats like last year's."),
       item("Seats (day 1)", "is the students expected in a seat when classes",
            "begin. It is context, not the planning number."),
       item("First day / sections", "shows the last four same-season terms. A",
@@ -133,28 +135,40 @@ projection_build_explainer <- function() {
       tags$li(tags$strong("Fall changes."),
               " The adjusted forecast also adds the change in the course's own",
               " and its feeder courses' enrollment in the term just finished, times",
-              " the share that historically carried over. Two terms ahead, that",
-              " term has not happened yet, so the change is left out and the",
-              " course's detail says so."),
+              " the share that historically carried over. A course listed as the",
+              " one taken just before (Composition I before II, say) carries its",
+              " change at its own rate. Two terms ahead, that term has not",
+              " happened yet, so the change is left out and the course's detail",
+              " says so."),
       tags$li(tags$strong("Choosing a forecast."), paste0(
         " Last year's number is used unless the adjusted forecast beat it by ",
         defaults$selection_challenger_margin * 100, " points of error on at least ",
         defaults$selection_min_backtests, " earlier past forecasts, judged at",
         " each past term with only the evidence available then."
       )),
+      tags$li(tags$strong("The feeder adjustment."), paste0(
+        " When last year's number is the forecast, the plan still follows the",
+        " term just finished: the listed predecessor's change always counts,",
+        " and the other feeder courses' change counts when they moved ",
+        projection_percent(defaults$plan_feeder_change),
+        " or more, either way, each times the share that historically carried",
+        " over. Smaller moves are noise against a course's own year. When the",
+        " adjusted forecast is published it already holds these changes, and",
+        " the plan adds nothing."
+      )),
       tags$li(tags$strong("A pressure bump for courses always full."), paste0(
         " A course near full on the first day in every recent same-season term",
         " with a first-day count is planned for ",
         projection_percent(defaults$pressure_bump_share),
-        " more, or for the students left waiting if that is more, unless its",
-        " feeder courses just fell ", projection_percent(defaults$pressure_bump_feeder_decline),
-        " or more. A full course's registrations follow its seats, so last",
-        " year's count understates what it would draw. It changes the plan,",
-        " never the forecast or its reliability."
+        " more, or for the students left waiting if that is more. A full",
+        " course's registrations follow its seats, so last year's count",
+        " understates what it would draw, and that backlog stays whatever its",
+        " feeders do. It changes the plan, never the forecast or its",
+        " reliability."
       )),
       tags$li(tags$strong("Sections."),
-              " Registrations plus any bump, divided by the section size and",
-              " rounded up. Registrations run about 8% above the students in a",
+              " Registrations plus what the plan adds, divided by the section size",
+              " and rounded up. Registrations run about 8% above the students in a",
               " seat on day one, and that margin is deliberate: running short of",
               " seats costs more than an empty one.")
     ),
@@ -343,9 +357,10 @@ enrollmentProjectionsUI <- function(id) {
       paste(
         "Each row plans one course for the target term. Sections are planned",
         "for registrations, which start from last year's same-term",
-        "registrations; a course that is always full gets a pressure bump on",
-        "top, and a course whose enrollment moved sharply in the term just",
-        "finished is flagged for a look. The range is where past forecasts",
+        "registrations; the plan follows a clear change in its feeder courses",
+        "in the term just finished, a course that is always full gets a",
+        "pressure bump on top, and a course whose enrollment moved sharply is",
+        "flagged for a look. The range is where past forecasts",
         "for that course usually landed, and it assumes seats like last",
         "year's."
       )
@@ -367,7 +382,7 @@ enrollmentProjectionsUI <- function(id) {
           paste(
             "One published projection per course for the selected target term,",
             "with the evidence behind it. Click a course for its floor, Fall",
-            "deltas, capacity, and full method evidence."
+            "deltas, feeder adjustment, capacity, and full method evidence."
           )
         ),
         uiOutput(ns("pressure_summary")),
@@ -623,7 +638,8 @@ enrollmentProjectionsServer <- function(id, bundles, load_bundle, programs) {
     output$pressure_summary <- renderUI({
       tags$p(
         class = "enrollment-projection-lead",
-        view()$meta$pressure_bump$sentence
+        view()$meta$pressure_bump$sentence, " ",
+        view()$meta$plan_feeder$sentence
       )
     })
 
@@ -688,8 +704,8 @@ enrollmentProjectionsServer <- function(id, bundles, load_bundle, programs) {
         session$ns("selected_course")
       ))
       # Sized to fit a laptop-width window without horizontal scrolling: the
-      # department sits under the course, the range and the change under the
-      # registrations, and the method and its evidence in the modal. Course,
+      # department sits under the course, the range under the registrations,
+      # and the method and its evidence in the modal. Course,
       # Sections and Seats have fixed widths so a wide window stretches the
       # evidence columns instead of them.
       reactable::reactable(
@@ -718,7 +734,7 @@ enrollmentProjectionsServer <- function(id, bundles, load_bundle, programs) {
             header = htmltools::span(
               "Sections",
               title = paste(
-                "Sections to plan: registrations plus any pressure bump,",
+                "Sections to plan: registrations plus what the plan adds,",
                 "divided by the section size and rounded up; a floor when last",
                 "term filled its seats"
               )
@@ -727,24 +743,35 @@ enrollmentProjectionsServer <- function(id, bundles, load_bundle, programs) {
             na = "—"
           ),
           pressure_bump = reactable::colDef(
-            name = "Pressure bump", align = "right", minWidth = 90,
+            name = "Plan adds", align = "right", minWidth = 90,
             header = htmltools::span(
-              "Pressure bump",
+              "Plan adds",
               title = paste(
-                "Registrations added to the plan because the course was near",
-                "full on the first day in every recent same-season term, and",
-                "the sections that adds. Click the course for why"
+                "Registrations the plan adds to the projection: the change in",
+                "its feeder courses in the term just finished, and a pressure",
+                "bump when the course was near full on the first day in every",
+                "recent same-season term; beneath, the sections they add.",
+                "Click the course for why"
               )
             ),
             cell = function(value, index) {
-              if (!isTRUE(value > 0)) return("—")
-              added <- data$pressure_bump_sections[[index]]
+              feeder <- data$plan_feeder_adjustment[[index]]
+              bumped <- isTRUE(value > 0)
+              fed <- isTRUE(feeder != 0)
+              if (!bumped && !fed) return("—")
+              added <- sum(
+                if (fed) data$plan_feeder_sections[[index]] else 0L,
+                if (bumped) data$pressure_bump_sections[[index]] else 0L,
+                na.rm = TRUE
+              )
               htmltools::tagList(
-                paste0("+", count_text(value)),
-                if (isTRUE(added > 0)) {
+                if (fed) htmltools::div(sprintf("%+.0f feeders", feeder)),
+                if (bumped) htmltools::div(paste0("+", count_text(value), " bump")),
+                if (added != 0L) {
                   htmltools::div(
                     class = "text-note",
-                    paste0("+", added, " section", if (added == 1L) "" else "s")
+                    paste0(if (added > 0L) "+" else "\u2212", abs(added),
+                           " section", if (abs(added) == 1L) "" else "s")
                   )
                 }
               )
@@ -752,6 +779,9 @@ enrollmentProjectionsServer <- function(id, bundles, load_bundle, programs) {
           ),
           pressure_bump_sections = reactable::colDef(show = FALSE),
           pressure_bump_note = reactable::colDef(show = FALSE),
+          plan_feeder_adjustment = reactable::colDef(show = FALSE),
+          plan_feeder_sections = reactable::colDef(show = FALSE),
+          plan_feeder_note = reactable::colDef(show = FALSE),
           projected_demand = reactable::colDef(
             name = "Registrations", align = "right", minWidth = 120,
             headerStyle = list(whiteSpace = "nowrap"),
@@ -760,12 +790,10 @@ enrollmentProjectionsServer <- function(id, bundles, load_bundle, programs) {
               title = paste(
                 "Everyone expected to register, including students who later",
                 "drop: the number sections are planned for. Beneath it, the",
-                "range past forecasts for this course usually landed in and",
-                "the change on last", season, "term"
+                "range past forecasts for this course usually landed in"
               )
             ),
             cell = function(value, index) {
-              change <- data$change_vs_last[[index]]
               htmltools::tagList(
                 count_text(value),
                 if (!is.na(data$demand_range[[index]])) {
@@ -773,21 +801,12 @@ enrollmentProjectionsServer <- function(id, bundles, load_bundle, programs) {
                 },
                 if (!is.na(data$range_note[[index]])) {
                   htmltools::div(class = "text-note", data$range_note[[index]])
-                },
-                if (is.finite(change)) {
-                  htmltools::div(
-                    class = "text-note",
-                    # Rounded first, so a change under half a percent
-                    # reads +0%, never -0%.
-                    sprintf("%+d%% vs last %s", as.integer(round(100 * change)), season)
-                  )
                 }
               )
             }
           ),
           demand_range = reactable::colDef(show = FALSE),
           range_note = reactable::colDef(show = FALSE),
-          change_vs_last = reactable::colDef(show = FALSE),
           expected_first_day = reactable::colDef(
             name = "Seats (day 1)", align = "right", width = 64,
             header = htmltools::span(
@@ -953,8 +972,14 @@ enrollmentProjectionsServer <- function(id, bundles, load_bundle, programs) {
             name = "Planned registrations", align = "right", minWidth = 110,
             cell = function(value, index) {
               bump <- table$pressure_bump[[index]]
+              feeder <- table$plan_feeder_adjustment[[index]]
               htmltools::tagList(
                 count_text(value),
+                if (isTRUE(feeder != 0)) {
+                  htmltools::div(
+                    class = "text-note", sprintf("incl. %+.0f feeders", feeder)
+                  )
+                },
                 if (isTRUE(bump > 0)) {
                   htmltools::div(
                     class = "text-note", paste0("incl. +", count_text(bump), " bump")
@@ -986,6 +1011,7 @@ enrollmentProjectionsServer <- function(id, bundles, load_bundle, programs) {
           in_draft = reactable::colDef(show = FALSE),
           campus_sections = reactable::colDef(show = FALSE),
           pressure_bump = reactable::colDef(show = FALSE),
+          plan_feeder_adjustment = reactable::colDef(show = FALSE),
           sections_to_add = reactable::colDef(show = FALSE),
           status = reactable::colDef(show = FALSE)
         )
@@ -1051,6 +1077,7 @@ enrollmentProjectionsServer <- function(id, bundles, load_bundle, programs) {
             if (is.na(current$recommended_sections)) "Unavailable" else
               format(current$recommended_sections, big.mark = ",")
           ),
+          tags$dt("Feeder adjustment"), tags$dd(current$plan_feeder_note),
           tags$dt("Pressure bump"), tags$dd(current$pressure_bump_note),
           tags$dt("Planning recommendation"), tags$dd(current$recommendation),
           tags$dt("Saturation floor"), tags$dd(current$floor_note),

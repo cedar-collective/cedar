@@ -198,7 +198,7 @@ async function closeEvidence(page) {
 
   let table = await readReactable(page, 'enrollment_projections-projection_table');
   const requiredHeaders = [
-    'Course', 'Sections', 'Pressure bump', 'Seats (day 1)', 'Registrations',
+    'Course', 'Sections', 'Plan adds', 'Seats (day 1)', 'Registrations',
     'Flags', 'Stability', 'Depth', 'Reliability', 'Seat consistency',
   ];
   check(
@@ -208,7 +208,7 @@ async function closeEvidence(page) {
     table.headers.join(' | ')
   );
   // The method and its evidence live in the course modal; the department sits
-  // under the course and the change under the registrations, so the table
+  // under the course and the range under the registrations, so the table
   // fits a laptop window.
   check(
     'the summary keeps method detail and secondary values out of their own columns',

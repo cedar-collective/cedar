@@ -82,8 +82,8 @@ Each course gets one verdict:
 
 - **Short of day-one seats**: the draft has fewer seats than the students
   expected in the room when classes begin. Fix these first.
-- **Covers day one, short of the plan**: only the planning margin or the
-  pressure bump is missing.
+- **Covers day one, short of the plan**: only the planning margin, the
+  feeder adjustment or the pressure bump is missing.
 - **Covers the plan**, or **seats beyond the plan** when it has more than a
   section to spare. In a course that is always full, spare seats are likely to
   fill: when such courses were given more seats, the new seats filled.
@@ -91,8 +91,8 @@ Each course gets one verdict:
   sections yet.
 
 The table also shows the draft's sections (with each campus's share), its
-seats, the expected day-one seats, the planned registrations (including any
-pressure bump), the plan's sections, the gap, students registered so far once
+seats, the expected day-one seats, the planned registrations (including the
+feeder adjustment and any pressure bump), the plan's sections, the gap, students registered so far once
 registration opens, and the course's reliability and seat consistency. Click a
 course for its full evidence. Until the target term's schedule is in the data,
 the tab says so instead of showing a table.
@@ -157,22 +157,47 @@ seats, the new seats filled; when their seats were held flat, registrations
 stayed flat; when seats were cut, registrations fell by the cut.
 
 So a course near full on the first day in every recent same-season term with a
-first-day count (at least two of the last three) is planned for **10% more**
+first-day count (at least two of the last three) is planned for **5% more**
 than it registered last time, or for the students left waiting if that is
-more. It is not bumped if its feeder courses' enrollment fell 5% or more in the
-term just finished. When that term has not happened yet, the feeder check
-cannot run and the course's note says to recheck.
+more. 5% is about what the typical always-full course left waiting in Fall
+2026, and it is deliberately modest: a new section needs an instructor. Feeder
+courses never cancel it, because the students already turned away do not leave
+when a feeder shrinks; their change is the feeder adjustment, below.
 
 The bump is an allowance, not a measurement, and it is always shown
 separately:
 
-- The **Pressure bump** column gives the registrations added and, beneath them,
+- The **Plan adds** column gives the registrations added and, beneath them,
   the sections that adds.
 - The line above the table totals what the bump adds across the courses shown.
 - A course's detail says why it got the bump, or why not.
 - The registration forecast and its accuracy never include it.
 
-As waitlists accumulate, the flat 10% will be replaced by a measured allowance.
+As waitlists accumulate, the flat 5% will be replaced by a measured allowance.
+
+### The feeder adjustment
+
+Last year's registrations are a year old by the time the schedule is built.
+The plan still follows the term just finished:
+
+- **A course taken just before this one** (Composition I before Composition II,
+  Calculus I before II) counts every time, up or down. Most of its students go
+  straight into the next course, so its change carries through: if Fall
+  Composition I lost 100 students and 68% usually go on to Composition II, the
+  Spring plan for Composition II drops by 68. These pairs are a short list the
+  institution keeps (`projection_sequences.csv`).
+- **The course's other feeder courses** count only when together they moved
+  5% or more, either way, and then by the share of their students who
+  historically took this course next. A smaller move is noise against a
+  course's own year, and not every student who could take a course does.
+- When the published forecast is the adjusted one, it already holds these
+  changes, and the plan adds nothing.
+- Two terms ahead, the term just finished has not happened yet, so there is
+  nothing to follow and the course's detail says so.
+
+The **Plan adds** column shows the feeder change beside any bump, and a
+course's detail gives the arithmetic. The registration forecast and its
+accuracy never include it.
 
 Some terms' class lists were exported without status dates,
 so their first day is unknown; **Admin > Data & Usage** lists which. Those terms
@@ -190,10 +215,9 @@ two candidates:
 - **Prior same-season + floor + Fall deltas**: the same number, plus the
   students still waiting for a seat at the end of that term when it was
   saturated (90% or more of the seats filled on the first day), plus the change
-  in the course's
-  own enrollment and in its feeder courses' enrollment during the term just
-  finished, each scaled by the share that historically carried into this
-  course. It uses Fall enrollments, not grades, because grades are not posted
+  in the course's own enrollment, in the course taken just before it, and in
+  its other feeder courses during the term just finished, each scaled by the
+  share that historically carried into this course. It uses Fall enrollments, not grades, because grades are not posted
   when the schedule is built.
 
 **Prior same-season is the default for every course.** The adjusted candidate
@@ -212,9 +236,9 @@ The table is sized to fit a laptop window:
 | Column | Meaning |
 |---|---|
 | **Course** | The course, with its department beneath. |
-| **Sections** | Registrations plus any pressure bump, divided by the section size (the target schedule's average when it exists, otherwise the recent median), rounded up. "Plan at least" when last term filled its seats. |
-| **Pressure bump** | Registrations added to the plan because the course was near full on the first day in every recent same-season term, and beneath them the sections that adds. A dash means no bump; the course's detail says why. |
-| **Registrations** | Everyone expected to sign up, including students who drop before or after classes begin: the class-list demand the model forecasts, and the number sections are planned for. Beneath it, the range past forecasts for this course usually landed in and the change on the last same-season term's registrations. The range assumes seats like last year's: on past forecasts it held about 8 or 9 times in 10 when seats stayed within 10%, and about 1 in 3 when they moved. When the draft schedule moves the seats 10% or more, the row says so under the range. |
+| **Sections** | Registrations plus what the plan adds, divided by the section size (the target schedule's average when it exists, otherwise the recent median), rounded up. "Plan at least" when last term filled its seats. |
+| **Plan adds** | Registrations the plan adds to the forecast: the change in the course's feeder courses in the term just finished (up or down), and a pressure bump when the course was near full on the first day in every recent same-season term, with the sections they add beneath. A dash means neither; the course's detail says why. |
+| **Registrations** | Everyone expected to sign up, including students who drop before or after classes begin: the class-list demand the model forecasts, and the number sections are planned for. Beneath it, the range past forecasts for this course usually landed in. There is no change-on-last-year line: most forecasts are last year's number, and where the adjusted forecast moves it, the move has been a percent or so and has not predicted which way the course went. The range assumes seats like last year's: on past forecasts it held about 8 or 9 times in 10 when seats stayed within 10%, and about 1 in 3 when they moved. When the draft schedule moves the seats 10% or more, the row says so under the range. |
 | **Seats (day 1)** | Students expected to hold a seat when classes begin: registrations times the share of this course's registrants still enrolled on the first day in recent terms. Context, not the planning number. |
 | **First day / sections** | The last four same-season terms: students enrolled on the first day over the sections scheduled. A dash means the course was not offered, or the first day cannot be reconstructed; hover for which. |
 | **Flags** | Plain-language reasons to look: full last term (98% of seats filled on the first day) or near full (90%), students left waiting, one campus full while another had room (online seats can fill while Albuquerque's do not, and the pooled plan hides it), last term's fill unknown and why, a big change in the term just finished, a volatile history, past forecasts more than 20% off ("with steady seats" or "as seats moved"), or the two candidates disagreeing. |
@@ -227,7 +251,7 @@ Clicking a row opens the course's evidence in a window over the table; close it
 to return to the same place in the list. The evidence opens with one sentence
 that says what to plan and why, then the selected method and why it was
 selected, the three axes, seat consistency and what it says beside
-reliability, why the course is listed, the pressure bump, the planning
+reliability, why the course is listed, the feeder adjustment, the pressure bump, the planning
 recommendation, and the floor, Fall delta, regime, and capacity checks. The method plot, movement diagnostic, and
 candidate table sit under **Analyst detail**.
 
@@ -247,7 +271,7 @@ the adjustment whichever candidate was published: **Saturation floor**
 (whether the prior term was full on the first day, the waitlist left on it,
 and what happened the last times saturated courses in this market were given
 more seats), **Fall deltas** (the enrollment changes and carry-through rates
-behind the repeat and feeder terms), and **Regime check**, which flags a
+behind the repeat, sequence and feeder terms), and **Regime check**, which flags a
 course whose own enrollment in the term just finished moved 25% or more from
 the year before. The check changes nothing; it says look. Its full **What this
 means** text separates historical fit from structural caveats: a method can

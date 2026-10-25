@@ -19,7 +19,8 @@ controls have something to show. `population_groups.csv` groups the fixtures'
 program names into four named populations for Pathways and the projections
 scenario. `projection_groups.csv` and `projection_courses.csv` declare one
 monitoring scope over the fixture Gen Ed courses, with the window start in
-`settings.csv`; the demo does not build projections, but the files must load.
+`settings.csv`, and `projection_sequences.csv` one course sequence; the demo
+does not build projections, but the files must load.
 The `degree_*.csv` files are a designed Degree Explorer catalog: two synthetic
 programs, Biology B.S. (calculus route, lecture/lab bundles, a converging chain,
 a concurrent link, a lecture/lab choice set) and History B.A. (statistics route,

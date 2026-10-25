@@ -975,12 +975,15 @@ test_that("planning sections are sized from projected registrations, not first-d
   expect_equal(result$recommended_sections, 4L)
   expect_equal(result$recommendation, "Plan 4 section(s)")
   # 90 of 96 seats taken on both judged first days is near full, so the plan
-  # carries a 10-student pressure bump; ceiling(110 / 32) is still 4, and the
-  # forecast is untouched.
+  # carries a 5-student pressure bump (5%); ceiling(105 / 32) is still 4, and
+  # the forecast is untouched. No adjusted candidate ran, so the plan has no
+  # feeder adjustment.
   expect_true(result$pressure_bump_applied)
-  expect_equal(result$pressure_bump, 10)
-  expect_equal(result$planned_registrations, 110)
+  expect_equal(result$pressure_bump, 5)
+  expect_equal(result$plan_feeder_adjustment, 0)
+  expect_equal(result$planned_registrations, 105)
   expect_equal(result$pressure_bump_sections, 0L)
+  expect_equal(result$plan_feeder_sections, 0L)
 })
 
 test_that("an always-full course gets a pressure bump on its plan, never on its forecast", {
@@ -999,9 +1002,7 @@ test_that("an always-full course gets a pressure bump on its plan, never on its 
     market_id = "abq_ea_course_market", subject_course = "TEST 101",
     term_type = "fall", target_term = 202480L, method_id = "seasonal_last",
     observed_baseline = 200, projected_classlist_total = 200,
-    adjusted_waitlisted_prior = 0L, adjusted_floor_uplift = 0,
-    adjusted_preceding_term = 202410L, adjusted_feeder_check = "measured",
-    adjusted_feeder_courses = "FEED 1", adjusted_feeder_change_rate = 0.02
+    adjusted_waitlisted_prior = 0L, adjusted_floor_uplift = 0
   )
   bump <- function(r = row, h = history) {
     projection_pressure_bump(h, sections, r)
@@ -1011,24 +1012,27 @@ test_that("an always-full course gets a pressure bump on its plan, never on its 
   expect_true(full$pressure_bump_applied)
   expect_equal(full$pressure_judged_terms, 3L)
   expect_equal(full$pressure_full_terms, 3L)
-  expect_equal(full$pressure_bump, 20)
+  expect_equal(full$pressure_bump, 10)
   expect_match(full$pressure_bump_note, paste0(
-    "^Pressure bump \\+20: near full on the first day in every recent Fall ",
-    "with a first-day count \\(Fall 2021, Fall 2022, Fall 2023\\)"
+    "^Pressure bump \\+10: near full on the first day in every recent Fall ",
+    "with a first-day count \\(Fall 2021, Fall 2022, Fall 2023\\), so its ",
+    "registrations were capped by its seats; planned for 5% more than last ",
+    "Fall's 200 registrations$"
   ))
-  expect_match(full$pressure_bump_note, "Feeder courses moved \\+2\\.0% in Spring 2024\\.$")
 
-  # More students left waiting than 10%: the bump is the waiting count.
+  # More students left waiting than 5%: the bump is the waiting count.
   waiting <- bump(dplyr::mutate(row, adjusted_waitlisted_prior = 31L))
   expect_equal(waiting$pressure_bump, 31)
   expect_match(waiting$pressure_bump_note, "planned for the 31 students left waiting")
 
-  # A floor the published method already added counts toward the bump.
+  # A floor the published method already added counts toward the bump:
+  # max(5% of 200, 7 waiting) - 7 already in the projection = 3.
   floored <- bump(dplyr::mutate(
-    row, method_id = "spine_adjusted", adjusted_waitlisted_prior = 12L,
-    adjusted_floor_uplift = 12, projected_classlist_total = 212
+    row, method_id = "spine_adjusted", adjusted_waitlisted_prior = 7L,
+    adjusted_floor_uplift = 7, projected_classlist_total = 207
   ))
-  expect_equal(floored$pressure_bump, 8)
+  expect_equal(floored$pressure_bump, 3)
+  expect_match(floored$pressure_bump_note, "the published projection already adds 7 of them$")
 
   # One judged Fall below the near-full line is not always full.
   roomy <- bump(h = dplyr::mutate(history, first_day_enrl = c(190, 196, 170)))
@@ -1054,17 +1058,65 @@ test_that("an always-full course gets a pressure bump on its plan, never on its 
     "only 1 Fall offering on record, and the bump needs 2 with a first-day count"
   )
 
-  # Feeders that just fell 5% or more cancel it; feeders not observed yet do
-  # not, and the note says to recheck.
+  # Feeders never cancel the bump (0.26.0): a backlog does not leave with
+  # them. Their change is the plan's separate feeder adjustment.
   fell <- bump(dplyr::mutate(row, adjusted_feeder_change_rate = -0.08))
-  expect_false(fell$pressure_bump_applied)
-  expect_match(fell$pressure_bump_note, "but feeder courses moved -8\\.0% in Spring 2024")
-  unseen <- bump(dplyr::mutate(
-    row, adjusted_feeder_check = "term_not_observed",
-    adjusted_feeder_courses = NA_character_, adjusted_feeder_change_rate = NA_real_
+  expect_true(fell$pressure_bump_applied)
+  expect_equal(fell$pressure_bump, 10)
+  expect_no_match(fell$pressure_bump_note, "[Ff]eeder")
+})
+
+test_that("the plan follows a listed sequence always and pooled feeders only past the line", {
+  # Published rows joined to their adjusted-candidate audit fields: the
+  # function's input contract, not institutional data. Spring 2024 is the
+  # term just finished.
+  row <- tibble::tibble(
+    market_id = "abq_ea_course_market", subject_course = "TEST 201",
+    term_type = "fall", target_term = 202480L, method_id = "seasonal_last",
+    projected_classlist_total = 300, adjusted_applicable = TRUE,
+    adjusted_preceding_term = 202410L, adjusted_feeder_check = "measured",
+    adjusted_delta_sequence = -68, adjusted_sequence_courses = "SEQ 1",
+    adjusted_sequence_change = -100, adjusted_delta_feeder = 3,
+    adjusted_feeder_change_rate = 0.02
+  )
+  plan <- function(...) projection_plan_feeder_adjustment(dplyr::mutate(row, ...))
+
+  # The sequence always counts; pooled feeders moving 2% stay out.
+  inside <- plan()
+  expect_equal(inside$plan_feeder_adjustment, -68)
+  expect_equal(inside$plan_feeder_note, paste0(
+    "Feeder adjustment -68: SEQ 1, taken the term before, moved -100 students ",
+    "in Spring 2024, which carries -68 into this course; its other feeder ",
+    "courses moved +2.0% in Spring 2024, inside the 5% line, so the plan does ",
+    "not follow them"
   ))
-  expect_true(unseen$pressure_bump_applied)
-  expect_match(unseen$pressure_bump_note, "Feeder courses in Spring 2024 are not observed yet")
+
+  # Pooled feeders count at the line exactly and beyond it, either way.
+  at_line <- plan(adjusted_feeder_change_rate = -0.05, adjusted_delta_feeder = -12)
+  expect_equal(at_line$plan_feeder_adjustment, -80)
+  up <- plan(adjusted_sequence_courses = NA_character_, adjusted_delta_sequence = 0,
+             adjusted_feeder_change_rate = 0.064, adjusted_delta_feeder = 9.4)
+  expect_equal(up$plan_feeder_adjustment, 9)
+  expect_match(up$plan_feeder_note,
+               "^Feeder adjustment \\+9: its feeder courses moved \\+6\\.4% in Spring 2024, 5% or more, which carries \\+9$")
+
+  # The published adjusted candidate already holds both deltas.
+  adjusted <- plan(method_id = "spine_adjusted")
+  expect_equal(adjusted$plan_feeder_adjustment, 0)
+  expect_match(adjusted$plan_feeder_note,
+               "^No feeder adjustment: the published projection already includes the changes in Spring 2024\\. SEQ 1")
+
+  # Two steps out the term just finished is unobserved, so nothing is read.
+  unseen <- plan(adjusted_sequence_courses = NA_character_, adjusted_delta_sequence = 0,
+                 adjusted_feeder_check = "term_not_observed",
+                 adjusted_delta_feeder = 0, adjusted_feeder_change_rate = NA_real_)
+  expect_equal(unseen$plan_feeder_adjustment, 0)
+  expect_equal(unseen$plan_feeder_note, paste0(
+    "No feeder adjustment: feeder courses in Spring 2024 are not observed yet; ",
+    "recheck when they settle"
+  ))
+  none <- plan(adjusted_applicable = FALSE)
+  expect_equal(none$plan_feeder_adjustment, 0)
 })
 
 test_that("each past forecast term records its seat change and whether the term before was full", {
@@ -1209,7 +1261,7 @@ test_that("the draft comparison separates short of day one from short of the pla
     subject_course = c("DAY 1", "PLAN 1", "COVER 1", "SPARE 1", "MISSING 1"),
     department = "TEST",
     projected_classlist_total = 100,
-    planned_registrations = 110, pressure_bump = 10,
+    planned_registrations = 110, pressure_bump = 10, plan_feeder_adjustment = 0,
     projected_first_day_equivalent = 90,
     recommended_sections = 4L, reference_section_size = 30,
     scheduled_sections = c(2L, 3L, 4L, 7L, 0L),
@@ -1254,19 +1306,26 @@ test_that("the draft comparison separates short of day one from short of the pla
   expect_match(none$sentence, "^No schedule for Spring 2027 is in the data yet")
 })
 
-test_that("the bundle validator rejects a plan that is not its projection plus its bump", {
+test_that("the bundle validator rejects a plan that is not its projection plus its adjustments", {
   rows <- tibble::tibble(
+    method_id = "seasonal_last",
     projected_classlist_total = c(100, NA), pressure_bump = c(10, 0),
-    pressure_bump_applied = c(TRUE, FALSE), planned_registrations = c(110, NA),
-    reference_section_size = 25, recommended_sections = c(5L, NA)
+    plan_feeder_adjustment = c(-15, 0),
+    pressure_bump_applied = c(TRUE, FALSE), planned_registrations = c(95, NA),
+    reference_section_size = 25, recommended_sections = c(4L, NA)
   )
   expect_silent(validate_pressure_bump_rows(rows, "test"))
-  message <- "not its projection plus its pressure bump"
+  message <- "not its projection plus its feeder adjustment plus its pressure bump"
   expect_error(validate_pressure_bump_rows(
-    dplyr::mutate(rows, planned_registrations = c(100, NA)), "test"
+    dplyr::mutate(rows, planned_registrations = c(110, NA),
+                  recommended_sections = c(5L, NA)), "test"
+  ), message)
+  # The published adjusted candidate already carries the deltas.
+  expect_error(validate_pressure_bump_rows(
+    dplyr::mutate(rows, method_id = "spine_adjusted"), "test"
   ), message)
   expect_error(validate_pressure_bump_rows(
-    dplyr::mutate(rows, recommended_sections = c(4L, NA)), "test"
+    dplyr::mutate(rows, recommended_sections = c(5L, NA)), "test"
   ), message)
   expect_error(validate_pressure_bump_rows(
     dplyr::mutate(rows, pressure_bump_applied = c(FALSE, FALSE)), "test"
@@ -1460,7 +1519,11 @@ test_that("registrations over the recorded cap still count as capacity reached",
 #   FEED 1 enrolled 10, 10, 20 students in those Falls; half of each Fall's
 #   FEED 1 students took TEST 201 the following Spring, and a quarter of each
 #   Fall's TEST 201 students took it again.
-projection_spine_scenario <- function(spring_capacity = 30, waitlisted = 0L) {
+# With `sequence = TRUE`, SEQ 1 is the course taken just before: 8, 8 and 4
+#   students in those Falls, half of each of the first two taking TEST 201 the
+#   next Spring. Two of Fall 2023's four also took FEED 1.
+projection_spine_scenario <- function(spring_capacity = 30, waitlisted = 0L,
+                                      sequence = FALSE) {
   springs <- projection_test_history(
     c(20, 24), terms = c(202210L, 202310L), course = "TEST 201"
   ) %>% dplyr::mutate(term_type = "spring")
@@ -1476,7 +1539,12 @@ projection_spine_scenario <- function(spring_capacity = 30, waitlisted = 0L) {
     roster(202210L, "TEST 201", c(ids("f", 5), "r1", ids("x", 14))),
     roster(202280L, "FEED 1", ids("g", 10)), roster(202280L, "TEST 201", ids("s", 4)),
     roster(202310L, "TEST 201", c(ids("g", 5), "s1", ids("y", 18))),
-    roster(202380L, "FEED 1", ids("h", 20)), roster(202380L, "TEST 201", ids("t", 12))
+    roster(202380L, "FEED 1", ids("h", 20)), roster(202380L, "TEST 201", ids("t", 12)),
+    if (sequence) dplyr::bind_rows(
+      roster(202180L, "SEQ 1", ids("q", 8)), roster(202210L, "TEST 201", ids("q", 4)),
+      roster(202280L, "SEQ 1", ids("p", 8)), roster(202310L, "TEST 201", ids("p", 4)),
+      roster(202380L, "SEQ 1", ids("u", 4)), roster(202380L, "FEED 1", ids("u", 2))
+    )
   )
   sections <- tibble::tibble(
     market_id = "abq_ea_course_market", college = "AS", department = "TEST",
@@ -1549,6 +1617,45 @@ test_that("Fall deltas scale enrollment changes by the historical carry-through"
   expect_equal(far$delta_feeder, 0)
   expect_match(far$delta_basis, "Fall 2024 is not observed yet")
   expect_true(is.na(far$regime_alarm))
+})
+
+test_that("a listed sequence carries its own change and leaves the pooled feeders", {
+  s <- projection_spine_scenario(sequence = TRUE)
+  sequences <- tibble::tibble(from_course = "SEQ 1", to_course = "TEST 201")
+  result <- project_spine_adjusted(
+    s$enrollment_history, s$preceding_term_history, s$section_history,
+    s$waitlist_history, s$students, s$row, 202410L,
+    opt = list(sequences = sequences)
+  )
+
+  # SEQ 1: half of each earlier Fall's students took TEST 201 next Spring,
+  # and Fall 2023 had 4 against 8: (4 - 8) x 0.5 = -2.
+  expect_equal(result$sequence_courses, "SEQ 1")
+  expect_equal(result$sequence_change, -4)
+  expect_equal(result$delta_sequence, -2)
+  # SEQ 1's students are out of the pooled feeders, so SEQ 1 is not one and
+  # the two who also took FEED 1 in Fall 2023 count once, under SEQ 1:
+  # FEED 1 is 20 against 10, x 0.5 = 5, exactly as without the sequence.
+  expect_equal(result$feeder_courses, "FEED 1")
+  expect_equal(result$feeder_rate, 0.5)
+  expect_equal(result$feeder_change, 10)
+  expect_equal(result$delta_feeder, 5)
+  # 24 + repeat 1 - sequence 2 + feeder 5.
+  expect_equal(result$projected_classlist_total, 28)
+  expect_match(result$delta_basis, "sequence SEQ 1: \\(4 - 8\\) x 0\\.5 = -2\\.0")
+  expect_true(validate_spine_rows(
+    result %>% dplyr::mutate(target_term = 202410L), "fixture"
+  ))
+
+  # Unlisted, SEQ 1 is just another feeder, pooled with FEED 1.
+  pooled <- project_spine_adjusted(
+    s$enrollment_history, s$preceding_term_history, s$section_history,
+    s$waitlist_history, s$students, s$row, 202410L,
+    opt = list(sequences = sequences[0, ])
+  )
+  expect_true(is.na(pooled$sequence_courses))
+  expect_equal(pooled$delta_sequence, 0)
+  expect_equal(pooled$feeder_courses, "FEED 1, SEQ 1")
 })
 
 # ISSUES.md I28: a pending session's begun count is a lower bound, so it may
@@ -2308,7 +2415,7 @@ test_that("the administrator summary says the decision in one sentence and flags
     projected_classlist_total = 2179, projected_first_day_equivalent = 2080,
     pressure_bump = 218, pressure_bump_applied = TRUE,
     pressure_bump_note = "Pressure bump +218: near full in every recent Spring",
-    planned_registrations = 2397,
+    plan_feeder_adjustment = 0, planned_registrations = 2397,
     recommended_sections = 99L, observed_baseline = 2179,
     adjusted_saturated_prior = TRUE, adjusted_prior_first_day_fill = 0.988,
     adjusted_prior_first_day_basis = "complete", campus_fill_flag = NA_character_,
@@ -2327,15 +2434,24 @@ test_that("the administrator summary says the decision in one sentence and flags
   ))
   expect_false(grepl("No pressure bump", sentence))
 
+  # The feeder adjustment is stated beside the bump, either way.
+  fed <- projection_summary_sentence(dplyr::mutate(
+    row, plan_feeder_adjustment = -60, planned_registrations = 2337
+  ))
+  expect_match(fed, paste0(
+    "^Plan at least 99 sections for 2,337 registrations: 2,179 projected, -60 ",
+    "for the change in its feeder courses, plus a pressure bump of 218 "
+  ))
+
   # A full course denied the bump says why.
   denied <- dplyr::mutate(
     row, pressure_bump = 0, pressure_bump_applied = FALSE,
     planned_registrations = 2179,
-    pressure_bump_note = "No pressure bump: feeder courses moved -9% in Fall 2026"
+    pressure_bump_note = "No pressure bump: Spring 2026 filled 85.0% of its seats"
   )
   denied_sentence <- projection_summary_sentence(denied)
   expect_match(denied_sentence, "^Plan at least 99 sections for 2,179 registrations \\(about 2,080 in seats on the first day\\)\\.")
-  expect_match(denied_sentence, "so this is a floor\\. No pressure bump: feeder courses moved -9% in Fall 2026\\.")
+  expect_match(denied_sentence, "so this is a floor\\. No pressure bump: Spring 2026 filled 85\\.0% of its seats\\.")
   expect_match(sentence, "That is last year's level\\.")
   # One decimal: whole percents turned 98.8% into "99%" and read as full.
   expect_match(sentence, "filled 98\\.8% of its seats on the first day with 15 students waiting, so this is a floor\\.")
@@ -2393,12 +2509,47 @@ test_that("the administrator summary says the decision in one sentence and flags
   expect_match(projection_summary_sentence(sparse), "^Not enough comparable history")
 })
 
+test_that("the feeder summary says how many plans it moved, and why when none", {
+  # Published rows as the view holds them: the function's input contract.
+  rows <- tibble::tibble(
+    projected_classlist_total = c(100, 200, 300, 400, NA),
+    method_id = c("seasonal_last", "seasonal_last", "seasonal_last",
+                  "spine_adjusted", "seasonal_last"),
+    plan_feeder_adjustment = c(12, -30, -8, 0, 0),
+    adjusted_preceding_term = 202680L, adjusted_feeder_check = "measured"
+  )
+  summary <- projection_plan_feeder_summary(rows, 0.05)
+  expect_equal(summary$n_raised, 1L)
+  expect_equal(summary$n_lowered, 2L)
+  expect_equal(summary$registrations, -26)
+  expect_equal(summary$sentence, paste0(
+    "Feeder courses in Fall 2026 raise 1 course's plan by 12 registrations and ",
+    "lower 2 courses' plans by 38. A course's listed predecessor, taken the term ",
+    "before, always counts; its other feeder courses count when they moved 5% ",
+    "or more. 1 course's published projection already includes those changes."
+  ))
+  still <- projection_plan_feeder_summary(
+    dplyr::mutate(rows, plan_feeder_adjustment = 0, method_id = "seasonal_last"), 0.05
+  )
+  expect_equal(still$sentence, paste0(
+    "No plan shown has a feeder adjustment: where the forecast is last year's ",
+    "number, feeder courses moved less than 5% in Fall 2026 and no listed ",
+    "predecessor changed it."
+  ))
+  unseen <- projection_plan_feeder_summary(
+    dplyr::mutate(rows, plan_feeder_adjustment = 0, adjusted_feeder_check = "term_not_observed"),
+    0.05
+  )
+  expect_match(unseen$sentence, "^No plan has a feeder adjustment: Fall 2026 is not observed yet")
+  expect_error(projection_plan_feeder_summary(rows, NULL), "plan_feeder_change")
+})
+
 test_that("the view adds a needs-a-look filter without changing a number", {
   bundle <- projection_fixture_bundle(202110L, 202080L, 202080L)
   view <- build_enrollment_projection_view(bundle, list(group_id = "all_saved"))
 
   expect_true(all(c("planning_sections", "expected_first_day", "demand_range",
-                    "change_vs_last", "flags", "recent_first_day", "recent_sections",
+                    "flags", "recent_first_day", "recent_sections",
                     "recent_terms",
                     "summary_sentence", "attention") %in% names(view$table)))
   expect_equal(view$table$expected_first_day, view$projections$projected_first_day_equivalent)

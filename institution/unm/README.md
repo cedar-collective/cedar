@@ -24,6 +24,7 @@ and the generated [2026–2027 rules](shared_requirements/2026-2027/RULES.md).
 | `population_groups.csv` | program name in a named population group | `group`, `description`, `default_for`, `program_name` |
 | `projection_groups.csv` | enrollment-projection monitoring scope | `group_id`, `label`, `description`, `market_id`, `campuses`, `include_gen_ed` |
 | `projection_courses.csv` | course named in a projection scope | `group_id`, `subject_course`, `always_monitored`, `history_start_term`, `retention_min_terms` |
+| `projection_sequences.csv` | a course taken the term before another, whose change carries into it | `from_course`, `to_course`, `notes` |
 | `program_names.csv` | program name as an export writes it | `program_name`, `program_code` |
 | `program_name_aliases.csv` | variant program name | `source_name`, `program_name` |
 | `source_organizations.csv` | HR organisation name | `source_name`, `unit_code` |
@@ -277,6 +278,25 @@ course's override must agree across groups. Course membership is by exact
 `subject_course`; suffix variants are never included by prefix. Converted from
 `R/lists/enrollment_projection_groups.R` on 2026-10-16 with no change to any
 scope.
+
+## projection_sequences.csv
+
+A sequence is a course taken the term before another (`from_course` before
+`to_course`): Composition I before II, Calculus I before II. Its enrollment
+change carries into the next course at that pair's own carry-through rate, and
+the plan follows it every time, up or down; the course's other feeder courses
+count only when together they moved 5% or more. Its students leave the pooled
+feeders, so none is counted twice. A pair belongs here only when most of the
+earlier course's students take the later one the next term and the earlier
+course's year-over-year changes have shown up in the later one: ENGL 1110 to
+ENGL 1120 (68% go on, and they are 71% of its Spring students), MATH 1512 to
+MATH 1522 (59%; 67%), MATH 1250 to MATH 1512 (55%; 28%), measured Fall 2022 to
+Spring 2026 in the ABQ and EA market. Left off: MATH 1215 to MATH 1220 (30% go
+on, 18% of its students) and MATH 1118 to MATH 2118 (37% go on, and its Fall
+moves of +25 and -21 were followed by -4 and +2). Courses that share students
+without one leading to the other (cohort blocks, lecture and lab, a first-year
+seminar beside composition) are not sequences either. `notes` records the
+evidence. Added 2026-10-24 (model 0.26.0).
 
 ## The text maps: program_names.csv, program_name_aliases.csv, source_organizations.csv
 

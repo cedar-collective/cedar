@@ -1,0 +1,4 @@
+from_course,to_course,notes
+ENGL 1110,ENGL 1120,"Composition I to II. Fall 2022 to Spring 2026: 68% of Fall ENGL 1110 students took ENGL 1120 the next Spring, and they were 71% of its Spring students."
+MATH 1512,MATH 1522,"Calculus I to II. Fall 2022 to Spring 2026: 59% of Fall MATH 1512 students took MATH 1522 the next Spring (67% of its Spring students), and 41% of Spring students the next Fall."
+MATH 1250,MATH 1512,"Pre-calculus to Calculus I. Fall 2022 to Spring 2026: 55% of Fall MATH 1250 students took MATH 1512 the next Spring."

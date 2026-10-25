@@ -104,17 +104,24 @@ enrollment_projection_defaults <- function() {
     # its last pressure_bump_window same-season offerings with a known first
     # day -- at least pressure_bump_min_terms of them -- is planned for
     # pressure_bump_share more registrations than last time, or for the
-    # students left waiting if that is more, unless its feeder courses'
-    # enrollment fell by pressure_bump_feeder_decline or more in the term just
-    # finished. A near-full course's registrations follow its seats: given 10%
-    # or more seats they filled them (median 100%, 89 course-terms), held flat
-    # they stayed flat (139), cut they fell by the cut (51). The forecast and
-    # its accuracy are untouched, because a full course's registrations are
-    # capped and cannot score an allowance for the demand it turned away.
-    pressure_bump_share = 0.10,
+    # students left waiting if that is more. A near-full course's
+    # registrations follow its seats: given 10% or more seats they filled them
+    # (median 100%, 89 course-terms), held flat they stayed flat (139), cut
+    # they fell by the cut (51). The forecast and its accuracy are untouched,
+    # because a full course's registrations are capped and cannot score an
+    # allowance for the demand it turned away. 5% from 0.26.0: the median
+    # always-full Fall 2026 course left 4.7% of its registrations waiting, and
+    # a course with more waiting is sized by its waitlist.
+    pressure_bump_share = 0.05,
     pressure_bump_window = 3L,
     pressure_bump_min_terms = 2L,
-    pressure_bump_feeder_decline = 0.05,
+    # Feeder plan (0.26.0): the pooled feeders' change moves the plan only
+    # when it is plan_feeder_change or more either way; a listed sequence's
+    # change always does. Neither is added when the published projection
+    # already includes the deltas.
+    plan_feeder_change = 0.05,
+    # Course sequences (projection_sequences.csv): from_course, to_course.
+    sequences = CEDAR_ENROLLMENT_PROJECTION_SEQUENCES,
     # Seat consistency (0.23.0): over the past forecast terms behind a
     # course's reliability, how often its scheduled seats moved by
     # seat_consistency_change or more from the previous same-season offering.
@@ -182,7 +189,11 @@ enrollment_projection_model_config <- function(opt = list()) {
     stop("[enrollment-projections.R] No history window: set projection_history_start_term ",
          "in institution/<id>/settings.csv or pass opt$history_start_term.", call. = FALSE)
   }
-  config <- utils::modifyList(enrollment_projection_defaults(), opt)
+  # modifyList() merges nested lists, and a table is one: a caller's sequences
+  # replace the default table whole rather than column by column.
+  defaults <- enrollment_projection_defaults()
+  config <- utils::modifyList(defaults, opt[setdiff(names(opt), "sequences")])
+  config$sequences <- opt$sequences %||% defaults$sequences
   margin <- as.numeric(config$selection_challenger_margin)
   if (length(margin) != 1L || !is.finite(margin) || margin < 0) {
     stop(
@@ -200,7 +211,20 @@ enrollment_projection_model_config <- function(opt = list()) {
     )
   }
   config$saturation_fill_threshold <- saturation
-  for (field in c("pressure_bump_share", "pressure_bump_feeder_decline")) {
+  sequences <- config$sequences
+  if (!is.data.frame(sequences) ||
+      !all(c("from_course", "to_course") %in% names(sequences)) ||
+      anyNA(sequences$from_course) || anyNA(sequences$to_course)) {
+    stop(
+      "[enrollment-projections.R] sequences must be a table of from_course and to_course.",
+      call. = FALSE
+    )
+  }
+  config$sequences <- tibble::tibble(
+    from_course = as.character(sequences$from_course),
+    to_course = as.character(sequences$to_course)
+  )
+  for (field in c("pressure_bump_share", "plan_feeder_change")) {
     value <- as.numeric(config[[field]])
     if (length(value) != 1L || !is.finite(value) || value < 0 || value > 1) {
       stop("[enrollment-projections.R] ", field,
@@ -1313,6 +1337,9 @@ projection_candidate <- function(method_id, estimate = NA_real_, applicable = FA
                                  preceding_term_change = NA_real_,
                                  regime_alarm = NA,
                                  delta_repeat = 0, repeat_rate = NA_real_,
+                                 delta_sequence = 0,
+                                 sequence_courses = NA_character_,
+                                 sequence_change = NA_real_,
                                  delta_feeder = 0, feeder_rate = NA_real_,
                                  feeder_courses = NA_character_,
                                  feeder_change = NA_real_,
@@ -1350,6 +1377,9 @@ projection_candidate <- function(method_id, estimate = NA_real_, applicable = FA
     regime_alarm = as.logical(regime_alarm),
     delta_repeat = as.numeric(delta_repeat),
     repeat_rate = as.numeric(repeat_rate),
+    delta_sequence = as.numeric(delta_sequence),
+    sequence_courses = as.character(sequence_courses),
+    sequence_change = as.numeric(sequence_change),
     delta_feeder = as.numeric(delta_feeder),
     feeder_rate = as.numeric(feeder_rate),
     feeder_courses = as.character(feeder_courses),
@@ -1521,8 +1551,9 @@ projection_spine_floor <- function(spine_row, section_history, waitlist_history,
 }
 
 
-# Historical carry-through rates for the two deltas, learned only from pairs
-# (preceding term p, following same-season term s) with s before the target.
+# Historical carry-through rates for the deltas (repeat, each listed sequence,
+# pooled feeders), learned only from pairs (preceding term p, following
+# same-season term s) with s before the target.
 projection_delta_rates <- function(student_inputs, row, target_term,
                                    opt = list()) {
   window <- as.integer(projection_option(opt, "delta_pairs_window"))
@@ -1533,9 +1564,14 @@ projection_delta_rates <- function(student_inputs, row, target_term,
   enrollments <- student_inputs$course_enrollments
   targets <- student_inputs$target_students %>%
     dplyr::filter(subject_course == course)
+  sequences <- projection_option(opt, "sequences")
+  predecessors <- setdiff(
+    sort(unique(sequences$from_course[sequences$to_course == course])), course
+  )
   empty <- list(
     n_pairs = 0L, repeat_rate = NA_real_, feeder_rate = NA_real_,
-    feeders = character(0), pairs = integer(0)
+    feeders = character(0), pairs = integer(0),
+    sequence = tibble::tibble(course = predecessors, rate = NA_real_)
   )
   if (is.null(enrollments) || nrow(enrollments) == 0L || nrow(targets) == 0L) {
     return(empty)
@@ -1570,13 +1606,30 @@ projection_delta_rates <- function(student_inputs, row, target_term,
   repeat_rate <- if (nrow(in_course) == 0L) NA_real_ else
     mean(dplyr::coalesce(in_course$took_next, FALSE))
 
+  # Listed predecessors (projection_sequences.csv): each its own rate, the
+  # share of its p students who took this course in s. A predecessor's students
+  # then leave the pooled feeders, so none is counted twice.
+  sequence_rates <- vapply(predecessors, function(predecessor) {
+    pool <- preceding_rows %>%
+      dplyr::filter(subject_course == predecessor) %>%
+      dplyr::distinct(student_id, following) %>%
+      dplyr::left_join(following_rows, by = c("student_id", "following"))
+    if (nrow(pool) == 0L) NA_real_ else mean(dplyr::coalesce(pool$took_next, FALSE))
+  }, numeric(1))
+  in_sequence <- preceding_rows %>%
+    dplyr::filter(subject_course %in% predecessors) %>%
+    dplyr::distinct(student_id, following)
+  pooled_rows <- dplyr::anti_join(
+    preceding_rows, in_sequence, by = c("student_id", "following")
+  )
+
   # Feeders: the courses whose p students most often took this course in s,
   # excluding the course itself. Then one pooled rate across the feeder set so
   # a student in two feeders counts once.
   # CAMPUS_ROLLUP: course_enrollments is already deduplicated across the named
   # planning market, so a feeder is counted once per student whichever campus
   # delivered it; a campus split here would double-count cross-campus students.
-  transitions <- preceding_rows %>%
+  transitions <- pooled_rows %>%
     dplyr::filter(subject_course != course) %>%
     dplyr::distinct(student_id, following, subject_course) %>%
     dplyr::inner_join(following_rows, by = c("student_id", "following")) %>%
@@ -1590,7 +1643,7 @@ projection_delta_rates <- function(student_inputs, row, target_term,
     dplyr::slice_head(n = max_feeders)
   feeders <- transitions$subject_course
   feeder_rate <- if (length(feeders) == 0L) NA_real_ else {
-    pool <- preceding_rows %>%
+    pool <- pooled_rows %>%
       dplyr::filter(subject_course %in% feeders) %>%
       dplyr::distinct(student_id, following) %>%
       dplyr::left_join(following_rows, by = c("student_id", "following"))
@@ -1599,20 +1652,22 @@ projection_delta_rates <- function(student_inputs, row, target_term,
 
   list(
     n_pairs = nrow(pairs), repeat_rate = repeat_rate, feeder_rate = feeder_rate,
-    feeders = feeders, pairs = pairs$following
+    feeders = feeders, pairs = pairs$following,
+    sequence = tibble::tibble(course = predecessors, rate = unname(sequence_rates))
   )
 }
 
 
 # Distinct students enrolled in any of `courses` in `term`, excluding those in
-# `exclude_course`, from the market's deduplicated course enrollments.
+# any of `exclude_courses` that term, from the market's deduplicated course
+# enrollments.
 projection_distinct_enrolled <- function(enrollments, term, courses,
-                                         exclude_course = NULL) {
+                                         exclude_courses = NULL) {
   rows <- enrollments %>%
     dplyr::filter(term == .env$term, subject_course %in% courses)
-  if (!is.null(exclude_course)) {
+  if (length(exclude_courses) > 0L) {
     excluded <- enrollments %>%
-      dplyr::filter(term == .env$term, subject_course == exclude_course) %>%
+      dplyr::filter(term == .env$term, subject_course %in% exclude_courses) %>%
       dplyr::distinct(student_id)
     rows <- dplyr::anti_join(rows, excluded, by = "student_id")
   }
@@ -1654,10 +1709,13 @@ project_spine_adjusted <- function(history, preceding_term_history,
     !is.null(enrollments) && preceding_term %in% enrollments$term
 
   delta_repeat <- 0
+  delta_sequence <- 0
   delta_feeder <- 0
   repeat_rate <- NA_real_
   feeder_rate <- NA_real_
   feeders <- character(0)
+  sequence_courses <- character(0)
+  sequence_change <- NA_real_
   feeder_change <- NA_real_
   feeder_change_rate <- NA_real_
   change <- NA_real_
@@ -1687,12 +1745,38 @@ project_spine_adjusted <- function(history, preceding_term_history,
         "repeat: no carry-through rate from ", rates$n_pairs, " prior pairs"
       ))
     }
+    # A listed predecessor carries its own change at its own rate.
+    sequence <- rates$sequence %>% dplyr::filter(is.finite(rate))
+    if (nrow(sequence) > 0L) {
+      sequence_courses <- sequence$course
+      counts <- vapply(sequence$course, function(predecessor) {
+        c(
+          now = projection_distinct_enrolled(
+            enrollments, preceding_term, predecessor, row$subject_course
+          ),
+          then = projection_distinct_enrolled(
+            enrollments, prior_preceding_term, predecessor, row$subject_course
+          )
+        )
+      }, numeric(2))
+      changes <- counts["now", ] - counts["then", ]
+      sequence_change <- sum(changes)
+      delta_sequence <- sum(changes * sequence$rate)
+      parts <- c(parts, paste0(
+        "sequence ", sequence$course, ": (", counts["now", ], " - ",
+        counts["then", ], ") x ", round(sequence$rate, 3), " = ",
+        sprintf("%+.1f", changes * sequence$rate)
+      ))
+    }
     if (is.finite(feeder_rate) && length(feeders) > 0L) {
+      # Students in a listed predecessor are counted there, not here.
       feeder_now <- projection_distinct_enrolled(
-        enrollments, preceding_term, feeders, row$subject_course
+        enrollments, preceding_term, feeders,
+        c(row$subject_course, sequence_courses)
       )
       feeder_then <- projection_distinct_enrolled(
-        enrollments, prior_preceding_term, feeders, row$subject_course
+        enrollments, prior_preceding_term, feeders,
+        c(row$subject_course, sequence_courses)
       )
       feeder_change <- feeder_now - feeder_then
       feeder_change_rate <- if (feeder_then > 0) feeder_change / feeder_then else NA_real_
@@ -1707,8 +1791,8 @@ project_spine_adjusted <- function(history, preceding_term_history,
     }
     paste(parts, collapse = "; ")
   }
-  # Why a feeder change is or is not available, for the pressure bump's
-  # feeder check.
+  # Why a feeder change is or is not available, for the plan's feeder
+  # adjustment note.
   feeder_check <- if (is.null(enrollments) || !preceding_term %in% enrollments$term) {
     "term_not_observed"
   } else if (!preceding_observed || nrow(then_row) != 1L) {
@@ -1723,7 +1807,7 @@ project_spine_adjusted <- function(history, preceding_term_history,
   # Unknown when the preceding term is unobserved; never FALSE by default.
   regime_alarm <- if (is.finite(change)) abs(change) >= alarm_threshold else NA
 
-  estimate <- max(0, spine + floor$uplift + delta_repeat + delta_feeder)
+  estimate <- max(0, spine + floor$uplift + delta_repeat + delta_sequence + delta_feeder)
   projection_candidate(
     "spine_adjusted",
     estimate = estimate,
@@ -1731,11 +1815,15 @@ project_spine_adjusted <- function(history, preceding_term_history,
     reason = paste0(
       "Prior same-season ", spine, " + floor ", round(floor$uplift),
       " + repeat delta ", sprintf("%+.1f", delta_repeat),
+      if (length(sequence_courses) > 0L) {
+        paste0(" + sequence delta ", sprintf("%+.1f", delta_sequence))
+      } else "",
       " + feeder delta ", sprintf("%+.1f", delta_feeder)
     ),
     n_history_terms = 1L,
     evidence_n = spine,
-    n_components = 1L + (floor$uplift > 0) + (delta_repeat != 0) + (delta_feeder != 0),
+    n_components = 1L + (floor$uplift > 0) + (delta_repeat != 0) +
+      (delta_sequence != 0) + (delta_feeder != 0),
     component_summary = paste(floor$basis, delta_basis, sep = "; "),
     spine = spine,
     spine_term = spine_term,
@@ -1752,6 +1840,10 @@ project_spine_adjusted <- function(history, preceding_term_history,
     regime_alarm = regime_alarm,
     delta_repeat = delta_repeat,
     repeat_rate = repeat_rate,
+    delta_sequence = delta_sequence,
+    sequence_courses = if (length(sequence_courses) == 0L) NA_character_ else
+      paste(sequence_courses, collapse = ", "),
+    sequence_change = sequence_change,
     delta_feeder = delta_feeder,
     feeder_rate = feeder_rate,
     feeder_courses = if (length(feeders) == 0L) NA_character_ else
@@ -1759,7 +1851,7 @@ project_spine_adjusted <- function(history, preceding_term_history,
     feeder_change = feeder_change,
     feeder_change_rate = feeder_change_rate,
     delta_basis = delta_basis,
-    projection_formula = "spine + floor uplift + repeat delta + feeder delta"
+    projection_formula = "spine + floor uplift + repeat delta + sequence delta + feeder delta"
   )
 }
 
@@ -1827,7 +1919,7 @@ validate_spine_rows <- function(data, caller) {
     rows,
     c("target_term", "projected_classlist_total", "spine", "spine_term",
       "floor_uplift", "saturated_prior", "waitlisted_prior", "delta_repeat",
-      "delta_feeder"),
+      "delta_sequence", "delta_feeder"),
     caller
   )
   floor_expected <- ifelse(
@@ -1839,7 +1931,8 @@ validate_spine_rows <- function(data, caller) {
     rows$projected_classlist_total
   }
   expected <- pmax(
-    0, rows$spine + rows$floor_uplift + rows$delta_repeat + rows$delta_feeder
+    0, rows$spine + rows$floor_uplift + rows$delta_repeat +
+      rows$delta_sequence + rows$delta_feeder
   )
   valid <- is.finite(rows$spine) & rows$spine_term < rows$target_term &
     is.finite(floor_expected) & floor_expected >= 0 &
@@ -1856,13 +1949,16 @@ validate_spine_rows <- function(data, caller) {
 }
 
 
-# Every published plan is its projection plus its pressure bump, the bump is
-# zero unless it applies, and sections are sized from the plan, so the page can
-# say exactly how much the bump raised it.
+# Every published plan is its projection plus its feeder adjustment plus its
+# pressure bump (never below zero), the bump is zero unless it applies, the
+# feeder adjustment is zero where the published projection already carries the
+# deltas, and sections are sized from the plan, so the page can say exactly how
+# much each raised it.
 validate_pressure_bump_rows <- function(rows, caller) {
   if (nrow(rows) == 0L) return(invisible(TRUE))
   projected <- rows$projected_classlist_total
   bump <- rows$pressure_bump
+  feeder <- rows$plan_feeder_adjustment
   planned <- rows$planned_registrations
   expected_sections <- projection_sections_for_demand(
     planned, rows$reference_section_size
@@ -1873,19 +1969,22 @@ validate_pressure_bump_rows <- function(rows, caller) {
     !is.na(rows$recommended_sections) &
       rows$recommended_sections == expected_sections
   )
-  valid <- is.finite(bump) & bump >= 0 &
+  valid <- is.finite(bump) & bump >= 0 & is.finite(feeder) &
     !is.na(rows$pressure_bump_applied) &
     (rows$pressure_bump_applied | bump == 0) &
+    (rows$method_id != "spine_adjusted" | feeder == 0) &
     dplyr::if_else(
       is.finite(projected),
-      is.finite(planned) & abs(planned - (projected + bump)) <= 1e-6,
+      is.finite(planned) &
+        abs(planned - pmax(0, projected + feeder + bump)) <= 1e-6,
       is.na(planned)
     ) &
     sections_agree
   if (any(!valid)) {
     stop(
       "[enrollment-projections.R] ", caller,
-      " has a plan that is not its projection plus its pressure bump.",
+      " has a plan that is not its projection plus its feeder adjustment ",
+      "plus its pressure bump.",
       call. = FALSE
     )
   }
@@ -3068,14 +3167,17 @@ empty_enrollment_projections <- function() {
       adjusted_preceding_term_enrollment = numeric(),
       adjusted_preceding_term_change = numeric(), adjusted_regime_alarm = logical(),
       adjusted_delta_repeat = numeric(), adjusted_repeat_rate = numeric(),
+      adjusted_delta_sequence = numeric(), adjusted_sequence_courses = character(),
+      adjusted_sequence_change = numeric(),
       adjusted_delta_feeder = numeric(), adjusted_feeder_rate = numeric(),
       adjusted_feeder_courses = character(), adjusted_feeder_change = numeric(),
       adjusted_feeder_change_rate = numeric(),
       adjusted_delta_basis = character(),
       pressure_judged_terms = integer(), pressure_full_terms = integer(),
       pressure_bump_applied = logical(), pressure_bump = numeric(),
-      pressure_bump_note = character(), planned_registrations = numeric(),
-      pressure_bump_sections = integer(),
+      pressure_bump_note = character(), plan_feeder_adjustment = numeric(),
+      plan_feeder_note = character(), planned_registrations = numeric(),
+      plan_feeder_sections = integer(), pressure_bump_sections = integer(),
       seat_consistency = character(), seat_consistency_reason = character(),
       seat_consistency_terms = integer(), seat_consistency_moves = integer(),
       expansion_pairs = integer(), expansion_fill_rate = numeric(),
@@ -3697,6 +3799,9 @@ projection_method_pairing <- function(candidates, opt = list()) {
       adjusted_regime_alarm = regime_alarm,
       adjusted_delta_repeat = delta_repeat,
       adjusted_repeat_rate = repeat_rate,
+      adjusted_delta_sequence = delta_sequence,
+      adjusted_sequence_courses = sequence_courses,
+      adjusted_sequence_change = sequence_change,
       adjusted_delta_feeder = delta_feeder,
       adjusted_feeder_rate = feeder_rate,
       adjusted_feeder_courses = feeder_courses,
@@ -3796,9 +3901,10 @@ projection_expansion_response <- function(enrollment_history, section_history,
 # `pressure_bump_min_terms` of them) turned students away, and its
 # registrations were capped by the seats offered. It is planned for
 # `pressure_bump_share` more registrations than last time, or for the students
-# left waiting if that is more, unless its feeder courses' enrollment fell by
-# `pressure_bump_feeder_decline` or more in the term just finished. A floor the
-# published method already added counts toward the bump.
+# left waiting if that is more. A floor the published method already added
+# counts toward the bump. Feeder changes are the plan's separate feeder
+# adjustment (projection_plan_feeder_adjustment()) and never cancel the bump:
+# the backlog does not leave with them.
 #
 # `rows` are published rows joined to `projection_method_pairing()`. Returns
 # one row per course: the terms judged, the bump in registrations, and a note
@@ -3817,16 +3923,13 @@ projection_pressure_bump <- function(enrollment_history, section_history, rows,
   projection_require_columns(
     rows,
     c(keys, "method_id", "observed_baseline", "projected_classlist_total",
-      "adjusted_waitlisted_prior", "adjusted_floor_uplift",
-      "adjusted_preceding_term", "adjusted_feeder_check",
-      "adjusted_feeder_courses", "adjusted_feeder_change_rate"),
+      "adjusted_waitlisted_prior", "adjusted_floor_uplift"),
     "projection_pressure_bump()"
   )
   threshold <- as.numeric(projection_option(opt, "saturation_fill_threshold"))
   share <- as.numeric(projection_option(opt, "pressure_bump_share"))
   window <- as.integer(projection_option(opt, "pressure_bump_window"))
   min_terms <- as.integer(projection_option(opt, "pressure_bump_min_terms"))
-  decline <- as.numeric(projection_option(opt, "pressure_bump_feeder_decline"))
   share_label <- scales::percent(share, accuracy = 1)
 
   dplyr::bind_rows(lapply(seq_len(nrow(rows)), function(i) {
@@ -3859,14 +3962,10 @@ projection_pressure_bump <- function(enrollment_history, section_history, rows,
 
     spine <- row$observed_baseline
     waiting <- dplyr::coalesce(as.integer(row$adjusted_waitlisted_prior), 0L)
-    rate <- row$adjusted_feeder_change_rate
-    preceding <- if (is.na(row$adjusted_preceding_term)) "the term just finished" else
-      fmt_term(row$adjusted_preceding_term)
     always_full <- length(judged) >= min_terms && !any(short)
-    feeders_fell <- is.finite(rate) && rate <= -decline
 
     applied <- is.finite(spine) && spine > 0 &&
-      is.finite(row$projected_classlist_total) && always_full && !feeders_fell
+      is.finite(row$projected_classlist_total) && always_full
     already <- if (identical(row$method_id, "spine_adjusted")) {
       dplyr::coalesce(as.numeric(row$adjusted_floor_uplift), 0)
     } else 0
@@ -3877,26 +3976,6 @@ projection_pressure_bump <- function(enrollment_history, section_history, rows,
       "near full on the first day in every recent ", season,
       " with a first-day count (", terms_text(judged), ")"
     )
-    feeder_text <- if (is.finite(rate)) {
-      # One decimal: a whole percent printed -5% on both sides of the line.
-      paste0("feeder courses moved ", sprintf("%+.1f%%", 100 * rate),
-             " in ", preceding)
-    } else {
-      switch(
-        dplyr::coalesce(row$adjusted_feeder_check, "unmeasurable"),
-        term_not_observed = paste0(
-          "feeder courses in ", preceding,
-          " are not observed yet; recheck when they settle"
-        ),
-        no_course_baseline = paste0(
-          "the feeder check needs the course's own enrollment in ", preceding,
-          " and a year before, so it could not run"
-        ),
-        no_feeders = "no feeder courses met the evidence threshold, so the feeder check could not run",
-        "the feeder change could not be measured, so the feeder check could not run"
-      )
-    }
-    sentence_case <- function(x) paste0(toupper(substr(x, 1, 1)), substring(x, 2))
     note <- if (!is.finite(spine) || spine <= 0) {
       "No pressure bump: no prior same-season registrations to raise"
     } else if (!is.finite(row$projected_classlist_total)) {
@@ -3927,11 +4006,6 @@ projection_pressure_bump <- function(enrollment_history, section_history, rows,
         " of its seats on the first day, below the ",
         scales::percent(threshold, accuracy = 1), " near-full line"
       )
-    } else if (feeders_fell) {
-      paste0(
-        "No pressure bump: ", full_text, ", but ", feeder_text,
-        ", a fall of ", scales::percent(decline, accuracy = 1), " or more"
-      )
     } else {
       sized_by <- if (waiting > share * spine) {
         paste0(
@@ -3952,8 +4026,7 @@ projection_pressure_bump <- function(enrollment_history, section_history, rows,
         if (already > 0) {
           paste0("; the published projection already adds ", round(already),
                  " of them")
-        } else "",
-        ". ", sentence_case(feeder_text), "."
+        } else ""
       )
     }
 
@@ -3965,6 +4038,112 @@ projection_pressure_bump <- function(enrollment_history, section_history, rows,
       pressure_bump_applied = applied,
       pressure_bump = as.numeric(bump),
       pressure_bump_note = note
+    )
+  }))
+}
+
+
+# The plan's feeder adjustment (0.26.0): the term just finished, carried into
+# the plan wherever the published projection does not already carry it.
+#
+# A listed sequence's change (projection_sequences.csv: the course taken the
+# term before this one) always counts, either way, at that pair's own rate.
+# The pooled feeders' change counts only when it moved `plan_feeder_change` or
+# more either way; smaller moves are noise against the course's own year. When
+# the published method is the adjusted candidate, its projection already holds
+# both deltas and the plan adds nothing. Planning only: the forecast and its
+# accuracy are untouched.
+#
+# `rows` are published rows joined to `projection_method_pairing()`. Returns
+# one row per course with the adjustment in registrations and a note.
+projection_plan_feeder_adjustment <- function(rows, opt = list()) {
+  keys <- c("market_id", "subject_course", "term_type", "target_term")
+  empty <- tibble::tibble(
+    market_id = character(), subject_course = character(),
+    term_type = character(), target_term = integer(),
+    plan_feeder_adjustment = numeric(), plan_feeder_note = character()
+  )
+  if (nrow(rows) == 0L) return(empty)
+  projection_require_columns(
+    rows,
+    c(keys, "method_id", "projected_classlist_total", "adjusted_applicable",
+      "adjusted_preceding_term", "adjusted_feeder_check",
+      "adjusted_delta_sequence", "adjusted_sequence_courses",
+      "adjusted_sequence_change", "adjusted_delta_feeder",
+      "adjusted_feeder_change_rate"),
+    "projection_plan_feeder_adjustment()"
+  )
+  line <- as.numeric(projection_option(opt, "plan_feeder_change"))
+  line_label <- scales::percent(line, accuracy = 1)
+  signed <- function(x) sprintf("%+.0f", x)
+  sentence_case <- function(x) paste0(toupper(substr(x, 1, 1)), substring(x, 2))
+
+  dplyr::bind_rows(lapply(seq_len(nrow(rows)), function(i) {
+    row <- rows[i, , drop = FALSE]
+    preceding <- if (is.na(row$adjusted_preceding_term)) "the term just finished" else
+      fmt_term(row$adjusted_preceding_term)
+    has_sequence <- !is.na(row$adjusted_sequence_courses)
+    sequence_delta <- if (has_sequence) as.numeric(row$adjusted_delta_sequence) else 0
+    rate <- row$adjusted_feeder_change_rate
+    pooled_moves <- is.finite(rate) && abs(rate) >= line - 1e-9
+    pooled_delta <- if (pooled_moves) as.numeric(row$adjusted_delta_feeder) else 0
+    in_projection <- identical(row$method_id, "spine_adjusted")
+    usable <- isTRUE(row$adjusted_applicable) && is.finite(row$projected_classlist_total)
+    adjustment <- if (usable && !in_projection) round(sequence_delta + pooled_delta) else 0
+
+    others <- if (has_sequence) "its other feeder courses" else "its feeder courses"
+    sequence_text <- if (has_sequence) {
+      paste0(
+        row$adjusted_sequence_courses, ", taken the term before, moved ",
+        signed(row$adjusted_sequence_change), " students in ", preceding,
+        ", which carries ", signed(sequence_delta), " into this course"
+      )
+    }
+    pooled_text <- if (is.finite(rate)) {
+      # One decimal: a whole percent printed 5% on both sides of the line.
+      paste0(
+        others, " moved ", sprintf("%+.1f%%", 100 * rate), " in ", preceding,
+        if (in_projection) {
+          paste0(", which carries ", signed(row$adjusted_delta_feeder))
+        } else if (pooled_moves) {
+          paste0(", ", line_label, " or more, which carries ", signed(pooled_delta))
+        } else {
+          paste0(", inside the ", line_label, " line, so the plan does not follow them")
+        }
+      )
+    } else {
+      switch(
+        dplyr::coalesce(row$adjusted_feeder_check, "unmeasurable"),
+        term_not_observed = paste0(
+          "feeder courses in ", preceding,
+          " are not observed yet; recheck when they settle"
+        ),
+        no_course_baseline = paste0(
+          "the feeder change needs the course's own enrollment in ", preceding,
+          " and a year before"
+        ),
+        no_feeders = paste0("no ", if (has_sequence) "other " else "",
+                            "feeder course met the evidence threshold"),
+        "the feeder change could not be measured"
+      )
+    }
+    detail <- paste(c(sequence_text, pooled_text), collapse = "; ")
+    note <- if (!usable) {
+      "No feeder adjustment: no projection to adjust"
+    } else if (in_projection) {
+      paste0("No feeder adjustment: the published projection already includes ",
+             "the changes in ", preceding, ". ", sentence_case(detail))
+    } else if (adjustment == 0) {
+      paste0("No feeder adjustment: ", detail)
+    } else {
+      paste0("Feeder adjustment ", signed(adjustment), ": ", detail)
+    }
+
+    tibble::tibble(
+      market_id = row$market_id, subject_course = row$subject_course,
+      term_type = row$term_type, target_term = row$target_term,
+      plan_feeder_adjustment = as.numeric(adjustment),
+      plan_feeder_note = note
     )
   }))
 }
@@ -4306,9 +4485,11 @@ add_projection_recommendations <- function(selected, candidates, pressure_screen
   pressure <- projection_pressure_bump(
     enrollment_history, section_history, joined, opt
   )
+  plan_feeder <- projection_plan_feeder_adjustment(joined, opt)
 
   joined %>%
     dplyr::left_join(pressure, by = keys) %>%
+    dplyr::left_join(plan_feeder, by = keys) %>%
     dplyr::mutate(
       expansion_pairs = as.integer(expansion$n_pairs),
       expansion_fill_rate = as.numeric(expansion$fill_rate),
@@ -4333,13 +4514,17 @@ add_projection_recommendations <- function(selected, candidates, pressure_screen
         if (!is.finite(target_size) || target_size <= 0) NA_real_ else target_size
       },
       # Seats are planned for REGISTRATIONS, not expected first-day occupancy
-      # (0.23.0): projected registrations plus any pressure bump. Registrations
-      # run above the first day because every early drop frees a seat someone
-      # else takes, and that margin is kept on purpose: running short of seats
-      # costs more than an empty one. Sized on the first day, 61% of 207 past
-      # aftcasts planned fewer seats than were filled on day one; sized on
-      # registrations, 32% (forecasting-lessons.md).
-      planned_registrations = projected_classlist_total + pressure_bump,
+      # (0.23.0): projected registrations plus the feeder adjustment (0.26.0)
+      # plus any pressure bump. Registrations run above the first day because
+      # every early drop frees a seat someone else takes, and that margin is
+      # kept on purpose: running short of seats costs more than an empty one.
+      # Sized on the first day, 61% of 207 past aftcasts planned fewer seats
+      # than were filled on day one; sized on registrations, 32%
+      # (forecasting-lessons.md). A falling feeder can lower the plan, never
+      # below zero.
+      planned_registrations = if (is.finite(projected_classlist_total)) {
+        max(0, projected_classlist_total + plan_feeder_adjustment + pressure_bump)
+      } else NA_real_,
       seat_gap = round(planned_registrations - scheduled_capacity),
       projected_over_capacity = pmax(0, seat_gap),
       capacity_limit_signal = target_schedule_available &
@@ -4376,8 +4561,18 @@ add_projection_recommendations <- function(selected, candidates, pressure_screen
       recommended_sections = projection_sections_for_demand(
         planned_registrations, reference_section_size
       ),
+      # The sections each part of the plan adds: the feeder adjustment's on top
+      # of the projection's (negative when feeders fell), the bump's on top of
+      # both. Together they are the plan's sections less the projection's.
+      plan_feeder_sections = projection_sections_for_demand(
+        max(0, projected_classlist_total + plan_feeder_adjustment),
+        reference_section_size
+      ) - projection_sections_for_demand(projected_classlist_total, reference_section_size),
       pressure_bump_sections = recommended_sections -
-        projection_sections_for_demand(projected_classlist_total, reference_section_size),
+        projection_sections_for_demand(
+          max(0, projected_classlist_total + plan_feeder_adjustment),
+          reference_section_size
+        ),
       additional_sections = projection_additional_sections(
         recommended_sections, scheduled_sections
       ),
@@ -4440,7 +4635,8 @@ add_projection_recommendations <- function(selected, candidates, pressure_screen
         !target_schedule_available & !is.na(recommended_sections) ~
           paste("Plan", recommended_sections, "section(s)"),
         is.finite(projection_high) &
-          projection_high + pressure_bump <= scheduled_capacity ~
+          projection_high + plan_feeder_adjustment + pressure_bump <=
+            scheduled_capacity ~
           "Capacity appears sufficient",
         !is.na(additional_sections) & additional_sections > 0 &
           (scheduled_sections == 0L |
@@ -4694,12 +4890,14 @@ validate_enrollment_projection_bundle <- function(bundle) {
       "adjusted_projection", "adjusted_applicable", "adjusted_reason",
       "adjusted_saturated_prior", "adjusted_prior_first_day_fill",
       "adjusted_prior_first_day_basis", "adjusted_floor_uplift",
-      "adjusted_floor_basis", "adjusted_delta_repeat", "adjusted_delta_feeder",
-      "adjusted_regime_alarm", "adjusted_delta_basis",
+      "adjusted_floor_basis", "adjusted_delta_repeat", "adjusted_delta_sequence",
+      "adjusted_sequence_courses", "adjusted_sequence_change",
+      "adjusted_delta_feeder", "adjusted_regime_alarm", "adjusted_delta_basis",
       "expansion_pairs", "expansion_fill_rate", "expansion_note",
       "floor_note", "regime_note", "reference_section_size",
       "pressure_judged_terms", "pressure_full_terms", "pressure_bump_applied",
-      "pressure_bump", "pressure_bump_note", "planned_registrations",
+      "pressure_bump", "pressure_bump_note", "plan_feeder_adjustment",
+      "plan_feeder_note", "planned_registrations", "plan_feeder_sections",
       "pressure_bump_sections", "seat_consistency", "seat_consistency_reason",
       "seat_consistency_terms", "seat_consistency_moves"),
     "validate_enrollment_projection_bundle() projections"
@@ -4754,7 +4952,8 @@ validate_enrollment_projection_bundle <- function(bundle) {
       "spine", "spine_term", "saturated_prior", "prior_first_day_fill",
       "waitlisted_prior", "floor_uplift", "floor_basis", "preceding_term",
       "preceding_term_enrollment", "preceding_term_change", "regime_alarm",
-      "delta_repeat", "repeat_rate", "delta_feeder", "feeder_rate",
+      "delta_repeat", "repeat_rate", "delta_sequence", "sequence_courses",
+      "sequence_change", "delta_feeder", "feeder_rate",
       "feeder_courses", "feeder_change", "delta_basis", "projection_formula"),
     "validate_enrollment_projection_bundle() candidates"
   )

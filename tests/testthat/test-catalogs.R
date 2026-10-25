@@ -794,6 +794,32 @@ test_that("the projection validator reports every problem at once", {
   expect_match(err, "history_start_term differs between groups for MATH 1215")
 })
 
+test_that("course sequences are the institution's file and the validator reports every problem", {
+  dir <- cedar_institution_dir(cedar_base_dir, "unm")
+  sequences <- validate_projection_sequences(read_institution_file("projection_sequences", dir))
+  expect_equal(CEDAR_ENROLLMENT_PROJECTION_SEQUENCES, sequences)
+  expect_equal(names(sequences), c("from_course", "to_course"))
+  expect_true(nrow(sequences) > 0L)
+  # A model default, so the bundle signature changes when the list does.
+  expect_equal(enrollment_projection_defaults()$sequences, sequences)
+  demo <- validate_projection_sequences(
+    read_institution_file("projection_sequences", cedar_institution_dir(cedar_base_dir, "demo"))
+  )
+  expect_true(nrow(demo) > 0L)
+
+  bad <- tempfile("institution-config-")
+  dir.create(bad)
+  utils::write.csv(data.frame(from_course = c("ENGL 1110", "ENGL 1110", "MATH 1512", ""),
+                              to_course = c("ENGL 1120", "ENGL 1120", "MATH 1512", "MATH 1522"),
+                              notes = ""),
+                   file.path(bad, "projection_sequences.csv"), row.names = FALSE)
+  err <- tryCatch(validate_projection_sequences(read_institution_file("projection_sequences", bad)),
+                  error = conditionMessage)
+  expect_match(err, "blank from_course")
+  expect_match(err, "a course cannot precede itself: MATH 1512")
+  expect_match(err, "duplicate pair ENGL 1110 -> ENGL 1120")
+})
+
 test_that("a settings.csv without a projection window stops the builder, not the app", {
   withr::local_options(list())
   old <- CEDAR_ENROLLMENT_PROJECTION_HISTORY_START_TERM

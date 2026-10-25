@@ -784,29 +784,41 @@ projection_summary_sentence <- function(projections) {
     }
     count <- function(x) format(round(x), big.mark = ",")
     bumped <- isTRUE(row$pressure_bump > 0)
+    fed <- isTRUE(row$plan_feeder_adjustment != 0)
+    raised <- bumped || fed
     first_day <- if (is.finite(row$projected_first_day_equivalent)) {
       paste0(
         " (about ", count(row$projected_first_day_equivalent),
-        if (bumped) paste0(" of the projected ", count(row$projected_classlist_total)) else "",
+        if (raised) paste0(" of the projected ", count(row$projected_classlist_total)) else "",
         " in seats on the first day)"
       )
     } else ""
+    # The projection, then what the plan adds to it: the feeder adjustment
+    # (either way) and the pressure bump.
+    parts <- paste0(
+      count(row$projected_classlist_total), " projected",
+      if (fed) {
+        paste0(", ", sprintf("%+.0f", row$plan_feeder_adjustment),
+               " for the change in its feeder courses")
+      } else "",
+      if (bumped) {
+        paste0(if (fed) "," else "", " plus a pressure bump of ",
+               count(row$pressure_bump))
+      } else ""
+    )
     plan <- if (!is.na(row$recommended_sections)) {
       paste0(
         if (isTRUE(row$adjusted_saturated_prior)) "Plan at least " else "Plan ",
         row$recommended_sections, " section",
         if (row$recommended_sections == 1L) "" else "s", " for ",
         count(row$planned_registrations), " registrations",
-        if (bumped) {
-          paste0(": ", count(row$projected_classlist_total),
-                 " projected plus a pressure bump of ", count(row$pressure_bump))
-        } else "",
+        if (raised) paste0(": ", parts) else "",
         first_day, "."
       )
     } else {
       paste0(
-        "Expect about ", count(row$projected_classlist_total), " registrations",
-        if (bumped) paste0(", ", count(row$planned_registrations), " with the pressure bump") else "",
+        "Expect about ", count(row$planned_registrations), " registrations",
+        if (raised) paste0(" (", parts, ")") else "",
         "; no section size is available to convert that to sections."
       )
     }
@@ -892,6 +904,78 @@ projection_pressure_bump_summary <- function(projections, share) {
     n_courses = as.integer(n_courses),
     registrations = as.numeric(registrations),
     sections = as.integer(sections),
+    sentence = sentence
+  )
+}
+
+
+# What the plan's feeder adjustment moves across the rows shown, and one
+# sentence saying so: how many plans it raised and lowered and by how much,
+# or why it moved none. `line` is the bundle's plan_feeder_change.
+projection_plan_feeder_summary <- function(projections, line) {
+  if (!is.numeric(line) || length(line) != 1L || !is.finite(line)) {
+    stop("[enrollment-projections.R] The bundle's model_config has no ",
+         "plan_feeder_change.", call. = FALSE)
+  }
+  projection_require_columns(
+    projections,
+    c("projected_classlist_total", "method_id", "plan_feeder_adjustment",
+      "adjusted_preceding_term", "adjusted_feeder_check"),
+    "projection_plan_feeder_summary()"
+  )
+  projected <- is.finite(projections$projected_classlist_total)
+  adjustment <- projections$plan_feeder_adjustment
+  up <- projected & adjustment > 0
+  down <- projected & adjustment < 0
+  in_projection <- projected & projections$method_id == "spine_adjusted"
+  unobserved <- projected & projections$adjusted_feeder_check %in% "term_not_observed"
+  preceding <- stats::na.omit(projections$adjusted_preceding_term)
+  preceding_label <- if (length(preceding) > 0L) fmt_term(preceding[[1]]) else
+    "the term just finished"
+  count <- function(x) format(round(x), big.mark = ",")
+  whose <- function(n, noun) {
+    if (n == 1L) paste0("1 course's ", noun) else paste0(n, " courses' ", noun, "s")
+  }
+  rule <- paste0(
+    "A course's listed predecessor, taken the term before, always counts; its ",
+    "other feeder courses count when they moved ",
+    scales::percent(line, accuracy = 1), " or more."
+  )
+  included <- if (sum(in_projection) > 0L) {
+    paste0(
+      " ", whose(sum(in_projection), "published projection"),
+      if (sum(in_projection) == 1L) " already includes" else " already include",
+      " those changes."
+    )
+  } else ""
+  sentence <- if (sum(projected) > 0L && all(unobserved[projected])) {
+    paste0(
+      "No plan has a feeder adjustment: ", preceding_label, " is not observed ",
+      "yet, so its feeder courses cannot be read. They count once it settles."
+    )
+  } else if (sum(up) + sum(down) == 0L) {
+    paste0(
+      "No plan shown has a feeder adjustment: where the forecast is last ",
+      "year's number, feeder courses moved less than ",
+      scales::percent(line, accuracy = 1), " in ", preceding_label,
+      " and no listed predecessor changed it.", included
+    )
+  } else {
+    paste0(
+      "Feeder courses in ", preceding_label, " ",
+      paste(c(
+        if (sum(up) > 0L) paste0("raise ", whose(sum(up), "plan"), " by ",
+                                 count(sum(adjustment[up])), " registrations"),
+        if (sum(down) > 0L) paste0("lower ", whose(sum(down), "plan"), " by ",
+                                   count(-sum(adjustment[down])))
+      ), collapse = " and "),
+      ". ", rule, included
+    )
+  }
+  list(
+    n_raised = as.integer(sum(up)),
+    n_lowered = as.integer(sum(down)),
+    registrations = as.numeric(sum(adjustment[up | down])),
     sentence = sentence
   )
 }
@@ -1023,7 +1107,8 @@ projection_range_seat_notes <- function(projections, recent_history, model_confi
 # draft until registration settles -- course by course. Arithmetic over saved
 # rows: the bundle captured the schedule when it was built, and a changed
 # draft rebuilds the bundle on the next refresh. Planned registrations carry
-# the deliberate margin and any pressure bump, so the comparison separates a
+# the deliberate margin, the feeder adjustment and any pressure bump, so the
+# comparison separates a
 # draft short of the students expected on day one from one short only of the
 # margin.
 build_enrollment_projection_draft_comparison <- function(view) {
@@ -1031,7 +1116,8 @@ build_enrollment_projection_draft_comparison <- function(view) {
   projection_require_columns(
     projections,
     c("subject_course", "department", "market_id", "projected_classlist_total",
-      "planned_registrations", "pressure_bump", "projected_first_day_equivalent",
+      "planned_registrations", "pressure_bump", "plan_feeder_adjustment",
+      "projected_first_day_equivalent",
       "recommended_sections", "additional_sections", "reference_section_size",
       "scheduled_sections", "scheduled_capacity", "target_schedule_available",
       "target_registration_observed", "target_registered_now", "accuracy",
@@ -1065,6 +1151,7 @@ build_enrollment_projection_draft_comparison <- function(view) {
       expected_first_day = projected_first_day_equivalent,
       planned_registrations,
       pressure_bump,
+      plan_feeder_adjustment,
       plan_sections = recommended_sections,
       seat_gap = dplyr::if_else(in_draft, planned_registrations - scheduled_capacity, NA_real_),
       sections_to_add = dplyr::if_else(in_draft, additional_sections, NA_integer_),
@@ -1112,7 +1199,8 @@ build_enrollment_projection_draft_comparison <- function(view) {
       course, department, verdict, draft_sections, draft_seats,
       expected_first_day, planned_registrations, plan_sections, seat_gap,
       registered_now, reliability, seat_consistency,
-      in_draft, campus_sections, pressure_bump, sections_to_add, status
+      in_draft, campus_sections, pressure_bump, plan_feeder_adjustment,
+      sections_to_add, status
     ) %>%
     dplyr::arrange(
       factor(status, levels = c("short_day_one", "short_plan", "not_in_draft", "covers", "spare")),
@@ -1398,10 +1486,6 @@ build_enrollment_projection_view <- function(bundle, opt = list()) {
       summary_sentence = projection_summary_sentence(
         dplyr::pick(dplyr::everything())
       ),
-      change_vs_last = dplyr::if_else(
-        is.finite(observed_baseline) & observed_baseline > 0,
-        projected_classlist_total / observed_baseline - 1, NA_real_
-      ),
       # The range is in registrations, the unit sections are sized from.
       demand_range = dplyr::if_else(
         is.finite(projection_low) & is.finite(projection_high),
@@ -1463,10 +1547,12 @@ build_enrollment_projection_view <- function(bundle, opt = list()) {
       pressure_bump,
       pressure_bump_sections,
       pressure_bump_note,
+      plan_feeder_adjustment,
+      plan_feeder_sections,
+      plan_feeder_note,
       expected_first_day = projected_first_day_equivalent,
       demand_range,
       range_note,
-      change_vs_last,
       flags,
       attention,
       projected_demand = projected_classlist_total,
@@ -1492,14 +1578,15 @@ build_enrollment_projection_view <- function(bundle, opt = list()) {
     ) %>%
     dplyr::left_join(history_summary$data, by = "course") %>%
     dplyr::select(
-      # The decision first: sections to plan, how much of them the pressure
-      # bump added, the registrations they are sized from with their range and
-      # change on last term, first-day seats, the recent first days and
-      # sections, and plain-language flags. The evidence axes follow; the
+      # The decision first: sections to plan, how much of them the feeder
+      # adjustment and the pressure bump added, the registrations they are
+      # sized from with their range, first-day seats, the recent first days
+      # and sections, and plain-language flags. The evidence axes follow; the
       # method and its evidence are for the course detail.
       course, department, planning_sections, pressure_bump,
-      pressure_bump_sections, pressure_bump_note, projected_demand,
-      demand_range, range_note, change_vs_last, expected_first_day,
+      pressure_bump_sections, pressure_bump_note, plan_feeder_adjustment,
+      plan_feeder_sections, plan_feeder_note, projected_demand,
+      demand_range, range_note, expected_first_day,
       recent_first_day, recent_sections, recent_terms, flags,
       stability, stability_reason, depth, depth_reason,
       # Reliability (accuracy) sits beside seat consistency so the two read
@@ -1533,6 +1620,9 @@ build_enrollment_projection_view <- function(bundle, opt = list()) {
       n_attention = sum(projections$attention),
       pressure_bump = projection_pressure_bump_summary(
         projections, bundle$model_config$pressure_bump_share
+      ),
+      plan_feeder = projection_plan_feeder_summary(
+        projections, bundle$model_config$plan_feeder_change
       ),
       # Bundle-wide, not filtered: the evidence for where error comes from is
       # every past forecast the rule would have published.
@@ -1990,6 +2080,9 @@ format_enrollment_projection_preview <- function(bundle, courses = NULL) {
       Course = subject_course,
       Target = target_term_label,
       `Class-list demand` = projection_preview_integer(projected_classlist_total),
+      `Feeder adjustment` = dplyr::if_else(
+        plan_feeder_adjustment != 0, sprintf("%+.0f", plan_feeder_adjustment), "--"
+      ),
       `Pressure bump` = dplyr::if_else(
         pressure_bump > 0, paste0("+", projection_preview_integer(pressure_bump)), "--"
       ),
@@ -2036,14 +2129,19 @@ format_enrollment_projection_preview <- function(bundle, courses = NULL) {
       `Fall deltas` = dplyr::if_else(
         adjusted_applicable %in% TRUE,
         paste0(
-          "repeat ", sprintf("%+.0f", adjusted_delta_repeat), ", feeder ",
-          sprintf("%+.0f", adjusted_delta_feeder)
+          "repeat ", sprintf("%+.0f", adjusted_delta_repeat),
+          dplyr::if_else(
+            is.na(adjusted_sequence_courses), "",
+            paste0(", sequence ", sprintf("%+.0f", adjusted_delta_sequence))
+          ),
+          ", feeder ", sprintf("%+.0f", adjusted_delta_feeder)
         ),
         "--"
       ),
       `Regime check` = dplyr::if_else(
         adjusted_regime_alarm %in% TRUE, "Review", "--"
       ),
+      `Feeder adjustment basis` = plan_feeder_note,
       `Pressure bump basis` = pressure_bump_note,
       Recommendation = recommendation
     )
