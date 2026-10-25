@@ -182,6 +182,11 @@ CEDAR_CONFIG_FILE_SPECS <- list(
   # every group that names it.
   projection_courses = c("group_id", "subject_course", "always_monitored",
                          "history_start_term", "retention_min_terms"),
+  # Course sequences: from_course is the course taken the term before
+  # to_course (Composition I before II). A projection carries a listed
+  # predecessor's enrollment change into the next course at that pair's own
+  # measured rate, apart from the pooled feeders. notes is free text for why.
+  projection_sequences = c("from_course", "to_course", "notes"),
   # Text maps for exports that carry a name but no code. program_names: a
   # program name as a source writes it (without any "Pre-" prefix) to the
   # program code the transform fills in when the export has none.
@@ -433,6 +438,28 @@ validate_projection_groups <- function(groups, courses, known_campuses) {
   courses$history_start_term <- suppressWarnings(as.integer(ifelse(blank(starts), NA, starts)))
   courses$retention_min_terms <- suppressWarnings(as.integer(ifelse(blank(mins), NA, mins)))
   list(groups = groups, courses = courses)
+}
+
+#' Check projection_sequences.csv
+#'
+#' @param sequences The table as read.
+#' @return `sequences` with `from_course` and `to_course` only, if valid.
+#'   Stops listing every problem otherwise.
+validate_projection_sequences <- function(sequences) {
+  problems <- character(0)
+  blank <- function(x) is.na(x) | !nzchar(x)
+  for (col in c("from_course", "to_course")) {
+    if (any(blank(sequences[[col]]))) problems <- c(problems, paste("projection_sequences.csv: blank", col))
+  }
+  same <- unique(sequences$from_course[sequences$from_course == sequences$to_course])
+  if (length(same)) problems <- c(problems, paste("projection_sequences.csv: a course cannot precede itself:", paste(same, collapse = ", ")))
+  key <- paste(sequences$from_course, sequences$to_course, sep = " -> ")
+  d <- unique(key[duplicated(key)])
+  if (length(d)) problems <- c(problems, paste("projection_sequences.csv: duplicate pair", paste(d, collapse = "; ")))
+  if (length(problems)) {
+    stop("[institution_files.R] Invalid projection_sequences.csv:\n  ", paste(problems, collapse = "\n  "))
+  }
+  sequences[, c("from_course", "to_course")]
 }
 
 #' Check the three text-map files together

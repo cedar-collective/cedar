@@ -3,12 +3,21 @@
 # CEDAR's. The monitoring scopes -- which courses, on which campuses, in which
 # market, with which per-course window overrides -- are the institution's, in
 # projection_groups.csv and projection_courses.csv, with the history window
-# start in settings.csv (projection_history_start_term). This file names no
-# course, campus or term.
+# start in settings.csv (projection_history_start_term) and the course
+# sequences in projection_sequences.csv. This file names no course, campus or
+# term.
 #
 # Groups are monitoring scopes. Projection rows use the named market and course;
 # campus and part-term allocation remains in saved delivery components.
 
+# 0.26.0 (schema 25): the plan follows the term just finished. A course's listed
+# predecessor (projection_sequences.csv) carries its enrollment change in at
+# that pair's own rate, and is taken out of the pooled feeders so no student
+# counts twice. The plan adds that sequence change every time, and the pooled
+# feeders' change only when they moved 5% or more, unless the published
+# projection already includes them. The pressure bump is 5%, not 10%, and
+# feeders no longer cancel it. The adjusted candidate splits its feeder delta
+# the same way, sequence from pooled; the selection rule is unchanged.
 # 0.25.0 (schema 24): a term pulled before one of its later sessions began
 # (ISSUES.md I28) is no longer read as undated. Its begun sessions' first day
 # is a lower bound on fill, so it settles saturation, the pressure bump and the
@@ -46,9 +55,9 @@
 # saturation floor and two Fall-enrollment deltas and must beat the spine on
 # rolling aftcasts. (0.19.0 introduced rolling selection and the
 # occupancy-based capacity signal.)
-CEDAR_ENROLLMENT_PROJECTION_MODEL_VERSION <- "0.25.0"
+CEDAR_ENROLLMENT_PROJECTION_MODEL_VERSION <- "0.26.0"
 
-CEDAR_ENROLLMENT_PROJECTION_SCHEMA_VERSION <- 24L
+CEDAR_ENROLLMENT_PROJECTION_SCHEMA_VERSION <- 25L
 # Capacity is reached at CEDAR_FULL_FILL first-day fill and a prior term is
 # saturated at CEDAR_NEAR_FULL_FILL; both levels live in R/lists/seat_fill.R.
 # The first term the model reads history from (settings.csv
@@ -79,6 +88,12 @@ CEDAR_INTERSESSION_PARTS_OF_TERM <- local({
   rows <- rows[!duplicated(rows$subject_course), ]
   stats::setNames(as.integer(rows[[col]]), rows$subject_course)
 }
+# Course sequences (projection_sequences.csv): a listed predecessor's
+# enrollment change carries into the next course at that pair's own rate.
+CEDAR_ENROLLMENT_PROJECTION_SEQUENCES <- validate_projection_sequences(
+  read_institution_file("projection_sequences")
+)
+
 CEDAR_ENROLLMENT_PROJECTION_COURSE_HISTORY_START_TERMS <- .cedar_projection_override("history_start_term")
 CEDAR_ENROLLMENT_PROJECTION_COURSE_RETENTION_MIN_TERMS <- .cedar_projection_override("retention_min_terms")
 
@@ -155,8 +170,9 @@ CEDAR_ENROLLMENT_PROJECTION_METHOD_GUIDE <- data.frame(
     paste(
       "Starts from the same number, adds the students still waiting when that",
       "term was saturated, and adds the change in the course's own",
-      "enrollment and in its feeder courses during the term just finished,",
-      "each scaled by the share that historically carried into this course."
+      "enrollment, in the course taken just before it, and in its other",
+      "feeder courses during the term just finished, each scaled by the share",
+      "that historically carried into this course."
     )
   ),
   distinction = c(

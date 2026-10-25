@@ -40,6 +40,7 @@ between the two population models.
 
 | Model | Bundle schema | Calculation contract | Evidence |
 |---|---:|---|---|
+| `0.26.0` | 25 | A course's listed predecessor (`projection_sequences.csv`: ENGL 1110 before 1120, MATH 1512 before 1522, MATH 1250 before 1512) carries its enrollment change in at its own rate and leaves the pooled feeders. The plan follows the term just finished where the spine is published: the predecessor's change always, the pooled feeders' only at 5% or more either way. The pressure bump is 5%, and feeders no longer cancel it. On the same data, Spring 2027 forecasts change for three courses (ENGL 1120 and MATH 1512 now publish the adjusted candidate); bumps fall from 1,134 to 567 registrations and planned sections from 616 to 596; no plan gets a feeder adjustment, because every spine-published course's feeders moved under 5% in Fall 2026. Fall 2027 forecasts are unchanged; bumps fall from 2,151 to 1,323 and sections from 752 to 732 | [Sequences, the feeder adjustment and a 5% bump](#sequences-the-feeder-adjustment-and-a-5-bump-model-0260-2026-10-24) below |
 | `0.25.0` | 24 | No forecast change. The recent history is saved by delivery campus as well (`recent_campus_history`), and the summary flags a campus full on the first day while another had room, which the pooled market hides; a prior term at 98% or more is flagged full, not near full; an unknown prior fill names its cause. On the Oct 23 pull it flags 9 Spring 2027 rows, each EA full on the Spring 2026 first day with ABQ under 90%, and 2 Fall 2027 rows (FYEX 1030 EA full; NATV 1150 ABQ full with EA at 86%). The page states that the range assumes steady seats and how often it held, rebuilt from earlier forecasts only: Spring 86 of 105 with steady seats and 40 of 99 when they moved; Fall 98 of 115 and 28 of 91. A row whose draft moves the seats 10% or more says so under its range | [Re-audit on production data](#re-audit-on-production-data-model-0230-2026-10-20); ISSUES.md M36 |
 | `0.25.0` | 24 | A term pulled before one of its later sessions began is no longer read as undated. Its begun sessions' first day, divided by all the seats, is a lower bound on fill: it settles saturation, the pressure bump and the expansion response only where it already reaches their level, the floor note says "at least", and an unsettled term names the session not yet begun. On a Fall 2026 class list pulled Oct 8, four days before the second-half sessions began, 12 of the 65 Fall 2027 courses offered in Fall 2026 are pending in the pooled market; the bound settles 5 as near full (MATH 1350 at least 94.8%, ENGL 1120 94.6%, PHIL 1120 92.6%, COMM 1130 91.8%, PHIL 1115 90.2%), and the other 7 now name the pending session instead of missing status dates. Once a pull covers every session start, nothing is pending and nothing changes | ISSUES.md I28 |
 | `0.24.0` | 23 | December intersession (settings.csv `intersession_parts_of_term`) is left out of every projection input: it starts weeks after the term's first day, so it blanked first days (ISSUES.md I28), and it registers after a Fall settles, so the Fall spine read a partial Fall (I35). Pressure seat gaps compare with a floating-point tolerance (I34). | Spring 2027 regains pressure bumps for CHEM 1215L, COMM 1130 and HNRS 2221; Fall 2027 gains AFST 1110, ENGL 2210, MATH 1430, RELG 1110 and THEA 1110 (2026-10-23 pull). |
@@ -426,6 +427,81 @@ plan seats so that past forecasts would have covered, say, 8 terms in 10. On
 this record that is the first-day plan plus 21%. Registrations are the simpler
 rule and do as well as a flat 10%.
 
+## Sequences, the feeder adjustment and a 5% bump (model 0.26.0, 2026-10-24)
+
+Three decisions, made for what a department can actually staff:
+
+1. **The bump is 5%, not 10%.** In Fall 2026, the median always-full course
+   left 4.7% of its registrations waiting. A course with more waiting is sized
+   by its waitlist anyway, and a new section needs an instructor who may not
+   exist. Feeders no longer cancel the bump, because the students already
+   turned away do not leave when a feeder shrinks.
+2. **The plan follows pooled feeders only past 5%.** At the pooled
+   carry-through rates, a 5% feeder move changes the median course by 3.0%:
+   not everyone who could take a course does, and the backlog apart from
+   feeders is the bump's. A smaller move is noise against the course's own
+   year.
+3. **A few courses are declared sequences** whose change goes straight into
+   the next course. Candidates were pairs over consecutive regular terms, Fall
+   2022 to Spring 2026, ABQ and EA, with at least 50 students moving:
+
+| Pair | Go on next term | Share of the later course | Year-over-year carry (earlier course's change x rate, then the later course's actual change) |
+|---|---:|---:|---|
+| ENGL 1110 -> ENGL 1120 (Fall to Spring) | 68% | 71% | +236 / +514, +28 / +3, +115 / +57 |
+| MATH 1512 -> MATH 1522 (Fall to Spring) | 59% | 67% | +28 / +56, +2 / -11, +21 / +7 |
+| MATH 1512 -> MATH 1522 (Spring to Fall) | 41% | 29% | +16 / +11, +7 / +22, +7 / +24 |
+| MATH 1250 -> MATH 1512 (Fall to Spring) | 55% | 28% | +10 / +39, +3 / +17, +4 / +16 |
+| MATH 1118 -> MATH 2118 (Fall to Spring) | 37% | 67% | +3 / -2, +9 / -4, -8 / +2 |
+| MATH 1215 -> MATH 1220 (Fall to Spring) | 30% | 18% | +13 / -80, +102 / +46 |
+
+The first four are listed: most students go on, and the change shows up in
+the later course in the same direction, though its size is noisy over three
+years. MATH 1118 to 2118 is not: most go elsewhere, and its changes did not
+carry. MATH 1215 to 1220 is not either: 30% go on, and 1220 draws mostly from
+elsewhere. Courses that share students without one leading to the other (a
+first-year seminar beside composition, cohort blocks) are not sequences.
+
+Rebuilt on the same data and cutoff as 0.25.0:
+
+| Evidence | Spring 2027 | Fall 2027 |
+|---|---:|---:|
+| Forecasts changed | 3 (ENGL 1120 2,179 to 2,164; MATH 1512 267 to 269; MATH 1522 261 to 256) | 0 |
+| Adjusted candidate published | 9 to 11 (ENGL 1120: 6.8% vs 11.2% on four shared aftcasts; MATH 1512: 8.2% vs 10.6%) | 2 to 2 |
+| Courses bumped | 51 of 74 | 74 of 76 |
+| Bump registrations | 1,134 to 567 (10.0% to 5.0% of their projections) | 2,151 to 1,323 (10.4% to 6.4%) |
+| Bumps sized by students left waiting | 0 to 0 | 18 to 36 |
+| Sections the bump adds | 35 in 20 courses, to 16 in 11 | 58 in 28 courses, to 38 in 25 |
+| Plans with a feeder adjustment | 0 | 0 |
+| Planned registrations, all rows | 17,986 to 17,401 | 23,638 to 22,810 |
+| Planned sections, all rows | 616 to 596 | 752 to 732 |
+
+Four readings:
+
+1. **The feeder adjustment changes no plan this year, as designed.** The
+   three sequence courses all publish the adjusted candidate, which already
+   holds the change. Of the 63 Spring courses publishing the spine, 57 had a
+   measured feeder change and all were within 4.7% either way (FYEX 1030
+   +4.7%, HNRS 2221 -4.7%, CHEM 1215L -4.2%, COMM 1130 -4.1%); the other 6
+   had no own-enrollment baseline. Fall 2026 was a quiet year for feeders.
+   Fall 2027 cannot be adjusted at all until Spring 2027 is observed.
+2. **Splitting the sequence out changed selection for two courses.** With
+   ENGL 1110's students carried at their own rate instead of pooled, the
+   adjusted candidate's past aftcasts for ENGL 1120 improved enough to beat
+   the spine, and likewise MATH 1512 with MATH 1250. Their forecasts moved by
+   less than 1%; the reliability axes are the rolling rule's, as always.
+3. **No bump was being cancelled by feeders on this pull**, so dropping the
+   cancel adds no bump; the halved share is the whole change.
+4. **The "vs last year" line in the table was dropped.** For a spine-published
+   course it is 0% by construction. On past folds the adjusted candidate moved
+   a median 1.4% (Spring) and 0.3% (Fall) off last year, while registrations
+   actually moved a median 12% and 9.6%, and the two did not correlate (0.02
+   and -0.09). The line could only ever say "a percent or so", and that
+   percent did not say which way the course would go.
+
+The sequence list is fixed today and applied at past folds, so the rates
+learned at a past fold use a list chosen with later knowledge. The pairs are
+structural (a course and its continuation), so the look-ahead is mild.
+
 ## The pressure bump (model 0.23.0, 2026-10-18)
 
 A near-full course's registrations follow its seats, not its demand. On the
@@ -684,7 +760,7 @@ or progression eligibility. Those require leakage-safe course-specific tests.
    1010 move for reasons no feeder or demand model can see.
 4. **Carry a waitlist into the next term** as a change from the year before,
    once a second year of waitlists exists to measure the change against. The
-   same evidence should replace the pressure bump's flat 10% with a measured,
+   same evidence should replace the pressure bump's flat 5% with a measured,
    per-course allowance.
 5. ~~Select between candidates over the pooled course set.~~ Tested
    2026-10-20: 12.6% against 12.3% per course and 12.4% for the spine on Spring;

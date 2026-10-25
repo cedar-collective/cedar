@@ -219,7 +219,8 @@ aftcast for historical lifecycle comparison, but they are not alternative
 scoring targets.
 
 Sections and seat gaps are planned for registrations, not first-day seats
-(0.23.0): projected registrations plus any pressure bump (below). Registrations run a median 8% above the first day, because a
+(0.23.0): projected registrations plus the feeder adjustment and any pressure
+bump (below). Registrations run a median 8% above the first day, because a
 student who drops early frees a seat someone else takes, and the margin is kept
 on purpose: running short of seats costs more than an empty one. Over 207 past
 aftcasts with a known first day, sizing on the first day would have planned
@@ -238,19 +239,21 @@ than it registered last time:
 ```text
 unserved          = max(pressure_bump_share x spine, students left waiting)
 pressure_bump     = max(0, unserved - floor already in the published projection)
-planned_registrations = projected_classlist_total + pressure_bump
+planned_registrations = max(0, projected_classlist_total
+                               + plan_feeder_adjustment + pressure_bump)
 recommended_sections  = ceiling(planned_registrations / reference_section_size)
 ```
 
-`pressure_bump_share` is 0.10. The bump is withheld when the course's feeder
-courses' enrollment fell `pressure_bump_feeder_decline` (5%) or more in the term
-just finished; when that term is not observed yet (the two-step horizon), the
-check cannot run, the bump stands, and the note says to recheck. A term whose
-first day is unknown is skipped, never read as full or not full.
+`pressure_bump_share` is 0.05 (0.10 before 0.26.0): the median always-full
+Fall 2026 course left 4.7% of its registrations waiting, and new sections need
+instructors who may not exist. Feeders never cancel the bump (they did before
+0.26.0, at a 5% fall): a backlog does not leave with them, and their change is
+the plan's feeder adjustment instead. A term whose first day is unknown is
+skipped, never read as full or not full.
 
 The reason is that a near-full course's registrations follow its seats: given
 10% or more seats they filled them (89 course-terms), held flat they stayed
-flat (139), cut they fell by the cut (51). The 10% is an allowance, not a
+flat (139), cut they fell by the cut (51). The 5% is an allowance, not a
 measurement, and every row says which. `projection_pressure_bump()` writes
 `pressure_judged_terms`, `pressure_full_terms`, `pressure_bump_applied`,
 `pressure_bump`, and `pressure_bump_note` (why it applies or why not);
@@ -259,8 +262,42 @@ measurement, and every row says which. `projection_pressure_bump()` writes
 accuracy axes never include it, because a full course's registrations are
 capped and would score any allowance as over-projection.
 `validate_pressure_bump_rows()` rejects a bundle whose plan is not projection
-plus bump or whose sections are not sized from the plan. The page states the
-total above the table (`projection_pressure_bump_summary()`).
+plus feeder adjustment plus bump or whose sections are not sized from the plan.
+The page states the total above the table (`projection_pressure_bump_summary()`).
+
+### Feeder adjustment (0.26.0)
+
+The spine is a year old when the schedule is built. Where the rule publishes
+it, the plan still reads the term just finished, from the adjusted candidate's
+own deltas (`projection_plan_feeder_adjustment()`):
+
+```text
+plan_feeder_adjustment = delta_sequence                      always
+                       + delta_feeder  if |pooled feeder change| >= plan_feeder_change
+                       = 0             if the published method is spine_adjusted
+```
+
+`plan_feeder_change` is 0.05. A listed predecessor (`projection_sequences.csv`)
+counts every time, either way, because its students go straight into the next
+course: 68% of Fall ENGL 1110 students took ENGL 1120 the next Spring, and they
+were 71% of its Spring students. The pooled feeders are a looser set, ranked by
+transitions, and a move under 5% is noise against the course's own year. At
+the pooled carry-through rates, a 5% feeder move changes the median course by
+3%: not everyone who could take it does, and the backlog apart from feeders is
+the bump's. When the adjusted candidate is published, its projection already
+holds both deltas, and the plan adds nothing (`validate_pressure_bump_rows()`
+enforces it). Two steps out the term just finished is unobserved, so there is
+nothing to read and the note says so.
+
+Published rows gain `plan_feeder_adjustment`, `plan_feeder_note` (why it
+applies or why not, with each part's arithmetic) and `plan_feeder_sections`
+(the sections it adds or removes, before the bump's). The page states the total
+(`projection_plan_feeder_summary()`) beside the bump's.
+
+The sequence list is fixed today and applied at past folds too, so the rates
+learned at a past fold use a list chosen with later knowledge. The pairs are
+structural (a course and its continuation), so the look-ahead is mild, and the
+selection rule's out-of-sample accuracy is unchanged in kind.
 
 ### Reliability, seat consistency, and where error comes from
 
@@ -373,7 +410,7 @@ enrollment changed, or its feeders' Fall enrollment changed.
 ### The adjusted candidate
 
 ```text
-seats needed = spine + floor uplift + repeat delta + feeder delta
+seats needed = spine + floor uplift + repeat delta + sequence delta + feeder delta
 
 spine         prior same-season class-list total
 floor uplift  if first-day fill of that term >= 90%:
@@ -382,7 +419,11 @@ floor uplift  if first-day fill of that term >= 90%:
               (unknown first day: saturation cannot be judged, uplift 0)
 repeat delta  (course enrollment in the preceding term
                - same a year earlier) x repeat rate
-feeder delta  (distinct enrollment across the feeder set in the preceding term
+sequence delta for each listed predecessor (projection_sequences.csv):
+               (its enrollment in the preceding term, excluding students
+               also in this course - same a year earlier) x its own rate
+feeder delta  (distinct enrollment across the feeder set in the preceding term,
+               excluding students in this course or a listed predecessor
                - same a year earlier) x feeder rate
 ```
 
@@ -393,7 +434,10 @@ term who were in it again the following same-season term. The feeder set is
 the up-to-eight courses whose preceding-term students most often took this
 course next (at least three transitions over at least two pairs), and the
 feeder rate is one pooled share across that set so a student in two feeders
-counts once. **Both deltas read enrollments, not grades**, because grades are
+counts once. A listed predecessor's rate is the share of its preceding-term
+students who took this course next; its students leave the pool before the
+feeder set is chosen, so the predecessor is never also a pooled feeder and a
+student in both counts once, under the predecessor (0.26.0). **Both deltas read enrollments, not grades**, because grades are
 not posted when the schedule is built; the rates embed the historical pass
 and repeat behaviour, and the same terms can be re-read once grades land.
 
@@ -712,6 +756,15 @@ bundle. They must not reproduce a model, backtest, pressure calculation, or
 recommendation pipeline.
 
 ## Saved Bundle
+
+Schema 25 (model 0.26.0) adds the listed-predecessor delta: candidates gain
+`delta_sequence`, `sequence_courses` and `sequence_change` (published as
+`adjusted_delta_sequence`, `adjusted_sequence_courses`,
+`adjusted_sequence_change`), and `validate_spine_rows()` includes it in the sum.
+Published rows gain `plan_feeder_adjustment`, `plan_feeder_note` and
+`plan_feeder_sections`; `planned_registrations` includes the feeder adjustment.
+The model config gains `sequences` and `plan_feeder_change` and drops
+`pressure_bump_feeder_decline`; `pressure_bump_share` is 0.05.
 
 Schema 24 (model 0.25.0) adds `recent_campus_history`: the recent history's
 terms again, one row per delivery campus that offered the course, with that
