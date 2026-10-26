@@ -973,7 +973,7 @@ test_that("planning sections are sized from projected registrations, not first-d
   expect_equal(result$projected_first_day_equivalent, 90)
   # ceiling(100 / 32) = 4; the first day (90) would say 3, census (60) 2.
   expect_equal(result$recommended_sections, 4L)
-  expect_equal(result$recommendation, "Plan 4 section(s)")
+  expect_equal(result$recommendation, "Plan 4 sections")
   # 90 of 96 seats taken on both judged first days is near full, so the plan
   # carries a 5-student pressure bump (5%); ceiling(105 / 32) is still 4, and
   # the forecast is untouched. No adjusted candidate ran, so the plan has no
@@ -1066,15 +1066,15 @@ test_that("an always-full course gets a pressure bump on its plan, never on its 
   expect_no_match(fell$pressure_bump_note, "[Ff]eeder")
 })
 
-test_that("the plan follows a listed sequence always and pooled feeders only past the line", {
+test_that("a Spring plan follows a listed sequence always and pooled feeders only past the line", {
   # Published rows joined to their adjusted-candidate audit fields: the
-  # function's input contract, not institutional data. Spring 2024 is the
-  # term just finished.
+  # function's input contract, not institutional data. Fall 2024 is the term
+  # just finished.
   row <- tibble::tibble(
     market_id = "abq_ea_course_market", subject_course = "TEST 201",
-    term_type = "fall", target_term = 202480L, method_id = "seasonal_last",
+    term_type = "spring", target_term = 202510L, method_id = "seasonal_last",
     projected_classlist_total = 300, adjusted_applicable = TRUE,
-    adjusted_preceding_term = 202410L, adjusted_feeder_check = "measured",
+    adjusted_preceding_term = 202480L, adjusted_feeder_check = "measured",
     adjusted_delta_sequence = -68, adjusted_sequence_courses = "SEQ 1",
     adjusted_sequence_change = -100, adjusted_delta_feeder = 3,
     adjusted_feeder_change_rate = 0.02
@@ -1086,8 +1086,8 @@ test_that("the plan follows a listed sequence always and pooled feeders only pas
   expect_equal(inside$plan_feeder_adjustment, -68)
   expect_equal(inside$plan_feeder_note, paste0(
     "Feeder adjustment -68: SEQ 1, taken the term before, moved -100 students ",
-    "in Spring 2024, which carries -68 into this course; its other feeder ",
-    "courses moved +2.0% in Spring 2024, inside the 5% line, so the plan does ",
+    "in Fall 2024, which carries -68 into this course; its other feeder ",
+    "courses moved +2.0% in Fall 2024, inside the 5% line, so the plan does ",
     "not follow them"
   ))
 
@@ -1098,13 +1098,13 @@ test_that("the plan follows a listed sequence always and pooled feeders only pas
              adjusted_feeder_change_rate = 0.064, adjusted_delta_feeder = 9.4)
   expect_equal(up$plan_feeder_adjustment, 9)
   expect_match(up$plan_feeder_note,
-               "^Feeder adjustment \\+9: its feeder courses moved \\+6\\.4% in Spring 2024, 5% or more, which carries \\+9$")
+               "^Feeder adjustment \\+9: its feeder courses moved \\+6\\.4% in Fall 2024, 5% or more, which carries \\+9$")
 
   # The published adjusted candidate already holds both deltas.
   adjusted <- plan(method_id = "spine_adjusted")
   expect_equal(adjusted$plan_feeder_adjustment, 0)
   expect_match(adjusted$plan_feeder_note,
-               "^No feeder adjustment: the published projection already includes the changes in Spring 2024\\. SEQ 1")
+               "^No feeder adjustment: the published projection already includes the changes in Fall 2024\\. SEQ 1")
 
   # Two steps out the term just finished is unobserved, so nothing is read.
   unseen <- plan(adjusted_sequence_courses = NA_character_, adjusted_delta_sequence = 0,
@@ -1112,11 +1112,30 @@ test_that("the plan follows a listed sequence always and pooled feeders only pas
                  adjusted_delta_feeder = 0, adjusted_feeder_change_rate = NA_real_)
   expect_equal(unseen$plan_feeder_adjustment, 0)
   expect_equal(unseen$plan_feeder_note, paste0(
-    "No feeder adjustment: feeder courses in Spring 2024 are not observed yet; ",
+    "No feeder adjustment: feeder courses in Fall 2024 are not observed yet; ",
     "recheck when they settle"
   ))
   none <- plan(adjusted_applicable = FALSE)
   expect_equal(none$plan_feeder_adjustment, 0)
+
+  # A Fall plan does not follow its Spring feeders (0.27.0): the same
+  # sequence and an 8% pooled move leave it where the projection is.
+  fall <- plan(term_type = "fall", target_term = 202580L,
+               adjusted_preceding_term = 202510L,
+               adjusted_feeder_change_rate = 0.08, adjusted_delta_feeder = 15)
+  expect_equal(fall$plan_feeder_adjustment, 0)
+  expect_equal(fall$plan_feeder_note,
+               "No feeder adjustment: only Spring plans follow their feeder courses")
+  # The season list is a model setting, not a fixed rule.
+  both <- projection_plan_feeder_adjustment(
+    dplyr::mutate(row, term_type = "fall", target_term = 202580L,
+                  adjusted_preceding_term = 202510L),
+    list(plan_feeder_seasons = c("spring", "fall"))
+  )
+  expect_equal(both$plan_feeder_adjustment, -68)
+  expect_equal(projection_plan_feeder_seasons_rule(character(0)),
+               "no plan follows its feeder courses")
+  expect_error(projection_plan_feeder_seasons_rule("autumn"), "Unknown plan_feeder_seasons")
 })
 
 test_that("each past forecast term records its seat change and whether the term before was full", {
@@ -1308,28 +1327,33 @@ test_that("the draft comparison separates short of day one from short of the pla
 
 test_that("the bundle validator rejects a plan that is not its projection plus its adjustments", {
   rows <- tibble::tibble(
-    method_id = "seasonal_last",
+    term_type = "spring", method_id = "seasonal_last",
     projected_classlist_total = c(100, NA), pressure_bump = c(10, 0),
     plan_feeder_adjustment = c(-15, 0),
     pressure_bump_applied = c(TRUE, FALSE), planned_registrations = c(95, NA),
     reference_section_size = 25, recommended_sections = c(4L, NA)
   )
-  expect_silent(validate_pressure_bump_rows(rows, "test"))
+  expect_silent(validate_pressure_bump_rows(rows, "spring", "test"))
   message <- "not its projection plus its feeder adjustment plus its pressure bump"
   expect_error(validate_pressure_bump_rows(
     dplyr::mutate(rows, planned_registrations = c(110, NA),
-                  recommended_sections = c(5L, NA)), "test"
+                  recommended_sections = c(5L, NA)), "spring", "test"
   ), message)
   # The published adjusted candidate already carries the deltas.
   expect_error(validate_pressure_bump_rows(
-    dplyr::mutate(rows, method_id = "spine_adjusted"), "test"
+    dplyr::mutate(rows, method_id = "spine_adjusted"), "spring", "test"
   ), message)
   expect_error(validate_pressure_bump_rows(
-    dplyr::mutate(rows, recommended_sections = c(5L, NA)), "test"
+    dplyr::mutate(rows, recommended_sections = c(5L, NA)), "spring", "test"
   ), message)
   expect_error(validate_pressure_bump_rows(
-    dplyr::mutate(rows, pressure_bump_applied = c(FALSE, FALSE)), "test"
+    dplyr::mutate(rows, pressure_bump_applied = c(FALSE, FALSE)), "spring", "test"
   ), message)
+  # A Fall plan does not follow its feeders unless the model says it does.
+  fall <- dplyr::mutate(rows, term_type = "fall")
+  expect_error(validate_pressure_bump_rows(fall, "spring", "test"), message)
+  expect_silent(validate_pressure_bump_rows(fall, c("spring", "fall"), "test"))
+  expect_error(validate_pressure_bump_rows(rows, NULL, "test"), "plan_feeder_seasons")
 })
 
 test_that("the pressure screen reads first-day fill, so neither seat churn nor census drops decide pressure", {
@@ -1508,7 +1532,7 @@ test_that("registrations over the recorded cap still count as capacity reached",
   expect_equal(result$capacity_data_quality, "Usable")
   expect_equal(result$recent_capacity_reached_terms, 2L)
   expect_true(result$persistent_capacity_reached)
-  expect_equal(result$recommendation, "Add 2 section(s)")
+  expect_equal(result$recommendation, "Add 2 sections")
 })
 
 # ---- The spine / floor / delta model -------------------------------------------
@@ -2509,16 +2533,83 @@ test_that("the administrator summary says the decision in one sentence and flags
   expect_match(projection_summary_sentence(sparse), "^Not enough comparable history")
 })
 
+test_that("a plan's steps add up from last year's class list to its sections", {
+  # One published row as the view holds it: the function's input contract.
+  # Spring 2027 target: 200 registered last Spring, 6 still waiting, Fall
+  # changes of +3.4 (retakes), -6.8 (listed predecessor) and +1.2 (feeders),
+  # so the adjusted forecast is round(200 + 6 - 2.2) = 204.
+  row <- tibble::tibble(
+    term_type = "spring", method_id = "spine_adjusted",
+    spine = 200, spine_term = 202610L, floor_uplift = 6,
+    delta_repeat = 3.4, delta_sequence = -6.8, delta_feeder = 1.2,
+    adjusted_sequence_courses = "SEQ 1", adjusted_preceding_term = 202680L,
+    projected_classlist_total = 204, accuracy = "High", wape = 0.068,
+    n_backtests = 4L, backtest_term_range = "Spring 2023 to Spring 2026",
+    plan_feeder_adjustment = 0, plan_feeder_note = "No feeder adjustment",
+    pressure_bump = 10,
+    pressure_bump_note = "Pressure bump +10: near full on the first day in every recent Spring",
+    planned_registrations = 214, reference_section_size = 25,
+    recommended_sections = 9L, scheduled_sections = 8L,
+    target_schedule_available = TRUE
+  )
+  steps <- projection_plan_steps(row)
+
+  expect_equal(steps$label, c(
+    "Registered in Spring 2026", "Students still waiting",
+    "Enrollment change in Fall 2026", "Forecast registrations",
+    "Pressure bump", "Planned registrations", "Sections"
+  ))
+  expect_equal(steps$kind,
+               c("start", "add", "add", "total", "add", "total", "sections"))
+  # The arithmetic reads down: each total is the lines above it.
+  forecast <- which(steps$label == "Forecast registrations")
+  expect_equal(sum(steps$amount[1:(forecast - 1)]), steps$amount[[forecast]])
+  planned <- which(steps$label == "Planned registrations")
+  expect_equal(sum(steps$amount[forecast:(planned - 1)]), steps$amount[[planned]])
+  # Rounded parts (+3, -7, +1) no longer sum to the change (-2), and say so.
+  expect_equal(steps$detail[[3]], paste0(
+    "students retaking this course +3; SEQ 1, taken just before \u22127; ",
+    "other feeder courses +1 (each rounded)"
+  ))
+  expect_equal(steps$detail[[4]], paste0(
+    "Past forecasts for this course missed by 6.8% on average ",
+    "(4 terms, Spring 2023 to Spring 2026)"
+  ))
+  expect_equal(steps$detail[[5]], "Near full on the first day in every recent Spring")
+  expect_equal(steps$detail[[7]], paste0(
+    "214 registrations at 25.0 per section (the draft schedule's average), ",
+    "rounded up; the draft schedule has 8 sections"
+  ))
+
+  # Last year's number with no additions: start, forecast, sections.
+  plain <- projection_plan_steps(dplyr::mutate(
+    row, method_id = "seasonal_last", projected_classlist_total = 200,
+    pressure_bump = 0, planned_registrations = 200, recommended_sections = 8L
+  ))
+  expect_equal(plain$label,
+               c("Registered in Spring 2026", "Forecast registrations", "Sections"))
+  # Changes that cancel still show, so the adjusted method's work is visible.
+  cancelled <- projection_plan_steps(dplyr::mutate(
+    row, floor_uplift = 0, delta_repeat = 2, delta_sequence = -3,
+    delta_feeder = 1, projected_classlist_total = 200
+  ))
+  expect_equal(cancelled$amount[cancelled$label == "Enrollment change in Fall 2026"], 0)
+  expect_equal(nrow(projection_plan_steps(
+    dplyr::mutate(row, projected_classlist_total = NA_real_)
+  )), 0L)
+  expect_error(projection_plan_steps(dplyr::select(row, -spine)), "spine")
+})
+
 test_that("the feeder summary says how many plans it moved, and why when none", {
   # Published rows as the view holds them: the function's input contract.
   rows <- tibble::tibble(
-    projected_classlist_total = c(100, 200, 300, 400, NA),
+    term_type = "spring", projected_classlist_total = c(100, 200, 300, 400, NA),
     method_id = c("seasonal_last", "seasonal_last", "seasonal_last",
                   "spine_adjusted", "seasonal_last"),
     plan_feeder_adjustment = c(12, -30, -8, 0, 0),
     adjusted_preceding_term = 202680L, adjusted_feeder_check = "measured"
   )
-  summary <- projection_plan_feeder_summary(rows, 0.05)
+  summary <- projection_plan_feeder_summary(rows, 0.05, "spring")
   expect_equal(summary$n_raised, 1L)
   expect_equal(summary$n_lowered, 2L)
   expect_equal(summary$registrations, -26)
@@ -2529,7 +2620,8 @@ test_that("the feeder summary says how many plans it moved, and why when none", 
     "or more. 1 course's published projection already includes those changes."
   ))
   still <- projection_plan_feeder_summary(
-    dplyr::mutate(rows, plan_feeder_adjustment = 0, method_id = "seasonal_last"), 0.05
+    dplyr::mutate(rows, plan_feeder_adjustment = 0, method_id = "seasonal_last"), 0.05,
+    "spring"
   )
   expect_equal(still$sentence, paste0(
     "No plan shown has a feeder adjustment: where the forecast is last year's ",
@@ -2538,10 +2630,20 @@ test_that("the feeder summary says how many plans it moved, and why when none", 
   ))
   unseen <- projection_plan_feeder_summary(
     dplyr::mutate(rows, plan_feeder_adjustment = 0, adjusted_feeder_check = "term_not_observed"),
-    0.05
+    0.05, "spring"
   )
   expect_match(unseen$sentence, "^No plan has a feeder adjustment: Fall 2026 is not observed yet")
-  expect_error(projection_plan_feeder_summary(rows, NULL), "plan_feeder_change")
+  expect_error(projection_plan_feeder_summary(rows, NULL, "spring"), "plan_feeder_change")
+  # A Fall bundle says the rule, not that its feeders are unobserved.
+  fall <- projection_plan_feeder_summary(
+    dplyr::mutate(rows, term_type = "fall", plan_feeder_adjustment = 0,
+                  adjusted_preceding_term = 202710L,
+                  adjusted_feeder_check = "term_not_observed"),
+    0.05, "spring"
+  )
+  expect_equal(fall$sentence,
+               "No plan has a feeder adjustment: only Spring plans follow their feeder courses.")
+  expect_error(projection_plan_feeder_summary(rows, 0.05, NULL), "plan_feeder_seasons")
 })
 
 test_that("the view adds a needs-a-look filter without changing a number", {

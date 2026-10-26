@@ -120,6 +120,13 @@ enrollment_projection_defaults <- function() {
     # change always does. Neither is added when the published projection
     # already includes the deltas.
     plan_feeder_change = 0.05,
+    # Only targets in these seasons follow their feeders (0.27.0). Scored on
+    # past forecasts, size-weighted error: Spring 14.7% for the spine alone,
+    # 13.6% following sequences and feeders; Fall 12.8% and 13.0%. A Spring
+    # feeder change pointed the way the Fall course moved no more often than
+    # chance (correlation -0.09), and ENGL 1110's pointed the wrong way for
+    # ENGL 1120 in two of three Falls.
+    plan_feeder_seasons = "spring",
     # Course sequences (projection_sequences.csv): from_course, to_course.
     sequences = CEDAR_ENROLLMENT_PROJECTION_SEQUENCES,
     # Seat consistency (0.23.0): over the past forecast terms behind a
@@ -173,6 +180,11 @@ enrollment_projection_defaults <- function() {
   )
 }
 
+# "1 section", "2 sections": a whole count and its noun, for recommendations.
+projection_count_noun <- function(n, noun) {
+  paste(format(n, big.mark = ","), if (isTRUE(n == 1)) noun else paste0(noun, "s"))
+}
+
 #' One model option: the caller's value, else the model default
 projection_option <- function(opt, name) {
   value <- opt[[name]]
@@ -224,6 +236,8 @@ enrollment_projection_model_config <- function(opt = list()) {
     from_course = as.character(sequences$from_course),
     to_course = as.character(sequences$to_course)
   )
+  # Stops on anything but spring, summer or fall.
+  projection_plan_feeder_seasons_rule(config$plan_feeder_seasons)
   for (field in c("pressure_bump_share", "plan_feeder_change")) {
     value <- as.numeric(config[[field]])
     if (length(value) != 1L || !is.finite(value) || value < 0 || value > 1) {
@@ -1952,9 +1966,14 @@ validate_spine_rows <- function(data, caller) {
 # Every published plan is its projection plus its feeder adjustment plus its
 # pressure bump (never below zero), the bump is zero unless it applies, the
 # feeder adjustment is zero where the published projection already carries the
-# deltas, and sections are sized from the plan, so the page can say exactly how
-# much each raised it.
-validate_pressure_bump_rows <- function(rows, caller) {
+# deltas or the target's season does not follow feeders (`seasons`, the
+# model's plan_feeder_seasons), and sections are sized from the plan, so the
+# page can say exactly how much each raised it.
+validate_pressure_bump_rows <- function(rows, seasons, caller) {
+  if (!is.character(seasons) || anyNA(seasons)) {
+    stop("[enrollment-projections.R] ", caller,
+         " needs the model's plan_feeder_seasons.", call. = FALSE)
+  }
   if (nrow(rows) == 0L) return(invisible(TRUE))
   projected <- rows$projected_classlist_total
   bump <- rows$pressure_bump
@@ -1973,6 +1992,7 @@ validate_pressure_bump_rows <- function(rows, caller) {
     !is.na(rows$pressure_bump_applied) &
     (rows$pressure_bump_applied | bump == 0) &
     (rows$method_id != "spine_adjusted" | feeder == 0) &
+    (rows$term_type %in% seasons | feeder == 0) &
     dplyr::if_else(
       is.finite(projected),
       is.finite(planned) &
@@ -4051,8 +4071,10 @@ projection_pressure_bump <- function(enrollment_history, section_history, rows,
 # The pooled feeders' change counts only when it moved `plan_feeder_change` or
 # more either way; smaller moves are noise against the course's own year. When
 # the published method is the adjusted candidate, its projection already holds
-# both deltas and the plan adds nothing. Planning only: the forecast and its
-# accuracy are untouched.
+# both deltas and the plan adds nothing. Only targets in `plan_feeder_seasons`
+# are adjusted (0.27.0): following Fall feeders improved past Spring forecasts,
+# and following Spring feeders did not improve Fall ones. Planning only: the
+# forecast and its accuracy are untouched.
 #
 # `rows` are published rows joined to `projection_method_pairing()`. Returns
 # one row per course with the adjustment in registrations and a note.
@@ -4075,6 +4097,8 @@ projection_plan_feeder_adjustment <- function(rows, opt = list()) {
   )
   line <- as.numeric(projection_option(opt, "plan_feeder_change"))
   line_label <- scales::percent(line, accuracy = 1)
+  seasons <- projection_option(opt, "plan_feeder_seasons")
+  seasons_rule <- projection_plan_feeder_seasons_rule(seasons)
   signed <- function(x) sprintf("%+.0f", x)
   sentence_case <- function(x) paste0(toupper(substr(x, 1, 1)), substring(x, 2))
 
@@ -4088,8 +4112,11 @@ projection_plan_feeder_adjustment <- function(rows, opt = list()) {
     pooled_moves <- is.finite(rate) && abs(rate) >= line - 1e-9
     pooled_delta <- if (pooled_moves) as.numeric(row$adjusted_delta_feeder) else 0
     in_projection <- identical(row$method_id, "spine_adjusted")
+    in_season <- row$term_type %in% seasons
     usable <- isTRUE(row$adjusted_applicable) && is.finite(row$projected_classlist_total)
-    adjustment <- if (usable && !in_projection) round(sequence_delta + pooled_delta) else 0
+    adjustment <- if (usable && !in_projection && in_season) {
+      round(sequence_delta + pooled_delta)
+    } else 0
 
     others <- if (has_sequence) "its other feeder courses" else "its feeder courses"
     sequence_text <- if (has_sequence) {
@@ -4133,6 +4160,8 @@ projection_plan_feeder_adjustment <- function(rows, opt = list()) {
     } else if (in_projection) {
       paste0("No feeder adjustment: the published projection already includes ",
              "the changes in ", preceding, ". ", sentence_case(detail))
+    } else if (!in_season) {
+      paste0("No feeder adjustment: ", seasons_rule)
     } else if (adjustment == 0) {
       paste0("No feeder adjustment: ", detail)
     } else {
@@ -4146,6 +4175,25 @@ projection_plan_feeder_adjustment <- function(rows, opt = list()) {
       plan_feeder_note = note
     )
   }))
+}
+
+
+# "only Spring plans follow their feeder courses", from plan_feeder_seasons.
+projection_plan_feeder_seasons_rule <- function(seasons) {
+  if (!is.character(seasons) || anyNA(seasons)) {
+    stop("[enrollment-projections.R] plan_feeder_seasons must name term types.",
+         call. = FALSE)
+  }
+  labels <- c(spring = "Spring", summer = "Summer", fall = "Fall")
+  unknown <- setdiff(seasons, names(labels))
+  if (length(unknown) > 0L) {
+    stop("[enrollment-projections.R] Unknown plan_feeder_seasons: ",
+         paste(unknown, collapse = ", "), call. = FALSE)
+  }
+  named <- unname(labels[intersect(names(labels), seasons)])
+  if (length(named) == 0L) return("no plan follows its feeder courses")
+  paste0("only ", paste(named, collapse = " and "),
+         " plans follow their feeder courses")
 }
 
 
@@ -4543,14 +4591,18 @@ add_projection_recommendations <- function(selected, candidates, pressure_screen
         !is.finite(projected_classlist_total) ~
           "Class-list demand is not yet stable",
         projected_over_capacity <= 0 ~ paste(
-          round(scheduled_capacity - planned_registrations),
-          "planned seat(s) remain above planned registrations"
+          projection_count_noun(
+            round(scheduled_capacity - planned_registrations), "planned seat"
+          ),
+          if (isTRUE(round(scheduled_capacity - planned_registrations) == 1)) "remains" else "remain",
+          "above planned registrations"
         ),
         capacity_limit_signal ~ paste0(
           "Planned registrations exceed capacity by ",
           round(projected_over_capacity), "; ",
-          round(target_available_seats),
-          " seat(s) are currently unoccupied"
+          projection_count_noun(round(target_available_seats), "seat"),
+          if (isTRUE(round(target_available_seats) == 1)) " is" else " are",
+          " currently unoccupied"
         ),
         TRUE ~ paste0(
           "Planned registrations exceed capacity by ",
@@ -4631,9 +4683,10 @@ add_projection_recommendations <- function(selected, candidates, pressure_screen
         projected_classlist_total <= 0 ~ "No projected demand",
         !target_schedule_available & !is.na(recommended_sections) &
           adjusted_saturated_prior %in% TRUE ~
-          paste("Plan at least", recommended_sections, "section(s); prior term was saturated"),
+          paste0("Plan at least ", projection_count_noun(recommended_sections, "section"),
+                 "; prior term was saturated"),
         !target_schedule_available & !is.na(recommended_sections) ~
-          paste("Plan", recommended_sections, "section(s)"),
+          paste("Plan", projection_count_noun(recommended_sections, "section")),
         is.finite(projection_high) &
           projection_high + plan_feeder_adjustment + pressure_bump <=
             scheduled_capacity ~
@@ -4644,8 +4697,8 @@ add_projection_recommendations <- function(selected, candidates, pressure_screen
               as.numeric(projection_option(opt, "recommendation_min_seat_gap")),
               0.25 * reference_section_size
             )) ~
-          paste("Add", additional_sections, "section(s)"),
-        seat_gap > 0 ~ paste("Open", seat_gap, "additional seat(s)"),
+          paste("Add", projection_count_noun(additional_sections, "section")),
+        seat_gap > 0 ~ paste("Open", projection_count_noun(seat_gap, "additional seat")),
         methods_disagree ~ "Review method disagreement",
         TRUE ~ "Monitor near capacity"
       )
@@ -5038,7 +5091,8 @@ validate_enrollment_projection_bundle <- function(bundle) {
     bundle$candidates, "validate_enrollment_projection_bundle() candidates"
   )
   validate_pressure_bump_rows(
-    bundle$projections, "validate_enrollment_projection_bundle() projections"
+    bundle$projections, bundle$model_config$plan_feeder_seasons,
+    "validate_enrollment_projection_bundle() projections"
   )
   if (nrow(bundle$backtests) > 0) {
     validate_spine_rows(

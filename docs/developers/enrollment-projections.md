@@ -265,17 +265,39 @@ capped and would score any allowance as over-projection.
 plus feeder adjustment plus bump or whose sections are not sized from the plan.
 The page states the total above the table (`projection_pressure_bump_summary()`).
 
-### Feeder adjustment (0.26.0)
+### Feeder adjustment (0.26.0; Spring plans only from 0.27.0)
 
 The spine is a year old when the schedule is built. Where the rule publishes
-it, the plan still reads the term just finished, from the adjusted candidate's
-own deltas (`projection_plan_feeder_adjustment()`):
+it, a Spring plan still reads the Fall just finished, from the adjusted
+candidate's own deltas (`projection_plan_feeder_adjustment()`):
 
 ```text
 plan_feeder_adjustment = delta_sequence                      always
                        + delta_feeder  if |pooled feeder change| >= plan_feeder_change
                        = 0             if the published method is spine_adjusted
+                       = 0             if the target's term_type is not in plan_feeder_seasons
 ```
+
+`plan_feeder_seasons` is `"spring"`. Scored on the 0.26.0 bundles' past
+forecasts, error weighted by course size:
+
+| Rule | Spring targets (198 folds) | Fall targets (195 folds) |
+|---|---:|---:|
+| Spine alone | 14.71% | 12.78% |
+| Spine + listed sequence | 13.85% | 12.78% |
+| Spine + sequence + pooled feeders, always | 13.61% | 13.03% |
+| Spine + sequence + pooled feeders at 5% | 13.60% | 13.01% |
+
+A Fall feeder's change carries into Spring; a Spring feeder's does not carry
+into Fall. Among Fall targets the pooled feeder delta pointed the way the
+course moved in 97 of 194 folds (correlation -0.09), and where feeders moved
+5% or more, following them raised error from 11.56% to 12.01%. The sequences
+are weaker in that direction too: 41% of Spring MATH 1512 students take MATH
+1522 in Fall and are 29% of its Fall students, against 59% and 67% from Fall
+to Spring ([forecasting-lessons.md](forecasting-lessons.md)). A Fall plan's
+note says the rule. The adjusted forecast candidate
+keeps its deltas in both seasons, because it publishes only by beating the
+spine on earlier aftcasts.
 
 `plan_feeder_change` is 0.05. A listed predecessor (`projection_sequences.csv`)
 counts every time, either way, because its students go straight into the next
@@ -499,7 +521,7 @@ year:
 **Both current targets are pre-schedule.** Spring 2027 and Fall 2027 carry
 `target_schedule_available = FALSE` for every row, so capacity-derived
 comparisons are unavailable rather than zero and the recommendation reads
-"Plan N section(s)", or "Plan at least N section(s); prior term was saturated"
+"Plan N sections", or "Plan at least N sections; prior term was saturated"
 when the floor applies.
 
 ## Capacity Censoring
@@ -756,6 +778,10 @@ bundle. They must not reproduce a model, backtest, pressure calculation, or
 recommendation pipeline.
 
 ## Saved Bundle
+
+Model 0.27.0 keeps schema 25. The model config gains `plan_feeder_seasons`,
+and `validate_pressure_bump_rows()` takes it and rejects a feeder adjustment on
+a row whose target season is not listed.
 
 Schema 25 (model 0.26.0) adds the listed-predecessor delta: candidates gain
 `delta_sequence`, `sequence_courses` and `sequence_change` (published as
