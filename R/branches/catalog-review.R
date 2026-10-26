@@ -56,9 +56,10 @@ build_catalog_review_items <- function(records, nodes, issues) {
   }
   actions <- c(source_query_flag_false = "Check whether the course belongs in this catalog edition. Follow the catalog link and consult the catalog owner if necessary; this flag does not establish cancellation or availability.",
     no_degree_section = "Check the published program requirements and the captured field schema. Repair the field mapping or extraction before building a degree plan.",
-    credential_needs_review = "Check the published credential and undergraduate classification, then update the institution's catalog scan configuration if needed.")
+    credential_needs_review = "Check the published credential and undergraduate classification, then update the institution's catalog scan configuration if needed.",
+    total_credit_conflict = "Check the catalog's own Degree Hours field against every other total-credit figure printed on this program's own page (Grand Total Credits, Total Credits, etc.) and resolve with the catalog owner. This flag does not say which number is correct, and does not compare against concentration-level totals.")
   reasons <- c(source_query_flag_false = "Catalog inclusion flag", no_degree_section = "Degree requirements missing",
-    credential_needs_review = "Credential needs classification")
+    credential_needs_review = "Credential needs classification", total_credit_conflict = "Conflicting total-credit figures")
   if (any(!issues$issue %in% names(actions))) stop("[catalog-review.R] Unknown source issue type")
   for (i in seq_len(nrow(issues))) {
     x <- issues[i, ]

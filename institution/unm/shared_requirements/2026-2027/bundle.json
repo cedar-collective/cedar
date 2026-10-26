@@ -74,6 +74,16 @@
       "status": "illustrative_planning"
     },
     {
+      "catalog_id": "mechanical-engineering-bs-2026",
+      "college_code": "EN",
+      "rule_set_ids": [
+        "unm-university",
+        "unm-general-education",
+        "unm-engineering"
+      ],
+      "status": "illustrative_planning"
+    },
+    {
       "catalog_id": "business-bba-2026",
       "college_code": "MG",
       "rule_set_ids": [

@@ -303,3 +303,69 @@ catalog_source_issue_rows <- function(records, inventory, receipts, sections) {
   as.data.frame(stats::setNames(rep(list(character()), 9), c("issue", "entity", "title", "course_code",
     "source_pointer", "source_url", "source_sha256", "detail", "review_status")))
 }
+
+#' Parse a single credit figure or explicit range ("120" or "123-130")
+catalog_parse_credit_range <- function(text) {
+  m <- regmatches(text, regexec("(\\d{2,3})(?:\\s*[-–]\\s*(\\d{2,3}))?", text, perl = TRUE))[[1]]
+  if (!length(m) || !nzchar(m[1])) return(NULL)
+  low <- as.numeric(m[2]); high <- if (nzchar(m[3])) as.numeric(m[3]) else low
+  list(min = min(low, high), max = max(low, high))
+}
+
+#' Every "<label>: <number or range>" total-credit mention inside one section's text
+catalog_credit_mentions_in_text <- function(text) {
+  labels <- c("Grand Total Credits", "Total Credits", "Degree Hours", "Total Program Credits")
+  label_alt <- paste(labels, collapse = "|")
+  pattern <- paste0("(", label_alt, ")\\s*:?\\s*\\d{2,3}(?:\\s*[-–]\\s*\\d{2,3})?")
+  whole <- regmatches(text, gregexpr(pattern, text, perl = TRUE))[[1]]
+  if (!length(whole)) return(list())
+  lapply(whole, function(one) {
+    label <- regmatches(one, regexec(paste0("^(", label_alt, ")"), one, perl = TRUE))[[1]][2]
+    range <- catalog_parse_credit_range(one)
+    list(label = label, min = range$min, max = range$max)
+  })
+}
+
+#' Flag total-credit mentions that conflict on one program's own captured page (e.g. a
+#' structured Degree Hours field disagreeing with a "Grand Total Credits" figure printed
+#' elsewhere on that same page). Scoped deliberately to the program record itself: a
+#' concentration's own total almost always describes a smaller, different quantity (its
+#' share of the major, not the whole degree), so comparing it against the parent's Degree
+#' Hours produces false conflicts far more often than real ones (observed: 38 of ~115
+#' programs in the 2026-2027 undergraduate scan). A later authored degree plan still needs
+#' a human decision on which number is correct; this only stops a same-page conflict from
+#' going unnoticed before the decision is made.
+catalog_credit_conflict_rows <- function(records) {
+  rows <- list()
+  programs <- Filter(function(x) x$kind == "programs", records)
+  for (program in programs) {
+    mentions <- list()
+    if (nzchar(program$degree_hours)) {
+      range <- catalog_parse_credit_range(program$degree_hours)
+      if (!is.null(range)) mentions[[length(mentions) + 1L]] <- list(
+        label = "Degree Hours (structured field)", min = range$min, max = range$max, pointer = "/degreeHours")
+    }
+    for (section in program$sections) for (found in catalog_credit_mentions_in_text(section$text)) {
+      mentions[[length(mentions) + 1L]] <- c(found, list(pointer = section$source_pointer))
+    }
+    if (length(mentions) < 2L) next
+    conflict <- FALSE
+    for (a in seq_along(mentions)) for (b in seq_along(mentions)) {
+      if (b <= a) next
+      if (mentions[[a]]$max < mentions[[b]]$min || mentions[[b]]$max < mentions[[a]]$min) conflict <- TRUE
+    }
+    if (!conflict) next
+    describe <- function(m) sprintf("%s: %s (%s)", m$label,
+      if (m$min == m$max) as.character(m$min) else paste0(m$min, "-", m$max), m$pointer)
+    rows[[length(rows) + 1L]] <- data.frame(issue = "total_credit_conflict",
+      entity = paste(program$kind, program$pid, sep = ":"), title = program$title, course_code = "",
+      source_pointer = "/degreeHours", source_url = program$source$url, source_sha256 = program$source$sha256,
+      detail = paste0("Conflicting total-credit mentions on this program's own captured page — ",
+        paste(vapply(mentions, describe, character(1)), collapse = "; "),
+        ". This flag does not say which number is correct, and does not compare against concentration-level totals."),
+      review_status = "unreviewed", stringsAsFactors = FALSE)
+  }
+  if (length(rows)) return(do.call(rbind, rows))
+  as.data.frame(stats::setNames(rep(list(character()), 9), c("issue", "entity", "title", "course_code",
+    "source_pointer", "source_url", "source_sha256", "detail", "review_status")))
+}

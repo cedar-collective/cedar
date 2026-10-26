@@ -461,6 +461,39 @@ test_that("catalog capture inventories every entry and follows course links with
   expect_error(analyze_degree_catalog(out), "already exists")
 })
 
+test_that("conflicting total-credit mentions are flagged without claiming which number is right", {
+  config <- scan_config()
+  baseline <- tempfile("catalog-credits-baseline-")
+  withr::defer(unlink(baseline, recursive = TRUE))
+  capture_degree_catalog(config$source, config$credentials, config$fields, baseline, fetch = scan_fetcher(), pause = 0)
+  analyze_degree_catalog(baseline)
+  clean_issues <- read.csv(file.path(baseline, "analysis", "source-issues.csv"))
+  expect_false("total_credit_conflict" %in% clean_issues$issue)
+
+  conflicting <- scan_fixture()
+  conflicting$programs$biology$description <- "<p>Grand Total Credits: 130</p>"
+  out <- tempfile("catalog-credits-conflict-")
+  withr::defer(unlink(out, recursive = TRUE))
+  capture_degree_catalog(config$source, config$credentials, config$fields, out, fetch = scan_fetcher(conflicting), pause = 0)
+  analyze_degree_catalog(out)
+  issues <- read.csv(file.path(out, "analysis", "source-issues.csv"))
+  flagged <- issues[issues$issue == "total_credit_conflict", ]
+  expect_equal(nrow(flagged), 1L)
+  expect_equal(flagged$entity, "programs:biology")
+  expect_match(flagged$detail, "Degree Hours \\(structured field\\): 120", perl = TRUE)
+  expect_match(flagged$detail, "Grand Total Credits: 130", perl = TRUE)
+  expect_match(flagged$detail, "does not say which number is correct", fixed = TRUE)
+
+  consistent <- scan_fixture()
+  consistent$programs$biology$description <- "<p>Grand Total Credits: 120</p>"
+  matched <- tempfile("catalog-credits-consistent-")
+  withr::defer(unlink(matched, recursive = TRUE))
+  capture_degree_catalog(config$source, config$credentials, config$fields, matched, fetch = scan_fetcher(consistent), pause = 0)
+  analyze_degree_catalog(matched)
+  agreeing <- read.csv(file.path(matched, "analysis", "source-issues.csv"))
+  expect_false("total_credit_conflict" %in% agreeing$issue)
+})
+
 test_that("failed captures resume from verified bytes and tampering blocks extraction", {
   config <- scan_config(); out <- tempfile("catalog-resume-")
   withr::defer(unlink(out, recursive = TRUE))

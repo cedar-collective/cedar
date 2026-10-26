@@ -43,3 +43,7 @@ radiologic-nuclear-bs-2026,calculus,Ready for MATH 1240,math1240
 radiologic-nuclear-bs-2026,precalculus,Ready for MATH 1240,math1240
 radiologic-nuclear-bs-2026,algebra,Start with College Algebra (MATH 1220),math1220|math1240
 radiologic-nuclear-bs-2026,intermediate,Start with Intermediate Algebra (MATH 1215),math1215|math1220|math1240
+mechanical-engineering-bs-2026,calculus,Ready for Calculus I,calc1
+mechanical-engineering-bs-2026,precalculus,Start with Trig / Pre-Calculus (MATH 1250),math1250|calc1
+mechanical-engineering-bs-2026,algebra,Start with College Algebra (MATH 1220),math1220|math1250|calc1
+mechanical-engineering-bs-2026,intermediate,Start with Intermediate Algebra (MATH 1215),math1215|math1220|math1250|calc1

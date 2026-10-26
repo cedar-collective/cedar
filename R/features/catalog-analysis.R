@@ -20,9 +20,12 @@ catalog_extractor_provenance <- function() {
     catalog_canonical_value = catalog_canonical_value, catalog_scalar = catalog_scalar,
     catalog_named_value = catalog_named_value, catalog_config_rows = catalog_config_rows,
     catalog_source_issue_rows = catalog_source_issue_rows,
+    catalog_parse_credit_range = catalog_parse_credit_range,
+    catalog_credit_mentions_in_text = catalog_credit_mentions_in_text,
+    catalog_credit_conflict_rows = catalog_credit_conflict_rows,
     write_catalog_jsonl = write_catalog_jsonl, source_json_bytes = source_json_bytes,
     analyze_degree_catalog = analyze_degree_catalog)
-  list(version = "1.2.0", r_version = R.version.string, locale = Sys.getlocale(),
+  list(version = "1.3.0", r_version = R.version.string, locale = Sys.getlocale(),
     packages = lapply(stats::setNames(c("xml2", "jsonlite", "digest"), c("xml2", "jsonlite", "digest")),
       function(x) as.character(utils::packageVersion(x))),
     functions = lapply(functions, function(x) paste(deparse(x, width.cutoff = 500L), collapse = "\n")))
@@ -87,7 +90,8 @@ analyze_degree_catalog <- function(directory, output = file.path(directory, "ana
   utils::write.csv(milestones, file.path(output, "milestones.csv"), row.names = FALSE, na = "")
   write_catalog_jsonl(lapply(seq_len(nrow(queue)), function(i) as.list(queue[i, , drop = FALSE])), file.path(output, "review-queue.jsonl"))
   inventory <- catalog_config_rows(manifest$inventory)
-  source_issues <- catalog_source_issue_rows(records, inventory, requests, sections)
+  source_issues <- rbind(catalog_source_issue_rows(records, inventory, requests, sections),
+    catalog_credit_conflict_rows(records))
   utils::write.csv(source_issues, file.path(output, "source-issues.csv"), row.names = FALSE, na = "")
   status <- inventory[inventory$scope %in% c("undergraduate_degree", "undergraduate_candidate", "unclassified"), ]
   status$sections <- vapply(status$program_id, function(id) sum(sections$entity == paste0("programs:", id) & !sections$phase %in% c("metadata", "info")), integer(1))
