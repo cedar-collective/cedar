@@ -147,6 +147,29 @@ retain separate enclosing AND/OR context, course evidence, pointers and hashes.
 The program definition includes its captured admission-policy context once.
 Changing a standing, negation or linked program changes the structure fingerprint.
 
+Extractor 1.3.0 also flags conflicting total-credit mentions: a structured
+`degreeHours` value (itself sometimes a range, e.g. `"123-130"`) compared
+against every "Grand Total Credits" / "Total Credits" / "Total Program
+Credits" figure printed in that program's own sections
+(`catalog_credit_conflict_rows()`, `R/branches/catalog-extraction.R`).
+A `total_credit_conflict` source issue fires when any two of those figures
+(or ranges) don't overlap — the same shape of conflict already hand-noted in
+`degree_catalogs.csv` for Biology, Business, Physics, Population Health and
+Dental Hygiene before anyone automated the check. It never decides which
+number is correct, and it only catches labeled totals already captured in a
+scan; it is not a line-item sum of every structured requirement.
+
+**Deliberately scoped to one program's own page, not its concentrations.** A
+concentration's own "Grand Total Credits" almost always names a different,
+smaller quantity (its share of the major) rather than the whole degree, so
+comparing it against the parent's Degree Hours produced false conflicts on
+38 of ~115 programs in the first real-data run — far more noise than signal.
+Radiologic Sciences' documented concentration-vs-parent conflict (nuclear
+medicine's own total vs. the parent's Degree Hours) is a real case this
+narrower check does not catch; it remains a manual find until a principled,
+measured way to tell "alternative full-degree total" apart from "concentration
+subtotal" is added.
+
 Admission is a required status, distinct from satisfying academic criteria.
 Automatic admission must be supported by the target program's policy; the scanner
 does not infer that a student has been admitted or compile that policy into an
@@ -202,9 +225,11 @@ course records to inspect.
   fully represent as draft rules. A flag indicates an extraction gap, not
   necessarily an error or ambiguous language in the catalog. A literal
   **Course Not Found** gets its own reason and an action to verify the source.
-- **Source checks** lists inclusion flags, missing degree sections and ambiguous
-  credential classifications. Current checks run on the saved records, including
-  older analyses created before `source-issues.csv` was added; nothing is fetched.
+- **Source checks** lists inclusion flags, missing degree sections, ambiguous
+  credential classifications, and conflicting total-credit mentions on a
+  program's own page (1.3.0; see above). Current checks run on the saved
+  records, including older analyses created before `source-issues.csv` was
+  added or before 1.3.0; nothing is fetched.
 - **Milestones** lists cited uses of shared standing/admission gates, following
   the degree/type filters. Inspect preserves the complete rule and shared ID;
   admission uses also show the linked program's frozen policy, independently

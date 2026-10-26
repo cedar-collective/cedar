@@ -294,3 +294,40 @@ radiologic-nuclear-bs-2026,math1240,degree,degree-radiologic-nuclear-bs-2026-mat
 radiologic-nuclear-bs-2026,engl1,general,degree-radiologic-nuclear-bs-2026-engl1,Illustrative English route; complete Gen Ed allocation remains separate.
 population-health-bs-2026,poph-missing-1,degree,degree-population-health-bs-2026-poph-missing-1,"The catalog core says Course Not Found. Identity, actual credits, level and prerequisites are unknown. This card reserves a provisional 3-credit planning slot; it is not an official course or credit value."
 population-health-bs-2026,poph-missing-2,degree,degree-population-health-bs-2026-poph-missing-2,"The catalog core says Course Not Found. Identity, actual credits, level and prerequisites are unknown. This card reserves a provisional 3-credit planning slot; it is not an official course or credit value."
+mechanical-engineering-bs-2026,math1215,prerequisite,route-*-math1215-math1220,Preparation added by the selected math or English starting route; not a separately listed major requirement.
+mechanical-engineering-bs-2026,math1220,prerequisite,route-*-math1220-math1250,Preparation added by the selected math or English starting route; not a separately listed major requirement.
+mechanical-engineering-bs-2026,math1250,prerequisite,route-*-math1250-calc1,Preparation added by the selected math or English starting route; not a separately listed major requirement.
+mechanical-engineering-bs-2026,calc1,degree,degree-mechanical-engineering-bs-2026-calc1,Named degree requirement.
+mechanical-engineering-bs-2026,englX,prerequisite,route-*-englX-englY,Preparation added by the selected math or English starting route; not a separately listed major requirement.
+mechanical-engineering-bs-2026,englY,general,degree-mechanical-engineering-bs-2026-englY,Illustrative English route toward general communication requirements; full Gen Ed allocation is not encoded.
+mechanical-engineering-bs-2026,engl1,general,degree-mechanical-engineering-bs-2026-engl1,Illustrative English route toward general communication requirements; full Gen Ed allocation is not encoded.
+mechanical-engineering-bs-2026,engl2,degree,degree-mechanical-engineering-bs-2026-engl2,Named degree requirement (Composition II).
+mechanical-engineering-bs-2026,me160l,degree,degree-mechanical-engineering-bs-2026-me160l,Degree requirement in this selected example.
+mechanical-engineering-bs-2026,mechem,degree,degree-mechanical-engineering-bs-2026-mechem,Degree requirement in this selected example.
+mechanical-engineering-bs-2026,meeng130l,degree,degree-mechanical-engineering-bs-2026-meeng130l,Degree requirement in this selected example.
+mechanical-engineering-bs-2026,me260l,degree,degree-mechanical-engineering-bs-2026-me260l,Degree requirement in this selected example.
+mechanical-engineering-bs-2026,me217,degree,degree-mechanical-engineering-bs-2026-me217,Degree requirement in this selected example.
+mechanical-engineering-bs-2026,mephys1,degree,degree-mechanical-engineering-bs-2026-mephys1,Degree requirement in this selected example.
+mechanical-engineering-bs-2026,mecalc2,degree,degree-mechanical-engineering-bs-2026-mecalc2,Degree requirement in this selected example.
+mechanical-engineering-bs-2026,mece202,degree,degree-mechanical-engineering-bs-2026-mece202,Degree requirement in this selected example.
+mechanical-engineering-bs-2026,mephys2,degree,degree-mechanical-engineering-bs-2026-mephys2,Degree requirement in this selected example.
+mechanical-engineering-bs-2026,mecalc3,degree,degree-mechanical-engineering-bs-2026-mecalc3,Degree requirement in this selected example.
+mechanical-engineering-bs-2026,mece203,degree,degree-mechanical-engineering-bs-2026-mece203,Degree requirement in this selected example.
+mechanical-engineering-bs-2026,meode,degree,degree-mechanical-engineering-bs-2026-meode,Degree requirement in this selected example.
+mechanical-engineering-bs-2026,medynamics,degree,degree-mechanical-engineering-bs-2026-medynamics,Degree requirement in this selected example.
+mechanical-engineering-bs-2026,mematerials,degree,degree-mechanical-engineering-bs-2026-mematerials,Degree requirement in this selected example.
+mechanical-engineering-bs-2026,melab1,degree,degree-mechanical-engineering-bs-2026-melab1,Degree requirement in this selected example.
+mechanical-engineering-bs-2026,metherm,degree,degree-mechanical-engineering-bs-2026-metherm,Degree requirement in this selected example.
+mechanical-engineering-bs-2026,mevibrations,degree,degree-mechanical-engineering-bs-2026-mevibrations,Degree requirement in this selected example.
+mechanical-engineering-bs-2026,mefluid,degree,degree-mechanical-engineering-bs-2026-mefluid,Degree requirement in this selected example.
+mechanical-engineering-bs-2026,medesign3,degree,degree-mechanical-engineering-bs-2026-medesign3,Degree requirement in this selected example.
+mechanical-engineering-bs-2026,mematsci,degree,degree-mechanical-engineering-bs-2026-mematsci,Degree requirement in this selected example.
+mechanical-engineering-bs-2026,mecontrols,degree,degree-mechanical-engineering-bs-2026-mecontrols,Degree requirement in this selected example.
+mechanical-engineering-bs-2026,meheat,degree,degree-mechanical-engineering-bs-2026-meheat,Degree requirement in this selected example.
+mechanical-engineering-bs-2026,medesign4,degree,degree-mechanical-engineering-bs-2026-medesign4,Degree requirement in this selected example.
+mechanical-engineering-bs-2026,me_microsys1,degree,degree-mechanical-engineering-bs-2026-me_microsys1,Microsystems Engineering concentration course in this selected example; not required for the base degree.
+mechanical-engineering-bs-2026,medesign5,degree,degree-mechanical-engineering-bs-2026-medesign5,Degree requirement in this selected example.
+mechanical-engineering-bs-2026,me_microsys2,degree,degree-mechanical-engineering-bs-2026-me_microsys2,Microsystems Engineering concentration course in this selected example; not required for the base degree.
+mechanical-engineering-bs-2026,me_microsys3,degree,degree-mechanical-engineering-bs-2026-me_microsys3,Microsystems Engineering concentration course in this selected example; not required for the base degree.
+mechanical-engineering-bs-2026,me_math_choice,degree,degree-mechanical-engineering-bs-2026-me_math_choice,Selected course group; individual course prerequisites still need review.
+mechanical-engineering-bs-2026,me_tech_elective,degree,degree-mechanical-engineering-bs-2026-me_tech_elective,Selected course group; individual course prerequisites still need review.
