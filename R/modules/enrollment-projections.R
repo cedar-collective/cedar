@@ -64,6 +64,69 @@ enrollment_projection_method_guide_ui <- function(guide) {
 
 projection_percent <- function(x) scales::percent(x, accuracy = 1)
 
+# None/Unrated mean "not enough evidence", which is grey, never red: an
+# unmeasured course has not failed anything. Shared by the table's axis
+# columns and the course detail's headline badges.
+projection_axis_badge <- function(value) {
+  tone <- switch(
+    value,
+    Stable = , Deep = , High = "good",
+    Moderate = "mid",
+    Thin = "thin",
+    Volatile = , Low = "poor",
+    "none"
+  )
+  htmltools::span(
+    value, class = paste0("projection-axis projection-axis--", tone)
+  )
+}
+
+# The plan, step by step from last year's class list to the sections
+# (projection_plan_steps()): each number beside where it came from. Shown open
+# in the course detail, because a plan a chair can check line by line is the
+# point of the page.
+projection_plan_steps_ui <- function(steps) {
+  if (is.null(steps) || nrow(steps) == 0L) return(NULL)
+  amount_text <- function(amount, kind) {
+    whole <- format(abs(round(amount)), big.mark = ",")
+    if (!identical(kind, "add")) return(format(round(amount), big.mark = ","))
+    if (round(amount) > 0) paste0("+", whole) else if (round(amount) < 0) {
+      paste0("\u2212", whole)
+    } else "0"
+  }
+  section_block(
+    "How this plan was built",
+    description = paste(
+      "Every number below comes from the saved projection; nothing is",
+      "estimated when this window opens."
+    ),
+    tags$table(
+      class = "enrollment-projection-steps",
+      tags$tbody(lapply(seq_len(nrow(steps)), function(i) {
+        tags$tr(
+          class = paste0("enrollment-projection-step enrollment-projection-step--",
+                         steps$kind[[i]]),
+          tags$th(scope = "row", steps$label[[i]]),
+          tags$td(class = "enrollment-projection-step-amount",
+                  amount_text(steps$amount[[i]], steps$kind[[i]])),
+          tags$td(class = "enrollment-projection-step-detail",
+                  dplyr::coalesce(steps$detail[[i]], ""))
+        )
+      }))
+    ),
+    level = "h3",
+    class = "enrollment-projection-steps-block"
+  )
+}
+
+projection_axis_named_badge <- function(name, value) {
+  htmltools::span(
+    class = "enrollment-projection-axis-named",
+    htmltools::span(class = "enrollment-projection-axis-name", name),
+    projection_axis_badge(value)
+  )
+}
+
 projection_columns_explainer <- function() {
   item <- function(name, ...) tags$li(tags$strong(name), paste0(" ", paste(...)))
   info_panel(
@@ -147,14 +210,17 @@ projection_build_explainer <- function() {
         " each past term with only the evidence available then."
       )),
       tags$li(tags$strong("The feeder adjustment."), paste0(
-        " When last year's number is the forecast, the plan still follows the",
-        " term just finished: the listed predecessor's change always counts,",
+        " When last year's number is the forecast, a Spring plan still follows",
+        " the Fall just finished: the listed predecessor's change always counts,",
         " and the other feeder courses' change counts when they moved ",
         projection_percent(defaults$plan_feeder_change),
         " or more, either way, each times the share that historically carried",
         " over. Smaller moves are noise against a course's own year. When the",
         " adjusted forecast is published it already holds these changes, and",
-        " the plan adds nothing."
+        " the plan adds nothing. A Fall plan does not follow its feeders:",
+        " following them made past Spring forecasts closer and past Fall",
+        " forecasts no closer, because a Spring feeder's change pointed the way",
+        " the Fall course moved no more often than chance."
       )),
       tags$li(tags$strong("A pressure bump for courses always full."), paste0(
         " A course near full on the first day in every recent same-season term",
@@ -357,12 +423,13 @@ enrollmentProjectionsUI <- function(id) {
       paste(
         "Each row plans one course for the target term. Sections are planned",
         "for registrations, which start from last year's same-term",
-        "registrations; the plan follows a clear change in its feeder courses",
-        "in the term just finished, a course that is always full gets a",
+        "registrations; a Spring plan follows a clear change in its feeder",
+        "courses the Fall before, a course that is always full gets a",
         "pressure bump on top, and a course whose enrollment moved sharply is",
         "flagged for a look. The range is where past forecasts",
         "for that course usually landed, and it assumes seats like last",
-        "year's."
+        "year's. Click any course to see how its plan was built, step by",
+        "step, and how close past forecasts for it came."
       )
     ),
     # Each explainer answers one question a reader brings to the page, and
@@ -380,9 +447,9 @@ enrollmentProjectionsUI <- function(id) {
         subtab_header(
           "Projections",
           paste(
-            "One published projection per course for the selected target term,",
-            "with the evidence behind it. Click a course for its floor, Fall",
-            "deltas, feeder adjustment, capacity, and full method evidence."
+            "One published projection per course for the selected target term.",
+            "Click a course to see how its plan was built, step by step, with",
+            "the evidence behind each step."
           )
         ),
         uiOutput(ns("pressure_summary")),
@@ -596,21 +663,7 @@ enrollmentProjectionsServer <- function(id, bundles, load_bundle, programs) {
       )
     })
 
-    # None/Unrated mean "not enough evidence", which is grey, never red: an
-    # unmeasured course has not failed anything.
-    axis_cell <- function(value) {
-      tone <- switch(
-        value,
-        Stable = , Deep = , High = "good",
-        Moderate = "mid",
-        Thin = "thin",
-        Volatile = , Low = "poor",
-        "none"
-      )
-      htmltools::span(
-        value, class = paste0("projection-axis projection-axis--", tone)
-      )
-    }
+    axis_cell <- projection_axis_badge
 
     flag_cell <- function(value) {
       if (is.na(value) || !nzchar(value)) return("\u2014")
@@ -719,7 +772,7 @@ enrollmentProjectionsServer <- function(id, bundles, load_bundle, programs) {
         pagination = FALSE,
         columns = list(
           course = reactable::colDef(
-            name = "Course", width = 100,
+            name = "Course", width = 96,
             cell = function(value, index) {
               htmltools::tagList(
                 htmltools::strong(value),
@@ -729,7 +782,7 @@ enrollmentProjectionsServer <- function(id, bundles, load_bundle, programs) {
           ),
           department = reactable::colDef(show = FALSE, searchable = TRUE),
           planning_sections = reactable::colDef(
-            name = "Sections", align = "right", width = 80,
+            name = "Sections", align = "right", width = 70,
             headerStyle = list(whiteSpace = "nowrap"),
             header = htmltools::span(
               "Sections",
@@ -849,14 +902,14 @@ enrollmentProjectionsServer <- function(id, bundles, load_bundle, programs) {
           ),
           recent_sections = reactable::colDef(show = FALSE),
           recent_terms = reactable::colDef(show = FALSE),
-          flags = reactable::colDef(name = "Flags", minWidth = 170, cell = flag_cell),
+          flags = reactable::colDef(name = "Flags", minWidth = 160, cell = flag_cell),
           attention = reactable::colDef(show = FALSE),
           stability = reactable::colDef(
-            name = "Stability", minWidth = 85, cell = axis_cell
+            name = "Stability", minWidth = 80, cell = axis_cell
           ),
           stability_reason = reactable::colDef(show = FALSE),
           depth = reactable::colDef(
-            name = "Depth", minWidth = 80, cell = axis_cell
+            name = "Depth", minWidth = 64, cell = axis_cell
           ),
           depth_reason = reactable::colDef(show = FALSE),
           accuracy = reactable::colDef(
@@ -872,7 +925,7 @@ enrollmentProjectionsServer <- function(id, bundles, load_bundle, programs) {
           ),
           accuracy_reason = reactable::colDef(show = FALSE),
           seat_consistency = reactable::colDef(
-            name = "Seat consistency", minWidth = 95, cell = axis_cell,
+            name = "Seat consistency", minWidth = 105, cell = axis_cell,
             header = htmltools::span(
               "Seat consistency",
               title = paste(
@@ -1045,49 +1098,95 @@ enrollmentProjectionsServer <- function(id, bundles, load_bundle, programs) {
 
     projection_detail_ui <- function(data) {
       current <- data$current
+      adjusted_candidate_text <- if (isTRUE(current$adjusted_applicable[[1]])) {
+        paste0(
+          format(round(current$adjusted_projection[[1]]), big.mark = ","),
+          " (", current$adjusted_reason[[1]], ")"
+        )
+      } else {
+        dplyr::coalesce(current$adjusted_reason[[1]], "Not applicable")
+      }
+      estimated_sections_text <- if (is.na(current$recommended_sections)) {
+        "Unavailable"
+      } else {
+        format(current$recommended_sections, big.mark = ",")
+      }
+      planned_text <- if (is.finite(current$planned_registrations)) {
+        format(round(current$planned_registrations), big.mark = ",")
+      } else {
+        "Unavailable"
+      }
       tags$div(
         id = session$ns("detail"),
         class = "enrollment-projection-detail",
         tags$p(class = "enrollment-projection-lead", current$summary_sentence),
-        tags$dl(
-          class = "enrollment-projection-summary",
-          tags$dt("Selected method"), tags$dd(current$method_label),
-          tags$dt("Why selected"), tags$dd(current$selection_reason),
-          tags$dt("Adjusted candidate"),
-          tags$dd(
-            if (isTRUE(current$adjusted_applicable[[1]])) {
-              paste0(
-                format(round(current$adjusted_projection[[1]]), big.mark = ","),
-                " (", current$adjusted_reason[[1]], ")"
-              )
-            } else {
-              dplyr::coalesce(current$adjusted_reason[[1]], "Not applicable")
-            }
+        # The three things to act on, large and up front: what to plan, how
+        # many sections, and how many registrations they are sized for. How
+        # those numbers were built comes straight after, open, step by step;
+        # the reasoning behind each step is in the collapsed evidence trail.
+        tags$div(
+          class = "enrollment-projection-headline",
+          tags$div(
+            class = "enrollment-projection-headline-item",
+            tags$span(class = "enrollment-projection-headline-label", "Plan"),
+            tags$span(class = "enrollment-projection-headline-value",
+                      current$recommendation)
           ),
-          tags$dt("Stability"), tags$dd(current$stability),
-          tags$dt("Depth"), tags$dd(current$depth),
-          tags$dt("Reliability"), tags$dd(current$accuracy),
-          tags$dt("Seat consistency"),
-          tags$dd(paste0(current$seat_consistency, ": ", current$seat_consistency_reason)),
-          tags$dt("Reading the two together"), tags$dd(current$reliability_reading),
-          tags$dt("What this means"), tags$dd(current$axis_explanation),
-          tags$dt("Why it is listed"), tags$dd(current$inclusion_reason),
-          tags$dt("Estimated sections"),
-          tags$dd(
-            if (is.na(current$recommended_sections)) "Unavailable" else
-              format(current$recommended_sections, big.mark = ",")
+          tags$div(
+            class = "enrollment-projection-headline-item",
+            tags$span(class = "enrollment-projection-headline-label",
+                      "Estimated sections"),
+            tags$span(class = "enrollment-projection-headline-value",
+                      estimated_sections_text)
           ),
-          tags$dt("Feeder adjustment"), tags$dd(current$plan_feeder_note),
-          tags$dt("Pressure bump"), tags$dd(current$pressure_bump_note),
-          tags$dt("Planning recommendation"), tags$dd(current$recommendation),
-          tags$dt("Saturation floor"), tags$dd(current$floor_note),
-          tags$dt("Fall deltas"),
-          tags$dd(dplyr::coalesce(current$adjusted_delta_basis, "Not available")),
-          tags$dt("Regime check"), tags$dd(current$regime_note),
-          tags$dt("Capacity check"), tags$dd(current$capacity_limit_note)
+          tags$div(
+            class = "enrollment-projection-headline-item",
+            tags$span(class = "enrollment-projection-headline-label",
+                      "Planned registrations"),
+            tags$span(class = "enrollment-projection-headline-value",
+                      planned_text)
+          )
+        ),
+        projection_plan_steps_ui(data$plan_steps),
+        tags$div(
+          class = "enrollment-projection-axes-row",
+          # Named as in the table's column headers: four bare badges reading
+          # "Moderate Deep Moderate Low" say nothing about which is which.
+          projection_axis_named_badge("Stability", current$stability),
+          projection_axis_named_badge("Depth", current$depth),
+          projection_axis_named_badge("Reliability", current$accuracy),
+          projection_axis_named_badge("Seat consistency", current$seat_consistency),
+          tags$p(class = "enrollment-projection-axes-reading",
+                 current$reliability_reading)
         ),
         section_heading("Recent same-season evidence", level = "h3"),
         reactable::reactableOutput(session$ns("history_table")),
+        info_panel(
+          "Why this method, why this course: the full evidence trail",
+          tags$dl(
+            class = "enrollment-projection-summary",
+            tags$dt("Selected method"), tags$dd(current$method_label),
+            tags$dt("Why selected"), tags$dd(current$selection_reason),
+            tags$dt("Adjusted candidate"), tags$dd(adjusted_candidate_text),
+            tags$dt("Seat consistency detail"),
+            tags$dd(current$seat_consistency_reason),
+            tags$dt("What the axes mean"), tags$dd(current$axis_explanation),
+            tags$dt("Why it is listed"), tags$dd(current$inclusion_reason),
+            tags$dt("Feeder adjustment"), tags$dd(current$plan_feeder_note),
+            tags$dt("Pressure bump"), tags$dd(current$pressure_bump_note),
+            tags$dt("Saturation floor"), tags$dd(current$floor_note),
+            tags$dt("Fall deltas"),
+            tags$dd(dplyr::coalesce(current$adjusted_delta_basis, "Not available")),
+            tags$dt("Regime check"), tags$dd(current$regime_note),
+            tags$dt("Capacity check"), tags$dd(current$capacity_limit_note)
+          ),
+          description = paste(
+            "Why this method and this course were selected, the feeder and",
+            "pressure-bump arithmetic, and the floor, Fall-delta, regime, and",
+            "capacity checks behind the number above."
+          ),
+          class = "enrollment-projection-evidence"
+        ),
         info_panel(
           "Analyst detail: methods, movement diagnostic, and candidates",
           tags$div(

@@ -178,7 +178,7 @@ As waitlists accumulate, the flat 5% will be replaced by a measured allowance.
 ### The feeder adjustment
 
 Last year's registrations are a year old by the time the schedule is built.
-The plan still follows the term just finished:
+A Spring plan still follows the Fall just finished:
 
 - **A course taken just before this one** (Composition I before Composition II,
   Calculus I before II) counts every time, up or down. Most of its students go
@@ -194,6 +194,10 @@ The plan still follows the term just finished:
   changes, and the plan adds nothing.
 - Two terms ahead, the term just finished has not happened yet, so there is
   nothing to follow and the course's detail says so.
+- **A Fall plan does not follow its feeders.** Following Fall feeder courses
+  made past Spring forecasts closer. Following Spring feeder courses made past
+  Fall forecasts no closer: a Spring feeder's change pointed the way the Fall
+  course moved about half the time, no better than a coin toss.
 
 The **Plan adds** column shows the feeder change beside any bump, and a
 course's detail gives the arithmetic. The registration forecast and its
@@ -248,12 +252,36 @@ The table is sized to fit a laptop window:
 | **Seat consistency** | High, Moderate, Low, or Unrated: how steady the course's seats were in those same past terms (held within 10% every time, moved once, moved more) |
 
 Clicking a row opens the course's evidence in a window over the table; close it
-to return to the same place in the list. The evidence opens with one sentence
-that says what to plan and why, then the selected method and why it was
-selected, the three axes, seat consistency and what it says beside
-reliability, why the course is listed, the feeder adjustment, the pressure bump, the planning
-recommendation, and the floor, Fall delta, regime, and capacity checks. The method plot, movement diagnostic, and
-candidate table sit under **Analyst detail**.
+to return to the same place in the list. It opens with one sentence that says
+what to plan and why, then three things large and up front: the planning
+recommendation, the estimated sections, and the planned registrations they
+are sized for.
+
+**How this plan was built** follows, open: one line per step from last
+year's class list to the sections, each with where its number came from.
+
+- Registered last year: everyone on the class lists, including students who
+  later dropped.
+- Students still waiting, when the course was near full.
+- The enrollment change in the term just finished, split into retakes, the
+  listed predecessor, and other feeder courses.
+- The forecast, with how far past forecasts for the course missed.
+- The feeder adjustment and the pressure bump, when the plan has them.
+- The planned registrations.
+- The sections: registrations divided by the section size, rounded up, beside
+  the draft schedule's count.
+
+Each total is the sum of the lines above it, so a reader can check the plan
+line by line.
+
+Beneath that are the four axes as badges, with the one sentence reading
+reliability beside seat consistency, and then the last four same-season
+terms. The reasoning behind each step is in **Why this method, why this
+course: the full evidence trail**, collapsed by default: the selected method
+and why, why the course is listed, the feeder and pressure-bump notes, and the
+floor, Fall-delta, regime and capacity checks. The method plot, movement
+diagnostic and candidate table sit under **Analyst detail**, collapsed as
+well.
 
 The plot compares every forecasting method against historical ever-registered,
 first-day, census, and final/last-day enrollment. It is restricted to the

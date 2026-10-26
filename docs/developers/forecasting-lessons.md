@@ -40,6 +40,7 @@ between the two population models.
 
 | Model | Bundle schema | Calculation contract | Evidence |
 |---|---:|---|---|
+| `0.27.0` | 25 | The plan's feeder adjustment applies to Spring targets only (`plan_feeder_seasons`). Rescored past forecasts: following feeders took Spring error from 14.71% to 13.60% and raised Fall error from 12.78% to 13.01%, and a Spring feeder's change pointed the way the Fall course moved in 97 of 194 folds. The adjusted candidate keeps its deltas in both seasons. Rebuilt on the same data as 0.26.0, no forecast, bump, plan or section changes in either season; Fall plans' notes now state the rule | [Feeder adjustment for Spring plans only](#feeder-adjustment-for-spring-plans-only-model-0270-2026-10-25) below |
 | `0.26.0` | 25 | A course's listed predecessor (`projection_sequences.csv`: ENGL 1110 before 1120, MATH 1512 before 1522, MATH 1250 before 1512) carries its enrollment change in at its own rate and leaves the pooled feeders. The plan follows the term just finished where the spine is published: the predecessor's change always, the pooled feeders' only at 5% or more either way. The pressure bump is 5%, and feeders no longer cancel it. On the same data, Spring 2027 forecasts change for three courses (ENGL 1120 and MATH 1512 now publish the adjusted candidate); bumps fall from 1,134 to 567 registrations and planned sections from 616 to 596; no plan gets a feeder adjustment, because every spine-published course's feeders moved under 5% in Fall 2026. Fall 2027 forecasts are unchanged; bumps fall from 2,151 to 1,323 and sections from 752 to 732 | [Sequences, the feeder adjustment and a 5% bump](#sequences-the-feeder-adjustment-and-a-5-bump-model-0260-2026-10-24) below |
 | `0.25.0` | 24 | No forecast change. The recent history is saved by delivery campus as well (`recent_campus_history`), and the summary flags a campus full on the first day while another had room, which the pooled market hides; a prior term at 98% or more is flagged full, not near full; an unknown prior fill names its cause. On the Oct 23 pull it flags 9 Spring 2027 rows, each EA full on the Spring 2026 first day with ABQ under 90%, and 2 Fall 2027 rows (FYEX 1030 EA full; NATV 1150 ABQ full with EA at 86%). The page states that the range assumes steady seats and how often it held, rebuilt from earlier forecasts only: Spring 86 of 105 with steady seats and 40 of 99 when they moved; Fall 98 of 115 and 28 of 91. A row whose draft moves the seats 10% or more says so under its range | [Re-audit on production data](#re-audit-on-production-data-model-0230-2026-10-20); ISSUES.md M36 |
 | `0.25.0` | 24 | A term pulled before one of its later sessions began is no longer read as undated. Its begun sessions' first day, divided by all the seats, is a lower bound on fill: it settles saturation, the pressure bump and the expansion response only where it already reaches their level, the floor note says "at least", and an unsettled term names the session not yet begun. On a Fall 2026 class list pulled Oct 8, four days before the second-half sessions began, 12 of the 65 Fall 2027 courses offered in Fall 2026 are pending in the pooled market; the bound settles 5 as near full (MATH 1350 at least 94.8%, ENGL 1120 94.6%, PHIL 1120 92.6%, COMM 1130 91.8%, PHIL 1115 90.2%), and the other 7 now name the pending session instead of missing status dates. Once a pull covers every session start, nothing is pending and nothing changes | ISSUES.md I28 |
@@ -426,6 +427,48 @@ A coverage level chosen as policy is the deliberate version of this margin:
 plan seats so that past forecasts would have covered, say, 8 terms in 10. On
 this record that is the first-day plan plus 21%. Registrations are the simpler
 rule and do as well as a flat 10%.
+
+## Feeder adjustment for Spring plans only (model 0.27.0, 2026-10-25)
+
+Should the plan follow feeders at all, and only past a 5% move? Each past
+forecast of the 0.26.0 bundles was rescored with its own saved deltas: the
+spine, then the spine plus the listed sequence, then plus the pooled feeders
+under each threshold. Error is weighted by course size.
+
+| Rule | Spring targets (198 folds, 69 courses) | Fall targets (195 folds, 71 courses) |
+|---|---:|---:|
+| Spine alone | 14.71% | 12.78% |
+| Spine + listed sequence | 13.85% | 12.78% |
+| + pooled feeders, always | 13.61% | 13.03% |
+| + pooled feeders at 2.5% | 13.58% | 13.00% |
+| + pooled feeders at 5% | 13.60% | 13.01% |
+| + pooled feeders at 7.5% | 13.48% | 13.05% |
+| + pooled feeders at 10% | 13.64% | 13.01% |
+
+Three readings:
+
+1. **The threshold is a wash.** Between always and 10% the error moves by
+   less than two tenths of a point in either season. The 5% line stays: it
+   keeps a plan from moving on a change too small to matter, and it costs
+   nothing measurable.
+2. **Feeders help Spring plans and not Fall plans.** For Spring targets the
+   sequence takes 0.86 points off the spine and the pooled feeders 0.25 more;
+   where feeders moved 5% or more, error falls from 14.96% to 14.05%, and the
+   feeder delta pointed the way the course moved in 44 of 80 of those folds
+   (correlation 0.22). For Fall targets the sequence changes nothing and the
+   pooled feeders add error: overall 12.78% to 13.01%, and 11.56% to 12.01%
+   where they moved 5% or more. Their delta pointed the right way in 97 of 194
+   folds, correlation -0.09: a coin toss.
+3. **The Fall sequences point the wrong way as often as not.** ENGL 1110's
+   Spring change pointed the wrong way for Fall ENGL 1120 in two of three
+   Falls. The pairs are weaker in that direction (41% of Spring MATH 1512
+   students go on to Fall MATH 1522, against 59% from Fall to Spring).
+
+So the plan's feeder adjustment applies to Spring targets only
+(`plan_feeder_seasons = "spring"`). The adjusted forecast candidate keeps its
+deltas in both seasons: it publishes only by beating the spine on earlier
+aftcasts, so the selection rule already guards it, and Fall 2027 publishes it
+for two courses.
 
 ## Sequences, the feeder adjustment and a 5% bump (model 0.26.0, 2026-10-24)
 

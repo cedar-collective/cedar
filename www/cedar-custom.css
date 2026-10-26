@@ -283,6 +283,127 @@ details.enrollment-projection-method-guide {
   max-width: 980px;
 }
 
+/* Course detail modal: the three things to act on, large and up front. */
+.enrollment-projection-headline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  margin: 0 0 14px;
+  padding: 10px 0 14px;
+  border-bottom: 1px solid rgba(71, 105, 117, 0.22);
+}
+
+.enrollment-projection-headline-item {
+  display: flex;
+  flex-direction: column;
+  min-width: 140px;
+}
+
+.enrollment-projection-headline-label {
+  color: var(--cedar-text-muted, #666);
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.enrollment-projection-headline-value {
+  font-size: 1.2rem;
+  font-weight: 650;
+  color: var(--charcoal-soil);
+}
+
+/* The four evidence-axis badges plus the one sentence reading them together. */
+.enrollment-projection-axes-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px;
+  margin: 0 0 16px;
+}
+
+.enrollment-projection-axis-named {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-right: 8px;
+}
+
+.enrollment-projection-axis-name {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+
+.enrollment-projection-axes-reading {
+  flex-basis: 100%;
+  margin: 4px 0 0;
+  color: var(--text-secondary);
+}
+
+details.enrollment-projection-evidence {
+  margin-top: 12px;
+}
+
+/* How the plan was built: label, amount, and where it came from, one step per
+   row; totals ruled above and set heavier so the arithmetic reads down. */
+.enrollment-projection-steps-block {
+  margin: 0 0 16px;
+}
+
+.enrollment-projection-steps {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.enrollment-projection-steps th,
+.enrollment-projection-steps td {
+  padding: 5px 10px 5px 0;
+  vertical-align: top;
+  text-align: left;
+}
+
+.enrollment-projection-steps th {
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.enrollment-projection-step-amount {
+  text-align: right !important;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  min-width: 70px;
+}
+
+.enrollment-projection-step-detail {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.enrollment-projection-step--total th,
+.enrollment-projection-step--total td,
+.enrollment-projection-step--sections th,
+.enrollment-projection-step--sections td {
+  border-top: 1px solid rgba(71, 105, 117, 0.35);
+}
+
+.enrollment-projection-step--total th,
+.enrollment-projection-step--total .enrollment-projection-step-amount,
+.enrollment-projection-step--sections th,
+.enrollment-projection-step--sections .enrollment-projection-step-amount {
+  font-weight: 650;
+}
+
+@media (max-width: 767px) {
+  .enrollment-projection-headline {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .enrollment-projection-steps th {
+    white-space: normal;
+  }
+}
+
 .enrollment-projection-method-family {
   border-top: 1px solid rgba(71, 105, 117, 0.22);
   margin-top: 12px;

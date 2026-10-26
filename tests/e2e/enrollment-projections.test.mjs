@@ -395,19 +395,25 @@ async function closeEvidence(page) {
     { timeout: 60000 }
   );
   // The method plot, movement diagnostic, and candidate table sit in the
-  // collapsed Analyst detail accordion, and Shiny renders nothing inside it
-  // until it opens -- so open it before waiting on any of them.
+  // collapsed Analyst detail accordion, and the method/course evidence trail
+  // sits in its own collapsed panel beside it; Shiny renders nothing inside a
+  // closed <details> -- so open both before waiting on or reading any of it.
   const movementPanel = await page.evaluate(() => {
     const panel = document.querySelector('details.enrollment-projection-movement');
+    const evidence = document.querySelector('details.enrollment-projection-evidence');
     if (panel) panel.open = true;
+    if (evidence) evidence.open = true;
     return {
       found: !!panel,
       title: panel ? panel.querySelector('summary')?.innerText.trim() : '',
+      evidenceFound: !!evidence,
     };
   });
   check('course detail includes the analyst detail accordion',
     movementPanel.found && movementPanel.title.includes('movement diagnostic'),
     movementPanel.title || '(missing)');
+  check('course detail includes the method/course evidence accordion',
+    movementPanel.evidenceFound);
   await waitForSelector(
     page,
     '#enrollment_projections-candidate_table .rt-tbody .rt-tr',
@@ -438,8 +444,12 @@ async function closeEvidence(page) {
     return detail ? detail.innerText : '';
   });
   check('course detail retains planning, bias, and population-fit evidence',
-    ['Plan ', 'Planning recommendation', 'Saturation floor', 'Fall deltas', 'Regime check']
-      .every((label) => detailSummaryText.includes(label)), detailSummaryText.slice(0, 500));
+    ['Plan', 'Estimated sections', 'Planned registrations', 'How this plan was built',
+      'Forecast registrations', 'Selected method', 'Saturation floor',
+      'Fall deltas', 'Regime check']
+      // innerText applies CSS text-transform: the headline labels read in capitals.
+      .every((label) => detailSummaryText.toLowerCase().includes(label.toLowerCase())),
+    detailSummaryText.slice(0, 500));
   await waitForSelector(page, '.modal.show .modal-footer button', { timeout: 60000 });
 
   const history = await readReactable(page, 'enrollment_projections-history_table');

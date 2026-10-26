@@ -560,8 +560,32 @@ definitions:
             functions: [get_true_waitlisted_rows, summarize_waitlist_demand]
 
   - id: enrollment-projection
-    current_version: "1.7.0"
+    current_version: "1.8.0"
     versions:
+      - version: "1.8.0"
+        title: Saved enrollment projections
+        summary: Saved Spring and Fall projections estimate ever-registered class-list demand for the pooled Albuquerque and online market as prior same-season demand, plus the students still waiting when that term was full on the first day of classes, moved by Fall enrollment changes where they beat the plain baseline on earlier aftcasts; planning sections are sized for projected registrations, which run above first-day enrollment by design, plus, for a Spring plan, a labelled feeder adjustment that follows the Fall just finished (a listed predecessor course always, other feeder courses when they moved 5% or more) and a labelled pressure bump for a course near full in every recent term (5%, or the students left waiting if more), and expected first-day enrollment is shown beside them.
+        population: Monitored course-market groups in the saved projection bundle.
+        unit: Course and target term in the pooled ABQ/EA market.
+        numerator: Prior same-season enrollment (the spine), or the spine plus a saturation floor (the students still waiting at the end of that term who are on no campus's class list in the market, when 90% or more of the seats were filled on the first day) plus repeat, listed-predecessor and pooled feeder deltas read from the term just finished, when that candidate beat the spine on at least three earlier shared aftcasts; planning sections convert projected registrations plus the feeder adjustment and any pressure bump using the bundle's section-size assumptions.
+        denominator: Historical actual demand for error measures; expected section size for the planning-section conversion.
+        campus: ABQ and EA are pooled deliberately, not presented as separate campus forecasts.
+        time_window: The saved target term, as-of term, build timestamp, and historical evaluation windows are displayed from the bundle.
+        exclusions: Unmonitored courses and unsupported target seasons are outside this model. Shiny does not fit or select models during a session. Fall deltas use enrollments, never grades. A waiting student already on the market's class list on either campus is counted once, in the spine. December intersession sections and their students are left out of every input, because they start weeks after the term begins and register after it settles.
+        limitations:
+          - Stability, depth, and reliability (the accuracy axis, High, Moderate, or Low) are reported as three separate axes, with seat consistency beside reliability; Unrated and None remain visible. Low reliability with steady seats is the forecast's own miss; with moving seats, most of the miss followed the schedule. Accuracy is the realised error of the selection rule replayed at each past term, so it is out of sample but still no guarantee of future coverage.
+          - First-day enrollment is reconstructed from registration status dates. A term whose class lists carry no status dates (Fall 2024 and Spring 2025) has no first-day count; it is not judged full or not full, and census is not substituted. A term pulled before one of its later sessions began has no complete first-day count either; it is judged near full only when the sessions that had begun already fill 90% of all its seats, and the note says "at least".
+          - Capacity counts as reached, and an overprojection as Capacity-bounded, when first-day enrollment filled 98% or more of the scheduled seats; seats pooled over many sections rarely fill to the last one.
+          - A saturated prior term with no retained waitlist rows reports the spine as its own floor; class lists retain waitlist rows only from Summer 2026, so the floor has almost no past-term aftcasts to be tested against.
+          - The waiting students are a lower bound on unserved demand, not an estimate of it; a student who gave up without joining a waitlist leaves no record.
+          - Sections are planned for registrations, not first-day seats, because running short of seats costs more than an empty one. In past aftcasts, first-day sizing fell short of the seats filled on day one 61% of the time and registration sizing 32%.
+          - The pressure bump is an allowance, not a measurement. A near-full course's registrations follow its seats, so its count understates demand; until retained waitlists can measure the shortfall, a flat 5% (or the students left waiting, if more) is added to the plan, never to the forecast or its accuracy. Feeder courses never cancel it.
+          - The feeder adjustment changes the plan, never the forecast or its accuracy, and is zero where the published forecast already includes the feeder changes. It applies to Spring plans only, since following Spring feeder courses did not make past Fall forecasts closer. The predecessor list is the institution's (projection_sequences.csv) and is applied to past terms too, so the carry-through rates learned at a past term use a list chosen later.
+          - The definition version describes the metric. The bundle's separate model_version and schema_version identify the actual calculation and artifact format.
+        guide: users/enrollment-projections
+        implementation:
+          - file: R/features/enrollment-projections.R
+            functions: [build_enrollment_projection_view, load_latest_enrollment_projection_bundle]
       - version: "1.7.0"
         title: Saved enrollment projections
         summary: Saved Spring and Fall projections estimate ever-registered class-list demand for the pooled Albuquerque and online market as prior same-season demand, plus the students still waiting when that term was full on the first day of classes, moved by Fall enrollment changes where they beat the plain baseline on earlier aftcasts; planning sections are sized for projected registrations, which run above first-day enrollment by design, plus a labelled feeder adjustment that follows the term just finished (a listed predecessor course always, other feeder courses when they moved 5% or more) and a labelled pressure bump for a course near full in every recent term (5%, or the students left waiting if more), and expected first-day enrollment is shown beside them.

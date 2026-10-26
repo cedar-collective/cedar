@@ -10,6 +10,11 @@
 # Groups are monitoring scopes. Projection rows use the named market and course;
 # campus and part-term allocation remains in saved delivery components.
 
+# 0.27.0 (schema 25): the plan's feeder adjustment applies to Spring targets
+# only (plan_feeder_seasons). On past forecasts, Fall feeder changes improved
+# Spring forecasts and did not improve Fall ones: a Spring feeder change
+# pointed the way the Fall course moved no more often than chance. The
+# adjusted candidate still carries its deltas, because selection guards it.
 # 0.26.0 (schema 25): the plan follows the term just finished. A course's listed
 # predecessor (projection_sequences.csv) carries its enrollment change in at
 # that pair's own rate, and is taken out of the pooled feeders so no student
@@ -55,7 +60,7 @@
 # saturation floor and two Fall-enrollment deltas and must beat the spine on
 # rolling aftcasts. (0.19.0 introduced rolling selection and the
 # occupancy-based capacity signal.)
-CEDAR_ENROLLMENT_PROJECTION_MODEL_VERSION <- "0.26.0"
+CEDAR_ENROLLMENT_PROJECTION_MODEL_VERSION <- "0.27.0"
 
 CEDAR_ENROLLMENT_PROJECTION_SCHEMA_VERSION <- 25L
 # Capacity is reached at CEDAR_FULL_FILL first-day fill and a prior term is

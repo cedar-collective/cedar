@@ -868,6 +868,149 @@ projection_summary_sentence <- function(projections) {
 }
 
 
+# How one course's plan was built, step by step from last year's class list to
+# the sections: every number on the course's detail, each with where it came
+# from, so a reader can check the plan without opening the evidence. Display
+# only, from saved fields: the projection's own audit trail (spine, floor,
+# deltas), the plan's two additions, and the section size. Returns one row per
+# step: `label`, `amount`, `kind` ("start", "add", "total" or "sections") and
+# `detail`. A course with no projection has no steps.
+projection_plan_steps <- function(row) {
+  projection_require_columns(
+    row,
+    c("term_type", "method_id", "spine", "spine_term", "floor_uplift",
+      "delta_repeat", "delta_sequence", "delta_feeder",
+      "adjusted_sequence_courses", "adjusted_preceding_term",
+      "projected_classlist_total", "accuracy", "wape", "n_backtests",
+      "backtest_term_range", "plan_feeder_adjustment", "plan_feeder_note",
+      "pressure_bump", "pressure_bump_note", "planned_registrations",
+      "reference_section_size", "recommended_sections",
+      "scheduled_sections", "target_schedule_available"),
+    "projection_plan_steps()"
+  )
+  if (nrow(row) != 1L) {
+    stop("[enrollment-projections.R] projection_plan_steps() takes one row.",
+         call. = FALSE)
+  }
+  empty <- tibble::tibble(
+    label = character(), amount = numeric(), kind = character(),
+    detail = character()
+  )
+  if (!is.finite(row$projected_classlist_total) || !is.finite(row$spine)) {
+    return(empty)
+  }
+  count <- function(x) format(round(x), big.mark = ",")
+  signed <- function(x) {
+    paste0(if (round(x) > 0) "+" else if (round(x) < 0) "\u2212" else "",
+           count(abs(x)))
+  }
+  season <- switch(row$term_type, spring = "Spring", fall = "Fall", "term")
+  step <- function(label, amount, kind, detail = NA_character_) {
+    tibble::tibble(label = label, amount = as.numeric(amount), kind = kind,
+                   detail = detail)
+  }
+  # The plan notes open with "Feeder adjustment -68: " / "Pressure bump +109: ",
+  # which the step's label and amount already say.
+  reason <- function(note) {
+    text <- sub("^[^:]*[+-][0-9,]+: ", "", note)
+    paste0(toupper(substr(text, 1, 1)), substring(text, 2))
+  }
+
+  adjusted <- identical(row$method_id, "spine_adjusted")
+  floor_uplift <- if (adjusted) dplyr::coalesce(row$floor_uplift, 0) else 0
+  steps <- list(step(
+    paste0("Registered in ", fmt_term(row$spine_term)), row$spine, "start",
+    paste0("Everyone on last ", season, "'s class lists, including students ",
+           "who later dropped")
+  ))
+  if (floor_uplift != 0) {
+    steps <- c(steps, list(step(
+      "Students still waiting", floor_uplift, "add",
+      paste0("Waitlisted last ", season, " without a seat in any section, ",
+             "because the course was near full")
+    )))
+  }
+  # The projection is the rounded sum, so the change is whatever takes the
+  # whole-number start to it; its parts are rounded separately and say so
+  # when they no longer add up to it.
+  # Parts that cancel still show, so the adjusted method's work is visible.
+  change <- row$projected_classlist_total - row$spine - floor_uplift
+  parts <- c(
+    dplyr::coalesce(row$delta_repeat, 0),
+    dplyr::coalesce(row$delta_sequence, 0),
+    dplyr::coalesce(row$delta_feeder, 0)
+  )
+  if (adjusted && any(round(parts) != 0)) {
+    names <- c(
+      "students retaking this course",
+      paste0(dplyr::coalesce(row$adjusted_sequence_courses, "the listed predecessor"),
+             ", taken just before"),
+      "other feeder courses"
+    )
+    shown <- round(parts) != 0
+    detail <- paste0(
+      paste0(names[shown], " ", vapply(parts[shown], signed, character(1)),
+             collapse = "; "),
+      if (sum(round(parts)) != round(change)) " (each rounded)" else ""
+    )
+    steps <- c(steps, list(step(
+      paste0("Enrollment change in ", fmt_term(row$adjusted_preceding_term)),
+      change, "add", detail
+    )))
+  }
+  record <- if (identical(row$accuracy, "Unrated") || !is.finite(row$wape)) {
+    "Too few past forecasts to say how close this one will be"
+  } else {
+    paste0(
+      "Past forecasts for this course missed by ",
+      scales::percent(row$wape, accuracy = 0.1), " on average (",
+      row$n_backtests, " term", if (row$n_backtests == 1L) "" else "s",
+      if (!is.na(row$backtest_term_range)) paste0(", ", row$backtest_term_range) else "",
+      ")"
+    )
+  }
+  steps <- c(steps, list(step(
+    "Forecast registrations", row$projected_classlist_total, "total", record
+  )))
+  if (isTRUE(row$plan_feeder_adjustment != 0)) {
+    steps <- c(steps, list(step(
+      "Feeder adjustment", row$plan_feeder_adjustment, "add",
+      reason(row$plan_feeder_note)
+    )))
+  }
+  if (isTRUE(row$pressure_bump > 0)) {
+    steps <- c(steps, list(step(
+      "Pressure bump", row$pressure_bump, "add", reason(row$pressure_bump_note)
+    )))
+  }
+  if (isTRUE(row$plan_feeder_adjustment != 0) || isTRUE(row$pressure_bump > 0)) {
+    steps <- c(steps, list(step(
+      "Planned registrations", row$planned_registrations, "total",
+      "What the sections are sized for"
+    )))
+  }
+  if (!is.na(row$recommended_sections)) {
+    from_draft <- isTRUE(row$target_schedule_available) &&
+      isTRUE(row$scheduled_sections > 0)
+    steps <- c(steps, list(step(
+      "Sections", row$recommended_sections, "sections",
+      paste0(
+        count(row$planned_registrations), " registrations at ",
+        format(round(row$reference_section_size, 1), nsmall = 1),
+        " per section (",
+        if (from_draft) "the draft schedule's average" else "recent average",
+        "), rounded up",
+        if (from_draft) {
+          paste0("; the draft schedule has ", row$scheduled_sections,
+                 " section", if (row$scheduled_sections == 1L) "" else "s")
+        } else ""
+      )
+    )))
+  }
+  dplyr::bind_rows(steps)
+}
+
+
 # What the pressure bump adds across the rows shown, and one sentence saying
 # so, so the page states how much it raised the plan. Rows without a
 # projection carry a zero bump and no sections, and are left out of the
@@ -911,19 +1054,23 @@ projection_pressure_bump_summary <- function(projections, share) {
 
 # What the plan's feeder adjustment moves across the rows shown, and one
 # sentence saying so: how many plans it raised and lowered and by how much,
-# or why it moved none. `line` is the bundle's plan_feeder_change.
-projection_plan_feeder_summary <- function(projections, line) {
+# or why it moved none. `line` and `seasons` are the bundle's
+# plan_feeder_change and plan_feeder_seasons.
+projection_plan_feeder_summary <- function(projections, line, seasons) {
   if (!is.numeric(line) || length(line) != 1L || !is.finite(line)) {
     stop("[enrollment-projections.R] The bundle's model_config has no ",
          "plan_feeder_change.", call. = FALSE)
   }
+  seasons_rule <- projection_plan_feeder_seasons_rule(seasons)
   projection_require_columns(
     projections,
-    c("projected_classlist_total", "method_id", "plan_feeder_adjustment",
-      "adjusted_preceding_term", "adjusted_feeder_check"),
+    c("term_type", "projected_classlist_total", "method_id",
+      "plan_feeder_adjustment", "adjusted_preceding_term",
+      "adjusted_feeder_check"),
     "projection_plan_feeder_summary()"
   )
   projected <- is.finite(projections$projected_classlist_total)
+  out_of_season <- projected & !projections$term_type %in% seasons
   adjustment <- projections$plan_feeder_adjustment
   up <- projected & adjustment > 0
   down <- projected & adjustment < 0
@@ -948,7 +1095,9 @@ projection_plan_feeder_summary <- function(projections, line) {
       " those changes."
     )
   } else ""
-  sentence <- if (sum(projected) > 0L && all(unobserved[projected])) {
+  sentence <- if (sum(projected) > 0L && all(out_of_season[projected])) {
+    paste0("No plan has a feeder adjustment: ", seasons_rule, ".")
+  } else if (sum(projected) > 0L && all(unobserved[projected])) {
     paste0(
       "No plan has a feeder adjustment: ", preceding_label, " is not observed ",
       "yet, so its feeder courses cannot be read. They count once it settles."
@@ -1622,7 +1771,8 @@ build_enrollment_projection_view <- function(bundle, opt = list()) {
         projections, bundle$model_config$pressure_bump_share
       ),
       plan_feeder = projection_plan_feeder_summary(
-        projections, bundle$model_config$plan_feeder_change
+        projections, bundle$model_config$plan_feeder_change,
+        bundle$model_config$plan_feeder_seasons
       ),
       # Bundle-wide, not filtered: the evidence for where error comes from is
       # every past forecast the rule would have published.
@@ -1687,6 +1837,7 @@ enrollment_projection_course_detail <- function(view, subject_course) {
     dplyr::arrange(recency_rank)
   list(
     current = current,
+    plan_steps = projection_plan_steps(current),
     history = course_history,
     movement = build_enrollment_projection_movement_detail(course_history),
     candidates = view$candidates %>%
