@@ -2445,8 +2445,8 @@ test_that("the administrator summary says the decision in one sentence and flags
     adjusted_prior_first_day_basis = "complete", campus_fill_flag = NA_character_,
     adjusted_waitlisted_prior = 15L, adjusted_regime_alarm = FALSE,
     adjusted_preceding_term = 202680L, adjusted_preceding_term_change = 0.02,
-    stability = "Moderate", accuracy = "Moderate", seat_consistency = "Unrated",
-    methods_disagree = FALSE
+    stability = "Moderate", accuracy = "Moderate", wape = 0.1004,
+    seat_consistency = "Unrated", methods_disagree = FALSE
   )
   sentence <- projection_summary_sentence(row)
   # The plan says how much of it is the pressure bump, and the first-day
@@ -2479,7 +2479,18 @@ test_that("the administrator summary says the decision in one sentence and flags
   expect_match(sentence, "That is last year's level\\.")
   # One decimal: whole percents turned 98.8% into "99%" and read as full.
   expect_match(sentence, "filled 98\\.8% of its seats on the first day with 15 students waiting, so this is a floor\\.")
-  expect_match(sentence, "averaged 10 to 20% off\\.$")
+  # The course's own error, as its plan step states it: a Moderate course at
+  # 10.0% once read "averaged 10 to 20% off" above a step saying 10.0%.
+  expect_match(sentence, "Past forecasts for this course missed by 10\\.0% on average\\.$")
+  expect_false(grepl("10 to 20", sentence))
+  expect_match(
+    projection_summary_sentence(dplyr::mutate(row, accuracy = "Low", wape = 0.264)),
+    "missed by 26\\.4% on average; treat it as a rough scale\\.$"
+  )
+  expect_match(
+    projection_summary_sentence(dplyr::mutate(row, accuracy = "Unrated", wape = NA_real_)),
+    "Too few past forecasts to say how reliable this is\\.$"
+  )
   # 98.8% on the first day is full, not merely near full: the flag uses the
   # same two levels as every other page.
   expect_equal(projection_flags(row), "Full last term | 15 waiting")
