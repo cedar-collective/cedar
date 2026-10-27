@@ -148,8 +148,17 @@ async function closeEvidence(page) {
   if (!otherSeason) {
     check('a second published season is available to switch to', false, '(only one)');
   } else {
+    // The stripe names the season and the table has rows under it.
+    const seasonShown = (label) => {
+      const scope = document.getElementById('enrollment_projections-scope');
+      return Boolean(scope && scope.innerText.includes(label) && document.querySelector(
+        '#enrollment_projections-projection_table .rt-tbody .rt-tr'));
+    };
     await setInput(page, 'enrollment_projections-target_term', otherSeason.value);
     await waitForIdle(page);
+    // A freshly started app can still be reading the other bundle when the page
+    // first goes idle; wait for its label rather than read once.
+    await waitFor(page, seasonShown, { timeout: 60000, args: [otherSeason.label] });
     const switched = await page.evaluate(() => {
       const scope = document.getElementById('enrollment_projections-scope');
       const rows = document.querySelectorAll(
@@ -179,6 +188,7 @@ async function closeEvidence(page) {
     // Restore the opening season; every later check reads that bundle.
     await setInput(page, 'enrollment_projections-target_term', initialContext.target);
     await waitForIdle(page);
+    await waitFor(page, seasonShown, { timeout: 60000, args: [selectedLabel] });
   }
   // The comparable-history floor is fixed by policy (Spring 2022), but the
   // through-term moves with every data refresh as the settled enrollment edge
