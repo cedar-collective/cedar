@@ -856,13 +856,18 @@ projection_summary_sentence <- function(projections) {
         " from the year before; review before scheduling to this number."
       )
     } else ""
-    trust <- switch(
-      row$accuracy,
-      High = " Past forecasts for this course landed within 10%.",
-      Moderate = " Past forecasts for this course averaged 10 to 20% off.",
-      Low = " Past forecasts for this course were more than 20% off; treat it as a rough scale.",
+    # The course's own figure, rounded as its plan steps round it: the band
+    # ("10 to 20% off") read beside the step's 10.0% as though they disagreed.
+    trust <- if (identical(row$accuracy, "Unrated") || !is.finite(row$wape)) {
       " Too few past forecasts to say how reliable this is."
-    )
+    } else {
+      paste0(
+        " Past forecasts for this course missed by ",
+        scales::percent(row$wape, accuracy = 0.1), " on average",
+        if (identical(row$accuracy, "Low")) "; treat it as a rough scale" else "",
+        "."
+      )
+    }
     paste0(plan, change, full, no_bump, fall, trust)
   }, character(1))
 }
