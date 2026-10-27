@@ -1,0 +1,95 @@
+{
+  "schema_version": "1.0.0",
+  "catalog_year": "2026-2027",
+  "catalog_id": "68a34618094c97cf857f1ec1",
+  "rule_set_id": "unm-education-human-sciences",
+  "title": "College of Education and Human Sciences bachelor rules",
+  "scope": {
+    "level": "college",
+    "credential": "bachelors",
+    "college_code": "EH"
+  },
+  "coverage": "selected_sections",
+  "notes": [
+    "Selected graduation requirements common to the college's bachelor programs. Programs can be stricter; Exercise Science sets its own admission GPA and grade rules on its program page."
+  ],
+  "rules": [
+    {
+      "rule_id": "unm-education-human-sciences.total_credits",
+      "label": "Degree credits",
+      "statement": "Complete at least 120 credits. No more than 5 credits earned in workshops count toward a bachelor's degree.",
+      "phase": "degree",
+      "operator": "credits",
+      "role": "reference",
+      "applies_when": "All students in this rule set scope.",
+      "review_status": "transcribed",
+      "source_refs": [
+        {
+          "source_id": "education_human_sciences",
+          "pointer": "/body",
+          "anchor": "minimum of 120 credit hours"
+        }
+      ],
+      "minimum": 120,
+      "unit": "credit_hours"
+    },
+    {
+      "rule_id": "unm-education-human-sciences.upper_division",
+      "label": "Upper-division coursework",
+      "statement": "Complete at least 40 credits in courses numbered 300 or above. This is a subset of degree credits.",
+      "phase": "degree",
+      "operator": "credits",
+      "role": "overlapping_subset",
+      "applies_when": "All students in this rule set scope.",
+      "review_status": "transcribed",
+      "source_refs": [
+        {
+          "source_id": "education_human_sciences",
+          "pointer": "/body",
+          "anchor": "40 credit hours in courses numbered 300 or above"
+        }
+      ],
+      "minimum": 40,
+      "unit": "credit_hours",
+      "planning_metric": "upper_credits"
+    },
+    {
+      "rule_id": "unm-education-human-sciences.degree_gpa",
+      "label": "Degree GPA",
+      "statement": "Maintain at least a 2.00 GPA on the 120 credits counted for graduation and at least 2.00 on all UNM work.",
+      "phase": "degree",
+      "operator": "condition",
+      "role": "condition",
+      "applies_when": "All students in this rule set scope.",
+      "review_status": "transcribed",
+      "source_refs": [
+        {
+          "source_id": "education_human_sciences",
+          "pointer": "/body",
+          "anchor": "2.00 or higher on the 120 credit hours"
+        }
+      ],
+      "minimum": 2,
+      "unit": "gpa"
+    },
+    {
+      "rule_id": "unm-education-human-sciences.writing",
+      "label": "Composition II",
+      "statement": "Complete ENGL 1120 with a C or better, or an authorized proficiency score, before graduation.",
+      "phase": "degree",
+      "operator": "condition",
+      "role": "condition",
+      "applies_when": "All students in this rule set scope.",
+      "review_status": "transcribed",
+      "source_refs": [
+        {
+          "source_id": "education_human_sciences",
+          "pointer": "/body",
+          "anchor": "Completion of English 1120 with a grade"
+        }
+      ],
+      "min_grade": "C"
+    }
+  ],
+  "attention": []
+}

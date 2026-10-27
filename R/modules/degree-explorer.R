@@ -195,6 +195,7 @@ degree_semester_board <- function(view, id, select_id = paste0(id, "-select")) {
       tags$script(HTML(sprintf("window.CedarRoadmap.initialize(document.getElementById(%s));",
                                jsonlite::toJSON(id, auto_unbox = TRUE))))),
     tags$p(class = "text-hint mt-2", view$workload_note),
+    tags$p(class = "text-hint", view$program_codes_note),
     tags$p(class = "text-hint", view$note, " ",
       tags$a(href = view$catalog$source_url, target = "_blank", rel = "noopener noreferrer", "Degree catalog source"),
       " · saved ", view$catalog$catalog_year, " excerpt, retrieved ", view$catalog$retrieved_on, "."))

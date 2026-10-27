@@ -1,0 +1,22 @@
+{
+  "schema_version": "1.0.0",
+  "catalog_year": "2026-2027",
+  "catalog_id": "68a34618094c97cf857f1ec1",
+  "rule_set_id": "unm-architecture-planning",
+  "title": "School of Architecture and Planning shared-rule coverage",
+  "scope": {
+    "level": "college",
+    "credential": "bachelors",
+    "college_code": "AP"
+  },
+  "coverage": "not_located_on_checked_overview",
+  "notes": [
+    "The school overview describes its degree programs but does not state common bachelor graduation requirements. Architecture's requirements come from its program and concentration pages.",
+    "An empty shared-rule list records this source coverage only; it does not establish that no additional requirements exist."
+  ],
+  "rules": [],
+  "attention": [],
+  "checked_source_ids": [
+    "architecture_planning"
+  ]
+}

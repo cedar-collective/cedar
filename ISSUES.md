@@ -29,6 +29,7 @@ recurrence is recognizable.
 
 | ID | Kind | Summary |
 |---|---|---|
+| [I38](#i38--a-pathways-program-population-misses-pre-majors-whose-name-differs-from-their-major) | Defect | A Pathways program population misses pre-majors whose name differs from their major: "Film and Digital Arts" holds 1 of the 1,016 Film pre-majors who never declared the major, because `FFDA` is named "FDMA" |
 | [I37](#i37--renumbered-courses-lose-their-history) | Defect | Renumbered courses lose their history: no crosswalk exists, so ACCT 3401 (was MGMT 340) and the other Fall 2026 ACCT, BUSA and POPH courses read as new |
 | [I36](#i36--low-enrollments-schedule-view-reports-no-prior-history-for-courses-that-have-it) | Defect | Low Enrollment's schedule view reports no prior history for courses that have it: 363 of 2,226 Spring 2027 ABQ/EA undergraduate courses, of which 40 were never offered under that number (resolved 2026-10-24) |
 | [I35](#i35--a-fall-projection-is-read-before-the-falls-intersession-has-registered) | Defect | A Fall projection is read before the Fall's intersession has registered: the Fall 2027 spine had none of Fall 2026's December demand (FYEX 1110: 168 of 801 Fall 2025 registrations were December) (fixed in model 0.24.0) |
@@ -50,11 +51,50 @@ recurrence is recognizable.
 | [I8](#i8--a-timing-log-row-is-silently-dropped-when-the-write-lock-times-out) | Defect | A timing-log row is dropped when the write lock times out |
 | [I6](#i6--a-killed-projection-rebuild-strands-its-lock-and-blocks-every-later-refresh) | Defect | A killed projection rebuild strands its lock |
 | [I4](#i4--pre-change-course-ratios-are-confounded-by-career-stage) | Defect | Pre-change course ratios confounded by career stage (deferred) |
-| M1–M36 | Improvement | See [Improvements](#improvements) |
+| M1–M37 | Improvement | See [Improvements](#improvements) |
 
 ---
 
 # Defects
+
+## I38 — A Pathways program population misses pre-majors whose name differs from their major
+
+**Status:** open
+**Found:** 2026-10-26, while adding Film and Digital Arts to Degree Explorer
+**Severity:** moderate — a program population undercounts its pre-majors, so
+their outcomes (`chose_elsewhere`, `left_undeclared`) read low or vanish.
+**Affects:** `build_population()` for every type that starts from declared
+programs (`major`, `preset`, `dept`; `R/branches/population.R`), so every
+Pathways population except the demographic one. Pathways presets pass their
+group's program names down this path. Only the projections growth scenario
+resolves a group through `population_group_major_codes()`, which already adds
+pre-majors through `leads_to`.
+
+### What is wrong
+
+`get_focal_programs()` takes the declared programs' names and codes, and
+candidates are rows matching either. A pre-major whose `program_name` in `institution/<id>/programs.csv`
+differs from its major's matches neither. Eleven do: `FFDA` is named "FDMA"
+(4,410 rows), `FSIG` "Signed Language Interpret" (657), `FLAI`, `FFDM`
+("IFDM"), `FDTP`, `FCCS`, `FMDL`, `FWGS`, `FCLC`, `FINN` and `FITT`; each
+`leads_to` names the right major.
+
+Measured for Film: the "Film and Digital Arts" population (pre-majors lumped)
+has 1,149 students. Of the 2,000 students ever declared `FFDA`, 985 are in it;
+of the 1,016 who never declared `FDMA`, 1 is.
+
+### Reproduction
+
+`build_population(cedar_programs, cedar_degrees, cedar_students, opt =
+list(program_names = "Film and Digital Arts", include_pre_majors = "lump",
+data_edges = cedar_report_edges(cedar_students, cedar_degrees)))`, then count
+`FFDA` students who never declared `FDMA` among its `student_id`s.
+
+*Done when:* the program-name path adds pre-major codes through
+`premajor_leads_to`, as `population_group_major_codes()` does, with a designed
+fixture pre-major whose name differs from its major; and the eleven names are
+corrected in `programs.csv` (a mapping change, so the deploy gate rebuilds
+programs).
 
 ## I37 — Renumbered courses lose their history
 
@@ -2648,6 +2688,16 @@ FYEX 1030 (EA full) and NATV 1150 (ABQ full, EA at 86%). CLST 1110 is not a
 published Fall 2027 row, so its flag cannot show. The flag reads only complete
 campus first days: on the Oct 8 class list it found 1 Fall course, because 16
 campus rows had a second-half session not yet begun.
+
+**M37 — Pathways cannot tell a field's B.A. from its B.S.** A population is
+chosen by program name or major code, and both are shared: `BA-PSY-AS` and
+`BS-PSY-AS` are both "Psychology", major code `PSY` (11,596 and 3,913 program
+rows). Chemistry, Biochemistry, Biology, Anthropology and Film and Digital
+Arts (B.A. and B.F.A.) are the same. Banner's full program code
+(`cedar_programs$program_code`) does separate them, and since 2026-10-26 each
+Degree Explorer map names its own (`degree_catalogs.csv`, `program_codes`).
+*Done when:* a Pathways population can be restricted to one degree's program
+codes, and a page that pools them says so.
 
 **M28 — The HR department list is a hand-kept R list.** **Done 2026-10-16.**
 `hr_org_desc_to_dept` (79 names to 32 departments) now comes from

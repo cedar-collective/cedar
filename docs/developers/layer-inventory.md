@@ -100,7 +100,7 @@ band/cell guards. The enrolled-term clock precedes campus scope.
 `features/degree-explorer.R`: `build_degree_roadmap_view(catalog, roadmaps,
 catalog_id, math_start, english_start, start_season = "fall")` and
 `build_population_course_paths(students, population, groups, opt, description)`
-assemble typed payloads, including complete enumerated course alternatives and option-specific prerequisite citations. `degree_roadmap_tile_detail(view, node_id)` resolves one tile's popup content (citation, conditions, alternatives) from that payload. `format_degree_explorer_preview(view)` formats semesters;
+assemble typed payloads, including complete enumerated course alternatives and option-specific prerequisite citations. `degree_roadmap_tile_detail(view, node_id)` resolves one tile's popup content (citation, conditions, alternatives) from that payload. `degree_program_codes_note(catalog, catalog_id)` states the degree's Banner program codes, which `R/lists/degree_catalog.R`'s `degree_catalog_program_codes(catalogs, programs)` validated at load against `programs.csv`. `format_degree_explorer_preview(view)` formats semesters;
 `plot_grouped_student_paths(paths)` plots already-suppressed aggregates.
 
 | File | Main function(s) | Takes cohort? | Purpose |

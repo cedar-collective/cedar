@@ -10,7 +10,10 @@
     "colleges/business.json",
     "colleges/nursing.json",
     "colleges/population-health.json",
-    "colleges/medicine.json"
+    "colleges/medicine.json",
+    "colleges/education-human-sciences.json",
+    "colleges/fine-arts.json",
+    "colleges/architecture-planning.json"
   ],
   "profiles": [
     {
@@ -130,6 +133,126 @@
         "unm-university",
         "unm-general-education",
         "unm-medicine"
+      ],
+      "status": "illustrative_planning"
+    },
+    {
+      "catalog_id": "psychology-ba-2026",
+      "college_code": "AS",
+      "rule_set_ids": [
+        "unm-university",
+        "unm-general-education",
+        "unm-arts-sciences"
+      ],
+      "status": "illustrative_planning"
+    },
+    {
+      "catalog_id": "psychology-bs-2026",
+      "college_code": "AS",
+      "rule_set_ids": [
+        "unm-university",
+        "unm-general-education",
+        "unm-arts-sciences"
+      ],
+      "status": "illustrative_planning"
+    },
+    {
+      "catalog_id": "criminology-ba-2026",
+      "college_code": "AS",
+      "rule_set_ids": [
+        "unm-university",
+        "unm-general-education",
+        "unm-arts-sciences"
+      ],
+      "status": "illustrative_planning"
+    },
+    {
+      "catalog_id": "chemistry-ba-2026",
+      "college_code": "AS",
+      "rule_set_ids": [
+        "unm-university",
+        "unm-general-education",
+        "unm-arts-sciences"
+      ],
+      "status": "illustrative_planning"
+    },
+    {
+      "catalog_id": "chemistry-bs-2026",
+      "college_code": "AS",
+      "rule_set_ids": [
+        "unm-university",
+        "unm-general-education",
+        "unm-arts-sciences"
+      ],
+      "status": "illustrative_planning"
+    },
+    {
+      "catalog_id": "biochemistry-bs-2026",
+      "college_code": "AS",
+      "rule_set_ids": [
+        "unm-university",
+        "unm-general-education",
+        "unm-arts-sciences"
+      ],
+      "status": "illustrative_planning"
+    },
+    {
+      "catalog_id": "political-science-ba-2026",
+      "college_code": "AS",
+      "rule_set_ids": [
+        "unm-university",
+        "unm-general-education",
+        "unm-arts-sciences"
+      ],
+      "status": "illustrative_planning"
+    },
+    {
+      "catalog_id": "electrical-engineering-bs-2026",
+      "college_code": "EN",
+      "rule_set_ids": [
+        "unm-university",
+        "unm-general-education",
+        "unm-engineering"
+      ],
+      "status": "illustrative_planning"
+    },
+    {
+      "catalog_id": "exercise-science-bs-2026",
+      "college_code": "EH",
+      "rule_set_ids": [
+        "unm-university",
+        "unm-general-education",
+        "unm-education-human-sciences"
+      ],
+      "status": "illustrative_planning"
+    },
+    {
+      "catalog_id": "film-digital-arts-ba-2026",
+      "college_code": "FA",
+      "rule_set_ids": [
+        "unm-university",
+        "unm-general-education",
+        "unm-fine-arts"
+      ],
+      "status": "illustrative_planning"
+    },
+    {
+      "catalog_id": "film-digital-arts-bfa-2026",
+      "college_code": "FA",
+      "rule_set_ids": [
+        "unm-university",
+        "unm-general-education",
+        "unm-fine-arts"
+      ],
+      "status": "illustrative_planning"
+    },
+    {
+      "catalog_id": "architecture-ba-2026",
+      "college_code": "AP",
+      "rule_set_ids": [
+        "unm-university",
+        "unm-general-education",
+        "unm-architecture-planning"
       ],
       "status": "illustrative_planning"
     }

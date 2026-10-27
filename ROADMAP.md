@@ -354,6 +354,12 @@ Plan: [ADR-002](docs/developers/adr-002-explicit-mapping-files.md).
 - [x] Add Nursing (Freshman Direct Entry), Population Health, Medical Laboratory
   Sciences and Radiologic Sciences (Nuclear Medicine) prototypes, preserving
   source gaps/conflicts, required clinical blocks and the semester credit cap.
+- [x] Add Psychology (B.A. and B.S.), Chemistry (B.A. and B.S.), Biochemistry,
+  Criminology, Political Science, Electrical Engineering, Exercise Science,
+  Film and Digital Arts (B.A. and B.F.A.) and Architecture, with the Education
+  and Human Sciences, Fine Arts and Architecture and Planning college rules.
+  Each map names its own Banner program codes, so a B.A. and a B.S. in one field
+  stay apart; Pathways selection by degree remains ([M37](ISSUES.md)).
 - [x] Record annual University, Gen Ed and awarding-college reference rules
   separately from degree-specific files, with one format, readable rulebook,
   explicit program profiles, source hashes/locators and unresolved cases.

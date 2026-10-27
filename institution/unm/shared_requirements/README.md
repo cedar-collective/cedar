@@ -50,10 +50,11 @@ same degree-credit record. Approved overlaps can satisfy multiple rules while
 earned credits count once. College rules can narrow University allowances.
 Alternatives and conflicts must not become silent overrides.
 
-The college files cover the six awarding colleges in the prototypes. A&S,
-Engineering and Business have selected shared rules. Nursing, Population Health
-and Medicine record that no common bachelor completion block was located on
-their checked overviews. Empty lists are coverage limits, **not exemptions**.
+The college files cover the nine awarding colleges in the prototypes. A&S,
+Engineering, Business, Education and Human Sciences and Fine Arts have selected
+shared rules. Nursing, Population Health, Medicine and Architecture and
+Planning record that no common bachelor completion block was located on their
+checked overviews. Empty lists are coverage limits, **not exemptions**.
 Program/route rules still apply. Other colleges are not covered by this first set.
 
 The new membership CSV uses Roman area labels, including VA/VB. Existing

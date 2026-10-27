@@ -593,6 +593,38 @@ const checkDegreeExplorer = async () => {
       `${catalog}: additional math preparation also respects the credit maximum`);
     await choose('degree_explorer-dx_math_start', 'algebra');
   }
+  // A field's B.A. and B.S. share a name in Banner but not program codes: each
+  // map states its own and never its sibling's.
+  const programCodes = () => page.$$eval('p.text-hint', els => {
+    const note = els.find(el => el.innerText.startsWith('Banner program codes for this degree'));
+    return note ? note.innerText.split(/[\s,;:.]+/) : [];
+  });
+  for (const [catalog, own, sibling] of [
+    ['psychology-ba-2026', 'BA-PSY-AS', 'BS-PSY-AS'],
+    ['psychology-bs-2026', 'BS-PSY-AS', 'BA-PSY-AS'],
+    ['criminology-ba-2026', 'BA-CRIM-AS', null],
+    ['chemistry-ba-2026', 'BA-CHEM-AS', 'BS-CHEM-AS'],
+    ['chemistry-bs-2026', 'BS-CHEM-AS', 'BA-CHEM-AS'],
+    ['biochemistry-bs-2026', 'BS-BIOC-AS', null],
+    ['political-science-ba-2026', 'BA-POLS-AS', null],
+    ['electrical-engineering-bs-2026', 'BSEE-EE-EN', null],
+    ['mechanical-engineering-bs-2026', 'BSME-ME-EN', null],
+    ['exercise-science-bs-2026', 'BS-ES-EH', null],
+    ['film-digital-arts-ba-2026', 'BA-FDMA-FA', 'BFA-FDMA-FA'],
+    ['film-digital-arts-bfa-2026', 'BFA-FDMA-FA', 'BA-FDMA-FA'],
+    ['architecture-ba-2026', 'BAA-ARCT-AP', null]
+  ]) {
+    await choose('degree_explorer-dx_catalog_id', catalog);
+    const codes = await programCodes();
+    check(codes.includes(own) && (!sibling || !codes.includes(sibling)),
+      `${catalog}: states its own Banner program codes${sibling ? ', not ' + sibling : ''}`);
+    check(await page.$$eval('.cedar-roadmap-semester', els => els.every(el => Number(el.dataset.plannedCredits) <= 16)) &&
+      await alignedHeaders() && await soundRows(), `${catalog}: aligned board within 16 credits`);
+    await choose('degree_explorer-dx_math_start', 'intermediate');
+    check(await page.$$eval('.cedar-roadmap-semester', els => els.every(el => Number(el.dataset.plannedCredits) <= 16)) &&
+      await alignedHeaders() && await soundRows(), `${catalog}: additional math preparation keeps the board aligned within 16 credits`);
+    await choose('degree_explorer-dx_math_start', 'algebra');
+  }
   await connect(page, { search: 'tab=degree-explorer&catalog_id=business-bba-2026&math_start=algebra&english_start=stretch' });
   await waitForSelector(page, '[data-roadmap][data-ready][data-catalog="business-bba-2026"][data-math-start="algebra"][data-english-start="stretch"]');
   check(await semester('math1350') === 1 && await semester('engl2') === 3 && await semester('buswriting') === 4,
