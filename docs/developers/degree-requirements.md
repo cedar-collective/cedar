@@ -133,8 +133,9 @@ After scheduling, `assign_degree_roadmap_rows(nodes)` adds a positive integer
 `row` from the authored `row_group` family. Math and writing have reserved rows;
 parallel courses occupy separate rows. Other families can share a row only
 outside each other's complete semester span, preserving gaps within sequences.
-The planner shifts these rows together below the early Gen Ed allowance band.
-This step changes neither course semesters nor workload. The view adds `n_rows`;
+`layout_degree_roadmap_bands(nodes, slots)` then stacks the board: Gen Ed cards
+on top, math and writing, elective/minor cards, then the other families (keeping
+each node's `family_row`). This step changes neither course semesters nor workload. The view adds `n_rows`;
 the renderer uses shared CSS grid tracks so each row grows to fit its tallest
 tile across every semester. Browser code still only draws actual graph edges.
 
@@ -186,15 +187,16 @@ toward the usual load (15), then uses the allowed maximum for the remainder.
 Semester totals include both named courses and other work. The latter is a workload allowance, within which shared rules earmark
 source-identified Gen Ed needs; other capacity stays elective/minor space.
 
-`build_degree_allowance_slots(terms, slot_credits)` splits early allowances into course-sized grid
-tiles, using the plan's `allowance_slot_credits` and preserving the exact budget.
-A usual slot can absorb one extra credit; smaller remainders remain explicit.
-It fills rows from the top of each semester. `build_degree_roadmap()` reserves
-the largest slot count as a shared top band and shifts all named course rows
-below it without disturbing math/writing alignment or interior course-family
-spans. A plan without early allowances reserves no extra rows. Later upper-level/
-minor allowances remain below the grid. The plan returns the slots separately
-in `allowances`, never as catalog graph nodes; the view adds their display labels.
+`build_degree_allowance_slots(terms, slot_credits)` splits every semester's
+allowance, early and late, into course-sized grid tiles, using the plan's
+`allowance_slot_credits` and preserving the exact budget. A usual slot can absorb
+one extra credit; smaller remainders remain explicit. `layout_degree_roadmap_bands()`
+sizes each band for its fullest semester: Gen Ed rows first, then the reserved
+math/writing rows, then the elective/minor band, then every other course family,
+without disturbing math/writing alignment or interior course-family spans. A
+plan with no allowances reserves no extra rows. The plan returns the slots
+separately in `allowances`, never as catalog graph nodes; the view adds their
+display labels.
 `start_season` defaults to fall and alternates fall/spring labels, with a selector
 and shared-URL field. It affects example offerings, not prerequisite scheduling.
 
@@ -213,10 +215,10 @@ Credit fit is an allowance comparison, not enrollment eligibility. The canonical
 These are general historical examples, not a Gen Ed audit or curated advice for
 a major. Future major-specific Markdown guidance remains a separate extension.
 `terms$other_phase` distinguishes early foundation allowances from later advanced
-work. The feature labels identified area needs as Gen Ed and other early slots as
-elective/minor, any level. Late footer balances remain elective/minor context;
-explicit late Gen Ed cards are subtracted from those balances. No generic
-allowance is called an extra Gen Ed requirement.
+work. The feature labels identified area needs as Gen Ed, other early slots as
+elective/minor, any level, and later slots as elective/minor where upper level
+may count. Explicit late Gen Ed cards take their credits before later elective
+cards are cut. No generic allowance is called an extra Gen Ed requirement.
 
 Template positions and elective-group placements are planning suggestions.
 Course-specific options, offerings, admission, transfers, equivalences and the
@@ -376,10 +378,9 @@ coverage; preparation eligibility and transfer/approval waivers are not inferred
 
 `allocate_shared_degree_slots(view, coverage)` earmarks named gaps within the
 existing per-term allowance budget, preserves remainders and exposes needs that
-cannot fit a whole slot. It shifts the common option band without altering named
-course timing or workload. `footer_credits` is the remaining late-term balance
-after any explicit late Gen Ed slots; rendering must not also count those slots
-in the footer. Other early cards are elective/minor space, any level.
+cannot fit a whole slot. It cuts the remaining budget of every semester into
+elective/minor cards and re-runs `layout_degree_roadmap_bands()`, without
+altering named course timing or workload; every allowance credit is on a card.
 
 The shared payload also shows the standard college upper-credit minimum, named
 upper-level credits and the balance still to fit in existing elective/minor space.

@@ -84,7 +84,6 @@
 .cedar-roadmap-course.is-after { box-shadow:0 0 0 1px var(--roadmap-downstream); }
 .cedar-roadmap-course.is-qualifying { outline:2px dotted var(--roadmap-conditional); outline-offset:2px; }
 .cedar-roadmap-course:hover,.cedar-roadmap-course:focus-visible { outline:2px solid var(--roadmap-ink); outline-offset:2px; }
-.cedar-roadmap-flex { display:flex; flex-direction:column; gap:5px; padding:12px 6px; border:1px dashed var(--roadmap-rule); border-radius:var(--radius-md); color:var(--text-muted); font-size:11px; align-self:start; }
 
 /* Prerequisite connectors */
 .cedar-roadmap-connectors { position:absolute; top:0; left:0; overflow:visible; pointer-events:none; z-index:1; }

@@ -67,10 +67,13 @@ still need review; a lab-free fifth course does not replace required labs.
 
 The general planning pattern puts Gen Ed and lower-level foundations in years
 1–2 and upper-level courses in semester 5 or later. Upper-level course groups
-follow the same rule. Early allowances say **Gen Ed / lower-level electives**;
-later ones say **Upper-level / minor / electives**. These are planning spaces,
-not verified Gen Ed or upper-division credit totals. Prerequisites and the
-16-credit ceiling still apply, so a sequence can extend the plan.
+follow the same rule. The board reads top to bottom from breadth to the major:
+Gen Ed area cards first, then math and writing, then elective/minor cards, then
+the program's own courses, with its upper-level work in the lower right. Every
+semester's elective space is a full-size card; later ones say **upper level may
+count**. These are planning spaces, not verified Gen Ed or upper-division credit
+totals. Prerequisites and the 16-credit ceiling still apply, so a sequence can
+extend the plan.
 
 Every tile shows its prerequisite count and how many later courses it leads
 to. Entry courses identify the chain they start. These numbers describe the

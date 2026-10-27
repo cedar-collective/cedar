@@ -114,7 +114,7 @@ build_degree_plan_rules <- function(catalog, roadmaps, view) {
     paste0(nodes$code[i], ": preferred starting semester ", nodes$base_semester[i], "."),
     paste0("Authored template position; prerequisites, upper-level timing and the credit limit may move it later. Related courses align in the ", nodes$row_group[i], " row."),
     ids = nodes$node_id[i])
-  add("Planning preference", "Fill existing workload space with identified Gen Ed areas, then elective/minor credits; early options appear at the top.",
+  add("Planning preference", "Fill existing workload space with identified Gen Ed areas, then elective/minor credits. Gen Ed sits at the top, then math and writing, then elective/minor space, then the program's own courses.",
     "Elective space does not have to be Gen Ed or lower level. Upper-level entry conditions still apply. Overlapping requirements never add credits to the budget.")
   math_choices <- degree_math_start_choices(roadmaps, program$catalog_id)
   list(title = view$title, source_url = program$source_url, note = program$notes,
@@ -208,7 +208,8 @@ build_degree_allowance_tiles <- function(view) {
   slots$phase <- view$terms$other_phase[match(slots$semester, view$terms$semester)]
   slots$kind <- rep("allowance", nrow(slots))
   slots$title <- ifelse(slots$credits < slot_credits, "Credits left to allocate",
-    ifelse(slots$purpose == "gen_ed", "Remaining area in this example", "Any level · Gen Ed not required"))
+    ifelse(slots$purpose == "gen_ed", "Remaining area in this example",
+      ifelse(slots$phase == "advanced", "Any level · upper level may count", "Any level · Gen Ed not required")))
   if (!is.null(view$shared)) {
     possible <- view$shared$choice_areas
     slots$title[slots$purpose == "gen_ed" & slots$area %in% possible] <- "May be covered by a program choice"

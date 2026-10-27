@@ -104,11 +104,13 @@ build_degree_roadmap <- function(catalog, roadmaps, catalog_id, math_start, engl
   nodes <- schedule$nodes
   nodes$moved <- nodes$semester > nodes$base_semester & nodes$catalog_id == catalog_id
   nodes <- assign_degree_roadmap_rows(nodes)
+  nodes$family_row <- nodes$row
   nodes <- nodes[order(nodes$semester, match(nodes$track, c("math", "english", "main")), nodes$base_semester), ]
   terms <- allocate_degree_semester_credits(nodes, schedule$loads, policy, entry$completed_credits)
-  allowances <- build_degree_allowance_slots(terms, as.numeric(policy$allowance_slot_credits))
-  # Keep every course family aligned below the same foundational Gen Ed band.
-  nodes$row <- nodes$row + max(c(0L, allowances$row))
+  layout <- layout_degree_roadmap_bands(nodes,
+    build_degree_allowance_slots(terms, as.numeric(policy$allowance_slot_credits)))
+  nodes <- layout$nodes
+  allowances <- layout$slots
 
   metrics <- get_degree_chain_metrics(nodes, links, conditions)
   nodes <- cbind(nodes, metrics[match(nodes$node_id, metrics$node_id), setdiff(names(metrics), "node_id")])
@@ -289,13 +291,15 @@ assign_degree_roadmap_rows <- function(nodes) {
   nodes
 }
 
-#' Break early planning allowances into course-sized slots without adding credit
+#' Break every semester's planning allowance into course-sized slots without adding credit
 #'
-#' Fill a shared band at the top of the board. Suggestions have no prerequisite
-#' edges and never become catalog requirement nodes.
+#' Later semesters get cards too, the same size as a course, so elective and
+#' minor space is not overlooked. Suggestions have no prerequisite edges and
+#' never become catalog requirement nodes.
 build_degree_allowance_slots <- function(terms, slot_credits) {
-  slots <- data.frame(node_id = character(), semester = integer(), credits = numeric(), row = integer())
-  for (i in which(terms$other_phase == "foundation" & terms$other_credits > 0)) {
+  slots <- data.frame(node_id = character(), semester = integer(), credits = numeric(), row = integer(),
+    purpose = character())
+  for (i in which(terms$other_credits > 0)) {
     semester <- terms$semester[i]
     unallocated <- terms$other_credits[i]
     index <- 0L
@@ -304,11 +308,31 @@ build_degree_allowance_slots <- function(terms, slot_credits) {
       # leaving small remainders explicit rather than rounding the budget up.
       amount <- if (unallocated <= slot_credits + 1) unallocated else slot_credits
       index <- index + 1L
-      slots[nrow(slots) + 1L, ] <- list(paste0("allowance-", semester, "-", index), semester, amount, index)
+      slots[nrow(slots) + 1L, ] <- list(paste0("allowance-", semester, "-", index), semester, amount, index, "elective")
       unallocated <- unallocated - amount
     }
   }
   slots
+}
+
+#' Stack the board's bands: Gen Ed, math and writing, electives, then the program
+#'
+#' Read top-left to bottom-right, the board moves from breadth to the major's
+#' upper-level work. Math and writing are early work and stay near Gen Ed;
+#' elective space is mostly later and sits just above the program's courses.
+#' Rows are shared across semesters, so each band is as tall as its fullest
+#' semester. `family_row` is the row from `assign_degree_roadmap_rows()`, whose
+#' math and writing rows come first. Layout never changes a semester or a credit.
+layout_degree_roadmap_bands <- function(nodes, slots) {
+  gen_ed <- slots$purpose == "gen_ed"
+  position <- ave(seq_along(gen_ed), slots$semester, gen_ed, FUN = seq_along)
+  n_gen_ed <- max(c(0L, position[gen_ed]))
+  n_elective <- max(c(0L, position[!gen_ed]))
+  foundation <- nodes$row_group %in% c("math", "writing")
+  n_foundation <- max(c(0L, nodes$family_row[foundation]))
+  slots$row <- as.integer(ifelse(gen_ed, position, n_gen_ed + n_foundation + position))
+  nodes$row <- as.integer(nodes$family_row + n_gen_ed + ifelse(foundation, 0L, n_elective))
+  list(nodes = nodes, slots = slots)
 }
 
 degree_semester_seasons <- function(semesters, start_season) {

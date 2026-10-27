@@ -120,7 +120,8 @@ optional styling suggestions. The data/API contract is in
   guarantee that named courses will be offered then.
 - A Gen Ed slot names its area and links to the annual shared rules. Its popup
   filters the captured area memberships. Elective/minor slots say **Any level ·
-  Gen Ed not required** and include lower- and upper-level undergraduate
+  Gen Ed not required** (from the upper-level semester on, **Any level · upper
+  level may count**) and include lower- and upper-level undergraduate
   offerings, with a visible Level column. Keep titles, credits, campus/college/
   session, matching-season history, seats and first-day fills. Exclude entry
   routes, fixed requirements and enumerated pools already represented.
@@ -162,12 +163,20 @@ optional styling suggestions. The data/API contract is in
 
 ## Spatial layout
 
-- Put early Gen Ed / lower-level option tiles in the top rows, above math,
-  writing and program course sequences. Reserve one shared band across all
-  semesters, sized for the term with the most slots, so the course families
-  below stay aligned. Keep empty positions when a term has fewer options.
-  Render the options first in each semester's reading and keyboard order.
-  This visual foundation does not establish a prerequisite relationship.
+- Stack the board in four bands, top to bottom: **Gen Ed** area cards, then
+  **math and writing**, then **elective/minor** cards, then the **program's own
+  courses**. Read top-left to bottom-right, it moves from breadth to the major's
+  upper-level work, as the Pathways course-timing heatmap does. Math and writing
+  are early work and stay near Gen Ed; elective space is mostly later and sits
+  just above the major. A future minor takes the Gen Ed band's place in later
+  semesters.
+- Each band is shared across all semesters and sized for the term with the
+  most cards in it, so the course families below stay aligned. Keep empty
+  positions when a term has fewer. Each semester's reading and keyboard order
+  follows the rows. Band position establishes no prerequisite relationship.
+- Every semester's elective/minor space is course-sized cards, early and late
+  alike, never a footer or a smaller box: later elective work is easy to
+  overlook otherwise.
 - Align related courses horizontally across semesters. ENGL 1110 → ENGL 1120
   and the stretch English route each stay in one row; algebra through calculus
   also stays aligned. Apply the same technique to program sequences and course
@@ -185,10 +194,8 @@ optional styling suggestions. The data/API contract is in
   move a course to make a family fit on one row.
 - Share row heights across all semester columns, sized to their tallest tile.
   Wrapped titles and condition badges must stay readable. Keep semester headers
-  equal in height. Place early allowance tiles in the reserved top rows,
-  preserving math/writing rows and interior gaps in every course family below.
-  Later upper-level,
-  minor and elective allowances remain below the aligned rows.
+  equal in height. Allowance bands never disturb the math/writing rows or the
+  interior gaps in any course family.
 - Check actual rendered alignment for ordinary and extended plans, alternate
   math/English placements, and narrow screens. An assigned row number alone
   does not prove visual alignment.

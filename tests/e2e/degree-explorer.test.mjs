@@ -71,14 +71,23 @@ const soundRows = () => page.evaluate(() => {
     return valid;
   });
 });
-const genEdRowsFirst = () => page.evaluate(() => {
-  const allowances = [...document.querySelectorAll('[data-card-type="allowance"]')];
-  const courses = [...document.querySelectorAll('[data-card-type="course"]')];
-  return allowances.length > 0 && courses.length > 0 &&
-    Math.max(...allowances.map(el => el.getBoundingClientRect().bottom)) <
-      Math.min(...courses.map(el => el.getBoundingClientRect().top)) &&
-    [...document.querySelectorAll('.cedar-roadmap-courses')].every(term =>
-      !term.querySelector('[data-card-type="allowance"]') || term.firstElementChild.dataset.cardType === 'allowance');
+// Gen Ed heads the board, then math/writing, elective/minor cards and the
+// program's own courses; each semester's reading order follows the rows.
+const bandsInOrder = () => page.evaluate(() => {
+  const cards = selector => [...document.querySelectorAll(selector)];
+  const foundation = el => ['math', 'writing'].includes(el.dataset.rowGroup);
+  const genEd = cards('[data-card-type="allowance"][data-purpose="gen_ed"]');
+  const electives = cards('[data-card-type="allowance"][data-purpose="elective"]');
+  const mathWriting = cards('[data-card-type="course"]').filter(foundation);
+  const program = cards('[data-card-type="course"]').filter(el => !foundation(el));
+  const above = (upper, lower) => !upper.length || !lower.length ||
+    Math.max(...upper.map(el => el.getBoundingClientRect().bottom)) <
+      Math.min(...lower.map(el => el.getBoundingClientRect().top));
+  return genEd.length > 0 && electives.length > 0 && program.length > 0 &&
+    above(genEd, [...mathWriting, ...electives, ...program]) &&
+    above(mathWriting, electives) && above(electives, program) &&
+    cards('.cedar-roadmap-courses').every(term => [...term.children].every((el, i, tiles) =>
+      i === 0 || Number(tiles[i - 1].dataset.row) < Number(el.dataset.row)));
 });
 const checkCommunicationOverlap = async () => {
   check(await page.$eval('[data-node="communication"]', el => el.dataset.optionCount === '3' &&
@@ -97,8 +106,9 @@ const checkAnthropologyCoverage = async () => {
   check(await page.$$eval('[data-purpose="gen_ed"]', els => els.length === 4 &&
     els.reduce((sum, el) => sum + Number(el.dataset.credits), 0) === 12) &&
     await page.$$eval('[data-purpose="elective"]', els => els.length > 0 &&
-      els.every(el => el.innerText.includes('Gen Ed not required') || Number(el.dataset.credits) < 3)),
-    'Anthropology identifies four Gen Ed areas; other early cards are elective/minor space');
+      els.every(el => Number(el.dataset.credits) < 3 || el.innerText.includes(
+        el.dataset.allowancePhase === 'advanced' ? 'upper level may count' : 'Gen Ed not required'))),
+    'Anthropology identifies four Gen Ed areas; other cards are elective/minor space, upper level later');
   check(await page.$eval('.cedar-roadmap-coverage', el => el.innerText.includes('19 of 31') &&
     el.innerText.includes('48 credits') && el.innerText.includes('27 more needed')) &&
     await page.$eval('[data-node="antharch"]', el => el.innerText.includes('Also Gen Ed')),
@@ -151,18 +161,18 @@ const checkDegreeExplorer = async () => {
   check(await page.$$eval('[data-course-level="upper"]', els =>
     els.length > 0 && els.every(el => Number(el.dataset.semester) >= 5)),
     'upper-level degree courses begin in year three or later');
-  check(await page.$$eval('.cedar-roadmap-flex', els => els.every(el =>
-    el.dataset.allowancePhase === 'advanced' && el.innerText.includes('Elective / minor'))),
-    'later allowance balances remain elective/minor credits, with upper-level options');
+  check(await page.$$eval('[data-card-type="allowance"][data-purpose="elective"][data-allowance-phase="advanced"]', els =>
+    els.length > 0 && els.every(el => el.innerText.includes('Elective / minor') &&
+      (el.innerText.includes('upper level may count') || Number(el.dataset.credits) < 3))),
+    'later semesters show elective/minor space as full-size cards, with upper-level options');
   check(await page.$$eval('[data-card-type="allowance"]', els => els.length > 0 && els.every(el =>
-    (el.dataset.allowancePhase === "advanced" ? el.dataset.purpose === "gen_ed" : Number(el.dataset.semester) < 5) && el.tagName === 'BUTTON' && el.getAttribute('aria-haspopup') === 'dialog')) &&
-    await page.$$eval('.cedar-roadmap-flex[data-allowance-phase="foundation"]', els => els.length === 0),
-    'early Gen Ed allowances are clickable course slots in the shared grid');
-  check(await genEdRowsFirst(),
-    'Gen Ed options occupy the top rows and precede course sequences in keyboard reading order');
+    el.tagName === 'BUTTON' && el.getAttribute('aria-haspopup') === 'dialog')),
+    'Gen Ed and elective/minor allowances are clickable course slots in the shared grid');
+  check(await bandsInOrder(),
+    'Gen Ed heads the board, then math/writing, elective/minor cards and the program, in reading order');
   await page.screenshot({ path: '/tmp/cedar-degree-gen-ed-top.png', fullPage: true });
   check(await page.$$eval('.cedar-roadmap-semester', terms => terms.every(term =>
-    [...term.querySelectorAll('.cedar-roadmap-course, .cedar-roadmap-flex')].reduce((sum, card) =>
+    [...term.querySelectorAll('.cedar-roadmap-course')].reduce((sum, card) =>
       sum + Number(card.dataset.credits), 0) === Number(term.dataset.plannedCredits))),
     'course tiles and remaining allowances exactly account for every semester credit');
   await hoverCourse('java1');
@@ -188,11 +198,17 @@ const checkDegreeExplorer = async () => {
     'leaving an unselected course clears its temporary chain preview');
   await page.focus('.cedar-roadmap-scroll');
   await page.keyboard.press('Tab');
-  const firstOption = await page.$eval('.cedar-roadmap-courses [data-card-type="allowance"]', el => el.dataset.node);
+  const firstTile = await page.$eval('.cedar-roadmap-courses > *', el => el.dataset.node);
   check(await waitFor(page, id => document.querySelector('[data-roadmap]').dataset.previewNode === id,
-    { args: [firstOption] }) && await page.$eval(`[data-node="${firstOption}"]`, el =>
+    { args: [firstTile] }) && await page.$eval(`[data-node="${firstTile}"]`, el =>
       document.activeElement === el && !!el.getAttribute('aria-describedby')),
-    'keyboard entry reaches a foundational Gen Ed option with an accessible preview');
+    'keyboard entry reaches the first tile in reading order with an accessible preview');
+  const genEdOption = await page.$eval('[data-card-type="allowance"][data-purpose="gen_ed"]', el => el.dataset.node);
+  await page.focus(`[data-node="${genEdOption}"]`);
+  check(await waitFor(page, id => document.querySelector('[data-roadmap]').dataset.previewNode === id,
+    { args: [genEdOption] }) && await page.$eval(`[data-node="${genEdOption}"]`, el =>
+      document.activeElement === el && !!el.getAttribute('aria-describedby')),
+    'keyboard focus on a Gen Ed option gives it an accessible preview');
   await page.focus('[data-node="calc1"]');
   check(await waitFor(page, () => document.querySelector('[data-roadmap]').dataset.previewNode === 'calc1') &&
     await page.$eval('[data-node="calc1"]', el => document.activeElement === el && !!el.getAttribute('aria-describedby')),
@@ -402,7 +418,7 @@ const checkDegreeExplorer = async () => {
   check(await alignedHeaders(), 'mobile year/semester headers retain identical heights');
   check(await alignedCourses(['englX', 'englY', 'engl2']) && await soundRows(),
     'stretch English stays in one aligned row on narrow screens without clipping wrapped course details');
-  check(await genEdRowsFirst(), 'Gen Ed options stay above aligned course sequences on narrow, extended plans');
+  check(await bandsInOrder(), 'the board keeps its bands in order on narrow, extended plans');
   await popup('calc1');
   check(await page.$eval(MODAL, el => {
     const r = el.getBoundingClientRect(); return r.top >= 0 && r.bottom <= window.innerHeight && r.left >= 0 && r.right <= window.innerWidth;
@@ -642,7 +658,7 @@ try {
     check(await alignedHeaders() && await soundRows(), 'shared requirement cards preserve aligned headers and course rows');
     check(await page.$$eval('.cedar-roadmap-semester', terms => terms.every(term =>
       Number(term.dataset.plannedCredits) <= 16 &&
-      [...term.querySelectorAll('.cedar-roadmap-course, .cedar-roadmap-flex')].reduce((sum, card) =>
+      [...term.querySelectorAll('.cedar-roadmap-course')].reduce((sum, card) =>
         sum + Number(card.dataset.credits), 0) === Number(term.dataset.plannedCredits))),
       'shared requirement cards preserve every semester credit and the 16-credit cap');
     await (await page.$('[data-node="antharch"]')).screenshot({ path: '/tmp/cedar-degree-anthropology-overlap-card.png' });
