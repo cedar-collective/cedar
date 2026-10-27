@@ -345,7 +345,26 @@ Still open:
 - One Academic Study file satisfies the check. A run that gets the first file
   and loses the second, as on Oct 23, still passes.
 - `parse-data.R` still passes a requested report that has no file.
-- mrgather still exits 0 after a fatal error.
+- mrgather still exits 0 after a fatal error. On Oct 27 a manual class-list
+  re-pull (`/var/log/cedar-update-20261027_110446.log`) stopped on the
+  VPN's sign-in handoff (`unmvpn.unm.edu/SAML20/SP/ACS`), never reached
+  `#SignonUserName`, and exited 0 with `Fatal error during report gathering`.
+  The fetch check caught it (`no file from today for: cl`) and nothing was
+  republished; the same command run again at 13:36 UTC logged in normally.
+- One missing report blocks every table. The check fails the whole fetch
+  step, so a run that downloads everything but the applicants file publishes
+  nothing, class lists included. The morning cron failed three days running
+  for this reason: on Oct 25 and Oct 26 the Academic Study download timed out
+  and mrgather stopped before class lists and applicants (`no file from today
+  for: cl aa`); on Oct 27 every report downloaded except applicants, which
+  mrgather never attempted (the log has no Applicants URL after the class
+  list), and the run ended `Skipping transform because an earlier step
+  failed`. Production served the tables of the last successful run. *Done
+  when* gains: a report that did download still has its tables rebuilt, and
+  only the tables built from the missing report are kept.
+
+  To check a morning: `grep -E "Fetch exited|Skipping transform|Update
+  Finished|Update Complete" /var/log/cedar-update-$(date -u +%Y%m%d)_100501.log`.
 
 ---
 

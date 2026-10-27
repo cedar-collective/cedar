@@ -1280,6 +1280,11 @@ build_enrollment_projection_draft_comparison <- function(view) {
   )
   as_of <- view$meta$target_schedule_as_of
   count <- function(x) format(round(x), big.mark = ",", trim = TRUE)
+  sections_note <- function(n) dplyr::if_else(
+    dplyr::coalesce(n, 0L) > 0L,
+    paste0(" (", n, " section", dplyr::if_else(n == 1L, "", "s"), ")"),
+    ""
+  )
   # CAMPUS_ROLLUP: the draft is shown per course across the pooled market, with
   # each campus's sections listed beside it from the saved delivery components.
   campus_sections <- view$delivery_components %>%
@@ -1307,8 +1312,15 @@ build_enrollment_projection_draft_comparison <- function(view) {
       pressure_bump,
       plan_feeder_adjustment,
       plan_sections = recommended_sections,
-      seat_gap = dplyr::if_else(in_draft, planned_registrations - scheduled_capacity, NA_real_),
+      # Negative where the draft is short of the plan.
+      draft_vs_plan = dplyr::if_else(in_draft, scheduled_capacity - planned_registrations, NA_real_),
       sections_to_add = dplyr::if_else(in_draft, additional_sections, NA_integer_),
+      # Each shortfall carries its own sections, at the plan's section size:
+      # "short by 10; the plan needs 2 more sections" read as 2 sections for 10
+      # students, when the 2 were for the larger gap to the plan.
+      day_one_sections = projection_sections_for_demand(
+        expected_first_day - draft_seats, reference_section_size
+      ),
       spare_line = pmax(10, dplyr::coalesce(reference_section_size, 0)),
       registered_now = dplyr::if_else(
         target_registration_observed %in% TRUE, as.numeric(target_registered_now), NA_real_
@@ -1318,47 +1330,44 @@ build_enrollment_projection_draft_comparison <- function(view) {
       status = dplyr::case_when(
         !in_draft ~ "not_in_draft",
         is.finite(expected_first_day) & draft_seats < expected_first_day ~ "short_day_one",
-        seat_gap > 0 ~ "short_plan",
-        -seat_gap > spare_line ~ "spare",
+        draft_vs_plan < 0 ~ "short_plan",
+        draft_vs_plan > spare_line ~ "spare",
         TRUE ~ "covers"
       ),
       verdict = dplyr::case_when(
         status == "not_in_draft" ~ "Not in the draft schedule",
         status == "short_day_one" ~ paste0(
           "Short of day-one seats by ", count(expected_first_day - draft_seats),
+          sections_note(day_one_sections),
+          # A falling feeder can put the plan below the first day.
           dplyr::if_else(
-            dplyr::coalesce(sections_to_add, 0L) > 0L,
-            paste0("; the plan needs ", sections_to_add, " more section",
-                   dplyr::if_else(sections_to_add == 1L, "", "s")),
+            draft_vs_plan < 0,
+            paste0("; ", count(-draft_vs_plan), " short of the plan",
+                   sections_note(sections_to_add)),
             ""
           )
         ),
         status == "short_plan" ~ paste0(
-          "Covers day one; ", count(seat_gap), " short of the plan",
-          dplyr::if_else(
-            dplyr::coalesce(sections_to_add, 0L) > 0L,
-            paste0(" (", sections_to_add, " section",
-                   dplyr::if_else(sections_to_add == 1L, "", "s"), ")"),
-            ""
-          )
+          "Covers day one; ", count(-draft_vs_plan), " short of the plan",
+          sections_note(sections_to_add)
         ),
-        status == "spare" ~ paste0(count(-seat_gap), " seats beyond the plan"),
+        status == "spare" ~ paste0(count(draft_vs_plan), " seats beyond the plan"),
         TRUE ~ dplyr::if_else(
-          seat_gap < 0, paste0("Covers the plan, ", count(-seat_gap), " to spare"),
+          draft_vs_plan > 0, paste0("Covers the plan, ", count(draft_vs_plan), " to spare"),
           "Covers the plan"
         )
       )
     ) %>%
     dplyr::select(
       course, department, verdict, draft_sections, draft_seats,
-      expected_first_day, planned_registrations, plan_sections, seat_gap,
+      expected_first_day, planned_registrations, plan_sections, draft_vs_plan,
       registered_now, reliability, seat_consistency,
       in_draft, campus_sections, pressure_bump, plan_feeder_adjustment,
       sections_to_add, status
     ) %>%
     dplyr::arrange(
       factor(status, levels = c("short_day_one", "short_plan", "not_in_draft", "covers", "spare")),
-      dplyr::desc(seat_gap)
+      draft_vs_plan
     )
 
   in_draft <- table$in_draft
