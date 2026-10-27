@@ -702,6 +702,45 @@ test_that("catalog trees preserve alternatives, bundles, timing and unresolved s
   expect_error(validate_degree_catalog(bad), "evidence year")
 })
 
+# Banner gives a field's B.A. and B.S. separate program codes (BA-PSY-AS,
+# BS-PSY-AS) under one program name, so a degree map claims its own codes.
+# The demo has no pre-major for History; FHIS below is built here, named after
+# its own code as UNM's FFDA is, to show that leads_to is what connects it.
+test_that("each degree claims its own Banner program codes, keeping a B.A. apart from a B.S.", {
+  programs <- read_institution_file("programs", cedar_institution_dir(cedar_base_dir, "demo"))
+  codes <- catalog()$program_codes
+  expect_equal(codes$catalog_id, c(BIOLOGY, HISTORY))
+  expect_equal(codes$program_code, c("BS-BIOL-AS", "BA-HIST-AS"))
+  expect_equal(codes$major_code, c("BIOL", "HIST"))
+  is_id <- function(cats, id) cats$catalog_id == id
+  bad <- catalog(); bad$catalogs$program_codes[is_id(bad$catalogs, BIOLOGY)] <- "BA-BIOL-AS"
+  expect_error(validate_degree_catalog(bad), "belong to the catalog's degree: demo-biology-bs-2026")
+  bad <- catalog(); bad$catalogs$program_codes[is_id(bad$catalogs, BIOLOGY)] <- "BS-BIOL"
+  expect_error(validate_degree_catalog(bad), "belong to the catalog's degree")
+  bad <- catalog(); bad$catalogs$program_codes[is_id(bad$catalogs, BIOLOGY)] <- ""
+  expect_error(validate_degree_catalog(bad), "belong to the catalog's degree")
+  bad <- catalog(); bad$catalogs$degree_code[is_id(bad$catalogs, HISTORY)] <- "BS"
+  bad$catalogs$program_codes[is_id(bad$catalogs, HISTORY)] <- "BS-BIOL-AS"
+  expect_error(validate_degree_catalog(bad), "belongs to one catalog")
+
+  cats <- catalog()$catalogs
+  cats$program_codes[is_id(cats, HISTORY)] <- "BA-BIOL-AS"
+  expect_error(degree_catalog_program_codes(cats, programs), "not the catalog's program: BA-BIOL-AS")
+  cats$program_codes[is_id(cats, HISTORY)] <- "BA-HIST-AS|BA-FHIS-AS"
+  expect_error(degree_catalog_program_codes(cats, programs), "not the catalog's program: BA-FHIS-AS")
+  pre <- rbind(programs, transform(programs[programs$program_code == "HIST", ],
+    program_code = "FHIS", program_name = "FHIS", is_pre_major = "TRUE", leads_to = "HIST"))
+  out <- degree_catalog_program_codes(cats, pre)
+  expect_equal(out$is_pre_major[out$catalog_id == HISTORY], c(FALSE, TRUE))
+  expect_match(degree_program_codes_note(list(program_codes = out), HISTORY),
+    "Banner program codes for this degree: BA-HIST-AS; pre-major BA-FHIS-AS.", fixed = TRUE)
+  expect_match(view_of(HISTORY)$program_codes_note, "for this degree: BA-HIST-AS. Another degree", fixed = TRUE)
+  rules <- build_degree_plan_rules(catalog(), roadmaps(), view_of(HISTORY))$rows
+  expect_equal(rules$rule[rules$kind == "Banner program codes"], view_of(HISTORY)$program_codes_note)
+  pre$leads_to[pre$program_code == "FHIS"] <- "BIOL"
+  expect_error(degree_catalog_program_codes(cats, pre), "not the catalog's program: BA-FHIS-AS")
+})
+
 # ── Scheduling ───────────────────────────────────────────────────────────────
 
 test_that("readable plan rules expose the active graph and distinguish policy from scheduling", {
@@ -1066,6 +1105,7 @@ test_that("the loaded institution's roadmaps keep every planning rule in every s
       }
     }
   }
+  expect_setequal(unique(c$program_codes$catalog_id), c$catalogs$catalog_id)
 })
 
 # ── Popup history ────────────────────────────────────────────────────────────

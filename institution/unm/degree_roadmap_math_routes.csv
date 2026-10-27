@@ -47,3 +47,51 @@ mechanical-engineering-bs-2026,calculus,Ready for Calculus I,calc1
 mechanical-engineering-bs-2026,precalculus,Start with Trig / Pre-Calculus (MATH 1250),math1250|calc1
 mechanical-engineering-bs-2026,algebra,Start with College Algebra (MATH 1220),math1220|math1250|calc1
 mechanical-engineering-bs-2026,intermediate,Start with Intermediate Algebra (MATH 1215),math1215|math1220|math1250|calc1
+psychology-ba-2026,calculus,Calculus-ready · statistics route,math1350
+psychology-ba-2026,precalculus,Pre-calculus-ready · statistics route,math1350
+psychology-ba-2026,algebra,College-algebra-ready · statistics route,math1350
+psychology-ba-2026,intermediate,"Start with MATH 1215, then statistics",math1215|math1350
+psychology-bs-2026,calculus,Calculus-ready · statistics route,math1350
+psychology-bs-2026,precalculus,Pre-calculus-ready · statistics route,math1350
+psychology-bs-2026,algebra,College-algebra-ready · statistics route,math1350
+psychology-bs-2026,intermediate,"Start with MATH 1215, then statistics",math1215|math1350
+criminology-ba-2026,calculus,Calculus-ready · statistics route,math1350
+criminology-ba-2026,precalculus,Pre-calculus-ready · statistics route,math1350
+criminology-ba-2026,algebra,College-algebra-ready · statistics route,math1350
+criminology-ba-2026,intermediate,"Start with MATH 1215, then statistics",math1215|math1350
+chemistry-ba-2026,calculus,Ready for Calculus I,calc1
+chemistry-ba-2026,precalculus,Start with Trig / Pre-Calculus (MATH 1250),math1250|calc1
+chemistry-ba-2026,algebra,Start with College Algebra (MATH 1220),math1220|math1250|calc1
+chemistry-ba-2026,intermediate,Start with Intermediate Algebra (MATH 1215),math1215|math1220|math1250|calc1
+chemistry-bs-2026,calculus,Ready for Calculus I,calc1
+chemistry-bs-2026,precalculus,Start with Trig / Pre-Calculus (MATH 1250),math1250|calc1
+chemistry-bs-2026,algebra,Start with College Algebra (MATH 1220),math1220|math1250|calc1
+chemistry-bs-2026,intermediate,Start with Intermediate Algebra (MATH 1215),math1215|math1220|math1250|calc1
+biochemistry-bs-2026,calculus,Ready for Calculus I,calc1
+biochemistry-bs-2026,precalculus,Start with Trig / Pre-Calculus (MATH 1250),math1250|calc1
+biochemistry-bs-2026,algebra,Start with College Algebra (MATH 1220),math1220|math1250|calc1
+biochemistry-bs-2026,intermediate,Start with Intermediate Algebra (MATH 1215),math1215|math1220|math1250|calc1
+political-science-ba-2026,calculus,Calculus-ready · statistics route,math1350
+political-science-ba-2026,precalculus,Pre-calculus-ready · statistics route,math1350
+political-science-ba-2026,algebra,College-algebra-ready · statistics route,math1350
+political-science-ba-2026,intermediate,"Start with MATH 1215, then statistics",math1215|math1350
+electrical-engineering-bs-2026,calculus,Ready for Calculus I,calc1
+electrical-engineering-bs-2026,precalculus,Start with Trig / Pre-Calculus (MATH 1250),math1250|calc1
+electrical-engineering-bs-2026,algebra,Start with College Algebra (MATH 1220),math1220|math1250|calc1
+electrical-engineering-bs-2026,intermediate,Start with Intermediate Algebra (MATH 1215),math1215|math1220|math1250|calc1
+exercise-science-bs-2026,calculus,"Ready for MATH 1220, then statistics",math1220|math1350
+exercise-science-bs-2026,precalculus,"Ready for MATH 1220, then statistics",math1220|math1350
+exercise-science-bs-2026,algebra,"Start with College Algebra (MATH 1220), then statistics",math1220|math1350
+exercise-science-bs-2026,intermediate,Start with Intermediate Algebra (MATH 1215),math1215|math1220|math1350
+film-digital-arts-ba-2026,calculus,Calculus-ready · statistics route,math1350
+film-digital-arts-ba-2026,precalculus,Pre-calculus-ready · statistics route,math1350
+film-digital-arts-ba-2026,algebra,College-algebra-ready · statistics route,math1350
+film-digital-arts-ba-2026,intermediate,"Start with MATH 1215, then statistics",math1215|math1350
+film-digital-arts-bfa-2026,calculus,Calculus-ready · statistics route,math1350
+film-digital-arts-bfa-2026,precalculus,Pre-calculus-ready · statistics route,math1350
+film-digital-arts-bfa-2026,algebra,College-algebra-ready · statistics route,math1350
+film-digital-arts-bfa-2026,intermediate,"Start with MATH 1215, then statistics",math1215|math1350
+architecture-ba-2026,calculus,Calculus-ready · statistics route,math1350
+architecture-ba-2026,precalculus,Pre-calculus-ready · statistics route,math1350
+architecture-ba-2026,algebra,College-algebra-ready · statistics route,math1350
+architecture-ba-2026,intermediate,"Start with MATH 1215, then statistics",math1215|math1350

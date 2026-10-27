@@ -198,6 +198,51 @@
       "file": "sources/9b84e0549312334c7ab10c1cae790b8fa6f2e68f8b0f21e313f46038cab187ec.body",
       "title": "School of Medicine",
       "catalog_url": "https://catalog.unm.edu/#/content/68a34619f6461f0934cc1594"
+    },
+    "education_human_sciences": {
+      "kind": "college",
+      "key": "education_human_sciences",
+      "url": "https://unm.kuali.co/api/v1/catalog/content/68a34618f6461f0934cc1582",
+      "final_url": "https://unm.kuali.co/api/v1/catalog/content/68a34618f6461f0934cc1582",
+      "fetched_at": "2026-10-27T02:12:55Z",
+      "status_code": 200,
+      "content_type": "application/json; charset=utf-8",
+      "etag": "W/\"bb5a-IhJ7Drix2rxmIES7Lb7evb/Gj5Q\"",
+      "last_modified": "",
+      "sha256": "3f219c23df7044d51693a4d986bdf60c56125b0c166b5f4b7b1817aaa3e1efe5",
+      "file": "sources/3f219c23df7044d51693a4d986bdf60c56125b0c166b5f4b7b1817aaa3e1efe5.body",
+      "title": "College of Education and Human Sciences",
+      "catalog_url": "https://catalog.unm.edu/#/content/68a34618f6461f0934cc1582"
+    },
+    "fine_arts": {
+      "kind": "college",
+      "key": "fine_arts",
+      "url": "https://unm.kuali.co/api/v1/catalog/content/68a34619f6461f0934cc1586",
+      "final_url": "https://unm.kuali.co/api/v1/catalog/content/68a34619f6461f0934cc1586",
+      "fetched_at": "2026-10-27T02:12:56Z",
+      "status_code": 200,
+      "content_type": "application/json; charset=utf-8",
+      "etag": "W/\"69da-lJrkEhW1BKGxwvDsIR1CgAxUmHU\"",
+      "last_modified": "",
+      "sha256": "33d09bc147390a33f4d5f296948de32240e34f7d703fa547cce66cd79641e03d",
+      "file": "sources/33d09bc147390a33f4d5f296948de32240e34f7d703fa547cce66cd79641e03d.body",
+      "title": "College of Fine Arts",
+      "catalog_url": "https://catalog.unm.edu/#/content/68a34619f6461f0934cc1586"
+    },
+    "architecture_planning": {
+      "kind": "college",
+      "key": "architecture_planning",
+      "url": "https://unm.kuali.co/api/v1/catalog/content/68a34618f6461f0934cc157c",
+      "final_url": "https://unm.kuali.co/api/v1/catalog/content/68a34618f6461f0934cc157c",
+      "fetched_at": "2026-10-27T02:12:56Z",
+      "status_code": 200,
+      "content_type": "application/json; charset=utf-8",
+      "etag": "W/\"4089-/2TdAsH7tFE2CN5Z6wZ4rNuND7M\"",
+      "last_modified": "",
+      "sha256": "ac85cf79e3116b97c9bf4c904d3bee4fada5ea06adbf8867b630725d87627cbd",
+      "file": "sources/ac85cf79e3116b97c9bf4c904d3bee4fada5ea06adbf8867b630725d87627cbd.body",
+      "title": "School of Architecture and Planning",
+      "catalog_url": "https://catalog.unm.edu/#/content/68a34618f6461f0934cc157c"
     }
   }
 }

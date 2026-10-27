@@ -331,3 +331,313 @@ mechanical-engineering-bs-2026,me_microsys2,degree,degree-mechanical-engineering
 mechanical-engineering-bs-2026,me_microsys3,degree,degree-mechanical-engineering-bs-2026-me_microsys3,Microsystems Engineering concentration course in this selected example; not required for the base degree.
 mechanical-engineering-bs-2026,me_math_choice,degree,degree-mechanical-engineering-bs-2026-me_math_choice,Selected course group; individual course prerequisites still need review.
 mechanical-engineering-bs-2026,me_tech_elective,degree,degree-mechanical-engineering-bs-2026-me_tech_elective,Selected course group; individual course prerequisites still need review.
+psychology-ba-2026,psyc1110,degree,degree-psychology-ba-2026-psyc1110,Named degree requirement.
+psychology-ba-2026,psyc2510,degree,degree-psychology-ba-2026-psyc2510,Named degree requirement.
+psychology-ba-2026,psyc302,degree,degree-psychology-ba-2026-psyc302,Named degree requirement.
+psychology-ba-2026,psyfound1,degree,degree-psychology-ba-2026-psyfound1,Choose one of 6 options for this requirement.
+psychology-ba-2026,psyfound2,degree,degree-psychology-ba-2026-psyfound2,Choose one of 6 options for this requirement.
+psychology-ba-2026,psyfound3,degree,degree-psychology-ba-2026-psyfound3,Choose one of 6 options for this requirement.
+psychology-ba-2026,psyfound4,degree,degree-psychology-ba-2026-psyfound4,Choose one of 6 options for this requirement.
+psychology-ba-2026,psyupper1,degree,degree-psychology-ba-2026-psyupper1,Selected course group; individual course prerequisites still need review.
+psychology-ba-2026,psyupper2,degree,degree-psychology-ba-2026-psyupper2,Selected course group; individual course prerequisites still need review.
+psychology-ba-2026,psyupper3,degree,degree-psychology-ba-2026-psyupper3,Selected course group; individual course prerequisites still need review.
+psychology-ba-2026,psyupper4,degree,degree-psychology-ba-2026-psyupper4,Selected course group; individual course prerequisites still need review.
+psychology-ba-2026,psyelective,degree,degree-psychology-ba-2026-psyelective,Selected course group; individual course prerequisites still need review.
+psychology-ba-2026,math1350,general,degree-psychology-ba-2026-math1350,Illustrative Gen Ed math choice; this major does not specifically require MATH 1350.
+psychology-ba-2026,math1215,prerequisite,route-*-math1215-math1350,Preparation added by the selected math or English starting route; not a separately listed major requirement.
+psychology-ba-2026,englX,prerequisite,route-*-englX-englY,Preparation added by the selected math or English starting route; not a separately listed major requirement.
+psychology-ba-2026,englY,general,degree-psychology-ba-2026-englY,Illustrative English route toward general communication requirements; full Gen Ed allocation is not encoded.
+psychology-ba-2026,engl1,general,degree-psychology-ba-2026-engl1,Illustrative English route toward general communication requirements; full Gen Ed allocation is not encoded.
+psychology-ba-2026,engl2,general,degree-psychology-ba-2026-engl2,Illustrative English route toward general communication requirements; full Gen Ed allocation is not encoded.
+psychology-bs-2026,psyc1110,degree,degree-psychology-bs-2026-psyc1110,Named degree requirement.
+psychology-bs-2026,psyc2510,degree,degree-psychology-bs-2026-psyc2510,Named degree requirement.
+psychology-bs-2026,psyc302,degree,degree-psychology-bs-2026-psyc302,Named degree requirement.
+psychology-bs-2026,psyfound1,degree,degree-psychology-bs-2026-psyfound1,Choose one of 6 options for this requirement.
+psychology-bs-2026,psyfound2,degree,degree-psychology-bs-2026-psyfound2,Choose one of 6 options for this requirement.
+psychology-bs-2026,psyfound3,degree,degree-psychology-bs-2026-psyfound3,Choose one of 6 options for this requirement.
+psychology-bs-2026,psyfound4,degree,degree-psychology-bs-2026-psyfound4,Choose one of 6 options for this requirement.
+psychology-bs-2026,psyupper1,degree,degree-psychology-bs-2026-psyupper1,Selected course group; individual course prerequisites still need review.
+psychology-bs-2026,psyupper2,degree,degree-psychology-bs-2026-psyupper2,Selected course group; individual course prerequisites still need review.
+psychology-bs-2026,psyupper3,degree,degree-psychology-bs-2026-psyupper3,Selected course group; individual course prerequisites still need review.
+psychology-bs-2026,psyupper4,degree,degree-psychology-bs-2026-psyupper4,Selected course group; individual course prerequisites still need review.
+psychology-bs-2026,psylab,degree,degree-psychology-bs-2026-psylab,Selected course group; individual course prerequisites still need review.
+psychology-bs-2026,math1350,general,degree-psychology-bs-2026-math1350,Illustrative Gen Ed math choice; this major does not specifically require MATH 1350.
+psychology-bs-2026,math1215,prerequisite,route-*-math1215-math1350,Preparation added by the selected math or English starting route; not a separately listed major requirement.
+psychology-bs-2026,englX,prerequisite,route-*-englX-englY,Preparation added by the selected math or English starting route; not a separately listed major requirement.
+psychology-bs-2026,englY,general,degree-psychology-bs-2026-englY,Illustrative English route toward general communication requirements; full Gen Ed allocation is not encoded.
+psychology-bs-2026,engl1,general,degree-psychology-bs-2026-engl1,Illustrative English route toward general communication requirements; full Gen Ed allocation is not encoded.
+psychology-bs-2026,engl2,general,degree-psychology-bs-2026-engl2,Illustrative English route toward general communication requirements; full Gen Ed allocation is not encoded.
+criminology-ba-2026,soci1110,degree,degree-criminology-ba-2026-soci1110,Named degree requirement.
+criminology-ba-2026,soci2120,degree,degree-criminology-ba-2026-soci2120,Named degree requirement.
+criminology-ba-2026,soci2210,degree,degree-criminology-ba-2026-soci2210,Named degree requirement.
+criminology-ba-2026,soci312,degree,degree-criminology-ba-2026-soci312,Named degree requirement.
+criminology-ba-2026,soci380,degree,degree-criminology-ba-2026-soci380,Named degree requirement.
+criminology-ba-2026,soci381l,degree,degree-criminology-ba-2026-soci381l,Named degree requirement.
+criminology-ba-2026,crimrace,degree,degree-criminology-ba-2026-crimrace,Choose one of 5 options for this requirement.
+criminology-ba-2026,crimupper1,degree,degree-criminology-ba-2026-crimupper1,Choose one of 12 options for this requirement.
+criminology-ba-2026,crimupper2,degree,degree-criminology-ba-2026-crimupper2,Choose one of 12 options for this requirement.
+criminology-ba-2026,crimelective1,degree,degree-criminology-ba-2026-crimelective1,Selected course group; individual course prerequisites still need review.
+criminology-ba-2026,crimelective2,degree,degree-criminology-ba-2026-crimelective2,Selected course group; individual course prerequisites still need review.
+criminology-ba-2026,math1350,prerequisite,route-criminology-ba-2026-math1350-soci381l,Not listed by the major; SOCI 381L requires MATH 1350 with C or better.
+criminology-ba-2026,math1215,prerequisite,route-*-math1215-math1350,Preparation added by the selected math or English starting route; not a separately listed major requirement.
+criminology-ba-2026,englX,prerequisite,route-*-englX-englY,Preparation added by the selected math or English starting route; not a separately listed major requirement.
+criminology-ba-2026,englY,general,degree-criminology-ba-2026-englY,Illustrative English route toward general communication requirements; full Gen Ed allocation is not encoded.
+criminology-ba-2026,engl1,general,degree-criminology-ba-2026-engl1,Illustrative English route toward general communication requirements; full Gen Ed allocation is not encoded.
+criminology-ba-2026,engl2,general,degree-criminology-ba-2026-engl2,Illustrative English route toward general communication requirements; full Gen Ed allocation is not encoded.
+chemistry-ba-2026,chem1,degree,degree-chemistry-ba-2026-chem1,Named degree requirement (lecture and lab planned together).
+chemistry-ba-2026,chem2,degree,degree-chemistry-ba-2026-chem2,Named degree requirement (lecture and lab planned together).
+chemistry-ba-2026,quant,degree,degree-chemistry-ba-2026-quant,Named degree requirement.
+chemistry-ba-2026,orgo1,degree,degree-chemistry-ba-2026-orgo1,Named degree requirement (lecture and lab planned together).
+chemistry-ba-2026,orgo2,degree,degree-chemistry-ba-2026-orgo2,Named degree requirement (lecture and lab planned together).
+chemistry-ba-2026,calc2,degree,degree-chemistry-ba-2026-calc2,Named degree requirement.
+chemistry-ba-2026,phys1,degree,degree-chemistry-ba-2026-phys1,Named degree requirement (lecture and lab planned together).
+chemistry-ba-2026,phys2,degree,degree-chemistry-ba-2026-phys2,Named degree requirement (lecture and lab planned together).
+chemistry-ba-2026,pchem,degree,degree-chemistry-ba-2026-pchem,Named degree requirement.
+chemistry-ba-2026,chemelective1,degree,degree-chemistry-ba-2026-chemelective1,Selected course group; individual course prerequisites still need review.
+chemistry-ba-2026,chemelective2,degree,degree-chemistry-ba-2026-chemelective2,Selected course group; individual course prerequisites still need review.
+chemistry-ba-2026,calc1,degree,degree-chemistry-ba-2026-calc1,Named degree requirement.
+chemistry-ba-2026,math1250,prerequisite,route-*-math1250-calc1,Preparation added by the selected math or English starting route; not a separately listed major requirement.
+chemistry-ba-2026,math1220,prerequisite,route-*-math1220-math1250,Preparation added by the selected math or English starting route; not a separately listed major requirement.
+chemistry-ba-2026,math1215,prerequisite,route-*-math1215-math1220,Preparation added by the selected math or English starting route; not a separately listed major requirement.
+chemistry-ba-2026,englX,prerequisite,route-*-englX-englY,Preparation added by the selected math or English starting route; not a separately listed major requirement.
+chemistry-ba-2026,englY,general,degree-chemistry-ba-2026-englY,Illustrative English route toward general communication requirements; full Gen Ed allocation is not encoded.
+chemistry-ba-2026,engl1,general,degree-chemistry-ba-2026-engl1,Illustrative English route toward general communication requirements; full Gen Ed allocation is not encoded.
+chemistry-ba-2026,engl2,general,degree-chemistry-ba-2026-engl2,Illustrative English route toward general communication requirements; full Gen Ed allocation is not encoded.
+chemistry-bs-2026,chem1,degree,degree-chemistry-bs-2026-chem1,Named degree requirement (lecture and lab planned together).
+chemistry-bs-2026,chem2,degree,degree-chemistry-bs-2026-chem2,Named degree requirement (lecture and lab planned together).
+chemistry-bs-2026,quant,degree,degree-chemistry-bs-2026-quant,Named degree requirement.
+chemistry-bs-2026,orgo1,degree,degree-chemistry-bs-2026-orgo1,Named degree requirement (lecture and lab planned together).
+chemistry-bs-2026,orgo2,degree,degree-chemistry-bs-2026-orgo2,Named degree requirement (lecture and lab planned together).
+chemistry-bs-2026,calc2,prerequisite,route-chemistry-bs-2026-calc2-calc3,Not listed by the program; a prerequisite of the selected route to calc3.
+chemistry-bs-2026,calc3,degree,degree-chemistry-bs-2026-calc3,Named degree requirement.
+chemistry-bs-2026,phys1,degree,degree-chemistry-bs-2026-phys1,Named degree requirement (lecture and lab planned together).
+chemistry-bs-2026,phys2,degree,degree-chemistry-bs-2026-phys2,Named degree requirement (lecture and lab planned together).
+chemistry-bs-2026,pchem1,degree,degree-chemistry-bs-2026-pchem1,Named degree requirement.
+chemistry-bs-2026,pchem2,degree,degree-chemistry-bs-2026-pchem2,Named degree requirement.
+chemistry-bs-2026,instrument,degree,degree-chemistry-bs-2026-instrument,Named degree requirement.
+chemistry-bs-2026,inorganic,degree,degree-chemistry-bs-2026-inorganic,Named degree requirement.
+chemistry-bs-2026,pchemlab,degree,degree-chemistry-bs-2026-pchemlab,Named degree requirement.
+chemistry-bs-2026,mathupper,degree,degree-chemistry-bs-2026-mathupper,Selected course group; individual course prerequisites still need review.
+chemistry-bs-2026,chemelective1,degree,degree-chemistry-bs-2026-chemelective1,Selected course group; individual course prerequisites still need review.
+chemistry-bs-2026,chemelective2,degree,degree-chemistry-bs-2026-chemelective2,Selected course group; individual course prerequisites still need review.
+chemistry-bs-2026,calc1,prerequisite,route-chemistry-bs-2026-calc1-calc2,Not listed by the B.S.; MATH 1522 and MATH 2531 build on it. The admission coursework names MATH 1430 or 1512.
+chemistry-bs-2026,math1250,prerequisite,route-*-math1250-calc1,Preparation added by the selected math or English starting route; not a separately listed major requirement.
+chemistry-bs-2026,math1220,prerequisite,route-*-math1220-math1250,Preparation added by the selected math or English starting route; not a separately listed major requirement.
+chemistry-bs-2026,math1215,prerequisite,route-*-math1215-math1220,Preparation added by the selected math or English starting route; not a separately listed major requirement.
+chemistry-bs-2026,englX,prerequisite,route-*-englX-englY,Preparation added by the selected math or English starting route; not a separately listed major requirement.
+chemistry-bs-2026,englY,general,degree-chemistry-bs-2026-englY,Illustrative English route toward general communication requirements; full Gen Ed allocation is not encoded.
+chemistry-bs-2026,engl1,general,degree-chemistry-bs-2026-engl1,Illustrative English route toward general communication requirements; full Gen Ed allocation is not encoded.
+chemistry-bs-2026,engl2,general,degree-chemistry-bs-2026-engl2,Illustrative English route toward general communication requirements; full Gen Ed allocation is not encoded.
+biochemistry-bs-2026,chem1,degree,degree-biochemistry-bs-2026-chem1,Named degree requirement (lecture and lab planned together).
+biochemistry-bs-2026,chem2,degree,degree-biochemistry-bs-2026-chem2,Named degree requirement (lecture and lab planned together).
+biochemistry-bs-2026,bio1,prerequisite,route-biochemistry-bs-2026-bio1-biol301,Not listed by the program; a prerequisite of the selected route to biol301.
+biochemistry-bs-2026,bio2,prerequisite,route-biochemistry-bs-2026-bio2-biol301,Not listed by the program; a prerequisite of the selected route to biol301.
+biochemistry-bs-2026,calc2,degree,degree-biochemistry-bs-2026-calc2,Selected listed mathematics option; MATH 1430 + 1440 is the alternative.
+biochemistry-bs-2026,biol301,degree,degree-biochemistry-bs-2026-biol301,Named degree requirement.
+biochemistry-bs-2026,biol302,degree,degree-biochemistry-bs-2026-biol302,Named degree requirement.
+biochemistry-bs-2026,orgo1,degree,degree-biochemistry-bs-2026-orgo1,Named degree requirement (lecture and lab planned together).
+biochemistry-bs-2026,orgo2,degree,degree-biochemistry-bs-2026-orgo2,Named degree requirement (lecture and lab planned together).
+biochemistry-bs-2026,quantchoice,degree,degree-biochemistry-bs-2026-quantchoice,Choose one of 3 options for this requirement.
+biochemistry-bs-2026,phys1,degree,degree-biochemistry-bs-2026-phys1,Selected listed physics option (lecture and lab planned together).
+biochemistry-bs-2026,phys2,degree,degree-biochemistry-bs-2026-phys2,Selected listed physics option (lecture and lab planned together).
+biochemistry-bs-2026,bioc445,degree,degree-biochemistry-bs-2026-bioc445,Named degree requirement.
+biochemistry-bs-2026,bioc446,degree,degree-biochemistry-bs-2026-bioc446,Named degree requirement.
+biochemistry-bs-2026,pchem,degree,degree-biochemistry-bs-2026-pchem,Choose one of 2 options for this requirement.
+biochemistry-bs-2026,bioc448l,degree,degree-biochemistry-bs-2026-bioc448l,Named degree requirement.
+biochemistry-bs-2026,biocmentor,degree,degree-biochemistry-bs-2026-biocmentor,Choose one of 2 options for this requirement.
+biochemistry-bs-2026,biocelective1,degree,degree-biochemistry-bs-2026-biocelective1,Choose one of 4 options for this requirement.
+biochemistry-bs-2026,biocelective2,degree,degree-biochemistry-bs-2026-biocelective2,Choose one of 4 options for this requirement.
+biochemistry-bs-2026,approvedelective,degree,degree-biochemistry-bs-2026-approvedelective,Selected course group; individual course prerequisites still need review.
+biochemistry-bs-2026,calc1,degree,degree-biochemistry-bs-2026-calc1,Selected listed mathematics option; MATH 1430 + 1440 is the alternative.
+biochemistry-bs-2026,math1250,prerequisite,route-*-math1250-calc1,Preparation added by the selected math or English starting route; not a separately listed major requirement.
+biochemistry-bs-2026,math1220,prerequisite,route-*-math1220-math1250,Preparation added by the selected math or English starting route; not a separately listed major requirement.
+biochemistry-bs-2026,math1215,prerequisite,route-*-math1215-math1220,Preparation added by the selected math or English starting route; not a separately listed major requirement.
+biochemistry-bs-2026,englX,prerequisite,route-*-englX-englY,Preparation added by the selected math or English starting route; not a separately listed major requirement.
+biochemistry-bs-2026,englY,general,degree-biochemistry-bs-2026-englY,Illustrative English route toward general communication requirements; full Gen Ed allocation is not encoded.
+biochemistry-bs-2026,engl1,general,degree-biochemistry-bs-2026-engl1,Illustrative English route toward general communication requirements; full Gen Ed allocation is not encoded.
+biochemistry-bs-2026,engl2,general,degree-biochemistry-bs-2026-engl2,Illustrative English route toward general communication requirements; full Gen Ed allocation is not encoded.
+political-science-ba-2026,polsgov,degree,degree-political-science-ba-2026-polsgov,Choose one of 2 options for this requirement.
+political-science-ba-2026,polsworld,degree,degree-political-science-ba-2026-polsworld,Choose one of 2 options for this requirement.
+political-science-ba-2026,polstheory,degree,degree-political-science-ba-2026-polstheory,Choose one of 2 options for this requirement.
+political-science-ba-2026,polscore4,degree,degree-political-science-ba-2026-polscore4,Selected course group; individual course prerequisites still need review.
+political-science-ba-2026,polsupper1,degree,degree-political-science-ba-2026-polsupper1,Selected course group; individual course prerequisites still need review.
+political-science-ba-2026,polsupper2,degree,degree-political-science-ba-2026-polsupper2,Selected course group; individual course prerequisites still need review.
+political-science-ba-2026,polsupper3,degree,degree-political-science-ba-2026-polsupper3,Selected course group; individual course prerequisites still need review.
+political-science-ba-2026,polsupper4,degree,degree-political-science-ba-2026-polsupper4,Selected course group; individual course prerequisites still need review.
+political-science-ba-2026,polsupper5,degree,degree-political-science-ba-2026-polsupper5,Selected course group; individual course prerequisites still need review.
+political-science-ba-2026,polsupper6,degree,degree-political-science-ba-2026-polsupper6,Selected course group; individual course prerequisites still need review.
+political-science-ba-2026,polsupper7,degree,degree-political-science-ba-2026-polsupper7,Selected course group; individual course prerequisites still need review.
+political-science-ba-2026,polsany,degree,degree-political-science-ba-2026-polsany,Selected course group; individual course prerequisites still need review.
+political-science-ba-2026,math1350,general,degree-political-science-ba-2026-math1350,Illustrative Gen Ed math choice; this major does not specifically require MATH 1350.
+political-science-ba-2026,math1215,prerequisite,route-*-math1215-math1350,Preparation added by the selected math or English starting route; not a separately listed major requirement.
+political-science-ba-2026,englX,prerequisite,route-*-englX-englY,Preparation added by the selected math or English starting route; not a separately listed major requirement.
+political-science-ba-2026,englY,general,degree-political-science-ba-2026-englY,Illustrative English route toward general communication requirements; full Gen Ed allocation is not encoded.
+political-science-ba-2026,engl1,general,degree-political-science-ba-2026-engl1,Illustrative English route toward general communication requirements; full Gen Ed allocation is not encoded.
+political-science-ba-2026,engl2,general,degree-political-science-ba-2026-engl2,Illustrative English route toward general communication requirements; full Gen Ed allocation is not encoded.
+electrical-engineering-bs-2026,ece101,degree,degree-electrical-engineering-bs-2026-ece101,Named degree requirement.
+electrical-engineering-bs-2026,ece131l,degree,degree-electrical-engineering-bs-2026-ece131l,Named degree requirement.
+electrical-engineering-bs-2026,calc2,degree,degree-electrical-engineering-bs-2026-calc2,Named degree requirement.
+electrical-engineering-bs-2026,phys1,degree,degree-electrical-engineering-bs-2026-phys1,Named degree requirement.
+electrical-engineering-bs-2026,ece238l,degree,degree-electrical-engineering-bs-2026-ece238l,Named degree requirement.
+electrical-engineering-bs-2026,econ,degree,degree-electrical-engineering-bs-2026-econ,Choose one of 2 options for this requirement.
+electrical-engineering-bs-2026,calc3,degree,degree-electrical-engineering-bs-2026-calc3,Named degree requirement.
+electrical-engineering-bs-2026,phys2,degree,degree-electrical-engineering-bs-2026-phys2,Named degree requirement (lecture and lab planned together).
+electrical-engineering-bs-2026,ece203,degree,degree-electrical-engineering-bs-2026-ece203,Named degree requirement.
+electrical-engineering-bs-2026,ece206l,degree,degree-electrical-engineering-bs-2026-ece206l,Named degree requirement.
+electrical-engineering-bs-2026,engl2210,degree,degree-electrical-engineering-bs-2026-engl2210,Named degree requirement.
+electrical-engineering-bs-2026,phys3,degree,degree-electrical-engineering-bs-2026-phys3,Named degree requirement.
+electrical-engineering-bs-2026,ece300,degree,degree-electrical-engineering-bs-2026-ece300,Named degree requirement.
+electrical-engineering-bs-2026,ece213,degree,degree-electrical-engineering-bs-2026-ece213,Named degree requirement.
+electrical-engineering-bs-2026,ece321l,degree,degree-electrical-engineering-bs-2026-ece321l,Named degree requirement.
+electrical-engineering-bs-2026,eng220,degree,degree-electrical-engineering-bs-2026-eng220,Named degree requirement.
+electrical-engineering-bs-2026,scienceelective,degree,degree-electrical-engineering-bs-2026-scienceelective,Selected course group; individual course prerequisites still need review.
+electrical-engineering-bs-2026,ece314l,degree,degree-electrical-engineering-bs-2026-ece314l,Named degree requirement.
+electrical-engineering-bs-2026,ece340,degree,degree-electrical-engineering-bs-2026-ece340,Named degree requirement.
+electrical-engineering-bs-2026,ece322l,degree,degree-electrical-engineering-bs-2026-ece322l,Named degree requirement.
+electrical-engineering-bs-2026,ece344l,degree,degree-electrical-engineering-bs-2026-ece344l,Named degree requirement.
+electrical-engineering-bs-2026,ece360l,degree,degree-electrical-engineering-bs-2026-ece360l,Named degree requirement.
+electrical-engineering-bs-2026,ece371,degree,degree-electrical-engineering-bs-2026-ece371,Named degree requirement.
+electrical-engineering-bs-2026,ece381,degree,degree-electrical-engineering-bs-2026-ece381,Named degree requirement.
+electrical-engineering-bs-2026,ece341,degree,degree-electrical-engineering-bs-2026-ece341,Named degree requirement.
+electrical-engineering-bs-2026,ece345,degree,degree-electrical-engineering-bs-2026-ece345,Named degree requirement.
+electrical-engineering-bs-2026,ece419,degree,degree-electrical-engineering-bs-2026-ece419,Named degree requirement.
+electrical-engineering-bs-2026,ece420,degree,degree-electrical-engineering-bs-2026-ece420,Named degree requirement.
+electrical-engineering-bs-2026,techelective1,degree,degree-electrical-engineering-bs-2026-techelective1,Selected course group; individual course prerequisites still need review.
+electrical-engineering-bs-2026,techelective2,degree,degree-electrical-engineering-bs-2026-techelective2,Selected course group; individual course prerequisites still need review.
+electrical-engineering-bs-2026,techelective3,degree,degree-electrical-engineering-bs-2026-techelective3,Selected course group; individual course prerequisites still need review.
+electrical-engineering-bs-2026,calc1,degree,degree-electrical-engineering-bs-2026-calc1,Named degree requirement.
+electrical-engineering-bs-2026,math1250,prerequisite,route-*-math1250-calc1,Preparation added by the selected math or English starting route; not a separately listed major requirement.
+electrical-engineering-bs-2026,math1220,prerequisite,route-*-math1220-math1250,Preparation added by the selected math or English starting route; not a separately listed major requirement.
+electrical-engineering-bs-2026,math1215,prerequisite,route-*-math1215-math1220,Preparation added by the selected math or English starting route; not a separately listed major requirement.
+electrical-engineering-bs-2026,englX,prerequisite,route-*-englX-englY,Preparation added by the selected math or English starting route; not a separately listed major requirement.
+electrical-engineering-bs-2026,englY,general,degree-electrical-engineering-bs-2026-englY,Illustrative English route toward general communication requirements; full Gen Ed allocation is not encoded.
+electrical-engineering-bs-2026,engl1,general,degree-electrical-engineering-bs-2026-engl1,Illustrative English route toward general communication requirements; full Gen Ed allocation is not encoded.
+electrical-engineering-bs-2026,engl2,degree,degree-electrical-engineering-bs-2026-engl2,Named degree requirement (Composition II).
+exercise-science-bs-2026,bio,degree,degree-exercise-science-bs-2026-bio,Named degree requirement (lecture and lab planned together).
+exercise-science-bs-2026,chem1,degree,degree-exercise-science-bs-2026-chem1,Named degree requirement (lecture and lab planned together).
+exercise-science-bs-2026,prpe2180,degree,degree-exercise-science-bs-2026-prpe2180,Named degree requirement.
+exercise-science-bs-2026,psyc1110,degree,degree-exercise-science-bs-2026-psyc1110,Named degree requirement.
+exercise-science-bs-2026,chem2,degree,degree-exercise-science-bs-2026-chem2,Named degree requirement (lecture and lab planned together).
+exercise-science-bs-2026,nutr2110,degree,degree-exercise-science-bs-2026-nutr2110,Named degree requirement.
+exercise-science-bs-2026,prpe2150,degree,degree-exercise-science-bs-2026-prpe2150,Named degree requirement.
+exercise-science-bs-2026,ap1,degree,degree-exercise-science-bs-2026-ap1,Named degree requirement (lecture and lab planned together).
+exercise-science-bs-2026,comm1130,degree,degree-exercise-science-bs-2026-comm1130,Named degree requirement.
+exercise-science-bs-2026,ap2,degree,degree-exercise-science-bs-2026-ap2,Named degree requirement (lecture and lab planned together).
+exercise-science-bs-2026,chem2120,degree,degree-exercise-science-bs-2026-chem2120,Named degree requirement.
+exercise-science-bs-2026,prpe2155,degree,degree-exercise-science-bs-2026-prpe2155,Named degree requirement.
+exercise-science-bs-2026,prpe2165,degree,degree-exercise-science-bs-2026-prpe2165,Named degree requirement.
+exercise-science-bs-2026,training,degree,degree-exercise-science-bs-2026-training,Choose one of 2 options for this requirement.
+exercise-science-bs-2026,swim,degree,degree-exercise-science-bs-2026-swim,Choose one of 2 options for this requirement.
+exercise-science-bs-2026,physics,degree,degree-exercise-science-bs-2026-physics,Choose one of 2 options for this requirement.
+exercise-science-bs-2026,pilates,degree,degree-exercise-science-bs-2026-pilates,Choose one of 2 options for this requirement.
+exercise-science-bs-2026,pep326l,degree,degree-exercise-science-bs-2026-pep326l,Named degree requirement.
+exercise-science-bs-2026,nutr344,degree,degree-exercise-science-bs-2026-nutr344,Named degree requirement.
+exercise-science-bs-2026,pep305,degree,degree-exercise-science-bs-2026-pep305,Named degree requirement.
+exercise-science-bs-2026,pep470,degree,degree-exercise-science-bs-2026-pep470,Named degree requirement.
+exercise-science-bs-2026,pep475,degree,degree-exercise-science-bs-2026-pep475,Named degree requirement.
+exercise-science-bs-2026,pep486,degree,degree-exercise-science-bs-2026-pep486,Named degree requirement.
+exercise-science-bs-2026,pep476,degree,degree-exercise-science-bs-2026-pep476,Named degree requirement.
+exercise-science-bs-2026,pep469,degree,degree-exercise-science-bs-2026-pep469,Named degree requirement.
+exercise-science-bs-2026,pep471,degree,degree-exercise-science-bs-2026-pep471,Named degree requirement.
+exercise-science-bs-2026,pep478,degree,degree-exercise-science-bs-2026-pep478,Named degree requirement.
+exercise-science-bs-2026,pep498,degree,degree-exercise-science-bs-2026-pep498,Named degree requirement.
+exercise-science-bs-2026,pep495,degree,degree-exercise-science-bs-2026-pep495,Named degree requirement.
+exercise-science-bs-2026,upperelective1,degree,degree-exercise-science-bs-2026-upperelective1,Selected course group; individual course prerequisites still need review.
+exercise-science-bs-2026,upperelective2,degree,degree-exercise-science-bs-2026-upperelective2,Selected course group; individual course prerequisites still need review.
+exercise-science-bs-2026,math1220,degree,degree-exercise-science-bs-2026-math1220,Named degree requirement.
+exercise-science-bs-2026,math1350,degree,degree-exercise-science-bs-2026-math1350,Named degree requirement.
+exercise-science-bs-2026,math1215,prerequisite,route-*-math1215-math1220,Preparation added by the selected math or English starting route; not a separately listed major requirement.
+exercise-science-bs-2026,englX,prerequisite,route-*-englX-englY,Preparation added by the selected math or English starting route; not a separately listed major requirement.
+exercise-science-bs-2026,englY,degree,degree-exercise-science-bs-2026-englY,Named degree requirement (one Composition I option).
+exercise-science-bs-2026,engl1,degree,degree-exercise-science-bs-2026-engl1,Named degree requirement (one Composition I option).
+exercise-science-bs-2026,engl2,degree,degree-exercise-science-bs-2026-engl2,Named degree requirement (Composition II).
+film-digital-arts-ba-2026,fdma1210,degree,degree-film-digital-arts-ba-2026-fdma1210,Named degree requirement.
+film-digital-arts-ba-2026,writing,degree,degree-film-digital-arts-ba-2026-writing,Choose one of 2 options for this requirement.
+film-digital-arts-ba-2026,producing,degree,degree-film-digital-arts-ba-2026-producing,Choose one of 2 options for this requirement.
+film-digital-arts-ba-2026,fhc1,degree,degree-film-digital-arts-ba-2026-fhc1,Selected course group; individual course prerequisites still need review.
+film-digital-arts-ba-2026,fhc2,degree,degree-film-digital-arts-ba-2026-fhc2,Selected course group; individual course prerequisites still need review.
+film-digital-arts-ba-2026,fhc3,degree,degree-film-digital-arts-ba-2026-fhc3,Selected course group; individual course prerequisites still need review.
+film-digital-arts-ba-2026,fdmaelective1,degree,degree-film-digital-arts-ba-2026-fdmaelective1,Selected course group; individual course prerequisites still need review.
+film-digital-arts-ba-2026,fdmaelective2,degree,degree-film-digital-arts-ba-2026-fdmaelective2,Selected course group; individual course prerequisites still need review.
+film-digital-arts-ba-2026,fdmaelective3,degree,degree-film-digital-arts-ba-2026-fdmaelective3,Selected course group; individual course prerequisites still need review.
+film-digital-arts-ba-2026,fdmaelective4,degree,degree-film-digital-arts-ba-2026-fdmaelective4,Selected course group; individual course prerequisites still need review.
+film-digital-arts-ba-2026,fdmaelective5,degree,degree-film-digital-arts-ba-2026-fdmaelective5,Selected course group; individual course prerequisites still need review.
+film-digital-arts-ba-2026,fdmaelective6,degree,degree-film-digital-arts-ba-2026-fdmaelective6,Selected course group; individual course prerequisites still need review.
+film-digital-arts-ba-2026,fdmaelective7,degree,degree-film-digital-arts-ba-2026-fdmaelective7,Selected course group; individual course prerequisites still need review.
+film-digital-arts-ba-2026,fdmaelective8,degree,degree-film-digital-arts-ba-2026-fdmaelective8,Selected course group; individual course prerequisites still need review.
+film-digital-arts-ba-2026,fdmaelective9,degree,degree-film-digital-arts-ba-2026-fdmaelective9,Selected course group; individual course prerequisites still need review.
+film-digital-arts-ba-2026,fdmaelective10,degree,degree-film-digital-arts-ba-2026-fdmaelective10,Selected course group; individual course prerequisites still need review.
+film-digital-arts-ba-2026,fdmaelective11,degree,degree-film-digital-arts-ba-2026-fdmaelective11,Selected course group; individual course prerequisites still need review.
+film-digital-arts-ba-2026,finearts1,degree,degree-film-digital-arts-ba-2026-finearts1,Selected course group; individual course prerequisites still need review.
+film-digital-arts-ba-2026,finearts2,degree,degree-film-digital-arts-ba-2026-finearts2,Selected course group; individual course prerequisites still need review.
+film-digital-arts-ba-2026,finearts3,degree,degree-film-digital-arts-ba-2026-finearts3,Selected course group; individual course prerequisites still need review.
+film-digital-arts-ba-2026,finearts4,degree,degree-film-digital-arts-ba-2026-finearts4,Selected course group; individual course prerequisites still need review.
+film-digital-arts-ba-2026,finearts5,degree,degree-film-digital-arts-ba-2026-finearts5,Selected course group; individual course prerequisites still need review.
+film-digital-arts-ba-2026,finearts6,degree,degree-film-digital-arts-ba-2026-finearts6,Selected course group; individual course prerequisites still need review.
+film-digital-arts-ba-2026,math1350,general,degree-film-digital-arts-ba-2026-math1350,Illustrative Gen Ed math choice; this major does not specifically require MATH 1350.
+film-digital-arts-ba-2026,math1215,prerequisite,route-*-math1215-math1350,Preparation added by the selected math or English starting route; not a separately listed major requirement.
+film-digital-arts-ba-2026,englX,prerequisite,route-*-englX-englY,Preparation added by the selected math or English starting route; not a separately listed major requirement.
+film-digital-arts-ba-2026,englY,general,degree-film-digital-arts-ba-2026-englY,Illustrative English route toward general communication requirements; full Gen Ed allocation is not encoded.
+film-digital-arts-ba-2026,engl1,general,degree-film-digital-arts-ba-2026-engl1,Illustrative English route toward general communication requirements; full Gen Ed allocation is not encoded.
+film-digital-arts-ba-2026,engl2,general,degree-film-digital-arts-ba-2026-engl2,Illustrative English route toward general communication requirements; full Gen Ed allocation is not encoded.
+film-digital-arts-bfa-2026,fdma1210,degree,degree-film-digital-arts-bfa-2026-fdma1210,Named degree requirement.
+film-digital-arts-bfa-2026,fdma2110,degree,degree-film-digital-arts-bfa-2026-fdma2110,Named degree requirement.
+film-digital-arts-bfa-2026,fdma2525,degree,degree-film-digital-arts-bfa-2026-fdma2525,Named degree requirement.
+film-digital-arts-bfa-2026,arts1510,degree,degree-film-digital-arts-bfa-2026-arts1510,Named degree requirement.
+film-digital-arts-bfa-2026,cinedirect,degree,degree-film-digital-arts-bfa-2026-cinedirect,Choose one of 3 options for this requirement.
+film-digital-arts-bfa-2026,fdma324,degree,degree-film-digital-arts-bfa-2026-fdma324,Named degree requirement.
+film-digital-arts-bfa-2026,fdma326,degree,degree-film-digital-arts-bfa-2026-fdma326,Named degree requirement.
+film-digital-arts-bfa-2026,fdma327,degree,degree-film-digital-arts-bfa-2026-fdma327,Named degree requirement.
+film-digital-arts-bfa-2026,fdma401,degree,degree-film-digital-arts-bfa-2026-fdma401,Named degree requirement.
+film-digital-arts-bfa-2026,advwriting,degree,degree-film-digital-arts-bfa-2026-advwriting,Choose one of 2 options for this requirement.
+film-digital-arts-bfa-2026,producing,degree,degree-film-digital-arts-bfa-2026-producing,Choose one of 2 options for this requirement.
+film-digital-arts-bfa-2026,fdma450,degree,degree-film-digital-arts-bfa-2026-fdma450,Named degree requirement.
+film-digital-arts-bfa-2026,fdma451,degree,degree-film-digital-arts-bfa-2026-fdma451,Named degree requirement.
+film-digital-arts-bfa-2026,fhc1,degree,degree-film-digital-arts-bfa-2026-fhc1,Selected course group; individual course prerequisites still need review.
+film-digital-arts-bfa-2026,fhc2,degree,degree-film-digital-arts-bfa-2026-fhc2,Selected course group; individual course prerequisites still need review.
+film-digital-arts-bfa-2026,fhc3,degree,degree-film-digital-arts-bfa-2026-fhc3,Selected course group; individual course prerequisites still need review.
+film-digital-arts-bfa-2026,fhc4,degree,degree-film-digital-arts-bfa-2026-fhc4,Selected course group; individual course prerequisites still need review.
+film-digital-arts-bfa-2026,production1,degree,degree-film-digital-arts-bfa-2026-production1,Selected course group; individual course prerequisites still need review.
+film-digital-arts-bfa-2026,production2,degree,degree-film-digital-arts-bfa-2026-production2,Selected course group; individual course prerequisites still need review.
+film-digital-arts-bfa-2026,production3,degree,degree-film-digital-arts-bfa-2026-production3,Selected course group; individual course prerequisites still need review.
+film-digital-arts-bfa-2026,production4,degree,degree-film-digital-arts-bfa-2026-production4,Selected course group; individual course prerequisites still need review.
+film-digital-arts-bfa-2026,production5,degree,degree-film-digital-arts-bfa-2026-production5,Selected course group; individual course prerequisites still need review.
+film-digital-arts-bfa-2026,finearts1,degree,degree-film-digital-arts-bfa-2026-finearts1,Selected course group; individual course prerequisites still need review.
+film-digital-arts-bfa-2026,finearts2,degree,degree-film-digital-arts-bfa-2026-finearts2,Selected course group; individual course prerequisites still need review.
+film-digital-arts-bfa-2026,finearts3,degree,degree-film-digital-arts-bfa-2026-finearts3,Selected course group; individual course prerequisites still need review.
+film-digital-arts-bfa-2026,finearts4,degree,degree-film-digital-arts-bfa-2026-finearts4,Selected course group; individual course prerequisites still need review.
+film-digital-arts-bfa-2026,math1350,general,degree-film-digital-arts-bfa-2026-math1350,Illustrative Gen Ed math choice; this major does not specifically require MATH 1350.
+film-digital-arts-bfa-2026,math1215,prerequisite,route-*-math1215-math1350,Preparation added by the selected math or English starting route; not a separately listed major requirement.
+film-digital-arts-bfa-2026,englX,prerequisite,route-*-englX-englY,Preparation added by the selected math or English starting route; not a separately listed major requirement.
+film-digital-arts-bfa-2026,englY,general,degree-film-digital-arts-bfa-2026-englY,Illustrative English route toward general communication requirements; full Gen Ed allocation is not encoded.
+film-digital-arts-bfa-2026,engl1,general,degree-film-digital-arts-bfa-2026-engl1,Illustrative English route toward general communication requirements; full Gen Ed allocation is not encoded.
+film-digital-arts-bfa-2026,engl2,general,degree-film-digital-arts-bfa-2026-engl2,Illustrative English route toward general communication requirements; full Gen Ed allocation is not encoded.
+architecture-ba-2026,arch1115,degree,degree-architecture-ba-2026-arch1115,Named degree requirement.
+architecture-ba-2026,arch1120,degree,degree-architecture-ba-2026-arch1120,Named degree requirement.
+architecture-ba-2026,arch1125,degree,degree-architecture-ba-2026-arch1125,Named degree requirement.
+architecture-ba-2026,arch2120,degree,degree-architecture-ba-2026-arch2120,Named degree requirement.
+architecture-ba-2026,arch2151,degree,degree-architecture-ba-2026-arch2151,Named degree requirement.
+architecture-ba-2026,arch2125,degree,degree-architecture-ba-2026-arch2125,Named degree requirement.
+architecture-ba-2026,arch2315,degree,degree-architecture-ba-2026-arch2315,Named degree requirement.
+architecture-ba-2026,arch2112,degree,degree-architecture-ba-2026-arch2112,Named degree requirement.
+architecture-ba-2026,arch2325,degree,degree-architecture-ba-2026-arch2325,Named degree requirement.
+architecture-ba-2026,arch2117,degree,degree-architecture-ba-2026-arch2117,Named degree requirement.
+architecture-ba-2026,arch2333,degree,degree-architecture-ba-2026-arch2333,Named degree requirement.
+architecture-ba-2026,arch301,degree,degree-architecture-ba-2026-arch301,Named degree requirement.
+architecture-ba-2026,arch331,degree,degree-architecture-ba-2026-arch331,Named degree requirement.
+architecture-ba-2026,arch332,degree,degree-architecture-ba-2026-arch332,Named degree requirement.
+architecture-ba-2026,arch302,degree,degree-architecture-ba-2026-arch302,Named degree requirement.
+architecture-ba-2026,arch323,degree,degree-architecture-ba-2026-arch323,Named degree requirement.
+architecture-ba-2026,arch324,degree,degree-architecture-ba-2026-arch324,Named degree requirement.
+architecture-ba-2026,arch401,degree,degree-architecture-ba-2026-arch401,Named degree requirement.
+architecture-ba-2026,arch450,degree,degree-architecture-ba-2026-arch450,Named degree requirement.
+architecture-ba-2026,arch402,degree,degree-architecture-ba-2026-arch402,Named degree requirement.
+architecture-ba-2026,arch472,degree,degree-architecture-ba-2026-arch472,Named degree requirement.
+architecture-ba-2026,structures2,degree,degree-architecture-ba-2026-structures2,Selected course group; individual course prerequisites still need review.
+architecture-ba-2026,sustainability2,degree,degree-architecture-ba-2026-sustainability2,Selected course group; individual course prerequisites still need review.
+architecture-ba-2026,math1350,general,degree-architecture-ba-2026-math1350,Illustrative Gen Ed math choice; this major does not specifically require MATH 1350.
+architecture-ba-2026,math1215,prerequisite,route-*-math1215-math1350,Preparation added by the selected math or English starting route; not a separately listed major requirement.
+architecture-ba-2026,englX,prerequisite,route-*-englX-englY,Preparation added by the selected math or English starting route; not a separately listed major requirement.
+architecture-ba-2026,englY,general,degree-architecture-ba-2026-englY,Illustrative English route toward general communication requirements; full Gen Ed allocation is not encoded.
+architecture-ba-2026,engl1,general,degree-architecture-ba-2026-engl1,Illustrative English route toward general communication requirements; full Gen Ed allocation is not encoded.
+architecture-ba-2026,engl2,degree,degree-architecture-ba-2026-engl2,Named degree requirement (Composition II).

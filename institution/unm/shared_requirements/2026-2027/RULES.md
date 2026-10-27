@@ -248,4 +248,45 @@ Coverage: Overview checked; no common bachelor completion block located.
 The overview covers MD, graduate and Health Professions programs. It does not state common bachelor graduation requirements for MLS or Radiologic Sciences. MD/graduate requirements must not be applied to those bachelor programs.
 An empty shared-rule list records this source coverage only; it does not establish that no additional requirements exist.
 
+No shared bachelor rule was located on the checked overview. This is a coverage limit, not an exemption.
+
+## College of Education and Human Sciences bachelor rules
+
+Coverage: Selected catalog sections.
+
+Selected graduation requirements common to the college's bachelor programs. Programs can be stricter; Exercise Science sets its own admission GPA and grade rules on its program page.
+
+- **Degree credits** (`unm-education-human-sciences.total_credits`): Complete at least 120 credits. No more than 5 credits earned in workshops count toward a bachelor's degree. Source: [College of Education and Human Sciences](https://catalog.unm.edu/#/content/68a34618f6461f0934cc1582).
+
+- **Upper-division coursework** (`unm-education-human-sciences.upper_division`): Complete at least 40 credits in courses numbered 300 or above. This is a subset of degree credits. Source: [College of Education and Human Sciences](https://catalog.unm.edu/#/content/68a34618f6461f0934cc1582).
+
+- **Degree GPA** (`unm-education-human-sciences.degree_gpa`): Maintain at least a 2.00 GPA on the 120 credits counted for graduation and at least 2.00 on all UNM work. Source: [College of Education and Human Sciences](https://catalog.unm.edu/#/content/68a34618f6461f0934cc1582).
+
+- **Composition II** (`unm-education-human-sciences.writing`): Complete ENGL 1120 with a C or better, or an authorized proficiency score, before graduation. Source: [College of Education and Human Sciences](https://catalog.unm.edu/#/content/68a34618f6461f0934cc1582).
+
+## College of Fine Arts bachelor rules
+
+Coverage: Selected catalog sections.
+
+Selected requirements the college states are common to all its programs, plus declared-major admission. Programs can require a higher major GPA.
+
+- **Upper-division coursework** (`unm-fine-arts.upper_division`): Of at least 120 credits, complete at least 42 in courses numbered at the 300 or 400 level. This is a subset of degree credits. Source: [College of Fine Arts](https://catalog.unm.edu/#/content/68a34619f6461f0934cc1586).
+
+- **Degree GPA** (`unm-fine-arts.degree_gpa`): Have a UNM GPA of at least 2.00 and at least 2.00 on all credits attempted while enrolled in the College of Fine Arts. Source: [College of Fine Arts](https://catalog.unm.edu/#/content/68a34619f6461f0934cc1586).
+
+- **Major GPA** (`unm-fine-arts.major_gpa`): Graduate with at least a 2.75 GPA in the major; some degrees require more. Source: [College of Fine Arts](https://catalog.unm.edu/#/content/68a34619f6461f0934cc1586).
+
+- **Physical education activity** (`unm-fine-arts.excluded_pe`): No more than four credits of nonprofessional physical education count toward a degree. Source: [College of Fine Arts](https://catalog.unm.edu/#/content/68a34619f6461f0934cc1586).
+
+- **Declared-major earned credit** (`unm-fine-arts.entry_credits`): Complete at least 26 earned credits before admission as a declared major. Source: [College of Fine Arts](https://catalog.unm.edu/#/content/68a34619f6461f0934cc1586).
+
+- **Declared-major admission GPA** (`unm-fine-arts.entry_gpa`): Have at least a 2.50 GPA on all UNM credits attempted, or on the last 30 credits attempted. The page lists further admission conditions, including major coursework at 2.5. Source: [College of Fine Arts](https://catalog.unm.edu/#/content/68a34619f6461f0934cc1586).
+
+## School of Architecture and Planning shared-rule coverage
+
+Coverage: Overview checked; no common bachelor completion block located.
+
+The school overview describes its degree programs but does not state common bachelor graduation requirements. Architecture's requirements come from its program and concentration pages.
+An empty shared-rule list records this source coverage only; it does not establish that no additional requirements exist.
+
 No shared bachelor rule was located on the checked overview. This is a coverage limit, not an exemption. 

@@ -47,6 +47,8 @@ build_degree_plan_rules <- function(catalog, roadmaps, view) {
   outline <- degree_rule_outline(catalog, program$catalog_id)
   for (i in seq_len(nrow(outline))) add("Recorded catalog requirement", outline$text[i],
     "Recorded in the prototype; admission, GPA and degree completion are not evaluated.", program$source_url)
+  add("Banner program codes", view$program_codes_note,
+    "Names the students this degree describes, so it is not confused with another degree in the same field. The roadmap reads no student records.")
 
   # Identical pool slots share a readable rule but retain every underlying ID.
   nodes <- view$nodes
@@ -178,10 +180,22 @@ build_degree_roadmap_view <- function(catalog, roadmaps, catalog_id, math_start,
   view$workload_note <- paste0("Planning workload: ", view$degree_credits, " degree credits − ",
     view$completed_credits, " already completed + ",
     view$preparation_credits, " preparation credits. ", view$policy$assumption)
+  view$program_codes_note <- degree_program_codes_note(catalog, catalog_id)
   view$note <- paste("Illustrative plan: specific choices, admission, offerings, transfer credit and a",
     "complete degree audit still need review. Colors describe prerequisites in this selected route,",
     "not eligibility or course difficulty.")
   view
+}
+
+# Banner gives a field's B.A. and B.S. separate program codes under one name;
+# the degree names its own, as validated by degree_catalog_program_codes().
+degree_program_codes_note <- function(catalog, catalog_id) {
+  codes <- catalog$program_codes[catalog$program_codes$catalog_id == catalog_id, ]
+  if (!nrow(codes)) stop("[degree-explorer.R] No Banner program codes for ", catalog_id)
+  pre <- codes$program_code[codes$is_pre_major]
+  paste0("Banner program codes for this degree: ", paste(codes$program_code[!codes$is_pre_major], collapse = ", "),
+    if (length(pre)) paste0("; pre-major ", paste(pre, collapse = ", ")),
+    ". Another degree in the same field, such as a B.A. beside a B.S., has codes of its own.")
 }
 
 #' Source-identified Gen Ed needs and flexible elective/minor allowance tiles
@@ -365,7 +379,7 @@ format_degree_explorer_preview <- function(view) {
             paste(term$other_label, ":", term$other_credits, "credits")), collapse = "\n")
   }, character(1))
   paste(c(view$title, view$math_note, view$change_note, view$timing_note, semesters,
-          view$workload_note, view$note), collapse = "\n\n")
+          view$workload_note, view$note, view$program_codes_note), collapse = "\n\n")
 }
 
 #' Assemble history for a selected tile; authored components distinguish bundles

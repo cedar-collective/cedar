@@ -20,6 +20,7 @@ CEDAR_DEGREE_OPERATORS <- c("all", "choose_n", "course", "credits", "condition",
 
 .DEGREE_COURSE_CODE_PATTERN <- "^[A-Z]+ [0-9]+[A-Z]*$"
 .DEGREE_ID_PATTERN <- "^[a-z][a-z0-9_]*$"
+.DEGREE_PROGRAM_CODE_PATTERN <- "^[A-Z]+-[A-Z0-9]+-[A-Z]+$"
 
 #' Split a pipe-delimited id list from a roadmap file; a blank field means none
 degree_split_ids <- function(ids) {
@@ -62,6 +63,41 @@ validate_degree_catalog <- function(catalog) {
   if (any(!nzchar(catalogs$source_url)) || any(!nzchar(catalogs$program_name))) {
     stop("[degree_catalog.R] Catalog needs source and program name")
   }
+  if (any(!grepl("^[A-Z]+$", catalogs$degree_code))) stop("[degree_catalog.R] Catalog needs a Banner degree code")
+  codes <- lapply(catalogs$program_codes, degree_split_ids)
+  for (i in seq_along(codes)) {
+    # BA-PSY-AS is a B.A.; a B.S. map claiming it would describe the wrong students.
+    if (!length(codes[[i]]) || any(!grepl(.DEGREE_PROGRAM_CODE_PATTERN, codes[[i]])) ||
+        any(sub("-.*", "", codes[[i]]) != catalogs$degree_code[i])) {
+      stop("[degree_catalog.R] Program codes must belong to the catalog's degree: ", catalogs$catalog_id[i])
+    }
+  }
+  if (anyDuplicated(unlist(codes))) stop("[degree_catalog.R] A program code belongs to one catalog")
+}
+
+#' Each catalog's Banner program codes, checked against the programs file
+#'
+#' A code's major must be the catalog's program, or a pre-major that leads to
+#' it (FFDA is named "FDMA" but leads to Film and Digital Arts).
+degree_catalog_program_codes <- function(catalogs, programs) {
+  rows <- lapply(seq_len(nrow(catalogs)), function(i) {
+    codes <- degree_split_ids(catalogs$program_codes[i])
+    data.frame(catalog_id = catalogs$catalog_id[i], program_code = codes,
+               major_code = sub("^[A-Z]+-([A-Z0-9]+)-[A-Z]+$", "\\1", codes), stringsAsFactors = FALSE)
+  })
+  codes <- do.call(rbind, rows)
+  row <- match(codes$major_code, programs$program_code)
+  name_of <- function(major) programs$program_name[match(major, programs$program_code)]
+  same <- function(a, b) !is.na(a) & !is.na(b) & a == b
+  codes$is_pre_major <- programs$is_pre_major[row] %in% "TRUE"
+  program <- catalogs$program_name[match(codes$catalog_id, catalogs$catalog_id)]
+  named <- same(name_of(codes$major_code), program) |
+    (codes$is_pre_major & same(name_of(programs$leads_to[row]), program))
+  if (!all(named)) {
+    stop("[degree_catalog.R] Program code's major is not the catalog's program: ",
+         paste(codes$program_code[!named], collapse = ", "))
+  }
+  codes
 }
 
 .validate_degree_rules <- function(rules, catalogs) {
@@ -155,12 +191,14 @@ validate_pathway_subject_groups <- function(groups) {
 
 #' Read and validate an institution's degree catalog files
 read_degree_catalog <- function(dir = cedar_institution_dir()) {
-  validate_degree_catalog(list(
+  catalog <- validate_degree_catalog(list(
     catalogs = read_institution_file("degree_catalogs", dir),
     rules = read_institution_file("degree_rules", dir),
     courses = read_institution_file("degree_rule_courses", dir),
     evidence = read_institution_file("degree_catalog_evidence", dir)
   ))
+  catalog$program_codes <- degree_catalog_program_codes(catalog$catalogs, read_institution_file("programs", dir))
+  catalog
 }
 
 CEDAR_DEGREE_CATALOG <- read_degree_catalog()

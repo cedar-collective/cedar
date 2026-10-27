@@ -1,0 +1,134 @@
+{
+  "schema_version": "1.0.0",
+  "catalog_year": "2026-2027",
+  "catalog_id": "68a34618094c97cf857f1ec1",
+  "rule_set_id": "unm-fine-arts",
+  "title": "College of Fine Arts bachelor rules",
+  "scope": {
+    "level": "college",
+    "credential": "bachelors",
+    "college_code": "FA"
+  },
+  "coverage": "selected_sections",
+  "notes": [
+    "Selected requirements the college states are common to all its programs, plus declared-major admission. Programs can require a higher major GPA."
+  ],
+  "rules": [
+    {
+      "rule_id": "unm-fine-arts.upper_division",
+      "label": "Upper-division coursework",
+      "statement": "Of at least 120 credits, complete at least 42 in courses numbered at the 300 or 400 level. This is a subset of degree credits.",
+      "phase": "degree",
+      "operator": "credits",
+      "role": "overlapping_subset",
+      "applies_when": "All students in this rule set scope.",
+      "review_status": "transcribed",
+      "source_refs": [
+        {
+          "source_id": "fine_arts",
+          "pointer": "/body",
+          "anchor": "at least 42 credit hours must be completed in courses numbered in the 300- or 400-level"
+        }
+      ],
+      "minimum": 42,
+      "unit": "credit_hours",
+      "planning_metric": "upper_credits"
+    },
+    {
+      "rule_id": "unm-fine-arts.degree_gpa",
+      "label": "Degree GPA",
+      "statement": "Have a UNM GPA of at least 2.00 and at least 2.00 on all credits attempted while enrolled in the College of Fine Arts.",
+      "phase": "degree",
+      "operator": "condition",
+      "role": "condition",
+      "applies_when": "All students in this rule set scope.",
+      "review_status": "transcribed",
+      "source_refs": [
+        {
+          "source_id": "fine_arts",
+          "pointer": "/body",
+          "anchor": "UNM grade point average of 2.00 or higher"
+        }
+      ],
+      "minimum": 2,
+      "unit": "gpa"
+    },
+    {
+      "rule_id": "unm-fine-arts.major_gpa",
+      "label": "Major GPA",
+      "statement": "Graduate with at least a 2.75 GPA in the major; some degrees require more.",
+      "phase": "degree",
+      "operator": "condition",
+      "role": "condition",
+      "applies_when": "All students in this rule set scope.",
+      "review_status": "transcribed",
+      "source_refs": [
+        {
+          "source_id": "fine_arts",
+          "pointer": "/body",
+          "anchor": "minimum 2.75 grade point in their major"
+        }
+      ],
+      "minimum": 2.75,
+      "unit": "gpa"
+    },
+    {
+      "rule_id": "unm-fine-arts.excluded_pe",
+      "label": "Physical education activity",
+      "statement": "No more than four credits of nonprofessional physical education count toward a degree.",
+      "phase": "degree",
+      "operator": "condition",
+      "role": "allocation",
+      "applies_when": "All students in this rule set scope.",
+      "review_status": "transcribed",
+      "source_refs": [
+        {
+          "source_id": "fine_arts",
+          "pointer": "/body",
+          "anchor": "No more than four credit hours of nonprofessional physical education"
+        }
+      ],
+      "maximum": 4,
+      "unit": "credit_hours"
+    },
+    {
+      "rule_id": "unm-fine-arts.entry_credits",
+      "label": "Declared-major earned credit",
+      "statement": "Complete at least 26 earned credits before admission as a declared major.",
+      "phase": "admission",
+      "operator": "credits",
+      "role": "overlapping_subset",
+      "applies_when": "All students in this rule set scope.",
+      "review_status": "transcribed",
+      "source_refs": [
+        {
+          "source_id": "fine_arts",
+          "pointer": "/body",
+          "anchor": "Completion of 26 hours of earned credit"
+        }
+      ],
+      "minimum": 26,
+      "unit": "credit_hours"
+    },
+    {
+      "rule_id": "unm-fine-arts.entry_gpa",
+      "label": "Declared-major admission GPA",
+      "statement": "Have at least a 2.50 GPA on all UNM credits attempted, or on the last 30 credits attempted. The page lists further admission conditions, including major coursework at 2.5.",
+      "phase": "admission",
+      "operator": "condition",
+      "role": "condition",
+      "applies_when": "All students in this rule set scope.",
+      "review_status": "transcribed",
+      "source_refs": [
+        {
+          "source_id": "fine_arts",
+          "pointer": "/body",
+          "anchor": "A grade point average of at least 2.50 in all credit hours attempted at UNM"
+        }
+      ],
+      "minimum": 2.5,
+      "unit": "gpa"
+    }
+  ],
+  "attention": []
+}

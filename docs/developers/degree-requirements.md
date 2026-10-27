@@ -14,7 +14,7 @@ by `R/lists/degree_catalog.R` at startup:
 
 | Table | Grain and purpose |
 |---|---|
-| `degree_catalogs.csv` | Snapshot: program name, degree label, year, source, retrieval date, coverage and caveats |
+| `degree_catalogs.csv` | Snapshot: program name, degree label, Banner degree code and the degree's own Banner program codes, year, source, retrieval date, coverage and caveats |
 | `degree_rules.csv` | Rule node, parent, catalog, phase, common area, target course, operator, minimum, grade, review status and detail |
 | `degree_rule_courses.csv` | One course per leaf rule, with catalog title and credits |
 | `degree_roadmap_nodes.csv` | Authored planning slots, course/group labels, explicit lower/upper course level, credits, type, paired flag, source and `row_group` course-family alignment; `*` holds shared entry routes |
@@ -35,6 +35,26 @@ Degree tables are exposed as `CEDAR_DEGREE_CATALOG` (`catalogs`, `rules`,
 categories as `CEDAR_PATHWAY_SUBJECT_GROUPS`. The synthetic institution
 has empty catalog files rather than importing real university rules as synthetic
 facts; its fixture courses still have descriptive groups.
+
+## Banner program codes
+
+Banner gives each degree its own program codes, written
+`<degree>-<major>-<college>`: Psychology's B.A. is `BA-PSY-AS` and its B.S. is
+`BS-PSY-AS`, though both are named "Psychology" with major code `PSY`. Each
+catalog row names its degree's `degree_code` and the `program_codes` (separated
+by `|`) of the students it describes, pre-majors included. The validator refuses
+a malformed code, a code whose degree prefix is not the row's `degree_code`, and
+a code two catalogs claim. `degree_catalog_program_codes(catalogs, programs)`
+then checks each code's major against `programs.csv`: it must be the catalog's
+program or a pre-major whose `leads_to` names it. A field's B.A. and B.S. are
+two catalogs with two sets of codes, never one map under a shared name.
+
+The codes are evidence of identity, not a population: the roadmap reads no
+student records. Degree Explorer states them under the board, and the rules
+dialog lists them as **Banner program codes**. Codes a map does not describe —
+accelerated-online `X` programs, an R.N.-to-B.S.N. route — are left unclaimed
+and named in the catalog's notes. Pathways still selects by name
+([ISSUES.md M37](../../ISSUES.md)).
 
 ## Readable rules behind a plan
 
