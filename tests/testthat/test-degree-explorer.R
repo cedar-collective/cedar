@@ -647,8 +647,9 @@ test_that("catalog comparisons separate choice changes, formatting and missing s
 #   s5 molecular 4, evolution 4, physiology 3 (evolution before or with it) = 11
 #   s7 bioelective 3 (choice); s8 biocap 3 (after molecular)
 #   Shown 54; other degree work 66 fills every semester to 15.
-#   Early allowances: s3 has 3 + 3 + 2; s4 has five 3-credit slots. They occupy
-#   top rows 1–5; the aligned course families begin with math at row 6.
+#   Allowance cards: s3 3 + 3 + 2; s4 five 3s; s5 one 4; s6 five 3s; s7 and s8
+#   four 3s each. With no Gen Ed band, math (row 1) and writing (row 2) come
+#   first, electives fill rows 3–7, and the program's families begin at row 8.
 #   molecular's ancestors: genetics, chem2 (2), bio2, chem1 (2), bio1 = 7 courses,
 #   chem1 counted once although both genetics and chem2 lead from it.
 #   physiology: prereq_depth 2, not 3 — a concurrent link adds no semester.
@@ -889,7 +890,7 @@ test_that("upper-level courses wait for the institution's later planning stage",
 
 test_that("course families align after scheduling and parallel courses take separate rows", {
   v <- plan()
-  expect_equal(at(v, c("calc1", "engl1", "engl2"), "row"), c(6L, 7L, 7L))
+  expect_equal(at(v, c("calc1", "engl1", "engl2"), "row"), c(1L, 2L, 2L))
   expect_equal(at(v, c("bio1", "bio2", "genetics", "molecular"), "row"), rep(8L, 4))
   # Evolution and Physiology share Molecular Biology's semester and family.
   expect_equal(at(v, c("evolution", "physiology"), "row"), c(9L, 10L))
@@ -908,16 +909,20 @@ test_that("course families align after scheduling and parallel courses take sepa
   expect_error(validate_degree_roadmaps(r, catalog()), "row group")
 })
 
-test_that("early allowances occupy the top rows without changing credits or family gaps", {
+test_that("allowance cards fill every semester between math/writing and the program's courses", {
   v <- view_of()
   expect_identical(v$nodes$row, plan()$nodes$row)
-  expect_equal(v$allowances$semester, c(3L, 3L, 3L, 4L, 4L, 4L, 4L, 4L))
-  expect_equal(v$allowances$credits, c(3, 3, 2, 3, 3, 3, 3, 3))
-  expect_equal(v$allowances$row, c(1L, 2L, 3L, 1L, 2L, 3L, 4L, 5L))
-  expect_lt(max(v$allowances$row), min(v$nodes$row))
+  expect_equal(v$allowances$semester, rep(3:8, c(3, 5, 1, 5, 4, 4)))
+  expect_equal(v$allowances$credits, c(3, 3, 2, rep(3, 5), 4, rep(3, 13)))
+  expect_equal(v$allowances$row, c(3:5, 3:7, 3L, 3:7, 3:6, 3:6))
+  foundation <- v$nodes$row_group %in% c("math", "writing")
+  expect_lt(max(v$nodes$row[foundation]), min(v$allowances$row))
+  expect_lt(max(v$allowances$row), min(v$nodes$row[!foundation]))
   expect_equal(v$allowances$title[3], "Credits left to allocate")
+  expect_equal(unique(v$allowances$title[v$allowances$semester >= 5L]), "Any level · upper level may count")
   expect_equal(v$n_rows, 10L)
-  for (s in v$terms$semester[v$terms$other_phase == "foundation"]) {
+  # Later semesters have cards too: no credit is left to a footer.
+  for (s in v$terms$semester) {
     expect_equal(sum(v$allowances$credits[v$allowances$semester == s]), v$terms$other_credits[v$terms$semester == s])
   }
   expect_false(anyDuplicated(c(paste(v$nodes$semester, v$nodes$row),
@@ -1099,7 +1104,10 @@ test_that("the loaded institution's roadmaps keep every planning rule in every s
           v$nodes$semester[match(v$links$from, v$nodes$node_id)] + as.integer(v$links$timing == "before")))
         expect_false(anyDuplicated(paste(v$nodes$semester, v$nodes$row)) > 0L)
         expect_lte(length(unique(v$nodes$row[v$nodes$row_group == "writing"])), 1L)
-        expect_lt(max(c(0L, v$allowances$row)), min(v$nodes$row))
+        foundation <- v$nodes$row_group %in% c("math", "writing")
+        expect_lt(max(c(0L, v$nodes$row[foundation])), min(c(Inf, v$allowances$row)))
+        expect_lt(max(c(0L, v$allowances$row)), min(c(Inf, v$nodes$row[!foundation])))
+        expect_equal(sum(v$allowances$credits), sum(v$terms$other_credits))
         expect_false(anyDuplicated(c(paste(v$nodes$semester, v$nodes$row),
           paste(v$allowances$semester, v$allowances$row))) > 0L)
       }
