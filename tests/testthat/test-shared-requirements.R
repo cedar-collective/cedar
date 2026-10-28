@@ -169,8 +169,16 @@ test_that("planned coverage consumes each course once and never resolves an open
   expect_equal(view$terms$planned_credits, base$terms$planned_credits)
   for (i in seq_len(nrow(view$terms))) expect_equal(
     sum(view$nodes$credits[view$nodes$semester == i]) +
-      sum(view$allowances$credits[view$allowances$semester == i]) + view$terms$footer_credits[i],
+      sum(view$allowances$credits[view$allowances$semester == i]),
     view$terms$planned_credits[i])
+  # Both earmarked areas land in semester 3, the first with room. Gen Ed heads
+  # the board; elective space sits between math/writing and the program's courses.
+  gen_ed <- view$allowances$purpose == "gen_ed"
+  foundation <- view$nodes$row_group %in% c("math", "writing")
+  expect_equal(view$allowances$row[gen_ed], 1:2)
+  expect_lt(max(view$allowances$row[gen_ed]), min(view$nodes$row))
+  expect_true(all(view$allowances$row[!gen_ed] > max(view$nodes$row[foundation]) &
+    view$allowances$row[!gen_ed] < min(view$nodes$row[!foundation])))
   # A bare approved lab is not a full science requirement.
   reference$memberships <- reference$memberships[reference$memberships$subject_course != "CHEM 1215", ]
   missing <- degree_shared_coverage(base, test_degree_roadmaps, reference)
@@ -192,7 +200,10 @@ test_that("placement does not award preparation coverage and absent profiles sta
     "demo-history-ba-2026", "calculus", "composition", shared = reference)
   expect_null(generic$shared)
   expect_true(all(generic$allowances$purpose == "elective"))
-  expect_true(all(grepl("Gen Ed not required", generic$allowances$title[generic$allowances$credits >= 3], fixed = TRUE)))
+  whole <- generic$allowances[generic$allowances$credits >= 3, ]
+  expect_true(all(grepl("Gen Ed not required", whole$title[whole$phase == "foundation"], fixed = TRUE)))
+  expect_true(any(whole$phase == "advanced") &&
+    all(grepl("upper level may count", whole$title[whole$phase == "advanced"], fixed = TRUE)))
 })
 
 test_that("active annual profiles preserve semester budgets and show source-linked area gaps", {
@@ -205,7 +216,7 @@ test_that("active annual profiles preserve semester budgets and show source-link
     expect_equal(sum(view$terms$planned_credits), view$degree_credits - view$completed_credits + view$preparation_credits)
     expect_true(all(view$shared$areas$remaining >= 0))
     expect_true(all(grepl("^https://", view$allowances$source_url)))
-    expect_equal(sum(view$allowances$credits) + sum(view$terms$footer_credits), sum(view$terms$other_credits))
+    expect_equal(sum(view$allowances$credits), sum(view$terms$other_credits))
     expect_false(anyDuplicated(c(paste(view$nodes$semester, view$nodes$row),
       paste(view$allowances$semester, view$allowances$row))) > 0L)
   }

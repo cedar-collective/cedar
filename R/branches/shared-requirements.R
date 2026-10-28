@@ -259,7 +259,8 @@ allocate_shared_degree_slots <- function(view, coverage) {
       unplaced <- unplaced[rownames(unplaced) != rownames(pending)[j], ]
     }
   }
-  for (i in which(view$terms$other_phase == "foundation" & budget > 0)) while (budget[i] > 0) {
+  # Every semester's remaining space becomes elective/minor cards, early and late alike.
+  for (i in which(budget > 0)) while (budget[i] > 0) {
     usual <- as.numeric(view$policy$allowance_slot_credits)
     amount <- if (budget[i] <= usual + 1) budget[i] else usual
     add(i, amount)
@@ -267,12 +268,10 @@ allocate_shared_degree_slots <- function(view, coverage) {
   for (semester in unique(slots$semester)) {
     ix <- which(slots$semester == semester)
     slots$node_id[ix] <- paste0("allowance-", semester, "-", seq_along(ix))
-    slots$row[ix] <- seq_along(ix)
   }
-  old_band <- max(c(0L, view$allowances$row)); new_band <- max(c(0L, slots$row))
-  view$nodes$row <- view$nodes$row - old_band + new_band
-  view$allowances <- slots
-  view$terms$footer_credits <- budget
+  layout <- layout_degree_roadmap_bands(view$nodes, slots)
+  view$nodes <- layout$nodes
+  view$allowances <- layout$slots
   view$shared <- coverage
   view$unplaced_gen_ed <- unplaced
   view

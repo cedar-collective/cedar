@@ -222,20 +222,16 @@ degree_hover_preview <- function(id) {
 degree_semester_column <- function(view, term) {
   courses <- view$nodes[view$nodes$semester == term$semester, ]
   allowances <- view$allowances[view$allowances$semester == term$semester, ]
+  # Reading and keyboard order follow the board's bands from top to bottom.
+  tiles <- c(lapply(seq_len(nrow(allowances)), function(j) degree_allowance_tile(allowances[j, ])),
+             lapply(seq_len(nrow(courses)), function(j) degree_course_tile(view, courses[j, ])))
   tags$section(class = "cedar-roadmap-semester", `aria-label` = paste("Semester", term$semester),
     `data-planned-credits` = term$planned_credits,
     div(class = "cedar-roadmap-semester-header",
       tags$span(class = "cedar-roadmap-year", paste("Year", term$year, "·", tools::toTitleCase(term$season))),
       tags$strong(paste("Semester", term$semester)),
       tags$span(class = "cedar-roadmap-load", paste(term$planned_credits, "credits planned"))),
-    div(class = "cedar-roadmap-courses",
-      lapply(seq_len(nrow(allowances)), function(j) degree_allowance_tile(allowances[j, ])),
-      lapply(seq_len(nrow(courses)), function(j) degree_course_tile(view, courses[j, ]))),
-    if (term$footer_credits >= 1 && term$other_phase == "advanced") {
-      div(class = "cedar-roadmap-flex", `data-allowance-phase` = term$other_phase,
-        `data-credits` = term$footer_credits,
-        tags$span(term$other_label), tags$strong(paste(term$footer_credits, "cr planned")))
-    })
+    div(class = "cedar-roadmap-courses", tiles[order(c(allowances$row, courses$row))]))
 }
 
 degree_course_tile <- function(view, course) {
