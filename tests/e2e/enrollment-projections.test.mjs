@@ -40,8 +40,6 @@ async function closeEvidence(page) {
     'enrollment_projections-group',
     'enrollment_projections-department',
     'enrollment_projections-course',
-    'enrollment_projections-stability',
-    'enrollment_projections-accuracy',
     'enrollment_projections-projection_table',
     'enrollment_projections-scenario_population',
     'enrollment_projections-scenario_growth',
@@ -150,8 +148,17 @@ async function closeEvidence(page) {
   if (!otherSeason) {
     check('a second published season is available to switch to', false, '(only one)');
   } else {
+    // The stripe names the season and the table has rows under it.
+    const seasonShown = (label) => {
+      const scope = document.getElementById('enrollment_projections-scope');
+      return Boolean(scope && scope.innerText.includes(label) && document.querySelector(
+        '#enrollment_projections-projection_table .rt-tbody .rt-tr'));
+    };
     await setInput(page, 'enrollment_projections-target_term', otherSeason.value);
     await waitForIdle(page);
+    // A freshly started app can still be reading the other bundle when the page
+    // first goes idle; wait for its label rather than read once.
+    await waitFor(page, seasonShown, { timeout: 60000, args: [otherSeason.label] });
     const switched = await page.evaluate(() => {
       const scope = document.getElementById('enrollment_projections-scope');
       const rows = document.querySelectorAll(
@@ -181,6 +188,7 @@ async function closeEvidence(page) {
     // Restore the opening season; every later check reads that bundle.
     await setInput(page, 'enrollment_projections-target_term', initialContext.target);
     await waitForIdle(page);
+    await waitFor(page, seasonShown, { timeout: 60000, args: [selectedLabel] });
   }
   // The comparable-history floor is fixed by policy (Spring 2022), but the
   // through-term moves with every data refresh as the settled enrollment edge
@@ -331,47 +339,45 @@ async function closeEvidence(page) {
     const rows = root ? root.querySelectorAll('.rt-tbody .rt-tr').length : 0;
     return rows > 0 && rows < n;
   }, { timeout: 60000, args: [allSavedRows] });
-  const monitored = await readReactable(page, 'enrollment_projections-projection_table');
-  const monitoredStability = colIndex(monitored.headers, 'Stability');
-  const monitoredOffset = monitored.rows[0].length - monitored.headers.length;
-  const expectedVolatile = monitored.rows.filter((row) =>
-    row[monitoredStability + monitoredOffset].trim().toLowerCase() === 'volatile').length;
-
-  await setInput(page, 'enrollment_projections-stability', ['Volatile']);
-  await waitFor(page, () => {
+  // No rating filters: the table opens on what the plan adds, largest
+  // first, and a rating column sorts weakest first rather than alphabetically.
+  const openingSort = await page.evaluate(() => {
     const root = document.getElementById('enrollment_projections-projection_table');
-    const headers = root ? [...root.querySelectorAll('.rt-thead .rt-th')]
-      .map((cell) => cell.innerText.trim().toLowerCase()) : [];
-    const stabilityIndex = headers.indexOf('stability');
-    const rows = root ? [...root.querySelectorAll('.rt-tbody .rt-tr')] : [];
-    return stabilityIndex >= 0 && rows.length > 0 && rows.every((row) => {
-      const cells = [...row.querySelectorAll('.rt-td')];
-      return cells[stabilityIndex] &&
-        cells[stabilityIndex].innerText.trim().toLowerCase() === 'volatile';
-    });
-  }, { timeout: 60000 });
-  table = await readReactable(page, 'enrollment_projections-projection_table');
-  const stabilityIndex = colIndex(table.headers, 'Stability');
-  const selectionOffset = table.rows[0].length - table.headers.length;
+    const header = root && [...root.querySelectorAll('.rt-thead .rt-th')]
+      .find((cell) => /^plan adds$/i.test(cell.innerText.trim()));
+    return header ? header.getAttribute('aria-sort') : null;
+  });
+  check('the table opens sorted by what the plan adds, largest first',
+    openingSort === 'descending', String(openingSort));
+  await page.evaluate(() => {
+    const root = document.getElementById('enrollment_projections-projection_table');
+    const header = [...root.querySelectorAll('.rt-thead .rt-th')]
+      .find((cell) => /^reliability$/i.test(cell.innerText.trim()));
+    if (!header) throw new Error('no Reliability header');
+    header.click();
+  });
+  const reliabilitySorted = await waitFor(page, () => {
+    const root = document.getElementById('enrollment_projections-projection_table');
+    const header = [...root.querySelectorAll('.rt-thead .rt-th')]
+      .find((cell) => /^reliability$/i.test(cell.innerText.trim()));
+    return header && header.getAttribute('aria-sort') === 'descending';
+  }, { timeout: 10000 });
+  const reliabilityOrder = reliabilitySorted && await page.evaluate(() => {
+    const root = document.getElementById('enrollment_projections-projection_table');
+    const index = [...root.querySelectorAll('.rt-thead .rt-th')]
+      .findIndex((cell) => /^reliability$/i.test(cell.innerText.trim()));
+    return [...root.querySelectorAll('.rt-tbody .rt-tr')]
+      .map((row) => row.querySelectorAll('.rt-td')[index].innerText.trim().toLowerCase());
+  });
+  const reliabilityRank = { low: 3, moderate: 2, high: 1, unrated: 0 };
   check(
-    'the volatile-history attention list filters to Volatile rows only',
-    table.rows.length > 0 &&
-      table.rows.every((row) =>
-        row[stabilityIndex + selectionOffset].trim().toLowerCase() === 'volatile')
+    'Reliability sorts weakest first, unrated last',
+    Array.isArray(reliabilityOrder) && reliabilityOrder.length > 1 &&
+      reliabilityOrder.every((value, i) => i === 0 ||
+        reliabilityRank[reliabilityOrder[i - 1]] >= reliabilityRank[value]),
+    Array.isArray(reliabilityOrder) ? reliabilityOrder.join(', ') : String(reliabilityOrder)
   );
 
-  // The axes are independent: filtering to Volatile must not also filter the
-  // evidence axes, or the table would be quietly answering a narrower question.
-  // So the filter keeps every Volatile row the unfiltered group showed. (This
-  // once asked for mixed Depth or Reliability values among the Volatile rows,
-  // which is a property of the data: Spring 2027's three are all Deep / Low.)
-  check(
-    'the stability filter keeps every volatile row and drops no other axis',
-    expectedVolatile > 0 && table.rows.length === expectedVolatile,
-    `${table.rows.length} shown, ${expectedVolatile} volatile before filtering`
-  );
-
-  await setInput(page, 'enrollment_projections-stability', null);
   await setInput(page, 'enrollment_projections-course', ['CHEM 1215']);
   await waitForIdle(page, { timeout: 60000 });
   const oneCourse = await waitFor(page, () => {

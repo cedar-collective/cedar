@@ -1284,7 +1284,9 @@ test_that("the draft comparison separates short of day one from short of the pla
     projected_first_day_equivalent = 90,
     recommended_sections = 4L, reference_section_size = 30,
     scheduled_sections = c(2L, 3L, 4L, 7L, 0L),
-    scheduled_capacity = c(50, 100, 115, 200, 0),
+    # DAY 1 is short of day one by less than a section (30 of 90) and of the
+    # plan by two (50 of 110), so the two section counts differ.
+    scheduled_capacity = c(60, 100, 115, 200, 0),
     target_schedule_available = c(TRUE, TRUE, TRUE, TRUE, FALSE),
     additional_sections = c(2L, 1L, 0L, 0L, NA),
     target_registration_observed = FALSE, target_registered_now = NA_real_,
@@ -1306,13 +1308,18 @@ test_that("the draft comparison separates short of day one from short of the pla
   expect_equal(table$course, c("DAY 1", "PLAN 1", "MISSING 1", "COVER 1", "SPARE 1"))
   expect_equal(table$status,
                c("short_day_one", "short_plan", "not_in_draft", "covers", "spare"))
-  expect_equal(table$verdict[[1]], "Short of day-one seats by 40; the plan needs 2 more sections")
+  expect_equal(
+    table$verdict[[1]],
+    "Short of day-one seats by 30 (1 section); 50 short of the plan (2 sections)"
+  )
   expect_equal(table$verdict[[2]], "Covers day one; 10 short of the plan (1 section)")
   expect_equal(table$verdict[[4]], "Covers the plan, 5 to spare")
   expect_equal(table$verdict[[5]], "90 seats beyond the plan")
+  # Draft seats less the plan: negative is short.
+  expect_equal(table$draft_vs_plan, c(-50, -10, NA, 5, 90))
   expect_equal(table$campus_sections[[1]], "ABQ 1 \u00b7 EA 1")
-  expect_match(draft$sentence, "^The draft schedule \\(pulled October 8, 2026\\) has 465 seats in 4 of the 5 courses shown")
-  expect_match(draft$sentence, "1 course is short of the students expected on day one \\(by 40 seats\\)")
+  expect_match(draft$sentence, "^The draft schedule \\(pulled October 8, 2026\\) has 475 seats in 4 of the 5 courses shown")
+  expect_match(draft$sentence, "1 course is short of the students expected on day one \\(by 30 seats\\)")
   expect_match(draft$sentence, "1 monitored course is not in the draft\\.$")
 
   # No schedule for the target term: says so instead of an empty table.

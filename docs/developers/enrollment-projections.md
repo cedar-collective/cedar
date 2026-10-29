@@ -362,7 +362,11 @@ captured it (`scheduled_sections`, `scheduled_capacity`, and per-campus
 latest DESR `as_of_date` for the target term; `NA` when none is loaded). Each
 course is one of: short of day-one seats (draft seats below
 `projected_first_day_equivalent`), covering day one but short of the plan,
-covering the plan, more than a section beyond it, or not in the draft. It is
+covering the plan, more than a section beyond it, or not in the draft.
+`draft_vs_plan` is draft seats minus planned registrations, negative where the
+draft is short. Each shortfall in a verdict names its own sections at the
+plan's section size: the sections to reach day one and the sections to reach
+the plan, never one count beside the other's gap. It is
 arithmetic over saved rows: the bundle's refresh signature includes the
 target-term sections, so a changed draft rebuilds the bundle at the next
 refresh, and Shiny never refits to compare.
