@@ -626,6 +626,15 @@ Three readings:
    seats". A course that appears there later is the first evidence of a
    model problem rather than a schedule one.
 
+**Reading 3 corrected, 2026-10-29 (ISSUES.md I40).** It took any seat move as
+the schedule's. A move explains a miss only when the course was near full; a
+course with seats to spare misses on its own whatever its seats do. Read term
+by term (`projection_fold_miss_cause()`) on the bundles of 2026-10-27 (model
+0.27.0), 8 of 37 Spring 2027 and 2 of 33 Fall 2027 Low-reliability courses
+missed mostly with seats to spare, 9 of them with moving seats. The page now
+flags those. The "Seats changed 10%+" row above still counts a move in a
+course with room as the schedule's.
+
 The page shows this breakdown for whichever projection is loaded, in the
 "Where forecast error comes from" panel.
 

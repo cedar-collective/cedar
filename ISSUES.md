@@ -29,6 +29,7 @@ recurrence is recognizable.
 
 | ID | Kind | Summary |
 |---|---|---|
+| [I40](#i40--the-projections-page-gave-a-forecasts-own-misses-to-the-schedule) | Defect | The projections page gave a forecast's own misses to the schedule: 7 of the 8 Spring 2027 courses whose past misses came with seats to spare read "the misses came when the seats moved", because any seat move counted (resolved 2026-10-29) |
 | [I39](#i39--projection-flags-called-last-years-same-season-term-last-term) | Defect | Projection flags called last year's same-season term "last term": a Spring 2027 course flagged "Full last term" was full in Spring 2026, not in the Fall just finished (resolved 2026-10-28) |
 | [I38](#i38--a-pathways-program-population-misses-pre-majors-whose-name-differs-from-their-major) | Defect | A Pathways program population misses pre-majors whose name differs from their major: "Film and Digital Arts" holds 1 of the 1,016 Film pre-majors who never declared the major, because `FFDA` is named "FDMA" |
 | [I37](#i37--renumbered-courses-lose-their-history) | Defect | Renumbered courses lose their history: no crosswalk exists, so ACCT 3401 (was MGMT 340) and the other Fall 2026 ACCT, BUSA and POPH courses read as new |
@@ -57,6 +58,56 @@ recurrence is recognizable.
 ---
 
 # Defects
+
+## I40 — The projections page gave a forecast's own misses to the schedule
+
+**Status:** resolved 2026-10-29
+**Found:** 2026-10-29, auditing the projections table as a first-time reader
+before the chairs' and deans' review
+**Severity:** medium. No projection changed, but the page told a reader that a
+course's large past misses were the schedule's, and so safe to plan through,
+when the course had seats to spare and the misses were the forecast's own.
+**Affects:** `projection_reliability_reading()`, `projection_flags()` and
+`projection_miss_sentence()`, `R/features/enrollment-projection-view.R`.
+
+### What is wrong
+
+Whose miss a course's past error was came from one course-level rating,
+`seat_consistency`: High when the seats held within 10% in every reliability
+term, Low or Moderate when they moved in any. Low reliability with moving
+seats read "the misses came when the seats moved: the schedule set those
+numbers", with no flag; only Low with steady seats was flagged as the
+forecast's own. A seat move says whose a miss was only when the course was
+near full: a full course registers about as many students as it has seats, so
+added seats fill and cut seats cap it. A course with seats to spare could have
+drawn more or fewer students whatever its seats did. FYEX 1110 moved its seats
+in all four of its Spring reliability terms, was never near full in them, and
+missed by 48% on average; the page gave every point of that to the schedule.
+
+### Reproduction
+
+Load the saved Spring 2027 bundle and run `projection_miss_attribution()`
+(this fix) beside each row's `seat_consistency`. Of 37 Low-reliability
+courses, the old rule flagged 1 (GEOG 2115, steady seats) as the forecast's
+own; per term, 8 missed mostly with seats to spare, and 7 of them (ARTS 1143,
+CCST 1125, FYEX 1110, MATH 1300, POLS 1120, POLS 2120, RELG 2110) had moving
+seats, so the old rule gave them to the schedule. In Fall 2027 the old rule
+flagged none of 33 Low courses; per term, FYEX 1030 and PHIL 2225 missed
+mostly with seats to spare.
+
+### Fix
+
+`projection_fold_miss_cause()` reads each past forecast term on its own: the
+schedule's when the course was near full and its seats moved the way the
+forecast missed, or held; the forecast's own when it had seats to spare or
+its seats moved against the miss; unknown when the seats or the first day are
+not known. `projection_miss_attribution()` gives each course the cause behind
+most of its absolute error. The reading, the flag ("Off 20%+ with seats to
+spare") and the sentence above the table follow it. Seat moves still show,
+as counts beneath Reliability, never as a rating of their own. The test "a
+past miss is the schedule's only when a full course's seats moved the way it
+missed" in `test-enrollment-projections.R` pins every case of the rule;
+replacing the near-full condition with any seat move fails it.
 
 ## I39 — Projection flags called last year's same-season term "last term"
 

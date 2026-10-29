@@ -66,11 +66,21 @@ cedar_definition_note <- function(id, version = NULL) {
     htmltools::tags$p(htmltools::tags$strong(paste0(record$title, ". ")), record$summary),
     htmltools::tags$p(htmltools::tags$strong("Exclusions. "), record$exclusions),
     htmltools::tags$ul(lapply(record$limitations, htmltools::tags$li)),
-    htmltools::tags$p(
-      cedar_docs_link(paste0("users/definitions#", record$anchor),
-                      paste0("Definition v", record$version, " \u2192")),
-      " · ", cedar_docs_link(record$guide, "User guide \u2192")
-    )
+    cedar_definition_links(id, version, attributes = FALSE)
+  )
+}
+
+# The definition's version and user-guide links alone, for a page that
+# explains the metric in its own words and leaves the full record to the docs.
+cedar_definition_links <- function(id, version = NULL, attributes = TRUE) {
+  record <- cedar_definition(id, version)
+  htmltools::tags$p(
+    class = "cedar-definition-links",
+    `data-definition-id` = if (attributes) record$id,
+    `data-definition-version` = if (attributes) record$version,
+    cedar_docs_link(paste0("users/definitions#", record$anchor),
+                    paste0("Definition v", record$version, " \u2192")),
+    " · ", cedar_docs_link(record$guide, "User guide \u2192")
   )
 }
 

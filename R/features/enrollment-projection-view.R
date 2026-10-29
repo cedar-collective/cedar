@@ -88,25 +88,25 @@ projection_axis_explanation <- function(stability, depth, accuracy,
       term_type[[i]], spring = "Spring", summer = "Summer", fall = "Fall",
       "same-term-type"
     )
-    basis_suffix <- "WAPE"
-
+    # Reader labels: the `stability` axis is "Own history" and `depth` is
+    # "Evidence", so neither reads as a synonym of Reliability.
     stability_text <- switch(
       stability[[i]],
       Stable = paste0(
-        "Stability: this course's own ", season,
+        "Own history: this course's ", season,
         " enrollment has moved only ",
         scales::percent(history_cv[[i]], accuracy = 0.1),
         " across ", history_terms[[i]], " comparable terms, so its history ",
         "alone supports a forecast."
       ),
       Moderate = paste0(
-        "Stability: ", season, " enrollment varies ",
+        "Own history: ", season, " enrollment varies ",
         scales::percent(history_cv[[i]], accuracy = 0.1),
         " across ", history_terms[[i]], " comparable terms — enough movement ",
         "to matter for planning, not enough to make the course unpredictable."
       ),
       Volatile = paste0(
-        "Stability: ", season, " enrollment swings ",
+        "Own history: ", season, " enrollment swings ",
         scales::percent(history_cv[[i]], accuracy = 0.1),
         " across ", history_terms[[i]], " comparable terms, typically ",
         scales::percent(history_median_yoy[[i]], accuracy = 0.1),
@@ -114,7 +114,7 @@ projection_axis_explanation <- function(stability, depth, accuracy,
         "the swing itself is the thing worth investigating."
       ),
       paste0(
-        "Stability: ", history_terms[[i]], " comparable ", season,
+        "Own history: ", history_terms[[i]], " comparable ", season,
         " term(s) observed, too few to judge whether this course behaves ",
         "predictably."
       )
@@ -123,45 +123,47 @@ projection_axis_explanation <- function(stability, depth, accuracy,
     depth_text <- switch(
       depth[[i]],
       Deep = paste0(
-        "Depth: ", n, " comparable ", season,
-        " aftcasts stand behind the selection rule."
+        "Evidence: ", n, " past ", season,
+        " forecasts stand behind its reliability."
       ),
       Moderate = paste0(
-        "Depth: ", n, " comparable ", season,
-        " aftcasts — enough to measure accuracy, not enough to be sure it holds."
+        "Evidence: ", n, " past ", season,
+        " forecasts, enough to measure reliability, not enough to be sure it holds."
       ),
       Thin = paste0(
-        "Depth: only ", n, " comparable ", season,
-        " aftcast", if (n == 1L) "" else "s",
-        ", so any accuracy figure rests on very little evidence."
+        "Evidence: only ", n, " past ", season,
+        " forecast", if (n == 1L) "" else "s",
+        ", so its reliability rests on very little."
       ),
-      "Depth: no comparable aftcast for the selection rule."
+      "Evidence: no past forecast to measure reliability against."
     )
 
-    # The accuracy figure is the realised error of the selection rule replayed
-    # at each past term with only earlier evidence, so it is an out-of-sample
-    # record rather than the fit of the winner on the terms that chose it.
+    # The figure is the realised error of the selection rule replayed at each
+    # past term with only earlier evidence, so it is an out-of-sample record
+    # rather than the fit of the winner on the terms that chose it.
     accuracy_text <- switch(
       accuracy[[i]],
       High = paste0(
-        "Reliability: rolling-selection aftcasts landed within ",
-        scales::percent(error, accuracy = 0.1), " ", basis_suffix,
+        "Reliability: past forecasts, each made with only the evidence ",
+        "available then, landed within ",
+        scales::percent(error, accuracy = 0.1), " on average",
         if (is.finite(variation)) paste0(
           ", varying ", scales::percent(variation, accuracy = 0.1),
           " term to term"
         ) else "", "."
       ),
       Moderate = paste0(
-        "Reliability: rolling-selection aftcasts averaged ",
-        scales::percent(error, accuracy = 0.1), " ", basis_suffix,
-        " — usable for planning, not for a precise seat count."
+        "Reliability: past forecasts, each made with only the evidence ",
+        "available then, were ", scales::percent(error, accuracy = 0.1),
+        " off on average — usable for planning, not for a precise seat count."
       ),
       Low = paste0(
-        "Reliability: rolling-selection aftcasts averaged ",
-        scales::percent(error, accuracy = 0.1), " ", basis_suffix,
-        ". Treat this projection as a rough scale, not a number to schedule to."
+        "Reliability: past forecasts, each made with only the evidence ",
+        "available then, were ", scales::percent(error, accuracy = 0.1),
+        " off on average. Treat this projection as a rough scale, not a ",
+        "number to schedule to."
       ),
-      "Reliability: not enough comparable aftcasts to measure how close past forecasts were."
+      "Reliability: too few past forecasts to measure how close they came."
     )
 
     caveats <- character(0)
@@ -169,17 +171,16 @@ projection_axis_explanation <- function(stability, depth, accuracy,
       reached <- dplyr::coalesce(n_capacity_reached[[i]], 0L)
       unreached <- dplyr::coalesce(n_capacity_unreached[[i]], 0L)
       caveats <- c(caveats, paste0(
-        "Capacity caveat: first-day enrollment reached the scheduled seats in ",
+        "Capacity caveat: the course filled its seats on the first day in ",
         reached, " of ", reached + unreached,
-        " capacity-observed aftcast term(s). ",
-        "Accuracy describes fit to observed enrollment, not proof of ",
-        "unconstrained demand."
+        " past forecast terms whose first day is known, so its reliability ",
+        "measures the students it had room for, not everyone who wanted it."
       ))
     }
     if (isTRUE(methods_disagree[[i]])) {
       caveats <- c(caveats, paste(
-        "Method caveat: candidate projections differ materially, so method",
-        "choice remains important."
+        "Method caveat: the two forecasts differ materially, so which one",
+        "is used matters."
       ))
     }
     paste(c(stability_text, depth_text, accuracy_text, caveats), collapse = " ")
@@ -222,38 +223,48 @@ projection_axis_brief <- function(stability, depth, accuracy,
 }
 
 
-# What reliability and seat consistency say together, in one sentence. Most
-# past error followed schedule changes, so a miss is only the forecast's when
-# the seats held steady.
-projection_reliability_reading <- function(reliability, seat_consistency) {
+# What a course's reliability means, in one sentence, from where most of its
+# past error came (projection_miss_attribution()): a full course whose seats
+# changed missed because the schedule did; a course with seats to spare
+# missed on its own, whatever its seats did.
+projection_reliability_reading <- function(reliability, miss_cause, model_config) {
+  close <- model_config$accuracy_close_max_wape
+  fair <- model_config$accuracy_fair_max_wape
+  if (!is.numeric(close) || !is.numeric(fair) || length(close) != 1L ||
+      length(fair) != 1L) {
+    stop("[enrollment-projection-view.R] model_config$accuracy_close_max_wape and ",
+         "accuracy_fair_max_wape are required.", call. = FALSE)
+  }
+  pct <- function(x) paste0(round(100 * x), "%")
   reliability <- as.character(reliability)
-  seat_consistency <- dplyr::coalesce(as.character(seat_consistency), "Unrated")
+  miss_cause <- dplyr::coalesce(as.character(miss_cause), "unknown")
   dplyr::case_when(
     reliability == "Unrated" ~
       "Too few past forecasts to say how reliable this course's projection is.",
     reliability == "High" ~
       "Past forecasts landed close, so the projection can be planned to.",
-    reliability == "Low" & seat_consistency == "High" ~ paste(
-      "Past forecasts missed by more than 20% even though the seats held",
-      "steady, so the forecast itself missed: look at this course before",
-      "planning to it."
+    reliability == "Low" & miss_cause == "seats" ~ paste0(
+      "Past forecasts missed by more than ", pct(fair), ", mostly in terms",
+      " when the course was near full and its seats changed: the schedule set",
+      " those numbers, so the projection holds if the seats do."
     ),
-    reliability == "Low" & seat_consistency %in% c("Moderate", "Low") ~ paste(
-      "Past forecasts missed by more than 20%, in terms when the seats kept",
-      "moving: the misses follow the schedule more than demand, so the",
-      "projection holds if the seats do."
+    reliability == "Low" & miss_cause == "forecast" ~ paste0(
+      "Past forecasts missed by more than ", pct(fair), " while the course had",
+      " seats to spare, so the misses were the forecast's: enrollment changed",
+      " on its own. Where the seats moved with it, the department saw the",
+      " change coming; ask what it expects before planning to this number."
     ),
-    reliability == "Moderate" & seat_consistency == "High" ~ paste(
-      "Past forecasts were 10 to 20% off with steady seats: usable for",
-      "planning, not for a precise seat count."
+    reliability == "Low" ~ paste0(
+      "Past forecasts missed by more than ", pct(fair), ", in terms whose seats",
+      " or first day are not known, so the cause cannot be told."
     ),
-    reliability == "Moderate" & seat_consistency %in% c("Moderate", "Low") ~ paste(
-      "Past forecasts were 10 to 20% off, and some of that followed seat",
-      "changes."
+    reliability == "Moderate" & miss_cause == "seats" ~ paste0(
+      "Past forecasts were ", pct(close), " to ", pct(fair), " off, mostly",
+      " when the course was near full and its seats changed."
     ),
-    TRUE ~ paste(
-      "The seats behind past forecasts cannot be compared, so a miss cannot",
-      "be told apart from a schedule change."
+    TRUE ~ paste0(
+      "Past forecasts were ", pct(close), " to ", pct(fair), " off: usable for",
+      " planning, not for a precise seat count."
     )
   )
 }
@@ -263,16 +274,16 @@ projection_reliability_reading <- function(reliability, seat_consistency) {
 # administrator should look at the row that no column already shows; none
 # changes a number. A flag on nearly every row is not a flag: last year's fill
 # and its waiting students are the Day-1 fill column (projection_prior_fill()),
-# and a forecast more than 20% off is the Reliability column, read beside Seat
-# consistency. What stays is what a column cannot say: a campus full while the
-# pooled market had room, a sharp change in the term just finished, a miss with
-# steady seats (the forecast's own), a volatile course with no track record,
-# and candidates that disagree.
+# and a forecast more than 20% off is the Reliability column. What stays is
+# what a column cannot say: a campus full while the pooled market had room, a
+# sharp change in the term just finished, a miss with seats to spare (the
+# forecast's own, projection_miss_attribution()), a volatile course with no
+# track record, and candidates that disagree.
 projection_flags <- function(projections) {
   projection_require_columns(
     projections,
     c("adjusted_regime_alarm", "adjusted_preceding_term_change", "stability",
-      "accuracy", "seat_consistency", "methods_disagree", "campus_fill_flag"),
+      "accuracy", "miss_cause", "methods_disagree", "campus_fill_flag"),
     "projection_flags()"
   )
   vapply(seq_len(nrow(projections)), function(i) {
@@ -287,11 +298,11 @@ projection_flags <- function(projections) {
       # course was; without one, its own volatile history is the only warning.
       if (identical(row$stability, "Volatile") &&
           identical(row$accuracy, "Unrated")) "Hard to predict",
-      # A miss with steady seats is the forecast's, which the two columns only
-      # say when read together. A miss as seats moved is mostly the schedule's
-      # and needs no flag.
+      # A miss while the course had seats to spare is the forecast's, which no
+      # column says. A full course's miss as its seats changed is the
+      # schedule's and needs no flag.
       if (identical(row$accuracy, "Low") &&
-          identical(row$seat_consistency, "High")) "Off 20%+ with steady seats",
+          identical(row$miss_cause, "forecast")) "Off 20%+ with seats to spare",
       if (isTRUE(row$methods_disagree)) "Candidates disagree"
     )
     if (length(flags) == 0L) "" else paste(flags, collapse = " | ")
@@ -389,22 +400,129 @@ projection_axis_values <- function(projections) {
     accuracy_value = rated(
       projections$accuracy, sprintf("%.1f%% off", 100 * projections$wape)
     ),
+    # Shown beneath reliability, uncoloured: context for a miss, not a grade.
     seat_consistency_value = rated(
       projections$seat_consistency,
-      paste("moved", projections$seat_consistency_moves, "of",
+      paste("seats moved in", projections$seat_consistency_moves, "of",
             projections$seat_consistency_terms)
     )
   )
 }
 
 
-# One sentence for the page on the courses whose past forecasts missed most:
-# how many missed as their seats moved, and how many with steady seats, the
-# only misses that are the forecast's own. Said even when the answer is none,
-# because "none missed with steady seats" is the finding.
+# What each past forecast's miss is attributable to, from the conditions saved
+# with it (annotate_projection_fold_conditions()) and its first day. A course
+# near full on the first day registers about as many students as it has seats,
+# so a miss is the schedule's ("schedule") only when the seats moved and the
+# course was full on the side the miss points to: seats added and the
+# forecast low, with the course full the year before (demand held back) or
+# after (it filled the new seats); or seats cut and the forecast high, with
+# the course full after (the cut capped it). Seats that held on a course full
+# after it ("seats_full") also set the number. A course with seats to spare
+# could have registered more or fewer students than it did, so its miss is
+# the forecast's ("forecast"), whatever its seats did; so is a miss against
+# the way the seats moved. "unknown": the seats or the first day needed are
+# not in the data.
+projection_fold_miss_cause <- function(backtests, model_config) {
+  projection_require_columns(
+    backtests,
+    c("error", "fold_seat_change", "fold_prior_near_full", "actual_first_day",
+      "scheduled_capacity"),
+    "projection_fold_miss_cause()"
+  )
+  change <- model_config$seat_consistency_change
+  threshold <- model_config$saturation_fill_threshold
+  if (!is.numeric(change) || !is.numeric(threshold) || length(change) != 1L ||
+      length(threshold) != 1L) {
+    stop("[enrollment-projection-view.R] model_config$seat_consistency_change and ",
+         "saturation_fill_threshold are required.", call. = FALSE)
+  }
+  after <- projection_capacity_metrics(
+    backtests$actual_first_day, backtests$scheduled_capacity,
+    reached_threshold = threshold
+  )
+  full_after <- dplyr::if_else(after$capacity_usable, after$capacity_reached, NA)
+  full_before <- as.logical(backtests$fold_prior_near_full)
+  seats <- as.numeric(backtests$fold_seat_change)
+  error <- as.numeric(backtests$error)
+  up <- is.finite(seats) & seats >= change
+  down <- is.finite(seats) & seats <= -change
+  held <- is.finite(seats) & !up & !down
+  dplyr::case_when(
+    !is.finite(seats) | !is.finite(error) ~ "unknown",
+    (up & error > 0) | (down & error < 0) ~ "forecast",
+    up & (full_before %in% TRUE | full_after %in% TRUE) ~ "schedule",
+    down & full_after %in% TRUE ~ "schedule",
+    held & full_after %in% TRUE ~ "seats_full",
+    up & full_before %in% FALSE & full_after %in% FALSE ~ "forecast",
+    (down | held) & full_after %in% FALSE ~ "forecast",
+    # An exact hit has no cause and no weight.
+    error == 0 ~ "forecast",
+    TRUE ~ "unknown"
+  )
+}
+
+
+# Where most of each course's past error came from, over the rule's published
+# past forecasts (the terms behind its reliability): "seats" when the schedule
+# set the number (projection_fold_miss_cause() "schedule" or "seats_full"),
+# "forecast" when the course had seats to spare, "unknown" when the data
+# cannot tell; whichever holds the largest share of its absolute error. NA for
+# a course with no past forecast.
+projection_miss_attribution <- function(projections, backtests, model_config) {
+  keys <- c("market_id", "subject_course", "term_type")
+  projection_require_columns(projections, keys, "projection_miss_attribution()")
+  none <- tibble::tibble(miss_cause = rep(NA_character_, nrow(projections)),
+                         miss_seat_share = NA_real_, miss_forecast_share = NA_real_)
+  if (nrow(projections) == 0L || nrow(backtests) == 0L) return(none)
+  projection_require_columns(
+    backtests, c(keys, "policy_selected", "abs_error"),
+    "projection_miss_attribution()"
+  )
+  folds <- backtests %>%
+    dplyr::filter(policy_selected %in% TRUE, is.finite(abs_error))
+  folds$cause <- projection_fold_miss_cause(folds, model_config)
+  shares <- folds %>%
+    dplyr::mutate(group = dplyr::case_when(
+      cause %in% c("schedule", "seats_full") ~ "seats",
+      TRUE ~ cause
+    )) %>%
+    dplyr::group_by(dplyr::across(dplyr::all_of(keys))) %>%
+    dplyr::summarize(
+      total = sum(abs_error),
+      seats = sum(abs_error[group == "seats"]),
+      forecast = sum(abs_error[group == "forecast"]),
+      unknown = sum(abs_error[group == "unknown"]),
+      .groups = "drop"
+    ) %>%
+    dplyr::filter(total > 0) %>%
+    dplyr::mutate(
+      # Ties go to the schedule, then the forecast: the larger known cause.
+      miss_cause = dplyr::case_when(
+        seats >= forecast & seats >= unknown ~ "seats",
+        forecast >= unknown ~ "forecast",
+        TRUE ~ "unknown"
+      ),
+      miss_seat_share = seats / total,
+      miss_forecast_share = forecast / total
+    ) %>%
+    dplyr::select(dplyr::all_of(keys), miss_cause, miss_seat_share, miss_forecast_share)
+  projections %>%
+    dplyr::select(dplyr::all_of(keys)) %>%
+    dplyr::left_join(shares, by = keys) %>%
+    dplyr::select(miss_cause, miss_seat_share, miss_forecast_share)
+}
+
+
+# Sentences for the page on the courses whose past forecasts missed most: how
+# many missed mostly as a full course's seats changed (the schedule's), and
+# which missed with seats to spare (the forecast's own, named, since they are
+# the ones to look at). Said even when the answer is none, because "none
+# missed with seats to spare" is the finding.
 projection_miss_sentence <- function(projections, model_config) {
   projection_require_columns(
-    projections, c("accuracy", "seat_consistency"), "projection_miss_sentence()"
+    projections, c("accuracy", "miss_cause", "subject_course"),
+    "projection_miss_sentence()"
   )
   fair_max <- model_config$accuracy_fair_max_wape
   if (!is.numeric(fair_max) || length(fair_max) != 1L || !is.finite(fair_max)) {
@@ -423,20 +541,31 @@ projection_miss_sentence <- function(projections, model_config) {
       " had past forecasts more than ", threshold, " off."
     ))
   }
-  seats <- dplyr::coalesce(projections$seat_consistency[low], "Unrated")
-  moved <- sum(seats %in% c("Moderate", "Low"))
-  steady <- sum(seats == "High")
-  unknown <- n_low - moved - steady
-  how_many <- function(k) {
-    if (k == 0L) "none" else if (k == n_low && n_low > 1L) paste("all", k) else as.character(k)
+  cause <- dplyr::coalesce(projections$miss_cause[low], "unknown")
+  seats <- sum(cause == "seats")
+  own <- sort(projections$subject_course[low][cause == "forecast"])
+  unknown <- sum(cause == "unknown")
+  for_how_many <- function(k) {
+    if (k == n_low && n_low > 1L) paste("all", k) else as.character(k)
+  }
+  named <- function(courses) {
+    if (length(courses) <= 5L) paste0(" (", paste(courses, collapse = ", "), ")") else ""
   }
   paste0(
     n_low, " of the ", n, " ", course_word(n), " shown had past forecasts more than ",
-    threshold, " off: ", how_many(moved), " in terms when the seats moved, ",
-    how_many(steady), " with steady seats",
-    if (unknown > 0L) paste0(", ", unknown, " whose seats cannot be compared"),
-    ". A miss as the seats moved follows the schedule; one with steady seats is",
-    " the forecast's own."
+    threshold, " off.",
+    if (seats > 0L) paste0(
+      " For ", for_how_many(seats), ", most of the miss came when the course was",
+      " near full and its seats changed, so the schedule set the number."
+    ),
+    if (length(own) > 0L) paste0(
+      " For ", for_how_many(length(own)), named(own), ", the course had seats to",
+      " spare, so the miss was the forecast's own."
+    ) else " None missed with seats to spare.",
+    if (unknown > 0L) paste0(
+      " For ", for_how_many(unknown), ", the seats or first day of those terms",
+      " are not known."
+    )
   )
 }
 
@@ -1250,41 +1379,27 @@ build_enrollment_projection_method_guide <- function(
   )
   families <- Filter(Negate(is.null), families)
 
-  family_count <- function(id) sum(guide$family_id == id)
   n_candidates <- nrow(guide)
   n_ideas <- length(unique(guide$concept_id))
-  repeated_ideas <- sum(table(guide$concept_id) > 1L)
+  forecast_word <- if (n_candidates == 1L) "forecast" else "forecasts"
 
   list(
     n_candidates = n_candidates,
     n_ideas = n_ideas,
-    summary = sprintf(
-      paste0(
-        "%d candidates: %d historical baselines, %d diagnostic upstream ",
-        "indicators, and %d selectable anchored blend%s."
-      ),
-      n_candidates,
-      family_count("observed_enrollment"),
-      family_count("structural_demand"),
-      family_count("anchored_upstream"),
-      if (family_count("anchored_upstream") == 1L) "" else "s"
+    summary = paste0(
+      n_candidates, " ", forecast_word, ": ",
+      paste(guide$method_label, collapse = ", and ")
     ),
-    overview = sprintf(
-      paste0(
-        "The %d labels represent %d underlying ideas. %d signals ",
-        "appear twice: once raw and once as a 50/50 blend with ",
-        "prior same-season enrollment."
-      ),
-      n_candidates, n_ideas, repeated_ideas
+    overview = paste(
+      "Every course has one published forecast. Each candidate below is",
+      "computed for every course and every past term."
     ),
     selection_process = paste(
-      "Prior same-season is the default for every course. Another candidate",
-      "replaces it only after beating it by a margin on earlier aftcast terms",
+      "Prior same-season is the default for every course. Another forecast",
+      "replaces it only after beating it by a margin on earlier past forecasts",
       "the two share, and the rule is replayed at every past term with only",
-      "the evidence available then, so the accuracy shown is what that rule",
-      "would actually have delivered. Raw upstream indicators never win",
-      "directly, and the anchored candidate must clear aftcast, coverage, and",
-      "error gates before it can challenge."
+      "the evidence available then, so the reliability shown is what that rule",
+      "would actually have delivered."
     ),
     families = families
   )
@@ -1342,7 +1457,12 @@ build_enrollment_projection_view <- function(bundle, opt = list()) {
     projections <- dplyr::filter(projections, attention)
   }
   projections <- projections %>%
-    dplyr::arrange(department, subject_course) %>%
+    dplyr::arrange(department, subject_course)
+  projections <- dplyr::bind_cols(
+    projections,
+    projection_miss_attribution(projections, bundle$backtests, bundle$model_config)
+  )
+  projections <- projections %>%
     dplyr::mutate(
       # Why this method is live: the default, or the challenger evidence that
       # displaced it. The accuracy figures themselves live on the axes.
@@ -1374,7 +1494,7 @@ build_enrollment_projection_view <- function(bundle, opt = list()) {
       ),
       regime_alarm = dplyr::coalesce(adjusted_regime_alarm, FALSE),
       reliability_reading = projection_reliability_reading(
-        accuracy, seat_consistency
+        accuracy, miss_cause, bundle$model_config
       ),
       flags = projection_flags(dplyr::pick(dplyr::everything())),
       summary_sentence = projection_summary_sentence(
@@ -1452,6 +1572,7 @@ build_enrollment_projection_view <- function(bundle, opt = list()) {
       course = subject_course,
       department,
       planning_sections = recommended_sections,
+      planned_registrations,
       pressure_bump,
       pressure_bump_sections,
       pressure_bump_note,
@@ -1502,7 +1623,7 @@ build_enrollment_projection_view <- function(bundle, opt = list()) {
       # fill, the recent first days and sections, and plain-language flags.
       # The evidence axes follow; the method and its evidence are for the
       # course detail.
-      course, department, planning_sections, pressure_bump,
+      course, department, planning_sections, planned_registrations, pressure_bump,
       pressure_bump_sections, pressure_bump_note, plan_feeder_adjustment,
       plan_feeder_sections, plan_feeder_note, projected_demand,
       demand_range, range_note, expected_first_day,
@@ -1511,8 +1632,8 @@ build_enrollment_projection_view <- function(bundle, opt = list()) {
       recent_first_day, recent_sections, recent_terms, flags,
       stability, stability_value, stability_reason,
       depth, depth_value, depth_reason,
-      # Reliability (accuracy) sits beside seat consistency so the two read
-      # together: low reliability with steady seats is the forecast's miss.
+      # Reliability (accuracy) carries seat consistency beneath it, so the two
+      # read together; the flags say when a miss was the forecast's own.
       accuracy, accuracy_value, accuracy_reason,
       seat_consistency, seat_consistency_value, seat_consistency_reason,
       reliability_reading,

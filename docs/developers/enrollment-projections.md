@@ -326,7 +326,7 @@ learned at a past fold use a list chosen with later knowledge. The pairs are
 structural (a course and its continuation), so the look-ahead is mild, and the
 selection rule's out-of-sample accuracy is unchanged in kind.
 
-### Reliability, seat consistency, and where error comes from
+### Reliability, whose miss it was, and where error comes from
 
 The `accuracy` axis is shown to readers as **Reliability** (High within 10%
 WAPE, Moderate to 20%, Low beyond; it was Close / Fair / Poor before 0.23.0).
@@ -344,20 +344,52 @@ seats are unknown). Two summaries read them from the published rule's aftcasts
   (10%) in every one of the course's reliability terms, Moderate when they moved
   in up to `seat_consistency_moderate_max_moves` (1), Low beyond, Unrated when no
   term can be compared; with `seat_consistency_reason`,
-  `seat_consistency_terms` and `seat_consistency_moves`. Low reliability with
-  High seat consistency is the forecast's own miss, flagged "Off 20%+ with
-  steady seats". A miss as the seats moved carries no flag: the Reliability
-  and Seat consistency cells already say it, and `projection_miss_sentence()`
-  counts both kinds above the table, reading `accuracy_fair_max_wape` live.
+  `seat_consistency_terms` and `seat_consistency_moves`. The page shows the
+  counts beneath Reliability ("seats moved in 1 of 4") and in the detail as a
+  grey badge, never as a rating of its own: a seat move alone does not say
+  whose a miss was (ISSUES.md I40).
 - `summarize_projection_error_sources()` attributes each aftcast to one source
   -- seats changed 10%+, seat or first-day data missing, seats held while near
   full, seats held with room -- and sums the absolute error by source. The page
   renders it in **Where forecast error comes from**
   (`projection_error_sources_summary()`); the text preview prints it.
 
-On the Spring and Fall 2027 bundles, 77% and 83% of the published rule's
-aftcast error came from terms whose seats changed, and no Low-reliability
-course had High seat consistency (the breakdown is in
+Whose miss each course's was is read per aftcast, in the view
+(`R/features/enrollment-projection-view.R`), from the same saved columns:
+
+- `projection_fold_miss_cause(backtests, model_config)` sorts each aftcast.
+  "Near full" is first-day fill at `saturation_fill_threshold` (90%), after
+  the fold term from `actual_first_day` / `scheduled_capacity`, before it from
+  `fold_prior_near_full`; moved is `seat_consistency_change` (10%) either way.
+  - `forecast` when the seats moved against the miss (added and the forecast
+    ran high, cut and it ran low): the seats were not what limited it.
+  - `schedule` when the seats moved the way of the miss and the course was
+    near full: after the fold term or the term before it for an increase
+    (new seats filled), after it for a cut (the cut capped it).
+  - `seats_full` when the seats held and the course was near full after: it
+    stopped at its seats.
+  - `forecast` when the course had room (not near full after, and for an
+    increase not before either), and for an exact hit.
+  - `unknown` when the seat change, the error, or a fill the rule needs is
+    missing.
+- `projection_miss_attribution(projections, backtests, model_config)` sums
+  each course's published-rule `abs_error` by cause, with `schedule` and
+  `seats_full` together as `seats`, and returns `miss_cause` (the largest;
+  ties to seats, then forecast), `miss_seat_share` and `miss_forecast_share`;
+  `NA` for a course with no scored folds.
+- `projection_reliability_reading()` gives each row one sentence from
+  `accuracy` and `miss_cause`; `projection_flags()` flags Low with
+  `miss_cause == "forecast"` as "Off 20%+ with seats to spare", the one Low
+  the table flags; `projection_miss_sentence()` counts both kinds above the
+  table and names the courses that missed with seats to spare (five or
+  fewer), reading `accuracy_fair_max_wape` live.
+
+The rule replaced one read off the course's seat-consistency rating, under
+which Low reliability with any seat move in the window was the schedule's.
+That gave a course whose seats moved every year but never filled to the
+schedule, though the misses were the forecast's own (ISSUES.md I40). On the
+Spring and Fall 2027 bundles, 77% and 83% of the published rule's aftcast
+error came from terms whose seats changed (the breakdown is in
 `forecasting-lessons.md`).
 
 ### Draft schedule comparison
@@ -711,7 +743,10 @@ five years and which aftcast to within 2%.
 | `stability` | Is this course predictable from its own history at all? | Stable / Moderate / Volatile / Unrated | **No** |
 | `depth` | How much comparable aftcast evidence stands behind the selected method? | Deep / Moderate / Thin / None | No |
 | `accuracy`, shown as Reliability | When we did aftcast it, how close were we? | High / Moderate / Low / Unrated | Yes |
-| `seat_consistency` | Did the seats hold steady in those same aftcast terms? | High / Moderate / Low / Unrated | No |
+| `seat_consistency` | Did the seats hold steady in those same aftcast terms? Shown as counts beneath Reliability, not as a rating | High / Moderate / Low / Unrated | No |
+
+Readers see `stability` as **Own history** and `depth` as **Evidence**, both in
+a course's detail; the columns keep their names.
 
 **`stability` is measured with no model**, from the coefficient of variation of
 the course's own comparable class-list series over `demand_history_window`

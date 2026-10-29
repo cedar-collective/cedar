@@ -95,9 +95,11 @@ async function closeEvidence(page) {
   check('projection-method guide sits below the table as a collapsed accordion',
     methodGuide.initiallyOpen === false && methodGuide.summary.includes('Projection methods'),
     methodGuide.summary || '(missing)');
-  check('method guide explains the three managed candidate families',
-    ['2 candidates', 'Prior same-season is the default']
-      .every((phrase) => methodGuide.text.includes(phrase)),
+  // Retired candidate families once read "0 diagnostic upstream indicators".
+  check('method guide counts the two forecasts and no retired ones',
+    ['2 forecasts', 'Prior same-season is the default']
+      .every((phrase) => methodGuide.text.includes(phrase)) &&
+      !/\b0 (diagnostic|selectable|signals)/.test(methodGuide.text),
     methodGuide.text.slice(0, 700));
   check('method guide describes both registered methods',
     ['Prior same-season', 'Prior same-season + floor + Fall deltas']
@@ -206,22 +208,23 @@ async function closeEvidence(page) {
 
   let table = await readReactable(page, 'enrollment_projections-projection_table');
   const requiredHeaders = [
-    'Course', 'Sections', 'Plan adds', 'Seats (day 1)', 'Registrations',
-    'Flags', 'Reliability', 'Seat consistency',
+    'Course', 'Sections', 'Plan adds', 'Students (day 1)', 'Registrations',
+    'Flags', 'Reliability',
   ];
   // The Day-1 fill header carries its term, so it is matched by prefix.
   const hasFillHeader = table.headers.some((h) => /^day-1 fill\b/i.test(h));
   check(
-    'projection table leads with the decision and keeps reliability beside seat consistency',
+    'projection table leads with the decision and ends with reliability',
     hasFillHeader &&
       requiredHeaders.every((header) => colIndex(table.headers, header) >= 0) &&
-      colIndex(table.headers, 'Sections') < colIndex(table.headers, 'Reliability') &&
-      colIndex(table.headers, 'Seat consistency') === colIndex(table.headers, 'Reliability') + 1,
+      colIndex(table.headers, 'Sections') < colIndex(table.headers, 'Reliability'),
     table.headers.join(' | ')
   );
-  // Stability and depth are in the course detail, not the table.
-  check('stability and depth are not table columns',
-    !['Stability', 'Depth'].some((header) => colIndex(table.headers, header) >= 0),
+  // Seat moves sit under reliability; own history and evidence are in the
+  // course detail. "Seats" once headed a column of students.
+  check('seat consistency, own history and evidence are not table columns',
+    !['Seat consistency', 'Seats (day 1)', 'Stability', 'Depth', 'Own history', 'Evidence']
+      .some((header) => colIndex(table.headers, header) >= 0),
     table.headers.join(' | '));
   // Ratings read as the number behind them, coloured by the rating; fill is a
   // column, so no flag repeats it.
@@ -234,23 +237,26 @@ async function closeEvidence(page) {
     const fillHeader = root.querySelectorAll('.rt-thead .rt-th')[at('day-1 fill')];
     return {
       reliability: rows.map((r) => cell(r, at('reliability')).innerText.trim()),
-      seats: rows.map((r) => cell(r, at('seat consistency')).innerText.trim()),
+      sections: rows.map((r) => cell(r, at('sections')).innerText.trim()),
       flags: rows.map((r) => cell(r, at('flags')).innerText.trim()),
       fillHeader: fillHeader ? fillHeader.innerText.replace(/\s+/g, ' ').trim() : '',
     };
   });
-  check('reliability cells show how far off, or Unrated',
+  check('reliability cells show how far off with the seat moves beneath, or Unrated',
     ratingCells.reliability.length > 0 &&
-      ratingCells.reliability.every((v) => /^\d+\.\d% off$/.test(v) || v === 'Unrated'),
+      ratingCells.reliability.every((v) =>
+        /^\d+\.\d% off\nseats moved in \d+ of \d+$/.test(v) || /^\d+\.\d% off$/.test(v) ||
+        v === 'Unrated'),
     ratingCells.reliability.join(', '));
-  check('seat consistency cells show how many terms the seats moved, or Unrated',
-    ratingCells.seats.every((v) => /^moved \d+ of \d+$/.test(v) || v === 'Unrated'),
-    ratingCells.seats.join(', '));
+  check('sections cells name the registrations they are planned for',
+    ratingCells.sections.length > 0 &&
+      ratingCells.sections.every((v) => /^[\d,]+\nfor [\d,]+$/.test(v) || v === '\u2014'),
+    ratingCells.sections.join(', '));
   check('the Day-1 fill header names the term the plans start from',
     /^Day-1 fill \((Spring|Fall) \d{4}\)$/i.test(ratingCells.fillHeader),
     ratingCells.fillHeader);
   check('no flag repeats a column',
-    !ratingCells.flags.some((f) => /last term|waiting|as seats moved|off by 20%/i.test(f)),
+    !ratingCells.flags.some((f) => /last term|waiting|as seats moved|off by 20%|steady seats/i.test(f)),
     ratingCells.flags.join(' / '));
   const findings = await page.evaluate(() => {
     const box = document.getElementById('enrollment_projections-projection_findings');
@@ -578,9 +584,10 @@ async function closeEvidence(page) {
     detailEvidence.text.includes('against ever-registered demand') &&
       detailEvidence.text.includes('judged on the first day of classes'));
   check('detail explains all three axes separately for CHEM 1215',
-    detailEvidence.text.includes('Stability:') &&
-      detailEvidence.text.includes('Depth:') &&
-      detailEvidence.text.includes('Reliability:'));
+    detailEvidence.text.includes('Own history:') &&
+      detailEvidence.text.includes('Evidence:') &&
+      detailEvidence.text.includes('Reliability:') &&
+      !detailEvidence.text.includes('rolling-selection aftcasts'));
   check('historical plot includes all enrollment lifecycle measures',
     ['Ever registered (model target)', 'First day (seats judged here)', 'Census',
       'Final / last day']

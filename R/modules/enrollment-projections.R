@@ -46,10 +46,7 @@ enrollment_projection_method_guide_ui <- function(guide) {
       tags$strong("How CEDAR manages the set. "),
       guide$selection_process
     ),
-    cedar_docs_link(
-      "users/enrollment-projections",
-      label = "Full projection guide \u2192"
-    ),
+    cedar_definition_links("enrollment-projection"),
     description = guide$summary,
     class = "enrollment-projection-method-guide"
   )
@@ -106,8 +103,8 @@ projection_select_course_js <- function(input_id) {
   ))
 }
 
-# Shared by the projections and draft tables, so a course and its first-day
-# seats read the same in both.
+# Shared by the projections and draft tables, so a course and the students
+# expected on its first day read the same in both.
 projection_course_coldef <- function(departments, ...) {
   reactable::colDef(
     name = "Course", ...,
@@ -120,19 +117,30 @@ projection_course_coldef <- function(departments, ...) {
   )
 }
 
+# Students, not seats: "Seats" read as the seats to offer, beside a banner
+# counting the draft's seats.
 projection_day_one_coldef <- function(title) {
   reactable::colDef(
-    name = "Seats (day 1)", align = "right", width = 64,
-    header = htmltools::span("Seats", htmltools::div("(day 1)"), title = title),
+    name = "Students (day 1)", align = "right", width = 90,
+    header = htmltools::span("Students", htmltools::div("(day 1)"), title = title),
     cell = function(value) projection_count_text(value)
   )
 }
 
-projection_axis_value_coldef <- function(ratings, values, reasons, ...) {
+# Reliability as its number, coloured by the rating, with how often the
+# course's seats moved in the same terms beneath, uncoloured: the context a
+# miss is read in, not a second grade.
+projection_reliability_coldef <- function(ratings, values, reasons, seat_ratings,
+                                          seat_notes, ...) {
   reactable::colDef(
     ..., searchable = FALSE, defaultSortOrder = "desc", sortNALast = TRUE,
     cell = function(value, index) {
-      projection_axis_value_badge(ratings[[index]], values[[index]], reasons[[index]])
+      htmltools::tagList(
+        projection_axis_value_badge(ratings[[index]], values[[index]], reasons[[index]]),
+        if (!seat_ratings[[index]] %in% c("Unrated", NA)) {
+          htmltools::div(class = "text-note", seat_notes[[index]])
+        }
+      )
     }
   )
 }
@@ -205,13 +213,18 @@ projection_plan_steps_ui <- function(steps) {
 }
 
 # In the course detail each axis shows its number and its rating, so the
-# rating words are learned from the numbers rather than from a glossary.
-projection_axis_named_badge <- function(name, rating, value, reason) {
-  label <- if (is.na(value) || identical(value, rating)) rating else paste0(value, " (", rating, ")")
+# rating words are learned from the numbers rather than from a glossary. A
+# `neutral` badge shows the number alone, grey: context, not a grade.
+projection_axis_named_badge <- function(name, rating, value, reason, neutral = FALSE) {
+  label <- if (is.na(value) || identical(value, rating) || neutral) {
+    dplyr::coalesce(value, rating)
+  } else {
+    paste0(value, " (", rating, ")")
+  }
   htmltools::span(
     class = "enrollment-projection-axis-named",
     htmltools::span(class = "enrollment-projection-axis-name", name),
-    projection_axis_badge(rating, label = label, title = reason)
+    projection_axis_badge(if (neutral) "neutral" else rating, label = label, title = reason)
   )
 }
 
@@ -225,24 +238,26 @@ projection_columns_explainer <- function() {
     "Reading the table: what each column means",
     tags$ul(
       item("Course", "with its academic department beneath."),
-      item("Sections", "to plan: registrations plus what the plan adds,",
-           "divided by the section size (the target schedule's average,",
-           "otherwise the recent median), rounded up. \"Plan at least\" when",
-           "last term filled its seats."),
+      item("Sections", "to plan, with the registrations they are planned for",
+           "beneath: the projection plus what the plan adds, divided by the",
+           "section size (the target schedule's average, otherwise the recent",
+           "median), rounded up. \"Plan at least\" in a course's detail when the",
+           "same term last year filled its seats, so it may have turned students",
+           "away."),
       item("Plan adds", "are the registrations the plan adds to the",
            "projection: the change in the course's feeder courses in the term",
            "just finished, up or down, and a pressure bump for a course that is",
            "always full, with the sections they add beneath. A dash means",
            "neither; the course's detail says why."),
-      item("Registrations", "is everyone expected to sign up, including",
-           "students who drop: the number the model forecasts and sections are",
-           "planned for. Beneath it, the range past forecasts usually landed in,",
-           "which assumes seats like last year's; a course's detail says when",
-           "the draft schedule moves them."),
-      item("Seats (day 1)", "is the students expected in a seat when classes",
-           "begin. It is context, not the planning number."),
-      item("Day-1 fill", "is the share of seats filled on the first day in the",
-           "term the plan starts from, the same season last year: full at",
+      item("Registrations", "is the projection: everyone expected to sign up,",
+           "including students who drop. Beneath it, the range past forecasts",
+           "usually landed in, which assumes seats like last year's; a course's",
+           "detail says when the draft schedule moves them."),
+      item("Students (day 1)", "is the students expected in a seat when classes",
+           "begin, fewer than registrations because early drops free seats. It",
+           "is context, not the planning number."),
+      item("Day-1 fill", "is the share of seats filled on the first day of the",
+           "same term last year, the term the plan starts from: full at",
            paste0(projection_percent(CEDAR_FULL_FILL), ","), "near full at",
            paste0(projection_percent(CEDAR_NEAR_FULL_FILL), ","),
            "with the students left waiting beneath. Unknown says why."),
@@ -251,29 +266,27 @@ projection_columns_explainer <- function() {
            "reconstructed."),
       item("Flags", "say what no column does: one campus full while the other",
            "had room, a sharp change in the term just finished, a forecast far",
-           "off with steady seats, a volatile course with no track record, or",
-           "candidates that disagree. Most rows have none."),
+           "off while the course had seats to spare, a volatile course with no",
+           "track record, or forecasts that disagree. Most rows have none."),
       item("Reliability", "is how far past forecasts for the course landed from",
            "what happened, on average, each made with only the evidence",
            "available at the time. Its colour is the rating: High within", close,
-           paste0(", Moderate ", close, " to ", fair, ", Low more than ", fair, ".")),
-      item("Seat consistency", "is in how many of those same terms the course's",
-           "seats moved", projection_percent(defaults$seat_consistency_change),
-           "or more: High when none did, Moderate when",
-           if (defaults$seat_consistency_moderate_max_moves == 1L) "one" else
-             paste("up to", defaults$seat_consistency_moderate_max_moves),
-           "did, Low when more did."),
-      item("Stability and depth", "are in each course's detail: how steady its",
-           "own history is, using no model, and how many past forecasts stand",
-           "behind its reliability.")
+           paste0(", Moderate ", close, " to ", fair, ", Low more than ", fair, "."),
+           "Beneath it, in how many of those terms the course's seats moved",
+           projection_percent(defaults$seat_consistency_change), "or more."),
+      item("Own history and evidence", "are in each course's detail: how much",
+           "its enrollment swings from year to year, using no model, and how",
+           "many past forecasts stand behind its reliability.")
     ),
     tags$p(
-      "Read Reliability beside Seat consistency. A course far off in terms when",
-      "its seats moved missed mostly because the schedule did, so its projection",
-      "holds if the seats do. A course far off with steady seats missed on its",
-      "own, and is flagged."
+      "Most of a far-off forecast's miss follows the seats. A course near full on",
+      "the first day registers about as many students as it has seats, so when",
+      "its seats changed, the schedule set the number and the projection holds",
+      "if the seats do. A course with seats to spare could have drawn more or",
+      "fewer students whatever its seats did, so a miss there is the",
+      "forecast's own, and is flagged."
     ),
-    description = "Every column, and how Reliability and Seat consistency read together.",
+    description = "Every column, and when a miss is the schedule's rather than the forecast's.",
     class = "enrollment-projection-guide"
   )
 }
@@ -289,8 +302,9 @@ projection_build_explainer <- function(shown = NULL) {
               " The start is the same season last year: everyone who registered,",
               " including students who dropped. When the schedule holds still it",
               " lands within about 6%, and no other forecast tested beat it."),
-      tags$li(tags$strong("A floor for full courses."), paste0(
-        " When last term was near full (", projection_percent(CEDAR_NEAR_FULL_FILL),
+      tags$li(tags$strong("Waiting students for full courses."), paste0(
+        " When the same term last year was near full (",
+        projection_percent(CEDAR_NEAR_FULL_FILL),
         " or more of the seats taken on the first day), the students still",
         " waiting, who registered nowhere in the market, are added to it in",
         " the adjusted forecast."
@@ -353,8 +367,8 @@ projection_build_explainer <- function(shown = NULL) {
       " later sessions began, unless the sessions that had begun already fill ",
       projection_percent(CEDAR_NEAR_FULL_FILL), " of all its seats."
     )),
-    cedar_definition_note("enrollment-projection"),
-    cedar_docs_link("users/enrollment-projections"),
+    # The full definition, its exclusions and limits are in the docs.
+    cedar_definition_links("enrollment-projection"),
     description = "From last year's registrations to sections: every step, and why it is there.",
     class = "enrollment-projection-build"
   )
@@ -393,9 +407,9 @@ projection_error_explainer <- function(error_sources, range_coverage) {
               " before a later session began.")
     ),
     tags$p(
-      "To judge one course, read its Reliability beside its Seat consistency:",
-      " a miss with steady seats is the forecast's; a miss as seats moved is",
-      " mostly the schedule's."
+      "To judge one course, open it: its detail says whether its past misses",
+      " came when it was near full and its seats changed (the schedule's) or",
+      " when it had seats to spare (the forecast's)."
     ),
     description = paste0(
       "Past misses by cause, from ", format(error_sources$n_folds, big.mark = ","),
@@ -510,12 +524,12 @@ projection_detail_ui <- function(data, ns) {
       # nothing about which is which, or what any of them measured.
       projection_axis_named_badge("Reliability", current$accuracy,
                                   current$accuracy_value, current$accuracy_reason),
-      projection_axis_named_badge("Seat consistency", current$seat_consistency,
+      projection_axis_named_badge("Seats", current$seat_consistency,
                                   current$seat_consistency_value,
-                                  current$seat_consistency_reason),
-      projection_axis_named_badge("Stability", current$stability,
+                                  current$seat_consistency_reason, neutral = TRUE),
+      projection_axis_named_badge("Own history", current$stability,
                                   current$stability_value, current$stability_reason),
-      projection_axis_named_badge("Depth", current$depth,
+      projection_axis_named_badge("Evidence", current$depth,
                                   current$depth_value, current$depth_reason),
       tags$p(class = "enrollment-projection-axes-reading",
              current$reliability_reading)
@@ -529,7 +543,7 @@ projection_detail_ui <- function(data, ns) {
         tags$dt("Selected method"), tags$dd(current$method_label),
         tags$dt("Why selected"), tags$dd(current$selection_reason),
         tags$dt("Adjusted candidate"), tags$dd(adjusted_candidate_text),
-        tags$dt("Seat consistency detail"),
+        tags$dt("Seats in past forecast terms"),
         tags$dd(current$seat_consistency_reason),
         tags$dt("What the axes mean"), tags$dd(current$axis_explanation),
         tags$dt("Why it is listed"), tags$dd(current$inclusion_reason),
@@ -618,20 +632,17 @@ projection_table_reactable <- function(projection_view, select_input) {
       flags_order = vapply(flag_lists, function(f) {
         100 * sum(projection_flag_is_warning(f)) + length(f)
       }, numeric(1)),
-      dplyr::across(
-        c(accuracy, seat_consistency), projection_axis_rank,
-        .names = "{.col}_order"
-      )
+      accuracy_order = projection_axis_rank(accuracy)
     ) %>%
     dplyr::relocate(plan_adds_size, .before = pressure_bump) %>%
     dplyr::relocate(flags_order, .before = flags) %>%
-    dplyr::relocate(accuracy_order, .before = accuracy) %>%
-    dplyr::relocate(seat_consistency_order, .before = seat_consistency)
+    dplyr::relocate(accuracy_order, .before = accuracy)
   # Sized to fit a laptop-width window without horizontal scrolling: the
-  # department sits under the course, the range under the registrations,
-  # and stability, depth, the method and its evidence in the modal.
-  # Course, Sections and Seats have fixed widths so a wide window
-  # stretches the evidence columns instead of them.
+  # department sits under the course, the planned registrations under the
+  # sections, the range under the registrations, seat moves under
+  # reliability, and own history, evidence, the method and its evidence in
+  # the modal. Course, Sections and Students have fixed widths so a wide
+  # window stretches the evidence columns instead of them.
   reactable::reactable(
     data,
     theme = cedar_tbl_theme,
@@ -647,19 +658,29 @@ projection_table_reactable <- function(projection_view, select_input) {
       course = projection_course_coldef(data$department, width = 96),
       department = reactable::colDef(show = FALSE, searchable = TRUE),
       planning_sections = reactable::colDef(
-        name = "Sections", align = "right", width = 70,
+        name = "Sections", align = "right", width = 78,
         headerStyle = list(whiteSpace = "nowrap"),
         header = htmltools::span(
           "Sections",
           title = paste(
-            "Sections to plan: registrations plus what the plan adds,",
-            "divided by the section size and rounded up; a floor when last",
-            "year's same term filled its seats"
+            "Sections to plan, with the registrations they are planned for",
+            "beneath: the projection plus what the plan adds, divided by the",
+            "section size and rounded up"
           )
         ),
-        format = reactable::colFormat(separators = TRUE, digits = 0),
-        na = "—"
+        cell = function(value, index) {
+          if (is.na(value)) return("—")
+          planned <- data$planned_registrations[[index]]
+          htmltools::tagList(
+            format(value, big.mark = ","),
+            if (is.finite(planned)) {
+              htmltools::div(class = "text-note",
+                             paste("for", projection_count_text(planned)))
+            }
+          )
+        }
       ),
+      planned_registrations = reactable::colDef(show = FALSE),
       plan_adds_size = reactable::colDef(
         name = "Plan adds", align = "right", minWidth = 90,
         searchable = FALSE, defaultSortOrder = "desc", sortNALast = TRUE,
@@ -711,9 +732,9 @@ projection_table_reactable <- function(projection_view, select_input) {
         header = htmltools::span(
           "Registrations",
           title = paste(
-            "Everyone expected to register, including students who later",
-            "drop: the number sections are planned for. Beneath it, the",
-            "range past forecasts for this course usually landed in"
+            "The projection: everyone expected to register, including",
+            "students who later drop. Beneath it, the range past forecasts",
+            "for this course usually landed in"
           )
         ),
         cell = function(value, index) {
@@ -808,41 +829,32 @@ projection_table_reactable <- function(projection_view, select_input) {
       ),
       flags = reactable::colDef(show = FALSE, searchable = TRUE),
       attention = reactable::colDef(show = FALSE),
-      # Stability and depth are in the course detail; their ratings stay
-      # searchable here.
+      # Own history (stability) and evidence (depth) are in the course
+      # detail; their ratings stay searchable here.
       stability = reactable::colDef(show = FALSE, searchable = TRUE),
       stability_value = reactable::colDef(show = FALSE),
       stability_reason = reactable::colDef(show = FALSE),
       depth = reactable::colDef(show = FALSE, searchable = TRUE),
       depth_value = reactable::colDef(show = FALSE),
       depth_reason = reactable::colDef(show = FALSE),
-      accuracy_order = projection_axis_value_coldef(
+      accuracy_order = projection_reliability_coldef(
         data$accuracy, data$accuracy_value, data$accuracy_reason,
-        name = "Reliability", minWidth = 85,
+        data$seat_consistency, data$seat_consistency_value,
+        name = "Reliability", minWidth = 120,
         header = htmltools::span(
           "Reliability",
           title = paste(
             "How far past forecasts for this course landed from what",
-            "happened, on average. Read it beside seat consistency"
+            "happened, on average; beneath, in how many of those terms its",
+            "seats moved. A full course's miss as its seats changed is the",
+            "schedule's; a miss with seats to spare is the forecast's, and",
+            "is flagged"
           )
         )
       ),
       accuracy = reactable::colDef(show = FALSE, searchable = TRUE),
       accuracy_value = reactable::colDef(show = FALSE),
       accuracy_reason = reactable::colDef(show = FALSE),
-      seat_consistency_order = projection_axis_value_coldef(
-        data$seat_consistency, data$seat_consistency_value,
-        data$seat_consistency_reason,
-        name = "Seat consistency", minWidth = 105,
-        header = htmltools::span(
-          "Seat consistency",
-          title = paste(
-            "In how many of those past terms the course's seats moved. A",
-            "forecast far off with steady seats is the forecast's miss;",
-            "with moving seats, mostly the schedule's"
-          )
-        )
-      ),
       seat_consistency = reactable::colDef(show = FALSE, searchable = TRUE),
       seat_consistency_value = reactable::colDef(show = FALSE),
       seat_consistency_reason = reactable::colDef(show = FALSE),
@@ -936,15 +948,13 @@ projection_draft_reactable <- function(data, select_input) {
         name = "Registered so far", align = "right", minWidth = 90,
         cell = function(value) count_text(value)
       ),
-      reliability = projection_axis_value_coldef(
+      reliability = projection_reliability_coldef(
         table$reliability, table$reliability_value,
-        rep(NA_character_, nrow(table)), name = "Reliability", minWidth = 85
+        rep(NA_character_, nrow(table)), table$seat_consistency,
+        table$seat_consistency_value, name = "Reliability", minWidth = 120
       ),
       reliability_value = reactable::colDef(show = FALSE),
-      seat_consistency = projection_axis_value_coldef(
-        table$seat_consistency, table$seat_consistency_value,
-        rep(NA_character_, nrow(table)), name = "Seat consistency", minWidth = 95
-      ),
+      seat_consistency = reactable::colDef(show = FALSE),
       seat_consistency_value = reactable::colDef(show = FALSE),
       in_draft = reactable::colDef(show = FALSE),
       campus_sections = reactable::colDef(show = FALSE),
@@ -1439,7 +1449,7 @@ enrollmentProjectionsServer <- function(id, bundles, load_bundle, programs) {
         tags$div(
           class = "scope-bar",
           tags$strong(data$meta$target_term_label),
-          " demand | Data window: ", data$meta$history_start_term_label,
+          " projections | Data window: ", data$meta$history_start_term_label,
           " through ", data$meta$as_of_term_label,
           " | ABQ + EA | ", data$meta$n_rows,
           paste0(" course", if (data$meta$n_rows == 1L) "" else "s"),
