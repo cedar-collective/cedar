@@ -74,6 +74,7 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
   # 3. Branches (reusable cedar domain computations — called by multiple cones/features)
   message("[load-funcs.R] Loading branches...")
   source_file("branches/waitlist-demand.R")
+  source_file("branches/registration-snapshots.R")
   source_file("branches/enrl.R")
   source_file("branches/credit-hours.R")
   source_file("branches/data-edges.R")            # where the loaded data starts/stops; see the right-edge policy in AGENTS.md
@@ -144,6 +145,7 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
   source_file("features/regstats.R")
   source_file("features/enrollment-projection-refresh.R")
   source_file("features/enrollment-projections.R")
+  source_file("features/registration-snapshots.R")
   source_file("features/enrollment-projection-scenario.R")
   source_file("features/degree-explorer.R")
   source_file("features/shared-requirements.R")

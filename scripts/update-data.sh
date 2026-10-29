@@ -9,7 +9,8 @@
 #   4. Rebuild cedar_programs if the department mappings changed since it was
 #      built (the deploy's gate too: rebuild-programs-if-mappings-changed.R)
 #   5. Check projection freshness and rebuild only if missing or stale
-#   6. Warm report caches (restart-cedar.sh --update reloads the app afterwards)
+#   6. Keep today's registration counts for each term still in registration
+#   7. Warm report caches (restart-cedar.sh --update reloads the app afterwards)
 #
 # Works in both production (Docker) and local environments.
 # All output is tee'd to a timestamped log file.
@@ -608,6 +609,35 @@ else
         record_step "refresh projections" "FAILED" "$((SECONDS - STEP_START))s" "exit $PROJECTION_RC; retry on next successful data refresh"
     fi
 fi
+
+# ── Registration snapshot: counts that the next refresh would overwrite ──────
+# One file per term in registration (or scheduled ahead of it) per pair of
+# class-list and schedule pulls, aggregates only, in
+# output/registration-snapshots/ (R/branches/registration-snapshots.R). A
+# failure is recorded and the refresh goes on: the app does not read these yet.
+if [[ "$PIPELINE_SUCCESS" != true ]]; then
+    record_step "registration snapshot" "SKIPPED" "0s" "data refresh failed"
+else
+    log_step "Keep today's registration counts for terms in registration"
+    STEP_START=$SECONDS
+    if [[ "$MODE" == "production" ]]; then
+        # cedar-projections: the deployed image with the only writable output/.
+        run_cmd /usr/bin/docker compose -f "$DOCKER_COMPOSE_FILE" run --rm --no-deps -T \
+            --user "$(id -u):$(id -g)" cedar-projections \
+            scripts/record-registration-snapshot.R < /dev/null
+        SNAPSHOT_RC=$?
+    else
+        run_cmd "${RSCRIPT_LOCAL[@]}" "$CEDAR_HOST_DIR/scripts/record-registration-snapshot.R"
+        SNAPSHOT_RC=$?
+    fi
+    if [[ $SNAPSHOT_RC -eq 0 ]]; then
+        record_step "registration snapshot" "OK" "$((SECONDS - STEP_START))s" "see log for terms written or already recorded"
+    else
+        log_error "Registration snapshot failed; that pull's counts are not kept"
+        record_step "registration snapshot" "FAILED" "$((SECONDS - STEP_START))s" "exit $SNAPSHOT_RC"
+    fi
+fi
+echo
 
 # ── Step 4: Warm Dept Dashboard cache ────────────────────────────────────────
 WARM_DASHBOARD_CACHE="${CEDAR_WARM_DASHBOARD_CACHE:-auto}"
