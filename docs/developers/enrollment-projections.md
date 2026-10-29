@@ -69,6 +69,11 @@ it.
 Because the gate reads the hashes of every file in
 `enrollment_projection_model_source_files()`, editing any of them — including
 the refresh feature itself — correctly triggers one rebuild on the next deploy.
+What only reads a saved bundle for the page — its sentences, plan steps, flags,
+course detail, draft comparison and text preview — lives in
+`R/features/enrollment-projection-view.R`, which is deliberately off that list:
+a wording change there deploys in minutes and rebuilds nothing. Anything the
+bundle builder calls must stay in a listed file.
 
 Use `scripts/restart-cedar.sh --update` for the morning refresh plus app reload.
 The builder runs outside Shiny with a temporary writable output mount; normal
@@ -341,7 +346,9 @@ seats are unknown). Two summaries read them from the published rule's aftcasts
   term can be compared; with `seat_consistency_reason`,
   `seat_consistency_terms` and `seat_consistency_moves`. Low reliability with
   High seat consistency is the forecast's own miss, flagged "Off 20%+ with
-  steady seats"; with moving seats it is "Off 20%+ as seats moved".
+  steady seats". A miss as the seats moved carries no flag: the Reliability
+  and Seat consistency cells already say it, and `projection_miss_sentence()`
+  counts both kinds above the table, reading `accuracy_fair_max_wape` live.
 - `summarize_projection_error_sources()` attributes each aftcast to one source
   -- seats changed 10%+, seat or first-day data missing, seats held while near
   full, seats held with room -- and sums the absolute error by source. The page
@@ -362,7 +369,11 @@ captured it (`scheduled_sections`, `scheduled_capacity`, and per-campus
 latest DESR `as_of_date` for the target term; `NA` when none is loaded). Each
 course is one of: short of day-one seats (draft seats below
 `projected_first_day_equivalent`), covering day one but short of the plan,
-covering the plan, more than a section beyond it, or not in the draft. It is
+covering the plan, more than a section beyond it, or not in the draft.
+`draft_vs_plan` is draft seats minus planned registrations, negative where the
+draft is short. Each shortfall in a verdict names its own sections at the
+plan's section size: the sections to reach day one and the sections to reach
+the plan, never one count beside the other's gap. It is
 arithmetic over saved rows: the bundle's refresh signature includes the
 target-term sections, so a changed draft rebuilds the bundle at the next
 refresh, and Shiny never refits to compare.
@@ -822,8 +833,9 @@ campus's `scheduled_sections`, `scheduled_capacity`, `first_day_enrl`,
 `first_day_basis` and `first_day_fill` (each student counted once within the
 campus). It never feeds a projection. It keeps a campus full on the first day
 visible beside one with room, which pooling the market hides (ISSUES.md M36):
-the summary flag "EA full last term, ABQ had room" compares the latest term's
-complete campus first days at the two seat-fill levels, read live. Published
+the summary flag "EA full in Spring 2026, ABQ had room" compares the latest
+term's complete campus first days at the two seat-fill levels, read live, and
+names that term. Published
 rows gain `adjusted_prior_first_day_basis` (`complete`, `sessions_begun`,
 `sessions_pending`, `undated`, `no_capacity`), so a prior term full on the
 first day is flagged full rather than near full, and an unknown prior fill

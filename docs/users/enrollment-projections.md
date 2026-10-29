@@ -29,19 +29,33 @@ depth and no deltas — which means that evidence was unavailable, not that
 nothing changed.
 
 The page opens to **Always monitored**. Use **Target term**, **Course group**,
-**Department**, **Course**, **Stability**, and **Reliability** to narrow the
-saved rows. The table expands to
+**Department**, and **Course** to narrow the saved rows. The table expands to
 show every matching row and scrolls with the page. These controls do not fit or
 rerun a model.
 
-Four blue boxes above the table each answer one question; the title says which:
+Two sentences sit above the table. The first, once the target term's draft
+schedule is in the data, says how many of the courses shown are short of the
+students expected on day one, with a link to the **Draft schedule** tab. The
+second says how many courses' past forecasts were more than 20% off, and how
+many of those misses came in terms when the seats moved. The scope stripe
+beneath them names the date the projection was built and the date the draft
+schedule was pulled.
+
+The table opens sorted by **Plan adds**, largest first, up or down. Most
+projections are last year's registrations, so what the plan adds is the plan's
+change from last year. Click any header to sort by it instead: **Flags** puts
+warnings (amber) first, and the rating columns put the weakest first, with
+Unrated last. The search box matches flag and rating text, including the
+Stability and Depth ratings the table does not show, so typing
+"Hard to predict" or "Volatile" finds those courses.
+
+Three blue boxes above the table each answer one question; the title says which:
 
 | Box | Answers |
 |---|---|
 | **Reading the table: what each column means** | Every column, and how Reliability and Seat consistency read together |
-| **How a course's plan is built, step by step** | From last year's registrations to sections, and why each step is there |
+| **How a course's plan is built, step by step** | From last year's registrations to sections, and why each step is there; then what the pressure bump and the feeder adjustment add across the courses shown |
 | **Where forecast error comes from** | Past misses by cause, measured on the loaded projection's past forecasts |
-| **Which courses are on this page** | The monitored list, the screen that adds near-full courses, and what is left out |
 
 Below the table, **Projection methods: the two forecasts, and how one is
 chosen** describes the two forecasting methods. The Draft schedule tab has its
@@ -62,9 +76,15 @@ them together:
 |---|---|---|
 | High | any | Past forecasts landed close; plan to it. |
 | Low | Low or Moderate | The misses came when the seats moved. They follow the schedule more than demand, so the projection holds if the seats hold. |
-| Low | High | The course missed with steady seats. That miss is the forecast's: look before planning to it. Flagged "Off 20%+ with steady seats". |
+| Low | High | The course missed with steady seats. That miss is the forecast's: look before planning to it. Flagged "Off 20%+ with steady seats". The one Low the table flags. |
 | Moderate | any | Usable for planning, not for a precise seat count. |
 | Unrated | — | Too few past forecasts to tell. |
+
+The table shows each as the number behind it, with the rating in its colour:
+Reliability as how far past forecasts were off ("10.4% off"), Seat consistency
+as how often the seats moved 10% or more ("moved 1 of 4"). The sentence above
+the table counts the courses whose forecasts missed by more than 20% and
+says how many of those misses came as the seats moved.
 
 The **Where forecast error comes from** box gives the breakdown for the
 loaded projection: how much error came from seat changes, from missing data,
@@ -81,7 +101,9 @@ departments edit it, and the comparison follows at the next refresh.
 Each course gets one verdict:
 
 - **Short of day-one seats**: the draft has fewer seats than the students
-  expected in the room when classes begin. Fix these first.
+  expected in the room when classes begin. Fix these first. The verdict gives
+  each shortfall its own sections: "short of day-one seats by 10 (1 section);
+  44 short of the plan (2 sections)".
 - **Covers day one, short of the plan**: only the planning margin, the
   feeder adjustment or the pressure bump is missing.
 - **Covers the plan**, or **seats beyond the plan** when it has more than a
@@ -92,7 +114,8 @@ Each course gets one verdict:
 
 The table also shows the draft's sections (with each campus's share), its
 seats, the expected day-one seats, the planned registrations (including the
-feeder adjustment and any pressure bump), the plan's sections, the gap, students registered so far once
+feeder adjustment and any pressure bump), the plan's sections, **Draft vs. plan** (draft seats minus planned
+registrations, negative where the draft is short), students registered so far once
 registration opens, and the course's reliability and seat consistency. Click a
 course for its full evidence. Until the target term's schedule is in the data,
 the tab says so instead of showing a table.
@@ -231,10 +254,6 @@ then, so the accuracy you see is what that rule would actually have delivered,
 not the fit of the winner on the terms that chose it. A course's detail gives
 the evidence behind its current method.
 
-The **Only courses that need a look** box narrows the course table to rows that
-were full on the first day last term, moved sharply in the term just finished,
-or whose past forecasts were more than 20% off.
-
 The table is sized to fit a laptop window:
 
 | Column | Meaning |
@@ -242,20 +261,24 @@ The table is sized to fit a laptop window:
 | **Course** | The course, with its department beneath. |
 | **Sections** | Registrations plus what the plan adds, divided by the section size (the target schedule's average when it exists, otherwise the recent median), rounded up. "Plan at least" when last term filled its seats. |
 | **Plan adds** | Registrations the plan adds to the forecast: the change in the course's feeder courses in the term just finished (up or down), and a pressure bump when the course was near full on the first day in every recent same-season term, with the sections they add beneath. A dash means neither; the course's detail says why. |
-| **Registrations** | Everyone expected to sign up, including students who drop before or after classes begin: the class-list demand the model forecasts, and the number sections are planned for. Beneath it, the range past forecasts for this course usually landed in. There is no change-on-last-year line: most forecasts are last year's number, and where the adjusted forecast moves it, the move has been a percent or so and has not predicted which way the course went. The range assumes seats like last year's: on past forecasts it held about 8 or 9 times in 10 when seats stayed within 10%, and about 1 in 3 when they moved. When the draft schedule moves the seats 10% or more, the row says so under the range. |
+| **Registrations** | Everyone expected to sign up, including students who drop before or after classes begin: the class-list demand the model forecasts, and the number sections are planned for. Beneath it, the range past forecasts for this course usually landed in. There is no change-on-last-year line: most forecasts are last year's number, and where the adjusted forecast moves it, the move has been a percent or so and has not predicted which way the course went. The range assumes seats like last year's: on past forecasts it held about 8 or 9 times in 10 when seats stayed within 10%, and about 1 in 3 when they moved. When the draft schedule moves the seats 10% or more, the course's detail says so beside the range. |
 | **Seats (day 1)** | Students expected to hold a seat when classes begin: registrations times the share of this course's registrants still enrolled on the first day in recent terms. Context, not the planning number. |
 | **First day / sections** | The last four same-season terms: students enrolled on the first day over the sections scheduled. A dash means the course was not offered, or the first day cannot be reconstructed; hover for which. |
-| **Flags** | Plain-language reasons to look: full last term (98% of seats filled on the first day) or near full (90%), students left waiting, one campus full while another had room (online seats can fill while Albuquerque's do not, and the pooled plan hides it), last term's fill unknown and why, a big change in the term just finished, a volatile history, past forecasts more than 20% off ("with steady seats" or "as seats moved"), or the two candidates disagreeing. |
-| **Stability** | Stable, Moderate, Volatile, or Unrated: whether the course is predictable from its own history at all, measured with no model |
-| **Depth** | Deep, Moderate, Thin, or None: how many comparable rolling-selection aftcasts stand behind the published method |
-| **Reliability** | High, Moderate, Low, or Unrated: how close past forecasts for this course landed (within 10%, 10 to 20%, more than 20%), each made with only the evidence available then |
-| **Seat consistency** | High, Moderate, Low, or Unrated: how steady the course's seats were in those same past terms (held within 10% every time, moved once, moved more) |
+| **Day-1 fill** | The share of seats filled on the first day of classes in the term the forecast starts from, the same season last year; the header names that term. **Full** at 98% or more, **Near full** at 90%, with the students still waiting beneath. "Unknown" says why: the class lists carry no status dates, a later session had not begun when the data was pulled, or there was no seat count. |
+| **Flags** | What no column already says: one campus full while another had room (online seats can fill while Albuquerque's do not, and the pooled plan hides it), a big enrollment change in the term just finished, a volatile history with no track record yet ("Hard to predict"), past forecasts more than 20% off with steady seats, or the two candidates disagreeing. |
+| **Reliability** | How far past forecasts for this course were off, each made with only the evidence available then, coloured High (within 10%), Moderate (10 to 20%) or Low (more than 20%). Unrated when there are too few. |
+| **Seat consistency** | How many of those same past terms moved the course's seats 10% or more, coloured High (none), Moderate (once) or Low (more). Unrated when there are too few. |
+
+The course's **Stability** (whether it is predictable from its own history at
+all, measured with no model: Stable, Moderate, Volatile or Unrated) and
+**Depth** (how many past forecasts stand behind the published method: Deep,
+Moderate, Thin or None) are in its detail.
 
 Clicking a row opens the course's evidence in a window over the table; close it
 to return to the same place in the list. It opens with one sentence that says
-what to plan and why, then three things large and up front: the planning
-recommendation, the estimated sections, and the planned registrations they
-are sized for.
+what to plan and why, then three things large and up front: its **Status**
+(the planning recommendation), the **Sections**, and the planned registrations
+they are sized for.
 
 **How this plan was built** follows, open: one line per step from last
 year's class list to the sections, each with where its number came from.
@@ -274,8 +297,10 @@ year's class list to the sections, each with where its number came from.
 Each total is the sum of the lines above it, so a reader can check the plan
 line by line.
 
-Beneath that are the four axes as badges, with the one sentence reading
-reliability beside seat consistency, and then the last four same-season
+Beneath that are the four axes as badges, each with its number and rating
+("10.4% off (Moderate)"), in the order Reliability, Seat consistency,
+Stability, Depth, with the one sentence reading reliability beside seat
+consistency, and then the last four same-season
 terms. The reasoning behind each step is in **Why this method, why this
 course: the full evidence trail**, collapsed by default: the selected method
 and why, why the course is listed, the feeder and pressure-bump notes, and the
