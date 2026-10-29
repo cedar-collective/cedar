@@ -402,6 +402,30 @@ in 2026 (Summer 2026: 543; Fall 2026: 3,615); a past term's extract keeps only
 students still waiting when it closed. There is no history yet to fit or test a
 waitlist method against, so it cannot provide a defensible demand signal.
 
+### Registration snapshots
+
+The class lists and the draft schedule are overwritten by every refresh, and
+neither can be rebuilt afterwards for a past week: a student who registered and
+later dropped carries only the drop's status date, and a waiting student who got
+a seat leaves no waitlist row. So the refresh keeps them.
+`scripts/record-registration-snapshot.R` (run by `update-data.sh` after the
+projection refresh) calls `record_registration_snapshot()`, which writes
+`build_registration_snapshot()` for every term after the settled edge that has
+a class list or a schedule to `output/registration-snapshots/`. It writes one
+file per term per pair of class-list and schedule pulls, and skips a pair it
+already holds.
+
+Each row is one term, delivery campus, college, course and part of term. It
+holds registered, waiting (the canonical rule), early and late drops, and active
+sections and seats, with crosslists counted once at home. There are no student
+IDs. Part of term is kept so a reader can leave out intersession. A source with
+no pull for the term has `NA` counts, never zeros: before Spring registration
+opens, its draft schedule is kept and its class-list counts are unknown.
+Nothing reads the snapshots yet. They are the evidence a pace revision (this
+week against the same week a year earlier) and a projection against the
+submitted draft schedule would both need. Neither is useful until a year of
+snapshots exists.
+
 ## Method Roles
 
 Model 0.20.0 has two candidates and one idea: **seats needed is last year's

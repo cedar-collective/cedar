@@ -137,9 +137,15 @@ The projection contract and measured lessons are documented in
 - [ ] Re-read the Fall deltas with posted grades in December (feeder
   completions and DFW counts in place of enrollments) as a revision of the
   published number for add/cancel decisions.
-- [ ] Retain one registration-to-date row per course per week during Spring
-  registration, so next year's Spring can be revised by pace against the same
-  week a year earlier. The single most valuable data addition for revision.
+- [x] Retain registration-to-date counts per course during registration, so
+  next year's Spring can be revised by pace against the same week a year
+  earlier: every refresh keeps each term in registration, or scheduled ahead
+  of it, in `output/registration-snapshots/` (registered, waiting, drops,
+  sections and seats per course, campus and part of term; no student IDs).
+  This also archives the draft schedule as it changes before registration opens.
+- [ ] Revise Spring by pace once a year of snapshots exists: this week's
+  registrations against the same week a year earlier, scored rolling against
+  the spine like any other candidate.
 - [x] Compare the plan with the draft schedule (Registration > Projections >
   Draft schedule, model 0.23.0): short of day-one seats, short of the plan,
   covering it, beyond it, or missing from the draft.
@@ -148,7 +154,8 @@ The projection contract and measured lessons are documented in
   aftcast error moves with the seats, one registrant per seat (77% of Spring
   2027's aftcast error, 83% of Fall 2027's). Needs the schedule archived when departments submit it,
   which also separates planned seats from sections added or cancelled during
-  registration.
+  registration. Registration snapshots now keep the draft at every refresh
+  from October 2026; the submission date still has to be marked.
 - [ ] Rank feeders by lift rather than raw count, with one pooled rate, so the
   feeder list a chair reads names prerequisites, not the largest freshman
   courses. The strongest prerequisites are now declared sequences

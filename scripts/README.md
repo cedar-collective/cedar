@@ -58,7 +58,9 @@ Runs the complete data update workflow:
 2. **Fetch** — Downloads data from MyReports via mrgather (only if needed). It fails, and the transform is skipped, if any requested report has no file from today afterward, even when mrgather exits 0
 3. **Parse** — Processes raw .xlsx files into R-readable format (parse-data.R)
 4. **Transform** — Converts to CEDAR data model (transform-to-cedar.R)
-5. **Restart** — (Docker only) Restarts Shiny app and warms it up
+5. **Projections** — Rebuilds the enrollment projection bundles only when stale
+6. **Registration snapshot** — Keeps the day's class-list and schedule counts for each term in registration or scheduled ahead of it (`record-registration-snapshot.R`, below)
+7. **Restart** — (Docker only) Restarts Shiny app and warms it up
 
 **Smart caching:** MyReports data is only updated once per day. If today's files already exist in `mrgather/data/`, the script skips the slow fetch step. This is especially useful when debugging parse or transform errors - you can re-run the script without re-downloading the same data.
 
@@ -444,6 +446,33 @@ the underlying data files change.
 
 See [Computational Prototyping Without Shiny](../docs/developers/testing.md#computational-prototyping-without-shiny)
 for the complete workflow and evidence requirements.
+
+---
+
+## record-registration-snapshot.R
+
+Keeps what the next refresh would overwrite: for every term in registration, or
+scheduled and not yet open, one row per course, delivery campus, college and part
+of term with the registered, waiting, early- and late-drop counts and the
+schedule's active sections and seats. Aggregates only, no student ID. One file per
+term per pair of class-list and schedule pulls, under
+`output/registration-snapshots/`; a pair already recorded is left alone, so an
+unchanged morning writes nothing. A source with no pull for the term (Spring's
+class list before registration opens) has blank counts, not zeros.
+
+`update-data.sh` runs it after the projection refresh. In production it runs in
+the `cedar-projections` service, the only one that may write `output/`:
+
+```bash
+docker compose run --rm --no-deps -T --user "$(id -u):$(id -g)" \
+  cedar-projections scripts/record-registration-snapshot.R </dev/null
+```
+
+Locally: `Rscript --vanilla scripts/record-registration-snapshot.R [--output DIR]`.
+Read them back with `read_registration_snapshots("output/registration-snapshots")`.
+Nothing in the app reads them yet; they exist so a Spring projection can later be
+revised by registration pace against the same week a year earlier. Why the counts
+cannot be rebuilt afterwards, and the grain: `R/branches/registration-snapshots.R`.
 
 ---
 

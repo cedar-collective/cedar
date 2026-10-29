@@ -61,6 +61,7 @@ A per-function index of `R/branches/`, `R/cones/`, and `R/features/`. `AGENTS.md
 | `enrollment-projection-plan.R` | `add_projection_recommendations(...)`, `projection_pressure_bump()`, `projection_plan_feeder_adjustment()`, `validate_pressure_bump_rows()` | Planned registrations and sections: feeder adjustment and pressure bump |
 | `enrollment-projection-error-sources.R` | `annotate_projection_fold_conditions()`, `add_projection_seat_consistency()`, `summarize_projection_error_sources()`, `summarize_projection_range_coverage()` | Seat consistency and where aftcast error came from |
 | `enrollment-projection-bundle.R` | `new_enrollment_projection_bundle()`, `validate_enrollment_projection_bundle()`, `write_/read_enrollment_projection_bundle()` | The artifact: assembly, validation, atomic write and read |
+| `registration-snapshots.R` | `build_registration_snapshot(students, sections, opt)`, `validate_registration_snapshot(snapshot, source)` | A term's registered, waiting, early- and late-drop counts (`calc_cl_enrls(by_part_term = TRUE)`, the canonical waitlist rule) and active sections and seats (crosslists once, at home), per term, campus, college, course and part of term. `opt$terms` is required. A source with no pull for the term leaves its counts `NA`; a course a source does not list is a measured zero |
 | `pathways.R` | `pathways_level_filter()`, `pathways_observation_boundary()`, `apply_pathways_population_window()`, `resolve_pathways_focal_programs/dept_codes/subjects()` | Pure result-shaping helpers for the Pathways module — calculation-affecting rules kept testable without loading Shiny |
 
 ### Named population groups (`R/branches/population.R`)
@@ -232,6 +233,7 @@ Features call multiple branches/cones and assemble payloads for visible app surf
 | | `enrollment_projection_model_drift(output_dir, base_dir)` | Deploy-time gate. Checks every saved season's bundle against the deployed model source; loads no CEDAR table |
 | `enrollment-projection-scenario.R` | `build_enrollment_projection_scenario(bundle, programs, opt)` | Grows one named population and reads the effect on published course demand. Arithmetic over saved rows only — year 1 is the published projection at any growth rate, later years are labeled `Scenario` and carry no accuracy axes |
 | | `format_enrollment_projection_scenario_preview(scenario, measure)` | Text preview over the scenario payload; `measure` is students, sections, or additional |
+| `registration-snapshots.R` | `registration_snapshot_terms(students, sections)`, `record_registration_snapshot(students, sections, output_dir, terms)`, `read_registration_snapshots(output_dir, terms)` | Terms after the settled edge with a class list or a schedule; one atomic file per term per pair of pulls, skipped when already kept; every kept file read back and validated |
 
 
 ## Trunk Helpers — full function tables
