@@ -1290,7 +1290,8 @@ test_that("the draft comparison separates short of day one from short of the pla
     target_schedule_available = c(TRUE, TRUE, TRUE, TRUE, FALSE),
     additional_sections = c(2L, 1L, 0L, 0L, NA),
     target_registration_observed = FALSE, target_registered_now = NA_real_,
-    accuracy = "High", seat_consistency = "High"
+    accuracy = "High", accuracy_value = "5.0% off",
+    seat_consistency = "High", seat_consistency_value = "moved 0 of 4"
   )
   components <- tibble::tibble(
     market_id = "abq_ea_course_market", subject_course = "DAY 1",
@@ -1321,6 +1322,14 @@ test_that("the draft comparison separates short of day one from short of the pla
   expect_match(draft$sentence, "^The draft schedule \\(pulled October 8, 2026\\) has 475 seats in 4 of the 5 courses shown")
   expect_match(draft$sentence, "1 course is short of the students expected on day one \\(by 30 seats\\)")
   expect_match(draft$sentence, "1 monitored course is not in the draft\\.$")
+  # One course takes a singular verb.
+  expect_match(draft$sentence, paste0(
+    "; 1 covers day one but not the plan; 1 covers the plan; 1 has more than ",
+    "a section to spare\\."
+  ))
+  # The ratings travel with the numbers behind them.
+  expect_equal(unique(table$reliability_value), "5.0% off")
+  expect_equal(unique(table$seat_consistency_value), "moved 0 of 4")
 
   # No schedule for the target term: says so instead of an empty table.
   none <- build_enrollment_projection_draft_comparison(list(
@@ -1758,14 +1767,17 @@ test_that("a campus full on the first day beside one with room is flagged, never
     market_id = "abq_ea_course_market",
     subject_course = c("TEST 101", "TEST 101", "TEST 101", "TEST 102", "TEST 102"),
     projection_target_term = 202480L,
+    history_term = c(202380L, 202380L, 202280L, 202380L, 202380L),
     recency_rank = c(1L, 1L, 2L, 1L, 1L),
     campus = c("ABQ", "EA", "EA", "ABQ", "EA"),
     first_day_basis = "complete",
     first_day_fill = c(0.80, 1.00, 0.50, 0.95, 1.00)
   )
+  # The term is named: "last term" read as the term just finished, which is
+  # not the same-season term the flag describes.
   expect_equal(
     projection_campus_fill_flags(projections, history),
-    c("EA full last term, ABQ had room", NA)
+    c("EA full in Fall 2023, ABQ had room", NA)
   )
   # Near full is not room, and an incomplete first day is not compared.
   pending <- dplyr::mutate(history, first_day_basis = dplyr::if_else(
@@ -2498,26 +2510,13 @@ test_that("the administrator summary says the decision in one sentence and flags
     projection_summary_sentence(dplyr::mutate(row, accuracy = "Unrated", wape = NA_real_)),
     "Too few past forecasts to say how reliable this is\\.$"
   )
-  # 98.8% on the first day is full, not merely near full: the flag uses the
-  # same two levels as every other page.
-  expect_equal(projection_flags(row), "Full last term | 15 waiting")
+  # A flag says what no column does. Last year's fill and its waiting
+  # students are the Day-1 fill column, so a full course carries no flag:
+  # when they were flags, 10 of the 11 monitored Spring 2027 courses had one.
+  expect_equal(projection_flags(row), "")
   expect_equal(
-    projection_flags(dplyr::mutate(row, adjusted_prior_first_day_fill = 0.93)),
-    "Near full last term | 15 waiting"
-  )
-  # An unknown fill names its cause (ISSUES.md I28); one with no cause
-  # recorded (no prior term to read) adds nothing.
-  unknown <- function(basis) projection_flags(dplyr::mutate(
-    row, adjusted_saturated_prior = NA, adjusted_prior_first_day_fill = NA_real_,
-    adjusted_prior_first_day_basis = basis
-  ))
-  expect_equal(unknown("undated"), "Last term's fill unknown: no status dates")
-  expect_equal(unknown("sessions_pending"), "Last term's fill unknown: a session had not begun")
-  expect_equal(unknown("no_capacity"), "Last term's fill unknown: no seat count")
-  expect_equal(unknown(NA_character_), "")
-  expect_equal(
-    projection_flags(dplyr::mutate(row, campus_fill_flag = "EA full last term, ABQ had room")),
-    "Full last term | 15 waiting | EA full last term, ABQ had room"
+    projection_flags(dplyr::mutate(row, campus_fill_flag = "EA full in Spring 2026, ABQ had room")),
+    "EA full in Spring 2026, ABQ had room"
   )
   expect_error(projection_flags(dplyr::select(row, -campus_fill_flag)), "campus_fill_flag")
 
@@ -2532,23 +2531,113 @@ test_that("the administrator summary says the decision in one sentence and flags
   expect_match(projection_summary_sentence(moved), "^Plan 99 sections")
   expect_match(projection_summary_sentence(moved), "That is \\+10% on last Spring\\.")
   expect_match(projection_summary_sentence(moved), "Fall 2026 moved \\+91%")
-  expect_equal(
-    projection_flags(moved),
-    "Fall enrollment +91% | Hard to predict | Past forecasts off by 20%+"
-  )
-  # A Low course whose seats held is the forecast's miss; one whose seats
-  # moved is mostly the schedule's.
-  expect_equal(
-    projection_flags(dplyr::mutate(moved, seat_consistency = "High")),
-    "Fall enrollment +91% | Hard to predict | Off 20%+ with steady seats"
-  )
+  # Far off as the seats moved is the Reliability and Seat consistency columns
+  # read together, so it is no flag; far off with steady seats is the
+  # forecast's own miss, which the columns only show side by side, so it is.
+  expect_equal(projection_flags(moved), "Fall enrollment +91%")
   expect_equal(
     projection_flags(dplyr::mutate(moved, seat_consistency = "Low")),
-    "Fall enrollment +91% | Hard to predict | Off 20%+ as seats moved"
+    "Fall enrollment +91%"
+  )
+  expect_equal(
+    projection_flags(dplyr::mutate(moved, seat_consistency = "High")),
+    "Fall enrollment +91% | Off 20%+ with steady seats"
+  )
+  # A volatile history warns only when there is no track record to read.
+  expect_equal(
+    projection_flags(dplyr::mutate(moved, accuracy = "Unrated")),
+    "Fall enrollment +91% | Hard to predict"
+  )
+  expect_equal(
+    projection_flags(dplyr::mutate(moved, methods_disagree = TRUE, adjusted_regime_alarm = FALSE)),
+    "Candidates disagree"
   )
 
   sparse <- dplyr::mutate(row, projected_classlist_total = NA_real_)
   expect_match(projection_summary_sentence(sparse), "^Not enough comparable history")
+})
+
+test_that("the Day-1 fill column names last year's fill, who waited, and why a fill is unknown", {
+  # Five courses' saved fields, as the bundle holds them: an analytical frame,
+  # not institutional data.
+  rows <- tibble::tibble(
+    spine_term = c(202610L, 202610L, 202610L, 202510L, 202610L),
+    adjusted_saturated_prior = c(TRUE, TRUE, FALSE, NA, NA),
+    adjusted_prior_first_day_fill = c(0.988, 0.93, 0.72, NA, NA),
+    adjusted_prior_first_day_basis = c("complete", "complete", "complete",
+                                       "undated", NA),
+    adjusted_waitlisted_prior = c(15L, 0L, 0L, NA, NA)
+  )
+  fill <- projection_prior_fill(rows, header_term = 202610L)
+  # 98.8% is full, not merely near full, and shown with one decimal: whole
+  # percents turned it into "99%". The two levels are the seat-fill constants.
+  expect_equal(fill$prior_fill_text,
+               c("Full · 98.8%", "Near full · 93.0%", "72.0%", "Unknown", NA))
+  # The table shows the number, with the level beneath it.
+  expect_equal(fill$prior_fill_percent, c("98.8%", "93.0%", "72.0%", "Unknown", NA))
+  expect_equal(fill$prior_fill_level, c("Full", "Near full", NA, NA, NA))
+  expect_equal(fill$prior_fill_note, c("15 waiting", NA, NA, "no status dates", NA))
+  expect_equal(fill$prior_fill, c(0.988, 0.93, 0.72, NA, NA))
+  # A course starting from an older term than the header's says which.
+  expect_equal(fill$prior_fill_term, c(NA, NA, NA, "Spring 2025", NA))
+  expect_true(all(is.na(projection_prior_fill(rows)$prior_fill_term)))
+  # Every recorded cause of an unknown fill is named (ISSUES.md I28).
+  causes <- projection_prior_fill(dplyr::mutate(
+    rows[c(4, 4, 4), ],
+    adjusted_prior_first_day_basis = c("undated", "sessions_pending", "no_capacity")
+  ))
+  expect_equal(causes$prior_fill_note,
+               c("no status dates", "a session had not begun", "no seat count"))
+  expect_error(projection_prior_fill(dplyr::select(rows, -spine_term)), "spine_term")
+})
+
+test_that("each rating is shown as the number behind it", {
+  rows <- tibble::tibble(
+    stability = c("Moderate", "Unrated"), history_cv = c(0.157, NA),
+    depth = c("Deep", "None"), n_backtests = c(4L, NA),
+    accuracy = c("Moderate", "Unrated"), wape = c(0.10408922, NA),
+    seat_consistency = c("Moderate", "Unrated"),
+    seat_consistency_moves = c(1L, 0L), seat_consistency_terms = c(4L, 0L)
+  )
+  values <- projection_axis_values(rows)
+  # The same 10.4% the summary sentence and plan steps state.
+  expect_equal(values$accuracy_value, c("10.4% off", "Unrated"))
+  expect_equal(values$seat_consistency_value, c("moved 1 of 4", "Unrated"))
+  expect_equal(values$stability_value, c("15.7% variation", "Unrated"))
+  expect_equal(values$depth_value, c("4 past forecasts", "None"))
+  expect_equal(projection_axis_values(rows[c(1, 1), ] %>%
+                 dplyr::mutate(n_backtests = c(1L, 2L)))$depth_value,
+               c("1 past forecast", "2 past forecasts"))
+})
+
+test_that("the page says how many of the worst misses followed the seats", {
+  config <- list(accuracy_fair_max_wape = 0.20)
+  rows <- tibble::tibble(
+    accuracy = c("Low", "Low", "Low", "High", "Moderate"),
+    seat_consistency = c("Low", "Moderate", "High", "High", "Low")
+  )
+  expect_equal(
+    projection_miss_sentence(rows, config),
+    paste0(
+      "3 of the 5 courses shown had past forecasts more than 20% off: 2 in ",
+      "terms when the seats moved, 1 with steady seats. A miss as the seats ",
+      "moved follows the schedule; one with steady seats is the forecast's own."
+    )
+  )
+  # "None with steady seats" is the finding, so it is said.
+  expect_match(projection_miss_sentence(rows[1:2, ], config),
+               "^2 of the 2 courses shown had past forecasts more than 20% off: all 2 in terms when the seats moved, none with steady seats\\.")
+  expect_match(
+    projection_miss_sentence(dplyr::mutate(rows[1, ], seat_consistency = NA), config),
+    "none in terms when the seats moved, none with steady seats, 1 whose seats cannot be compared\\."
+  )
+  expect_equal(projection_miss_sentence(rows[4:5, ], config),
+               "None of the 2 courses shown has had past forecasts more than 20% off.")
+  expect_equal(projection_miss_sentence(rows[4, ], config),
+               "The course shown has not had past forecasts more than 20% off.")
+  # The threshold is the model's, read live.
+  expect_match(projection_miss_sentence(rows, list(accuracy_fair_max_wape = 0.25)), "more than 25% off")
+  expect_error(projection_miss_sentence(rows, list()), "accuracy_fair_max_wape")
 })
 
 test_that("a plan's steps add up from last year's class list to its sections", {

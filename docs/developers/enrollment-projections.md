@@ -346,7 +346,9 @@ seats are unknown). Two summaries read them from the published rule's aftcasts
   term can be compared; with `seat_consistency_reason`,
   `seat_consistency_terms` and `seat_consistency_moves`. Low reliability with
   High seat consistency is the forecast's own miss, flagged "Off 20%+ with
-  steady seats"; with moving seats it is "Off 20%+ as seats moved".
+  steady seats". A miss as the seats moved carries no flag: the Reliability
+  and Seat consistency cells already say it, and `projection_miss_sentence()`
+  counts both kinds above the table, reading `accuracy_fair_max_wape` live.
 - `summarize_projection_error_sources()` attributes each aftcast to one source
   -- seats changed 10%+, seat or first-day data missing, seats held while near
   full, seats held with room -- and sums the absolute error by source. The page
@@ -807,8 +809,9 @@ campus's `scheduled_sections`, `scheduled_capacity`, `first_day_enrl`,
 `first_day_basis` and `first_day_fill` (each student counted once within the
 campus). It never feeds a projection. It keeps a campus full on the first day
 visible beside one with room, which pooling the market hides (ISSUES.md M36):
-the summary flag "EA full last term, ABQ had room" compares the latest term's
-complete campus first days at the two seat-fill levels, read live. Published
+the summary flag "EA full in Spring 2026, ABQ had room" compares the latest
+term's complete campus first days at the two seat-fill levels, read live, and
+names that term. Published
 rows gain `adjusted_prior_first_day_basis` (`complete`, `sessions_begun`,
 `sessions_pending`, `undated`, `no_capacity`), so a prior term full on the
 first day is flagged full rather than near full, and an unknown prior fill

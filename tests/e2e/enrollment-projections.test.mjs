@@ -76,7 +76,7 @@ async function closeEvidence(page) {
   check('title is presented in the green filter bar',
     pageChrome.title === 'Enrollment Projections', pageChrome.title || '(missing)');
   check('filter bar carries a brief page description',
-    pageChrome.subtitle.includes('Saved course-demand projections'), pageChrome.subtitle);
+    pageChrome.subtitle.startsWith('Sections to plan for each course'), pageChrome.subtitle);
   check('the column guide is a collapsed, purpose-labelled info panel',
     pageChrome.guideTitle.includes('Reading the table: what each column means') &&
       pageChrome.guideOpen === false, pageChrome.guideTitle || '(missing)');
@@ -207,14 +207,79 @@ async function closeEvidence(page) {
   let table = await readReactable(page, 'enrollment_projections-projection_table');
   const requiredHeaders = [
     'Course', 'Sections', 'Plan adds', 'Seats (day 1)', 'Registrations',
-    'Flags', 'Stability', 'Depth', 'Reliability', 'Seat consistency',
+    'Flags', 'Reliability', 'Seat consistency',
   ];
+  // The Day-1 fill header carries its term, so it is matched by prefix.
+  const hasFillHeader = table.headers.some((h) => /^day-1 fill\b/i.test(h));
   check(
-    'projection table leads with the decision and keeps the evidence axes',
-    requiredHeaders.every((header) => colIndex(table.headers, header) >= 0) &&
-      colIndex(table.headers, 'Sections') < colIndex(table.headers, 'Stability'),
+    'projection table leads with the decision and keeps reliability beside seat consistency',
+    hasFillHeader &&
+      requiredHeaders.every((header) => colIndex(table.headers, header) >= 0) &&
+      colIndex(table.headers, 'Sections') < colIndex(table.headers, 'Reliability') &&
+      colIndex(table.headers, 'Seat consistency') === colIndex(table.headers, 'Reliability') + 1,
     table.headers.join(' | ')
   );
+  // Stability and depth are in the course detail, not the table.
+  check('stability and depth are not table columns',
+    !['Stability', 'Depth'].some((header) => colIndex(table.headers, header) >= 0),
+    table.headers.join(' | '));
+  // Ratings read as the number behind them, coloured by the rating; fill is a
+  // column, so no flag repeats it.
+  const ratingCells = await page.evaluate(() => {
+    const root = document.getElementById('enrollment_projections-projection_table');
+    const headers = [...root.querySelectorAll('.rt-thead .rt-th')].map((c) => c.innerText.trim());
+    const at = (name) => headers.findIndex((h) => h.toLowerCase().startsWith(name));
+    const rows = [...root.querySelectorAll('.rt-tbody .rt-tr')];
+    const cell = (row, i) => row.querySelectorAll('.rt-td')[i];
+    const fillHeader = root.querySelectorAll('.rt-thead .rt-th')[at('day-1 fill')];
+    return {
+      reliability: rows.map((r) => cell(r, at('reliability')).innerText.trim()),
+      seats: rows.map((r) => cell(r, at('seat consistency')).innerText.trim()),
+      flags: rows.map((r) => cell(r, at('flags')).innerText.trim()),
+      fillHeader: fillHeader ? fillHeader.innerText.replace(/\s+/g, ' ').trim() : '',
+    };
+  });
+  check('reliability cells show how far off, or Unrated',
+    ratingCells.reliability.length > 0 &&
+      ratingCells.reliability.every((v) => /^\d+\.\d% off$/.test(v) || v === 'Unrated'),
+    ratingCells.reliability.join(', '));
+  check('seat consistency cells show how many terms the seats moved, or Unrated',
+    ratingCells.seats.every((v) => /^moved \d+ of \d+$/.test(v) || v === 'Unrated'),
+    ratingCells.seats.join(', '));
+  check('the Day-1 fill header names the term the plans start from',
+    /^Day-1 fill \((Spring|Fall) \d{4}\)$/i.test(ratingCells.fillHeader),
+    ratingCells.fillHeader);
+  check('no flag repeats a column',
+    !ratingCells.flags.some((f) => /last term|waiting|as seats moved|off by 20%/i.test(f)),
+    ratingCells.flags.join(' / '));
+  const findings = await page.evaluate(() => {
+    const box = document.getElementById('enrollment_projections-projection_findings');
+    const scope = document.getElementById('enrollment_projections-scope');
+    return {
+      text: box ? box.innerText : '',
+      link: Boolean(box && box.querySelector('#enrollment_projections-open_draft')),
+      scope: scope ? scope.innerText : '',
+    };
+  });
+  check('the page says how many of the worst misses followed the seats',
+    /had past forecasts more than \d+% off|has had past forecasts more than \d+% off|has not had past forecasts/.test(findings.text),
+    findings.text);
+  check('the scope says when the projection was built and which draft it was set beside',
+    /built [A-Z][a-z]+ \d{1,2}, \d{4}/.test(findings.scope) &&
+      /draft schedule (as of [A-Z][a-z]+ \d{1,2}, \d{4}|not yet in the data)/.test(findings.scope),
+    findings.scope);
+  if (findings.link) {
+    check('the draft verdict leads the Projections tab',
+      findings.text.startsWith('The draft schedule'), findings.text);
+    await page.evaluate(() => document.getElementById('enrollment_projections-open_draft').click());
+    const draftShown = await waitFor(page, () => {
+      const pane = document.getElementById('enrollment_projections-draft_table');
+      return Boolean(pane && pane.checkVisibility());
+    }, { timeout: 30000 });
+    check('the draft link opens the draft comparison', draftShown);
+    await openSubTab(page, 'Projections');
+    await waitForIdle(page);
+  }
   // The method and its evidence live in the course modal; the department sits
   // under the course and the range under the registrations, so the table
   // fits a laptop window.
@@ -362,14 +427,18 @@ async function closeEvidence(page) {
       .find((cell) => /^reliability$/i.test(cell.innerText.trim()));
     return header && header.getAttribute('aria-sort') === 'descending';
   }, { timeout: 10000 });
+  // A cell shows the number; its rating is the badge's tone.
   const reliabilityOrder = reliabilitySorted && await page.evaluate(() => {
     const root = document.getElementById('enrollment_projections-projection_table');
     const index = [...root.querySelectorAll('.rt-thead .rt-th')]
       .findIndex((cell) => /^reliability$/i.test(cell.innerText.trim()));
-    return [...root.querySelectorAll('.rt-tbody .rt-tr')]
-      .map((row) => row.querySelectorAll('.rt-td')[index].innerText.trim().toLowerCase());
+    return [...root.querySelectorAll('.rt-tbody .rt-tr')].map((row) => {
+      const badge = row.querySelectorAll('.rt-td')[index].querySelector('.projection-axis');
+      const tone = badge ? [...badge.classList].find((c) => c.startsWith('projection-axis--')) : null;
+      return tone ? tone.replace('projection-axis--', '') : 'missing';
+    });
   });
-  const reliabilityRank = { low: 3, moderate: 2, high: 1, unrated: 0 };
+  const reliabilityRank = { poor: 3, mid: 2, good: 1, none: 0 };
   check(
     'Reliability sorts weakest first, unrated last',
     Array.isArray(reliabilityOrder) && reliabilityOrder.length > 1 &&
@@ -450,7 +519,7 @@ async function closeEvidence(page) {
     return detail ? detail.innerText : '';
   });
   check('course detail retains planning, bias, and population-fit evidence',
-    ['Plan', 'Estimated sections', 'Planned registrations', 'How this plan was built',
+    ['Status', 'Sections', 'Planned registrations', 'How this plan was built',
       'Forecast registrations', 'Selected method', 'Saturation floor',
       'Fall deltas', 'Regime check']
       // innerText applies CSS text-transform: the headline labels read in capitals.
@@ -460,7 +529,7 @@ async function closeEvidence(page) {
 
   const history = await readReactable(page, 'enrollment_projections-history_table');
   const expectedHistoryOrder = [
-    'Term', 'Method that term', 'Aftcast', 'Raw error', 'Assessment',
+    'Term', 'Forecast method', 'Forecast then', 'Error', 'How scored',
     'Ever registered', 'First day', 'Census', 'Final / last day',
     'Sections', 'Capacity', 'First-day fill', 'Potential explanation',
   ];
@@ -483,14 +552,14 @@ async function closeEvidence(page) {
     return Number.isFinite(value) ? value : null;
   };
   const boundedMismatches = history.rows.filter((row) => {
-    const bounded = historyCell(row, 'Assessment') === 'Capacity-bounded';
-    const error = percentValue(historyCell(row, 'Raw error'));
+    const bounded = historyCell(row, 'How scored') === 'Capacity-bounded';
+    const error = percentValue(historyCell(row, 'Error'));
     const fill = percentValue(historyCell(row, 'First-day fill'));
     const over = error !== null && error > 0;
     if (bounded) return !over || fill === null || fill < 98;
     // 98.0% can be a rounded 97.96%; only an unambiguous fill must be labeled.
     return over && fill !== null && fill >= 98.1 &&
-      historyCell(row, 'Assessment') !== 'No aftcast';
+      historyCell(row, 'How scored') !== 'Not forecast';
   });
   check(
     'capacity-bounded labels exactly the overprojected terms that filled 98% on day one',
