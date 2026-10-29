@@ -1088,31 +1088,49 @@ test_that("authored course levels agree with institution numbering bands", {
 
 # Integrity of whichever institution is loaded (UNM by default): its authored
 # files, not the planner, are under test. A demo or empty catalog passes trivially.
+# Every program is built from every pair of starting points and each rule broken
+# is listed by program and starts, so a failure says where to look.
 test_that("the loaded institution's roadmaps keep every planning rule in every starting scenario", {
   c <- CEDAR_DEGREE_CATALOG; r <- CEDAR_DEGREE_ROADMAPS
+  problems <- character(0)
   for (id in c$catalogs$catalog_id) {
     max_load <- as.numeric(r$plans$max_load[r$plans$catalog_id == id])
     upper_start <- as.integer(r$plans$upper_level_from_semester[r$plans$catalog_id == id])
     for (math in r$starts$start_id[r$starts$track == "math"]) {
       for (english in r$starts$start_id[r$starts$track == "english"]) {
         v <- build_degree_roadmap(c, r, id, math, english)
-        expect_true(all(v$terms$planned_credits <= max_load))
-        expect_equal(v$terms$planned_credits, v$terms$known_credits + v$terms$other_credits)
-        expect_equal(sum(v$terms$planned_credits), v$degree_credits - v$completed_credits + v$preparation_credits)
-        expect_true(all(v$nodes$semester[v$nodes$course_level == "upper"] >= upper_start))
-        expect_true(all(v$nodes$semester[match(v$links$to, v$nodes$node_id)] >=
-          v$nodes$semester[match(v$links$from, v$nodes$node_id)] + as.integer(v$links$timing == "before")))
-        expect_false(anyDuplicated(paste(v$nodes$semester, v$nodes$row)) > 0L)
-        expect_lte(length(unique(v$nodes$row[v$nodes$row_group == "writing"])), 1L)
         foundation <- v$nodes$row_group %in% c("math", "writing")
-        expect_lt(max(c(0L, v$nodes$row[foundation])), min(c(Inf, v$allowances$row)))
-        expect_lt(max(c(0L, v$allowances$row)), min(c(Inf, v$nodes$row[!foundation])))
-        expect_equal(sum(v$allowances$credits), sum(v$terms$other_credits))
-        expect_false(anyDuplicated(c(paste(v$nodes$semester, v$nodes$row),
-          paste(v$allowances$semester, v$allowances$row))) > 0L)
+        rules <- vapply(list(
+          "a semester over the plan's maximum load" =
+            all(v$terms$planned_credits <= max_load),
+          "a semester whose known and other credits do not sum to its planned credits" =
+            all.equal(v$terms$planned_credits, v$terms$known_credits + v$terms$other_credits),
+          "planned credits that do not cover the degree" =
+            all.equal(sum(v$terms$planned_credits),
+                      v$degree_credits - v$completed_credits + v$preparation_credits),
+          "an upper-level course before its plan allows" =
+            all(v$nodes$semester[v$nodes$course_level == "upper"] >= upper_start),
+          "a course placed before what leads to it" =
+            all(v$nodes$semester[match(v$links$to, v$nodes$node_id)] >=
+              v$nodes$semester[match(v$links$from, v$nodes$node_id)] + as.integer(v$links$timing == "before")),
+          "writing courses on more than one row" =
+            length(unique(v$nodes$row[v$nodes$row_group == "writing"])) <= 1L,
+          "an allowance row above a math or writing row" =
+            max(c(0L, v$nodes$row[foundation])) < min(c(Inf, v$allowances$row)),
+          "a course row above an allowance row" =
+            max(c(0L, v$allowances$row)) < min(c(Inf, v$nodes$row[!foundation])),
+          "allowance credits that do not sum to the semesters' other credits" =
+            all.equal(sum(v$allowances$credits), sum(v$terms$other_credits)),
+          "two cards in one semester and row" =
+            anyDuplicated(c(paste(v$nodes$semester, v$nodes$row),
+              paste(v$allowances$semester, v$allowances$row))) == 0L
+        ), isTRUE, logical(1))
+        problems <- c(problems, sprintf("%s, %s math, %s English: %s",
+          id, math, english, names(rules)[!rules]))
       }
     }
   }
+  expect(length(problems) == 0L, paste(problems, collapse = "\n"))
   expect_setequal(unique(c$program_codes$catalog_id), c$catalogs$catalog_id)
 })
 

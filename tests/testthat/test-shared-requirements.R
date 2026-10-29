@@ -210,14 +210,25 @@ test_that("active annual profiles preserve semester budgets and show source-link
   c <- CEDAR_DEGREE_CATALOG; r <- CEDAR_DEGREE_ROADMAPS
   reference <- load_degree_shared_requirements(c, cedar_institution_dir(cedar_base_dir))
   if (is.null(reference)) return(invisible(NULL))
+  # Each rule broken is listed by program and English start.
+  problems <- character(0)
   for (id in c$catalogs$catalog_id) for (english in r$starts$start_id[r$starts$track == "english"]) {
     view <- build_degree_roadmap_view(c, r, id, "intermediate", english, shared = reference)
-    expect_true(all(view$terms$planned_credits <= 16))
-    expect_equal(sum(view$terms$planned_credits), view$degree_credits - view$completed_credits + view$preparation_credits)
-    expect_true(all(view$shared$areas$remaining >= 0))
-    expect_true(all(grepl("^https://", view$allowances$source_url)))
-    expect_equal(sum(view$allowances$credits), sum(view$terms$other_credits))
-    expect_false(anyDuplicated(c(paste(view$nodes$semester, view$nodes$row),
-      paste(view$allowances$semester, view$allowances$row))) > 0L)
+    rules <- vapply(list(
+      "a semester over 16 credits" = all(view$terms$planned_credits <= 16),
+      "planned credits that do not cover the degree" =
+        all.equal(sum(view$terms$planned_credits),
+                  view$degree_credits - view$completed_credits + view$preparation_credits),
+      "a Gen Ed area with negative credits remaining" = all(view$shared$areas$remaining >= 0),
+      "an allowance without a source link" = all(grepl("^https://", view$allowances$source_url)),
+      "allowance credits that do not sum to the semesters' other credits" =
+        all.equal(sum(view$allowances$credits), sum(view$terms$other_credits)),
+      "two cards in one semester and row" =
+        anyDuplicated(c(paste(view$nodes$semester, view$nodes$row),
+          paste(view$allowances$semester, view$allowances$row))) == 0L
+    ), isTRUE, logical(1))
+    problems <- c(problems, sprintf("%s, intermediate math, %s English: %s",
+      id, english, names(rules)[!rules]))
   }
+  expect(length(problems) == 0L, paste(problems, collapse = "\n"))
 })
