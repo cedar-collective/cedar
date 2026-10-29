@@ -257,7 +257,13 @@ test_that("Gen Ed and FYEX monitoring group has an explicit campus scope", {
   expect_equal(guide$n_candidates, 2L)
   expect_equal(guide$n_ideas, 2L)
   expect_equal(vapply(guide$families, function(x) nrow(x$methods), integer(1)), 2L)
-  expect_match(guide$summary, "2 candidates")
+  # Only the forecasts that exist are counted: retired candidate families
+  # once read "0 diagnostic upstream indicators" on the page.
+  expect_equal(guide$summary, paste0(
+    "2 forecasts: ", paste(unname(CEDAR_ENROLLMENT_PROJECTION_METHODS[config$projection_methods]),
+                           collapse = ", and ")
+  ))
+  expect_false(grepl("0 ", guide$summary, fixed = TRUE) || grepl("0 ", guide$overview, fixed = TRUE))
   expect_match(guide$selection_process, "Prior same-season is the default")
   expect_error(
     enrollment_projection_model_config(list(saturation_fill_threshold = 2)),
@@ -672,12 +678,15 @@ test_that("the three axes are explained separately and may disagree", {
     history_median_yoy = 0.03, term_type = "spring"
   )
 
-  expect_match(explanation, "Stability:", fixed = TRUE)
-  expect_match(explanation, "Depth:", fixed = TRUE)
+  # Reader labels: stability is "Own history" and depth is "Evidence", so
+  # neither reads as a synonym of Reliability; no WAPE or aftcast jargon.
+  expect_match(explanation, "Own history:", fixed = TRUE)
+  expect_match(explanation, "Evidence:", fixed = TRUE)
   expect_match(explanation, "Reliability:", fixed = TRUE)
   expect_match(explanation, "moved only 4.0%", fixed = TRUE)
-  expect_match(explanation, "only 2 comparable Spring aftcasts", fixed = TRUE)
-  expect_match(explanation, "within 4.5% WAPE", fixed = TRUE)
+  expect_match(explanation, "only 2 past Spring forecasts", fixed = TRUE)
+  expect_match(explanation, "landed within 4.5% on average", fixed = TRUE)
+  expect_false(grepl("WAPE|aftcast|Stability|Depth", explanation))
 
   # A volatile course says so plainly and frames the swing as the finding,
   # rather than reporting it as a failure of the forecast.
@@ -689,7 +698,7 @@ test_that("the three axes are explained separately and may disagree", {
   expect_match(volatile, "swings 55.0%", fixed = TRUE)
   expect_match(volatile, "the swing itself is the thing worth investigating",
                fixed = TRUE)
-  expect_match(volatile, "4 comparable Spring aftcasts stand behind", fixed = TRUE)
+  expect_match(volatile, "4 past Spring forecasts stand behind", fixed = TRUE)
 })
 
 test_that("the axis summary stays compact and names the main caveat", {
@@ -1197,15 +1206,68 @@ test_that("seat consistency counts how often seats moved in the terms behind rel
     "Seats moved 10% or more in 2 of 2 past forecast terms ",
     "(Fall 2022 -20%, Fall 2023 +15%)"
   ))
+})
 
-  # Read together: a miss with steady seats is the forecast's.
-  reading <- projection_reliability_reading(
-    c("Low", "Low", "High", "Unrated"), c("High", "Low", "Low", "High")
+test_that("a past miss is the schedule's only when a full course's seats moved the way it missed", {
+  config <- list(seat_consistency_change = 0.10, saturation_fill_threshold = 0.90,
+                 accuracy_close_max_wape = 0.10, accuracy_fair_max_wape = 0.20)
+  # One row per case, the patterns of the Spring 2027 courses more than 20%
+  # off (ISSUES.md I40): a course full every term whose seats were cut and
+  # added (ENGL 1110), and one never full whose seats followed its enrollment
+  # (FYEX 1110). error is projected minus actual; fill is first day / seats.
+  folds <- tibble::tribble(
+    ~case,                          ~error, ~fold_seat_change, ~fold_prior_near_full, ~actual_first_day, ~scheduled_capacity,
+    "added, low, full before",         -85,  0.48,  TRUE,  102, 100,
+    "cut, high, full after",           104, -0.28,  TRUE,  105, 100,
+    "added, low, full only after",     -40,  0.30,  FALSE,  95, 100,
+    "cut, high, room after",            10, -0.29,  FALSE,  68, 100,
+    "added, low, room both",          -185,  3.03,  FALSE,  86, 100,
+    "held, high, room after",           20,  0.02,  FALSE,  53, 100,
+    "held, low, full after",           -22,  0.04,  FALSE,  96, 100,
+    "added, high: against the seats",   15,  0.40,  TRUE,   80, 100,
+    "no seat comparison",              -30,    NA,  NA,     90, 100,
+    "added, low, fills unknown",       -30,  0.40,  NA,     NA, 100,
+    "cut, high, first day unknown",     30, -0.20,  TRUE,   NA, 100
   )
-  expect_match(reading[[1]], "even though the seats held steady")
-  expect_match(reading[[2]], "follow the schedule more than demand")
-  expect_match(reading[[3]], "landed close")
-  expect_match(reading[[4]], "^Too few past forecasts")
+  expect_equal(
+    projection_fold_miss_cause(folds, config),
+    c("schedule", "schedule", "schedule", "forecast", "forecast", "forecast",
+      "seats_full", "forecast", "unknown", "unknown", "unknown")
+  )
+  expect_error(projection_fold_miss_cause(folds, list()), "seat_consistency_change")
+  expect_error(projection_fold_miss_cause(dplyr::select(folds, -actual_first_day), config),
+               "actual_first_day")
+
+  # Per course, whichever cause holds most of its absolute error; only the
+  # rule's published past forecasts count.
+  key <- function(course) tibble::tibble(market_id = "m", subject_course = course, term_type = "spring")
+  projections <- dplyr::bind_rows(key("ALWAYS 1"), key("MIXED 1"), key("ROOM 1"), key("NEW 1"))
+  backtests <- dplyr::bind_rows(
+    dplyr::mutate(folds[1:2, ], subject_course = "ALWAYS 1"),
+    # 85 of the schedule's against 20 + 10 of the forecast's: mostly seats.
+    dplyr::mutate(folds[c(1, 6, 4), ], subject_course = "MIXED 1"),
+    dplyr::mutate(folds[c(5, 6), ], subject_course = "ROOM 1"),
+    # Another candidate's row never counts.
+    dplyr::mutate(folds[5, ], subject_course = "ALWAYS 1", policy_selected = FALSE)
+  ) %>%
+    dplyr::mutate(market_id = "m", term_type = "spring", abs_error = abs(error),
+                  policy_selected = dplyr::coalesce(policy_selected, TRUE))
+  attribution <- projection_miss_attribution(projections, backtests, config)
+  expect_equal(attribution$miss_cause, c("seats", "seats", "forecast", NA))
+  expect_equal(attribution$miss_seat_share, c(1, 85 / 115, 0, NA))
+  expect_equal(attribution$miss_forecast_share, c(0, 30 / 115, 1, NA))
+
+  reading <- projection_reliability_reading(
+    c("Low", "Low", "Low", "High", "Unrated", "Moderate"),
+    c("seats", "forecast", "unknown", "forecast", NA, "seats"), config
+  )
+  expect_match(reading[[1]], "when the course was near full and its seats changed: the schedule set those numbers")
+  expect_match(reading[[2]], "while the course had seats to spare, so the misses were the forecast's")
+  expect_match(reading[[3]], "the cause cannot be told")
+  expect_match(reading[[4]], "landed close")
+  expect_match(reading[[5]], "^Too few past forecasts")
+  expect_match(reading[[6]], "^Past forecasts were 10% to 20% off, mostly when the course was near full")
+  expect_error(projection_reliability_reading("Low", "seats", list()), "accuracy_close_max_wape")
 })
 
 test_that("past error is summed by what each miss is attributable to", {
@@ -1291,7 +1353,7 @@ test_that("the draft comparison separates short of day one from short of the pla
     additional_sections = c(2L, 1L, 0L, 0L, NA),
     target_registration_observed = FALSE, target_registered_now = NA_real_,
     accuracy = "High", accuracy_value = "5.0% off",
-    seat_consistency = "High", seat_consistency_value = "moved 0 of 4"
+    seat_consistency = "High", seat_consistency_value = "seats moved in 0 of 4"
   )
   components <- tibble::tibble(
     market_id = "abq_ea_course_market", subject_course = "DAY 1",
@@ -1329,7 +1391,7 @@ test_that("the draft comparison separates short of day one from short of the pla
   ))
   # The ratings travel with the numbers behind them.
   expect_equal(unique(table$reliability_value), "5.0% off")
-  expect_equal(unique(table$seat_consistency_value), "moved 0 of 4")
+  expect_equal(unique(table$seat_consistency_value), "seats moved in 0 of 4")
 
   # No schedule for the target term: says so instead of an empty table.
   none <- build_enrollment_projection_draft_comparison(list(
@@ -2117,9 +2179,9 @@ test_that("capacity-bounded fit retains fit confidence with a demand caveat", {
     method_role = selected$method_role, methods_disagree = TRUE
   )
   expect_match(explanation, "3 of 4", fixed = TRUE)
-  expect_match(explanation, "first-day enrollment reached", fixed = TRUE)
-  expect_match(explanation, "not proof of unconstrained demand", fixed = TRUE)
-  expect_match(explanation, "candidate projections differ", fixed = TRUE)
+  expect_match(explanation, "filled its seats on the first day", fixed = TRUE)
+  expect_match(explanation, "not everyone who wanted it", fixed = TRUE)
+  expect_match(explanation, "the two forecasts differ materially", fixed = TRUE)
 })
 
 test_that("variable term errors are reported without downgrading accuracy", {
@@ -2465,7 +2527,8 @@ test_that("the administrator summary says the decision in one sentence and flags
     adjusted_waitlisted_prior = 15L, adjusted_regime_alarm = FALSE,
     adjusted_preceding_term = 202680L, adjusted_preceding_term_change = 0.02,
     stability = "Moderate", accuracy = "Moderate", wape = 0.1004,
-    seat_consistency = "Unrated", methods_disagree = FALSE
+    seat_consistency = "Unrated", miss_cause = NA_character_,
+    methods_disagree = FALSE
   )
   sentence <- projection_summary_sentence(row)
   # The plan says how much of it is the pressure bump, and the first-day
@@ -2531,17 +2594,21 @@ test_that("the administrator summary says the decision in one sentence and flags
   expect_match(projection_summary_sentence(moved), "^Plan 99 sections")
   expect_match(projection_summary_sentence(moved), "That is \\+10% on last Spring\\.")
   expect_match(projection_summary_sentence(moved), "Fall 2026 moved \\+91%")
-  # Far off as the seats moved is the Reliability and Seat consistency columns
-  # read together, so it is no flag; far off with steady seats is the
-  # forecast's own miss, which the columns only show side by side, so it is.
+  # Far off as a full course's seats changed is the schedule's, so it is no
+  # flag; far off with seats to spare is the forecast's own miss, which no
+  # column says, so it is, whatever the seats did.
   expect_equal(projection_flags(moved), "Fall enrollment +91%")
   expect_equal(
-    projection_flags(dplyr::mutate(moved, seat_consistency = "Low")),
+    projection_flags(dplyr::mutate(moved, miss_cause = "seats")),
     "Fall enrollment +91%"
   )
   expect_equal(
-    projection_flags(dplyr::mutate(moved, seat_consistency = "High")),
-    "Fall enrollment +91% | Off 20%+ with steady seats"
+    projection_flags(dplyr::mutate(moved, miss_cause = "forecast")),
+    "Fall enrollment +91% | Off 20%+ with seats to spare"
+  )
+  expect_equal(
+    projection_flags(dplyr::mutate(moved, miss_cause = "forecast", accuracy = "Moderate")),
+    "Fall enrollment +91%"
   )
   # A volatile history warns only when there is no track record to read.
   expect_equal(
@@ -2602,7 +2669,7 @@ test_that("each rating is shown as the number behind it", {
   values <- projection_axis_values(rows)
   # The same 10.4% the summary sentence and plan steps state.
   expect_equal(values$accuracy_value, c("10.4% off", "Unrated"))
-  expect_equal(values$seat_consistency_value, c("moved 1 of 4", "Unrated"))
+  expect_equal(values$seat_consistency_value, c("seats moved in 1 of 4", "Unrated"))
   expect_equal(values$stability_value, c("15.7% variation", "Unrated"))
   expect_equal(values$depth_value, c("4 past forecasts", "None"))
   expect_equal(projection_axis_values(rows[c(1, 1), ] %>%
@@ -2610,27 +2677,34 @@ test_that("each rating is shown as the number behind it", {
                c("1 past forecast", "2 past forecasts"))
 })
 
-test_that("the page says how many of the worst misses followed the seats", {
+test_that("the page says which of the worst misses the schedule set and names the forecast's own", {
   config <- list(accuracy_fair_max_wape = 0.20)
   rows <- tibble::tibble(
+    subject_course = c("ENGL 1110", "FYEX 1010", "FYEX 1110", "MATH 1220", "BIOL 1140"),
     accuracy = c("Low", "Low", "Low", "High", "Moderate"),
-    seat_consistency = c("Low", "Moderate", "High", "High", "Low")
+    miss_cause = c("seats", "seats", "forecast", "forecast", "seats")
   )
   expect_equal(
     projection_miss_sentence(rows, config),
     paste0(
-      "3 of the 5 courses shown had past forecasts more than 20% off: 2 in ",
-      "terms when the seats moved, 1 with steady seats. A miss as the seats ",
-      "moved follows the schedule; one with steady seats is the forecast's own."
+      "3 of the 5 courses shown had past forecasts more than 20% off. For 2, ",
+      "most of the miss came when the course was near full and its seats changed, ",
+      "so the schedule set the number. For 1 (FYEX 1110), the course had seats ",
+      "to spare, so the miss was the forecast's own."
     )
   )
-  # "None with steady seats" is the finding, so it is said.
+  # "None missed with seats to spare" is the finding, so it is said.
   expect_match(projection_miss_sentence(rows[1:2, ], config),
-               "^2 of the 2 courses shown had past forecasts more than 20% off: all 2 in terms when the seats moved, none with steady seats\\.")
+               "^2 of the 2 courses shown .*\\. For all 2, most of the miss came .* None missed with seats to spare\\.$")
   expect_match(
-    projection_miss_sentence(dplyr::mutate(rows[1, ], seat_consistency = NA), config),
-    "none in terms when the seats moved, none with steady seats, 1 whose seats cannot be compared\\."
+    projection_miss_sentence(dplyr::mutate(rows[1, ], miss_cause = NA), config),
+    "None missed with seats to spare\\. For 1, the seats or first day of those terms are not known\\.$"
   )
+  # More than five of the forecast's own are counted, not listed.
+  many <- tibble::tibble(subject_course = paste("C", 1:6), accuracy = "Low",
+                         miss_cause = "forecast")
+  expect_match(projection_miss_sentence(many, config),
+               "For all 6, the course had seats to spare")
   expect_equal(projection_miss_sentence(rows[4:5, ], config),
                "None of the 2 courses shown has had past forecasts more than 20% off.")
   expect_equal(projection_miss_sentence(rows[4, ], config),
@@ -2638,6 +2712,7 @@ test_that("the page says how many of the worst misses followed the seats", {
   # The threshold is the model's, read live.
   expect_match(projection_miss_sentence(rows, list(accuracy_fair_max_wape = 0.25)), "more than 25% off")
   expect_error(projection_miss_sentence(rows, list()), "accuracy_fair_max_wape")
+  expect_error(projection_miss_sentence(dplyr::select(rows, -miss_cause), config), "miss_cause")
 })
 
 test_that("a plan's steps add up from last year's class list to its sections", {

@@ -170,7 +170,9 @@ forced-collision scenario in `nav.test.mjs` guard this.
 the migrated metric explanations. `R/trunk/definitions.R` validates and selects
 records; `load_funcs()` loads them once as static metadata. Use
 `cedar_definition_summary()` for descriptions and `cedar_definition_note()` /
-`cedar_definition_panel()` from `ui-helpers.R` for blue boxes. Jekyll uses the
+`cedar_definition_panel()` from `ui-helpers.R` for blue boxes;
+`cedar_definition_links()` gives the definition and user-guide links alone, to
+end a box that already explains the measure in its own words. Jekyll uses the
 same records in its user guides and versioned reference page. Keep actual run
 scope, data edges, and exclusion counts beside results. Full methodology lives
 on the docs site; do not add static Methodology tabs. Preserve published record
@@ -301,7 +303,9 @@ This applies everywhere: cones, branches, trunk, data pipeline scripts, and test
 the migrated metric explanations. `R/trunk/definitions.R` validates and selects
 records; `load_funcs()` loads them once as static metadata. Use
 `cedar_definition_summary()` for descriptions and `cedar_definition_note()` /
-`cedar_definition_panel()` from `ui-helpers.R` for blue boxes. Jekyll uses the
+`cedar_definition_panel()` from `ui-helpers.R` for blue boxes;
+`cedar_definition_links()` gives the definition and user-guide links alone, to
+end a box that already explains the measure in its own words. Jekyll uses the
 same records in its user guides and versioned reference page. Keep actual run
 scope, data edges, and exclusion counts beside results. Full methodology lives
 on the docs site; do not add static Methodology tabs. Preserve published record
