@@ -29,6 +29,7 @@ recurrence is recognizable.
 
 | ID | Kind | Summary |
 |---|---|---|
+| [I39](#i39--projection-flags-called-last-years-same-season-term-last-term) | Defect | Projection flags called last year's same-season term "last term": a Spring 2027 course flagged "Full last term" was full in Spring 2026, not in the Fall just finished (resolved 2026-10-28) |
 | [I38](#i38--a-pathways-program-population-misses-pre-majors-whose-name-differs-from-their-major) | Defect | A Pathways program population misses pre-majors whose name differs from their major: "Film and Digital Arts" holds 1 of the 1,016 Film pre-majors who never declared the major, because `FFDA` is named "FDMA" |
 | [I37](#i37--renumbered-courses-lose-their-history) | Defect | Renumbered courses lose their history: no crosswalk exists, so ACCT 3401 (was MGMT 340) and the other Fall 2026 ACCT, BUSA and POPH courses read as new |
 | [I36](#i36--low-enrollments-schedule-view-reports-no-prior-history-for-courses-that-have-it) | Defect | Low Enrollment's schedule view reports no prior history for courses that have it: 363 of 2,226 Spring 2027 ABQ/EA undergraduate courses, of which 40 were never offered under that number (resolved 2026-10-24) |
@@ -56,6 +57,42 @@ recurrence is recognizable.
 ---
 
 # Defects
+
+## I39 — Projection flags called last year's same-season term "last term"
+
+**Status:** resolved 2026-10-28
+**Found:** 2026-10-28, reviewing the Spring 2027 projections page before the
+chairs' and deans' review
+**Severity:** low. No number was wrong, but the words pointed a reader at the
+wrong term.
+**Affects:** `projection_flags()` and `projection_campus_fill_flags()`,
+`R/features/enrollment-projection-view.R`.
+
+### What is wrong
+
+The fill flags ("Full last term", "Near full last term", "N waiting", "Last
+term's fill unknown") and the campus flag ("EA full last term, ABQ had room")
+read `adjusted_prior_first_day_fill` and `recent_campus_history`. Both describe
+the spine term, the same season a year earlier. For a Spring 2027 target that
+is Spring 2026. A chair reads "last term" as Fall 2026, the term just finished,
+which the Fall deltas read and the fill does not.
+
+### Reproduction
+
+Load the Spring 2027 bundle and tabulate `spine_term` against
+`adjusted_saturated_prior`. Of the 61 saturated rows, 57 start from 202610 and
+4 from earlier Springs (courses not offered in Spring 2026); none is a Fall
+term. `projection_flags()` on the bundle before this fix labels those rows
+"Full last term" or "Near full last term". The Fall 2027 bundle is the same
+with Fall terms: 74 of 79 saturated rows start from 202680.
+
+### Fix
+
+The fill moved out of the flags into its own **Day-1 fill** column
+(`projection_prior_fill()`). Its header names the term, for example "Day-1 fill
+(Spring 2026)", and each of those older-Spring rows names its own term. The campus flag names its term too: "EA full in Spring 2026, ABQ had
+room". A test in `test-enrollment-projections.R` asserts the named term. The
+user guide says the column describes the same season last year.
 
 ## I38 — A Pathways program population misses pre-majors whose name differs from their major
 

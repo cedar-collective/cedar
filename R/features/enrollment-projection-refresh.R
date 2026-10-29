@@ -110,7 +110,7 @@ enrollment_projection_refresh_signature <- function(inputs, opt, force_courses,
 #
 # The saved signature keeps model_version, schema_version and per-file
 # source_hashes as separate fields precisely so the model half can be compared
-# on its own. This reads the saved bundle and hashes the 13 files named by
+# on its own. This reads the saved bundle and hashes the files named by
 # enrollment_projection_model_source_files(); it never touches a CEDAR table.
 #
 # Returns NULL when the deployed model matches the one that produced the
@@ -169,7 +169,7 @@ enrollment_projection_model_drift <- function(
   saved_hashes <- saved$source_hashes
   current_hashes <- current$source_hashes
   # Name the files, not just the fact of a mismatch. A deploy log that says
-  # "model source changed" sends someone diffing thirteen files by hand.
+  # "model source changed" sends someone diffing twenty-odd files by hand.
   added <- setdiff(names(current_hashes), names(saved_hashes))
   removed <- setdiff(names(saved_hashes), names(current_hashes))
   shared <- intersect(names(saved_hashes), names(current_hashes))

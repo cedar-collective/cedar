@@ -5,8 +5,8 @@
 # them, so a page never calls a course full at two different levels:
 #
 #   near full  at least 90%: demand is pressing on the seats. Regstats'
-#              chronic constraint, the projection floor ("Near full last term")
-#              and Degree Explorer's seat pressure.
+#              chronic constraint, the projection floor, the projections
+#              Day-1 fill column and Degree Explorer's seat pressure.
 #   full       at least 98% on the first day of classes: the seats are taken.
 #              Not 100%: capacity pools every section, and a course with a few
 #              seats open across many section times is full to the students
