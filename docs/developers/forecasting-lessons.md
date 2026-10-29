@@ -632,8 +632,12 @@ course with seats to spare misses on its own whatever its seats do. Read term
 by term (`projection_fold_miss_cause()`) on the bundles of 2026-10-27 (model
 0.27.0), 8 of 37 Spring 2027 and 2 of 33 Fall 2027 Low-reliability courses
 missed mostly with seats to spare, 9 of them with moving seats. The page now
-flags those. The "Seats changed 10%+" row above still counts a move in a
-course with room as the schedule's.
+flags those. The table above splits by seat change alone, so it counts a move
+in a course with room as the schedule's. From schema 26 the page's panel sums
+by the per-term rule instead: on the bundles of 2026-10-29, 80% of Spring
+2027's error (61% seats moved the way of the miss, 18% seats held, near full)
+and 92% of Fall 2027's (75%, 17%) was the schedule's; 20% and 8% was the
+forecast's own, over 65 and 21 of 301 and 311 past forecasts.
 
 The page shows this breakdown for whichever projection is loaded, in the
 "Where forecast error comes from" panel.

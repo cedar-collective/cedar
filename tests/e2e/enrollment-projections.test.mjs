@@ -255,9 +255,24 @@ async function closeEvidence(page) {
   check('the Day-1 fill header names the term the plans start from',
     /^Day-1 fill \((Spring|Fall) \d{4}\)$/i.test(ratingCells.fillHeader),
     ratingCells.fillHeader);
+  // The spine term's waiting students are the Day-1 fill column; the term
+  // just finished's are a flag, and name their term.
   check('no flag repeats a column',
-    !ratingCells.flags.some((f) => /last term|waiting|as seats moved|off by 20%|steady seats/i.test(f)),
+    !ratingCells.flags.some((f) => /last term|^[\d,]+ waiting$|as seats moved|off by 20%|steady seats/i.test(f)),
     ratingCells.flags.join(' / '));
+  // A cell's flags run together in its text, so count rather than anchor.
+  check('a waiting flag names the term just finished',
+    ratingCells.flags.filter((f) => /waiting/i.test(f))
+      .every((f) => (f.match(/waiting/gi) || []).length ===
+        (f.match(/[\d,]+ left waiting in (Spring|Fall) \d{4}/g) || []).length),
+    ratingCells.flags.filter((f) => /waiting/i.test(f)).join(' / ') || '(none flagged)');
+  const buildBox = await page.evaluate(() => {
+    const box = document.getElementById('enrollment_projections-pressure_summary');
+    return box ? box.textContent : '';
+  });
+  check('the build box says who the term just finished left waiting, or why it cannot',
+    /left waiting in \d+ of the \d+ courses shown|No student was left waiting in|kept no waitlist rows|is not observed yet/.test(buildBox),
+    buildBox.slice(-300));
   const findings = await page.evaluate(() => {
     const box = document.getElementById('enrollment_projections-projection_findings');
     const scope = document.getElementById('enrollment_projections-scope');
@@ -586,8 +601,21 @@ async function closeEvidence(page) {
   check('detail explains all three axes separately for CHEM 1215',
     detailEvidence.text.includes('Own history:') &&
       detailEvidence.text.includes('Evidence:') &&
-      detailEvidence.text.includes('Reliability:') &&
-      !detailEvidence.text.includes('rolling-selection aftcasts'));
+      detailEvidence.text.includes('Reliability:'));
+  // Analyst detail keeps the analysts' column names; everything else in the
+  // detail, collapsed or not, is read by planners.
+  const plainDetail = await page.evaluate(() => {
+    const detail = document.getElementById('enrollment_projections-detail');
+    if (!detail) return '';
+    const copy = detail.cloneNode(true);
+    copy.querySelectorAll('.enrollment-projection-movement').forEach((node) => node.remove());
+    return copy.textContent;
+  });
+  check('the detail outside Analyst detail says neither WAPE nor aftcast',
+    plainDetail.length > 0 && !/WAPE|aftcast/i.test(plainDetail),
+    (plainDetail.match(/.{0,50}(WAPE|aftcast).{0,50}/i) || [''])[0]);
+  check('the detail says who the term just finished left waiting',
+    plainDetail.includes('Left waiting in the term just finished'));
   check('historical plot includes all enrollment lifecycle measures',
     ['Ever registered (model target)', 'First day (seats judged here)', 'Census',
       'Final / last day']

@@ -297,6 +297,7 @@ validate_enrollment_projection_bundle <- function(bundle) {
       "capacity_censored_terms", "capacity_miss_assessment",
       "spine", "spine_term", "saturated_prior", "prior_first_day_fill",
       "waitlisted_prior", "floor_uplift", "floor_basis", "preceding_term",
+      "waitlisted_preceding",
       "preceding_term_enrollment", "preceding_term_change", "regime_alarm",
       "delta_repeat", "repeat_rate", "delta_sequence", "sequence_courses",
       "sequence_change", "delta_feeder", "feeder_rate",

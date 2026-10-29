@@ -109,6 +109,12 @@ past miss is the schedule's only when a full course's seats moved the way it
 missed" in `test-enrollment-projections.R` pins every case of the rule;
 replacing the near-full condition with any seat move fails it.
 
+The **Where forecast error comes from** panel made the same mistake page-wide:
+`summarize_projection_error_sources()` counted every 10%+ seat move as the
+schedule's. Schema 26 moved `projection_fold_miss_cause()` into
+`R/branches/enrollment-projection-error-sources.R` and the panel now sums
+the error by it, so the panel and each course read misses one way.
+
 ## I39 — Projection flags called last year's same-season term "last term"
 
 **Status:** resolved 2026-10-28

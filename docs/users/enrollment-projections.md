@@ -55,7 +55,7 @@ Three blue boxes above the table each answer one question; the title says which:
 | Box | Answers |
 |---|---|
 | **Reading the table: what each column means** | Every column, and when a miss is the schedule's rather than the forecast's |
-| **How a course's plan is built, step by step** | From last year's registrations to sections, and why each step is there; then what the pressure bump and the feeder adjustment add across the courses shown |
+| **How a course's plan is built, step by step** | From last year's registrations to sections, and why each step is there; then what the pressure bump and the feeder adjustment add across the courses shown, and how many students the term just finished left waiting |
 | **Where forecast error comes from** | Past misses by cause, measured on the loaded projection's past forecasts |
 
 Below the table, **Projection methods: the two forecasts, and how one is
@@ -104,9 +104,27 @@ forecasts missed by more than 20%, says for how many the schedule set the
 number, and names those that missed with seats to spare.
 
 The **Where forecast error comes from** box gives the breakdown for the
-loaded projection: how much error came from seat changes, from missing data,
-from full courses whose seats held, and from courses with room whose seats
-held. Only that last group tests the forecast of demand itself.
+loaded projection, by the same rule: how much error came when a near-full
+course's seats moved the way of the miss or held (the schedule's), how much
+with seats to spare or seats moving against the miss (the forecast's own,
+split by whether the seats held), and how much from terms whose seats or
+first day are not known.
+
+## Students left waiting last Fall
+
+Class lists keep waitlist rows from Summer 2026, so Fall 2026 is the first
+Fall whose students left waiting are known. For a Spring plan, each course's
+detail says how many were left waiting in the Fall just finished on no class
+list for the course, and the **How a course's plan is built** box adds them
+up across the courses shown. A course is flagged ("12 left waiting in Fall
+2026") when they would fill half a section or more.
+
+They are context, never part of the plan: how many of them register in the
+Spring cannot be measured until its class lists arrive, and a student left
+waiting in the Fall may have taken another course or another term instead.
+Read them as a sign of pent-up demand beside the plan, not as students to
+add to it. A Fall plan reads the Spring before it, which has not happened
+yet, so it says so.
 
 ## Compare to the draft schedule
 
@@ -124,8 +142,8 @@ Each course gets one verdict:
 - **Covers day one, short of the plan**: only the planning margin, the
   feeder adjustment or the pressure bump is missing.
 - **Covers the plan**, or **seats beyond the plan** when it has more than a
-  section to spare. In a course that is always full, spare seats are likely to
-  fill: when such courses were given more seats, the new seats filled.
+  section to spare. In a course that is always near full, spare seats are likely
+  to fill: when such courses were given more seats, the new seats filled.
 - **Not in the draft schedule**: a monitored course with a projection and no
   sections yet.
 
@@ -192,7 +210,7 @@ registrations, in 32%. Expected first-day seats are shown beside the plan.
 
 ### The pressure bump
 
-A course that is always full turns students away, so last year's registrations
+A course that is always near full turns students away, so last year's registrations
 undercount what it would draw. When near-full courses were given 10% or more
 seats, the new seats filled; when their seats were held flat, registrations
 stayed flat; when seats were cut, registrations fell by the cut.
@@ -283,7 +301,7 @@ The table is sized to fit a laptop window:
 | **Students (day 1)** | Students expected to hold a seat when classes begin: registrations times the share of this course's registrants still enrolled on the first day in recent terms. Context, not the planning number. |
 | **First day / sections** | The last four same-season terms: students enrolled on the first day over the sections scheduled. A dash means the course was not offered, or the first day cannot be reconstructed; hover for which. |
 | **Day-1 fill** | The share of seats filled on the first day of classes in the term the forecast starts from, the same season last year; the header names that term. **Full** at 98% or more, **Near full** at 90%, with the students still waiting beneath. "Unknown" says why: the class lists carry no status dates, a later session had not begun when the data was pulled, or there was no seat count. |
-| **Flags** | What no column already says: one campus full while another had room (online seats can fill while Albuquerque's do not, and the pooled plan hides it), a big enrollment change in the term just finished, a volatile history with no track record yet ("Hard to predict"), past forecasts more than 20% off while the course had seats to spare, or the two candidates disagreeing. |
+| **Flags** | What no column already says: one campus full while another had room (online seats can fill while Albuquerque's do not, and the pooled plan hides it), students left waiting in the term just finished (enough to fill half a section or more; context, never added to the plan), a big enrollment change in that term, a volatile history with no track record yet ("Hard to predict"), past forecasts more than 20% off while the course had seats to spare, or the two candidates disagreeing. |
 | **Reliability** | How far past forecasts for this course were off, each made with only the evidence available then, coloured High (within 10%), Moderate (10 to 20%) or Low (more than 20%), with how many of those same past terms moved the course's seats 10% or more beneath. Unrated when there are too few. |
 
 The course's **Own history** (whether it is predictable from its own history
@@ -321,8 +339,9 @@ and Evidence, then the one sentence saying whose the past misses were, and
 then the last four same-season
 terms. The reasoning behind each step is in **Why this method, why this
 course: the full evidence trail**, collapsed by default: the selected method
-and why, why the course is listed, the feeder and pressure-bump notes, and the
-floor, Fall-delta, regime and capacity checks. The method plot, movement
+and why, why the course is listed, the students left waiting in the term just
+finished, the feeder and pressure-bump notes, and the floor, Fall-delta,
+regime and capacity checks. The method plot, movement
 diagnostic and candidate table sit under **Analyst detail**, collapsed as
 well.
 

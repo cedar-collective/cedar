@@ -62,7 +62,9 @@
 # occupancy-based capacity signal.)
 CEDAR_ENROLLMENT_PROJECTION_MODEL_VERSION <- "0.27.0"
 
-CEDAR_ENROLLMENT_PROJECTION_SCHEMA_VERSION <- 25L
+# Schema 26: candidates and projections carry the students left waiting in
+# the term just finished (waitlisted_preceding), shown as context only.
+CEDAR_ENROLLMENT_PROJECTION_SCHEMA_VERSION <- 26L
 # Capacity is reached at CEDAR_FULL_FILL first-day fill and a prior term is
 # saturated at CEDAR_NEAR_FULL_FILL; both levels live in R/lists/seat_fill.R.
 # The first term the model reads history from (settings.csv
