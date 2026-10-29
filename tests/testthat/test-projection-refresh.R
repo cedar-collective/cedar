@@ -218,7 +218,7 @@ test_that("each half of the model signature is reported by name", {
   )
 
   # A changed source file is named, so a deploy log does not send someone
-  # diffing thirteen files by hand.
+  # diffing twenty-odd files by hand.
   stale_source <- bundle
   stale_source$source_fingerprint$refresh$source_hashes[[
     "R/branches/enrollment-projections.R"

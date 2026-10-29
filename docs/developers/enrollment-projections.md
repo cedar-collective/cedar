@@ -69,6 +69,11 @@ it.
 Because the gate reads the hashes of every file in
 `enrollment_projection_model_source_files()`, editing any of them — including
 the refresh feature itself — correctly triggers one rebuild on the next deploy.
+What only reads a saved bundle for the page — its sentences, plan steps, flags,
+course detail, draft comparison and text preview — lives in
+`R/features/enrollment-projection-view.R`, which is deliberately off that list:
+a wording change there deploys in minutes and rebuilds nothing. Anything the
+bundle builder calls must stay in a listed file.
 
 Use `scripts/restart-cedar.sh --update` for the morning refresh plus app reload.
 The builder runs outside Shiny with a temporary writable output mount; normal

@@ -62,7 +62,7 @@ build_enrollment_projection_scenario <- function(bundle, programs = NULL,
            call. = FALSE)
     }
     if (is.null(programs)) {
-      stop("[scenario] cedar_programs is required to resolve a population group.",
+      stop("[scenario] A programs table is required to resolve a population group.",
            call. = FALSE)
     }
     codes <- population_group_major_codes(

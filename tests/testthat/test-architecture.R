@@ -146,14 +146,13 @@ test_that("cones do not directly call other cones", {
 })
 
 test_that("projection computation stays independent of Shiny and global data", {
-  files <- file.path(
-    project_root,
-    c(
-      "R/branches/enrollment-projections.R",
-      "R/cones/enrollment-projections.R",
-      "R/features/enrollment-projections.R"
-    )
-  )
+  # Every projection file below the modules, so a stage split into its own
+  # file is covered without anyone remembering to list it here.
+  files <- unlist(lapply(c("R/branches", "R/cones", "R/features"), function(dir) {
+    list.files(file.path(project_root, dir),
+               pattern = "^enrollment-projection.*\\.R$", full.names = TRUE)
+  }))
+  expect_gte(length(files), 13L)
   code <- paste(vapply(files, read_code, character(1)), collapse = "\n")
 
   forbidden <- c(

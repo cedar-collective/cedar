@@ -158,7 +158,7 @@ test_that("the scenario fails loudly rather than guessing", {
     build_enrollment_projection_scenario(
       bundle, opt = list(population_group = "Health Professions (Clinical)")
     ),
-    "cedar_programs is required"
+    "A programs table is required"
   )
   expect_error(
     build_enrollment_projection_scenario(
