@@ -355,7 +355,7 @@ summarize_projection_backtests <- function(backtests, opt = list()) {
       capacity_miss_assessment = dplyr::case_when(
         n_capacity_usable == 0L ~ "Insufficient capacity history",
         n_capacity_censored_misses == 0L ~
-          "No aftcast misses are explained by the seat ceiling",
+          "No past forecast misses are explained by the seat ceiling",
         capacity_explained_error_share >= as.numeric(
           projection_option(opt, "capacity_explained_share_threshold")
         ) ~ "Capacity likely explains most of the apparent error",
@@ -443,9 +443,9 @@ projection_rolling_policy <- function(backtests, challengers, current_term,
   }
 
   default_reason <- paste0(
-    default_label, " is the default; no challenger beat it by at least ",
-    scales::percent(margin, accuracy = 0.1), " WAPE on ", min_folds,
-    " or more earlier shared aftcasts"
+    default_label, " is the default; no other forecast beat it by ",
+    scales::percent(margin, accuracy = 0.1), " or more of average error on ",
+    min_folds, " or more earlier terms both were made for"
   )
 
   decide <- function(at_term) {
@@ -495,9 +495,9 @@ projection_rolling_policy <- function(backtests, challengers, current_term,
       reason = paste0(
         unname(CEDAR_ENROLLMENT_PROJECTION_METHODS[[winner$method_id]]),
         " beat ", default_label, " on ", winner$common_n,
-        " earlier shared aftcasts (",
+        " earlier terms both were made for (",
         scales::percent(winner$challenger_wape, accuracy = 0.1), " vs ",
-        scales::percent(winner$default_wape, accuracy = 0.1), " WAPE)"
+        scales::percent(winner$default_wape, accuracy = 0.1), " off on average)"
       )
     )
   }
@@ -702,10 +702,11 @@ select_projection_methods <- function(candidates, performance, backtests,
       depth_reason = dplyr::case_when(
         method_id == "none" ~ "No applicable method",
         dplyr::coalesce(n_backtests, 0L) < 1L ~
-          "No comparable aftcast for the selection rule",
+          "No past forecast to check the selection rule against",
         TRUE ~ paste0(
-          n_backtests, " comparable rolling-selection aftcast",
-          dplyr::if_else(n_backtests == 1L, "", "s")
+          n_backtests, " past forecast",
+          dplyr::if_else(n_backtests == 1L, "", "s"),
+          ", each made with only the evidence available then"
         )
       ),
       accuracy = dplyr::case_when(
@@ -714,9 +715,8 @@ select_projection_methods <- function(candidates, performance, backtests,
           as.integer(projection_option(opt, "accuracy_min_aftcasts")) ~ "Unrated",
         !is.finite(wape) ~ "Unrated",
         # Shown to readers as Reliability: High, Moderate, Low (0.23.0; it
-        # was Close, Fair, Poor). Read it beside seat_consistency: a Low
-        # course whose seats kept moving missed with the schedule; a Low
-        # course whose seats held is a miss the forecast made.
+        # was Close, Fair, Poor). Whose a Low course's misses were is read
+        # per past forecast term (projection_fold_miss_cause(); ISSUES.md I40).
         wape <= as.numeric(projection_option(opt, "accuracy_close_max_wape")) ~ "High",
         wape <= as.numeric(projection_option(opt, "accuracy_fair_max_wape")) ~ "Moderate",
         TRUE ~ "Low"
@@ -726,13 +726,13 @@ select_projection_methods <- function(candidates, performance, backtests,
         dplyr::coalesce(n_backtests, 0L) <
           as.integer(projection_option(opt, "accuracy_min_aftcasts")) ~ paste0(
             "Fewer than ", as.integer(projection_option(opt, "accuracy_min_aftcasts")),
-            " comparable aftcasts; accuracy cannot be measured"
+            " past forecasts; reliability cannot be measured"
           ),
-        !is.finite(wape) ~ "No measurable aftcast accuracy",
+        !is.finite(wape) ~ "No measurable reliability",
         TRUE ~ paste0(
           scales::percent(wape, accuracy = 0.1),
-          " average rolling-selection aftcast error across ", n_backtests,
-          " term", dplyr::if_else(n_backtests == 1L, "", "s"),
+          " off on average across ", n_backtests,
+          " past forecast", dplyr::if_else(n_backtests == 1L, "", "s"),
           dplyr::if_else(
             is.finite(selection_pct_error_sd),
             paste0(

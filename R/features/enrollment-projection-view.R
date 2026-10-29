@@ -283,13 +283,15 @@ projection_flags <- function(projections) {
   projection_require_columns(
     projections,
     c("adjusted_regime_alarm", "adjusted_preceding_term_change", "stability",
-      "accuracy", "miss_cause", "methods_disagree", "campus_fill_flag"),
+      "accuracy", "miss_cause", "methods_disagree", "campus_fill_flag",
+      "waiting_flag"),
     "projection_flags()"
   )
   vapply(seq_len(nrow(projections)), function(i) {
     row <- projections[i, , drop = FALSE]
     flags <- c(
       if (!is.na(row$campus_fill_flag)) row$campus_fill_flag,
+      if (!is.na(row$waiting_flag)) row$waiting_flag,
       if (isTRUE(row$adjusted_regime_alarm)) paste0(
         "Fall enrollment ",
         sprintf("%+.0f%%", 100 * row$adjusted_preceding_term_change)
@@ -406,59 +408,6 @@ projection_axis_values <- function(projections) {
       paste("seats moved in", projections$seat_consistency_moves, "of",
             projections$seat_consistency_terms)
     )
-  )
-}
-
-
-# What each past forecast's miss is attributable to, from the conditions saved
-# with it (annotate_projection_fold_conditions()) and its first day. A course
-# near full on the first day registers about as many students as it has seats,
-# so a miss is the schedule's ("schedule") only when the seats moved and the
-# course was full on the side the miss points to: seats added and the
-# forecast low, with the course full the year before (demand held back) or
-# after (it filled the new seats); or seats cut and the forecast high, with
-# the course full after (the cut capped it). Seats that held on a course full
-# after it ("seats_full") also set the number. A course with seats to spare
-# could have registered more or fewer students than it did, so its miss is
-# the forecast's ("forecast"), whatever its seats did; so is a miss against
-# the way the seats moved. "unknown": the seats or the first day needed are
-# not in the data.
-projection_fold_miss_cause <- function(backtests, model_config) {
-  projection_require_columns(
-    backtests,
-    c("error", "fold_seat_change", "fold_prior_near_full", "actual_first_day",
-      "scheduled_capacity"),
-    "projection_fold_miss_cause()"
-  )
-  change <- model_config$seat_consistency_change
-  threshold <- model_config$saturation_fill_threshold
-  if (!is.numeric(change) || !is.numeric(threshold) || length(change) != 1L ||
-      length(threshold) != 1L) {
-    stop("[enrollment-projection-view.R] model_config$seat_consistency_change and ",
-         "saturation_fill_threshold are required.", call. = FALSE)
-  }
-  after <- projection_capacity_metrics(
-    backtests$actual_first_day, backtests$scheduled_capacity,
-    reached_threshold = threshold
-  )
-  full_after <- dplyr::if_else(after$capacity_usable, after$capacity_reached, NA)
-  full_before <- as.logical(backtests$fold_prior_near_full)
-  seats <- as.numeric(backtests$fold_seat_change)
-  error <- as.numeric(backtests$error)
-  up <- is.finite(seats) & seats >= change
-  down <- is.finite(seats) & seats <= -change
-  held <- is.finite(seats) & !up & !down
-  dplyr::case_when(
-    !is.finite(seats) | !is.finite(error) ~ "unknown",
-    (up & error > 0) | (down & error < 0) ~ "forecast",
-    up & (full_before %in% TRUE | full_after %in% TRUE) ~ "schedule",
-    down & full_after %in% TRUE ~ "schedule",
-    held & full_after %in% TRUE ~ "seats_full",
-    up & full_before %in% FALSE & full_after %in% FALSE ~ "forecast",
-    (down | held) & full_after %in% FALSE ~ "forecast",
-    # An exact hit has no cause and no weight.
-    error == 0 ~ "forecast",
-    TRUE ~ "unknown"
   )
 }
 
@@ -617,6 +566,109 @@ projection_campus_fill_flags <- function(projections, campus_history) {
     dplyr::pull(campus_fill_flag)
 }
 
+
+
+# Students left waiting in the term just finished, on no class list for the
+# course in the market (adjusted_waitlisted_preceding, schema 26). Context,
+# never added to the plan: how many register in the target term cannot be
+# measured until its class lists arrive. NA: that term is not observed yet,
+# or kept no waitlist rows.
+
+# A flag where they would fill at least preceding_waiting_flag_sections of a
+# section; NA otherwise.
+projection_waiting_flags <- function(projections, model_config) {
+  projection_require_columns(
+    projections,
+    c("adjusted_waitlisted_preceding", "adjusted_preceding_term",
+      "reference_section_size"),
+    "projection_waiting_flags()"
+  )
+  share <- as.numeric(projection_option(model_config, "preceding_waiting_flag_sections"))
+  waiting <- as.numeric(projections$adjusted_waitlisted_preceding)
+  size <- as.numeric(projections$reference_section_size)
+  flagged <- is.finite(waiting) & waiting > 0 & is.finite(size) & waiting >= share * size
+  flags <- rep(NA_character_, nrow(projections))
+  flags[flagged] <- paste0(
+    format(waiting[flagged], big.mark = ","), " left waiting in ",
+    vapply(as.integer(projections$adjusted_preceding_term[flagged]), fmt_term, character(1))
+  )
+  flags
+}
+
+# One sentence per course for its detail.
+projection_waiting_notes <- function(projections) {
+  projection_require_columns(
+    projections,
+    c("adjusted_waitlisted_preceding", "adjusted_preceding_term",
+      "adjusted_feeder_check", "target_term"),
+    "projection_waiting_notes()"
+  )
+  vapply(seq_len(nrow(projections)), function(i) {
+    row <- projections[i, , drop = FALSE]
+    preceding <- as.integer(row$adjusted_preceding_term)
+    if (is.na(preceding)) return("No adjusted candidate, so the term just finished is not read.")
+    term <- fmt_term(preceding)
+    waiting <- as.integer(row$adjusted_waitlisted_preceding)
+    if (is.na(waiting)) {
+      return(if (identical(row$adjusted_feeder_check, "term_not_observed")) {
+        paste0(term, " is not observed yet, so who it leaves waiting cannot be shown.")
+      } else {
+        paste0(term, " kept no waitlist rows for these courses, so who was left ",
+               "waiting is unknown.")
+      })
+    }
+    if (waiting == 0L) return(paste0("No student was left waiting in ", term, "."))
+    paste0(
+      waiting, " student", if (waiting == 1L) " was" else "s were",
+      " left waiting in ", term, " on no class list for the course. The plan ",
+      "does not add them: how many register in ", fmt_term(as.integer(row$target_term)),
+      " cannot be measured until its class lists arrive."
+    )
+  }, character(1))
+}
+
+# One sentence across the courses shown.
+projection_preceding_waiting_summary <- function(projections) {
+  projection_require_columns(
+    projections,
+    c("adjusted_waitlisted_preceding", "adjusted_preceding_term",
+      "adjusted_feeder_check", "target_term"),
+    "projection_preceding_waiting_summary()"
+  )
+  waiting <- as.numeric(projections$adjusted_waitlisted_preceding)
+  terms <- unique(stats::na.omit(as.integer(projections$adjusted_preceding_term)))
+  known <- is.finite(waiting)
+  n_courses <- sum(known & waiting > 0)
+  students <- sum(waiting[known])
+  sentence <- if (nrow(projections) == 0L || length(terms) != 1L) {
+    ""
+  } else if (!any(known)) {
+    if (all(projections$adjusted_feeder_check %in% "term_not_observed")) {
+      paste0(fmt_term(terms), " is not observed yet, so who it leaves waiting ",
+             "cannot be shown.")
+    } else {
+      paste0(fmt_term(terms), " kept no waitlist rows for the courses shown, ",
+             "so who was left waiting is unknown.")
+    }
+  } else if (n_courses == 0L) {
+    paste0("No student was left waiting in ", fmt_term(terms), " in the courses shown.")
+  } else {
+    targets <- unique(as.integer(projections$target_term))
+    paste0(
+      "In ", fmt_term(terms), ", ", format(students, big.mark = ","), " student",
+      if (students == 1) " was" else "s were", " left waiting in ", n_courses,
+      " of the ", nrow(projections), " courses shown, on no class list for the ",
+      "course. The plan does not add them: how many register in ",
+      if (length(targets) == 1L) fmt_term(targets) else "the target term",
+      " cannot be measured until its class lists arrive."
+    )
+  }
+  list(
+    n_courses = as.integer(n_courses),
+    students = as.numeric(students),
+    sentence = sentence
+  )
+}
 
 # One sentence an administrator can act on, built from the published fields.
 # The tables beneath it are supporting evidence, not the first thing a reader
@@ -985,25 +1037,26 @@ projection_plan_feeder_summary <- function(projections, line, seasons) {
 projection_error_sources_summary <- function(backtests, model_config) {
   sources <- summarize_projection_error_sources(backtests, model_config)
   n_folds <- sum(sources$folds)
-  share <- function(id) {
-    value <- sources$share_of_error[sources$source == id]
-    if (length(value) == 1L && is.finite(value)) scales::percent(value, accuracy = 1) else "none"
+  pct <- function(x) if (length(x) == 1L && is.finite(x)) scales::percent(x, accuracy = 1) else "none"
+  share <- function(ids) {
+    value <- sources$share_of_error[sources$source %in% ids]
+    pct(if (all(is.na(value))) NA_real_ else sum(value, na.rm = TRUE))
   }
-  room_wape <- sources$wape[sources$source == "seats_held_room"]
+  schedule <- c("schedule", "seats_full")
+  forecast <- c("forecast_seats_moved", "forecast_seats_held")
+  own_folds <- sum(sources$folds[sources$source %in% forecast])
   sentence <- if (n_folds == 0L) {
     "No past forecasts are saved for this target, so where error comes from cannot be shown."
   } else {
     paste0(
       "Across ", format(n_folds, big.mark = ","), " past forecasts, ",
-      share("seats_changed"), " of the error came from terms whose seats ",
-      "changed, ", share("data_missing"), " from terms with seat or first-day ",
-      "data missing, ", share("seats_held_full"), " from near-full courses ",
-      "whose seats held, and ", share("seats_held_room"), " from courses with ",
-      "room whose seats held", if (length(room_wape) == 1L && is.finite(room_wape)) {
-        paste0(" (", scales::percent(room_wape, accuracy = 0.1), " off on average)")
-      } else "",
-      ". Only that last group tests the forecast of demand itself; the rest ",
-      "is the schedule, the data, or demand a full course could not show."
+      share(schedule), " of the error came when the course was near full and ",
+      "its seats moved the way of the miss (", share("schedule"), ") or held (",
+      share("seats_full"), "): the schedule set those numbers. ",
+      share(forecast), " was the forecast's own, with seats to spare or seats ",
+      "moving against the miss (", format(own_folds, big.mark = ","),
+      " past forecast", if (own_folds == 1L) "" else "s", "), and ",
+      share("unknown"), " came from terms whose seats or first day are not known."
     )
   }
   list(table = sources, n_folds = as.integer(n_folds), sentence = sentence)
@@ -1449,9 +1502,13 @@ build_enrollment_projection_view <- function(bundle, opt = list()) {
       campus_fill_flag = projection_campus_fill_flags(
         dplyr::pick(dplyr::everything()), bundle$recent_campus_history
       ),
+      waiting_flag = projection_waiting_flags(
+        dplyr::pick(dplyr::everything()), bundle$model_config
+      ),
+      waiting_note = projection_waiting_notes(dplyr::pick(dplyr::everything())),
       attention = adjusted_saturated_prior %in% TRUE |
         adjusted_regime_alarm %in% TRUE | accuracy == "Low" |
-        !is.na(campus_fill_flag)
+        !is.na(campus_fill_flag) | !is.na(waiting_flag)
     )
   if (attention_only) {
     projections <- dplyr::filter(projections, attention)
@@ -1470,11 +1527,11 @@ build_enrollment_projection_view <- function(bundle, opt = list()) {
         method_id == "none" ~ "No applicable method",
         is.finite(selection_common_n) ~ paste0(
           "Beat prior same-season on ", selection_common_n,
-          " earlier shared aftcasts (",
+          " earlier terms both were made for (",
           projection_preview_percent(selection_challenger_wape), " vs ",
-          projection_preview_percent(selection_default_wape), ")"
+          projection_preview_percent(selection_default_wape), " off on average)"
         ),
-        TRUE ~ "Default; no challenger beat it on earlier aftcasts"
+        TRUE ~ "Default; no other forecast beat it on earlier terms"
       ),
       axis_explanation = projection_axis_explanation(
         stability, depth, accuracy, n_backtests, wape,
@@ -1669,6 +1726,7 @@ build_enrollment_projection_view <- function(bundle, opt = list()) {
         projections, bundle$model_config$plan_feeder_change,
         bundle$model_config$plan_feeder_seasons
       ),
+      preceding_waiting = projection_preceding_waiting_summary(projections),
       # Bundle-wide, not filtered: the evidence for where error comes from is
       # every past forecast the rule would have published.
       error_sources = projection_error_sources_summary(

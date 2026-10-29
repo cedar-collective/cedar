@@ -462,10 +462,14 @@ add_projection_recommendations <- function(selected, candidates, pressure_screen
           if (isTRUE(round(target_available_seats) == 1)) " is" else " are",
           " currently unoccupied"
         ),
+        # Registration may not have opened, so the fill can be unknown.
         TRUE ~ paste0(
           "Planned registrations exceed capacity by ",
-          round(projected_over_capacity), "; active registration fill is ",
-          scales::percent(target_active_fill, accuracy = 0.1)
+          round(projected_over_capacity),
+          if (is.finite(target_active_fill)) paste0(
+            "; active registration fill is ",
+            scales::percent(target_active_fill, accuracy = 0.1)
+          ) else ""
         )
       ),
       recommended_sections = projection_sections_for_demand(
@@ -531,8 +535,8 @@ add_projection_recommendations <- function(selected, candidates, pressure_screen
         ),
         accuracy == "Low" ~ accuracy_reason,
         stability == "Volatile" ~ paste0(
-          "Aftcasts land within ", accuracy, " range, but the course's own ",
-          "history is volatile: ", stability_reason
+          "Past forecasts are rated ", accuracy, " for reliability, but the ",
+          "course's own history is volatile: ", stability_reason
         ),
         TRUE ~ paste0(accuracy_reason, "; ", stability_reason)
       ),

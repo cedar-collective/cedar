@@ -348,16 +348,11 @@ seats are unknown). Two summaries read them from the published rule's aftcasts
   counts beneath Reliability ("seats moved in 1 of 4") and in the detail as a
   grey badge, never as a rating of its own: a seat move alone does not say
   whose a miss was (ISSUES.md I40).
-- `summarize_projection_error_sources()` attributes each aftcast to one source
-  -- seats changed 10%+, seat or first-day data missing, seats held while near
-  full, seats held with room -- and sums the absolute error by source. The page
-  renders it in **Where forecast error comes from**
-  (`projection_error_sources_summary()`); the text preview prints it.
 
-Whose miss each course's was is read per aftcast, in the view
-(`R/features/enrollment-projection-view.R`), from the same saved columns:
+Whose miss each aftcast was is one rule, read by both the page-wide panel
+and each course's reading (`R/branches/enrollment-projection-error-sources.R`):
 
-- `projection_fold_miss_cause(backtests, model_config)` sorts each aftcast.
+- `projection_fold_miss_cause(backtests, opt)` sorts each aftcast.
   "Near full" is first-day fill at `saturation_fill_threshold` (90%), after
   the fold term from `actual_first_day` / `scheduled_capacity`, before it from
   `fold_prior_near_full`; moved is `seat_consistency_change` (10%) either way.
@@ -372,6 +367,17 @@ Whose miss each course's was is read per aftcast, in the view
     increase not before either), and for an exact hit.
   - `unknown` when the seat change, the error, or a fill the rule needs is
     missing.
+- `summarize_projection_error_sources()` reads every published-rule aftcast
+  with it, splits the forecast's own by whether the seats held, and sums the
+  absolute error by source: `schedule`, `seats_full`, `forecast_seats_moved`,
+  `forecast_seats_held` and `unknown`, each with its `owner` (schedule,
+  forecast or unknown). The page renders it in **Where forecast error comes
+  from** (`projection_error_sources_summary()`); the text preview prints it.
+  Before schema 26 it split by seat change alone, so a move in a course with
+  room counted against the schedule.
+
+In the view (`R/features/enrollment-projection-view.R`):
+
 - `projection_miss_attribution(projections, backtests, model_config)` sums
   each course's published-rule `abs_error` by cause, with `schedule` and
   `seats_full` together as `seats`, and returns `miss_cause` (the largest;
@@ -383,14 +389,26 @@ Whose miss each course's was is read per aftcast, in the view
   the table flags; `projection_miss_sentence()` counts both kinds above the
   table and names the courses that missed with seats to spare (five or
   fewer), reading `accuracy_fair_max_wape` live.
+- `projection_waiting_flags(projections, model_config)`,
+  `projection_waiting_notes()` and `projection_preceding_waiting_summary()`
+  read `adjusted_waitlisted_preceding` (schema 26): the students left waiting
+  in the term just finished on no class list for the course in the market.
+  A course is flagged ("12 left waiting in Fall 2026") when they would fill
+  `preceding_waiting_flag_sections` (0.5) of its `reference_section_size`;
+  every course's detail and the build box say the count or why it is
+  unknown. Context only: nothing adds it to the plan, because how many
+  register in the target term cannot be measured until its class lists
+  arrive (Fall 2026 is the first Fall with retained waitlists).
 
 The rule replaced one read off the course's seat-consistency rating, under
 which Low reliability with any seat move in the window was the schedule's.
 That gave a course whose seats moved every year but never filled to the
 schedule, though the misses were the forecast's own (ISSUES.md I40). On the
-Spring and Fall 2027 bundles, 77% and 83% of the published rule's aftcast
-error came from terms whose seats changed (the breakdown is in
-`forecasting-lessons.md`).
+schema-26 bundles of 2026-10-29, 80% of Spring 2027's published-rule aftcast
+error (301 aftcasts) and 92% of Fall 2027's (311) came when a near-full
+course's seats moved the way of the miss or held; 20% and 8% were the
+forecast's own. Split by seat change alone, the old panel gave 77% and 83% to
+the schedule (`forecasting-lessons.md`).
 
 ### Draft schedule comparison
 
@@ -849,7 +867,19 @@ recommendation pipeline.
 
 ## Saved Bundle
 
-Model 0.27.0 keeps schema 25. The model config gains `plan_feeder_seasons`,
+Schema 26 (model 0.27.0, no calculation change) adds the students left waiting
+in the term just finished: candidates gain `waitlisted_preceding`
+(`projection_preceding_waitlist()`), published as
+`adjusted_waitlisted_preceding`. It is `NA`, not zero, when that term is not
+observed or no monitored course in the market kept a waitlist row in it, and
+it is never added to the projection or the plan. The model config gains
+`preceding_waiting_flag_sections`. Saved reasons (`selection_reason`,
+`depth_reason`, `accuracy_reason`, `capacity_miss_assessment`,
+`potential_miss_explanation`, `why_uncertain`) drop "WAPE" and "aftcast" for
+the reader's words, and `capacity_limit_note` no longer prints an unknown active fill as
+`NA`.
+
+Model 0.27.0 first shipped with schema 25. The model config gains `plan_feeder_seasons`,
 and `validate_pressure_bump_rows()` takes it and rejects a feeder adjustment on
 a row whose target season is not listed.
 

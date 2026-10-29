@@ -500,6 +500,7 @@ projection_method_pairing <- function(candidates, opt = list()) {
       adjusted_floor_uplift = floor_uplift,
       adjusted_floor_basis = floor_basis,
       adjusted_preceding_term = preceding_term,
+      adjusted_waitlisted_preceding = waitlisted_preceding,
       adjusted_feeder_check = feeder_check,
       adjusted_preceding_term_enrollment = preceding_term_enrollment,
       adjusted_preceding_term_change = preceding_term_change,

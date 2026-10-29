@@ -247,7 +247,7 @@ projection_columns_explainer <- function() {
       item("Plan adds", "are the registrations the plan adds to the",
            "projection: the change in the course's feeder courses in the term",
            "just finished, up or down, and a pressure bump for a course that is",
-           "always full, with the sections they add beneath. A dash means",
+           "always near full, with the sections they add beneath. A dash means",
            "neither; the course's detail says why."),
       item("Registrations", "is the projection: everyone expected to sign up,",
            "including students who drop. Beneath it, the range past forecasts",
@@ -265,9 +265,12 @@ projection_columns_explainer <- function() {
            "dash means the course was not offered or its first day cannot be",
            "reconstructed."),
       item("Flags", "say what no column does: one campus full while the other",
-           "had room, a sharp change in the term just finished, a forecast far",
-           "off while the course had seats to spare, a volatile course with no",
-           "track record, or forecasts that disagree. Most rows have none."),
+           "had room, students left waiting in the term just finished (enough",
+           "to fill", projection_percent(defaults$preceding_waiting_flag_sections),
+           "of a section or more; context, never added to the plan), a sharp",
+           "change in that term, a forecast far off while the course had seats",
+           "to spare, a volatile course with no track record, or forecasts that",
+           "disagree. Most rows have none."),
       item("Reliability", "is how far past forecasts for the course landed from",
            "what happened, on average, each made with only the evidence",
            "available at the time. Its colour is the rating: High within", close,
@@ -302,7 +305,7 @@ projection_build_explainer <- function(shown = NULL) {
               " The start is the same season last year: everyone who registered,",
               " including students who dropped. When the schedule holds still it",
               " lands within about 6%, and no other forecast tested beat it."),
-      tags$li(tags$strong("Waiting students for full courses."), paste0(
+      tags$li(tags$strong("Waiting students for near-full courses."), paste0(
         " When the same term last year was near full (",
         projection_percent(CEDAR_NEAR_FULL_FILL),
         " or more of the seats taken on the first day), the students still",
@@ -336,11 +339,11 @@ projection_build_explainer <- function(shown = NULL) {
         " forecasts no closer, because a Spring feeder's change pointed the way",
         " the Fall course moved no more often than chance."
       )),
-      tags$li(tags$strong("A pressure bump for courses always full."), paste0(
+      tags$li(tags$strong("A pressure bump for courses always near full."), paste0(
         " A course near full on the first day in every recent same-season term",
         " with a first-day count is planned for ",
         projection_percent(defaults$pressure_bump_share),
-        " more, or for the students left waiting if that is more. A full",
+        " more, or for the students left waiting if that is more. A near-full",
         " course's registrations follow its seats, so last year's count",
         " understates what it would draw, and that backlog stays whatever its",
         " feeders do. It changes the plan, never the forecast or its",
@@ -413,7 +416,7 @@ projection_error_explainer <- function(error_sources, range_coverage) {
     ),
     description = paste0(
       "Past misses by cause, from ", format(error_sources$n_folds, big.mark = ","),
-      " past forecasts: most follow schedule changes, not demand."
+      " past forecasts: most came when a near-full course's seats set the number."
     ),
     class = "enrollment-projection-error-sources"
   )
@@ -437,7 +440,7 @@ projection_draft_explainer <- function() {
               " only the planning margin or the pressure bump is missing."),
       tags$li(tags$strong("Covers the plan"), " or ", tags$strong("seats beyond the plan"),
               ": the draft meets the plan, or exceeds it by more than a section.",
-              " In a course that is always full, spare seats are likely to fill:",
+              " In a course that is always near full, spare seats are likely to fill:",
               " when such courses were given more seats, the new seats filled."),
       tags$li(tags$strong("Not in the draft:"),
               " a monitored course with a projection and no sections yet.")
@@ -545,6 +548,8 @@ projection_detail_ui <- function(data, ns) {
         tags$dt("Adjusted candidate"), tags$dd(adjusted_candidate_text),
         tags$dt("Seats in past forecast terms"),
         tags$dd(current$seat_consistency_reason),
+        tags$dt("Left waiting in the term just finished"),
+        tags$dd(current$waiting_note),
         tags$dt("What the axes mean"), tags$dd(current$axis_explanation),
         tags$dt("Why it is listed"), tags$dd(current$inclusion_reason),
         tags$dt("Feeder adjustment"), tags$dd(current$plan_feeder_note),
@@ -574,7 +579,7 @@ projection_detail_ui <- function(data, ns) {
         "same-term-type"
       ),
       " terms only. Method choice is rolling: at every past ",
-      "term the rule saw only earlier aftcasts, and the accuracy shown is ",
+      "term the rule saw only its forecasts of earlier terms, and the accuracy shown is ",
       "the error of the method it would have published then, measured ",
       "against ",
       tags$strong("ever-registered demand"),
@@ -602,8 +607,8 @@ projection_detail_ui <- function(data, ns) {
     section_heading("Candidate methods", level = "h4"),
     reactable::reactableOutput(ns("candidate_table")),
       description = paste(
-        "The method aftcast plot, the capacity and upstream movement",
-        "diagnostic, and both candidates with their evidence."
+        "Each method's past forecasts plotted, the capacity and upstream",
+        "movement diagnostic, and both candidates with their evidence."
       ),
       class = "enrollment-projection-movement"
     )
@@ -846,8 +851,8 @@ projection_table_reactable <- function(projection_view, select_input) {
           title = paste(
             "How far past forecasts for this course landed from what",
             "happened, on average; beneath, in how many of those terms its",
-            "seats moved. A full course's miss as its seats changed is the",
-            "schedule's; a miss with seats to spare is the forecast's, and",
+            "seats moved. A near-full course's miss as its seats changed is",
+            "the schedule's; a miss with seats to spare is the forecast's, and",
             "is flagged"
           )
         )
@@ -1421,7 +1426,8 @@ enrollmentProjectionsServer <- function(id, bundles, load_bundle, programs) {
     output$pressure_summary <- renderUI({
       tags$p(
         view()$meta$pressure_bump$sentence, " ",
-        view()$meta$plan_feeder$sentence
+        view()$meta$plan_feeder$sentence, " ",
+        view()$meta$preceding_waiting$sentence
       )
     })
 

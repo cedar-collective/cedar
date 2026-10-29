@@ -1043,7 +1043,7 @@ test_that("an always-full course gets a pressure bump on its plan, never on its 
   expect_equal(floored$pressure_bump, 3)
   expect_match(floored$pressure_bump_note, "the published projection already adds 7 of them$")
 
-  # One judged Fall below the near-full line is not always full.
+  # One judged Fall below the near-full line is not always near full.
   roomy <- bump(h = dplyr::mutate(history, first_day_enrl = c(190, 196, 170)))
   expect_false(roomy$pressure_bump_applied)
   expect_equal(roomy$pressure_bump, 0)
@@ -1171,10 +1171,6 @@ test_that("each past forecast term records its seat change and whether the term 
   expect_false(folds$fold_prior_near_full[[2]])
   expect_equal(folds$fold_seat_change[[3]], 0.30)
   expect_true(folds$fold_prior_near_full[[3]])
-  expect_equal(
-    projection_fold_error_source(folds$fold_seat_change, folds$fold_prior_near_full),
-    c("data_missing", "seats_held_room", "seats_changed")
-  )
 })
 
 test_that("seat consistency counts how often seats moved in the terms behind reliability", {
@@ -1234,7 +1230,9 @@ test_that("a past miss is the schedule's only when a full course's seats moved t
     c("schedule", "schedule", "schedule", "forecast", "forecast", "forecast",
       "seats_full", "forecast", "unknown", "unknown", "unknown")
   )
-  expect_error(projection_fold_miss_cause(folds, list()), "seat_consistency_change")
+  # Options resolve through projection_option(), so an empty opt reads the
+  # model defaults, which are the levels above.
+  expect_equal(projection_fold_miss_cause(folds, list()), projection_fold_miss_cause(folds, config))
   expect_error(projection_fold_miss_cause(dplyr::select(folds, -actual_first_day), config),
                "actual_first_day")
 
@@ -1270,30 +1268,50 @@ test_that("a past miss is the schedule's only when a full course's seats moved t
   expect_error(projection_reliability_reading("Low", "seats", list()), "accuracy_close_max_wape")
 })
 
-test_that("past error is summed by what each miss is attributable to", {
+test_that("past error is summed by whose miss each term was", {
+  # One row per published past forecast, read by projection_fold_miss_cause():
+  # seats +40% on a course near full the year before, forecast low (schedule);
+  # seats -30% and the forecast high, near full after (schedule); seats held,
+  # near full after (seats_full); seats held with room (forecast, held); seats
+  # +20% with room on both sides (forecast, moved); seats +30% and the
+  # forecast high, against the move (forecast, moved); no seat change known
+  # (unknown); and an unpublished row the summary ignores.
   backtests <- tibble::tribble(
-    ~policy_selected, ~abs_error, ~actual_classlist_total, ~fold_seat_change, ~fold_prior_near_full,
-    TRUE,  30, 100,  0.40, TRUE,
-    TRUE,  10, 100, -0.30, NA,
-    TRUE,   5, 100,  0.00, TRUE,
-    TRUE,  15, 100,  0.05, FALSE,
-    TRUE,  20, 100,  NA,   NA,
-    FALSE, 99, 100,  0.00, TRUE
+    ~policy_selected, ~error, ~abs_error, ~actual_classlist_total, ~fold_seat_change, ~fold_prior_near_full, ~actual_first_day, ~scheduled_capacity,
+    TRUE,  -30, 30, 100,  0.40, TRUE,  98, 100,
+    TRUE,   10, 10, 100, -0.30, NA,    95, 100,
+    TRUE,   -5,  5, 100,  0.00, TRUE,  96, 100,
+    TRUE,   15, 15, 100,  0.05, FALSE, 60, 100,
+    TRUE,  -12, 12, 100,  0.20, FALSE, 70, 100,
+    TRUE,    8,  8, 100,  0.30, TRUE,  99, 100,
+    TRUE,   20, 20, 100,  NA,   NA,    NA,  NA,
+    FALSE,  99, 99, 100,  0.00, TRUE,  95, 100
   )
   sources <- summarize_projection_error_sources(backtests)
 
   expect_equal(sources$source,
-               c("seats_changed", "data_missing", "seats_held_full", "seats_held_room"))
-  expect_equal(sources$folds, c(2L, 1L, 1L, 1L))
-  # 80 points of error in all, from the rule's published rows only.
-  expect_equal(sources$share_of_error, c(40, 20, 5, 15) / 80)
-  expect_equal(sources$wape, c(40 / 200, 20 / 100, 5 / 100, 15 / 100))
-  expect_equal(sources$label[[1]], "Seats changed 10% or more")
+               c("schedule", "seats_full", "forecast_seats_moved",
+                 "forecast_seats_held", "unknown"))
+  expect_equal(sources$owner,
+               c("schedule", "schedule", "forecast", "forecast", "unknown"))
+  expect_equal(sources$folds, c(2L, 1L, 2L, 1L, 1L))
+  # 100 points of error in all, from the rule's published rows only.
+  expect_equal(sources$share_of_error, c(40, 5, 20, 15, 20) / 100)
+  expect_equal(sources$wape, c(40 / 200, 5 / 100, 20 / 200, 15 / 100, 20 / 100))
+  expect_equal(sources$label[[1]], "Near full; seats moved 10% or more the way of the miss")
 
   summary <- projection_error_sources_summary(backtests, list())
-  expect_equal(summary$n_folds, 5L)
-  expect_match(summary$sentence, "^Across 5 past forecasts, 50% of the error came from terms whose seats changed")
-  expect_match(summary$sentence, "and 19% from courses with room whose seats held \\(15\\.0% off on average\\)")
+  expect_equal(summary$n_folds, 7L)
+  expect_equal(
+    summary$sentence,
+    paste0(
+      "Across 7 past forecasts, 45% of the error came when the course was near ",
+      "full and its seats moved the way of the miss (40%) or held (5%): the ",
+      "schedule set those numbers. 35% was the forecast's own, with seats to ",
+      "spare or seats moving against the miss (3 past forecasts), and 20% came ",
+      "from terms whose seats or first day are not known."
+    )
+  )
 })
 
 # ISSUES.md M35. Five published forecasts of 100 for one course; each range is
@@ -1566,6 +1584,17 @@ test_that("target class-list snapshot drives the active seat check", {
   expect_equal(result$projected_over_capacity, 100)
   expect_true(result$capacity_limit_signal)
   expect_match(result$capacity_limit_status, "Seat ceiling likely")
+
+  # Before registration opens there is no active fill to quote; the saved
+  # note once read "active registration fill is NA".
+  unopened <- inputs
+  unopened$target_registration_snapshot <- inputs$target_registration_snapshot[0, ]
+  early <- get_course_enrollment_projections(
+    unopened, 202480L, force_courses = "TEST 101",
+    opt = list(projection_methods = "seasonal_last")
+  )$projections
+  expect_true(is.na(early$target_active_fill))
+  expect_equal(early$capacity_limit_note, "Planned registrations exceed capacity by 100")
 })
 
 test_that("registrations over the recorded cap still count as capacity reached", {
@@ -1719,6 +1748,39 @@ test_that("Fall deltas scale enrollment changes by the historical carry-through"
   expect_equal(far$delta_feeder, 0)
   expect_match(far$delta_basis, "Fall 2024 is not observed yet")
   expect_true(is.na(far$regime_alarm))
+})
+
+test_that("the students left waiting in the term just finished are context, never added", {
+  # The scenario's class lists cover Fall 2023, the term before the Spring
+  # 2024 target, but keep no waitlist row in it: who was left waiting then is
+  # unknown (NA), not zero, as in every term before waitlist rows were kept.
+  s <- projection_spine_scenario()
+  run <- function(waitlists, target = 202410L) project_spine_adjusted(
+    s$enrollment_history, s$preceding_term_history, s$section_history,
+    waitlists, s$students, s$row, target
+  )
+  base <- run(s$waitlist_history)
+  expect_true(is.na(base$waitlisted_preceding))
+
+  # Another monitored course kept waiting students in Fall 2023, so the term
+  # retained its waitlists and this course had none.
+  other <- dplyr::bind_rows(s$waitlist_history, tibble::tibble(
+    market_id = "abq_ea_course_market", subject_course = "OTHER 1",
+    term = 202380L, waitlisted = 4L
+  ))
+  expect_identical(run(other)$waitlisted_preceding, 0L)
+
+  # Nine waited for this course in Fall 2023. The forecast does not move.
+  own <- dplyr::bind_rows(other, tibble::tibble(
+    market_id = "abq_ea_course_market", subject_course = "TEST 201",
+    term = 202380L, waitlisted = 9L
+  ))
+  waiting <- run(own)
+  expect_identical(waiting$waitlisted_preceding, 9L)
+  expect_equal(waiting$projected_classlist_total, base$projected_classlist_total)
+
+  # Two steps out, Fall 2024 is not observed: unknown, whatever was retained.
+  expect_true(is.na(run(own, target = 202510L)$waitlisted_preceding))
 })
 
 test_that("a listed sequence carries its own change and leaves the pooled feeders", {
@@ -2096,7 +2158,11 @@ test_that("selection is rolling: a challenger wins only on earlier shared aftcas
   expect_equal(selected$method_id, "spine_adjusted")
   expect_equal(selected$selection_common_n, 4L)
   expect_match(selected$selection_reason,
-               "floor \\+ Fall deltas beat Prior same-season on 4 earlier shared")
+               "floor \\+ Fall deltas beat Prior same-season on 4 earlier terms both were made for")
+  # Saved reasons are read on the page, so they speak plainly.
+  expect_false(any(grepl("WAPE|aftcast", c(
+    selected$selection_reason, selected$depth_reason, selected$accuracy_reason
+  ), ignore.case = TRUE)))
   expect_equal(selected$n_backtests, 4L)
   expect_equal(selected$wape, 0.08)
   expect_equal(selected$selection_wape, 0.08)
@@ -2514,6 +2580,45 @@ test_that("feature builder rejects an unsettled source term", {
   )
 })
 
+test_that("students left waiting in the term just finished are flagged from half a section and stated for every course", {
+  # Four Spring 2027 rows with sections of 24: 12 and 11 left waiting in Fall
+  # 2026, none, and a term that kept no waitlist rows.
+  rows <- tibble::tibble(
+    subject_course = c("A 1", "B 1", "C 1", "D 1"),
+    target_term = 202710L, adjusted_preceding_term = 202680L,
+    adjusted_waitlisted_preceding = c(12L, 11L, 0L, NA),
+    adjusted_feeder_check = "measured", reference_section_size = 24
+  )
+  # Half a section of 24 is 12.
+  expect_equal(projection_waiting_flags(rows, list()),
+               c("12 left waiting in Fall 2026", NA, NA, NA))
+  expect_equal(projection_waiting_flags(rows, list(preceding_waiting_flag_sections = 0.25)),
+               c("12 left waiting in Fall 2026", "11 left waiting in Fall 2026", NA, NA))
+  notes <- projection_waiting_notes(rows)
+  expect_equal(notes[[1]], paste0(
+    "12 students were left waiting in Fall 2026 on no class list for the ",
+    "course. The plan does not add them: how many register in Spring 2027 ",
+    "cannot be measured until its class lists arrive."
+  ))
+  expect_equal(notes[[3]], "No student was left waiting in Fall 2026.")
+  expect_match(notes[[4]], "^Fall 2026 kept no waitlist rows")
+  summary <- projection_preceding_waiting_summary(rows)
+  expect_equal(summary$students, 23)
+  expect_equal(summary$n_courses, 2L)
+  expect_match(summary$sentence, "^In Fall 2026, 23 students were left waiting in 2 of the 4 courses shown")
+
+  # A Fall target two steps out: Spring 2027 has not happened.
+  ahead <- dplyr::mutate(
+    rows, target_term = 202780L, adjusted_preceding_term = 202710L,
+    adjusted_waitlisted_preceding = NA_integer_,
+    adjusted_feeder_check = "term_not_observed"
+  )
+  unseen <- "Spring 2027 is not observed yet, so who it leaves waiting cannot be shown."
+  expect_true(all(is.na(projection_waiting_flags(ahead, list()))))
+  expect_equal(projection_waiting_notes(ahead)[[1]], unseen)
+  expect_equal(projection_preceding_waiting_summary(ahead)$sentence, unseen)
+})
+
 test_that("the administrator summary says the decision in one sentence and flags why to look", {
   row <- tibble::tibble(
     subject_course = "TEST 101", term_type = "spring",
@@ -2524,6 +2629,7 @@ test_that("the administrator summary says the decision in one sentence and flags
     recommended_sections = 99L, observed_baseline = 2179,
     adjusted_saturated_prior = TRUE, adjusted_prior_first_day_fill = 0.988,
     adjusted_prior_first_day_basis = "complete", campus_fill_flag = NA_character_,
+    waiting_flag = NA_character_,
     adjusted_waitlisted_prior = 15L, adjusted_regime_alarm = FALSE,
     adjusted_preceding_term = 202680L, adjusted_preceding_term_change = 0.02,
     stability = "Moderate", accuracy = "Moderate", wape = 0.1004,
@@ -2582,6 +2688,11 @@ test_that("the administrator summary says the decision in one sentence and flags
     "EA full in Spring 2026, ABQ had room"
   )
   expect_error(projection_flags(dplyr::select(row, -campus_fill_flag)), "campus_fill_flag")
+  expect_equal(
+    projection_flags(dplyr::mutate(row, waiting_flag = "42 left waiting in Fall 2026")),
+    "42 left waiting in Fall 2026"
+  )
+  expect_error(projection_flags(dplyr::select(row, -waiting_flag)), "waiting_flag")
 
   moved <- dplyr::mutate(
     row, adjusted_saturated_prior = FALSE, adjusted_waitlisted_prior = 0L,
