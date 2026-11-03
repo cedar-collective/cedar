@@ -499,7 +499,7 @@ number, corrected for what can actually be seen**.
 | Method | Role | What it is |
 |---|---|---|
 | Prior same-season | The spine, and the default | Last comparable season's class-list demand |
-| Prior same-season + floor + Fall deltas | Challenger | The spine, raised to a floor when that term was saturated, plus two deltas read from the term just finished |
+| Prior same-season + floor + latest-term changes | Challenger | The spine, raised to a floor when that term was saturated, plus two deltas read from the term just finished |
 
 Reader-facing method descriptions live in
 `CEDAR_ENROLLMENT_PROJECTION_METHOD_GUIDE` beside the registry in

@@ -759,7 +759,7 @@ test_that("historical-method plot compares one term type with lifecycle actuals"
   expect_true("First day (seats judged here)" %in% trace_names)
   expect_true("Census" %in% trace_names)
   expect_true("Final / last day" %in% trace_names)
-  expect_true("Prior same-season + floor + Fall deltas (selected)" %in% trace_names)
+  expect_true("Prior same-season + floor + latest-term changes (selected)" %in% trace_names)
   expect_equal(length(trace_names), 6L)
   first_day_trace <- built$x$data[[which(trace_names == "First day (seats judged here)")]]
   expect_true(is.na(first_day_trace$y[[2]]))
@@ -1033,14 +1033,14 @@ test_that("an always-full course gets a pressure bump on its plan, never on its 
   expect_match(full$pressure_bump_note, paste0(
     "^Pressure bump \\+10: near full on the first day in every recent Fall ",
     "with a first-day count \\(Fall 2021, Fall 2022, Fall 2023\\), so its ",
-    "registrations were capped by its seats; planned for 5% more than last ",
-    "Fall's 200 registrations$"
+    "registrations were capped by its seats; the bump is 5% of last Fall's ",
+    "200 registrations$"
   ))
 
   # More students left waiting than 5%: the bump is the waiting count.
   waiting <- bump(dplyr::mutate(row, adjusted_waitlisted_prior = 31L))
   expect_equal(waiting$pressure_bump, 31)
-  expect_match(waiting$pressure_bump_note, "planned for the 31 students left waiting")
+  expect_match(waiting$pressure_bump_note, "the bump is the 31 students left waiting")
 
   # A floor the published method already added counts toward the bump:
   # max(5% of 200, 7 waiting) - 7 already in the projection = 3.
@@ -1808,6 +1808,13 @@ test_that("Fall deltas scale enrollment changes by the historical carry-through"
   expect_true(is.na(far$regime_alarm))
 })
 
+# A change that rounds to nothing read "-0%" in the regime note and "repeat -0"
+# in the text preview.
+test_that("signed changes that round to nothing read 0, never -0 or +0", {
+  expect_equal(projection_signed_whole(c(-0.4, 0.4, 3.2, -7.6)), c("0", "0", "+3", "-8"))
+  expect_equal(projection_signed_percent(c(-0.004, 0.25, -0.12)), c("0%", "+25%", "-12%"))
+})
+
 test_that("the students left waiting in the term just finished are context, never added", {
   # The scenario's class lists cover Fall 2023, the term before the Spring
   # 2024 target, but keep no waitlist row in it: who was left waiting then is
@@ -2216,7 +2223,7 @@ test_that("selection is rolling: a challenger wins only on earlier shared aftcas
   expect_equal(selected$method_id, "spine_adjusted")
   expect_equal(selected$selection_common_n, 4L)
   expect_match(selected$selection_reason,
-               "floor \\+ Fall deltas beat Prior same-season on 4 earlier terms both were made for")
+               "floor \\+ latest-term changes beat Prior same-season on 4 earlier terms both were made for")
   # Saved reasons are read on the page, so they speak plainly.
   expect_false(any(grepl("WAPE|aftcast", c(
     selected$selection_reason, selected$depth_reason, selected$accuracy_reason
@@ -2331,7 +2338,7 @@ test_that("backtests separate raw from registration-cap-censored accuracy", {
     subject_course = "TEST 101", term_type = "spring",
     target_term = c(202210L, 202310L),
     method_id = "spine_adjusted",
-    method_label = "Prior same-season + floor + Fall deltas",
+    method_label = "Prior same-season + floor + latest-term changes",
     applicable = TRUE, projected_classlist_total = c(150, 120),
     actual_classlist_total = c(100, 100),
     first_day_retention_rate = 1,

@@ -319,10 +319,12 @@ projection_spine_floor <- function(spine_row, section_history, waitlist_history,
       fmt_term(spine_term), " was saturated (",
       fill_text(saturation$fill_rate[[1]]), "); ",
       if (waitlisted > 0) {
-        paste0("floor is spine ", round(spine), " + ", waitlisted,
+        paste0("spine ", round(spine), " + ", waitlisted,
                " still waiting = ", round(floor_demand))
       } else {
-        "no waitlist rows retained for that term, so the floor is the spine itself"
+        # Capped, so the count understates demand; nothing measured lifts it,
+        # and it is no lower bound on this year (ISSUES.md I42).
+        "no waitlist rows retained for that term, so nothing is added to the spine"
       }
     )
   )
@@ -517,10 +519,10 @@ project_spine_adjusted <- function(history, preceding_term_history,
   preceding_enrollment <- if (nrow(now_row) == 1L) now_row$classlist_total[[1]] else NA_real_
   delta_basis <- if (!preceding_observed) {
     paste("Preceding term", fmt_term(preceding_term),
-          "is not observed yet; no Fall deltas")
+          "is not observed yet, so no change from it is added")
   } else if (nrow(then_row) != 1L) {
     paste("No", fmt_term(prior_preceding_term),
-          "enrollment to measure the change against; no Fall deltas")
+          "enrollment to measure the change against, so no change is added")
   } else {
     rates <- projection_delta_rates(student_inputs, row, target_term, opt)
     then_enrollment <- then_row$classlist_total[[1]]

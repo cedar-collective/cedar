@@ -23,7 +23,7 @@ target — and neither replaces the other. Use **Target term** to choose which o
 you are reading; the page opens on the nearest one, and the scope stripe always
 names the term actually loaded. The two are not directly comparable as forecasts
 of the same thing: the nearer target can read the term that has already
-happened for its Fall deltas, while the further one carries the spine and the
+happened for its changes, while the further one carries the spine and the
 saturation floor alone. A further-out target therefore shows thinner evidence
 depth and no deltas — which means that evidence was unavailable, not that
 nothing changed.
@@ -280,12 +280,12 @@ two candidates:
   every past forecast. On the October 2026 projections the two were 15.2% and
   15.5% off for Spring, and both 14.2% for Fall: the plan's additions and the
   flags, not a cleverer forecast, are what the page adds to last year's count.
-- **Prior same-season + floor + Fall deltas**: the same number, plus the
+- **Prior same-season + floor + latest-term changes**: the same number, plus the
   students still waiting for a seat at the end of that term when it was
   saturated (90% or more of the seats filled on the first day), plus the change
   in the course's own enrollment, in the course taken just before it, and in
   its other feeder courses during the term just finished, each scaled by the
-  share that historically carried into this course. It uses Fall enrollments, not grades, because grades are not posted
+  share that historically carried into this course. It uses that term's enrollments, not grades, because grades are not posted
   when the schedule is built.
 
 **Prior same-season is the default for every course.** The adjusted candidate

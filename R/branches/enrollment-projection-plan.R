@@ -165,15 +165,21 @@ projection_pressure_bump <- function(enrollment_history, section_history, rows,
     } else {
       sized_by <- if (waiting > share * spine) {
         paste0(
-          "planned for the ", waiting, " students left waiting, more than ",
+          "the bump is the ", waiting, " students left waiting, more than ",
           share_label, " of last ", season, "'s ",
           format(round(spine), big.mark = ","), " registrations"
         )
       } else {
+        # The bump is a share OF last year's count added to the forecast, not
+        # a target above last year: where the term just finished moved the
+        # forecast, the plan is not 5% over last year (ISSUES.md I42).
         paste0(
-          "planned for ", share_label, " more than last ", season, "'s ",
+          "the bump is ", share_label, " of last ", season, "'s ",
           format(round(spine), big.mark = ","), " registrations",
-          if (waiting > 0L) paste0(" (", waiting, " students were left waiting)") else ""
+          if (waiting > 0L) paste0(
+            " (", projection_count_noun(waiting, "student"),
+            if (waiting == 1L) " was" else " were", " left waiting)"
+          ) else ""
         )
       }
       paste0(
@@ -506,7 +512,8 @@ add_projection_recommendations <- function(selected, candidates, pressure_screen
         ),
         adjusted_saturated_prior ~ paste0(
           "Floor: ", adjusted_floor_basis,
-          "; the projection is a lower bound. ", expansion_note
+          "; its count was capped by its seats, so it understates demand. ",
+          expansion_note
         ),
         TRUE ~ adjusted_floor_basis
       ),
@@ -516,12 +523,12 @@ add_projection_recommendations <- function(selected, candidates, pressure_screen
         ),
         adjusted_regime_alarm ~ paste0(
           "Regime check: enrollment in ", fmt_term(adjusted_preceding_term),
-          " moved ", sprintf("%+.0f%%", 100 * adjusted_preceding_term_change),
+          " moved ", projection_signed_percent(adjusted_preceding_term_change),
           " from the year before; review this course before scheduling to the projection"
         ),
         TRUE ~ paste0(
           "Enrollment in ", fmt_term(adjusted_preceding_term), " moved ",
-          sprintf("%+.0f%%", 100 * adjusted_preceding_term_change),
+          projection_signed_percent(adjusted_preceding_term_change),
           " from the year before"
         )
       ),

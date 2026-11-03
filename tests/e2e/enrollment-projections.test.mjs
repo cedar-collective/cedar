@@ -102,7 +102,7 @@ async function closeEvidence(page) {
       !/\b0 (diagnostic|selectable|signals)/.test(methodGuide.text),
     methodGuide.text.slice(0, 700));
   check('method guide describes both registered methods',
-    ['Prior same-season', 'Prior same-season + floor + Fall deltas']
+    ['Prior same-season', 'Prior same-season + floor + latest-term changes']
       .every((label) => methodGuide.text.includes(label)));
 
   const initialContext = await page.evaluate(() => {
@@ -630,7 +630,7 @@ async function closeEvidence(page) {
   // 0.20.0 retired every candidate but the spine and its adjusted form.
   check('both candidates are inspectable',
     candidates.rows.length === 2 &&
-      candidateText.includes('Prior same-season + floor + Fall deltas'),
+      candidateText.includes('Prior same-season + floor + latest-term changes'),
     `${candidates.rows.length} rows: ${candidateText.slice(0, 200)}`);
 
   // Closing the modal returns the reader to the table exactly where they were.

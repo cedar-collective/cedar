@@ -2337,12 +2337,12 @@ format_enrollment_projection_preview <- function(bundle, courses = NULL) {
       `Term-just-finished changes` = dplyr::if_else(
         adjusted_applicable %in% TRUE,
         paste0(
-          "repeat ", sprintf("%+.0f", adjusted_delta_repeat),
+          "repeat ", projection_signed_whole(adjusted_delta_repeat),
           dplyr::if_else(
             is.na(adjusted_sequence_courses), "",
-            paste0(", sequence ", sprintf("%+.0f", adjusted_delta_sequence))
+            paste0(", sequence ", projection_signed_whole(adjusted_delta_sequence))
           ),
-          ", feeder ", sprintf("%+.0f", adjusted_delta_feeder)
+          ", feeder ", projection_signed_whole(adjusted_delta_feeder)
         ),
         "--"
       ),

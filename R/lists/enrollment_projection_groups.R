@@ -140,7 +140,9 @@ CEDAR_ENROLLMENT_PROJECTION_GROUPS <- local({
 # figures are in docs/developers/forecasting-lessons.md.
 CEDAR_ENROLLMENT_PROJECTION_METHODS <- c(
   seasonal_last = "Prior same-season",
-  spine_adjusted = "Prior same-season + floor + Fall deltas"
+  # Named for the term just finished, whatever its season: a Spring for a
+  # Fall target read one step ahead (ISSUES.md I41).
+  spine_adjusted = "Prior same-season + floor + latest-term changes"
 )
 
 CEDAR_ENROLLMENT_PROJECTION_DEFAULT_METHOD <- "seasonal_last"
@@ -183,8 +185,8 @@ CEDAR_ENROLLMENT_PROJECTION_METHOD_GUIDE <- data.frame(
     )
   ),
   distinction = c(
-    "The default. Within 6% when the schedule holds still; a year old by the time the target is scheduled, and blind to a saturated ceiling.",
-    "Sees a saturated prior term and a Fall that moved. Uses Fall enrollments only, because grades are not posted when the schedule is built; the same terms can be re-read once they are."
+    "The default. Closest when the schedule holds still; a year old by the time the target is scheduled, and blind to a saturated ceiling.",
+    "Sees a saturated prior term and a term just finished that moved. Uses that term's enrollments only, because grades are not posted when the schedule is built; the same terms can be re-read once they are."
   ),
   stringsAsFactors = FALSE
 )

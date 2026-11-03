@@ -29,8 +29,6 @@ recurrence is recognizable.
 
 | ID | Kind | Summary |
 |---|---|---|
-| [I42](#i42--a-saturated-course-whose-fall-changes-lower-its-forecast-is-still-called-a-floor) | Defect | A saturated course whose Fall changes lower its forecast is still called "a floor": ENGL 1120's Spring 2027 forecast is 2,164, below last Spring's 2,179, and the page says "so this is a floor" (page text fixed; `floor_note` awaits the next model change) |
-| [I41](#i41--projection-labels-call-the-term-just-finished-fall-whatever-its-season) | Defect | Projection labels call the term just finished "Fall" whatever its season: once Spring 2027 settles (about February 2027), a Fall 2027 course whose Spring moved 25% would be flagged "Fall enrollment +25%" (page labels fixed; the method label awaits the next model change) |
 | [I38](#i38--a-pathways-program-population-misses-pre-majors-whose-name-differs-from-their-major) | Defect | A Pathways program population misses pre-majors whose name differs from their major: "Film and Digital Arts" holds 1 of the 1,016 Film pre-majors who never declared the major, because `FFDA` is named "FDMA" |
 | [I37](#i37--renumbered-courses-lose-their-history) | Defect | Renumbered courses lose their history: no crosswalk exists, so ACCT 3401 (was MGMT 340) and the other Fall 2026 ACCT, BUSA and POPH courses read as new |
 | [I33](#i33--a-crashed-myreports-download-is-recorded-as-a-successful-fetch) | Defect | A crashed MyReports download is recorded as a successful fetch: on Oct 23 class lists and applicants were never downloaded, and every step reported ✅ (partly fixed) |
@@ -52,6 +50,8 @@ Kept until the next release, so a recurrence is recognisable; each entry below g
 
 | ID | Kind | Summary |
 |---|---|---|
+| [I42](#i42--a-saturated-course-whose-fall-changes-lower-its-forecast-is-still-called-a-floor) | Defect | A saturated course whose Fall changes lower its forecast was still called "a floor": ENGL 1120's Spring 2027 forecast is 2,164, below last Spring's 2,179, and the page said "so this is a floor" (resolved 2026-11-03) |
+| [I41](#i41--projection-labels-call-the-term-just-finished-fall-whatever-its-season) | Defect | Projection labels called the term just finished "Fall" whatever its season: once Spring 2027 settles, a Fall 2027 course whose Spring moved 25% would have been flagged "Fall enrollment +25%" (resolved 2026-11-03) |
 | [I40](#i40--the-projections-page-gave-a-forecasts-own-misses-to-the-schedule) | Defect | The projections page gave a forecast's own misses to the schedule: 7 of the 8 Spring 2027 courses whose past misses came with seats to spare read "the misses came when the seats moved", because any seat move counted (resolved 2026-10-29) |
 | [I39](#i39--projection-flags-called-last-years-same-season-term-last-term) | Defect | Projection flags called last year's same-season term "last term": a Spring 2027 course flagged "Full last term" was full in Spring 2026, not in the Fall just finished (resolved 2026-10-28) |
 | [I36](#i36--low-enrollments-schedule-view-reports-no-prior-history-for-courses-that-have-it) | Defect | Low Enrollment's schedule view reports no prior history for courses that have it: 363 of 2,226 Spring 2027 ABQ/EA undergraduate courses, of which 40 were never offered under that number (resolved 2026-10-24) |
@@ -70,8 +70,8 @@ Kept until the next release, so a recurrence is recognisable; each entry below g
 
 ## I42 — A saturated course whose Fall changes lower its forecast is still called a floor
 
-**Status:** page text fixed 2026-11-03 (branch `projections/page-wording`);
-`floor_note` in the analyst detail remains, because it is model source
+**Status:** resolved 2026-11-03: page text in #185, model-source text in #184
+(branch `projections/fall-waiting`)
 **Found:** 2026-11-03, rechecking the projections page's wording against the
 saved Spring 2027 bundle
 **Severity:** low. No number is wrong, but one row's text contradicts its own
@@ -129,17 +129,19 @@ keeps a decimal, so CHEM 1215's 716 against 719 does not read as a match. The
 plan explainer's "Changes in the term just finished" step says the change can
 take a near-full course below last year's count, and the text preview's floor
 column reads "spine was capped". A test in `test-enrollment-projections.R`
-pins the ENGL 1120 case. Still to do, with the next model change:
-`floor_note` ("the projection is a lower bound"), shown under **Saturation
-floor** in the evidence trail, and the pressure-bump note's "planned for 5%
-more than last Spring's 2,179 registrations". The bump is 5% *of* last year's
-count added to the forecast, so for the 3 Spring 2027 rows whose forecast
-differs from last year's count, that note overstates the plan.
+pins the ENGL 1120 case. In the model source (#184), `floor_note`, shown
+under **Saturation floor** in the evidence trail, now says the prior term's
+count "was capped by its seats, so it understates demand" instead of "the
+projection is a lower bound", and a capped term with no waitlist rows "adds
+nothing to the spine" instead of being "the floor itself". The pressure-bump
+note said "planned for 5% more than last Spring's 2,179 registrations", which
+overstated the plan wherever the forecast differs from last year's count; it
+now reads "the bump is 5% of last Spring's 2,179 registrations".
 
 ## I41 — Projection labels call the term just finished "Fall" whatever its season
 
-**Status:** page labels fixed 2026-11-03 (branch `projections/page-wording`);
-the method label and basis text remain, because they are model source
+**Status:** resolved 2026-11-03: page labels in #185, model-source labels in
+#184 (branch `projections/fall-waiting`)
 **Found:** 2026-11-03, rechecking the projections page's wording
 **Severity:** low. A wrong word, not a wrong number, but it points a reader at
 the wrong term.
@@ -171,17 +173,17 @@ for Fall 2023–2026 reads the Spring before it (`preceding_term` 202310 to
 202610), and 98 of them raise the regime alarm. Only the published row is two
 steps out today.
 
-### What a fix requires
-
 ### Fix
 
 The flag names the term ("Fall 2026 enrollment +25%", "Spring 2027 enrollment
 +25%"), and `projection_flag_is_warning()` matches any season. The plan
 explainer's step and the evidence trail read "Changes in the term just
-finished". A test pins the Spring case. Still to do, with the next model change: the method
-label "Prior same-season + floor + Fall deltas", the "no Fall deltas" basis
-text, and the definition's "moved by Fall enrollment changes"
-(`docs/_data/definitions.yml`).
+finished". A test pins the Spring case. In the model source (#184), the
+method label is "Prior same-season + floor + latest-term changes", the delta
+basis says "so no change from it is added" instead of "no Fall deltas", and
+the definition (`docs/_data/definitions.yml`, 1.10.0) says "moved by
+enrollment changes in the term just finished". A change that rounds to
+nothing reads "0%", not "-0%", in the regime note and the text preview.
 
 ## I40 — The projections page gave a forecast's own misses to the schedule
 

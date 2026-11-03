@@ -190,6 +190,17 @@ projection_count_noun <- function(n, noun) {
   paste(format(n, big.mark = ","), if (isTRUE(n == 1)) noun else paste0(noun, "s"))
 }
 
+# Signed whole numbers and percents that never read "-0" or "+0%": a change
+# that rounds to nothing is shown as 0.
+projection_signed_whole <- function(x) {
+  whole <- round(x)
+  dplyr::if_else(whole == 0, "0", sprintf("%+.0f", whole))
+}
+
+projection_signed_percent <- function(x) {
+  paste0(projection_signed_whole(100 * x), "%")
+}
+
 
 #' One model option: the caller's value, else the model default
 projection_option <- function(opt, name) {
