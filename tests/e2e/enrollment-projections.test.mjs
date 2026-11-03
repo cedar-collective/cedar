@@ -542,7 +542,7 @@ async function closeEvidence(page) {
   check('course detail retains planning, bias, and population-fit evidence',
     ['Status', 'Sections', 'Planned registrations', 'How this plan was built',
       'Forecast registrations', 'Selected method', 'Saturation floor',
-      'Fall deltas', 'Regime check']
+      'Changes in the term just finished', 'Regime check']
       // innerText applies CSS text-transform: the headline labels read in capitals.
       .every((label) => detailSummaryText.toLowerCase().includes(label.toLowerCase())),
     detailSummaryText.slice(0, 500));

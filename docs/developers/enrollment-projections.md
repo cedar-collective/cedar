@@ -387,8 +387,23 @@ In the view (`R/features/enrollment-projection-view.R`):
   `accuracy` and `miss_cause`; `projection_flags()` flags Low with
   `miss_cause == "forecast"` as "Off 20%+ with seats to spare", the one Low
   the table flags; `projection_miss_sentence()` counts both kinds above the
-  table and names the courses that missed with seats to spare (five or
-  fewer), reading `accuracy_fair_max_wape` live.
+  table and names the courses whose misses were the forecast's own (five or
+  fewer), reading `accuracy_fair_max_wape` live. Both use the rule's own
+  words: near full with seats moving the way of the miss or holding, against
+  seats to spare or seats moving against the miss.
+- `projection_track_record_summary(backtests, model_config)` states the
+  published rule's record for step 1 of **How a course's plan is built**:
+  its error over the past forecasts whose seats held, and over all of them
+  beside prior same-season alone on the same terms. It replaced a hand-written
+  "within about 6%, and no other forecast tested beat it", which no bundle
+  checked. On the October 2026 bundles it reads 6.8% held, 15.2% against
+  15.5% (Spring), and 4.9% held, 14.2% against 14.2% (Fall).
+- `projection_summary_sentence()` names the forecast's change from last
+  year's count ("The forecast is 0.7% below last Spring's 2,179: the changes
+  in Fall 2026 point lower"), with a decimal under 1%. A near-full course's
+  count is "capped by its seats and understates demand", never "a floor":
+  that is evidence about last year, and falling feeders can take this year's
+  forecast below it (ISSUES.md I42).
 - `projection_waiting_flags(projections, model_config)`,
   `projection_waiting_notes()` and `projection_preceding_waiting_summary()`
   read `adjusted_waitlisted_preceding` (schema 26): the students left waiting

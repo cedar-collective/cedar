@@ -171,7 +171,7 @@ projection_axis_rank <- function(value) {
 # Flags a reader should weigh before trusting the number, as against flags
 # that say why the plan is what it is. Amber in the table, and sorted first.
 projection_flag_is_warning <- function(flag) {
-  grepl("^Fall enrollment|^Off 20%|^Past forecasts|^Hard to predict", flag)
+  grepl("^(Spring|Summer|Fall) [0-9]{4} enrollment|^Off 20%|^Past forecasts|^Hard to predict", flag)
 }
 
 # The plan, step by step from last year's class list to the sections
@@ -284,9 +284,10 @@ projection_columns_explainer <- function() {
     tags$p(
       "Most of a far-off forecast's miss follows the seats. A course near full on",
       "the first day registers about as many students as it has seats, so when",
-      "its seats changed, the schedule set the number and the projection holds",
-      "if the seats do. A course with seats to spare could have drawn more or",
-      "fewer students whatever its seats did, so a miss there is the",
+      "its seats moved the way of the miss, or held, the schedule set the number",
+      "and the projection holds if the seats do. A course with seats to spare",
+      "could have drawn more or fewer students whatever its seats did, and seats",
+      "that moved against the miss cannot explain it, so a miss there is the",
       "forecast's own, and is flagged."
     ),
     description = "Every column, and when a miss is the schedule's rather than the forecast's.",
@@ -295,16 +296,16 @@ projection_columns_explainer <- function() {
 }
 
 # `shown` is a slot for what the bump and the feeder adjustment add across
-# the courses on the page, rendered in the server from the loaded bundle.
-projection_build_explainer <- function(shown = NULL) {
+# the courses on the page, and `track_record` for how far off past forecasts
+# were, both rendered in the server from the loaded bundle.
+projection_build_explainer <- function(shown = NULL, track_record = NULL) {
   defaults <- enrollment_projection_defaults()
   info_panel(
     "How a course's plan is built, step by step",
     tags$ol(
       tags$li(tags$strong("Last year's registrations."),
               " The start is the same season last year: everyone who registered,",
-              " including students who dropped. When the schedule holds still it",
-              " lands within about 6%, and no other forecast tested beat it."),
+              " including students who dropped. ", track_record),
       tags$li(tags$strong("Waiting students for near-full courses."), paste0(
         " When the same term last year was near full (",
         projection_percent(CEDAR_NEAR_FULL_FILL),
@@ -312,14 +313,16 @@ projection_build_explainer <- function(shown = NULL) {
         " waiting, who registered nowhere in the market, are added to it in",
         " the adjusted forecast."
       )),
-      tags$li(tags$strong("Fall changes."),
+      tags$li(tags$strong("Changes in the term just finished."),
               " The adjusted forecast also adds the change in the course's own",
               " and its feeder courses' enrollment in the term just finished, times",
               " the share that historically carried over. A course listed as the",
               " one taken just before (Composition I before II, say) carries its",
-              " change at its own rate. Two terms ahead, that term has not",
-              " happened yet, so the change is left out and the course's detail",
-              " says so."),
+              " change at its own rate. The change can take a near-full course",
+              " below last year's count: a count capped by its seats says demand",
+              " was higher last year, not that it cannot fall. Two terms ahead,",
+              " that term has not happened yet, so the change is left out and the",
+              " course's detail says so."),
       tags$li(tags$strong("Choosing a forecast."), paste0(
         " Last year's number is used unless the adjusted forecast beat it by ",
         defaults$selection_challenger_margin * 100, " points of error on at least ",
@@ -341,9 +344,10 @@ projection_build_explainer <- function(shown = NULL) {
       )),
       tags$li(tags$strong("A pressure bump for courses always near full."), paste0(
         " A course near full on the first day in every recent same-season term",
-        " with a first-day count is planned for ",
+        " with a first-day count gets ",
         projection_percent(defaults$pressure_bump_share),
-        " more, or for the students left waiting if that is more. A near-full",
+        " of last year's registrations on top of its forecast, or the students",
+        " left waiting if that is more. A near-full",
         " course's registrations follow its seats, so last year's count",
         " understates what it would draw, and that backlog stays whatever its",
         " feeders do. It changes the plan, never the forecast or its",
@@ -411,8 +415,9 @@ projection_error_explainer <- function(error_sources, range_coverage) {
     ),
     tags$p(
       "To judge one course, open it: its detail says whether its past misses",
-      " came when it was near full and its seats changed (the schedule's) or",
-      " when it had seats to spare (the forecast's)."
+      " came when it was near full and its seats moved the way of the miss or",
+      " held (the schedule's), or when it had seats to spare or its seats moved",
+      " against the miss (the forecast's)."
     ),
     description = paste0(
       "Past misses by cause, from ", format(error_sources$n_folds, big.mark = ","),
@@ -555,15 +560,15 @@ projection_detail_ui <- function(data, ns) {
         tags$dt("Feeder adjustment"), tags$dd(current$plan_feeder_note),
         tags$dt("Pressure bump"), tags$dd(current$pressure_bump_note),
         tags$dt("Saturation floor"), tags$dd(current$floor_note),
-        tags$dt("Fall deltas"),
+        tags$dt("Changes in the term just finished"),
         tags$dd(dplyr::coalesce(current$adjusted_delta_basis, "Not available")),
         tags$dt("Regime check"), tags$dd(current$regime_note),
         tags$dt("Capacity check"), tags$dd(current$capacity_limit_note)
       ),
       description = paste(
         "Why this method and this course were selected, the feeder and",
-        "pressure-bump arithmetic, and the floor, Fall-delta, regime, and",
-        "capacity checks behind the number above."
+        "pressure-bump arithmetic, and the floor, term-just-finished, regime,",
+        "and capacity checks behind the number above."
       ),
       class = "enrollment-projection-evidence"
     ),
@@ -851,9 +856,9 @@ projection_table_reactable <- function(projection_view, select_input) {
           title = paste(
             "How far past forecasts for this course landed from what",
             "happened, on average; beneath, in how many of those terms its",
-            "seats moved. A near-full course's miss as its seats changed is",
-            "the schedule's; a miss with seats to spare is the forecast's, and",
-            "is flagged"
+            "seats moved. A near-full course's miss as its seats moved the way",
+            "of the miss, or held, is the schedule's; a miss with seats to spare",
+            "is the forecast's, and is flagged"
           )
         )
       ),
@@ -1163,7 +1168,10 @@ enrollmentProjectionsUI <- function(id) {
     # Each explainer answers one question a reader brings to the page, and
     # its title says which. The methods guide sits below the table.
     projection_columns_explainer(),
-    projection_build_explainer(uiOutput(ns("pressure_summary"))),
+    projection_build_explainer(
+      uiOutput(ns("pressure_summary")),
+      track_record = uiOutput(ns("track_record"), inline = TRUE)
+    ),
     uiOutput(ns("error_sources")),
     navset_tab(
       id = ns("projection_tabs"),
@@ -1422,6 +1430,8 @@ enrollmentProjectionsServer <- function(id, bundles, load_bundle, programs) {
       }
       empty_state("No validated enrollment projection bundle is available.")
     })
+
+    output$track_record <- renderUI(view()$meta$track_record$sentence)
 
     output$pressure_summary <- renderUI({
       tags$p(
