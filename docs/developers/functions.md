@@ -8,7 +8,7 @@ parent: Developer Guide
 
 This reference is auto-generated from roxygen2 comments in the source code.
 
-*Generated: 2026-10-07 09:34:35.557617*
+*Generated: 2026-11-03 06:52:22.482573*
 
 ---
 
@@ -79,6 +79,132 @@ Analyze Cancelled Course Sections  Returns cancelled section rows and summary ta
 - `opt` - Filter options compatible with filter_DESRs().
 
 **Returns:** Named list with cancelled sections, summary tables, and status notes.
+
+---
+
+## catalog-comparison
+
+### `compare_catalog_sections()`
+
+*Source: catalog-comparison.R*
+
+**Language and explicit list-structure differences, keyed by stable source pid**
+
+Language and explicit list-structure differences, keyed by stable source pid  Revision ids and list positions are evidence, not matching keys. Formatting changes are separate; wording changes on a condition always require review.
+
+---
+
+## catalog-extraction
+
+### `extract_catalog_rule_tree()`
+
+*Source: catalog-extraction.R*
+
+**Preserve list nesting, explicit choice counts and AND bundles; retain prose**
+
+Preserve list nesting, explicit choice counts and AND bundles; retain prose as a condition requiring review. No attempt to infer eligibility is made.
+
+---
+
+### `extract_catalog_record()`
+
+*Source: catalog-extraction.R*
+
+**Extract configured public fields using the captured schema's labels/types**
+
+---
+
+### `catalog_rule_rows()`
+
+*Source: catalog-extraction.R*
+
+**Flatten one extracted tree for CSV review; every node retains its source**
+
+---
+
+### `catalog_source_issue_rows()`
+
+*Source: catalog-extraction.R*
+
+**Surface provider flags and coverage gaps without repairing or discarding data**
+
+---
+
+### `catalog_parse_credit_range()`
+
+*Source: catalog-extraction.R*
+
+**Parse a single credit figure or explicit range ("120" or "123-130")**
+
+---
+
+### `catalog_credit_mentions_in_text()`
+
+*Source: catalog-extraction.R*
+
+**Every "<label>: <number or range>" total-credit mention inside one section's text**
+
+---
+
+### `catalog_credit_conflict_rows()`
+
+*Source: catalog-extraction.R*
+
+**Flag total-credit mentions that conflict on one program's own captured page (e.g. a**
+
+Flag total-credit mentions that conflict on one program's own captured page (e.g. a structured Degree Hours field disagreeing with a "Grand Total Credits" figure printed elsewhere on that same page). Scoped deliberately to the program record itself: a concentration's own total almost always describes a smaller, different quantity (its share of the major, not the whole degree), so comparing it against the parent's Degree Hours produces false conflicts far more often than real ones (observed: 38 of ~115 programs in the 2026-2027 undergraduate scan). A later authored degree plan still needs a human decision on which number is correct; this only stops a same-page conflict from going unnoticed before the decision is made.
+
+---
+
+## catalog-milestones
+
+### `resolve_catalog_milestones()`
+
+*Source: catalog-milestones.R*
+
+**Resolve explicit program links to stable captured program identities**
+
+Resolve explicit program links to stable captured program identities Uncaptured targets stay conditions; no matching by names or inferred codes.
+
+---
+
+### `catalog_milestone_rows()`
+
+*Source: catalog-milestones.R*
+
+**One shared milestone definition; rule-nodes.csv carries each cited use**
+
+One shared milestone definition; rule-nodes.csv carries each cited use Counts describe catalog references, not enrollment or campus analytics.
+
+---
+
+## catalog-normalization
+
+### `validate_catalog_normalization()`
+
+*Source: catalog-normalization.R*
+
+**Reject invented references, unsupported evidence and malformed AND/OR graphs**
+
+---
+
+## catalog-review
+
+### `build_catalog_review_items()`
+
+*Source: catalog-review.R*
+
+**One actionable work list, with separate source checks and section checks**
+
+---
+
+### `catalog_review_program_entities()`
+
+*Source: catalog-review.R*
+
+**Program scope includes its concentrations and the transitive course references**
+
+Program scope includes its concentrations and the transitive course references This is a reference closure, never a claim that all those courses are required.
 
 ---
 
@@ -181,7 +307,7 @@ Get Major Mix for a Course Set  Summarizes the major/program mix for students en
 
 - `students` - Data frame of student enrollments from cedar_students.
 - `programs` - Data frame of program records from cedar_programs.
-- `opt` - Options list. Supports course/term/campus/college filters accepted by filter_class_list(), plus min_n and top_n for display grouping.
+- `opt` - Options list. Supports course/term/campus/college filters accepted by filter_class_list(), plus min_n and top_n for display grouping, and optionally major_code_to_name (the cedar_lookups table of the same name, a named character vector) to label an enrollment-row major code that has no same-term program record. Codes it does not cover, or all codes when it is absent, are named from \code{programs}.
 
 **Returns:** Tibble with major_label, n_enrollments, n_students, pct_enrollments.
 
@@ -494,6 +620,28 @@ pairs %>% filter(course_a == "BIOL 2310")
 
 ---
 
+## course-planning-history
+
+### `get_course_planning_history()`
+
+*Source: course-planning-history.R*
+
+**Historical availability and first-class-day pressure for exact course codes**
+
+Historical availability and first-class-day pressure for exact course codes  The last nine possible terms end at settled enrollment. Keep course, delivery campus, college and session together. First day is reconstructed only from dated class-list statuses, never substituted with census or ever-registered.
+
+---
+
+### `get_gen_ed_planning_options()`
+
+*Source: course-planning-history.R*
+
+**Recent options from an explicit course pool, retaining the first-day grain.**
+
+Recent options from an explicit course pool, retaining the first-day grain. History is supplied by the feature; this cone never calls another cone.
+
+---
+
 ## course-sequence-effect
 
 ### `get_course_sequence_effect()`
@@ -522,15 +670,16 @@ Course Sequence Effect  Compares grades in course Y between students who passed 
 
 *Source: credit-hours.R*
 
-**Rows that count toward student credit hours**
+**Rows that count toward student credit hours, and the hours each carries**
 
-Rows that count toward student credit hours  The one definition of an SCH row (definition credit-hours 2.0.0): a course registration that is still registered (RE/RS/RR) when the class list was pulled, excluding audits, which carry no credit. This is ATTEMPTED SCH.  SCH used to count only passing grades, i.e. earned hours. That made SCH grade-dependent, so a term had no SCH until its grades posted -- Fall 2026 was invisible on every credit-hour chart through the whole term while its registrations were already in the data. Workload is attempted hours; whether a student passes is an outcome, and outcomes have their own (graded) edge.  Late drops (DG/DW) are not counted: Banner zeroes their credits, so including them would change nothing in a settled term. In an in-progress term, students who will later withdraw are still registered, so its SCH runs slightly high until the term closes -- one reason the in-progress term is labelled.
+Rows that count toward student credit hours, and the hours each carries  The one definition of an SCH row (definition credit-hours 3.0.0). SCH is ATTEMPTED hours counted at census, the 15th day of instruction -- the count UNM's official enrollment report publishes -- with the end-of-term count kept beside it:  - `census_credits`: every enrollment still registered (RE/RS/RR) plus every late drop (DG/DW), the students who were in the course at census and withdrew after it. add_census_enrl() counts heads the same way. - `final_credits`: the still-registered enrollments alone, what is left at the end of term (definition 2.0.0's SCH). A late drop carries zero.  Banner zeroes a late drop's credits on the class list, so a late drop counts at its section's credit value: cedar_sections' credits_min where it equals credits_max, which matches the class-list credits of 100% of registered rows in fixed-credit sections. In a variable-credit section the hours the student chose are gone once they withdraw, so the row keeps what the class list recorded, almost always zero (0.7% of late drops: music lessons, independent study, thesis).  SCH used to count only passing grades (earned hours, 1.0.0), which hid a term until its grades posted; whether a student passes is an outcome, and outcomes have their own (graded) edge. Audits carry no credit and are excluded, as are waitlists and early drops (DR/DD), which leave before census. Before a term's census date no one has late-dropped yet, so its census credits are current registration -- one reason an in-progress term is labelled.
 
 **Parameters:**
 
-- `students` - cedar_students rows. Requires registration_status_code, final_grade, credits.
+- `students` - cedar_students rows. Requires term, crn, registration_status_code, final_grade, credits.
+- `sections` - cedar_sections rows for those terms. Requires term, crn, credits_min, credits_max.
 
-**Returns:** The qualifying rows.
+**Returns:** The qualifying rows, with census_credits and final_credits added.
 
 ---
 
@@ -540,15 +689,16 @@ Rows that count toward student credit hours  The one definition of an SCH row (d
 
 **Summarize credit hours by term, campus, college, department, subject, and level**
 
-Summarize credit hours by term, campus, college, department, subject, and level  This is the foundational summary used by all department-level SCH plots. It counts attempted credit hours -- every still-registered enrollment, see filter_sch_rows() -- so a term has SCH as soon as it has registrations.  The result includes both individual level rows (lower/upper/grad) AND a "total" row per group that sums across all levels — so downstream callers can choose either view without re-aggregating.
+Summarize credit hours by term, campus, college, department, subject, and level  This is the foundational summary used by all department-level SCH plots. It counts attempted credit hours at census, with the end-of-term count beside it (see filter_sch_rows()), so a term has SCH as soon as it has registrations.  The result includes both individual level rows (lower/upper/grad) AND a "total" row per group that sums across all levels — so downstream callers can choose either view without re-aggregating.
 
 **Parameters:**
 
 - `students` - cedar_students data frame
+- `sections` - cedar_sections data frame, for late drops' credit values.
 - `term_start,term_end` - Optional integer term-code bounds.
 - `departments,colleges,campuses` - Optional scope filters. When both departments and colleges are supplied, rows matching either are retained.
 
-**Returns:** Long-format data frame with columns: term, campus, college, department, subject_code, level, total_hours. Level values: "lower", "upper", "grad", "total".
+**Returns:** Long-format data frame with columns: term, campus, college, department, subject_code, level, total_hours (SCH at census), and final_hours (SCH still registered at the end of term). Level values: "lower", "upper", "grad", "total".
 
 ---
 
@@ -558,7 +708,7 @@ Summarize credit hours by term, campus, college, department, subject, and level 
 
 **Infer the college that owns a department for SCH comparisons**
 
-Infer the college that owns a department for SCH comparisons  Uses attempted SCH in the selected term/campus scope when possible, then falls back to all rows for the department. Weighting by SCH is more robust than counting already-summarized rows, especially when a department has multiple subject codes or uneven course levels.
+Infer the college that owns a department for SCH comparisons  Uses census SCH in the selected term/campus scope when possible, then falls back to all rows for the department. Weighting by SCH is more robust than counting already-summarized rows, especially when a department has multiple subject codes or uneven course levels.
 
 ---
 
@@ -573,10 +723,11 @@ Filter and normalize student data for credit-hours-by-major analysis  Before we 
 **Parameters:**
 
 - `students` - cedar_students data frame
+- `sections` - cedar_sections data frame, for late drops' credit values
 - `term_start` - Integer term code for the beginning of the analysis window
 - `term_end` - Integer term code for the end of the analysis window
 
-**Returns:** Filtered data frame, ready for major-level analysis
+**Returns:** Filtered data frame with census_credits, ready for major-level analysis
 
 ---
 
@@ -590,7 +741,7 @@ Summarize SCH by major and split into home vs. outside  For a given set of cours
 
 **Parameters:**
 
-- `level_data` - Filtered student enrollment rows for one course level Required cols: major, major_name, credits
+- `level_data` - Filtered student enrollment rows for one course level Required cols: major, major_name, census_credits
 - `major_codes` - Character vector of major codes that belong to this department (e.g., c("BIOL", "FBIO", "CHBI") for Biology)
 
 **Returns:** Named list with slots: major_summary — all majors with total hours home          — only the department's own majors outside       — all other majors home_hours, outside_hours, total_hours — scalar totals
@@ -625,7 +776,7 @@ Build the term-by-term data for the outside-major bar chart  The pie charts show
 
 **Parameters:**
 
-- `level_data` - Filtered student enrollment rows for one course level Required cols: major, major_name, credits, term
+- `level_data` - Filtered student enrollment rows for one course level Required cols: major, major_name, census_credits, term
 - `major_codes` - Home department major codes — excluded from outside count
 - `named_outside_codes` - The major_code values from build_outside_pie_data() $named_outside — these are the program codes that get their own bar color
 
@@ -717,6 +868,22 @@ Build subject-level credit hour data for the department's own plots  This prepar
 - `dept_code` - Department code
 
 **Returns:** Named list with three data frames: by_subj_level — one row per (term, subject, level), level is NOT "total"; used for the faceted chart showing each subject broken down by lower/upper/grad by_subj_total — one row per (term, subject), level IS "total"; used for the stacked chart and the data export table by_period     — one row per (term, level) with an added period_hours column (the sum across all subjects for that level and term); used for the by-level stacked bar
+
+---
+
+### `build_sch_census_final_data()`
+
+*Source: credit-hours.R*
+
+**Build the department's SCH at census and at the end of term**
+
+Build the department's SCH at census and at the end of term  One row per term for the main trend chart: census SCH (the headline every other chart uses) and the SCH still registered at the end of term, from the same rows as the subject-code charts so the totals agree. The gap between them is the credits of students who withdrew after census.
+
+**Parameters:**
+
+- `by_subj_total` - by_subj_total slot from build_dept_subject_data() (requires term, total_hours, final_hours)
+
+**Returns:** Data frame: term, census_hours, final_hours, withdrawn_hours
 
 ---
 
@@ -855,6 +1022,22 @@ Stacked bar: total credit hours by subject code across all levels  A simpler vie
 
 ---
 
+### `plot_sch_census_final()`
+
+*Source: credit-hours.R*
+
+**Line chart: department SCH at census and at the end of term**
+
+Line chart: department SCH at census and at the end of term  Census is the solid line, the end of term the dashed one; the space between them is the credits of students who withdrew after census, shown on hover.
+
+**Parameters:**
+
+- `census_final` - Output of build_sch_census_final_data()
+
+**Returns:** plotly line chart, or NULL if there are no terms
+
+---
+
 ### `plot_chd_by_level()`
 
 *Source: credit-hours.R*
@@ -884,7 +1067,9 @@ Credit Hours by Major  The main function for the "who is taking our courses" ana
 **Parameters:**
 
 - `students` - cedar_students data frame (pre-filtered to this department)
+- `sections` - cedar_sections data frame, for late drops' credit values
 - `dept_code` - Department code (e.g., "BIOL")
+- `major_codes` - Character vector of the department's home program codes (the caller resolves them, e.g. Dept Trends' `base$prog_codes` from `major_to_dept`). A student on one of these is a home major; everyone else is an outside major. May be empty for a unit with no degree programs; never guessed from `dept_code`.
 - `term_start,term_end` - Integer term codes for the analysis window (inclusive)
 - `include_all_ug` - Whether to build the additional all-undergraduate plots.
 - `include_wide_table` - Whether to build the all-level wide export table.
@@ -893,23 +1078,25 @@ Credit Hours by Major  The main function for the "who is taking our courses" ana
 
 ---
 
-### `plot_chd_by_fac_faceted()`
+### `credit_hours_by_fac()`
 
 *Source: credit-hours.R*
 
 **Credit Hours by Faculty Category**
 
-Credit Hours by Faculty Category  Shows how SCH production is distributed across faculty job categories — tenure-track, lecturer, adjunct, etc. Requires the cedar_faculty table, which is built from HR data and is not always available.
+Credit Hours by Faculty Category  Shows how SCH production is distributed across faculty job categories — tenure-track, lecturer, adjunct, etc. Requires the cedar_faculty table, which is built from HR data and is not always available. Not displayed by Dept Trends today (see `compute_dept_credit_hours_tab()`).
 
 **Parameters:**
 
-- `data_objects` - List containing cedar_students and cedar_faculty
+- `students` - cedar_students data frame
+- `sections` - cedar_sections data frame, for late drops' credit values
+- `faculty` - cedar_faculty data frame (term, instructor_id, department, job_category). An empty table returns the two "No faculty data available" placeholders; NULL is an error.
 - `dept_code` - Department code
 - `subj_codes` - Subject codes for plot titles
 - `term_start,term_end` - Integer term codes (inclusive)
 - `palette` - RColorBrewer palette name
 
-**Returns:** list($plots): chd_by_fac_facet_plot (breakdown by level), chd_by_fac_plot (totals stacked by job category)
+**Returns:** list($plots): chd_by_fac_facet_plot (breakdown by level), chd_by_fac_plot (totals stacked by job category); $tables: chd_fac_by_level, chd_fac_by_total
 
 ---
 
@@ -924,20 +1111,13 @@ Credit Hours for Dept Trends  Produces the full set of department-level SCH plot
 **Parameters:**
 
 - `class_lists` - cedar_students data frame (full — not pre-filtered to dept)
+- `sections` - cedar_sections data frame, for late drops' credit values
 - `dept_code` - Department code (e.g., "BIOL")
 - `subj_codes` - Subject codes used in plot titles (informational only)
 - `term_start,term_end` - Integer term codes for the analysis window (inclusive)
 - `palette` - RColorBrewer palette name for bar chart colors
 
-**Returns:** list with: $plots:  college_credit_hours_plot, college_credit_hours_comp_plot, college_dept_dual_plot, chd_by_year_facet_subj_plot, chd_by_year_subj_plot, chd_by_period_plot $tables: chd_by_period_table
-
----
-
-### `get_credit_hours_for_dept_report()`
-
-*Source: credit-hours.R*
-
-**Legacy wrapper for retired Rmd department report callers**
+**Returns:** list with: $plots:  college_credit_hours_plot, college_credit_hours_comp_plot, college_dept_dual_plot, chd_by_year_facet_subj_plot, chd_by_year_subj_plot, chd_by_period_plot, sch_census_final_plot $tables: chd_by_period_table, chd_census_final
 
 ---
 
@@ -1010,7 +1190,7 @@ Programs whose department is the identity fallback rather than a real one  The l
 
 - `programs` - cedar_programs.
 - `known_departments` - Character vector of real department codes, normally `subj_dept_map$dept_code`.
-- `department_less` - Major codes that legitimately have no department, so the screen does not report them forever. Defaults to the curated list in `R/lists/program_code_maps.R`.
+- `department_less` - Major codes that legitimately have no department. Since ADR-002 Stage 3 those are `basis = no_unit` rows in programs.csv and carry no dept_code, so none reaches this screen; the parameter stays for tables built before then.
 
 **Returns:** Rows in the cedar_mapping_issues shape.
 
@@ -1059,6 +1239,41 @@ Programs whose declared-major headcount far exceeds their graduates  A multi-yea
 - `min_days_after_start` - Integer. How long after a term begins its data must have been pulled before the term counts as settled. Default `14`, which clears add/drop. Needs an `as_of_date` column; without one `last_enrolled_complete` is NULL rather than a guess.
 
 **Returns:** Named list: `first_enrolled`, `last_enrolled`, `last_graded`, `last_degree` (NULL when `degrees` is not supplied), and `graded_by_term`, a tibble of `term` / `rows` / `graded_share` so a caller can show its work rather than asserting an edge. Any edge that cannot be determined is NULL, never a guess.
+
+---
+
+### `cedar_registration_settled()`
+
+*Source: data-edges.R*
+
+**Whether a pull came after a term's registration settled**
+
+Whether a pull came after a term's registration settled  The settled rule behind `last_enrolled_complete`, shared so every surface that labels moving counts uses the same test: a pull counts as settled once it came at least `min_days_after_start` days after the term began, which clears add/drop.
+
+**Parameters:**
+
+- `term` - Integer term codes.
+- `pulled` - Dates of the pulls, parallel to `term`.
+- `min_days_after_start` - Integer. Pass the edges' `min_days_after_start`.
+
+**Returns:** Logical, parallel to `term`; NA where `term` or `pulled` is NA.
+
+---
+
+### `cedar_report_edges()`
+
+*Source: data-edges.R*
+
+**The app's report edges, computed once at startup**
+
+The app's report edges, computed once at startup  The one place global.R and the cache-warming scripts get their right edges, so the app and the caches it reads agree on them. Nothing caps them at `cedar_current_term`: a term with registrations is the newest enrolled term the day it lands, and the settled rule in [cedar_data_edges()] already keeps it out of trend comparisons until its registration has settled.  The settled and graded edges are required. Several surfaces read a NULL bound as "no bound" (Pathways' population window, for one), so an edge the data cannot determine stops startup rather than being guessed from the configured current term or silently lifted.
+
+**Parameters:**
+
+- `students` - Data frame. `cedar_students`.
+- `degrees` - Data frame or NULL. `cedar_degrees`, for `last_degree`.
+
+**Returns:** Named list: `edges` (the full [cedar_data_edges()] result), `graded_through` (`last_graded`), `report_end_term` (`last_enrolled_complete`) and `report_latest_term` (`last_enrolled`).
 
 ---
 
@@ -1183,6 +1398,122 @@ Snapshot of credits and prior course history at the moment students first declar
 
 ---
 
+## degree-requirements
+
+### `degree_rule_outline()`
+
+*Source: degree-requirements.R*
+
+**One row per rule; nested alternatives retain their depth and timing language**
+
+---
+
+### `attach_pathway_groups()`
+
+*Source: degree-requirements.R*
+
+**Classify a course once for descriptive pathways, never as degree fulfillment**
+
+---
+
+### `build_degree_roadmap()`
+
+*Source: degree-requirements.R*
+
+**Schedule one selected route using prerequisite timing and authored semester floors**
+
+Schedule one selected route using prerequisite timing and authored semester floors  Metadata only: no transcript, admission, availability or degree-audit inference. Courses are placed by prerequisite timing, course-count conditions, the upper-level planning stage and the credit maximum; other degree work then fills each semester toward the usual load.
+
+---
+
+### `resolve_degree_entry_routes()`
+
+*Source: degree-requirements.R*
+
+**The entry courses each starting point adds, and the degree credit it already earned**
+
+The entry courses each starting point adds, and the degree credit it already earned  Math placement resolves per program: a statistics major never inherits the calculus sequence. English routes are shared by every program.
+
+---
+
+### `prepare_degree_roadmap_nodes()`
+
+*Source: degree-requirements.R*
+
+**The program's tiles plus the shared entry courses its routes use, typed for scheduling**
+
+---
+
+### `schedule_degree_roadmap()`
+
+*Source: degree-requirements.R*
+
+**Place each course in the earliest semester its constraints allow**
+
+Place each course in the earliest semester its constraints allow  A course is ready once every prerequisite is placed and each of its course-count conditions has enough pool members placed. Foundation courses go first and file order breaks ties. A course then waits for its prerequisites (a "before" link adds a semester), for the earliest qualifying pool completions, and for a semester with room under `max_load`.
+
+**Returns:** list(nodes with `semester` set, loads = credits per semester).
+
+---
+
+### `allocate_degree_semester_credits()`
+
+*Source: degree-requirements.R*
+
+**Per-semester credits: shown courses plus other degree work**
+
+Per-semester credits: shown courses plus other degree work  Other degree work fills each semester toward the usual load first; the permitted maximum absorbs the remainder. The horizon grows with the workload rather than forcing the baseline number of semesters.
+
+---
+
+### `assign_degree_roadmap_rows()`
+
+*Source: degree-requirements.R*
+
+**Align authored course families after scheduling; never change their semesters**
+
+Align authored course families after scheduling; never change their semesters  Math and writing rows are reserved. Other families may share a row only outside each other's full semester span, so gaps inside a sequence remain visible.
+
+---
+
+### `build_degree_allowance_slots()`
+
+*Source: degree-requirements.R*
+
+**Break every semester's planning allowance into course-sized slots without adding credit**
+
+Break every semester's planning allowance into course-sized slots without adding credit  Later semesters get cards too, the same size as a course, so elective and minor space is not overlooked. Suggestions have no prerequisite edges and never become catalog requirement nodes.
+
+---
+
+### `layout_degree_roadmap_bands()`
+
+*Source: degree-requirements.R*
+
+**Stack the board's bands: Gen Ed, math and writing, electives, then the program**
+
+Stack the board's bands: Gen Ed, math and writing, electives, then the program  Read top-left to bottom-right, the board moves from breadth to the major's upper-level work. Math and writing are early work and stay near Gen Ed; elective space is mostly later and sits just above the program's courses. Rows are shared across semesters, so each band is as tall as its fullest semester. `family_row` is the row from `assign_degree_roadmap_rows()`, whose math and writing rows come first. Layout never changes a semester or a credit.
+
+---
+
+### `get_degree_chain_metrics()`
+
+*Source: degree-requirements.R*
+
+**Prerequisite burden and downstream reach on the selected route, not readiness**
+
+Prerequisite burden and downstream reach on the selected route, not readiness  Counts unique direct and indirect prerequisite courses (a lecture/lab pair counts twice), the longest chain of earlier semesters, and the courses that depend on each one. `upstream_ids` / `downstream_ids` carry the same chains to the browser, which draws them without walking the graph itself.
+
+---
+
+### `attach_degree_roadmap_evidence()`
+
+*Source: degree-requirements.R*
+
+**Resolve why a tile is present against a year-specific program or requisite citation**
+
+---
+
 ## degrees
 
 ### `count_degrees()`
@@ -1222,7 +1553,7 @@ degree_summary %>%
 
 ---
 
-### `plot_degrees_for_dept_report()`
+### `degree_major_facet_layout()`
 
 *Source: degrees.R*
 
@@ -1238,8 +1569,9 @@ Generate Degree Visualizations for Dept Trends  Prepares degree analysis data, p
 - `term_start` - Integer. Starting term code for filtering (e.g., 201980).
 - `term_end` - Integer. Ending term code for filtering (e.g., 202580).
 - `palette` - Character. Brewer palette name or explicit color vector. Use NULL to inherit the shared CEDAR palette.
+- `n_majors` - Number of major facets.
 
-**Returns:** List with structure: list( plots  = list(degree_summary_faceted_by_major_plot, degree_summary_filtered_program_stacked_plot), tables = list(degree_summary_filtered_program) )
+**Returns:** list(per_row, nrows, height_px).
 
 **Details:**
 
@@ -1261,6 +1593,12 @@ result <- get_degrees_for_dept_report(
 result$plots$degree_summary_faceted_by_major_plot
 result$tables$degree_summary_filtered_program
 }
+
+Grid for the By Major degree chart: small multiples, three to a row
+
+The plot builder and the page that holds the chart both read this, so a
+department with many majors gets a taller chart instead of squeezing every
+row of facets into a fixed box.
 
 ```
 
@@ -1336,6 +1674,73 @@ Add the three interpretable class-list lifecycle counts  Banner class-list extra
 
 ---
 
+### `class_list_status_date_coverage()`
+
+*Source: enrl.R*
+
+**Which terms' class lists carry Registration Status Dates**
+
+Which terms' class lists carry Registration Status Dates  First-day enrollment (calc_first_day_enrl()) needs a status date on every registered or dropped row; waitlist rows never count. A class list exported without the column has none, so a whole term lacks first-day counts until it is re-pulled. Surfaces report that from here instead of naming terms in prose, which goes stale the day the term is re-pulled.
+
+**Parameters:**
+
+- `students` - cedar_students (term, registration_status_code, registration_date).
+
+**Returns:** Tibble: term, n_rows (registered or dropped rows), n_dated, coverage ("none", "partial" or "complete"), one row per term.
+
+---
+
+### `calc_first_day_enrl()`
+
+*Source: enrl.R*
+
+**Reconstruct first-class-day enrollment from class-list status dates**
+
+Reconstruct first-class-day enrollment from class-list status dates  Unlike `first_day_proxy` (everyone ever registered), this reads each row's Registration Status Date against its section's first class day. A student was enrolled that day when a row is still registered with a status date on or before it, or is a drop (early or late) dated after it. A student with several rows in a group — listings merged under one code — counts once if any row places them there.  Class lists record only the date of each row's current status, so a student who added after day one and later dropped counts as present: the date of joining is gone. A group is reconstructed only when every enrolled or dropped row has a status date, its section has a start date, and that row was pulled on or after that day. Otherwise `first_day_enrl` is NA, never a partial count; class lists pulled before status dates were exported carry none. Waitlist rows are exempt: they never count, and CEDAR keeps waitlists from pulls taken before classes began.  `first_day_basis` says which: `"complete"`, `"sessions_pending"` (every row is dated but some section had not begun when the class list was pulled -- a second-half session during the term, ISSUES.md I28) or `"undated"` (a status or start date is missing, ISSUES.md M32). `first_day_started_enrl` counts the same way over the sections that had begun: equal to `first_day_enrl` when complete, a lower bound on it while sessions are pending, NA when undated.
+
+**Parameters:**
+
+- `students` - Class-list rows with `student_id`, `crn`, `registration_status_code`, `registration_date`, `as_of_date`, and the `campus`, `college`, `term`, `subject_course` grouping columns.
+- `sections` - Section rows supplying each `(term, crn)`'s `start_date`.
+- `by_part_term` - Retain each session as its own enrollment count.
+- `pool_campuses` - Count each student once per term and course across every campus and college in `students`, for a named planning market whose rows the caller has already restricted to its declared campuses.
+
+**Returns:** One row per campus, college, term, and course with `first_day_enrl`, `first_day_basis` and `first_day_started_enrl` (per term and course when `pool_campuses`).
+
+---
+
+### `add_first_day_enrl()`
+
+*Source: enrl.R*
+
+**Attach first-day enrollment to `calc_cl_enrls()` output**
+
+**Parameters:**
+
+- `cl_enrls` - A `calc_cl_enrls()` result built from `students`.
+- `students` - The class-list rows `cl_enrls` was counted from.
+- `sections` - Section rows supplying first class days.
+
+**Returns:** `cl_enrls`, ungrouped, with `first_day_enrl` from `calc_first_day_enrl()`.
+
+---
+
+### `summarize_listing_overlap()`
+
+*Source: enrl.R*
+
+**Count students listed under more than one code of a crosslist family**
+
+Count students listed under more than one code of a crosslist family  A student who switches codes inside a shared section holds a row under each: a drop or waitlist under one, a registration under the other. Each listing counts its own rows while the family total counts the student once, so listing counts can add up to more than the total. Naming these students lets a page explain that difference instead of leaving it to look like an arithmetic error.
+
+**Parameters:**
+
+- `students` - Class-list rows for one crosslist family, under their own codes (before any relabeling to the selected course).
+
+**Returns:** One row per campus, term, and pattern with `students`. `kind` is "moved" (registered under exactly one code: `to_code`; `from_code` names the others), "enrolled_both", "dropped_both" (every row a drop), or "other" (no registration and not all drops, such as a waitlist).
+
+---
+
 ### `capacity_saturation_metrics()`
 
 *Source: enrl.R*
@@ -1350,6 +1755,16 @@ Add the three interpretable class-list lifecycle counts  Banner class-list extra
 - `max_plausible_fill` - Fill rates above this value indicate unreliable capacity rather than a defensible ceiling.
 
 **Returns:** A tibble with census fill, remaining census seats, and capacity quality/constraint flags.
+
+---
+
+### `enrollment_capacity_metrics()`
+
+*Source: enrl.R*
+
+**Compare an explicitly selected enrollment lifecycle point with scheduled seats**
+
+Compare an explicitly selected enrollment lifecycle point with scheduled seats Callers own the numerator's meaning; first day and census must remain labelled.
 
 ---
 
@@ -1662,7 +2077,7 @@ Resolve every active section in a selected course's crosslist family  The select
 
 **Build crosslist-family class-list enrollment for one course**
 
-Build crosslist-family class-list enrollment for one course  Student records are matched to the selected course's full active section family through `(term, crn)`, then canonicalized to the selected course and its college before the standard `calc_cl_enrls()` calculation. This counts a student once when the same person appears under two codes in one crosslist family while retaining the canonical registration-status buckets.
+Build crosslist-family class-list enrollment for one course  Student records are matched to the selected course's full active section family through `(term, crn)`, then canonicalized to the selected course and its college before the standard `calc_cl_enrls()` calculation. This counts a student once when the same person appears under two codes in one crosslist family — as registered if they hold a seat under either listing — while retaining the canonical registration-status buckets.
 
 **Parameters:**
 
@@ -1670,7 +2085,7 @@ Build crosslist-family class-list enrollment for one course  Student records are
 - `sections` - `cedar_sections`.
 - `opt` - Standard CEDAR filter options including `course`.
 
-**Returns:** A list with `selected` (the chosen course code only) and `family` (every active partner, labeled with the selected course), both calculated by `calc_cl_enrls()`.
+**Returns:** A list with `listings` (each code in the family under its own code and college), `selected` (the chosen code's rows of `listings`), and `family` (every listing, labeled with the selected course and each student counted once), all calculated by `calc_cl_enrls()` with `calc_first_day_enrl()`'s `first_day_enrl` joined on, plus `overlap` from `summarize_listing_overlap()`. A student who switched listings appears in each listing's own status buckets, so listing counts need not sum to the family count.
 
 ---
 
@@ -1780,8 +2195,28 @@ Format an enrollment history series as display text  Renders a term-by-term seri
 - `term` - Term codes (vector), ordered oldest→newest.
 - `enrl` - Active enrollment per term (vector, parallel to \code{term}).
 - `has_active` - Logical per term: did the term have an active section? \code{NULL} treats every term as active (no cancelled "C" markers).
+- `campus` - Optional campus per term, prefixed to each term label (\code{"14 (ABQ Sp20)"}) when a series spans campuses.
 
 **Returns:** A single string; \code{"No history"} when \code{term} is empty.
+
+---
+
+### `classify_low_enrollment_terms()`
+
+*Source: enrl.R*
+
+**Which Low Enrollment view each selected term gets**
+
+Which Low Enrollment view each selected term gets  A term after `current_term` whose sections show no enrollment yet is only a schedule, so it gets the "concerns" view: each course against its own history. Every other term gets per-section "alerts" on its actual counts, including an upcoming term once registration has begun, because those counts are what review decisions are made from. Counts from a DESR pulled before the term's registration settled ([cedar_registration_settled()], the rule behind the settled data edge) are still moving; `registration_open` lets the page say so instead of presenting them as final. A term type ("fall") is not a dated term and is never upcoming or labelled.
+
+**Parameters:**
+
+- `sections` - cedar_sections; needs `term`, `enrolled`, `as_of_date`.
+- `terms` - Selected term values: six-digit codes or term types.
+- `current_term` - Integer. `cedar_current_term`.
+- `min_days_after_start` - Integer. The edges' `min_days_after_start`.
+
+**Returns:** Tibble, one row per selected term: `term` (as selected), `upcoming`, `has_enrollment`, `view` ("concerns" or "alerts"), `pulled_on` (newest DESR pull for the term; NA for a term type or a term with no sections) and `registration_open` (NA when there is no pull date).
 
 ---
 
@@ -1799,7 +2234,7 @@ Get enrollment concerns for a future term  Analyzes a future term's scheduled co
 - `opt` - Options list with filters (term, course_campus, dept, etc.)
 - `n_history_terms` - Number of prior same-type terms to average (default 4)
 
-**Returns:** Data frame with schedule + historical stats per course
+**Returns:** Data frame with schedule + historical stats per course. A course with no same-season history on its campus has `n_prior_terms` 0, `avg_enrl` NA, and `other_history_text` listing its latest offerings that ran in other seasons, on other campuses or as other topics (NA when there are none).
 
 ---
 
@@ -1861,6 +2296,34 @@ Create enrollment history string for display  Thin adapter over \code{\link{form
 
 ---
 
+## enrollment-projection-backtests
+
+### `projection_rolling_policy()`
+
+*Source: enrollment-projection-backtests.R*
+
+**Replay the selection rule at every fold of one course's aftcasts**
+
+**Parameters:**
+
+- `backtests` - Aftcast rows for one course market and term type, every method. Only rows with `target_term < current_term` are read.
+- `challengers` - Method ids allowed to challenge the default at `current_term`.
+- `current_term` - The target being published.
+
+**Returns:** `current`: the pick for `current_term` with its evidence and reason. `record`: the realised aftcast row the rule would have published at each historical fold, with a `policy_reason`.
+
+---
+
+### `select_projection_methods()`
+
+*Source: enrollment-projection-backtests.R*
+
+**Publish one method per course from leakage-safe rolling selection**
+
+Publish one method per course from leakage-safe rolling selection  Returns the selected candidate rows. The realised fold-by-fold record the rule produced is attached as `attr(, "policy_record")` so the cone can mark `backtests$policy_selected` without replaying the rule.
+
+---
+
 ## enrollment-projections
 
 ### `get_course_enrollment_projections()`
@@ -1879,7 +2342,25 @@ Project Class-List Demand and Section Need for Pressured Courses  Answers one qu
 - `force_courses` - Courses included even when pressure thresholds do not fire.
 - `opt` - Projection method and threshold options.
 
-**Returns:** A list containing pressure screen, published projections, delivery components, all current candidates, historical backtests, recent audit history, and performance.
+**Returns:** A list containing pressure screen, published projections, delivery components, all current candidates, historical backtests, recent audit history pooled and by delivery campus, and performance.
+
+---
+
+### `enrollment_projection_defaults()`
+
+*Source: enrollment-projections.R*
+
+**Every model option's default, in one place**
+
+Every model option's default, in one place  enrollment_projection_model_config() starts from this list, and helpers read an option a caller did not set through projection_option(), so no call site restates a default that could drift from this one.
+
+---
+
+### `projection_option()`
+
+*Source: enrollment-projections.R*
+
+**One model option: the caller's value, else the model default**
 
 ---
 
@@ -1981,6 +2462,25 @@ Attach Cumulative GPA to an Event Table  Joins `gpa_entering` onto rows keyed by
 
 ---
 
+## grouped-student-paths
+
+### `get_grouped_student_paths()`
+
+*Source: grouped-student-paths.R*
+
+**When does a population take each kind of coursework?**
+
+**Parameters:**
+
+- `students` - cedar_students; all history is needed to anchor the clock.
+- `population` - build_population() output, including relevant_until.
+- `groups` - Validated subject-to-descriptive-group table.
+- `opt` - data_edges (required), campus, max_terms, min_n, min_band_n.
+
+**Returns:** Suppressed group/campus/relative-term cells, safe course detail and metadata.
+
+---
+
 ## headcount
 
 ### `normalize_headcount_opt()`
@@ -1996,6 +2496,23 @@ Attach Cumulative GPA to an Event Table  Joins `gpa_entering` onto rows keyed by
 - `lookups` - Optional college-code-to-name lookup.
 
 **Returns:** Normalized filter options.
+
+---
+
+### `filter_programs_to_dept()`
+
+*Source: headcount.R*
+
+**Program rows that belong to a department**
+
+Program rows that belong to a department  A row belongs to the department its own `dept_code` names -- nothing else. Since ADR-002 Stage 3 that is the unit the mapping files give the program (a concentration takes its primary major's). Matching by program name as well credited a department with every program sharing a name with one of its own: ASPE's "Engineering" pulled in 231-246 ENG graduate students a term (ISSUES.md I15). The Headcount tab, Dept Trends and the Dept Dashboard all scope through here, so they cannot disagree about which rows count.
+
+**Parameters:**
+
+- `programs` - cedar_programs rows.
+- `dept_code` - One or more department (unit) codes.
+
+**Returns:** The rows whose dept_code is one of them.
 
 ---
 
@@ -2017,7 +2534,7 @@ Filter Programs Data by Options  Helper function that applies institutional and 
 
 **Details:**
 
-**Filtering strategy**  Campus and college are row-level filters. Because these attributes are the same across all program rows for a student in a given term, row-level filtering is equivalent to student-level filtering and safe to apply directly.  Dept is a row-level filter: program rows must match by dept_code or the program-to-department lookup. Cross-dept combinations (e.g. History major + Anthropology minor) are handled by using the major/minor/concentration filters directly instead of the dept filter.  Major, minor, and concentration each independently find matching student-term pairs, then intersect them. A student must satisfy every active program filter in the same term (AND across filters; OR among selections within one filter). Records with a missing student ID or term cannot establish membership and are excluded when a program filter is active. Only rows for the primary filter are returned (major > minor > concentration), so the plot does not add secondary program types as separate series.
+**Filtering strategy**  Campus and college are row-level filters. Because these attributes are the same across all program rows for a student in a given term, row-level filtering is equivalent to student-level filtering and safe to apply directly.  Dept is a row-level filter on each row's own dept_code (\code{\link{filter_programs_to_dept}}), never on program name (ISSUES I15). Cross-dept combinations (e.g. History major + Anthropology minor) are handled by using the major/minor/concentration filters directly instead of the dept filter.  Major, minor, and concentration each independently find matching student-term pairs, then intersect them. A student must satisfy every active program filter in the same term (AND across filters; OR among selections within one filter). Records with a missing student ID or term cannot establish membership and are excluded when a program filter is active. Only rows for the primary filter are returned (major > minor > concentration), so the plot does not add secondary program types as separate series.
 
 ---
 
@@ -2034,13 +2551,13 @@ Summarize Headcount Data  Helper function that groups and counts students from f
 - `df` - Filtered programs data frame (from filter_programs_by_opt)
 - `has_program_filter` - Boolean indicating if program filters were applied
 - `group_by` - Character vector of column names to group by. When NULL: - No program filter: groups by c("term", "student_level", "program_type") - Program filter active: groups by c("term", "student_level", "program_type", "program_name") Pass explicitly for custom aggregations (e.g. SFR: c("term", "dept_code", "student_level")).
-- `lookups` - Optional list with \code{program_name_lookup} (program_name → dept_code) and \code{dept_name_lookup} (dept_code → dept_name), used only to roll a broad program selection up to department totals (see Details).
+- `lookups` - Optional list with \code{dept_name_lookup} (dept_code → dept_name), used only to name departments when a broad program selection is rolled up to department totals (see Details).
 
 **Returns:** Data frame with columns from group_by plus student_count (distinct student IDs)
 
 **Details:**
 
-**Department/unit rollup**  When no explicit \code{group_by} is given and a program filter selects more than \code{UNIT_ROLLUP_THRESHOLD} distinct programs (e.g. every major in a college), faceting one panel per program doesn't scale. In that case the data is regrouped by the program's owning department (via \code{program_name_lookup}) instead of by individual program, and \code{attr(result, "rolled_up_by_dept")} is set to TRUE so \code{\link{make_headcount_plots_by_level}} can facet/label by department.
+**Department/unit rollup**  When no explicit \code{group_by} is given and a program filter selects more than \code{UNIT_ROLLUP_THRESHOLD} distinct programs (e.g. every major in a college), faceting one panel per program doesn't scale. In that case the data is regrouped by each row's own department (\code{dept_code}) instead of by individual program, and \code{attr(result, "rolled_up_by_dept")} is set to TRUE so \code{\link{make_headcount_plots_by_level}} can facet/label by department.
 
 ---
 
@@ -2115,6 +2632,42 @@ result <- get_headcount(
 }
 
 ```
+
+---
+
+### `headcount_scope_facts()`
+
+*Source: headcount.R*
+
+**What a headcount run actually counted**
+
+What a headcount run actually counted  Facts read off the run itself -- not the filter inputs -- so the page can say exactly what its numbers mean. Shared by the Headcount tab and the Dept Dashboard (see describe_headcount_scope()).
+
+**Parameters:**
+
+- `df` - The filtered program rows the count was taken over.
+- `summarized` - The summarized counts (only its columns are read).
+- `opt` - The normalized options.
+- `rolled_up_by_dept` - Whether programs were rolled up to departments.
+
+**Returns:** A list: program_types, levels, terms, campus, department_rule, dept_codes, grouping, n_pre_major (pre-major students in the latest term), latest_term.
+
+---
+
+### `describe_headcount_scope()`
+
+*Source: headcount.R*
+
+**The scope of a headcount, in words**
+
+The scope of a headcount, in words  One labelled part per fact, for a scope bar: what is counted, where, which terms, how departments were decided, and how to read totals across groups.
+
+**Parameters:**
+
+- `facts` - headcount_scope_facts() output, or a list of the same shape.
+- `in_progress_terms` - Terms still in progress, labelled as such: `cedar_in_progress_terms(edges)$term`.
+
+**Returns:** A named character vector, in display order.
 
 ---
 
@@ -2416,9 +2969,9 @@ Courses students were taking in the term before a major switch appeared  Answers
 
 *Source: mapping-provenance.R*
 
-**Files whose content decides cedar_programs$dept_code**
+**Files whose content decides the stored units and colleges**
 
-Files whose content decides cedar_programs$dept_code  Institution configuration plus the transform logic that consumes it. A change to any of them can move a student between departments.
+Files whose content decides the stored units and colleges  The institution mapping files plus the code that reads them into the CEDAR tables (ADR-002). A change to any of them can move a student or a course between departments or colleges.
 
 ---
 
@@ -2436,20 +2989,46 @@ Files whose content decides cedar_programs$dept_code  Institution configuration 
 
 ---
 
+### `cedar_table_mapping_drift()`
+
+*Source: mapping-provenance.R*
+
+**Has the mapping source moved since a CEDAR table was built?**
+
+Has the mapping source moved since a CEDAR table was built?  Reads only the stamped attribute, never a CEDAR table, so it is cheap enough to run on every deploy.
+
+**Parameters:**
+
+- `table_file` - Path to the table's .qs file.
+- `base_dir` - Repository root.
+- `table` - The table's name, for the reason: "cedar_programs".
+
+**Returns:** NULL when current, otherwise a human-readable reason. Anything unreadable or unstamped counts as drift: rebuilding costs minutes, while serving units built by unknown code is how a stale map went unnoticed for nine months.
+
+---
+
 ### `cedar_programs_mapping_drift()`
 
 *Source: mapping-provenance.R*
 
 **Has the mapping source moved since cedar_programs was built?**
 
-Has the mapping source moved since cedar_programs was built?  Reads only the stamped attribute, never a CEDAR table, so it is cheap enough to run on every deploy.
+Has the mapping source moved since cedar_programs was built?  cedar_table_mapping_drift() for cedar_programs, which Admin > Data & Usage reports as the mapping freshness.
+
+---
+
+### `cedar_stale_mapped_tables()`
+
+*Source: mapping-provenance.R*
+
+**Which mapped tables in a data directory are stale?**
 
 **Parameters:**
 
-- `programs_file` - Path to cedar_programs.qs.
+- `data_dir` - The directory holding cedar_<table>.qs.
 - `base_dir` - Repository root.
 
-**Returns:** NULL when current, otherwise a human-readable reason. Anything unreadable or unstamped counts as drift: rebuilding costs minutes, while serving departments built by unknown code is how this went unnoticed for nine months.
+**Returns:** A named character vector: for each table in CEDAR_MAPPED_TABLES that needs a rebuild, the reason. Empty when all are current.
 
 ---
 
@@ -2914,6 +3493,20 @@ Build a Demographic Population  Identifies students based on demographic indicat
 
 ---
 
+### `population_group_default()`
+
+*Source: population.R*
+
+**The group a surface preselects**
+
+**Parameters:**
+
+- `surface` - One of CEDAR_POPULATION_GROUP_SURFACES ("pathways", "scenario").
+
+**Returns:** The group id population_groups.csv marks default_for that surface, else the first group in the file. Documented, not a silent fallback: a file that names no default for a surface gets its first group.
+
+---
+
 ### `population_group_major_codes()`
 
 *Source: population.R*
@@ -2957,6 +3550,39 @@ Semantic annotations that apply to a population  Looks up CEDAR_DATA_SEMANTICS (
 - `opt` - The opt used to build the population; `program_names` or `dept_code` identifies which programs are in scope.
 
 **Returns:** A list of registry entries, empty when nothing applies.
+
+---
+
+## registration-snapshots
+
+### `build_registration_snapshot()`
+
+*Source: registration-snapshots.R*
+
+**Build one registration snapshot**
+
+**Parameters:**
+
+- `students` - `cedar_students` rows (all terms are accepted; only `opt$terms` are read).
+- `sections` - `cedar_sections` rows.
+- `opt` - `terms` (required): the terms to snapshot, normally those still in registration (see `registration_snapshot_terms()`).
+
+**Returns:** A tibble with `REGISTRATION_SNAPSHOT_COLUMNS`. `classlist_as_of` and `sections_as_of` are each term's newest pull date, `NA` for a source with no rows for the term. Within a source that has the term, a course it does not list is a measured zero (nobody registered yet, no active section); for a source without the term, that source's counts are `NA`, unknown.
+
+---
+
+### `validate_registration_snapshot()`
+
+*Source: registration-snapshots.R*
+
+**Check a snapshot read back from disk**
+
+**Parameters:**
+
+- `snapshot` - A tibble read from a snapshot file.
+- `source` - A label for the error message, normally the file path.
+
+**Returns:** `snapshot`, unchanged, or an error naming what is wrong.
 
 ---
 
@@ -3119,7 +3745,7 @@ Get Permanent Faculty Count from CEDAR Faculty Table  Calculates FTE (full-time 
 
 - `cedar_faculty` - Data frame from cedar_faculty table with columns: term, department, job_category, appointment_pct
 
-**Returns:** Data frame with columns: \itemize{ \item \code{term} - Term code \item \code{department} - Department code (lowercase) \item \code{total} - FTE count (sum of appointment percentages) } Returns NULL if cedar_faculty is NULL, empty, or missing required columns.
+**Returns:** Data frame with columns: \itemize{ \item \code{term} - Term code \item \code{department} - Department code (lowercase) \item \code{total} - FTE count (sum of appointment percentages) } Returns NULL when the faculty table has no rows (no HR data loaded). Stops if the table is NULL or missing a required column.
 
 **Details:**
 
@@ -3149,7 +3775,8 @@ Calculate Student-Faculty Ratios  Calculates student-faculty ratios (SFR) by mer
 
 **Parameters:**
 
-- `data_objects` - Named list containing: \itemize{ \item \code{academic_studies} - Academic study data for headcount calculation \item \code{cedar_faculty} - CEDAR faculty table with normalized columns }
+- `programs` - The \code{cedar_programs} table (one row per student-term program declaration) used for the headcount.
+- `faculty` - The \code{cedar_faculty} table used for permanent faculty FTE.
 
 **Returns:** Data frame with columns: \itemize{ \item \code{term} - Term code (CEDAR naming) \item \code{department} - Department code (CEDAR naming, lowercase) \item \code{student_level} - Student level (Undergraduate/Graduate/GASM) \item \code{program_type} - Type: "all_majors" or "all_minors" \item \code{program_name} - Program name \item \code{total} - Faculty FTE count \item \code{students} - Student headcount \item \code{sfr} - Student-faculty ratio (students/total) } Returns NULL if headcount or faculty data is unavailable.
 
@@ -3161,11 +3788,7 @@ Calculate Student-Faculty Ratios  Calculates student-faculty ratios (SFR) by mer
 ```r
 \dontrun{
 # Calculate SFRs
-data_objects <- list(
-  academic_studies = academic_studies_data,
-  cedar_faculty = cedar_faculty
-)
-sfr_data <- get_sfr(data_objects)
+sfr_data <- get_sfr(cedar_programs, cedar_faculty)
 
 # View undergraduate major SFRs for Fall 2025
 sfr_data %>%
@@ -3187,8 +3810,9 @@ Get SFR Data for Legacy Department-Level Analysis  Generates student-faculty rat
 
 **Parameters:**
 
-- `data_objects` - Named list containing cedar_programs and cedar_faculty data.
-- `dept_code` - Character. Department code (e.g., "HIST", "MATH").
+- `programs` - The \code{cedar_programs} table.
+- `faculty` - The \code{cedar_faculty} table.
+- `opt` - Named list. \code{dept_code} (required): the department to highlight, e.g. \code{"HIST"}.
 
 **Returns:** List with structure: list( plots  = list(ug_sfr_plot, grad_sfr_plot, sfr_scatterplot), tables = list() ) If insufficient data, plot values will be character strings instead of ggplot objects.
 
@@ -3200,17 +3824,44 @@ Plot specifications:  **Undergraduate SFR Plot**: \itemize{ \item X-axis: term \
 ```r
 \dontrun{
 # Generate SFR plots for History department
-data_objects <- list(
-  academic_studies = academic_studies_data,
-  cedar_faculty = cedar_faculty
-)
-result <- get_sfr_data_for_dept_report(data_objects, "HIST")
+result <- get_sfr_data_for_dept_report(cedar_programs, cedar_faculty,
+                                       opt = list(dept_code = "HIST"))
 print(result$plots$ug_sfr_plot)
 print(result$plots$grad_sfr_plot)
 print(result$plots$sfr_scatterplot)
 }
 
 ```
+
+---
+
+## shared-requirements
+
+### `read_shared_requirement_bundle()`
+
+*Source: shared-requirements.R*
+
+**Read and validate the shared reference bundle; optionally verify saved bytes**
+
+Read and validate the shared reference bundle; optionally verify saved bytes Source verification is explicit so a repository-only reader can inspect the rules without pretending that a missing local capture has been checked.
+
+---
+
+### `degree_shared_coverage()`
+
+*Source: shared-requirements.R*
+
+**Source-linked, illustrative coverage from the courses already on a roadmap**
+
+Source-linked, illustrative coverage from the courses already on a roadmap Membership is curricular, not enrollment data (CAMPUS_ROLLUP). A course is consumed once across base/flexible areas; its major credits are never added again. Open choices can advertise potential coverage but cannot satisfy it.
+
+---
+
+### `allocate_shared_degree_slots()`
+
+*Source: shared-requirements.R*
+
+**Earmark actual area gaps inside the existing allowance budget, never on top**
 
 ---
 
@@ -3337,30 +3988,6 @@ Compute Stop-Out Rates for One Group in One Course  Given one selected observati
 ---
 
 ## transform-to-cedar
-
-### `generate_program_map()`
-
-*Source: transform-to-cedar.R*
-
-**Build program_map from academic_studies**
-
-Build program_map from academic_studies  Parses Banner program codes from raw academic_studies data and resolves each to college_code, dept_code, degree_level, program_type, and canonical_code. Called by transform_to_cedar() when program_map.qs is absent.
-
-**Parameters:**
-
-- `as_file` - Path to academic_studies file (qs or Rds)
-- `ext` - File extension: ".qs" or ".Rds"
-- `subj_dept_map` - Data frame from subj_dept_map.R
-- `premaj_canon` - Named character vector from program_code_maps.R
-- `xvar_explicit` - Named character vector from program_code_maps.R
-- `extra_p2d` - Named character vector from program_code_maps.R
-- `known_suffixes` - Character vector of valid college suffixes
-- `real_F_progs` - Character vector of F-prefix codes that are not pre-majors
-- `get_lev` - Function that maps degree description → degree level string
-
-**Returns:** A tibble with columns: program_code, college_code, dept_code, major_code, degree_abbr, degree_level, program_type, canonical_code
-
----
 
 ### `transform_applicants()`
 
@@ -3559,12 +4186,13 @@ Scope the enrollment base to waitlist course keys  Keeps every historical term f
 
 **Attach per-course census-enrollment context to the waitlist course overview**
 
-Attach per-course census-enrollment context to the waitlist course overview  Enriches the waitlist count table with each course's current-term census enrollment, its historical average census enrollment (same term type, viewed term excluded), the count of reference terms behind that average, and the same-term-type census series used to draw a sparkline in the UI. This reference can include later terms when reviewing an older target; Regstats instead uses a strictly prior baseline. The count uses registered plus late drops (see \code{\link{add_census_enrl}}), the same class-list lifecycle numerator Regstats matches to DESR scheduled capacity for saturation. It is not a frozen census roster.  Enrollment history comes from the precomputed \code{cedar_cl_enrls_base} table (built in global.R) when it is in scope; outside the running app (tests, standalone scripts) it is recomputed via \code{\link{calc_cl_enrls}}, scoped to just the courses in the overview so the fallback stays cheap.
+Attach per-course census-enrollment context to the waitlist course overview  Enriches the waitlist count table with each course's current-term census enrollment, its historical average census enrollment (same term type, viewed term excluded), the count of reference terms behind that average, and the same-term-type census series used to draw a sparkline in the UI. This reference can include later terms when reviewing an older target; Regstats instead uses a strictly prior baseline. The count uses registered plus late drops (see \code{\link{add_census_enrl}}), the same class-list lifecycle numerator Regstats matches to DESR scheduled capacity for saturation. It is not a frozen census roster.  Enrollment history comes from \code{enrl_base}, the app's precomputed course-term enrollment table (\code{cedar_cl_enrls_base}, built in global.R and handed down by the caller). Without one (tests, standalone scripts) it is recomputed via \code{\link{calc_cl_enrls}}, scoped to just the courses in the overview so the recompute stays cheap. The cone never looks the table up by name.
 
 **Parameters:**
 
 - `count_df` - Waitlist course-overview table (one row per campus/college/ term/part_term/subject_course) from \code{\link{get_unique_waitlisted}}.
-- `students` - Student enrollment rows, used to recompute enrollment history when no precomputed base table is available.
+- `students` - Student enrollment rows, used to recompute enrollment history when no precomputed base table is passed.
+- `enrl_base` - Optional precomputed course-term enrollment rows (\code{calc_cl_enrls(students, by_part_term = TRUE)} over the whole class list). NULL recomputes from \code{students}.
 
 **Returns:** \code{count_df} with added columns \code{census_enrl} (current-term census enrollment), \code{census_enrl_mean} (historical average, viewed term excluded), \code{n_hist_terms} (reference terms behind the average), and the \code{trend_hist} / \code{trend_terms} list-columns the module renders as a sparkline. Returned unchanged when no enrollment source is available.
 
@@ -3582,6 +4210,7 @@ Inspect Waitlist by Major and Classification  Comprehensive waitlist analysis th
 
 - `students` - Data frame of student enrollments from cedar_students table. Must include columns: campus, college, term, term_type, major, student_classification, subject_course, course_title, level, and registration_status_code (or the backward-compatible registration_status).
 - `opt` - Options list for filtering: \itemize{ \item \code{course} - Course identifier(s) (e.g., "MATH 1430") \item \code{term} - Term code(s) (e.g., 202510) \item \code{subject} - Subject code(s) (e.g., "MATH") \item Other filtering options supported by \code{filter_class_list()} }
+- `enrl_base` - Optional precomputed course-term enrollment table (\code{cedar_cl_enrls_base}); passed on to \code{\link{attach_enrollment_history}}, which recomputes a scoped base from \code{students} when this is NULL.
 - `sections` - Optional cedar_sections table; only needed if students lacks a course_title column (titles are joined by term/subject_course)
 
 **Returns:** Named list with three elements: \itemize{ \item \code{majors} - Data frame summarizing waitlist by major/program. Columns: campus, term, subject_course, course_title, major, count \item \code{classifications} - Data frame summarizing waitlist by student level. Columns: campus, term, subject_course, course_title, student_classification, count \item \code{count} - Data frame of unique waitlisted students (see \code{\link{get_unique_waitlisted}}), enriched (when \code{sections} is supplied) with \code{n_sections} (active sections offered), \code{avg_size} (mean enrolled per section), and \code{sections_needed} (additional sections to clear the waitlist at the average size). }
