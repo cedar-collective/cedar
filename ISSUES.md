@@ -29,6 +29,7 @@ recurrence is recognizable.
 
 | ID | Kind | Summary |
 |---|---|---|
+| [I43](#i43--every-scheduled-refresh-fails-because-the-default-asks-for-a-report-mrgather-never-fetches) | Defect | Every scheduled refresh has failed since 2026-10-24: the default asks for the applicants report, which production mrgather never fetches, so production tables have not been rebuilt since Oct 27 (default fixed; mrgather and per-report rebuilds remain) |
 | [I38](#i38--a-pathways-program-population-misses-pre-majors-whose-name-differs-from-their-major) | Defect | A Pathways program population misses pre-majors whose name differs from their major: "Film and Digital Arts" holds 1 of the 1,016 Film pre-majors who never declared the major, because `FFDA` is named "FDMA" |
 | [I37](#i37--renumbered-courses-lose-their-history) | Defect | Renumbered courses lose their history: no crosswalk exists, so ACCT 3401 (was MGMT 340) and the other Fall 2026 ACCT, BUSA and POPH courses read as new |
 | [I33](#i33--a-crashed-myreports-download-is-recorded-as-a-successful-fetch) | Defect | A crashed MyReports download is recorded as a successful fetch: on Oct 23 class lists and applicants were never downloaded, and every step reported ✅ (partly fixed) |
@@ -67,6 +68,67 @@ Kept until the next release, so a recurrence is recognisable; each entry below g
 ---
 
 # Defects
+
+## I43 — Every scheduled refresh fails because the default asks for a report mrgather never fetches
+
+**Status:** default fixed 2026-11-03 (#186);
+mrgather and per-report rebuilds remain (see Still to do)
+**Found:** 2026-11-03, reading the production refresh logs
+**Severity:** high. Nothing wrong was published, but production stopped
+refreshing. `cedar_sections` and `cedar_programs` were last written on Oct 27
+at the morning run, and `cedar_students` by a manual class-list run that
+afternoon. The app has served those tables since.
+**Affects:** the default report list in `scripts/update-data.sh`, and mrgather
+(`/root/mrgather`, a separate repository; image built 2026-04-10).
+
+### What is wrong
+
+The 10:05 cron runs `update-data.sh -s 202680 -e 202710` and names no reports,
+so the script asks for all five: `desr deg as cl aa`. Production mrgather
+fetches only the first four. It accepts `aa` as an argument, never attempts
+it, and still reports "Total Downloads Attempted: 8, Successful: 8". The
+applicants table has not been refreshed since `admissions_applicants.qs` was
+written on 2026-06-19.
+
+Until 2026-10-24 that went unseen, because the fetch step trusted mrgather's
+exit status (I33). The I33 fix checks every requested report for a file from
+today. Since then, every scheduled run has stopped at the fetch, and the
+transform and every later step are skipped:
+
+```
+mrgather fetch               ❌      1146s    no file from today for: aa; see mrgather output
+transform-to-cedar.R         ✅      0s       prior step failed; transform not run
+```
+
+The four reports that did download are parsed and then never used. Oct 28 to
+Nov 3 each failed on `aa` alone; Oct 25–26 on `cl aa`; Oct 29 on all five (a
+login failure). Only the manual `cl` run of Oct 27 at 13:36 completed.
+
+### Reproduction
+
+On the droplet:
+
+```bash
+grep -E "Reports:|mrgather fetch|Total Downloads Attempted" /var/log/cedar-update-202611*_100501.log
+ls -la /root/shared-data/cedar_sections.qs /root/shared-data/cedar_students.qs
+```
+
+### Fix
+
+The default is `desr deg as cl`. The applicants report runs only when named
+(`update-data.sh -s 202680 desr deg as cl aa`). A test in
+`test-data-update-pipeline.R` pins the default; with `aa` back in it, the test
+fails.
+
+### Still to do
+
+- mrgather: fetch the applicants report, or refuse a report it cannot fetch
+  instead of accepting it and counting the rest as complete.
+- `update-data.sh`: one missing report skips every table, including those
+  built from the reports that arrived. I33's *Done when* asks only that the
+  tables built from a missing report are not rebuilt.
+- The run summary marks skipped steps ✅ ("transform-to-cedar.R ✅ 0s prior
+  step failed; transform not run"), so the failure shows only on its own line.
 
 ## I42 — A saturated course whose Fall changes lower its forecast is still called a floor
 

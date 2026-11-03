@@ -125,3 +125,14 @@ test_that("a fetch that produces no file from today fails, so nothing is republi
   # A failing mrgather is still reported by its exit code.
   expect_equal(exercise(fetch_rc = 3L), "STEP:FAILED|exit code 3")
 })
+
+
+# ISSUES.md I43: the cron names no reports, and the default asked for the
+# applicants report, which production mrgather never fetches. Under the check
+# above, every scheduled refresh failed from 2026-10-24 and kept the old tables.
+test_that("the scheduled refresh's default reports leave the applicants report out", {
+  script <- readLines("../../scripts/update-data.sh", warn = FALSE)
+  default <- grep("^\\[\\[ \\$\\{#REPORTS\\[@\\]\\} -eq 0 \\]\\]", script, value = TRUE)
+  expect_length(default, 1L)
+  expect_match(default, "REPORTS=(desr deg as cl);", fixed = TRUE)
+})
