@@ -2025,9 +2025,13 @@ cedar_students <- dplyr::bind_rows(
 )
 
 # Add columns present in real cedar_students that are derived or NA in designed data.
+# crn comes from the row's section, as it does in a Banner class list. A late
+# drop's credits are zero, as Banner records them; census SCH reads the credits
+# back from the section (filter_sch_rows(), credit-hours 3.0.0).
 cedar_students <- cedar_students %>%
   dplyr::mutate(
-    crn                   = NA_character_,
+    crn                   = cedar_sections$crn[match(section_id, cedar_sections$section_id)],
+    credits               = dplyr::if_else(registration_status_code %in% c("DG", "DW"), 0, credits),
     subject_code          = sub(" .*", "", subject_course),
     course_title          = NA_character_,
     level                 = dplyr::case_when(

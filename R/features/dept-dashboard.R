@@ -23,20 +23,22 @@
 
 # ── Credit hours by level trendlines ─────────────────────────────────────────
 
-get_credit_hours_by_level_data <- function(cedar_students, dept_code, n_years = 5,
-                                           campus = NULL) {
+get_credit_hours_by_level_data <- function(cedar_students, cedar_sections, dept_code,
+                                           n_years = 5, campus = NULL) {
   current_year <- as.integer(format(Sys.Date(), "%Y"))
   cutoff_year  <- current_year - (n_years - 1)
 
-  filter_sch_rows(cedar_students) %>%
+  # Census SCH (definition credit-hours 3.0.0), the same count Dept Trends uses.
+  cedar_students %>%
     dplyr::filter(
       department   == dept_code,
       level        %in% c("lower", "upper", "grad"),
       floor(term / 100) >= cutoff_year,
       if (!is.null(campus)) .data$campus %in% campus else TRUE
     ) %>%
+    filter_sch_rows(cedar_sections) %>%
     dplyr::group_by(term, level) %>%
-    dplyr::summarize(credit_hours = sum(credits, na.rm = TRUE), .groups = "drop") %>%
+    dplyr::summarize(credit_hours = sum(census_credits, na.rm = TRUE), .groups = "drop") %>%
     dplyr::mutate(
       level = factor(
         level,
@@ -53,14 +55,16 @@ get_credit_hours_by_level_data <- function(cedar_students, dept_code, n_years = 
 #' a department's instructional mix is shifting over time.
 #'
 #' @param cedar_students CEDAR students data frame (cedar_students).
+#' @param cedar_sections CEDAR sections data frame, for late drops' credit values.
 #' @param dept_code Department code string (e.g., "HIST").
 #' @param n_years Number of years to include (default 5). Filters to
 #'   academic years >= current_year - (n_years - 1).
 #' @return A plotly object, or NULL if insufficient data.
-plot_credit_hours_by_level <- function(cedar_students, dept_code, n_years = 5, campus = NULL) {
+plot_credit_hours_by_level <- function(cedar_students, cedar_sections, dept_code,
+                                       n_years = 5, campus = NULL) {
   message("[dept-dashboard.R] plot_credit_hours_by_level for ", dept_code)
 
-  ch <- get_credit_hours_by_level_data(cedar_students, dept_code, n_years, campus)
+  ch <- get_credit_hours_by_level_data(cedar_students, cedar_sections, dept_code, n_years, campus)
 
   plot_credit_hours_by_level_data(ch)
 }
@@ -98,7 +102,7 @@ plot_credit_hours_by_level_data <- function(ch) {
     )
 }
 
-get_dashboard_credit_hour_shifts <- function(cedar_students, dept_code, current_term,
+get_dashboard_credit_hour_shifts <- function(cedar_students, cedar_sections, dept_code, current_term,
                                              campus = NULL, n_years = 5L,
                                              hist_terms = 3L,
                                              min_abs_diff = 25,
@@ -119,7 +123,7 @@ get_dashboard_credit_hour_shifts <- function(cedar_students, dept_code, current_
   current_term <- as.integer(current_term[[1]])
   current_type <- get_term_type(current_term)
 
-  ch <- get_credit_hours_by_level_data(cedar_students, dept_code, n_years, campus)
+  ch <- get_credit_hours_by_level_data(cedar_students, cedar_sections, dept_code, n_years, campus)
   if (nrow(ch) == 0 || !any(ch$term == current_term)) return(empty)
 
   ch <- ch %>%
@@ -1718,7 +1722,7 @@ create_dept_dashboard_data <- function(data_objects, opt) {
     dashboard_headcount_scope_facts(programs_for_hc, dept_code, current_term)
 
   result$credit_hour_shifts <- get_dashboard_credit_hour_shifts(
-    cedar_students, dept_code, current_term, campus = campus
+    cedar_students, cedar_sections, dept_code, current_term, campus = campus
   )
 
   # Build course enrollment history via get_enrl (one row per course per campus per

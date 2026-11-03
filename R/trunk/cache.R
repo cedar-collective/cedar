@@ -224,15 +224,18 @@ clear_course_cache <- function(course_code) {
 #        MHA, and MPP) into a single unlabelled "Major" bar.
 #   v9 — charts run to the newest enrolled term (cedar_report_latest_term) and
 #        SCH is attempted rather than earned hours (credit-hours 2.0.0).
-cedar_dept_cache_version <- 9L
+#   v10 — SCH is counted at census, late drops at their section's credit value,
+#        with the end-of-term count beside it (credit-hours 3.0.0).
+cedar_dept_cache_version <- 10L
 
 # Include lookup-derived labels/department metadata where a tab uses them.
-# Credit Hours reads class lists only; no visible tab consumes faculty data.
+# Credit Hours reads class lists, and sections for late drops' credit values;
+# no visible tab consumes faculty data.
 DEPT_CACHE_TABLES <- list(
   hc = c("cedar_programs", "cedar_lookups"),
   enrl = c("cedar_students", "cedar_sections", "cedar_programs", "cedar_lookups"),
   deg = c("cedar_degrees", "cedar_lookups"),
-  ch = c("cedar_students", "cedar_lookups"),
+  ch = c("cedar_students", "cedar_sections", "cedar_lookups"),
   demo = "cedar_programs"
 )
 
@@ -408,7 +411,8 @@ load_dept_demographics_cache <- function(dept_code, data_objects, opt = list()) 
 # v8 aligns high-waitlist flags with class-list true demand.
 # v9 SCH shifts use attempted rather than earned hours (credit-hours 2.0.0).
 # v10 carries headcount_scope, the facts behind the headcount cards' scope bar.
-cedar_dept_dashboard_cache_version <- 10L
+# v11 SCH shifts count census SCH (credit-hours 3.0.0).
+cedar_dept_dashboard_cache_version <- 11L
 
 cache_value_or <- function(x, default) {
   if (is.null(x) || length(x) == 0) default else x

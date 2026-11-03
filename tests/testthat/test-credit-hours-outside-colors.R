@@ -23,7 +23,7 @@ hist_major_codes <- function() {
 }
 
 ch_result <- function() {
-  credit_hours_by_major(ch_fixture(), "HIST", hist_major_codes(),
+  credit_hours_by_major(ch_fixture(), test_sections, "HIST", hist_major_codes(),
                         cedar_report_start_term, cedar_report_end_term)
 }
 
@@ -81,19 +81,19 @@ ch_fixture_with_majors <- function() {
 test_that("credit_hours_by_major takes its home major codes from the caller (M12)", {
   # No major_codes: an error, never a lookup of major_to_dept or dept_code as a major code.
   expect_error(
-    credit_hours_by_major(ch_fixture(), "HIST",
+    credit_hours_by_major(ch_fixture(), test_sections, "HIST",
                           term_start = cedar_report_start_term, term_end = cedar_report_end_term),
     "major_codes"
   )
   expect_error(
-    credit_hours_by_major(ch_fixture(), "HIST", NULL,
+    credit_hours_by_major(ch_fixture(), test_sections, "HIST", NULL,
                           cedar_report_start_term, cedar_report_end_term),
     "major_codes"
   )
 
   st   <- ch_fixture_with_majors()
   run  <- function(codes) {
-    credit_hours_by_major(st, "HIST", codes, cedar_report_start_term, cedar_report_end_term,
+    credit_hours_by_major(st, test_sections, "HIST", codes, cedar_report_start_term, cedar_report_end_term,
                           include_all_ug = FALSE, include_wide_table = FALSE)
   }
   outside_hours <- function(r) {
