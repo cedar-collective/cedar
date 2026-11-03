@@ -29,16 +29,20 @@
 #   update-data.sh -s START_TERM -e END_TERM [reports]
 #
 # Examples:
-#   update-data.sh -s 202610 -e 202680              # All reports, Spring–Fall 2026
+#   update-data.sh -s 202610 -e 202680              # Default reports, Spring–Fall 2026
 #   update-data.sh -s 202610 desr deg               # Only DESR and degrees
-#   update-data.sh -s 202580                        # Single term, all reports
+#   update-data.sh -s 202580                        # Single term, default reports
+#   update-data.sh -s 202680 desr deg as cl aa      # Every report, applicants too
 #
-# Report options: desr deg as cl aa
+# Report options: desr deg as cl aa (default: desr deg as cl)
 #   desr = Department Enrollment Status Report (section data)
 #   deg  = Degrees (graduation data)
 #   as   = Academic Studies (program/major data)
 #   cl   = Class Lists (student enrollment data)
-#   aa   = Admissions Applicants (applicant detail data)
+#   aa   = Admissions Applicants (applicant detail data). Not in the default:
+#          production mrgather does not fetch it, and a requested report with
+#          no file from today fails the fetch, so asking for it by default
+#          stopped every scheduled refresh from 2026-10-24 (ISSUES.md I43).
 
 # No set -e: exit codes are tracked explicitly so we always print the final summary
 
@@ -147,7 +151,8 @@ Optional:
     CEDAR_TRENDS_WARM_DEPTS   comma list (overrides college-derived depts)
 
   -h               Show this help message
-  REPORTS          Space-separated list of reports to fetch (default: all)
+  REPORTS          Space-separated list of reports to fetch
+                   (default: desr deg as cl; aa only when named)
                    Options: desr deg as cl aa
 
 Examples:
@@ -198,7 +203,7 @@ if [[ -z "$START_TERM" ]]; then
 fi
 
 [[ -z "$END_TERM" ]] && { END_TERM="$START_TERM"; log_warning "No end term specified, using START_TERM: $END_TERM"; }
-[[ ${#REPORTS[@]} -eq 0 ]] && { REPORTS=(desr deg as cl aa); log_warning "No reports specified, using all: ${REPORTS[*]}"; }
+[[ ${#REPORTS[@]} -eq 0 ]] && { REPORTS=(desr deg as cl); log_warning "No reports specified, using the default: ${REPORTS[*]}"; }
 
 # ── Mode detection ────────────────────────────────────────────────────────────
 PROD_COMPOSE_EXISTS=false
