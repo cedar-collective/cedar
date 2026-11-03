@@ -165,7 +165,8 @@ projection_pressure_bump <- function(enrollment_history, section_history, rows,
     } else {
       sized_by <- if (waiting > share * spine) {
         paste0(
-          "the bump is the ", waiting, " students left waiting, more than ",
+          "the bump is the ", projection_count_noun(waiting, "student"),
+          " left waiting, more than ",
           share_label, " of last ", season, "'s ",
           format(round(spine), big.mark = ","), " registrations"
         )
