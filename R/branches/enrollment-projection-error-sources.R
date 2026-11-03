@@ -59,15 +59,50 @@ annotate_projection_fold_conditions <- function(backtests, enrollment_history,
 }
 
 
-# What a past forecast term's miss is attributable to, from its conditions.
-projection_fold_error_source <- function(seat_change, prior_near_full,
-                                         opt = list()) {
+# What each past forecast's miss is attributable to, from the conditions saved
+# with it (annotate_projection_fold_conditions()) and its first day. A course
+# near full on the first day registers about as many students as it has seats,
+# so a miss is the schedule's ("schedule") only when the seats moved and the
+# course was near full on the side the miss points to: seats added and the
+# forecast low, with the course near full the year before (demand held back)
+# or after (it filled the new seats); or seats cut and the forecast high,
+# with the course near full after (the cut capped it). Seats that held on a
+# course near full after it ("seats_full") also set the number. A course with seats to spare
+# could have registered more or fewer students than it did, so its miss is
+# the forecast's ("forecast"), whatever its seats did; so is a miss against
+# the way the seats moved. "unknown": the seats or the first day needed are
+# not in the data.
+projection_fold_miss_cause <- function(backtests, opt = list()) {
+  projection_require_columns(
+    backtests,
+    c("error", "fold_seat_change", "fold_prior_near_full", "actual_first_day",
+      "scheduled_capacity"),
+    "projection_fold_miss_cause()"
+  )
   change <- as.numeric(projection_option(opt, "seat_consistency_change"))
+  threshold <- as.numeric(projection_option(opt, "saturation_fill_threshold"))
+  after <- projection_capacity_metrics(
+    backtests$actual_first_day, backtests$scheduled_capacity,
+    reached_threshold = threshold
+  )
+  full_after <- dplyr::if_else(after$capacity_usable, after$capacity_reached, NA)
+  full_before <- as.logical(backtests$fold_prior_near_full)
+  seats <- as.numeric(backtests$fold_seat_change)
+  error <- as.numeric(backtests$error)
+  up <- is.finite(seats) & seats >= change
+  down <- is.finite(seats) & seats <= -change
+  held <- is.finite(seats) & !up & !down
   dplyr::case_when(
-    is.finite(seat_change) & abs(seat_change) >= change ~ "seats_changed",
-    !is.finite(seat_change) | is.na(prior_near_full) ~ "data_missing",
-    prior_near_full ~ "seats_held_full",
-    TRUE ~ "seats_held_room"
+    !is.finite(seats) | !is.finite(error) ~ "unknown",
+    (up & error > 0) | (down & error < 0) ~ "forecast",
+    up & (full_before %in% TRUE | full_after %in% TRUE) ~ "schedule",
+    down & full_after %in% TRUE ~ "schedule",
+    held & full_after %in% TRUE ~ "seats_full",
+    up & full_before %in% FALSE & full_after %in% FALSE ~ "forecast",
+    (down | held) & full_after %in% FALSE ~ "forecast",
+    # An exact hit has no cause and no weight.
+    error == 0 ~ "forecast",
+    TRUE ~ "unknown"
   )
 }
 
@@ -154,27 +189,32 @@ add_projection_seat_consistency <- function(projections, backtests,
 
 
 # Where the published rule's past forecast error came from: each aftcast it
-# would have published is attributed to the conditions it was made under, and
-# the error is summed by source. Most of it follows schedule changes, which no
-# demand model can see; only the seats-held-with-room source tests the
-# forecast of demand itself.
+# would have published is read by projection_fold_miss_cause(), split by
+# whether its seats held, and the error is summed by source. A near-full
+# course's misses follow its seats, which no demand model can see; the misses
+# with seats to spare, or with seats moving against the miss, are the
+# forecast's own (ISSUES.md I40).
 summarize_projection_error_sources <- function(backtests, opt = list()) {
   change_label <- scales::percent(
     as.numeric(projection_option(opt, "seat_consistency_change")), accuracy = 1
   )
   sources <- tibble::tibble(
-    source = c("seats_changed", "data_missing", "seats_held_full", "seats_held_room"),
+    source = c("schedule", "seats_full", "forecast_seats_moved",
+               "forecast_seats_held", "unknown"),
+    owner = c("schedule", "schedule", "forecast", "forecast", "unknown"),
     label = c(
-      paste("Seats changed", change_label, "or more"),
-      "Seat or first-day data missing",
-      "Seats held; course was near full",
-      "Seats held; course had room"
+      paste("Near full; seats moved", change_label, "or more the way of the miss"),
+      "Near full; seats held",
+      paste("Seats moved", change_label, "or more, but did not set the number"),
+      "Seats held; course had room",
+      "Seat or first-day data missing"
     ),
     meaning = c(
-      "The schedule moved. A near-full course's registrations follow its seats, so the miss is the schedule's.",
-      "The term's seats or first-day count are not in the data, so the cause cannot be told.",
+      "A near-full course's registrations follow its seats, so the schedule set the number.",
       "The seats filled again. Close, but it cannot show how many students the course turned away.",
-      "The one case that tests the forecast of demand itself."
+      "The course had seats to spare, or its seats moved against the miss, so the miss is the forecast's own.",
+      "The forecast's own, with nothing on the schedule to explain it.",
+      "The term's seats or first-day count are not in the data, so the cause cannot be told."
     )
   )
   empty <- dplyr::mutate(
@@ -184,7 +224,7 @@ summarize_projection_error_sources <- function(backtests, opt = list()) {
   projection_require_columns(
     backtests,
     c("policy_selected", "abs_error", "actual_classlist_total",
-      "fold_seat_change", "fold_prior_near_full"),
+      "fold_seat_change"),
     "summarize_projection_error_sources()"
   )
   policy <- backtests %>%
@@ -194,10 +234,17 @@ summarize_projection_error_sources <- function(backtests, opt = list()) {
     )
   if (nrow(policy) == 0L) return(empty)
   total_error <- sum(policy$abs_error)
+  change <- as.numeric(projection_option(opt, "seat_consistency_change"))
   by_source <- policy %>%
-    dplyr::mutate(source = projection_fold_error_source(
-      fold_seat_change, fold_prior_near_full, opt
-    )) %>%
+    dplyr::mutate(
+      cause = projection_fold_miss_cause(policy, opt),
+      held = is.finite(fold_seat_change) & abs(fold_seat_change) < change,
+      source = dplyr::case_when(
+        cause == "forecast" & held ~ "forecast_seats_held",
+        cause == "forecast" ~ "forecast_seats_moved",
+        TRUE ~ cause
+      )
+    ) %>%
     dplyr::group_by(source) %>%
     dplyr::summarise(
       folds = dplyr::n(),

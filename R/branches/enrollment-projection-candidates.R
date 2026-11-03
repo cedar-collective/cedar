@@ -107,6 +107,7 @@ projection_candidate <- function(method_id, estimate = NA_real_, applicable = FA
                                  floor_uplift = 0,
                                  floor_basis = NA_character_,
                                  preceding_term = NA_integer_,
+                                 waitlisted_preceding = NA_integer_,
                                  feeder_check = NA_character_,
                                  preceding_term_enrollment = NA_real_,
                                  preceding_term_change = NA_real_,
@@ -146,6 +147,7 @@ projection_candidate <- function(method_id, estimate = NA_real_, applicable = FA
     floor_uplift = as.numeric(floor_uplift),
     floor_basis = as.character(floor_basis),
     preceding_term = as.integer(preceding_term),
+    waitlisted_preceding = as.integer(waitlisted_preceding),
     feeder_check = as.character(feeder_check),
     preceding_term_enrollment = as.numeric(preceding_term_enrollment),
     preceding_term_change = as.numeric(preceding_term_change),
@@ -317,10 +319,12 @@ projection_spine_floor <- function(spine_row, section_history, waitlist_history,
       fmt_term(spine_term), " was saturated (",
       fill_text(saturation$fill_rate[[1]]), "); ",
       if (waitlisted > 0) {
-        paste0("floor is spine ", round(spine), " + ", waitlisted,
+        paste0("spine ", round(spine), " + ", waitlisted,
                " still waiting = ", round(floor_demand))
       } else {
-        "no waitlist rows retained for that term, so the floor is the spine itself"
+        # Capped, so the count understates demand; nothing measured lifts it,
+        # and it is no lower bound on this year (ISSUES.md I42).
+        "no waitlist rows retained for that term, so nothing is added to the spine"
       }
     )
   )
@@ -451,6 +455,23 @@ projection_distinct_enrolled <- function(enrollments, term, courses,
 }
 
 
+# Students left waiting in the term just finished who are on no class list
+# for the course in the market: context for the plan, never added to it,
+# because how many register next term cannot be measured until that term's
+# class lists arrive. NA, not zero, when that term is not observed or no
+# monitored course retained a waitlist row in it (class lists keep them only
+# from Summer 2026).
+projection_preceding_waitlist <- function(waitlist_history, row, preceding_term,
+                                          observed) {
+  if (!isTRUE(observed)) return(NA_integer_)
+  term_rows <- waitlist_history %>%
+    dplyr::filter(market_id == row$market_id, term == as.integer(preceding_term))
+  if (nrow(term_rows) == 0L) return(NA_integer_)
+  own <- term_rows %>% dplyr::filter(subject_course == row$subject_course)
+  if (nrow(own) == 0L) 0L else as.integer(own$waitlisted[[1]])
+}
+
+
 project_spine_adjusted <- function(history, preceding_term_history,
                                    section_history, waitlist_history,
                                    student_inputs, row, target_term,
@@ -498,10 +519,10 @@ project_spine_adjusted <- function(history, preceding_term_history,
   preceding_enrollment <- if (nrow(now_row) == 1L) now_row$classlist_total[[1]] else NA_real_
   delta_basis <- if (!preceding_observed) {
     paste("Preceding term", fmt_term(preceding_term),
-          "is not observed yet; no Fall deltas")
+          "is not observed yet, so no change from it is added")
   } else if (nrow(then_row) != 1L) {
     paste("No", fmt_term(prior_preceding_term),
-          "enrollment to measure the change against; no Fall deltas")
+          "enrollment to measure the change against, so no change is added")
   } else {
     rates <- projection_delta_rates(student_inputs, row, target_term, opt)
     then_enrollment <- then_row$classlist_total[[1]]
@@ -582,6 +603,10 @@ project_spine_adjusted <- function(history, preceding_term_history,
   }
   # Unknown when the preceding term is unobserved; never FALSE by default.
   regime_alarm <- if (is.finite(change)) abs(change) >= alarm_threshold else NA
+  waitlisted_preceding <- projection_preceding_waitlist(
+    waitlist_history, row, preceding_term,
+    observed = !is.null(enrollments) && preceding_term %in% enrollments$term
+  )
 
   estimate <- max(0, spine + floor$uplift + delta_repeat + delta_sequence + delta_feeder)
   projection_candidate(
@@ -610,6 +635,7 @@ project_spine_adjusted <- function(history, preceding_term_history,
     floor_uplift = floor$uplift,
     floor_basis = floor$basis,
     preceding_term = preceding_term,
+    waitlisted_preceding = waitlisted_preceding,
     feeder_check = feeder_check,
     preceding_term_enrollment = preceding_enrollment,
     preceding_term_change = change,

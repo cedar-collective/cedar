@@ -30,22 +30,11 @@ recurrence is recognizable.
 | ID | Kind | Summary |
 |---|---|---|
 | [I43](#i43--every-scheduled-refresh-fails-because-the-default-asks-for-a-report-mrgather-never-fetches) | Defect | Every scheduled refresh has failed since 2026-10-24: the default asks for the applicants report, which production mrgather never fetches, so production tables have not been rebuilt since Oct 27 (default fixed; mrgather and per-report rebuilds remain) |
-| [I40](#i40--the-projections-page-gave-a-forecasts-own-misses-to-the-schedule) | Defect | The projections page gave a forecast's own misses to the schedule: 7 of the 8 Spring 2027 courses whose past misses came with seats to spare read "the misses came when the seats moved", because any seat move counted (resolved 2026-10-29) |
-| [I39](#i39--projection-flags-called-last-years-same-season-term-last-term) | Defect | Projection flags called last year's same-season term "last term": a Spring 2027 course flagged "Full last term" was full in Spring 2026, not in the Fall just finished (resolved 2026-10-28) |
 | [I38](#i38--a-pathways-program-population-misses-pre-majors-whose-name-differs-from-their-major) | Defect | A Pathways program population misses pre-majors whose name differs from their major: "Film and Digital Arts" holds 1 of the 1,016 Film pre-majors who never declared the major, because `FFDA` is named "FDMA" |
 | [I37](#i37--renumbered-courses-lose-their-history) | Defect | Renumbered courses lose their history: no crosswalk exists, so ACCT 3401 (was MGMT 340) and the other Fall 2026 ACCT, BUSA and POPH courses read as new |
-| [I36](#i36--low-enrollments-schedule-view-reports-no-prior-history-for-courses-that-have-it) | Defect | Low Enrollment's schedule view reports no prior history for courses that have it: 363 of 2,226 Spring 2027 ABQ/EA undergraduate courses, of which 40 were never offered under that number (resolved 2026-10-24) |
-| [I35](#i35--a-fall-projection-is-read-before-the-falls-intersession-has-registered) | Defect | A Fall projection is read before the Fall's intersession has registered: the Fall 2027 spine had none of Fall 2026's December demand (FYEX 1110: 168 of 801 Fall 2025 registrations were December) (fixed in model 0.24.0) |
-| [I34](#i34--a-projection-pressure-decision-flips-with-the-platforms-floating-point) | Defect | A projection pressure decision flips with the platform's floating point: NATV 1150 is included for Spring 2027 on Linux and excluded on macOS (fixed in model 0.24.0) |
 | [I33](#i33--a-crashed-myreports-download-is-recorded-as-a-successful-fetch) | Defect | A crashed MyReports download is recorded as a successful fetch: on Oct 23 class lists and applicants were never downloaded, and every step reported ✅ (partly fixed) |
 | [I32](#i32--a-scheduled-refresh-waits-forever-when-myreports-asks-for-a-2fa-code) | Defect | A scheduled refresh waits forever when MyReports asks for a 2FA code: the Oct 11 run sat 12 days at the prompt, unreported |
-| [I31](#i31--course-paths-finishes-behind-a-stuck-loading-dialog) | Defect | Nested Course paths report sends completion to the wrong loading-dialog channel (resolved) |
-| [I30](#i30--saved-r-workspaces-entered-the-docker-build-context) | Defect | Case-sensitive Docker ignore omitted `.RData`, copying an 89 MB workspace into app image layers (resolved) |
-| [I29](#i29--generated-navigation-ids-can-open-the-wrong-panel) | Defect | Generated nav-menu IDs collide, so Admin can open Gen Ed instead of Data & Usage (resolved) |
 | [I28](#i28--one-late-starting-session-makes-a-whole-courses-first-day-unknown) | Defect | One late-starting session makes a whole course's first day unknown: 257 Fall 2026 courses on the Oct 8 pull, 17 on Oct 23. Intersession is out of the forecast (model 0.24.0), and a session not yet begun is judged on its lower bound (model 0.25.0). A section with no start date still reads as having no status dates |
-| [I27](#i27--the-projection-floor-adds-a-waitlist-to-first-day-enrollment-and-compares-it-with-ever-registered-demand) | Defect | The projection floor mixed units: 245 unserved waitlisted students lifted Fall 2027 by 77 (resolved) |
-| [I26](#i26--projection-capacity-reached-was-judged-on-ever-registered-demand) | Defect | Projection "capacity reached" was judged on ever-registered demand: 72% of course-terms flagged full when census filled 17% (resolved) |
-| [I25](#i25--projection-method-selection-was-in-sample-and-lost-to-the-default) | Defect | Projection method selection was in-sample on two folds and lost to doing nothing; reported 13.7% WAPE, honest 16.5% (resolved) |
 | [I24](#i24--cis-demo-browser-run-intermittently-loses-the-app-at-open-seats) | Defect | CI's demo browser run intermittently loses the app at Open Seats (probably fixed 2026-10-23: a test race) |
 | [I23](#i23--student-ids-are-hashed-with-the-built-in-default-salt) | Defect | Student IDs are hashed with the built-in default salt: the salt protects nothing |
 | [I20](#i20--cedar_programs-holds-almost-no-branch-campus-students) | Defect | `cedar_programs` holds 1–3% of branch-campus students; branch program counts read near zero |
@@ -56,13 +45,33 @@ recurrence is recognizable.
 | [I4](#i4--pre-change-course-ratios-are-confounded-by-career-stage) | Defect | Pre-change course ratios confounded by career stage (deferred) |
 | M1–M37 | Improvement | See [Improvements](#improvements) |
 
+### Resolved since the last release
+
+Kept until the next release, so a recurrence is recognisable; each entry below gives its fix.
+
+| ID | Kind | Summary |
+|---|---|---|
+| [I42](#i42--a-saturated-course-whose-fall-changes-lower-its-forecast-is-still-called-a-floor) | Defect | A saturated course whose Fall changes lower its forecast was still called "a floor": ENGL 1120's Spring 2027 forecast is 2,164, below last Spring's 2,179, and the page said "so this is a floor" (resolved 2026-11-03) |
+| [I41](#i41--projection-labels-call-the-term-just-finished-fall-whatever-its-season) | Defect | Projection labels called the term just finished "Fall" whatever its season: once Spring 2027 settles, a Fall 2027 course whose Spring moved 25% would have been flagged "Fall enrollment +25%" (resolved 2026-11-03) |
+| [I40](#i40--the-projections-page-gave-a-forecasts-own-misses-to-the-schedule) | Defect | The projections page gave a forecast's own misses to the schedule: 7 of the 8 Spring 2027 courses whose past misses came with seats to spare read "the misses came when the seats moved", because any seat move counted (resolved 2026-10-29) |
+| [I39](#i39--projection-flags-called-last-years-same-season-term-last-term) | Defect | Projection flags called last year's same-season term "last term": a Spring 2027 course flagged "Full last term" was full in Spring 2026, not in the Fall just finished (resolved 2026-10-28) |
+| [I36](#i36--low-enrollments-schedule-view-reports-no-prior-history-for-courses-that-have-it) | Defect | Low Enrollment's schedule view reports no prior history for courses that have it: 363 of 2,226 Spring 2027 ABQ/EA undergraduate courses, of which 40 were never offered under that number (resolved 2026-10-24) |
+| [I35](#i35--a-fall-projection-is-read-before-the-falls-intersession-has-registered) | Defect | A Fall projection is read before the Fall's intersession has registered: the Fall 2027 spine had none of Fall 2026's December demand (FYEX 1110: 168 of 801 Fall 2025 registrations were December) (fixed in model 0.24.0) |
+| [I34](#i34--a-projection-pressure-decision-flips-with-the-platforms-floating-point) | Defect | A projection pressure decision flips with the platform's floating point: NATV 1150 is included for Spring 2027 on Linux and excluded on macOS (fixed in model 0.24.0) |
+| [I31](#i31--course-paths-finishes-behind-a-stuck-loading-dialog) | Defect | Nested Course paths report sends completion to the wrong loading-dialog channel (resolved) |
+| [I30](#i30--saved-r-workspaces-entered-the-docker-build-context) | Defect | Case-sensitive Docker ignore omitted `.RData`, copying an 89 MB workspace into app image layers (resolved) |
+| [I29](#i29--generated-navigation-ids-can-open-the-wrong-panel) | Defect | Generated nav-menu IDs collide, so Admin can open Gen Ed instead of Data & Usage (resolved) |
+| [I27](#i27--the-projection-floor-adds-a-waitlist-to-first-day-enrollment-and-compares-it-with-ever-registered-demand) | Defect | The projection floor mixed units: 245 unserved waitlisted students lifted Fall 2027 by 77 (resolved) |
+| [I26](#i26--projection-capacity-reached-was-judged-on-ever-registered-demand) | Defect | Projection "capacity reached" was judged on ever-registered demand: 72% of course-terms flagged full when census filled 17% (resolved) |
+| [I25](#i25--projection-method-selection-was-in-sample-and-lost-to-the-default) | Defect | Projection method selection was in-sample on two folds and lost to doing nothing; reported 13.7% WAPE, honest 16.5% (resolved) |
+
 ---
 
 # Defects
 
 ## I43 — Every scheduled refresh fails because the default asks for a report mrgather never fetches
 
-**Status:** default fixed 2026-11-03 (branch `refresh/default-reports`);
+**Status:** default fixed 2026-11-03 (#186);
 mrgather and per-report rebuilds remain (see Still to do)
 **Found:** 2026-11-03, reading the production refresh logs
 **Severity:** high. Nothing wrong was published, but production stopped
@@ -121,6 +130,123 @@ fails.
 - The run summary marks skipped steps ✅ ("transform-to-cedar.R ✅ 0s prior
   step failed; transform not run"), so the failure shows only on its own line.
 
+## I42 — A saturated course whose Fall changes lower its forecast is still called a floor
+
+**Status:** resolved 2026-11-03: page text in #185, model-source text in #184
+(branch `projections/fall-waiting`)
+**Found:** 2026-11-03, rechecking the projections page's wording against the
+saved Spring 2027 bundle
+**Severity:** low. No number is wrong, but one row's text contradicts its own
+plan steps.
+**Affects:** `projection_summary_sentence()`
+(`R/features/enrollment-projection-view.R`) and `floor_note` in
+`add_projection_recommendations()` (`R/branches/enrollment-projection-plan.R`,
+model source).
+
+### What is wrong
+
+When last year's same term was near full, the summary says "Last Spring filled
+96.2% of its seats on the first day, so this is a floor", and `floor_note`
+says "the floor is the spine itself; the projection is a lower bound". The
+published adjusted forecast is spine + floor + Fall deltas. When the deltas
+are negative it falls below the spine, which the text has just called the
+floor. ENGL 1120: last Spring 2,179, and the Fall changes take 15 off (repeat
++3, ENGL 1110 −7, other feeders −12), so the forecast is 2,164. CHEM 1215:
+719 → 716. The plan steps show the subtraction directly under a sentence that
+says the number cannot go lower.
+
+### Reproduction
+
+Load the Spring 2027 bundle (schema 26) and filter `projections` to
+`adjusted_saturated_prior` with `projected_classlist_total <
+observed_baseline`. That returns ENGL 1120 and CHEM 1215, and both
+`summary_sentence` values from `build_enrollment_projection_view()` end their
+fill clause "so this is a floor". The Fall 2027 bundle has none, because two
+steps ahead it carries no deltas.
+
+### Decision: evidence about last year, not a floor under this one
+
+A saturated course's count is a lower bound on *last year's* demand. A rule
+that kept this year's forecast from falling below it would make the forecast
+blind to falling feeder courses and majors, which is exactly what the deltas
+are there to read. The saved aftcasts agree. Take the past forecasts whose
+prior term was near full and whose term-just-finished changes pointed lower:
+9 Spring and 26 Fall. Registrations then came in below last year's count in
+6 of the 9 and 13 of the 26. A clamp at last year's count would have been 14.5%
+off against 14.1% unclamped (Spring), and 8.0% against 8.4% (Fall). That is no
+better, and it says nothing true about direction. So the forecast keeps the
+decline, and the page states both facts. The capped count understates demand,
+and the pressure bump, where it applies, allows for that. The changes in the
+term just finished point lower. The bump is 5% of last year's count, so the
+plan can still sit above last year (ENGL 1120: 2,164 + 109 = 2,273 against
+2,179).
+
+### Fix
+
+`projection_summary_sentence()` now says "The forecast is 0.7% below last
+Spring's 2,179: the changes in Fall 2026 point lower. Last Spring filled 96.2%
+of its seats on the first day, so its count was capped by its seats and
+understates demand; the pressure bump allows for that." A change under 1%
+keeps a decimal, so CHEM 1215's 716 against 719 does not read as a match. The
+plan explainer's "Changes in the term just finished" step says the change can
+take a near-full course below last year's count, and the text preview's floor
+column reads "spine was capped". A test in `test-enrollment-projections.R`
+pins the ENGL 1120 case. In the model source (#184), `floor_note`, shown
+under **Saturation floor** in the evidence trail, now says the prior term's
+count "was capped by its seats, so it understates demand" instead of "the
+projection is a lower bound", and a capped term with no waitlist rows "adds
+nothing to the spine" instead of being "the floor itself". The pressure-bump
+note said "planned for 5% more than last Spring's 2,179 registrations", which
+overstated the plan wherever the forecast differs from last year's count; it
+now reads "the bump is 5% of last Spring's 2,179 registrations".
+
+## I41 — Projection labels call the term just finished "Fall" whatever its season
+
+**Status:** resolved 2026-11-03: page labels in #185, model-source labels in
+#184 (branch `projections/fall-waiting`)
+**Found:** 2026-11-03, rechecking the projections page's wording
+**Severity:** low. A wrong word, not a wrong number, but it points a reader at
+the wrong term.
+**Affects:** `projection_flags()` ("Fall enrollment ±N%",
+`R/features/enrollment-projection-view.R`); `projection_flag_is_warning()`
+(matches `^Fall enrollment`) and the "Fall changes" step of
+`projection_build_explainer()` (`R/modules/enrollment-projections.R`); the
+method label "Prior same-season + floor + Fall deltas" and the "no Fall deltas"
+basis text (model source).
+
+### What is wrong
+
+The adjusted candidate reads its deltas from `subtract_term(target_term,
+summer = FALSE)`, the term just before the target. For a Spring target that is
+a Fall term. For a Fall target one step ahead it is a Spring term. The regime
+flag hard-codes the word "Fall". So does the step label, and so does the method
+label. The summary sentence and `regime_note` use `fmt_term()` and are
+correct. Today no Fall bundle is one step ahead: Fall 2027 is two steps past
+the settled edge and carries no deltas. When Spring 2027 settles, the Fall 2027
+bundle will read Spring 2027 and flag "Fall enrollment +N%" about a Spring term.
+
+### Reproduction
+
+`R/branches/enrollment-projection-candidates.R` sets `preceding_term <-
+subtract_term(target_term, summer = FALSE)`, and `projection_flags()` pasted
+the literal "Fall enrollment " in front of it. The saved Fall 2027 bundle's
+own aftcasts are already one step ahead. Every `spine_adjusted` backtest row
+for Fall 2023–2026 reads the Spring before it (`preceding_term` 202310 to
+202610), and 98 of them raise the regime alarm. Only the published row is two
+steps out today.
+
+### Fix
+
+The flag names the term ("Fall 2026 enrollment +25%", "Spring 2027 enrollment
++25%"), and `projection_flag_is_warning()` matches any season. The plan
+explainer's step and the evidence trail read "Changes in the term just
+finished". A test pins the Spring case. In the model source (#184), the
+method label is "Prior same-season + floor + latest-term changes", the delta
+basis says "so no change from it is added" instead of "no Fall deltas", and
+the definition (`docs/_data/definitions.yml`, 1.10.0) says "moved by
+enrollment changes in the term just finished". A change that rounds to
+nothing reads "0%", not "-0%", in the regime note and the text preview.
+
 ## I40 — The projections page gave a forecast's own misses to the schedule
 
 **Status:** resolved 2026-10-29
@@ -170,6 +296,12 @@ as counts beneath Reliability, never as a rating of their own. The test "a
 past miss is the schedule's only when a full course's seats moved the way it
 missed" in `test-enrollment-projections.R` pins every case of the rule;
 replacing the near-full condition with any seat move fails it.
+
+The **Where forecast error comes from** panel made the same mistake page-wide:
+`summarize_projection_error_sources()` counted every 10%+ seat move as the
+schedule's. Schema 26 moved `projection_fold_miss_cause()` into
+`R/branches/enrollment-projection-error-sources.R` and the panel now sums
+the error by it, so the panel and each course read misses one way.
 
 ## I39 — Projection flags called last year's same-season term "last term"
 
@@ -2720,7 +2852,12 @@ inline tabs are modules (templates: `R/modules/headcount.R`,
 `course-demographics.R` 679, `stopout.R` 577, `gen-ed-conversion.R` 542,
 `seatfinder.R` 522. Long analytical files with repeated
 filter/summarize/cache code: `enrl.R`, `regstats.R`, `credit-hours.R`,
-`pathway.R`, `dept-dashboard.R`. *Done when:* each is split by sub-question or
+`pathway.R`, `dept-dashboard.R`. The projections page (measured 2026-11-03):
+`R/features/enrollment-projection-view.R` is 2,471 lines of page payload and
+text, and `R/modules/enrollment-projections.R` 1,711, of which the server is
+about 430 against a 300-line budget. The view file is deliberately off the
+model-source list, so splitting it costs no bundle rebuild, but a split file
+must stay off that list too. *Done when:* each is split by sub-question or
 its repeated code extracted — alongside other work on the file.
 
 ### Interface consistency

@@ -132,10 +132,15 @@ enrollment_projection_defaults <- function() {
     # course's reliability, how often its scheduled seats moved by
     # seat_consistency_change or more from the previous same-season offering.
     # None is High, up to seat_consistency_moderate_max_moves is Moderate,
-    # more is Low. Most past error came from terms whose seats moved, so a Low
-    # reliability with High seat consistency is a miss the forecast made.
+    # more is Low. A seat move alone does not say whose a miss was: that is
+    # read per past forecast term, from whether the course was near full
+    # (projection_fold_miss_cause(); ISSUES.md I40).
     seat_consistency_change = 0.10,
     seat_consistency_moderate_max_moves = 1L,
+    # Students left waiting in the term just finished (schema 26) are context,
+    # never added to the plan. A course is flagged when they would fill at
+    # least this share of one section.
+    preceding_waiting_flag_sections = 0.5,
     regime_alarm_threshold = 0.25,
     # Rolling selection: prior same-season is the default. A challenger
     # replaces it for a target only when, on at least selection_min_backtests
@@ -183,6 +188,17 @@ enrollment_projection_defaults <- function() {
 # "1 section", "2 sections": a whole count and its noun, for recommendations.
 projection_count_noun <- function(n, noun) {
   paste(format(n, big.mark = ","), if (isTRUE(n == 1)) noun else paste0(noun, "s"))
+}
+
+# Signed whole numbers and percents that never read "-0" or "+0%": a change
+# that rounds to nothing is shown as 0.
+projection_signed_whole <- function(x) {
+  whole <- round(x)
+  dplyr::if_else(whole == 0, "0", sprintf("%+.0f", whole))
+}
+
+projection_signed_percent <- function(x) {
+  paste0(projection_signed_whole(100 * x), "%")
 }
 
 
@@ -505,6 +521,7 @@ empty_enrollment_projections <- function() {
       adjusted_prior_first_day_basis = character(),
       adjusted_waitlisted_prior = integer(), adjusted_floor_uplift = numeric(),
       adjusted_floor_basis = character(), adjusted_preceding_term = integer(),
+      adjusted_waitlisted_preceding = integer(),
       adjusted_feeder_check = character(),
       adjusted_preceding_term_enrollment = numeric(),
       adjusted_preceding_term_change = numeric(), adjusted_regime_alarm = logical(),
