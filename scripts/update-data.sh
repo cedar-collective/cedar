@@ -616,10 +616,12 @@ else
 fi
 
 # ── Registration snapshot: counts that the next refresh would overwrite ──────
-# One file per term in registration (or scheduled ahead of it) per pair of
-# class-list and schedule pulls, aggregates only, in
-# output/registration-snapshots/ (R/branches/registration-snapshots.R). A
-# failure is recorded and the refresh goes on: the app does not read these yet.
+# Aggregates only, in output/registration-snapshots/: each course's counts for
+# every term in registration or scheduled ahead of it
+# (R/branches/registration-snapshots.R), and which of last term's students have
+# registered for the Fall or Spring term in registration
+# (R/branches/return-snapshots.R). A failure is recorded and the refresh goes
+# on: the app does not read these yet.
 if [[ "$PIPELINE_SUCCESS" != true ]]; then
     record_step "registration snapshot" "SKIPPED" "0s" "data refresh failed"
 else

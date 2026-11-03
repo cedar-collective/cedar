@@ -2,12 +2,17 @@
 #
 #   Rscript --vanilla scripts/record-registration-snapshot.R [--output DIR]
 #
-# Run by update-data.sh after each successful refresh. Writes one file per term
-# per pair of class-list and schedule pulls to output/registration-snapshots/
-# (default), for every term in registration or scheduled ahead of it, and
-# leaves a pair already recorded alone. The counts are per course, campus and
-# part of term, with no student ID; why they are kept:
-# R/branches/registration-snapshots.R.
+# Run by update-data.sh after each successful refresh. Writes to
+# output/registration-snapshots/ (default), and leaves a set of pulls already
+# recorded alone:
+#   - registration-*: one file per term in registration or scheduled ahead of
+#     it, per pair of class-list and schedule pulls. Counts per course, campus
+#     and part of term (R/branches/registration-snapshots.R).
+#   - return-*: one file per Fall or Spring term in registration, per set of
+#     pulls. Which of last term's students have registered for it, by group
+#     (R/branches/return-snapshots.R).
+# Neither holds a student ID. The course counts are written first, so a failure
+# in the return snapshot never costs them.
 
 record_registration_snapshot_cli <- function(args) {
   repo_root <- getwd()
@@ -37,7 +42,16 @@ record_registration_snapshot_cli <- function(args) {
                     format(recorded$sections_as_of[[i]]), recorded$status[[i]],
                     recorded$rows[[i]], recorded$path[[i]]))
   }
-  invisible(recorded)
+  returning <- record_return_snapshot(cedar_students, cedar_programs, output_dir)
+  for (i in seq_len(nrow(returning))) {
+    message(sprintf("[registration-snapshots] %s from %s, class list %s: %s registered of %s (%d rows) %s %s",
+                    fmt_term(returning$term[[i]]), fmt_term(returning$anchor_term[[i]]),
+                    format(returning$classlist_as_of[[i]]),
+                    format(returning$registered[[i]], big.mark = ","),
+                    format(returning$students[[i]], big.mark = ","),
+                    returning$rows[[i]], returning$status[[i]], returning$path[[i]]))
+  }
+  invisible(list(courses = recorded, returning = returning))
 }
 
 

@@ -204,6 +204,38 @@ explanations, and links into the detailed tables/plots that support each flag.
 This should make CEDAR feel less like a data warehouse front end and more like
 an analytical partner that points people toward the next useful question.
 
+### 3. Retention signals while there is time to act
+
+CEDAR's retention views look backward: Course Dynamics > Retention, Pathways
+outcomes and Roadblocks, and the hidden cross-course Retention tab. None is on
+the pages deans open first, and none says, while there is time to act, where
+students are slipping away. Last year 2,354 of 19,277 undergraduates did not
+return from Fall 2025 to Spring 2026; the 6,751 who had withdrawn late, failed
+a course or were on probation returned at 78%, against 93%, and were 63% of the
+loss. Not registering is earlier and broader: on Dec 1 a third had not
+registered, nearly every eventual non-returner among them, and 63% of them came
+back on their own. So the measure is pace against the same day a year earlier,
+never a count of losses. Every surface stays aggregate; advising acts on
+named students.
+
+- [x] Keep next-term registration of last term's students at every refresh,
+  by unit, standing and warning sign, with no student IDs (`return-*` files in
+  `output/registration-snapshots/`, `R/branches/return-snapshots.R`). A past
+  day cannot be rebuilt from status dates, which a drop overwrites.
+- [ ] **Return watch** on the Dept Dashboard, and UNM-wide under Registration:
+  continuing students not yet registered against the same day a year earlier,
+  by classification and standing, split by the warning signs. Exact from Fall
+  2027, once a year of snapshots exists; before that, last year rebuilt from
+  status dates and labelled approximate.
+- [ ] Roadblocks for the department's own courses on the Dept Dashboard,
+  ranked by its Impact column (`get_stopout()`).
+- [ ] Unhide cross-course Retention once its comparison view sets each course
+  against its department and college.
+- [ ] Near-completers who stopped out (seniors with no degree, by program, from
+  the credit timeline) and pre-majors who stall before declaring, as outreach
+  counts. Their long-term home is the departure-modelling item under
+  Established Analytical Methods.
+
 ---
 
 ## Before New Features: Cleanup

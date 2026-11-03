@@ -75,6 +75,7 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
   message("[load-funcs.R] Loading branches...")
   source_file("branches/waitlist-demand.R")
   source_file("branches/registration-snapshots.R")
+  source_file("branches/return-snapshots.R")      # next-term registration of last term's students
   source_file("branches/enrl.R")
   source_file("branches/credit-hours.R")
   source_file("branches/data-edges.R")            # where the loaded data starts/stops; see the right-edge policy in AGENTS.md
