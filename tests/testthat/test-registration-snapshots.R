@@ -143,3 +143,100 @@ test_that("a pull is written once, read back whole, and a bad file is refused", 
   expect_error(read_registration_snapshots(dir), "missing column\\(s\\): seats")
   expect_error(read_registration_snapshots(file.path(dir, "absent")), "does not exist")
 })
+
+
+# RW01: Fall 2020's students and their Spring 2021 registration, both pulled
+# 2020-11-20. See the RW01 block in designed_test_data.R for each student.
+test_that("a return snapshot counts last term's students by what they have done since", {
+  snapshot <- build_return_snapshot(test_students_rw, test_programs_rw,
+                                    list(terms = 202110L))
+  expect_named(snapshot, RETURN_SNAPSHOT_COLUMNS)
+  expect_false(any(c("student_id", "enrollment_id") %in% names(snapshot)))
+  expect_equal(unique(snapshot$anchor_term), 202080L)
+  expect_equal(unique(snapshot$classlist_as_of), as.Date("2020-11-20"))
+  expect_equal(unique(snapshot$anchor_classlist_as_of), as.Date("2020-11-20"))
+  expect_equal(unique(snapshot$programs_as_of), as.Date("2020-11-20"))
+
+  got <- snapshot %>%
+    dplyr::select(dept_code, academic_standing, student_classification,
+                  late_withdrawal, dfw_grades, students, registered,
+                  waitlisted_only, dropped_only) %>%
+    dplyr::arrange(dept_code, academic_standing, late_withdrawal, dfw_grades)
+  expected <- tibble::tribble(
+    ~dept_code, ~academic_standing,   ~student_classification, ~late_withdrawal, ~dfw_grades,   ~students, ~registered, ~waitlisted_only, ~dropped_only,
+    "HIST",     "Academic Probation", "Sophomore",             "none",           "2+",          1L,        0L,          0L,               1L,
+    "HIST",     "Good Standing",      "Sophomore",             "all",            "none posted", 1L,        0L,          0L,               0L,
+    "HIST",     "Good Standing",      "Sophomore",             "none",           "0",           2L,        1L,          0L,               0L,
+    "HIST",     "Good Standing",      "Sophomore",             "none",           "none posted", 1L,        0L,          1L,               0L,
+    "MATH",     "Good Standing",      "Junior",                "some",           "1",           1L,        1L,          0L,               0L,
+    NA,         NA,                   "Sophomore",             "none",           "0",           1L,        0L,          0L,               0L
+  )
+  expect_equal(got, expected)
+  # RW_F (early drop only) and RW_G (new in Spring) are not last term's
+  # students; RW_E's second Major row does not count them twice; RW_E's
+  # registration on another campus counts.
+  expect_equal(sum(snapshot$students), 7L)
+  expect_equal(sum(snapshot$registered), 2L)
+})
+
+test_that("a return snapshot refuses Summer, an unopened term, and a mixed record", {
+  expect_error(build_return_snapshot(test_students_rw, test_programs_rw, list()),
+               "opt\\$terms is required")
+  expect_error(build_return_snapshot(test_students_rw, test_programs_rw,
+                                     list(terms = 202160L)),
+               "not Fall or Spring")
+  expect_error(build_return_snapshot(dplyr::filter(test_students_rw, term != 202110L),
+                                     test_programs_rw, list(terms = 202110L)),
+               "registration has not opened")
+  expect_error(build_return_snapshot(test_students_rw,
+                                     dplyr::filter(test_programs_rw, term != 202080L),
+                                     list(terms = 202110L)),
+               "no programs pull date for term 202080")
+  # One student, two classifications in the same term: no value is chosen
+  # for them.
+  mixed <- test_students_rw %>%
+    dplyr::mutate(student_classification = dplyr::if_else(
+      student_id == "RW_A" & subject_course == "ENGL 1110", "Junior",
+      student_classification))
+  expect_error(build_return_snapshot(mixed, test_programs_rw, list(terms = 202110L)),
+               "1 student\\(s\\) carry more than one home campus, level or classification")
+})
+
+test_that("return snapshot terms are the Fall and Spring terms whose registration has opened", {
+  # Fall 2020, pulled in November, has settled; Spring 2021 is in registration.
+  # A Summer 2021 class list is in registration too, but is never a target.
+  expect_identical(return_snapshot_terms(test_students_rw), 202110L)
+  summer <- test_students_rw %>%
+    dplyr::filter(student_id == "RW_G") %>%
+    dplyr::mutate(term = 202160L, term_type = "summer")
+  expect_identical(return_snapshot_terms(dplyr::bind_rows(test_students_rw, summer)),
+                   202110L)
+  fall_only <- dplyr::filter(test_students_rw, term == 202080L)
+  expect_identical(return_snapshot_terms(fall_only), integer(0))
+})
+
+test_that("a return snapshot is written once, read back whole, and a bad file is refused", {
+  dir <- tempfile("return-snapshots-")
+  on.exit(unlink(dir, recursive = TRUE), add = TRUE)
+
+  first <- record_return_snapshot(test_students_rw, test_programs_rw, dir)
+  expect_equal(first$status, "written")
+  expect_equal(basename(first$path),
+               "return-202110-classlist-2020-11-20-anchor-2020-11-20-programs-2020-11-20.qs2")
+  expect_equal(c(first$rows, first$students, first$registered), c(6L, 7L, 2L))
+  again <- record_return_snapshot(test_students_rw, test_programs_rw, dir)
+  expect_equal(again$status, "already recorded")
+  expect_length(list.files(dir), 1L)
+
+  kept <- read_return_snapshots(dir)
+  expect_equal(kept, build_return_snapshot(test_students_rw, test_programs_rw,
+                                           list(terms = 202110L)),
+               ignore_attr = TRUE)
+  expect_equal(nrow(read_return_snapshots(dir, terms = 202180L)), 0L)
+  # The two kinds of snapshot share the directory and never read each other.
+  expect_equal(nrow(read_registration_snapshots(dir)), 0L)
+
+  qs2::qs_save(dplyr::mutate(kept, registered = students + 1L),
+               file.path(dir, "return-202180-classlist-2021-04-01-anchor-2021-04-01-programs-2021-04-01.qs2"))
+  expect_error(read_return_snapshots(dir), "counts exceed its students")
+})

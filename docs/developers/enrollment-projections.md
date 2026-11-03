@@ -491,6 +491,15 @@ week against the same week a year earlier) and a projection against the
 submitted draft schedule would both need. Neither is useful until a year of
 snapshots exists.
 
+The same run keeps a second kind, `return-*` files from
+`record_return_snapshot()`: for each Fall or Spring term in registration, the
+students enrolled in the term before it, grouped by home campus, unit, level,
+classification, standing and two warning signs (late withdrawal, posted DFW
+grades), with how many have registered, are only waitlisted, or have only
+dropped. It is for retention, not projections: whether last term's students
+are registering at last year's pace. About 3,600 rows and 23 KB a day, so a
+year of daily pulls is about 5 MB. Why and how: `R/branches/return-snapshots.R`.
+
 ## Method Roles
 
 Model 0.20.0 has two candidates and one idea: **seats needed is last year's

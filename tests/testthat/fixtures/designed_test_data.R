@@ -82,6 +82,13 @@
 #          session it makes the first day unknown, the seats 65 and the
 #          class-list total 5 (ISSUES.md I28, I35).
 #
+#   RW01 — cedar_students_rw (18 rows) + cedar_programs_rw (9 rows). Fall 2020
+#          students and their Spring 2021 registration, both pulled 2020-11-20.
+#          Population 7 (an early drop and a new student are out); registered
+#          2, one of them on another campus; 1 waitlisted only, 1 dropped only.
+#          Six groups by unit, standing, late withdrawal and posted DFW grades.
+#          Used by test-registration-snapshots.R.
+#
 # === CEDAR_SECTIONS (85 total: 71 base + 14 XL rows merged in) ===
 #
 # Base sections (non-XL):
@@ -3246,6 +3253,85 @@ cedar_students_intersession <- dplyr::bind_rows(
   .is_row("IS_D", "41003", "EA",  "RE", "2020-10-05"),
   .is_row("IS_E", "41001", "ABQ", "DR", "2020-08-25"),
   .is_row("IS_F", "41003", "EA",  "WL", "2020-10-10")
+)
+
+
+# ── RW01 — return snapshot: last term's students, registered for the next ────
+# build_return_snapshot() keeps which of Fall 2020's students have registered
+# for Spring 2021 on the day both class lists were pulled (2020-11-20, Spring
+# registration open, Fall grades partly posted).
+#
+#   student  Fall 2020 rows             Spring 2021 rows     group
+#   RW_A     RE HIST A, RE ENGL B        RE                   HIST, none, 0
+#   RW_I     RE HIST B                   none                 HIST, none, 0
+#   RW_B     RE HIST, no grade yet       WL                   HIST, none, none posted
+#   RW_C     RE HIST F, RE ENGL D        DR                   HIST, probation, 2+
+#   RW_D     DW HIST, DG ENGL            none                 HIST, all, none posted
+#   RW_E     RE MATH C-, DG ENGL         RE at EA             MATH, some, 1
+#   RW_H     RE ENGL A, no program row   none                 no unit, none, 0
+#   RW_F     DR HIST (early drop)        RE                   not in the population
+#   RW_G     none                        RE                   new: not in it
+#
+# Pinned: 7 students in 6 groups; registered 2 (RW_A, RW_E), waitlisted only 1
+# (RW_B), dropped only 1 (RW_C), no Spring row 3. The (HIST, none, 0) group has
+# 2 students and 1 registered. RW_E registered on another campus and counts:
+# registration is read UNM-wide. RW_E also has a second Major row (PHYS), which
+# must not count twice: the primary major is the first by code. RW_C's Spring
+# program row says Good Standing; only the anchor term's is read. Late drops are
+# not DFW grades here: they have their own column.
+.rw_row <- function(sid, term, course, status, grade = NA_character_,
+                    campus = "ABQ", classification = "Sophomore") {
+  .mc_row(sid, term, course, campus, sub(" .*", "", course), grade) %>%
+    dplyr::mutate(
+      enrollment_id = paste("RW01", sid, term, gsub(" ", "", course), sep = "-"),
+      registration_status_code = status,
+      registration_status = dplyr::case_when(
+        status %in% c("RE", "RS") ~ "Registered",
+        status == "WL" ~ "Wait Listed",
+        TRUE ~ "Drop"
+      ),
+      student_classification = classification,
+      student_campus = "ABQ",
+      as_of_date = as.Date("2020-11-20")
+    )
+}
+cedar_students_rw <- dplyr::bind_rows(
+  .rw_row("RW_A", 202080L, "HIST 1110", "RE", "A"),
+  .rw_row("RW_A", 202080L, "ENGL 1110", "RE", "B"),
+  .rw_row("RW_A", 202110L, "HIST 2110", "RE"),
+  .rw_row("RW_I", 202080L, "HIST 1110", "RE", "B"),
+  .rw_row("RW_B", 202080L, "HIST 1110", "RE"),
+  .rw_row("RW_B", 202110L, "HIST 2110", "WL"),
+  .rw_row("RW_C", 202080L, "HIST 1110", "RE", "F"),
+  .rw_row("RW_C", 202080L, "ENGL 1110", "RE", "D"),
+  .rw_row("RW_C", 202110L, "HIST 2110", "DR"),
+  .rw_row("RW_D", 202080L, "HIST 1110", "DW"),
+  .rw_row("RW_D", 202080L, "ENGL 1110", "DG"),
+  .rw_row("RW_E", 202080L, "MATH 1215", "RE", "C-", classification = "Junior"),
+  .rw_row("RW_E", 202080L, "ENGL 1110", "DG", classification = "Junior"),
+  .rw_row("RW_E", 202110L, "MATH 1240", "RE", campus = "EA", classification = "Junior"),
+  .rw_row("RW_H", 202080L, "ENGL 1110", "RE", "A"),
+  .rw_row("RW_F", 202080L, "HIST 1110", "DR"),
+  .rw_row("RW_F", 202110L, "HIST 2110", "RE"),
+  .rw_row("RW_G", 202110L, "HIST 2110", "RE")
+)
+
+.rw_program <- function(sid, major_code, standing = "Good Standing", term = 202080L) {
+  tibble::tibble(
+    student_id = sid, term = as.integer(term),
+    program_type = "Major", program_name = major_code,
+    major_code = major_code, dept_code = major_code, college_code = "AS",
+    student_college = "College of Arts and Sciences", student_campus = "ABQ",
+    student_level = "UG", is_pre_major = FALSE, academic_standing = standing,
+    as_of_date = as.Date("2020-11-20")
+  )
+}
+cedar_programs_rw <- dplyr::bind_rows(
+  .rw_program(c("RW_A", "RW_I", "RW_B", "RW_D", "RW_F"), "HIST"),
+  .rw_program("RW_C", "HIST", standing = "Academic Probation"),
+  .rw_program("RW_C", "HIST", term = 202110L),
+  .rw_program("RW_E", "MATH"),
+  .rw_program("RW_E", "PHYS")
 )
 
 

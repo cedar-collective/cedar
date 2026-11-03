@@ -8,7 +8,7 @@ parent: Developer Guide
 
 This reference is auto-generated from roxygen2 comments in the source code.
 
-*Generated: 2026-11-03 06:52:22.482573*
+*Generated: 2026-11-03 09:21:33.597254*
 
 ---
 
@@ -3622,6 +3622,39 @@ Summarize term-level retention rates across like term types  Converts the term r
 - `min_n` - Integer; minimum pooled cohort size for a summary row and for each displayed horizon. Small individual terms may contribute to a pooled row as long as the pooled denominator meets this threshold.
 
 **Returns:** One row per campus and term type, optionally per instructor, with `terms`, `n`, `ret_1 ... ret_N`, and `eligible_1 ... eligible_N`.
+
+---
+
+## return-snapshots
+
+### `build_return_snapshot()`
+
+*Source: return-snapshots.R*
+
+**Build one return snapshot**
+
+**Parameters:**
+
+- `students` - `cedar_students` rows; only each target term and its anchor are read.
+- `programs` - `cedar_programs` rows; only the anchor terms are read.
+- `opt` - `terms` (required): the Fall or Spring terms in registration.
+
+**Returns:** A tibble with `RETURN_SNAPSHOT_COLUMNS`, one row per anchor-term group. `students` is the group's size; `registered` holds a registered row for the target term, `waitlisted_only` only waitlist rows, `dropped_only` only drops. The rest of the group has no target-term row yet.
+
+---
+
+### `validate_return_snapshot()`
+
+*Source: return-snapshots.R*
+
+**Check a return snapshot read back from disk**
+
+**Parameters:**
+
+- `snapshot` - A tibble read from a return snapshot file.
+- `source` - A label for the error message, normally the file path.
+
+**Returns:** `snapshot`, unchanged, or an error naming what is wrong.
 
 ---
 
