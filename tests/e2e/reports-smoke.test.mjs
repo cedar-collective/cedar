@@ -300,6 +300,7 @@ export async function runReportChecks({ scope = 'smoke', synthetic = false } = {
 
       await clickSubTabIn(page, 'dept_trends-tabs', 'Credit Hours');
       await waitForOutput(page, 'Dept Trends Credit Hours tab', [
+        { type: 'plotly', id: 'dept_trends-sch_census_final_plot' },
         { type: 'plotly', id: 'dept_trends-chd_by_year_facet_subj_plot' },
         { type: 'reactable', id: 'dept_trends-sch_outside_full_table' },
       ], { all: true });

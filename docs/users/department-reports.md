@@ -73,6 +73,7 @@ Degree production often lags behind enrollment changes by several years, so this
 
 The credit-hour tab includes:
 
+- **At census and end of term**: the department's SCH at census (solid line) and still registered at the end of term (dashed). The gap between the lines is the credits of students who withdrew after census. Every other chart on the tab counts at census.
 - **By level and subject code** — SCH per term split by course level (lower 100–299, upper 300–499, graduate 500+) and by subject code prefix. Departments that teach under multiple subject codes (e.g., BIOL and BIOC) appear in separate facets.
 - **By subject code combined** — same data collapsed across levels, showing total SCH per subject code as a stacked bar over time.
 - **By major (home vs. outside)** — whose students are taking these courses? Home majors are students whose Banner major code matches the department's programs; outside majors are everyone else — other programs, pre-majors, undeclared students. Shown separately for lower and upper division.
@@ -96,7 +97,7 @@ DFW data is intentionally not public within the app because it involves identifi
 The dropdown shows departments with course data in CEDAR. If your department is missing, it may use a different Banner code than expected, or may not have section data in the current dataset.
 
 **Why don't the credit hour numbers match what IR reports?**
-CEDAR counts attempted credit hours: the credits of every enrollment still registered when the class list was pulled, whatever grade it later receives. IR figures can differ if they are frozen at census, count earned credits only, or use a different term cutoff. The Credit Hours tab explains the exact methodology.
+They should. CEDAR counts attempted credit hours at census, as UNM's official enrollment report does: every enrollment still registered, plus every student who withdrew after census, whatever grade they receive. For Chemistry, Fall 2022–2026, the two agree to within 0.2%. Remaining differences come from scope: the official report covers every location of the Albuquerque campus, so compare it with Albuquerque and online (EA) together. A figure that counts only earned credits, or only students still enrolled at the end of term, will be lower. The end-of-term count is the dashed line on the first Credit Hours chart. The Credit Hours tab explains the exact methodology.
 
 **Why does the newest term look different on the charts?**
 A term that has not finished is shown as soon as it has registrations, shaded and labeled *In progress*, with the date of the data pull. Its enrollment, headcount, and credit hours are current registration and will change until the term closes. DFW and other grade-based measures stop at the last term with grades posted.

@@ -805,8 +805,26 @@ definitions:
             functions: [build_enrollment_projection_view, load_latest_enrollment_projection_bundle]
 
   - id: credit-hours
-    current_version: "2.0.0"
+    current_version: "3.0.0"
     versions:
+      - version: "3.0.0"
+        title: Attempted student credit hours at census
+        summary: Dept Trends and dashboard credit hours count each course's attempted hours at census, the 15th day of instruction, the count UNM's official enrollment report publishes. That is every enrollment still registered (RE, RS, RR) plus every late drop (DG, DW), whatever its grade. The main Credit Hours chart also shows the hours still registered at the end of term.
+        population: Class-list records with a registered or late-drop status, excluding audits, within the selected scope.
+        unit: Student-course credit hours; one three-credit registration contributes three hours.
+        numerator: Sum of credit values on qualifying records. Banner zeroes a late drop's credits, so a late drop counts at its section's credit value.
+        denominator: Not applicable to the total; displayed shares use the labeled total.
+        campus: Course delivery campus, with department and course-level filters.
+        time_window: Every term in the report's displayed window, including a term still in progress, which is labeled and reflects registration as of its newest pull.
+        exclusions: Audits, waitlists, and early drops (DR, DD), which leave before census, are excluded. The end-of-term count also leaves out late drops.
+        limitations:
+          - A late drop from a variable-credit section (music lessons, independent study, thesis) keeps the credits the class list recorded, almost always zero, because the hours the student chose are not kept once they withdraw. These are under 1% of late drops.
+          - Before a term's census date nobody has late-dropped yet, so its census hours are registration so far.
+          - Version 2.0.0 counted the end-of-term hours alone, which run about 5% below census in a finished Fall or Spring term (3-6% by term). Figures exported under 2.0.0 are not comparable. Census SCH matches UNM's official enrollment report to within 0.2% for Chemistry, Fall 2022-2026. New Mexico's funding formula counts end-of-course hours, the dashed line on the chart.
+        guide: users/department-reports#credit-hours
+        implementation:
+          - file: R/branches/credit-hours.R
+            functions: [filter_sch_rows, get_credit_hours, build_sch_census_final_data]
       - version: "2.0.0"
         title: Attempted student credit hours
         summary: Dept Trends and dashboard credit-hour histories sum the course credits of every enrollment still registered (RE, RS, RR) in the selected scope, whatever its grade, so a term has credit hours as soon as it has registrations.
