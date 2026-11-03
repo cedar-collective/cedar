@@ -326,14 +326,14 @@ build_projection_recent_history <- function(projections, enrollment_history,
         aftcast_censored_pct_error,
         potential_miss_explanation = dplyr::case_when(
           !aftcast_applicable | !is.finite(aftcast_classlist_total) ~
-            "No comparable aftcast",
+            "No comparable past forecast",
           dplyr::coalesce(aftcast_capacity_censored, FALSE) ~
             paste(
               "First-day enrollment reached scheduled capacity; observed demand",
               "is a lower bound rather than a complete error measurement"
             ),
           is.finite(aftcast_pct_error) & abs(aftcast_pct_error) <= 0.10 ~
-            "Aftcast was within 10% of observed class-list enrollment",
+            "Past forecast was within 10% of observed class-list enrollment",
           is.finite(classlist_change) & is.finite(capacity_change) &
             abs(capacity_change) >= 0.10 & abs(classlist_change) >= 0.08 &
             sign(classlist_change) == sign(capacity_change) ~ paste0(

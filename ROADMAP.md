@@ -45,18 +45,16 @@ The product should keep moving toward:
 
 Use this only for scale and prioritization, not as a history log.
 
-| Surface | Current size / state |
-|---|---|
-Measured 2026-10-07.
+Measured 2026-11-03, with `wc -l` on tracked files.
 
 | Surface | Current size / state |
 |---|---|
-| `server.R` | 6,408 lines; several legacy inline surfaces remain |
-| `R/modules/pathways.R` | 4,173 lines; still contains business logic (38 `group_by`/`summarize` pipelines) |
-| Largest files | `R/branches/enrollment-projections.R` 4,736 · `R/branches/enrl.R` 2,779 · `R/features/dept-dashboard.R` 1,798 |
-| Total R code | 96,012 lines (including tests and scripts) |
-| Cones / branches / features / modules | 24 / 21 / 10 / 12 files |
-| Test suites | 71 designed-fixture R test files; 12 browser suites (focused checks, demo, and the institutional release tour) |
+| `server.R` | 6,398 lines; several legacy inline surfaces remain |
+| `R/modules/pathways.R` | 4,100 lines; still contains business logic (36 `group_by`/`summarize` calls) |
+| Largest files | `R/branches/enrl.R` 3,118 · `R/features/enrollment-projection-view.R` 2,471 · `R/features/dept-dashboard.R` 1,834 · `R/modules/enrollment-projections.R` 1,711 |
+| Total R code | 109,532 lines (tracked `.R` files, including tests and scripts) |
+| Cones / branches / features / modules | 26 / 37 / 18 / 16 files (the projection model is split into one branch file per stage) |
+| Test suites | 75 designed-fixture R test files; 13 browser suites (focused checks, demo, and the institutional release tour) |
 | Institution configuration | `institution/unm/` mapping files (ADR-002), validated at startup |
 | Other supported surface | RStudio analysis via `scripts/cedar-repl.R` and the normalized tables |
 

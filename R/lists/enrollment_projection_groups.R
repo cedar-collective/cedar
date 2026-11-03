@@ -62,7 +62,9 @@
 # occupancy-based capacity signal.)
 CEDAR_ENROLLMENT_PROJECTION_MODEL_VERSION <- "0.27.0"
 
-CEDAR_ENROLLMENT_PROJECTION_SCHEMA_VERSION <- 25L
+# Schema 26: candidates and projections carry the students left waiting in
+# the term just finished (waitlisted_preceding), shown as context only.
+CEDAR_ENROLLMENT_PROJECTION_SCHEMA_VERSION <- 26L
 # Capacity is reached at CEDAR_FULL_FILL first-day fill and a prior term is
 # saturated at CEDAR_NEAR_FULL_FILL; both levels live in R/lists/seat_fill.R.
 # The first term the model reads history from (settings.csv
@@ -138,7 +140,9 @@ CEDAR_ENROLLMENT_PROJECTION_GROUPS <- local({
 # figures are in docs/developers/forecasting-lessons.md.
 CEDAR_ENROLLMENT_PROJECTION_METHODS <- c(
   seasonal_last = "Prior same-season",
-  spine_adjusted = "Prior same-season + floor + Fall deltas"
+  # Named for the term just finished, whatever its season: a Spring for a
+  # Fall target read one step ahead (ISSUES.md I41).
+  spine_adjusted = "Prior same-season + floor + latest-term changes"
 )
 
 CEDAR_ENROLLMENT_PROJECTION_DEFAULT_METHOD <- "seasonal_last"
@@ -181,8 +185,8 @@ CEDAR_ENROLLMENT_PROJECTION_METHOD_GUIDE <- data.frame(
     )
   ),
   distinction = c(
-    "The default. Within 6% when the schedule holds still; a year old by the time the target is scheduled, and blind to a saturated ceiling.",
-    "Sees a saturated prior term and a Fall that moved. Uses Fall enrollments only, because grades are not posted when the schedule is built; the same terms can be re-read once they are."
+    "The default. Closest when the schedule holds still; a year old by the time the target is scheduled, and blind to a saturated ceiling.",
+    "Sees a saturated prior term and a term just finished that moved. Uses that term's enrollments only, because grades are not posted when the schedule is built; the same terms can be re-read once they are."
   ),
   stringsAsFactors = FALSE
 )
