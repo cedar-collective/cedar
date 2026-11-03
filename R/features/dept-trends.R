@@ -8,6 +8,7 @@ DEPT_TRENDS_PRELOAD_TABS <- c(
 )
 
 DEPT_TRENDS_CREDIT_HOUR_PLOTS <- c(
+  "sch_census_final_plot",
   "chd_by_year_facet_subj_plot",
   "chd_by_year_subj_plot",
   "college_dept_dual_plot",
@@ -451,6 +452,7 @@ compute_dept_enrl_tab <- function(base, data_objects, campus_filter = NULL) {
 
   credit_hours_by_level <- get_credit_hours_by_level_data(
     scoped_data[["cedar_students"]],
+    scoped_data[["cedar_sections"]],
     base$dept_code,
     n_years = 5
   )
@@ -593,6 +595,7 @@ compute_dept_credit_hours_tab <- function(base, data_objects,
 
   sch_college <- get_credit_hours_for_dept_trends(
     do_filt[["cedar_students"]],
+    do_filt[["cedar_sections"]],
     base$dept_code,
     base$subj_codes,
     base$term_start,
@@ -601,6 +604,7 @@ compute_dept_credit_hours_tab <- function(base, data_objects,
   )
   sch_major <- credit_hours_by_major(
     filtered_cl,
+    do_filt[["cedar_sections"]],
     base$dept_code,
     base$prog_codes,
     base$term_start,
@@ -685,6 +689,9 @@ rebuild_dept_credit_hours_tab <- function(cached, base) {
     ),
     chd_by_period_plot = plot_chd_by_level(
       empty_table(tables$chd_by_period_data), base$subj_codes, base$palette
+    ),
+    sch_census_final_plot = plot_sch_census_final(
+      empty_table(tables$chd_census_final)
     ),
     sch_outside_pct_lower_plot = lower$outside,
     sch_dept_pct_lower_plot = lower$dept,

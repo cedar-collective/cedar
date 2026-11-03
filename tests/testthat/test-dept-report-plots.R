@@ -376,12 +376,13 @@ test_that("get_credit_hours scoped summary matches relevant full summary", {
   dept_code <- "HIST"
   dept_college <- infer_credit_hours_dept_college(
     test_students,
+    test_sections,
     dept_code,
     cedar_report_start_term,
     cedar_report_end_term
   )
 
-  full_relevant <- get_credit_hours(test_students) %>%
+  full_relevant <- get_credit_hours(test_students, test_sections) %>%
     filter(
       term >= cedar_report_start_term,
       term <= cedar_report_end_term,
@@ -392,6 +393,7 @@ test_that("get_credit_hours scoped summary matches relevant full summary", {
 
   scoped <- get_credit_hours(
     test_students,
+    test_sections,
     term_start = cedar_report_start_term,
     term_end = cedar_report_end_term,
     departments = dept_code,
@@ -406,6 +408,7 @@ test_that("get_credit_hours scoped summary matches relevant full summary", {
 test_that("get_credit_hours_for_dept_trends returns level-wide period table", {
   result <- get_credit_hours_for_dept_trends(
     test_students,
+    test_sections,
     dept_code = "HIST",
     subj_codes = "HIST",
     term_start = cedar_report_start_term,
@@ -487,7 +490,7 @@ test_that("credit_hours_by_fac takes students and faculty as parameters", {
   st <- test_students
   st$instructor_id[st$department == "HIST"] <- "INS001"
 
-  result <- credit_hours_by_fac(st, test_faculty, "HIST", "HIST",
+  result <- credit_hours_by_fac(st, test_sections, test_faculty, "HIST", "HIST",
                                 cedar_report_start_term, cedar_report_end_term,
                                 palette = "Set2")
   expect_setequal(names(result$plots), c("chd_by_fac_facet_plot", "chd_by_fac_plot"))
@@ -498,14 +501,14 @@ test_that("credit_hours_by_fac takes students and faculty as parameters", {
   expect_true(all(totals$total_hours > 0))
 
   # An empty faculty table is the documented "no HR data" state.
-  empty <- credit_hours_by_fac(st, test_faculty[0, ], "HIST", "HIST",
+  empty <- credit_hours_by_fac(st, test_sections, test_faculty[0, ], "HIST", "HIST",
                                cedar_report_start_term, cedar_report_end_term,
                                palette = "Set2")
   expect_equal(empty$plots$chd_by_fac_plot, "No faculty data available")
 
   # A missing table is an error, never a silent empty result.
   expect_error(
-    credit_hours_by_fac(st, NULL, "HIST", "HIST",
+    credit_hours_by_fac(st, test_sections, NULL, "HIST", "HIST",
                         cedar_report_start_term, cedar_report_end_term, palette = "Set2"),
     "cedar_faculty"
   )

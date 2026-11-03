@@ -55,66 +55,113 @@
 # 1. DATA BUILDERS
 # =============================================================================
 
-#' Rows that count toward student credit hours
+#' Rows that count toward student credit hours, and the hours each carries
 #'
-#' The one definition of an SCH row (definition credit-hours 2.0.0): a course
-#' registration that is still registered (RE/RS/RR) when the class list was
-#' pulled, excluding audits, which carry no credit. This is ATTEMPTED SCH.
+#' The one definition of an SCH row (definition credit-hours 3.0.0). SCH is
+#' ATTEMPTED hours counted at census, the 15th day of instruction -- the count
+#' UNM's official enrollment report publishes -- with the end-of-term count
+#' kept beside it:
 #'
-#' SCH used to count only passing grades, i.e. earned hours. That made SCH
-#' grade-dependent, so a term had no SCH until its grades posted -- Fall 2026
-#' was invisible on every credit-hour chart through the whole term while its
-#' registrations were already in the data. Workload is attempted hours; whether
-#' a student passes is an outcome, and outcomes have their own (graded) edge.
+#' - `census_credits`: every enrollment still registered (RE/RS/RR) plus every
+#'   late drop (DG/DW), the students who were in the course at census and
+#'   withdrew after it. add_census_enrl() counts heads the same way.
+#' - `final_credits`: the still-registered enrollments alone, what is left at
+#'   the end of term (definition 2.0.0's SCH). A late drop carries zero.
 #'
-#' Late drops (DG/DW) are not counted: Banner zeroes their credits, so including
-#' them would change nothing in a settled term. In an in-progress term, students
-#' who will later withdraw are still registered, so its SCH runs slightly high
-#' until the term closes -- one reason the in-progress term is labelled.
+#' Banner zeroes a late drop's credits on the class list, so a late drop counts
+#' at its section's credit value: cedar_sections' credits_min where it equals
+#' credits_max, which matches the class-list credits of 100% of registered rows
+#' in fixed-credit sections. In a variable-credit section the hours the student
+#' chose are gone once they withdraw, so the row keeps what the class list
+#' recorded, almost always zero (0.7% of late drops: music lessons,
+#' independent study, thesis).
 #'
-#' @param students cedar_students rows. Requires registration_status_code,
-#'   final_grade, credits.
-#' @return The qualifying rows.
-filter_sch_rows <- function(students) {
-  required_cols <- c("registration_status_code", "final_grade", "credits")
+#' SCH used to count only passing grades (earned hours, 1.0.0), which hid a
+#' term until its grades posted; whether a student passes is an outcome, and
+#' outcomes have their own (graded) edge. Audits carry no credit and are
+#' excluded, as are waitlists and early drops (DR/DD), which leave before
+#' census. Before a term's census date no one has late-dropped yet, so its
+#' census credits are current registration -- one reason an in-progress term is
+#' labelled.
+#'
+#' @param students cedar_students rows. Requires term, crn,
+#'   registration_status_code, final_grade, credits.
+#' @param sections cedar_sections rows for those terms. Requires term, crn,
+#'   credits_min, credits_max.
+#' @return The qualifying rows, with census_credits and final_credits added.
+filter_sch_rows <- function(students, sections) {
+  required_cols <- c("term", "crn", "registration_status_code", "final_grade", "credits")
   missing_cols <- setdiff(required_cols, colnames(students))
   if (length(missing_cols) > 0) {
     stop("[credit-hours.R] filter_sch_rows() missing columns: ",
          paste(missing_cols, collapse = ", "))
   }
+  if (is.null(sections)) {
+    stop("[credit-hours.R] filter_sch_rows() requires cedar_sections: a late ",
+         "drop's census credits are its section's credit value")
+  }
+  section_cols <- c("term", "crn", "credits_min", "credits_max")
+  missing_cols <- setdiff(section_cols, colnames(sections))
+  if (length(missing_cols) > 0) {
+    stop("[credit-hours.R] filter_sch_rows() sections missing columns: ",
+         paste(missing_cols, collapse = ", "))
+  }
+
+  fixed_credits <- sections %>%
+    filter(!is.na(credits_min), credits_min == credits_max) %>%
+    distinct(term, crn, section_credits = credits_min)
+  if (anyDuplicated(fixed_credits[c("term", "crn")]) > 0) {
+    stop("[credit-hours.R] filter_sch_rows(): a (term, crn) carries two ",
+         "credit values in cedar_sections")
+  }
+
   students %>%
     filter(
-      registration_status_code %in% STATUS_REGISTERED,
+      registration_status_code %in% c(STATUS_REGISTERED, STATUS_DROP_LATE),
       is.na(final_grade) | final_grade != "AUD"
-    )
+    ) %>%
+    left_join(fixed_credits, by = c("term", "crn"), na_matches = "never") %>%
+    mutate(
+      census_credits = if_else(
+        registration_status_code %in% STATUS_DROP_LATE & !is.na(section_credits),
+        section_credits, credits
+      ),
+      final_credits = if_else(
+        registration_status_code %in% STATUS_DROP_LATE, 0, credits
+      )
+    ) %>%
+    select(-section_credits)
 }
 
 
 #' Summarize credit hours by term, campus, college, department, subject, and level
 #'
 #' This is the foundational summary used by all department-level SCH plots.
-#' It counts attempted credit hours -- every still-registered enrollment, see
-#' filter_sch_rows() -- so a term has SCH as soon as it has registrations.
+#' It counts attempted credit hours at census, with the end-of-term count
+#' beside it (see filter_sch_rows()), so a term has SCH as soon as it has
+#' registrations.
 #'
 #' The result includes both individual level rows (lower/upper/grad) AND a
 #' "total" row per group that sums across all levels — so downstream callers
 #' can choose either view without re-aggregating.
 #'
 #' @param students cedar_students data frame
+#' @param sections cedar_sections data frame, for late drops' credit values.
 #' @param term_start,term_end Optional integer term-code bounds.
 #' @param departments,colleges,campuses Optional scope filters. When both
 #'   departments and colleges are supplied, rows matching either are retained.
 #' @return Long-format data frame with columns: term, campus, college,
-#'   department, subject_code, level, total_hours.
+#'   department, subject_code, level, total_hours (SCH at census), and
+#'   final_hours (SCH still registered at the end of term).
 #'   Level values: "lower", "upper", "grad", "total".
-get_credit_hours <- function(students, term_start = NULL, term_end = NULL,
+get_credit_hours <- function(students, sections, term_start = NULL, term_end = NULL,
                              departments = NULL, colleges = NULL,
                              campuses = NULL) {
   message("[credit-hours.R] get_credit_hours")
 
   # Fail loudly if the data doesn't have the columns we need — better to stop
   # here with a clear message than to produce silent wrong results downstream.
-  required_cols <- c("final_grade", "registration_status_code", "term", "campus",
+  required_cols <- c("final_grade", "registration_status_code", "term", "crn", "campus",
                      "college", "department", "level", "subject_code", "credits")
   missing_cols <- setdiff(required_cols, colnames(students))
   if (length(missing_cols) > 0) {
@@ -131,7 +178,8 @@ get_credit_hours <- function(students, term_start = NULL, term_end = NULL,
   colleges    <- clean_scope(colleges)
   campuses    <- clean_scope(campuses)
 
-  scoped <- filter_sch_rows(students)
+  # Scope before filter_sch_rows(), so its section join runs on the rows kept.
+  scoped <- students
   if (!is.null(term_start)) {
     scoped <- scoped %>% filter(term >= as.integer(term_start))
   }
@@ -148,19 +196,23 @@ get_credit_hours <- function(students, term_start = NULL, term_end = NULL,
   } else if (length(colleges) > 0) {
     scoped <- scoped %>% filter(college %in% colleges)
   }
+  scoped <- filter_sch_rows(scoped, sections)
 
   # Sum attempted credits, grouped by every dimension we care about.
   # This gives us one row per unique (term, campus, college, dept, level, subject).
   by_level <- scoped %>%
     group_by(term, campus, college, department, level, subject_code) %>%
-    summarize(total_hours = sum(credits, na.rm = TRUE), .groups = "keep")
+    summarize(total_hours = sum(census_credits, na.rm = TRUE),
+              final_hours = sum(final_credits, na.rm = TRUE), .groups = "keep")
 
   # Also compute a "total" row that adds lower + upper + grad together.
   # We add this as a separate row (level = "total") rather than filtering
   # it out, so callers can choose either the breakdown or the aggregate.
   totals <- scoped %>%
     group_by(term, campus, college, department, subject_code) %>%
-    summarize(level = "total", total_hours = sum(credits, na.rm = TRUE), .groups = "keep")
+    summarize(level = "total",
+              total_hours = sum(census_credits, na.rm = TRUE),
+              final_hours = sum(final_credits, na.rm = TRUE), .groups = "keep")
 
   # Stack the by-level rows and the total rows, then sort so levels appear
   # in a consistent order: lower → upper → grad → total.
@@ -172,14 +224,14 @@ get_credit_hours <- function(students, term_start = NULL, term_end = NULL,
 
 #' Infer the college that owns a department for SCH comparisons
 #'
-#' Uses attempted SCH in the selected term/campus scope when possible, then falls
+#' Uses census SCH in the selected term/campus scope when possible, then falls
 #' back to all rows for the department. Weighting by SCH is more robust than
 #' counting already-summarized rows, especially when a department has multiple
 #' subject codes or uneven course levels.
-infer_credit_hours_dept_college <- function(students, dept_code,
+infer_credit_hours_dept_college <- function(students, sections, dept_code,
                                             term_start = NULL, term_end = NULL,
                                             campuses = NULL) {
-  required_cols <- c("final_grade", "registration_status_code", "term", "campus",
+  required_cols <- c("final_grade", "registration_status_code", "term", "crn", "campus",
                      "college", "department", "credits")
   missing_cols <- setdiff(required_cols, colnames(students))
   if (length(missing_cols) > 0) {
@@ -208,13 +260,17 @@ infer_credit_hours_dept_college <- function(students, dept_code,
 
   if (nrow(dept_rows) == 0) return(NA_character_)
 
-  sch_rows <- filter_sch_rows(dept_rows)
-  if (nrow(sch_rows) > 0) dept_rows <- sch_rows
+  sch_rows <- filter_sch_rows(dept_rows, sections)
+  weighted <- if (nrow(sch_rows) > 0) {
+    sch_rows %>% mutate(hours = census_credits)
+  } else {
+    dept_rows %>% mutate(hours = credits)
+  }
 
-  inferred <- dept_rows %>%
+  inferred <- weighted %>%
     group_by(college) %>%
     summarize(
-      total_hours = sum(credits, na.rm = TRUE),
+      total_hours = sum(hours, na.rm = TRUE),
       rows = dplyr::n(),
       .groups = "drop"
     ) %>%
@@ -236,15 +292,17 @@ infer_credit_hours_dept_college <- function(students, dept_code,
 #' to one display name so grouping works correctly.
 #'
 #' @param students cedar_students data frame
+#' @param sections cedar_sections data frame, for late drops' credit values
 #' @param term_start Integer term code for the beginning of the analysis window
 #' @param term_end   Integer term code for the end of the analysis window
-#' @return Filtered data frame, ready for major-level analysis
-build_major_level_data <- function(students, term_start, term_end) {
-  filter_sch_rows(students) %>%
+#' @return Filtered data frame with census_credits, ready for major-level analysis
+build_major_level_data <- function(students, sections, term_start, term_end) {
+  students %>%
     filter(
       as.integer(term) >= term_start,   # drop terms before the window
       as.integer(term) <= term_end      # drop terms after the window
     ) %>%
+    filter_sch_rows(sections) %>%
     # Banner has used two different names for the same college in different
     # export generations. Normalize so charts don't show it as two separate groups.
     mutate(student_college = str_replace(
@@ -265,7 +323,7 @@ build_major_level_data <- function(students, term_start, term_end) {
 #' function to the rest of the university.
 #'
 #' @param level_data Filtered student enrollment rows for one course level
-#'   Required cols: major, major_name, credits
+#'   Required cols: major, major_name, census_credits
 #' @param major_codes Character vector of major codes that belong to this
 #'   department (e.g., c("BIOL", "FBIO", "CHBI") for Biology)
 #' @return Named list with slots:
@@ -280,7 +338,7 @@ build_major_summary <- function(level_data, major_codes) {
   summary <- level_data %>%
     mutate(major_name = if_else(!is.na(major_name) & major_name != "", major_name, major_code)) %>%
     group_by(major_code, major_name) %>%
-    summarize(total_hours = sum(credits, na.rm = TRUE), .groups = "drop") %>%
+    summarize(total_hours = sum(census_credits, na.rm = TRUE), .groups = "drop") %>%
     arrange(desc(total_hours))  # biggest programs first
 
   # Split into home (our students) vs. outside (everyone else)
@@ -406,7 +464,7 @@ build_outside_pie_data <- function(outside_summary, pct_threshold = 0.03, max_na
 #' pie also appears as its own bar in the time series.
 #'
 #' @param level_data Filtered student enrollment rows for one course level
-#'   Required cols: major, major_name, credits, term
+#'   Required cols: major, major_name, census_credits, term
 #' @param major_codes Home department major codes — excluded from outside count
 #' @param named_outside_codes The major_code values from build_outside_pie_data()
 #'   $named_outside — these are the program codes that get their own bar color
@@ -422,7 +480,7 @@ build_outside_time_data <- function(level_data, major_codes, named_outside_codes
     ) %>%
     # Sum credits by term and group, giving one row per term × major_group
     group_by(term, major_group) %>%
-    summarize(total_hours = sum(credits, na.rm = TRUE), .groups = "drop") %>%
+    summarize(total_hours = sum(census_credits, na.rm = TRUE), .groups = "drop") %>%
     ungroup() %>%
     mutate(term = term_axis_factor(term))
 }
@@ -446,7 +504,7 @@ build_credit_hours_wide_table <- function(filtered_students) {
   long <- filtered_students %>%
     mutate(major_name = if_else(!is.na(major_name) & major_name != "", major_name, major_code)) %>%
     group_by(term, student_college, major_code, major_name) %>%
-    summarize(total_hours = sum(credits), .groups = "drop") %>%
+    summarize(total_hours = sum(census_credits), .groups = "drop") %>%
     arrange(term, desc(total_hours))
 
   # Pivot so each term becomes its own column
@@ -514,7 +572,7 @@ compute_major_sch_trends <- function(level_data, major_codes, top_n = 5L) {
     filter(!(major_code %in% major_codes)) %>%
     mutate(major_name = if_else(!is.na(major_name) & major_name != "", major_name, major_code)) %>%
     group_by(major_code, major_name, term) %>%
-    summarize(sch = sum(credits, na.rm = TRUE), .groups = "drop")
+    summarize(sch = sum(census_credits, na.rm = TRUE), .groups = "drop")
 
   if (nrow(sch_by_term) == 0L) return(NULL)
 
@@ -740,6 +798,36 @@ build_dept_subject_data <- function(credit_hours_data, dept_code) {
     by_subj_total = by_subj_total,
     by_period     = by_period
   )
+}
+
+
+#' Build the department's SCH at census and at the end of term
+#'
+#' One row per term for the main trend chart: census SCH (the headline every
+#' other chart uses) and the SCH still registered at the end of term, from the
+#' same rows as the subject-code charts so the totals agree. The gap between
+#' them is the credits of students who withdrew after census.
+#'
+#' @param by_subj_total by_subj_total slot from build_dept_subject_data()
+#'   (requires term, total_hours, final_hours)
+#' @return Data frame: term, census_hours, final_hours, withdrawn_hours
+build_sch_census_final_data <- function(by_subj_total) {
+  required_cols <- c("term", "total_hours", "final_hours")
+  missing_cols <- setdiff(required_cols, colnames(by_subj_total))
+  if (length(missing_cols) > 0) {
+    stop("[credit-hours.R] build_sch_census_final_data() missing columns: ",
+         paste(missing_cols, collapse = ", "))
+  }
+  by_subj_total %>%
+    ungroup() %>%
+    group_by(term) %>%
+    summarize(
+      census_hours = sum(total_hours, na.rm = TRUE),
+      final_hours  = sum(final_hours, na.rm = TRUE),
+      .groups = "drop"
+    ) %>%
+    mutate(withdrawn_hours = census_hours - final_hours) %>%
+    arrange(term)
 }
 
 
@@ -992,6 +1080,44 @@ plot_chd_by_subj_stacked <- function(by_subj_total) {
 }
 
 
+#' Line chart: department SCH at census and at the end of term
+#'
+#' Census is the solid line, the end of term the dashed one; the space between
+#' them is the credits of students who withdrew after census, shown on hover.
+#'
+#' @param census_final Output of build_sch_census_final_data()
+#' @return plotly line chart, or NULL if there are no terms
+plot_sch_census_final <- function(census_final) {
+  if (nrow(census_final) == 0) return(NULL)
+
+  colors <- cedar_plotly_palette(c("At census", "End of term"))
+  plot_ly(census_final %>% mutate(term = term_axis_factor(term)), x = ~term) %>%
+    add_trace(
+      y = ~census_hours, name = "At census",
+      type = "scatter", mode = "lines+markers",
+      line = list(color = colors[["At census"]], width = 2),
+      marker = list(color = colors[["At census"]], size = 6),
+      customdata = ~withdrawn_hours,
+      hovertemplate = paste0(
+        "%{x}<br>%{y:,.0f} hrs at census<br>",
+        "%{customdata:,.0f} hrs withdrawn after census<extra></extra>"
+      )
+    ) %>%
+    add_trace(
+      y = ~final_hours, name = "End of term",
+      type = "scatter", mode = "lines+markers",
+      line = list(color = colors[["End of term"]], width = 2, dash = "dash"),
+      marker = list(color = colors[["End of term"]], size = 6),
+      hovertemplate = "%{x}<br>%{y:,.0f} hrs still registered<extra></extra>"
+    ) %>%
+    layout(
+      xaxis  = list(title = "Academic Period", tickangle = -45),
+      yaxis  = list(title = "Credit Hours", rangemode = "tozero"),
+      legend = list(orientation = "h", x = 0, y = -0.2)
+    )
+}
+
+
 #' Stacked bar: total credit hours by course level (lower/upper/grad)
 #'
 #' Shows the balance between undergraduate and graduate instruction over time.
@@ -1034,6 +1160,7 @@ plot_chd_by_level <- function(by_period, subj_codes, palette) {
 #' and once for all undergrad combined — then assembles all plots and tables.
 #'
 #' @param students cedar_students data frame (pre-filtered to this department)
+#' @param sections cedar_sections data frame, for late drops' credit values
 #' @param dept_code Department code (e.g., "BIOL")
 #' @param major_codes Character vector of the department's home program codes
 #'   (the caller resolves them, e.g. Dept Trends' `base$prog_codes` from
@@ -1050,12 +1177,12 @@ plot_chd_by_level <- function(by_period, subj_codes, palette) {
 #'            sch_outside_pct_plot, sch_dept_pct_plot
 #'   $tables: credit_hours_data_w, sch_major_trends_lower, sch_outside_full_lower,
 #'            sch_major_trends_upper, sch_outside_full_upper
-credit_hours_by_major <- function(students, dept_code, major_codes, term_start, term_end,
+credit_hours_by_major <- function(students, sections, dept_code, major_codes, term_start, term_end,
                                   include_all_ug = TRUE,
                                   include_wide_table = TRUE) {
 
   # Verify the incoming data has everything we need before doing any work
-  required_cols <- c("term", "final_grade", "registration_status_code", "credits",
+  required_cols <- c("term", "crn", "final_grade", "registration_status_code", "credits",
                      "major_code", "major_name", "student_college", "level")
   missing_cols <- setdiff(required_cols, colnames(students))
   if (length(missing_cols) > 0) {
@@ -1076,7 +1203,7 @@ credit_hours_by_major <- function(students, dept_code, major_codes, term_start, 
   major_codes <- unique(major_codes[!is.na(major_codes) & nzchar(major_codes)])
 
   # Filter to the term range, SCH rows, and normalized college names
-  all_data <- build_major_level_data(students, term_start, term_end)
+  all_data <- build_major_level_data(students, sections, term_start, term_end)
 
   # The optional wide summary covers all levels combined and supports callers
   # that expose the legacy export data view.
@@ -1269,6 +1396,7 @@ plot_chd_by_fac_stacked <- function(by_total, subj_codes, palette) {
 #' Dept Trends today (see `compute_dept_credit_hours_tab()`).
 #'
 #' @param students cedar_students data frame
+#' @param sections cedar_sections data frame, for late drops' credit values
 #' @param faculty cedar_faculty data frame (term, instructor_id, department,
 #'   job_category). An empty table returns the two "No faculty data available"
 #'   placeholders; NULL is an error.
@@ -1279,7 +1407,7 @@ plot_chd_by_fac_stacked <- function(by_total, subj_codes, palette) {
 #' @return list($plots): chd_by_fac_facet_plot (breakdown by level),
 #'   chd_by_fac_plot (totals stacked by job category); $tables:
 #'   chd_fac_by_level, chd_fac_by_total
-credit_hours_by_fac <- function(students, faculty, dept_code, subj_codes, term_start, term_end, palette) {
+credit_hours_by_fac <- function(students, sections, faculty, dept_code, subj_codes, term_start, term_end, palette) {
   message("[credit-hours.R] credit_hours_by_fac for dept: ", dept_code)
 
   if (is.null(students)) {
@@ -1298,7 +1426,7 @@ credit_hours_by_fac <- function(students, faculty, dept_code, subj_codes, term_s
     )))
   }
 
-  required_student_cols <- c("final_grade", "registration_status_code", "term", "department", "credits",
+  required_student_cols <- c("final_grade", "registration_status_code", "term", "crn", "department", "credits",
                               "campus", "college", "level", "instructor_id")
   missing <- setdiff(required_student_cols, colnames(students))
   if (length(missing) > 0) {
@@ -1323,11 +1451,12 @@ credit_hours_by_fac <- function(students, faculty, dept_code, subj_codes, term_s
     select(term, instructor_id, department, job_category)
 
   # Keep only this department's courses within the analysis window
-  filtered <- filter_sch_rows(students) %>%
+  filtered <- students %>%
     filter(
       department  == dept_code,
       term        >= term_start & term <= term_end
-    )
+    ) %>%
+    filter_sch_rows(sections)
 
   # Join student enrollment rows to faculty job category by instructor + term.
   # all.x=TRUE is a left join: keeps all student rows even if the instructor
@@ -1340,7 +1469,7 @@ credit_hours_by_fac <- function(students, faculty, dept_code, subj_codes, term_s
   by_level <- merged %>%
     filter(campus %in% c("ABQ", "EA")) %>%
     group_by(term, college, department, level, job_category) %>%
-    summarize(total_hours = sum(credits), .groups = "drop")
+    summarize(total_hours = sum(census_credits), .groups = "drop")
 
   by_total <- by_level %>%
     group_by(term, college, department, job_category) %>%
@@ -1368,6 +1497,7 @@ credit_hours_by_fac <- function(students, faculty, dept_code, subj_codes, term_s
 #' compares to its college over time, broken down by subject code and level.
 #'
 #' @param class_lists cedar_students data frame (full — not pre-filtered to dept)
+#' @param sections cedar_sections data frame, for late drops' credit values
 #' @param dept_code Department code (e.g., "BIOL")
 #' @param subj_codes Subject codes used in plot titles (informational only)
 #' @param term_start,term_end Integer term codes for the analysis window (inclusive)
@@ -1375,9 +1505,9 @@ credit_hours_by_fac <- function(students, faculty, dept_code, subj_codes, term_s
 #' @return list with:
 #'   $plots:  college_credit_hours_plot, college_credit_hours_comp_plot,
 #'            college_dept_dual_plot, chd_by_year_facet_subj_plot,
-#'            chd_by_year_subj_plot, chd_by_period_plot
-#'   $tables: chd_by_period_table
-get_credit_hours_for_dept_trends <- function(class_lists, dept_code, subj_codes,
+#'            chd_by_year_subj_plot, chd_by_period_plot, sch_census_final_plot
+#'   $tables: chd_by_period_table, chd_census_final
+get_credit_hours_for_dept_trends <- function(class_lists, sections, dept_code, subj_codes,
                                              term_start, term_end, palette,
                                              dept_college = NULL,
                                              campuses = NULL) {
@@ -1388,7 +1518,7 @@ get_credit_hours_for_dept_trends <- function(class_lists, dept_code, subj_codes,
   # for department plots and department-vs-college comparisons.
   if (is.null(dept_college) || length(dept_college) == 0 || is.na(dept_college)) {
     dept_college <- infer_credit_hours_dept_college(
-      class_lists, dept_code, term_start, term_end, campuses
+      class_lists, sections, dept_code, term_start, term_end, campuses
     )
   }
   message("[credit-hours.R] dept_college: ", dept_college)
@@ -1396,6 +1526,7 @@ get_credit_hours_for_dept_trends <- function(class_lists, dept_code, subj_codes,
   college_scope <- if (!is.na(dept_college) && nzchar(dept_college)) dept_college else NULL
   credit_hours_data <- get_credit_hours(
     class_lists,
+    sections,
     term_start  = term_start,
     term_end    = term_end,
     departments = dept_code,
@@ -1410,6 +1541,7 @@ get_credit_hours_for_dept_trends <- function(class_lists, dept_code, subj_codes,
   indexed_upper_data <- build_indexed_growth_data(credit_hours_data, dept_code, dept_college, "upper")
   indexed_grad_data  <- build_indexed_growth_data(credit_hours_data, dept_code, dept_college, "grad")
   dept_subj_data <- build_dept_subject_data(credit_hours_data, dept_code)
+  census_final   <- build_sch_census_final_data(dept_subj_data$by_subj_total)
 
   # The period table pivots level breakdown wide — one column per level,
   # one row per term × subject — for the tabular export view
@@ -1447,7 +1579,8 @@ get_credit_hours_for_dept_trends <- function(class_lists, dept_code, subj_codes,
       ),
       chd_by_year_facet_subj_plot    = plot_chd_by_subj_faceted(dept_subj_data$by_subj_level, palette),
       chd_by_year_subj_plot          = plot_chd_by_subj_stacked(dept_subj_data$by_subj_total),
-      chd_by_period_plot             = plot_chd_by_level(dept_subj_data$by_period, subj_codes, palette)
+      chd_by_period_plot             = plot_chd_by_level(dept_subj_data$by_period, subj_codes, palette),
+      sch_census_final_plot          = plot_sch_census_final(census_final)
     ),
     tables = list(
       chd_by_period_table = chd_by_period_table,
@@ -1460,22 +1593,8 @@ get_credit_hours_for_dept_trends <- function(class_lists, dept_code, subj_codes,
       chd_indexed_grad    = indexed_grad_data,
       chd_by_subj_level   = dept_subj_data$by_subj_level,
       chd_by_subj_total   = dept_subj_data$by_subj_total,
-      chd_by_period_data  = dept_subj_data$by_period
+      chd_by_period_data  = dept_subj_data$by_period,
+      chd_census_final    = census_final
     )
-  )
-}
-
-
-#' Legacy wrapper for retired Rmd department report callers
-get_credit_hours_for_dept_report <- function(class_lists, dept_code, subj_codes,
-                                              term_start, term_end, palette) {
-  message("[credit-hours.R] get_credit_hours_for_dept_report is legacy; use get_credit_hours_for_dept_trends")
-  get_credit_hours_for_dept_trends(
-    class_lists = class_lists,
-    dept_code   = dept_code,
-    subj_codes  = subj_codes,
-    term_start  = term_start,
-    term_end    = term_end,
-    palette     = palette
   )
 }

@@ -229,7 +229,7 @@ CEDAR's local data runs behind the registrar, and a term does not arrive all at 
 | `last_enrolled` (`cedar_report_latest_term`) | descriptive current-registration charts — headcount, course enrollment, attempted SCH — **only with every term after `last_graded` labelled in progress** (`cedar_in_progress_terms()`, `mark_plotly_terms()`). Never a trend comparison, a longitudinal denominator, or a grade-based rate |
 | `last_degree` | completions |
 
-**Current enrollment is never hidden.** A term with registrations appears on descriptive charts the day it lands, labelled, rather than waiting to settle or be graded: hiding it made Fall 2026 vanish from Dept Trends for its first weeks, and earned-only SCH hid it until grades posted. That is why SCH is *attempted* hours (`filter_sch_rows()`, definition credit-hours 2.0.0) — a grade is an outcome, and outcomes keep their own edge.
+**Current enrollment is never hidden.** A term with registrations appears on descriptive charts the day it lands, labelled, rather than waiting to settle or be graded: hiding it made Fall 2026 vanish from Dept Trends for its first weeks, and earned-only SCH hid it until grades posted. That is why SCH is *attempted* hours (`filter_sch_rows()`, definition credit-hours 3.0.0) — a grade is an outcome, and outcomes keep their own edge. It is counted at census, still registered plus late drops (late drops at their section's credit value, because Banner zeroes theirs), with the end-of-term count beside it on the main Credit Hours chart; census matches UNM's official enrollment report.
 
 **The edges are computed in one place.** `cedar_report_edges()` sets all four at startup, for `global.R` and the cache-warming scripts alike, so the app and the caches it reads agree; none is hand-maintained. A term counts as settled when the newest pull covering it happened at least `min_days_after_start` days (default 14) after the term began — **never by comparing row counts to prior years**, which cannot distinguish a real enrollment decline from an unfinished term. An edge `cedar_data_edges()` cannot determine is `NULL`, never a guess: fail closed. The app cannot run without the settled and graded edges (Pathways reads a `NULL` bound as no bound), so `cedar_report_edges()` stops startup without them rather than guess from the current term. **Say which edge you used** — `cedar_edge_note()` produces the sentence.
 
@@ -510,7 +510,7 @@ Known variations still in use: student count (`enrolled`, `registered`, `count` 
 
 ## Key Data Flow Notes
 
-- `dept-trends.R` passes **unfiltered** `cedar_students` to `get_credit_hours_for_dept_report` (needed for college vs. dept comparison), but **filtered** students to `credit_hours_by_major` and `credit_hours_by_fac`.
+- `dept-trends.R` passes **unfiltered** `cedar_students` to `get_credit_hours_for_dept_trends` (needed for college vs. dept comparison), but **filtered** students to `credit_hours_by_major`. Every SCH function also takes `cedar_sections`, for late drops' credit values.
 - `credit_hours_data` has a `level` column: `"lower"`, `"upper"`, `"grad"`, `"total"`. Filter to `"total"` to avoid double-counting.
 - `appointment_pct` in `cedar_faculty` is stored as 0–100; divide by 100 for FTE.
 - `get_stopout()` requires `add_next_term_col()` from utils.R — called internally.

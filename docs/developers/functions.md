@@ -8,7 +8,7 @@ parent: Developer Guide
 
 This reference is auto-generated from roxygen2 comments in the source code.
 
-*Generated: 2026-11-03 09:13:01.088725*
+*Generated: 2026-11-03 09:21:33.597254*
 
 ---
 
@@ -670,15 +670,16 @@ Course Sequence Effect  Compares grades in course Y between students who passed 
 
 *Source: credit-hours.R*
 
-**Rows that count toward student credit hours**
+**Rows that count toward student credit hours, and the hours each carries**
 
-Rows that count toward student credit hours  The one definition of an SCH row (definition credit-hours 2.0.0): a course registration that is still registered (RE/RS/RR) when the class list was pulled, excluding audits, which carry no credit. This is ATTEMPTED SCH.  SCH used to count only passing grades, i.e. earned hours. That made SCH grade-dependent, so a term had no SCH until its grades posted -- Fall 2026 was invisible on every credit-hour chart through the whole term while its registrations were already in the data. Workload is attempted hours; whether a student passes is an outcome, and outcomes have their own (graded) edge.  Late drops (DG/DW) are not counted: Banner zeroes their credits, so including them would change nothing in a settled term. In an in-progress term, students who will later withdraw are still registered, so its SCH runs slightly high until the term closes -- one reason the in-progress term is labelled.
+Rows that count toward student credit hours, and the hours each carries  The one definition of an SCH row (definition credit-hours 3.0.0). SCH is ATTEMPTED hours counted at census, the 15th day of instruction -- the count UNM's official enrollment report publishes -- with the end-of-term count kept beside it:  - `census_credits`: every enrollment still registered (RE/RS/RR) plus every late drop (DG/DW), the students who were in the course at census and withdrew after it. add_census_enrl() counts heads the same way. - `final_credits`: the still-registered enrollments alone, what is left at the end of term (definition 2.0.0's SCH). A late drop carries zero.  Banner zeroes a late drop's credits on the class list, so a late drop counts at its section's credit value: cedar_sections' credits_min where it equals credits_max, which matches the class-list credits of 100% of registered rows in fixed-credit sections. In a variable-credit section the hours the student chose are gone once they withdraw, so the row keeps what the class list recorded, almost always zero (0.7% of late drops: music lessons, independent study, thesis).  SCH used to count only passing grades (earned hours, 1.0.0), which hid a term until its grades posted; whether a student passes is an outcome, and outcomes have their own (graded) edge. Audits carry no credit and are excluded, as are waitlists and early drops (DR/DD), which leave before census. Before a term's census date no one has late-dropped yet, so its census credits are current registration -- one reason an in-progress term is labelled.
 
 **Parameters:**
 
-- `students` - cedar_students rows. Requires registration_status_code, final_grade, credits.
+- `students` - cedar_students rows. Requires term, crn, registration_status_code, final_grade, credits.
+- `sections` - cedar_sections rows for those terms. Requires term, crn, credits_min, credits_max.
 
-**Returns:** The qualifying rows.
+**Returns:** The qualifying rows, with census_credits and final_credits added.
 
 ---
 
@@ -688,15 +689,16 @@ Rows that count toward student credit hours  The one definition of an SCH row (d
 
 **Summarize credit hours by term, campus, college, department, subject, and level**
 
-Summarize credit hours by term, campus, college, department, subject, and level  This is the foundational summary used by all department-level SCH plots. It counts attempted credit hours -- every still-registered enrollment, see filter_sch_rows() -- so a term has SCH as soon as it has registrations.  The result includes both individual level rows (lower/upper/grad) AND a "total" row per group that sums across all levels — so downstream callers can choose either view without re-aggregating.
+Summarize credit hours by term, campus, college, department, subject, and level  This is the foundational summary used by all department-level SCH plots. It counts attempted credit hours at census, with the end-of-term count beside it (see filter_sch_rows()), so a term has SCH as soon as it has registrations.  The result includes both individual level rows (lower/upper/grad) AND a "total" row per group that sums across all levels — so downstream callers can choose either view without re-aggregating.
 
 **Parameters:**
 
 - `students` - cedar_students data frame
+- `sections` - cedar_sections data frame, for late drops' credit values.
 - `term_start,term_end` - Optional integer term-code bounds.
 - `departments,colleges,campuses` - Optional scope filters. When both departments and colleges are supplied, rows matching either are retained.
 
-**Returns:** Long-format data frame with columns: term, campus, college, department, subject_code, level, total_hours. Level values: "lower", "upper", "grad", "total".
+**Returns:** Long-format data frame with columns: term, campus, college, department, subject_code, level, total_hours (SCH at census), and final_hours (SCH still registered at the end of term). Level values: "lower", "upper", "grad", "total".
 
 ---
 
@@ -706,7 +708,7 @@ Summarize credit hours by term, campus, college, department, subject, and level 
 
 **Infer the college that owns a department for SCH comparisons**
 
-Infer the college that owns a department for SCH comparisons  Uses attempted SCH in the selected term/campus scope when possible, then falls back to all rows for the department. Weighting by SCH is more robust than counting already-summarized rows, especially when a department has multiple subject codes or uneven course levels.
+Infer the college that owns a department for SCH comparisons  Uses census SCH in the selected term/campus scope when possible, then falls back to all rows for the department. Weighting by SCH is more robust than counting already-summarized rows, especially when a department has multiple subject codes or uneven course levels.
 
 ---
 
@@ -721,10 +723,11 @@ Filter and normalize student data for credit-hours-by-major analysis  Before we 
 **Parameters:**
 
 - `students` - cedar_students data frame
+- `sections` - cedar_sections data frame, for late drops' credit values
 - `term_start` - Integer term code for the beginning of the analysis window
 - `term_end` - Integer term code for the end of the analysis window
 
-**Returns:** Filtered data frame, ready for major-level analysis
+**Returns:** Filtered data frame with census_credits, ready for major-level analysis
 
 ---
 
@@ -738,7 +741,7 @@ Summarize SCH by major and split into home vs. outside  For a given set of cours
 
 **Parameters:**
 
-- `level_data` - Filtered student enrollment rows for one course level Required cols: major, major_name, credits
+- `level_data` - Filtered student enrollment rows for one course level Required cols: major, major_name, census_credits
 - `major_codes` - Character vector of major codes that belong to this department (e.g., c("BIOL", "FBIO", "CHBI") for Biology)
 
 **Returns:** Named list with slots: major_summary — all majors with total hours home          — only the department's own majors outside       — all other majors home_hours, outside_hours, total_hours — scalar totals
@@ -773,7 +776,7 @@ Build the term-by-term data for the outside-major bar chart  The pie charts show
 
 **Parameters:**
 
-- `level_data` - Filtered student enrollment rows for one course level Required cols: major, major_name, credits, term
+- `level_data` - Filtered student enrollment rows for one course level Required cols: major, major_name, census_credits, term
 - `major_codes` - Home department major codes — excluded from outside count
 - `named_outside_codes` - The major_code values from build_outside_pie_data() $named_outside — these are the program codes that get their own bar color
 
@@ -865,6 +868,22 @@ Build subject-level credit hour data for the department's own plots  This prepar
 - `dept_code` - Department code
 
 **Returns:** Named list with three data frames: by_subj_level — one row per (term, subject, level), level is NOT "total"; used for the faceted chart showing each subject broken down by lower/upper/grad by_subj_total — one row per (term, subject), level IS "total"; used for the stacked chart and the data export table by_period     — one row per (term, level) with an added period_hours column (the sum across all subjects for that level and term); used for the by-level stacked bar
+
+---
+
+### `build_sch_census_final_data()`
+
+*Source: credit-hours.R*
+
+**Build the department's SCH at census and at the end of term**
+
+Build the department's SCH at census and at the end of term  One row per term for the main trend chart: census SCH (the headline every other chart uses) and the SCH still registered at the end of term, from the same rows as the subject-code charts so the totals agree. The gap between them is the credits of students who withdrew after census.
+
+**Parameters:**
+
+- `by_subj_total` - by_subj_total slot from build_dept_subject_data() (requires term, total_hours, final_hours)
+
+**Returns:** Data frame: term, census_hours, final_hours, withdrawn_hours
 
 ---
 
@@ -1003,6 +1022,22 @@ Stacked bar: total credit hours by subject code across all levels  A simpler vie
 
 ---
 
+### `plot_sch_census_final()`
+
+*Source: credit-hours.R*
+
+**Line chart: department SCH at census and at the end of term**
+
+Line chart: department SCH at census and at the end of term  Census is the solid line, the end of term the dashed one; the space between them is the credits of students who withdrew after census, shown on hover.
+
+**Parameters:**
+
+- `census_final` - Output of build_sch_census_final_data()
+
+**Returns:** plotly line chart, or NULL if there are no terms
+
+---
+
 ### `plot_chd_by_level()`
 
 *Source: credit-hours.R*
@@ -1032,6 +1067,7 @@ Credit Hours by Major  The main function for the "who is taking our courses" ana
 **Parameters:**
 
 - `students` - cedar_students data frame (pre-filtered to this department)
+- `sections` - cedar_sections data frame, for late drops' credit values
 - `dept_code` - Department code (e.g., "BIOL")
 - `major_codes` - Character vector of the department's home program codes (the caller resolves them, e.g. Dept Trends' `base$prog_codes` from `major_to_dept`). A student on one of these is a home major; everyone else is an outside major. May be empty for a unit with no degree programs; never guessed from `dept_code`.
 - `term_start,term_end` - Integer term codes for the analysis window (inclusive)
@@ -1053,6 +1089,7 @@ Credit Hours by Faculty Category  Shows how SCH production is distributed across
 **Parameters:**
 
 - `students` - cedar_students data frame
+- `sections` - cedar_sections data frame, for late drops' credit values
 - `faculty` - cedar_faculty data frame (term, instructor_id, department, job_category). An empty table returns the two "No faculty data available" placeholders; NULL is an error.
 - `dept_code` - Department code
 - `subj_codes` - Subject codes for plot titles
@@ -1074,20 +1111,13 @@ Credit Hours for Dept Trends  Produces the full set of department-level SCH plot
 **Parameters:**
 
 - `class_lists` - cedar_students data frame (full — not pre-filtered to dept)
+- `sections` - cedar_sections data frame, for late drops' credit values
 - `dept_code` - Department code (e.g., "BIOL")
 - `subj_codes` - Subject codes used in plot titles (informational only)
 - `term_start,term_end` - Integer term codes for the analysis window (inclusive)
 - `palette` - RColorBrewer palette name for bar chart colors
 
-**Returns:** list with: $plots:  college_credit_hours_plot, college_credit_hours_comp_plot, college_dept_dual_plot, chd_by_year_facet_subj_plot, chd_by_year_subj_plot, chd_by_period_plot $tables: chd_by_period_table
-
----
-
-### `get_credit_hours_for_dept_report()`
-
-*Source: credit-hours.R*
-
-**Legacy wrapper for retired Rmd department report callers**
+**Returns:** list with: $plots:  college_credit_hours_plot, college_credit_hours_comp_plot, college_dept_dual_plot, chd_by_year_facet_subj_plot, chd_by_year_subj_plot, chd_by_period_plot, sch_census_final_plot $tables: chd_by_period_table, chd_census_final
 
 ---
 

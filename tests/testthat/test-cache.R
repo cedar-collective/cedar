@@ -254,7 +254,8 @@ test_that("Dept Trends invalidates only tabs that consume the changed source", {
     cedar_degrees = "deg",
     cedar_students = c("enrl", "ch"),
     cedar_faculty = character(0),
-    cedar_sections = "enrl",
+    # Credit Hours reads late drops' credit values from sections (3.0.0).
+    cedar_sections = c("enrl", "ch"),
     cedar_lookups = c("hc", "enrl", "deg", "ch"),
     # Edges enter the key through cedar_report_end_term and
     # cedar_report_latest_term, not as a hashed source table.

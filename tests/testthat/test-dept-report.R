@@ -308,6 +308,7 @@ test_that("Credit Hours UI does not read its payload while building the tab shel
 test_that("credit-hour dept trends carry level-specific college comparisons", {
   result <- get_credit_hours_for_dept_trends(
     test_students,
+    test_sections,
     dept_code = "HIST",
     subj_codes = "HIST",
     term_start = cedar_report_start_term,
@@ -319,33 +320,58 @@ test_that("credit-hour dept trends carry level-specific college comparisons", {
     "college_dept_dual_plot",
     "college_dept_lower_dual_plot",
     "college_dept_upper_dual_plot",
-    "college_dept_grad_dual_plot"
+    "college_dept_grad_dual_plot",
+    "sch_census_final_plot"
   ) %in% names(result$plots)))
 })
 
-# SCH is ATTEMPTED hours (credit-hours 2.0.0): every still-registered row,
-# whatever its grade. Earned-only SCH left a term with no SCH until its grades
-# posted, which hid the current term from every credit-hour chart.
+# SCH is ATTEMPTED hours counted at census (credit-hours 3.0.0): every
+# still-registered row, whatever its grade, plus every late drop, with the
+# end-of-term count beside it.
 # HIST 202010 in the fixtures: 35 registered passing rows (105 credits) +
-# 9 registered nonpassing rows (27) = 132. Its 12 late drops (DW, 36 credits)
-# are not registered and stay out. Earned-only SCH gave 105.
-test_that("SCH counts attempted credits of registered rows, not just passing grades", {
-  sch <- get_credit_hours(test_students, term_start = 202010, term_end = 202010,
+# 9 registered nonpassing rows (27) = 132 still registered at the end of term.
+# Its 12 late drops (DW) carry 0 credits, as Banner records them; at their
+# sections' 3 credits (S10001, S10002) they add 36, so census is 168.
+# Earned-only SCH (1.0.0) gave 105.
+test_that("SCH counts late drops at census and leaves them out at the end of term", {
+  sch <- get_credit_hours(test_students, test_sections,
+                          term_start = 202010, term_end = 202010,
                           departments = "HIST")
-  hist_total <- sch %>% dplyr::filter(level == "total") %>% dplyr::pull(total_hours) %>% sum()
-  expect_equal(hist_total, 132)
+  totals <- sch %>% dplyr::filter(level == "total")
+  expect_equal(sum(totals$total_hours), 168)
+  expect_equal(sum(totals$final_hours), 132)
+
+  census_final <- build_sch_census_final_data(
+    totals %>% dplyr::filter(campus %in% c("ABQ", "EA"))
+  )
+  expect_equal(census_final$census_hours, 168)
+  expect_equal(census_final$final_hours, 132)
+  expect_equal(census_final$withdrawn_hours, 36)
 })
 
-test_that("filter_sch_rows drops audits and every non-registered status", {
-  # Intermediate frame: one row per status/grade case the rule must decide.
+test_that("filter_sch_rows reads a late drop's credits from its section", {
+  # Intermediate frame: one row per status/grade case the rule must decide,
+  # each in its own section. Late drops carry 0 credits, as Banner records them.
   rows <- tibble::tibble(
-    registration_status_code = c("RE", "RS", "RR", "RE", "RE", "DW", "DR", "WL"),
-    final_grade              = c("A",  "F",  NA,   "",   "AUD", "W",  NA,   NA),
-    credits                  = 3
+    term                     = 202010L,
+    crn                      = c("1", "2", "3", "4", "5", "6", "7", "8", "9", "10"),
+    registration_status_code = c("RE", "RS", "RR", "RE", "RE", "DW", "DG", "DG", "DR", "WL"),
+    final_grade              = c("A",  "F",  NA,   "",   "AUD", "W",  "AUD", "W",  NA,   NA),
+    credits                  = c(3,    3,    3,    3,    3,     0,    0,     0,    0,    3)
   )
-  kept <- filter_sch_rows(rows)
-  expect_equal(kept$registration_status_code, c("RE", "RS", "RR", "RE"))
-  expect_false("AUD" %in% kept$final_grade)
+  # Section 8 is variable credit (1-3): the hours a withdrawn student chose are
+  # gone, so the row keeps its recorded zero.
+  sections <- tibble::tibble(
+    term = 202010L, crn = as.character(1:10),
+    credits_min = c(rep(3, 7), 1, 3, 3), credits_max = 3
+  )
+  kept <- filter_sch_rows(rows, sections)
+  expect_equal(kept$crn, c("1", "2", "3", "4", "6", "8"))
+  expect_equal(kept$census_credits, c(3, 3, 3, 3, 3, 0))
+  expect_equal(kept$final_credits,  c(3, 3, 3, 3, 0, 0))
+
+  expect_error(filter_sch_rows(rows, NULL), "cedar_sections")
+  expect_error(filter_sch_rows(rows, sections[c("term", "crn")]), "credits_min")
 })
 
 

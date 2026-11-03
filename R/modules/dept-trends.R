@@ -714,6 +714,7 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
       highest_mean_histo_plot = "enrl",
       degree_summary_faceted_by_major_plot = "deg",
       degree_summary_filtered_program_stacked_plot = "deg",
+      sch_census_final_plot = "ch",
       chd_by_year_facet_subj_plot = "ch",
       chd_by_year_subj_plot = "ch",
       chd_by_year_plot = "ch",
@@ -1130,8 +1131,13 @@ deptTrendsCreditHoursUI <- function(ns, home_major_code_label) {
         "Credit Hour Production",
         "How much SCH this department generates over time, how that production is distributed across subject codes and course levels, and how its trajectory compares with the college.",
         dashboard_subsection(
+          "At Census and End of Term",
+          "SCH in this department's courses at census (the solid line, and the count every other chart here uses) and still registered at the end of term (dashed). The gap is the credits of students who withdrew after census. For a term in progress, both lines show registration so far.",
+          plotlyOutput(ns("sch_census_final_plot"))
+        ),
+        dashboard_subsection(
           "By Level and Subject Code",
-          "Total attempted SCH in this department's courses each term, broken down by course level and subject code prefix.",
+          "SCH at census in this department's courses each term, broken down by course level and subject code prefix.",
           div(class = "download-row",
             downloadButton(
               ns("download_ch_period"),
