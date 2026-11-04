@@ -8,7 +8,7 @@ parent: Developer Guide
 
 This reference is auto-generated from roxygen2 comments in the source code.
 
-*Generated: 2026-11-04 13:50:02.119648*
+*Generated: 2026-11-04 14:13:50.252584*
 
 ---
 
@@ -401,7 +401,8 @@ Get Course Demographics  Analyzes the demographic composition (majors, classific
 **Parameters:**
 
 - `students` - Data frame of student enrollments from cedar_students table.
-- `opt` - Options list for filtering and grouping: \itemize{ \item \code{group_cols} - Character vector of columns to group by. If NULL, uses defaults: campus, college, term, term_type, student_classification, major, subject_course, course_title, level \item \code{reg_status_code} - Registration status codes to include (default: STATUS_REGISTERED) \item \code{course} - Course identifier(s) to filter by \item \code{term} - Term code(s) to filter by \item Other filtering options supported by \code{filter_class_list()} }
+- `student_terms` - The `cedar_student_terms` table. A grouping by `student_classification` or `major_code` reads the student's description off it, never off the class-list row (ADR-001 step 2). May be `NULL` only when no grouping column describes the student.
+- `opt` - Options list for filtering and grouping: \itemize{ \item \code{group_cols} - Character vector of columns to group by. If NULL, uses defaults: campus, college, term, term_type, student_classification, major_code, subject_course, course_title, level \item \code{reg_status_code} - Registration status codes to include (default: STATUS_REGISTERED) \item \code{course} - Course identifier(s) to filter by \item \code{term} - Term code(s) to filter by \item Other filtering options supported by \code{filter_class_list()} }
 
 **Returns:** Data frame with student demographic breakdown including counts, means, and percentages. See \code{\link{summarize_student_demographics}} for column details.
 
@@ -411,16 +412,16 @@ Get Course Demographics  Analyzes the demographic composition (majors, classific
 # Major composition of a course over time
 opt <- list(
   course     = "BIOL 2305",
-  group_cols = c("campus", "term", "term_type", "major", "subject_course")
+  group_cols = c("campus", "term", "term_type", "major_code", "subject_course")
 )
-major_breakdown <- get_course_demographics(cedar_students, opt)
+major_breakdown <- get_course_demographics(cedar_students, cedar_student_terms, opt)
 
 # Classification breakdown across all MATH courses
 opt <- list(
   subject    = "MATH",
   group_cols = c("campus", "term", "student_classification", "subject_course")
 )
-class_breakdown <- get_course_demographics(cedar_students, opt)
+class_breakdown <- get_course_demographics(cedar_students, cedar_student_terms, opt)
 }
 
 ```
@@ -1672,10 +1673,27 @@ Summarize Student Demographics  Flexible demographic summary function that group
 
 **Parameters:**
 
-- `filtered_students` - Data frame of student enrollments from cedar_students table, already filtered by desired criteria. Must include: student_id, term, campus, college, subject_course, and any demographic columns used in grouping.
+- `filtered_students` - Data frame of student enrollments from cedar_students table, already filtered by desired criteria. Must include: student_id, term, campus, college, subject_course, and any grouping column that describes the course row rather than the student.
+- `student_terms` - The `cedar_student_terms` table. A grouping by `student_classification` or `major_code` reads the student's description off it (`student_classification`, `primary_major_code`), never off the class-list row (ADR-001 step 2); the class-list copies are dropped first. May be `NULL` only when no grouping column describes the student.
 - `opt` - Options list containing: \itemize{ \item \code{group_cols} - Character vector of column names to group by. If NULL, uses default: campus, college, term, term_type, major, student_classification, subject_course, course_title, level }
 
 **Returns:** Data frame with student demographic breakdown including: \describe{ \item{count}{Number of distinct students in this group for THIS SPECIFIC TERM} \item{mean}{Average count across all terms OF THE SAME TERM_TYPE (e.g., avg across all falls). This is the key value used for plotting "average students per term type".} \item{registered}{Total course enrollment for this specific term} \item{registered_mean}{Average course enrollment across terms of same term_type} \item{term_pct}{Percentage of course enrollment this group represents IN THIS TERM (count / registered * 100)} \item{term_type_pct}{AVERAGE percentage across all terms of this term_type (mean / registered_mean * 100). This is what the pie charts display.} } Plus all columns specified in group_cols.  The \code{mean} and \code{term_type_pct} columns answer: "On average, what percentage of students in HIST 1105 are freshmen in fall semesters?" This averages across Fall 2022, Fall 2023, Fall 2024, etc. to give a stable "typical" value.
+
+---
+
+### `attach_student_descriptions()`
+
+*Source: demographics.R*
+
+**Replace class-list student descriptions with the student-term table's**
+
+**Parameters:**
+
+- `rows` - Class-list rows with `student_id` and `term`.
+- `student_terms` - The `cedar_student_terms` table.
+- `cols` - Names of `DEMOGRAPHIC_STUDENT_TERM_COLS` to attach.
+
+**Returns:** `rows` with each named column read off the student-term table.
 
 ---
 
@@ -4374,6 +4392,7 @@ Inspect Waitlist by Major and Classification  Comprehensive waitlist analysis th
 - `opt` - Options list for filtering: \itemize{ \item \code{course} - Course identifier(s) (e.g., "MATH 1430") \item \code{term} - Term code(s) (e.g., 202510) \item \code{subject} - Subject code(s) (e.g., "MATH") \item Other filtering options supported by \code{filter_class_list()} }
 - `enrl_base` - Optional precomputed course-term enrollment table (\code{cedar_cl_enrls_base}); passed on to \code{\link{attach_enrollment_history}}, which recomputes a scoped base from \code{students} when this is NULL.
 - `sections` - Optional cedar_sections table; only needed if students lacks a course_title column (titles are joined by term/subject_course)
+- `student_terms` - The `cedar_student_terms` table. The majors and classifications splits read each waiting student's description off it (`primary_major_code`, `student_classification`), never off the class-list row (ADR-001 step 2). Required.
 
 **Returns:** Named list with three elements: \itemize{ \item \code{majors} - Data frame summarizing waitlist by major/program. Columns: campus, term, subject_course, course_title, major, count \item \code{classifications} - Data frame summarizing waitlist by student level. Columns: campus, term, subject_course, course_title, student_classification, count \item \code{count} - Data frame of unique waitlisted students (see \code{\link{get_unique_waitlisted}}), enriched (when \code{sections} is supplied) with \code{n_sections} (active sections offered), \code{avg_size} (mean enrolled per section), and \code{sections_needed} (additional sections to clear the waitlist at the average size). }
 

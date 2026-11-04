@@ -55,6 +55,8 @@ The canonical illustration, one student's entire history as returned by the **si
 
 A freshman with 129 earned credits. The per-term columns are right; the cumulative columns are that student's 2026 totals printed six times.
 
+**The class list's `student_classification` fails the same test when a term is pulled late.** The table above measures academic studies. The class list prints each student's classification *as of the pull* on every row of the term: Fall 2025's retained list, pulled 2026-03-07, puts 535 of ENGL 1120's 1,543 registered student-terms (35%) one or two steps ahead of what academic studies recorded for Fall 2025, never behind (ISSUES.md I47). `cedar_student_terms$student_classification` takes academic studies' value and flags the disagreement (`description_conflict`); read classification off the table, never off a course row.
+
 ### What this permits and forbids
 
 **Permitted:** when a student took a course; when they changed program and to what; their classification, level, standing, per-term credit load and per-term GPA at any past term.

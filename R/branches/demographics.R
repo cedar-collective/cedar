@@ -10,7 +10,13 @@
 #'
 #' @param filtered_students Data frame of student enrollments from cedar_students table,
 #'   already filtered by desired criteria. Must include: student_id, term, campus,
-#'   college, subject_course, and any demographic columns used in grouping.
+#'   college, subject_course, and any grouping column that describes the course
+#'   row rather than the student.
+#' @param student_terms The `cedar_student_terms` table. A grouping by
+#'   `student_classification` or `major_code` reads the student's description
+#'   off it (`student_classification`, `primary_major_code`), never off the
+#'   class-list row (ADR-001 step 2); the class-list copies are dropped first.
+#'   May be `NULL` only when no grouping column describes the student.
 #' @param opt Options list containing:
 #'   \itemize{
 #'     \item \code{group_cols} - Character vector of column names to group by.
@@ -42,7 +48,7 @@
 #' \code{\link{calc_cl_enrls}} for enrollment counts
 #'
 #' @export
-summarize_student_demographics <- function(filtered_students, opt) {
+summarize_student_demographics <- function(filtered_students, student_terms, opt = list()) {
   message("[demographics.R] Welcome to summarize_student_demographics!")
 
   group_cols <- opt[["group_cols"]]
@@ -58,6 +64,11 @@ summarize_student_demographics <- function(filtered_students, opt) {
   }
 
   message("[demographics.R] group_cols: ", paste(group_cols, collapse = ", "))
+
+  described <- intersect(group_cols, names(DEMOGRAPHIC_STUDENT_TERM_COLS))
+  if (length(described) > 0L) {
+    filtered_students <- attach_student_descriptions(filtered_students, student_terms, described)
+  }
 
   # Group and count distinct students.
   summary <- filtered_students %>%
@@ -113,9 +124,55 @@ summarize_student_demographics <- function(filtered_students, opt) {
   return(merge_sum_enrl)
 }
 
+#' The grouping columns that describe the student, mapped to the
+#' `cedar_student_terms` column each is read from. The summary keeps the
+#' class-list names (`major_code`, `student_classification`) because its
+#' readers pivot and plot on them.
+DEMOGRAPHIC_STUDENT_TERM_COLS <- c(
+  student_classification = "student_classification",
+  major_code             = "primary_major_code"
+)
+
+#' Replace class-list student descriptions with the student-term table's
+#'
+#' @param rows Class-list rows with `student_id` and `term`.
+#' @param student_terms The `cedar_student_terms` table.
+#' @param cols Names of `DEMOGRAPHIC_STUDENT_TERM_COLS` to attach.
+#' @return `rows` with each named column read off the student-term table.
+#' @keywords internal
+attach_student_descriptions <- function(rows, student_terms, cols) {
+  term_cols <- DEMOGRAPHIC_STUDENT_TERM_COLS[cols]
+  if (is.null(student_terms)) {
+    stop("[demographics.R] Grouping by ", paste(cols, collapse = ", "),
+         " reads cedar_student_terms. Pass student_terms = cedar_student_terms.")
+  }
+  missing <- setdiff(c("student_id", "term", unname(term_cols)), names(student_terms))
+  if (length(missing) > 0L) {
+    stop("[demographics.R] student_terms is missing required column(s): ",
+         paste(missing, collapse = ", "))
+  }
+  rows <- rows %>%
+    select(-any_of(c(cols, unname(term_cols)))) %>%
+    mutate(term = as.integer(term))
+  joined <- attach_student_term(
+    rows,
+    mutate(student_terms, term = as.integer(term)),
+    unname(term_cols)
+  )
+  # The table has a row for every student-term with a class-list row, so a
+  # miss means the two tables were not built from the same class lists.
+  unmatched <- !(paste(joined$student_id, joined$term) %in%
+                   paste(student_terms$student_id, student_terms$term))
+  if (any(unmatched)) {
+    stop("[demographics.R] ", sum(unmatched), " enrollment rows have no row on ",
+         "cedar_student_terms; the two tables were not built from the same class lists.")
+  }
+  rename(joined, !!!setNames(unname(term_cols), cols))
+}
+
 #' @describeIn summarize_student_demographics Deprecated name for backward compatibility
 #' @export
-summarize_classifications <- function(filtered_students, opt) {
+summarize_classifications <- function(filtered_students, student_terms, opt = list()) {
   warning("[demographics.R] summarize_classifications() is deprecated. Use summarize_student_demographics() instead.")
-  summarize_student_demographics(filtered_students, opt)
+  summarize_student_demographics(filtered_students, student_terms, opt)
 }

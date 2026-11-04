@@ -42,10 +42,13 @@ get_high_fall_sophs <- function (students,courses,opt) {
 
   cedar_debug("[regstats.R] Getting fall courses with 100+ sophomores for potential summer offerings...")
   myopt <- list()
-  myopt[["group_cols"]] <- c("campus", "college","term", "term_type", "student_classification", "subject_course","course_title","level")
+  # Sophomores are selected by the classification filter, so the count needs
+  # no grouping by classification; nothing here describes the student, which is
+  # why no student-term table is read.
+  myopt[["group_cols"]] <- c("campus", "college","term", "term_type", "subject_course","course_title","level")
   myopt[["classification"]] <- "Sophomore, 2nd Yr"
   myopt[["term"]] <- "fall"
-  demo_out <- get_course_demographics(students,myopt)
+  demo_out <- get_course_demographics(students, NULL, myopt)
 
   # 100 is a bit arbitrary; not sure how to calc would what be a better threshold
   demo_out <- demo_out %>% filter(mean > 100)

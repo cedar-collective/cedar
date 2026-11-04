@@ -202,7 +202,7 @@ waitlistUI <- function(id, sections, default_term, dept_choices) {
 }
 
 waitlistServer <- function(id, students, parent_session, sections = NULL,
-                           enrl_base = NULL) {
+                           enrl_base = NULL, student_terms = NULL) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
 
@@ -293,7 +293,8 @@ waitlistServer <- function(id, students, parent_session, sections = NULL,
       # end_report_timer also feed the shared report-timing log).
       timer <- start_report_timer("waitlist", list(course = course, term = term))
       waitlist_data <- tryCatch(
-        inspect_waitlist(students, opt, sections, enrl_base = enrl_base),
+        inspect_waitlist(students, opt, sections, enrl_base = enrl_base,
+                         student_terms = student_terms),
         error = function(e) {
           message("[waitlist] Error: ", conditionMessage(e))
           showNotification(paste("Waitlist error:", conditionMessage(e)),
