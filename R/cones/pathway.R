@@ -181,8 +181,12 @@
 #'   **Required by every credit-band x_axis** — `inst_credit_band` and
 #'   `overall_credit_band` resolve their position through
 #'   [build_credit_timeline()], and `unm_credit_band` reads the table's
-#'   completed-credit running total directly. Ignored by `relative_term` and
-#'   `classification`.
+#'   completed-credit running total directly — **and by the `classification`
+#'   axis and `opt$start_classification`**, which read its
+#'   `student_classification` (the programs value where the student has one
+#'   that term, else the class list's; ADR-001 step 2) and, for the start
+#'   filter, its `enrolled` rows for the student's first term. Ignored by
+#'   `relative_term` without a start filter.
 #'
 #'   None of them may read the Academic Studies cumulative columns on
 #'   `cedar_programs`. Those are stamped as of the data pull onto every
@@ -247,12 +251,37 @@ get_course_timing <- function(students, population, programs = NULL, opt = list(
   # Keep only the columns we need; deduplicate (a student registered in the
   # same course twice in one term gets one row).
   enrolled <- enrolled %>%
-    # No credit columns carried through from cedar_students: every credit axis
-    # now resolves through build_credit_timeline() rather than reading a
-    # cumulative column off the enrollment row.
-    select(student_id, term, campus, subject_course, course_title,
-           student_classification) %>%
+    # No credit or description columns carried through from cedar_students:
+    # every credit axis resolves through build_credit_timeline(), and a
+    # student's classification in a term is read off cedar_student_terms
+    # (ADR-001 step 2), never off the course row.
+    select(student_id, term, campus, subject_course, course_title) %>%
     distinct()
+
+  # The classification axis and the start-classification filter read the
+  # student-term table's `student_classification`: the programs value where
+  # the student has one that term, else the class list's.
+  reads_classification <- x_axis == "classification" ||
+    (!is.null(opt$start_classification) && length(opt$start_classification) > 0)
+  if (reads_classification) {
+    if (is.null(student_terms)) {
+      stop("[pathway.R] the classification axis and start_classification need ",
+           "cedar_student_terms. Pass student_terms = cedar_student_terms to get_course_timing().")
+    }
+    needed <- c("student_id", "term", "student_classification", "enrolled")
+    missing_cols <- setdiff(needed, names(student_terms))
+    if (length(missing_cols) > 0) {
+      stop("[pathway.R] student_terms is missing required column(s): ",
+           paste(missing_cols, collapse = ", "))
+    }
+    enrolled <- attach_student_term(enrolled, student_terms, "student_classification")
+    unmatched <- !(paste(enrolled$student_id, enrolled$term) %in%
+                     paste(student_terms$student_id, student_terms$term))
+    if (any(unmatched)) {
+      stop("[pathway.R] ", sum(unmatched), " enrollment rows have no row on ",
+           "cedar_student_terms; the two tables were not built from the same class lists.")
+    }
+  }
 
   if (nrow(enrolled) == 0) {
     message("[pathway.R] No registered enrollment records found for this population.")
@@ -270,10 +299,11 @@ get_course_timing <- function(students, population, programs = NULL, opt = list(
   # detect "Transfer" explicitly and resolve it from the population instead.
   #
   # For all other values (Freshman, Sophomore, Junior, Senior), we check
-  # student_classification at the student's earliest enrolled term.
-  # Uses students_full (the un-windowed enrollment table) when available so
-  # a History major's "first term" isn't their Sophomore year just because
-  # their Freshman enrollment preceded their focal-program declaration.
+  # student_classification at the student's earliest enrolled term, read off
+  # cedar_student_terms: it holds every term the student was enrolled, not the
+  # windowed rows passed as `students`, so a History major's "first term" isn't
+  # their Sophomore year just because their Freshman enrollment preceded their
+  # focal-program declaration.
   if (!is.null(opt$start_classification) && length(opt$start_classification) > 0) {
 
     wants_transfer  <- "Transfer" %in% opt$start_classification
@@ -290,15 +320,9 @@ get_course_timing <- function(students, population, programs = NULL, opt = list(
     # Resolve other classifications via student_classification in first enrolled term
     class_ids <- if (length(other_class) > 0) {
       pattern  <- paste(other_class, collapse = "|")
-      ref_data <- if (!is.null(students_full)) {
-        students_full %>%
-          filter(student_id %in% pop_ids,
-                 registration_status_code %in% STATUS_REGISTERED) %>%
-          select(student_id, term, student_classification) %>%
-          distinct()
-      } else {
-        enrolled
-      }
+      ref_data <- student_terms %>%
+        filter(student_id %in% pop_ids, enrolled) %>%
+        select(student_id, term, student_classification)
       ref_data %>%
         group_by(student_id) %>%
         slice_min(order_by = term, n = 1, with_ties = FALSE) %>%

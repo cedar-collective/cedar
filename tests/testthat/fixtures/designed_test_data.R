@@ -3633,6 +3633,9 @@ cedar_degrees_gg <- tibble::tibble(
 # are cumulative minus that term's own completed credits. timeline_valid is
 # the table's flag, set over the whole data: GG_TRUNC's first term is the
 # first term in the data (201980), so their running total is unreadable.
+# Carries the description columns get_gen_ed_grad_cohort() reads too
+# (student_classification, enrolled): every GG class-list row is Freshman and
+# registered, so entry standing is "freshman" throughout.
 cedar_student_terms_gg <- tibble::tribble(
   ~student_id, ~term,   ~completed_unm_credits, ~cumulative_completed_unm_credits, ~timeline_valid,
   "GG_IN1",    202080L,  3,   3,   TRUE,   # entering:  0 -> band 1
@@ -3646,7 +3649,8 @@ cedar_student_terms_gg <- tibble::tribble(
   "GG_TRUNC",  202080L,  3,   6,   FALSE,
   "GG_PEND",   202080L,  3,   3,   TRUE,
   "GG_OTHER",  202080L,  3,   3,   TRUE
-)
+) %>%
+  dplyr::mutate(student_classification = "Freshman", enrolled = TRUE)
 
 
 # ── CT01 — per-term credit position (credit-timeline.R) ─────────────────────

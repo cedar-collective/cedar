@@ -41,6 +41,8 @@
 #' @param students Data frame. The `cedar_students` table. Supplies the
 #'   enrollment bookends that decide whether a graduate's record is complete.
 #' @param degrees Data frame. The `cedar_degrees` table.
+#' @param student_terms Data frame. The `cedar_student_terms` table, read for
+#'   each graduate's `student_classification` in their first term here.
 #' @param opt List of options:
 #'   \describe{
 #'     \item{`dept_code`}{Character. Department code (e.g. `"HIST"`). Required.}
@@ -67,7 +69,7 @@
 #'   term in the data, so their start is unreadable), `n_post_grad_entry`
 #'   (graduates whose only visible enrollment postdates the degree — they
 #'   finished before the window and came back later), and `n_cohort`.
-get_gen_ed_grad_cohort <- function(students, degrees, opt = list()) {
+get_gen_ed_grad_cohort <- function(students, degrees, student_terms, opt = list()) {
 
   dept_code <- opt$dept_code
   if (is.null(dept_code) || length(dept_code) != 1 || !nzchar(dept_code)) {
@@ -181,13 +183,32 @@ get_gen_ed_grad_cohort <- function(students, degrees, opt = list()) {
   # elsewhere, and the two take entirely different amounts of Gen Ed here — on
   # History, 13.4 courses against 2.5. A single average over both describes
   # nobody.
-  entry <- if (nrow(grad_enrl) == 0 || !"student_classification" %in% names(grad_enrl)) {
+  #
+  # The classification is the student-term table's for the student's first
+  # term here (ADR-001 step 2): the programs value where they have one, else
+  # the class list's. The table covers every student-term with a class-list
+  # row, so a graduate whose first term it lacks is an error, not "other".
+  needed_st <- c("student_id", "term", "student_classification")
+  missing_st <- setdiff(needed_st, names(student_terms))
+  if (length(missing_st) > 0) {
+    stop("[gen-ed-grads.R] student_terms is missing required column(s): ",
+         paste(missing_st, collapse = ", "))
+  }
+  kept <- scoped %>%
+    dplyr::filter(!is.na(first_unm_term), first_unm_term > min_data_term,
+                  first_unm_term < grad_term)
+  entry <- if (nrow(kept) == 0) {
     tibble::tibble(student_id = character(), entry_standing = character())
   } else {
-    grad_enrl %>%
-      dplyr::group_by(student_id) %>%
-      dplyr::slice_min(term, n = 1, with_ties = FALSE) %>%
-      dplyr::ungroup() %>%
+    first_terms <- kept %>%
+      dplyr::transmute(student_id, term = first_unm_term)
+    unmatched <- !(paste(first_terms$student_id, first_terms$term) %in%
+                     paste(student_terms$student_id, student_terms$term))
+    if (any(unmatched)) {
+      stop("[gen-ed-grads.R] ", sum(unmatched), " graduates' first term has no row on ",
+           "cedar_student_terms; the two tables were not built from the same class lists.")
+    }
+    attach_student_term(first_terms, student_terms, "student_classification") %>%
       dplyr::transmute(student_id, entry_standing = dplyr::case_when(
         grepl("^Freshman",           student_classification) ~ "freshman",
         grepl("^Sophomore",          student_classification) ~ "sophomore",
@@ -196,9 +217,7 @@ get_gen_ed_grad_cohort <- function(students, degrees, opt = list()) {
       ))
   }
 
-  cohort <- scoped %>%
-    dplyr::filter(!is.na(first_unm_term), first_unm_term > min_data_term,
-                  first_unm_term < grad_term) %>%
+  cohort <- kept %>%
     dplyr::left_join(entry, by = "student_id") %>%
     dplyr::transmute(
       student_id,

@@ -616,7 +616,7 @@ get_gen_ed_grad_profile <- function(students, degrees, student_terms, opt = list
 
   gen_ed_lu <- gen_ed_course_lookup()
 
-  cohort <- get_gen_ed_grad_cohort(students, degrees, opt = list(
+  cohort <- get_gen_ed_grad_cohort(students, degrees, student_terms, opt = list(
     dept_code   = opt$dept_code,
     degree_abbr = opt$degree_abbr %||% NULL,
     major_code  = opt$major_code %||% NULL
