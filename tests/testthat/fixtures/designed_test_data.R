@@ -3452,7 +3452,7 @@ cedar_programs_st <- dplyr::bind_rows(
 )
 cedar_degrees_st <- tibble::tibble(
   student_id = "ST_J", term = 202010L, graduation_status = "Awarded",
-  degree = "BA", major_code = "HIST", program_name = "History"
+  degree = "BA", major_code = "HIST", major = "HIST", program_name = "History"
 )
 
 # ── RP01 — next-term return: one definition for persistence and retention ───

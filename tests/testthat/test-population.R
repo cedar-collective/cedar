@@ -536,14 +536,17 @@ test_that("demographic populations honor level and carry enrollment bookends", {
     student_level = c("Undergraduate", "Graduate", "Graduate"),
     pell_eligible = c(TRUE, FALSE, TRUE)
   )
-  students <- tibble::tibble(
-    student_id = c("D1", "D1", "D2"),
-    term = c(201980L, 202180L, 202010L)
+  # cedar_student_terms-shaped: D1's 202280 row is a waitlist, not an enrolled
+  # term, so it is not a bookend.
+  student_terms <- tibble::tibble(
+    student_id = c("D1", "D1", "D1", "D2"),
+    term = c(201980L, 202180L, 202280L, 202010L),
+    enrolled = c(TRUE, TRUE, FALSE, TRUE)
   )
 
   pop <- build_population(
     programs,
-    students = students,
+    student_terms = student_terms,
     opt = list(
       type = "demographic", pell_eligible = TRUE, campus = "M",
       student_level = "Undergraduate"
@@ -554,6 +557,55 @@ test_that("demographic populations honor level and carry enrollment bookends", {
   expect_equal(pop$first_unm_term, 201980L)
   expect_equal(pop$last_record_term, 202180L)
   expect_true(all(c("first_unit_term", "last_unit_term", "relevant_until") %in% names(pop)))
+
+  # cedar_students handed in the table's place would count every class-list
+  # row as a term at UNM; it is refused by column.
+  expect_error(
+    build_population(programs, student_terms = student_terms %>% select(-enrolled),
+                     opt = list(type = "demographic", pell_eligible = TRUE)),
+    "Pass cedar_student_terms"
+  )
+})
+
+
+# =============================================================================
+# Enrollment evidence comes from cedar_student_terms (ADR-001 step 2)
+# =============================================================================
+#
+# ST01 (test_programs_st / test_student_terms_st): every student declared HIST
+# in 202010, ST_I in 202110 (the last term) and ST_E again in 202080. A
+# candidate for stopped_out is switched_out when enrolled at UNM after the
+# last focal term, and `enrolled` is the table's: a late withdrawal counts
+# (ST_A), a waitlist (ST_C) or an early drop (ST_B) does not. Before the move
+# any class-list row counted, so ST_B and ST_C read as switched_out.
+
+test_that("enrollment-based switch detection and the UNM bookends read enrolled student-terms", {
+  pop <- suppressMessages(build_population(
+    test_programs_st, degrees = test_degrees_st, student_terms = test_student_terms_st,
+    opt = list(type = "major", program_names = "HIST")
+  ))
+  outcome <- setNames(pop$outcome, pop$student_id)
+
+  expect_equal(outcome[["ST_I"]], "ongoing")
+  expect_equal(outcome[["ST_J"]], "graduated")
+  expect_equal(outcome[["ST_A"]], "switched_out")   # only a DW in 202080: enrolled
+  expect_equal(outcome[["ST_D"]], "switched_out")   # registered in Summer 2020
+  expect_equal(outcome[["ST_B"]], "stopped_out")    # only a DR in 202080: not enrolled
+  expect_equal(outcome[["ST_C"]], "stopped_out")    # only WL in 202080: not enrolled
+  expect_equal(outcome[["ST_H"]], "stopped_out")
+
+  bookend <- pop %>% filter(student_id %in% c("ST_A", "ST_B", "ST_C"))
+  expect_equal(bookend$first_unm_term, rep(202010L, 3))
+  expect_equal(setNames(bookend$last_record_term, bookend$student_id),
+               c(ST_A = 202080L, ST_B = 202010L, ST_C = 202010L))
+
+  # Without the table: no reclassification, NA bookends, never a guess.
+  bare <- suppressMessages(build_population(
+    test_programs_st, degrees = test_degrees_st,
+    opt = list(type = "major", program_names = "HIST")
+  ))
+  expect_equal(bare$outcome[bare$student_id == "ST_A"], "stopped_out")
+  expect_true(all(is.na(bare$first_unm_term)))
 })
 
 

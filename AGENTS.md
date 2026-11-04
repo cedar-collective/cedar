@@ -390,7 +390,7 @@ A population is a tibble of `student_id`s (plus classification columns) built by
 **Before working in this code, read the CONCEPTS block at the top of `R/branches/population.R`.** It defines the shared ontology every Pathways analysis assumes: the six outcomes and their precedence (and why `stopped_out` is a residual, not a detection), the three independent entry axes (`origin` / `entry_method` / `entry_status`), the six per-student timestamps, the `relevant_until` enrollment-ceiling contract, and the two data-boundary rules.
 
 ```r
-population <- build_population(cedar_programs, degrees = cedar_degrees, students = cedar_students,
+population <- build_population(cedar_programs, degrees = cedar_degrees, student_terms = cedar_student_terms,
   opt = list(
     focal_names        = c("Nursing", "Radiologic Sciences"),
     pre_major_names    = c("Biology", "Biochemistry"),

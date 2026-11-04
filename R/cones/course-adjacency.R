@@ -59,7 +59,7 @@ get_event_adjacent_courses <- function(students, population,
   if (length(missing_cols) > 0)
     stop("[pathway.R] population missing columns for event analysis: ",
          paste(missing_cols, collapse = ", "),
-         ". Ensure build_population() was called with students= provided.")
+         ". Ensure build_population() was called with student_terms= provided.")
 
   # ── Assign groups and anchor event terms ──────────────────────────────────
 

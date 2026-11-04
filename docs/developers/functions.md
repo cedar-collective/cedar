@@ -8,7 +8,7 @@ parent: Developer Guide
 
 This reference is auto-generated from roxygen2 comments in the source code.
 
-*Generated: 2026-11-04 09:58:35.97371*
+*Generated: 2026-11-04 11:01:58.51036*
 
 ---
 
@@ -3504,7 +3504,7 @@ Build a Student Population  Constructs a population data frame from cedar_progra
 
 - `programs` - Data frame. cedar_programs.
 - `degrees` - Data frame or NULL. cedar_degrees.
-- `students` - Data frame or NULL. cedar_students. Supplies UNM-wide enrollment bookends and enrollment-based continuation evidence.
+- `student_terms` - Data frame or NULL. cedar_student_terms. Its `enrolled` rows supply the UNM-wide enrollment bookends and the enrollment-based continuation evidence; without it both bookends are NA and no candidate is reclassified. Never cedar_students: a waitlist or an early drop is not an enrolled term.
 - `opt` - List of options: type          — "preset", "dept", or "major". Default "preset". program_names — required for preset/major types. dept_code     — required for dept type. outcomes      — character vector of outcomes to include. Default: all six outcomes (graduated, switched_out, stopped_out, ongoing, chose_elsewhere, left_undeclared). split_by      — "none" (default), "outcome", "entry", "entry_status", or "transfer". When "entry", population_label is set to entry_method per student. When "entry_status", population_label is set to whether the student first appeared as a declared major or pre-major. When "transfer", population_label is set to origin per student. campus        — character vector. Filter by student_campus. Optional. student_level — character vector. Filter by student_level before outcome detection. Common values: "Undergraduate", "Graduate". When omitted, all levels are included and undergrad/grad students are mixed in a single population. Pass "Undergraduate" to build a clean undergrad cohort for a department that also has grad programs.
 
 **Returns:** Data frame with one row per student.
@@ -3540,7 +3540,7 @@ Build a Demographic Population  Identifies students based on demographic indicat
 
 - `programs` - Data frame. cedar_programs.
 - `opt` - Options list: pell_eligible, first_gen, time_status, ipeds_race, gender, campus, student_level, term.
-- `students` - Data frame or NULL. cedar_students, used for UNM-wide first/last enrollment bookends.
+- `student_terms` - Data frame or NULL. cedar_student_terms, whose `enrolled` rows give the UNM-wide first/last enrollment bookends.
 
 **Returns:** Population tibble with one row per student. Program-specific outcome and entry fields are NA; UNM-wide bookends are populated when possible.
 
