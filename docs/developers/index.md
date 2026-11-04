@@ -62,6 +62,7 @@ See [Installation](installation.html) for detailed setup instructions.
 | Understand projection methods, aftcasts, and demand censoring | [Enrollment Projection Architecture](enrollment-projections.html) |
 | Review forecasting findings, failed assumptions, and next model ideas | [Enrollment Forecasting Lessons](forecasting-lessons.html) |
 | Understand where the data model is heading | [ADR-001: Domain Data Model](adr-001-domain-data-model.html) |
+| Build or read the student-term table | [cedar_student_terms contract](student-terms.html) |
 | Understand how units, subjects and programs will be mapped | [ADR-002: Explicit Mapping Files](adr-002-explicit-mapping-files.html) |
 | Look up function documentation | [Function Reference](functions.html) |
 | Contribute code or docs | [Contributing](contributing.html) |
