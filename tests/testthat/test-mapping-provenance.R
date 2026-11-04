@@ -77,26 +77,31 @@ test_that("every mapped table is checked, and each stale one is named with its r
                   %in% cedar_mapping_source_files()))
 })
 
-# ISSUES.md I22: the deploy's health check starts the app, which loads the
-# tables on disk and, with app_idle_timeout 0, keeps them until it restarts.
-# A gate that rebuilds them afterwards must restart the app, or the rebuild
-# reaches production only at the morning refresh. The deploy's own gate block
-# runs here with docker and the health check stubbed.
-test_that("a deploy that rebuilds mapped tables restarts the app to serve them", {
+# ISSUES.md I22 and I46: shiny-server starts the app's R process on the first
+# request, which is the deploy's health check, and with app_idle_timeout 0 the
+# process keeps the tables it loaded until the container restarts. So the gate
+# runs after the container is replaced and before the health check: a table
+# it rebuilds is on disk before the app reads it (a deploy whose gate ran after
+# the health check never reached the gate when the app could not start without
+# the rebuild, and took the site down: I46), and a rebuild still restarts the
+# container so nothing started meanwhile serves the old tables (I22). The
+# deploy's own gate block runs here with docker stubbed.
+test_that("the deploy's table gate runs before the first request and restarts on a rebuild", {
   # The script's lines as written; bash ignores their YAML indentation.
   deploy <- readLines("../../.github/workflows/deploy.yml", warn = FALSE)
-  first <- grep("Checking whether the mapping source changed", deploy, fixed = TRUE)
+  first <- grep("Checking whether the mapping source or the student-term table changed",
+                deploy, fixed = TRUE)
   last <- grep('rm -f "$MAPPING_LOG"', deploy, fixed = TRUE)
   expect_length(first, 1L)
   expect_length(last, 1L)
-  # After the app's first start and health check, as before.
+  # After the container is replaced, before anything can start the app.
   expect_lt(grep("docker compose up -d", deploy, fixed = TRUE), first)
-  expect_lt(grep("wait_for_app || exit 1", deploy, fixed = TRUE)[1], first)
+  expect_gt(grep("wait_for_app || exit 1", deploy, fixed = TRUE)[1], last)
+  expect_gt(grep("^\\s*clear_restarting$", deploy)[1], last)
 
   run_gate <- function(output, rc = 0L) {
     code <- paste(
       paste0("GATE_OUTPUT=", shQuote(output), "; GATE_RC=", rc),
-      "RESTARTING_FLAG=$(mktemp); RESTARTING_ENABLED=false",
       "docker() { if [ \"$2\" = exec ]; then printf '%s\\n' \"$GATE_OUTPUT\"; return $GATE_RC; fi; echo \"DOCKER:$*\"; }",
       "wait_for_app() { echo WAIT; }",
       "clear_restarting() { echo CLEAR; }",
@@ -106,8 +111,8 @@ test_that("a deploy that rebuilds mapped tables restarts the app to serve them",
   }
   rebuilt <- run_gate("[mappings] Rebuilt: cedar_programs, cedar_students.")
   expect_true("DOCKER:compose restart cedar-shiny" %in% rebuilt)
-  expect_lt(match("DOCKER:compose restart cedar-shiny", rebuilt), match("WAIT", rebuilt))
-  expect_true("CLEAR" %in% rebuilt)
+  # The restart page stays up until the health check that follows the block.
+  expect_false(any(grepl("WAIT|CLEAR", rebuilt)))
   unchanged <- run_gate("[mappings] Mapping source unchanged since cedar_programs were built; no rebuild.")
   expect_false(any(grepl("restart", unchanged)))
   failed <- run_gate("Error: an export is missing", rc = 1L)

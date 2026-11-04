@@ -29,6 +29,7 @@ recurrence is recognizable.
 
 | ID | Kind | Summary |
 |---|---|---|
+| [I46](#i46--a-deploy-that-must-rebuild-a-table-the-app-cannot-start-without-takes-the-site-down) | Defect | The deploy's table gate ran after the health check, so a deploy that added a column to `cedar_student_terms` failed its health check on the missing column and never reached the gate: production served the restart page from 17:07 UTC on 2026-11-04 (gate moved before the first request) |
 | [I45](#i45--the-class-list-and-the-schedule-name-the-same-section-with-different-course-codes) | Defect | The class list and the schedule name the same section differently for renamed subjects (SOC to SOCI, PSY to PSYC, CCS to CCST): SOCI 371 has class-list history from Fall 2019 but no sections before Fall 2021 |
 | [I43](#i43--every-scheduled-refresh-fails-because-the-default-asks-for-a-report-mrgather-never-fetches) | Defect | Every scheduled refresh has failed since 2026-10-24: the default asks for the applicants report, which production mrgather never fetches, so production tables have not been rebuilt since Oct 27 (default fixed; mrgather and per-report rebuilds remain) |
 | [I38](#i38--a-pathways-program-population-misses-pre-majors-whose-name-differs-from-their-major) | Defect | A Pathways program population misses pre-majors whose name differs from their major: "Film and Digital Arts" holds 1 of the 1,016 Film pre-majors who never declared the major, because `FFDA` is named "FDMA" |
@@ -70,6 +71,47 @@ Kept until the next release, so a recurrence is recognisable; each entry below g
 ---
 
 # Defects
+
+## I46 — A deploy that must rebuild a table the app cannot start without takes the site down
+
+**Status:** resolved 2026-11-04. The gate runs as soon as the new container
+is up and before the health check, which is the first request and the one
+that starts the app's R process. A table it rebuilds is on disk before the app
+reads anything, and it runs beside no app at all: the old container is gone
+and the new one has loaded nothing, which answers the memory concern that had
+kept it off the start (I22). A rebuild still restarts the container, cheaply,
+so nothing started meanwhile serves the old tables. The restart page stays up
+throughout. `test-mapping-provenance.R` holds the order.
+**Found:** 2026-11-04, the deploy of #193 (run 41870776329): the health check
+failed and the step exited before the gate line.
+**Severity:** high. Production answered 503 with the restart page from 17:07
+UTC until the table was rebuilt by hand or by the morning refresh. The first
+deploy after any change that adds a column the app requires to
+`cedar_student_terms` would do the same.
+**Affects:** `.github/workflows/deploy.yml`.
+
+### What was wrong
+
+The order was: replace the container, poll the health check, then run the gate.
+The health check's first request starts the app, whose `global.R` validates
+`cedar_student_terms` against the columns the new code requires and stops on
+`cumulative_completed_unm_credits`, which #193 added. shiny-server reports the
+app as exited on every request, the poll fails after five minutes and the step
+exits, so the gate that reports exactly that staleness
+(`cedar_student_terms_staleness()`: "saved cedar_student_terms lacks column(s)
+the builder now writes") and would have rebuilt the table in its own process
+never ran. The transform wrote the column on every development machine, which
+is why the R gate and the browser suites passed.
+
+### Reproduce
+
+Add a column to `STUDENT_TERMS_COLUMNS` and to the app's validation spec, deploy
+without rebuilding the server's saved table. With the gate after the health
+check the deploy fails on the health check; with it before, the log shows
+`[mappings] Rebuilding cedar_student_terms: saved cedar_student_terms lacks
+column(s)...` and then the health check passes.
+
+---
 
 ## I45 — The class list and the schedule name the same section with different course codes
 
@@ -2376,7 +2418,9 @@ mapping file restarts once, as before. Running the gate before the first start
 was tried and dropped: it would run beside the old app, whose sessions have
 grown its memory, and a one-off rebuild beside a running app was killed for
 memory on a development VM. `test-mapping-provenance.R` runs the deploy's gate
-block with docker stubbed and fails without the restart. A bare
+block with docker stubbed and fails without the restart. Since I46
+(2026-11-04) the gate runs after the container is replaced and before the
+health check that first starts the app, beside no app at all. A bare
 `update-data.sh` run still leaves the app on its old tables until it restarts:
 the morning job's `restart-cedar.sh --update` restarts it.
 **Found:** 2026-10-14, reviewing why each mapping deploy needed a manual restart
