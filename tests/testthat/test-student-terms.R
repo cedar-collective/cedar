@@ -160,10 +160,20 @@ test_that("ST_K: with no programs row the class list describes the student, in c
   expect_equal(k$description_source, "class_list")
   expect_false(k$declared)
   expect_equal(k$n_declarations, 0L)
-  expect_true(is.na(k$primary_major_code))
   expect_true(is.na(k$academic_standing))
   expect_equal(k$student_level, "UG")
   expect_equal(k$student_campus, "ABQ")
+  # The primary major is the one Banner stamped on the roster (SPAN), resolved
+  # through programs.csv as a programs row would be: the file's unit and
+  # pre-major flag, never the code itself. A student with a programs row
+  # (ST_A) keeps academic studies' major.
+  files <- read_institution_mappings()
+  expect_equal(k$primary_major_code, "SPAN")
+  expect_equal(k$primary_dept_code, resolve_program_units("SPAN", "", files$programs))
+  expect_false(is.na(k$primary_dept_code))
+  expect_equal(k$is_pre_major, program_pre_major_flags("SPAN", files$programs))
+  expect_equal(row(st, "ST_A", 202010L)$primary_major_code, "HIST")
+  expect_equal(attr(st, "cedar_student_terms_build_version"), STUDENT_TERMS_BUILD_VERSION)
   # the programs names resolve to the same codes through the institution's files
   a <- row(st, "ST_A", 202010L)
   expect_equal(a$student_level, "UG")
@@ -264,7 +274,8 @@ test_that("class lists alone build a table in which no row is declared", {
   expect_equal(nrow(st), nrow(full) - 1L)
   expect_false(any(st$declared))
   expect_true(all(st$description_source == "class_list"))
-  expect_true(all(is.na(st$primary_major_code)))
+  # No declaration anywhere, but the roster's major on every row.
+  expect_true(all(st$primary_major_code == "SPAN"))
   expect_equal(sum(st$enrolled), sum(full$enrolled))
   expect_equal(dplyr::select(st, student_id, term, enrolled, returned_next_regular_term, return_observable),
                dplyr::select(dplyr::filter(full, class_list_rows > 0L),

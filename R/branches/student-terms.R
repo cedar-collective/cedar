@@ -51,6 +51,15 @@ STUDENT_TERMS_COLUMNS <- c(
   "degree_awarded"
 )
 
+# Stamped on the built table as the attribute cedar_student_terms_build_version.
+# Bump it when the builder's rules change the values it writes without adding
+# a column: the deploy gate compares the saved stamp with this and rebuilds a
+# table built under an older rule, a staleness neither a file time nor the
+# column list records.
+#   2 (2026-11-04): a primary major, unit, college and pre-major flag from the
+#     class list where academic studies has no row.
+STUDENT_TERMS_BUILD_VERSION <- 2L
+
 
 #' Build the student-term table
 #'
@@ -62,14 +71,22 @@ STUDENT_TERMS_COLUMNS <- c(
 #'   everywhere and the build says so.
 #' @param edges The result of [cedar_data_edges()] on the same tables. Required
 #'   to carry `last_enrolled_complete`; the build stops without it.
+#' @param files The institution's mapping files, as [read_institution_mappings()]
+#'   returns them: a primary major the class list supplies resolves to its
+#'   unit, college and pre-major flag through `programs.csv`, exactly as a
+#'   programs row did in the transform.
 #' @param opt Unused; present for the branch calling convention.
-#' @return A tibble with `STUDENT_TERMS_COLUMNS`, one row per student-term.
+#' @return A tibble with `STUDENT_TERMS_COLUMNS`, one row per student-term,
+#'   carrying `STUDENT_TERMS_BUILD_VERSION` as the attribute
+#'   `cedar_student_terms_build_version`.
 build_student_terms <- function(students, programs = NULL, degrees = NULL,
                                 edges = cedar_data_edges(students, degrees = degrees),
+                                files = read_institution_mappings(),
                                 opt = list()) {
   required_students <- c("student_id", "term", "registration_status_code", "final_grade",
                          "credits", "subject_course", "course_title", "student_level",
-                         "student_classification", "student_campus", "residency", "as_of_date")
+                         "student_classification", "student_campus", "residency",
+                         "major_code", "student_college", "as_of_date")
   required_programs <- c("student_id", "term", "program_type", "major_code", "dept_code",
                          "college_code", "is_pre_major", "student_level",
                          "student_classification", "student_campus", "academic_standing",
@@ -127,6 +144,36 @@ build_student_terms <- function(students, programs = NULL, degrees = NULL,
 
   # ── Precedence: programs wins, class list fills, disagreement is flagged ──
   st <- .student_terms_resolve_description(st)
+
+  # ── Primary major where academic studies has no row: the class list's ────
+  # Banner stamps a major and home college on every roster row, and a fifth of
+  # student-terms have no academic studies row at all (branch-campus associate
+  # and non-degree students, mostly: 92,653 on the 2026-11-04 pull, every one
+  # with a major on its class list). Their primary major fills in from the
+  # class list, resolved through programs.csv exactly as a programs row is in
+  # the transform: unit from the confirmed row, college from the file where
+  # the code is decided and from Banner's own value translated through
+  # colleges.csv where it is not, pre-major flag from the file; NA where the
+  # code has no confirmed row, never the code itself. description_source
+  # already says "class_list" on these rows. A row with a programs pull is
+  # never filled, even when that pull holds no Major row.
+  from_classlist <- is.na(st$programs_as_of) & !is.na(st$cl_major_code)
+  if (any(from_classlist)) {
+    code    <- st$cl_major_code[from_classlist]
+    college <- dplyr::coalesce(st$cl_student_college[from_classlist], "")
+    decided <- !is.na(.confirmed_program_rows(code, college, files$programs, no_unit = TRUE))
+    st$primary_major_code[from_classlist]   <- code
+    st$primary_dept_code[from_classlist]    <- resolve_program_units(code, college, files$programs)
+    st$primary_college_code[from_classlist] <- dplyr::if_else(
+      decided, resolve_program_colleges(code, college, files),
+      translate_source_college(college, files))
+    st$is_pre_major[from_classlist] <- program_pre_major_flags(code, files$programs)
+    message(sprintf(
+      "[student-terms.R] %s student-terms take their primary major from the class list (no academic studies row); %s resolve to a unit through programs.csv, %s to a college.",
+      format(sum(from_classlist), big.mark = ","),
+      format(sum(!is.na(st$primary_dept_code[from_classlist])), big.mark = ","),
+      format(sum(!is.na(st$primary_college_code[from_classlist])), big.mark = ",")))
+  }
 
   # ── Position: the running total of attempted credits over the data ───────
   # The window opens where the CLASS LISTS open, not where the table's rows
@@ -207,6 +254,7 @@ build_student_terms <- function(students, programs = NULL, degrees = NULL,
                  !is.na(st$classlist_as_of)), big.mark = ","),
     format(n_conflict, big.mark = ","), fmt_term(settled_edge)))
 
+  attr(st, "cedar_student_terms_build_version") <- STUDENT_TERMS_BUILD_VERSION
   validate_student_terms(st)
 }
 
@@ -286,10 +334,33 @@ build_student_terms <- function(students, programs = NULL, degrees = NULL,
     dplyr::mutate(.pull = as.Date(as_of_date)) %>%
     dplyr::group_by(student_id, term) %>%
     dplyr::filter(.pull == .newest_date(.pull) | is.na(.pull)) %>%
-    dplyr::ungroup() %>%
+    dplyr::ungroup()
+  description <- newest %>%
     dplyr::distinct(student_id, term, dplyr::across(dplyr::all_of(cols)))
-  .stop_on_repeated_keys(newest, "class list", "level, classification, campus or residency")
-  newest %>% dplyr::rename_with(~ paste0("cl_", .x), dplyr::all_of(cols))
+  .stop_on_repeated_keys(description, "class list", "level, classification, campus or residency")
+  # The major and home college Banner stamped on the roster, read only where
+  # academic studies has no row (see build_student_terms()). One pull can
+  # carry two majors for a student, stamped on sections registered either
+  # side of a change; where it does, the class list names no primary major
+  # and the count is reported, never the first or the later one.
+  one_value <- function(x) {
+    x <- unique(x[!is.na(x) & nzchar(x)])
+    if (length(x) == 1L) x else NA_character_
+  }
+  n_values <- function(x) length(unique(x[!is.na(x) & nzchar(x)]))
+  major <- newest %>%
+    dplyr::group_by(student_id, term) %>%
+    dplyr::summarize(cl_major_code = one_value(major_code),
+                     cl_student_college = one_value(student_college),
+                     .n_majors = n_values(major_code), .groups = "drop")
+  if (any(major$.n_majors > 1L)) {
+    message(sprintf(
+      "[student-terms.R] %s student-term(s) carry two majors in one class-list pull; the class list names no primary major there.",
+      format(sum(major$.n_majors > 1L), big.mark = ",")))
+  }
+  description %>%
+    dplyr::rename_with(~ paste0("cl_", .x), dplyr::all_of(cols)) %>%
+    dplyr::left_join(dplyr::select(major, -.n_majors), by = c("student_id", "term"))
 }
 
 

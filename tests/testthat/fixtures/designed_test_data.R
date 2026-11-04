@@ -2138,7 +2138,7 @@ cedar_students_audits <- tribble(
     campus = "ABQ", college = "ARTS", department = "HIST",
     subject_code = "HIST", credits = 3, level = "lower", part_term = "1",
     student_level = "UG", student_classification = "Sophomore",
-    student_campus = "ABQ", student_college = "ARTS",
+    student_campus = "ABQ", student_college = "ARTS", major_code = "HIST",
     course_title = "Survey of History", residency = "Resident",
     as_of_date = as.Date("2020-12-20"),
     registration_status = case_when(
@@ -3293,7 +3293,7 @@ cedar_students_intersession <- dplyr::bind_rows(
 #   RW_C     RE HIST F, RE ENGL D        DR                   HIST, probation, 2+
 #   RW_D     DW HIST, DG ENGL            none                 HIST, all, none posted
 #   RW_E     RE MATH C-, DG ENGL         RE at EA             MATH, some, 1
-#   RW_H     RE ENGL A, no program row   none                 no unit, none, 0
+#   RW_H     RE ENGL A, no program row   none                 SPAN (the roster's major), no standing, none, 0
 #   RW_F     DR HIST (early drop)        RE                   not in the population
 #   RW_G     none                        RE                   new: not in it
 #
@@ -3386,7 +3386,7 @@ cedar_programs_rw <- dplyr::bind_rows(
 #   ST_H     RE 202010 A, RE C-, DW                         dfw_grades 1, late_withdrawals 1, graded_rows 2
 #   ST_I     RE 202110 only                                 return not observable: NA, never FALSE
 #   ST_J     RE 202010 A, degree awarded 202010             degree_awarded TRUE, returned FALSE
-#   ST_K     RE 202010 and 202080, no programs rows         description from the class list; declared FALSE
+#   ST_K     RE 202010 and 202080, no programs rows         description and primary major (SPAN, resolved through programs.csv) from the class list; declared FALSE
 .st_row <- function(sid, term, course, status, grade = NA_character_,
                     classification = "Sophomore, 2nd Yr", as_of = "2021-02-15") {
   .mc_row(sid, term, course, "ABQ", sub(" .*", "", course), grade) %>%

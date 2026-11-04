@@ -73,10 +73,10 @@ in `cedar_programs`; "degrees" means `cedar_degrees`.
 | `academic_standing` | chr | programs | as recorded; `NA` when no programs row |
 | `residency` | chr | programs, else class list | |
 | `time_status` | chr | programs | |
-| `primary_major_code` | chr | programs | the **first `Major` row by `major_code`**, the rule the transform uses for a student's unit and college |
-| `primary_dept_code` | chr | programs | that row's `dept_code`, as mapped by `programs.csv` (`NA` when the code has no confirmed row) |
-| `primary_college_code` | chr | programs | that row's college, as mapped |
-| `is_pre_major` | lgl | programs | the primary row's flag, from the file |
+| `primary_major_code` | chr | programs, else class list | the **first `Major` row by `major_code`**, the rule the transform uses for a student's unit and college. Where the student-term has no academic studies row at all, the major Banner stamped on the roster: a fifth of student-terms (92,653 on the 2026-11-04 pull, branch-campus associate and non-degree students mostly) have no programs row and every one has a class-list major. A programs row with no `Major` row is never filled from the class list. Two majors in one class-list pull name none, and the build reports the count |
+| `primary_dept_code` | chr | programs, else class list | that row's `dept_code`, as mapped by `programs.csv` (`NA` when the code has no confirmed row). A class-list major resolves through the same file, keyed on the roster's college as a programs row is on Banner's |
+| `primary_college_code` | chr | programs, else class list | that row's college, as mapped. For a class-list major: the file's college where the code is decided, else Banner's roster college translated through `colleges.csv`, the rule `cedar_programs$college_code` follows |
+| `is_pre_major` | lgl | programs, else class list | the primary row's flag, from the file |
 | `n_declarations` | int | programs | program rows that term (majors, minors, concentrations) |
 | `declared` | lgl | programs | `n_declarations > 0` |
 
@@ -171,7 +171,7 @@ any change stated in the PR body.
 | ~~`build_return_snapshot()` anchor population and warning signs~~ **moved 2026-11-04** | own group-by over class-list rows, descriptions from the class list, standing from programs | `build_return_snapshot(student_terms, opt)` filters `enrolled`, reads `late_withdrawals` / `registered_courses`, `dfw_grades` / `graded_rows`, the description columns and the pull dates; `cedar_students` and `cedar_programs` are no longer read. The refresh's gate rebuilds the table before the snapshot script runs. Measured difference below |
 | ~~`population.R` enrollment-based switch detection and the UNM-wide bookends~~ **moved 2026-11-04** | any `cedar_students` row counted as a term at UNM | `build_population(programs, degrees, student_terms, opt)` reads `enrolled`: a stopped-out candidate is switched out when enrolled after the last focal term, and `first_unm_term` / `last_record_term` are the first and last enrolled term. A waitlist-only or early-drop-only term no longer counts. Measured difference below |
 | `course-flows.R`, `gen-ed-conversion.R`, `major-changes.R`, `course-instructor-effect.R` | each filters status codes itself | **not readers of this table.** Each filter is on course attempts (which courses a student took, with what status and grade), which is a `cedar_students` question; a student-term `enrolled` flag cannot say which course. Reviewed 2026-11-04 and left as they are |
-| `cedar_students` readers of the eight student columns | repeated column | join on `(student_id, term)` through a shared `attach_student_term(rows, cols)` helper; `cedar_students` keeps the columns until the last reader has moved (ADR-001 step 5) |
+| `cedar_students` readers of the eight student columns | repeated column | join on `(student_id, term)` through a shared `attach_student_term(rows, cols)` helper; `cedar_students` keeps the columns until the last reader has moved (ADR-001 step 5). Measured 2026-11-04 (below): level, home campus, residency and classification agree with the table on 99% or more of student-terms, and since rule version 2 the table names a primary major wherever the roster does, so a `major_code` reader loses nothing. `student_college` is different: the class list carries Banner's raw college (`GP` for graduate programs, `UC` for a pre-nursing student, `ED` for a renamed college) and the table the mapped one, disagreeing on 95,442 of 358,663; each of its readers moves with its numbers compared |
 
 ## Designed fixture: ST01
 
@@ -208,6 +208,8 @@ summer as a return term (ST_D), and returned FALSE past the edge (ST_I).
 
 **The return-snapshot move, measured (2026-11-04 pull).** No term was in registration on the pull, so the pair is Fall 2026 from Spring 2026, both functions on the same data: the same 26,909 students, the same 19,347 registered. Three definitions moved, each to the table's: 150 students whose Spring grades were partly posted read `none posted` before (the old count was `NA` whenever any row was ungraded) and now report their posted DFW count; 5 students with a late drop in a course they also held a registered row for read `some` and now `none` (`late_withdrawals` counts a course only when every row is a late drop); 7 students enrolled in Fall by a late drop alone and also waiting on a list moved from `waitlisted_only` to `dropped_only` (`waitlisted_only` on the table is not-enrolled). 32 of 3,282 groups changed size; no home campus, level, classification or standing value moved, since on this pair the class list and academic studies agree.
 
+**The class-list primary major, measured (2026-11-04 pull, rule version 2).** Rebuilt beside the version-1 table: the same 518,894 rows, and no column but the four primary-major columns changed on any row. 92,652 student-terms gained a primary major, all of them described by the class list alone (43,226 at the associate level, 29,168 non-degree, 14,569 undergraduate), none lost or changed one, and one roster carries two majors in its pull and names none. 43,363 of the new majors resolve to a unit through `programs.csv` and 57,437 to a college: Non-Degree (33,022) is a confirmed no-unit code by design, and the rest with no unit are branch-campus associate programs the file has no confirmed row for yet (SCI 3,864, GSCI 2,817, PRSC 1,839, BUAD 981, INGV 824), codes that appear on class lists only, so the mapping audit, which reads programs and degrees, has not listed them. The same agreement check found the class list's level, home campus and residency matching the table on all but 48, 1 and 8 of 465,842 student-terms, and its classification on all but 5,202 (the pull-date disagreements the precedence rule resolves), so those readers can move without a number moving.
+
 **The population move, measured (2026-11-04 pull).** `build_population()` on this table against the same function on `cedar_students`, three populations, every student the same in each. In the default Pathways group (12,349 undergraduates), 229 students read `switched_out` before and `stopped_out` now: every one had class-list rows after their last focal term and was enrolled in none of them, 220 having only early drops and 10 only waitlists. The same for 12 of 606 History undergraduates, all early drops. Graduated, ongoing and `relevant_until` did not move for anyone. The bookends moved the same way: `first_unm_term` is later for 161 of the group (their first class-list term was a waitlist or an early drop), `last_record_term` earlier for 355 and newly `NA` for 17 whose class-list rows were never an enrolled term; for the 33,714 Pell-eligible undergraduates, 419, 1,175 and 81. Across the table, 13,845 student-terms have class-list rows and are not enrolled: 13,505 only early drops, 340 only waitlists. The old reading had called each a term at UNM.
 
 ## Done when
@@ -219,7 +221,10 @@ summer as a return term (ST_D), and returned FALSE past the edge (ST_I).
 - `global.R` loads it (done 2026-11-04; the app stops without it); `cedar_next_term`
   and `cedar_student_term_credits` are no longer written or loaded (done
   2026-11-04), and the deploy gate rebuilds the table when the saved file lacks
-  a column the builder now writes.
+  a column the builder now writes or carries an older
+  `cedar_student_terms_build_version` stamp than `STUDENT_TERMS_BUILD_VERSION`
+  (bumped when a rule moves values without adding a column: 2, the class-list
+  primary major).
 - The first three readers in the table above have moved and the Retention
   change is stated on the page and in `definitions.yml` (done 2026-11-04).
 - ST01 is in the fixture with its mutation checks recorded; `./run-tests.sh`
