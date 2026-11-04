@@ -17,9 +17,13 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
   # must find institution/<id>/ while they load. A global cedar_base_dir can
   # name a different place: production's config.R holds the host path, and the
   # deploy's rebuild ran inside the container, where it does not exist
-  # (ISSUES.md I14).
-  # mustWork = FALSE: a missing directory still fails below, with "File not found".
-  options(cedar.base_dir = normalizePath(cedar_base_dir, mustWork = FALSE))
+  # (ISSUES.md I14). Recorded only once the directory is known to hold R/:
+  # a refused path must leave the record as it was, or every later default
+  # read of the mapping files resolves against a directory that is not there.
+  if (!dir.exists(file.path(cedar_base_dir, "R"))) {
+    stop("[load-funcs.R] File not found: ", file.path(cedar_base_dir, "R"))
+  }
+  options(cedar.base_dir = normalizePath(cedar_base_dir, mustWork = TRUE))
 
   source_file <- function(relative_path) {
     full_path <- file.path(cedar_base_dir, "R", relative_path)

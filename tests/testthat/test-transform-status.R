@@ -232,11 +232,12 @@ test_that("a lookups-only rebuild carries the saved major names forward and refu
 # or older than a saved table it reads, by file time, and when the saved file
 # lacks a column the builder now writes — the one staleness a file time cannot
 # record (the completed-credit running total, 2026-11-04).
-test_that("cedar_student_terms is stale when missing, older than a source, or short a column", {
+test_that("cedar_student_terms is stale when missing, older than a source, short a column, or built under an older rule", {
   env <- load_transform_helpers()
   dir <- withr::local_tempdir()
   full_row <- tibble::as_tibble(stats::setNames(as.list(rep(1, length(STUDENT_TERMS_COLUMNS))),
                                                 STUDENT_TERMS_COLUMNS))
+  attr(full_row, "cedar_student_terms_build_version") <- STUDENT_TERMS_BUILD_VERSION
   write_at <- function(name, when, data = tibble::tibble(x = 1)) {
     path <- file.path(dir, paste0(name, ".qs"))
     qs2::qs_save(data, path)
@@ -253,6 +254,17 @@ test_that("cedar_student_terms is stale when missing, older than a source, or sh
            dplyr::select(full_row, -cumulative_completed_unm_credits))
   expect_match(env$cedar_student_terms_staleness(dir),
                "^saved cedar_student_terms lacks column\\(s\\) the builder now writes: cumulative_completed_unm_credits$")
+  # Every column, but written before the builder stamped its rule version, or
+  # under an earlier one: a value change no file time or column list records.
+  unstamped <- full_row
+  attr(unstamped, "cedar_student_terms_build_version") <- NULL
+  write_at("cedar_student_terms", t0 + 60, unstamped)
+  expect_match(env$cedar_student_terms_staleness(dir),
+               "^saved cedar_student_terms was built under rule version 1 \\(unstamped\\); the builder is at ")
+  older <- full_row
+  attr(older, "cedar_student_terms_build_version") <- STUDENT_TERMS_BUILD_VERSION - 1L
+  write_at("cedar_student_terms", t0 + 60, older)
+  expect_match(env$cedar_student_terms_staleness(dir), "was built under rule version ")
   write_at("cedar_student_terms", t0 + 60, full_row)
   write_at("cedar_programs", t0 + 120)
   expect_match(env$cedar_student_terms_staleness(dir), "^cedar_programs newer than cedar_student_terms$")

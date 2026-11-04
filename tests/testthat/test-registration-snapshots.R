@@ -169,12 +169,14 @@ test_that("a return snapshot counts last term's students by what they have done 
     "HIST",     "Good Standing",      "Sophomore",             "none",           "0",           2L,        1L,          0L,               0L,
     "HIST",     "Good Standing",      "Sophomore",             "none",           "none posted", 1L,        0L,          1L,               0L,
     "MATH",     "Good Standing",      "Junior",                "some",           "1",           1L,        1L,          0L,               0L,
-    NA,         NA,                   "Sophomore",             "none",           "0",           1L,        0L,          0L,               0L
+    "SPAN",     NA,                   "Sophomore",             "none",           "0",           1L,        0L,          0L,               0L
   )
   expect_equal(got, expected)
   # RW_F (early drop only) and RW_G (new in Spring) are not last term's
   # students; RW_E's second Major row does not count them twice; RW_E's
-  # registration on another campus counts.
+  # registration on another campus counts. RW_H has no academic studies row:
+  # the major Banner stamped on the roster (SPAN) places them, standing stays
+  # unknown.
   expect_equal(sum(snapshot$students), 7L)
   expect_equal(sum(snapshot$registered), 2L)
 })

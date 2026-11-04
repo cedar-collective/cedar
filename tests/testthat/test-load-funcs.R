@@ -183,8 +183,13 @@ test_that("load_funcs() fails gracefully with bad path", {
 
   # Should error with a clear message when path is invalid
 
+  before <- getOption("cedar.base_dir")
   expect_error(
     load_funcs("/nonexistent/path"),
     "File not found"
   )
+  # A refused path leaves the recorded base alone: build_student_terms() and
+  # every other default read of the mapping files resolves against it later
+  # in the suite, and once pointed it at /nonexistent/path.
+  expect_identical(getOption("cedar.base_dir"), before)
 })

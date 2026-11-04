@@ -8,7 +8,7 @@ parent: Developer Guide
 
 This reference is auto-generated from roxygen2 comments in the source code.
 
-*Generated: 2026-11-04 11:01:58.51036*
+*Generated: 2026-11-04 11:52:28.080614*
 
 ---
 
@@ -4070,9 +4070,10 @@ Compute Stop-Out Rates for One Group in One Course  Given one selected observati
 - `programs` - `cedar_programs`, or NULL for class lists alone: then no row is declared, every row is described by the class list, and the build says so.
 - `degrees` - `cedar_degrees` or NULL; without it `degree_awarded` is FALSE everywhere and the build says so.
 - `edges` - The result of [cedar_data_edges()] on the same tables. Required to carry `last_enrolled_complete`; the build stops without it.
+- `files` - The institution's mapping files, as [read_institution_mappings()] returns them: a primary major the class list supplies resolves to its unit, college and pre-major flag through `programs.csv`, exactly as a programs row did in the transform.
 - `opt` - Unused; present for the branch calling convention.
 
-**Returns:** A tibble with `STUDENT_TERMS_COLUMNS`, one row per student-term.
+**Returns:** A tibble with `STUDENT_TERMS_COLUMNS`, one row per student-term, carrying `STUDENT_TERMS_BUILD_VERSION` as the attribute `cedar_student_terms_build_version`.
 
 ---
 

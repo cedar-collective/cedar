@@ -830,10 +830,20 @@ cedar_student_terms_staleness <- function(data_dir, ext = ".qs") {
   # running total, 2026-11-04) is a schema change no file time records: the app
   # would start and the first reader of that column would fail. Compare the
   # saved names with what build_student_terms() writes today.
-  missing <- setdiff(STUDENT_TERMS_COLUMNS, names(load_file(target, ext)))
+  saved <- load_file(target, ext)
+  missing <- setdiff(STUDENT_TERMS_COLUMNS, names(saved))
   if (length(missing) > 0L) {
     return(paste0("saved cedar_student_terms lacks column(s) the builder now writes: ",
                   paste(missing, collapse = ", ")))
+  }
+  # A rule change that moves values without adding a column (the class-list
+  # primary major, 2026-11-04) is recorded only by the stamp the builder
+  # writes. A table with no stamp predates stamping.
+  built_under <- attr(saved, "cedar_student_terms_build_version")
+  if (is.null(built_under) || as.integer(built_under) < STUDENT_TERMS_BUILD_VERSION) {
+    return(paste0("saved cedar_student_terms was built under rule version ",
+                  if (is.null(built_under)) "1 (unstamped)" else built_under,
+                  "; the builder is at ", STUDENT_TERMS_BUILD_VERSION))
   }
   NULL
 }
