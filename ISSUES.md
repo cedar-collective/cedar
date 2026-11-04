@@ -29,6 +29,8 @@ recurrence is recognizable.
 
 | ID | Kind | Summary |
 |---|---|---|
+| [I45](#i45--the-class-list-and-the-schedule-name-the-same-section-with-different-course-codes) | Defect | The class list and the schedule name the same section differently for renamed subjects (SOC to SOCI, PSY to PSYC, CCS to CCST): SOCI 371 has class-list history from Fall 2019 but no sections before Fall 2021 |
+| [I44](#i44--roadblocks-and-retention-disagree-on-whether-a-late-withdrawal-returned) | Defect | Roadblocks and Retention disagree on whether a student who withdrew late next term returned: Fall 2025 to Spring 2026 reads 82.7% on one and 81.7% on the other (284 students) |
 | [I43](#i43--every-scheduled-refresh-fails-because-the-default-asks-for-a-report-mrgather-never-fetches) | Defect | Every scheduled refresh has failed since 2026-10-24: the default asks for the applicants report, which production mrgather never fetches, so production tables have not been rebuilt since Oct 27 (default fixed; mrgather and per-report rebuilds remain) |
 | [I38](#i38--a-pathways-program-population-misses-pre-majors-whose-name-differs-from-their-major) | Defect | A Pathways program population misses pre-majors whose name differs from their major: "Film and Digital Arts" holds 1 of the 1,016 Film pre-majors who never declared the major, because `FFDA` is named "FDMA" |
 | [I37](#i37--renumbered-courses-lose-their-history) | Defect | Renumbered courses lose their history: no crosswalk exists, so ACCT 3401 (was MGMT 340) and the other Fall 2026 ACCT, BUSA and POPH courses read as new |
@@ -68,6 +70,108 @@ Kept until the next release, so a recurrence is recognisable; each entry below g
 ---
 
 # Defects
+
+## I45 — The class list and the schedule name the same section with different course codes
+
+**Status:** open
+**Found:** 2026-11-03, profiling which `cedar_students` columns could come from `cedar_sections`
+**Severity:** medium. 1.3% of class-list rows; every page that reads the
+schedule loses those terms for the courses affected.
+**Affects:** any course-level view reading `cedar_sections` beside
+`cedar_students` for SOCI, PSYC and CCST courses in the terms below. Related
+to [I37](#i37--renumbered-courses-lose-their-history), which is the same gap
+across terms; this one is inside a single term.
+
+### What is wrong
+
+Banner's class lists carry a renamed subject's new code back onto old terms,
+and the DESR keeps the code the section was scheduled under. So one
+`(term, crn)` has two `subject_course` values:
+
+```
+term     sections   class-list rows   example
+201980      244          5,890        SOC 371 -> SOCI 371
+202010      239          5,487        SOC 312 -> SOCI 312
+202060       46          1,074        PSY 499 -> PSYC 499
+202080      264          5,256        SOC 371 -> SOCI 371
+202110      274          5,068        SOC 312 -> SOCI 312
+202580       87            676        CCS 495 -> CCST 495
+```
+
+23,451 class-list rows (1.26%), all in SOC, PSY and CCS. SOCI 371 has 177,
+150, 125 and 101 registered students from Fall 2019 to Spring 2021 on the class
+list, and no sections at all in those terms: they sit under SOC 371. Courses
+renumbered at the same time (SOC 1110 to SOCI 1110) agree, because the number
+changed too. Every other section attribute checked agrees across the two
+tables (campus, department, level, title: 100%).
+
+### Reproduction
+
+```r
+source("scripts/cedar-repl.R")
+inner_join(cedar_students %>% distinct(term, crn, subject_course),
+           cedar_sections %>% select(term, crn, s_course = subject_course),
+           by = c("term", "crn")) %>%
+  filter(subject_course != s_course) %>% count(term)
+```
+
+### Done when
+
+The transform names each section once. Either the class list takes its
+section's code from the DESR, or both read a renaming crosswalk (I37's), so a
+course's history is one code everywhere. A designed-fixture section carries
+two codes across the tables and a test pins it to one.
+
+## I44 — Roadblocks and Retention disagree on whether a late withdrawal returned
+
+**Status:** open
+**Found:** 2026-11-03, comparing the return lookups while planning degree-roadblock surfaces
+**Severity:** medium. About one point UNM-wide, and more for the groups these
+pages exist to find: a student who withdraws late is a student at risk.
+**Affects:** `.build_registered_lookup()` in `R/branches/retention-context.R`
+(Course Dynamics > Retention, `next_term_persistence()`, cross-course
+Retention) and `build_next_term_lookup()` in `R/cones/stopout.R` (Pathways >
+Roadblocks, saved as `cedar_next_term`).
+
+### What is wrong
+
+Both answer "was this student enrolled at UNM next term?", and they answer it
+differently. Retention counts a registered row only (`STATUS_REGISTERED`).
+Roadblocks counts a registered row or a late drop (`STATUS_DROP_LATE`). A
+student who registered for next term, attended past census and then withdrew is
+retained on one page and stopped out on the other.
+
+```
+anchor -> next   anchor students   registered only   registered or late drop   only a late drop next term
+202580 -> 202610      28,282        23,111 (81.72%)      23,395 (82.72%)                 284
+202510 -> 202580      25,921        18,425 (71.08%)      18,642 (71.92%)                 217
+```
+
+(All levels, enrolled in the anchor term registered or late-dropped, Oct 27
+pull. Graduates are not removed here; both lookups treat them alike.)
+
+I17 unified Retention with next-term persistence on Course Dynamics, but
+Roadblocks kept its own lookup.
+
+### Reproduction
+
+```r
+source("scripts/cedar-repl.R")
+a <- cedar_students %>% filter(term == 202580, registration_status_code %in% c(STATUS_REGISTERED, STATUS_DROP_LATE)) %>% distinct(student_id)
+nx <- cedar_students %>% filter(term == 202610) %>% group_by(student_id) %>%
+  summarise(reg = any(registration_status_code %in% STATUS_REGISTERED),
+            late = any(registration_status_code %in% STATUS_DROP_LATE))
+a %>% left_join(nx, by = "student_id") %>% summarise(only_late = sum(!reg & late, na.rm = TRUE))  # 284
+```
+
+### Done when
+
+One definition of "enrolled next term", in one branch helper, read by
+Retention, persistence, Roadblocks and `cedar_next_term`. A cross-tab test pins
+a student whose only next-term row is a late drop to the same answer on every
+path. Registered or late-dropped is the likelier choice, since census is
+CEDAR's basis for enrollment elsewhere. Whichever is chosen goes into
+`definitions.yml`, and the page whose numbers move says so.
 
 ## I43 — Every scheduled refresh fails because the default asks for a report mrgather never fetches
 
