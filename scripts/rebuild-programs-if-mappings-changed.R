@@ -44,8 +44,27 @@ rebuild_programs_if_mappings_changed <- function(
   } else {
     cedar_stale_mapped_tables(data_dir, base_dir)
   }
-  rebuild <- rebuild %||% function(tables) transform_to_cedar(data_dir = data_dir,
-                                                             tables = tables)
+  # Each table is rebuilt in its own R process. The transform keeps every
+  # stage's heap until it exits, so one process running sections, students,
+  # programs, degrees and then the student-term stage was killed for memory on
+  # an 8.6 GB development host while anything else ran beside it (2026-11-04);
+  # a stage alone peaks at about 1.6 GB. The child builds only the table named:
+  # the student-term table, which the transform would otherwise add to any run
+  # of its sources, is built last, once, by its own process below.
+  rebuild <- rebuild %||% function(tables) {
+    script <- file.path(base_dir, "R", "data-parsers", "transform-to-cedar.R")
+    for (table in tables) {
+      message("[mappings] Rebuilding cedar_", table, " in its own R process...")
+      status <- system2(
+        file.path(R.home("bin"), "Rscript"),
+        c("--vanilla", shQuote(script), "--data-dir", shQuote(data_dir),
+          "--tables", table, "--without-student-terms"))
+      if (!identical(as.integer(status), 0L)) {
+        stop("[mappings] The rebuild of cedar_", table, " exited with status ", status,
+             call. = FALSE)
+      }
+    }
+  }
   rebuilt <- character(0)
 
   if (length(stale) == 0) {
@@ -80,8 +99,7 @@ rebuild_programs_if_mappings_changed <- function(
   # cedar_student_terms is built from the saved students, programs and degrees
   # (ADR-001 step 2), so it is stale whenever one of them is newer, and absent
   # on the first deploy after the stage was added. The app requires it, so the
-  # gate builds it here, after the mapped tables it reads. A transform that
-  # rebuilt any of its sources already rebuilt it too; this catches the rest.
+  # gate builds it here, after the mapped tables it reads, in its own process.
   # Checked after the mapped rebuild, by file time, and never by loading data.
   st_reason <- cedar_student_terms_staleness(data_dir)
   if (!is.null(st_reason)) {

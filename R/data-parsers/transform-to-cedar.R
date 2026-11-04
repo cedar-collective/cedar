@@ -1560,7 +1560,8 @@ build_lookups <- function(cedar_sections, cedar_programs, data_dir, ext, maps,
 #'                 Options: "sections", "students", "programs", "degrees",
 #'                          "faculty", "applicants", "lookups"
 #' @return Invisibly: named list of save metadata for each table written
-transform_to_cedar <- function(data_dir = NULL, use_qs = NULL, tables = NULL) {
+transform_to_cedar <- function(data_dir = NULL, use_qs = NULL, tables = NULL,
+                               include_student_terms = TRUE) {
 
   message("\n═══════════════════════════════════════════════════════")
   message("  CEDAR Data Model Transformation")
@@ -1598,8 +1599,11 @@ transform_to_cedar <- function(data_dir = NULL, use_qs = NULL, tables = NULL) {
       message("  Note: Adding lookups (auto-included when sections/programs/degrees are transformed)")
     }
     # The student-term table reads the saved students, programs and degrees,
-    # so it is rebuilt whenever any of them is.
-    if (any(c("students", "programs", "degrees") %in% run_tables) && !"student_terms" %in% run_tables) {
+    # so it is rebuilt whenever any of them is. A caller that will build it in
+    # a later run of its own (the deploy gate, one table per process so no
+    # process carries four tables' heap into this stage) says so.
+    if (isTRUE(include_student_terms) &&
+        any(c("students", "programs", "degrees") %in% run_tables) && !"student_terms" %in% run_tables) {
       run_tables <- c(run_tables, "student_terms")
       message("  Note: Adding student_terms (auto-included when students/programs/degrees are transformed)")
     }
@@ -1931,6 +1935,7 @@ if (!interactive() && !exists("SOURCED_FROM_PARSE_DATA")) {
   args         <- commandArgs(trailingOnly = TRUE)
   data_dir_arg <- NULL
   tables_arg   <- NULL
+  include_student_terms <- !"--without-student-terms" %in% args
 
   if (length(args) > 0) {
     for (i in seq_along(args)) {
@@ -1945,5 +1950,6 @@ if (!interactive() && !exists("SOURCED_FROM_PARSE_DATA")) {
     }
   }
 
-  transform_to_cedar(data_dir = data_dir_arg, tables = tables_arg)
+  transform_to_cedar(data_dir = data_dir_arg, tables = tables_arg,
+                     include_student_terms = include_student_terms)
 }
