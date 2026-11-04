@@ -28,13 +28,17 @@ The production deploy workflow supports the restart pattern:
 2. Build the new Docker image while the old app continues serving users.
 3. Clear any marker stranded by an earlier deploy, then write a short-lived one.
 4. Replace the Shiny container.
-5. Poll the local Shiny health check.
-6. Remove the restart marker as soon as that health check passes.
-7. Rebuild any mapped table whose mapping files changed. If one was rebuilt,
-   put the marker back, restart the app, check it again and clear the marker:
-   the app keeps the tables it loaded until it restarts (`app_idle_timeout 0`),
-   so without the restart a rebuild reached production only at the morning
-   refresh (ISSUES.md I22).
+5. Rebuild any mapped table whose mapping files changed, and the student-term
+   table when it lacks a column the builder now writes or is older than its
+   sources. Before the health check, because that first request is what starts
+   the app: the gate runs beside no app at all, and a table the app cannot
+   start without is on disk before it reads it (ISSUES.md I46; a gate after the
+   health check never ran when the app could not start). If anything was
+   rebuilt, restart the container, which has loaded nothing yet: the app keeps
+   the tables it loaded until it restarts (`app_idle_timeout 0`), so a rebuild
+   without a restart reached production only at the morning refresh (I22).
+6. Poll the local Shiny health check.
+7. Remove the restart marker as soon as that health check passes.
 8. Rebuild the projection bundles if the projection model changed.
 
 ## The marker is cleared three times, deliberately

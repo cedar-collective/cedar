@@ -177,6 +177,56 @@ jobs:
             docker compose ps
             docker image prune -f || true
 
+            # Rebuild the tables this code cannot serve from, before the app
+            # loads anything: the mapped tables when the MAPPING source
+            # changed, and the student-term table when it is missing a column
+            # the builder now writes or is older than its sources.
+            #
+            # dept_code is derived at transform time, so editing a mapping list
+            # changes nothing until the table is rebuilt -- and nothing says the
+            # two have drifted, because the stored dept_code stays plausible and
+            # every report keeps using it. A mapping fix can sit in the
+            # repository while production serves the old departments; a stale
+            # map hid 194 of 229 Radiologic Sciences students for nine months
+            # (ISSUES.md I7).
+            #
+            # Cheap by design: five file hashes against a fingerprint stamped on
+            # the table and one file time, touching no CEDAR table, so a deploy
+            # that changed nothing costs about a second. Data-driven staleness
+            # stays with the morning refresh.
+            #
+            # Here, and not after the health check: the container is replaced,
+            # but shiny-server starts the app's R process on the first request,
+            # and that is the health check below. So the gate runs beside no
+            # app at all -- the old container is gone and the new one has
+            # loaded nothing -- which is the memory concern that kept it off
+            # the start (ISSUES.md I22) answered. And a table the app cannot
+            # start without is on disk before the app reads it: a deploy whose
+            # gate ran after the health check never reached the gate, because
+            # the health check failed on the missing column and took the site
+            # down (ISSUES.md I46). The restart page is still up while this
+            # runs. A rebuild restarts the container all the same, so nothing
+            # that may have started meanwhile outlives the tables it loaded
+            # (app_idle_timeout 0); it has loaded nothing, so that is cheap.
+            echo "Checking whether the mapping source or the student-term table changed in this deploy..."
+            MAPPING_LOG="$(mktemp)"
+            if docker compose exec -T cedar-shiny \
+                 Rscript --vanilla \
+                 /srv/shiny-server/cedar/scripts/rebuild-programs-if-mappings-changed.R \
+                 < /dev/null > "$MAPPING_LOG" 2>&1; then
+              cat "$MAPPING_LOG"
+              echo "Mapping check complete."
+              if grep -q '^\[mappings\] Rebuilt:' "$MAPPING_LOG"; then
+                echo "Tables were rebuilt; restarting the container so the app starts from them."
+                docker compose restart cedar-shiny
+              fi
+            else
+              cat "$MAPPING_LOG"
+              echo "WARNING: mapping check or rebuild of the mapped tables failed."
+              echo "The previous tables are retained; the next data refresh retries."
+            fi
+            rm -f "$MAPPING_LOG"
+
             # Health check: compose reports success as soon as the container
             # starts, but the app isn't up until shiny-server serves the page
             # (and the first real request triggers the heavy global.R data
@@ -232,55 +282,6 @@ jobs:
             # the restart marker was cleared as soon as the health check passed.
             # This is by far the longest-running step when it does rebuild, so
             # it is also the likeliest place to lose the session.
-            # Rebuild the mapped tables when the MAPPING source changed.
-            #
-            # dept_code is derived at transform time, so editing a mapping list
-            # changes nothing until the table is rebuilt -- and nothing says the
-            # two have drifted, because the stored dept_code stays plausible and
-            # every report keeps using it. A mapping fix can sit in the
-            # repository while production serves the old departments; a stale
-            # map hid 194 of 229 Radiologic Sciences students for nine months
-            # (ISSUES.md I7).
-            #
-            # Cheap by design: five file hashes against a fingerprint stamped on
-            # the table, touching no CEDAR table, so a deploy that changed no
-            # mapping costs about a second. Data-driven staleness stays with the
-            # morning refresh.
-            #
-            # The app is already running when this rebuilds, and keeps the
-            # tables it loaded for as long as it runs (app_idle_timeout 0): a
-            # rebuild here reached production only at the morning restart
-            # (ISSUES.md I22). So a rebuild restarts the app, behind the
-            # restart page, and checks it again. Not before the first start: the
-            # rebuild would then run beside the old app, whose sessions have
-            # grown its memory, and a one-off rebuild beside a running app was
-            # killed for memory on a development VM.
-            echo "Checking whether the mapping source changed in this deploy..."
-            MAPPING_LOG="$(mktemp)"
-            if docker compose exec -T cedar-shiny \
-                 Rscript --vanilla \
-                 /srv/shiny-server/cedar/scripts/rebuild-programs-if-mappings-changed.R \
-                 < /dev/null > "$MAPPING_LOG" 2>&1; then
-              cat "$MAPPING_LOG"
-              echo "Mapping check complete."
-              if grep -q '^\[mappings\] Rebuilt:' "$MAPPING_LOG"; then
-                echo "Mapped tables were rebuilt; restarting the app so it serves them."
-                if printf 'CEDAR deploy restart (rebuilt tables) started at %s\n' "$(date -Is)" \
-                     > "$RESTARTING_FLAG"; then
-                  RESTARTING_ENABLED=true
-                fi
-                docker compose restart cedar-shiny
-                wait_for_app || exit 1
-                clear_restarting
-                RESTARTING_ENABLED=false
-              fi
-            else
-              cat "$MAPPING_LOG"
-              echo "WARNING: mapping check or rebuild of the mapped tables failed."
-              echo "The previous tables are retained; the next data refresh retries."
-            fi
-            rm -f "$MAPPING_LOG"
-
             echo "Checking whether the projection model changed in this deploy..."
             # cedar-projections, not cedar-shiny: the app service mounts output/
             # read-only and a CLI --volume does not override that, so the build
