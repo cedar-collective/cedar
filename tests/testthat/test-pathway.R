@@ -99,6 +99,51 @@ make_pathway_population <- function() {
   )
 }
 
+# The position columns of cedar_student_terms for the S00x students, as
+# build_student_terms() would write them: running totals per student, and
+# timeline_valid set against the first term in the whole table. `extra` rows
+# are bound in before either is derived, so a row on an earlier term opens the
+# window for everyone.
+make_pathway_student_terms <- function(extra = NULL) {
+  dplyr::bind_rows(
+    tibble(
+      student_id = c("S001", "S001", "S001",
+                     "S002", "S002", "S002",
+                     "S003", "S003",
+                     "S004", "S004", "S004",
+                     "S005", "S005"),
+      term = c(202410L, 202480L, 202510L,
+               202410L, 202480L, 202510L,
+               202410L, 202480L,
+               202410L, 202480L, 202510L,
+               202480L, 202510L),
+      attempted_unm_credits = rep(15, 13),
+      completed_unm_credits = rep(15, 13),
+      # The classification each student carried that term, as the class-list
+      # fixture above records it; the classification axis and the start filter
+      # read it from here, never from the course row.
+      student_classification = c("Freshman", "Sophomore", "Junior",
+                                 "Freshman", "Sophomore", "Junior",
+                                 "Freshman", "Sophomore",
+                                 "Freshman", "Sophomore", "Junior",
+                                 "Sophomore", "Junior"),
+      enrolled = TRUE
+    ),
+    extra
+  ) %>%
+    dplyr::mutate(.min_data_term = min(term)) %>%
+    dplyr::group_by(student_id) %>%
+    dplyr::arrange(term, .by_group = TRUE) %>%
+    dplyr::mutate(
+      cumulative_attempted_unm_credits = cumsum(attempted_unm_credits),
+      cumulative_completed_unm_credits = cumsum(completed_unm_credits),
+      unm_credits_entering = cumulative_attempted_unm_credits - attempted_unm_credits,
+      timeline_valid = min(term) > .min_data_term
+    ) %>%
+    dplyr::ungroup() %>%
+    dplyr::select(-.min_data_term)
+}
+
 
 # =============================================================================
 # get_course_timing() tests
@@ -203,20 +248,26 @@ test_that("timing suppresses thin bands and thin course cells separately", {
   population <- tibble::tibble(
     student_id = paste0("S", 1:6), population_label = "guards"
   )
+  student_terms <- tibble::tibble(
+    student_id = paste0("S", 1:6), term = 202410L,
+    student_classification = "Freshman", enrolled = TRUE
+  )
 
   thin_cell <- suppressMessages(get_course_timing(
     students, population,
     opt = list(
       min_n = 1L, min_band_n = 5L, min_cell_n = 3L,
       x_axis = "classification", subject_course = "TARGET 100"
-    )
+    ),
+    student_terms = student_terms
   ))
   thin_band <- suppressMessages(get_course_timing(
     students, population,
     opt = list(
       min_n = 1L, min_band_n = 7L, min_cell_n = 1L,
       x_axis = "classification", subject_course = "TARGET 100"
-    )
+    ),
+    student_terms = student_terms
   ))
 
   expect_equal(nrow(thin_cell), 0L)
@@ -227,7 +278,8 @@ test_that("timing suppresses thin bands and thin course cells separately", {
 test_that("get_course_timing start_classification excludes S005 from counts and eligibility", {
   result <- get_course_timing(
     make_pathway_students(), make_pathway_population(),
-    opt = list(min_n = 1, start_classification = "Freshman")
+    opt = list(min_n = 1, start_classification = "Freshman"),
+    student_terms = make_pathway_student_terms()
   ) %>%
     filter(subject_course %in% c("BIOL 2310", "CHEM 1215")) %>%
     arrange(subject_course, relative_term)
@@ -700,41 +752,6 @@ test_that("course pairs scope by delivery campus but keep cross-campus pairs", {
 # The classification axis reads a per-term Banner value and is unaffected, which
 # is why it is the default and why the guard must not touch it.
 
-# The position columns of cedar_student_terms for the S00x students, as
-# build_student_terms() would write them: running totals per student, and
-# timeline_valid set against the first term in the whole table. `extra` rows
-# are bound in before either is derived, so a row on an earlier term opens the
-# window for everyone.
-make_pathway_student_terms <- function(extra = NULL) {
-  dplyr::bind_rows(
-    tibble(
-      student_id = c("S001", "S001", "S001",
-                     "S002", "S002", "S002",
-                     "S003", "S003",
-                     "S004", "S004", "S004",
-                     "S005", "S005"),
-      term = c(202410L, 202480L, 202510L,
-               202410L, 202480L, 202510L,
-               202410L, 202480L,
-               202410L, 202480L, 202510L,
-               202480L, 202510L),
-      attempted_unm_credits = rep(15, 13),
-      completed_unm_credits = rep(15, 13)
-    ),
-    extra
-  ) %>%
-    dplyr::mutate(.min_data_term = min(term)) %>%
-    dplyr::group_by(student_id) %>%
-    dplyr::arrange(term, .by_group = TRUE) %>%
-    dplyr::mutate(
-      cumulative_attempted_unm_credits = cumsum(attempted_unm_credits),
-      cumulative_completed_unm_credits = cumsum(completed_unm_credits),
-      unm_credits_entering = cumulative_attempted_unm_credits - attempted_unm_credits,
-      timeline_valid = min(term) > .min_data_term
-    ) %>%
-    dplyr::ungroup() %>%
-    dplyr::select(-.min_data_term)
-}
 
 test_that("inst_credit_band drops left-truncated students and reports the count", {
   result <- get_course_timing(
@@ -770,6 +787,37 @@ test_that("unm_credit_band carries the same guard as the other credit axes", {
 
   expect_equal(attr(result, "timing_meta")$n_truncated, 4)
   expect_false("CHEM 1215" %in% result$subject_course)
+})
+
+test_that("classification axis reads the student-term table, not the course row", {
+  # Every course row says Senior; the table keeps the fixture's progression,
+  # and the axis follows the table.
+  rows <- dplyr::mutate(make_pathway_students(), student_classification = "Senior")
+  result <- suppressMessages(get_course_timing(
+    rows, make_pathway_population(),
+    opt = list(min_n = 1, x_axis = "classification"),
+    student_terms = make_pathway_student_terms()
+  ))
+  expect_setequal(result$relative_term[result$subject_course == "CHEM 1215"], 1L)
+  expect_setequal(result$relative_term[result$subject_course == "ENGL 1110"], 3L)
+
+  # Without the table neither the axis nor the start filter can be read.
+  expect_error(get_course_timing(make_pathway_students(), make_pathway_population(),
+                                 opt = list(min_n = 1, x_axis = "classification")),
+               "need cedar_student_terms")
+  expect_error(get_course_timing(make_pathway_students(), make_pathway_population(),
+                                 opt = list(min_n = 1, start_classification = "Freshman")),
+               "need cedar_student_terms")
+  # The start filter reads the first enrolled term on the table: S005 enters as
+  # a Sophomore there, and a table calling that term Freshman keeps S005.
+  st <- make_pathway_student_terms()
+  st$student_classification[st$student_id == "S005" & st$term == 202480L] <- "Freshman"
+  kept <- suppressMessages(get_course_timing(
+    make_pathway_students(), make_pathway_population(),
+    opt = list(min_n = 1, start_classification = "Freshman"),
+    student_terms = st
+  ))
+  expect_equal(unique(kept$n_eligible[kept$relative_term == 1L]), 5L)
 })
 
 test_that("classification axis excludes nobody for truncation", {
