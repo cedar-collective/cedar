@@ -5,8 +5,8 @@
 # (scripts/record-registration-snapshot.R). The first keeps each course's
 # counts for every term in registration or scheduled ahead of it
 # (R/branches/registration-snapshots.R); the second keeps which of last term's
-# students have registered for a Fall or Spring term in registration
-# (R/branches/return-snapshots.R). A set of pulls already recorded is left
+# students have registered for a Fall or Spring term in registration, read off
+# cedar_student_terms (R/branches/return-snapshots.R). A set of pulls already recorded is left
 # alone, so a morning that brought no new class list writes nothing. The files
 # are aggregates with no student ID; they live beside the projection bundles in
 # output/, the only directory the refresh may write in production.
@@ -131,14 +131,15 @@ return_snapshot_path <- function(output_dir, term, classlist_as_of,
 
 #' Record today's return snapshot of every Fall or Spring term in registration
 #'
-#' @param students,programs `cedar_students`, `cedar_programs`.
+#' @param students `cedar_students`, read only to find the terms in registration.
+#' @param student_terms `cedar_student_terms`, which the snapshot is built from.
 #' @param output_dir Directory to write into; created if absent.
 #' @param terms Target terms; default, the Fall and Spring terms whose
 #'   registration has opened (`return_snapshot_terms()`).
 #' @return One row per term: `term`, `anchor_term`, `classlist_as_of`, `path`,
 #'   `rows`, `students`, `registered`, and `status` ("written" or
 #'   "already recorded").
-record_return_snapshot <- function(students, programs, output_dir,
+record_return_snapshot <- function(students, student_terms, output_dir,
                                    terms = return_snapshot_terms(students)) {
   if (length(terms) == 0L) {
     message("[registration-snapshots] No Fall or Spring term is in registration; no return snapshot recorded.")
@@ -148,7 +149,7 @@ record_return_snapshot <- function(students, programs, output_dir,
                   status = character(0)))
   }
   dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
-  snapshot <- build_return_snapshot(students, programs, list(terms = terms))
+  snapshot <- build_return_snapshot(student_terms, list(terms = terms))
 
   results <- lapply(split(snapshot, snapshot$term), function(rows) {
     path <- return_snapshot_path(output_dir, rows$term[[1]], rows$classlist_as_of[[1]],

@@ -3281,7 +3281,10 @@ cedar_students_intersession <- dplyr::bind_rows(
 # ── RW01 — return snapshot: last term's students, registered for the next ────
 # build_return_snapshot() keeps which of Fall 2020's students have registered
 # for Spring 2021 on the day both class lists were pulled (2020-11-20, Spring
-# registration open, Fall grades partly posted).
+# registration open, Fall grades partly posted). It reads the student-term
+# table, so setup.R builds test_student_terms_rw from these rows with
+# build_student_terms(); the programs rows carry academic studies' names
+# (Undergraduate, Albuquerque/Main), which the table translates to codes.
 #
 #   student  Fall 2020 rows             Spring 2021 rows     group
 #   RW_A     RE HIST A, RE ENGL B        RE                   HIST, none, 0
@@ -3300,7 +3303,8 @@ cedar_students_intersession <- dplyr::bind_rows(
 # registration is read UNM-wide. RW_E also has a second Major row (PHYS), which
 # must not count twice: the primary major is the first by code. RW_C's Spring
 # program row says Good Standing; only the anchor term's is read. Late drops are
-# not DFW grades here: they have their own column.
+# not DFW grades here: they have their own column. RW_E's two Major rows agree
+# on every description column, as the table requires.
 .rw_row <- function(sid, term, course, status, grade = NA_character_,
                     campus = "ABQ", classification = "Sophomore") {
   .mc_row(sid, term, course, campus, sub(" .*", "", course), grade) %>%
@@ -3338,22 +3342,25 @@ cedar_students_rw <- dplyr::bind_rows(
   .rw_row("RW_G", 202110L, "HIST 2110", "RE")
 )
 
-.rw_program <- function(sid, major_code, standing = "Good Standing", term = 202080L) {
+.rw_program <- function(sid, major_code, standing = "Good Standing", term = 202080L,
+                        classification = "Sophomore") {
   tibble::tibble(
     student_id = sid, term = as.integer(term),
     program_type = "Major", program_name = major_code,
     major_code = major_code, dept_code = major_code, college_code = "AS",
-    student_college = "College of Arts and Sciences", student_campus = "ABQ",
-    student_level = "UG", is_pre_major = FALSE, academic_standing = standing,
-    as_of_date = as.Date("2020-11-20")
+    student_college = "College of Arts and Sciences",
+    student_campus = "Albuquerque/Main", student_level = "Undergraduate",
+    student_classification = classification, residency = "Resident",
+    is_pre_major = FALSE, academic_standing = standing, time_status = "FT",
+    sem_gpa = 3.0, as_of_date = as.Date("2020-11-20")
   )
 }
 cedar_programs_rw <- dplyr::bind_rows(
   .rw_program(c("RW_A", "RW_I", "RW_B", "RW_D", "RW_F"), "HIST"),
   .rw_program("RW_C", "HIST", standing = "Academic Probation"),
   .rw_program("RW_C", "HIST", term = 202110L),
-  .rw_program("RW_E", "MATH"),
-  .rw_program("RW_E", "PHYS")
+  .rw_program("RW_E", "MATH", classification = "Junior"),
+  .rw_program("RW_E", "PHYS", classification = "Junior")
 )
 
 
