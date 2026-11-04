@@ -2185,8 +2185,9 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
       # course timing pipeline. get_course_timing() only needs population
       # students — passing the full table (potentially millions of rows) forces
       # an expensive scan inside the function on every run.
-      # students_full uses the raw (un-windowed) table for start_classification
-      # lookups, but we still restrict to pop IDs and the 4 needed columns.
+      # students_full uses the raw (un-windowed) table to anchor relative terms
+      # (start_classification reads cedar_student_terms), restricted to pop IDs
+      # and the 3 needed columns.
       pop_ids_ct    <- unique(get_analysis_population()$student_id)
       # Pre-filter to pop IDs first, then apply windowing on the small subset.
       # Avoids running the full relevant_until window on 2M+ rows just to get ~30K.
@@ -2195,7 +2196,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
       students_pre <- apply_pathways_population_window(students_pre, pop_rv, analysis_through)
       students_pop  <- students_pre
       students_meta <- filter(students, student_id %in% pop_ids_ct) %>%
-        select(student_id, term, student_classification, registration_status_code)
+        select(student_id, term, registration_status_code)
 
       # student_terms is required by every credit-band axis: those modes read
       # the position from the student-term table's running total instead of the

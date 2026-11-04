@@ -18,7 +18,7 @@ gg_opt <- function(...) utils::modifyList(list(dept_code = "LING"), list(...))
 # =============================================================================
 
 test_that("cohort keeps only awarded graduates with a complete UNM record", {
-  cohort <- get_gen_ed_grad_cohort(cedar_students_gg, cedar_degrees_gg, gg_opt())
+  cohort <- get_gen_ed_grad_cohort(cedar_students_gg, cedar_degrees_gg, cedar_student_terms_gg, gg_opt())
 
   expect_equal(nrow(cohort), 3)
   expect_setequal(cohort$student_id, c("GG_IN1", "GG_IN2", "GG_IN3"))
@@ -27,7 +27,7 @@ test_that("cohort keeps only awarded graduates with a complete UNM record", {
 })
 
 test_that("cohort_meta accounts for every excluded graduate", {
-  cohort <- get_gen_ed_grad_cohort(cedar_students_gg, cedar_degrees_gg, gg_opt())
+  cohort <- get_gen_ed_grad_cohort(cedar_students_gg, cedar_degrees_gg, cedar_student_terms_gg, gg_opt())
   m <- attr(cohort, "cohort_meta")
 
   # 5 awarded LING degrees. GG_PEND (pending) and GG_OTHER (different department)
@@ -44,12 +44,12 @@ test_that("cohort_meta accounts for every excluded graduate", {
 })
 
 test_that("cohort excludes pending degrees", {
-  cohort <- get_gen_ed_grad_cohort(cedar_students_gg, cedar_degrees_gg, gg_opt())
+  cohort <- get_gen_ed_grad_cohort(cedar_students_gg, cedar_degrees_gg, cedar_student_terms_gg, gg_opt())
   expect_false("GG_PEND" %in% cohort$student_id)
 })
 
 test_that("cohort excludes graduates of other departments", {
-  cohort <- get_gen_ed_grad_cohort(cedar_students_gg, cedar_degrees_gg, gg_opt())
+  cohort <- get_gen_ed_grad_cohort(cedar_students_gg, cedar_degrees_gg, cedar_student_terms_gg, gg_opt())
   expect_false("GG_OTHER" %in% cohort$student_id)
 })
 
@@ -59,14 +59,14 @@ test_that("cohort takes the latest degree term for a student with several", {
     dplyr::filter(cedar_degrees_gg, student_id == "GG_IN1") %>%
       dplyr::mutate(degree_id = "GGDEG1b", term = 202180L)
   )
-  cohort <- get_gen_ed_grad_cohort(cedar_students_gg, degrees_two, gg_opt())
+  cohort <- get_gen_ed_grad_cohort(cedar_students_gg, degrees_two, cedar_student_terms_gg, gg_opt())
 
   expect_equal(sum(cohort$student_id == "GG_IN1"), 1)
   expect_equal(cohort$grad_term[cohort$student_id == "GG_IN1"], 202410)
 })
 
 test_that("cohort is empty, not an error, for a department with no graduates", {
-  cohort <- get_gen_ed_grad_cohort(cedar_students_gg, cedar_degrees_gg,
+  cohort <- get_gen_ed_grad_cohort(cedar_students_gg, cedar_degrees_gg, cedar_student_terms_gg,
                                    gg_opt(dept_code = "NOPE"))
   expect_equal(nrow(cohort), 0)
   expect_equal(attr(cohort, "cohort_meta")$n_cohort, 0)
@@ -74,7 +74,7 @@ test_that("cohort is empty, not an error, for a department with no graduates", {
 
 test_that("cohort requires a dept_code", {
   expect_error(
-    get_gen_ed_grad_cohort(cedar_students_gg, cedar_degrees_gg, list()),
+    get_gen_ed_grad_cohort(cedar_students_gg, cedar_degrees_gg, cedar_student_terms_gg, list()),
     "dept_code is required"
   )
 })
@@ -83,7 +83,7 @@ test_that("cohort fails loudly on a degrees table missing required columns", {
   expect_error(
     get_gen_ed_grad_cohort(cedar_students_gg,
                            dplyr::select(cedar_degrees_gg, -graduation_status),
-                           gg_opt()),
+                           cedar_student_terms_gg, gg_opt()),
     "missing required column"
   )
 })
@@ -94,7 +94,7 @@ test_that("cohort fails loudly on a degrees table missing required columns", {
 # =============================================================================
 
 gg_uptake <- function(...) {
-  cohort <- get_gen_ed_grad_cohort(cedar_students_gg, cedar_degrees_gg, gg_opt())
+  cohort <- get_gen_ed_grad_cohort(cedar_students_gg, cedar_degrees_gg, cedar_student_terms_gg, gg_opt())
   get_gen_ed_grad_uptake(cedar_students_gg, cohort, gen_ed_course_lookup(),
                          opt = utils::modifyList(
                            list(campus = "ABQ", dept_code = "LING", min_n = 1L),
@@ -163,7 +163,7 @@ test_that("uptake min_n drops courses below the threshold", {
 })
 
 test_that("uptake returns typed empty tables for an empty cohort", {
-  empty <- get_gen_ed_grad_cohort(cedar_students_gg, cedar_degrees_gg,
+  empty <- get_gen_ed_grad_cohort(cedar_students_gg, cedar_degrees_gg, cedar_student_terms_gg,
                                   gg_opt(dept_code = "NOPE"))
   u <- get_gen_ed_grad_uptake(cedar_students_gg, empty, gen_ed_course_lookup(),
                               opt = list(campus = "ABQ"))
@@ -189,7 +189,7 @@ test_that("uptake fails loudly on a cohort that did not come from the cohort bui
 # =============================================================================
 
 gg_population <- function() {
-  get_gen_ed_grad_cohort(cedar_students_gg, cedar_degrees_gg, gg_opt()) %>%
+  get_gen_ed_grad_cohort(cedar_students_gg, cedar_degrees_gg, cedar_student_terms_gg, gg_opt()) %>%
     dplyr::select(student_id, population_label)
 }
 
@@ -403,7 +403,8 @@ gg_credits_own <- function() {
     tibble::tibble(student_id = "GG_IN2", term = 202110L,
                    completed_unm_credits = 3,
                    cumulative_completed_unm_credits = 3,
-                   timeline_valid = TRUE)
+                   timeline_valid = TRUE,
+                   student_classification = "Freshman", enrolled = TRUE)
   )
 }
 
@@ -504,7 +505,7 @@ test_that("own-unit min_n filters on distinct students like the main scope", {
 })
 
 test_that("uptake exposes per-student own-unit counts", {
-  cohort <- get_gen_ed_grad_cohort(gg_students_own(), cedar_degrees_gg, gg_opt())
+  cohort <- get_gen_ed_grad_cohort(gg_students_own(), cedar_degrees_gg, cedar_student_terms_gg, gg_opt())
   u <- get_gen_ed_grad_uptake(gg_students_own(), cohort, gen_ed_course_lookup(),
                               opt = list(campus = "ABQ", dept_code = "LING", min_n = 1L))
 
@@ -514,7 +515,7 @@ test_that("uptake exposes per-student own-unit counts", {
 })
 
 test_that("uptake omits summary_dept when there is no department to scope to", {
-  cohort <- get_gen_ed_grad_cohort(gg_students_own(), cedar_degrees_gg, gg_opt())
+  cohort <- get_gen_ed_grad_cohort(gg_students_own(), cedar_degrees_gg, cedar_student_terms_gg, gg_opt())
   u <- get_gen_ed_grad_uptake(gg_students_own(), cohort, gen_ed_course_lookup(),
                               opt = list(campus = "ABQ", min_n = 1L))
 
@@ -632,14 +633,15 @@ test_that("relative_term is the default axis", {
   expect_equal(res$timing_guards$x_axis, "relative_term")
 })
 
-test_that("relative_term needs no student_terms", {
-  # The credit table is only consulted by the credit-band axis. A department
-  # should still get a map if that table is unavailable.
-  res <- suppressMessages(get_gen_ed_grad_profile(
-    cedar_students_gg, cedar_degrees_gg, student_terms = NULL,
-    opt = list(dept_code = "LING", campus = "ABQ", min_n = 1L, min_band_n = 1L)))
-
-  expect_gt(nrow(res$timing), 0)
+test_that("every axis needs the student-term table", {
+  # The credit-band axis reads its position there and, since ADR-001 step 2,
+  # the cohort reads each graduate's entry standing there too, so a missing
+  # table is an error on the relative-term axis as well.
+  expect_error(
+    suppressMessages(get_gen_ed_grad_profile(
+      cedar_students_gg, cedar_degrees_gg, student_terms = NULL,
+      opt = list(dept_code = "LING", campus = "ABQ", min_n = 1L, min_band_n = 1L))),
+    "student_terms is missing")
 })
 
 test_that("relative_term places each course by terms enrolled, not credits", {
@@ -716,7 +718,7 @@ test_that("a graduate whose only enrollment postdates the degree is excluded", {
     .gg_row("GG_RETURN", 202210, "MATH 1350", "MATH")
   )
 
-  cohort <- get_gen_ed_grad_cohort(students_return, degrees_early, gg_opt())
+  cohort <- get_gen_ed_grad_cohort(students_return, degrees_early, cedar_student_terms_gg, gg_opt())
   expect_false("GG_RETURN" %in% cohort$student_id)
   expect_equal(attr(cohort, "cohort_meta")$n_post_grad_entry, 1)
 })
@@ -724,7 +726,7 @@ test_that("a graduate whose only enrollment postdates the degree is excluded", {
 test_that("a graduate who enrolled before graduating is still kept", {
   # The guard must not catch ordinary students; GG_IN1 enrolls 202080 and
   # graduates 202410.
-  cohort <- get_gen_ed_grad_cohort(cedar_students_gg, cedar_degrees_gg, gg_opt())
+  cohort <- get_gen_ed_grad_cohort(cedar_students_gg, cedar_degrees_gg, cedar_student_terms_gg, gg_opt())
   expect_true("GG_IN1" %in% cohort$student_id)
   expect_equal(attr(cohort, "cohort_meta")$n_post_grad_entry, 0)
 })
@@ -734,7 +736,7 @@ test_that("enrollment in the same term as graduation does not count as preceding
   # coursework behind it, so it cannot support a Gen Ed profile.
   degrees_same <- cedar_degrees_gg %>%
     dplyr::mutate(term = dplyr::if_else(student_id == "GG_IN3", 202110L, term))
-  cohort <- get_gen_ed_grad_cohort(cedar_students_gg, degrees_same, gg_opt())
+  cohort <- get_gen_ed_grad_cohort(cedar_students_gg, degrees_same, cedar_student_terms_gg, gg_opt())
 
   expect_false("GG_IN3" %in% cohort$student_id)
 })
@@ -758,7 +760,7 @@ test_that("the conditional denominator still describes itself correctly", {
   # so this rebuilds the same shape locally.
   timing <- suppressMessages(get_course_timing(
     gg_students_own(),
-    get_gen_ed_grad_cohort(gg_students_own(), cedar_degrees_gg, gg_opt()) %>%
+    get_gen_ed_grad_cohort(gg_students_own(), cedar_degrees_gg, cedar_student_terms_gg, gg_opt()) %>%
       dplyr::select(student_id, population_label),
     opt = list(x_axis = "unm_credit_band", min_n = 1L, campus = "ABQ",
                group_campus = FALSE),
@@ -787,7 +789,11 @@ test_that("graduate degrees are excluded by default", {
   students_mixed <- dplyr::bind_rows(
     cedar_students_gg, .gg_row("GG_IN1b", 202110, "LING 300"))
 
-  cohort <- get_gen_ed_grad_cohort(students_mixed, degrees_mixed, gg_opt())
+  terms_mixed <- dplyr::bind_rows(
+    cedar_student_terms_gg,
+    tibble::tibble(student_id = "GG_IN1b", term = 202110L,
+                   student_classification = "Freshman", enrolled = TRUE))
+  cohort <- get_gen_ed_grad_cohort(students_mixed, degrees_mixed, terms_mixed, gg_opt())
   expect_false("GG_IN1b" %in% cohort$student_id)
   expect_equal(attr(cohort, "cohort_meta")$n_graduate_degrees, 1)
 })
@@ -802,17 +808,39 @@ test_that("undergraduate_only = FALSE keeps every award level", {
   )
   students_mixed <- dplyr::bind_rows(
     cedar_students_gg, .gg_row("GG_IN1b", 202110, "LING 300"))
+  terms_mixed <- dplyr::bind_rows(
+    cedar_student_terms_gg,
+    tibble::tibble(student_id = "GG_IN1b", term = 202110L,
+                   student_classification = "Freshman", enrolled = TRUE))
 
-  cohort <- get_gen_ed_grad_cohort(students_mixed, degrees_mixed,
+  cohort <- get_gen_ed_grad_cohort(students_mixed, degrees_mixed, terms_mixed,
                                    gg_opt(undergraduate_only = FALSE))
   expect_true("GG_IN1b" %in% cohort$student_id)
 })
 
-test_that("the cohort records how each graduate arrived at UNM", {
-  cohort <- get_gen_ed_grad_cohort(cedar_students_gg, cedar_degrees_gg, gg_opt())
+test_that("the cohort records how each graduate arrived at UNM, read off the student-term table", {
+  cohort <- get_gen_ed_grad_cohort(cedar_students_gg, cedar_degrees_gg, cedar_student_terms_gg, gg_opt())
   expect_true("entry_standing" %in% names(cohort))
   # The GG01 fixture rows are all Freshman at first appearance.
   expect_setequal(unique(cohort$entry_standing), "freshman")
+
+  # The standing is the table's for the first term, not the class-list row's:
+  # calling GG_IN1 a Junior in Fall 2020 on the table moves them, and calling
+  # every class-list row Senior moves nobody.
+  st <- cedar_student_terms_gg
+  st$student_classification[st$student_id == "GG_IN1" & st$term == 202080L] <- "Junior"
+  moved <- get_gen_ed_grad_cohort(cedar_students_gg, cedar_degrees_gg, st, gg_opt())
+  expect_equal(moved$entry_standing[moved$student_id == "GG_IN1"], "junior_senior")
+  rows <- dplyr::mutate(cedar_students_gg, student_classification = "Senior")
+  same <- get_gen_ed_grad_cohort(rows, cedar_degrees_gg, cedar_student_terms_gg, gg_opt())
+  expect_setequal(unique(same$entry_standing), "freshman")
+
+  # A graduate whose first term the table lacks is an error, never "other".
+  expect_error(
+    get_gen_ed_grad_cohort(cedar_students_gg, cedar_degrees_gg,
+                           dplyr::filter(cedar_student_terms_gg, !(student_id == "GG_IN1" & term == 202080L)),
+                           gg_opt()),
+    "no row on cedar_student_terms")
 })
 
 test_that("uptake reports averages split by entry standing", {
@@ -829,7 +857,7 @@ test_that("a degrees table without award_category fails loudly rather than silen
   expect_error(
     get_gen_ed_grad_cohort(cedar_students_gg,
                            dplyr::select(cedar_degrees_gg, -award_category),
-                           gg_opt()),
+                           cedar_student_terms_gg, gg_opt()),
     "needs an award_category column"
   )
 })
