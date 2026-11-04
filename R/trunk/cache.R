@@ -226,16 +226,19 @@ clear_course_cache <- function(course_code) {
 #        SCH is attempted rather than earned hours (credit-hours 2.0.0).
 #   v10 — SCH is counted at census, late drops at their section's credit value,
 #        with the end-of-term count beside it (credit-hours 3.0.0).
-cedar_dept_cache_version <- 10L
+#   v11 — SCH by major reads each row's major off cedar_student_terms, named
+#        through the programs table (credit_hours_by_major(); ADR-001 step 2).
+cedar_dept_cache_version <- 11L
 
 # Include lookup-derived labels/department metadata where a tab uses them.
-# Credit Hours reads class lists, and sections for late drops' credit values;
-# no visible tab consumes faculty data.
+# Credit Hours reads class lists, sections for late drops' credit values, the
+# student-term table for each row's major and programs for its name; no
+# visible tab consumes faculty data.
 DEPT_CACHE_TABLES <- list(
   hc = c("cedar_programs", "cedar_lookups"),
   enrl = c("cedar_students", "cedar_sections", "cedar_programs", "cedar_lookups"),
   deg = c("cedar_degrees", "cedar_lookups"),
-  ch = c("cedar_students", "cedar_sections", "cedar_lookups"),
+  ch = c("cedar_students", "cedar_sections", "cedar_student_terms", "cedar_programs", "cedar_lookups"),
   demo = "cedar_programs"
 )
 

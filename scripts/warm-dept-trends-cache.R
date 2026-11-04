@@ -80,6 +80,8 @@ load_object <- function(name) {
 data_objects <- list(
   cedar_sections = load_object("cedar_sections"),
   cedar_students = load_object("cedar_students"),
+  # Credit Hours reads each row's major off the student-term table.
+  cedar_student_terms = load_object("cedar_student_terms"),
   cedar_programs = load_object("cedar_programs"),
   cedar_degrees = load_object("cedar_degrees"),
   cedar_lookups = load_object("cedar_lookups")
