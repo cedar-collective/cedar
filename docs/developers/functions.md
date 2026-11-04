@@ -8,7 +8,7 @@ parent: Developer Guide
 
 This reference is auto-generated from roxygen2 comments in the source code.
 
-*Generated: 2026-11-04 11:52:28.080614*
+*Generated: 2026-11-04 12:18:11.125162*
 
 ---
 
@@ -335,13 +335,14 @@ abbreviate_classification("Junior, 3rd Yr.")  # Returns "Junior"
 
 **Get Major Mix for a Course Set**
 
-Get Major Mix for a Course Set  Summarizes the major/program mix for students enrolled in a selected set of courses. Counts are enrollment rows, not unique students, so a student taking two selected courses contributes two seats to the mix. The enrollment-row major code is used as the baseline because it is attached to the course term; same-term primary program records are used when available for cleaner names and pre-major labels.
+Get Major Mix for a Course Set  Summarizes the major/program mix for students enrolled in a selected set of courses. Counts are enrollment rows, not unique students, so a student taking two selected courses contributes two seats to the mix. Each row's major is the student-term table's `primary_major_code` for that student and term: the academic studies primary major where the student has one, else the major Banner stamped on the roster (ADR-001 step 2; the rule is in docs/developers/student-terms.md). Nothing here re-derives it from the class list or from `programs`.
 
 **Parameters:**
 
 - `students` - Data frame of student enrollments from cedar_students.
-- `programs` - Data frame of program records from cedar_programs.
-- `opt` - Options list. Supports course/term/campus/college filters accepted by filter_class_list(), plus min_n and top_n for display grouping, and optionally major_code_to_name (the cedar_lookups table of the same name, a named character vector) to label an enrollment-row major code that has no same-term program record. Codes it does not cover, or all codes when it is absent, are named from \code{programs}.
+- `student_terms` - Data frame. The `cedar_student_terms` table, read for `primary_major_code` and `is_pre_major` on each enrollment row's student-term. Every registered row has one; a row without is an error.
+- `programs` - Data frame of program records from cedar_programs, read only to name each code: its `program_name` is the mapping file's, with a pre-major's "Pre" already taken off, where the class list's name keeps it.
+- `opt` - Options list. Supports course/term/campus/college filters accepted by filter_class_list(), plus min_n and top_n for display grouping, and optionally major_code_to_name (the cedar_lookups table of the same name, a named character vector) to label a code \code{programs} never carries, such as a class-list-only associate program. A code neither names is shown as itself.
 
 **Returns:** Tibble with major_label, n_enrollments, n_students, pct_enrollments.
 

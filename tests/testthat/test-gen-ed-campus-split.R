@@ -13,7 +13,7 @@ context("Gen Ed campus split")
 
 ge_profile <- function(min_n = 1L, instructor = TRUE) {
   suppressMessages(get_gen_ed_profile(
-    test_students, test_sections, test_programs, NULL,
+    test_students, test_sections, test_programs, NULL, test_student_terms,
     list(min_n = min_n,
          include_instructor_dfw = instructor,
          include_associations = FALSE,
@@ -29,6 +29,7 @@ ge_two_campus_profile <- function(min_n = 1L) {
     gen_ed_assoc_students,
     gen_ed_assoc_sections,
     gen_ed_assoc_programs,
+    student_terms = test_student_terms_gen_ed_assoc,
     opt = list(data_edges = data_objects$cedar_edges, dept_code = "HIST", min_n = min_n, include_instructor_dfw = TRUE)
   ))
 }

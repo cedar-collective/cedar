@@ -2928,6 +2928,7 @@ gen_ed_assoc_programs <- cedar_programs[0, ] %>%
     residency = c("Resident", "Resident", "Resident", "Resident", "Resident"),
     academic_standing = c("Good", "Good", "Good", "Good", "Good"),
     inst_gpa = c(3.2, 3.1, 3.0, 3.0, 2.8),
+    sem_gpa = c(3.2, 3.1, 3.0, 3.0, 2.8),
     inst_credits_attempted = c(30, 24, 12, 15, 18),
     program_id = paste0("GE-PROG-", 1:5),
     program_classification = c("Major", "Major", "Major", "Major", "Major"),

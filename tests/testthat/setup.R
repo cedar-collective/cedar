@@ -84,7 +84,11 @@ test_student_terms_mc         <<- .fixture_student_terms(cedar_students_mc)
 # so Fall 2020 is the settled edge.
 test_student_terms_rw         <<- suppressMessages(build_student_terms(
   cedar_students_rw, cedar_programs_rw, edges = list(last_enrolled_complete = 202080L)))
-test_student_terms_gen_ed_assoc <<- .fixture_student_terms(gen_ed_assoc_students, cedar_degrees)
+# The Gen Ed association rows carry programs rows (GE_S1..GE_S4 declare HIST),
+# so the major mix reads a programs primary major beside class-list ones.
+test_student_terms_gen_ed_assoc <<- suppressMessages(build_student_terms(
+  gen_ed_assoc_students, gen_ed_assoc_programs, cedar_degrees,
+  edges = list(last_enrolled_complete = as.integer(max(gen_ed_assoc_students$term)))))
 # ST01 carries its own programs and a settled edge of its own (Fall 2020).
 test_student_terms_st         <<- suppressMessages(build_student_terms(
   cedar_students_st, cedar_programs_st, cedar_degrees_st))

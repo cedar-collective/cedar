@@ -140,7 +140,8 @@ plot_gen_ed_course_modality_trends <- function(enrl_by_course_modality, top_n = 
 }
 
 
-get_gen_ed_profile <- function(students, sections, programs, degrees = NULL, opt = list()) {
+get_gen_ed_profile <- function(students, sections, programs, degrees = NULL,
+                               student_terms, opt = list()) {
   min_n <- suppressWarnings(as.integer(opt$min_n %||% 5L))
   if (length(min_n) == 0 || is.na(min_n) || min_n < 1L) min_n <- 5L
   include_associations <- isTRUE(opt$include_associations %||% TRUE)
@@ -308,6 +309,7 @@ get_gen_ed_profile <- function(students, sections, programs, degrees = NULL, opt
 
   major_mix <- get_course_major_mix(
     ge_students,
+    student_terms,
     programs,
     opt = list(min_n = min_n, top_n = opt$major_mix_top_n %||% 10L,
                major_code_to_name = opt$major_code_to_name)
