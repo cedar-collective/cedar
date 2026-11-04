@@ -55,21 +55,28 @@ abbreviate_classification <- function(classification) {
 #'
 #' Summarizes the major/program mix for students enrolled in a selected set of
 #' courses. Counts are enrollment rows, not unique students, so a student taking
-#' two selected courses contributes two seats to the mix. The enrollment-row
-#' major code is used as the baseline because it is attached to the course term;
-#' same-term primary program records are used when available for cleaner names
-#' and pre-major labels.
+#' two selected courses contributes two seats to the mix. Each row's major is
+#' the student-term table's `primary_major_code` for that student and term:
+#' the academic studies primary major where the student has one, else the
+#' major Banner stamped on the roster (ADR-001 step 2; the rule is in
+#' docs/developers/student-terms.md). Nothing here re-derives it from the
+#' class list or from `programs`.
 #'
 #' @param students Data frame of student enrollments from cedar_students.
-#' @param programs Data frame of program records from cedar_programs.
+#' @param student_terms Data frame. The `cedar_student_terms` table, read for
+#'   `primary_major_code` and `is_pre_major` on each enrollment row's
+#'   student-term. Every registered row has one; a row without is an error.
+#' @param programs Data frame of program records from cedar_programs, read only
+#'   to name each code: its `program_name` is the mapping file's, with a
+#'   pre-major's "Pre" already taken off, where the class list's name keeps it.
 #' @param opt Options list. Supports course/term/campus/college filters accepted
 #'   by filter_class_list(), plus min_n and top_n for display grouping, and
 #'   optionally major_code_to_name (the cedar_lookups table of the same name,
-#'   a named character vector) to label an enrollment-row major code that has
-#'   no same-term program record. Codes it does not cover, or all codes when it
-#'   is absent, are named from \code{programs}.
+#'   a named character vector) to label a code \code{programs} never carries,
+#'   such as a class-list-only associate program. A code neither names is
+#'   shown as itself.
 #' @return Tibble with major_label, n_enrollments, n_students, pct_enrollments.
-get_course_major_mix <- function(students, programs, opt = list()) {
+get_course_major_mix <- function(students, student_terms, programs, opt = list()) {
   if (is.null(students) || nrow(students) == 0) {
     return(tibble::tibble())
   }
@@ -84,11 +91,17 @@ get_course_major_mix <- function(students, programs, opt = list()) {
          paste(missing_student_cols, collapse = ", "))
   }
 
-  required_program_cols <- c("student_id", "term", "program_type", "program_name", "major_code")
+  required_program_cols <- c("program_type", "program_name", "major_code")
   missing_program_cols <- setdiff(required_program_cols, names(programs))
   if (length(missing_program_cols) > 0) {
     stop("[course-demographics.R] get_course_major_mix missing program columns: ",
          paste(missing_program_cols, collapse = ", "))
+  }
+
+  required_term_cols <- c("student_id", "term", "primary_major_code", "is_pre_major")
+  if (is.null(student_terms) || !all(required_term_cols %in% names(student_terms))) {
+    stop("[course-demographics.R] get_course_major_mix needs cedar_student_terms with ",
+         paste(required_term_cols, collapse = ", "))
   }
 
   min_n <- suppressWarnings(as.integer(opt$min_n %||% 5L))
@@ -110,61 +123,47 @@ get_course_major_mix <- function(students, programs, opt = list()) {
   # scope; each student-course contributes once to the curriculum mix.
   enrollment_rows <- filtered %>%
     dplyr::mutate(term = as.integer(term)) %>%
-    dplyr::distinct(student_id, term, subject_course, .keep_all = TRUE) %>%
-    dplyr::mutate(
-      class_major_code = if ("major_code" %in% names(.)) as.character(major_code) else NA_character_
-    ) %>%
-    dplyr::select(student_id, term, subject_course, class_major_code)
+    dplyr::distinct(student_id, term, subject_course)
 
-  program_rows <- programs %>%
-    dplyr::filter(program_type == "Major") %>%
-    dplyr::mutate(term = as.integer(term)) %>%
-    dplyr::arrange(student_id, term, dplyr::desc(!is.na(program_name) & program_name != "")) %>%
-    dplyr::distinct(student_id, term, .keep_all = TRUE) %>%
-    dplyr::transmute(
-      student_id,
-      term,
-      program_major_code = major_code,
-      program_name,
-      is_pre_major = if ("is_pre_major" %in% names(.)) is_pre_major else FALSE
-    )
-
-  joined <- enrollment_rows %>%
-    dplyr::left_join(program_rows, by = c("student_id", "term")) %>%
-    dplyr::mutate(
-      program_name = dplyr::na_if(program_name, ""),
-      program_major_code = dplyr::na_if(program_major_code, ""),
-      class_major_code = dplyr::na_if(class_major_code, "")
-    )
-
-  joined$class_major_label <- joined$class_major_code
-  major_code_to_name <- opt$major_code_to_name
-  if (!is.null(major_code_to_name) && length(major_code_to_name) > 0) {
-    translated <- unname(major_code_to_name[as.character(joined$class_major_code)])
-    has_translation <- !is.na(translated) & translated != ""
-    joined$class_major_label[has_translation] <- translated[has_translation]
+  joined <- attach_student_term(
+    enrollment_rows,
+    dplyr::mutate(student_terms, term = as.integer(term)),
+    c("primary_major_code", "is_pre_major")
+  )
+  # The table has a row for every student-term with a class-list row, so a
+  # miss means the two tables were not built from the same class lists.
+  unmatched <- !(paste(joined$student_id, joined$term) %in%
+                   paste(student_terms$student_id, student_terms$term))
+  if (any(unmatched)) {
+    stop("[course-demographics.R] ", sum(unmatched), " enrollment rows have no row on ",
+         "cedar_student_terms; the two tables were not built from the same class lists.")
   }
-  if (any(is.na(joined$class_major_label) | joined$class_major_label == joined$class_major_code, na.rm = TRUE)) {
-    program_code_to_name <- programs %>%
-      dplyr::filter(!is.na(major_code), major_code != "", !is.na(program_name), program_name != "") %>%
-      dplyr::arrange(major_code, dplyr::desc(program_type == "Major")) %>%
-      dplyr::distinct(major_code, .keep_all = TRUE) %>%
-      dplyr::select(major_code, program_name)
-    program_code_to_name <- stats::setNames(program_code_to_name$program_name, program_code_to_name$major_code)
-    translated <- unname(program_code_to_name[as.character(joined$class_major_code)])
+
+  # Name each code: the name programs records for it first (the mapping file's
+  # name, with a pre-major's "Pre" already taken off), then the lookup for a
+  # code programs never carries (class-list-only codes), then the code itself.
+  codes <- unique(stats::na.omit(joined$primary_major_code))
+  labels <- stats::setNames(codes, codes)
+  program_code_to_name <- programs %>%
+    dplyr::filter(major_code %in% .env$codes, !is.na(program_name), program_name != "") %>%
+    dplyr::arrange(major_code, dplyr::desc(program_type == "Major")) %>%
+    dplyr::distinct(major_code, .keep_all = TRUE)
+  labels[program_code_to_name$major_code] <- program_code_to_name$program_name
+  unnamed <- setdiff(codes, program_code_to_name$major_code)
+  major_code_to_name <- opt$major_code_to_name
+  if (length(unnamed) > 0 && !is.null(major_code_to_name) && length(major_code_to_name) > 0) {
+    translated <- unname(major_code_to_name[unnamed])
     has_translation <- !is.na(translated) & translated != ""
-    joined$class_major_label[has_translation] <- translated[has_translation]
+    labels[unnamed[has_translation]] <- translated[has_translation]
   }
 
   major_counts <- joined %>%
     dplyr::mutate(
-      class_major_label = dplyr::na_if(class_major_label, ""),
       major_label = dplyr::case_when(
-        !is.na(program_name) & !is.na(is_pre_major) & is_pre_major ~ paste0(program_name, " (pre-major)"),
-        !is.na(program_name) ~ program_name,
-        !is.na(class_major_label) ~ class_major_label,
-        !is.na(program_major_code) ~ program_major_code,
-        TRUE ~ "No major code"
+        is.na(primary_major_code) ~ "No major code",
+        !is.na(is_pre_major) & is_pre_major ~
+          paste0(unname(labels[primary_major_code]), " (pre-major)"),
+        TRUE ~ unname(labels[primary_major_code])
       )
     ) %>%
     dplyr::group_by(major_label) %>%

@@ -216,28 +216,68 @@ test_that("calc_cl_enrls returns a row per course for HIST department", {
 
 
 # =============================================================================
-# get_course_major_mix(): the major-code lookup is opt$major_code_to_name (M12)
+# get_course_major_mix(): each row's major is the student-term table's primary
+# major (ADR-001 step 2), named through opt$major_code_to_name (M12)
 # =============================================================================
 
-test_that("get_course_major_mix labels enrollment-row majors from opt$major_code_to_name, never a global", {
-  # test_students carries no major_code on its course rows; stamp one on HIST 1110
-  # so an enrollment-row code without a same-term program record exists. Local
-  # scaffolding for this contract; the shared fixture stays unchanged.
-  st <- test_students
-  st$major_code[st$subject_course == "HIST 1110"] <- "ZZZ-BA"
-  opt <- list(course = "HIST 1110", min_n = 1L, top_n = 50L)
+# ST01: ST_A (and six others) hold a HIST programs row in Spring 2020; ST_K has
+# no programs row and a roster major of SPAN, which the table carries as the
+# class-list primary major. Both took HIST 1110 that term.
+.mix_opt <- list(course = "HIST 1110", term = 202010L, min_n = 1L, top_n = 50L)
 
-  plain <- get_course_major_mix(st, test_programs, opt)
-  expect_true("ZZZ-BA" %in% plain$major_label)
+test_that("get_course_major_mix reads the student-term table's primary major, not the roster", {
+  plain <- get_course_major_mix(cedar_students_st, test_student_terms_st, cedar_programs_st, .mix_opt)
+  expect_true(all(c("HIST", "SPAN") %in% plain$major_label))
+  expect_equal(plain$n_enrollments[plain$major_label == "SPAN"], 1L)
+  # One seat per student-course: a student registered twice in the course that
+  # term counts once.
+  expect_equal(sum(plain$n_enrollments), dplyr::n_distinct(dplyr::filter(
+    cedar_students_st, subject_course == "HIST 1110", term == 202010L,
+    registration_status_code %in% STATUS_REGISTERED)$student_id))
 
-  named <- get_course_major_mix(st, test_programs,
-                                c(opt, list(major_code_to_name = c("ZZZ-BA" = "Zed Studies"))))
-  expect_true("Zed Studies" %in% named$major_label)
-  expect_false("ZZZ-BA" %in% named$major_label)
+  # The roster's major is not read: moving every roster major to SPAN changes
+  # nothing, because the table still says HIST for the declared students.
+  roster <- cedar_students_st
+  roster$major_code <- "SPAN"
+  expect_equal(get_course_major_mix(roster, test_student_terms_st, cedar_programs_st, .mix_opt), plain)
+
+  # The table is read: blanking ST_K's primary major there moves the seat.
+  st <- test_student_terms_st
+  st$primary_major_code[st$student_id == "ST_K"] <- NA_character_
+  blanked <- get_course_major_mix(cedar_students_st, st, cedar_programs_st, .mix_opt)
+  expect_false("SPAN" %in% blanked$major_label)
+  expect_equal(blanked$n_enrollments[blanked$major_label == "No major code"], 1L)
+
+  # The pre-major flag is the table's too.
+  st <- test_student_terms_st
+  st$is_pre_major[st$student_id == "ST_K"] <- TRUE
+  pre <- get_course_major_mix(cedar_students_st, st, cedar_programs_st, .mix_opt)
+  expect_true("SPAN (pre-major)" %in% pre$major_label)
+  expect_false("SPAN" %in% pre$major_label)
+})
+
+test_that("get_course_major_mix refuses enrollment rows the student-term table does not cover", {
+  st <- dplyr::filter(test_student_terms_st, student_id != "ST_K")
+  expect_error(get_course_major_mix(cedar_students_st, st, cedar_programs_st, .mix_opt),
+               "no row on cedar_student_terms")
+  expect_error(get_course_major_mix(cedar_students_st, dplyr::select(test_student_terms_st, -is_pre_major),
+                                    cedar_programs_st, .mix_opt),
+               "needs cedar_student_terms")
+})
+
+test_that("get_course_major_mix names codes from programs, then opt$major_code_to_name, never a global", {
+  # HIST is named by its programs rows (ST01 names it by its code); SPAN has no
+  # programs row, so the lookup names it, and without the lookup it is itself.
+  # programs first: its name is the mapping file's, with a pre-major's "Pre"
+  # taken off, where the class list's lookup keeps it ("Pre Biology (pre-major)").
+  named <- get_course_major_mix(cedar_students_st, test_student_terms_st, cedar_programs_st,
+                                c(.mix_opt, list(major_code_to_name = c(SPAN = "Spanish", HIST = "Pre History"))))
+  expect_true(all(c("Spanish", "HIST") %in% named$major_label))
+  expect_false(any(c("SPAN", "Pre History") %in% named$major_label))
 
   # A global of the same name is not consulted.
-  rlang::local_bindings(major_code_to_name = c("ZZZ-BA" = "Should not appear"), .env = .GlobalEnv)
-  ignored <- get_course_major_mix(st, test_programs, opt)
+  rlang::local_bindings(major_code_to_name = c(SPAN = "Should not appear"), .env = .GlobalEnv)
+  ignored <- get_course_major_mix(cedar_students_st, test_student_terms_st, cedar_programs_st, .mix_opt)
   expect_false("Should not appear" %in% ignored$major_label)
-  expect_equal(ignored$major_label, plain$major_label)
+  expect_true("SPAN" %in% ignored$major_label)
 })

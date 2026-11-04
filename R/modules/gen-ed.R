@@ -484,7 +484,8 @@ gen_ed_table_output_or_note <- function(data, output_id, message, label = "table
 #'   in the UI. NULL for the auto-running Dept Trends variant, which is covered
 #'   by the parent Dept Trends overlay.
 gen_ed_module_server <- function(input, output, session, students, sections, programs,
-                                 degrees, current_term, opt_builder, report_timer_name,
+                                 degrees, student_terms, current_term, opt_builder,
+                                 report_timer_name,
                                  run_id = "run", instructor_dfw_enabled = FALSE,
                                  dfw_password = NULL, overlay_id = NULL,
                                  run_spec_title = NULL, active = NULL) {
@@ -511,7 +512,7 @@ gen_ed_module_server <- function(input, output, session, students, sections, pro
     uses_overlay <- !is.null(overlay_id)
     timer <- start_report_timer(report_timer_name)
     result <- tryCatch(
-      get_gen_ed_profile(students, sections, programs, degrees, opt_builder()),
+      get_gen_ed_profile(students, sections, programs, degrees, student_terms, opt_builder()),
       error = function(e) {
         showNotification(paste("Gen Ed profile failed:", e$message), type = "error")
         NULL
@@ -1141,7 +1142,8 @@ gen_ed_module_server <- function(input, output, session, students, sections, pro
 
 
 genEdExploreServer <- function(id, students, sections, programs, degrees = NULL,
-                               edges, current_term = NULL, lookups = NULL) {
+                               student_terms = NULL, edges, current_term = NULL,
+                               lookups = NULL) {
   moduleServer(id, function(input, output, session) {
     build_terms <- reactive({
       all_terms <- sort(unique(sections$term[!is.na(sections$term)]))
@@ -1168,7 +1170,7 @@ genEdExploreServer <- function(id, students, sections, programs, degrees = NULL,
     })
 
     gen_ed_module_server(
-      input, output, session, students, sections, programs, degrees,
+      input, output, session, students, sections, programs, degrees, student_terms,
       current_term, opt_builder, "gen-ed-explore", run_id = "ge_button",
       overlay_id = id, run_spec_title = "Gen Ed"
     )
@@ -1214,7 +1216,7 @@ deptProfileGenEdServer <- function(id, students, sections, programs, degrees = N
     })
 
     gen_ed_module_server(
-      input, output, session, students, sections, programs, degrees,
+      input, output, session, students, sections, programs, degrees, student_terms,
       current_term, opt_builder, "dept-profile-gen-ed",
       run_id = NULL,
       instructor_dfw_enabled = TRUE,
