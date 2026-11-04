@@ -9,8 +9,9 @@
 #     it, per pair of class-list and schedule pulls. Counts per course, campus
 #     and part of term (R/branches/registration-snapshots.R).
 #   - return-*: one file per Fall or Spring term in registration, per set of
-#     pulls. Which of last term's students have registered for it, by group
-#     (R/branches/return-snapshots.R).
+#     pulls. Which of last term's students have registered for it, by group,
+#     read off cedar_student_terms (R/branches/return-snapshots.R), which the
+#     gate that runs before this script has just rebuilt.
 # Neither holds a student ID. The course counts are written first, so a failure
 # in the return snapshot never costs them.
 
@@ -42,7 +43,7 @@ record_registration_snapshot_cli <- function(args) {
                     format(recorded$sections_as_of[[i]]), recorded$status[[i]],
                     recorded$rows[[i]], recorded$path[[i]]))
   }
-  returning <- record_return_snapshot(cedar_students, cedar_programs, output_dir)
+  returning <- record_return_snapshot(cedar_students, cedar_student_terms, output_dir)
   for (i in seq_len(nrow(returning))) {
     message(sprintf("[registration-snapshots] %s from %s, class list %s: %s registered of %s (%d rows) %s %s",
                     fmt_term(returning$term[[i]]), fmt_term(returning$anchor_term[[i]]),

@@ -146,10 +146,10 @@ test_that("a pull is written once, read back whole, and a bad file is refused", 
 
 
 # RW01: Fall 2020's students and their Spring 2021 registration, both pulled
-# 2020-11-20. See the RW01 block in designed_test_data.R for each student.
+# 2020-11-20. See the RW01 block in designed_test_data.R for each student. The
+# snapshot reads the student-term table built from those rows (setup.R).
 test_that("a return snapshot counts last term's students by what they have done since", {
-  snapshot <- build_return_snapshot(test_students_rw, test_programs_rw,
-                                    list(terms = 202110L))
+  snapshot <- build_return_snapshot(test_student_terms_rw, list(terms = 202110L))
   expect_named(snapshot, RETURN_SNAPSHOT_COLUMNS)
   expect_false(any(c("student_id", "enrollment_id") %in% names(snapshot)))
   expect_equal(unique(snapshot$anchor_term), 202080L)
@@ -179,27 +179,49 @@ test_that("a return snapshot counts last term's students by what they have done 
   expect_equal(sum(snapshot$registered), 2L)
 })
 
-test_that("a return snapshot refuses Summer, an unopened term, and a mixed record", {
-  expect_error(build_return_snapshot(test_students_rw, test_programs_rw, list()),
+test_that("a return snapshot refuses Summer, an unopened term, and a table without its columns", {
+  expect_error(build_return_snapshot(test_student_terms_rw, list()),
                "opt\\$terms is required")
-  expect_error(build_return_snapshot(test_students_rw, test_programs_rw,
-                                     list(terms = 202160L)),
+  expect_error(build_return_snapshot(test_student_terms_rw, list(terms = 202160L)),
                "not Fall or Spring")
-  expect_error(build_return_snapshot(dplyr::filter(test_students_rw, term != 202110L),
-                                     test_programs_rw, list(terms = 202110L)),
-               "registration has not opened")
-  expect_error(build_return_snapshot(test_students_rw,
-                                     dplyr::filter(test_programs_rw, term != 202080L),
+  expect_error(build_return_snapshot(dplyr::filter(test_student_terms_rw, term != 202110L),
                                      list(terms = 202110L)),
+               "registration has not opened")
+  # A declaration alone is not registration: RW_C's Spring program row does
+  # not open the term.
+  declared_only <- dplyr::filter(test_student_terms_rw,
+                                 term != 202110L | class_list_rows == 0L)
+  expect_error(build_return_snapshot(declared_only, list(terms = 202110L)),
+               "registration has not opened")
+  no_programs <- test_student_terms_rw %>%
+    dplyr::mutate(programs_as_of = dplyr::if_else(term == 202080L, as.Date(NA), programs_as_of))
+  expect_error(build_return_snapshot(no_programs, list(terms = 202110L)),
                "no programs pull date for term 202080")
-  # One student, two classifications in the same term: no value is chosen
-  # for them.
-  mixed <- test_students_rw %>%
+  expect_error(build_return_snapshot(dplyr::select(test_student_terms_rw, -late_withdrawals),
+                                     list(terms = 202110L)),
+               "missing column\\(s\\): late_withdrawals")
+})
+
+test_that("a return snapshot describes students as the student-term table does", {
+  # The class list calls RW_A a Junior in Fall 2020; academic studies says
+  # Sophomore. The table's precedence (programs wins, the conflict flagged) is
+  # the snapshot's: it never re-reads the class list.
+  disagreeing <- test_students_rw %>%
     dplyr::mutate(student_classification = dplyr::if_else(
-      student_id == "RW_A" & subject_course == "ENGL 1110", "Junior",
-      student_classification))
-  expect_error(build_return_snapshot(mixed, test_programs_rw, list(terms = 202110L)),
-               "1 student\\(s\\) carry more than one home campus, level or classification")
+      student_id == "RW_A" & term == 202080L, "Junior", student_classification))
+  st <- suppressMessages(build_student_terms(
+    disagreeing, test_programs_rw, edges = list(last_enrolled_complete = 202080L)))
+  expect_true(st$description_conflict[st$student_id == "RW_A" & st$term == 202080L])
+  snapshot <- build_return_snapshot(st, list(terms = 202110L))
+  expect_equal(snapshot, build_return_snapshot(test_student_terms_rw, list(terms = 202110L)))
+  # And the population is the table's `enrolled`: dropping RW_D's late
+  # withdrawals to early drops removes them from it.
+  never_attended <- test_students_rw %>%
+    dplyr::mutate(registration_status_code = dplyr::if_else(
+      student_id == "RW_D", "DR", registration_status_code))
+  st2 <- suppressMessages(build_student_terms(
+    never_attended, test_programs_rw, edges = list(last_enrolled_complete = 202080L)))
+  expect_equal(sum(build_return_snapshot(st2, list(terms = 202110L))$students), 6L)
 })
 
 test_that("return snapshot terms are the Fall and Spring terms whose registration has opened", {
@@ -219,18 +241,17 @@ test_that("a return snapshot is written once, read back whole, and a bad file is
   dir <- tempfile("return-snapshots-")
   on.exit(unlink(dir, recursive = TRUE), add = TRUE)
 
-  first <- record_return_snapshot(test_students_rw, test_programs_rw, dir)
+  first <- record_return_snapshot(test_students_rw, test_student_terms_rw, dir)
   expect_equal(first$status, "written")
   expect_equal(basename(first$path),
                "return-202110-classlist-2020-11-20-anchor-2020-11-20-programs-2020-11-20.qs2")
   expect_equal(c(first$rows, first$students, first$registered), c(6L, 7L, 2L))
-  again <- record_return_snapshot(test_students_rw, test_programs_rw, dir)
+  again <- record_return_snapshot(test_students_rw, test_student_terms_rw, dir)
   expect_equal(again$status, "already recorded")
   expect_length(list.files(dir), 1L)
 
   kept <- read_return_snapshots(dir)
-  expect_equal(kept, build_return_snapshot(test_students_rw, test_programs_rw,
-                                           list(terms = 202110L)),
+  expect_equal(kept, build_return_snapshot(test_student_terms_rw, list(terms = 202110L)),
                ignore_attr = TRUE)
   expect_equal(nrow(read_return_snapshots(dir, terms = 202180L)), 0L)
   # The two kinds of snapshot share the directory and never read each other.

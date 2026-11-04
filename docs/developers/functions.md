@@ -8,7 +8,7 @@ parent: Developer Guide
 
 This reference is auto-generated from roxygen2 comments in the source code.
 
-*Generated: 2026-11-04 08:00:10.374284*
+*Generated: 2026-11-04 09:58:35.97371*
 
 ---
 
@@ -3688,11 +3688,10 @@ Summarize term-level retention rates across like term types  Converts the term r
 
 **Parameters:**
 
-- `students` - `cedar_students` rows; only each target term and its anchor are read.
-- `programs` - `cedar_programs` rows; only the anchor terms are read.
+- `student_terms` - `cedar_student_terms`; only each target term and its anchor are read.
 - `opt` - `terms` (required): the Fall or Spring terms in registration.
 
-**Returns:** A tibble with `RETURN_SNAPSHOT_COLUMNS`, one row per anchor-term group. `students` is the group's size; `registered` holds a registered row for the target term, `waitlisted_only` only waitlist rows, `dropped_only` only drops. The rest of the group has no target-term row yet.
+**Returns:** A tibble with `RETURN_SNAPSHOT_COLUMNS`, one row per anchor-term group. `students` is the group's size; `registered` has a registered course for the target term, `waitlisted_only` only waitlist rows, `dropped_only` only drops. The rest of the group has no target-term row yet.
 
 ---
 
