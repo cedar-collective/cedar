@@ -21,7 +21,7 @@
 #
 # Exported functions:
 #   retentionUI(id)
-#   retentionServer(id, students)
+#   retentionServer(id, students, student_terms)
 
 
 # =============================================================================
@@ -165,7 +165,7 @@ retentionUI <- function(id) {
 # Server
 # =============================================================================
 
-retentionServer <- function(id, students) {
+retentionServer <- function(id, students, student_terms) {
   moduleServer(id, function(input, output, session) {
 
     retention_heat_style <- function(value) {
@@ -244,7 +244,7 @@ retentionServer <- function(id, students) {
       on.exit(removeNotification(notify_id))
 
       tryCatch(
-        get_retention_comparison(students, opt),
+        get_retention_comparison(students, opt, student_terms = student_terms),
         error = function(e) {
           showNotification(paste("Retention comparison failed:", e$message), type = "error")
           NULL
@@ -303,7 +303,7 @@ retentionServer <- function(id, students) {
       on.exit(removeNotification(notify_id))
 
       tryCatch(
-        get_retention_trend(students, opt),
+        get_retention_trend(students, opt, student_terms = student_terms),
         error = function(e) {
           showNotification(paste("Retention trend failed:", e$message), type = "error")
           NULL

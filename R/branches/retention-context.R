@@ -1,12 +1,16 @@
 # retention-context.R — Shared retention computation (branch)
 #
-# Builds the context every retention question needs — the registered and
+# Builds the context every retention question needs — the enrolled and
 # graduated lookups, the observation edge, and the per-student retained_1 ..
 # retained_n flags — and nothing that answers a question with it.
 #
 # Retention definition: a student is retained at T+N if they are:
-#   (a) registered anywhere at UNM in the target term, OR
+#   (a) enrolled anywhere at UNM in the target term, OR
 #   (b) recorded as having graduated between the anchor and target term.
+# Enrolled is `cedar_student_terms$enrolled`: registered, or registered and
+# withdrawn after census (a late drop). CEDAR's one definition of an enrolled
+# student-term, the same column Pathways Roadblocks reads; this file never
+# re-derives it from status codes (ISSUES.md I44; student-terms.md).
 # Graduates are not counted as stop-outs — they successfully completed.
 #
 # Cells where the target term is beyond the available data are returned as NA,
@@ -14,7 +18,7 @@
 # have met the criterion.
 #
 # Campus policy (see AGENTS.md): .filter_campus() scopes the *cohort*, but
-# .build_registered_lookup() is deliberately UNM-wide, because a student who
+# .build_enrolled_lookup() is deliberately UNM-wide, because a student who
 # transfers between campuses has been retained, not lost. That is the one
 # intentional campus-blind aggregate in the retention code.
 #
@@ -22,8 +26,8 @@
 # consume what this file produces, so it belongs below them rather than beside
 # them.
 #
-# Depends on: STATUS_REGISTERED (lists/status_codes.R),
-#             add_next_term_col() (trunk/utils.R)
+# Depends on: add_next_term_col() (trunk/utils.R), cedar_student_terms
+#             (branches/student-terms.R, built in the transform)
 
 # =============================================================================
 # Internal helpers
@@ -70,8 +74,8 @@
   dplyr::filter(df, term <= .env$observation_end)
 }
 
-# Pre-build the "is registered at term T" lookup.
-# Returns a tibble with (student_id, term) for all registered rows.
+# Pre-build the "is enrolled at term T" lookup from the student-term table.
+# Returns a tibble with (student_id, term) for every enrolled student-term.
 #
 # DELIBERATELY UNM-WIDE, and the one place in this file that is. Retention asks
 # whether a student was still enrolled *anywhere at UNM*, so a student who takes
@@ -79,10 +83,15 @@
 # Narrowing this lookup to the cohort's campus would silently redefine retention
 # as "stayed on the same campus" and count every transfer as attrition.
 # The cohort is campus-scoped (see .filter_campus); the outcome is not.
-.build_registered_lookup <- function(students) {
-  students %>%
-    filter(registration_status_code %in% STATUS_REGISTERED) %>%
-    distinct(student_id, term)
+.build_enrolled_lookup <- function(student_terms) {
+  missing <- setdiff(c("student_id", "term", "enrolled"), names(student_terms))
+  if (length(missing) > 0L) {
+    stop("[retention-context.R] student_terms is missing column(s): ",
+         paste(missing, collapse = ", "), ". Pass cedar_student_terms.")
+  }
+  student_terms %>%
+    filter(enrolled) %>%
+    distinct(student_id, term = as.integer(term))
 }
 
 # Pre-build the graduated lookup.
@@ -96,31 +105,41 @@
 # Prepare the shared, UNM-wide inputs used by every retention view. Course
 # Dynamics requests a course trend plus department and college benchmarks in
 # one click; without this context each view filters the full student history
-# and rebuilds the same registration lookup independently.
-build_retention_context <- function(students, degrees = NULL, opt = list()) {
+# and rebuilds the same enrolled lookup independently.
+#
+# `student_terms` is cedar_student_terms, the full history: the lookup is read
+# from its `enrolled` column, never rebuilt from class-list rows.
+build_retention_context <- function(students, degrees = NULL, opt = list(),
+                                    student_terms = NULL) {
+  if (is.null(student_terms)) {
+    stop("[retention-context.R] build_retention_context() needs student_terms ",
+         "(cedar_student_terms): retention reads `enrolled` from it.")
+  }
   observation_end <- .retention_observation_edge(opt)
-  students <- .scope_retention_history(students, observation_end)
-  degrees  <- .scope_retention_history(degrees, observation_end)
+  students      <- .scope_retention_history(students, observation_end)
+  degrees       <- .scope_retention_history(degrees, observation_end)
+  student_terms <- .scope_retention_history(student_terms, observation_end)
 
   structure(
     list(
       observation_end = observation_end,
       students = students,
       degrees = degrees,
-      registered_lookup = .build_registered_lookup(students),
+      enrolled_lookup = .build_enrolled_lookup(student_terms),
       graduated_lookup = .build_graduated_lookup(degrees)
     ),
     class = "cedar_retention_context"
   )
 }
 
-.resolve_retention_context <- function(students, degrees, opt, context) {
+.resolve_retention_context <- function(students, degrees, opt, context,
+                                       student_terms = NULL) {
   if (is.null(context)) {
-    return(build_retention_context(students, degrees, opt))
+    return(build_retention_context(students, degrees, opt, student_terms = student_terms))
   }
 
   required <- c("observation_end", "students", "degrees",
-                "registered_lookup", "graduated_lookup")
+                "enrolled_lookup", "graduated_lookup")
   if (!inherits(context, "cedar_retention_context") ||
       !all(required %in% names(context))) {
     stop("[course-retention.R] context must come from build_retention_context().")
@@ -138,19 +157,19 @@ build_retention_context <- function(students, degrees = NULL, opt = list()) {
 # whether each student is retained at T+1 .. T+n_terms.
 #
 # A student is retained at T+N if:
-#   - registered anywhere at UNM in the target term, OR
+#   - enrolled anywhere at UNM in the target term, OR
 #   - has a graduation record at or after their anchor term and no later than
 #     the target term being measured.
 #
-# Cells whose target term is beyond max(registered_lookup$term) are set to NA
+# Cells whose target term is beyond max(enrolled_lookup$term) are set to NA
 # rather than FALSE — the data simply does not exist yet.
 #
 # Returns cohort with additional logical/NA columns retained_1 .. retained_n.
-.compute_retention <- function(cohort, registered_lookup, n_terms,
+.compute_retention <- function(cohort, enrolled_lookup, n_terms,
                                 graduated_lookup = NULL) {
   result         <- cohort
   unique_anchors <- unique(cohort$anchor_term)
-  max_data_term  <- max(registered_lookup$term, na.rm = TRUE)
+  max_data_term  <- max(enrolled_lookup$term, na.rm = TRUE)
 
   # Keep the graduation term until each horizon is evaluated. Dropping it here
   # would let a future degree retroactively mark every earlier horizon retained.
@@ -179,15 +198,15 @@ build_retention_context <- function(students, degrees = NULL, opt = list()) {
       filter(target_term > max_data_term) %>%
       pull(anchor_term)
 
-    # Students registered at the target term
+    # Students enrolled at the target term
     # Many-to-many is expected and harmless: several anchor terms can share a
-    # target term, and every student registered in that target matches each of
+    # target term, and every student enrolled in that target matches each of
     # them. The resulting (student_id, anchor_term) pairs are still distinct, so
     # the left_join below cannot duplicate a cohort row. Declared explicitly so
     # the warning does not read as a real fan-out.
     retained_enrolled <- term_map %>%
       inner_join(
-        registered_lookup %>% rename(target_term = term),
+        enrolled_lookup %>% rename(target_term = term),
         by = "target_term",
         relationship = "many-to-many"
       ) %>%

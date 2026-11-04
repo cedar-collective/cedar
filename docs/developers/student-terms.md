@@ -5,7 +5,7 @@ holding every fact about a student in a term that CEDAR today re-derives from
 raw class-list rows or reads off a repeated column. Written before the code;
 the code is wrong where it departs from this page.
 
-- **Status:** contract agreed 2026-11-03; **built the same day** (`R/branches/student-terms.R`, saved by the transform as `cedar_student_terms`). Not yet loaded by the app: the readers below move next, in order, and the two side tables retire with the last of them.
+- **Status:** contract agreed 2026-11-03; **built the same day** (`R/branches/student-terms.R`, saved by the transform as `cedar_student_terms`). **Loaded by the app since 2026-11-04**, which does not start without it; the first two readers below have moved (I44 closed) and `cedar_next_term` is gone. `cedar_student_term_credits` retires when `build_credit_timeline()` moves.
 - **Closes:** ISSUES.md I44 (two definitions of "returned next term").
 - **Depends on:** nothing new. ADR-001 step 1 (`cedar_terms`) would supply the
   next regular term and the settled edge; until it exists this table computes
@@ -161,8 +161,8 @@ any change stated in the PR body.
 
 | reader | today | after |
 |---|---|---|
-| `build_next_term_lookup()` (`R/cones/stopout.R`) and the saved `cedar_next_term` | own lookup, registered or late drop | read `returned_next_regular_term`; delete both. Numbers unchanged. |
-| `.build_registered_lookup()` (`R/branches/retention-context.R`) | registered only | read `enrolled`. **Retention moves by about one point** (284 students, Fall 2025→Spring 2026); the Retention methodology panel and `definitions.yml` say so. Closes I44. |
+| ~~`build_next_term_lookup()` (`R/cones/stopout.R`) and the saved `cedar_next_term`~~ **moved 2026-11-04** | own lookup, registered or late drop | `get_stopout(..., student_terms)` reads `returned_next_regular_term` and omits (and counts) the rows whose return is unobservable; both deleted. Numbers unchanged. |
+| ~~`.build_registered_lookup()` (`R/branches/retention-context.R`)~~ **moved 2026-11-04** | registered only | `.build_enrolled_lookup(student_terms)` reads `enrolled`; `build_retention_context()` requires the table. **Retention moved by about one point** (284 students, Fall 2025→Spring 2026); `definitions.yml` course-retention 2.0.0 says so on the page. Closed I44. |
 | `build_credit_timeline()` input | `cedar_student_term_credits` | this table; `cedar_student_term_credits` retires |
 | `build_return_snapshot()` anchor population and warning signs | own group-by over class-list rows | filter `enrolled`, read `late_withdrawals`, `dfw_grades`, `graded_rows`, the description columns |
 | `population.R` enrollment-based switch detection, `course-flows.R`, `gen-ed-conversion.R`, `major-changes.R`, `course-instructor-effect.R` | each filters status codes itself | read `enrolled`; each is checked against its old output and any difference is reported before merging |
@@ -205,10 +205,11 @@ summer as a return term (ST_D), and returned FALSE past the edge (ST_I).
   validator `validate_student_terms()` rejecting a duplicate key, an
   `enrolled` row with `class_list_rows = 0`, a `returned_next_regular_term`
   that is not `NA` where `return_observable` is FALSE, and any banned column.
-- `global.R` loads it; `cedar_student_term_credits` and `cedar_next_term`
-  are no longer written or loaded.
+- `global.R` loads it (done 2026-11-04; the app stops without it); `cedar_next_term`
+  is no longer written or loaded (done); `cedar_student_term_credits` retires
+  with `build_credit_timeline()`.
 - The first two readers in the table above have moved and the Retention
-  change is stated on the page and in `definitions.yml`.
+  change is stated on the page and in `definitions.yml` (done 2026-11-04).
 - ST01 is in the fixture with its mutation checks recorded; `./run-tests.sh`
   passes.
 - `data-model.md` documents the table; AGENTS.md's table list names it and

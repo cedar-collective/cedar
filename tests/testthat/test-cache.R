@@ -253,6 +253,8 @@ test_that("Dept Trends invalidates only tabs that consume the changed source", {
     cedar_programs = c("hc", "enrl", "demo"),
     cedar_degrees = "deg",
     cedar_students = c("enrl", "ch"),
+    # No Dept Trends tab reads the student-term table yet.
+    cedar_student_terms = character(0),
     cedar_faculty = character(0),
     # Credit Hours reads late drops' credit values from sections (3.0.0).
     cedar_sections = c("enrl", "ch"),

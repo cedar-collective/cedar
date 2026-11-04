@@ -19,7 +19,8 @@
 # are always grouped by campus.
 #
 # Depends on: build_retention_context(), .compute_retention(), .safe_mean()
-#             (branches/retention-context.R)
+#             (branches/retention-context.R). The return is cedar_student_terms'
+#             `enrolled`, passed as `student_terms` or inside a prepared context.
 
 # =============================================================================
 # get_retention_comparison
@@ -49,12 +50,14 @@
 #'   as stop-outs. Optional; pass NULL to skip the correction.
 #' @param context Optional value from [build_retention_context()]. Reuse one
 #'   context when computing several retention views from the same data and edge.
+#' @param student_terms `cedar_student_terms`, read for the `enrolled` lookup
+#'   when no `context` is passed.
 #'
 #' @return Wide tibble: one row per course, columns subject_course, n,
 #'   ret_1 .. ret_n (numeric 0–1 or NA).
 #'
 get_retention_comparison <- function(students, opt = list(), degrees = NULL,
-                                     context = NULL) {
+                                     context = NULL, student_terms = NULL) {
   anchor_term <- as.integer(opt[["term"]])
   if (is.na(anchor_term) || length(anchor_term) != 1) {
     stop("[course-retention.R] get_retention_comparison: opt$term must be a single term code.")
@@ -62,7 +65,7 @@ get_retention_comparison <- function(students, opt = list(), degrees = NULL,
 
   n_terms <- as.integer(opt[["n_terms"]] %||% 5L)
   min_n   <- as.integer(opt[["min_n"]]   %||% 10L)
-  context <- .resolve_retention_context(students, degrees, opt, context)
+  context <- .resolve_retention_context(students, degrees, opt, context, student_terms)
   students <- context$students
 
   .require_campus(students, "get_retention_comparison")
@@ -90,10 +93,10 @@ get_retention_comparison <- function(students, opt = list(), degrees = NULL,
     return(data.frame())
   }
 
-  registered_lookup <- context$registered_lookup
+  enrolled_lookup <- context$enrolled_lookup
   graduated_lookup  <- context$graduated_lookup
 
-  cohort_with_ret <- .compute_retention(anchor, registered_lookup, n_terms, graduated_lookup)
+  cohort_with_ret <- .compute_retention(anchor, enrolled_lookup, n_terms, graduated_lookup)
 
   ret_cols <- paste0("retained_", seq_len(n_terms))
 
@@ -146,13 +149,15 @@ get_retention_comparison <- function(students, opt = list(), degrees = NULL,
 #'   as stop-outs. Optional; pass NULL to skip the correction.
 #' @param context Optional value from [build_retention_context()]. Reuse one
 #'   context when computing several retention views from the same data and edge.
+#' @param student_terms `cedar_student_terms`, read for the `enrolled` lookup
+#'   when no `context` is passed.
 #'
 #' @return Wide tibble: one row per campus × term (or campus × term ×
 #'   instructor), columns campus, term_label, n, ret_1 .. ret_n (numeric 0–1
 #'   or NA).
 #'
 get_retention_trend <- function(students, opt = list(), degrees = NULL,
-                                context = NULL) {
+                                context = NULL, student_terms = NULL) {
   course <- opt[["course"]] %||% ""
   if (!nzchar(course)) {
     stop("[course-retention.R] get_retention_trend: opt$course must be a non-empty course code.")
@@ -161,7 +166,7 @@ get_retention_trend <- function(students, opt = list(), degrees = NULL,
   n_terms       <- as.integer(opt[["n_terms"]] %||% 5L)
   min_n         <- as.integer(opt[["min_n"]]   %||% 10L)
   by_instructor <- isTRUE(opt[["by_instructor"]])
-  context <- .resolve_retention_context(students, degrees, opt, context)
+  context <- .resolve_retention_context(students, degrees, opt, context, student_terms)
   students <- context$students
 
   .require_campus(students, "get_retention_trend")
@@ -205,10 +210,10 @@ get_retention_trend <- function(students, opt = list(), degrees = NULL,
     return(data.frame())
   }
 
-  registered_lookup <- context$registered_lookup
+  enrolled_lookup <- context$enrolled_lookup
   graduated_lookup  <- context$graduated_lookup
 
-  cohort_with_ret <- .compute_retention(cohort, registered_lookup, n_terms, graduated_lookup)
+  cohort_with_ret <- .compute_retention(cohort, enrolled_lookup, n_terms, graduated_lookup)
 
   group_vars <- c("campus", "anchor_term",
                   if (by_instructor) c("instructor_id", "instructor_name"))
@@ -277,12 +282,14 @@ get_retention_trend <- function(students, opt = list(), degrees = NULL,
 #'   stop-outs. Optional; pass NULL to skip.
 #' @param context Optional value from [build_retention_context()]. Reuse one
 #'   context when computing several retention views from the same data and edge.
+#' @param student_terms `cedar_student_terms`, read for the `enrolled` lookup
+#'   when no `context` is passed.
 #'
 #' @return Wide tibble: one row per campus × anchor term, columns campus, term,
 #'   term_label, n, ret_1 .. ret_n (numeric 0–1 or NA).
 #'
 get_dept_retention_trend <- function(students, opt = list(), degrees = NULL,
-                                     context = NULL) {
+                                     context = NULL, student_terms = NULL) {
   dept_val    <- opt[["dept_code"]]
   college_val <- opt[["college"]]
 
@@ -292,7 +299,7 @@ get_dept_retention_trend <- function(students, opt = list(), degrees = NULL,
 
   n_terms   <- as.integer(opt[["n_terms"]] %||% 5L)
   min_n     <- as.integer(opt[["min_n"]]   %||% 10L)
-  context <- .resolve_retention_context(students, degrees, opt, context)
+  context <- .resolve_retention_context(students, degrees, opt, context, student_terms)
   students <- context$students
   terms     <- opt[["terms"]]
   level_val <- opt[["level"]]
@@ -340,10 +347,10 @@ get_dept_retention_trend <- function(students, opt = list(), degrees = NULL,
     return(data.frame())
   }
 
-  registered_lookup <- context$registered_lookup
+  enrolled_lookup <- context$enrolled_lookup
   graduated_lookup  <- context$graduated_lookup
 
-  cohort_with_ret <- .compute_retention(cohort, registered_lookup, n_terms, graduated_lookup)
+  cohort_with_ret <- .compute_retention(cohort, enrolled_lookup, n_terms, graduated_lookup)
 
   ret_cols <- paste0("retained_", seq_len(n_terms))
 

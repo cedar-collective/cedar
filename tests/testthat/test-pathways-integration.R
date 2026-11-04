@@ -185,7 +185,7 @@ test_that("filter_students_by_pop: ongoing students not truncated", {
 # =============================================================================
 
 test_that("stopout: History population returns expected list structure", {
-  result <- get_stopout(hist_students, hist_pop, opt = list(min_n = 3))
+  result <- get_stopout(hist_students, hist_pop, opt = list(min_n = 3), student_terms = test_student_terms)
   expect_true(is.list(result))
   expect_true("by_course"       %in% names(result))
   expect_true("population_size" %in% names(result))
@@ -194,7 +194,7 @@ test_that("stopout: History population returns expected list structure", {
 })
 
 test_that("stopout: by_course has required columns", {
-  result <- get_stopout(hist_students, hist_pop, opt = list(min_n = 3))
+  result <- get_stopout(hist_students, hist_pop, opt = list(min_n = 3), student_terms = test_student_terms)
   required <- c("subject_course", "pop_n_dfw", "pop_n_pass",
                 "pop_dfw_stopout_rate", "pop_pass_stopout_rate",
                 "pop_stopout_gap")
@@ -202,7 +202,7 @@ test_that("stopout: by_course has required columns", {
 })
 
 test_that("stopout: cohort rates are valid proportions", {
-  result <- get_stopout(hist_students, hist_pop, opt = list(min_n = 3))
+  result <- get_stopout(hist_students, hist_pop, opt = list(min_n = 3), student_terms = test_student_terms)
   if (nrow(result$by_course) > 0) {
     expect_true(all(result$by_course$pop_dfw_stopout_rate  >= 0, na.rm = TRUE))
     expect_true(all(result$by_course$pop_dfw_stopout_rate  <= 1, na.rm = TRUE))
@@ -212,7 +212,7 @@ test_that("stopout: cohort rates are valid proportions", {
 })
 
 test_that("stopout: n counts are non-negative integers", {
-  result <- get_stopout(hist_students, hist_pop, opt = list(min_n = 3))
+  result <- get_stopout(hist_students, hist_pop, opt = list(min_n = 3), student_terms = test_student_terms)
   if (nrow(result$by_course) > 0) {
     expect_true(all(result$by_course$pop_n_dfw  >= 0, na.rm = TRUE))
     expect_true(all(result$by_course$pop_n_pass >= 0, na.rm = TRUE))
@@ -223,7 +223,7 @@ test_that("stopout: HIST 327 appears with correct cohort counts", {
   # Named enrollment: 5 SP1 pass (B), 5 SP1 DFW (F), 9 SP2 pass (A) in HIST 327 202010
   # SP1 students have no 202080 enrollment → stopped_out = TRUE
   # SP2 students appear in HIST 490 202080 → returned → stopped_out = FALSE
-  result <- get_stopout(hist_students, hist_pop, opt = list(min_n = 3))
+  result <- get_stopout(hist_students, hist_pop, opt = list(min_n = 3), student_terms = test_student_terms)
   expect_true("HIST 327" %in% result$by_course$subject_course)
   hist327 <- result$by_course[result$by_course$subject_course == "HIST 327", ]
   expect_equal(hist327$pop_n_dfw,  5L)
@@ -233,7 +233,7 @@ test_that("stopout: HIST 327 appears with correct cohort counts", {
 })
 
 test_that("stopout: Math population returns correct structure even with thin data", {
-  result <- get_stopout(math_students, math_pop, opt = list(min_n = 3))
+  result <- get_stopout(math_students, math_pop, opt = list(min_n = 3), student_terms = test_student_terms)
   expect_true(is.list(result))
   expect_equal(result$population_size, 8L)
   expect_s3_class(result$by_course, "data.frame")

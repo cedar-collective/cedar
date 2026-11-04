@@ -10,6 +10,7 @@
 #   Summer as a return term                   -> ST_D returned
 #   returned FALSE past the settled edge      -> ST_I returned NA
 #   a return judged into a term with no pull  -> gap test, ST_A return_observable
+#   retention reading registered rows only    -> I44 cross-tab, ret_1 0.2 not 0.3
 
 context("Student terms")
 
@@ -222,4 +223,52 @@ test_that("attach_student_term() joins named columns and refuses a clash", {
   expect_true(all(c("enrolled", "primary_major_code") %in% names(out)))
   expect_error(attach_student_term(out, st, "enrolled"), "already carry")
   expect_error(attach_student_term(rows, st, "nope"), "not on the student-term table")
+})
+
+test_that("class lists alone build a table in which no row is declared", {
+  expect_message(
+    st <- build_student_terms(test_students_st, NULL, test_degrees_st),
+    "no programs supplied"
+  )
+  full <- st01()
+  # ST_E's Fall 2020 declaration has no class list: the only row that goes.
+  expect_equal(nrow(st), nrow(full) - 1L)
+  expect_false(any(st$declared))
+  expect_true(all(st$description_source == "class_list"))
+  expect_true(all(is.na(st$primary_major_code)))
+  expect_equal(sum(st$enrolled), sum(full$enrolled))
+  expect_equal(dplyr::select(st, student_id, term, enrolled, returned_next_regular_term, return_observable),
+               dplyr::select(dplyr::filter(full, class_list_rows > 0L),
+                             student_id, term, enrolled, returned_next_regular_term, return_observable))
+})
+
+# ── I44: one definition of a return, read by Retention and Roadblocks ────────
+# HIST 1110 at ABQ in Spring 2020: ten students. ST_A withdrew late next term
+# (enrolled), ST_K registered, ST_J graduated that term; ST_B (early drop),
+# ST_C (waitlist), ST_D (Summer only), ST_E (declared, no class list) and the
+# rest did not return. Retention's ret_1 and one minus Roadblocks' pass
+# stop-out rate are the same 3 of 10, because both read this table.
+test_that("Retention and Roadblocks agree on who returned, through the table (I44)", {
+  st <- st01()
+  trend <- suppressMessages(get_retention_trend(
+    test_students_st,
+    opt = list(course = "HIST 1110", n_terms = 1L, min_n = 1L),
+    degrees = test_degrees_st, student_terms = st
+  ))
+  spring <- trend[trend$campus == "ABQ" & trend$term == 202010L, ]
+  expect_equal(spring$n, 10L)
+  expect_equal(spring$ret_1, 0.3)
+
+  population <- tibble::tibble(student_id = unique(test_students_st$student_id),
+                               population_label = "ST01")
+  stopout <- suppressMessages(get_stopout(
+    test_students_st, population, degrees = test_degrees_st,
+    opt = list(min_n = 1L, min_dfw_n = 0L, graded_through = 202010L,
+               observation_end_term = 202080L),
+    student_terms = st
+  ))
+  row <- stopout$by_course[stopout$by_course$campus == "ABQ" &
+                             stopout$by_course$subject_course == "HIST 1110", ]
+  expect_equal(row$pop_n_pass, 10L)
+  expect_equal(1 - row$pop_pass_stopout_rate, spring$ret_1)
 })

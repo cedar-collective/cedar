@@ -12,6 +12,7 @@ server <- function(input, output, session) {
   #   - data_objects[["cedar_sections"]]  - Course sections (DESRs)
   #   - data_objects[["cedar_students"]]  - Student enrollments (class lists)
   #   - data_objects[["cedar_student_term_credits"]] - Observed UNM credits by student-term
+  #   - data_objects[["cedar_student_terms"]] - One row per student-term: enrolled, returned
   #   - data_objects[["cedar_programs"]]  - Student programs (academic studies)
   #   - data_objects[["cedar_degrees"]]   - Degree completions
   #   - data_objects[["cedar_faculty"]]   - Faculty information
@@ -31,7 +32,9 @@ server <- function(input, output, session) {
   # Optional pre-computed tables — NULL/empty if files don't exist yet (before transform runs)
   cedar_grades    <- data_objects[["cedar_grades"]]
   cedar_student_term_credits <- data_objects[["cedar_student_term_credits"]]
-  cedar_next_term <- data_objects[["cedar_next_term"]]
+  # One row per student-term (ADR-001 step 2): the one definition of enrolled
+  # and returned, read by Roadblocks and Course Dynamics retention.
+  cedar_student_terms <- data_objects[["cedar_student_terms"]]
 
   # Initialize session logging within reactive context. Client data arrives
   # reactively, so guard this observer to one session_start row per Shiny token.
@@ -3161,7 +3164,8 @@ output$enrl_classlist_download <- downloadHandler(
   cr_retention_context <- reactive({
     build_retention_context(
       data_objects[["cedar_students"]], data_objects[["cedar_degrees"]],
-      list(data_edges = data_objects[["cedar_edges"]])
+      list(data_edges = data_objects[["cedar_edges"]]),
+      student_terms = data_objects[["cedar_student_terms"]]
     )
   })
 
@@ -5711,7 +5715,7 @@ output$enrl_classlist_download <- downloadHandler(
     if (is.null(students) || nrow(students) == 0) return(NULL)
 
     candidates <- c("cedar_programs", "cedar_degrees", "cedar_applicants",
-                    "cedar_student_term_credits", "cedar_grades")
+                    "cedar_student_term_credits", "cedar_student_terms", "cedar_grades")
     tables <- Filter(
       function(d) !is.null(d) && nrow(d) > 0 &&
         all(c("student_id", "term") %in% names(d)),
@@ -6378,7 +6382,7 @@ output$enrl_classlist_download <- downloadHandler(
   pathwaysServer("pathways", cedar_students, cedar_programs, degrees = cedar_degrees,
                  cedar_grades = cedar_grades,
                  cedar_student_term_credits = cedar_student_term_credits,
-                 cedar_next_term = cedar_next_term,
+                 cedar_student_terms = cedar_student_terms,
                  lookups = data_objects[["cedar_lookups"]],
                  program_choices = cedar_pathways_choices$program_choices,
                  dept_choices = cedar_pathways_choices$dept_choices,
@@ -6393,6 +6397,6 @@ output$enrl_classlist_download <- downloadHandler(
   # Parked with its UI: retentionUI() is commented out in ui.R pending the
   # cross-course comparison work. The server was still running on every session,
   # registering outputs nothing rendered. Re-enable both together.
-  # retentionServer("retention", students = cedar_students)
+  # retentionServer("retention", students = cedar_students, student_terms = cedar_student_terms)
 
 } # end server

@@ -527,7 +527,7 @@ transform_sections <- function(desrs, data_dir, ext, maps) {
 #' @param data_dir    Path to data directory
 #' @param ext         File extension
 #' @param maps        Named list of lookup vectors
-#' @return list(saved = list(students, grades, student_term_credits, next_term), major_code_name_raw)
+#' @return list(saved = list(students, grades, student_term_credits), major_code_name_raw)
 transform_students <- function(class_lists, data_dir, ext, maps) {
   message("──────────────────────────────────────────────────────")
   message("2. Transforming class_lists → cedar_students")
@@ -807,35 +807,13 @@ transform_students <- function(class_lists, data_dir, ext, maps) {
           ncol(cedar_student_term_credits_tbl), " columns")
   rm(cedar_student_term_credits_tbl)
 
-  # ── cedar_next_term ───────────────────────────────────────────────────────
-  # Pre-compute the student × term → returned_next_term lookup once,
-  # so Roadblocks doesn't rebuild it from raw enrollment rows on every query.
-  message("  Computing cedar_next_term (return lookup)...")
-  # A return means census participation: registered rows plus late drops, which
-  # were enrolled at census. Waitlists and early drops are not enrollment.
-  student_terms_tbl <- cedar_students %>%
-    filter(registration_status_code %in% c(STATUS_REGISTERED, STATUS_DROP_LATE)) %>%
-    select(student_id, term) %>%
-    distinct()
   rm(cedar_students); gc(verbose = FALSE)
-  cedar_next_term_tbl <- student_terms_tbl %>%
-    add_next_term_col("term", summer = FALSE) %>%
-    left_join(
-      student_terms_tbl %>% rename(next_term = term) %>% mutate(returned = TRUE),
-      by = c("student_id", "next_term")
-    ) %>%
-    mutate(returned_next_term = !is.na(returned)) %>%
-    select(student_id, term, returned_next_term)
-  next_term_meta <- save_cedar_file(cedar_next_term_tbl, "next_term", data_dir, ext)
-  message("  ✅ cedar_next_term: ", nrow(cedar_next_term_tbl), " rows")
-  rm(student_terms_tbl, cedar_next_term_tbl)
 
   list(
     saved = list(
       students = students_meta,
       grades = grades_meta,
-      student_term_credits = student_term_credits_meta,
-      next_term = next_term_meta
+      student_term_credits = student_term_credits_meta
     ),
     major_code_name_raw = major_code_name_raw
   )
@@ -1582,7 +1560,8 @@ build_lookups <- function(cedar_sections, cedar_programs, data_dir, ext, maps,
 #'                 Options: "sections", "students", "programs", "degrees",
 #'                          "faculty", "applicants", "lookups"
 #' @return Invisibly: named list of save metadata for each table written
-transform_to_cedar <- function(data_dir = NULL, use_qs = NULL, tables = NULL) {
+transform_to_cedar <- function(data_dir = NULL, use_qs = NULL, tables = NULL,
+                               include_student_terms = TRUE) {
 
   message("\n═══════════════════════════════════════════════════════")
   message("  CEDAR Data Model Transformation")
@@ -1620,8 +1599,11 @@ transform_to_cedar <- function(data_dir = NULL, use_qs = NULL, tables = NULL) {
       message("  Note: Adding lookups (auto-included when sections/programs/degrees are transformed)")
     }
     # The student-term table reads the saved students, programs and degrees,
-    # so it is rebuilt whenever any of them is.
-    if (any(c("students", "programs", "degrees") %in% run_tables) && !"student_terms" %in% run_tables) {
+    # so it is rebuilt whenever any of them is. A caller that will build it in
+    # a later run of its own (the deploy gate, one table per process so no
+    # process carries four tables' heap into this stage) says so.
+    if (isTRUE(include_student_terms) &&
+        any(c("students", "programs", "degrees") %in% run_tables) && !"student_terms" %in% run_tables) {
       run_tables <- c(run_tables, "student_terms")
       message("  Note: Adding student_terms (auto-included when students/programs/degrees are transformed)")
     }
@@ -1953,6 +1935,7 @@ if (!interactive() && !exists("SOURCED_FROM_PARSE_DATA")) {
   args         <- commandArgs(trailingOnly = TRUE)
   data_dir_arg <- NULL
   tables_arg   <- NULL
+  include_student_terms <- !"--without-student-terms" %in% args
 
   if (length(args) > 0) {
     for (i in seq_along(args)) {
@@ -1967,5 +1950,6 @@ if (!interactive() && !exists("SOURCED_FROM_PARSE_DATA")) {
     }
   }
 
-  transform_to_cedar(data_dir = data_dir_arg, tables = tables_arg)
+  transform_to_cedar(data_dir = data_dir_arg, tables = tables_arg,
+                     include_student_terms = include_student_terms)
 }

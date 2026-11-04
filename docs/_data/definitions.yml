@@ -297,8 +297,29 @@ definitions:
             functions: [build_credit_timeline, attach_credit_position]
 
   - id: roadblocks
-    current_version: "2.0.0"
+    current_version: "2.1.0"
     versions:
+      - version: "2.1.0"
+        title: Roadblocks stop-out comparison
+        summary: Compares the DFW-versus-pass stop-out gap for the selected population with the same gap for other students, using each student's first eligible observed outcome in a course and campus. A return is read from the student-term table, the one definition CEDAR uses everywhere.
+        population: Students with classifiable outcomes and an observable next-regular-term window in the selected course scope and population window.
+        unit: One observation per student, course, and delivery campus; the same observations supply counts, rates, DFW context, and tests.
+        numerator: Selected students not enrolled anywhere at UNM in the next fall or spring (enrolled meaning registered, or registered and withdrawn after census), except those with a degree in the outcome term.
+        denominator: Selected students in each mutually exclusive first-outcome DFW/pass group. DFW context divides the DFW count by the combined DFW and pass counts.
+        campus: Outcomes are compared separately by course delivery campus; return is checked across UNM, including other campuses.
+        time_window: Apply course filters, the population window, the grade edge, and complete next-term follow-up eligibility before choosing the first observed outcome. An outcome whose next regular term is past the settled edge, or has no class list, is omitted and counted in the coverage note.
+        exclusions: Later outcomes do not add observations. Agreeing first-term records collapse to one; conflicting first-term outcomes exclude that student-course-campus comparison. Coverage notes report these counts, invalid records and unobservable returns before size thresholds.
+        limitations:
+          - First eligible observed does not mean first lifetime attempt. The result describes first outcomes within the available, selected window, not repeat-attempt outcomes or permanent departure.
+          - The chi-square test uses Yates correction within each population, not a test of the difference between population and baseline gaps. At least five students per outcome group does not guarantee adequate expected cell counts; p-values are unadjusted across courses.
+          - Return is the student-term table's returned_next_regular_term, the same column Course Dynamics retention reads, so the two pages agree on who returned. Students receiving a degree in the outcome term are counted as completed rather than stopped out.
+          - Impact is the positive excess gap multiplied by the population DFW count, using unrounded proportions. It is a descriptive ranking score, not an estimate of students lost because of a course. These are associations, not causal course effects.
+        guide: users/pathways#roadblocks
+        implementation:
+          - file: R/cones/stopout.R
+            functions: [get_stopout, select_stopout_observations, compute_stopout_for_group, prepare_roadblock_results]
+          - file: R/branches/student-terms.R
+            functions: [build_student_terms]
       - version: "2.0.0"
         title: Roadblocks stop-out comparison
         summary: Compares the DFW-versus-pass stop-out gap for the selected population with the same gap for other students, using each student's first eligible observed outcome in a course and campus.
@@ -337,8 +358,31 @@ definitions:
             functions: [get_stopout, compute_stopout_for_group, build_next_term_lookup]
 
   - id: course-retention
-    current_version: "1.1.0"
+    current_version: "2.0.0"
     versions:
+      - version: "2.0.0"
+        title: Course retention and next-term persistence
+        summary: Among students who took a course, returning means being enrolled anywhere at UNM in the next fall or spring (registered, or registered and withdrawn after census), or a degree awarded in between. Enrolled is read from the student-term table, the one definition CEDAR uses everywhere, so this page and Pathways Roadblocks agree on who returned. Until 2026-11-04 a student whose only next-term row was a late withdrawal counted as lost; the change moves retention by about one point (284 of 28,282 Fall 2025 students).
+        population: Students in the selected course and anchor term. The retention trend takes registered students; the persistence table splits them by course outcome (pass, fail, late drop) and adds early drops as their own group.
+        unit: Student within an anchor course/term; a student who took the course in two terms counts once per term.
+        numerator: Students enrolled at UNM in the target term or graduating between the anchor and target terms. A next-term row that is only an early drop or a waitlist is not a return; a late withdrawal is, because that student was enrolled at census.
+        denominator: Eligible anchors with an observable follow-up term.
+        campus: Course delivery campus selects the cohort; follow-up spans all UNM campuses.
+        time_window: The next regular term (or year-later window) must be observable through the enrollment-complete edge; persistence anchors also stop at last_graded because they read a grade.
+        exclusions: Future follow-up is missing, not zero. Persistence outcomes come from the canonical classifier; anchors with no classifiable outcome (blank grade, audit) are excluded.
+        limitations:
+          - This is a course cohort, not the first-time degree-seeking cohort used for official institutional retention reporting.
+          - Differences between outcome groups do not establish that a course caused departure.
+        guide: users/course-reports
+        implementation:
+          - file: R/branches/retention-context.R
+            functions: [build_retention_context, .compute_retention]
+          - file: R/branches/student-terms.R
+            functions: [build_student_terms]
+          - file: R/cones/course-retention.R
+            functions: [get_retention_trend]
+          - file: R/cones/course-outcomes.R
+            functions: [get_course_persistence, next_term_persistence]
       - version: "1.0.0"
         title: Course retention over time
         summary: Among students registered in a course, retention means registered enrollment anywhere at UNM in the follow-up term or a degree awarded within the follow-up window.

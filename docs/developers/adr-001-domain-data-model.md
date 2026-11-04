@@ -221,7 +221,9 @@ Each step is additive until its last sub-step, so the app runs throughout.
    a parameter every cone passes and checks.
 2. **`cedar_student_terms`**, merging the two existing side tables with one
    definition of an enrolled term and `return_observable` from `cedar_terms`.
-   Closes I44. Precedence when the two source snapshots disagree: the
+   Closes I44 (closed 2026-11-04: the app loads the table and Roadblocks
+   and Retention read it; `cedar_next_term` is gone). Precedence when the
+   two source snapshots disagree: the
    academic-studies row wins (it is the student-level report), the row is
    flagged and the count reported — never a silent coalesce. Measured on the
    first build: 5,442 of 373,169 student-terms described by both sources

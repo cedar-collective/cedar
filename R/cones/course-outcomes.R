@@ -158,8 +158,11 @@ get_course_outcomes <- function(students, cedar_faculty = NULL, opt = list()) {
 #'   next_term_persistence() options.
 #' @param context Optional build_retention_context() output, shared with the
 #'   retention trend so both read the same lookups.
+#' @param student_terms `cedar_student_terms`, read for the `enrolled` lookup
+#'   when no `context` is passed.
 #' @return See next_term_persistence().
-get_course_persistence <- function(students, degrees, opt = list(), context = NULL) {
+get_course_persistence <- function(students, degrees, opt = list(), context = NULL,
+                                   student_terms = NULL) {
   courses <- opt$course
   if (is.null(courses) || length(courses) == 0 || !any(nzchar(courses))) {
     stop("[course-outcomes.R] get_course_persistence: opt$course is required.")
@@ -172,7 +175,8 @@ get_course_persistence <- function(students, degrees, opt = list(), context = NU
     cedar_filter_campus(opt$campus, fn = "get_course_persistence")
   if (length(opt$term) > 0) filtered <- filter(filtered, term %in% opt$term)
   filtered <- dedup_enrollment(filtered, level = "course")
-  next_term_persistence(filtered, students, degrees, opt, context = context)
+  next_term_persistence(filtered, students, degrees, opt, context = context,
+                        student_terms = student_terms)
 }
 
 #' Next-term persistence by grade outcome
@@ -182,11 +186,12 @@ get_course_persistence <- function(students, degrees, opt = list(), context = NU
 #' whether bad outcomes go with leaving.
 #'
 #' "Returned" is the retention definition, computed by the same
-#' .compute_retention() as the retention trend: registered anywhere at UNM in
-#' the next regular term, or graduated between the course term and that term.
-#' A next-term row that is only a drop or a waitlist is not a return, and a
-#' graduate has not left. Anchors whose next term is beyond the observation edge
-#' are excluded, never counted as not returned.
+#' .compute_retention() as the retention trend: enrolled anywhere at UNM in
+#' the next regular term (cedar_student_terms' `enrolled`: registered, or
+#' registered and withdrawn after census), or graduated between the course
+#' term and that term. A next-term row that is only an early drop or a waitlist
+#' is not a return, and a graduate has not left. Anchors whose next term is
+#' beyond the observation edge are excluded, never counted as not returned.
 #'
 #' Outcomes come from classify_enrollment_outcomes(): its "dfw" outcomes are
 #' split into "late drop" (a late-drop status or a W grade) and "fail"; early
@@ -204,11 +209,13 @@ get_course_persistence <- function(students, degrees, opt = list(), context = NU
 #'   page's opt-in uses GRADES_PASS_SUB_C_OPT_IN), and `data_edges` or
 #'   `observation_end_term`.
 #' @param context Optional build_retention_context() output.
+#' @param student_terms `cedar_student_terms`, read for the `enrolled` lookup
+#'   when no `context` is passed.
 #' @return Tibble: campus, subject_course, outcome, n_students, n_returned,
 #'   pct_returned (a proportion, unrounded); sorted by campus, subject_course,
 #'   outcome.
 next_term_persistence <- function(filtered, all_students, degrees, opt = list(),
-                                  context = NULL) {
+                                  context = NULL, student_terms = NULL) {
   min_n <- opt$min_n %||% 5L
   cedar_require_campus(filtered, "next_term_persistence")
   required <- c("student_id", "term", "campus", "subject_course",
@@ -224,7 +231,7 @@ next_term_persistence <- function(filtered, all_students, degrees, opt = list(),
   }
 
   message("[course-outcomes.R] Computing next-term persistence by outcome...")
-  context <- .resolve_retention_context(all_students, degrees, opt, context)
+  context <- .resolve_retention_context(all_students, degrees, opt, context, student_terms)
 
   # The anchor outcome reads a grade, so a settled but partly graded term cannot
   # enter the cohort merely because its following term is observable.
@@ -253,7 +260,7 @@ next_term_persistence <- function(filtered, all_students, degrees, opt = list(),
   }
 
   # NA means the next regular term is beyond the observation edge: excluded.
-  returned <- .compute_retention(cohort, context$registered_lookup, 1L,
+  returned <- .compute_retention(cohort, context$enrolled_lookup, 1L,
                                  context$graduated_lookup) %>%
     filter(!is.na(retained_1))
 

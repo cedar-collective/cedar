@@ -440,7 +440,7 @@ export async function runReportChecks({ scope = 'smoke', synthetic = false } = {
         { type: 'reactable', id: 'pathways-so_table' },
       ]);
       await page.waitForFunction(() => {
-        const note = document.querySelector('[data-definition-id="roadblocks"][data-definition-version="2.0.0"]');
+        const note = document.querySelector('[data-definition-id="roadblocks"][data-definition-version="2.1.0"]');
         const scope = document.getElementById('pathways-so_meta')?.innerText || '';
         const table = document.getElementById('pathways-so_table')?.innerText || '';
         return !!note && scope.includes('first eligible student-course-campus observations') &&
