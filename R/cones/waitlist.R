@@ -272,13 +272,19 @@ attach_enrollment_history <- function(count_df, students, enrl_base = NULL) {
 #' bio_waitlist <- inspect_waitlist(cedar_students, opt)
 #' }
 #'
+#' @param student_terms The `cedar_student_terms` table. The majors and
+#'   classifications splits read each waiting student's description off it
+#'   (`primary_major_code`, `student_classification`), never off the class-list
+#'   row (ADR-001 step 2). Required.
+#'
 #' @seealso
 #' \code{\link{filter_class_list}} for filtering options,
 #' \code{\link{summarize_waitlist_groups}} for grouping logic,
 #' \code{\link{get_unique_waitlisted}} for unique student counts
 #'
 #' @export
-inspect_waitlist <- function(students, opt, sections = NULL, enrl_base = NULL) {
+inspect_waitlist <- function(students, opt, sections = NULL, enrl_base = NULL,
+                             student_terms = NULL) {
 
   message("[waitlist.R] Welcome to inspect_waitlist!")
 
@@ -290,6 +296,12 @@ inspect_waitlist <- function(students, opt, sections = NULL, enrl_base = NULL) {
   # Keep only true demand: students waitlisted for a course who do not also hold
   # a registered row for that same course scope.
   waitlisted_students <- get_true_waitlisted_rows(filtered_students)
+
+  # Who is waiting is described by the student-term table, not the class-list
+  # row (attach_student_descriptions(), R/branches/demographics.R).
+  waitlisted_students <- attach_student_descriptions(
+    waitlisted_students, student_terms, c("major_code", "student_classification")
+  )
 
   # Create empty list for waitlist data
   waitlist_data <- list()

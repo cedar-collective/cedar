@@ -4842,8 +4842,9 @@ output$enrl_classlist_download <- downloadHandler(
   # Waitlists tab (Shiny module)
   # ===========================================================================
   waitlistServer("waitlist", cedar_students, session,
-                 sections  = data_objects[["cedar_sections"]],
-                 enrl_base = cedar_cl_enrls_base)
+                 sections      = data_objects[["cedar_sections"]],
+                 enrl_base     = cedar_cl_enrls_base,
+                 student_terms = cedar_student_terms)
 
 
   # ===========================================================================

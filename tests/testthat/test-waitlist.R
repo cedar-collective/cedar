@@ -204,10 +204,11 @@ test_that("inspect_waitlist structure is correct", {
   expect_true(exists("inspect_waitlist"))
 
   # Function should take students, opt, an optional sections table (only needed
-  # when students lack a course_title column) and an optional precomputed
-  # enrollment base (M12: never looked up by name).
+  # when students lack a course_title column), an optional precomputed
+  # enrollment base (M12: never looked up by name) and the student-term table
+  # that describes each waiting student.
   args <- formals(inspect_waitlist)
-  expect_equal(names(args), c("students", "opt", "sections", "enrl_base"))
+  expect_equal(names(args), c("students", "opt", "sections", "enrl_base", "student_terms"))
 
   message("  inspect_waitlist function signature verified")
 })
@@ -219,7 +220,7 @@ test_that("inspect_waitlist course overview reports college and section supply",
   # 28 waitlisted students (registration_status_code WL). See the waitlist design
   # block in fixtures/designed_test_data.R.
   opt <- create_test_opt(list(term = 202080, uel = FALSE))
-  out <- inspect_waitlist(test_students, opt, sections = test_sections)
+  out <- inspect_waitlist(test_students, opt, sections = test_sections, student_terms = test_student_terms)
 
   cnt <- out[["count"]]
   expect_true(all(c("campus", "college", "subject_course", "course_title",
@@ -245,7 +246,7 @@ test_that("inspect_waitlist course overview reports college and section supply",
 
 test_that("inspect_waitlist excludes registered overlap from every summary", {
   opt <- create_test_opt(list(term = 202080, uel = FALSE))
-  out <- inspect_waitlist(test_students, opt, sections = test_sections)
+  out <- inspect_waitlist(test_students, opt, sections = test_sections, student_terms = test_student_terms)
 
   course_count <- out$count %>%
     filter(subject_course == "NURS 2010", campus == "ABQ")
@@ -269,12 +270,41 @@ test_that("inspect_waitlist excludes registered overlap from every summary", {
   )
 })
 
+test_that("inspect_waitlist describes waiting students from the student-term table", {
+  opt <- create_test_opt(list(term = 202080, uel = FALSE))
+  waiting <- test_students %>%
+    filter(subject_course == "NURS 2010", registration_status_code == "WL")
+
+  # The roster's own major and classification are never read: stamp them with
+  # values the table does not carry and the splits still show the table's.
+  roster <- test_students %>%
+    mutate(major_code = if_else(student_id %in% waiting$student_id, "ROSTER", major_code),
+           student_classification = if_else(student_id %in% waiting$student_id,
+                                            "Roster Class", student_classification))
+  table <- test_student_terms %>%
+    mutate(primary_major_code = if_else(student_id %in% waiting$student_id & term == 202080L,
+                                        "NURS-BSN", primary_major_code))
+  out <- inspect_waitlist(roster, opt, sections = test_sections, student_terms = table)
+
+  majors <- out$majors %>% filter(subject_course == "NURS 2010", campus == "ABQ")
+  expect_setequal(unique(majors$major_code), "NURS-BSN")
+  expect_equal(sum(majors$count), 28L)
+  classes <- out$classifications %>% filter(subject_course == "NURS 2010", campus == "ABQ")
+  expect_false("Roster Class" %in% classes$student_classification)
+  expect_equal(sum(classes$count), 28L)
+
+  expect_error(
+    inspect_waitlist(test_students, opt, sections = test_sections),
+    "reads cedar_student_terms"
+  )
+})
+
 test_that("Waitlists, Regstats, and Department Dashboard reconcile true demand", {
   wait_opt <- create_test_opt(list(
     term = 202080L, course = "NURS 2010", course_campus = "ABQ",
     dept_code = "NURS", uel = TRUE
   ))
-  waitlists <- inspect_waitlist(test_students, wait_opt, sections = test_sections)$count %>%
+  waitlists <- inspect_waitlist(test_students, wait_opt, sections = test_sections, student_terms = test_student_terms)$count %>%
     filter(subject_course == "NURS 2010") %>%
     transmute(campus, college, term, part_term, subject_course, course_title,
               waiting = count)
@@ -321,7 +351,7 @@ test_that("inspect_waitlist requires sections when course titles are absent", {
   opt <- create_test_opt(list(term = 202080, uel = FALSE))
 
   expect_error(
-    inspect_waitlist(students_without_titles, opt),
+    inspect_waitlist(students_without_titles, opt, student_terms = test_student_terms),
     "input has no course_title column and no sections table was supplied",
     fixed = TRUE
   )

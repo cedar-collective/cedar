@@ -29,6 +29,7 @@ recurrence is recognizable.
 
 | ID | Kind | Summary |
 |---|---|---|
+| [I47](#i47--the-class-lists-student_classification-is-stamped-at-pull-time-when-a-term-is-pulled-late) | Defect | A class list pulled months after its term carries each student's classification as of the pull: Fall 2025's list (pulled 2026-03-07) puts 35% of ENGL 1120's registered student-terms one step ahead of the classification academic studies recorded for Fall 2025. Every grouping reader now takes the student-term table's value; the `classification` filter key and Regstats' sophomore screen still read the class list |
 | [I46](#i46--a-deploy-that-must-rebuild-a-table-the-app-cannot-start-without-takes-the-site-down) | Defect | The deploy's table gate ran after the health check, so a deploy that added a column to `cedar_student_terms` failed its health check on the missing column and never reached the gate: production served the restart page from 17:07 UTC on 2026-11-04 (gate moved before the first request) |
 | [I45](#i45--the-class-list-and-the-schedule-name-the-same-section-with-different-course-codes) | Defect | The class list and the schedule name the same section differently for renamed subjects (SOC to SOCI, PSY to PSYC, CCS to CCST): SOCI 371 has class-list history from Fall 2019 but no sections before Fall 2021 |
 | [I43](#i43--every-scheduled-refresh-fails-because-the-default-asks-for-a-report-mrgather-never-fetches) | Defect | Every scheduled refresh has failed since 2026-10-24: the default asks for the applicants report, which production mrgather never fetches, so production tables have not been rebuilt since Oct 27 (default fixed; mrgather and per-report rebuilds remain) |
@@ -71,6 +72,67 @@ Kept until the next release, so a recurrence is recognisable; each entry below g
 ---
 
 # Defects
+
+## I47 — The class list's `student_classification` is stamped at pull time when a term is pulled late
+
+**Status:** open; grouping readers resolved 2026-11-04. Course Dynamics'
+rollcall, the Waitlists splits, Pathways' classification axis and the Gen Ed
+graduate cohort now read `cedar_student_terms$student_classification`, which
+takes academic studies' per-term value and keeps the class list's only where
+no academic-studies row exists (`description_source`). What remains reads the
+class list: `filter_class_list()`'s `classification` key (every tab's
+classification filter) and the sophomore screen in `get_high_fall_sophs()`
+(`R/features/regstats.R`). Both move in ADR-001 step 5, when the filter keys
+join the table.
+**Found:** 2026-11-04, comparing Course Dynamics' rollcall by classification
+before and after the move (PR for the demographics readers).
+**Severity:** medium. A late-pulled term's classification filter selects the
+wrong students: filtering Fall 2025 to sophomores returns students who were
+freshmen that term and sophomores at the pull. Terms pulled near their own
+time are unaffected, which is why the 2026-11-04 agreement measurement
+(99% of student-terms) hid it.
+**Affects:** `R/trunk/filter.R` (`classification`), `R/features/regstats.R`
+(`get_high_fall_sophs()`), and any ad-hoc reader of
+`cedar_students$student_classification` for a term pulled late.
+
+### What is wrong
+
+The field-reliability contract tested academic studies' fields, not the class
+list's. The class list's `student_classification` is the student's
+classification **when the list was pulled**, printed on every row of the term.
+Fall 2025's retained class list was pulled on 2026-03-07, mid Spring 2026, so
+it describes its students as they stood in March 2026.
+
+### Reproduction
+
+```r
+source("scripts/cedar-repl.R")
+cl <- cedar_students %>%
+  filter(subject_course == "ENGL 1120", term == 202580L,
+         registration_status_code %in% STATUS_REGISTERED) %>%
+  distinct(student_id, term, roster = student_classification)
+j <- inner_join(cl, select(cedar_student_terms, student_id, term,
+                           student_classification, description_conflict),
+                by = c("student_id", "term"))
+count(j, roster != student_classification)   # 535 of 1,543 differ
+count(filter(j, roster != student_classification), roster, student_classification, sort = TRUE)
+# Sophomore -> Freshman 2nd Sem 157; Freshman 2nd Sem -> Freshman 1st Sem 148;
+# Sophomore -> Freshman 1st Sem 138; Junior -> Sophomore 76; Senior -> Junior 15
+unique(filter(cedar_students, term == 202580L)$as_of_date)   # 2026-03-07
+```
+
+Every differing row is `description_conflict = TRUE` with
+`description_source = "programs"`, and every difference is the class list one
+or two steps **ahead** of academic studies, never behind: the signature of a
+value stamped at the pull.
+
+### Done when
+
+`filter_class_list()`'s `classification` key and `get_high_fall_sophs()` read
+the student-term table (ADR-001 step 5), and the Fall 2025 sophomore filter
+returns the students academic studies called sophomores that term.
+
+---
 
 ## I46 — A deploy that must rebuild a table the app cannot start without takes the site down
 

@@ -16,6 +16,8 @@ get_course_data <- function(data_objects, opt, skip_neighbors = FALSE,
   # Extract CEDAR data objects (no legacy fallbacks)
   students <- data_objects[["cedar_students"]]
   courses <- data_objects[["cedar_sections"]]
+  # Rollcall reads each student's classification and major off the student-term table.
+  student_terms <- data_objects[["cedar_student_terms"]]
 
   # Bail out early with a clear error if required datasets are missing
   if (is.null(courses)) {
@@ -24,6 +26,10 @@ get_course_data <- function(data_objects, opt, skip_neighbors = FALSE,
   }
   if (is.null(students)) {
     stop("[course_report.R] cedar_students dataset is NULL in data_objects\n",
+         "  Found data_objects keys: ", paste(names(data_objects), collapse = ", "))
+  }
+  if (is.null(student_terms)) {
+    stop("[course_report.R] cedar_student_terms dataset is NULL in data_objects\n",
          "  Found data_objects keys: ", paste(names(data_objects), collapse = ", "))
   }
 
@@ -122,7 +128,7 @@ get_course_data <- function(data_objects, opt, skip_neighbors = FALSE,
 
   # demographics by classification
   myopt[["group_cols"]] <- c("campus", "college", "term", "term_type", "student_classification", "subject_course", "level")
-  demo_by_class_raw <- get_course_demographics(filtered_students, myopt)
+  demo_by_class_raw <- get_course_demographics(filtered_students, student_terms, myopt)
   cedar_debug("[course_report.R] demo_by_class: ", nrow(demo_by_class_raw), " rows")
 
   demo_by_class_for_plot <- demo_by_class_raw
@@ -136,7 +142,7 @@ get_course_data <- function(data_objects, opt, skip_neighbors = FALSE,
 
   # demographics by major
   myopt[["group_cols"]] <- c("campus", "college", "term", "term_type", "major_code", "subject_course", "level")
-  demo_by_major_raw <- get_course_demographics(filtered_students, myopt)
+  demo_by_major_raw <- get_course_demographics(filtered_students, student_terms, myopt)
   cedar_debug("[course_report.R] demo_by_major: ", nrow(demo_by_major_raw), " rows")
 
   demo_by_major_for_plot <- demo_by_major_raw
