@@ -40,7 +40,7 @@ sources <- c("dev/demo-data.R", "dev/generate-demo.R", "dev/shiny_config.R",
              list.files(file.path("institution", cedar_institution_id()), full.names = TRUE))
 signature <- digest::digest(tools::md5sum(sources), algo = "sha256")
 outputs <- paste0("cedar_", c("sections", "students", "programs", "degrees", "faculty",
-                             "lookups", "grades", "student_terms", "student_term_credits", "applicants"), ".qs")
+                             "lookups", "grades", "student_terms", "applicants"), ".qs")
 if (file.exists(marker) && identical(readLines(marker), signature) &&
     all(file.exists(file.path(target, outputs)))) {
   message("Synthetic demo already matches the source; reusing it.")

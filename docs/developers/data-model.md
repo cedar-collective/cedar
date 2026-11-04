@@ -208,26 +208,9 @@ The flags are the startup edges from `cedar_data_edges()` passed in, never recom
 
 ---
 
-## 2a. `cedar_student_term_credits` (Observed UNM Credits)
+## 2a. `cedar_student_term_credits` (retired)
 
-**Purpose:** One row per student per term, derived from `cedar_students`, for analyses that need an observed UNM credit timeline without re-summarizing class lists.
-
-| Column | Type | Description | Example |
-|--------|------|-------------|---------|
-| `student_id` | string | Encrypted student ID | Hash of real ID |
-| `term` | integer | Academic term code | 202580 |
-| `attempted_unm_credits` | numeric | Registered UNM credits observed in that term | 15 |
-| `completed_unm_credits` | numeric | Credit-earning UNM credits observed in that term | 12 |
-| `dfw_unm_credits` | numeric | Observed credits with a recorded nonpassing outcome under the canonical DFW policy | 3 |
-| `w_unm_credits` | numeric | Observed W credits in that term | 3 |
-| `registered_courses` | integer | Distinct registered courses observed in that term | 5 |
-| `completed_courses` | integer | Distinct credit-earning courses observed in that term | 4 |
-| `cumulative_attempted_unm_credits` | numeric | Running observed UNM attempted credits | 72 |
-| `cumulative_completed_unm_credits` | numeric | Running observed UNM completed credits | 66 |
-
-**Derivation:** `transform_students()` filters `cedar_students` to `registration_status_code %in% STATUS_REGISTERED` and non-missing `credits`, deduplicates by `student_id`, `term`, `subject_course`, `course_title`, `credits`, `final_grade`, and status, then summarizes and cumulatively sums by student. Completed credits use `passing_grades` from `R/lists/grades.R`.
-
-**Pathways use:** Major Changes movement cards use `cumulative_completed_unm_credits` for the headline credit medians and `cumulative_attempted_unm_credits` in the detail table. This avoids treating Academic Studies cumulative UNM credit fields as a term-accurate credit timeline.
+Retired 2026-11-04. Its columns — per-term and running attempted and completed UNM credits, counted from registered class-list rows with a credit value and de-duplicated the same way — are columns of `cedar_student_terms` (2b), which `build_credit_timeline()` and the Pathways credit cards now read. The transform no longer writes the file, and the app no longer loads it; a copy left in a data directory is ignored.
 
 ---
 
@@ -239,7 +222,7 @@ The flags are the startup edges from `cedar_data_edges()` passed in, never recom
 - `enrolled` is registered **or** late-dropped (enrolled at census): CEDAR's one definition of an enrolled student-term. `returned_next_regular_term` reads it in the next Fall or Spring; it is `NA` where `return_observable` is FALSE (the next regular term is past the settled edge, or has no class list at all), never FALSE.
 - The description columns (`student_level`, `student_classification`, `student_campus`, `residency`) take the academic-studies value where there is one and the class list's otherwise; `description_source` says which, and `description_conflict` flags the two disagreeing. Level and home campus are stored as codes; academic studies' names are translated through `institution/<id>/student_levels.csv` and `campuses.csv` `source_names`, and an unlisted name is `NA` and reported.
 - The pull-stamped fields (`inst_*`, `overall_*`, `inst_gpa`) are banned from the table; `validate_student_terms()` rejects them.
-- `attempted_unm_credits` and `cumulative_attempted_unm_credits` reproduce `cedar_student_term_credits` exactly, so `build_credit_timeline()` reads the same numbers from either.
+- `attempted_unm_credits`, `completed_unm_credits` and their running totals `cumulative_attempted_unm_credits` / `cumulative_completed_unm_credits` keep the definition the retired `cedar_student_term_credits` used, with `unm_credits_entering` and `timeline_valid` beside them; `build_credit_timeline()` and the Pathways credit medians read them from here.
 
 On the 2026-10-27 pull: 518,889 rows (452,021 enrolled; 53,053 declared without a class list), 126 MB in memory, 5,442 student-terms where the two sources disagree (4,210 of them in Fall 2025, whose programs were pulled in November 2025 and whose class list in March 2026).
 
@@ -285,7 +268,7 @@ On the 2026-10-27 pull: 518,889 rows (452,021 enrolled; 53,053 declared without 
 | `overall_credits_attempted` | numeric | Cumulative credits attempted, UNM + transfer | 105 |
 | `overall_credits_earned` | numeric | Cumulative credits earned, UNM + transfer | 96 |
 
-> **Credit-hour notes:** All three are cumulative totals as reported on the Banner Academic Studies record. `inst_*` is UNM-only; `overall_*` includes transfer hours. These fields are useful for transfer-inclusive context and program-row metadata, but they should not be assumed to be a term-accurate UNM credit timeline. Use `cedar_student_term_credits` when an observed UNM credit progression is needed.
+> **Credit-hour notes:** All three are cumulative totals as reported on the Banner Academic Studies record. `inst_*` is UNM-only; `overall_*` includes transfer hours. These fields are useful for transfer-inclusive context and program-row metadata, but they should not be assumed to be a term-accurate UNM credit timeline. Use the credit columns of `cedar_student_terms` (through `build_credit_timeline()`) when an observed UNM credit progression is needed.
 
 ### Source-field notes for Pathways / Major Changes
 
@@ -312,7 +295,7 @@ records remain available in the movement detail table. This entry-card eligibili
 rule is separate from transfer classification: Transfer vs Always UNM comes from
 the earliest available `cedar_programs$student_population` label, never from a
 credit threshold. The attempted-UNM value used by the eligibility rule is
-`cedar_student_term_credits$cumulative_attempted_unm_credits`, reconstructed from
+`cedar_student_terms$cumulative_attempted_unm_credits`, reconstructed from
 Class Lists, not the frozen Academic Studies `inst_credits_attempted` field.
 
 ---

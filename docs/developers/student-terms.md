@@ -5,14 +5,14 @@ holding every fact about a student in a term that CEDAR today re-derives from
 raw class-list rows or reads off a repeated column. Written before the code;
 the code is wrong where it departs from this page.
 
-- **Status:** contract agreed 2026-11-03; **built the same day** (`R/branches/student-terms.R`, saved by the transform as `cedar_student_terms`). **Loaded by the app since 2026-11-04**, which does not start without it; the first two readers below have moved (I44 closed) and `cedar_next_term` is gone. `cedar_student_term_credits` retires when `build_credit_timeline()` moves.
+- **Status:** contract agreed 2026-11-03; **built the same day** (`R/branches/student-terms.R`, saved by the transform as `cedar_student_terms`). **Loaded by the app since 2026-11-04**, which does not start without it; the first three readers below have moved (I44 closed), and `cedar_next_term` and `cedar_student_term_credits` are both gone: every credit position reads this table's running totals through `build_credit_timeline()`.
 - **Closes:** ISSUES.md I44 (two definitions of "returned next term").
 - **Depends on:** nothing new. ADR-001 step 1 (`cedar_terms`) would supply the
   next regular term and the settled edge; until it exists this table computes
   them the way the app does today (`add_next_term_col()`, `cedar_data_edges()`).
 - **Replaces:** `cedar_student_term_credits` and `cedar_next_term`, which the
-  transform builds fifty lines apart with two different definitions of an
-  enrolled term.
+  transform built fifty lines apart with two different definitions of an
+  enrolled term. Both retired 2026-11-04.
 
 ---
 
@@ -98,7 +98,7 @@ programs row. **No column is ever coalesced silently.**
 | `late_withdrawals` | int | distinct `subject_course` whose only rows are `STATUS_DROP_LATE` |
 | `early_drops` | int | distinct `subject_course` whose only rows are `STATUS_DROP_EARLY` |
 | `waitlisted_only` | lgl | not `enrolled` and at least one `STATUS_WAITLIST` row |
-| `attempted_unm_credits` | num | sum of `credits` over registered rows with a credit value; as `cedar_student_term_credits` defines it today |
+| `attempted_unm_credits` | num | sum of `credits` over registered rows with a credit value; the definition the retired `cedar_student_term_credits` used |
 | `completed_unm_credits` | num | the same over rows whose `final_grade` is in `passing_grades` |
 | `dfw_grades` | int | registered rows (not late drops) whose `classify_enrollment_outcomes()` outcome is `dfw`; late drops are counted in `late_withdrawals`, never here |
 | `graded_rows` | int | registered rows with a posted grade; `dfw_grades` is unknown, not zero, when this is 0 and `enrolled` is TRUE |
@@ -106,17 +106,21 @@ programs row. **No column is ever coalesced silently.**
 
 ### Position: where they were in their degree
 
-Carried over from `build_credit_timeline()`, which this table then reads
-from instead of from `cedar_student_term_credits`.
+Carried over from `build_credit_timeline()`, which reads them from this
+table (since 2026-11-04) instead of deriving them from
+`cedar_student_term_credits`.
 
 | column | type | definition |
 |---|---|---|
-| `cumulative_attempted_unm_credits` | num | running sum of `attempted_unm_credits` over the student's enrolled terms in the data |
-| `unm_credits_entering` | num | the running sum before this term |
-| `timeline_valid` | lgl | the student's first term in the data is after the data's first term, so the running sum started at zero for a reason. **Readers placing students on a credit axis filter on it and say how many they dropped.** |
+| `cumulative_attempted_unm_credits` | num | running sum of `attempted_unm_credits` over the student's terms in the data (a declared-only term adds 0 and carries the total) |
+| `cumulative_completed_unm_credits` | num | the same running sum of `completed_unm_credits`: the basis of Pathways' `unm_credit_band` axis and the Major Changes credit medians |
+| `unm_credits_entering` | num | the running attempted sum before this term |
+| `timeline_valid` | lgl | the student's first term in the data (any row, enrolled or declared) is after the data's first term, so the running sum started at zero for a reason. **Set here, over the whole data, so a slice of the table keeps the right answer; readers read it, never re-derive it.** Readers placing students on a credit axis filter on it and say how many they dropped. |
 
 Transfer credits stay in `build_credit_timeline()`'s per-student block, since
 they are recovered from two banned fields and are per-student, not per-term.
+`build_gpa_timeline()` still builds its own series from class-list rows and
+derives the flag through `credit_timeline_validity()`; it moves later.
 
 ### Return: did they come back
 
@@ -163,7 +167,7 @@ any change stated in the PR body.
 |---|---|---|
 | ~~`build_next_term_lookup()` (`R/cones/stopout.R`) and the saved `cedar_next_term`~~ **moved 2026-11-04** | own lookup, registered or late drop | `get_stopout(..., student_terms)` reads `returned_next_regular_term` and omits (and counts) the rows whose return is unobservable; both deleted. Numbers unchanged. |
 | ~~`.build_registered_lookup()` (`R/branches/retention-context.R`)~~ **moved 2026-11-04** | registered only | `.build_enrolled_lookup(student_terms)` reads `enrolled`; `build_retention_context()` requires the table. **Retention moved by about one point** (284 students, Fall 2025→Spring 2026); `definitions.yml` course-retention 2.0.0 says so on the page. Closed I44. |
-| `build_credit_timeline()` input | `cedar_student_term_credits` | this table; `cedar_student_term_credits` retires |
+| ~~`build_credit_timeline()` input, and every reader of `cedar_student_term_credits`~~ **moved 2026-11-04** | `cedar_student_term_credits`, one row per registered term, its own running total and `timeline_valid` re-derived per call | `build_credit_timeline(student_terms, ...)` reads `unm_credits_entering`, `cumulative_attempted_unm_credits` and `timeline_valid` off this table; `get_course_timing()`'s `unm_credit_band` and the Pathways credit medians read `cumulative_completed_unm_credits`. The parameter is `student_terms` throughout. `cedar_student_term_credits` is no longer written or loaded. The difference on real data is measured below |
 | `build_return_snapshot()` anchor population and warning signs | own group-by over class-list rows | filter `enrolled`, read `late_withdrawals`, `dfw_grades`, `graded_rows`, the description columns |
 | `population.R` enrollment-based switch detection, `course-flows.R`, `gen-ed-conversion.R`, `major-changes.R`, `course-instructor-effect.R` | each filters status codes itself | read `enrolled`; each is checked against its old output and any difference is reported before merging |
 | `cedar_students` readers of the eight student columns | repeated column | join on `(student_id, term)` through a shared `attach_student_term(rows, cols)` helper; `cedar_students` keeps the columns until the last reader has moved (ADR-001 step 5) |
@@ -199,6 +203,8 @@ summer as a return term (ST_D), and returned FALSE past the edge (ST_I).
 
 518,889 student-terms: 452,021 enrolled, 53,053 declared without a class list, 92,667 described by the class list alone (no programs row), 373,169 by both, 5,442 of those disagreeing — 4,210 in Fall 2025, whose programs were pulled 2025-11-06 and whose class list 2026-03-07. 126 MB in memory, 126 s to build. Every one of the 443,458 `cedar_student_term_credits` rows matches on attempted and cumulative credits; every one of the 422,847 observable `cedar_next_term` rows agrees on the return. I44 reproduced from the table: Fall 2025 → Spring 2026 returned 82.72%, Spring → Fall 2025 71.92%. Home campus `student_campus` is one of the five campuses.csv codes on every row but one (a class-list `NA`); level resolves on every row but one (class-list code `00`).
 
+**The credit-timeline move, measured (2026-11-04 pull, 518,894 rows).** `build_credit_timeline()` on this table against the same function on the retired `cedar_student_term_credits`: every one of the 443,519 rows the two share agrees on credits entering, after, total entering and the completed-credit band source. The table adds 75,375 rows the old series lacked (53,052 declared without a class list, 13,845 waitlist- or early-drop-only, 8,478 enrolled by a late drop alone), on which a position now exists where readers joining on that term saw `NA`; 14,266 of them carry a valid flag. `timeline_valid` changed for 2,651 students, all from valid to invalid and none the other way: 2,363 were declared before the class lists begin (Fall 2018 to Summer 2019), 288 had a class-list row in the first class-list term without a registered credit — history the running total cannot see. The builder judges the window against the **first class-list term** (`min(students$term)`), not the table's first row: academic studies reaches a year further back, and judged against that, 12,935 students first registered in the first class-list term read as valid (test "the credit window opens with the class lists").
+
 ## Done when
 
 - `transform_to_cedar()` writes `cedar_student_terms.qs`, with the
@@ -206,9 +212,10 @@ summer as a return term (ST_D), and returned FALSE past the edge (ST_I).
   `enrolled` row with `class_list_rows = 0`, a `returned_next_regular_term`
   that is not `NA` where `return_observable` is FALSE, and any banned column.
 - `global.R` loads it (done 2026-11-04; the app stops without it); `cedar_next_term`
-  is no longer written or loaded (done); `cedar_student_term_credits` retires
-  with `build_credit_timeline()`.
-- The first two readers in the table above have moved and the Retention
+  and `cedar_student_term_credits` are no longer written or loaded (done
+  2026-11-04), and the deploy gate rebuilds the table when the saved file lacks
+  a column the builder now writes.
+- The first three readers in the table above have moved and the Retention
   change is stated on the page and in `definitions.yml` (done 2026-11-04).
 - ST01 is in the fixture with its mutation checks recorded; `./run-tests.sh`
   passes.

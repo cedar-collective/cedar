@@ -51,7 +51,7 @@
 #'   }
 build_comparison <- function(treatment_ids, pool_ids, programs,
                               applicants = NULL, students = NULL,
-                              covariate_terms = NULL, term_credits = NULL) {
+                              covariate_terms = NULL, student_terms = NULL) {
   message("[comparison.R] Building comparison groups...")
   message("[comparison.R]   Treatment: ", length(treatment_ids), " students")
   message("[comparison.R]   Control pool: ", length(pool_ids), " students")
@@ -149,7 +149,7 @@ build_comparison <- function(treatment_ids, pool_ids, programs,
   # measured at the point of comparison. Measured: `inst_gpa` is identical across
   # every term of a student's own history for 67.8% of students with 5+ terms.
   # See the field reliability contract in AGENTS.md.
-  groups <- .attach_position_covariates(groups, students, programs, term_credits)
+  groups <- .attach_position_covariates(groups, students, programs, student_terms)
 
   # Optionally join cedar_applicants covariates.
   # high_school_cum_gpa values > 5.5 are data artifacts (unscaled/weighted GPA) — capped.
@@ -220,10 +220,10 @@ build_comparison <- function(treatment_ids, pool_ids, programs,
 #' @param groups Tibble with `student_id` and `covariate_term`.
 #' @param students cedar_students, or NULL.
 #' @param programs cedar_programs, for the transfer block.
-#' @param term_credits cedar_student_term_credits, or NULL.
+#' @param student_terms cedar_student_terms, or NULL.
 #' @return `groups` with the three columns added.
 #' @keywords internal
-.attach_position_covariates <- function(groups, students, programs, term_credits) {
+.attach_position_covariates <- function(groups, students, programs, student_terms) {
 
   ids <- unique(groups$student_id)
 
@@ -242,9 +242,9 @@ build_comparison <- function(treatment_ids, pool_ids, programs,
   }
 
   # --- Credit position entering the covariate term ---
-  if (!is.null(term_credits) && nrow(term_credits) > 0) {
+  if (!is.null(student_terms) && nrow(student_terms) > 0) {
     credit_tl <- build_credit_timeline(
-      term_credits, programs = programs, opt = list(student_ids = ids))
+      student_terms, programs = programs, opt = list(student_ids = ids))
     groups <- groups %>%
       left_join(
         credit_tl %>%
@@ -253,8 +253,8 @@ build_comparison <- function(treatment_ids, pool_ids, programs,
                  unm_credits_entering, total_credits_entering),
         by = c("student_id", "covariate_term"))
   } else {
-    message("[comparison.R]   No term_credits table — credit covariates unavailable. ",
-            "Pass term_credits = cedar_student_term_credits.")
+    message("[comparison.R]   No student_terms table — credit covariates unavailable. ",
+            "Pass student_terms = cedar_student_terms.")
     groups$unm_credits_entering   <- NA_real_
     groups$total_credits_entering <- NA_real_
   }

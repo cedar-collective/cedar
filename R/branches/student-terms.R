@@ -44,7 +44,8 @@ STUDENT_TERMS_COLUMNS <- c(
   "early_drops", "waitlisted_only", "attempted_unm_credits", "completed_unm_credits",
   "dfw_grades", "graded_rows", "sem_gpa",
   # position
-  "cumulative_attempted_unm_credits", "unm_credits_entering", "timeline_valid",
+  "cumulative_attempted_unm_credits", "cumulative_completed_unm_credits",
+  "unm_credits_entering", "timeline_valid",
   # return
   "next_regular_term", "returned_next_regular_term", "return_observable",
   "degree_awarded"
@@ -128,12 +129,19 @@ build_student_terms <- function(students, programs = NULL, degrees = NULL,
   st <- .student_terms_resolve_description(st)
 
   # ── Position: the running total of attempted credits over the data ───────
-  min_data_term <- min(st$term)
+  # The window opens where the CLASS LISTS open, not where the table's rows
+  # do: academic studies reaches back further (UNM's programs start Fall 2018,
+  # its class lists Fall 2019), and a student first registered in the first
+  # class-list term has credits before it that no row can show. A declaration
+  # before that term is the same evidence of earlier enrollment, so a
+  # student's first row of any kind is what is compared.
+  min_data_term <- min(students$term)
   st <- st %>%
     dplyr::arrange(student_id, term) %>%
     dplyr::group_by(student_id) %>%
     dplyr::mutate(
       cumulative_attempted_unm_credits = cumsum(attempted_unm_credits),
+      cumulative_completed_unm_credits = cumsum(completed_unm_credits),
       unm_credits_entering = cumulative_attempted_unm_credits - attempted_unm_credits,
       timeline_valid = min(term) > min_data_term
     ) %>%
@@ -204,9 +212,10 @@ build_student_terms <- function(students, programs = NULL, degrees = NULL,
 
 
 # Enrollment facts per student-term from the class list. The credit figures
-# reproduce cedar_student_term_credits' definition exactly (registered rows
-# with a credit value, de-duplicated the same way) so build_credit_timeline()
-# reads the same numbers from this table.
+# keep the definition the retired cedar_student_term_credits table used
+# (registered rows with a credit value, de-duplicated the same way), so
+# build_credit_timeline() reads the same numbers from this table as it did
+# from that one.
 .student_terms_enrollment <- function(students) {
   # CAMPUS_ROLLUP: these are a student's courses in a term, a curriculum count
   # and not a delivery metric; the same course on two campuses is one course.

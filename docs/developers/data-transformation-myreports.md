@@ -118,16 +118,18 @@ The complete transformation logic is in [R/data-parsers/transform-to-cedar.R](..
     `cedar_students$term`, which means the first class-list term present in CEDAR.
     This is not a formal Banner matriculation/start-term field.
 
-**2a. cedar_students → cedar_student_term_credits**
-- Produces one row per `student_id + term`.
+**2a. cedar_students (+ programs, degrees) → cedar_student_terms**
+- One row per `student_id + term` with any class-list row or declaration
+  (`build_student_terms()`, ADR-001 step 2; contract in `student-terms.md`).
 - Counts observed registered UNM credits from class-list rows with
-  `registration_status_code %in% STATUS_REGISTERED` and non-missing `credits`.
-- Stores both term-level and cumulative attempted UNM credits.
-- Stores term-level and cumulative completed UNM credits, where completed credits
-  use the canonical `passing_grades` list from `R/lists/grades.R`.
-- Used by Pathways / Major Changes movement cards for UNM credit timing so the
-  app does not rely on Academic Studies cumulative UNM credit fields as a
-  historical credit timeline.
+  `registration_status_code %in% STATUS_REGISTERED` and non-missing `credits`,
+  as term-level and cumulative attempted credits, and the same for completed
+  credits under the canonical `passing_grades` list from `R/lists/grades.R`,
+  with `unm_credits_entering` and `timeline_valid` beside them.
+- Read by `build_credit_timeline()` and the Pathways / Major Changes movement
+  cards for UNM credit timing, so the app does not rely on Academic Studies
+  cumulative UNM credit fields as a historical credit timeline. Replaced
+  `cedar_student_term_credits` on 2026-11-04.
 
 **3. academic_studies → cedar_programs**
 - Expands majors/minors into separate rows

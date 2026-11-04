@@ -229,21 +229,31 @@ test_that("a lookups-only rebuild carries the saved major names forward and refu
 })
 
 # ADR-001 step 2: the deploy gate builds cedar_student_terms when it is absent
-# or older than a saved table it reads, by file time, without loading data.
-test_that("cedar_student_terms is stale when missing or older than a source it reads", {
+# or older than a saved table it reads, by file time, and when the saved file
+# lacks a column the builder now writes — the one staleness a file time cannot
+# record (the completed-credit running total, 2026-11-04).
+test_that("cedar_student_terms is stale when missing, older than a source, or short a column", {
   env <- load_transform_helpers()
   dir <- withr::local_tempdir()
-  write_at <- function(name, when) {
+  full_row <- tibble::as_tibble(stats::setNames(as.list(rep(1, length(STUDENT_TERMS_COLUMNS))),
+                                                STUDENT_TERMS_COLUMNS))
+  write_at <- function(name, when, data = tibble::tibble(x = 1)) {
     path <- file.path(dir, paste0(name, ".qs"))
-    qs2::qs_save(tibble::tibble(x = 1), path)
+    qs2::qs_save(data, path)
     Sys.setFileTime(path, when)
     path
   }
   t0 <- Sys.time() - 3600
   for (name in c("cedar_students", "cedar_programs", "cedar_degrees")) write_at(name, t0)
   expect_match(env$cedar_student_terms_staleness(dir), "not been built")
-  write_at("cedar_student_terms", t0 + 60)
+  write_at("cedar_student_terms", t0 + 60, full_row)
   expect_null(env$cedar_student_terms_staleness(dir))
+  # Built by last week's builder: every column but the one added since.
+  write_at("cedar_student_terms", t0 + 60,
+           dplyr::select(full_row, -cumulative_completed_unm_credits))
+  expect_match(env$cedar_student_terms_staleness(dir),
+               "^saved cedar_student_terms lacks column\\(s\\) the builder now writes: cumulative_completed_unm_credits$")
+  write_at("cedar_student_terms", t0 + 60, full_row)
   write_at("cedar_programs", t0 + 120)
   expect_match(env$cedar_student_terms_staleness(dir), "^cedar_programs newer than cedar_student_terms$")
   write_at("cedar_students", t0 + 180)

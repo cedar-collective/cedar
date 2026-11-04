@@ -63,7 +63,7 @@ A freshman with 129 earned credits. The per-term columns are right; the cumulati
 
 ### The two sound replacements
 
-- **`cedar_student_term_credits`** — built in `transform-to-cedar.R` from the per-term fields, so it inherits their reliability. `cumulative_completed_unm_credits` is a genuine running total. UNM-only, so a transfer student places earlier than their true standing; History graduates carry a median 58 UNM credits against 129.5 on the degree record, and the upper bands thin out badly (eligibility 101, 80, 33, 16, 4). Biology is healthy on the same axis (453, 407, 285, 209, 60). Never assume a population whose UNM record is complete arrived with no credit.
+- **`cedar_student_terms`' credit columns** — built by `build_student_terms()` in the transform from class-list rows, so they inherit the per-term fields' reliability. `cumulative_attempted_unm_credits` and `cumulative_completed_unm_credits` are genuine running totals, and `timeline_valid` is set beside them over the whole data (the retired `cedar_student_term_credits` carried the same numbers on enrolled terms only). UNM-only, so a transfer student places earlier than their true standing; History graduates carry a median 58 UNM credits against 129.5 on the degree record, and the upper bands thin out badly (eligibility 101, 80, 33, 16, 4). Biology is healthy on the same axis (453, 407, 285, 209, 60). Never assume a population whose UNM record is complete arrived with no credit.
 - **`build_gpa_timeline()`** in `R/branches/gpa-timeline.R` — a cumulative GPA that moves, rebuilt as a credit-weighted running mean over class-list grade points. `gpa_entering` is the matchable one: it excludes the term's own grades, which in a course-effect study *are* the outcome. Validated where the frozen field is right — `inst_gpa` is stamped at pull, so it should equal a student's true cumulative GPA at the **end** of their record and nowhere else; for students whose whole history is in-window the reconstruction lands within a median of **0.090** of it (85% within 0.25, r = 0.937). Not Banner's official GPA: UNM's repeat policy replaces the earlier grade of a repeated course, this counts both attempts.
 ### Descriptive vs matched — a pull-stamped field is not simply banned
 
@@ -100,9 +100,9 @@ Eligibility thins sharply toward the far end of every one of these axes. `pct_po
 
 ### Where the sound replacement lives
 
-`build_credit_timeline(term_credits, programs, opt)` in `R/branches/credit-timeline.R` is the single
+`build_credit_timeline(student_terms, programs, opt)` in `R/branches/credit-timeline.R` is the single
 sanctioned source for a per-term credit position. It returns `unm_credits_entering` /
-`unm_credits_after` (class-list series) and `total_credits_entering` / `total_credits_after` (plus a
+`unm_credits_after` (the student-term table's running totals) and `total_credits_entering` / `total_credits_after` (plus a
 transfer block recovered as `overall_credits_attempted - inst_credits_attempted`, a difference taken
 at one instant and so immune to the freeze), with `timeline_valid` marking students whose UNM history
 predates the data window. `attach_credit_position()` joins it onto any event table.
@@ -132,7 +132,7 @@ test and needs no cohort restriction. It is the default x-axis in Pathways → C
 reason. Prefer it unless the question is specifically about credit progress.
 
 **Every consumer has been migrated.** None of them falls back to the banned fields when
-`term_credits` is absent — they return NA and say so, because a missing number is visible downstream
+`student_terms` is absent — they return NA and say so, because a missing number is visible downstream
 and a wrong one is not:
 
 | Consumer | What it now reads |

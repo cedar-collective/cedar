@@ -68,7 +68,7 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
     # Powers the credit-band x-axis on the graduate Gen Ed section; that section
     # hides itself when this is absent rather than substituting a credit source
     # that cannot answer the question. See R/features/gen-ed.R.
-    term_credits <- data_objects[["cedar_student_term_credits"]]
+    student_terms <- data_objects[["cedar_student_terms"]]
 
     # Charts run to the newest enrolled term. Terms after the graded edge are
     # current registration, so every chart marks them and the page says so.
@@ -128,7 +128,7 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
       degrees = degrees,
       edges = data_objects[["cedar_edges"]],
       lookups = data_objects[["cedar_lookups"]],
-      term_credits = term_credits,
+      student_terms = student_terms,
       dept = reactive(active_scope()$dept),
       campus = reactive(active_scope()$campus),
       active = reactive(identical(input$tabs, "Gen Ed")),

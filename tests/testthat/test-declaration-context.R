@@ -22,14 +22,14 @@ hist_population <- tibble::tibble(
 )
 
 decl_context <- function(population = hist_population, opt = list(min_n = 1L),
-                         term_credits = NULL, focal_subjects = "HIST") {
+                         student_terms = NULL, focal_subjects = "HIST") {
   suppressMessages(get_declaration_context(
     programs       = test_programs,
     students       = test_students,
     population     = population,
     focal_subjects = focal_subjects,
     opt            = opt,
-    term_credits   = term_credits
+    student_terms  = student_terms
   ))
 }
 
@@ -51,13 +51,13 @@ test_that("pre-major rows never count as a declaration", {
 })
 
 
-test_that("credit position is NA without term_credits rather than read off the frozen columns", {
+test_that("credit position is NA without student_terms rather than read off the frozen columns", {
   # The field reliability contract: inst_credits_attempted / overall_credits_*
   # on cedar_programs are stamped at the pull and frozen across a student's
   # history. When the trustworthy class-list series is absent this function must
   # return NA, not fall back to those columns. A missing number is visible
   # downstream; a wrong one is not.
-  result <- decl_context(term_credits = NULL)
+  result <- decl_context(student_terms = NULL)
 
   expect_true(is.na(result$credits$mean_inst))
   expect_true(is.na(result$credits$median_inst))

@@ -280,8 +280,8 @@ definitions:
     versions:
       - version: "1.0.0"
         title: Historical credit position
-        summary: Per-term credit positions are reconstructed from class-list credit histories; pull-stamped Banner cumulative totals are not historical positions.
-        population: Students with term-credit histories and a valid observed start inside the data window.
+        summary: Per-term credit positions are the running class-list credit totals on the student-term table; pull-stamped Banner cumulative totals are not historical positions.
+        population: Students with class-list credit histories and a valid observed start inside the data window, as the student-term table flags it.
         unit: Student and term, explicitly entering or after the term.
         numerator: Running attempted or completed UNM credits as labeled. Total attempted credits add a recovered transfer-credit block.
         denominator: Not applicable to a credit position; aggregate medians use only eligible positions.
@@ -295,6 +295,8 @@ definitions:
         implementation:
           - file: R/branches/credit-timeline.R
             functions: [build_credit_timeline, attach_credit_position]
+          - file: R/branches/student-terms.R
+            functions: [build_student_terms]
 
   - id: roadblocks
     current_version: "2.1.0"

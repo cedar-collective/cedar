@@ -24,7 +24,7 @@
 #
 # Exported functions:
 #   pathwaysUI(id, campus_choices, program_choices, dept_choices, course_campus_choices)
-#   pathwaysServer(id, students, programs, degrees, cedar_grades, cedar_student_term_credits, cedar_student_terms, lookups, program_choices, dept_choices, edges, pathway_groups)
+#   pathwaysServer(id, students, programs, degrees, cedar_grades, cedar_student_terms, lookups, program_choices, dept_choices, edges, pathway_groups)
 #
 # Internal sub-module:
 #   populationSelectorUI(id, campus_choices, program_choices, dept_choices)
@@ -964,8 +964,7 @@ pathways_start_panel <- function() {
 # =============================================================================
 
 pathwaysServer <- function(id, students, programs, degrees = NULL,
-                           cedar_grades = NULL, cedar_student_term_credits = NULL,
-                           cedar_student_terms = NULL,
+                           cedar_grades = NULL, cedar_student_terms = NULL,
                            lookups = list(), program_choices = character(),
                            dept_choices = character(), edges, pathway_groups) {
   moduleServer(id, function(input, output, session) {
@@ -2198,14 +2197,14 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
       students_meta <- filter(students, student_id %in% pop_ids_ct) %>%
         select(student_id, term, student_classification, registration_status_code)
 
-      # term_credits is required by every credit-band axis: those modes rebuild
-      # the position from the per-term class-list series instead of reading the
+      # student_terms is required by every credit-band axis: those modes read
+      # the position from the student-term table's running total instead of the
       # frozen cumulative columns on cedar_programs. programs is still passed —
       # overall_credit_band uses it to recover the transfer block.
       result <- tryCatch(
         get_course_timing(students_pop, get_analysis_population(), programs = programs, opt = opt,
                           students_full = students_meta,
-                          term_credits = cedar_student_term_credits),
+                          student_terms = cedar_student_terms),
         error = function(e) {
           showNotification(paste("Course timing failed:", e$message), type = "error")
           NULL
@@ -2564,12 +2563,12 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
       )
 
       result <- tryCatch({
-        # term_credits is required for the credit-at-change figures; without it
+        # student_terms is required for the credit-at-change figures; without it
         # detect_major_changes() returns NA rather than reading the frozen
         # cumulative columns. See the field reliability contract in AGENTS.md.
         changes <- detect_major_changes(pop_programs,
                                         opt = list(observation_end_term = analysis_through),
-                                        term_credits = cedar_student_term_credits)
+                                        student_terms = cedar_student_terms)
 
         # focal_changes: only transitions that directly involve the population's programs.
         # A History population shows History→PolSci and PolSci→History, but NOT PolSci→Law
@@ -2582,7 +2581,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
           pop_programs, students, get_analysis_population(),
           focal_subjects = focal_subjects,
           opt = opt,
-          term_credits = cedar_student_term_credits
+          student_terms = cedar_student_terms
         )
 
         # Movement summary over the selected-unit program timeline. This is built
@@ -2597,23 +2596,15 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
           group_by(student_id) %>%
           summarize(first_unm_term = as.integer(min(term, na.rm = TRUE)), .groups = "drop")
 
-        # Per-term credit position for this population, from the class-list
-        # series rather than the cumulative columns on cedar_programs. Those are
-        # stamped at the pull and would report each student's total today at
-        # every historical term — see the field reliability contract in
-        # AGENTS.md. Built once here and joined wherever a position is needed.
-        credit_timeline <- if (!is.null(cedar_student_term_credits)) {
-          build_credit_timeline(cedar_student_term_credits, programs,
-                                opt = list(student_ids = pop_ids))
-        } else {
-          NULL
-        }
+        # Per-term credit position for this population, from the student-term
+        # table's running total rather than the cumulative columns on
+        # cedar_programs. Those are stamped at the pull and would report each
+        # student's total today at every historical term — see the field
+        # reliability contract in AGENTS.md. Built once here and joined
+        # wherever a position is needed.
+        credit_timeline <- build_credit_timeline(cedar_student_terms, programs,
+                                                 opt = list(student_ids = pop_ids))
         credit_at_term <- function(df, term_col = "term") {
-          if (is.null(credit_timeline)) {
-            df$unm_credits   <- NA_real_
-            df$total_credits <- NA_real_
-            return(df)
-          }
           # A left-truncated student's running total starts at zero mid-career,
           # so their position is not merely imprecise, it is wrong in a known
           # direction. Report it as unknown rather than as a low credit count —
@@ -2711,55 +2702,14 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
           left_join(first_pre_credits, by = "student_id") %>%
           left_join(first_full_credits, by = "student_id")
 
-        build_observed_credit_table <- function() {
-          students %>%
-            filter(
-              student_id %in% pop_ids,
-              registration_status_code %in% STATUS_REGISTERED,
-              !is.na(credits)
-            ) %>%
-            # CAMPUS_ROLLUP: one observed curriculum credit load per student-term.
-            distinct(student_id, term, subject_course, course_title, credits,
-                     final_grade, registration_status_code) %>%
-            mutate(
-              attempted_credit = credits,
-              completed_credit = if_else(final_grade %in% passing_grades, credits, 0)
-            ) %>%
-            group_by(student_id, term) %>%
-            summarize(
-              attempted_unm_credits = sum(attempted_credit, na.rm = TRUE),
-              completed_unm_credits = sum(completed_credit, na.rm = TRUE),
-              .groups = "drop"
-            ) %>%
-            arrange(student_id, term) %>%
-            group_by(student_id) %>%
-            mutate(
-              cumulative_attempted_unm_credits = cumsum(attempted_unm_credits),
-              cumulative_completed_unm_credits = cumsum(completed_unm_credits)
-            ) %>%
-            ungroup()
-        }
-
-        credit_required_cols <- c(
-          "student_id", "term",
-          "cumulative_attempted_unm_credits",
-          "cumulative_completed_unm_credits"
-        )
-        observed_student_term_credits <- if (
-          !is.null(cedar_student_term_credits) &&
-            nrow(cedar_student_term_credits) > 0 &&
-            all(credit_required_cols %in% names(cedar_student_term_credits))
-        ) {
-          cedar_student_term_credits %>%
-            filter(student_id %in% pop_ids) %>%
-            select(any_of(c(
-              "student_id", "term",
-              "cumulative_attempted_unm_credits",
-              "cumulative_completed_unm_credits"
-            )))
-        } else {
-          build_observed_credit_table()
-        }
+        # The population's running credit totals, as the student-term table
+        # carries them: attempted and completed UNM credits through the end of
+        # each term, for the movement cards' credit medians.
+        observed_credit_totals <- cedar_student_terms %>%
+          filter(student_id %in% pop_ids) %>%
+          select(student_id, term,
+                 cumulative_attempted_unm_credits,
+                 cumulative_completed_unm_credits)
 
         build_pathways_with_observed_credits <- function(changes, credit_table, opt = list()) {
           min_n <- opt$min_n %||% 3L
@@ -2820,14 +2770,14 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
         }
 
         pathways <- build_pathways_with_observed_credits(
-          focal_changes, observed_student_term_credits, opt = opt
+          focal_changes, observed_credit_totals, opt = opt
         )
 
         observed_unm_credit_at <- function(events, term_col, completed_col, attempted_col) {
           events %>%
             select(student_id, event_term = {{ term_col }}) %>%
             filter(!is.na(event_term)) %>%
-            left_join(observed_student_term_credits, by = "student_id") %>%
+            left_join(observed_credit_totals, by = "student_id") %>%
             filter(!is.na(term), term <= event_term) %>%
             arrange(student_id, term) %>%
             group_by(student_id) %>%

@@ -141,9 +141,11 @@ build_gpa_timeline <- function(students, opt = list()) {
     ) %>%
     dplyr::ungroup()
 
-  # Same rule, same helper as the credit timeline: a running mean over a record
-  # that starts mid-career is not a cumulative GPA, it is the GPA of whatever
-  # fragment happens to be inside the window.
+  # The same rule cedar_student_terms$timeline_valid is set by: a running mean
+  # over a record that starts mid-career is not a cumulative GPA, it is the GPA
+  # of whatever fragment happens to be inside the window. This series is still
+  # built from class-list rows, so it derives the flag through the shared helper
+  # rather than reading it off the table.
   validity <- credit_timeline_validity(students, opt = opt)
 
   timeline %>%

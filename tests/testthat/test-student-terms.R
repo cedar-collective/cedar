@@ -181,9 +181,38 @@ test_that("credit position is a running total over the student's terms", {
   expect_equal(k10$cumulative_attempted_unm_credits, 3)
   expect_equal(k80$unm_credits_entering, 3)
   expect_equal(k80$cumulative_attempted_unm_credits, 6)
+  # ST_K passed both courses (A, B), so the completed total runs beside it;
+  # ST_H's C- and DW earn nothing, so theirs stops at the A's credits.
+  expect_equal(k10$cumulative_completed_unm_credits, 3)
+  expect_equal(k80$cumulative_completed_unm_credits, 6)
+  expect_equal(row(st, "ST_H", 202010L)$cumulative_completed_unm_credits, 3)
   # every ST01 student first appears in the data's first term, so none is valid
   expect_false(any(st$timeline_valid[st$student_id != "ST_I"]))
   expect_true(row(st, "ST_I", 202110L)$timeline_valid)
+})
+
+test_that("the credit window opens with the class lists, not with the programs", {
+  # UNM's academic studies reaches back a year before its class lists. Judged
+  # against the table's own first row, a student first registered in the first
+  # class-list term looked valid whenever someone else had an earlier
+  # declaration (12,935 students on the 2026-11-04 pull); and a student
+  # declared before the class lists begin has credits no row can show.
+  # Local scaffold: a term before the stable set, so outside ST01's counts.
+  early <- dplyr::bind_rows(
+    test_programs_st,
+    .st_program("ST_A", "HIST", term = 201980L),   # someone declared a term earlier
+    .st_program("ST_I", "HIST", term = 201980L)    # ST_I's history predates the class lists
+  )
+  st <- suppressMessages(build_student_terms(test_students_st, early, test_degrees_st))
+  # ST_K first registers in 202010, the first class-list term: still invalid,
+  # whatever the programs' first term is. (min(st$term) in the builder makes
+  # this TRUE.)
+  expect_false(any(st$timeline_valid[st$student_id == "ST_K"]))
+  # ST_I's only class list is 202110, but their 201980 declaration says they
+  # were here before the window opened.
+  expect_false(any(st$timeline_valid[st$student_id == "ST_I"]))
+  # ST_A: declared 201980, registered 202010 — invalid either way.
+  expect_false(any(st$timeline_valid[st$student_id == "ST_A"]))
 })
 
 test_that("the build fails loudly without a settled edge or with a missing column", {

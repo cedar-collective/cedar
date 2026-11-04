@@ -700,28 +700,40 @@ test_that("course pairs scope by delivery campus but keep cross-campus pairs", {
 # The classification axis reads a per-term Banner value and is unaffected, which
 # is why it is the default and why the guard must not touch it.
 
-make_pathway_term_credits <- function() {
-  tibble(
-    student_id = c("S001", "S001", "S001",
-                   "S002", "S002", "S002",
-                   "S003", "S003",
-                   "S004", "S004", "S004",
-                   "S005", "S005"),
-    term = c(202410L, 202480L, 202510L,
-             202410L, 202480L, 202510L,
-             202410L, 202480L,
-             202410L, 202480L, 202510L,
-             202480L, 202510L),
-    attempted_unm_credits = rep(15, 13),
-    completed_unm_credits = rep(15, 13)
+# The position columns of cedar_student_terms for the S00x students, as
+# build_student_terms() would write them: running totals per student, and
+# timeline_valid set against the first term in the whole table. `extra` rows
+# are bound in before either is derived, so a row on an earlier term opens the
+# window for everyone.
+make_pathway_student_terms <- function(extra = NULL) {
+  dplyr::bind_rows(
+    tibble(
+      student_id = c("S001", "S001", "S001",
+                     "S002", "S002", "S002",
+                     "S003", "S003",
+                     "S004", "S004", "S004",
+                     "S005", "S005"),
+      term = c(202410L, 202480L, 202510L,
+               202410L, 202480L, 202510L,
+               202410L, 202480L,
+               202410L, 202480L, 202510L,
+               202480L, 202510L),
+      attempted_unm_credits = rep(15, 13),
+      completed_unm_credits = rep(15, 13)
+    ),
+    extra
   ) %>%
+    dplyr::mutate(.min_data_term = min(term)) %>%
     dplyr::group_by(student_id) %>%
     dplyr::arrange(term, .by_group = TRUE) %>%
     dplyr::mutate(
       cumulative_attempted_unm_credits = cumsum(attempted_unm_credits),
-      cumulative_completed_unm_credits = cumsum(completed_unm_credits)
+      cumulative_completed_unm_credits = cumsum(completed_unm_credits),
+      unm_credits_entering = cumulative_attempted_unm_credits - attempted_unm_credits,
+      timeline_valid = min(term) > .min_data_term
     ) %>%
-    dplyr::ungroup()
+    dplyr::ungroup() %>%
+    dplyr::select(-.min_data_term)
 }
 
 test_that("inst_credit_band drops left-truncated students and reports the count", {
@@ -729,7 +741,7 @@ test_that("inst_credit_band drops left-truncated students and reports the count"
     make_pathway_students(),
     make_pathway_population(),
     opt = list(min_n = 1, x_axis = "inst_credit_band"),
-    term_credits = make_pathway_term_credits()
+    student_terms = make_pathway_student_terms()
   )
 
   meta <- attr(result, "timing_meta")
@@ -753,7 +765,7 @@ test_that("unm_credit_band carries the same guard as the other credit axes", {
     make_pathway_students(),
     make_pathway_population(),
     opt = list(min_n = 1, x_axis = "unm_credit_band"),
-    term_credits = make_pathway_term_credits()
+    student_terms = make_pathway_student_terms()
   )
 
   expect_equal(attr(result, "timing_meta")$n_truncated, 4)
@@ -765,7 +777,7 @@ test_that("classification axis excludes nobody for truncation", {
     make_pathway_students(),
     make_pathway_population(),
     opt = list(min_n = 1, x_axis = "classification"),
-    term_credits = make_pathway_term_credits()
+    student_terms = make_pathway_student_terms()
   )
 
   expect_equal(attr(result, "timing_meta")$n_truncated, 0L)
@@ -774,20 +786,16 @@ test_that("classification axis excludes nobody for truncation", {
 })
 
 test_that("a fully-visible population loses no students to the guard", {
-  # Same data, but an earlier term now exists in the credit table, so the window
-  # opens before every S00x student's first term and none of them are truncated.
-  tc <- make_pathway_term_credits()
+  # Same data, but an earlier term now exists in the student-term table, so the
+  # window opens before every S00x student's first term and none of them are
+  # truncated.
   result <- get_course_timing(
     make_pathway_students(),
     make_pathway_population(),
     opt = list(min_n = 1, x_axis = "inst_credit_band"),
-    term_credits = dplyr::bind_rows(
-      tibble(student_id = "S000", term = 202380L,
-             attempted_unm_credits = 12, completed_unm_credits = 12,
-             cumulative_attempted_unm_credits = 12,
-             cumulative_completed_unm_credits = 12),
-      tc
-    )
+    student_terms = make_pathway_student_terms(
+      extra = tibble(student_id = "S000", term = 202380L,
+                     attempted_unm_credits = 12, completed_unm_credits = 12))
   )
 
   expect_equal(attr(result, "timing_meta")$n_truncated, 0)

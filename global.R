@@ -82,7 +82,6 @@ if (is_docker()) {
 # CEDAR Data Files:
 #   - cedar_sections.qs    - Course sections
 #   - cedar_students.qs    - Student enrollments
-#   - cedar_student_term_credits.qs - Observed UNM credits by student-term
 #   - cedar_student_terms.qs - One row per student-term: enrolled, returned (ADR-001)
 #   - cedar_programs.qs    - Program enrollments
 #   - cedar_degrees.qs     - Degrees awarded
@@ -92,7 +91,6 @@ if (is_docker()) {
 # data_objects Structure (what cones expect):
 #   data_objects[["cedar_sections"]]  - Course sections
 #   data_objects[["cedar_students"]]  - Student enrollments
-#   data_objects[["cedar_student_term_credits"]] - Observed UNM credits by student-term
 #   data_objects[["cedar_student_terms"]] - One row per student-term (enrolled, returned)
 #   data_objects[["cedar_programs"]]  - Program enrollments
 #   data_objects[["cedar_degrees"]]   - Degrees awarded
@@ -112,7 +110,6 @@ cedar_files <- list(
   cedar_faculty    = "cedar_faculty",
   cedar_lookups    = "cedar_lookups",    # Auto-generated normalization tables
   cedar_grades     = "cedar_grades",     # Pre-classified outcomes (pass/dfw) — speeds up Roadblocks
-  cedar_student_term_credits = "cedar_student_term_credits", # Observed UNM credits by student-term
   cedar_student_terms = "cedar_student_terms", # One row per student-term: enrolled, returned (ADR-001 step 2)
   cedar_applicants = "cedar_applicants"  # Admissions data — used for course impact covariate matching
 )
@@ -209,7 +206,10 @@ validation_specs <- list(
   cedar_programs = c("term", "student_level", "program_type", "program_name", "dept_code", "student_college", "student_campus"),
   cedar_degrees = c("term", "degree", "major_code"),
   cedar_faculty = c("term", "instructor_id", "department", "job_category"),
-  cedar_student_terms = c("student_id", "term", "enrolled", "returned_next_regular_term", "return_observable")
+  cedar_student_terms = c("student_id", "term", "enrolled", "returned_next_regular_term", "return_observable",
+                          # the credit position every Pathways credit axis reads
+                          "cumulative_attempted_unm_credits", "cumulative_completed_unm_credits",
+                          "unm_credits_entering", "timeline_valid")
 )
 
 # cedar_student_terms is built by the transform from students, programs and
@@ -240,8 +240,7 @@ if (validation_failed) {
 message("[global.R] ✅ All CEDAR data validated successfully!")
 
 # Drop data older than cedar_min_term (set in shiny_config.R).
-for (.key in c("cedar_sections", "cedar_students", "cedar_grades", "cedar_student_term_credits",
-               "cedar_student_terms", "cedar_faculty", "cedar_degrees", "cedar_programs")) {
+for (.key in c("cedar_sections", "cedar_students", "cedar_grades", "cedar_student_terms", "cedar_faculty", "cedar_degrees", "cedar_programs")) {
   if (!is.null(data_objects[[.key]]) && "term" %in% names(data_objects[[.key]])) {
     .n_before <- nrow(data_objects[[.key]])
     data_objects[[.key]] <- dplyr::filter(data_objects[[.key]], term >= cedar_min_term)
@@ -328,11 +327,6 @@ message(sprintf(
 message("[global.R] Data objects ready:")
 message("  - cedar_sections: ", nrow(data_objects[["cedar_sections"]]), " rows")
 message("  - cedar_students: ", nrow(data_objects[["cedar_students"]]), " rows")
-if (!is.null(data_objects[["cedar_student_term_credits"]]) &&
-    nrow(data_objects[["cedar_student_term_credits"]]) > 0) {
-  message("  - cedar_student_term_credits: ",
-          nrow(data_objects[["cedar_student_term_credits"]]), " rows")
-}
 message("  - cedar_student_terms: ", nrow(data_objects[["cedar_student_terms"]]), " rows")
 message("  - cedar_programs: ", nrow(data_objects[["cedar_programs"]]), " rows")
 message("  - cedar_degrees: ", nrow(data_objects[["cedar_degrees"]]), " rows")

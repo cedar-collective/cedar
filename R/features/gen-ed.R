@@ -560,7 +560,7 @@ get_gen_ed_profile <- function(students, sections, programs, degrees = NULL, opt
 #' [plot_curriculum_map()] rendering as Pathways > Course Timing. It differs in
 #' two deliberate ways: the population is fixed to department graduates rather
 #' than user-selected, and the x-axis is `unm_credit_band` rather than the
-#' program-record credit fields — see the `term_credits` docs in
+#' program-record credit fields — see the `student_terms` docs in
 #' `R/cones/pathway.R` for why those fields cannot answer this question.
 #'
 #' Enrollment rows are capped at each student's graduation term before timing
@@ -569,7 +569,7 @@ get_gen_ed_profile <- function(students, sections, programs, degrees = NULL, opt
 #'
 #' @param students Data frame. The `cedar_students` table.
 #' @param degrees Data frame. The `cedar_degrees` table.
-#' @param term_credits Data frame. The `cedar_student_term_credits` table.
+#' @param student_terms Data frame. The `cedar_student_terms` table.
 #' @param opt List of options:
 #'   \describe{
 #'     \item{`dept_code`}{Character. Required.}
@@ -600,7 +600,7 @@ get_gen_ed_profile <- function(students, sections, programs, degrees = NULL, opt
 #'   Plus `cohort_meta` and `n_cohort`, which describe the shared cohort and so
 #'   belong to neither scope. When the cohort is empty every table is present but
 #'   zero-row, so callers render an explanation rather than branching on NULL.
-get_gen_ed_grad_profile <- function(students, degrees, term_credits, opt = list()) {
+get_gen_ed_grad_profile <- function(students, degrees, student_terms, opt = list()) {
 
   min_n <- suppressWarnings(as.integer(opt$min_n %||% 3L))
   if (length(min_n) == 0 || is.na(min_n) || min_n < 1L) min_n <- 3L
@@ -684,7 +684,7 @@ get_gen_ed_grad_profile <- function(students, degrees, term_credits, opt = list(
       denominator       = "population",
       min_n             = 1L
     ),
-    term_credits = term_credits
+    student_terms = student_terms
   )
 
   # Both scopes are cut from this one timing frame rather than computed by a

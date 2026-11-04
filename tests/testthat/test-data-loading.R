@@ -7,8 +7,7 @@ with_temp_cedar_data_dir <- function(code) {
   old_use_qs <- if (exists("cedar_use_qs", inherits = TRUE)) cedar_use_qs else NULL
   old_use_small <- if (exists("cedar_use_small_data", inherits = TRUE)) cedar_use_small_data else NULL
   global_names <- c(
-    "sections", "courses", "students", "cedar_student_term_credits",
-    "student_term_credits", "cedar_student_terms", "programs", "degrees", "faculty", "fac_by_term",
+    "sections", "courses", "students", "cedar_student_terms", "programs", "degrees", "faculty", "fac_by_term",
     "applicants", "data_objects"
   )
   old_globals <- stats::setNames(vector("list", length(global_names)), global_names)
@@ -87,9 +86,8 @@ test_that("load_global_data loads all required CEDAR model objects from configur
   # is which files load_global_data() reaches for. See AGENTS.md.
   with_temp_cedar_data_dir({
     cedar_files <- c(
-      "cedar_sections", "cedar_students", "cedar_student_term_credits",
-      "cedar_student_terms", "cedar_programs", "cedar_degrees", "cedar_faculty",
-      "cedar_applicants"
+      "cedar_sections", "cedar_students", "cedar_student_terms",
+      "cedar_programs", "cedar_degrees", "cedar_faculty", "cedar_applicants"
     )
 
     for (name in cedar_files) {

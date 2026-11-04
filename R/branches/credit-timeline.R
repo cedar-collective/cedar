@@ -16,9 +16,11 @@
 #
 # THE RECONSTRUCTION
 #
-# UNM-side history is trustworthy: cedar_student_term_credits is derived from
-# class lists, one row per enrolled term, and is a genuine running total. What it
-# cannot see is credit the student arrived with.
+# UNM-side history is trustworthy: cedar_student_terms carries, on every
+# student-term row, the term's attempted credits from the class list and the
+# running total over the student's terms in the data (`unm_credits_entering`,
+# `cumulative_attempted_unm_credits`), computed once in the transform by
+# build_student_terms(). What it cannot see is credit the student arrived with.
 #
 # Transfer credit is recoverable as a difference of the two frozen columns. Both
 # are stamped at the same instant, so the *gap* between them survives the freeze:
@@ -35,17 +37,20 @@
 #   * The UNM running total starts at zero on the first term IN THE DATA. For a
 #     student already enrolled when the window opens, their timeline begins
 #     mid-career reading zero. `timeline_valid` marks who this applies to;
-#     callers must filter or caveat rather than quietly averaging them in.
+#     callers must filter or caveat rather than quietly averaging them in. The
+#     flag is set on the table at build time, over the whole data, so a slice
+#     of the table handed to this function keeps the right answer.
 
 
 #' Build a Per-Term Credit Position for Students
 #'
-#' One row per (student, enrolled term) giving how many credits the student had
-#' *entering* that term — the figure that answers "where were they when they did
-#' this" — and after completing it.
+#' One row per student-term giving how many credits the student had *entering*
+#' that term — the figure that answers "where were they when they did this" —
+#' and after completing it. A term the student was declared but not enrolled in
+#' is a row too, carrying the position unchanged.
 #'
-#' @param term_credits Data frame. `cedar_student_term_credits`. Required; this
-#'   is the trustworthy UNM series.
+#' @param student_terms Data frame. `cedar_student_terms`. Required; this is
+#'   the trustworthy UNM series, and `timeline_valid` is read from it.
 #' @param programs Data frame or NULL. `cedar_programs`, used only to recover
 #'   each student's transfer block. NULL yields a UNM-only timeline with
 #'   `transfer_credits = 0` and `total_*` equal to `unm_*`, which is honest but
@@ -53,18 +58,7 @@
 #' @param opt List of options:
 #'   \describe{
 #'     \item{`student_ids`}{Character vector. Restrict to these students. Strongly
-#'       recommended — the full table is ~430k rows.}
-#'     \item{`min_data_term`}{Integer. First term present in the enrollment data.
-#'       Used to set `timeline_valid`. Defaults to the earliest term in
-#'       `term_credits`.}
-#'     \item{`student_first_terms`}{Data frame with `student_id` and
-#'       `first_unm_term`. **Required if you pre-filtered `term_credits` by
-#'       term.** `timeline_valid` asks whether a student's history starts inside
-#'       the data, which cannot be read off a slice: filtering to
-#'       `term <= grad_term` hides nothing, but filtering to `term >= X` hides
-#'       exactly the early rows that make a student invalid, and every one of
-#'       them would then be marked valid. Supplying this makes the guard immune
-#'       to how the input was sliced.}
+#'       recommended — the full table is ~520k rows.}
 #'   }
 #'
 #' @return Tibble with `student_id`, `term`, `unm_credits_entering`,
@@ -72,31 +66,95 @@
 #'   `total_credits_after`, and `timeline_valid` (FALSE when the student's first
 #'   term in the data is the first term of the data, so their earlier
 #'   coursework is invisible and the running total starts too low).
+build_credit_timeline <- function(student_terms, programs = NULL, opt = list()) {
+
+  needed <- c("student_id", "term", "unm_credits_entering",
+              "cumulative_attempted_unm_credits", "timeline_valid")
+  missing_cols <- setdiff(needed, names(student_terms))
+  if (length(missing_cols) > 0) {
+    stop("[credit-timeline.R] student_terms is missing required column(s): ",
+         paste(missing_cols, collapse = ", "),
+         ". Expected the cedar_student_terms table.")
+  }
+
+  st <- student_terms
+  if (!is.null(opt$student_ids) && length(opt$student_ids) > 0) {
+    st <- dplyr::filter(st, student_id %in% opt$student_ids)
+  }
+  if (nrow(st) == 0) {
+    return(tibble::tibble(
+      student_id = character(), term = integer(),
+      unm_credits_entering = numeric(), unm_credits_after = numeric(),
+      transfer_credits = numeric(), total_credits_entering = numeric(),
+      total_credits_after = numeric(), timeline_valid = logical()
+    ))
+  }
+
+  # Attempted basis throughout. The transfer block below is a difference of two
+  # attempted columns, so pairing it with completed UNM credits would add
+  # attempted transfer hours to completed UNM hours and silently inflate anyone
+  # who failed or withdrew from a course.
+  timeline <- st %>%
+    dplyr::transmute(
+      student_id, term,
+      unm_credits_entering,
+      unm_credits_after = cumulative_attempted_unm_credits,
+      # The table sets the flag over the whole data; an NA here is a row the
+      # builder could not place, and unknown is not valid.
+      timeline_valid = !is.na(timeline_valid) & timeline_valid
+    ) %>%
+    dplyr::arrange(student_id, term)
+
+  transfer <- .credit_timeline_transfer_block(programs, unique(timeline$student_id))
+
+  timeline %>%
+    dplyr::left_join(transfer, by = "student_id") %>%
+    dplyr::mutate(
+      transfer_credits       = dplyr::coalesce(transfer_credits, 0),
+      total_credits_entering = transfer_credits + unm_credits_entering,
+      total_credits_after    = transfer_credits + unm_credits_after
+    ) %>%
+    dplyr::select(student_id, term, unm_credits_entering, unm_credits_after,
+                  transfer_credits, total_credits_entering, total_credits_after,
+                  timeline_valid)
+}
+
+
 #' Which Students Have a Readable Credit Timeline
 #'
-#' The `timeline_valid` rule on its own, for callers that need the flag without
-#' the credit series — notably an axis sourced from the *completed*-credit
-#' columns, which cannot call [build_credit_timeline()] because that requires the
-#' attempted ones. Factored out so there is exactly one definition of "we can see
-#' this student's whole record"; a second local rule is how the two drift apart.
+#' The `timeline_valid` rule over a raw (student, term) frame, for the one
+#' reader that still builds its own running series from class-list rows:
+#' [build_gpa_timeline()]. The credit position itself no longer needs this —
+#' `cedar_student_terms` carries `timeline_valid`, set by
+#' `build_student_terms()` over the whole data — and a reader with that table
+#' in hand reads the column rather than re-deriving it. Kept so there is still
+#' exactly one definition of "we can see this student's whole record" for a
+#' series built from rows; a second local rule is how the two drift apart.
 #'
 #' Needs only `student_id` and `term`.
 #'
-#' @param term_credits Data frame. `cedar_student_term_credits`, **unsliced by
-#'   term** where possible — see `opt$student_first_terms`.
-#' @param opt List. Accepts `student_ids`, `min_data_term`, and
-#'   `student_first_terms`, with the same meanings as in
-#'   [build_credit_timeline()].
+#' @param rows Data frame with `student_id` and `term`, **unsliced by term**
+#'   where possible — see `opt$student_first_terms`.
+#' @param opt List of options:
+#'   \describe{
+#'     \item{`student_ids`}{Character vector. Restrict to these students.}
+#'     \item{`min_data_term`}{Integer. First term present in the data. Defaults
+#'       to the earliest term in `rows`.}
+#'     \item{`student_first_terms`}{Data frame with `student_id` and
+#'       `first_unm_term`. **Required if you pre-filtered `rows` by term.**
+#'       Filtering to `term >= X` hides exactly the early rows that make a
+#'       student invalid, and every one of them would then be marked valid.}
+#'   }
 #' @return Tibble of `student_id` and `timeline_valid`.
-credit_timeline_validity <- function(term_credits, opt = list()) {
+credit_timeline_validity <- function(rows, opt = list()) {
 
-  missing_cols <- setdiff(c("student_id", "term"), names(term_credits))
+  missing_cols <- setdiff(c("student_id", "term"), names(rows))
   if (length(missing_cols) > 0) {
-    stop("[credit-timeline.R] term_credits is missing required column(s): ",
+    stop("[credit-timeline.R] rows is missing required column(s): ",
          paste(missing_cols, collapse = ", "))
   }
 
-  tc <- term_credits
+  tc <- rows
   if (!is.null(opt$student_ids) && length(opt$student_ids) > 0) {
     tc <- dplyr::filter(tc, student_id %in% opt$student_ids)
   }
@@ -104,7 +162,7 @@ credit_timeline_validity <- function(term_credits, opt = list()) {
   # Read from the FULL table, not the population slice: the window opens where
   # the data opens, not where this cohort happens to start.
   min_data_term <- opt$min_data_term %||%
-    suppressWarnings(min(term_credits$term, na.rm = TRUE))
+    suppressWarnings(min(rows$term, na.rm = TRUE))
 
   # First terms come from the caller when supplied, and otherwise from the input
   # itself. See the student_first_terms note above for why the distinction
@@ -129,60 +187,6 @@ credit_timeline_validity <- function(term_credits, opt = list()) {
     # student. Unknown is not the same as fine — fail closed.
     dplyr::mutate(timeline_valid = !is.na(first_unm_term) & first_unm_term > min_data_term) %>%
     dplyr::select(student_id, timeline_valid)
-}
-
-
-build_credit_timeline <- function(term_credits, programs = NULL, opt = list()) {
-
-  needed <- c("student_id", "term", "attempted_unm_credits",
-              "cumulative_attempted_unm_credits")
-  missing_cols <- setdiff(needed, names(term_credits))
-  if (length(missing_cols) > 0) {
-    stop("[credit-timeline.R] term_credits is missing required column(s): ",
-         paste(missing_cols, collapse = ", "),
-         ". Expected the cedar_student_term_credits table.")
-  }
-
-  tc <- term_credits
-  if (!is.null(opt$student_ids) && length(opt$student_ids) > 0) {
-    tc <- dplyr::filter(tc, student_id %in% opt$student_ids)
-  }
-  if (nrow(tc) == 0) {
-    return(tibble::tibble(
-      student_id = character(), term = integer(),
-      unm_credits_entering = numeric(), unm_credits_after = numeric(),
-      transfer_credits = numeric(), total_credits_entering = numeric(),
-      total_credits_after = numeric(), timeline_valid = logical()
-    ))
-  }
-
-  # Attempted basis throughout. The transfer block below is a difference of two
-  # attempted columns, so pairing it with completed UNM credits would add
-  # attempted transfer hours to completed UNM hours and silently inflate anyone
-  # who failed or withdrew from a course.
-  timeline <- tc %>%
-    dplyr::arrange(student_id, term) %>%
-    dplyr::group_by(student_id) %>%
-    dplyr::mutate(
-      unm_credits_after    = cumulative_attempted_unm_credits,
-      unm_credits_entering = cumulative_attempted_unm_credits - attempted_unm_credits
-    ) %>%
-    dplyr::ungroup() %>%
-    dplyr::left_join(
-      credit_timeline_validity(term_credits, opt = opt), by = "student_id")
-
-  transfer <- .credit_timeline_transfer_block(programs, unique(timeline$student_id))
-
-  timeline %>%
-    dplyr::left_join(transfer, by = "student_id") %>%
-    dplyr::mutate(
-      transfer_credits       = dplyr::coalesce(transfer_credits, 0),
-      total_credits_entering = transfer_credits + unm_credits_entering,
-      total_credits_after    = transfer_credits + unm_credits_after
-    ) %>%
-    dplyr::select(student_id, term, unm_credits_entering, unm_credits_after,
-                  transfer_credits, total_credits_entering, total_credits_after,
-                  timeline_valid)
 }
 
 
@@ -230,8 +234,8 @@ build_credit_timeline <- function(term_credits, programs = NULL, opt = list()) {
 #'
 #' @return `events` with `credits_entering` and `timeline_valid` added. Rows with
 #'   no matching timeline entry get NA rather than being dropped — an event in a
-#'   term the student had no graded enrollment in is real and should stay
-#'   visible, just without a credit position.
+#'   term the student has no row for is real and should stay visible, just
+#'   without a credit position.
 attach_credit_position <- function(events, timeline, term_col = "term",
                                    basis = c("total", "unm")) {
   basis <- match.arg(basis)

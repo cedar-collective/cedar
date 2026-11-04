@@ -120,7 +120,7 @@
 #'     \item{n_treatment, n_control}{Group sizes.}
 #'   }
 get_course_sequence_effect <- function(students, programs, applicants = NULL,
-                                       opt = list(), term_credits = NULL,
+                                       opt = list(), student_terms = NULL,
                                        data_edges = NULL) {
   course_x <- opt$course_x
   course_y <- opt$course_y
@@ -231,7 +231,7 @@ get_course_sequence_effect <- function(students, programs, applicants = NULL,
     applicants      = applicants,
     students        = students,
     covariate_terms = covariate_terms,
-    term_credits    = term_credits
+    student_terms    = student_terms
   )
   groups <- comparison$groups
   n_dropped_by_programs <- length(treatment_ids) - comparison$n_treatment

@@ -2461,9 +2461,9 @@ own). A new salt changes every student ID, consistently across terms within a
 rebuilt table, since the transform rehashes every term from the stored MD5s.
 But tables built under different salts no longer join, so the change must be
 one complete rebuild of every table holding student IDs (`cedar_programs`,
-`cedar_degrees`, `cedar_students`, `cedar_grades`,
-`cedar_student_term_credits`, `cedar_next_term`, `cedar_applicants`; the
-course-flow and enrollment caches hold none), checked afterwards on Admin >
+`cedar_degrees`, `cedar_students`, `cedar_grades`, `cedar_student_terms`,
+`cedar_applicants`; the course-flow and enrollment caches hold none; `cedar_student_term_credits`
+and `cedar_next_term` are retired), checked afterwards on Admin >
 Join Integrity. Salting the parse stage too means a one-time migration of the
 stored exports' MD5s, not a re-pull.
 

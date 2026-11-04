@@ -97,9 +97,8 @@ load_global_data <- function(opt) {
 load_cedar_model_data <- function(opt) {
   # Define CEDAR files to load
   cedar_files <- c(
-    "cedar_sections", "cedar_students", "cedar_student_term_credits",
-    "cedar_student_terms", "cedar_programs", "cedar_degrees", "cedar_faculty",
-    "cedar_applicants"
+    "cedar_sections", "cedar_students", "cedar_student_terms",
+    "cedar_programs", "cedar_degrees", "cedar_faculty", "cedar_applicants"
   )
   message("[data.R] cedar_files: ", paste(cedar_files, collapse=", "))
 
@@ -126,8 +125,6 @@ load_cedar_model_data <- function(opt) {
   if (is.null(opt) || opt[["func"]] != "enrl") {
     # students table contains class lists (student enrollments in sections)
     .GlobalEnv$students <- data_objects[["cedar_students"]]
-    .GlobalEnv$cedar_student_term_credits <- data_objects[["cedar_student_term_credits"]]
-    .GlobalEnv$student_term_credits <- data_objects[["cedar_student_term_credits"]]
     .GlobalEnv$cedar_student_terms <- data_objects[["cedar_student_terms"]]
     .GlobalEnv$programs <- data_objects[["cedar_programs"]]
     .GlobalEnv$degrees <- data_objects[["cedar_degrees"]]

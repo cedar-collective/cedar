@@ -149,7 +149,7 @@ These are the main code paths:
 | Courses Before Major Entry heatmaps | `R/cones/entry-heatmap.R`: `get_entry_heatmap()` |
 | Major Changes | `R/branches/major-change-detection.R`: `detect_major_changes()` plus display assembly in `R/modules/pathways.R` |
 | Courses in the Term Before Students Left | `R/cones/major-changes.R`: `get_pre_change_courses()` |
-| Credit positions used in timing/change cards | `R/branches/credit-timeline.R`: `build_credit_timeline()`; `cedar_student_term_credits` from class-list history |
+| Credit positions used in timing/change cards | `R/branches/credit-timeline.R`: `build_credit_timeline()`; the running credit totals on `cedar_student_terms`, built from class-list history |
 
 Two rules explain many surprising Pathways numbers:
 
@@ -168,7 +168,7 @@ Timing is based on observed terms:
 - **Always UNM** means the earliest available Academic Studies `student_population` label used by this analysis does not contain “transfer.”
 - **Transfer** means that earliest available `student_population` label contains “transfer.” No credit threshold is used for this origin label.
 - **Completed UNM credits** are derived from class-list rows with credit-earning outcomes.
-- **Attempted UNM credits** are derived from registered class-list rows and accumulated term by term in `cedar_student_term_credits`. They are not the pull-stamped Academic Studies `Institution Credits Attempted` value.
+- **Attempted UNM credits** are derived from registered class-list rows and accumulated term by term on `cedar_student_terms`. They are not the pull-stamped Academic Studies `Institution Credits Attempted` value.
 
 Because CEDAR does not always have a formal Banner matriculation term in the student-course data, students already present at the left edge of the available data can have uncertain starts. Those students remain visible in reference tables where appropriate, but they are excluded from timing cards that would otherwise imply a precision the data do not support.
 

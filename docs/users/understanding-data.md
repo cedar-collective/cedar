@@ -43,8 +43,8 @@ field. When an analysis needs a student's enrollment anchor, CEDAR may use the
 minimum observed class-list term for that student. This means "first observed
 class-list enrollment," not a formal Banner matriculation or start-term field.
 
-CEDAR also derives `cedar_student_term_credits` from Class Lists. This table
-summarizes each student's observed UNM credits by term and is used by Pathways
+CEDAR also carries each student's observed UNM credits by term on
+`cedar_student_terms`, derived from Class Lists, and Pathways reads them
 for movement-card credit timing and Common Pathways medians. Completed credits
 come from credit-earning outcomes; attempted credits come from observed
 registered course attempts.

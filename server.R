@@ -11,7 +11,6 @@ server <- function(input, output, session) {
   # DEPENDENCIES (loaded via global.R):
   #   - data_objects[["cedar_sections"]]  - Course sections (DESRs)
   #   - data_objects[["cedar_students"]]  - Student enrollments (class lists)
-  #   - data_objects[["cedar_student_term_credits"]] - Observed UNM credits by student-term
   #   - data_objects[["cedar_student_terms"]] - One row per student-term: enrolled, returned
   #   - data_objects[["cedar_programs"]]  - Student programs (academic studies)
   #   - data_objects[["cedar_degrees"]]   - Degree completions
@@ -31,7 +30,6 @@ server <- function(input, output, session) {
   cedar_faculty   <- data_objects[["cedar_faculty"]]
   # Optional pre-computed tables — NULL/empty if files don't exist yet (before transform runs)
   cedar_grades    <- data_objects[["cedar_grades"]]
-  cedar_student_term_credits <- data_objects[["cedar_student_term_credits"]]
   # One row per student-term (ADR-001 step 2): the one definition of enrolled
   # and returned, read by Roadblocks and Course Dynamics retention.
   cedar_student_terms <- data_objects[["cedar_student_terms"]]
@@ -4332,7 +4330,7 @@ output$enrl_classlist_download <- downloadHandler(
           programs     = data_objects[["cedar_programs"]],
           applicants   = data_objects[["cedar_applicants"]],
           opt          = opt,
-          term_credits = data_objects[["cedar_student_term_credits"]],
+          student_terms = data_objects[["cedar_student_terms"]],
           data_edges   = data_objects[["cedar_edges"]]
         )
         cr_impact_sequence_data(result)
@@ -4546,7 +4544,7 @@ output$enrl_classlist_download <- downloadHandler(
           programs     = data_objects[["cedar_programs"]],
           applicants   = data_objects[["cedar_applicants"]],
           opt          = opt,
-          term_credits = data_objects[["cedar_student_term_credits"]],
+          student_terms = data_objects[["cedar_student_terms"]],
           data_edges   = data_objects[["cedar_edges"]]
         )
         cr_impact_instructor_data(result)
@@ -5715,7 +5713,7 @@ output$enrl_classlist_download <- downloadHandler(
     if (is.null(students) || nrow(students) == 0) return(NULL)
 
     candidates <- c("cedar_programs", "cedar_degrees", "cedar_applicants",
-                    "cedar_student_term_credits", "cedar_student_terms", "cedar_grades")
+                    "cedar_student_terms", "cedar_grades")
     tables <- Filter(
       function(d) !is.null(d) && nrow(d) > 0 &&
         all(c("student_id", "term") %in% names(d)),
@@ -6381,7 +6379,6 @@ output$enrl_classlist_download <- downloadHandler(
   # =============================================================================
   pathwaysServer("pathways", cedar_students, cedar_programs, degrees = cedar_degrees,
                  cedar_grades = cedar_grades,
-                 cedar_student_term_credits = cedar_student_term_credits,
                  cedar_student_terms = cedar_student_terms,
                  lookups = data_objects[["cedar_lookups"]],
                  program_choices = cedar_pathways_choices$program_choices,
