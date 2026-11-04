@@ -68,8 +68,10 @@
 #
 #   first_unm_term can predate first_unit_term (they were at UNM before the
 #   unit); last_record_term can postdate last_unit_term (they stayed at UNM
-#   after leaving the unit). Both UNM-wide bookends are NA when
-#   cedar_students isn't supplied.
+#   after leaving the unit). Both UNM-wide bookends are read off
+#   cedar_student_terms' `enrolled` rows (registered or withdrawn after
+#   census, CEDAR's one definition; ADR-001 step 2) and are NA when the
+#   table isn't supplied.
 #
 # THE relevant_until CONTRACT
 #   relevant_until is the per-student enrollment ceiling for ANALYSIS: rows
@@ -514,8 +516,11 @@ classify_entry_status <- function(programs, focal_names, focal_codes = character
 #'
 #' @param programs Data frame. cedar_programs.
 #' @param degrees Data frame or NULL. cedar_degrees.
-#' @param students Data frame or NULL. cedar_students. Supplies UNM-wide
-#'   enrollment bookends and enrollment-based continuation evidence.
+#' @param student_terms Data frame or NULL. cedar_student_terms. Its `enrolled`
+#'   rows supply the UNM-wide enrollment bookends and the enrollment-based
+#'   continuation evidence; without it both bookends are NA and no candidate
+#'   is reclassified. Never cedar_students: a waitlist or an early drop is not
+#'   an enrolled term.
 #' @param opt List of options:
 #'   type          — "preset", "dept", or "major". Default "preset".
 #'   program_names — required for preset/major types.
@@ -534,11 +539,12 @@ classify_entry_status <- function(programs, focal_names, focal_codes = character
 #'     single population. Pass "Undergraduate" to build a clean undergrad
 #'     cohort for a department that also has grad programs.
 #' @return Data frame with one row per student.
-build_population <- function(programs, degrees = NULL, students = NULL, opt = list()) {
+build_population <- function(programs, degrees = NULL, student_terms = NULL, opt = list()) {
   type <- opt$type %||% "preset"
+  enrolled_terms <- .population_enrolled_terms(student_terms)
 
   if (type == "demographic") {
-    return(build_demographic_population(programs, opt, students = students))
+    return(build_demographic_population(programs, opt, student_terms = student_terms))
   }
 
   if (!"is_pre_major" %in% names(programs))
@@ -656,13 +662,14 @@ build_population <- function(programs, degrees = NULL, students = NULL, opt = li
     pull(student_id) %>%
     unique()
 
-  # Enrollment-based switch detection: candidates who have any enrollment
-  # record in cedar_students AFTER their last focal term are still at UNM —
-  # reclassify as switched_out even if they never formally declared another
-  # program. This prevents students who quietly kept taking courses from being
-  # counted as stop-outs just because Banner has no re-declaration record.
-  # Only runs when cedar_students is provided (students param).
-  if (!is.null(students) && nrow(students) > 0 && "term" %in% names(students)) {
+  # Enrollment-based switch detection: candidates who were enrolled at UNM in
+  # any term AFTER their last focal term are still at UNM — reclassify as
+  # switched_out even if they never formally declared another program. This
+  # prevents students who quietly kept taking courses from being counted as
+  # stop-outs just because Banner has no re-declaration record. Enrolled is
+  # cedar_student_terms' `enrolled`: a waitlist-only or early-drop-only term
+  # is not evidence of being at UNM. Only runs when the table is provided.
+  if (!is.null(enrolled_terms)) {
     program_stopped_candidates <- setdiff(all_declared_ids,
                                           c(ongoing_ids, graduated_ids, switched_ids))
     if (length(program_stopped_candidates) > 0) {
@@ -671,9 +678,8 @@ build_population <- function(programs, degrees = NULL, students = NULL, opt = li
         group_by(student_id) %>%
         summarize(last_focal_term = max(term, na.rm = TRUE), .groups = "drop")
 
-      enrollment_after <- students %>%
+      enrollment_after <- enrolled_terms %>%
         filter(student_id %in% program_stopped_candidates) %>%
-        distinct(student_id, term) %>%
         inner_join(last_focal_by_student, by = "student_id") %>%
         filter(term > last_focal_term) %>%
         pull(student_id) %>%
@@ -681,7 +687,7 @@ build_population <- function(programs, degrees = NULL, students = NULL, opt = li
 
       if (length(enrollment_after) > 0) {
         message("[population.R] Enrollment-based switched_out: ", length(enrollment_after),
-                " candidates reclassified via cedar_students enrollment after last focal term.")
+                " candidates reclassified: enrolled at UNM after their last focal term.")
         switched_ids <- union(switched_ids, enrollment_after)
       }
     }
@@ -724,23 +730,13 @@ build_population <- function(programs, degrees = NULL, students = NULL, opt = li
       .groups = "drop"
     )
 
-  # first_unm_term / last_record_term — UNM-wide enrollment bookends from
-  # cedar_students. first_unm_term may predate first_unit_term for students who
-  # were at UNM before declaring this program. last_record_term may postdate
-  # last_unit_term for students who continued at UNM after leaving the unit.
-  # Both are NA when cedar_students is not available.
-  unm_timing <- if (!is.null(students) && nrow(students) > 0L &&
-                    "term" %in% names(students)) {
-    students %>%
-      group_by(student_id) %>%
-      summarize(
-        first_unm_term   = as.integer(min(term, na.rm = TRUE)),
-        last_record_term = as.integer(max(term, na.rm = TRUE)),
-        .groups = "drop"
-      )
-  } else {
-    tibble(student_id = character(), first_unm_term = integer(), last_record_term = integer())
-  }
+  # first_unm_term / last_record_term — UNM-wide enrollment bookends, the
+  # first and last term the student was enrolled anywhere at UNM
+  # (cedar_student_terms). first_unm_term may predate first_unit_term for
+  # students who were at UNM before declaring this program. last_record_term
+  # may postdate last_unit_term for students who continued at UNM after
+  # leaving the unit. Both are NA when the table is not available.
+  unm_timing <- .population_enrollment_bookends(enrolled_terms)
 
   # ── Assemble outcome table ─────────────────────────────────────────────────
   # PRECEDENCE: first match wins, so this ordering is load-bearing — e.g. a
@@ -902,12 +898,12 @@ get_focal_programs <- function(programs, opt) {
 #' @param programs Data frame. cedar_programs.
 #' @param opt Options list: pell_eligible, first_gen, time_status, ipeds_race,
 #'   gender, campus, student_level, term.
-#' @param students Data frame or NULL. cedar_students, used for UNM-wide
-#'   first/last enrollment bookends.
+#' @param student_terms Data frame or NULL. cedar_student_terms, whose
+#'   `enrolled` rows give the UNM-wide first/last enrollment bookends.
 #' @return Population tibble with one row per student. Program-specific outcome
 #'   and entry fields are NA; UNM-wide bookends are populated when possible.
 #' @keywords internal
-build_demographic_population <- function(programs, opt = list(), students = NULL) {
+build_demographic_population <- function(programs, opt = list(), student_terms = NULL) {
   df <- programs
   if (!is.null(opt$campus)) df <- filter(df, student_campus %in% opt$campus)
   if (!is.null(opt$student_level) && length(opt$student_level) > 0) {
@@ -986,21 +982,52 @@ build_demographic_population <- function(programs, opt = list(), students = NULL
     relevant_until   = NA_integer_
   )
 
-  if (!is.null(students) && nrow(students) > 0L && "term" %in% names(students)) {
-    bookends <- students %>%
-      filter(student_id %in% ids) %>%
-      group_by(student_id) %>%
-      summarize(
-        first_unm_term = as.integer(min(term, na.rm = TRUE)),
-        last_record_term = as.integer(max(term, na.rm = TRUE)),
-        .groups = "drop"
-      )
+  enrolled_terms <- .population_enrolled_terms(student_terms)
+  if (!is.null(enrolled_terms)) {
+    bookends <- .population_enrollment_bookends(enrolled_terms %>% filter(student_id %in% ids))
     out <- out %>%
       select(-first_unm_term, -last_record_term) %>%
       left_join(bookends, by = "student_id")
   }
 
   out
+}
+
+
+# The student-terms a population reads: one row per (student_id, term) the
+# student was enrolled at UNM, off cedar_student_terms (ADR-001 step 2). NULL
+# when no table was supplied, so callers without one get NA bookends and no
+# reclassification, never a guess. A table without `enrolled` is refused, so
+# cedar_students handed in its place cannot count a waitlist or an early drop
+# as a term at UNM.
+.population_enrolled_terms <- function(student_terms) {
+  if (is.null(student_terms)) return(NULL)
+  needed <- c("student_id", "term", "enrolled")
+  missing_cols <- setdiff(needed, names(student_terms))
+  if (length(missing_cols) > 0L) {
+    stop("[population.R] student_terms is missing column(s): ",
+         paste(missing_cols, collapse = ", "),
+         ". Pass cedar_student_terms, not cedar_students.")
+  }
+  student_terms %>%
+    filter(enrolled) %>%
+    distinct(student_id, term)
+}
+
+# first_unm_term / last_record_term: the first and last term the student was
+# enrolled anywhere at UNM. Empty, with the right columns, for NULL.
+.population_enrollment_bookends <- function(enrolled_terms) {
+  if (is.null(enrolled_terms)) {
+    return(tibble(student_id = character(), first_unm_term = integer(),
+                  last_record_term = integer()))
+  }
+  enrolled_terms %>%
+    group_by(student_id) %>%
+    summarize(
+      first_unm_term   = as.integer(min(term, na.rm = TRUE)),
+      last_record_term = as.integer(max(term, na.rm = TRUE)),
+      .groups = "drop"
+    )
 }
 
 

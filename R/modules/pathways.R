@@ -227,7 +227,7 @@ populationSelectorUI <- function(id, campus_choices, program_choices = character
   )
 }
 
-populationSelectorServer <- function(id, programs, degrees = NULL, students = NULL,
+populationSelectorServer <- function(id, programs, degrees = NULL, student_terms = NULL,
                                      program_choices = character(), dept_choices = character()) {
   moduleServer(id, function(input, output, session) {
 
@@ -341,7 +341,7 @@ populationSelectorServer <- function(id, programs, degrees = NULL, students = NU
       timer <- start_report_timer("pathways-population")
 
       result <- tryCatch(
-        build_population(programs, degrees = degrees, students = students, opt = opt),
+        build_population(programs, degrees = degrees, student_terms = student_terms, opt = opt),
         error = function(e) {
           showNotification(paste("Population build failed:", e$message), type = "error")
           NULL
@@ -1074,7 +1074,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
 
     # ---- Population selector sub-module ----
     population_rv <- populationSelectorServer("population", programs,
-                                               degrees = degrees, students = students,
+                                               degrees = degrees, student_terms = cedar_student_terms,
                                                program_choices = program_choices,
                                                dept_choices = dept_choices)
 
@@ -1450,8 +1450,8 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
       outcome_desc <- c(
         ongoing        = "Still declared in the focal major in the most recent data term.",
         graduated      = "Received a degree in the focal major near their last focal term.",
-        switched_out    = "Declared majors only. Left the focal major but remained at UNM — either declared another major or had enrollment records after their last focal term.",
-        stopped_out     = "Declared majors only. No UNM enrollment or major record of any kind after their last focal term.",
+        switched_out    = "Declared majors only. Left the focal major but remained at UNM — either declared another major or was enrolled (registered, or withdrawn after census) in a later term.",
+        stopped_out     = "Declared majors only. Not enrolled at UNM and no major record of any kind after their last focal term. A waitlist or an early drop alone does not count as enrolled.",
         chose_elsewhere = "Pre-major only. Never declared this program, but did declare a different program afterward.",
         left_undeclared = "Pre-major only. Never declared any program and has no later major record in the available data."
       )
@@ -1530,7 +1530,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
                 bench_opt$type <- "major"
                 bench_opt$program_names <- college_programs
                 bench_pop <- build_population(
-                  programs, degrees = degrees, students = students, opt = bench_opt
+                  programs, degrees = degrees, student_terms = cedar_student_terms, opt = bench_opt
                 )
                 if (!is.null(bench_pop) && nrow(bench_pop) > 0) {
                   benchmark <- list(
