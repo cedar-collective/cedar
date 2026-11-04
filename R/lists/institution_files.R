@@ -153,7 +153,14 @@ CEDAR_CONFIG_FILE_SPECS <- list(
   # TRUE for the campuses a filter bar selects by default (CEDAR_CAMPUS_DEFAULT).
   # campus_name may be blank for a code whose expansion is not documented; it
   # then displays as the bare code rather than a guessed name.
-  campuses = c("campus_code", "campus_name", "kind", "default_scope"),
+  # source_names: every other spelling the exports use for the campus,
+  # |-separated (academic studies says "Albuquerque/Main" where the class list
+  # says ABQ). A value may name only one campus.
+  campuses = c("campus_code", "campus_name", "kind", "default_scope", "source_names"),
+  # Student level codes as the class list carries them, the readable name, and
+  # every other spelling the exports use (academic studies says "Graduate/GASM"
+  # where the class list says GR). A value may name only one level.
+  student_levels = c("level_code", "level_name", "source_names"),
   # One row for each leading digit 0-9 of a course number; level is one of
   # CEDAR_COURSE_LEVELS. The rule is keyed on the leading digit, whatever the
   # number's length (ISSUES.md I5).
@@ -282,11 +289,51 @@ validate_campuses <- function(df) {
   if (anyNA(flag)) problems <- c(problems, paste("campuses.csv: default_scope must be TRUE or FALSE for",
                                                  paste(df$campus_code[is.na(flag)], collapse = ", ")))
   if (!anyNA(flag) && !any(flag)) problems <- c(problems, "campuses.csv: no campus has default_scope TRUE")
+  d <- .ambiguous_source_values(df$campus_code, df$campus_name, df$source_names)
+  if (length(d)) problems <- c(problems, paste("campuses.csv: names more than one campus:", paste(d, collapse = ", ")))
   if (length(problems)) {
     stop("[institution_files.R] Invalid campuses.csv:\n  ", paste(problems, collapse = "\n  "))
   }
   df$default_scope <- flag
   df
+}
+
+
+#' Check student_levels.csv
+#'
+#' @return The table, if valid. Stops listing every problem otherwise.
+validate_student_levels <- function(df) {
+  problems <- character(0)
+  blank <- function(x) is.na(x) | !nzchar(x)
+  if (any(blank(df$level_code))) problems <- c(problems, "student_levels.csv: blank level_code")
+  if (any(blank(df$level_name))) problems <- c(problems, "student_levels.csv: blank level_name")
+  d <- unique(df$level_code[duplicated(df$level_code)])
+  if (length(d)) problems <- c(problems, paste("student_levels.csv: duplicate level_code", paste(d, collapse = ", ")))
+  d <- .ambiguous_source_values(df$level_code, df$level_name, df$source_names)
+  if (length(d)) problems <- c(problems, paste("student_levels.csv: names more than one level:", paste(d, collapse = ", ")))
+  if (length(problems)) {
+    stop("[institution_files.R] Invalid student_levels.csv:\n  ", paste(problems, collapse = "\n  "))
+  }
+  df
+}
+
+
+# Every value (code, name or |-separated source spelling) that resolves to a
+# code, as a two-column data frame; shared by the campus and level translators
+# and the college one in .college_source_values().
+.source_value_table <- function(codes, names, source_names) {
+  extra <- strsplit(ifelse(is.na(source_names), "", source_names), "|", fixed = TRUE)
+  out <- data.frame(
+    value = c(codes, names, unlist(extra)),
+    code  = c(codes, codes, rep(codes, lengths(extra))),
+    stringsAsFactors = FALSE)
+  out[!is.na(out$value) & nzchar(out$value), ]
+}
+
+# Values that resolve to more than one code.
+.ambiguous_source_values <- function(codes, names, source_names) {
+  v <- unique(.source_value_table(codes, names, source_names))
+  unique(v$value[duplicated(v$value)])
 }
 
 #' Check course_levels.csv

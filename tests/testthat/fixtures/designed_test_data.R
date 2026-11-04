@@ -89,6 +89,14 @@
 #          Six groups by unit, standing, late withdrawal and posted DFW grades.
 #          Used by test-registration-snapshots.R.
 #
+#   ST01 — cedar_students_st (19 rows) + cedar_programs_st (13 rows) +
+#          cedar_degrees_st (1 row). Eleven students ST_A..ST_K, every class
+#          list row pulled 2021-02-15 so the settled edge is Spring 2021.
+#          build_student_terms(): 17 student-terms, 14 enrolled, 1 declared
+#          without a class list (ST_E 202080), 1 description conflict (ST_F),
+#          1 degree awarded (ST_J). Each student guards one rule; see the
+#          table in docs/developers/student-terms.md and test-student-terms.R.
+#
 # === CEDAR_SECTIONS (85 total: 71 base + 14 XL rows merged in) ===
 #
 # Base sections (non-XL):
@@ -3334,6 +3342,97 @@ cedar_programs_rw <- dplyr::bind_rows(
   .rw_program("RW_E", "PHYS")
 )
 
+
+# ── ST01 — the student-term table: one row per student-term ─────────────────
+# build_student_terms() (R/branches/student-terms.R; contract in
+# docs/developers/student-terms.md). Every class-list row is pulled 2021-02-15,
+# a month into Spring 2021, so cedar_data_edges() settles through 202110 and
+# a return from 202010 or 202080 is observable while one from 202110 is not.
+# The class list carries codes (UG, ABQ) and academic studies names
+# (Undergraduate, Albuquerque/Main), as production does; the institution's
+# student_levels.csv and campuses.csv translate them.
+#
+#   student  rows                                          the rule it guards
+#   ST_A     RE 202010 A; 202080 only a DW                 a late withdrawal is enrolled; returned TRUE (I44)
+#   ST_B     RE 202010 A; 202080 only a DR                 early drop: row present, enrolled FALSE, returned FALSE
+#   ST_C     RE 202010 A; 202080 only WL                   waitlisted_only; returned FALSE
+#   ST_D     RE 202010 A and RE 202060 only                Summer skipped: returned FALSE
+#   ST_E     RE 202010 A; 202080 declaration, no class list declared, enrolled FALSE, class_list_rows 0
+#   ST_F     202010: two pulls, "Freshman, 1st Yr, 1st Sem" (2020-01-20) then
+#            "Freshman, 1st Yr, 2nd Sem" (2021-02-15); programs says Sophomore
+#                                                          newest pull read; programs wins; conflict TRUE
+#   ST_G     RE 202010; Majors BB and AA, a Minor           primary major AA (first by code); 3 declarations
+#   ST_H     RE 202010 A, RE C-, DW                         dfw_grades 1, late_withdrawals 1, graded_rows 2
+#   ST_I     RE 202110 only                                 return not observable: NA, never FALSE
+#   ST_J     RE 202010 A, degree awarded 202010             degree_awarded TRUE, returned FALSE
+#   ST_K     RE 202010 and 202080, no programs rows         description from the class list; declared FALSE
+.st_row <- function(sid, term, course, status, grade = NA_character_,
+                    classification = "Sophomore, 2nd Yr", as_of = "2021-02-15") {
+  .mc_row(sid, term, course, "ABQ", sub(" .*", "", course), grade) %>%
+    dplyr::mutate(
+      enrollment_id = paste("ST01", sid, term, gsub(" ", "", course), as_of, sep = "-"),
+      registration_status_code = status,
+      registration_status = dplyr::case_when(
+        status %in% c("RE", "RS") ~ "Registered",
+        status == "WL" ~ "Wait Listed",
+        TRUE ~ "Drop"
+      ),
+      student_classification = classification,
+      student_campus = "ABQ",
+      residency = "Resident",
+      dual_credit = FALSE,
+      as_of_date = as.Date(as_of)
+    )
+}
+cedar_students_st <- dplyr::bind_rows(
+  .st_row("ST_A", 202010L, "HIST 1110", "RE", "A"),
+  .st_row("ST_A", 202080L, "HIST 2110", "DW"),
+  .st_row("ST_B", 202010L, "HIST 1110", "RE", "A"),
+  .st_row("ST_B", 202080L, "HIST 2110", "DR"),
+  .st_row("ST_C", 202010L, "HIST 1110", "RE", "A"),
+  .st_row("ST_C", 202080L, "HIST 2110", "WL"),
+  .st_row("ST_D", 202010L, "HIST 1110", "RE", "A"),
+  .st_row("ST_D", 202060L, "HIST 2110", "RE", "B"),
+  .st_row("ST_E", 202010L, "HIST 1110", "RE", "A"),
+  .st_row("ST_F", 202010L, "HIST 1110", "RE", "B", classification = "Freshman, 1st Yr, 1st Sem",
+          as_of = "2020-01-20"),
+  .st_row("ST_F", 202010L, "HIST 1110", "RE", "B", classification = "Freshman, 1st Yr, 2nd Sem"),
+  .st_row("ST_G", 202010L, "HIST 1110", "RE", "A"),
+  .st_row("ST_H", 202010L, "HIST 1110", "RE", "A"),
+  .st_row("ST_H", 202010L, "ENGL 1110", "RE", "C-"),
+  .st_row("ST_H", 202010L, "MATH 1215", "DW"),
+  .st_row("ST_I", 202110L, "HIST 1110", "RE"),
+  .st_row("ST_J", 202010L, "HIST 1110", "RE", "A"),
+  .st_row("ST_K", 202010L, "HIST 1110", "RE", "A"),
+  .st_row("ST_K", 202080L, "HIST 2110", "RE", "B")
+)
+.st_program <- function(sid, major_code, term = 202010L, program_type = "Major",
+                        classification = "Sophomore, 2nd Yr", standing = "Good Standing",
+                        sem_gpa = 3.5) {
+  tibble::tibble(
+    student_id = sid, term = as.integer(term),
+    program_type = program_type, program_name = major_code,
+    major_code = major_code, dept_code = major_code, college_code = "AS",
+    is_pre_major = FALSE,
+    student_level = "Undergraduate", student_classification = classification,
+    student_campus = "Albuquerque/Main", residency = "Resident",
+    academic_standing = standing, time_status = "FT", sem_gpa = sem_gpa,
+    as_of_date = as.Date("2021-02-15")
+  )
+}
+cedar_programs_st <- dplyr::bind_rows(
+  .st_program(c("ST_A", "ST_B", "ST_C", "ST_D", "ST_E", "ST_H", "ST_J"), "HIST"),
+  .st_program("ST_E", "HIST", term = 202080L),
+  .st_program("ST_I", "HIST", term = 202110L),
+  .st_program("ST_F", "HIST"),
+  .st_program("ST_G", "BB"),
+  .st_program("ST_G", "AA"),
+  .st_program("ST_G", "ENGL", program_type = "First Minor")
+)
+cedar_degrees_st <- tibble::tibble(
+  student_id = "ST_J", term = 202010L, graduation_status = "Awarded",
+  degree = "BA", major_code = "HIST", program_name = "History"
+)
 
 # ── RP01 — next-term return: one definition for persistence and retention ───
 # Fixture for next_term_persistence() / get_course_persistence() and their

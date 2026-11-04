@@ -45,7 +45,7 @@ recurrence is recognizable.
 | [I8](#i8--a-timing-log-row-is-silently-dropped-when-the-write-lock-times-out) | Defect | A timing-log row is dropped when the write lock times out |
 | [I6](#i6--a-killed-projection-rebuild-strands-its-lock-and-blocks-every-later-refresh) | Defect | A killed projection rebuild strands its lock |
 | [I4](#i4--pre-change-course-ratios-are-confounded-by-career-stage) | Defect | Pre-change course ratios confounded by career stage (deferred) |
-| M1–M37 | Improvement | See [Improvements](#improvements) |
+| M1–M38 | Improvement | See [Improvements](#improvements) |
 
 ### Resolved since the last release
 
@@ -3108,6 +3108,19 @@ Arts (B.A. and B.F.A.) are the same. Banner's full program code
 Degree Explorer map names its own (`degree_catalogs.csv`, `program_codes`).
 *Done when:* a Pathways population can be restricted to one degree's program
 codes, and a page that pools them says so.
+
+**M38 — The designed class-list fixture carries student level as a name,
+production as a code.** `cedar_students$student_level` is `UG` / `GR` in
+production (Banner's `Student Level Code`), and `Undergraduate` / `Graduate`
+on academic studies; the fixture's `cedar_students` says `Undergraduate` on
+both tables, so a test written against it cannot see the vocabulary split
+ADR-001 §2 describes, and a filter that works on the fixture
+(`student_level == "Undergraduate"`) matches nothing in production — which is
+how the first return-snapshot probe, written against the fixture, read zero
+undergraduates on real data. ST01
+uses production vocabulary on purpose. *Done when:* the base fixture's class
+list carries the codes and every test that filtered on the name is moved to
+the code (or to `cedar_student_terms`, which stores the code).
 
 **M28 — The HR department list is a hand-kept R list.** **Done 2026-10-16.**
 `hr_org_desc_to_dept` (79 names to 32 departments) now comes from

@@ -1,0 +1,9 @@
+level_code,level_name,source_names
+UG,Undergraduate,
+GR,Graduate,Graduate/GASM
+NG,Non-degree graduate,Non Degree Graduate
+NU,Non-degree undergraduate,Non Degree Undergraduate
+LW,Law,Law School
+AD,Associate/Certificate,
+PH,PharmD,
+MD,Doctor of Medicine,

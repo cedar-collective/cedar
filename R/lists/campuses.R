@@ -39,6 +39,22 @@ CEDAR_CAMPUS_LABELS <- local({
   stats::setNames(paste0(named$campus_code, " — ", named$campus_name), named$campus_code)
 })
 
+#' Translate campus values (codes, names or source spellings) to campus codes
+#'
+#' Academic studies names a student's home campus ("Albuquerque/Main") where
+#' the class list codes it (ABQ); campuses.csv's `source_names` says which is
+#' which, and the student-term table stores the code.
+#'
+#' @param values Character. Campus codes, names, or the spellings listed in
+#'   `source_names`.
+#' @return Character, parallel to `values`: the campus code, or NA where the
+#'   file does not name the value. Never a guess.
+cedar_campus_code_from_source <- function(values) {
+  v <- .source_value_table(.cedar_campuses$campus_code, .cedar_campuses$campus_name,
+                           .cedar_campuses$source_names)
+  unname(v$code[match(values, v$value)])
+}
+
 
 #' Campus choices for a selectInput, labelled where a label is known
 #'

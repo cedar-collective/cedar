@@ -842,6 +842,40 @@ transform_students <- function(class_lists, data_dir, ext, maps) {
 }
 
 
+# ── 2b. transform_student_terms: students + programs + degrees → cedar_student_terms
+
+#' One row per student-term, built from the saved CEDAR tables (ADR-001 step 2;
+#' contract in docs/developers/student-terms.md). The build itself is
+#' build_student_terms() in R/branches/student-terms.R; this stage only loads
+#' its inputs, computes the data edges it needs, and saves the result.
+#'
+#' @param data_dir Path to data directory
+#' @param ext      File extension
+#' @return list(saved = list(student_terms = <meta>))
+transform_student_terms <- function(data_dir, ext) {
+  message("──────────────────────────────────────────────────────")
+  message("4b. Transforming cedar_students + cedar_programs + cedar_degrees → cedar_student_terms")
+  message("──────────────────────────────────────────────────────")
+  load_saved <- function(name) {
+    path <- file.path(data_dir, paste0("cedar_", name, ext))
+    if (!file.exists(path)) {
+      stop("[transform-to-cedar.R] cedar_student_terms needs ", path, ", which has not been built.")
+    }
+    message("  Loading: ", path)
+    load_file(path, ext)
+  }
+  students <- load_saved("students")
+  programs <- load_saved("programs")
+  degrees  <- load_saved("degrees")
+  edges <- cedar_data_edges(students, degrees = degrees)
+  student_terms <- build_student_terms(students, programs, degrees, edges = edges)
+  rm(students, programs, degrees); gc(verbose = FALSE)
+  meta <- save_cedar_file(student_terms, "student_terms", data_dir, ext)
+  message("  ✅ cedar_student_terms: ", nrow(student_terms), " rows, ", ncol(student_terms), " columns")
+  list(saved = list(student_terms = meta))
+}
+
+
 # ── 3. transform_programs: academic_studies → cedar_programs ─────────────────
 
 #' @param academic_studies Raw academic_studies data frame
@@ -1549,7 +1583,8 @@ transform_to_cedar <- function(data_dir = NULL, use_qs = NULL, tables = NULL) {
   ext <- if (use_qs && requireNamespace("qs2", quietly = TRUE)) ".qs" else ".Rds"
 
   # Resolve which tables to run
-  all_tables <- c("sections", "students", "programs", "degrees", "faculty", "applicants", "lookups")
+  all_tables <- c("sections", "students", "programs", "degrees", "student_terms", "faculty",
+                  "applicants", "lookups")
   if (is.null(tables)) {
     run_tables <- all_tables
   } else {
@@ -1560,6 +1595,12 @@ transform_to_cedar <- function(data_dir = NULL, use_qs = NULL, tables = NULL) {
     if (any(c("sections", "programs", "degrees") %in% run_tables) && !"lookups" %in% run_tables) {
       run_tables <- c(run_tables, "lookups")
       message("  Note: Adding lookups (auto-included when sections/programs/degrees are transformed)")
+    }
+    # The student-term table reads the saved students, programs and degrees,
+    # so it is rebuilt whenever any of them is.
+    if (any(c("students", "programs", "degrees") %in% run_tables) && !"student_terms" %in% run_tables) {
+      run_tables <- c(run_tables, "student_terms")
+      message("  Note: Adding student_terms (auto-included when students/programs/degrees are transformed)")
     }
   }
 
@@ -1676,6 +1717,17 @@ transform_to_cedar <- function(data_dir = NULL, use_qs = NULL, tables = NULL) {
     }
   } else {
     message("  ⏭  Skipping cedar_degrees (not in --tables)")
+  }
+
+  # ── 4b. cedar_student_terms ───────────────────────────────────────────────
+  # Reads the SAVED students, programs and degrees, whichever of them this run
+  # rebuilt, so a --tables programs run still produces a table that matches
+  # every stored source.
+  if ("student_terms" %in% run_tables) {
+    result <- transform_student_terms(data_dir, ext)
+    saved_files <- c(saved_files, result$saved)
+  } else {
+    message("  ⏭  Skipping cedar_student_terms (not in --tables)")
   }
 
   # ── 5. cedar_faculty ──────────────────────────────────────────────────────

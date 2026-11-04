@@ -231,6 +231,20 @@ The flags are the startup edges from `cedar_data_edges()` passed in, never recom
 
 ---
 
+## 2b. `cedar_student_terms` (One Row per Student-Term)
+
+**Purpose:** Every fact about a student in a term, stored once (ADR-001 step 2). Built in the transform by `build_student_terms()` (`R/branches/student-terms.R`) from the saved students, programs and degrees, whenever any of them is rebuilt. The full contract, column by column, is [student-terms.md](student-terms.md); the rules that matter most:
+
+- One row per `(student_id, term)` for every student with any class-list row **or** any declaration that term, so waitlist-only, early-drop-only and declared-but-not-registered students are rows with `enrolled = FALSE`.
+- `enrolled` is registered **or** late-dropped (enrolled at census): CEDAR's one definition of an enrolled student-term. `returned_next_regular_term` reads it in the next Fall or Spring; it is `NA` where `return_observable` is FALSE (the next regular term is past the settled edge), never FALSE.
+- The description columns (`student_level`, `student_classification`, `student_campus`, `residency`) take the academic-studies value where there is one and the class list's otherwise; `description_source` says which, and `description_conflict` flags the two disagreeing. Level and home campus are stored as codes; academic studies' names are translated through `institution/<id>/student_levels.csv` and `campuses.csv` `source_names`, and an unlisted name is `NA` and reported.
+- The pull-stamped fields (`inst_*`, `overall_*`, `inst_gpa`) are banned from the table; `validate_student_terms()` rejects them.
+- `attempted_unm_credits` and `cumulative_attempted_unm_credits` reproduce `cedar_student_term_credits` exactly, so `build_credit_timeline()` reads the same numbers from either.
+
+On the 2026-10-27 pull: 518,889 rows (452,021 enrolled; 53,053 declared without a class list), 126 MB in memory, 5,442 student-terms where the two sources disagree (4,210 of them in Fall 2025, whose programs were pulled in November 2025 and whose class list in March 2026).
+
+---
+
 ## 3. `cedar_programs` (Student Academic Programs)
 
 **Purpose:** Student major, minor, concentration enrollment by term

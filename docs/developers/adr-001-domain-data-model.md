@@ -221,9 +221,11 @@ Each step is additive until its last sub-step, so the app runs throughout.
    a parameter every cone passes and checks.
 2. **`cedar_student_terms`**, merging the two existing side tables with one
    definition of an enrolled term and `return_observable` from `cedar_terms`.
-   Closes I44. Precedence when the two source snapshots disagree: the later
-   pull wins and the disagreement is counted, since every measured
-   disagreement came from mixed pull dates.
+   Closes I44. Precedence when the two source snapshots disagree: the
+   academic-studies row wins (it is the student-level report), the row is
+   flagged and the count reported — never a silent coalesce. Measured on the
+   first build: 5,442 of 373,169 student-terms described by both sources
+   disagree, 4,210 of them in Fall 2025, pulled four months apart.
 3. **Dimension reads for the mapping files**, through a shared
    `attach_unit()`; readers move as files are touched; then the stamped
    columns, provenance stamps and deploy gate go. Supersedes ADR-002 Stages 3

@@ -543,11 +543,15 @@ test_that("set_payload prog_focus restricts to single program code", {
 
 # ---- Configuration files: campuses.csv and course_levels.csv ------------------
 
-write_config_dir <- function(campuses, course_levels) {
+write_config_dir <- function(campuses, course_levels, student_levels = NULL) {
   dir <- tempfile("institution-config-")
   dir.create(dir)
+  if (!"source_names" %in% names(campuses)) campuses$source_names <- ""
   utils::write.csv(campuses, file.path(dir, "campuses.csv"), row.names = FALSE)
   utils::write.csv(course_levels, file.path(dir, "course_levels.csv"), row.names = FALSE)
+  if (!is.null(student_levels)) {
+    utils::write.csv(student_levels, file.path(dir, "student_levels.csv"), row.names = FALSE)
+  }
   dir
 }
 
@@ -593,7 +597,8 @@ test_that("the configuration validators report every problem at once", {
     campuses = data.frame(campus_code = c("ABQ", "EA", "GA", "GA"),
                           campus_name = c("Main", "Online", "Gallup", "Gallup"),
                           kind = c("main", "main", "satellite", "branch"),
-                          default_scope = c("TRUE", "yes", "FALSE", "FALSE")),
+                          default_scope = c("TRUE", "yes", "FALSE", "FALSE"),
+                          source_names = c("Albuquerque/Main", "Albuquerque/Main", "", "")),
     course_levels = data.frame(leading_digit = c(as.character(0:8), "9", "9"),
                                level = c(rep("lower", 3), rep("upper", 2), rep("grad", 4), "doctoral", "grad"))
   )
@@ -602,6 +607,7 @@ test_that("the configuration validators report every problem at once", {
   expect_match(err, "kind must be main, online, branch; found satellite")
   expect_match(err, "exactly one campus must have kind main; found 2")
   expect_match(err, "default_scope must be TRUE or FALSE for EA")
+  expect_match(err, "names more than one campus: Albuquerque/Main")
 
   err <- tryCatch(validate_course_levels(read_institution_file("course_levels", dir)), error = conditionMessage)
   expect_match(err, "duplicate leading_digit 9")
@@ -617,6 +623,34 @@ test_that("the configuration validators report every problem at once", {
   one <- validate_campuses(read_institution_file("campuses", short))
   expect_equal(one$campus_code[one$kind == "online"], character(0))
   expect_true(one$default_scope)
+})
+
+test_that("student_levels.csv translates the exports' spellings to one code each", {
+  dir <- cedar_institution_dir(cedar_base_dir, "unm")
+  levels <- validate_student_levels(read_institution_file("student_levels", dir))
+  expect_equal(CEDAR_STUDENT_LEVELS, levels)
+  # a code, its name and a source spelling all resolve to the code; an unlisted
+  # value is NA, never a guess
+  expect_equal(cedar_level_code_from_source(c(levels$level_code[1], levels$level_name[1], "not a level")),
+               c(levels$level_code[1], levels$level_code[1], NA))
+  with_source <- levels[nzchar(levels$source_names), ][1, ]
+  expect_equal(cedar_level_code_from_source(with_source$source_names), with_source$level_code)
+  campuses <- validate_campuses(read_institution_file("campuses", dir))
+  with_source <- campuses[nzchar(campuses$source_names), ][1, ]
+  expect_equal(cedar_campus_code_from_source(c(with_source$source_names, with_source$campus_name,
+                                               with_source$campus_code, "nowhere")),
+               c(rep(with_source$campus_code, 3), NA))
+
+  bad <- write_config_dir(
+    campuses = data.frame(campus_code = "ABQ", campus_name = "Main", kind = "main", default_scope = "TRUE"),
+    course_levels = good_levels,
+    student_levels = data.frame(level_code = c("UG", "GR", "GR", ""),
+                                level_name = c("Undergraduate", "Graduate", "Graduate", "Law"),
+                                source_names = c("Graduate", "Graduate/GASM", "", "")))
+  err <- tryCatch(validate_student_levels(read_institution_file("student_levels", bad)), error = conditionMessage)
+  expect_match(err, "blank level_code")
+  expect_match(err, "duplicate level_code GR")
+  expect_match(err, "names more than one level: Graduate")
 })
 
 
