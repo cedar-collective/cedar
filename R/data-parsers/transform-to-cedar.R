@@ -875,6 +875,29 @@ transform_student_terms <- function(data_dir, ext) {
   list(saved = list(student_terms = meta))
 }
 
+#' Why cedar_student_terms needs rebuilding, or NULL when it does not
+#'
+#' The table is built from three saved tables, so it can be missing (a deploy
+#' before any refresh has run this stage) or older than a source rebuilt
+#' without it. The deploy gate (scripts/rebuild-programs-if-mappings-changed.R)
+#' asks this and builds the table, as it does a stale mapped table, so the app,
+#' which requires the file, never starts without it.
+#'
+#' @param data_dir Path to data directory
+#' @param ext      File extension
+#' @return A one-line reason, or NULL when the file exists and is newer than
+#'   every saved source it reads.
+cedar_student_terms_staleness <- function(data_dir, ext = ".qs") {
+  target <- file.path(data_dir, paste0("cedar_student_terms", ext))
+  if (!file.exists(target)) return("cedar_student_terms has not been built")
+  sources <- file.path(data_dir, paste0("cedar_", c("students", "programs", "degrees"), ext))
+  sources <- sources[file.exists(sources)]
+  newer <- sources[file.mtime(sources) > file.mtime(target)]
+  if (length(newer) == 0L) return(NULL)
+  paste0(paste(sub(ext, "", basename(newer), fixed = TRUE), collapse = ", "),
+         " newer than cedar_student_terms")
+}
+
 
 # ── 3. transform_programs: academic_studies → cedar_programs ─────────────────
 

@@ -44,36 +44,59 @@ rebuild_programs_if_mappings_changed <- function(
   } else {
     cedar_stale_mapped_tables(data_dir, base_dir)
   }
+  rebuild <- rebuild %||% function(tables) transform_to_cedar(data_dir = data_dir,
+                                                             tables = tables)
+  rebuilt <- character(0)
+
   if (length(stale) == 0) {
     message("[mappings] Mapping source unchanged since ",
             paste0("cedar_", CEDAR_MAPPED_TABLES, collapse = ", "),
             " were built; no rebuild. Data-driven staleness is handled by the morning refresh.")
-    return(invisible(FALSE))
-  }
-  for (table in names(stale)) {
-    message("[mappings] Rebuilding cedar_", table, ": ", stale[[table]])
+  } else {
+    for (table in names(stale)) {
+      message("[mappings] Rebuilding cedar_", table, ": ", stale[[table]])
+    }
+
+    # A missing export would make the transform skip the table with a warning,
+    # leaving it stale while this gate reported a rebuild. Stop instead.
+    inputs <- c(programs = "academic_studies", degrees = "degrees",
+                sections = "DESRs", students = "class_lists")
+    needed <- file.path(data_dir, paste0(inputs[names(stale)], ".qs"))
+    if (any(!file.exists(needed))) {
+      stop("[mappings] Cannot rebuild ", paste0("cedar_", names(stale)[!file.exists(needed)], collapse = ", "),
+           ": missing ", paste(basename(needed[!file.exists(needed)]), collapse = ", "),
+           " in ", data_dir, call. = FALSE)
+    }
+
+    rebuild(names(stale))
+    still <- intersect(names(stale), names(cedar_stale_mapped_tables(data_dir, base_dir)))
+    if (length(still)) {
+      stop("[mappings] Rebuilt, but still stale: ", paste0("cedar_", still, collapse = ", "),
+           call. = FALSE)
+    }
+    rebuilt <- names(stale)
   }
 
-  # A missing export would make the transform skip the table with a warning,
-  # leaving it stale while this gate reported a rebuild. Stop instead.
-  inputs <- c(programs = "academic_studies", degrees = "degrees",
-              sections = "DESRs", students = "class_lists")
-  needed <- file.path(data_dir, paste0(inputs[names(stale)], ".qs"))
-  if (any(!file.exists(needed))) {
-    stop("[mappings] Cannot rebuild ", paste0("cedar_", names(stale)[!file.exists(needed)], collapse = ", "),
-         ": missing ", paste(basename(needed[!file.exists(needed)]), collapse = ", "),
-         " in ", data_dir, call. = FALSE)
+  # cedar_student_terms is built from the saved students, programs and degrees
+  # (ADR-001 step 2), so it is stale whenever one of them is newer, and absent
+  # on the first deploy after the stage was added. The app requires it, so the
+  # gate builds it here, after the mapped tables it reads. A transform that
+  # rebuilt any of its sources already rebuilt it too; this catches the rest.
+  # Checked after the mapped rebuild, by file time, and never by loading data.
+  st_reason <- cedar_student_terms_staleness(data_dir)
+  if (!is.null(st_reason)) {
+    message("[mappings] Rebuilding cedar_student_terms: ", st_reason)
+    rebuild("student_terms")
+    still <- cedar_student_terms_staleness(data_dir)
+    if (!is.null(still)) {
+      stop("[mappings] Rebuilt, but cedar_student_terms is still stale: ", still, call. = FALSE)
+    }
+    rebuilt <- c(rebuilt, "student_terms")
   }
 
-  rebuild <- rebuild %||% function(tables) transform_to_cedar(data_dir = data_dir,
-                                                             tables = tables)
-  rebuild(names(stale))
-  still <- intersect(names(stale), names(cedar_stale_mapped_tables(data_dir, base_dir)))
-  if (length(still)) {
-    stop("[mappings] Rebuilt, but still stale: ", paste0("cedar_", still, collapse = ", "),
-         call. = FALSE)
-  }
-  message("[mappings] Rebuilt: ", paste0("cedar_", names(stale), collapse = ", "), ".")
+  if (length(rebuilt) == 0) return(invisible(FALSE))
+  # deploy.yml restarts the app on this exact line, so it serves what was built.
+  message("[mappings] Rebuilt: ", paste0("cedar_", rebuilt, collapse = ", "), ".")
   invisible(TRUE)
 }
 
