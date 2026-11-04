@@ -422,6 +422,34 @@ term_diff <- function(from, to, include_summer = FALSE) {
 }
 
 
+#' Every Fall and Spring term from `from` to `to`, inclusive
+#'
+#' A Summer endpoint is moved to the regular term beside it: `from` forward
+#' to its Fall, `to` back to its Spring. Oldest first; empty when `to` is
+#' before `from`.
+#'
+#' @examples
+#' regular_terms_between(202010, 202110)   # 202010 202080 202110
+#' regular_terms_between(202060, 202110)   # 202080 202110
+regular_terms_between <- function(from, to) {
+  from <- as.integer(from)
+  to   <- as.integer(to)
+  if (length(from) != 1L || length(to) != 1L || is.na(from) || is.na(to)) {
+    stop("[utils.R] regular_terms_between() needs two term codes.")
+  }
+  if (from %% 100L == 60L) from <- from + 20L   # Summer -> that year's Fall
+  if (to %% 100L == 60L)   to   <- to - 50L     # Summer -> that year's Spring
+  if (to < from) return(integer(0))
+  out <- integer(term_diff(from, to) + 1L)
+  t <- from
+  for (i in seq_along(out)) {
+    out[[i]] <- t
+    t <- if (t %% 100L == 80L) t + 30L else t + 70L
+  }
+  out
+}
+
+
 # convert a term code to a date object
 # expects something like 202280 or 2023101H or 2020602H
 term_code_to_date <- function(term) {

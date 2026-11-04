@@ -124,7 +124,7 @@ they are recovered from two banned fields and are per-student, not per-term.
 |---|---|---|
 | `next_regular_term` | int | `add_next_term_col(term, summer = FALSE)`: Spring→Fall, Fall→Spring, Summer→Fall |
 | `returned_next_regular_term` | lgl | the student has an `enrolled = TRUE` row for `next_regular_term`. `NA` when `return_observable` is FALSE. |
-| `return_observable` | lgl | `next_regular_term <= last_enrolled_complete` at build time (`cedar_data_edges()`; `cedar_terms$is_settled` once step 1 lands). A term past the settled edge has registration still arriving, so its return is unknown, never FALSE. |
+| `return_observable` | lgl | `next_regular_term <= last_enrolled_complete` at build time (`cedar_data_edges()`) **and** `next_regular_term` has a class list. A term past the settled edge has registration still arriving, and a Fall or Spring with no pull inside the data's run has nobody in it to find, so in both cases the return is unknown, never FALSE. The build names any such gap term; `cedar_terms` carries it as a row with zero enrollment. |
 | `degree_awarded` | lgl | a `cedar_degrees` row with `graduation_status == "Awarded"` for this student and term |
 
 A graduate who does not return is not a non-returner. The table does not

@@ -9,6 +9,7 @@
 #   class list winning precedence             -> ST_F classification
 #   Summer as a return term                   -> ST_D returned
 #   returned FALSE past the settled edge      -> ST_I returned NA
+#   a return judged into a term with no pull  -> gap test, ST_A return_observable
 
 context("Student terms")
 
@@ -123,6 +124,25 @@ test_that("ST_I: a return past the settled edge is NA, never FALSE", {
   expect_false(i$return_observable)
   expect_true(is.na(i$returned_next_regular_term))
   expect_true(all(!is.na(st$returned_next_regular_term[st$return_observable])))
+})
+
+test_that("a Fall or Spring with no class list makes the return into it unobservable, never FALSE", {
+  # Drop every Fall 2020 class-list row: Spring 2020 and Spring 2021 remain,
+  # the settled edge still reaches Spring 2021, and Fall 2020 is a gap. Before
+  # this rule, every Spring 2020 student read as not returning.
+  expect_message(
+    st <- build_student_terms(dplyr::filter(test_students_st, term != 202080L),
+                              test_programs_st, test_degrees_st),
+    "no class list for Fall 2020")
+  a <- row(st, "ST_A", 202010L)
+  expect_equal(a$next_regular_term, 202080L)
+  expect_false(a$return_observable)
+  expect_true(is.na(a$returned_next_regular_term))
+  # Summer 2020's next regular term is the same gap.
+  expect_false(row(st, "ST_D", 202060L)$return_observable)
+  expect_false(any(st$return_observable[st$next_regular_term == 202080L]))
+  # The complete fixture judges Spring 2020 returns, as ST_A shows.
+  expect_true(row(st01(), "ST_A", 202010L)$return_observable)
 })
 
 test_that("ST_J: a degree awarded sits beside the return flag; the table does not combine them", {

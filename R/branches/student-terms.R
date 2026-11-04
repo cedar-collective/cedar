@@ -22,8 +22,9 @@
 #     them (Undergraduate, Albuquerque/Main). The institution's files say which
 #     is which (student_levels.csv, campuses.csv source_names); this table
 #     stores the code. A name the file does not list is NA and is reported.
-#   - A return is read only where the next regular term is settled; past the
-#     edge it is NA, never FALSE.
+#   - A return is read only where the next regular term is settled AND has a
+#     class list; past the edge, or into a Fall or Spring the data has no pull
+#     for, it is NA, never FALSE.
 #   - No pull-stamped field (inst_*, overall_*, inst_gpa) is on this table.
 
 STUDENT_TERMS_BANNED_COLUMNS <- c("inst_credits_attempted", "inst_credits_earned",
@@ -133,6 +134,12 @@ build_student_terms <- function(students, programs, degrees = NULL,
     dplyr::ungroup()
 
   # ── Return: enrolled in the next regular term, where that term is settled ─
+  # ...and has a class list at all. A Fall or Spring with no pull between the
+  # first and last term in the data would otherwise read as a term nobody
+  # returned to. The same gaps are rows with zero enrollment on cedar_terms.
+  classlist_terms <- sort(unique(students$term))
+  gaps <- setdiff(regular_terms_between(min(classlist_terms), max(classlist_terms)),
+                  classlist_terms)
   st <- add_next_term_col(st, term, summer = FALSE) %>%
     dplyr::rename(next_regular_term = next_term) %>%
     dplyr::mutate(next_regular_term = as.integer(next_regular_term))
@@ -143,11 +150,18 @@ build_student_terms <- function(students, programs, degrees = NULL,
   st <- st %>%
     dplyr::left_join(enrolled_terms, by = c("student_id", "next_regular_term")) %>%
     dplyr::mutate(
-      return_observable = next_regular_term <= settled_edge,
+      return_observable = next_regular_term <= settled_edge &
+        next_regular_term %in% classlist_terms,
       returned_next_regular_term = dplyr::if_else(return_observable,
                                                   dplyr::coalesce(.returned, FALSE), NA)
     ) %>%
     dplyr::select(-.returned)
+  if (length(gaps) > 0L) {
+    message(sprintf(
+      "[student-terms.R] no class list for %s: the %s student-term(s) whose next regular term is one of them have return_observable FALSE, never a return of FALSE.",
+      paste(fmt_term(gaps), collapse = ", "),
+      format(sum(st$next_regular_term %in% gaps), big.mark = ",")))
+  }
 
   # ── Degrees awarded that term ────────────────────────────────────────────
   if (!is.null(degrees) && nrow(degrees) > 0L) {

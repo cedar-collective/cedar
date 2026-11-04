@@ -15,6 +15,13 @@
 # They are never recomputed here: the edges are passed in, and an edge the data
 # cannot determine (NULL) makes its flag NA on every row, never FALSE.
 #
+# Every Fall and Spring between the first and last term with a class list is a
+# row, with a class list or without one, so next_regular_term always names a
+# row and a reader filtering is_enrolled or is_settled never mistakes a gap
+# for a term nobody attended. A gap means a pull is missing: it is reported
+# at build time, never absorbed and never a stop (the synthetic institution
+# has them by design; production has had none).
+#
 # Built once per load, in global.R, from the tables after cedar_min_term
 # trimming; never saved, because it describes whatever data is loaded.
 
@@ -42,8 +49,10 @@ CEDAR_TERMS_COLUMNS <- c(
 #'   to computing it, so the function stands alone; the app passes the edges it
 #'   already computed so the two cannot disagree.
 #' @param opt Unused; present for the branch calling convention.
-#' @return A tibble with `CEDAR_TERMS_COLUMNS`, one row per term, oldest
-#'   first. Flags: `is_enrolled` has class-list rows; `is_settled` is enrolled
+#' @return A tibble with `CEDAR_TERMS_COLUMNS`, one row per term in the data
+#'   plus every Fall and Spring between the first and last term with a class
+#'   list (a gap term has zero enrollment and is reported), oldest first.
+#'   Flags: `is_enrolled` has class-list rows; `is_settled` is enrolled
 #'   and at or before `last_enrolled_complete`; `is_graded` is enrolled and at
 #'   or before `last_graded`; `in_progress` is enrolled after `last_graded`;
 #'   `has_degrees` is at or before `last_degree`; `is_upcoming` has sections
@@ -94,6 +103,22 @@ build_cedar_terms <- function(students, sections = NULL, degrees = NULL,
     stop("[cedar-terms.R] term code(s) are not YYYYSS with SS in 10/60/80: ",
          paste(bad, collapse = ", "))
   }
+  # A Fall or Spring with no class list between the first and last term that
+  # has one is a row with zero enrollment, so next_regular_term always names a
+  # row; it is never settled or graded (both require is_enrolled), and
+  # build_student_terms() judges no return into it. It is reported here
+  # because it means a pull is missing.
+  classlist_terms <- sort(unique(as.integer(students$term)))
+  classlist_terms <- classlist_terms[!is.na(classlist_terms)]
+  run <- regular_terms_between(min(classlist_terms), max(classlist_terms))
+  gaps <- setdiff(run, classlist_terms)
+  if (length(gaps) > 0L) {
+    message(sprintf(
+      "[cedar-terms.R] Fall/Spring term(s) with no class list between %s and %s: %s. Each is a row with zero enrollment, never settled or graded, and no return is judged into it.",
+      fmt_term(min(classlist_terms)), fmt_term(max(classlist_terms)),
+      paste(fmt_term(gaps), collapse = ", ")))
+  }
+  terms <- sort(unique(c(terms, run)))
 
   dim <- tibble::tibble(term = terms) %>%
     add_acad_year(term) %>%
@@ -178,8 +203,8 @@ build_cedar_terms <- function(students, sections = NULL, degrees = NULL,
 #'
 #' @param terms A tibble as built by [build_cedar_terms()].
 #' @return `terms`, unchanged, or an error naming what is wrong: a missing
-#'   column, a repeated term, a term code that is not YYYYSS, or a Fall or
-#'   Spring term with no class list between the first and last enrolled term.
+#'   column, a repeated term, a term code that is not YYYYSS, or no row for a
+#'   Fall or Spring between the first and last enrolled term.
 validate_cedar_terms <- function(terms) {
   missing <- setdiff(CEDAR_TERMS_COLUMNS, names(terms))
   if (length(missing) > 0L) {
@@ -195,24 +220,17 @@ validate_cedar_terms <- function(terms) {
     stop("[cedar-terms.R] term code(s) are not YYYYSS with SS in 10/60/80: ",
          paste(bad, collapse = ", "))
   }
-  # Every Fall and Spring between the first and last ENROLLED term must have
-  # a class list: a gap means a term's data is missing, and next_regular_term
-  # would point at a term that is not there. Summer is optional, and a term
-  # with only a schedule outside that run (an old DESR, an upcoming term) is
-  # not a gap.
+  # Every Fall and Spring between the first and last ENROLLED term has a row,
+  # with a class list (is_enrolled) or without one (a reported gap), so that
+  # next_regular_term always names a row. Summer is optional.
   regular <- sort(terms$term[terms$is_regular & terms$is_enrolled])
   if (length(regular) > 1L) {
-    expected <- regular[[1]]
-    run <- expected
-    while (expected < regular[[length(regular)]]) {
-      expected <- add_next_term_col(tibble::tibble(term = expected), term, summer = FALSE)$next_term
-      run <- c(run, as.integer(expected))
-    }
-    gaps <- setdiff(run, regular)
-    if (length(gaps) > 0L) {
-      stop("[cedar-terms.R] Fall/Spring term(s) with no class list between ",
+    missing_rows <- setdiff(regular_terms_between(regular[[1]], regular[[length(regular)]]),
+                            terms$term)
+    if (length(missing_rows) > 0L) {
+      stop("[cedar-terms.R] term dimension has no row for Fall/Spring term(s) between ",
            fmt_term(regular[[1]]), " and ", fmt_term(regular[[length(regular)]]), ": ",
-           paste(fmt_term(gaps), collapse = ", "))
+           paste(fmt_term(missing_rows), collapse = ", "))
     }
   }
   terms
