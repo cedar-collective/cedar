@@ -263,6 +263,20 @@ cedar_report_end_term <- .report_edges$report_end_term
 # terms after the graded edge as in progress -- see cedar_in_progress_terms().
 cedar_report_latest_term <- .report_edges$report_latest_term
 rm(.report_edges)
+# The term dimension (ADR-001 step 1): one row per term in the loaded data,
+# the edges above as per-term flags, the next and previous regular terms, and
+# each term's first day and census date read from its sections. A reader may
+# bound an analysis with filter(is_settled) instead of comparing against the
+# globals above; the flags are the same edges, passed in, never recomputed.
+cedar_terms <- build_cedar_terms(
+  data_objects[["cedar_students"]],
+  sections = data_objects[["cedar_sections"]],
+  degrees  = data_objects[["cedar_degrees"]],
+  edges    = cedar_edges
+)
+data_objects[["cedar_terms"]] <- cedar_terms
+message(sprintf("[global.R] cedar_terms: %d terms, %s to %s", nrow(cedar_terms),
+                cedar_terms$label[[1]], cedar_terms$label[[nrow(cedar_terms)]]))
 
 # Pre-compute stable source hashes for cache keys. Each combines the loaded
 # dimensions with file size and modification time, so a same-shape replacement

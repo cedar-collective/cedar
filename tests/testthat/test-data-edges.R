@@ -314,3 +314,112 @@ test_that("a pull settles registration fourteen days after the nominal term star
                                           14L),
                c(FALSE, TRUE, NA, NA))
 })
+
+
+# ── The term dimension (R/branches/cedar-terms.R) ───────────────────────────
+# The same edges as per-term flags, beside each term's calendar facts, so a
+# reader filters on a column instead of comparing against a startup global.
+
+test_that("the term dimension has one row per term in any table, oldest first", {
+  d <- build_cedar_terms(test_students, sections = test_sections, degrees = test_degrees)
+
+  # 201910 has sections and no class list; it is a term, with zero enrollment.
+  expect_equal(d$term, c(201910L, 202010L, 202060L, 202080L, 202110L))
+  expect_equal(d$enrollment_rows[d$term == 201910L], 0L)
+  expect_false(d$is_enrolled[d$term == 201910L])
+  expect_equal(d$section_rows[d$term == 201910L], 3L)
+  expect_equal(d$enrollment_rows[d$term == 202010L], 133L)
+  expect_equal(names(d), CEDAR_TERMS_COLUMNS)
+})
+
+test_that("calendar facts come from the term code, and Summer is skipped for regular neighbours", {
+  d <- build_cedar_terms(test_students, sections = test_sections, degrees = test_degrees)
+  r <- function(t, col) d[[col]][d$term == t]
+
+  expect_equal(r(202010L, "label"), "Spring 2020")
+  expect_equal(r(202080L, "acad_year"), "2020-2021")
+  expect_equal(r(202010L, "acad_year"), "2019-2020")
+  expect_equal(d$season, c("spring", "spring", "summer", "fall", "spring"))
+  expect_equal(d$is_regular, c(TRUE, TRUE, FALSE, TRUE, TRUE))
+  # calendar: Spring -> Summer -> Fall
+  expect_equal(r(202010L, "next_term"), 202060L)
+  expect_equal(r(202060L, "prev_term"), 202010L)
+  # regular: Spring -> Fall, and a Summer term's next regular term is the Fall
+  expect_equal(r(202010L, "next_regular_term"), 202080L)
+  expect_equal(r(202080L, "prev_regular_term"), 202010L)
+  expect_equal(r(202060L, "next_regular_term"), 202080L)
+  expect_equal(r(202060L, "prev_regular_term"), 202010L)
+})
+
+test_that("first day and census come from the term's sections, by the most common value", {
+  d <- build_cedar_terms(test_students, sections = test_sections, degrees = test_degrees)
+  # The fixture stamps census1 = as_of_date + 15 on every section, so one value.
+  expect_equal(d$census_date[d$term == 202010L], as.Date("2020-01-28"))
+  expect_equal(d$start_date[d$term == 202010L],
+               as.Date(names(which.max(table(test_sections$start_date[test_sections$term == 202010L])))))
+  expect_false(any(is.na(d$start_date[d$section_rows > 0L])))
+})
+
+test_that("degrees count awarded only, and the degree edge flags the terms", {
+  d <- build_cedar_terms(test_students, sections = test_sections, degrees = test_degrees)
+  expect_equal(d$degrees_awarded[d$term %in% c(202060L, 202080L, 202110L)], c(4L, 4L, 0L))
+  # last_degree is 202080 (202110's degrees are Pending)
+  expect_equal(d$has_degrees, c(TRUE, TRUE, TRUE, TRUE, FALSE))
+})
+
+test_that("an edge the data cannot determine is NA on every row, never FALSE", {
+  # Every fixture term was pulled within days of its start, so the settled edge
+  # is NULL. The dimension must say unknown, not "nothing is settled".
+  e <- cedar_data_edges(test_students, degrees = test_degrees)
+  expect_null(e$last_enrolled_complete)
+  d <- build_cedar_terms(test_students, sections = test_sections, degrees = test_degrees, edges = e)
+  expect_true(all(is.na(d$is_settled)))
+  # The graded edge exists (202110), so is_graded is known.
+  expect_equal(d$is_graded, c(FALSE, TRUE, TRUE, TRUE, TRUE))
+  expect_false(any(is.na(d$in_progress)))
+})
+
+test_that("the flags are the edges: settled, graded and in progress disagree where the edges do", {
+  s <- settled_students()
+  e <- cedar_data_edges(s)
+  d <- build_cedar_terms(s, edges = e)
+  r <- function(col) setNames(d[[col]], d$term)
+
+  expect_equal(unname(r("is_settled")),  c(TRUE, TRUE, FALSE, FALSE))
+  expect_equal(unname(r("is_graded")),   c(TRUE, FALSE, FALSE, FALSE))
+  expect_equal(unname(r("in_progress")), c(FALSE, TRUE, TRUE, TRUE))
+  expect_equal(d$term[d$is_settled], c(202580L, 202610L))
+  expect_equal(max(d$term[d$is_settled]), e$last_enrolled_complete)
+  expect_equal(max(d$term[d$is_graded]), e$last_graded)
+  # no sections supplied: no dates, no upcoming term
+  expect_true(all(is.na(d$start_date)))
+  expect_false(any(d$is_upcoming))
+})
+
+test_that("a term with a schedule and no class list after the last enrolled term is upcoming", {
+  ahead <- test_sections %>%
+    dplyr::filter(term == 202110L) %>%
+    dplyr::mutate(term = 202180L, start_date = start_date + 210L, census1 = census1 + 210L)
+  d <- build_cedar_terms(test_students, sections = dplyr::bind_rows(test_sections, ahead),
+                         degrees = test_degrees)
+  expect_true(d$is_upcoming[d$term == 202180L])
+  expect_false(d$is_enrolled[d$term == 202180L])
+  expect_equal(sum(d$is_upcoming), 1L)
+  # a past term with sections only is not upcoming
+  expect_false(d$is_upcoming[d$term == 201910L])
+})
+
+test_that("the dimension fails loudly on a repeated term, a bad code, or a missing regular term", {
+  d <- build_cedar_terms(test_students, sections = test_sections, degrees = test_degrees)
+  expect_error(validate_cedar_terms(dplyr::bind_rows(d, d[2, ])), "repeats term")
+  expect_error(validate_cedar_terms(dplyr::mutate(d, term = dplyr::if_else(term == 202060L, 202050L, term))),
+               "not YYYYSS")
+  expect_error(
+    build_cedar_terms(dplyr::filter(test_students, term != 202080L),
+                      sections = dplyr::filter(test_sections, term != 202080L),
+                      degrees = dplyr::filter(test_degrees, term != 202080L)),
+    "Fall 2020")
+  expect_error(build_cedar_terms(test_students, sections = dplyr::select(test_sections, -census1)),
+               "census1")
+  expect_error(build_cedar_terms(test_students[0, ]), "non-empty")
+})

@@ -52,6 +52,36 @@ files), `banner` (the code is not yet decided, so Banner's value, translated
 through `colleges.csv`), or `NA` (nothing names one, as for Non-Degree). Read
 the reported columns; only the mapping audit reads the source ones.
 
+## 0. `cedar_terms` (The Term Dimension)
+
+**Purpose:** One row per term in the loaded data, built at startup by `build_cedar_terms()` (`R/branches/cedar-terms.R`) and held as `data_objects[["cedar_terms"]]`; never saved, because it describes whatever is loaded. ADR-001 step 1: everything about a term that readers otherwise recompute, in one place.
+
+| Column | Type | Description | Example |
+|--------|------|-------------|---------|
+| `term` | integer | Term code | 202580 |
+| `label` | string | Readable label | "Fall 2025" |
+| `season` | string | `fall` / `spring` / `summer` | "fall" |
+| `acad_year` | string | Academic year | "2025-2026" |
+| `is_regular` | boolean | Fall or Spring | TRUE |
+| `prev_term`, `next_term` | integer | Calendar neighbours, Summer included | 202560, 202610 |
+| `prev_regular_term`, `next_regular_term` | integer | Neighbours skipping Summer; Summer's next is the Fall | 202510, 202610 |
+| `start_date`, `census_date` | date | Most common `start_date` / `census1` among the term's sections; NA without sections | 2025-08-18, 2025-09-05 |
+| `enrollment_rows` | integer | Class-list rows; 0 for a term with sections only | 129043 |
+| `graded_share` | numeric | Share of class-list rows with a posted grade; NA when none | 0.91 |
+| `newest_pull` | date | Newest class-list `as_of_date` | 2026-03-07 |
+| `section_rows` | integer | Sections scheduled | 12048 |
+| `degrees_awarded` | integer | Degrees with `graduation_status == "Awarded"` | 2150 |
+| `is_enrolled` | boolean | `enrollment_rows > 0` | TRUE |
+| `is_settled` | boolean | Enrolled and at or before `last_enrolled_complete` | TRUE |
+| `is_graded` | boolean | Enrolled and at or before `last_graded` | TRUE |
+| `in_progress` | boolean | Enrolled, after `last_graded` | FALSE |
+| `has_degrees` | boolean | At or before `last_degree` | TRUE |
+| `is_upcoming` | boolean | Sections but no class list, after `last_enrolled` | FALSE |
+
+The flags are the startup edges from `cedar_data_edges()` passed in, never recomputed here; an edge the data cannot determine is NA on every row, never FALSE. `validate_cedar_terms()` rejects a repeated term, a code that is not YYYYSS, and a Fall or Spring with no class list between the first and last enrolled term (a schedule-only term outside that run is not a gap).
+
+---
+
 ## 1. `cedar_sections` (Course Offerings)
 
 **Purpose:** One row per course section per term (e.g., MATH 1350-001 in Fall 2025)
