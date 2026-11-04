@@ -3540,7 +3540,7 @@ cedar_degrees_rp <- tibble::tibble(
 #              median_courses=2, mean_areas=(3+2+0)/3 areas -> (3+2+0)/3 = 1.67
 #              (GG_IN1 3 courses/3 areas, GG_IN2 2 courses/2 areas, GG_IN3 0/0)
 #
-# Credit bands (cedar_student_term_credits_gg) place GG_IN1's three gen ed
+# Credit bands (cedar_student_terms_gg) place GG_IN1's three gen ed
 # courses in three different bands so the unm_credit_band x-axis has something
 # to separate. Credits ENTERING each term = cumulative - that term's completed:
 #   GG_IN1 202080: 0     -> band 1 (0-30)
@@ -3620,51 +3620,55 @@ cedar_degrees_gg <- tibble::tibble(
   campus      = "ABQ"
 )
 
-# One row per enrolled term, mirroring the real cedar_student_term_credits
-# contract: cumulative_* is through the END of the term, so credits entering the
-# term are cumulative minus that term's own completed credits.
-cedar_student_term_credits_gg <- tibble::tribble(
-  ~student_id, ~term,   ~completed_unm_credits, ~cumulative_completed_unm_credits,
-  "GG_IN1",    202080L,  3,   3,      # entering:  0 -> band 1
-  "GG_IN1",    202110L,  6,   51,     # entering: 45 -> band 2
-  "GG_IN1",    202180L,  3,   98,     # entering: 95 -> band 4
-  "GG_IN2",    202080L,  3,   3,      # entering:  0 -> band 1
-  "GG_IN2",    202180L,  3,   48,     # entering: 45 -> band 2
-  "GG_IN2",    202480L,  3,   90,
-  "GG_IN3",    202110L,  3,   3,
-  "GG_TRUNC",  201980L,  3,   3,
-  "GG_TRUNC",  202080L,  3,   6,
-  "GG_PEND",   202080L,  3,   3,
-  "GG_OTHER",  202080L,  3,   3
+# The credit columns of cedar_student_terms, one row per enrolled term:
+# cumulative_* is through the END of the term, so credits entering the term
+# are cumulative minus that term's own completed credits. timeline_valid is
+# the table's flag, set over the whole data: GG_TRUNC's first term is the
+# first term in the data (201980), so their running total is unreadable.
+cedar_student_terms_gg <- tibble::tribble(
+  ~student_id, ~term,   ~completed_unm_credits, ~cumulative_completed_unm_credits, ~timeline_valid,
+  "GG_IN1",    202080L,  3,   3,   TRUE,   # entering:  0 -> band 1
+  "GG_IN1",    202110L,  6,   51,  TRUE,   # entering: 45 -> band 2
+  "GG_IN1",    202180L,  3,   98,  TRUE,   # entering: 95 -> band 4
+  "GG_IN2",    202080L,  3,   3,   TRUE,   # entering:  0 -> band 1
+  "GG_IN2",    202180L,  3,   48,  TRUE,   # entering: 45 -> band 2
+  "GG_IN2",    202480L,  3,   90,  TRUE,
+  "GG_IN3",    202110L,  3,   3,   TRUE,
+  "GG_TRUNC",  201980L,  3,   3,   FALSE,
+  "GG_TRUNC",  202080L,  3,   6,   FALSE,
+  "GG_PEND",   202080L,  3,   3,   TRUE,
+  "GG_OTHER",  202080L,  3,   3,   TRUE
 )
 
 
 # ── CT01 — per-term credit position (credit-timeline.R) ─────────────────────
-# Fixture for build_credit_timeline(). Built around the exact defect the branch
-# exists to work around: the cumulative columns on cedar_programs are frozen at
-# the pull, so `frozen_*` below is deliberately the SAME wrong number on every
-# term row, while the class-list-derived series moves.
+# Fixture for build_credit_timeline(): the position columns of
+# cedar_student_terms, as build_student_terms() writes them. Built around the
+# exact defect the branch exists to work around: the cumulative columns on
+# cedar_programs are frozen at the pull, so `frozen_*` below is deliberately
+# the SAME wrong number on every term row, while the class-list-derived series
+# moves.
 #
 #   CT_A  starts 202080 (inside the window), 4 terms, 12 credits/term.
 #         Transfer block = overall(45) - inst(15) = 30.
 #         Entering credits: 30, 42, 54, 66.  After: 42, 54, 66, 78.
 #   CT_B  starts 202010 = the FIRST term in the fixture data, so their earlier
-#         coursework is invisible -> timeline_valid = FALSE.
+#         coursework is invisible -> timeline_valid = FALSE on the table.
 #   CT_C  no program record at all -> transfer block 0, total == unm.
 #
 # The frozen columns say 15/45 for CT_A at every term — the number they ended
 # with — which is what makes lag() on them subtract zero.
 
-cedar_student_term_credits_ct <- tibble::tribble(
-  ~student_id, ~term,   ~attempted_unm_credits, ~cumulative_attempted_unm_credits,
-  "CT_A",      202080L,  12,  12,
-  "CT_A",      202110L,  12,  24,
-  "CT_A",      202180L,  12,  36,
-  "CT_A",      202210L,  12,  48,
-  "CT_B",      202010L,  12,  12,
-  "CT_B",      202080L,  12,  24,
-  "CT_C",      202080L,   9,   9,
-  "CT_C",      202110L,   9,  18
+cedar_student_terms_ct <- tibble::tribble(
+  ~student_id, ~term,   ~attempted_unm_credits, ~cumulative_attempted_unm_credits, ~unm_credits_entering, ~timeline_valid,
+  "CT_A",      202080L,  12,  12,   0, TRUE,
+  "CT_A",      202110L,  12,  24,  12, TRUE,
+  "CT_A",      202180L,  12,  36,  24, TRUE,
+  "CT_A",      202210L,  12,  48,  36, TRUE,
+  "CT_B",      202010L,  12,  12,   0, FALSE,
+  "CT_B",      202080L,  12,  24,  12, FALSE,
+  "CT_C",      202080L,   9,   9,   0, TRUE,
+  "CT_C",      202110L,   9,  18,   9, TRUE
 )
 
 cedar_programs_ct <- tibble::tibble(
@@ -3693,19 +3697,19 @@ cedar_programs_ct <- tibble::tibble(
 #
 # Transfer block = 30 for both, recovered from the fixture's
 # overall_credits_attempted - inst_credits_attempted gap.
-# MCC_ANCHOR exists only to establish 201980 as the first term of the data, so
-# the changers' 202010 start counts as "inside the window" and their running
-# totals are trustworthy. Without it every row is correctly marked
-# timeline_valid = FALSE and the credit averages are empty.
-cedar_student_term_credits_mcc <- tibble::tribble(
-  ~student_id,      ~term,   ~attempted_unm_credits, ~cumulative_attempted_unm_credits,
-  "MCC_ANCHOR",     201980L,  12,  12,
-  "STU-CHANGER-A",  202010L, 100, 100,
-  "STU-CHANGER-A",  202080L,  50, 150,
-  "STU-CHANGER-A",  202110L,  35, 185,
-  "STU-CHANGER-B",  202010L,  50,  50,
-  "STU-CHANGER-B",  202060L,  25,  75,
-  "STU-CHANGER-B",  202110L,  18,  93
+# MCC_ANCHOR starts on 201980, the first term of the data, so the table marks
+# their timeline invalid; the changers start on 202010, inside the window, so
+# theirs are trustworthy. Were every row marked FALSE the credit averages
+# would be empty.
+cedar_student_terms_mcc <- tibble::tribble(
+  ~student_id,      ~term,   ~attempted_unm_credits, ~cumulative_attempted_unm_credits, ~unm_credits_entering, ~timeline_valid,
+  "MCC_ANCHOR",     201980L,  12,  12,    0, FALSE,
+  "STU-CHANGER-A",  202010L, 100, 100,    0, TRUE,
+  "STU-CHANGER-A",  202080L,  50, 150,  100, TRUE,
+  "STU-CHANGER-A",  202110L,  35, 185,  150, TRUE,
+  "STU-CHANGER-B",  202010L,  50,  50,    0, TRUE,
+  "STU-CHANGER-B",  202060L,  25,  75,   50, TRUE,
+  "STU-CHANGER-B",  202110L,  18,  93,   75, TRUE
 )
 
 

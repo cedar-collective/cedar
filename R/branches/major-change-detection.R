@@ -22,7 +22,7 @@
 #' @param programs cedar_programs data frame.
 #' @param cohort   Optional tibble(student_id, cohort_label). If provided,
 #'   only students in the cohort are analyzed.
-#' @param term_credits Optional. `cedar_student_term_credits`. Supplies the
+#' @param student_terms Optional. `cedar_student_terms`. Supplies the
 #'   credit position at each change via [build_credit_timeline()]. When NULL the
 #'   credit columns are returned as NA rather than being read off the frozen
 #'   cumulative columns on `programs` — see the note below.
@@ -54,7 +54,7 @@
 #' total — overstating the position at a student's first term by a median of 84
 #' credits. See the field reliability contract in AGENTS.md.
 detect_major_changes <- function(programs, population = NULL, opt = list(),
-                                 term_credits = NULL) {
+                                 student_terms = NULL) {
 
   message("[major-change-detection.R] Welcome to detect_major_changes!")
 
@@ -113,7 +113,7 @@ detect_major_changes <- function(programs, population = NULL, opt = list(),
   # Credit position at the decision point. A major change posts to Banner the
   # term AFTER the student actually switches, so the figure that describes the
   # decision is the credits they had entering `prev_term`, not `change_term`.
-  changes <- .attach_change_credits(changes, term_credits, programs)
+  changes <- .attach_change_credits(changes, student_terms, programs)
 
   message("[major-change-detection.R] Detected ", nrow(changes), " change events across ",
           n_distinct(changes$student_id), " students")
@@ -125,26 +125,26 @@ detect_major_changes <- function(programs, population = NULL, opt = list(),
 #
 # Kept out of the main pipeline above so the change-detection logic stays
 # readable, and so the NULL path is obviously a deliberate "we cannot know"
-# rather than a missing join. Returns NA credit columns when term_credits is
+# rather than a missing join. Returns NA credit columns when student_terms is
 # absent: a caller that has not supplied the trustworthy series gets no number,
 # never a number read off the frozen columns.
-.attach_change_credits <- function(changes, term_credits, programs) {
+.attach_change_credits <- function(changes, student_terms, programs) {
   na_cols <- function(d) {
     d$unm_credits_before_change   <- NA_real_
     d$total_credits_before_change <- NA_real_
     d$credits_position_valid      <- NA
     d
   }
-  if (is.null(term_credits) || nrow(changes) == 0) {
-    if (is.null(term_credits)) {
-      message("[major-change-detection.R] No term_credits supplied — credit columns will be NA. ",
-              "Pass term_credits = cedar_student_term_credits for credit positions.")
+  if (is.null(student_terms) || nrow(changes) == 0) {
+    if (is.null(student_terms)) {
+      message("[major-change-detection.R] No student_terms supplied — credit columns will be NA. ",
+              "Pass student_terms = cedar_student_terms for credit positions.")
     }
     return(na_cols(changes))
   }
 
   timeline <- build_credit_timeline(
-    term_credits, programs,
+    student_terms, programs,
     opt = list(student_ids = unique(changes$student_id))
   )
   if (nrow(timeline) == 0) return(na_cols(changes))

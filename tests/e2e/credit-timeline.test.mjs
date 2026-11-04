@@ -2,7 +2,7 @@
 // onto build_credit_timeline(). See the field reliability contract in AGENTS.md.
 //
 // The R suite proves the arithmetic; this proves the wiring. Every one of these
-// paths now REQUIRES cedar_student_term_credits to be threaded through, and a
+// paths now REQUIRES cedar_student_terms to be threaded through, and a
 // missing thread is a runtime error the unit tests cannot see.
 //
 //   node tests/e2e/credit-timeline.test.mjs
@@ -19,7 +19,7 @@ const ok = (c, m) => { if (!c) fail.push(m); console.log(`${c ? 'ok  ' : 'FAIL'}
 const { browser, page, jsErrors } = await launch({ width: 1500, height: 1100 });
 
 // Shiny surfaces R errors as a notification rather than a page error, so a
-// missing term_credits argument would otherwise look like an empty tab.
+// missing student_terms argument would otherwise look like an empty tab.
 const errorToasts = () => page.evaluate(() =>
   [...document.querySelectorAll('.shiny-notification')]
     .map((n) => n.innerText.trim())

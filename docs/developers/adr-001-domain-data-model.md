@@ -76,8 +76,8 @@ A student-term table carrying the eight student columns is 53 MB.
 
 ### 3. Every analysis re-derives the same facts, slightly differently
 
-The transform builds `cedar_student_term_credits` (enrolled = registered) and
-`cedar_next_term` (enrolled = registered or late-dropped) fifty lines apart;
+The transform built `cedar_student_term_credits` (enrolled = registered) and
+`cedar_next_term` (enrolled = registered or late-dropped) fifty lines apart (both retired 2026-11-04);
 Retention and Roadblocks then disagree by 284 students on who returned (I44).
 Five other files decide for themselves what an enrolled student-term is.
 

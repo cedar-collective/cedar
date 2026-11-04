@@ -11,7 +11,7 @@ context("Per-Term Credit Position")
 
 
 test_that("timeline gives credits entering the term, not after it", {
-  tl <- build_credit_timeline(cedar_student_term_credits_ct, cedar_programs_ct)
+  tl <- build_credit_timeline(cedar_student_terms_ct, cedar_programs_ct)
   a <- dplyr::filter(tl, student_id == "CT_A") %>% dplyr::arrange(term)
 
   # Transfer block 30, then 12 credits a term. Entering the first term the
@@ -22,7 +22,7 @@ test_that("timeline gives credits entering the term, not after it", {
 })
 
 test_that("the transfer block is recovered from the frozen pair", {
-  tl <- build_credit_timeline(cedar_student_term_credits_ct, cedar_programs_ct)
+  tl <- build_credit_timeline(cedar_student_terms_ct, cedar_programs_ct)
   # overall(78) - inst(48) = 30. Both columns are frozen, but their difference
   # is taken at one instant and so survives the freeze.
   expect_equal(unique(tl$transfer_credits[tl$student_id == "CT_A"]), 30)
@@ -30,7 +30,7 @@ test_that("the transfer block is recovered from the frozen pair", {
 })
 
 test_that("students with no program record get a UNM-only timeline, not an error", {
-  tl <- build_credit_timeline(cedar_student_term_credits_ct, cedar_programs_ct)
+  tl <- build_credit_timeline(cedar_student_terms_ct, cedar_programs_ct)
   c3 <- dplyr::filter(tl, student_id == "CT_C")
 
   expect_equal(unique(c3$transfer_credits), 0)
@@ -38,64 +38,55 @@ test_that("students with no program record get a UNM-only timeline, not an error
 })
 
 test_that("programs = NULL yields an honest UNM-only timeline", {
-  tl <- build_credit_timeline(cedar_student_term_credits_ct, programs = NULL)
+  tl <- build_credit_timeline(cedar_student_terms_ct, programs = NULL)
   expect_true(all(tl$transfer_credits == 0))
   expect_equal(tl$total_credits_entering, tl$unm_credits_entering)
 })
 
 test_that("timeline_valid marks students whose history predates the data", {
-  tl <- build_credit_timeline(cedar_student_term_credits_ct, cedar_programs_ct)
+  tl <- build_credit_timeline(cedar_student_terms_ct, cedar_programs_ct)
 
   # CT_B's first term IS the first term in the data, so their running total
-  # starts mid-career at zero and every position is understated.
+  # starts mid-career at zero and every position is understated. The table
+  # says so on every one of their rows.
   expect_false(unique(tl$timeline_valid[tl$student_id == "CT_B"]))
   expect_true(all(tl$timeline_valid[tl$student_id == "CT_A"]))
 })
 
-test_that("a term-filtered slice without first terms fails OPEN, which is why the override exists", {
-  # Documents the trap rather than hiding it. Slicing away CT_B's 202010 row
-  # makes their history look like it starts at 202080, and the guard cannot tell.
-  slice <- dplyr::filter(cedar_student_term_credits_ct, term >= 202080L)
-  naive <- build_credit_timeline(slice, cedar_programs_ct,
-                                 opt = list(min_data_term = 202010L))
-  expect_true(any(naive$timeline_valid[naive$student_id == "CT_B"]))
+test_that("a term-filtered slice of the table keeps the flag the builder set", {
+  # The trap the old class-list series had: slicing away CT_B's 202010 row made
+  # their history look like it started at 202080, and a guard re-derived from
+  # the slice marked them valid. The flag now travels on the row, set over the
+  # whole data at build time, so the slice cannot change the answer.
+  slice <- dplyr::filter(cedar_student_terms_ct, term >= 202080L)
+  tl <- build_credit_timeline(slice, cedar_programs_ct)
+  expect_false(any(tl$timeline_valid[tl$student_id == "CT_B"]))
+  expect_true(all(tl$timeline_valid[tl$student_id == "CT_A"]))
 })
 
-test_that("student_first_terms makes the guard immune to how the input was sliced", {
-  slice <- dplyr::filter(cedar_student_term_credits_ct, term >= 202080L)
-  firsts <- cedar_student_term_credits_ct %>%
-    dplyr::group_by(student_id) %>%
-    dplyr::summarize(first_unm_term = min(term), .groups = "drop")
-  tl <- build_credit_timeline(slice, cedar_programs_ct,
-                              opt = list(min_data_term = 202010L,
-                                         student_first_terms = firsts))
-
-  expect_true(all(tl$timeline_valid[tl$student_id == "CT_A"]))
-  expect_false(any(tl$timeline_valid[tl$student_id == "CT_B"]))
-})
-
-test_that("a student missing from student_first_terms is marked invalid, not valid", {
-  firsts <- tibble::tibble(student_id = "CT_A", first_unm_term = 202080L)
-  tl <- build_credit_timeline(cedar_student_term_credits_ct, cedar_programs_ct,
-                              opt = list(min_data_term = 202010L,
-                                         student_first_terms = firsts))
-  expect_true(all(tl$timeline_valid[tl$student_id == "CT_A"]))
-  expect_false(any(tl$timeline_valid[tl$student_id == "CT_B"]))
+test_that("an NA flag on the table is invalid, never valid", {
+  # Unknown is not the same as fine — fail closed, as the builder does.
+  na_flag <- cedar_student_terms_ct %>%
+    dplyr::mutate(timeline_valid = dplyr::if_else(student_id == "CT_C", NA, timeline_valid))
+  tl <- build_credit_timeline(na_flag, cedar_programs_ct)
   expect_false(any(tl$timeline_valid[tl$student_id == "CT_C"]))
+  expect_false(anyNA(tl$timeline_valid))
 })
 
-test_that("a malformed student_first_terms fails loudly", {
-  expect_error(
-    build_credit_timeline(cedar_student_term_credits_ct, cedar_programs_ct,
-                          opt = list(student_first_terms = tibble::tibble(student_id = "CT_A"))),
-    "student_id and first_unm_term"
-  )
+test_that("the running total is read from the table, never recomputed from a slice", {
+  # CT_A's 202180 row says 24 entering; dropping their earlier rows must not
+  # restart the total at zero.
+  slice <- dplyr::filter(cedar_student_terms_ct, term >= 202180L)
+  tl <- build_credit_timeline(slice, cedar_programs_ct)
+  a <- dplyr::filter(tl, student_id == "CT_A") %>% dplyr::arrange(term)
+  expect_equal(a$unm_credits_entering, c(24, 36))
+  expect_equal(a$total_credits_entering, c(54, 66))
 })
 
 test_that("the position actually moves across a student's terms", {
   # The single property the frozen columns fail: within one student, the value
   # must change from term to term or it is not a timeline.
-  tl <- build_credit_timeline(cedar_student_term_credits_ct, cedar_programs_ct)
+  tl <- build_credit_timeline(cedar_student_terms_ct, cedar_programs_ct)
   moved <- tl %>% dplyr::group_by(student_id) %>%
     dplyr::summarize(n_vals = dplyr::n_distinct(total_credits_entering),
                      n_terms = dplyr::n(), .groups = "drop") %>%
@@ -104,30 +95,35 @@ test_that("the position actually moves across a student's terms", {
 })
 
 test_that("student_ids restricts the timeline", {
-  tl <- build_credit_timeline(cedar_student_term_credits_ct, cedar_programs_ct,
+  tl <- build_credit_timeline(cedar_student_terms_ct, cedar_programs_ct,
                               opt = list(student_ids = "CT_A"))
   expect_equal(unique(tl$student_id), "CT_A")
 })
 
 test_that("an empty student filter returns a typed empty frame", {
-  tl <- build_credit_timeline(cedar_student_term_credits_ct, cedar_programs_ct,
+  tl <- build_credit_timeline(cedar_student_terms_ct, cedar_programs_ct,
                               opt = list(student_ids = "NOBODY"))
   expect_equal(nrow(tl), 0)
   expect_true(is.character(tl$student_id))
   expect_true(is.numeric(tl$total_credits_entering))
 })
 
-test_that("a malformed term_credits table fails loudly", {
+test_that("a malformed student_terms table fails loudly", {
   expect_error(
-    build_credit_timeline(dplyr::select(cedar_student_term_credits_ct,
+    build_credit_timeline(dplyr::select(cedar_student_terms_ct,
                                         -cumulative_attempted_unm_credits)),
+    "missing required column"
+  )
+  # The flag is read, not derived, so a table without it is not usable either.
+  expect_error(
+    build_credit_timeline(dplyr::select(cedar_student_terms_ct, -timeline_valid)),
     "missing required column"
   )
 })
 
 test_that("a programs table without the credit pair fails loudly", {
   expect_error(
-    build_credit_timeline(cedar_student_term_credits_ct,
+    build_credit_timeline(cedar_student_terms_ct,
                           dplyr::select(cedar_programs_ct, student_id, term)),
     "to recover transfer credit"
   )
@@ -139,7 +135,7 @@ test_that("a programs table without the credit pair fails loudly", {
 # =============================================================================
 
 test_that("attach_credit_position joins the entering position onto events", {
-  tl <- build_credit_timeline(cedar_student_term_credits_ct, cedar_programs_ct)
+  tl <- build_credit_timeline(cedar_student_terms_ct, cedar_programs_ct)
   events <- tibble::tibble(student_id = c("CT_A", "CT_A"),
                            change_term = c(202110L, 202210L))
   out <- attach_credit_position(events, tl, term_col = "change_term")
@@ -149,16 +145,16 @@ test_that("attach_credit_position joins the entering position onto events", {
 })
 
 test_that("attach_credit_position can use the UNM-only basis", {
-  tl <- build_credit_timeline(cedar_student_term_credits_ct, cedar_programs_ct)
+  tl <- build_credit_timeline(cedar_student_terms_ct, cedar_programs_ct)
   events <- tibble::tibble(student_id = "CT_A", term = 202110L)
   out <- attach_credit_position(events, tl, basis = "unm")
 
   expect_equal(out$credits_entering, 12)   # 42 total minus the 30 transfer block
 })
 
-test_that("an event in a term with no graded enrollment keeps the row with NA", {
+test_that("an event in a term the student has no row for keeps the row with NA", {
   # Dropping it would silently shrink the event count; the change still happened.
-  tl <- build_credit_timeline(cedar_student_term_credits_ct, cedar_programs_ct)
+  tl <- build_credit_timeline(cedar_student_terms_ct, cedar_programs_ct)
   events <- tibble::tibble(student_id = "CT_A", term = 202480L)
   out <- attach_credit_position(events, tl)
 
@@ -198,7 +194,7 @@ test_that("inst_credit_band places a course by UNM credits entering the term", {
     ct_students(), ct_population(),
     opt = list(x_axis = "inst_credit_band", min_n = 1L, campus = "ABQ",
                group_campus = FALSE),
-    term_credits = cedar_student_term_credits_ct
+    student_terms = cedar_student_terms_ct
   ))
   # UNM entering: 0, 12, 24, 36 -> all band 1 (0-30) except the last (31-60).
   expect_setequal(timing$relative_term, c(1L, 2L))
@@ -209,7 +205,7 @@ test_that("overall_credit_band adds the transfer block and shifts the bands", {
     ct_students(), ct_population(), programs = cedar_programs_ct,
     opt = list(x_axis = "overall_credit_band", min_n = 1L, campus = "ABQ",
                group_campus = FALSE),
-    term_credits = cedar_student_term_credits_ct
+    student_terms = cedar_student_terms_ct
   ))
   # Total entering: 30, 42, 54, 66 -> bands 1, 2, 2, 3. The same student sits a
   # band higher than on the UNM axis, which is the whole point of the transfer
@@ -217,12 +213,12 @@ test_that("overall_credit_band adds the transfer block and shifts the bands", {
   expect_setequal(timing$relative_term, c(1L, 2L, 3L))
 })
 
-test_that("credit axes refuse to run without term_credits", {
+test_that("credit axes refuse to run without student_terms", {
   expect_error(
     suppressMessages(get_course_timing(
       ct_students(), ct_population(), programs = cedar_programs_ct,
       opt = list(x_axis = "inst_credit_band", min_n = 1L, campus = "ABQ"))),
-    "require cedar_student_term_credits"
+    "require cedar_student_terms"
   )
 })
 
@@ -234,7 +230,7 @@ test_that("overall_credit_band refuses to run without programs", {
     suppressMessages(get_course_timing(
       ct_students(), ct_population(),
       opt = list(x_axis = "overall_credit_band", min_n = 1L, campus = "ABQ"),
-      term_credits = cedar_student_term_credits_ct)),
+      student_terms = cedar_student_terms_ct)),
     "recover the transfer block"
   )
 })
@@ -245,7 +241,7 @@ test_that("the credit position moves across a student's terms on both axes", {
     timing <- suppressMessages(get_course_timing(
       ct_students(), ct_population(), programs = cedar_programs_ct,
       opt = list(x_axis = ax, min_n = 1L, campus = "ABQ", group_campus = FALSE),
-      term_credits = cedar_student_term_credits_ct))
+      student_terms = cedar_student_terms_ct))
     expect_gt(dplyr::n_distinct(timing$relative_term), 1)
   }
 })

@@ -35,8 +35,7 @@ cedar_read <- function(name) {
 
 # Tables load lazily so sourcing remains fast when only one is needed.
 for (.nm in c("cedar_students", "cedar_programs", "cedar_degrees",
-              "cedar_sections", "cedar_grades", "cedar_student_term_credits",
-              "cedar_student_terms",
+              "cedar_sections", "cedar_grades", "cedar_student_terms",
               "cedar_applicants", "cedar_lookups")) {
   local({
     name <- .nm

@@ -23,7 +23,7 @@ CEDAR analyses expect a small set of normalized tables:
 |:------|:-----------|
 | `cedar_sections` | Course offerings and section-level enrollment context |
 | `cedar_students` | Student course registrations, grades, and course-level attributes |
-| `cedar_student_term_credits` | Observed term-level and cumulative UNM-style credit timeline |
+| `cedar_student_terms` | One row per student-term: enrolled, returned, description, and the observed term-level and cumulative UNM credit timeline |
 | `cedar_programs` | Student majors, minors, concentrations, and program attributes by term |
 | `cedar_degrees` | Degrees awarded or pending |
 | `cedar_faculty` | Instructor identity and appointment context |

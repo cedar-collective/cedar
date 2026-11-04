@@ -144,7 +144,7 @@
 #'       `"classification"`, `"inst_credit_band"`, `"overall_credit_band"`, or
 #'       `"unm_credit_band"`. The three band modes all use the same 30-credit
 #'       cut points and differ only in where the credit total comes from — see
-#'       the `term_credits` parameter for `"unm_credit_band"`.}
+#'       the `student_terms` parameter for `"unm_credit_band"`.}
 #'   }
 #'
 #' @return Data frame with columns:
@@ -177,10 +177,11 @@
 #'
 #' @seealso [plot_curriculum_map()], [get_course_pairs()]
 #' @export
-#' @param term_credits Data frame or NULL. The `cedar_student_term_credits`
-#'   table. **Required by every credit-band x_axis** — `inst_credit_band`,
-#'   `overall_credit_band` and `unm_credit_band` all resolve their position
-#'   through [build_credit_timeline()]. Ignored by `relative_term` and
+#' @param student_terms Data frame or NULL. The `cedar_student_terms` table.
+#'   **Required by every credit-band x_axis** — `inst_credit_band` and
+#'   `overall_credit_band` resolve their position through
+#'   [build_credit_timeline()], and `unm_credit_band` reads the table's
+#'   completed-credit running total directly. Ignored by `relative_term` and
 #'   `classification`.
 #'
 #'   None of them may read the Academic Studies cumulative columns on
@@ -192,8 +193,8 @@
 #'
 #'   The three modes differ only in what they count:
 #'   \describe{
-#'     \item{`inst_credit_band`}{UNM credits attempted. Needs `term_credits`.}
-#'     \item{`overall_credit_band`}{UNM + transfer. Needs `term_credits` and
+#'     \item{`inst_credit_band`}{UNM credits attempted. Needs `student_terms`.}
+#'     \item{`overall_credit_band`}{UNM + transfer. Needs `student_terms` and
 #'       `programs`, the latter only to recover the transfer block.}
 #'     \item{`unm_credit_band`}{UNM credits completed entering the term.}
 #'   }
@@ -202,7 +203,7 @@
 #'   recover each student's transfer block. Never read for a per-term credit
 #'   total.
 get_course_timing <- function(students, population, programs = NULL, opt = list(),
-                              students_full = NULL, term_credits = NULL) {
+                              students_full = NULL, student_terms = NULL) {
 
   message("[pathway.R] Starting course timing analysis...")
 
@@ -417,22 +418,23 @@ get_course_timing <- function(students, population, programs = NULL, opt = list(
 
       # Credits the student had already EARNED walking into the term, so the
       # course being placed is not counted toward its own band. Sourced from
-      # cedar_student_term_credits (one row per enrolled term) rather than the
-      # program records — see the term_credits parameter docs above.
-      if (is.null(term_credits)) {
-        stop("[pathway.R] unm_credit_band mode requires cedar_student_term_credits. ",
-             "Pass term_credits = cedar_student_term_credits to get_course_timing().")
+      # cedar_student_terms' completed-credit running total rather than the
+      # program records — see the student_terms parameter docs above.
+      if (is.null(student_terms)) {
+        stop("[pathway.R] unm_credit_band mode requires cedar_student_terms. ",
+             "Pass student_terms = cedar_student_terms to get_course_timing().")
       }
       needed <- c("student_id", "term", "completed_unm_credits",
-                  "cumulative_completed_unm_credits")
-      missing_cols <- setdiff(needed, names(term_credits))
+                  "cumulative_completed_unm_credits", "timeline_valid")
+      missing_cols <- setdiff(needed, names(student_terms))
       if (length(missing_cols) > 0) {
-        stop("[pathway.R] term_credits is missing required column(s): ",
+        stop("[pathway.R] student_terms is missing required column(s): ",
              paste(missing_cols, collapse = ", "))
       }
 
-      credit_lookup <- term_credits %>%
-        dplyr::filter(student_id %in% pop_ids) %>%
+      pop_terms <- student_terms %>%
+        dplyr::filter(student_id %in% pop_ids)
+      credit_lookup <- pop_terms %>%
         dplyr::transmute(
           student_id, term,
           credit_band_source = cumulative_completed_unm_credits - completed_unm_credits
@@ -442,11 +444,10 @@ get_course_timing <- function(students, population, programs = NULL, opt = list(
         dplyr::left_join(credit_lookup, by = c("student_id", "term"))
 
       # This axis derives its position from the same running series, so it
-      # inherits the same left-truncation exposure. It reads the completed-credit
-      # columns, so it takes the validity rule on its own rather than through
-      # build_credit_timeline(), which needs the attempted ones.
-      validity <- credit_timeline_validity(
-        term_credits, opt = list(student_ids = pop_ids))
+      # inherits the same left-truncation exposure. The table carries the flag,
+      # set over the whole data at build time.
+      validity <- pop_terms %>%
+        dplyr::distinct(student_id, timeline_valid)
 
     } else {
 
@@ -464,9 +465,9 @@ get_course_timing <- function(students, population, programs = NULL, opt = list(
       # The names are kept because they still describe what the caller gets:
       #   inst_credit_band    — UNM credits only
       #   overall_credit_band — UNM + transfer
-      if (is.null(term_credits)) {
-        stop("[pathway.R] credit_band modes now require cedar_student_term_credits. ",
-             "Pass term_credits = cedar_student_term_credits to get_course_timing(). ",
+      if (is.null(student_terms)) {
+        stop("[pathway.R] credit_band modes require cedar_student_terms. ",
+             "Pass student_terms = cedar_student_terms to get_course_timing(). ",
              "The cedar_programs credit columns cannot answer a per-term question ",
              "(see the field reliability contract in AGENTS.md).")
       }
@@ -477,7 +478,7 @@ get_course_timing <- function(students, population, programs = NULL, opt = list(
       }
 
       timeline <- build_credit_timeline(
-        term_credits,
+        student_terms,
         programs = if (x_axis == "overall_credit_band") programs else NULL,
         opt = list(student_ids = pop_ids)
       )

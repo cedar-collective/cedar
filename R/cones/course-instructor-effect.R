@@ -79,7 +79,7 @@
 #'   one subsequent regular term before the complete-enrollment edge are excluded
 #'   from the continuation denominator.
 get_instructor_effect <- function(students, programs, applicants = NULL,
-                                   opt = list(), term_credits = NULL,
+                                   opt = list(), student_terms = NULL,
                                    data_edges = NULL) {
   course_x <- opt$course_x
   course_y <- opt$course_y
@@ -361,7 +361,7 @@ get_instructor_effect <- function(students, programs, applicants = NULL,
     programs      = programs,
     applicants    = applicants,
     students      = students,
-    term_credits  = term_credits
+    student_terms  = student_terms
   )
 
   message("[course-instructor-effect.R]   Instructor effect computed. Done.")

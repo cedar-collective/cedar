@@ -527,7 +527,7 @@ transform_sections <- function(desrs, data_dir, ext, maps) {
 #' @param data_dir    Path to data directory
 #' @param ext         File extension
 #' @param maps        Named list of lookup vectors
-#' @return list(saved = list(students, grades, student_term_credits), major_code_name_raw)
+#' @return list(saved = list(students, grades), major_code_name_raw)
 transform_students <- function(class_lists, data_dir, ext, maps) {
   message("──────────────────────────────────────────────────────")
   message("2. Transforming class_lists → cedar_students")
@@ -753,67 +753,16 @@ transform_students <- function(class_lists, data_dir, ext, maps) {
   attr(cedar_students, "cedar_mapping_provenance") <- cedar_mapping_provenance()
   students_meta <- save_cedar_file(cedar_students, "students", data_dir, ext)
 
-  # ── cedar_student_term_credits ────────────────────────────────────────────
-  # Observed UNM-only credits from class lists, one row per student-term.
-  # These are derived from course rows instead of Academic Studies cumulative
-  # credit fields, which can repeat current totals backward across old program
-  # records. Attempted credits include registered enrollments with a credit value;
-  # completed credits use the canonical grade set that earns credit hours.
-  message("  Computing cedar_student_term_credits (observed class-list credits)...")
-  cedar_student_term_credits_tbl <- cedar_students %>%
-    filter(
-      registration_status_code %in% STATUS_REGISTERED,
-      !is.na(credits)
-    ) %>%
-    # CAMPUS_ROLLUP: this is one curriculum credit load per student-term, not a
-    # delivery metric. A repeated course counts once even if campus changed.
-    distinct(student_id, term, subject_course, course_title, credits,
-             final_grade, registration_status_code) %>%
-    mutate(
-      attempted_credit = credits,
-      completed_credit = if_else(final_grade %in% passing_grades, credits, 0),
-      dfw_credit = if_else(
-        !is.na(final_grade) & nzchar(final_grade) &
-          !final_grade %in% c(GRADES_PASS, GRADES_EXCLUDED_FROM_OUTCOMES),
-        credits,
-        0
-      ),
-      w_credit = if_else(final_grade == "W", credits, 0),
-      completed_course = final_grade %in% passing_grades
-    ) %>%
-    group_by(student_id, term) %>%
-    summarize(
-      attempted_unm_credits = sum(attempted_credit, na.rm = TRUE),
-      completed_unm_credits = sum(completed_credit, na.rm = TRUE),
-      dfw_unm_credits = sum(dfw_credit, na.rm = TRUE),
-      w_unm_credits = sum(w_credit, na.rm = TRUE),
-      registered_courses = n_distinct(subject_course),
-      completed_courses = sum(completed_course, na.rm = TRUE),
-      .groups = "drop"
-    ) %>%
-    arrange(student_id, term) %>%
-    group_by(student_id) %>%
-    mutate(
-      cumulative_attempted_unm_credits = cumsum(attempted_unm_credits),
-      cumulative_completed_unm_credits = cumsum(completed_unm_credits),
-      cumulative_dfw_unm_credits = cumsum(dfw_unm_credits),
-      cumulative_w_unm_credits = cumsum(w_unm_credits)
-    ) %>%
-    ungroup()
-  student_term_credits_meta <- save_cedar_file(
-    cedar_student_term_credits_tbl, "student_term_credits", data_dir, ext
-  )
-  message("  ✅ cedar_student_term_credits: ", nrow(cedar_student_term_credits_tbl), " rows, ",
-          ncol(cedar_student_term_credits_tbl), " columns")
-  rm(cedar_student_term_credits_tbl)
+  # The per-term and running credit totals that cedar_student_term_credits
+  # used to carry are columns of cedar_student_terms (build_student_terms(),
+  # ADR-001 step 2), rebuilt whenever this table is.
 
   rm(cedar_students); gc(verbose = FALSE)
 
   list(
     saved = list(
       students = students_meta,
-      grades = grades_meta,
-      student_term_credits = student_term_credits_meta
+      grades = grades_meta
     ),
     major_code_name_raw = major_code_name_raw
   )
@@ -856,24 +805,37 @@ transform_student_terms <- function(data_dir, ext) {
 #' Why cedar_student_terms needs rebuilding, or NULL when it does not
 #'
 #' The table is built from three saved tables, so it can be missing (a deploy
-#' before any refresh has run this stage) or older than a source rebuilt
-#' without it. The deploy gate (scripts/rebuild-programs-if-mappings-changed.R)
-#' asks this and builds the table, as it does a stale mapped table, so the app,
-#' which requires the file, never starts without it.
+#' before any refresh has run this stage), older than a source rebuilt
+#' without it, or built by an older builder that wrote fewer columns than the
+#' code now deployed reads. The deploy gate
+#' (scripts/rebuild-programs-if-mappings-changed.R) asks this and builds the
+#' table, as it does a stale mapped table, so the app, which requires the file
+#' and its columns, never starts without them.
 #'
 #' @param data_dir Path to data directory
 #' @param ext      File extension
-#' @return A one-line reason, or NULL when the file exists and is newer than
-#'   every saved source it reads.
+#' @return A one-line reason, or NULL when the file exists, is newer than
+#'   every saved source it reads, and carries every column the builder writes.
 cedar_student_terms_staleness <- function(data_dir, ext = ".qs") {
   target <- file.path(data_dir, paste0("cedar_student_terms", ext))
   if (!file.exists(target)) return("cedar_student_terms has not been built")
   sources <- file.path(data_dir, paste0("cedar_", c("students", "programs", "degrees"), ext))
   sources <- sources[file.exists(sources)]
   newer <- sources[file.mtime(sources) > file.mtime(target)]
-  if (length(newer) == 0L) return(NULL)
-  paste0(paste(sub(ext, "", basename(newer), fixed = TRUE), collapse = ", "),
-         " newer than cedar_student_terms")
+  if (length(newer) > 0L) {
+    return(paste0(paste(sub(ext, "", basename(newer), fixed = TRUE), collapse = ", "),
+                  " newer than cedar_student_terms"))
+  }
+  # A column the builder gained since the file was written (the completed-credit
+  # running total, 2026-11-04) is a schema change no file time records: the app
+  # would start and the first reader of that column would fail. Compare the
+  # saved names with what build_student_terms() writes today.
+  missing <- setdiff(STUDENT_TERMS_COLUMNS, names(load_file(target, ext)))
+  if (length(missing) > 0L) {
+    return(paste0("saved cedar_student_terms lacks column(s) the builder now writes: ",
+                  paste(missing, collapse = ", ")))
+  }
+  NULL
 }
 
 

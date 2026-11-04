@@ -11,10 +11,10 @@
 
 # Credit position entering the declaration term, on the same basis and from the
 # same source as the major-change figures, so the two are comparable.
-.attach_declaration_credits <- function(first_decl, term_credits, programs) {
-  if (is.null(term_credits) || nrow(first_decl) == 0) {
-    if (is.null(term_credits)) {
-      message("[declaration-context.R] No term_credits supplied — declaration credit ",
+.attach_declaration_credits <- function(first_decl, student_terms, programs) {
+  if (is.null(student_terms) || nrow(first_decl) == 0) {
+    if (is.null(student_terms)) {
+      message("[declaration-context.R] No student_terms supplied — declaration credit ",
               "columns will be NA.")
     }
     first_decl$inst_credits    <- NA_real_
@@ -24,7 +24,7 @@
   }
 
   timeline <- build_credit_timeline(
-    term_credits, programs,
+    student_terms, programs,
     opt = list(student_ids = unique(first_decl$student_id))
   )
   first_decl %>%
@@ -56,7 +56,7 @@
 #'   n_declarers, focal_subjects
 get_declaration_context <- function(programs, students, population,
                                     focal_subjects = character(0),
-                                    opt = list(), term_credits = NULL) {
+                                    opt = list(), student_terms = NULL) {
   min_n <- opt$min_n %||% 5L
 
   focal_ids <- unique(population$student_id)
@@ -75,7 +75,7 @@ get_declaration_context <- function(programs, students, population,
   # series rather than the cumulative columns beside decl_term on `programs`,
   # which are stamped at the pull and would report the student's total today.
   # See the field reliability contract in AGENTS.md.
-  first_decl <- .attach_declaration_credits(first_decl, term_credits, programs)
+  first_decl <- .attach_declaration_credits(first_decl, student_terms, programs)
 
   if (nrow(first_decl) == 0) {
     message("[declaration-context.R] get_declaration_context: no declared students found.")

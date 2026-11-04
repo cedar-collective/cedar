@@ -82,7 +82,7 @@ test_that("detect_major_changes records correct from/to majors for CHANGER_A", {
 
 test_that("detect_major_changes reports CHANGER_A's credit position at the decision point", {
   result <- detect_major_changes(test_programs,
-                                 term_credits = cedar_student_term_credits_mcc)
+                                 student_terms = cedar_student_terms_mcc)
   row_a  <- result[result$student_id == CHANGER_A, ]
 
   # Position after prev_term (202080): 150 UNM, +30 transfer = 180 total.
@@ -103,7 +103,7 @@ test_that("detect_major_changes records correct from/to majors for CHANGER_B", {
 
 test_that("detect_major_changes reports CHANGER_B's credit position at the decision point", {
   result <- detect_major_changes(test_programs,
-                                 term_credits = cedar_student_term_credits_mcc)
+                                 student_terms = cedar_student_terms_mcc)
   row_b  <- result[result$student_id == CHANGER_B, ]
 
   # Position after prev_term (202060): 75 UNM, +30 transfer = 105 total.
@@ -111,7 +111,7 @@ test_that("detect_major_changes reports CHANGER_B's credit position at the decis
   expect_equal(row_b$total_credits_before_change, 105)
 })
 
-test_that("credit columns are NA without term_credits, never read off the frozen columns", {
+test_that("credit columns are NA without student_terms, never read off the frozen columns", {
   # The failure mode this guards: cedar_programs carries plausible-looking
   # cumulative columns, and silently falling back to them would restore exactly
   # the defect the migration removed.
@@ -127,7 +127,7 @@ test_that("avg_credits_before_major drops events with no usable position", {
   expect_equal(nrow(avg_credits_before_major(no_credits, opt = list(min_n = 1L))), 0)
 
   with_credits <- detect_major_changes(test_programs,
-                                       term_credits = cedar_student_term_credits_mcc)
+                                       student_terms = cedar_student_terms_mcc)
   out <- avg_credits_before_major(with_credits, opt = list(min_n = 1L))
   expect_gt(nrow(out), 0)
   expect_true(all(!is.na(out$avg_unm_credits)))
@@ -301,7 +301,7 @@ test_that("majors_moved_out_of includes Biology as an exit source", {
 
 test_that("avg_credits_before_major returns correct structure", {
   changes <- detect_major_changes(test_programs,
-                                  term_credits = cedar_student_term_credits_mcc)
+                                  student_terms = cedar_student_terms_mcc)
   result  <- avg_credits_before_major(changes, opt = list(min_n = 1))
 
   expect_s3_class(result, "data.frame")
@@ -314,7 +314,7 @@ test_that("avg_credits_before_major returns correct structure", {
 
 test_that("avg_credits_before_major Nursing entry uses the decision-point position (CHANGER_B = 75 UNM)", {
   changes <- detect_major_changes(test_programs,
-                                  term_credits = cedar_student_term_credits_mcc)
+                                  student_terms = cedar_student_terms_mcc)
   result  <- avg_credits_before_major(changes, opt = list(min_n = 1))
 
   nursing_row <- result[result$to_major == "Nursing", ]

@@ -8,7 +8,7 @@ parent: Developer Guide
 
 This reference is auto-generated from roxygen2 comments in the source code.
 
-*Generated: 2026-11-03 09:21:33.597254*
+*Generated: 2026-11-04 08:00:10.374284*
 
 ---
 
@@ -205,6 +205,40 @@ One shared milestone definition; rule-nodes.csv carries each cited use Counts de
 **Program scope includes its concentrations and the transitive course references**
 
 Program scope includes its concentrations and the transitive course references This is a reference closure, never a claim that all those courses are required.
+
+---
+
+## cedar-terms
+
+### `build_cedar_terms()`
+
+*Source: cedar-terms.R*
+
+**Build the term dimension**
+
+**Parameters:**
+
+- `students` - `cedar_students`. Required; supplies the terms with enrollment and, through `edges`, the right edges.
+- `sections` - `cedar_sections` or NULL. Supplies `section_rows`, `start_date` and `census_date` (each the most common value among the term's sections, so part-term and late-start sections do not move it) and the upcoming terms that have a schedule but no class list yet.
+- `degrees` - `cedar_degrees` or NULL. Supplies `degrees_awarded`.
+- `edges` - The result of [cedar_data_edges()] on the same tables. Defaults to computing it, so the function stands alone; the app passes the edges it already computed so the two cannot disagree.
+- `opt` - Unused; present for the branch calling convention.
+
+**Returns:** A tibble with `CEDAR_TERMS_COLUMNS`, one row per term in the data plus every Fall and Spring between the first and last term with a class list (a gap term has zero enrollment and is reported), oldest first. Flags: `is_enrolled` has class-list rows; `is_settled` is enrolled and at or before `last_enrolled_complete`; `is_graded` is enrolled and at or before `last_graded`; `in_progress` is enrolled after `last_graded`; `has_degrees` is at or before `last_degree`; `is_upcoming` has sections and no class list after `last_enrolled`. A flag whose edge is NULL is NA.
+
+---
+
+### `validate_cedar_terms()`
+
+*Source: cedar-terms.R*
+
+**Check a term dimension**
+
+**Parameters:**
+
+- `terms` - A tibble as built by [build_cedar_terms()].
+
+**Returns:** `terms`, unchanged, or an error naming what is wrong: a missing column, a repeated term, a term code that is not YYYYSS, or no row for a Fall or Spring between the first and last enrolled term.
 
 ---
 
@@ -562,6 +596,7 @@ Next-term persistence for one course, from cedar_students  Selects the course's 
 - `degrees` - cedar_degrees; graduates count as returned.
 - `opt` - `course` (required), optional `campus` and `term`, plus the next_term_persistence() options.
 - `context` - Optional build_retention_context() output, shared with the retention trend so both read the same lookups.
+- `student_terms` - `cedar_student_terms`, read for the `enrolled` lookup when no `context` is passed.
 
 **Returns:** See next_term_persistence().
 
@@ -573,7 +608,7 @@ Next-term persistence for one course, from cedar_students  Selects the course's 
 
 **Next-term persistence by grade outcome**
 
-Next-term persistence by grade outcome  For each course outcome (pass, fail, late drop, early drop), how many students returned the following fall or spring. Gives a course-level view of whether bad outcomes go with leaving.  "Returned" is the retention definition, computed by the same .compute_retention() as the retention trend: registered anywhere at UNM in the next regular term, or graduated between the course term and that term. A next-term row that is only a drop or a waitlist is not a return, and a graduate has not left. Anchors whose next term is beyond the observation edge are excluded, never counted as not returned.  Outcomes come from classify_enrollment_outcomes(): its "dfw" outcomes are split into "late drop" (a late-drop status or a W grade) and "fail"; early drops (no grade, never DFW) are their own group.  The unit is a student's course term: a student who took the course in two terms counts once per term, as in the retention trend.
+Next-term persistence by grade outcome  For each course outcome (pass, fail, late drop, early drop), how many students returned the following fall or spring. Gives a course-level view of whether bad outcomes go with leaving.  "Returned" is the retention definition, computed by the same .compute_retention() as the retention trend: enrolled anywhere at UNM in the next regular term (cedar_student_terms' `enrolled`: registered, or registered and withdrawn after census), or graduated between the course term and that term. A next-term row that is only an early drop or a waitlist is not a return, and a graduate has not left. Anchors whose next term is beyond the observation edge are excluded, never counted as not returned.  Outcomes come from classify_enrollment_outcomes(): its "dfw" outcomes are split into "late drop" (a late-drop status or a W grade) and "fail"; early drops (no grade, never DFW) are their own group.  The unit is a student's course term: a student who took the course in two terms counts once per term, as in the retention trend.
 
 **Parameters:**
 
@@ -582,6 +617,7 @@ Next-term persistence by grade outcome  For each course outcome (pass, fail, lat
 - `degrees` - cedar_degrees, for graduation.
 - `opt` - `min_n` (default 5), `passing_grades` (default GRADES_PASS; the page's opt-in uses GRADES_PASS_SUB_C_OPT_IN), and `data_edges` or `observation_end_term`.
 - `context` - Optional build_retention_context() output.
+- `student_terms` - `cedar_student_terms`, read for the `enrolled` lookup when no `context` is passed.
 
 **Returns:** Tibble: campus, subject_course, outcome, n_students, n_returned, pct_returned (a proportion, unrounded); sorted by campus, subject_course, outcome.
 
@@ -1123,19 +1159,36 @@ Credit Hours for Dept Trends  Produces the full set of department-level SCH plot
 
 ## credit-timeline
 
-### `credit_timeline_validity()`
+### `build_credit_timeline()`
 
 *Source: credit-timeline.R*
 
 **Build a Per-Term Credit Position for Students**
 
-Build a Per-Term Credit Position for Students  One row per (student, enrolled term) giving how many credits the student had *entering* that term — the figure that answers "where were they when they did this" — and after completing it.
+Build a Per-Term Credit Position for Students  One row per student-term giving how many credits the student had *entering* that term — the figure that answers "where were they when they did this" — and after completing it. A term the student was declared but not enrolled in is a row too, carrying the position unchanged.
 
 **Parameters:**
 
-- `term_credits` - Data frame. `cedar_student_term_credits`, **unsliced by term** where possible — see `opt$student_first_terms`.
+- `student_terms` - Data frame. `cedar_student_terms`. Required; this is the trustworthy UNM series, and `timeline_valid` is read from it.
 - `programs` - Data frame or NULL. `cedar_programs`, used only to recover each student's transfer block. NULL yields a UNM-only timeline with `transfer_credits = 0` and `total_*` equal to `unm_*`, which is honest but understates anyone who arrived with credit.
-- `opt` - List. Accepts `student_ids`, `min_data_term`, and `student_first_terms`, with the same meanings as in [build_credit_timeline()].
+- `opt` - List of options: \describe{ \item{`student_ids`}{Character vector. Restrict to these students. Strongly recommended — the full table is ~520k rows.} }
+
+**Returns:** Tibble with `student_id`, `term`, `unm_credits_entering`, `unm_credits_after`, `transfer_credits`, `total_credits_entering`, `total_credits_after`, and `timeline_valid` (FALSE when the student's first term in the data is the first term of the data, so their earlier coursework is invisible and the running total starts too low).
+
+---
+
+### `credit_timeline_validity()`
+
+*Source: credit-timeline.R*
+
+**Which Students Have a Readable Credit Timeline**
+
+Which Students Have a Readable Credit Timeline  The `timeline_valid` rule over a raw (student, term) frame, for the one reader that still builds its own running series from class-list rows: [build_gpa_timeline()]. The credit position itself no longer needs this — `cedar_student_terms` carries `timeline_valid`, set by `build_student_terms()` over the whole data — and a reader with that table in hand reads the column rather than re-deriving it. Kept so there is still exactly one definition of "we can see this student's whole record" for a series built from rows; a second local rule is how the two drift apart.  Needs only `student_id` and `term`.
+
+**Parameters:**
+
+- `rows` - Data frame with `student_id` and `term`, **unsliced by term** where possible — see `opt$student_first_terms`.
+- `opt` - List of options: \describe{ \item{`student_ids`}{Character vector. Restrict to these students.} \item{`min_data_term`}{Integer. First term present in the data. Defaults to the earliest term in `rows`.} \item{`student_first_terms`}{Data frame with `student_id` and `first_unm_term`. **Required if you pre-filtered `rows` by term.** Filtering to `term >= X` hides exactly the early rows that make a student invalid, and every one of them would then be marked valid.} }
 
 **Returns:** Tibble of `student_id` and `timeline_valid`.
 
@@ -1156,7 +1209,7 @@ Attach a Credit Position to Rows Keyed by Student and Term  Join helper for the 
 - `term_col` - Character. Name of the term column on `events`. Default `"term"`.
 - `basis` - Character. `"total"` (default, includes transfer) or `"unm"`.
 
-**Returns:** `events` with `credits_entering` and `timeline_valid` added. Rows with no matching timeline entry get NA rather than being dropped — an event in a term the student had no graded enrollment in is real and should stay visible, just without a credit position.
+**Returns:** `events` with `credits_entering` and `timeline_valid` added. Rows with no matching timeline entry get NA rather than being dropped — an event in a term the student has no row for is real and should stay visible, just without a credit position.
 
 ---
 
@@ -2798,7 +2851,7 @@ Detect major changes for each student across their academic timeline  Compares e
 
 - `programs` - cedar_programs data frame.
 - `cohort` - Optional tibble(student_id, cohort_label). If provided, only students in the cohort are analyzed.
-- `term_credits` - Optional. `cedar_student_term_credits`. Supplies the credit position at each change via [build_credit_timeline()]. When NULL the credit columns are returned as NA rather than being read off the frozen cumulative columns on `programs` — see the note below.
+- `student_terms` - Optional. `cedar_student_terms`. Supplies the credit position at each change via [build_credit_timeline()]. When NULL the credit columns are returned as NA rather than being read off the frozen cumulative columns on `programs` — see the note below.
 - `opt` - Options list: \itemize{ \item \code{campus}  — character; filter by student_campus \item \code{college} — character; filter by student_college \item \code{dept_code} — character; filter by dept_code \item \code{observation_end_term} — integer; exclude program records after the settled longitudinal enrollment edge }
 
 **Returns:** Tibble with one row per major change event: student_id, change_term, prev_term, from_major, to_major, unm_credits_before_change, total_credits_before_change (credits entering the term before the change posted, UNM-only and UNM + transfer), credits_position_valid, student_college, student_campus, dept_code, student_level, degree   This function used to read `inst_credits_attempted` / `overall_credits_attempted` at the change term and lag them by one term, on the stated reasoning that "because these columns are running totals, lag() subtracts exactly that student's lagged-term load". They are not running totals. Academic Studies stamps the student's total as of the pull onto every historical row, so within one full re-pull the value moves across a student's own terms only 16% of the time. `lag()` on a frozen column subtracts zero, and the reported "credits before the change" was approximately the student's FINAL credit total — overstating the position at a student's first term by a median of 84 credits. See the field reliability contract in AGENTS.md.
@@ -3065,8 +3118,8 @@ Get Course Timing for a Student Population  For each course taken by population 
 
 - `students` - Data frame. The `cedar_students` table.
 - `cohort` - Data frame. Output of `build_population()`. Must have columns `student_id` and `population_label`. Defines the student population to analyze.
-- `opt` - List of options: \describe{ \item{`start_classification`}{Character vector. Restrict to students whose first enrollment had this classification. Common values: `"Freshman"` (matches "Freshman, 1st Yr, 1st Sem" and "Freshman, 1st Yr, 2nd Sem"), `"Sophomore"`, `"Junior"`, `"Transfer"`. Partial matching is used. Default: no restriction (all students included).} \item{`include_summer`}{Logical. Whether to count summer as a separate relative term. If `FALSE` (default), summer enrollments are included in the surrounding term's count but summer itself does not advance the relative term counter.} \item{`max_relative_term`}{Integer. Cap on relative terms shown. Default: `8`.} \item{`min_n`}{Integer. Minimum number of population students who must have taken a course (across all terms) for it to appear. Default: `10`.} \item{`campus`}{Character vector of course-delivery campus codes. Scopes which enrollment rows are counted. This is the campus that taught the section, not the student's home campus — the two differ on roughly 28% of enrollment rows, so a population scoped by home campus still pulls in branch-delivered course rows without it. NULL includes every campus; pass NULL only for a deliberate UNM-wide aggregate.} \item{`subject_code`}{Character vector. Restrict to courses in these subjects (e.g., `c("BIOL", "CHEM")`). Optional.} \item{`subject_course`}{Character vector. Restrict to an explicit course list (e.g., the Gen Ed catalog). Applied alongside `subject_code` and, like it, after `n_eligible` is computed so the denominator stays the whole population. Optional.} \item{`denominator`}{Character. What `pct_pop` is a share OF. `"eligible"` (default) divides by the students who reached that x-axis position, giving a conditional rate: "of students who got this far, what share took this course". `"population"` divides by the whole population, giving "what share of everyone took this course at this point".  The choice matters most at the thin end of an axis. Eligibility falls away sharply — on a History graduate cohort the five credit bands hold 98, 80, 33, 16 and 4 students — so under `"eligible"` a single student in the top band reports 25%, indistinguishable from a 23% built on a hundred. Under `"population"` that same student reports 1%: small, visible, and comparable with every other cell in the grid. Use `"population"` when the question is *when* something happens across a fixed group, and `"eligible"` when it is genuinely conditional on having got that far.} \item{`group_campus`}{Logical. Keep `campus` in the output key. Default `TRUE`, per the CEDAR campus policy. `FALSE` counts each student once per course regardless of delivery campus — a deliberate exception for trajectory questions only; see the comment at Step 6.} \item{`x_axis`}{Character. One of `"relative_term"` (default), `"classification"`, `"inst_credit_band"`, `"overall_credit_band"`, or `"unm_credit_band"`. The three band modes all use the same 30-credit cut points and differ only in where the credit total comes from — see the `term_credits` parameter for `"unm_credit_band"`.} }
-- `term_credits` - Data frame or NULL. The `cedar_student_term_credits` table. **Required by every credit-band x_axis** — `inst_credit_band`, `overall_credit_band` and `unm_credit_band` all resolve their position through [build_credit_timeline()]. Ignored by `relative_term` and `classification`.  None of them may read the Academic Studies cumulative columns on `cedar_programs`. Those are stamped as of the data pull onto every historical row the report returns: within a single full historical re-pull they move across a student's own terms just 16% of the time, and at a student's first term they overstate the position by a median of 84 credits. See the field reliability contract in AGENTS.md.  The three modes differ only in what they count: \describe{ \item{`inst_credit_band`}{UNM credits attempted. Needs `term_credits`.} \item{`overall_credit_band`}{UNM + transfer. Needs `term_credits` and `programs`, the latter only to recover the transfer block.} \item{`unm_credit_band`}{UNM credits completed entering the term.} }
+- `opt` - List of options: \describe{ \item{`start_classification`}{Character vector. Restrict to students whose first enrollment had this classification. Common values: `"Freshman"` (matches "Freshman, 1st Yr, 1st Sem" and "Freshman, 1st Yr, 2nd Sem"), `"Sophomore"`, `"Junior"`, `"Transfer"`. Partial matching is used. Default: no restriction (all students included).} \item{`include_summer`}{Logical. Whether to count summer as a separate relative term. If `FALSE` (default), summer enrollments are included in the surrounding term's count but summer itself does not advance the relative term counter.} \item{`max_relative_term`}{Integer. Cap on relative terms shown. Default: `8`.} \item{`min_n`}{Integer. Minimum number of population students who must have taken a course (across all terms) for it to appear. Default: `10`.} \item{`campus`}{Character vector of course-delivery campus codes. Scopes which enrollment rows are counted. This is the campus that taught the section, not the student's home campus — the two differ on roughly 28% of enrollment rows, so a population scoped by home campus still pulls in branch-delivered course rows without it. NULL includes every campus; pass NULL only for a deliberate UNM-wide aggregate.} \item{`subject_code`}{Character vector. Restrict to courses in these subjects (e.g., `c("BIOL", "CHEM")`). Optional.} \item{`subject_course`}{Character vector. Restrict to an explicit course list (e.g., the Gen Ed catalog). Applied alongside `subject_code` and, like it, after `n_eligible` is computed so the denominator stays the whole population. Optional.} \item{`denominator`}{Character. What `pct_pop` is a share OF. `"eligible"` (default) divides by the students who reached that x-axis position, giving a conditional rate: "of students who got this far, what share took this course". `"population"` divides by the whole population, giving "what share of everyone took this course at this point".  The choice matters most at the thin end of an axis. Eligibility falls away sharply — on a History graduate cohort the five credit bands hold 98, 80, 33, 16 and 4 students — so under `"eligible"` a single student in the top band reports 25%, indistinguishable from a 23% built on a hundred. Under `"population"` that same student reports 1%: small, visible, and comparable with every other cell in the grid. Use `"population"` when the question is *when* something happens across a fixed group, and `"eligible"` when it is genuinely conditional on having got that far.} \item{`group_campus`}{Logical. Keep `campus` in the output key. Default `TRUE`, per the CEDAR campus policy. `FALSE` counts each student once per course regardless of delivery campus — a deliberate exception for trajectory questions only; see the comment at Step 6.} \item{`x_axis`}{Character. One of `"relative_term"` (default), `"classification"`, `"inst_credit_band"`, `"overall_credit_band"`, or `"unm_credit_band"`. The three band modes all use the same 30-credit cut points and differ only in where the credit total comes from — see the `student_terms` parameter for `"unm_credit_band"`.} }
+- `student_terms` - Data frame or NULL. The `cedar_student_terms` table. **Required by every credit-band x_axis** — `inst_credit_band` and `overall_credit_band` resolve their position through [build_credit_timeline()], and `unm_credit_band` reads the table's completed-credit running total directly. Ignored by `relative_term` and `classification`.  None of them may read the Academic Studies cumulative columns on `cedar_programs`. Those are stamped as of the data pull onto every historical row the report returns: within a single full historical re-pull they move across a student's own terms just 16% of the time, and at a student's first term they overstate the position by a median of 84 credits. See the field reliability contract in AGENTS.md.  The three modes differ only in what they count: \describe{ \item{`inst_credit_band`}{UNM credits attempted. Needs `student_terms`.} \item{`overall_credit_band`}{UNM + transfer. Needs `student_terms` and `programs`, the latter only to recover the transfer block.} \item{`unm_credit_band`}{UNM credits completed entering the term.} }
 - `programs` - Data frame or NULL. Used only by `overall_credit_band`, to recover each student's transfer block. Never read for a per-term credit total.
 
 **Returns:** Data frame with columns: \describe{ \item{`subject_course`}{Course identifier, e.g., `"BIOL 2310"`.} \item{`subject_code`}{Subject prefix, e.g., `"BIOL"`.} \item{`course_title`}{Course title (most common title for that course).} \item{`relative_term`}{Integer. Relative term number (1 = student's first term enrolled, 2 = second, etc.).} \item{`n_students`}{Number of population students who took this course in this relative term.} \item{`n_eligible`}{Number of population students who reached this relative term (denominator). Students with fewer terms than `relative_term` are excluded so later terms aren't penalized.} \item{`pct_pop`}{`n_students / n_eligible`, rounded to 3 decimal places. Column name retained for downstream compatibility.} \item{`median_term`}{Median relative term in which this course is taken, across all population students who took it. Used for sorting in `plot_curriculum_map()`.} }
@@ -3906,18 +3959,18 @@ Source-linked, illustrative coverage from the courses already on a roadmap Membe
 
 **Roadblocks: First-Outcome Stop-Out Comparisons**
 
-Roadblocks: First-Outcome Stop-Out Comparisons  For each course and delivery campus, compare next-regular-term stop-out after DFW versus pass, separately for a selected population and other students. Each student contributes their first eligible observed outcome to exactly one group. Scope, population-window filtering, and both right edges precede this selection. This is not necessarily the student's first lifetime attempt.  Agreeing first-term outcomes collapse to one observation; conflicting first-term outcomes exclude that student/course/campus comparison. Later repeats remain evidence of return but do not change the selected outcome. Counts, rates, DFW context, and tests all use these same observations.  Return means registered or late-drop enrollment anywhere at UNM in the next fall or spring. A degree in the outcome term also prevents a stop-out flag. Nonreturn is an observed absence, not proof of permanent departure.  The chi-squared test (Yates correction) compares DFW versus pass WITHIN each population; it does not test whether the population and baseline gaps differ. Tests require at least five students in each outcome group and both return states. Small expected cells can still make the approximation unreliable. P-values are unadjusted across courses; neither a gap nor the ranking score establishes that a course caused a student to leave.
+Roadblocks: First-Outcome Stop-Out Comparisons  For each course and delivery campus, compare next-regular-term stop-out after DFW versus pass, separately for a selected population and other students. Each student contributes their first eligible observed outcome to exactly one group. Scope, population-window filtering, and both right edges precede this selection. This is not necessarily the student's first lifetime attempt.  Agreeing first-term outcomes collapse to one observation; conflicting first-term outcomes exclude that student/course/campus comparison. Later repeats remain evidence of return but do not change the selected outcome. Counts, rates, DFW context, and tests all use these same observations.  Return is `returned_next_regular_term` on `cedar_student_terms`: enrolled (registered or late-dropped) anywhere at UNM in the next fall or spring, CEDAR's one definition of an enrolled student-term, the same column Course Dynamics retention reads (docs/developers/student-terms.md). A degree in the outcome term also prevents a stop-out flag. Nonreturn is an observed absence, not proof of permanent departure; an anchor whose return cannot be observed is omitted and counted, never a stop-out.  The chi-squared test (Yates correction) compares DFW versus pass WITHIN each population; it does not test whether the population and baseline gaps differ. Tests require at least five students in each outcome group and both return states. Small expected cells can still make the approximation unreliable. P-values are unadjusted across courses; neither a gap nor the ranking score establishes that a course caused a student to leave.
 
 **Parameters:**
 
-- `students` - Full `cedar_students` enrollment history. If course outcomes are term-windowed, supply the full-history `cedar_next_term` separately: otherwise filtering away return terms silently creates false stop-outs.
+- `students` - Full `cedar_students` enrollment history, read only to classify outcomes when `cedar_grades` is not supplied.
 - `population` - Output of [build_population()], with `student_id` and `population_label`. Callers apply population membership windows to outcome rows before this function; the return lookup must remain unwindowed.
 - `degrees` - Optional degree records; a degree in the outcome term counts as completion rather than stop-out.
 - `opt` - List of options: `term`, `campus`, `level`, and `subject_code` restrict course outcomes; `min_n` (default 15) is the minimum selected population students per course/campus; `min_dfw_n` (default 5) is the minimum selected DFW students; `graded_through` caps outcomes; `observation_end_term` requires the next regular term to be observable. Reporting thresholds do not guarantee statistical validity. Standalone callers must supply appropriate edges.
 - `cedar_grades` - Optional preclassified outcomes with the current saved outcome-policy version, already respecting the caller's population window.
-- `cedar_next_term` - Optional full-history next-term return lookup.
+- `student_terms` - `cedar_student_terms`, the full history, never windowed: `returned_next_regular_term` and `return_observable` per student-term. Required.
 
-**Returns:** List containing `by_course` (one row per campus/course), `population_size`, eligible anchor `term_range`, and `observation_info` (coverage counts before size thresholds). Course rows contain `pop_` and `baseline_` columns: `n_dfw`, `n_pass`, `n_graded`, `dfw_rate`, `dfw_stopout_rate`, `pass_stopout_rate`, `stopout_gap`, and `p_value`. Statistics retain full precision; round only for display.
+**Returns:** List containing `by_course` (one row per campus/course), `population_size`, eligible anchor `term_range`, and `observation_info` (coverage counts before size thresholds, including `n_return_unobservable`: anchors omitted because the next regular term is past the settled edge or has no class list). Course rows contain `pop_` and `baseline_` columns: `n_dfw`, `n_pass`, `n_graded`, `dfw_rate`, `dfw_stopout_rate`, `pass_stopout_rate`, `stopout_gap`, and `p_value`. Statistics retain full precision; round only for display.
 
 ---
 
@@ -3987,22 +4040,6 @@ Classify Student Enrollment Records as Pass or DFW  Takes enrollment records and
 
 ---
 
-### `build_next_term_lookup()`
-
-*Source: stopout.R*
-
-**Build a Next-Term Enrollment Lookup**
-
-Build a Next-Term Enrollment Lookup  For each student-term pair present in the data, determines the next regular academic term and whether the student enrolled in it. Uses `add_next_term_col()` from `utils.R`.  Summer terms are excluded from the "next term" mapping — a student who doesn't enroll in summer is not considered a stop-out.
-
-**Parameters:**
-
-- `students` - Data frame. The full `cedar_students` table (not pre-filtered by term — we need the full enrollment history to check the next term).
-
-**Returns:** Data frame with columns: `student_id`, `term`, `returned_next_term` (logical: `TRUE` if the student had any enrollment the following term).
-
----
-
 ### `compute_stopout_for_group()`
 
 *Source: stopout.R*
@@ -4020,7 +4057,91 @@ Compute Stop-Out Rates for One Group in One Course  Given one selected observati
 
 ---
 
+## student-terms
+
+### `build_student_terms()`
+
+*Source: student-terms.R*
+
+**Build the student-term table**
+
+**Parameters:**
+
+- `students` - `cedar_students`.
+- `programs` - `cedar_programs`, or NULL for class lists alone: then no row is declared, every row is described by the class list, and the build says so.
+- `degrees` - `cedar_degrees` or NULL; without it `degree_awarded` is FALSE everywhere and the build says so.
+- `edges` - The result of [cedar_data_edges()] on the same tables. Required to carry `last_enrolled_complete`; the build stops without it.
+- `opt` - Unused; present for the branch calling convention.
+
+**Returns:** A tibble with `STUDENT_TERMS_COLUMNS`, one row per student-term.
+
+---
+
+### `validate_student_terms()`
+
+*Source: student-terms.R*
+
+**Check a student-term table**
+
+**Parameters:**
+
+- `st` - A tibble as built by [build_student_terms()] or read from disk.
+
+**Returns:** `st`, unchanged, or an error naming what is wrong: a missing or banned column, a repeated key, an enrolled row without class-list rows, or a return judged where it is not observable.
+
+---
+
+### `attach_student_term()`
+
+*Source: student-terms.R*
+
+**Attach student-term columns to any rows keyed by student and term**
+
+**Parameters:**
+
+- `rows` - A tibble with `student_id` and `term`.
+- `student_terms` - The student-term table.
+- `cols` - Character. Columns of `student_terms` to attach.
+
+**Returns:** `rows` with `cols` joined on; stops if `rows` already has one of them.
+
+---
+
 ## transform-to-cedar
+
+### `transform_student_terms()`
+
+*Source: transform-to-cedar.R*
+
+**One row per student-term, built from the saved CEDAR tables (ADR-001 step 2;**
+
+One row per student-term, built from the saved CEDAR tables (ADR-001 step 2; contract in docs/developers/student-terms.md). The build itself is build_student_terms() in R/branches/student-terms.R; this stage only loads its inputs, computes the data edges it needs, and saves the result.
+
+**Parameters:**
+
+- `data_dir` - Path to data directory
+- `ext` - File extension
+
+**Returns:** list(saved = list(student_terms = <meta>))
+
+---
+
+### `cedar_student_terms_staleness()`
+
+*Source: transform-to-cedar.R*
+
+**Why cedar_student_terms needs rebuilding, or NULL when it does not**
+
+Why cedar_student_terms needs rebuilding, or NULL when it does not  The table is built from three saved tables, so it can be missing (a deploy before any refresh has run this stage), older than a source rebuilt without it, or built by an older builder that wrote fewer columns than the code now deployed reads. The deploy gate (scripts/rebuild-programs-if-mappings-changed.R) asks this and builds the table, as it does a stale mapped table, so the app, which requires the file and its columns, never starts without them.
+
+**Parameters:**
+
+- `data_dir` - Path to data directory
+- `ext` - File extension
+
+**Returns:** A one-line reason, or NULL when the file exists, is newer than every saved source it reads, and carries every column the builder writes.
+
+---
 
 ### `transform_applicants()`
 

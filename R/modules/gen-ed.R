@@ -1176,7 +1176,7 @@ genEdExploreServer <- function(id, students, sections, programs, degrees = NULL,
 }
 
 
-#' @param term_credits Data frame or NULL. The `cedar_student_term_credits`
+#' @param student_terms Data frame or NULL. The `cedar_student_terms`
 #'   table, required by the graduate Gen Ed section for its credit-band x-axis.
 #'   NULL hides that section rather than drawing it against a different credit
 #'   source — the program-record credit fields cannot answer the question. See
@@ -1184,7 +1184,7 @@ genEdExploreServer <- function(id, students, sections, programs, degrees = NULL,
 deptProfileGenEdServer <- function(id, students, sections, programs, degrees = NULL,
                                    dept, edges, campus = NULL, active = NULL,
                                    current_term = NULL, dfw_password = NULL,
-                                   term_credits = NULL, lookups = NULL) {
+                                   student_terms = NULL, lookups = NULL) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
 
@@ -1259,7 +1259,7 @@ deptProfileGenEdServer <- function(id, students, sections, programs, degrees = N
     })
 
     observeEvent(grad_ge_trigger(), {
-      if (is.null(term_credits) || is.null(degrees)) return()
+      if (is.null(student_terms) || is.null(degrees)) return()
       trig <- grad_ge_trigger()
       if (identical(grad_ge_last_trigger(), trig) && !is.null(grad_ge_rv())) return()
       grad_ge_last_trigger(trig)
@@ -1268,7 +1268,7 @@ deptProfileGenEdServer <- function(id, students, sections, programs, degrees = N
 
       timer <- start_report_timer("dept-profile-gen-ed-grads")
       result <- tryCatch(
-        get_gen_ed_grad_profile(students, degrees, term_credits, opt = list(
+        get_gen_ed_grad_profile(students, degrees, student_terms, opt = list(
           dept_code         = opt$dept_code,
           campus            = opt$campus,
           x_axis            = trig$x_axis,
