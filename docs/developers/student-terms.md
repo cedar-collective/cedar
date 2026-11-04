@@ -5,7 +5,7 @@ holding every fact about a student in a term that CEDAR today re-derives from
 raw class-list rows or reads off a repeated column. Written before the code;
 the code is wrong where it departs from this page.
 
-- **Status:** contract agreed 2026-11-03; not built.
+- **Status:** contract agreed 2026-11-03; **built the same day** (`R/branches/student-terms.R`, saved by the transform as `cedar_student_terms`). Not yet loaded by the app: the readers below move next, in order, and the two side tables retire with the last of them.
 - **Closes:** ISSUES.md I44 (two definitions of "returned next term").
 - **Depends on:** nothing new. ADR-001 step 1 (`cedar_terms`) would supply the
   next regular term and the settled edge; until it exists this table computes
@@ -67,7 +67,7 @@ in `cedar_programs`; "degrees" means `cedar_degrees`.
 
 | column | type | source | definition |
 |---|---|---|---|
-| `student_level` | chr | programs, else class list | code vocabulary (`UG`, `GR`, …), translated once from the programs name vocabulary |
+| `student_level` | chr | programs, else class list | code vocabulary (`UG`, `GR`, …). The class list carries the code; academic studies carries a name (`Undergraduate`, `Graduate/GASM`), translated through `institution/<id>/student_levels.csv`. A name the file does not list is `NA` and the build reports it |
 | `student_classification` | chr | programs, else class list | as Banner recorded it |
 | `student_campus` | chr | programs, else class list | home campus code |
 | `academic_standing` | chr | programs | as recorded; `NA` when no programs row |
@@ -102,7 +102,7 @@ programs row. **No column is ever coalesced silently.**
 | `completed_unm_credits` | num | the same over rows whose `final_grade` is in `passing_grades` |
 | `dfw_grades` | int | registered rows (not late drops) whose `classify_enrollment_outcomes()` outcome is `dfw`; late drops are counted in `late_withdrawals`, never here |
 | `graded_rows` | int | registered rows with a posted grade; `dfw_grades` is unknown, not zero, when this is 0 and `enrolled` is TRUE |
-| `sem_gpa` | num | programs `sem_gpa` (a per-term field; passes both reliability tests) |
+| `sem_gpa` | num | programs `sem_gpa` (a per-term field; passes both reliability tests). The one description academic studies repeats with two values in one pull — a program row duplicated with a 0.00 beside the real figure, 381 student-terms (0.09%) on the 2026-10-27 pull — so it is kept only where the rows agree, `NA` and counted where they do not |
 
 ### Position: where they were in their degree
 
@@ -124,7 +124,7 @@ they are recovered from two banned fields and are per-student, not per-term.
 |---|---|---|
 | `next_regular_term` | int | `add_next_term_col(term, summer = FALSE)`: Spring→Fall, Fall→Spring, Summer→Fall |
 | `returned_next_regular_term` | lgl | the student has an `enrolled = TRUE` row for `next_regular_term`. `NA` when `return_observable` is FALSE. |
-| `return_observable` | lgl | `next_regular_term <= last_enrolled_complete` at build time (`cedar_data_edges()`; `cedar_terms$is_settled` once step 1 lands). A term past the settled edge has registration still arriving, so its return is unknown, never FALSE. |
+| `return_observable` | lgl | `next_regular_term <= last_enrolled_complete` at build time (`cedar_data_edges()`) **and** `next_regular_term` has a class list. A term past the settled edge has registration still arriving, and a Fall or Spring with no pull inside the data's run has nobody in it to find, so in both cases the return is unknown, never FALSE. The build names any such gap term; `cedar_terms` carries it as a row with zero enrollment. |
 | `degree_awarded` | lgl | a `cedar_degrees` row with `graduation_status == "Awarded"` for this student and term |
 
 A graduate who does not return is not a non-returner. The table does not
@@ -182,7 +182,7 @@ Each student exists to make exactly one rule fail if it is broken:
 | ST_C | registered 202010; only `WL` in 202080 | `waitlisted_only` TRUE; returned FALSE |
 | ST_D | registered 202010 and 202060 only | Summer skipped: `next_regular_term` of 202010 is 202080; returned FALSE despite the summer row |
 | ST_E | registered 202010; declaration in 202080, no class list | row for 202080 with `declared` TRUE, `enrolled` FALSE, `class_list_rows` 0 |
-| ST_F | two class-list rows in 202010 pulled on two dates with different classifications; programs row agrees with the later | `description_source = "programs"`, `description_conflict` TRUE; precedence picks the programs value |
+| ST_F | two class-list rows in 202010 pulled on two dates with different classifications (the older pull is ignored); programs row disagrees with the newer | `description_source = "programs"`, `description_conflict` TRUE; precedence picks the programs value |
 | ST_G | registered 202010 with a `Major` row and a `Minor` row; two majors with codes `BB` and `AA` | `primary_major_code = "AA"` (first by code), `n_declarations` 3 |
 | ST_H | registered 202010 with grades `A`, `C-`, and one `DW` row | `dfw_grades` 1 (the C-), `late_withdrawals` 1, `graded_rows` 2; counting the DW as a DFW grade makes it 2 |
 | ST_I | registered in 202110 only (the last term) | `return_observable` FALSE, `returned_next_regular_term` NA |
@@ -194,6 +194,10 @@ and the mutation check in its header records that each of these breaks the
 named assertion: registered-only enrollment (ST_A), DW counted as a DFW grade
 (ST_H), every Major row counted (ST_G), class list winning precedence (ST_F),
 summer as a return term (ST_D), and returned FALSE past the edge (ST_I).
+
+## Measured on the first build (2026-10-27 pull)
+
+518,889 student-terms: 452,021 enrolled, 53,053 declared without a class list, 92,667 described by the class list alone (no programs row), 373,169 by both, 5,442 of those disagreeing — 4,210 in Fall 2025, whose programs were pulled 2025-11-06 and whose class list 2026-03-07. 126 MB in memory, 126 s to build. Every one of the 443,458 `cedar_student_term_credits` rows matches on attempted and cumulative credits; every one of the 422,847 observable `cedar_next_term` rows agrees on the return. I44 reproduced from the table: Fall 2025 → Spring 2026 returned 82.72%, Spring → Fall 2025 71.92%. Home campus `student_campus` is one of the five campuses.csv codes on every row but one (a class-list `NA`); level resolves on every row but one (class-list code `00`).
 
 ## Done when
 

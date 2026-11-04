@@ -409,17 +409,49 @@ test_that("a term with a schedule and no class list after the last enrolled term
   expect_false(d$is_upcoming[d$term == 201910L])
 })
 
-test_that("the dimension fails loudly on a repeated term, a bad code, or a missing regular term", {
+test_that("a Fall or Spring with no class list inside the enrolled run is a row with zero enrollment, reported", {
+  # Drop Fall 2020 from every table: Spring 2020 and Spring 2021 remain, so
+  # Fall 2020 is a gap, which the synthetic institution has by design and a
+  # production refresh would have only if a pull were missing. It must be a
+  # row (next_regular_term always names a row) that no reader can mistake
+  # for a term nobody attended: zero enrollment, never settled or graded.
+  expect_message(
+    d <- build_cedar_terms(dplyr::filter(test_students, term != 202080L),
+                           sections = dplyr::filter(test_sections, term != 202080L),
+                           degrees = dplyr::filter(test_degrees, term != 202080L)),
+    "no class list between Spring 2020 and Spring 2021: Fall 2020")
+  expect_equal(d$term, c(201910L, 202010L, 202060L, 202080L, 202110L))
+  g <- d[d$term == 202080L, ]
+  expect_equal(g$enrollment_rows, 0L)
+  expect_equal(g$section_rows, 0L)
+  expect_false(g$is_enrolled)
+  expect_false(g$is_graded)
+  expect_false(g$in_progress)
+  expect_false(g$is_upcoming)
+  expect_equal(d$next_regular_term[d$term == 202010L], 202080L)
+  expect_equal(d$prev_regular_term[d$term == 202110L], 202080L)
+  # The complete fixture has no gap and says nothing.
+  expect_no_message(build_cedar_terms(test_students, sections = test_sections, degrees = test_degrees,
+                                      edges = cedar_data_edges(test_students, degrees = test_degrees)),
+                    message = "no class list")
+})
+
+test_that("the dimension fails loudly on a repeated term, a bad code, or a missing regular row", {
   d <- build_cedar_terms(test_students, sections = test_sections, degrees = test_degrees)
   expect_error(validate_cedar_terms(dplyr::bind_rows(d, d[2, ])), "repeats term")
   expect_error(validate_cedar_terms(dplyr::mutate(d, term = dplyr::if_else(term == 202060L, 202050L, term))),
                "not YYYYSS")
-  expect_error(
-    build_cedar_terms(dplyr::filter(test_students, term != 202080L),
-                      sections = dplyr::filter(test_sections, term != 202080L),
-                      degrees = dplyr::filter(test_degrees, term != 202080L)),
-    "Fall 2020")
+  expect_error(validate_cedar_terms(dplyr::filter(d, term != 202080L)), "no row for.*Fall 2020")
   expect_error(build_cedar_terms(test_students, sections = dplyr::select(test_sections, -census1)),
                "census1")
   expect_error(build_cedar_terms(test_students[0, ]), "non-empty")
+})
+
+test_that("regular_terms_between() walks Fall and Spring and steps a Summer endpoint inward", {
+  expect_equal(regular_terms_between(202010L, 202110L), c(202010L, 202080L, 202110L))
+  expect_equal(regular_terms_between(202060L, 202110L), c(202080L, 202110L))
+  expect_equal(regular_terms_between(202010L, 202060L), 202010L)
+  expect_equal(regular_terms_between(202080L, 202080L), 202080L)
+  expect_equal(regular_terms_between(202110L, 202010L), integer(0))
+  expect_error(regular_terms_between(NA, 202010L), "two term codes")
 })

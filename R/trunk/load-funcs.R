@@ -43,6 +43,7 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
   source_file("lists/status_codes.R")
   source_file("lists/course_numbering.R")   # course level by leading digit, from course_levels.csv
   source_file("lists/campuses.R")           # campus constants from campuses.csv, campus guards
+  source_file("lists/student_levels.R")     # student level codes and their source spellings, from student_levels.csv
   source_file("lists/seat_fill.R")          # near full / full seat fill levels
   source_file("lists/enrollment_projection_groups.R")
   source_file("lists/degree_catalog.R")
@@ -80,6 +81,7 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
   source_file("branches/credit-hours.R")
   source_file("branches/data-edges.R")            # where the loaded data starts/stops; see the right-edge policy in AGENTS.md
   source_file("branches/cedar-terms.R")           # the term dimension: one row per term, the edges as flags (ADR-001 step 1)
+  source_file("branches/student-terms.R")         # one row per student-term; one definition of enrolled and returned (ADR-001 step 2)
   source_file("branches/credit-timeline.R")  # per-term credit position; see the field reliability contract in AGENTS.md
   source_file("branches/gpa-timeline.R")     # per-term cumulative GPA; shares credit_timeline_validity(), so must load after it
   source_file("branches/degrees.R")
