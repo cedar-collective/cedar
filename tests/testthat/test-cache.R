@@ -250,11 +250,12 @@ test_that("Dept Trends invalidates only tabs that consume the changed source", {
   names(changed_tabs) <- names(data_objects)
 
   expect_equal(changed_tabs, list(
-    cedar_programs = c("hc", "enrl", "demo"),
+    # Credit Hours names each row's major through the programs table and reads
+    # the major itself off the student-term table (ADR-001 step 2).
+    cedar_programs = c("hc", "enrl", "ch", "demo"),
     cedar_degrees = "deg",
     cedar_students = c("enrl", "ch"),
-    # No Dept Trends tab reads the student-term table yet.
-    cedar_student_terms = character(0),
+    cedar_student_terms = "ch",
     cedar_faculty = character(0),
     # Credit Hours reads late drops' credit values from sections (3.0.0).
     cedar_sections = c("enrl", "ch"),

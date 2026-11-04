@@ -139,32 +139,15 @@ get_course_major_mix <- function(students, student_terms, programs, opt = list()
          "cedar_student_terms; the two tables were not built from the same class lists.")
   }
 
-  # Name each code: the name programs records for it first (the mapping file's
-  # name, with a pre-major's "Pre" already taken off), then the lookup for a
-  # code programs never carries (class-list-only codes), then the code itself.
-  codes <- unique(stats::na.omit(joined$primary_major_code))
-  labels <- stats::setNames(codes, codes)
-  program_code_to_name <- programs %>%
-    dplyr::filter(major_code %in% .env$codes, !is.na(program_name), program_name != "") %>%
-    dplyr::arrange(major_code, dplyr::desc(program_type == "Major")) %>%
-    dplyr::distinct(major_code, .keep_all = TRUE)
-  labels[program_code_to_name$major_code] <- program_code_to_name$program_name
-  unnamed <- setdiff(codes, program_code_to_name$major_code)
-  major_code_to_name <- opt$major_code_to_name
-  if (length(unnamed) > 0 && !is.null(major_code_to_name) && length(major_code_to_name) > 0) {
-    translated <- unname(major_code_to_name[unnamed])
-    has_translation <- !is.na(translated) & translated != ""
-    labels[unnamed[has_translation]] <- translated[has_translation]
-  }
+  # One name per code, shared with every other reader of the table's primary
+  # major (name_program_codes(), R/branches/student-terms.R).
+  labels <- name_program_codes(joined$primary_major_code, programs, opt$major_code_to_name,
+                               is_pre_major = joined$is_pre_major)
 
   major_counts <- joined %>%
     dplyr::mutate(
-      major_label = dplyr::case_when(
-        is.na(primary_major_code) ~ "No major code",
-        !is.na(is_pre_major) & is_pre_major ~
-          paste0(unname(labels[primary_major_code]), " (pre-major)"),
-        TRUE ~ unname(labels[primary_major_code])
-      )
+      major_label = dplyr::if_else(is.na(primary_major_code), "No major code",
+                                   unname(labels[primary_major_code]))
     ) %>%
     dplyr::group_by(major_label) %>%
     dplyr::summarize(

@@ -545,6 +545,56 @@ validate_student_terms <- function(st) {
 #' @param student_terms The student-term table.
 #' @param cols Character. Columns of `student_terms` to attach.
 #' @return `rows` with `cols` joined on; stops if `rows` already has one of them.
+#' Name program codes for display
+#'
+#' One name per code, the same everywhere a table's `primary_major_code` is
+#' shown: the name `programs` records for the code first (the mapping file's,
+#' with a pre-major's "Pre" already taken off), then `major_code_to_name` (the
+#' class list's own spelling, which keeps it: "Pre Biology") for a code
+#' `programs` never carries, such as a class-list-only associate program, then
+#' the code itself. Used by the Gen Ed major mix and Dept Trends' SCH by major.
+#'
+#' @param codes Character vector of program codes; `NA` and blanks are dropped.
+#' @param programs Data frame with `major_code`, `program_name`, `program_type`
+#'   (`cedar_programs`, or any subset of it).
+#' @param major_code_to_name Named character vector (`cedar_lookups`' table of
+#'   the same name), or `NULL`.
+#' @param is_pre_major Logical vector parallel to `codes` (the student-term
+#'   table's flag on the same rows), or `NULL`. A code flagged on any row is
+#'   suffixed " (pre-major)", so a pre-major and the major it leads to never
+#'   share a label ("Psychology (pre-major)" beside "Psychology").
+#' @return Named character vector, code to name, one entry per distinct code.
+name_program_codes <- function(codes, programs, major_code_to_name = NULL,
+                               is_pre_major = NULL) {
+  needed <- c("major_code", "program_name", "program_type")
+  missing_cols <- setdiff(needed, names(programs))
+  if (length(missing_cols) > 0L) {
+    stop("[student-terms.R] name_program_codes() needs programs with: ",
+         paste(missing_cols, collapse = ", "))
+  }
+  if (!is.null(is_pre_major) && length(is_pre_major) != length(codes)) {
+    stop("[student-terms.R] name_program_codes(): is_pre_major must be parallel to codes.")
+  }
+  keep <- !is.na(codes) & nzchar(codes)
+  flagged <- if (is.null(is_pre_major)) character(0) else unique(codes[keep & !is.na(is_pre_major) & is_pre_major])
+  codes <- unique(codes[keep])
+  labels <- stats::setNames(codes, codes)
+  if (length(codes) == 0L) return(labels)
+  named <- programs %>%
+    dplyr::filter(major_code %in% .env$codes, !is.na(program_name), program_name != "") %>%
+    dplyr::arrange(major_code, dplyr::desc(program_type == "Major")) %>%
+    dplyr::distinct(major_code, .keep_all = TRUE)
+  labels[named$major_code] <- named$program_name
+  unnamed <- setdiff(codes, named$major_code)
+  if (length(unnamed) > 0L && !is.null(major_code_to_name) && length(major_code_to_name) > 0L) {
+    translated <- unname(major_code_to_name[unnamed])
+    has_translation <- !is.na(translated) & translated != ""
+    labels[unnamed[has_translation]] <- translated[has_translation]
+  }
+  labels[flagged] <- paste0(labels[flagged], " (pre-major)")
+  labels
+}
+
 attach_student_term <- function(rows, student_terms, cols) {
   if (!all(c("student_id", "term") %in% names(rows))) {
     stop("[student-terms.R] attach_student_term() needs student_id and term on rows.")

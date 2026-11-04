@@ -8,7 +8,7 @@ parent: Developer Guide
 
 This reference is auto-generated from roxygen2 comments in the source code.
 
-*Generated: 2026-11-04 13:13:53.290895*
+*Generated: 2026-11-04 13:50:02.119648*
 
 ---
 
@@ -763,8 +763,10 @@ Filter and normalize student data for credit-hours-by-major analysis  Before we 
 - `sections` - cedar_sections data frame, for late drops' credit values
 - `term_start` - Integer term code for the beginning of the analysis window
 - `term_end` - Integer term code for the end of the analysis window
+- `student_terms` - The `cedar_student_terms` table: each row's major and college are its student-term's `primary_major_code` and `primary_college_code` (ADR-001 step 2), never the roster's columns.
+- `major_names` - Named character vector, code to display name, from [name_program_codes()]; a code it does not name is shown as itself.
 
-**Returns:** Filtered data frame with census_credits, ready for major-level analysis
+**Returns:** Filtered data frame with census_credits, major_code, major_name and college_code, ready for major-level analysis
 
 ---
 
@@ -833,7 +835,7 @@ Build the wide-format SCH summary table (major × term)  This is the export tabl
 
 - `filtered_students` - Filtered student rows (all levels combined)
 
-**Returns:** Wide data frame: student_college, major, then one column per term
+**Returns:** Wide data frame: college_code (the student-term's mapped college), major, then one column per term
 
 ---
 
@@ -4093,7 +4095,7 @@ Compute Stop-Out Rates for One Group in One Course  Given one selected observati
 
 ---
 
-### `attach_student_term()`
+### `name_program_codes()`
 
 *Source: student-terms.R*
 
@@ -4104,8 +4106,12 @@ Compute Stop-Out Rates for One Group in One Course  Given one selected observati
 - `rows` - A tibble with `student_id` and `term`.
 - `student_terms` - The student-term table.
 - `cols` - Character. Columns of `student_terms` to attach.
+- `codes` - Character vector of program codes; `NA` and blanks are dropped.
+- `programs` - Data frame with `major_code`, `program_name`, `program_type` (`cedar_programs`, or any subset of it).
+- `major_code_to_name` - Named character vector (`cedar_lookups`' table of the same name), or `NULL`.
+- `is_pre_major` - Logical vector parallel to `codes` (the student-term table's flag on the same rows), or `NULL`. A code flagged on any row is suffixed " (pre-major)", so a pre-major and the major it leads to never share a label ("Psychology (pre-major)" beside "Psychology").
 
-**Returns:** `rows` with `cols` joined on; stops if `rows` already has one of them.
+**Returns:** Named character vector, code to name, one entry per distinct code.
 
 ---
 

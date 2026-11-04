@@ -295,19 +295,50 @@ infer_credit_hours_dept_college <- function(students, sections, dept_code,
 #' @param sections cedar_sections data frame, for late drops' credit values
 #' @param term_start Integer term code for the beginning of the analysis window
 #' @param term_end   Integer term code for the end of the analysis window
-#' @return Filtered data frame with census_credits, ready for major-level analysis
-build_major_level_data <- function(students, sections, term_start, term_end) {
-  students %>%
+#' @param student_terms The `cedar_student_terms` table: each row's major and
+#'   college are its student-term's `primary_major_code` and
+#'   `primary_college_code` (ADR-001 step 2), never the roster's columns.
+#' @param major_names Named character vector, code to display name, from
+#'   [name_program_codes()]; a code it does not name is shown as itself.
+#' @return Filtered data frame with census_credits, major_code, major_name and
+#'   college_code, ready for major-level analysis
+build_major_level_data <- function(students, sections, term_start, term_end,
+                                   student_terms, major_names = NULL) {
+  needed <- c("student_id", "term", "primary_major_code", "primary_college_code")
+  missing_cols <- setdiff(needed, names(student_terms))
+  if (length(missing_cols) > 0) {
+    stop("[credit-hours.R] student_terms is missing required column(s): ",
+         paste(missing_cols, collapse = ", "))
+  }
+  rows <- students %>%
     filter(
       as.integer(term) >= term_start,   # drop terms before the window
       as.integer(term) <= term_end      # drop terms after the window
     ) %>%
     filter_sch_rows(sections) %>%
-    # Banner has used two different names for the same college in different
-    # export generations. Normalize so charts don't show it as two separate groups.
-    mutate(student_college = str_replace(
-      student_college, "College of Educ & Human Sci", "College of Education"
-    ))
+    # The roster's own major and college columns are not read: drop them so
+    # the student-term value is the one attached.
+    select(-any_of(c("major_code", "major_name", "student_college"))) %>%
+    mutate(term = as.integer(term))
+  joined <- attach_student_term(
+    rows, mutate(student_terms, term = as.integer(term)),
+    c("primary_major_code", "primary_college_code")
+  )
+  unmatched <- !(paste(joined$student_id, joined$term) %in%
+                   paste(student_terms$student_id, student_terms$term))
+  if (any(unmatched)) {
+    stop("[credit-hours.R] ", sum(unmatched), " enrollment rows have no row on ",
+         "cedar_student_terms; the two tables were not built from the same class lists.")
+  }
+  names_known <- !is.null(major_names) && length(major_names) > 0
+  joined %>%
+    mutate(
+      major_code   = primary_major_code,
+      college_code = primary_college_code,
+      major_name   = if (names_known) unname(major_names[major_code]) else NA_character_,
+      major_name   = if_else(!is.na(major_name) & major_name != "", major_name, major_code)
+    ) %>%
+    select(-primary_major_code, -primary_college_code)
 }
 
 
@@ -497,13 +528,12 @@ build_outside_time_data <- function(level_data, major_codes, named_outside_codes
 #' by the most recent term so the most active programs appear first.
 #'
 #' @param filtered_students Filtered student rows (all levels combined)
-#' @return Wide data frame: student_college, major, then one column per term
+#' @return Wide data frame: college_code (the student-term's mapped college),
+#'   major, then one column per term
 build_credit_hours_wide_table <- function(filtered_students) {
   # Start with a long-format summary: one row per (term, college, major_name).
-  # Normalize the display name first so blank major_name falls back to the code.
   long <- filtered_students %>%
-    mutate(major_name = if_else(!is.na(major_name) & major_name != "", major_name, major_code)) %>%
-    group_by(term, student_college, major_code, major_name) %>%
+    group_by(term, college_code, major_code, major_name) %>%
     summarize(total_hours = sum(census_credits), .groups = "drop") %>%
     arrange(term, desc(total_hours))
 
@@ -520,7 +550,7 @@ build_credit_hours_wide_table <- function(filtered_students) {
   totals_row <- wide %>%
     ungroup() %>%
     summarise(
-      student_college = "Total",
+      college_code    = "Total",
       major_code      = "Total",
       major_name      = "Total",
       across(all_of(term_cols), ~ sum(.x, na.rm = TRUE))
@@ -1178,12 +1208,15 @@ plot_chd_by_level <- function(by_period, subj_codes, palette) {
 #'   $tables: credit_hours_data_w, sch_major_trends_lower, sch_outside_full_lower,
 #'            sch_major_trends_upper, sch_outside_full_upper
 credit_hours_by_major <- function(students, sections, dept_code, major_codes, term_start, term_end,
+                                  student_terms, major_names = NULL,
                                   include_all_ug = TRUE,
                                   include_wide_table = TRUE) {
 
-  # Verify the incoming data has everything we need before doing any work
-  required_cols <- c("term", "crn", "final_grade", "registration_status_code", "credits",
-                     "major_code", "major_name", "student_college", "level")
+  # Verify the incoming data has everything we need before doing any work.
+  # No major or college column is read off the rows: each row's major is its
+  # student-term's primary major (build_major_level_data()).
+  required_cols <- c("student_id", "term", "crn", "final_grade", "registration_status_code",
+                     "credits", "level")
   missing_cols <- setdiff(required_cols, colnames(students))
   if (length(missing_cols) > 0) {
     stop("[credit-hours.R] Missing required columns in students: ",
@@ -1202,8 +1235,9 @@ credit_hours_by_major <- function(students, sections, dept_code, major_codes, te
   }
   major_codes <- unique(major_codes[!is.na(major_codes) & nzchar(major_codes)])
 
-  # Filter to the term range, SCH rows, and normalized college names
-  all_data <- build_major_level_data(students, sections, term_start, term_end)
+  # Filter to the term range and SCH rows; attach each row's major and college
+  all_data <- build_major_level_data(students, sections, term_start, term_end,
+                                     student_terms, major_names)
 
   # The optional wide summary covers all levels combined and supports callers
   # that expose the legacy export data view.

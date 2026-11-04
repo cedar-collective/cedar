@@ -179,7 +179,8 @@ rehydrate_dept_tab_payload <- function(cached, base, rebuild,
 
 create_dept_report_base <- function(data_objects, opt) {
   required_datasets <- c(
-    "cedar_students", "cedar_degrees", "cedar_sections", "cedar_programs"
+    "cedar_students", "cedar_degrees", "cedar_sections", "cedar_programs",
+    "cedar_student_terms"
   )
   missing_datasets <- setdiff(required_datasets, names(data_objects))
   if (length(missing_datasets) > 0) {
@@ -602,6 +603,8 @@ compute_dept_credit_hours_tab <- function(base, data_objects,
     base$term_end,
     base$palette
   )
+  # Each row's major is its student-term's primary major, named through the
+  # programs table (ADR-001 step 2); the roster's major columns are not read.
   sch_major <- credit_hours_by_major(
     filtered_cl,
     do_filt[["cedar_sections"]],
@@ -609,6 +612,13 @@ compute_dept_credit_hours_tab <- function(base, data_objects,
     base$prog_codes,
     base$term_start,
     base$term_end,
+    student_terms = do_filt[["cedar_student_terms"]],
+    major_names = name_program_codes(
+      do_filt[["cedar_student_terms"]]$primary_major_code,
+      do_filt[["cedar_programs"]],
+      do_filt[["cedar_lookups"]]$major_code_to_name,
+      is_pre_major = do_filt[["cedar_student_terms"]]$is_pre_major
+    ),
     include_all_ug = FALSE,
     include_wide_table = FALSE
   )
