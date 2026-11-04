@@ -11,9 +11,13 @@
 #' repeats remain evidence of return but do not change the selected outcome.
 #' Counts, rates, DFW context, and tests all use these same observations.
 #'
-#' Return means registered or late-drop enrollment anywhere at UNM in the next
-#' fall or spring. A degree in the outcome term also prevents a stop-out flag.
-#' Nonreturn is an observed absence, not proof of permanent departure.
+#' Return is `returned_next_regular_term` on `cedar_student_terms`: enrolled
+#' (registered or late-dropped) anywhere at UNM in the next fall or spring,
+#' CEDAR's one definition of an enrolled student-term, the same column Course
+#' Dynamics retention reads (docs/developers/student-terms.md). A degree in
+#' the outcome term also prevents a stop-out flag. Nonreturn is an observed
+#' absence, not proof of permanent departure; an anchor whose return cannot be
+#' observed is omitted and counted, never a stop-out.
 #'
 #' The chi-squared test (Yates correction) compares DFW versus pass WITHIN each
 #' population; it does not test whether the population and baseline gaps differ.
@@ -22,9 +26,8 @@
 #' P-values are unadjusted across courses; neither a gap nor the ranking score
 #' establishes that a course caused a student to leave.
 #'
-#' @param students Full `cedar_students` enrollment history. If course outcomes
-#'   are term-windowed, supply the full-history `cedar_next_term` separately:
-#'   otherwise filtering away return terms silently creates false stop-outs.
+#' @param students Full `cedar_students` enrollment history, read only to
+#'   classify outcomes when `cedar_grades` is not supplied.
 #' @param population Output of [build_population()], with `student_id` and
 #'   `population_label`. Callers apply population membership windows to outcome
 #'   rows before this function; the return lookup must remain unwindowed.
@@ -39,21 +42,34 @@
 #'   statistical validity. Standalone callers must supply appropriate edges.
 #' @param cedar_grades Optional preclassified outcomes with the current saved
 #'   outcome-policy version, already respecting the caller's population window.
-#' @param cedar_next_term Optional full-history next-term return lookup.
+#' @param student_terms `cedar_student_terms`, the full history, never
+#'   windowed: `returned_next_regular_term` and `return_observable` per
+#'   student-term. Required.
 #' @return List containing `by_course` (one row per campus/course),
 #'   `population_size`, eligible anchor `term_range`, and `observation_info`
-#'   (coverage counts before size thresholds). Course rows contain `pop_` and
+#'   (coverage counts before size thresholds, including
+#'   `n_return_unobservable`: anchors omitted because the next regular term is
+#'   past the settled edge or has no class list). Course rows contain `pop_` and
 #'   `baseline_` columns: `n_dfw`, `n_pass`, `n_graded`, `dfw_rate`,
 #'   `dfw_stopout_rate`, `pass_stopout_rate`, `stopout_gap`, and `p_value`.
 #'   Statistics retain full precision; round only for display.
 #' @seealso [build_population()], [prepare_roadblock_results()]
 #' @export
 get_stopout <- function(students, population, degrees = NULL, opt = list(),
-                        cedar_grades = NULL, cedar_next_term = NULL) {
+                        cedar_grades = NULL, student_terms = NULL) {
 
   message("[stopout.R] Starting stop-out analysis...")
 
   validate_population(population, "get_stopout")
+  if (is.null(student_terms)) {
+    stop("[stopout.R] get_stopout() needs student_terms (cedar_student_terms): the return ",
+         "is read from it, never rebuilt from class-list rows.")
+  }
+  missing_st <- setdiff(c("student_id", "term", "returned_next_regular_term", "return_observable"),
+                        names(student_terms))
+  if (length(missing_st) > 0L) {
+    stop("[stopout.R] student_terms is missing column(s): ", paste(missing_st, collapse = ", "))
+  }
 
   min_n       <- opt$min_n     %||% 15L  # reporting threshold, not a test-validity guarantee
   min_dfw_n   <- opt$min_dfw_n %||% 5L   # suppress rates where fewer than 5 students had DFW
@@ -132,34 +148,47 @@ get_stopout <- function(students, population, degrees = NULL, opt = list(),
   message("[stopout.R] Analyzing ", nrow(course_keys),
           " campus-course groups...")
 
-  # Build next-term lookup only for students who appear in the analyzed courses
-  # (cohort + baseline). Scoping to courses_to_analyze rather than all of graded
-  # avoids building the lookup for students in unrelated courses that won't be used.
-  # We still draw from the full enrollment history so a student who stopped enrolling
-  # can be detected even if their next term falls outside opt$term.
+  # The return is read from the student-term table, which carries the full
+  # history: a student whose next term falls outside opt$term is still seen.
+  # Only students in the analyzed courses (cohort + baseline) are read.
   students_in_graded <- graded %>%
     semi_join(course_keys, by = c("campus", "subject_course")) %>%
     pull(student_id) %>%
     unique()
-  message("[stopout.R] Building next-term lookup for ",
-          format(length(students_in_graded), big.mark = ","), " students (in analyzed courses)...")
-  if (!is.null(cedar_next_term) && nrow(cedar_next_term) > 0) {
-    # Pre-computed at transform time — just filter to relevant students.
-    next_term_lookup <- cedar_next_term %>%
-      filter(student_id %in% students_in_graded)
-    message("[stopout.R] Used pre-computed cedar_next_term.")
-  } else {
-    next_term_lookup <- build_next_term_lookup(
-      students %>% filter(student_id %in% students_in_graded)
-    )
-  }
+  message("[stopout.R] Reading returns for ",
+          format(length(students_in_graded), big.mark = ","),
+          " students (in analyzed courses) from the student-term table...")
+  next_term_lookup <- student_terms %>%
+    filter(student_id %in% students_in_graded) %>%
+    transmute(student_id, term = as.integer(term),
+              returned_next_term = returned_next_regular_term, return_observable)
 
   # Pre-join stop-out status onto graded ONCE — eliminates a full join per course
   message("[stopout.R] Joining stop-out status...")
   graded_so <- graded %>%
     semi_join(course_keys, by = c("campus", "subject_course")) %>%
-    left_join(next_term_lookup, by = c("student_id", "term")) %>%
-    mutate(stopped_out = !returned_next_term | is.na(returned_next_term))
+    left_join(next_term_lookup, by = c("student_id", "term"))
+  n_uncovered <- sum(is.na(graded_so$return_observable))
+  if (n_uncovered > 0L) {
+    stop("[stopout.R] ", format(n_uncovered, big.mark = ","), " graded student-term(s) have no ",
+         "row on the student-term table; it must be built from the same class lists as the outcomes.")
+  }
+  # A return that cannot be observed (the next regular term is past the settled
+  # edge, or has no class list) is omitted and counted, never a stop-out.
+  n_unobservable <- sum(!graded_so$return_observable)
+  observation_info$n_return_unobservable <- n_unobservable
+  observation_info$note <- paste0(
+    observation_info$note,
+    sprintf(" %s observations omitted because the next regular term is not observable.",
+            format(n_unobservable, big.mark = ",")))
+  if (n_unobservable > 0L) {
+    message("[stopout.R] ", format(n_unobservable, big.mark = ","),
+            " observations omitted: the next regular term is not observable.")
+  }
+  graded_so <- graded_so %>%
+    filter(return_observable) %>%
+    mutate(stopped_out = !returned_next_term) %>%
+    select(-return_observable)
 
   # Graduate correction: students who earned a degree in term T did not "stop out" —
   # they completed. Mark them as stopped_out = FALSE for their graduation term.
@@ -435,50 +464,6 @@ classify_outcomes <- function(students) {
     distinct() %>%
     classify_enrollment_outcomes() %>%
     select(student_id, term, campus, subject_course, outcome)
-}
-
-
-#' Build a Next-Term Enrollment Lookup
-#'
-#' For each student-term pair present in the data, determines the next
-#' regular academic term and whether the student enrolled in it. Uses
-#' `add_next_term_col()` from `utils.R`.
-#'
-#' Summer terms are excluded from the "next term" mapping — a student who
-#' doesn't enroll in summer is not considered a stop-out.
-#'
-#' @param students Data frame. The full `cedar_students` table (not pre-filtered
-#'   by term — we need the full enrollment history to check the next term).
-#'
-#' @return Data frame with columns: `student_id`, `term`, `returned_next_term`
-#'   (logical: `TRUE` if the student had any enrollment the following term).
-#'
-#' @keywords internal
-build_next_term_lookup <- function(students) {
-
-  # Census participation is evidence of return. Waitlists and early drops are
-  # not enrollment; late drops were enrolled at census and therefore do count.
-  if ("registration_status_code" %in% names(students)) {
-    students <- students %>%
-      filter(registration_status_code %in% c(STATUS_REGISTERED, STATUS_DROP_LATE))
-  }
-  student_terms <- students %>%
-    select(student_id, term) %>%
-    distinct()
-
-  # Map each term to the next regular term (no summer)
-  with_next <- student_terms %>%
-    add_next_term_col("term", summer = FALSE)
-
-  # Which student-next_term pairs actually have enrollment?
-  enrolled_terms <- student_terms %>%
-    rename(next_term = term) %>%
-    mutate(returned = TRUE)
-
-  with_next %>%
-    left_join(enrolled_terms, by = c("student_id", "next_term")) %>%
-    mutate(returned_next_term = !is.na(returned)) %>%
-    select(student_id, term, returned_next_term)
 }
 
 

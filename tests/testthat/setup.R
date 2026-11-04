@@ -59,6 +59,31 @@ test_degrees_roadblocks <<- cedar_degrees_roadblocks
 test_sections_xl_switch <<- cedar_sections_xl_switch # EC-15: listing switch in a crosslist
 test_students_xl_switch <<- cedar_students_xl_switch
 test_degrees     <<- cedar_degrees
+
+# Student-term tables (cedar_student_terms), built by the production builder
+# from the class-list fixtures above, exactly as the transform builds them.
+# Roadblocks and Course Dynamics retention read `enrolled` and
+# `returned_next_regular_term` from here and nowhere else (ADR-001 step 2).
+# The designed fixtures are pulled within days of their last term, so the
+# settled edge they would compute is NULL; each table is built with the edge
+# the tests observe through, and a return into a term with no class list is
+# unobservable, never FALSE.
+.fixture_student_terms <- function(students, degrees = NULL, settled = max(students$term)) {
+  suppressMessages(build_student_terms(
+    students, programs = NULL, degrees = degrees,
+    edges = list(last_enrolled_complete = as.integer(settled))
+  ))
+}
+test_student_terms            <<- .fixture_student_terms(cedar_students, cedar_degrees)
+test_student_terms_audits     <<- .fixture_student_terms(cedar_students_audits, settled = 202110L)
+test_student_terms_roadblocks <<- .fixture_student_terms(cedar_students_roadblocks, cedar_degrees_roadblocks)
+test_student_terms_mcret      <<- .fixture_student_terms(cedar_students_mcret)
+test_student_terms_rp         <<- .fixture_student_terms(cedar_students_rp, cedar_degrees_rp)
+test_student_terms_mc         <<- .fixture_student_terms(cedar_students_mc)
+test_student_terms_gen_ed_assoc <<- .fixture_student_terms(gen_ed_assoc_students, cedar_degrees)
+# ST01 carries its own programs and a settled edge of its own (Fall 2020).
+test_student_terms_st         <<- suppressMessages(build_student_terms(
+  cedar_students_st, cedar_programs_st, cedar_degrees_st))
 # Degree Explorer: the demo institution's designed catalog (institution/demo/),
 # two synthetic programs whose schedules are worked by hand in
 # test-degree-explorer.R. Independent of any real institution's annual catalog.
@@ -93,6 +118,7 @@ data_objects <<- list(
   cedar_programs = test_programs,
   cedar_degrees  = test_degrees,
   cedar_students = test_students,
+  cedar_student_terms = test_student_terms,
   cedar_faculty  = test_faculty,
   cedar_sections = test_sections,
   cedar_lookups  = test_lookups

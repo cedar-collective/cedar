@@ -54,14 +54,16 @@ STUDENT_TERMS_COLUMNS <- c(
 #' Build the student-term table
 #'
 #' @param students `cedar_students`.
-#' @param programs `cedar_programs`.
+#' @param programs `cedar_programs`, or NULL for class lists alone: then no
+#'   row is declared, every row is described by the class list, and the build
+#'   says so.
 #' @param degrees `cedar_degrees` or NULL; without it `degree_awarded` is FALSE
 #'   everywhere and the build says so.
 #' @param edges The result of [cedar_data_edges()] on the same tables. Required
 #'   to carry `last_enrolled_complete`; the build stops without it.
 #' @param opt Unused; present for the branch calling convention.
 #' @return A tibble with `STUDENT_TERMS_COLUMNS`, one row per student-term.
-build_student_terms <- function(students, programs, degrees = NULL,
+build_student_terms <- function(students, programs = NULL, degrees = NULL,
                                 edges = cedar_data_edges(students, degrees = degrees),
                                 opt = list()) {
   required_students <- c("student_id", "term", "registration_status_code", "final_grade",
@@ -71,6 +73,10 @@ build_student_terms <- function(students, programs, degrees = NULL,
                          "college_code", "is_pre_major", "student_level",
                          "student_classification", "student_campus", "academic_standing",
                          "residency", "time_status", "sem_gpa", "as_of_date")
+  if (is.null(programs)) {
+    message("[student-terms.R] no programs supplied: no row is declared, and every row is described by the class list.")
+    programs <- .empty_programs()
+  }
   missing_s <- setdiff(required_students, names(students))
   missing_p <- setdiff(required_programs, names(programs))
   if (length(missing_s) > 0L || length(missing_p) > 0L) {
@@ -225,7 +231,7 @@ build_student_terms <- function(students, programs, degrees = NULL,
       class_list_rows = dplyr::n(),
       enrolled = any(registration_status_code %in% c(STATUS_REGISTERED, STATUS_DROP_LATE)),
       waitlisted_only = !enrolled & any(registration_status_code %in% STATUS_WAITLIST),
-      classlist_as_of = max(as.Date(as_of_date), na.rm = TRUE),
+      classlist_as_of = .newest_date(as_of_date),
       .groups = "drop")
 
   registered <- students %>%
@@ -270,7 +276,7 @@ build_student_terms <- function(students, programs, degrees = NULL,
   newest <- students %>%
     dplyr::mutate(.pull = as.Date(as_of_date)) %>%
     dplyr::group_by(student_id, term) %>%
-    dplyr::filter(.pull == max(.pull) | is.na(.pull)) %>%
+    dplyr::filter(.pull == .newest_date(.pull) | is.na(.pull)) %>%
     dplyr::ungroup() %>%
     dplyr::distinct(student_id, term, dplyr::across(dplyr::all_of(cols)))
   .stop_on_repeated_keys(newest, "class list", "level, classification, campus or residency")
@@ -286,7 +292,7 @@ build_student_terms <- function(students, programs, degrees = NULL,
   newest <- programs %>%
     dplyr::mutate(.pull = as.Date(as_of_date)) %>%
     dplyr::group_by(student_id, term) %>%
-    dplyr::filter(.pull == max(.pull) | is.na(.pull)) %>%
+    dplyr::filter(.pull == .newest_date(.pull) | is.na(.pull)) %>%
     dplyr::ungroup()
   description <- newest %>%
     dplyr::distinct(student_id, term, dplyr::across(dplyr::all_of(cols)))
@@ -326,7 +332,7 @@ build_student_terms <- function(students, programs, degrees = NULL,
   declarations <- programs %>%
     dplyr::group_by(student_id, term) %>%
     dplyr::summarize(n_declarations = dplyr::n(),
-                     programs_as_of = max(as.Date(as_of_date), na.rm = TRUE),
+                     programs_as_of = .newest_date(as_of_date),
                      .groups = "drop")
   primary <- programs %>%
     dplyr::filter(program_type == "Major") %>%
@@ -371,6 +377,29 @@ build_student_terms <- function(students, programs, degrees = NULL,
     )
 }
 
+
+# A programs table with no rows, typed as the build requires, so class lists
+# alone take the same path as class lists with academic studies.
+.empty_programs <- function() {
+  tibble::tibble(
+    student_id = character(), term = integer(), program_type = character(),
+    major_code = character(), dept_code = character(), college_code = character(),
+    is_pre_major = logical(), student_level = character(),
+    student_classification = character(), student_campus = character(),
+    academic_standing = character(), residency = character(), time_status = character(),
+    sem_gpa = double(), as_of_date = as.Date(character())
+  )
+}
+
+
+# The newest of a group's pull dates, or an NA date when the group has none.
+# max(..., na.rm = TRUE) warns and returns -Inf on an empty or all-NA group,
+# which dplyr evaluates once even for an empty programs table (programs = NULL).
+.newest_date <- function(x) {
+  x <- as.Date(x)
+  if (all(is.na(x))) return(as.Date(NA))
+  max(x, na.rm = TRUE)
+}
 
 .stop_on_repeated_keys <- function(df, source, what) {
   dup <- df[duplicated(df[c("student_id", "term")]), c("student_id", "term")]

@@ -24,7 +24,7 @@
 #
 # Exported functions:
 #   pathwaysUI(id, campus_choices, program_choices, dept_choices, course_campus_choices)
-#   pathwaysServer(id, students, programs, degrees, cedar_student_term_credits, lookups, program_choices, dept_choices, edges, pathway_groups)
+#   pathwaysServer(id, students, programs, degrees, cedar_grades, cedar_student_term_credits, cedar_student_terms, lookups, program_choices, dept_choices, edges, pathway_groups)
 #
 # Internal sub-module:
 #   populationSelectorUI(id, campus_choices, program_choices, dept_choices)
@@ -965,7 +965,7 @@ pathways_start_panel <- function() {
 
 pathwaysServer <- function(id, students, programs, degrees = NULL,
                            cedar_grades = NULL, cedar_student_term_credits = NULL,
-                           cedar_next_term = NULL,
+                           cedar_student_terms = NULL,
                            lookups = list(), program_choices = character(),
                            dept_choices = character(), edges, pathway_groups) {
   moduleServer(id, function(input, output, session) {
@@ -1940,7 +1940,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
             observation_end_term = analysis_through
           ),
           cedar_grades    = so_grades,
-          cedar_next_term = cedar_next_term
+          student_terms   = cedar_student_terms
         )
       }, error = function(e) {
         showNotification(paste("Stop-out analysis failed:", e$message), type = "error")

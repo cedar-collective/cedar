@@ -10,7 +10,7 @@ test_that("a later graduation does not retroactively satisfy earlier horizons", 
 
   result <- .compute_retention(
     cohort,
-    registered_lookup = registered,
+    enrolled_lookup = registered,
     n_terms = 2L,
     graduated_lookup = graduated
   )
@@ -229,7 +229,12 @@ test_that("instructor retention trend displays instructor names when available",
 
   result <- get_retention_trend(
     students,
-    opt = list(course = "HIST 101", by_instructor = TRUE, n_terms = 1L, min_n = 1L)
+    opt = list(course = "HIST 101", by_instructor = TRUE, n_terms = 1L, min_n = 1L),
+    student_terms = tibble::tibble(
+      student_id = c("S1", "S2", "S3", "S1", "S2"),
+      term = c(202110L, 202110L, 202110L, 202180L, 202180L),
+      enrolled = TRUE
+    )
   )
 
   expect_true("instructor_name" %in% names(result))
@@ -256,7 +261,12 @@ test_that("retention keeps partial current registration out of longitudinal coho
   result <- suppressMessages(get_retention_trend(
     students,
     opt = list(course = "HIST 101", n_terms = 1L, min_n = 1L,
-               data_edges = edges)
+               data_edges = edges),
+    student_terms = tibble::tibble(
+      student_id = c("S1", "S2", "S3"),
+      term = c(202610L, 202660L, 202680L),
+      enrolled = TRUE
+    )
   ))
 
   expect_equal(result$term, 202610L)
@@ -266,9 +276,11 @@ test_that("retention keeps partial current registration out of longitudinal coho
 
 test_that("retention views can reuse one prepared longitudinal context", {
   opt <- list(course = "COMM 101", n_terms = 1L, min_n = 1L)
-  context <- suppressMessages(build_retention_context(test_students_mcret, opt = opt))
+  context <- suppressMessages(build_retention_context(
+    test_students_mcret, opt = opt, student_terms = test_student_terms_mcret))
 
-  direct <- suppressMessages(get_retention_trend(test_students_mcret, opt = opt))
+  direct <- suppressMessages(get_retention_trend(
+    test_students_mcret, opt = opt, student_terms = test_student_terms_mcret))
   reused <- suppressMessages(get_retention_trend(
     test_students_mcret,
     opt = opt,
@@ -278,7 +290,7 @@ test_that("retention views can reuse one prepared longitudinal context", {
   expect_s3_class(context, "cedar_retention_context")
   expect_equal(reused, direct)
   expect_equal(
-    nrow(context$registered_lookup),
+    nrow(context$enrolled_lookup),
     nrow(dplyr::distinct(test_students_mcret, student_id, term))
   )
 })
@@ -308,7 +320,8 @@ test_that("an unsuppressed retention trend can be filtered without recomputation
 test_that("retention is grouped by campus, not blended across campuses", {
   r <- suppressMessages(get_retention_trend(
     test_students_mcret,
-    opt = list(course = "COMM 101", n_terms = 1L, min_n = 1L)
+    opt = list(course = "COMM 101", n_terms = 1L, min_n = 1L),
+    student_terms = test_student_terms_mcret
   ))
 
   expect_true("campus" %in% names(r))
@@ -327,7 +340,8 @@ test_that("a student who moves campuses is retained, not counted as attrition", 
   # cohort's campus would score it as a stop-out and understate every branch.
   r <- suppressMessages(get_retention_trend(
     test_students_mcret,
-    opt = list(course = "COMM 101", n_terms = 1L, min_n = 1L)
+    opt = list(course = "COMM 101", n_terms = 1L, min_n = 1L),
+    student_terms = test_student_terms_mcret
   ))
   expect_equal(r$ret_1[r$campus == "GA"], 0.5)   # S3 retained, S4 not
 })
@@ -335,7 +349,8 @@ test_that("a student who moves campuses is retained, not counted as attrition", 
 test_that("opt$campus restricts the cohort without changing the outcome rule", {
   r <- suppressMessages(get_retention_trend(
     test_students_mcret,
-    opt = list(course = "COMM 101", n_terms = 1L, min_n = 1L, campus = "GA")
+    opt = list(course = "COMM 101", n_terms = 1L, min_n = 1L, campus = "GA"),
+    student_terms = test_student_terms_mcret
   ))
   expect_equal(nrow(r), 1L)
   expect_equal(r$campus, "GA")
@@ -349,7 +364,8 @@ test_that("a students frame with no campus column fails loudly", {
   no_campus <- dplyr::select(test_students_mcret, -campus)
   expect_error(
     suppressMessages(get_retention_trend(
-      no_campus, opt = list(course = "COMM 101", n_terms = 1L, min_n = 1L))),
+      no_campus, opt = list(course = "COMM 101", n_terms = 1L, min_n = 1L),
+      student_terms = test_student_terms_mcret)),
     "campus"
   )
 })
@@ -371,4 +387,44 @@ test_that("benchmark comparison joins on campus and does not fan out", {
   expect_setequal(d$campus, c("ABQ", "GA"))
   expect_equal(d$diff_pct[d$campus == "ABQ"], 10)
   expect_equal(d$diff_pct[d$campus == "GA"], 10)
+})
+
+# =============================================================================
+# The enrolled lookup is cedar_student_terms' `enrolled` (ISSUES.md I44)
+# =============================================================================
+
+test_that("retention reads the student-term table and refuses to run without it", {
+  expect_error(
+    build_retention_context(test_students_mcret, opt = list()),
+    "needs student_terms"
+  )
+  expect_error(
+    get_retention_trend(test_students_mcret,
+                        opt = list(course = "COMM 101", n_terms = 1L, min_n = 1L),
+                        student_terms = dplyr::select(test_student_terms_mcret, -enrolled)),
+    "missing column"
+  )
+})
+
+test_that("a student who withdrew late next term is retained, not lost (I44)", {
+  # ST01: ST_A's only Fall 2020 row is a DW. A registered-only lookup scored
+  # that as attrition (2 of 10); the table's `enrolled` says 3 of 10, with ST_K
+  # registered and ST_J graduated.
+  trend <- suppressMessages(get_retention_trend(
+    test_students_st,
+    opt = list(course = "HIST 1110", n_terms = 1L, min_n = 1L),
+    degrees = test_degrees_st, student_terms = test_student_terms_st
+  ))
+  spring <- trend[trend$campus == "ABQ" & trend$term == 202010L, ]
+  expect_equal(spring$n, 10L)
+  expect_equal(spring$ret_1, 0.3)
+
+  registered_only <- test_student_terms_st %>%
+    dplyr::mutate(enrolled = enrolled & registered_courses > 0L)
+  narrower <- suppressMessages(get_retention_trend(
+    test_students_st,
+    opt = list(course = "HIST 1110", n_terms = 1L, min_n = 1L),
+    degrees = test_degrees_st, student_terms = registered_only
+  ))
+  expect_equal(narrower$ret_1[narrower$campus == "ABQ" & narrower$term == 202010L], 0.2)
 })

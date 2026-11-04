@@ -30,7 +30,6 @@ recurrence is recognizable.
 | ID | Kind | Summary |
 |---|---|---|
 | [I45](#i45--the-class-list-and-the-schedule-name-the-same-section-with-different-course-codes) | Defect | The class list and the schedule name the same section differently for renamed subjects (SOC to SOCI, PSY to PSYC, CCS to CCST): SOCI 371 has class-list history from Fall 2019 but no sections before Fall 2021 |
-| [I44](#i44--roadblocks-and-retention-disagree-on-whether-a-late-withdrawal-returned) | Defect | Roadblocks and Retention disagree on whether a student who withdrew late next term returned: Fall 2025 to Spring 2026 reads 82.7% on one and 81.7% on the other (284 students) |
 | [I43](#i43--every-scheduled-refresh-fails-because-the-default-asks-for-a-report-mrgather-never-fetches) | Defect | Every scheduled refresh has failed since 2026-10-24: the default asks for the applicants report, which production mrgather never fetches, so production tables have not been rebuilt since Oct 27 (default fixed; mrgather and per-report rebuilds remain) |
 | [I38](#i38--a-pathways-program-population-misses-pre-majors-whose-name-differs-from-their-major) | Defect | A Pathways program population misses pre-majors whose name differs from their major: "Film and Digital Arts" holds 1 of the 1,016 Film pre-majors who never declared the major, because `FFDA` is named "FDMA" |
 | [I37](#i37--renumbered-courses-lose-their-history) | Defect | Renumbered courses lose their history: no crosswalk exists, so ACCT 3401 (was MGMT 340) and the other Fall 2026 ACCT, BUSA and POPH courses read as new |
@@ -53,6 +52,7 @@ Kept until the next release, so a recurrence is recognisable; each entry below g
 
 | ID | Kind | Summary |
 |---|---|---|
+| [I44](#i44--roadblocks-and-retention-disagree-on-whether-a-late-withdrawal-returned) | Defect | Roadblocks and Retention disagreed on whether a student who withdrew late next term returned: Fall 2025 to Spring 2026 read 82.7% on one and 81.7% on the other (284 students) (resolved 2026-11-04) |
 | [I42](#i42--a-saturated-course-whose-fall-changes-lower-its-forecast-is-still-called-a-floor) | Defect | A saturated course whose Fall changes lower its forecast was still called "a floor": ENGL 1120's Spring 2027 forecast is 2,164, below last Spring's 2,179, and the page said "so this is a floor" (resolved 2026-11-03) |
 | [I41](#i41--projection-labels-call-the-term-just-finished-fall-whatever-its-season) | Defect | Projection labels called the term just finished "Fall" whatever its season: once Spring 2027 settles, a Fall 2027 course whose Spring moved 25% would have been flagged "Fall enrollment +25%" (resolved 2026-11-03) |
 | [I40](#i40--the-projections-page-gave-a-forecasts-own-misses-to-the-schedule) | Defect | The projections page gave a forecast's own misses to the schedule: 7 of the 8 Spring 2027 courses whose past misses came with seats to spare read "the misses came when the seats moved", because any seat move counted (resolved 2026-10-29) |
@@ -124,7 +124,16 @@ two codes across the tables and a test pins it to one.
 
 ## I44 — Roadblocks and Retention disagree on whether a late withdrawal returned
 
-**Status:** open
+**Status:** resolved 2026-11-04. Both read `cedar_student_terms` (ADR-001
+step 2): Roadblocks its `returned_next_regular_term`, Retention and persistence
+its `enrolled` (registered, or registered and withdrawn after census), so a
+student whose only next-term row is a late drop returned on every page.
+`build_next_term_lookup()`, `.build_registered_lookup()` and the saved
+`cedar_next_term` are gone. The cross-tab test is in
+`tests/testthat/test-student-terms.R` (ST01: Retention's ret_1 and one minus
+Roadblocks' pass stop-out rate are the same 3 of 10). Roadblocks' numbers did
+not move; Retention's rose by the late withdrawals, about one point, and
+`definitions.yml` course-retention 2.0.0 says so on the page.
 **Found:** 2026-11-03, comparing the return lookups while planning degree-roadblock surfaces
 **Severity:** medium. About one point UNM-wide, and more for the groups these
 pages exist to find: a student who withdraws late is a student at risk.

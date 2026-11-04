@@ -2139,12 +2139,26 @@ cedar_students_audits <- tribble(
     subject_code = "HIST", credits = 3, level = "lower", part_term = "1",
     student_level = "UG", student_classification = "Sophomore",
     student_campus = "ABQ", student_college = "ARTS",
+    course_title = "Survey of History", residency = "Resident",
+    as_of_date = as.Date("2020-12-20"),
     registration_status = case_when(
       registration_status_code %in% c("RE", "RS", "RR") ~ "Student Registered",
       registration_status_code %in% c("DR", "DD") ~ "Dropped Without Penalty",
       TRUE ~ "Dropped With Penalty"
     )
   )
+# One student registers for Spring 2021, so the term exists in the class list
+# and the Fall 2020 returns are observable on the student-term table (a return
+# into a term with no class list is unobservable, never FALSE). No grade, so
+# no outcome classifier counts the row.
+cedar_students_audits <- dplyr::bind_rows(
+  cedar_students_audits,
+  cedar_students_audits %>%
+    dplyr::filter(student_id == "EC09-RE-A") %>%
+    dplyr::mutate(term = 202110L, subject_course = "HIST 2110", crn = "92100",
+                  course_title = "Survey of History II", final_grade = NA_character_,
+                  as_of_date = as.Date("2021-01-25"))
+)
 
 class_lists_audits <- cedar_students_audits %>%
   dplyr::transmute(
@@ -4023,7 +4037,10 @@ cedar_students_roadblocks <- dplyr::bind_rows(
           c("A", "F", "A", "A")),
   .mc_row("RB_P02", 202010, "ECON 100", "ABQ", "ECON", "B"),
   .mc_row(rep("RB_P11", 2), 202010, "ECON 100", "ABQ", "ECON", c("A", "F")),
-  .mc_row("RB_P06", 202010, "ECON 100", "GA", "ECON", "A"),
+  # Delivered at Gallup to an Albuquerque-home student: one home campus per
+  # student-term, as the student-term table requires; the course campus differs.
+  .mc_row("RB_P06", 202010, "ECON 100", "GA", "ECON", "A") %>%
+    dplyr::mutate(student_campus = "ABQ"),
   .mc_row(NA_character_, 202010, "ECON 100", "ABQ", "ECON", "F"),
   .mc_row("RB_P12", 202180, "ECON 100", "ABQ", "ECON", "F"),
   .mc_row("RB_P13", 202110, "ECON 200", "ABQ", "ECON", "F")

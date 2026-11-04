@@ -18,7 +18,8 @@ test_that("saved outcomes require a current policy and agree with raw AUD exclus
     select(student_id, term, subject_course, outcome, campus, level)
 
   expect_error(get_dfw_rates(students, population, opt, cedar_grades = saved), "Rebuild from the current class_lists")
-  expect_error(get_stopout(students, population, opt = opt, cedar_grades = saved), "outdated outcome policy")
+  expect_error(get_stopout(students, population, opt = opt, cedar_grades = saved,
+                           student_terms = test_student_terms_audits), "outdated outcome policy")
   attr(saved, "cedar_outcome_policy_version") <- 0L
   expect_error(validate_cedar_grades_policy(saved), "outdated outcome policy")
 
@@ -34,8 +35,10 @@ test_that("saved outcomes require a current policy and agree with raw AUD exclus
   expect_equal(saved_rates$pop_n_dfw, 4L)
   expect_equal(saved_rates$pop_dfw_rate, 0.8)
 
-  raw_stopout <- get_stopout(students, population, opt = opt)
-  saved_stopout <- get_stopout(students, population, opt = opt, cedar_grades = saved)
+  raw_stopout <- get_stopout(students, population, opt = opt,
+                             student_terms = test_student_terms_audits)
+  saved_stopout <- get_stopout(students, population, opt = opt, cedar_grades = saved,
+                               student_terms = test_student_terms_audits)
   expect_equal(saved_stopout, raw_stopout, ignore_attr = TRUE)
   expect_equal(saved_stopout$by_course$pop_n_dfw, 4L)
   expect_equal(saved_stopout$by_course$pop_n_pass, 1L)
@@ -331,25 +334,53 @@ make_stopout_population <- function() {
   )
 }
 
-test_that("next-term lookup counts census enrollment, not waitlists or early drops", {
-  students <- tibble::tibble(
-    student_id = rep(c("WAIT", "EARLY", "LATE"), each = 2L),
-    term = rep(c(202480L, 202510L), 3L),
-    registration_status_code = c("RE", "WL", "RE", "DR", "RE", "DG")
+# The student-term rows get_stopout() reads for these students: the 202480
+# anchors, judged into Fall-to-Spring 202510. Hand-written to the same shape as
+# cedar_student_terms because make_stopout_students() is an intermediate frame,
+# not a fixture the production builder can read.
+make_stopout_terms <- function() {
+  returned <- c("C001", "C002", "C004", "B001", "B002", "B004")
+  ids <- c(paste0("C00", 1:6), paste0("B00", 1:5))
+  bind_rows(
+    tibble(student_id = ids, term = 202480L, enrolled = TRUE,
+           returned_next_regular_term = ids %in% returned, return_observable = TRUE),
+    tibble(student_id = returned, term = 202510L, enrolled = TRUE,
+           returned_next_regular_term = NA, return_observable = FALSE)
   )
+}
 
-  lookup <- build_next_term_lookup(students) %>%
-    dplyr::filter(term == 202480L) %>%
-    dplyr::arrange(student_id)
+test_that("a return that cannot be observed is omitted and counted, never a stop-out", {
+  terms <- make_stopout_terms()
+  # C003 did not come back, but suppose its next term were past the settled edge.
+  terms$return_observable[terms$student_id == "C003" & terms$term == 202480L] <- FALSE
+  terms$returned_next_regular_term[terms$student_id == "C003" & terms$term == 202480L] <- NA
+  result <- suppressMessages(get_stopout(
+    make_stopout_students(), make_stopout_population(), student_terms = terms,
+    opt = list(min_n = 1L, min_dfw_n = 1L)
+  ))
+  row <- result$by_course[result$by_course$subject_course == "BIOL 2310", ]
+  expect_equal(row$pop_n_pass, 2L)             # C001, C002: C003 is neither
+  expect_equal(row$pop_pass_stopout_rate, 0)
+  expect_equal(result$observation_info$n_return_unobservable, 1L)
+  expect_match(result$observation_info$note, "1 observations omitted")
+})
 
-  expect_false(lookup$returned_next_term[lookup$student_id == "WAIT"])
-  expect_false(lookup$returned_next_term[lookup$student_id == "EARLY"])
-  expect_true(lookup$returned_next_term[lookup$student_id == "LATE"])
+test_that("get_stopout needs the student-term table, with a row for every graded student-term", {
+  expect_error(
+    get_stopout(make_stopout_students(), make_stopout_population(), opt = list(min_n = 1L)),
+    "student_terms"
+  )
+  expect_error(
+    get_stopout(make_stopout_students(), make_stopout_population(), opt = list(min_n = 1L),
+                student_terms = dplyr::filter(make_stopout_terms(), student_id != "C001")),
+    "no row on the student-term table"
+  )
 })
 
 test_that("stop-out anchors require a complete following regular term", {
   result <- suppressMessages(get_stopout(
     make_stopout_students(),
+    student_terms = make_stopout_terms(),
     make_stopout_population(),
     opt = list(
       min_n = 5L, min_dfw_n = 2L,
@@ -365,6 +396,7 @@ test_that("stop-out anchors require a complete following regular term", {
 test_that("get_stopout returns correct top-level structure", {
   result <- get_stopout(
     make_stopout_students(),
+    student_terms = make_stopout_terms(),
     make_stopout_population(),
     opt = list(min_n = 5, min_dfw_n = 2)
   )
@@ -378,6 +410,7 @@ test_that("get_stopout returns correct top-level structure", {
 test_that("get_stopout population_size matches cohort input", {
   result <- get_stopout(
     make_stopout_students(),
+    student_terms = make_stopout_terms(),
     make_stopout_population(),
     opt = list(min_n = 5, min_dfw_n = 2)
   )
@@ -387,6 +420,7 @@ test_that("get_stopout population_size matches cohort input", {
 test_that("get_stopout BIOL 2310 cohort: n_pass=3 and n_dfw=3", {
   result  <- get_stopout(
     make_stopout_students(),
+    student_terms = make_stopout_terms(),
     make_stopout_population(),
     opt = list(min_n = 5, min_dfw_n = 2)
   )
@@ -402,6 +436,7 @@ test_that("get_stopout BIOL 2310 cohort: correct pass and DFW stop-out rates", {
   # pop dfw:  C005, C006 stopped out (2 of 3) → 0.667
   result <- get_stopout(
     make_stopout_students(),
+    student_terms = make_stopout_terms(),
     make_stopout_population(),
     opt = list(min_n = 5, min_dfw_n = 2)
   )
@@ -414,6 +449,7 @@ test_that("get_stopout BIOL 2310 cohort: correct pass and DFW stop-out rates", {
 test_that("get_stopout BIOL 2310 cohort: stop-out gap = dfw_rate - pass_rate", {
   result <- get_stopout(
     make_stopout_students(),
+    student_terms = make_stopout_terms(),
     make_stopout_population(),
     opt = list(min_n = 5, min_dfw_n = 2)
   )
@@ -425,6 +461,7 @@ test_that("get_stopout BIOL 2310 cohort: stop-out gap = dfw_rate - pass_rate", {
 test_that("get_stopout BIOL 2310 baseline: n_pass=3 and n_dfw=2", {
   result <- get_stopout(
     make_stopout_students(),
+    student_terms = make_stopout_terms(),
     make_stopout_population(),
     opt = list(min_n = 5, min_dfw_n = 2)
   )
@@ -439,6 +476,7 @@ test_that("get_stopout BIOL 2310 baseline: correct stop-out rates", {
   # baseline dfw:  B003 stopped out (1 of 2) → 0.5
   result <- get_stopout(
     make_stopout_students(),
+    student_terms = make_stopout_terms(),
     make_stopout_population(),
     opt = list(min_n = 5, min_dfw_n = 2)
   )
@@ -452,7 +490,8 @@ test_that("get_stopout BIOL 2310 baseline: correct stop-out rates", {
 test_that("get_stopout stops when population missing required columns", {
   bad_pop <- tibble(student_id = c("C001", "C002"))  # missing population_label
   expect_error(
-    get_stopout(make_stopout_students(), bad_pop, opt = list(min_n = 1)),
+    get_stopout(make_stopout_students(), bad_pop, opt = list(min_n = 1),
+                student_terms = make_stopout_terms()),
     "population_label"
   )
 })
@@ -461,6 +500,7 @@ test_that("get_stopout respects opt$min_n threshold", {
   # min_n=10 should exclude BIOL 2310 (only 6 cohort students)
   result <- get_stopout(
     make_stopout_students(),
+    student_terms = make_stopout_terms(),
     make_stopout_population(),
     opt = list(min_n = 10)
   )
@@ -478,12 +518,12 @@ test_that("get_stopout respects opt$min_n threshold", {
 # from other departments.
 
 test_that("subject_code restricts get_stopout to those prefixes", {
-  all_courses <- get_stopout(make_stopout_students(), make_stopout_population(),
+  all_courses <- get_stopout(make_stopout_students(), make_stopout_population(), student_terms = make_stopout_terms(),
                              opt = list(min_n = 5, min_dfw_n = 2))$by_course
   skip_if(nrow(all_courses) == 0, "fixture produced no qualifying courses")
 
   prefix <- sub(" .*", "", all_courses$subject_course[[1]])
-  scoped <- get_stopout(make_stopout_students(), make_stopout_population(),
+  scoped <- get_stopout(make_stopout_students(), make_stopout_population(), student_terms = make_stopout_terms(),
                         opt = list(min_n = 5, min_dfw_n = 2,
                                    subject_code = prefix))$by_course
 
@@ -492,10 +532,10 @@ test_that("subject_code restricts get_stopout to those prefixes", {
 })
 
 test_that("an empty or NULL subject_code means every subject", {
-  base <- get_stopout(make_stopout_students(), make_stopout_population(),
+  base <- get_stopout(make_stopout_students(), make_stopout_population(), student_terms = make_stopout_terms(),
                       opt = list(min_n = 5, min_dfw_n = 2))$by_course
   for (val in list(NULL, character(0))) {
-    out <- get_stopout(make_stopout_students(), make_stopout_population(),
+    out <- get_stopout(make_stopout_students(), make_stopout_population(), student_terms = make_stopout_terms(),
                        opt = list(min_n = 5, min_dfw_n = 2, subject_code = val))$by_course
     expect_equal(nrow(out), nrow(base))
   }
@@ -516,7 +556,7 @@ test_that("get_dfw_rates honours the same subject scope", {
 })
 
 test_that("a subject with no courses yields an empty result, not an error", {
-  out <- get_stopout(make_stopout_students(), make_stopout_population(),
+  out <- get_stopout(make_stopout_students(), make_stopout_population(), student_terms = make_stopout_terms(),
                      opt = list(min_n = 5, min_dfw_n = 2,
                                 subject_code = "ZZZZ"))$by_course
   expect_equal(nrow(out), 0)
@@ -529,7 +569,7 @@ test_that("stopout and DFW context keep campus-course cohorts separate", {
   )
 
   stopout <- suppressMessages(get_stopout(
-    test_students_mc, population, opt = list(min_n = 1L, min_dfw_n = 0L)
+    test_students_mc, student_terms = test_student_terms_mc, population, opt = list(min_n = 1L, min_dfw_n = 0L)
   ))$by_course
   rates <- suppressMessages(get_dfw_rates(
     test_students_mc, population, opt = list(min_n = 1L, min_dfw_n = 0L)
@@ -557,7 +597,8 @@ roadblocks_options <- function() {
 }
 
 test_that("Roadblocks uses mutually exclusive first-outcome groups for every statistic", {
-  result <- get_stopout(test_students_roadblocks, roadblocks_population(), opt = roadblocks_options())
+  result <- get_stopout(test_students_roadblocks, roadblocks_population(), opt = roadblocks_options(),
+                        student_terms = test_student_terms_roadblocks)
   row <- result$by_course %>% filter(campus == "ABQ", subject_course == "ECON 100")
   expect_equal(row$pop_n_pass, 5L)
   expect_equal(row$pop_n_dfw, 5L)
@@ -589,12 +630,13 @@ test_that("Roadblocks uses mutually exclusive first-outcome groups for every sta
 test_that("Roadblocks raw and saved paths ignore row order and repeated extract rows", {
   students <- test_students_roadblocks
   opt <- roadblocks_options()
-  raw <- get_stopout(students, roadblocks_population(), opt = opt)
+  raw <- get_stopout(students, roadblocks_population(), opt = opt,
+                     student_terms = test_student_terms_roadblocks)
   saved <- classify_outcomes(students) %>% mutate(level = "lower")
   saved <- bind_rows(saved, saved) %>% arrange(desc(term), desc(outcome))
   attr(saved, "cedar_outcome_policy_version") <- CEDAR_OUTCOME_POLICY_VERSION
   cached <- get_stopout(NULL, roadblocks_population(), opt = opt,
-    cedar_grades = saved, cedar_next_term = build_next_term_lookup(students))
+    cedar_grades = saved, student_terms = test_student_terms_roadblocks)
   expect_equal(cached$by_course, raw$by_course)
   expect_equal(cached$term_range, raw$term_range)
   expect_equal(cached$observation_info$n_ambiguous, 1L)
@@ -606,17 +648,20 @@ test_that("Roadblocks selects after term scope and both observation edges", {
   opt <- roadblocks_options()
   opt$term <- 202080L
   opt$observation_end_term <- 202080L
-  empty <- get_stopout(test_students_roadblocks, roadblocks_population(), opt = opt)
+  empty <- get_stopout(test_students_roadblocks, roadblocks_population(), opt = opt,
+                       student_terms = test_student_terms_roadblocks)
   expect_equal(nrow(empty$by_course), 0L)
   opt$observation_end_term <- 202110L
-  result <- get_stopout(test_students_roadblocks, roadblocks_population(), opt = opt)
+  result <- get_stopout(test_students_roadblocks, roadblocks_population(), opt = opt,
+                       student_terms = test_student_terms_roadblocks)
   row <- result$by_course %>% filter(subject_course == "ECON 100")
   expect_equal(row$pop_n_pass, 2L) # P06 and P11 first within THIS scope
   expect_equal(row$pop_n_dfw, 1L) # P01
   expect_equal(result$observation_info$n_ambiguous, 0L)
   opt$min_n <- 11L
   opt$term <- NULL
-  suppressed <- get_stopout(test_students_roadblocks, roadblocks_population(), opt = opt)
+  suppressed <- get_stopout(test_students_roadblocks, roadblocks_population(), opt = opt,
+                       student_terms = test_student_terms_roadblocks)
   expect_equal(nrow(suppressed$by_course), 0L) # P11 cannot satisfy threshold
   expect_equal(suppressed$observation_info$n_ambiguous, 1L)
 })
@@ -635,7 +680,7 @@ test_that("Roadblocks retains completion correction and full-history returns aft
   grades <- apply_pathways_population_window(grades, pop, analysis_through = 202110L)
   result <- get_stopout(NULL, pop, degrees = test_degrees_roadblocks,
     opt = roadblocks_options(), cedar_grades = grades,
-    cedar_next_term = build_next_term_lookup(test_students_roadblocks))
+    student_terms = test_student_terms_roadblocks)
   row <- result$by_course %>% filter(campus == "ABQ", subject_course == "ECON 100")
   expect_equal(row$pop_n_dfw, 5L)
   expect_equal(row$pop_dfw_rate, .5)
@@ -646,7 +691,8 @@ test_that("Roadblocks retains completion correction and full-history returns aft
 
 test_that("Roadblocks reports invalid-only input without inventing a term range", {
   result <- get_stopout(test_students_roadblocks %>% filter(is.na(student_id)),
-                        roadblocks_population(), opt = roadblocks_options())
+                        roadblocks_population(), opt = roadblocks_options(),
+                        student_terms = test_student_terms_roadblocks)
   expect_equal(nrow(result$by_course), 0L)
   expect_equal(result$observation_info$n_invalid, 1L)
   expect_equal(result$observation_info$n_selected, 0L)
