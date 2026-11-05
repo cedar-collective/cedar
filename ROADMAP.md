@@ -311,9 +311,17 @@ Plan: [ADR-002](docs/developers/adr-002-explicit-mapping-files.md).
 
 ### 2. Domain-shaped data model (ADR-001)
 
-- [ ] Plan the long-term move from report-shaped `cedar_*` tables toward
-  domain-shaped facts and dimensions; ADR-002's unit dimension is the first
-  piece.
+- [x] Step 1, `cedar_terms`: the term dimension with the right edges as flags.
+- [x] Step 2, `cedar_student_terms`: one row per student-term, one definition
+  of enrolled and returned, every description read off it (closed 2026-11-04;
+  the per-reader measurements are in `docs/developers/student-terms.md`).
+- [ ] Step 3, dimensions from the mapping files: the shared loader and `dims`
+  object, `attach_unit(rows, dims, hierarchy)`, readers moved one PR at a
+  time, then the stamped columns and the deploy gate retire. Design written
+  in full in [ADR-001](docs/developers/adr-001-domain-data-model.md#step-3-in-full-dimensions-and-how-data-reaches-a-cone).
+- [ ] Steps 4 and 5: `cedar_courses` with a stable id (I37, I45) and the
+  course-term and attempt measures; then thin `cedar_students` and
+  `cedar_programs` to keys and facts (closes I47).
 
 ### 3. Operational monitoring
 
