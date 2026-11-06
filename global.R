@@ -196,6 +196,16 @@ for (key in names(cedar_files)) {
   )
 }
 
+# ── Dimensions and the default unit (ADR-001 step 3) ─────────────────────────
+# The mapping files are the dimension tables, read at every start; the default
+# unit columns (department, college, dept_code, college_code) are attached
+# here, so a mapping edit changes the next start and rebuilds nothing. While
+# the transform still stamps the same columns, the loader drops its copy
+# first, and the result is identical to the row.
+cedar_dims <- build_cedar_dims()
+data_objects <- attach_default_units(data_objects, cedar_dims)
+data_objects[["cedar_dims"]] <- cedar_dims
+
 message("[global.R] Data loading complete. Validating CEDAR data structure...")
 
 # Validate critical CEDAR datasets

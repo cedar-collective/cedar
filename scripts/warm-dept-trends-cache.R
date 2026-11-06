@@ -97,6 +97,12 @@ if (exists("cedar_min_term", inherits = TRUE)) {
   }
 }
 
+# The default unit columns, attached at load as global.R attaches them, so the
+# cache the app reads was built on the same units (ADR-001 step 3).
+cedar_dims <- build_cedar_dims()
+data_objects <- attach_default_units(data_objects, cedar_dims)
+data_objects[["cedar_dims"]] <- cedar_dims
+
 lookups <- data_objects[["cedar_lookups"]]
 if ("major_code_to_name" %in% names(lookups)) {
   major_code_to_name <- lookups$major_code_to_name

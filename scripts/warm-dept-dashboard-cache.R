@@ -89,6 +89,12 @@ if (exists("cedar_min_term", inherits = TRUE)) {
   }
 }
 
+# The default unit columns, attached at load as global.R attaches them, so the
+# cache the app reads was built on the same units (ADR-001 step 3).
+cedar_dims <- build_cedar_dims()
+data_objects <- attach_default_units(data_objects, cedar_dims)
+data_objects[["cedar_dims"]] <- cedar_dims
+
 # The same edges global.R computes, so the cache keys match what the app asks for.
 report_edges <- cedar_report_edges(data_objects[["cedar_students"]])
 cedar_edges <- report_edges$edges

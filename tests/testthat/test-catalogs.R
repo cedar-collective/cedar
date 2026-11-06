@@ -928,3 +928,149 @@ test_that("the mapping provenance covers the text-map files", {
     expect_true(any(endsWith(files, f)), info = f)
   }
 })
+
+# ── Dimensions and attach_unit() (ADR-001 step 3) ────────────────────────────
+# The mapping files are read as dimension tables and the default unit is
+# attached at load, under the names every reader has always read. These tests
+# guard the one function that resolves a unit and the two rules it wraps.
+
+demo_dims <- function() {
+  build_cedar_dims(read_institution_mappings(cedar_institution_dir(cedar_base_dir, "demo")))
+}
+
+test_that("dims wraps the validated mapping files, and refuses anything else", {
+  dims <- demo_dims()
+  expect_s3_class(dims, "cedar_dims")
+  expect_setequal(names(dims), c("colleges", "units", "subjects", "programs", "settings"))
+  expect_error(validate_cedar_dims(unclass(dims)), "build_cedar_dims")
+  expect_error(build_cedar_dims(unclass(dims)[c("units", "colleges")]), "missing mapping table")
+  broken <- dims; broken$units$unit_name <- NULL
+  expect_error(validate_cedar_dims(broken), "dims\\$units lacks column")
+})
+
+test_that("attach_unit() reproduces the subject rule under the readers' column names", {
+  dims <- demo_dims()
+  # The designed sections as the fact table keeps them: subject, the source's
+  # college and the level are keys; the unit columns are what attach adds.
+  rows <- test_sections %>% select(-department) %>% rename(source_college = college)
+  got <- attach_unit(rows, dims, "subject", keys = c(subject = "subject"))
+  expect_equal(got$department, test_sections$department)
+  expect_true(all(got$college_basis == "mapped"))
+  expect_equal(got$college, dims$units$college_code[match(got$department, dims$units$unit_code)])
+  # Scaffolding. GEOG is Geography and Environmental Studies' (GES) in the
+  # demo files, so a unit is never the subject's own code; ZZZZ has no row, so
+  # NA with the source's college translated and labelled; an unknown source
+  # college with no row has nothing. Reintroducing the self-named fallback
+  # (EC-14) fails the first; a unit read off the subject fails it too.
+  probe <- rows[1:3, ] %>%
+    mutate(subject = c("GEOG", "ZZZZ", "ZZZZ"),
+           source_college = c("STEM", "STEM", "Nowhere"), level = "lower")
+  got <- attach_unit(probe, dims, "subject", keys = c(subject = "subject"))
+  expect_equal(got$department, c("GES", NA, NA))
+  expect_equal(got$college, c("AS", "AS", NA))
+  expect_equal(got$college_basis, c("mapped", "banner", NA))
+  # The class list keys on subject_code by default.
+  cl <- test_students %>% select(-department) %>% rename(source_college = college)
+  expect_equal(attach_unit(cl, dims, "subject")$department, test_students$department)
+  # Refuses rows missing a key, rows already carrying an output column, and
+  # an override that names nothing the rule reads or writes.
+  expect_error(attach_unit(select(rows, -level), dims, "subject", keys = c(subject = "subject")),
+               "lack key column\\(s\\) level")
+  expect_error(attach_unit(mutate(rows, department = "x"), dims, "subject", keys = c(subject = "subject")),
+               "already carry department")
+  expect_error(attach_unit(rows, dims, "subject", keys = c(subj = "subject")), "unknown keys subj")
+  expect_error(attach_unit(rows, dims, "subject", keys = c(subject = "subject"), cols = c(dept = "d")),
+               "unknown cols dept")
+  # Another hierarchy writes its own names, never the defaults.
+  other <- attach_unit(test_sections, dims, "subject",
+                       keys = c(subject = "subject", college = "college"),
+                       cols = c(unit = "subject_unit", college = "subject_college", basis = "subject_basis"))
+  expect_equal(other$subject_unit, test_sections$department)
+  expect_equal(other$department, test_sections$department)
+})
+
+test_that("attach_unit() reproduces the program rule, and a student's college follows the primary major", {
+  # Scaffolding institution: HIST and CRIM (SOCI, but CJUS at the branch
+  # college AD), BCHM owned by HIST but credited to AD, its pre-major FBCH,
+  # and UNDC that nothing owns but University-College-like AS reports.
+  programs <- rbind(
+    program_rows("HIST"),
+    program_rows("CRIM", unit_code = "SOCI"),
+    program_rows("CRIM", unit_code = "CJUS", in_college = "AD", basis = "override"),
+    program_rows("BCHM", college_code = "AD"),
+    program_rows("FBCH", is_pre_major = "TRUE", leads_to = "BCHM"),
+    program_rows("UNDC", unit_code = "", basis = "no_unit", college_code = "AS"))
+  dims <- build_cedar_dims(read_institution_mappings(
+    do.call(write_mapping_dir, c(one_unit, list(programs = programs)))))
+  # Declarations, as cedar_programs keeps them: the code, academic studies'
+  # Translated College (source_college) and Actual College as a code
+  # (source_college_code). Expected values, row by row, beside each student.
+  decl <- tibble::tribble(
+    ~student_id, ~term,   ~program_type,         ~major_code, ~source_college,     ~source_college_code,
+    # S1: a decided major; the minor and the concentration take its college,
+    # the concentration its unit too.
+    "S1",        202080L, "Major",               "HIST",      "Arts and Sciences", "AS",
+    "S1",        202080L, "First Minor",         "CRIM",      "Arts and Sciences", "AS",
+    "S1",        202080L, "First Concentration", "HISC",      "Arts and Sciences", "AS",
+    # S2: an undecided major; the student's college is Banner's, labelled,
+    # on the decided minor too. CRIM at AD is CJUS.
+    "S2",        202080L, "Major",               "NOPE",      "Branch Campuses",   "AD",
+    "S2",        202080L, "First Minor",         "CRIM",      "Branch Campuses",   "AD",
+    # S3: nothing owns UNDC, but the file names its college.
+    "S3",        202080L, "Major",               "UNDC",      "Branch Campuses",   "AD",
+    # S4: a minor and no major: no primary, so Banner's college.
+    "S4",        202080L, "First Minor",         "CRIM",      "Arts and Sciences", "AS",
+    # S5: BCHM's own college, not its unit's.
+    "S5",        202080L, "Major",               "BCHM",      "Arts and Sciences", "AS",
+    # S6: a pre-major follows its target's college; no source college at all.
+    "S6",        202080L, "Major",               "FBCH",      NA,                  NA,
+    # S7: undecided, and a source college no file names: nothing, labelled nothing.
+    "S7",        202080L, "Major",               "NOPE",      "Nowhere",           NA,
+    # S8: two majors; the primary is the first by code (BCHM before HIST).
+    "S8",        202080L, "Major",               "HIST",      "Arts and Sciences", "AS",
+    "S8",        202080L, "Second Major",        "BCHM",      "Arts and Sciences", "AS",
+    "S8",        202080L, "Major",               "BCHM",      "Arts and Sciences", "AS")
+  got <- attach_program_units(decl, dims)
+  expect_equal(got$dept_code,
+               c("HIST", "SOCI", "HIST",  NA, "CJUS",  NA,  "SOCI", "HIST", "HIST", NA, "HIST", "HIST", "HIST"))
+  expect_equal(got$program_college,
+               c("AS",   "AS",   "AS",    NA, "AD",    "AS", "AS",  "AD",   "AD",   NA, "AS",   "AD",   "AD"))
+  expect_equal(got$college_code,
+               c("AS",   "AS",   "AS",    "AD", "AD",  "AS", "AS",  "AD",   "AD",   NA, "AD",   "AD",   "AD"))
+  expect_equal(got$college_basis,
+               c("mapped", "mapped", "mapped", "banner", "banner", "mapped", "banner", "mapped", "mapped", NA,
+                 "mapped", "mapped", "mapped"))
+  expect_equal(got$student_college[c(1, 4, 6, 8, 10)],
+               c("Arts and Sciences", "Branch", "Arts and Sciences", "Branch", NA))
+  expect_false(any(grepl("^\\.", names(got))))
+  # Degrees: keyed on the Actual College, with the Translated College
+  # preferred for the Banner label; college and student_college are names.
+  awards <- tibble::tribble(
+    ~student_id, ~term,   ~major_code, ~source_college,     ~source_student_college,
+    "S5",        202110L, "BCHM",      "Arts and Sciences", "AS",
+    "S2",        202110L, "NOPE",      "Arts and Sciences", "ED",
+    "S9",        202110L, "CRIM",      NA,                  "ED")
+  got <- attach_degree_units(awards, dims)
+  expect_equal(got$dept_code, c("HIST", NA, "CJUS"))
+  expect_equal(got$college_code, c("AD", "AS", "AD"))
+  expect_equal(got$college_basis, c("mapped", "banner", "mapped"))
+  expect_equal(got$college, c("Branch", "Arts and Sciences", "Branch"))
+  expect_equal(got$student_college, got$college)
+})
+
+test_that("attach_default_units() replaces whatever a file stamped and keeps the table's attributes", {
+  dims <- demo_dims()
+  stamped <- test_sections %>%
+    mutate(source_college = college, department = "WRONG", college = "WRONG", college_basis = "x")
+  attr(stamped, "cedar_mapping_provenance") <- list(combined = "abc")
+  objs <- suppressMessages(attach_default_units(
+    list(cedar_sections = stamped, cedar_degrees = tibble::tibble()), dims))
+  expect_equal(objs$cedar_sections$department, test_sections$department)
+  expect_true(all(objs$cedar_sections$college %in% dims$colleges$college_code))
+  expect_equal(attr(objs$cedar_sections, "cedar_mapping_provenance"), list(combined = "abc"))
+  expect_setequal(names(objs$cedar_sections), c(names(test_sections), "source_college", "college_basis"))
+  # A table that is not loaded is left alone, and said so.
+  expect_equal(ncol(objs$cedar_degrees), 0L)
+  expect_message(attach_default_units(list(cedar_students = NULL), dims), "cedar_students is not loaded")
+  expect_error(attach_default_units(list(cedar_sections = stamped), unclass(dims)), "build_cedar_dims")
+})
