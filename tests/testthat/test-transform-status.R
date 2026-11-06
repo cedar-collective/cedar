@@ -20,6 +20,9 @@ scaffold_mapping_files <- function(programs = NULL) {
     subjects = data.frame(subject_code = "HIST", in_college = "", in_level = "", unit_code = "HIST",
                           college_code = "", status = "confirmed", evidence = "", notes = ""),
     programs = programs,
+    code_history = as.data.frame(stats::setNames(
+      rep(list(character()), length(CEDAR_MAPPING_FILE_SPECS$code_history)),
+      CEDAR_MAPPING_FILE_SPECS$code_history)),
     settings = data.frame(setting = character(), value = character())
   )
 }

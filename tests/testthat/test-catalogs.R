@@ -109,7 +109,7 @@ subject_rows <- function(subject_code, unit_code = "HIST", in_college = "AS", in
 }
 
 write_mapping_dir <- function(colleges, units, subjects, programs = program_rows("X")[0, ],
-                              settings = unm_settings) {
+                              settings = unm_settings, code_history = history_rows("X", "Y")[0, ]) {
   dir <- tempfile("institution-")
   dir.create(dir)
   utils::write.csv(colleges, file.path(dir, "colleges.csv"), row.names = FALSE)
@@ -117,7 +117,15 @@ write_mapping_dir <- function(colleges, units, subjects, programs = program_rows
   utils::write.csv(subjects, file.path(dir, "subjects.csv"), row.names = FALSE)
   utils::write.csv(programs, file.path(dir, "programs.csv"), row.names = FALSE)
   utils::write.csv(settings, file.path(dir, "settings.csv"), row.names = FALSE)
+  utils::write.csv(code_history, file.path(dir, "code_history.csv"), row.names = FALSE)
   dir
+}
+
+# Scaffolding: code_history.csv rows, defaults filled in.
+history_rows <- function(from_code, to_code, kind = "course", effective_term = "202080",
+                         scope = "", basis = "catalog", status = "confirmed") {
+  data.frame(kind, from_code, to_code, effective_term, scope, basis, status,
+             evidence = "", notes = "")
 }
 
 one_unit <- list(
@@ -934,7 +942,7 @@ demo_dims <- function() {
 test_that("dims wraps the validated mapping files, and refuses anything else", {
   dims <- demo_dims()
   expect_s3_class(dims, "cedar_dims")
-  expect_setequal(names(dims), c("colleges", "units", "subjects", "programs", "settings"))
+  expect_setequal(names(dims), c("colleges", "units", "subjects", "programs", "code_history", "settings"))
   expect_error(validate_cedar_dims(unclass(dims)), "build_cedar_dims")
   expect_error(build_cedar_dims(unclass(dims)[c("units", "colleges")]), "missing mapping table")
   broken <- dims; broken$units$unit_name <- NULL
@@ -1070,4 +1078,43 @@ test_that("attach_default_units() replaces whatever a file stamped and keeps the
   expect_equal(ncol(objs$cedar_degrees), 0L)
   expect_message(attach_default_units(list(cedar_students = NULL), dims), "cedar_students is not loaded")
   expect_error(attach_default_units(list(cedar_sections = stamped), unclass(dims)), "build_cedar_dims")
+})
+
+test_that("the code-history validator reports every problem at once", {
+  history <- rbind(
+    history_rows("SOCI 371", "SOCI 371"),                                  # a code does not succeed itself
+    history_rows("MATH 120", "MATH 1215"), history_rows("MATH 120", "MATH 1215"),  # duplicate
+    history_rows("MATH 121", "MATH 1220"), history_rows("MATH 121", "MATH 1230"),  # a confirmed split
+    history_rows("MATH 122", "MATH 1240", status = "proposed"),           # ...a proposed one is fine
+    history_rows("MATH 122", "MATH 1250", status = "proposed"),
+    history_rows("PSY", "PSYC", kind = "subject", scope = "undergraduate"),# scope on a subject row
+    history_rows("ALB", "ALBS", kind = "subject", effective_term = "2020"),# not a term code
+    history_rows("A", "B", kind = "subject"), history_rows("B", "A", kind = "subject"),  # a cycle
+    history_rows("soci 371", "SOCI 3710"),                                # a lower-case code
+    history_rows("RADS", "FRAD", kind = "major", basis = "vibes", status = "maybe")
+  )
+  dir <- do.call(write_mapping_dir, c(one_unit, list(code_history = history)))
+  err <- tryCatch(read_institution_mappings(dir), error = conditionMessage)
+  expect_match(err, "a code does not succeed itself: course SOCI 371 -> SOCI 371")
+  expect_match(err, "duplicate succession course MATH 120 -> MATH 1215")
+  expect_match(err, "a confirmed course code succeeds to more than one code \\(a split cannot give it one id\\): MATH 121")
+  expect_false(grepl("MATH 122", err))
+  expect_match(err, "scope must be blank on a subject or course row .*: subject PSY -> PSYC")
+  expect_match(err, "effective_term must be a term code YYYYSS \\(SS = 10, 60 or 80\\): 2020")
+  expect_match(err, "confirmed subject successions form a cycle, starting at: A, B")
+  expect_match(err, "a course row's codes must look like SOCI 371: course soci 371 -> SOCI 3710")
+  expect_match(err, "unknown kind major")
+  expect_match(err, "unknown basis vibes")
+  expect_match(err, "unknown status maybe")
+})
+
+test_that("the demo and UNM code histories load, and every confirmed subject rename is section-evidenced", {
+  demo <- read_institution_mappings(cedar_institution_dir(cedar_base_dir, "demo"))$code_history
+  expect_true(all(c("subject", "course") %in% demo$kind))
+  expect_true(any(demo$status == "proposed"))
+  unm <- read_institution_mappings(cedar_institution_dir(cedar_base_dir, "unm"))$code_history
+  confirmed_subjects <- unm[unm$kind == "subject" & unm$status == "confirmed", ]
+  expect_gt(nrow(confirmed_subjects), 0)
+  expect_true(all(confirmed_subjects$basis == "section_crn"))
+  expect_true(all(nzchar(unm$evidence)))
 })

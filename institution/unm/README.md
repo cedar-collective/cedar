@@ -15,6 +15,7 @@ and the generated [2026–2027 rules](shared_requirements/2026-2027/RULES.md).
 | `units.csv` | unit (department) | `unit_code`, `unit_name`, `college_code`, `kind`, `notes` |
 | `subjects.csv` | course subject, optionally within a section college or level | `subject_code`, `in_college`, `in_level`, `unit_code`, `college_code`, `status`, `evidence`, `notes` |
 | `programs.csv` | program code (optionally within a college) | `program_code`, `in_college`, `program_name`, `unit_code`, `college_code`, `is_pre_major`, `leads_to`, `basis`, `status`, `evidence`, `notes` |
+| `code_history.csv` | a code that replaced another (a subject, a course or a program) | `kind`, `from_code`, `to_code`, `effective_term`, `scope`, `basis`, `status`, `evidence`, `notes` |
 | `source_departments.csv` | department name as Banner exports it | `source_name`, `unit_code`, `kind`, `notes` |
 | `settings.csv` | institution setting | `setting`, `value` |
 | `campuses.csv` | campus code | `campus_code`, `campus_name`, `kind`, `default_scope` |
@@ -119,9 +120,8 @@ class lists for `subjects.csv`, all four for `units.csv` or `colleges.csv`.
     program code, so `FFCS` → `FCS` named the wrong degree. Check the target's
     row: the same unit and a matching name.
   - **Not history.** A code that replaced another (BIS by BISI, course subject
-    `ALB` by `ALBS`) is lineage. Record it in `notes` until `code_history.csv`
-    exists (ROADMAP, "Code history"), and never point `leads_to` at a successor
-    to stand in for a degree with no code.
+    `ALB` by `ALBS`) is lineage: a `code_history.csv` row. Never point
+    `leads_to` at a successor to stand in for a degree with no code.
   - What reads it: a pre-major's college, when its target sets its own
     `college_code`; the mapping assistant, which gives a pre-major its target's
     unit (`basis = inherited`); and the named population groups in Pathways and projections, which count a
@@ -173,6 +173,39 @@ beside `Film and Digital Arts`).
   (college-wide)". A college-wide unit is never named with the bare college
   code, which already means the college (as `ME` means the School of Medicine,
   not the Mechanical Engineering unit).
+
+## code_history.csv
+
+One row per succession: which code replaced which, and from when.
+
+- **`kind`:** `subject` when every course of the subject kept its number
+  (`SOC 371` became `SOCI 371`), `course` when one course was renumbered
+  (`MGMT 340` became `ACCT 3401`), `program` for a program code. A chain may
+  mix kinds: `SOC 250` takes the subject's rename to `SOCI 250`, then that
+  course's renumbering to `SOCI 2315`, and reads as one course throughout.
+- **`effective_term`:** the first term the new code was in use, a six-digit
+  term code. **`scope`:** blank for a whole succession. A `program` row may
+  describe a partial one in words (undergraduate `PHRD` to `FPHS`); a
+  `subject` or `course` row may not, because the course dimension follows
+  whole successions only.
+- **`basis`:** `section_crn` (the same section carries the old code on the
+  schedule and the new one on the class list, as Banner back-applies a subject
+  rename: the strongest evidence), `title_match` (the old code's title
+  reappears under the new code after the old one retired everywhere),
+  `catalog`, or `decided` with the reason in `notes`.
+- **`status`:** only `confirmed` subject and course rows reach the course
+  dimension (`course_id` on every section and class-list row, ADR-001 step 4).
+  A `proposed` row is a candidate from the screen, assigns nothing, and waits
+  for a person: confirm it, correct it, or delete it. New candidates come from
+  `scripts/propose-code-history.R --write`, which appends proposed rows with
+  their evidence and never touches an existing row. A subject whose courses
+  were renumbered one by one arrives as course rows; one subject row may
+  replace them.
+- **An annotation, never a rewrite.** `subject_course` on every saved row stays
+  as the source wrote it; the dimension adds `course_id` beside it at load.
+  A code with two successors (a split) cannot be recorded: one code cannot
+  have two ids, and the validator refuses it. `program` rows are validated and
+  not yet read; Admin > Mappings will show them (ROADMAP, "Code history").
 
 ## Working through decisions
 

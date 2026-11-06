@@ -297,12 +297,16 @@ Plan: [ADR-002](docs/developers/adr-002-explicit-mapping-files.md).
     in program, degree, and class-list rows, read against the data edges (a code
     in the first term was in use "since before" it) — never stored, because it
     would go stale at every refresh.
-  - *Which replaced which* is recorded, because the data can only suggest it: a
-    new `code_history.csv` (`kind`, `from_code`, `to_code`, `effective_term`,
-    `scope`, `basis`, `evidence`, `notes`), one row per succession, so partial
-    successions (undergraduate `PHRD` → `FPHS`) and splits (`RADS` → `RADS` +
-    `FRAD`) fit. An annotation only: it never rewrites old rows to the new code.
-    `CEDAR_DATA_SEMANTICS` keeps explaining what a code *meant*.
+  - *Which replaced which* is recorded, because the data can only suggest it:
+    `code_history.csv` (`kind`, `from_code`, `to_code`, `effective_term`,
+    `scope`, `basis`, `status`, `evidence`, `notes`), one row per succession,
+    exists since 2026-11-06 (ADR-001 step 4) and is read for subjects and
+    courses; its `program` rows are validated and await this page. A partial
+    program succession (undergraduate `PHRD` → `FPHS`) is a `program` row with
+    a `scope`; a split (`RADS` → `RADS` + `FRAD`) is two `program` rows, which
+    the course dimension would refuse for a course. An annotation only: it
+    never rewrites old rows to the new code. `CEDAR_DATA_SEMANTICS` keeps
+    explaining what a code *meant*.
   - A screen proposes candidates for review: course numbers carried across a
     prefix change (`ALB 450` → `ALBS 450`), or a code that stops as a same-unit
     code starts (`FING` → `FINN`). Timing alone confirms nothing — FING's last
@@ -327,6 +331,14 @@ Plan: [ADR-002](docs/developers/adr-002-explicit-mapping-files.md).
 - [ ] Steps 4 and 5: `cedar_courses` with a stable id (I37, I45) and the
   course-term and attempt measures; then thin `cedar_students` and
   `cedar_programs` to keys and facts (closes I47).
+  Step 4 PR 1 (2026-11-06): `cedar_courses` / `cedar_course_codes` built at
+  load from `code_history.csv` and `course_id` attached to sections and class
+  lists; UNM's file carries the three section-evidenced subject renames
+  confirmed and 320 title-matched renumberings proposed. Next: the schedule
+  history lookups read `course_id` (I36's renumbered rows show their old
+  offerings), then `cedar_course_terms` and `cedar_attempts` keyed on it.
+  Design in full in
+  [ADR-001](docs/developers/adr-001-domain-data-model.md#step-4-in-full-the-course-dimension-and-what-follows-it).
 
 ### 3. Operational monitoring
 

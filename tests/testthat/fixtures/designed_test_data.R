@@ -254,6 +254,22 @@
 #   own dept_code it is: ASPE has 2 majors, ENG 3. Matching by program name
 #   gave ASPE all 5 (ISSUES I15).
 #
+# RN01 (separate cedar_sections_rn / cedar_students_rn tables, read with
+#   institution/demo/code_history.csv): course codes that succeed one another,
+#   for the course dimension (ADR-001 step 4). Eleven codes, seven courses.
+#   SOC 371 (Spring 2020, section RN01A) is SOCI 371 on its class list and on
+#     the Fall 2020 schedule: the subject rename, confirmed. SOCI 371's history
+#     starts Spring 2020, not Fall 2020 (I45 in miniature).
+#   SOC 250 -> SOCI 250 (the subject rename) -> SOCI 2315 (a confirmed
+#     renumbering, Spring 2021): a two-step chain. Three codes, one course,
+#     "Social Problems", Spring 2020 to Spring 2021.
+#   HIST 320 (Spring and Fall 2020) -> HIST 3201 (Spring 2021), confirmed.
+#   PHIL 150 (Spring 2020) and PHIL 1115 (Fall 2020), "Introduction to Logic":
+#     a PROPOSED row, so two courses until someone confirms it; the screen's
+#     title_match candidate.
+#   SOCI 2120 is on a class list and never on the schedule (in_sections FALSE).
+#   LING 2110 is offered twice under one code: the control.
+#
 # EC-15 (separate cedar_sections_xl_switch / cedar_students_xl_switch tables):
 #   MATH 3750 + CS 3750 share one Spring 2021 ABQ section; MATH 3750 also has
 #   its own. Two students switch from CS to MATH inside the shared section.
@@ -4254,4 +4270,59 @@ cedar_students_xl_switch <- dplyr::bind_rows(
                 "MATH 3750", "ARTS", "MATH", "EC15M2",
                 c("RE", "RE", "DR", "DR"),
                 c("2020-11-02", "2021-01-25", "2021-01-10", "2021-01-22"))
+)
+
+# -----------------------------------------------------------------------------
+# RN01 — course codes that succeed one another (the course dimension, ADR-001
+# step 4). See the header. Sections copy XL0101's shape; every row is a plain
+# ABQ section with no crosslist.
+# -----------------------------------------------------------------------------
+.rn_section <- function(sid, crn_id, trm, course, title, lvl) {
+  cedar_sections %>%
+    dplyr::filter(section_id == "XL0101") %>%
+    dplyr::mutate(
+      section_id = sid, crn = crn_id, term = as.integer(trm), campus = "ABQ",
+      subject = sub(" .*", "", course), course_number = sub(".* ", "", course),
+      subject_course = course, course_title = title, level = lvl,
+      department = subject, college = "ARTS",
+      term_type = dplyr::case_when(term %% 100 == 10 ~ "spring", term %% 100 == 60 ~ "summer",
+                                   TRUE ~ "fall"),
+      enrolled = 2L, total_enrl = 2L, available = capacity - 2L,
+      crosslist_code = NA_character_, crosslist_group = NA_character_,
+      crosslist_role = NA_character_, crosslist_primary = TRUE,
+      crosslist_partners = NA_character_, crosslist_external = NA
+    )
+}
+cedar_sections_rn <- dplyr::bind_rows(
+  .rn_section("RN01-S1",  "RN01A", 202010L, "SOC 371",   "Sociology of Education", "upper"),
+  .rn_section("RN01-S2",  "RN01B", 202080L, "SOCI 371",  "Sociology of Education", "upper"),
+  .rn_section("RN01-S3",  "RN01C", 202010L, "SOC 250",   "Social Problems",        "lower"),
+  .rn_section("RN01-S4",  "RN01D", 202110L, "SOCI 2315", "Social Problems",        "lower"),
+  .rn_section("RN01-S5",  "RN01E", 202010L, "HIST 320",  "Historiography",         "upper"),
+  .rn_section("RN01-S6",  "RN01F", 202080L, "HIST 320",  "Historiography",         "upper"),
+  .rn_section("RN01-S7",  "RN01G", 202110L, "HIST 3201", "Historiography",         "upper"),
+  .rn_section("RN01-S8",  "RN01H", 202010L, "PHIL 150",  "Introduction to Logic",  "lower"),
+  .rn_section("RN01-S9",  "RN01I", 202080L, "PHIL 1115", "Introduction to Logic",  "lower"),
+  .rn_section("RN01-S10", "RN01J", 202010L, "LING 2110", "Language Matters",       "lower"),
+  .rn_section("RN01-S11", "RN01L", 202110L, "LING 2110", "Language Matters",       "lower")
+)
+# The class list carries the renamed subject on the old sections (RN01A and
+# RN01C read SOCI where the schedule reads SOC), as Banner back-applies it.
+.rn_student <- function(ids, term, course, crn_id, title, lvl) {
+  .mc_row(ids, term, course, "ABQ", sub(" .*", "", course)) %>%
+    dplyr::mutate(crn = crn_id, section_id = paste0("RN01-", crn_id),
+                  course_title = title, level = lvl, as_of_date = as.Date("2021-06-01"))
+}
+cedar_students_rn <- dplyr::bind_rows(
+  .rn_student(c("RN01-R1", "RN01-R2"), 202010L, "SOCI 371",  "RN01A", "Sociology of Education", "upper"),
+  .rn_student("RN01-R3",               202080L, "SOCI 371",  "RN01B", "Sociology of Education", "upper"),
+  .rn_student("RN01-R1",               202010L, "SOCI 250",  "RN01C", "Social Problems",        "lower"),
+  .rn_student("RN01-R4",               202110L, "SOCI 2315", "RN01D", "Social Problems",        "lower"),
+  .rn_student("RN01-R2",               202010L, "HIST 320",  "RN01E", "Historiography",         "upper"),
+  .rn_student("RN01-R5",               202110L, "HIST 3201", "RN01G", "Historiography",         "upper"),
+  .rn_student("RN01-R3",               202010L, "PHIL 150",  "RN01H", "Introduction to Logic",  "lower"),
+  .rn_student("RN01-R4",               202080L, "PHIL 1115", "RN01I", "Introduction to Logic",  "lower"),
+  .rn_student("RN01-R5",               202010L, "SOCI 2120", "RN01K", "Social Research",        "lower"),
+  .rn_student("RN01-R1",               202010L, "LING 2110", "RN01J", "Language Matters",       "lower"),
+  .rn_student("RN01-R5",               202110L, "LING 2110", "RN01L", "Language Matters",       "lower")
 )

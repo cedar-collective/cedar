@@ -32,7 +32,12 @@ The three text maps (`program_names.csv`, `program_name_aliases.csv`,
 `source_organizations.csv`) are headers only: the fixtures carry codes, and the
 demo parses no HR report.
 
-Every row is confirmed: the demo has no decisions waiting, so Admin > Mappings
-shows none. A fixture code with no row here would be listed there, as at any
+`code_history.csv` records the RN01 fixtures' successions (`SOC` to `SOCI`,
+`SOCI 250` to `SOCI 2315`, `HIST 320` to `HIST 3201`) and one proposed row
+(`PHIL 150` to `PHIL 1115`), so `tests/testthat/test-courses.R` can show a
+proposed row assigning nothing.
+
+Every unit row is confirmed: the demo has no unit decisions waiting, so Admin >
+Mappings shows none. A fixture code with no row here would be listed there, as at any
 institution. `BUSA` is a program, not a pre-major: the fixtures flag a few BUSA
 rows pre-major, and a flag is stated per code.

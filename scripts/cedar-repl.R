@@ -31,7 +31,8 @@ cedar_dims <- build_cedar_dims()
 
 # Load a local CEDAR table by name, e.g. cedar_read("cedar_students"). A fact
 # table gets its default unit columns attached here, as global.R attaches
-# them (ADR-001 step 3), so an ad-hoc number is on the app's units.
+# them (ADR-001 step 3), so an ad-hoc number is on the app's units; sections
+# and class lists also get course_id (step 4), from the dimension below.
 cedar_read <- function(name) {
   path <- file.path(cedar_data_dir, paste0(name, ".qs"))
   if (!file.exists(path)) stop("[cedar-repl.R] No such data file: ", path)
@@ -39,8 +40,20 @@ cedar_read <- function(name) {
   if (name %in% names(CEDAR_ATTACHED_UNIT_COLUMNS)) {
     tbl <- suppressMessages(attach_default_units(stats::setNames(list(tbl), name), cedar_dims))[[name]]
   }
+  if (name %in% names(CEDAR_ATTACHED_COURSE_COLUMNS)) {
+    tbl <- suppressMessages(attach_course_ids(stats::setNames(list(tbl), name), cedar_courses))[[name]]
+  }
   tbl
 }
+
+# The course dimension, built from the saved sections and class lists on first
+# use (both files are read for it, whichever table was asked for), as
+# global.R builds it. cedar_courses$courses and cedar_courses$codes are the
+# two tables the app holds as cedar_courses and cedar_course_codes.
+delayedAssign("cedar_courses", {
+  raw <- function(name) qs2::qs_read(file.path(cedar_data_dir, paste0(name, ".qs")))
+  build_cedar_courses(raw("cedar_sections"), raw("cedar_students"), cedar_dims)
+})
 
 # Tables load lazily so sourcing remains fast when only one is needed.
 for (.nm in c("cedar_students", "cedar_programs", "cedar_degrees",

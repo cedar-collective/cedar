@@ -154,7 +154,7 @@ after the fact. It drops the student-term and section descriptions.
 | table | grain | source | what moves here |
 |---|---|---|---|
 | `cedar_terms` | term | derived from the data once per load | season, academic year, next/previous regular term, start and census dates, and the four right edges as flags (`is_settled`, `is_graded`, `is_latest_enrolled`, `has_degrees`) |
-| `cedar_courses` | course id | the DESR plus a renaming crosswalk | a **stable id** per course; the display code (`SOCI 371`) is an attribute with effective terms, so a renamed or renumbered course keeps one history (I37, I45) |
+| `cedar_courses` | course id | the sections, the class lists and `code_history.csv` | a **stable id** per course: the last code of its confirmed succession chain, so a renamed or renumbered course keeps one history (I37, I45); the codes it has carried are `cedar_course_codes`. Built 2026-11-06 (step 4, PR 1); written out [below](#step-4-in-full-the-course-dimension-and-what-follows-it) |
 | `cedar_subjects` | subject × college × level | `subjects.csv` | subject → unit → college, read as a table instead of stamped |
 | `cedar_program_catalog` | program code × college | `programs.csv` | program → unit, `is_pre_major`, `leads_to` |
 | `cedar_units`, `cedar_colleges`, `cedar_campuses` | code | `units.csv`, `colleges.csv`, `campuses.csv` | names, home college, aliases |
@@ -256,7 +256,9 @@ Each step is additive until its last sub-step, so the app runs throughout.
    [below](#step-3-in-full-dimensions-and-how-data-reaches-a-cone).
 4. **`cedar_courses` with a stable id and renaming crosswalk** (I37, I45),
    then `cedar_course_terms` promoted from `cedar_cl_enrls_base` and
-   `cedar_attempts` from `cedar_grades`.
+   `cedar_attempts` from `cedar_grades`. **PR 1 done 2026-11-06:** the
+   dimension and `course_id` at load, no reader changed. Written out
+   [below](#step-4-in-full-the-course-dimension-and-what-follows-it).
 5. **Thin `cedar_students` and `cedar_programs`** to their keys and
    registration facts; rename to the fact names once no reader uses the old
    columns.
@@ -441,6 +443,94 @@ table, both measured in the first PR. Step 4 then follows directly, and that
 is where a new cone gains something to reuse: `cedar_course_terms` and
 `cedar_attempts` are what let it filter a measure table and join rather than
 re-derive from 1.86M rows.
+
+### Step 4 in full: the course dimension, and what follows it
+
+**Decided 2026-11-06, with the first PR.** Step 3 gave every row its unit
+from the files at load. Step 4 does the same for the course: every section
+and class-list row gets a `course_id` at load, from the files, and the code
+the registrar used that term stays beside it.
+
+**The problem, measured on the 2026-10-08 pull** (terms Fall 2018 to Fall
+2026). The data carries 7,641 distinct `subject_course` codes: 7,573 on the
+schedule, 6,598 on class lists, 68 on class lists only (61 CCST, 4 SOCI, 3
+PSYC). Those 68 are I45: Banner applies a subject's rename to old class lists
+and not to old schedules, so 1,355 `(term, crn)` sections carry two codes, 180
+distinct pairs, every one a same-number rename (CCS → CCST on 524 sections,
+PSY → PSYC on 611, SOC → SOCI on 220). CCS persists on the schedule to Fall
+2026 beside CCST, which began Fall 2019. Across terms the same gap is I37:
+the Fall 2019 common course numbering and the Fall 2026 Anderson and
+Population Health renumberings each started every affected course's history
+over. 36 R files group on `subject_course`; each one sees the old course die
+and the new one arrive from nowhere.
+
+**The decision.**
+
+- **One file records successions: `institution/<id>/code_history.csv`**,
+  the file the ROADMAP's "Code history" item planned, with a `status`. One
+  row per succession, `kind` subject / course / program, `from_code`,
+  `to_code`, `effective_term`, `scope`, `basis`, `status`, `evidence`,
+  `notes`. A subject row renames every number under the subject; a course
+  row renumbers one course; a chain may mix the two (SOC 250 → SOCI 250 →
+  SOCI 2315). The validator refuses a self-succession, a term that is not a
+  term code, a `scope` on a subject or course row, a confirmed code with two
+  successors (a split: one code cannot have two ids), and a cycle.
+- **Only confirmed rows take effect**, as with a unit mapping. A proposed row
+  is the screen's candidate, with its evidence, and assigns nothing until a
+  person confirms it. The data can only suggest a succession; recording one
+  is a decision, taken by a pull request, effective at the next start.
+- **`course_id` is the last code of the chain**, not a surrogate. It is
+  readable, it is stable until the next confirmed rename (a decision, like a
+  unit's), and since nothing is saved there is no key to migrate when it
+  moves. `cedar_courses` is one row per id (current subject and number,
+  level, latest title, first and last term over every code, how many codes
+  and which); `cedar_course_codes` one row per code with its id, where it
+  appears and how many steps it took.
+- **Attached at load, never saved.** `build_cedar_courses()` runs in every
+  loader after the units, `attach_course_ids()` writes `course_id` onto
+  `cedar_sections` and `cedar_students`, and `subject_course` is never
+  rewritten (annotate, never mutate). 8 s to build and under a second to
+  attach on the full pull.
+- **A screen proposes; a script writes.** `detect_course_renamings()` finds a
+  section under two subjects (`section_crn`) and a title whose one retired
+  code stopped before its one new code began (`title_match`), resolving codes
+  through the file first so a pair already joined is not a candidate.
+  `scripts/propose-code-history.R --write` appends what it finds as proposed
+  rows, with a floor of 20 rows between the two codes.
+
+**What the first PR produced.** UNM's file carries the three section-evidenced
+subject renames confirmed and 320 title matches proposed: 117 effective Fall
+2019 (the common course numbering: ENGL 112 → ENGL 1120 on 30,400 rows, MATH
+121 → MATH 1220, CJ 130 → COMM 1130), 64 effective Fall 2026 (MGMT 326 → BUSA
+3260 and the rest of I37's list), the remainder spread across the years
+between. With the three confirmed rows the dimension has 7,450 courses from
+7,641 codes; 229 codes resolve to another, joining 191 courses (79 PSYC, 61
+CCST, 51 SOCI). SOCI 371's history now begins Fall 2018, where SOC 371's did,
+instead of Fall 2021. The demo institution's file carries the RN01 fixtures'
+successions, one of them proposed, so `test-courses.R` shows a proposed row
+assigning nothing and a chain crossing kinds.
+
+**What has not happened, and the order it will.** No reader groups on
+`course_id`, so no number moved in PR 1. Next: the schedule history lookups
+read `course_id` where they follow a course across terms (Low Enrollment's
+schedule view, I36; Regstats baselines; Course Dynamics history; the
+enrollment projection inputs, which is a `model_version` decision), and
+I36's renumbered rows show their old offerings. Then `cedar_course_terms`
+is promoted from `cedar_cl_enrls_base` and `cedar_attempts` from
+`cedar_grades`, both keyed on `course_id`, and `course-flows.R`'s precompute
+rebuilds on it. The Admin > Mappings surface for code history (when each
+code was in use, computed from the data; which replaced which, from the
+file) is its own PR, and `program` rows are validated now so it has
+something to read.
+
+**Not doing.** Rewriting saved rows to the new code: the code the registrar
+used that term is a fact about the term, and a reader that wants it keeps
+it. A surrogate integer id: it would need saving, and a saved key is a
+migration every time it moves. Inferring successions at runtime from titles:
+the title screen is a proposer, and proposes one-to-one matches only, because
+a many-to-many title group (BIOL 429 matched BIOL 201L) needs a person.
+Recording a split: a course that becomes two courses is two courses, and the
+history before the split belongs to neither alone.
 
 ### Not doing this
 

@@ -79,6 +79,7 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
   # 3. Branches (reusable cedar domain computations — called by multiple cones/features)
   message("[load-funcs.R] Loading branches...")
   source_file("branches/dims.R")                  # the dimension tables and attach_unit(), the one place a row gets its unit (ADR-001 step 3)
+  source_file("branches/courses.R")               # the course dimension: one course_id per code through code_history.csv (ADR-001 step 4)
   source_file("branches/waitlist-demand.R")
   source_file("branches/registration-snapshots.R")
   source_file("branches/return-snapshots.R")      # next-term registration of last term's students
