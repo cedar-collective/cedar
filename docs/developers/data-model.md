@@ -38,7 +38,12 @@ CEDAR requires 5 core tables. Each table is described below with:
 ## Colleges: reported and source (ADR-002 Stage 3b)
 
 Every college a report reads comes from the institution mapping files; the
-value Banner recorded stays beside it for audit.
+value Banner recorded stays beside it for audit. Since ADR-001 step 3 only
+Banner's values are in the saved files: the reported columns below, the
+`department` / `dept_code` beside them, `college_basis`, and the crosslist
+columns that follow a department, are attached when a loader starts
+(`attach_default_units()`, `R/branches/dims.R`) from the keys each table
+stores, so a mapping edit changes the next start and rebuilds nothing.
 
 | Table | Reported college | Banner's value | Rule |
 |---|---|---|---|

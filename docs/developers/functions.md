@@ -8,7 +8,7 @@ parent: Developer Guide
 
 This reference is auto-generated from roxygen2 comments in the source code.
 
-*Generated: 2026-11-04 14:13:50.252584*
+*Generated: 2026-11-06 09:51:15.448583*
 
 ---
 
@@ -1697,6 +1697,103 @@ Summarize Student Demographics  Flexible demographic summary function that group
 
 ---
 
+## dims
+
+### `build_cedar_dims()`
+
+*Source: dims.R*
+
+**Build the dimension object from the validated mapping files**
+
+**Parameters:**
+
+- `files` - The list read_institution_mappings() returns; by default the one the lists layer read at load (`cedar_institution_files`).
+
+**Returns:** The same tables, classed `cedar_dims`, so a function that takes `dims` can tell it was built here and validated.
+
+---
+
+### `validate_cedar_dims()`
+
+*Source: dims.R*
+
+**Refuse anything that is not a dims object with every table and column**
+
+---
+
+### `attach_unit()`
+
+*Source: dims.R*
+
+**Attach a unit and college to rows, under one named hierarchy**
+
+**Parameters:**
+
+- `rows` - A fact table: sections or class-list rows for the subject hierarchy; declarations or degrees for the program hierarchy.
+- `dims` - The object build_cedar_dims() returns.
+- `hierarchy` - `"subject"` (the subject's unit, from subjects.csv, keyed on subject, the source's section college and the course level) or `"program"` (the program's unit, from programs.csv, keyed on the code and the source's college).
+- `keys` - Named overrides for the columns the rule reads, e.g. `c(subject = "subject")` for sections. Names as in CEDAR_UNIT_HIERARCHIES.
+- `cols` - Named overrides for the columns written: `unit`, `college`, `basis`, and optionally `decided` (whether the files decide the row) and `banner` (the source's college, translated), which are written only when named. Another hierarchy writes its own names, never the defaults.
+
+**Returns:** `rows` with the named columns added. Refuses rows missing a key column or already carrying an output column: drop them first, as attach_default_units() does, rather than overwrite silently.
+
+---
+
+### `attach_program_units()`
+
+*Source: dims.R*
+
+**Attach units and colleges to declarations (cedar_programs)**
+
+Attach units and colleges to declarations (cedar_programs)  Each row's own program resolves through the program rule into `dept_code` and `program_college`. Then the two rules declarations add (ADR-002 Stage 3b): a concentration takes the unit and college of the student's primary major that term (the first Major row by code); and `college_code`, `college_basis` and `student_college` are the STUDENT's college that term, on every one of their rows -- the primary major's college where the files decide that code, else the source's college for the row, labelled "banner".
+
+---
+
+### `attach_degree_units()`
+
+*Source: dims.R*
+
+**Attach the unit and college to awarded degrees (cedar_degrees)**
+
+Attach the unit and college to awarded degrees (cedar_degrees)  The program rule keyed on the degree's Actual College (`source_student_college`), with its Translated College (`source_college`) preferred for the "banner" label; `college` and `student_college` are the college's name.
+
+---
+
+### `attach_section_units()`
+
+*Source: dims.R*
+
+**Attach the unit and college to sections (cedar_sections)**
+
+Attach the unit and college to sections (cedar_sections)  The subject rule, keyed on the section's `subject`, then the two columns a crosslist group derives from its sections' units: `crosslist_external`, whether the group spans more than one unit, and `crosslist_partners`, the courses in an external group, sorted. Both follow the unit, so they are attached here rather than stored.
+
+---
+
+### `attach_student_term_units()`
+
+*Source: dims.R*
+
+**Attach the primary major's unit and college to student-terms**
+
+Attach the primary major's unit and college to student-terms  The program rule on the keys the student-term table stores: the primary major's code and the source's college for it (academic studies' Actual and Translated College where a programs row described the term, the roster's Student College Code where the class list did), written as `primary_dept_code`, `primary_college_code` and `primary_college_basis`.
+
+---
+
+### `attach_default_units()`
+
+*Source: dims.R*
+
+**Attach the default unit columns to every fact table a loader holds**
+
+**Parameters:**
+
+- `tables` - A named list of loaded tables; a table that is not loaded (NULL, or the empty tibble load_cedar_data() returns for a missing file) is left alone and named in a message.
+- `dims` - The object build_cedar_dims() returns.
+
+**Returns:** `tables` with the five tables carrying their default unit columns, the table's attributes kept, each attachment timed in a message.
+
+---
+
 ## enrl
 
 ### `filter_classlist_to_sections()`
@@ -3038,75 +3135,6 @@ Courses students were taking in the term before a major switch appeared  Answers
 
 ---
 
-## mapping-provenance
-
-### `cedar_mapping_source_files()`
-
-*Source: mapping-provenance.R*
-
-**Files whose content decides the stored units and colleges**
-
-Files whose content decides the stored units and colleges  The institution mapping files plus the code that reads them into the CEDAR tables (ADR-002). A change to any of them can move a student or a course between departments or colleges.
-
----
-
-### `cedar_mapping_provenance()`
-
-*Source: mapping-provenance.R*
-
-**Fingerprint of the current mapping source**
-
-**Parameters:**
-
-- `base_dir` - Repository root, or anywhere beneath it.
-
-**Returns:** A list with `files` (per-file sha256) and `combined` (one hash).
-
----
-
-### `cedar_table_mapping_drift()`
-
-*Source: mapping-provenance.R*
-
-**Has the mapping source moved since a CEDAR table was built?**
-
-Has the mapping source moved since a CEDAR table was built?  Reads only the stamped attribute, never a CEDAR table, so it is cheap enough to run on every deploy.
-
-**Parameters:**
-
-- `table_file` - Path to the table's .qs file.
-- `base_dir` - Repository root.
-- `table` - The table's name, for the reason: "cedar_programs".
-
-**Returns:** NULL when current, otherwise a human-readable reason. Anything unreadable or unstamped counts as drift: rebuilding costs minutes, while serving units built by unknown code is how a stale map went unnoticed for nine months.
-
----
-
-### `cedar_programs_mapping_drift()`
-
-*Source: mapping-provenance.R*
-
-**Has the mapping source moved since cedar_programs was built?**
-
-Has the mapping source moved since cedar_programs was built?  cedar_table_mapping_drift() for cedar_programs, which Admin > Data & Usage reports as the mapping freshness.
-
----
-
-### `cedar_stale_mapped_tables()`
-
-*Source: mapping-provenance.R*
-
-**Which mapped tables in a data directory are stale?**
-
-**Parameters:**
-
-- `data_dir` - The directory holding cedar_<table>.qs.
-- `base_dir` - Repository root.
-
-**Returns:** A named character vector: for each table in CEDAR_MAPPED_TABLES that needs a rebuild, the reason. Empty when all are current.
-
----
-
 ## parse-data
 
 ### `process_reports()`
@@ -4092,7 +4120,7 @@ Compute Stop-Out Rates for One Group in One Course  Given one selected observati
 - `programs` - `cedar_programs`, or NULL for class lists alone: then no row is declared, every row is described by the class list, and the build says so.
 - `degrees` - `cedar_degrees` or NULL; without it `degree_awarded` is FALSE everywhere and the build says so.
 - `edges` - The result of [cedar_data_edges()] on the same tables. Required to carry `last_enrolled_complete`; the build stops without it.
-- `files` - The institution's mapping files, as [read_institution_mappings()] returns them: a primary major the class list supplies resolves to its unit, college and pre-major flag through `programs.csv`, exactly as a programs row did in the transform.
+- `files` - The institution's mapping files, as [read_institution_mappings()] returns them: a primary major the class list supplies takes its pre-major flag from `programs.csv`, as a programs row's flag is the file's in the transform. Its unit and college are not read here: the table stores the code and the roster's college as keys, and the loader attaches them.
 - `opt` - Unused; present for the branch calling convention.
 
 **Returns:** A tibble with `STUDENT_TERMS_COLUMNS`, one row per student-term, carrying `STUDENT_TERMS_BUILD_VERSION` as the attribute `cedar_student_terms_build_version`.

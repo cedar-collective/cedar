@@ -360,6 +360,7 @@ test_that("the mapping audit checks only the tables it is given, and says so", {
   # With no course table, the other kinds still say what they need.
   only_programs <- audit_mapping_coverage(audit_files(), programs = test_programs)
   expect_false(anyNA(only_programs$needs))
-  expect_error(audit_mapping_coverage(audit_files(), programs = dplyr::select(test_programs, -student_college)),
+  expect_error(audit_mapping_coverage(audit_files(),
+                                      programs = dplyr::select(test_programs, -source_college, -student_college)),
                "cedar_programs lacks source_college and student_college")
 })

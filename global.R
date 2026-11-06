@@ -197,14 +197,37 @@ for (key in names(cedar_files)) {
 }
 
 # ── Dimensions and the default unit (ADR-001 step 3) ─────────────────────────
-# The mapping files are the dimension tables, read at every start; the default
-# unit columns (department, college, dept_code, college_code) are attached
-# here, so a mapping edit changes the next start and rebuilds nothing. While
-# the transform still stamps the same columns, the loader drops its copy
-# first, and the result is identical to the row.
+# The mapping files are the dimension tables, read at every start; every unit
+# column (department, college, dept_code, college_code, the student-term's
+# primary_dept_code, and the crosslist columns that follow a department) is
+# attached here, so a mapping edit changes the next start and rebuilds
+# nothing. The saved tables carry keys only; a file stamped by an older
+# transform loads the same way, its copy dropped first.
+#
+# Trim first (cedar_min_term, set in shiny_config.R): rows that go are never
+# attached, so the attach's transient copy is of the rows the app keeps.
+for (.key in c("cedar_sections", "cedar_students", "cedar_grades", "cedar_student_terms", "cedar_faculty", "cedar_degrees", "cedar_programs")) {
+  if (!is.null(data_objects[[.key]]) && "term" %in% names(data_objects[[.key]])) {
+    .n_before <- nrow(data_objects[[.key]])
+    data_objects[[.key]] <- dplyr::filter(data_objects[[.key]], term >= cedar_min_term)
+    message(sprintf("[global.R] %s: trimmed to term >= %s (%d -> %d rows)",
+                    .key, cedar_min_term, .n_before, nrow(data_objects[[.key]])))
+  }
+}
+rm(.key, .n_before)
+
 cedar_dims <- build_cedar_dims()
 data_objects <- attach_default_units(data_objects, cedar_dims)
 data_objects[["cedar_dims"]] <- cedar_dims
+# The mapping files now decide the unit columns on the attached tables without
+# changing any saved file, so they are an input to every cache keyed on those
+# tables' fingerprints (caching cardinal rule 1): fold a fingerprint of dims
+# into each attached table's, and a mapping edit is a miss.
+cedar_dims_hash <- substr(digest::digest(cedar_dims), 1, 12)
+for (.key in intersect(names(CEDAR_ATTACHED_UNIT_COLUMNS), names(cedar_source_fingerprints))) {
+  cedar_source_fingerprints[[.key]][["dims"]] <- cedar_dims_hash
+}
+rm(.key)
 
 message("[global.R] Data loading complete. Validating CEDAR data structure...")
 
@@ -248,17 +271,6 @@ if (validation_failed) {
 }
 
 message("[global.R] ✅ All CEDAR data validated successfully!")
-
-# Drop data older than cedar_min_term (set in shiny_config.R).
-for (.key in c("cedar_sections", "cedar_students", "cedar_grades", "cedar_student_terms", "cedar_faculty", "cedar_degrees", "cedar_programs")) {
-  if (!is.null(data_objects[[.key]]) && "term" %in% names(data_objects[[.key]])) {
-    .n_before <- nrow(data_objects[[.key]])
-    data_objects[[.key]] <- dplyr::filter(data_objects[[.key]], term >= cedar_min_term)
-    message(sprintf("[global.R] %s: trimmed to term >= %s (%d -> %d rows)",
-                    .key, cedar_min_term, .n_before, nrow(data_objects[[.key]])))
-  }
-}
-rm(.key, .n_before)
 
 # ── Data edges ──────────────────────────────────────────────────────────────
 # Read once from the loaded data, never derived from cedar_current_term. Local
@@ -472,20 +484,6 @@ cedar_course_flows <- tryCatch({
           " — downstream signals will be unavailable.")
   NULL
 })
-
-# ── Ensure crosslist_external column exists ──────────────────────────────────
-# Added in transform-to-cedar.R after 2026-03; compute on-the-fly from older .qs files.
-if (!is.null(data_objects[["cedar_sections"]]) &&
-    !"crosslist_external" %in% colnames(data_objects[["cedar_sections"]])) {
-  message("[global.R] crosslist_external not found — computing from crosslist_group/department...")
-  xlist_dept_scope <- data_objects[["cedar_sections"]] %>%
-    filter(!is.na(crosslist_group)) %>%
-    group_by(term, crosslist_group) %>%
-    summarize(crosslist_external = n_distinct(department) > 1, .groups = "drop")
-  data_objects[["cedar_sections"]] <- data_objects[["cedar_sections"]] %>%
-    left_join(xlist_dept_scope, by = c("term", "crosslist_group"))
-  message("[global.R] ✅ crosslist_external computed for ", nrow(xlist_dept_scope), " crosslist groups")
-}
 
 # ── Pre-compute data summary for Data & Usage page ─────────────────────────
 # This avoids expensive reactive computations and makes the tab load instantly

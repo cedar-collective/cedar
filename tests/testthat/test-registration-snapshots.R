@@ -211,8 +211,8 @@ test_that("a return snapshot describes students as the student-term table does",
   disagreeing <- test_students_rw %>%
     dplyr::mutate(student_classification = dplyr::if_else(
       student_id == "RW_A" & term == 202080L, "Junior", student_classification))
-  st <- suppressMessages(build_student_terms(
-    disagreeing, test_programs_rw, edges = list(last_enrolled_complete = 202080L)))
+  st <- attach_test_student_terms(suppressMessages(build_student_terms(
+    disagreeing, test_programs_rw, edges = list(last_enrolled_complete = 202080L))))
   expect_true(st$description_conflict[st$student_id == "RW_A" & st$term == 202080L])
   snapshot <- build_return_snapshot(st, list(terms = 202110L))
   expect_equal(snapshot, build_return_snapshot(test_student_terms_rw, list(terms = 202110L)))
@@ -221,8 +221,8 @@ test_that("a return snapshot describes students as the student-term table does",
   never_attended <- test_students_rw %>%
     dplyr::mutate(registration_status_code = dplyr::if_else(
       student_id == "RW_D", "DR", registration_status_code))
-  st2 <- suppressMessages(build_student_terms(
-    never_attended, test_programs_rw, edges = list(last_enrolled_complete = 202080L)))
+  st2 <- attach_test_student_terms(suppressMessages(build_student_terms(
+    never_attended, test_programs_rw, edges = list(last_enrolled_complete = 202080L))))
   expect_equal(sum(build_return_snapshot(st2, list(terms = 202110L))$students), 6L)
 })
 

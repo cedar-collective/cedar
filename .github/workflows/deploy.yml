@@ -177,23 +177,25 @@ jobs:
             docker compose ps
             docker image prune -f || true
 
-            # Rebuild the tables this code cannot serve from, before the app
-            # loads anything: the mapped tables when the MAPPING source
-            # changed, and the student-term table when it is missing a column
-            # the builder now writes or is older than its sources.
+            # Rebuild the table this code cannot serve from, before the app
+            # loads anything: cedar_student_terms, when it is missing, older
+            # than the students, programs or degrees file it is built from,
+            # short a column the builder now writes, or stamped with an older
+            # rule version (STUDENT_TERMS_BUILD_VERSION).
             #
-            # dept_code is derived at transform time, so editing a mapping list
-            # changes nothing until the table is rebuilt -- and nothing says the
-            # two have drifted, because the stored dept_code stays plausible and
-            # every report keeps using it. A mapping fix can sit in the
-            # repository while production serves the old departments; a stale
-            # map hid 194 of 229 Radiologic Sciences students for nine months
-            # (ISSUES.md I7).
+            # No mapping branch: since ADR-001 step 3 no saved table stores a
+            # unit. The loader attaches every department and college from the
+            # mapping files at each start, so a mapping edit takes effect when
+            # this deploy restarts the app and rebuilds nothing. (The stale
+            # stored dept_code that hid 194 of 229 Radiologic Sciences students
+            # for nine months, ISSUES.md I7, can no longer exist.) The four
+            # fact tables are rebuilt by the morning refresh, not here: a
+            # transform change to their stored columns waits for it (I48).
             #
-            # Cheap by design: five file hashes against a fingerprint stamped on
-            # the table and one file time, touching no CEDAR table, so a deploy
-            # that changed nothing costs about a second. Data-driven staleness
-            # stays with the morning refresh.
+            # Cheap by design: file times, a column list and one stamp,
+            # touching no other CEDAR table, so a deploy that changed nothing
+            # costs about a second. Data-driven staleness stays with the
+            # morning refresh.
             #
             # Here, and not after the health check: the container is replaced,
             # but shiny-server starts the app's R process on the first request,
@@ -208,22 +210,22 @@ jobs:
             # runs. A rebuild restarts the container all the same, so nothing
             # that may have started meanwhile outlives the tables it loaded
             # (app_idle_timeout 0); it has loaded nothing, so that is cheap.
-            echo "Checking whether the mapping source or the student-term table changed in this deploy..."
+            echo "Checking whether the student-term table needs rebuilding in this deploy..."
             MAPPING_LOG="$(mktemp)"
             if docker compose exec -T cedar-shiny \
                  Rscript --vanilla \
                  /srv/shiny-server/cedar/scripts/rebuild-programs-if-mappings-changed.R \
                  < /dev/null > "$MAPPING_LOG" 2>&1; then
               cat "$MAPPING_LOG"
-              echo "Mapping check complete."
-              if grep -q '^\[mappings\] Rebuilt:' "$MAPPING_LOG"; then
-                echo "Tables were rebuilt; restarting the container so the app starts from them."
+              echo "Student-term check complete."
+              if grep -q '^\[student-terms\] Rebuilt:' "$MAPPING_LOG"; then
+                echo "The table was rebuilt; restarting the container so the app starts from it."
                 docker compose restart cedar-shiny
               fi
             else
               cat "$MAPPING_LOG"
-              echo "WARNING: mapping check or rebuild of the mapped tables failed."
-              echo "The previous tables are retained; the next data refresh retries."
+              echo "WARNING: student-term check or rebuild failed."
+              echo "The previous table is retained; the next data refresh retries."
             fi
             rm -f "$MAPPING_LOG"
 

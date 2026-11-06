@@ -922,13 +922,6 @@ test_that("the text-map validator reports every problem at once", {
   expect_match(err, "unit_code not in units.csv: BSKT")
 })
 
-test_that("the mapping provenance covers the text-map files", {
-  files <- cedar_mapping_source_files()
-  for (f in c("program_names.csv", "program_name_aliases.csv", "source_organizations.csv")) {
-    expect_true(any(endsWith(files, f)), info = f)
-  }
-})
-
 # ── Dimensions and attach_unit() (ADR-001 step 3) ────────────────────────────
 # The mapping files are read as dimension tables and the default unit is
 # attached at load, under the names every reader has always read. These tests
@@ -1062,13 +1055,17 @@ test_that("attach_default_units() replaces whatever a file stamped and keeps the
   dims <- demo_dims()
   stamped <- test_sections %>%
     mutate(source_college = college, department = "WRONG", college = "WRONG", college_basis = "x")
-  attr(stamped, "cedar_mapping_provenance") <- list(combined = "abc")
+  attr(stamped, "cedar_example_stamp") <- list(combined = "abc")
   objs <- suppressMessages(attach_default_units(
     list(cedar_sections = stamped, cedar_degrees = tibble::tibble()), dims))
   expect_equal(objs$cedar_sections$department, test_sections$department)
   expect_true(all(objs$cedar_sections$college %in% dims$colleges$college_code))
-  expect_equal(attr(objs$cedar_sections, "cedar_mapping_provenance"), list(combined = "abc"))
+  expect_equal(attr(objs$cedar_sections, "cedar_example_stamp"), list(combined = "abc"))
   expect_setequal(names(objs$cedar_sections), c(names(test_sections), "source_college", "college_basis"))
+  # The crosslist columns follow the department, so they are attached with
+  # it and agree with the fixture's pinned values (XL01-XL06).
+  expect_equal(objs$cedar_sections$crosslist_external, test_sections$crosslist_external)
+  expect_equal(objs$cedar_sections$crosslist_partners, test_sections$crosslist_partners)
   # A table that is not loaded is left alone, and said so.
   expect_equal(ncol(objs$cedar_degrees), 0L)
   expect_message(attach_default_units(list(cedar_students = NULL), dims), "cedar_students is not loaded")

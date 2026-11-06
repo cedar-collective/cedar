@@ -100,7 +100,10 @@ test_that("ST_G: the primary major is the first Major row by code, and every dec
   st <- st01()
   g <- row(st, "ST_G", 202010L)
   expect_equal(g$primary_major_code, "AA")
-  expect_equal(g$primary_dept_code, "AA")
+  # The table stores the primary major's keys, never its unit (ADR-001 step 3).
+  expect_equal(g$primary_source_college_code, "AS")
+  expect_equal(g$primary_source_college, "College of Arts and Sciences")
+  expect_false(any(STUDENT_TERMS_ATTACHED_COLUMNS %in% names(st)))
   expect_equal(g$n_declarations, 3L)
   expect_true(g$declared)
   expect_false(g$is_pre_major)
@@ -163,14 +166,25 @@ test_that("ST_K: with no programs row the class list describes the student, in c
   expect_true(is.na(k$academic_standing))
   expect_equal(k$student_level, "UG")
   expect_equal(k$student_campus, "ABQ")
-  # The primary major is the one Banner stamped on the roster (SPAN), resolved
-  # through programs.csv as a programs row would be: the file's unit and
-  # pre-major flag, never the code itself. A student with a programs row
-  # (ST_A) keeps academic studies' major.
+  # The primary major is the one Banner stamped on the roster (SPAN), with the
+  # roster's college as the key it resolves under and the file's pre-major
+  # flag. Attached at load through the institution's files, it carries the
+  # file's unit, never the code itself. A student with a programs row (ST_A)
+  # keeps academic studies' major.
   files <- read_institution_mappings()
   expect_equal(k$primary_major_code, "SPAN")
-  expect_equal(k$primary_dept_code, resolve_program_units("SPAN", "", files$programs))
-  expect_false(is.na(k$primary_dept_code))
+  roster_college <- unique(test_students_st$student_college[test_students_st$student_id == "ST_K"])
+  expect_length(roster_college, 1L)
+  expect_equal(k$primary_source_college_code, roster_college)
+  expect_equal(k$primary_source_college, roster_college)
+  attached <- suppressMessages(attach_default_units(
+    list(cedar_student_terms = st), build_cedar_dims(files)))$cedar_student_terms
+  k_att <- row(attached, "ST_K", 202010L)
+  key <- dplyr::coalesce(translate_source_college(roster_college, files), "")
+  expect_equal(k_att$primary_dept_code, resolve_program_units("SPAN", key, files$programs))
+  expect_false(is.na(k_att$primary_dept_code))
+  expect_equal(k_att$primary_college_code, resolve_program_colleges("SPAN", key, files))
+  expect_equal(names(attached), c(STUDENT_TERMS_COLUMNS, STUDENT_TERMS_ATTACHED_COLUMNS))
   expect_equal(k$is_pre_major, program_pre_major_flags("SPAN", files$programs))
   expect_equal(row(st, "ST_A", 202010L)$primary_major_code, "HIST")
   expect_equal(attr(st, "cedar_student_terms_build_version"), STUDENT_TERMS_BUILD_VERSION)

@@ -509,7 +509,7 @@ build_counting_rules <- function(files, programs, sections, students) {
       "transform_programs(), R/data-parsers/transform-to-cedar.R",
       "transform_programs(), R/data-parsers/transform-to-cedar.R",
       "transform_programs(); CEDAR_DATA_SEMANTICS (R/lists/data_semantics.R)",
-      "add_program_colleges() and .course_colleges(), R/data-parsers/transform-to-cedar.R",
+      "attach_unit() and attach_program_units(), R/branches/dims.R (at every start)",
       "institution/<id>/course_levels.csv (COURSE_LEVEL_BY_LEADING_DIGIT, R/lists/course_numbering.R)",
       "keep_home_sections(), R/trunk/filter.R; transform_sections()",
       "institution/<id>/excluded_courses.csv (excluded_courses, R/lists/excluded_courses.R)",

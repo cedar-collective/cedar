@@ -1160,7 +1160,7 @@ cedar_sections_xl <- tribble(
   TRUE, FALSE,
   4.0,4.0, as.Date("2020-08-17"),as.Date("2020-12-12"),
   NA_character_,NA_character_,NA_character_,
-  FALSE,NA_character_,NA_character_,
+  NA,NA_character_,NA_character_,
   TRUE,FALSE,NA_character_,NA_integer_,as.Date("2020-08-17"),
 
   "EC-202080-A02", 202080L, "ECA02", "BIOL","2110C","BIOL 2110C","002",
@@ -1172,7 +1172,7 @@ cedar_sections_xl <- tribble(
   TRUE, FALSE,
   4.0,4.0, as.Date("2020-08-17"),as.Date("2020-12-12"),
   NA_character_,NA_character_,NA_character_,
-  FALSE,NA_character_,NA_character_,
+  NA,NA_character_,NA_character_,
   TRUE,FALSE,NA_character_,NA_integer_,as.Date("2020-08-17"),
 
   "EC-202080-A03", 202080L, "ECA03", "BIOL","2110C","BIOL 2110C","003",
@@ -1184,7 +1184,7 @@ cedar_sections_xl <- tribble(
   TRUE, FALSE,
   4.0,4.0, as.Date("2020-08-17"),as.Date("2020-12-12"),
   NA_character_,NA_character_,NA_character_,
-  FALSE,NA_character_,NA_character_,
+  NA,NA_character_,NA_character_,
   TRUE,FALSE,NA_character_,NA_integer_,as.Date("2020-08-17"),
 
   "EC-202080-A04", 202080L, "ECA04", "BIOL","2110C","BIOL 2110C","004",
@@ -1196,7 +1196,7 @@ cedar_sections_xl <- tribble(
   TRUE, FALSE,
   4.0,4.0, as.Date("2020-08-17"),as.Date("2020-12-12"),
   NA_character_,NA_character_,NA_character_,
-  FALSE,NA_character_,NA_character_,
+  NA,NA_character_,NA_character_,
   TRUE,FALSE,NA_character_,NA_integer_,as.Date("2020-08-17"),
 
   # --- EC-05: BIOL 304C — Pattern B non-crosslisted combined course (no XL_ENRL) ---
@@ -1212,7 +1212,7 @@ cedar_sections_xl <- tribble(
   TRUE, FALSE,
   4.0,4.0, as.Date("2020-08-17"),as.Date("2020-12-12"),
   NA_character_,NA_character_,NA_character_,
-  FALSE,NA_character_,NA_character_,
+  NA,NA_character_,NA_character_,
   TRUE,FALSE,NA_character_,NA_integer_,as.Date("2020-08-17"),
 
   "EC-202080-B02", 202080L, "ECB02", "BIOL","304C","BIOL 304C","002",
@@ -1224,7 +1224,7 @@ cedar_sections_xl <- tribble(
   TRUE, FALSE,
   4.0,4.0, as.Date("2020-08-17"),as.Date("2020-12-12"),
   NA_character_,NA_character_,NA_character_,
-  FALSE,NA_character_,NA_character_,
+  NA,NA_character_,NA_character_,
   TRUE,FALSE,NA_character_,NA_integer_,as.Date("2020-08-17"),
 
   "EC-202080-B03", 202080L, "ECB03", "BIOL","304C","BIOL 304C","003",
@@ -1236,7 +1236,7 @@ cedar_sections_xl <- tribble(
   TRUE, FALSE,
   4.0,4.0, as.Date("2020-08-17"),as.Date("2020-12-12"),
   NA_character_,NA_character_,NA_character_,
-  FALSE,NA_character_,NA_character_,
+  NA,NA_character_,NA_character_,
   TRUE,FALSE,NA_character_,NA_integer_,as.Date("2020-08-17"),
 
   "EC-202080-B04", 202080L, "ECB04", "BIOL","304C","BIOL 304C","004",
@@ -1248,7 +1248,7 @@ cedar_sections_xl <- tribble(
   TRUE, FALSE,
   4.0,4.0, as.Date("2020-08-17"),as.Date("2020-12-12"),
   NA_character_,NA_character_,NA_character_,
-  FALSE,NA_character_,NA_character_,
+  NA,NA_character_,NA_character_,
   TRUE,FALSE,NA_character_,NA_integer_,as.Date("2020-08-17"),
 
   # --- EC-06: BIOL 300C — Pattern C internal crosslist combined course ---
@@ -1469,7 +1469,7 @@ cedar_sections_xl <- tribble(
   TRUE,  FALSE,
   4.0,4.0, as.Date("2019-01-14"),as.Date("2019-05-11"),
   NA_character_,NA_character_,NA_character_,
-  FALSE,NA_character_,NA_character_,
+  NA,NA_character_,NA_character_,
   TRUE,FALSE,NA_character_,NA_integer_,as.Date("2019-01-14")
 )
 
@@ -2673,6 +2673,12 @@ cedar_programs <- cedar_programs %>%
       student_college == "EDU"  ~ "ED",
       TRUE                      ~ NA_character_
     ),
+    # Banner's two college values as the transform stores them (the Translated
+    # College as recorded, the Actual College as a code), the keys the loader
+    # resolves each program under (ADR-001 step 3). The unit and college
+    # columns above are what attaching yields on this fixture.
+    source_college      = student_college,
+    source_college_code = college_code,
     # Total (UNM + transfer) attempted = UNM attempted + a flat 30-credit transfer
     # block, so total_credits_* > unm_credits_* everywhere and the two-basis display
     # is exercised. Earned deflates attempted by 10% (W/F etc.).
@@ -3349,6 +3355,9 @@ cedar_students_rw <- dplyr::bind_rows(
     student_id = sid, term = as.integer(term),
     program_type = "Major", program_name = major_code,
     major_code = major_code, dept_code = major_code, college_code = "AS",
+    # Banner's two college values, the keys the loader resolves the program
+    # under (ADR-001 step 3); the unit and college above are the attached form.
+    source_college_code = "AS", source_college = "College of Arts and Sciences",
     student_college = "College of Arts and Sciences",
     student_campus = "Albuquerque/Main", student_level = "Undergraduate",
     student_classification = classification, residency = "Resident",
@@ -3435,6 +3444,9 @@ cedar_students_st <- dplyr::bind_rows(
     student_id = sid, term = as.integer(term),
     program_type = program_type, program_name = major_code,
     major_code = major_code, dept_code = major_code, college_code = "AS",
+    # The keys the student-term table stores for its primary major, from which
+    # the loader attaches the unit and college (ADR-001 step 3).
+    source_college_code = "AS", source_college = "College of Arts and Sciences",
     is_pre_major = FALSE,
     student_level = "Undergraduate", student_classification = classification,
     student_campus = "Albuquerque/Main", residency = "Resident",

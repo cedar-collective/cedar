@@ -1,26 +1,24 @@
-# Deploy-time gate: rebuild the mapped CEDAR tables when the MAPPING source moved.
+# Deploy-time gate: build cedar_student_terms when it is missing or stale.
 #
 #   Rscript --vanilla scripts/rebuild-programs-if-mappings-changed.R [--force]
 #
-# Same shape as the enrollment-projection model gate, and for the same reason.
-# Units are written at transform time, so editing a mapping file changes
-# nothing until the tables are rebuilt -- and nothing says the two have
-# drifted, because the stored units stay plausible. A mapping fix can sit in
-# the repository while production serves the old departments.
+# The name is historical: deploy.yml and update-data.sh call it by it. Until
+# ADR-001 step 3 (2026-11-06) it also rebuilt whichever of programs, degrees,
+# sections and class lists had been built from different mapping files, each
+# carrying a provenance stamp (ISSUES.md M26). The tables no longer store a
+# unit: the loader attaches every one at start from the mapping files
+# (R/branches/dims.R), so a mapping edit changes the next start and rebuilds
+# nothing, and that branch is gone.
 #
-# Since ADR-002 Stage 3 the files decide every unit: programs.csv for programs
-# and degrees, subjects.csv for sections and class lists. Each of those tables
-# carries the provenance that built it, and the gate rebuilds whichever are
-# stale (CEDAR_MAPPED_TABLES; ISSUES.md M26). The name is historical: deploy.yml
-# and update-data.sh call it by it.
-#
-# The check is cheap on purpose: it hashes the mapping files and reads one
-# attribute per table, so a deploy that changed no mapping costs seconds.
-# Data-driven staleness stays with the morning refresh.
-
-# The stamp asserts "these units were produced by this mapping source".
-# `force` rebuilds every mapped table regardless. (Until ADR-002 Stage 4 this
-# also regenerated program_map.qs; the map is retired.)
+# What remains is cedar_student_terms (ADR-001 step 2). It is built from the
+# saved students, programs and degrees, so it is stale whenever one of them is
+# newer, short a column the builder now writes, or built under an older rule
+# version, and absent on the first deploy after the stage was added. The app
+# requires it, so the gate builds it here, in its own R process, before the
+# first request. Checked by file time and the saved file's names and stamp
+# (cedar_student_terms_staleness()), never by loading the sources, so a deploy
+# that changed nothing costs about a second. Data-driven staleness stays with
+# the morning refresh. `force` rebuilds the table regardless.
 rebuild_programs_if_mappings_changed <- function(
     data_dir = NULL, base_dir = getwd(), rebuild = NULL, force = FALSE) {
   SOURCED_FROM_PARSE_DATA <<- TRUE
@@ -39,82 +37,54 @@ rebuild_programs_if_mappings_changed <- function(
       "data/"
     }
   }
-  stale <- if (isTRUE(force)) {
-    stats::setNames(rep("rebuild forced", length(CEDAR_MAPPED_TABLES)), CEDAR_MAPPED_TABLES)
-  } else {
-    cedar_stale_mapped_tables(data_dir, base_dir)
-  }
-  # Each table is rebuilt in its own R process. The transform keeps every
-  # stage's heap until it exits, so one process running sections, students,
-  # programs, degrees and then the student-term stage was killed for memory on
-  # an 8.6 GB development host while anything else ran beside it (2026-11-04);
-  # a stage alone peaks at about 1.6 GB. The child builds only the table named:
-  # the student-term table, which the transform would otherwise add to any run
-  # of its sources, is built last, once, by its own process below.
+  # The table is built in its own R process. The transform keeps every
+  # stage's heap until it exits, so one process running the four fact tables
+  # and then the student-term stage was killed for memory on an 8.6 GB
+  # development host while anything else ran beside it (2026-11-04); the
+  # stage alone peaks at about 1.6 GB.
   rebuild <- rebuild %||% function(tables) {
     script <- file.path(base_dir, "R", "data-parsers", "transform-to-cedar.R")
     for (table in tables) {
-      message("[mappings] Rebuilding cedar_", table, " in its own R process...")
+      message("[student-terms] Rebuilding cedar_", table, " in its own R process...")
       status <- system2(
         file.path(R.home("bin"), "Rscript"),
-        c("--vanilla", shQuote(script), "--data-dir", shQuote(data_dir),
-          "--tables", table, "--without-student-terms"))
+        c("--vanilla", shQuote(script), "--data-dir", shQuote(data_dir), "--tables", table))
       if (!identical(as.integer(status), 0L)) {
-        stop("[mappings] The rebuild of cedar_", table, " exited with status ", status,
+        stop("[student-terms] The rebuild of cedar_", table, " exited with status ", status,
              call. = FALSE)
       }
     }
   }
-  rebuilt <- character(0)
 
-  if (length(stale) == 0) {
-    message("[mappings] Mapping source unchanged since ",
-            paste0("cedar_", CEDAR_MAPPED_TABLES, collapse = ", "),
-            " were built; no rebuild. Data-driven staleness is handled by the morning refresh.")
-  } else {
-    for (table in names(stale)) {
-      message("[mappings] Rebuilding cedar_", table, ": ", stale[[table]])
-    }
+  build_student_terms_if_stale(data_dir, rebuild, force = force)
+}
 
-    # A missing export would make the transform skip the table with a warning,
-    # leaving it stale while this gate reported a rebuild. Stop instead.
-    inputs <- c(programs = "academic_studies", degrees = "degrees",
-                sections = "DESRs", students = "class_lists")
-    needed <- file.path(data_dir, paste0(inputs[names(stale)], ".qs"))
-    if (any(!file.exists(needed))) {
-      stop("[mappings] Cannot rebuild ", paste0("cedar_", names(stale)[!file.exists(needed)], collapse = ", "),
-           ": missing ", paste(basename(needed[!file.exists(needed)]), collapse = ", "),
-           " in ", data_dir, call. = FALSE)
-    }
-
-    rebuild(names(stale))
-    still <- intersect(names(stale), names(cedar_stale_mapped_tables(data_dir, base_dir)))
-    if (length(still)) {
-      stop("[mappings] Rebuilt, but still stale: ", paste0("cedar_", still, collapse = ", "),
-           call. = FALSE)
-    }
-    rebuilt <- names(stale)
+#' The gate's decision: build cedar_student_terms when stale or forced
+#'
+#' @param data_dir The directory holding the saved tables.
+#' @param rebuild A function taking the tables to build (here always
+#'   `"student_terms"`), run once when a build is due.
+#' @param force Build regardless of staleness.
+#' @param staleness The check (cedar_student_terms_staleness(), from the
+#'   transform); a parameter so the decision can be tested without one.
+#' @return TRUE when the table was built, FALSE when it was current; an error
+#'   when a build left it stale.
+build_student_terms_if_stale <- function(data_dir, rebuild, force = FALSE,
+                                         staleness = cedar_student_terms_staleness) {
+  reason <- if (isTRUE(force)) "rebuild forced" else staleness(data_dir)
+  if (is.null(reason)) {
+    message("[student-terms] cedar_student_terms is current; no rebuild. ",
+            "Data-driven staleness is handled by the morning refresh.")
+    return(invisible(FALSE))
   }
-
-  # cedar_student_terms is built from the saved students, programs and degrees
-  # (ADR-001 step 2), so it is stale whenever one of them is newer, and absent
-  # on the first deploy after the stage was added. The app requires it, so the
-  # gate builds it here, after the mapped tables it reads, in its own process.
-  # Checked after the mapped rebuild, by file time, and never by loading data.
-  st_reason <- cedar_student_terms_staleness(data_dir)
-  if (!is.null(st_reason)) {
-    message("[mappings] Rebuilding cedar_student_terms: ", st_reason)
-    rebuild("student_terms")
-    still <- cedar_student_terms_staleness(data_dir)
-    if (!is.null(still)) {
-      stop("[mappings] Rebuilt, but cedar_student_terms is still stale: ", still, call. = FALSE)
-    }
-    rebuilt <- c(rebuilt, "student_terms")
+  message("[student-terms] Rebuilding cedar_student_terms: ", reason)
+  rebuild("student_terms")
+  still <- staleness(data_dir)
+  if (!is.null(still)) {
+    stop("[student-terms] Rebuilt, but cedar_student_terms is still stale: ", still, call. = FALSE)
   }
-
-  if (length(rebuilt) == 0) return(invisible(FALSE))
   # deploy.yml restarts the app on this exact line, so it serves what was built.
-  message("[mappings] Rebuilt: ", paste0("cedar_", rebuilt, collapse = ", "), ".")
+  message("[student-terms] Rebuilt: cedar_student_terms.")
   invisible(TRUE)
 }
 

@@ -92,6 +92,19 @@ test_student_terms_gen_ed_assoc <<- suppressMessages(build_student_terms(
 # ST01 carries its own programs and a settled edge of its own (Fall 2020).
 test_student_terms_st         <<- suppressMessages(build_student_terms(
   cedar_students_st, cedar_programs_st, cedar_degrees_st))
+# As global.R attaches at start (ADR-001 step 3): the built table stores its
+# primary major's keys, and the unit and college (primary_dept_code,
+# primary_college_code, primary_college_basis) are attached from the
+# institution's mapping files, the ones load_funcs() read.
+test_dims <<- build_cedar_dims()
+attach_test_student_terms <<- function(st) {
+  suppressMessages(attach_default_units(list(cedar_student_terms = st), test_dims))$cedar_student_terms
+}
+for (.st in c("test_student_terms", "test_student_terms_audits", "test_student_terms_roadblocks",
+              "test_student_terms_mcret", "test_student_terms_rp", "test_student_terms_mc",
+              "test_student_terms_rw", "test_student_terms_gen_ed_assoc", "test_student_terms_st")) {
+  assign(.st, attach_test_student_terms(get(.st)), envir = globalenv())
+}
 # Degree Explorer: the demo institution's designed catalog (institution/demo/),
 # two synthetic programs whose schedules are worked by hand in
 # test-degree-explorer.R. Independent of any real institution's annual catalog.
@@ -129,7 +142,8 @@ data_objects <<- list(
   cedar_student_terms = test_student_terms,
   cedar_faculty  = test_faculty,
   cedar_sections = test_sections,
-  cedar_lookups  = test_lookups
+  cedar_lookups  = test_lookups,
+  cedar_dims     = test_dims
 )
 # global.R stores the data edges on data_objects; modules read them from there.
 data_objects$cedar_edges <<- cedar_data_edges(test_students, degrees = test_degrees)

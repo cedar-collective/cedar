@@ -15,6 +15,10 @@
 # Verify after changes: Rscript -e "testthat::test_dir('tests/testthat')"
 #
 # Recent schema changes:
+# - Nov 2026: Units and colleges are no longer written (ADR-001 step 3). Every
+#             table carries its keys -- subject, program code, the source's
+#             college -- and the loader attaches department / college /
+#             dept_code / college_code at every start (R/branches/dims.R).
 # - Apr 2026: Refactored: each table now has its own transform_*() function
 # - Apr 2026: Added cedar_applicants (from admissions_applicants)
 # - Mar 2026: Added residency, academic_standing, inst_gpa to cedar_programs
@@ -139,9 +143,11 @@ to_snake <- function(x) {
 }
 
 
-# The ADR-002 mapping files (read_institution_mappings()) that decide every
-# unit. Required: a transform that cannot read them stops, rather than naming
-# departments after codes as the old lookup chain did (ISSUES.md I7).
+# The ADR-002 mapping files (read_institution_mappings()). Since ADR-001 step 3
+# the transform writes no unit: the loader attaches every one at start from
+# the keys each table carries (R/branches/dims.R). The files are still read
+# here for what a row records about its own program (the pre-major flag), and
+# a transform that cannot read them stops rather than guess.
 .require_mapping_files <- function(maps, caller, tables) {
   files <- maps$mapping_files
   missing <- tables[vapply(tables, function(t) is.null(files[[t]]), logical(1))]
@@ -152,68 +158,37 @@ to_snake <- function(x) {
   files
 }
 
-# A course's reported college (ADR-002 Stage 3b): its subject row's
-# college_code, else its unit's home college. A subject with no confirmed row
-# reports Banner's section college instead, translated through colleges.csv
-# (ED -> EH) and labelled college_basis = "banner" until the subject is decided
-# (decided 2026-10-10: nothing drops out of college totals meanwhile).
-.course_colleges <- function(course_units, source_college, files) {
-  banner <- translate_source_college(source_college, files)
-  undecided <- is.na(course_units$unit_code)
-  tibble::tibble(
-    college = dplyr::if_else(undecided, banner, course_units$college_code),
-    college_basis = dplyr::case_when(
-      !undecided & !is.na(course_units$college_code) ~ "mapped",
-      undecided & !is.na(banner)                      ~ "banner",
-      TRUE                                            ~ NA_character_))
+# The same files as dimension tables (build_cedar_dims()), for the lookup
+# inputs below. Required where they are read, as the files are.
+.require_dims <- function(maps, caller) {
+  if (is.null(maps$dims)) {
+    stop("[", caller, "] maps$dims must carry the dimension tables (build_cedar_dims()): ",
+         "the lookup inputs attach their units through them (ADR-001 step 3).")
+  }
+  maps$dims
 }
 
-# Colleges on cedar_programs (ADR-002 Stage 3b; decided 2026-10-10).
-#
-# - program_college: each row's own program's college -- program -> unit ->
-#   college through the files; a concentration takes its primary major's.
-# - college_code / student_college: the STUDENT's college that term, the
-#   program_college of their primary major, on every one of their rows, so
-#   "students in a college" and a college filter mean what they always have.
-# - When the primary major's code is not yet decided in programs.csv, or the
-#   student has no primary major that term, the student's college is Banner's
-#   (Translated College, else Actual College), translated through colleges.csv
-#   and labelled college_basis = "banner". A decided code that names no college
-#   (Non-Degree) has none.
-# - Banner's values stay beside them: source_college (Translated College) and
-#   source_college_code (Actual College).
-add_program_colleges <- function(programs, files) {
-  needed <- c("student_id", "term", "program_type", "major_code", "student_college", "college_code")
-  missing <- setdiff(needed, names(programs))
-  if (length(missing)) {
-    stop("[add_program_colleges] programs lacks ", paste(missing, collapse = ", "), call. = FALSE)
-  }
-  programs <- programs %>%
-    dplyr::rename(source_college = student_college, source_college_code = college_code) %>%
-    dplyr::mutate(
-      program_college = resolve_program_colleges(major_code, dplyr::coalesce(source_college_code, ""), files),
-      .decided = !is.na(.confirmed_program_rows(major_code, dplyr::coalesce(source_college_code, ""),
-                                                files$programs, no_unit = TRUE)),
-      .banner = dplyr::coalesce(translate_source_college(source_college, files),
-                                translate_source_college(source_college_code, files)))
-  primary <- programs %>%
-    dplyr::filter(program_type == "Major") %>%
-    dplyr::arrange(student_id, term, major_code) %>%
-    dplyr::distinct(student_id, term, .keep_all = TRUE) %>%
-    dplyr::select(student_id, term, .primary_college = program_college, .primary_decided = .decided)
-  programs %>%
-    dplyr::left_join(primary, by = c("student_id", "term")) %>%
-    dplyr::mutate(
-      program_college = dplyr::if_else(grepl("Concentration", program_type),
-                                       .primary_college, program_college),
-      .primary_decided = dplyr::coalesce(.primary_decided, FALSE),
-      college_code = dplyr::if_else(.primary_decided, .primary_college, .banner),
-      college_basis = dplyr::case_when(
-        .primary_decided & !is.na(.primary_college) ~ "mapped",
-        !.primary_decided & !is.na(.banner)         ~ "banner",
-        TRUE                                        ~ NA_character_),
-      student_college = college_names(college_code, files)) %>%
-    dplyr::select(-".decided", -".banner", -".primary_college", -".primary_decided")
+# The inputs build_lookups() reads from sections and programs: the unit and
+# college behind each subject and program name. The tables store neither, so
+# they are attached here, transiently and on the key columns alone, through
+# attach_unit() -- the one resolver -- exactly as the loader attaches them.
+# cedar_lookups is itself a derived artifact the step's third PR reads off
+# the dimension tables instead; until then it is built as it always was.
+.sections_for_lookups <- function(cedar_sections, dims) {
+  cedar_sections %>%
+    dplyr::select(subject, source_college, level) %>%
+    attach_unit(dims, "subject", keys = c(subject = "subject")) %>%
+    distinct(subject, department, college) %>%
+    filter(!is.na(subject), subject != "", !is.na(department), department != "")
+}
+
+.programs_for_lookups <- function(cedar_programs, dims) {
+  cedar_programs %>%
+    dplyr::select(student_id, term, program_type, program_name, major_code,
+                  source_college_code, source_college) %>%
+    attach_program_units(dims) %>%
+    distinct(program_name, dept_code, major_code, college_code) %>%
+    filter(!is.na(program_name), program_name != "")
 }
 
 # ── 1. transform_sections: DESRs → cedar_sections ────────────────────────────
@@ -230,7 +205,7 @@ transform_sections <- function(desrs, data_dir, ext, maps) {
   message("  Loaded ", nrow(desrs), " rows, ", ncol(desrs), " columns")
   message("  Input columns: ", paste(names(desrs), collapse = ", "))
 
-  files  <- .require_mapping_files(maps, "transform_sections", c("subjects", "units", "colleges"))
+  dims   <- .require_dims(maps, "transform_sections")
   gen_ed <- maps$gen_ed
 
   # ── Pre-processing: derive helper columns ────────────────────────────────
@@ -260,20 +235,11 @@ transform_sections <- function(desrs, data_dir, ext, maps) {
     message("  ⚠️  gen_ed_courses.csv has no rows — gen_ed_area will be NA")
   }
 
-  # Unit from subjects.csv (ADR-002): the most specific confirmed row for the
-  # subject, the section's college and the course level. A subject with no
-  # confirmed row has no unit -- never a department named after itself. The
-  # end-of-transform mapping audit and Admin > Mappings list each one.
-  course_units <- resolve_course_units(desrs$SUBJ, desrs$COLLEGE, desrs$level, files)
-  desrs$DEPT <- course_units$unit_code
-  course_colleges <- .course_colleges(course_units, desrs$COLLEGE, files)
-  desrs$COLLEGE_REPORTED <- course_colleges$college
-  desrs$COLLEGE_BASIS    <- course_colleges$college_basis
-  rm(course_units, course_colleges)
-  no_unit <- sort(unique(desrs$SUBJ[is.na(desrs$DEPT)]))
-  if (length(no_unit) > 0)
-    message("  ⚠️  ", length(no_unit), " subject code(s) have no confirmed subjects.csv row, so no unit: ",
-            paste(no_unit, collapse = ", "))
+  # No unit is written: the section's subject and Banner's section college
+  # are its keys, and the loader attaches department, college and
+  # college_basis from subjects.csv at every start (ADR-001 step 3). A
+  # subject with no confirmed row is listed by the end-of-transform mapping
+  # audit and on Admin > Mappings.
 
   # ── HR merge (job_cat / title enrichment) ────────────────────────────────
   hr_file <- file.path(data_dir, paste0("hr_data", ext))
@@ -321,11 +287,9 @@ transform_sections <- function(desrs, data_dir, ext, maps) {
       course_title     = SECT_TITLE,
       part_term    = if ("PT" %in% names(.)) PT else NA_character_,
       campus       = CAMP,
-      # The mapped college (Stage 3b); Banner's own value stays beside it.
-      college        = COLLEGE_REPORTED,
+      # Banner's section college: the key the loader resolves the subject
+      # under. The mapped college and department are attached at load.
       source_college = COLLEGE,
-      college_basis  = COLLEGE_BASIS,
-      department   = DEPT,
       instructor_id   = as.character(PRIM_INST_ID),
       instructor_name = INST_NAME,
       job_cat      = if ("job_cat" %in% names(.)) job_cat else NA_character_,
@@ -477,23 +441,9 @@ transform_sections <- function(desrs, data_dir, ext, maps) {
   n_before_dedup <- nrow(cedar_sections)
   cedar_sections <- cedar_sections %>% distinct(section_id, .keep_all = TRUE)
 
-  # crosslist_external: TRUE if crosslist group involves sections from multiple departments.
-  xlist_dept_scope <- cedar_sections %>%
-    filter(!is.na(crosslist_group)) %>%
-    group_by(term, campus, crosslist_group) %>%
-    summarize(crosslist_external = n_distinct(department) > 1, .groups = "drop")
-  cedar_sections <- cedar_sections %>%
-    left_join(xlist_dept_scope, by = c("term", "campus", "crosslist_group"))
-
-  # crosslist_partners: all subject_course values in the same external crosslist group.
-  xl_partner_labels <- cedar_sections %>%
-    filter(!is.na(crosslist_group), coalesce(crosslist_external, FALSE)) %>%
-    distinct(term, campus, crosslist_group, subject_course) %>%
-    group_by(term, campus, crosslist_group) %>%
-    summarize(crosslist_partners = paste(sort(subject_course), collapse = " / "), .groups = "drop")
-  cedar_sections <- cedar_sections %>%
-    left_join(xl_partner_labels, by = c("term", "campus", "crosslist_group")) %>%
-    mutate(crosslist_partners = coalesce(crosslist_partners, NA_character_))
+  # crosslist_external (does the group span more than one department) and
+  # crosslist_partners (the courses in such a group) follow the department,
+  # so the loader attaches them with it (attach_section_units()).
 
   message("  ✅ Crosslist groups detected: ",
           n_distinct(na.omit(cedar_sections$crosslist_group)), " groups")
@@ -505,16 +455,12 @@ transform_sections <- function(desrs, data_dir, ext, maps) {
   message("  ✅ Created cedar_sections: ", nrow(cedar_sections), " rows, ", ncol(cedar_sections), " columns")
   message("  Output columns: ", paste(names(cedar_sections), collapse = ", "))
 
-  # Units come from the mapping files: stamp which files, so the rebuild gate
-  # can tell when they move (ISSUES.md M26), as for cedar_programs.
-  attr(cedar_sections, "cedar_mapping_provenance") <- cedar_mapping_provenance()
   saved_meta <- save_cedar_file(cedar_sections, "sections", data_dir, ext)
 
-  # Slim to only the columns build_lookups needs (subject_lookup).
-  # Avoids holding 30+ cols × all rows in memory through all subsequent transforms.
-  sections_for_lookups <- cedar_sections %>%
-    distinct(subject, department, college) %>%
-    filter(!is.na(subject), subject != "", !is.na(department), department != "")
+  # Slim to only the columns build_lookups needs (subject_lookup), units
+  # attached on the keys alone. Avoids holding 30+ cols × all rows in memory
+  # through all subsequent transforms.
+  sections_for_lookups <- .sections_for_lookups(cedar_sections, dims)
   rm(cedar_sections); gc(verbose = FALSE)
 
   list(saved = list(sections = saved_meta), table = sections_for_lookups)
@@ -589,20 +535,11 @@ transform_students <- function(class_lists, data_dir, ext, maps) {
   }
 
   if ("Subject Code" %in% names(class_lists)) {
-    # Unit from subjects.csv, as for sections (ADR-002): no confirmed row, no
-    # unit -- never a department named after the subject.
     # The course level is derived once here, and reused for the level column
-    # below: one classifier, called once per course table (ISSUES.md I5).
-    files <- .require_mapping_files(maps, "transform_students", c("subjects", "units", "colleges"))
+    # below: one classifier, called once per course table (ISSUES.md I5). No
+    # unit is written: the subject, Banner's course college and the level are
+    # the keys the loader resolves at every start (ADR-001 step 3).
     class_lists$COURSE_LEVEL <- course_level_from_number(class_lists$SUBJ_CRSE)
-    course_units <- resolve_course_units(
-      class_lists$`Subject Code`, class_lists$`Course College Code`,
-      class_lists$COURSE_LEVEL, files)
-    class_lists$DEPT <- course_units$unit_code
-    course_colleges <- .course_colleges(course_units, class_lists$`Course College Code`, files)
-    class_lists$COURSE_COLLEGE <- course_colleges$college
-    class_lists$COLLEGE_BASIS  <- course_colleges$college_basis
-    rm(course_units, course_colleges)
   }
 
   # Drop Subject Code and Course Number (now encoded in SUBJ_CRSE); keep transmute inputs.
@@ -611,8 +548,7 @@ transform_students <- function(class_lists, data_dir, ext, maps) {
       "Academic Period Code", "Course Reference Number", "Student ID",
       "SUBJ_CRSE", "Short Course Title",
       "Primary Instructor ID", "Primary Instructor Last Name", "Primary Instructor First Name",
-      "Course Campus Code", "Course College Code", "DEPT", "COURSE_LEVEL",
-      "COURSE_COLLEGE", "COLLEGE_BASIS",
+      "Course Campus Code", "Course College Code", "COURSE_LEVEL",
       "Registration Status", "Registration Status Code", "Registration Status Date",
       "Final Grade", "Course Credits", "Total Credits",
       "Student Level Code", "Student Classification", "Major Code", "Major",
@@ -643,11 +579,9 @@ transform_students <- function(class_lists, data_dir, ext, maps) {
         TRUE ~ NA_character_
       ),
       campus     = `Course Campus Code`,
-      # The mapped college (Stage 3b); Banner's own value stays beside it.
-      college        = COURSE_COLLEGE,
+      # Banner's course college: the key the loader resolves the subject
+      # under. The mapped college and department are attached at load.
       source_college = `Course College Code`,
-      college_basis  = COLLEGE_BASIS,
-      department = if ("DEPT" %in% names(.)) DEPT else Department,
       registration_status      = `Registration Status`,
       registration_status_code = `Registration Status Code`,
       registration_date = if ("Registration Status Date" %in% names(.)) {
@@ -748,9 +682,6 @@ transform_students <- function(class_lists, data_dir, ext, maps) {
   message("  Output columns: ", paste(names(cedar_students), collapse = ", "))
   rm(class_lists); gc(verbose = FALSE)
 
-  # Units come from the mapping files: stamp which files, so the rebuild gate
-  # can tell when they move (ISSUES.md M26), as for cedar_programs.
-  attr(cedar_students, "cedar_mapping_provenance") <- cedar_mapping_provenance()
   students_meta <- save_cedar_file(cedar_students, "students", data_dir, ext)
 
   # The per-term and running credit totals that cedar_student_term_credits
@@ -864,6 +795,7 @@ transform_programs <- function(academic_studies, data_dir, ext, maps) {
   message("  Input columns: ", paste(names(academic_studies), collapse = ", "))
 
   files                    <- .require_mapping_files(maps, "transform_programs", c("programs", "units", "colleges"))
+  dims                     <- .require_dims(maps, "transform_programs")
   major_name_to_major_code <- maps$major_name_to_major_code
 
   # ── Pre-processing: derive term ───────────────────────────────────────────
@@ -929,10 +861,13 @@ transform_programs <- function(academic_studies, data_dir, ext, maps) {
       student_classification = `Student Classification`,
       student_level          = `Student Level`,
       student_campus         = `Student Campus`,
-      student_college        = `Translated College`,
-      # Banner's Actual College as a code, through colleges.csv (its names and
-      # source_names), so a renamed college still resolves.
-      college_code           = translate_source_college(`Actual College`, files),
+      # Banner's two college values, the keys the loader resolves each
+      # program under (ADR-001 step 3): the Translated College as recorded,
+      # and the Actual College as a code, through colleges.csv (its names and
+      # source_names), so a renamed college still resolves. The mapped
+      # program_college, college_code and student_college are attached at load.
+      source_college         = `Translated College`,
+      source_college_code    = translate_source_college(`Actual College`, files),
       student_population     = if ("Student Population"             %in% names(.)) `Student Population`             else NA_character_,
       # ── Cumulative credit hours — NOT a per-term series ────────────────────
       # Reported by Academic Studies as running totals AS OF THE PULL, stamped
@@ -980,7 +915,7 @@ transform_programs <- function(academic_studies, data_dir, ext, maps) {
         major_code   = as.character(major_code),
         program_code,
         program_classification, degree,
-        student_classification, student_level, student_campus, student_college, college_code,
+        student_classification, student_level, student_campus, source_college, source_college_code,
         student_population, inst_credits_attempted, inst_credits_earned,
         overall_credits_attempted, overall_credits_earned,
         sem_credits_attempted, sem_credits_earned, sem_gpa,
@@ -1009,12 +944,11 @@ transform_programs <- function(academic_studies, data_dir, ext, maps) {
       ))
     ) %>%
     dplyr::mutate(
-      # Unit from programs.csv (ADR-002): the confirmed row for (code, college)
-      # if there is one, else the code's every-college row. One tier. A code
-      # with no confirmed row -- including a Banner organisation ID leaked into
-      # the major code column -- has no unit, never a department named after
-      # itself (ISSUES.md I7). Concentrations are resolved below.
-      dept_code = resolve_program_units(major_code, college_code, files$programs),
+      # No unit is written here (ADR-001 step 3): the loader resolves each
+      # row's major_code under its source_college_code through programs.csv
+      # at every start, a concentration under its primary major, and a code
+      # with no confirmed row to NA, never a department named after itself
+      # (ISSUES.md I7).
       # is_pre_major comes from programs.csv, stated per code (ADR-002 Stage 4),
       # not inferred from an F prefix. Banner's own program records name every
       # F and XF code the old rule exempted or missed "Pre-" (BS Pre-Exercise
@@ -1064,24 +998,6 @@ transform_programs <- function(academic_studies, data_dir, ext, maps) {
     # Working columns; pre_major_basis carries what they decided.
     dplyr::select(-dplyr::any_of(c(".concentration", ".pre_in_file", ".pre_by_name", ".pre_by_phrd")))
 
-  # Concentrations take the unit of the student's primary major that term
-  # (ADR-002): a concentration sits under a major, and matching its name to a
-  # major's instead lent PADM Political Science students (ISSUES.md I11). A
-  # student-term with two primary-major rows takes the first by major code, so
-  # the choice does not depend on row order.
-  primary_unit <- cedar_programs %>%
-    dplyr::filter(program_type == "Major") %>%
-    dplyr::arrange(student_id, term, major_code) %>%
-    dplyr::distinct(student_id, term, .keep_all = TRUE) %>%
-    dplyr::select(student_id, term, .primary_unit = dept_code)
-  cedar_programs <- cedar_programs %>%
-    dplyr::left_join(primary_unit, by = c("student_id", "term")) %>%
-    dplyr::mutate(dept_code = dplyr::if_else(grepl("Concentration", program_type),
-                                             .primary_unit, dept_code)) %>%
-    dplyr::select(-".primary_unit")
-
-  cedar_programs <- add_program_colleges(cedar_programs, files)
-
   # Warn about Major/Second Major rows with no major_code
   still_no_code <- cedar_programs %>%
     dplyr::filter(program_type %in% c("Major", "Second Major"),
@@ -1095,34 +1011,18 @@ transform_programs <- function(academic_studies, data_dir, ext, maps) {
       message("      [", still_no_code$program_type[i], "] ", still_no_code$program_name[i])
   }
 
-  na_dept_prgm <- cedar_programs %>%
-    filter(is.na(dept_code), program_type == "Major") %>%
-    distinct(major_code) %>% pull(major_code)
-  if (length(na_dept_prgm) > 0)
-    message("  ⚠️  Major rows with NA dept_code: ",
-            format(length(na_dept_prgm), big.mark = ","), " distinct values: ",
-            paste(na_dept_prgm[1:min(5, length(na_dept_prgm))], collapse = ", "))
-
   message("  ✅ Created cedar_programs: ", nrow(cedar_programs), " rows, ", ncol(cedar_programs), " columns")
   message("  Output columns: ", paste(names(cedar_programs), collapse = ", "))
   message("  Program type breakdown:")
   for (pt in unique(cedar_programs$program_type))
     message("     ", pt, ": ", sum(cedar_programs$program_type == pt))
 
-  # Stamp the mapping source that produced these departments, so a later deploy
-  # can tell whether this table was built by the code that is now deployed. The
-  # gap between editing a mapping list and rebuilding the table is invisible
-  # otherwise: dept_code stays plausible and every report keeps using it.
-  # Unconditional: a guard here once skipped the stamp silently whenever the
-  # transform ran as a script, and every refresh then read as STALE (ISSUES.md I13).
-  attr(cedar_programs, "cedar_mapping_provenance") <- cedar_mapping_provenance()
   saved_meta <- save_cedar_file(cedar_programs, "programs", data_dir, ext)
 
-  # Slim to only the columns build_lookups needs.
-  # Avoids holding 25+ cols × millions of rows through all subsequent transforms.
-  programs_for_lookups <- cedar_programs %>%
-    distinct(program_name, dept_code, major_code, college_code) %>%
-    filter(!is.na(program_name), program_name != "")
+  # Slim to only the columns build_lookups needs, units attached on the keys
+  # alone. Avoids holding 25+ cols × millions of rows through all subsequent
+  # transforms.
+  programs_for_lookups <- .programs_for_lookups(cedar_programs, dims)
   rm(cedar_programs); gc(verbose = FALSE)
 
   list(saved = list(programs = saved_meta), table = programs_for_lookups)
@@ -1144,8 +1044,6 @@ transform_degrees <- function(degrees, data_dir, ext, maps) {
   message("  Input columns: ", paste(names(degrees), collapse = ", "))
   message("  Transforming to CEDAR model...")
 
-  files                 <- .require_mapping_files(maps, "transform_degrees", c("programs", "units", "colleges"))
-
   required_cols <- c("Major", "Program Code", "Academic Period Code", "ID", "Degree", "Graduation Status")
   missing_cols  <- setdiff(required_cols, names(degrees))
   if (length(missing_cols) > 0)
@@ -1157,12 +1055,15 @@ transform_degrees <- function(degrees, data_dir, ext, maps) {
       degree_id      = paste0(`Academic Period Code`, "-", ID, "-", `Program Code`),
       student_id     = encrypt_if_needed(ID),
       term           = as.integer(`Academic Period Code`),
-      student_college = if ("Actual College" %in% names(.)) `Actual College` else NA_character_,
+      # Banner's two college values, the keys the loader resolves the degree's
+      # program under (ADR-001 step 3); dept_code, college_code, college and
+      # student_college are attached at load.
+      source_student_college = if ("Actual College" %in% names(.)) `Actual College` else NA_character_,
+      source_college = `Translated College`,
       degree         = Degree,
       award_category = if ("Award Category" %in% names(.)) `Award Category` else NA_character_,
       program_code   = `Program Code`,
       program_name   = Program,
-      college        = `Translated College`,
       department     = Department,
       graduation_status = `Graduation Status`,
       campus         = if ("Campus" %in% names(.)) Campus else NA_character_,
@@ -1181,37 +1082,11 @@ transform_degrees <- function(degrees, data_dir, ext, maps) {
       admitted_term      = if ("Academic Period Admitted"   %in% names(.)) suppressWarnings(as.integer(`Academic Period Admitted`)) else NA_integer_,
       as_of_date = as.Date(as_of_date)
     ) %>%
-    dplyr::mutate(
-      # Unit from programs.csv, as for cedar_programs (ADR-002): a code with
-      # no confirmed row has no unit.
-      .college_code = translate_source_college(student_college, files),
-      dept_code = resolve_program_units(major_code, unname(.college_code), files$programs),
-      # College (ADR-002 Stage 3b): the degree program's college through the
-      # files; for a code not yet decided, Banner's (Translated College, else
-      # Actual College), labelled "banner". Banner's values stay beside it.
-      .decided = !is.na(.confirmed_program_rows(major_code, dplyr::coalesce(unname(.college_code), ""),
-                                                files$programs, no_unit = TRUE)),
-      .mapped  = resolve_program_colleges(major_code, dplyr::coalesce(unname(.college_code), ""), files),
-      .banner  = dplyr::coalesce(translate_source_college(college, files),
-                                 translate_source_college(student_college, files)),
-      source_college         = college,
-      source_student_college = student_college,
-      college_code  = dplyr::if_else(.decided, .mapped, .banner),
-      college_basis = dplyr::case_when(.decided & !is.na(.mapped) ~ "mapped",
-                                       !.decided & !is.na(.banner) ~ "banner",
-                                       TRUE ~ NA_character_),
-      college         = college_names(college_code, files),
-      student_college = college,
-      degree_abbr = sub("^([A-Za-z]+)-.*$", "\\1", program_code)
-    ) %>%
-    dplyr::select(-.college_code, -.decided, -.mapped, -.banner)
+    dplyr::mutate(degree_abbr = sub("^([A-Za-z]+)-.*$", "\\1", program_code))
 
   message("  ✅ Created cedar_degrees: ", nrow(cedar_degrees), " rows, ", ncol(cedar_degrees), " columns")
   message("  Output columns: ", paste(names(cedar_degrees), collapse = ", "))
 
-  # Units come from the mapping files: stamp which files, so the rebuild gate
-  # can tell when they move (ISSUES.md M26), as for cedar_programs.
-  attr(cedar_degrees, "cedar_mapping_provenance") <- cedar_mapping_provenance()
   saved_meta <- save_cedar_file(cedar_degrees, "degrees", data_dir, ext)
   list(saved = list(degrees = saved_meta))
 }
@@ -1592,9 +1467,9 @@ transform_to_cedar <- function(data_dir = NULL, use_qs = NULL, tables = NULL,
   # institution mapping files (ADR-002). program_map.qs and the lists that fed
   # it were retired at Stage 4. Script mode, the deploy gate and the demo
   # generator all load CEDAR's functions first; anything else must too.
-  needed <- c("read_institution_mappings", "subj_dept_map", "college_name_to_code",
-              "dept_code_to_name", "major_name_to_major_code", "hr_org_desc_to_dept",
-              "CEDAR_GEN_ED_COURSES")
+  needed <- c("read_institution_mappings", "build_cedar_dims", "subj_dept_map",
+              "college_name_to_code", "dept_code_to_name", "major_name_to_major_code",
+              "hr_org_desc_to_dept", "CEDAR_GEN_ED_COURSES")
   missing <- needed[!vapply(needed, exists, logical(1))]
   if (length(missing)) {
     stop("[transform-to-cedar.R] CEDAR's lists are not loaded (run load_funcs() first); missing: ",
@@ -1616,6 +1491,9 @@ transform_to_cedar <- function(data_dir = NULL, use_qs = NULL, tables = NULL,
 
   maps <- list(
     mapping_files             = mapping_files,
+    # The same files as dimension tables, for the lookup inputs that attach
+    # a unit transiently through attach_unit() (ADR-001 step 3).
+    dims                      = build_cedar_dims(mapping_files),
     major_name_to_major_code  = major_name_to_major_code,
     college_name_to_code      = college_name_to_code,
     subj_dept_map             = subj_dept_map,
@@ -1747,18 +1625,14 @@ transform_to_cedar <- function(data_dir = NULL, use_qs = NULL, tables = NULL,
       sec_file <- file.path(data_dir, paste0("cedar_sections", ext))
       if (file.exists(sec_file)) {
         message("  Loading cedar_sections from disk for lookups (slimming)...")
-        cedar_for_lookups$sections <- load_file(sec_file, ext) %>%
-          distinct(subject, department, college) %>%
-          filter(!is.na(subject), subject != "", !is.na(department), department != "")
+        cedar_for_lookups$sections <- .sections_for_lookups(load_file(sec_file, ext), maps$dims)
       }
     }
     if (is.null(cedar_for_lookups$programs)) {
       prog_file <- file.path(data_dir, paste0("cedar_programs", ext))
       if (file.exists(prog_file)) {
         message("  Loading cedar_programs from disk for lookups (slimming)...")
-        cedar_for_lookups$programs <- load_file(prog_file, ext) %>%
-          distinct(program_name, dept_code, major_code, college_code) %>%
-          filter(!is.na(program_name), program_name != "")
+        cedar_for_lookups$programs <- .programs_for_lookups(load_file(prog_file, ext), maps$dims)
       }
     }
     result <- build_lookups(cedar_for_lookups$sections, cedar_for_lookups$programs,
@@ -1899,7 +1773,7 @@ if (!interactive() && !exists("SOURCED_FROM_PARSE_DATA")) {
   setwd(normalizePath(file.path(dirname(script_path), "..", "..")))
   if (file.exists("config/config.R")) source("config/config.R")
   # Load CEDAR's functions as scripts/rebuild-programs-if-mappings-changed.R
-  # does. Without them the provenance stamp on cedar_programs and the mapping
+  # does. Without them the mapping files, the dimension tables and the mapping
   # audit have nothing to call (ISSUES.md I13).
   source(file.path("R", "trunk", "load-funcs.R"))
   load_funcs(getwd(), modules = FALSE)

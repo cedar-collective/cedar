@@ -250,27 +250,20 @@ the code's row:
 next person's unanswerable question. Commit on a branch, one decision per
 commit, through a pull request: the app never edits the files.
 
-### 3. Rebuild — automatic on deploy and data refresh
+### 3. Restart — nothing is rebuilt
 
-`scripts/rebuild-programs-if-mappings-changed.R` runs on every deploy, which
-restarts the app when it rebuilt anything so the app serves the new tables,
-and on every `scripts/update-data.sh` run. The running app keeps the tables it loaded until
-it restarts: the morning job (`restart-cedar.sh --update`) restarts it, a bare
-`update-data.sh` run does not. It hashes the files that decide units and colleges
-(`cedar_mapping_source_files()`), compares them with the fingerprint stamped on
-each of `cedar_programs`, `cedar_degrees`, `cedar_sections` and
-`cedar_students`, and rebuilds only the tables that differ. It stops, rather
-than reporting success, if an export it needs is missing or a rebuilt table is
-still stale.
+No saved table stores a unit or a college (ADR-001 step 3): the app attaches
+every one when it starts, from the files as deployed
+(`attach_default_units()`, `R/branches/dims.R`). A merged edit takes effect at
+the next start, and the deploy restarts the app. The running app keeps what it
+attached until it restarts: the morning job (`restart-cedar.sh --update`)
+restarts it, a bare `update-data.sh` run does not. Locally, restart the app or
+re-source `scripts/cedar-repl.R`. Admin > Data & Usage > Mappings states what
+was read at startup; there is no STALE state to clear.
 
-The hash covers whole files, comments included, so Admin > Data & Usage reports
-STALE after any edit to them, even one that moves no department. The rebuild
-clears it. To apply an edit now: `Rscript --vanilla
-scripts/rebuild-programs-if-mappings-changed.R` (`--force` rebuilds all four).
-
-**Rebuild from the exports the transform reads** (`cedar_shared_data_dir`), not
-an old local copy: a stale `academic_studies.qs` faithfully reproduces stale
-programs.
+(`scripts/rebuild-programs-if-mappings-changed.R` still runs on every deploy
+and refresh, under its historical name, but builds only `cedar_student_terms`
+when that table is missing or stale.)
 
 ### 4. Verify
 

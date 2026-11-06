@@ -6,7 +6,7 @@
 # Every fact about a student in a term that CEDAR otherwise re-derives from raw
 # class-list rows, or reads off a column repeated on each of them, is here once:
 # who they were that term (level, classification, home campus, standing,
-# primary major and its unit), what they did (enrolled, courses, credits, DFW
+# primary major), what they did (enrolled, courses, credits, DFW
 # grades, late withdrawals), where they were in their degree (credits entering),
 # and whether they came back (`returned_next_regular_term`).
 #
@@ -26,6 +26,11 @@
 #     class list; past the edge, or into a Fall or Spring the data has no pull
 #     for, it is NA, never FALSE.
 #   - No pull-stamped field (inst_*, overall_*, inst_gpa) is on this table.
+#   - The table stores the primary major's KEYS -- its code and the source's
+#     college for it -- never its unit or college: those are attached at load
+#     by attach_default_units() (R/branches/dims.R, ADR-001 step 3) as
+#     `primary_dept_code`, `primary_college_code` and `primary_college_basis`,
+#     so a mapping edit changes the next start and rebuilds nothing.
 
 STUDENT_TERMS_BANNED_COLUMNS <- c("inst_credits_attempted", "inst_credits_earned",
                                   "overall_credits_attempted", "overall_credits_earned",
@@ -37,8 +42,8 @@ STUDENT_TERMS_COLUMNS <- c(
   "description_source", "description_conflict",
   # description
   "student_level", "student_classification", "student_campus", "academic_standing",
-  "residency", "time_status", "primary_major_code", "primary_dept_code",
-  "primary_college_code", "is_pre_major", "n_declarations", "declared",
+  "residency", "time_status", "primary_major_code", "primary_source_college_code",
+  "primary_source_college", "is_pre_major", "n_declarations", "declared",
   # enrollment
   "class_list_rows", "enrolled", "registered_courses", "late_withdrawals",
   "early_drops", "waitlisted_only", "attempted_unm_credits", "completed_unm_credits",
@@ -50,6 +55,10 @@ STUDENT_TERMS_COLUMNS <- c(
   "next_regular_term", "returned_next_regular_term", "return_observable",
   "degree_awarded"
 )
+
+# Attached at load from the keys above, never stored (ADR-001 step 3):
+# attach_student_term_units() in R/branches/dims.R writes them, and names them.
+STUDENT_TERMS_ATTACHED_COLUMNS <- unname(CEDAR_STUDENT_TERM_UNIT_COLS)
 
 # Stamped on the built table as the attribute cedar_student_terms_build_version.
 # Bump it when the builder's rules change the values it writes without adding
@@ -72,9 +81,10 @@ STUDENT_TERMS_BUILD_VERSION <- 2L
 #' @param edges The result of [cedar_data_edges()] on the same tables. Required
 #'   to carry `last_enrolled_complete`; the build stops without it.
 #' @param files The institution's mapping files, as [read_institution_mappings()]
-#'   returns them: a primary major the class list supplies resolves to its
-#'   unit, college and pre-major flag through `programs.csv`, exactly as a
-#'   programs row did in the transform.
+#'   returns them: a primary major the class list supplies takes its pre-major
+#'   flag from `programs.csv`, as a programs row's flag is the file's in the
+#'   transform. Its unit and college are not read here: the table stores the
+#'   code and the roster's college as keys, and the loader attaches them.
 #' @param opt Unused; present for the branch calling convention.
 #' @return A tibble with `STUDENT_TERMS_COLUMNS`, one row per student-term,
 #'   carrying `STUDENT_TERMS_BUILD_VERSION` as the attribute
@@ -87,8 +97,8 @@ build_student_terms <- function(students, programs = NULL, degrees = NULL,
                          "credits", "subject_course", "course_title", "student_level",
                          "student_classification", "student_campus", "residency",
                          "major_code", "student_college", "as_of_date")
-  required_programs <- c("student_id", "term", "program_type", "major_code", "dept_code",
-                         "college_code", "is_pre_major", "student_level",
+  required_programs <- c("student_id", "term", "program_type", "major_code",
+                         "source_college_code", "source_college", "is_pre_major", "student_level",
                          "student_classification", "student_campus", "academic_standing",
                          "residency", "time_status", "sem_gpa", "as_of_date")
   if (is.null(programs)) {
@@ -150,29 +160,28 @@ build_student_terms <- function(students, programs = NULL, degrees = NULL,
   # student-terms have no academic studies row at all (branch-campus associate
   # and non-degree students, mostly: 92,653 on the 2026-11-04 pull, every one
   # with a major on its class list). Their primary major fills in from the
-  # class list, resolved through programs.csv exactly as a programs row is in
-  # the transform: unit from the confirmed row, college from the file where
-  # the code is decided and from Banner's own value translated through
-  # colleges.csv where it is not, pre-major flag from the file; NA where the
-  # code has no confirmed row, never the code itself. description_source
-  # already says "class_list" on these rows. A row with a programs pull is
-  # never filled, even when that pull holds no Major row.
+  # class list: the roster's major code, with the roster's Student College
+  # Code as the college key the loader resolves it under (as a programs row's
+  # Actual College is), and the pre-major flag from programs.csv. The unit and
+  # college themselves are attached at load from these keys, exactly as a
+  # programs row's are. The roster gives a college CODE and no name, so both
+  # key columns hold the code on these rows, where a programs row's
+  # primary_source_college holds Banner's Translated College name; the
+  # loader's "banner" label translates either (translate_source_college()
+  # passes a code through), and description_source, already "class_list" on
+  # these rows, says which vocabulary a row holds. A row with a programs pull
+  # is never filled, even when that pull holds no Major row.
   from_classlist <- is.na(st$programs_as_of) & !is.na(st$cl_major_code)
   if (any(from_classlist)) {
-    code    <- st$cl_major_code[from_classlist]
-    college <- dplyr::coalesce(st$cl_student_college[from_classlist], "")
-    decided <- !is.na(.confirmed_program_rows(code, college, files$programs, no_unit = TRUE))
-    st$primary_major_code[from_classlist]   <- code
-    st$primary_dept_code[from_classlist]    <- resolve_program_units(code, college, files$programs)
-    st$primary_college_code[from_classlist] <- dplyr::if_else(
-      decided, resolve_program_colleges(code, college, files),
-      translate_source_college(college, files))
+    code <- st$cl_major_code[from_classlist]
+    st$primary_major_code[from_classlist]          <- code
+    st$primary_source_college_code[from_classlist] <- st$cl_student_college[from_classlist]
+    st$primary_source_college[from_classlist]      <- st$cl_student_college[from_classlist]
     st$is_pre_major[from_classlist] <- program_pre_major_flags(code, files$programs)
     message(sprintf(
-      "[student-terms.R] %s student-terms take their primary major from the class list (no academic studies row); %s resolve to a unit through programs.csv, %s to a college.",
+      "[student-terms.R] %s student-terms take their primary major from the class list (no academic studies row); %s of them carry a roster college to resolve it under.",
       format(sum(from_classlist), big.mark = ","),
-      format(sum(!is.na(st$primary_dept_code[from_classlist])), big.mark = ","),
-      format(sum(!is.na(st$primary_college_code[from_classlist])), big.mark = ",")))
+      format(sum(!is.na(st$primary_source_college_code[from_classlist])), big.mark = ",")))
   }
 
   # ── Position: the running total of attempted credits over the data ───────
@@ -419,7 +428,8 @@ build_student_terms <- function(students, programs = NULL, degrees = NULL,
     dplyr::arrange(student_id, term, major_code) %>%
     dplyr::distinct(student_id, term, .keep_all = TRUE) %>%
     dplyr::transmute(student_id, term, primary_major_code = major_code,
-                     primary_dept_code = dept_code, primary_college_code = college_code,
+                     primary_source_college_code = source_college_code,
+                     primary_source_college = source_college,
                      is_pre_major = as.logical(is_pre_major))
 
   description %>%
@@ -463,7 +473,7 @@ build_student_terms <- function(students, programs = NULL, degrees = NULL,
 .empty_programs <- function() {
   tibble::tibble(
     student_id = character(), term = integer(), program_type = character(),
-    major_code = character(), dept_code = character(), college_code = character(),
+    major_code = character(), source_college_code = character(), source_college = character(),
     is_pre_major = logical(), student_level = character(),
     student_classification = character(), student_campus = character(),
     academic_standing = character(), residency = character(), time_status = character(),

@@ -102,13 +102,14 @@ Normalizing is cheap. Re-deriving is what is slow, and it is also where the
 
 ### 4. Mappings are applied at transform time, so an edit rebuilds four tables
 
-ADR-002 Stage 3 stamps `subjects.csv` onto every class-list row and section
-(`department`, `college`) and `programs.csv` onto every program and degree row
-(`dept_code`, `college_code`). A one-line edit to a 263-line CSV rebuilds four
-tables; each carries a provenance stamp so a deploy gate
-(`scripts/rebuild-programs-if-mappings-changed.R`) can tell which is stale;
-and the same unit fact lives in four places, each able to drift, which is how
-I9 misclassified 23,272 rows. The gate and the stamps are machinery for a
+*(As it stood until step 3, 2026-11-06.)* ADR-002 Stage 3 stamped
+`subjects.csv` onto every class-list row and section (`department`, `college`)
+and `programs.csv` onto every program and degree row (`dept_code`,
+`college_code`). A one-line edit to a 263-line CSV rebuilt four tables; each
+carried a provenance stamp so a deploy gate
+(`scripts/rebuild-programs-if-mappings-changed.R`) could tell which was stale;
+and the same unit fact lived in four places, each able to drift, which is how
+I9 misclassified 23,272 rows. The gate and the stamps were machinery for a
 problem the storage shape created.
 
 ---
@@ -163,7 +164,7 @@ after the fact. It drops the student-term and section descriptions.
 The vocabulary decision is made once, in one column of one dimension. The
 mapping files **are** the dimension tables: an edit changes the next load and
 rebuilds nothing. The provenance stamps, `CEDAR_MAPPED_TABLES` and the deploy
-gate retire with the stamped columns.
+gate's mapping branch retired with the stamped columns (step 3, 2026-11-06).
 
 ### Measures: computed once, under the canonical definitions
 
@@ -384,6 +385,22 @@ data at each.**
    attached at load". Because the loader already drops any stamped column, a
    file written by either transform loads the same way, and the deploy needs
    no startup sequencing of the kind I46 was about.
+   **Done 2026-11-06.** The transform writes `source_college` on sections
+   and class-list rows, `source_college` / `source_college_code` on programs
+   and `source_student_college` / `source_college` on degrees, and nothing
+   else about a unit; `.sections_for_lookups()` / `.programs_for_lookups()`
+   attach through `dims` to build `cedar_lookups`. `cedar_student_terms`
+   stores `primary_source_college_code` / `primary_source_college` beside
+   `primary_major_code`; `attach_student_term_units()` resolves the three
+   attached columns, and `attach_section_units()` derives
+   `crosslist_external` / `crosslist_partners` from the attached department.
+   `R/branches/mapping-provenance.R` and `CEDAR_MAPPED_TABLES` are gone; the
+   gate is `build_student_terms_if_stale()` and nothing else. Measured on the
+   2026-10-08 pull: the new builder rebuilds the saved table's 518,894
+   student-terms (136.6 s) and, attached (0.39 s, 368 MB transient over a
+   136 MB table), `primary_major_code`, `primary_dept_code`,
+   `primary_college_code` and `is_pre_major` match the stamped values on
+   every row (14,086 under a Banner college, 451,940 mapped, 52,868 none).
 3. **`dims` absorbs `cedar_lookups`.** The lookups the transform builds from
    the files (`dept_lookup`, `dept_name_lookup`, `college_code_to_name`,
    `subject_lookup`) are read off `dims`; the ones it builds from the data

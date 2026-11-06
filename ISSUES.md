@@ -29,6 +29,7 @@ recurrence is recognizable.
 
 | ID | Kind | Summary |
 |---|---|---|
+| [I48](#i48--a-transform-change-to-a-fact-tables-stored-columns-is-not-rebuilt-at-deploy) | Defect | Since the mapping stamps retired (ADR-001 step 3, 2026-11-06) the deploy gate rebuilds only `cedar_student_terms`: a transform change that adds or renames a stored column on sections, students, programs or degrees starts the app on files without it until the morning refresh, the I46 shape with no gate |
 | [I47](#i47--the-class-lists-student_classification-is-stamped-at-pull-time-when-a-term-is-pulled-late) | Defect | A class list pulled months after its term carries each student's classification as of the pull: Fall 2025's list (pulled 2026-03-07) puts 35% of ENGL 1120's registered student-terms one step ahead of the classification academic studies recorded for Fall 2025. Every grouping reader now takes the student-term table's value; the `classification` filter key and Regstats' sophomore screen still read the class list |
 | [I46](#i46--a-deploy-that-must-rebuild-a-table-the-app-cannot-start-without-takes-the-site-down) | Defect | The deploy's table gate ran after the health check, so a deploy that added a column to `cedar_student_terms` failed its health check on the missing column and never reached the gate: production served the restart page from 17:07 UTC on 2026-11-04 (gate moved before the first request) |
 | [I45](#i45--the-class-list-and-the-schedule-name-the-same-section-with-different-course-codes) | Defect | The class list and the schedule name the same section differently for renamed subjects (SOC to SOCI, PSY to PSYC, CCS to CCST): SOCI 371 has class-list history from Fall 2019 but no sections before Fall 2021 |
@@ -72,6 +73,41 @@ Kept until the next release, so a recurrence is recognisable; each entry below g
 ---
 
 # Defects
+
+## I48 — A transform change to a fact table's stored columns is not rebuilt at deploy
+
+**Status:** open.
+**Found:** 2026-11-06, in review of the PR that retired the mapping stamps
+(ADR-001 step 3, PR 2).
+**Severity:** medium. Until 2026-11-06 each mapped table carried a provenance
+stamp that hashed `R/data-parsers/transform-to-cedar.R` among the mapping
+files, so any transform edit rebuilt `cedar_sections`, `cedar_students`,
+`cedar_programs` and `cedar_degrees` at deploy (about 16 minutes, every
+time, whatever the edit). The stamps went with the stored unit columns, and
+nothing replaced the one case that mattered: a transform change that adds or
+renames a column the loader or a reader needs. The deploy gate
+(`scripts/rebuild-programs-if-mappings-changed.R`) now checks
+`cedar_student_terms` alone (file times, `STUDENT_TERMS_COLUMNS`,
+`STUDENT_TERMS_BUILD_VERSION`); the four fact tables are rebuilt only by the
+morning refresh. So a deploy of such a change starts the app on yesterday's
+files, and the first reader of the new column fails until the refresh: the
+I46 shape, with no gate in front of it.
+**Reproduction:** add a stored column to `transform_sections()` and a reader
+of it to `attach_section_units()`; deploy without a refresh. The gate reports
+`cedar_student_terms is current`, the app starts, and `attach_unit()` stops on
+the missing key.
+**Fix (not yet made):** the pattern `cedar_student_terms` already uses. The
+transform stamps each fact table with a `cedar_transform_schema_version`
+attribute from a constant beside `STUDENT_TERMS_BUILD_VERSION`, bumped by hand
+when a stored column is added, renamed or changes meaning; the gate compares
+the saved stamp with the constant and rebuilds the stale tables in their own R
+process (`--tables sections students ...`, one table per process on the 8.6 GB
+host, see the memory-kill note under I46), then `cedar_student_terms`, which
+their file times make stale. An unstamped file predates stamping and is
+rebuilt once. A transform edit that changes no stored column then costs the
+deploy nothing, which the retired stamp could not tell.
+**Affects:** `.github/workflows/deploy.yml`,
+`scripts/rebuild-programs-if-mappings-changed.R`, `transform-to-cedar.R`.
 
 ## I47 — The class list's `student_classification` is stamped at pull time when a term is pulled late
 
@@ -2980,12 +3016,16 @@ refuses a confirmed pre-major in a different unit from its target (tested in
 reviewer: check the target's name.
 
 **M26 — The mapping gate rebuilds cedar_programs only.** *Status: resolved
-2026-10-10.* The transform stamps programs, degrees, sections and class lists
-with their mapping provenance, and the gate rebuilds whichever are stale
-(`cedar_stale_mapped_tables()`), stopping if an export it needs is missing or a
-rebuilt table is still stale. Before, it rebuilt only `cedar_programs`, so a
-subject decision reached the course tables only at the next refresh. A
-rebuild now restarts the app so it serves them (I22).
+2026-10-10; superseded 2026-11-06.* The transform stamped programs, degrees,
+sections and class lists with their mapping provenance, and the gate rebuilt
+whichever were stale (`cedar_stale_mapped_tables()`), stopping if an export it
+needed was missing or a rebuilt table was still stale. Before, it rebuilt only
+`cedar_programs`, so a subject decision reached the course tables only at the
+next refresh. A rebuild restarted the app so it served them (I22). Since
+ADR-001 step 3 no table stores a unit: the loader attaches every one at start
+from the mapping files, so a mapping edit rebuilds nothing, and the stamps,
+`R/branches/mapping-provenance.R` and the gate's mapping branch are gone. The
+gate builds `cedar_student_terms` alone.
 
 ### Architecture rules (`AGENTS.md`)
 
