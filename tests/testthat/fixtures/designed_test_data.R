@@ -2074,6 +2074,7 @@ cedar_students <- cedar_students %>%
       TRUE                                                ~ "Sophomore"
     ),
     major_code            = NA_character_,
+    major_name            = NA_character_,
     student_college       = college,
     student_campus        = campus,
     residency             = "Resident",
@@ -3059,6 +3060,7 @@ gen_ed_assoc_students <- dplyr::bind_rows(
     total_credits         = 15,
     student_classification = "Freshman",
     major_code    = "SPAN",
+    major_name    = "Spanish",
     student_college = "ARTS",
     student_campus  = campus,
     residency     = "Resident",

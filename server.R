@@ -4865,7 +4865,7 @@ output$enrl_classlist_download <- downloadHandler(
     student_terms = cedar_student_terms,
     edges = data_objects[["cedar_edges"]],
     current_term = cedar_current_term,
-    lookups = data_objects[["cedar_lookups"]]
+    dims = data_objects[["cedar_dims"]]
   )
 
   #################################

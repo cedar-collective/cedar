@@ -326,3 +326,33 @@ test_that("Retention and Roadblocks agree on who returned, through the table (I4
   expect_equal(row$pop_n_pass, 10L)
   expect_equal(1 - row$pop_pass_stopout_rate, spring$ret_1)
 })
+
+
+# ── name_program_codes(): one name per code, from programs.csv ───────────────
+test_that("name_program_codes reads programs.csv through dims, the every-college row first", {
+  # The demo institution's programs.csv names HIST "History" and SPAN "Spanish";
+  # a code with no row is itself; NA and blank codes are dropped.
+  labels <- name_program_codes(c("HIST", NA, "SPAN", "", "ZZZZ", "HIST"), test_dims)
+  expect_equal(labels, c(HIST = "History", SPAN = "Spanish", ZZZZ = "ZZZZ"))
+
+  # A code with a college-specific row beside its every-college row takes the
+  # every-college row's name, whatever order the file lists them in.
+  dims <- test_dims
+  dims$programs <- rbind(
+    data.frame(program_code = "HIST", in_college = "AS", program_name = "History (A&S)",
+               unit_code = "HIST", college_code = "", is_pre_major = "FALSE", leads_to = "",
+               basis = "override", status = "confirmed", evidence = "", notes = ""),
+    dims$programs)
+  expect_equal(name_program_codes("HIST", validate_cedar_dims(dims)), c(HIST = "History"))
+
+  # The pre-major flag is the caller's, row for row: a code flagged on any row
+  # is suffixed, so a pre-major never shares a label with the major it leads to.
+  expect_equal(name_program_codes(c("HIST", "HIST", "SPAN"), test_dims,
+                                  is_pre_major = c(FALSE, TRUE, FALSE)),
+               c(HIST = "History (pre-major)", SPAN = "Spanish"))
+  expect_error(name_program_codes("HIST", test_dims, is_pre_major = logical(0)), "parallel")
+  # Dims are required: the programs table does not name codes.
+  expect_error(name_program_codes("HIST", test_programs_st), "build_cedar_dims")
+  # No names, no entries.
+  expect_equal(name_program_codes(c(NA, ""), test_dims), stats::setNames(character(0), character(0)))
+})

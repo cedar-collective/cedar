@@ -359,12 +359,13 @@ attach_default_units <- function(tables, dims) {
 }
 
 # ── The lookups, read off the dimension tables (ADR-001 step 3, PR 3) ─────────
-# What cedar_lookups used to carry from the transform -- unit names, college
-# names, which subjects a unit teaches -- is the mapping files restated, so it
-# is read here at each start and never saved. The transform's cedar_lookups
-# keeps only what the files cannot know: major_code_to_name, from the class
-# lists. Measured on the 2026-10-08 pull: every saved (subject, unit) pair is
-# among the files' rows, every unit name and every college name is identical.
+# What the retired cedar_lookups used to carry from the transform -- unit
+# names, college names, which subjects a unit teaches, a program code's name --
+# is the mapping files restated, so it is read here at each start and never
+# saved. Measured on the 2026-10-08 pull: every saved (subject, unit) pair is
+# among the files' rows, every unit name and every college name is identical,
+# and 411 of the 415 program names both named agreed (the file wins on the 4).
+# Program names are read by name_program_codes() (R/branches/student-terms.R).
 
 #' Unit code and display name, one row per unit in units.csv
 #'

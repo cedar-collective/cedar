@@ -491,7 +491,8 @@ compute_dept_enrl_tab <- function(base, data_objects, campus_filter = NULL) {
     scoped_data[["cedar_students"]],
     scoped_data[["cedar_sections"]],
     base$dept_code,
-    base$current_term
+    base$current_term,
+    dims = scoped_data[["cedar_dims"]]
   )
   enrl$tables$enrl_student_donuts <- dept_student_donut_cache_data(student_donuts)
   enrl$plots$student_donuts <- student_donuts
@@ -603,8 +604,8 @@ compute_dept_credit_hours_tab <- function(base, data_objects,
     base$term_end,
     base$palette
   )
-  # Each row's major is its student-term's primary major, named through the
-  # programs table (ADR-001 step 2); the roster's major columns are not read.
+  # Each row's major is its student-term's primary major (ADR-001 step 2),
+  # named through the dimension tables; the roster's major columns are not read.
   sch_major <- credit_hours_by_major(
     filtered_cl,
     do_filt[["cedar_sections"]],
@@ -615,8 +616,7 @@ compute_dept_credit_hours_tab <- function(base, data_objects,
     student_terms = do_filt[["cedar_student_terms"]],
     major_names = name_program_codes(
       do_filt[["cedar_student_terms"]]$primary_major_code,
-      do_filt[["cedar_programs"]],
-      do_filt[["cedar_lookups"]]$major_code_to_name,
+      do_filt[["cedar_dims"]],
       is_pre_major = do_filt[["cedar_student_terms"]]$is_pre_major
     ),
     include_all_ug = FALSE,

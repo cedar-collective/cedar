@@ -86,7 +86,6 @@ if (is_docker()) {
 #   - cedar_programs.qs    - Program enrollments
 #   - cedar_degrees.qs     - Degrees awarded
 #   - cedar_faculty.qs     - Faculty data
-#   - cedar_lookups.qs     - major_code_to_name, the one lookup the mapping files cannot supply (class-list Major Code → name)
 #
 # data_objects Structure (what cones expect):
 #   data_objects[["cedar_sections"]]  - Course sections
@@ -95,7 +94,7 @@ if (is_docker()) {
 #   data_objects[["cedar_programs"]]  - Program enrollments
 #   data_objects[["cedar_degrees"]]   - Degrees awarded
 #   data_objects[["cedar_faculty"]]   - Faculty data
-#   data_objects[["cedar_lookups"]]   - list(major_code_to_name); unit, college and subject lookups are read off data_objects[["cedar_dims"]]
+#   data_objects[["cedar_dims"]]      - The mapping files as dimension tables (units, colleges, subjects, programs), built at load
 #
 # Note: Runtime code should use the CEDAR table names above. Short aliases are
 #       provided only for analyst convenience in interactive sessions.
@@ -108,7 +107,6 @@ cedar_files <- list(
   cedar_programs   = "cedar_programs",
   cedar_degrees    = "cedar_degrees",
   cedar_faculty    = "cedar_faculty",
-  cedar_lookups    = "cedar_lookups",    # Auto-generated normalization tables
   cedar_grades     = "cedar_grades",     # Pre-classified outcomes (pass/dfw) — speeds up Roadblocks
   cedar_student_terms = "cedar_student_terms", # One row per student-term: enrolled, returned (ADR-001 step 2)
   cedar_applicants = "cedar_applicants"  # Admissions data — used for course impact covariate matching
@@ -333,17 +331,14 @@ cedar_degrees_hash <- cedar_cache_object_hash(
 cedar_faculty_hash <- cedar_cache_object_hash(
   data_objects[["cedar_faculty"]], cedar_source_fingerprints[["cedar_faculty"]]
 )
-cedar_lookups_hash <- cedar_cache_object_hash(
-  data_objects[["cedar_lookups"]], cedar_source_fingerprints[["cedar_lookups"]]
-)
 # Dept Trends uses content hashes, prepared once so individual tab requests
 # never rescan source tables or invalidate just because a file was rewritten.
 cedar_dept_source_hashes <- hash_dept_cache_sources(data_objects)
 message(sprintf(
   paste0("[global.R] Cache hashes: students=%s sections=%s programs=%s ",
-         "degrees=%s faculty=%s lookups=%s"),
+         "degrees=%s faculty=%s"),
   cedar_students_hash, cedar_sections_hash, cedar_programs_hash,
-  cedar_degrees_hash, cedar_faculty_hash, cedar_lookups_hash
+  cedar_degrees_hash, cedar_faculty_hash
 ))
 
 message("[global.R] Data objects ready:")
@@ -353,21 +348,6 @@ message("  - cedar_student_terms: ", nrow(data_objects[["cedar_student_terms"]])
 message("  - cedar_programs: ", nrow(data_objects[["cedar_programs"]]), " rows")
 message("  - cedar_degrees: ", nrow(data_objects[["cedar_degrees"]]), " rows")
 message("  - cedar_faculty: ", nrow(data_objects[["cedar_faculty"]]), " rows")
-if (!is.null(data_objects[["cedar_lookups"]])) {
-  lookups <- data_objects[["cedar_lookups"]]
-  message("  - cedar_lookups: ", length(lookups), " tables (", paste(names(lookups), collapse = ", "), ")")
-
-  # Load major_code_to_name from data-derived version (built from class_lists during transform).
-  if ("major_code_to_name" %in% names(lookups) && length(lookups$major_code_to_name) > 0) {
-    major_code_to_name <- lookups$major_code_to_name
-    message("  - major_code_to_name: ", length(major_code_to_name), " entries (data-derived)")
-  } else {
-    major_code_to_name <- character(0)
-    message("  - major_code_to_name: empty — re-run transform to generate data-derived version")
-  }
-  # dept_code_to_name (unit code → name) is units.csv, read by
-  # R/lists/catalog_lookups.R at load; nothing here overrides it (ADR-001 step 3).
-}
 } # end data loading for docker
 
 # ── Pre-compute enrollment stats base table for regstats ─────────────────────

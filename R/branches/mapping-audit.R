@@ -84,6 +84,39 @@ audit_mapping_coverage <- function(files, sections = NULL, students = NULL,
                        file = "subjects", line)
   }
 
+  # Class-list major codes with no programs.csv row. The roster's major is the
+  # student-term table's primary major wherever the student has no declaration
+  # that term (a branch's associate program, a retired code), and every label
+  # built from that column -- the Gen Ed major mix, SCH by major, the Dept
+  # Dashboard's donuts -- is programs.csv's name for the code
+  # (name_program_codes()). A code the file does not carry is shown as itself
+  # until a row names it; the roster's own name is carried here as context.
+  if (!is.null(students)) {
+    need(students, c("major_code", "major_name", "term"), "cedar_students")
+    checked <- c(checked, "class_list_program_code")
+    unmapped <- students %>%
+      dplyr::filter(!is.na(major_code), nzchar(major_code),
+                    !major_code %in% files$programs$program_code)
+    roster_names <- unmapped %>%
+      dplyr::filter(!is.na(major_name), nzchar(major_name)) %>%
+      dplyr::count(major_code, major_name) %>%
+      dplyr::group_by(major_code) %>%
+      dplyr::slice_max(n, n = 1, with_ties = FALSE) %>%
+      dplyr::ungroup() %>%
+      dplyr::select(major_code, roster_name = major_name)
+    out$class_list_program_code <- unmapped %>%
+      span(major_code) %>%
+      dplyr::left_join(roster_names, by = "major_code") %>%
+      dplyr::transmute(
+        kind = "program_code", value = major_code,
+        context = org_id_or(major_code, dplyr::if_else(
+          is.na(roster_name), "class-list major, unnamed on the roster",
+          paste0("class-list major \"", roster_name, "\""))),
+        rows, first_term, last_term, status = "unmapped",
+        consequence = "Its students' seats are labelled by the code: nothing names it until a programs.csv row does",
+        file = "programs", line = NA_integer_)
+  }
+
   # Section colleges no colleges.csv row names.
   if (!is.null(sections)) {
     need(sections, "term", "cedar_sections")
@@ -214,6 +247,8 @@ audit_mapping_coverage <- function(files, sections = NULL, students = NULL,
       "A college for it: add to source_names, or to source_values_without_college",
     kind == "program_code" & grepl("organisation ID", context) ~
       "Nothing to map: a source data error to report",
+    kind == "program_code" & grepl("^class-list major", context) ~
+      "A programs.csv row: a proposed row carrying the roster's name, until the unit is decided",
     kind == "program_code" ~ "A programs.csv row: run propose-mappings.R --write",
     kind == "college_disagreement" ~ "A decision: confirm, or set the program's college_code",
     kind == "unit_college" ~ "A home college for the unit",

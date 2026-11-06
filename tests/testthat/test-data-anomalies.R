@@ -320,8 +320,9 @@ test_that("the mapping audit lists each kind of unmapped value, and college disa
                "unmapped", "unmapped"),
     rows   = c(1L, 3L, 4L, 2L, 1L, 17L, 1L, 2L, NA)))
   expect_setequal(attr(audit, "checked"),
-                  c("subject", "section_college", "program_code", "source_college",
-                    "college_disagreement", "degree_program_code", "degree_college", "unit_college"))
+                  c("subject", "class_list_program_code", "section_college", "program_code",
+                    "source_college", "college_disagreement", "degree_program_code",
+                    "degree_college", "unit_college"))
   # Where to fix each: POLS-BA's programs.csv row is line 11; PSYC is units.csv
   # line 7; a value with no row points at the file, with no line.
   where <- audit %>% dplyr::filter(value %in% c("POLS-BA", "PSYC", "BIOL"))
@@ -352,6 +353,36 @@ test_that("a subject proposed in subjects.csv is still unmapped, and says where"
   expect_match(biol$context, "proposed in subjects.csv")
   expect_equal(biol$needs, "Confirm the suggested department, MATH, or replace it")
   expect_equal(biol$line, 6L)
+})
+
+test_that("the mapping audit lists a class-list major code no programs.csv row names, with the roster's name", {
+  # ST01: every class-list row carries SPAN as the roster's major (named
+  # "Spanish" there), and the audit's fixture files have no SPAN row.
+  audit <- audit_mapping_coverage(audit_files(), students = test_students_st)
+  span <- audit %>% dplyr::filter(kind == "program_code", value == "SPAN")
+  expect_equal(nrow(span), 1L)
+  expect_equal(span$context, 'class-list major "Spanish"')
+  expect_equal(span$rows, nrow(test_students_st))
+  expect_equal(c(span$first_term, span$last_term), c(202010L, 202110L))
+  expect_equal(span$file, "programs")
+  expect_true(is.na(span$line))
+  expect_match(span$needs, "^A programs.csv row: a proposed row carrying the roster's name")
+  expect_true("class_list_program_code" %in% attr(audit, "checked"))
+  # A roster with no name for the code says so instead of inventing one.
+  unnamed <- test_students_st; unnamed$major_name <- NA_character_
+  expect_equal(audit_mapping_coverage(audit_files(), students = unnamed) %>%
+                 dplyr::filter(value == "SPAN") %>% dplyr::pull(context),
+               "class-list major, unnamed on the roster")
+  # A row in the file, proposed or confirmed, takes the code off the list.
+  files <- audit_files()
+  files$programs <- rbind(files$programs, data.frame(
+    program_code = "SPAN", in_college = "", program_name = "Spanish", unit_code = "",
+    college_code = "", is_pre_major = "FALSE", leads_to = "", basis = "unresolved",
+    status = "proposed", evidence = "", notes = ""))
+  expect_false("SPAN" %in% audit_mapping_coverage(files, students = test_students_st)$value)
+  # The class lists must carry the roster's name column to be checked.
+  expect_error(audit_mapping_coverage(audit_files(), students = dplyr::select(test_students_st, -major_name)),
+               "cedar_students lacks major_name")
 })
 
 test_that("the mapping audit checks only the tables it is given, and says so", {

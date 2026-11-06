@@ -178,26 +178,28 @@ test_that("the mapping work list separates decisions from problems no mapping fi
   # kind of work -- a subject to decide (taught in a named college, one under
   # an old code colleges.csv translates, and an unnamed one), a college check to review, an expected pre-major difference,
   # a Banner organisation ID in the major code, a program code with no
-  # programs.csv row (FNRS, which HP01 names "Nursing"), and a unit with no
-  # home college.
+  # programs.csv row (FNRS, which HP01 names "Nursing"), a class-list-only
+  # code (COSM, which no program record carries and the roster names
+  # "Cosmetology"), and a unit with no home college.
   audit <- tibble::tibble(
     kind = c("subject", "college_disagreement", "college_disagreement", "program_code",
-             "program_code", "unit_college"),
-    value = c("BIOL", "NURS", "FBIO", "1084", "FNRS", "MEDL"),
+             "program_code", "program_code", "unit_college"),
+    value = c("BIOL", "NURS", "FBIO", "1084", "FNRS", "COSM", "MEDL"),
     context = c("college AS, ED, STEM", "mapped AS, Banner Translated College SOSC",
                 "mapped STEM, Banner Translated College UC",
                 "a Banner organisation ID in the major code column, not a program",
-                "program record", "units.csv"),
-    rows = c(2L, 4L, 1L, 2L, 3L, NA), first_term = NA_integer_, last_term = NA_integer_,
-    status = c("unmapped", "review", "expected", "unmapped", "unmapped", "unmapped"),
+                "program record", 'class-list major "Cosmetology"', "units.csv"),
+    rows = c(2L, 4L, 1L, 2L, 3L, 1419L, NA), first_term = NA_integer_, last_term = NA_integer_,
+    status = c("unmapped", "review", "expected", "unmapped", "unmapped", "unmapped", "unmapped"),
     consequence = "", needs = c("A subjects.csv row: department and college",
                                 "A decision: confirm, or set the program's college_code",
                                 "Nothing: an expected difference",
                                 "Nothing to map: a source data error to report",
                                 "A programs.csv row: run propose-mappings.R --write",
+                                "A programs.csv row: a proposed row carrying the roster's name, until the unit is decided",
                                 "A home college in units.csv"),
-    file = c("subjects", "programs", "programs", "programs", "programs", "units"),
-    line = c(NA, 2L, 5L, NA, NA, 4L))
+    file = c("subjects", "programs", "programs", "programs", "programs", "programs", "units"),
+    line = c(NA, 2L, 5L, NA, NA, NA, 4L))
   sd <- data.frame(source_name = "Catch-all", unit_code = "", kind = "bucket", notes = "")
   w <- build_mapping_worklist(c(review_files(), list(
     units = data.frame(unit_code = c("NURS", "RADS", "MEDL", "BIOL"),
@@ -212,7 +214,8 @@ test_that("the mapping work list separates decisions from problems no mapping fi
   # FRAD is a pre-major in the file; ZZZZ has no program rows to say more.
   expect_setequal(paste(w$decisions$kind, w$decisions$code),
                   c("Program (pre-major) FRAD", "Program ZZZZ", "Course subject BIOL",
-                    "College check NURS", "Program code FNRS", "Unit college MEDL"))
+                    "College check NURS", "Program code FNRS", "Program code COSM",
+                    "Unit college MEDL"))
   row <- function(code) w$decisions[w$decisions$code == code, ]
   frad <- row("FRAD")
   expect_equal(frad$suggested_name, "Radiologic Sciences")
@@ -227,6 +230,8 @@ test_that("the mapping work list separates decisions from problems no mapping fi
   expect_equal(frad$name, "Radiologic Sciences")          # programs.csv
   expect_equal(row("NURS")$name, "Nursing")               # a college check names its program
   expect_equal(row("FNRS")$name, "Nursing")               # no row: the name its records carry
+  expect_equal(row("COSM")$name, "Cosmetology")           # no record either: the roster's name
+  expect_equal(row("COSM")$detail, 'class-list major "Cosmetology"')
   expect_equal(row("MEDL")$name, "Medical Lab")           # units.csv
   expect_true(is.na(row("BIOL")$name))                    # a subject has none
   expect_equal(row("BIOL")$taught_in, "AS (Arts and Sciences), ED (Education), STEM")

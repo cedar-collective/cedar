@@ -242,8 +242,8 @@ test_that("Dept Trends invalidates only tabs that consume the changed source", {
     get_dept_cache_key("HIST", tab, objects)
   }, character(1))
   original <- keys(data_objects)
-  # A table loses all but its first row; a list of tables (cedar_dims) or of
-  # vectors (cedar_lookups) has each member shrunk, so the change is inside it.
+  # A table loses all but its first row; a list of tables (cedar_dims) has
+  # each member shrunk, so the change is inside it.
   shrink <- function(x) {
     if (is.data.frame(x) || is.atomic(x)) head(x, 1) else lapply(x, shrink)
   }
@@ -264,8 +264,6 @@ test_that("Dept Trends invalidates only tabs that consume the changed source", {
     cedar_faculty = character(0),
     # Credit Hours reads late drops' credit values from sections (3.0.0).
     cedar_sections = c("enrl", "ch"),
-    # major_code_to_name labels Credit Hours' SCH by major and nothing else.
-    cedar_lookups = "ch",
     # A mapping edit reaches the key through the unit columns attach_unit()
     # writes on the hashed tables at load (ADR-001 step 3), and a renamed
     # unit through the dimension tables the named tabs read their labels off.
@@ -382,7 +380,7 @@ test_that("dept dashboard cache key includes request scope and daily date", {
   expect_true(grepl("^dashboard_dept_HIST_202110_ABQ-EA_20260730_", key))
 })
 
-test_that("dept dashboard cache key differs by term, campus, and date", {
+test_that("dept dashboard cache key differs by term, campus, date, and the mapping files", {
   base <- get_dept_dashboard_cache_key(
     list(dept_code = "HIST", campus = c("ABQ", "EA"), term = 202110L),
     data_objects,
@@ -403,10 +401,19 @@ test_that("dept dashboard cache key differs by term, campus, and date", {
     data_objects,
     cache_date = as.Date("2026-07-31")
   )
+  # A program renamed in programs.csv relabels the major donuts, so it misses.
+  renamed <- data_objects
+  renamed$cedar_dims$programs$program_name[renamed$cedar_dims$programs$program_code == "HIST"] <- "Histories"
+  other_dims <- get_dept_dashboard_cache_key(
+    list(dept_code = "HIST", campus = c("ABQ", "EA"), term = 202110L),
+    renamed,
+    cache_date = as.Date("2026-07-30")
+  )
 
   expect_false(base == other_term)
   expect_false(base == other_campus)
   expect_false(base == other_date)
+  expect_false(base == other_dims)
 })
 
 test_that("dept dashboard cache save/load roundtrips one dashboard payload", {

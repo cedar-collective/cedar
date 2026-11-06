@@ -484,7 +484,7 @@ gen_ed_table_output_or_note <- function(data, output_id, message, label = "table
 #'   in the UI. NULL for the auto-running Dept Trends variant, which is covered
 #'   by the parent Dept Trends overlay.
 gen_ed_module_server <- function(input, output, session, students, sections, programs,
-                                 degrees, student_terms, current_term, opt_builder,
+                                 degrees, student_terms, dims, current_term, opt_builder,
                                  report_timer_name,
                                  run_id = "run", instructor_dfw_enabled = FALSE,
                                  dfw_password = NULL, overlay_id = NULL,
@@ -512,7 +512,7 @@ gen_ed_module_server <- function(input, output, session, students, sections, pro
     uses_overlay <- !is.null(overlay_id)
     timer <- start_report_timer(report_timer_name)
     result <- tryCatch(
-      get_gen_ed_profile(students, sections, programs, degrees, student_terms, opt_builder()),
+      get_gen_ed_profile(students, sections, programs, degrees, student_terms, dims, opt_builder()),
       error = function(e) {
         showNotification(paste("Gen Ed profile failed:", e$message), type = "error")
         NULL
@@ -1143,7 +1143,7 @@ gen_ed_module_server <- function(input, output, session, students, sections, pro
 
 genEdExploreServer <- function(id, students, sections, programs, degrees = NULL,
                                student_terms = NULL, edges, current_term = NULL,
-                               lookups = NULL) {
+                               dims) {
   moduleServer(id, function(input, output, session) {
     build_terms <- reactive({
       all_terms <- sort(unique(sections$term[!is.na(sections$term)]))
@@ -1161,7 +1161,6 @@ genEdExploreServer <- function(id, students, sections, programs, degrees = NULL,
         terms = build_terms(),
         min_n = GEN_ED_MIN_N,
         data_edges = edges,
-        major_code_to_name = lookups$major_code_to_name,
         # Course-major associations are a per-department recruitment signal and
         # are not comparable across departments, so they live only on the
         # department-scoped Gen Ed profile, not this aggregate Explore view.
@@ -1170,7 +1169,7 @@ genEdExploreServer <- function(id, students, sections, programs, degrees = NULL,
     })
 
     gen_ed_module_server(
-      input, output, session, students, sections, programs, degrees, student_terms,
+      input, output, session, students, sections, programs, degrees, student_terms, dims,
       current_term, opt_builder, "gen-ed-explore", run_id = "ge_button",
       overlay_id = id, run_spec_title = "Gen Ed"
     )
@@ -1186,7 +1185,7 @@ genEdExploreServer <- function(id, students, sections, programs, degrees = NULL,
 deptProfileGenEdServer <- function(id, students, sections, programs, degrees = NULL,
                                    dept, edges, campus = NULL, active = NULL,
                                    current_term = NULL, dfw_password = NULL,
-                                   student_terms = NULL, lookups = NULL) {
+                                   student_terms = NULL, dims) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
 
@@ -1208,7 +1207,6 @@ deptProfileGenEdServer <- function(id, students, sections, programs, degrees = N
         terms = build_terms(),
         min_n = 5L,
         data_edges = edges,
-        major_code_to_name = lookups$major_code_to_name,
         include_associations = TRUE,
         include_instructor_dfw = TRUE,
         association_group_cols = c("campus", "subject_course", "instructor_name")
@@ -1216,7 +1214,7 @@ deptProfileGenEdServer <- function(id, students, sections, programs, degrees = N
     })
 
     gen_ed_module_server(
-      input, output, session, students, sections, programs, degrees, student_terms,
+      input, output, session, students, sections, programs, degrees, student_terms, dims,
       current_term, opt_builder, "dept-profile-gen-ed",
       run_id = NULL,
       instructor_dfw_enabled = TRUE,

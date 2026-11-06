@@ -83,8 +83,7 @@ data_objects <- list(
   # Credit Hours reads each row's major off the student-term table.
   cedar_student_terms = load_object("cedar_student_terms"),
   cedar_programs = load_object("cedar_programs"),
-  cedar_degrees = load_object("cedar_degrees"),
-  cedar_lookups = load_object("cedar_lookups")
+  cedar_degrees = load_object("cedar_degrees")
 )
 
 if (exists("cedar_min_term", inherits = TRUE)) {
@@ -103,11 +102,6 @@ cedar_dims <- build_cedar_dims()
 data_objects <- attach_default_units(data_objects, cedar_dims)
 data_objects[["cedar_dims"]] <- cedar_dims
 
-lookups <- data_objects[["cedar_lookups"]]
-if ("major_code_to_name" %in% names(lookups)) {
-  major_code_to_name <- lookups$major_code_to_name
-}
-# dept_code_to_name is units.csv, read by R/lists/catalog_lookups.R at load.
 
 # The same edges global.R computes, so the cache keys match what the app asks for.
 report_edges <- cedar_report_edges(

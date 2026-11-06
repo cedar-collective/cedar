@@ -1252,8 +1252,10 @@ diagnose_new_this_term <- function(course_history, current_term) {
 #'   any with no data): \code{lower_major_current},
 #'   \code{upper_major_current}, \code{lower_class_current},
 #'   \code{upper_class_current}.
+#' @param dims The dimension tables (`build_cedar_dims()`), which name each
+#'   major code through `name_program_codes()`.
 plot_dept_student_donuts <- function(cedar_students, cedar_sections, dept_code,
-                                     current_term, n_years = 5, campus = NULL) {
+                                     current_term, n_years = 5, campus = NULL, dims) {
   message("[dept-dashboard.R] plot_dept_student_donuts for ", dept_code)
 
   # Home-dept CRNs only — excludes sections where this dept is a crosslist partner.
@@ -1281,18 +1283,9 @@ plot_dept_student_donuts <- function(cedar_students, cedar_sections, dept_code,
     return(list())
   }
 
-  # Translate a vector of major codes to human-readable names using
-  # major_code_to_name (overridden at startup with data-derived cedar_lookups$major_code_to_name
-  # if available; falls back to hand-coded mappings.R).
-  # Unknown codes are kept as-is so the donut still shows something useful.
-  translate_major <- function(codes) {
-    if (exists("major_code_to_name") && length(major_code_to_name) > 0) {
-      translated <- major_code_to_name[as.character(codes)]
-      ifelse(is.na(translated), as.character(codes), translated)
-    } else {
-      as.character(codes)
-    }
-  }
+  # Each major code's name is programs.csv's, the same label the Gen Ed major
+  # mix and Dept Trends show for it; a code the file does not carry is itself.
+  translate_major <- function(codes) .translate_major_codes(codes, dims)
 
   # build_color_map() is the shared utility in utils.R. Pre-sort by frequency
   # so the most-common category gets the most visually distinct color. Colors
@@ -1416,11 +1409,21 @@ plot_dept_student_donuts <- function(cedar_students, cedar_sections, dept_code,
   result
 }
 
+# A roster's major codes as display names, row for row: name_program_codes()
+# names each distinct code once, and a code programs.csv does not carry stays
+# itself, so the donut still shows every seat.
+.translate_major_codes <- function(codes, dims) {
+  codes <- as.character(codes)
+  labels <- name_program_codes(codes, dims)
+  translated <- unname(labels[codes])
+  ifelse(is.na(translated), codes, translated)
+}
+
 get_dashboard_composition_shifts <- function(cedar_students, cedar_sections,
                                              cedar_programs, dept_code,
                                              current_term, campus = NULL,
                                              n_years = 3L, min_current = 5L,
-                                             min_abs_diff = 10) {
+                                             min_abs_diff = 10, dims) {
   message("[dept-dashboard.R] get_dashboard_composition_shifts for ", dept_code,
           " term ", current_term)
 
@@ -1537,14 +1540,7 @@ get_dashboard_composition_shifts <- function(cedar_students, cedar_sections,
     dplyr::bind_rows(rows) %>% distribution_by_term("category")
   }
 
-  translate_major <- function(codes) {
-    if (exists("major_code_to_name") && length(major_code_to_name) > 0) {
-      translated <- major_code_to_name[as.character(codes)]
-      ifelse(is.na(translated), as.character(codes), translated)
-    } else {
-      as.character(codes)
-    }
-  }
+  translate_major <- function(codes) .translate_major_codes(codes, dims)
 
   home_crns <- cedar_sections %>%
     dplyr::filter(
@@ -1756,7 +1752,8 @@ create_dept_dashboard_data <- function(data_objects, opt) {
   result$missing_from_earlier   <- get_missing_from_earlier(course_history, current_term)
   result$repeated_topics        <- get_repeated_topics_courses(course_history, current_term)
   result$composition_shifts     <- get_dashboard_composition_shifts(
-    cedar_students, cedar_sections, cedar_programs, dept_code, current_term, campus = campus
+    cedar_students, cedar_sections, cedar_programs, dept_code, current_term, campus = campus,
+    dims = data_objects[["cedar_dims"]]
   )
 
   message("[dept-dashboard.R] Dashboard data ready for ", dept_code)

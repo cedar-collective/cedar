@@ -61,8 +61,8 @@ test_that("cedar-status writer emits valid JSON with null metadata", {
       filename = "cedar_students.qs", rows = 10L, size_mb = 1.2,
       as_of_date = "2026-02-04", min_term = "201980", max_term = "202610"
     ),
-    lookups = list(
-      filename = "cedar_lookups.qs", rows = NA_integer_, size_mb = 0,
+    applicants = list(
+      filename = "cedar_applicants.qs", rows = NA_integer_, size_mb = 0,
       as_of_date = NA_character_, min_term = NA_character_, max_term = NA_character_
     )
   )
@@ -202,35 +202,6 @@ test_that("a transform without the mapping files stops instead of guessing", {
     env$transform_programs(academic_studies_program_units, tempdir(), ".qs",
                            maps = list(major_name_to_major_code = character(0))),
     "maps\\$mapping_files must carry programs")
-})
-
-test_that("a lookups-only rebuild carries the saved major names forward and refuses an unreadable file", {
-  env <- load_transform_helpers()
-  rebuild <- function(dir) {
-    suppressMessages(env$build_lookups(data_dir = dir, ext = ".qs", major_code_name_raw = NULL))
-    qs2::qs_read(file.path(dir, "cedar_lookups.qs"))
-  }
-
-  # Saved names are carried forward when there are no class lists to derive them.
-  kept <- file.path(tempdir(), "lookups-kept"); dir.create(kept, showWarnings = FALSE)
-  qs2::qs_save(list(major_code_to_name = c(HIST = "History")),
-               file.path(kept, "cedar_lookups.qs"))
-  expect_equal(rebuild(kept)$major_code_to_name, c(HIST = "History"))
-
-  # No saved file: the lookup is skipped, visibly, not invented.
-  fresh <- file.path(tempdir(), "lookups-fresh"); dir.create(fresh, showWarnings = FALSE)
-  expect_null(rebuild(fresh)$major_code_to_name)
-
-  # A file that exists but cannot be read stops the rebuild. The retired
-  # tryCatch returned NULL here and the transform logged "skipping".
-  corrupt <- file.path(tempdir(), "lookups-corrupt"); dir.create(corrupt, showWarnings = FALSE)
-  writeBin(as.raw(c(0x00, 0x01, 0x02, 0x03)), file.path(corrupt, "cedar_lookups.qs"))
-  expect_error(rebuild(corrupt))
-
-  # A readable file that is not a lookups list is refused by name.
-  wrong <- file.path(tempdir(), "lookups-wrong"); dir.create(wrong, showWarnings = FALSE)
-  qs2::qs_save(data.frame(x = 1), file.path(wrong, "cedar_lookups.qs"))
-  expect_error(rebuild(wrong), "does not hold a cedar_lookups list")
 })
 
 # ADR-001 step 2: the deploy gate builds cedar_student_terms when it is absent
