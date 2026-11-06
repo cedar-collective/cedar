@@ -3,6 +3,12 @@
 - **Status:** Proposed. First written 2026-07-31; rewritten 2026-11-03 with the
   measurements below and a target architecture, after the app's growth began
   exposing the report-shaped tables (ISSUES.md I9, I15, I37, I44, I45).
+  Amended 2026-11-05: step 2 closed, and step 3 written out in full
+  ([below](#step-3-in-full-dimensions-and-how-data-reaches-a-cone)), with the
+  convention for how tables reach a cone. Revised 2026-11-06 after review:
+  the default unit is attached once at load, not joined by every reader, and
+  step 4 follows in the same order it did, no longer behind a reader
+  migration.
 - **Supersedes:** nothing yet. When step 3 below lands it supersedes
   [ADR-002](adr-002-explicit-mapping-files.md) Stages 3 and 3b (units and
   colleges stamped onto rows at transform time) with the same files read as
@@ -228,10 +234,25 @@ Each step is additive until its last sub-step, so the app runs throughout.
    flagged and the count reported — never a silent coalesce. Measured on the
    first build: 5,442 of 373,169 student-terms described by both sources
    disagree, 4,210 of them in Fall 2025, pulled four months apart.
-3. **Dimension reads for the mapping files**, through a shared
-   `attach_unit()`; readers move as files are touched; then the stamped
-   columns, provenance stamps and deploy gate go. Supersedes ADR-002 Stages 3
-   and 3b.
+   **Done 2026-11-04.** Every reader that groups, labels or places a student
+   by a description column reads the table (the per-reader measurements are
+   in [student-terms.md](student-terms.md)). Three reads of the class-list
+   copies remain, each assigned elsewhere: `filter_class_list()`'s
+   `classification`, `major`, `student_campus` and `student_college` keys
+   and Regstats' sophomore screen join the table in step 5, when the columns
+   go (until then a late-pulled term's classification filter selects the
+   wrong students, ISSUES.md I47); `course-flows.R` carries
+   `student_classification` into the `cedar_course_flows` precompute and
+   moves with step 4, which rebuilds that precompute; the enrollment
+   projection inputs read `major_code` and `student_classification` as model
+   inputs, so that change is a `model_version` decision, not a data-model
+   chore.
+3. **Dimensions from the mapping files**, loaded as one `dims` object by one
+   shared loader, which attaches the default unit columns to the fact tables
+   once at load through `attach_unit()`; the transform then stops stamping
+   them, and the provenance stamps and deploy gate go. No reader changes.
+   Supersedes ADR-002 Stages 3 and 3b. Written out in full
+   [below](#step-3-in-full-dimensions-and-how-data-reaches-a-cone).
 4. **`cedar_courses` with a stable id and renaming crosswalk** (I37, I45),
    then `cedar_course_terms` promoted from `cedar_cl_enrls_base` and
    `cedar_attempts` from `cedar_grades`.
@@ -240,6 +261,124 @@ Each step is additive until its last sub-step, so the app runs throughout.
    columns.
 
 Pull history is the one piece with a deadline and should be sized now.
+
+### Step 3 in full: dimensions, and how data reaches a cone
+
+Decided 2026-11-05, before any code; revised 2026-11-06 after review. Three
+questions were open: whether the unit join runs once at load or where it is
+read; whether a reader may choose a hierarchy other than the subject's unit;
+and whether "every table a cone needs is a parameter" survives a model with
+twelve tables. The answers below are one design.
+
+**The mapping files are the dimension tables, and the default unit is
+attached once at load.** On disk, fact tables keep keys only: a class-list
+row its subject, section college and level; a section the same; a program or
+degree row its program code and college. The mapping files load as dimension
+tables beside `cedar_terms`: `subjects` (subject × college × level → unit),
+`programs` (code × college → unit, `is_pre_major`, `leads_to`), `units`,
+`colleges` and `campuses` (names, home college, aliases). The shared loader
+then attaches the default unit and college columns to every fact table, under
+the names every reader has always read (`department` and `college` on
+sections and class-list rows, `dept_code` and `college_code` on programs and
+degrees, `primary_dept_code` and `primary_college_code` on student-terms), so
+the in-memory tables look as they do today and **no reader changes**. A
+mapping edit changes the next start and rebuilds nothing.
+
+The alternative, the star schema proper, where every reader joins the
+dimension it needs and a cone or branch may not read a unit column off a fact
+table, was the 2026-11-05 design and was rejected on 2026-11-06. Measured on
+that day: 15 of 26 cones, 28 of 40 branches, 10 of 18 features and 13 of 16
+modules read a unit column, almost all as `filter(department == ...)` or
+`group_by(term, campus, college, department, ...)`. The end state would have
+turned that one-column read into a mandatory join step in 66 files, moved no
+number, and cost a migration six times the size of step 2 — and every future
+cone would carry the step. CEDAR's queries are mostly "filter registrations
+by a student or section attribute", which should need no join. The concern
+that had argued for the star schema, that a reader could not tell from a
+column's name which rule produced it (how I7 and I9 stayed invisible), is
+answered by a naming rule, not by removing the column: I7 and I9 came from a
+self-named fallback and a drifted duplicate list, both already gone under
+ADR-002.
+
+**The naming rule.** `department`, `college`, `dept_code` and `college_code`
+always mean the default hierarchy: the subject's unit on a section or
+class-list row, the program's unit on a declaration or degree. Any other
+hierarchy a reader wants (a course under its instructor's unit, a Gen Ed
+course under its awarding college, a student under their primary major's
+college) is attached by `attach_unit()` under its own column name, never
+written into the default columns. A reader that sees `department` knows the
+rule; a reader that sees `instructor_unit` knows the other one.
+
+**How data reaches a cone: facts explicit, `dims` as one object, `opt`
+last.** The rule that every table a cone needs is a parameter stays, for the
+reasons it was made: a cone is testable against a fixture, runnable in
+RStudio against any table, and says what it depends on. A cone names the one
+or two **fact** tables that are its actual input. A cone that needs a
+dimension by name (a unit's display name, a college's home, a non-default
+hierarchy) takes a single **`dims`** argument holding every dimension table,
+rather than five of them threaded through its signature. Most cones need
+neither: they read the attached column. `dims` is built once by one shared
+loader that every entry point calls (`global.R`, the two cache-warming
+scripts, `cedar-repl.R` and the scripts that source it, `dev/demo-data.R`,
+the projection build and the snapshot scripts), carries a class, is validated
+there, and absorbs `cedar_lookups`, which is already this object in all but
+name; the transform stops writing `cedar_lookups` when it does. Features keep
+taking `data_objects`; they are orchestrators. The M12 architecture test
+keeps forbidding global reads. A single data bag for cones (`cone(data, opt)`)
+was rejected: it hides the dependency the rule exists to show, and a test has
+to assemble everything to run anything.
+
+**How a unit is attached: one function, with the hierarchy as an argument.**
+`attach_unit(rows, dims, hierarchy)` is the only code that resolves a unit.
+It wraps `resolve_course_units()` and `resolve_program_units()`, which
+already hold the two default rules in `R/lists/institution_files.R`; it does
+not reimplement them. `hierarchy` names the rule (`"subject"`; `"program"`
+for declarations and degrees; others as readers need them). A row the files
+do not cover gets `NA` and a `unit_basis`, never a unit named after itself
+(the rule EC-14 guards). The invariant `test-architecture.R` enforces is the
+one that actually prevents I9: **no code outside `attach_unit()` and the
+lists layer resolves a unit** — no call to the resolve functions, no read of
+`subj_dept_map` or the mapping files, in a cone, branch, feature or module.
+Reading the dimension tables at load is what makes an institution's mapping
+work "edit a CSV and restart", and makes an adopter whose units are keyed on
+something other than subject a new hierarchy in one function.
+
+**How we get there: two code PRs and a small third, numbers compared on real
+data at each.**
+
+1. **The loader and `dims`.** One function every entry point calls reads the
+   mapping files into `dims`, drops any stamped unit column it finds on a
+   fact table, and attaches the default columns through `attach_unit()`.
+   The transform still stamps at this point, so the before-and-after
+   comparison must be identical to the row (same resolve functions, same
+   files); the join time and the peak memory of dropping and re-attaching
+   columns on 1.86M rows are measured here, against the projection build's
+   ceiling. The ADR's own measurement of the join is 0.4–0.9 s on the full
+   class list.
+2. **The transform stops stamping.** `cedar_students`, `cedar_sections`,
+   `cedar_programs` and `cedar_degrees` are written with keys only;
+   `cedar_student_terms` stores `primary_major_code` and the college key its
+   resolution uses, and the loader attaches `primary_dept_code` and
+   `primary_college_code` the same way, so a mapping edit no longer rebuilds
+   it either. The provenance stamps, `CEDAR_MAPPED_TABLES` and
+   `scripts/rebuild-programs-if-mappings-changed.R`'s mapping branch go (its
+   student-terms branch stays until step 5). AGENTS.md's "every stored unit
+   comes from the mapping files" paragraph is rewritten to "every unit is
+   attached at load". Because the loader already drops any stamped column, a
+   file written by either transform loads the same way, and the deploy needs
+   no startup sequencing of the kind I46 was about.
+3. **`dims` absorbs `cedar_lookups`.** The lookups the transform builds from
+   the files (`dept_lookup`, `dept_name_lookup`, `college_code_to_name`,
+   `subject_lookup`) are read off `dims`; the ones it builds from the data
+   (`program_name_lookup`) move to a measure or stay a small saved table.
+   Readers that take a `lookups` parameter take `dims`.
+
+**Cost, stated plainly.** Three PRs, no reader migration, and no number
+should move. The cost is startup time and a transient copy of the largest
+table, both measured in the first PR. Step 4 then follows directly, and that
+is where a new cone gains something to reuse: `cedar_course_terms` and
+`cedar_attempts` are what let it filter a measure table and join rather than
+re-derive from 1.86M rows.
 
 ### Not doing this
 
