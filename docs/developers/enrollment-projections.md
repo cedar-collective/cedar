@@ -122,7 +122,7 @@ suffix variants are never included by prefix.
 There is no implicit user scope because CEDAR has no login identity. A caller
 must supply courses, campuses, and a named market, directly or through a course
 group. Future department controls must resolve department codes through
-`cedar_lookups$subject_lookup` before calling the feature builder.
+`subject_units(dims)` before calling the feature builder.
 
 The inexpensive pressure screen runs before student-level methods. It can retain
 courses because they are always monitored, have a historical capacity

@@ -156,11 +156,9 @@ test_that("nonconcurrent and out-of-department combinations stay empty", {
   )$data), 0L)
 
   # Department remains a row filter; omit it for a cross-department combination.
-  lookups <- list(program_name_lookup = test_programs_concurrent %>%
-                   distinct(program_name, dept_code))
   expect_equal(nrow(filter_programs_by_opt(
     test_programs_concurrent,
-    list(dept_code = "HIST", major = "History", minor = "English"), lookups
+    list(dept_code = "HIST", major = "History", minor = "English")
   )$data), 0L)
 })
 
@@ -259,34 +257,24 @@ test_that("get_headcount grouped by program_type includes all six types", {
 # get_headcount() — URL/input normalization and default scope
 # =============================================================================
 
-headcount_fixture_lookups <- function() {
-  dept_codes <- sort(unique(test_programs$dept_code[!is.na(test_programs$dept_code)]))
-
-  list(
-    program_name_lookup = test_programs %>%
-      filter(!is.na(program_name), program_name != "",
-             !is.na(dept_code), dept_code != "") %>%
-      distinct(program_name, dept_code),
-    dept_name_lookup = tibble::tibble(
-      dept_code = dept_codes,
-      dept_name = paste(dept_codes, "Department")
-    ),
-    college_code_to_name = c(
-      AS = "ARTS",
-      SC = "STEM",
-      SO = "SOSC",
-      ED = "EDU",
-      NR = "NURS",
-      AD = "BUS"
-    )
+# test_dims with the fixtures' own college names: the fixtures' student_college
+# values (ARTS, STEM, ...) are not the institution's, so colleges.csv is
+# replaced by the codes the Headcount URL uses for them. Units are test_dims'.
+headcount_fixture_dims <- function() {
+  dims <- test_dims
+  dims$colleges <- tibble::tibble(
+    college_code = c("AS", "SC", "SO", "ED", "NR", "AD"),
+    college_name = c("ARTS", "STEM", "SOSC", "EDU", "NURS", "BUS"),
+    source_names = ""
   )
+  validate_cedar_dims(dims)
 }
 
 test_that("normalize_headcount_opt accepts college code aliases", {
   opt <- normalize_headcount_opt(
     test_programs,
     opt = list(college = "AS"),
-    lookups = headcount_fixture_lookups()
+    dims = headcount_fixture_dims()
   )
 
   expect_equal(opt$college, "ARTS")
@@ -296,7 +284,7 @@ test_that("college-level default scope rolls up to departments", {
   result <- get_headcount(
     test_programs,
     opt = list(college = "AS"),
-    lookups = headcount_fixture_lookups()
+    dims = headcount_fixture_dims()
   )
 
   expect_true(result$rolled_up_by_dept)
@@ -309,7 +297,7 @@ test_that("college-level charts use aggregate plot data, not department subplots
   result <- get_headcount(
     test_programs,
     opt = list(college = "AS"),
-    lookups = headcount_fixture_lookups()
+    dims = headcount_fixture_dims()
   )
 
   expect_true(result$rolled_up_by_dept)
@@ -330,7 +318,7 @@ test_that("department-level default scope breaks out programs", {
   result <- get_headcount(
     test_programs,
     opt = list(dept_code = "HIST"),
-    lookups = headcount_fixture_lookups()
+    dims = headcount_fixture_dims()
   )
 
   expect_false(result$rolled_up_by_dept)
@@ -346,7 +334,7 @@ test_that("headcount scope reports what the run counted, read off the result", {
   result <- get_headcount(
     test_programs %>% filter(term <= 202080),
     opt = list(dept_code = "HIST"),
-    lookups = headcount_fixture_lookups()
+    dims = headcount_fixture_dims()
   )
   facts <- result$scope
 
@@ -384,7 +372,7 @@ test_that("format_headcount_export returns download-ready headcount data", {
   result <- get_headcount(
     test_programs,
     opt = list(dept_code = "HIST"),
-    lookups = headcount_fixture_lookups()
+    dims = headcount_fixture_dims()
   )
 
   export <- format_headcount_export(result)
@@ -405,10 +393,10 @@ test_that("format_headcount_export returns a message row for empty results", {
 })
 
 test_that("department scope reads each row's dept_code and needs no name lookup", {
-  with_lookups <- get_headcount(test_programs, opt = list(dept_code = "HIST"),
-                                lookups = headcount_fixture_lookups())
-  without <- get_headcount(test_programs, opt = list(dept_code = "HIST"), lookups = list())
-  expect_equal(without$data, with_lookups$data)
+  with_dims <- get_headcount(test_programs, opt = list(dept_code = "HIST"),
+                             dims = headcount_fixture_dims())
+  without <- get_headcount(test_programs, opt = list(dept_code = "HIST"))
+  expect_equal(without$data, with_dims$data)
 })
 
 # EC-16 (ISSUES I15): ENG and ASPE each own a major named "Engineering". The
@@ -417,7 +405,7 @@ test_that("department scope reads each row's dept_code and needs no name lookup"
 test_that("Headcount and the Dept Dashboard count a department's own rows alike", {
   headcount_students <- function(dept) {
     get_headcount(cedar_programs_shared_name, opt = list(dept_code = dept),
-                  group_by = c("term", "student_level"), lookups = list())$data %>%
+                  group_by = c("term", "student_level"))$data %>%
       filter(term == 202110L, student_level == "Undergraduate") %>%
       pull(student_count)
   }
@@ -435,18 +423,24 @@ test_that("Headcount and the Dept Dashboard count a department's own rows alike"
 test_that("a rollup to department totals names departments, and says when there is none", {
   rows <- cedar_programs_shared_name %>%
     bind_rows(.hc_program_row("EC16-N1", 202110, "Major", "Engineering", NA_character_))
-  named <- add_headcount_dept_fields(rows, list(dept_name_lookup = tibble::tibble(
-    dept_code = c("ENG", "ASPE"), dept_name = c("Engineering (General)", "Pre-Engineering"))))
+  dims <- headcount_fixture_dims()
+  dims$units <- dims$units %>%
+    filter(!unit_code %in% c("ENG", "ASPE")) %>%
+    bind_rows(tibble::tibble(
+      unit_code = c("ENG", "ASPE"), unit_name = c("Engineering (General)", "Pre-Engineering"),
+      college_code = "SC", kind = "department", notes = ""
+    ))
+  named <- add_headcount_dept_fields(rows, dims)
   expect_equal(unique(named$dept_name[named$dept_code %in% "ASPE"]), "Pre-Engineering")
   expect_equal(named$dept_name[is.na(named$dept_code)], "No department (awaiting a mapping decision)")
-  expect_error(add_headcount_dept_fields(rows, list()), "dept_name_lookup")
+  expect_error(add_headcount_dept_fields(rows, NULL), "dims")
 })
 
 test_that("headcount charts format term axes as ordered categories", {
   result <- get_headcount(
     test_programs,
     opt = list(dept_code = "HIST"),
-    lookups = headcount_fixture_lookups()
+    dims = headcount_fixture_dims()
   )
 
   plots <- make_headcount_plots_by_level(result)
@@ -477,7 +471,7 @@ test_that("broad program selections roll up by each row's own dept_code", {
   result <- get_headcount(
     programs,
     opt = list(concentration = paste0("Unmapped Concentration ", seq_len(13))),
-    lookups = headcount_fixture_lookups()
+    dims = headcount_fixture_dims()
   )
 
   expect_true(result$rolled_up_by_dept)

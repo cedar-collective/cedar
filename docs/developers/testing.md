@@ -17,7 +17,7 @@ All unit test data lives in a single file:
 `tests/testthat/fixtures/designed_test_data.R`. It defines every CEDAR table
 as hand-crafted tribbles, and `tests/testthat/setup.R` sources it and exposes
 the tables as `test_sections`, `test_students`, `test_programs`,
-`test_degrees`, `test_faculty`, plus `test_lookups` and a `data_objects` list.
+`test_degrees`, `test_faculty`, plus `test_dims`, `test_lookups` and a `data_objects` list.
 
 There is no fixture generation step, no binary fixture files, and no
 dependency on production data — the file **is** the test database.

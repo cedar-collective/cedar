@@ -208,7 +208,7 @@ create_dept_report_base <- function(data_objects, opt) {
     cfg$dept_code,
     cfg$term_start,
     cfg$term_end,
-    lookups = data_objects[["cedar_lookups"]]
+    dims = data_objects[["cedar_dims"]]
   )
 
   c(cfg, list(

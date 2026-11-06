@@ -107,12 +107,7 @@ lookups <- data_objects[["cedar_lookups"]]
 if ("major_code_to_name" %in% names(lookups)) {
   major_code_to_name <- lookups$major_code_to_name
 }
-if ("dept_name_lookup" %in% names(lookups) && nrow(lookups$dept_name_lookup) > 0) {
-  dept_code_to_name <- setNames(
-    lookups$dept_name_lookup$dept_name,
-    lookups$dept_name_lookup$dept_code
-  )
-}
+# dept_code_to_name is units.csv, read by R/lists/catalog_lookups.R at load.
 
 # The same edges global.R computes, so the cache keys match what the app asks for.
 report_edges <- cedar_report_edges(

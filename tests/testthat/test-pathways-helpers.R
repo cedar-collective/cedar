@@ -109,10 +109,10 @@ test_that("resolve_pathways_focal_dept_codes resolves selected program names", {
 })
 
 
-test_that("resolve_pathways_focal_subjects uses subject lookup, not dept code as course prefix", {
+test_that("resolve_pathways_focal_subjects uses subjects.csv, not dept code as course prefix", {
   opt <- list(type = "dept", dept_code = "GES")
 
-  subjects <- resolve_pathways_focal_subjects(opt, test_programs, test_lookups)
+  subjects <- resolve_pathways_focal_subjects(opt, test_programs, test_dims)
 
   expect_true("GEOG" %in% subjects)
   expect_false("GES" %in% subjects)
@@ -121,7 +121,7 @@ test_that("resolve_pathways_focal_subjects uses subject lookup, not dept code as
 
 test_that("resolve_pathways_gen_ed_courses keeps only focal subject courses", {
   opt <- list(type = "dept", dept_code = "HIST")
-  focal_subjects <- resolve_pathways_focal_subjects(opt, test_programs, test_lookups)
+  focal_subjects <- resolve_pathways_focal_subjects(opt, test_programs, test_dims)
 
   courses <- resolve_pathways_gen_ed_courses(focal_subjects)
 

@@ -101,7 +101,7 @@ This is the **one lookup table that cannot be derived from the data.** There is 
 
 ## Department display names
 
-Given `dept_code`, the display name (e.g., "Geography and Environmental Studies" for `GES`) is derived at transform time and stored in `cedar_lookups$dept_name_lookup`.
+Given `dept_code`, the display name (e.g., "Geography and Environmental Studies" for `GES`) is `units.csv`'s `unit_name`, read at load as `dept_code_to_name` (`R/lists/catalog_lookups.R`) and as `unit_names(dims)` (`R/branches/dims.R`). Nothing about a unit's name is stored in a saved table (ADR-001 step 3). The derivation rule below is how the names were first drafted, and is history:
 
 **The derivation rule:** for each `dept_code`, find the program in `cedar_programs` where `program_code == dept_code`. That program's `program_name` is the canonical department name.
 
@@ -158,9 +158,14 @@ pre-major, the program it `leads_to`, and why. It replaced `premaj_canon`,
 
 | Lookup | Content | Used by |
 |--------|---------|---------|
-| `dept_name_lookup` | dept_code → dept_name (31 rows) | department dropdown in UI |
-| `dept_lookup` | HR/legacy string → dept_code | historical compatibility |
-| `program_name_lookup` | program_name string → dept_code | legacy report ingestion |
+| `major_code_to_name` | class-list Major Code → the name the class list prints | labelling a code `cedar_programs` never carries (Credit Hours by major, Gen Ed, course demographics) |
+
+The unit, college and subject lookups it used to hold (`dept_name_lookup`,
+`dept_lookup`, `college_code_to_name`, `subject_lookup`, `program_name_lookup`)
+are read off the dimension tables at load since ADR-001 step 3:
+`unit_names(dims)`, `college_code_names(dims)`, `subject_units(dims)` in
+`R/branches/dims.R`, and `headcount_program_names(programs)` for a department's
+program names.
 
 ### Runtime (Shiny app)
 
@@ -178,7 +183,7 @@ Short answer: yes, the current system is close to minimal — one more step is p
 
 **What's already data-driven:**
 - `dept_code` on `cedar_programs` rows — stored in the .qs, no runtime lookup
-- Department display names — derived from `program_name` where `program_code == dept_code`, stored in `cedar_lookups.qs`
+- Department display names — `units.csv`, read at load (`unit_names(dims)`)
 - Which departments appear in the dropdown — derived from unique `dept_code` values in `cedar_programs`
 
 **What still requires hand-maintained review:**

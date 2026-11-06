@@ -56,7 +56,7 @@
 #' @param lookups Optional college-code-to-name lookup.
 #' @return Normalized filter options.
 #' @keywords internal
-normalize_headcount_opt <- function(programs, opt = list(), lookups = NULL) {
+normalize_headcount_opt <- function(programs, opt = list(), dims = NULL) {
   opt <- opt %||% list()
 
   normalize_empty <- function(x) {
@@ -79,8 +79,9 @@ normalize_headcount_opt <- function(programs, opt = list(), lookups = NULL) {
     ]))
 
     college_map <- stats::setNames(valid_colleges, valid_colleges)
-    if (!is.null(lookups$college_code_to_name)) {
-      code_map <- lookups$college_code_to_name
+    if (!is.null(dims)) {
+      # A college code (the URL's "AS") names the college colleges.csv gives it.
+      code_map <- college_code_names(dims)
       code_map <- code_map[!is.na(code_map) & nzchar(code_map)]
       college_map <- c(college_map, code_map)
     }
@@ -96,7 +97,7 @@ normalize_headcount_opt <- function(programs, opt = list(), lookups = NULL) {
       stop("[headcount.R] Unknown college filter value(s): ",
            paste(unknown_colleges, collapse = ", "),
            ". Values must match cedar_programs$student_college or ",
-           "cedar_lookups$college_code_to_name.", call. = FALSE)
+           "a college code in colleges.csv.", call. = FALSE)
     }
   }
 
@@ -124,20 +125,24 @@ headcount_should_plot_aggregate <- function(opt) {
 }
 
 
-require_headcount_lookup <- function(lookups, name, cols) {
-  if (is.null(lookups) || is.null(lookups[[name]])) {
-    stop("[headcount.R] Missing required cedar_lookups$", name,
-         ". Re-run the transform or fix cedar_lookups.qs before using Headcount.",
-         call. = FALSE)
+# The programs a department owns, by name: one row per program_name with the
+# unit most of its rows resolve to (ADR-001 step 3: read off the attached
+# programs at run time, never saved). The Headcount tab's department picker
+# turns a department into its program names through this.
+headcount_program_names <- function(programs) {
+  needed <- c("program_name", "dept_code")
+  missing <- setdiff(needed, names(programs))
+  if (length(missing) > 0) {
+    stop("[headcount.R] headcount_program_names: programs lack ",
+         paste(missing, collapse = ", "), call. = FALSE)
   }
-
-  missing_cols <- setdiff(cols, names(lookups[[name]]))
-  if (length(missing_cols) > 0) {
-    stop("[headcount.R] cedar_lookups$", name, " is missing required columns: ",
-         paste(missing_cols, collapse = ", "), call. = FALSE)
-  }
-
-  lookups[[name]]
+  programs %>%
+    filter(!is.na(program_name), program_name != "", !is.na(dept_code), dept_code != "") %>%
+    count(program_name, dept_code, sort = TRUE) %>%
+    group_by(program_name) %>%
+    slice_head(n = 1) %>%
+    ungroup() %>%
+    select(program_name, dept_code)
 }
 
 
@@ -163,15 +168,19 @@ filter_programs_to_dept <- function(programs, dept_code) {
 
 
 # Department code and name for a rollup to department totals: the row's own
-# unit, named through dept_name_lookup. A program with no unit (awaiting a
-# mapping decision) is labelled as such rather than guessed from its name.
-add_headcount_dept_fields <- function(df, lookups = NULL) {
+# unit, named through units.csv (unit_names(dims)). A program with no unit
+# (awaiting a mapping decision) is labelled as such rather than guessed from
+# its name.
+add_headcount_dept_fields <- function(df, dims = NULL) {
   if (!"dept_code" %in% names(df)) {
     stop("[headcount.R] add_headcount_dept_fields: rows lack dept_code", call. = FALSE)
   }
-  dept_names <- require_headcount_lookup(
-    lookups, "dept_name_lookup", c("dept_code", "dept_name")
-  )
+  if (is.null(dims)) {
+    stop("[headcount.R] add_headcount_dept_fields: a department rollup names its ",
+         "departments through dims (units.csv); pass the loaded cedar_dims",
+         call. = FALSE)
+  }
+  dept_names <- unit_names(dims)
   df %>%
     left_join(dept_names %>% select(dept_code, lookup_dept_name = dept_name), by = "dept_code") %>%
     mutate(dept_name = dplyr::case_when(
@@ -224,8 +233,8 @@ add_headcount_dept_fields <- function(df, lookups = NULL) {
 #' program types as separate series.
 #'
 #' @keywords internal
-filter_programs_by_opt <- function(programs, opt = list(), lookups = NULL) {
-  opt <- normalize_headcount_opt(programs, opt, lookups)
+filter_programs_by_opt <- function(programs, opt = list(), dims = NULL) {
+  opt <- normalize_headcount_opt(programs, opt, dims)
 
   # Select important columns (CEDAR naming)
   important_cols <- c("student_id", "term", "student_college", "student_campus",
@@ -332,9 +341,9 @@ filter_programs_by_opt <- function(programs, opt = list(), lookups = NULL) {
 #'   - Program filter active: groups by c("term", "student_level", "program_type", "program_name")
 #'   Pass explicitly for custom aggregations (e.g. SFR: c("term", "dept_code", "student_level")).
 #'
-#' @param lookups Optional list with \code{dept_name_lookup} (dept_code →
-#'   dept_name), used only to name departments when a broad program selection
-#'   is rolled up to department totals (see Details).
+#' @param dims The dimension tables (\code{build_cedar_dims()}), used only to
+#'   name departments through units.csv when a broad program selection is
+#'   rolled up to department totals (see Details).
 #'
 #' @return Data frame with columns from group_by plus student_count (distinct student IDs)
 #'
@@ -350,7 +359,7 @@ filter_programs_by_opt <- function(programs, opt = list(), lookups = NULL) {
 #'
 #' @keywords internal
 summarize_headcount <- function(df, has_program_filter, group_by = NULL,
-                                lookups = NULL, opt = list()) {
+                                dims = NULL, opt = list()) {
 
   UNIT_ROLLUP_THRESHOLD <- 12
   rolled_up_by_dept <- FALSE
@@ -363,7 +372,7 @@ summarize_headcount <- function(df, has_program_filter, group_by = NULL,
       group_by <- c("term", "student_level", "program_type")
     } else if (identical(scope, "department")) {
       message("[headcount.R] College-level scope - summarizing by department/unit")
-      df <- add_headcount_dept_fields(df, lookups)
+      df <- add_headcount_dept_fields(df, dims)
       rolled_up_by_dept <- TRUE
       group_by <- c("term", "student_level", "program_type", "dept_code", "dept_name")
     } else {
@@ -373,7 +382,7 @@ summarize_headcount <- function(df, has_program_filter, group_by = NULL,
         message("[headcount.R] ", n_programs, " distinct programs selected (> ",
                 UNIT_ROLLUP_THRESHOLD, ") - rolling up to department/unit totals")
 
-        df <- add_headcount_dept_fields(df, lookups)
+        df <- add_headcount_dept_fields(df, dims)
         rolled_up_by_dept <- TRUE
         group_by <- c("term", "student_level", "program_type", "dept_code", "dept_name")
       } else {
@@ -556,21 +565,21 @@ format_headcount_export <- function(result) {
 #' \code{\link{make_headcount_plot}}
 #'
 #' @export
-get_headcount <- function(programs, opt = list(), group_by = NULL, lookups = NULL) {
+get_headcount <- function(programs, opt = list(), group_by = NULL, dims = NULL) {
 
   message("[headcount.R] Welcome to get_headcount!")
   message("[headcount.R] opt contents: ", paste(names(opt), collapse = ", "))
 
   # Step 1: Filter programs data
-  filtered <- filter_programs_by_opt(programs, opt, lookups = lookups)
-  opt <- normalize_headcount_opt(programs, opt, lookups)
+  filtered <- filter_programs_by_opt(programs, opt, dims = dims)
+  opt <- normalize_headcount_opt(programs, opt, dims)
 
   # Step 2: Summarize headcount by specified groups
   summarized <- summarize_headcount(
     df = filtered$data,
     has_program_filter = filtered$has_program_filter,
     group_by = group_by,
-    lookups = lookups,
+    dims = dims,
     opt = opt
   )
   rolled_up_by_dept <- isTRUE(attr(summarized, "rolled_up_by_dept"))
@@ -1172,7 +1181,7 @@ make_headcount_sparklines <- function(series) {
 #'
 #' @export
 get_headcount_data_for_dept_report <- function(programs, dept_code, term_start, term_end,
-                                               opt = list(), lookups = NULL) {
+                                               opt = list(), dims = NULL) {
   message("[headcount.R] Welcome to get_headcount_data_for_dept_report!")
 
   # Validate CEDAR data structure
@@ -1199,7 +1208,7 @@ get_headcount_data_for_dept_report <- function(programs, dept_code, term_start, 
   result <- get_headcount(
     programs, opt,
     group_by = c("term", "student_level", "program_type", "program_name"),
-    lookups = lookups
+    dims = dims
   )
   headcount <- result$data
 

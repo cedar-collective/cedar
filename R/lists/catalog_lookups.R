@@ -17,7 +17,7 @@
 #                        the section's college and course level.
 #   college_name_to_code — college name → code (colleges.csv). Prefer
 #                        translate_source_college(), which also reads source_names.
-#   dept_code_to_name  — unit code → unit name.
+#   dept_code_to_name  — unit code → unit name, every unit in units.csv.
 #   major_to_dept      — program_code → unit code: confirmed every-college
 #                        programs.csv rows. College-specific rows (BADM and CRIM
 #                        at the branch campuses) are not in it; resolve those with
@@ -36,9 +36,11 @@ names(subj_to_dept)    <- subj_dept_map$subject_code
 college_name_to_code       <- .college_lu$college_code
 names(college_name_to_code)<- .college_lu$college_name
 
-.dept_lu                   <- dplyr::distinct(subj_dept_map, dept_code, dept_name)
-dept_code_to_name          <- .dept_lu$dept_name
-names(dept_code_to_name)   <- .dept_lu$dept_code
+# Every unit in units.csv, not only those teaching a subject: a program's unit
+# with no courses of its own (a school, a college-wide unit) is named too.
+.units                     <- cedar_institution_files$units
+dept_code_to_name          <- .units$unit_name
+names(dept_code_to_name)   <- .units$unit_code
 
 # ── From programs.csv ──────────────────────────────────────────────────────────
 
@@ -51,4 +53,4 @@ major_to_dept <- stats::setNames(.every$unit_code, .every$program_code)
                     !nzchar(.programs$in_college), ]
 premajor_leads_to <- stats::setNames(.pre$leads_to, .pre$program_code)
 
-rm(.college_lu, .dept_lu, .programs, .every, .pre)
+rm(.college_lu, .units, .programs, .every, .pre)

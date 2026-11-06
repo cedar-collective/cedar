@@ -192,7 +192,7 @@ test_that("get_headcount_data_for_dept_report plots are plotly for HIST", {
     dept_code  = "HIST",
     term_start = cedar_report_start_term,
     term_end   = cedar_report_end_term,
-    lookups    = test_lookups
+    dims       = test_dims
   )
   non_null_plots <- Filter(is_plotly, result$plots)
   expect_true(length(non_null_plots) > 0,
@@ -209,7 +209,7 @@ test_that("dept headcount plots draw one labelled series per program", {
     dept_code  = "MGMT",
     term_start = cedar_report_start_term,
     term_end   = cedar_report_end_term,
-    lookups    = test_lookups
+    dims       = test_dims
   )
   plot <- plotly::plotly_build(result$plots$hc_progs_under_long_majors_plot)
   trace_names <- vapply(plot$x$data, function(tr) tr$name, character(1))
@@ -229,7 +229,7 @@ test_that("dept headcount keeps program detail for a department over the rollup 
     dept_code  = "LCLX",
     term_start = 202110L,
     term_end   = 202110L,
-    lookups    = test_lookups
+    dims       = test_dims
   )
   expect_true("program_name" %in% names(result$tables$hc_progs_under_long_majors))
   plot <- plotly::plotly_build(result$plots$hc_progs_under_long_majors_plot)
