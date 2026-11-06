@@ -330,7 +330,8 @@ test_that("dashboard payload includes headcount line data", {
   data_objects <- list(
     cedar_programs = test_programs,
     cedar_students = test_students,
-    cedar_sections = test_sections
+    cedar_sections = test_sections,
+    cedar_dims     = test_dims
   )
 
   expect_error(

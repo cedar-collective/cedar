@@ -323,7 +323,7 @@ loader that every entry point calls (`global.R`, the two cache-warming
 scripts, `cedar-repl.R` and the scripts that source it, `dev/demo-data.R`,
 the projection build and the snapshot scripts), carries a class, is validated
 there, and absorbs `cedar_lookups`, which is already this object in all but
-name; the transform stops writing `cedar_lookups` when it does. Features keep
+name; the transform stopped writing `cedar_lookups` on 2026-11-06. Features keep
 taking `data_objects`; they are orchestrators. The M12 architecture test
 keeps forbidding global reads. A single data bag for cones (`cone(data, opt)`)
 was rejected: it hides the dependency the rule exists to show, and a test has
@@ -416,9 +416,18 @@ data at each.**
    only those teaching a subject, and `global.R` no longer overrides it from
    the saved file. Headcount (`get_headcount()`, the module), Dept Trends'
    headcount panel, the Pathways focal-subject helper and the department
-   choice lists take `dims`; the Gen Ed modules keep `lookups` for
-   `major_code_to_name`. Dept Trends' cache keys hash `cedar_dims` for every
-   tab that labels a unit and `cedar_lookups` for Credit Hours alone.
+   choice lists take `dims`. Dept Trends' cache keys hash `cedar_dims` for
+   every tab that labels a unit.
+   **`cedar_lookups` retired 2026-11-06.** Its last table, `major_code_to_name`,
+   named the codes only a class list carries. Those 49 codes (6,362 class-list
+   rows, 0.34%) are now proposed rows in programs.csv, named from the class
+   list, so `name_program_codes(codes, dims)` names every code the data
+   carries from the file alone, and the Gen Ed major mix, Dept Trends' SCH by
+   major and the Dept Dashboard's donuts show one name per code. The mapping
+   audit reads the class lists' major codes too (`class_list_program_code`),
+   so a new class-list-only code is listed the day it arrives, with the
+   roster's name as context. Measured before the switch: 459 of 469 codes
+   named identically; the file's spelling wins on the rest.
    Measured on the 2026-10-08 pull before the change: every one of the saved
    `subject_lookup`'s 214 subjects is among subjects.csv's rows (25 of them
    with a second row differing only by college, which `subject_units()`

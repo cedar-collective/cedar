@@ -24,7 +24,6 @@ make_data_objects <- function() {
     cedar_student_terms = test_student_terms,
     cedar_faculty  = test_faculty,
     cedar_sections = test_sections,
-    cedar_lookups  = test_lookups,
     cedar_dims     = test_dims,
     cedar_edges    = data_objects$cedar_edges
   )

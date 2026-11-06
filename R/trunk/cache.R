@@ -234,15 +234,13 @@ cedar_dept_cache_version <- 11L
 # Credit Hours reads class lists, sections for late drops' credit values, the
 # student-term table for each row's major and programs for its name; no
 # visible tab consumes faculty data.
-# cedar_dims: unit and college names are read off the dimension tables since
-# ADR-001 step 3, so a mapping edit that renames a unit must miss too.
-# cedar_lookups is major_code_to_name alone, which only Credit Hours reads
-# (the SCH-by-major labels).
+# cedar_dims: unit, college and program names are read off the dimension
+# tables since ADR-001 step 3, so a mapping edit that renames one must miss too.
 DEPT_CACHE_TABLES <- list(
   hc = c("cedar_programs", "cedar_dims"),
   enrl = c("cedar_students", "cedar_sections", "cedar_programs", "cedar_dims"),
   deg = c("cedar_degrees", "cedar_dims"),
-  ch = c("cedar_students", "cedar_sections", "cedar_student_terms", "cedar_programs", "cedar_lookups", "cedar_dims"),
+  ch = c("cedar_students", "cedar_sections", "cedar_student_terms", "cedar_programs", "cedar_dims"),
   demo = "cedar_programs"
 )
 
@@ -419,7 +417,9 @@ load_dept_demographics_cache <- function(dept_code, data_objects, opt = list()) 
 # v9 SCH shifts use attempted rather than earned hours (credit-hours 2.0.0).
 # v10 carries headcount_scope, the facts behind the headcount cards' scope bar.
 # v11 SCH shifts count census SCH (credit-hours 3.0.0).
-cedar_dept_dashboard_cache_version <- 11L
+# v12 major donuts and composition shifts name codes from programs.csv (dims),
+#     not the retired cedar_lookups; the key hashes the dimension tables too.
+cedar_dept_dashboard_cache_version <- 12L
 
 cache_value_or <- function(x, default) {
   if (is.null(x) || length(x) == 0) default else x
@@ -461,7 +461,10 @@ get_dept_dashboard_cache_key <- function(opt, data_objects, cache_date = Sys.Dat
     date = date_key,
     students_hash = get_cache_table_dim_hash(data_objects, "cedar_students", "cedar_students_hash"),
     sections_hash = get_cache_table_dim_hash(data_objects, "cedar_sections", "cedar_sections_hash"),
-    programs_hash = get_cache_table_dim_hash(data_objects, "cedar_programs", "cedar_programs_hash")
+    programs_hash = get_cache_table_dim_hash(data_objects, "cedar_programs", "cedar_programs_hash"),
+    # The mapping files name every major on the dashboard, so a renamed program
+    # or a decided unit is a miss (ADR-001 step 3); the tables are small.
+    dims_hash = digest::digest(data_objects[["cedar_dims"]], algo = "xxhash64")
   )
 
   paste0(

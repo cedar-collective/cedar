@@ -434,7 +434,7 @@ transform_sections <- function(desrs, data_dir, ext, maps) {
 #' @param data_dir    Path to data directory
 #' @param ext         File extension
 #' @param maps        Named list of lookup vectors
-#' @return list(saved = list(students, grades), major_code_name_raw)
+#' @return list(saved = list(students, grades))
 transform_students <- function(class_lists, data_dir, ext, maps) {
   message("──────────────────────────────────────────────────────")
   message("2. Transforming class_lists → cedar_students")
@@ -447,19 +447,13 @@ transform_students <- function(class_lists, data_dir, ext, maps) {
   # ── Pre-processing ────────────────────────────────────────────────────────
   message("  Pre-processing: deriving helper columns...")
 
-  # Capture Major Code → name mapping from the full frame before any slimming.
-  if ("Major Code" %in% names(class_lists) && "Major" %in% names(class_lists)) {
-    major_code_name_raw <- class_lists %>%
-      dplyr::select(`Major Code`, `Major`, as_of_date) %>%
-      dplyr::filter(!is.na(`Major Code`), `Major Code` != "",
-                    !is.na(`Major`),      `Major`      != "") %>%
-      dplyr::arrange(dplyr::desc(as_of_date)) %>%
-      dplyr::distinct(`Major Code`, .keep_all = TRUE) %>%
-      dplyr::select(`Major Code`, `Major`)
-    message("  Captured ", nrow(major_code_name_raw), " major code → name pairs for cedar_lookups")
-  } else {
+  # The roster's Major Code becomes cedar_students$major_code: the student-term
+  # table's primary major wherever the student has no declaration that term,
+  # and what the mapping audit checks against programs.csv. Its name beside it
+  # (major_name) is the audit's context for a code the file does not carry.
+  if (!all(c("Major Code", "Major") %in% names(class_lists))) {
     stop("[transform_students] 'Major Code' and/or 'Major' columns absent from class lists export. ",
-         "These are required to build cedar_lookups. Check the Banner class list export format.")
+         "cedar_students$major_code and major_name are read from them. Check the Banner class list export format.")
   }
 
   # Slim early: drop unused columns before mutations so all subsequent operations
@@ -655,8 +649,7 @@ transform_students <- function(class_lists, data_dir, ext, maps) {
     saved = list(
       students = students_meta,
       grades = grades_meta
-    ),
-    major_code_name_raw = major_code_name_raw
+    )
   )
 }
 
@@ -1146,73 +1139,6 @@ transform_applicants <- function(applicants, data_dir, ext) {
 }
 
 
-# ── 7. build_lookups: generate cedar_lookups ──────────────────────────────────
-#
-# One table: major_code_to_name, the class-list Major Code beside the name the
-# class list prints for it. It is the one lookup the mapping files cannot
-# supply -- programs.csv knows the codes it maps, not every code a class list
-# has ever carried (an associate program at a branch, a retired code). Every
-# other lookup this used to build -- unit names, college names, which
-# subjects a unit teaches, program name to unit -- was the mapping files or
-# the saved tables restated, and is read off the dimension tables at load
-# (unit_names(), college_code_names(), subject_units() in R/branches/dims.R)
-# or counted from the table (headcount_program_names()) since ADR-001 step 3.
-
-#' @param data_dir          Path to data directory
-#' @param ext               File extension
-#' @param major_code_name_raw Data frame of Major Code / Major pairs from transform_students
-#' @return list(saved = list(lookups = <meta>))
-build_lookups <- function(data_dir, ext, major_code_name_raw = NULL) {
-  message("──────────────────────────────────────────────────────")
-  message("7. Generating cedar_lookups (major_code_to_name)")
-  message("──────────────────────────────────────────────────────")
-
-  cedar_lookups <- list()
-
-  # Major code → human-readable name
-  # Derived from class_lists in transform_students; ~100% coverage.
-  message("  Building major_code_to_name lookup...")
-  if (!is.null(major_code_name_raw) && nrow(major_code_name_raw) > 0) {
-    cedar_lookups$major_code_to_name <- setNames(
-      major_code_name_raw[["Major"]],
-      major_code_name_raw[["Major Code"]]
-    )
-    message("    ✅ major_code_to_name: ", length(cedar_lookups$major_code_to_name), " entries")
-  } else {
-    # A lookups-only rebuild has no class lists to derive the names from, so
-    # the saved table is carried forward. A saved file that exists but cannot
-    # be read is an error, not an empty lookup: swallowing it once left every
-    # major unnamed with nothing in the log but a "skipping" line (ISSUES.md
-    # M11).
-    existing_lookup_file <- file.path(data_dir, paste0("cedar_lookups", ext))
-    existing_lookups <- if (file.exists(existing_lookup_file)) {
-      load_file(existing_lookup_file, ext)
-    } else {
-      NULL
-    }
-    if (!is.null(existing_lookups) &&
-        (!is.list(existing_lookups) || is.data.frame(existing_lookups))) {
-      stop("[transform-to-cedar.R] ", existing_lookup_file,
-           " does not hold a cedar_lookups list; refusing to rebuild lookups ",
-           "over it. Delete the file or rebuild from class lists.",
-           call. = FALSE)
-    }
-
-    if (!is.null(existing_lookups$major_code_to_name)) {
-      cedar_lookups$major_code_to_name <- existing_lookups$major_code_to_name
-      message("    ✅ major_code_to_name preserved from existing cedar_lookups: ",
-              length(cedar_lookups$major_code_to_name), " entries")
-    } else {
-      message("    ⚠️  major_code_name_raw not available and no saved ",
-              "major_code_to_name to carry forward — skipping major_code_to_name")
-    }
-  }
-
-  saved_meta <- save_cedar_file(cedar_lookups, "lookups", data_dir, ext)
-  list(saved = list(lookups = saved_meta))
-}
-
-
 # ── Orchestrator ──────────────────────────────────────────────────────────────
 
 #' Transform MyReports data to CEDAR model
@@ -1224,7 +1150,7 @@ build_lookups <- function(data_dir, ext, major_code_name_raw = NULL) {
 #' @param use_qs   Use .qs format (default: from config)
 #' @param tables   Character vector of tables to run (default: all)
 #'                 Options: "sections", "students", "programs", "degrees",
-#'                          "faculty", "applicants", "lookups"
+#'                          "faculty", "applicants"
 #' @return Invisibly: named list of save metadata for each table written
 transform_to_cedar <- function(data_dir = NULL, use_qs = NULL, tables = NULL,
                                include_student_terms = TRUE) {
@@ -1252,7 +1178,7 @@ transform_to_cedar <- function(data_dir = NULL, use_qs = NULL, tables = NULL,
 
   # Resolve which tables to run
   all_tables <- c("sections", "students", "programs", "degrees", "student_terms", "faculty",
-                  "applicants", "lookups")
+                  "applicants")
   if (is.null(tables)) {
     run_tables <- all_tables
   } else {
@@ -1260,12 +1186,6 @@ transform_to_cedar <- function(data_dir = NULL, use_qs = NULL, tables = NULL,
     if (length(unknown) > 0)
       message("  ⚠️  Unknown table(s) ignored: ", paste(unknown, collapse = ", "))
     run_tables <- intersect(all_tables, tables)
-    # cedar_lookups is major_code_to_name, read off the class lists, so it is
-    # rebuilt whenever the students are.
-    if ("students" %in% run_tables && !"lookups" %in% run_tables) {
-      run_tables <- c(run_tables, "lookups")
-      message("  Note: Adding lookups (auto-included when students are transformed)")
-    }
     # The student-term table reads the saved students, programs and degrees,
     # so it is rebuilt whenever any of them is. A caller that will build it in
     # a later run of its own (the deploy gate, one table per process so no
@@ -1312,7 +1232,6 @@ transform_to_cedar <- function(data_dir = NULL, use_qs = NULL, tables = NULL,
 
   # Initialize results tracking
   saved_files       <- list()
-  major_code_name_raw <- NULL  # captured in transform_students, used in build_lookups
 
   # ── 1. cedar_sections ─────────────────────────────────────────────────────
   if ("sections" %in% run_tables) {
@@ -1338,7 +1257,6 @@ transform_to_cedar <- function(data_dir = NULL, use_qs = NULL, tables = NULL,
       class_lists <- load_file(cl_file, ext)
       result      <- transform_students(class_lists, data_dir, ext, maps)
       saved_files <- c(saved_files, result$saved)
-      major_code_name_raw <- result$major_code_name_raw
       rm(class_lists); gc(verbose = FALSE)
     } else {
       message("  ⚠️  class_lists file not found: ", cl_file, " — skipping cedar_students")
@@ -1420,15 +1338,6 @@ transform_to_cedar <- function(data_dir = NULL, use_qs = NULL, tables = NULL,
     }
   } else {
     message("  ⏭  Skipping cedar_applicants (not in --tables)")
-  }
-
-  # ── 7. cedar_lookups ──────────────────────────────────────────────────────
-  if ("lookups" %in% run_tables) {
-    message("\n──────────────────────────────────────────────────────")
-    result <- build_lookups(data_dir, ext, major_code_name_raw)
-    saved_files <- c(saved_files, result$saved)
-  } else {
-    message("  ⏭  Skipping cedar_lookups (not in --tables)")
   }
 
   # ── Summary ───────────────────────────────────────────────────────────────

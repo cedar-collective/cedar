@@ -8,7 +8,7 @@ parent: Developer Guide
 
 This reference is auto-generated from roxygen2 comments in the source code.
 
-*Generated: 2026-11-06 13:07:37.89098*
+*Generated: 2026-11-06 14:06:26.839047*
 
 ---
 
@@ -335,14 +335,14 @@ abbreviate_classification("Junior, 3rd Yr.")  # Returns "Junior"
 
 **Get Major Mix for a Course Set**
 
-Get Major Mix for a Course Set  Summarizes the major/program mix for students enrolled in a selected set of courses. Counts are enrollment rows, not unique students, so a student taking two selected courses contributes two seats to the mix. Each row's major is the student-term table's `primary_major_code` for that student and term: the academic studies primary major where the student has one, else the major Banner stamped on the roster (ADR-001 step 2; the rule is in docs/developers/student-terms.md). Nothing here re-derives it from the class list or from `programs`.
+Get Major Mix for a Course Set  Summarizes the major/program mix for students enrolled in a selected set of courses. Counts are enrollment rows, not unique students, so a student taking two selected courses contributes two seats to the mix. Each row's major is the student-term table's `primary_major_code` for that student and term: the academic studies primary major where the student has one, else the major Banner stamped on the roster (ADR-001 step 2; the rule is in docs/developers/student-terms.md). Nothing here re-derives it from the class list.
 
 **Parameters:**
 
 - `students` - Data frame of student enrollments from cedar_students.
 - `student_terms` - Data frame. The `cedar_student_terms` table, read for `primary_major_code` and `is_pre_major` on each enrollment row's student-term. Every registered row has one; a row without is an error.
-- `programs` - Data frame of program records from cedar_programs, read only to name each code: its `program_name` is the mapping file's, with a pre-major's "Pre" already taken off, where the class list's name keeps it.
-- `opt` - Options list. Supports course/term/campus/college filters accepted by filter_class_list(), plus min_n and top_n for display grouping, and optionally major_code_to_name (the cedar_lookups table of the same name, a named character vector) to label a code \code{programs} never carries, such as a class-list-only associate program. A code neither names is shown as itself.
+- `dims` - The dimension tables (`build_cedar_dims()`), read only to name each code through `name_program_codes()`: programs.csv's name, with a pre-major's "Pre" already taken off. A code the file does not carry is shown as itself, and the mapping audit lists it.
+- `opt` - Options list. Supports course/term/campus/college filters accepted by filter_class_list(), plus min_n and top_n for display grouping.
 
 **Returns:** Tibble with major_label, n_enrollments, n_students, pct_enrollments.
 
@@ -4183,8 +4183,7 @@ Compute Stop-Out Rates for One Group in One Course  Given one selected observati
 - `student_terms` - The student-term table.
 - `cols` - Character. Columns of `student_terms` to attach.
 - `codes` - Character vector of program codes; `NA` and blanks are dropped.
-- `programs` - Data frame with `major_code`, `program_name`, `program_type` (`cedar_programs`, or any subset of it).
-- `major_code_to_name` - Named character vector (`cedar_lookups`' table of the same name), or `NULL`.
+- `dims` - The dimension tables (`build_cedar_dims()`); `programs` is read.
 - `is_pre_major` - Logical vector parallel to `codes` (the student-term table's flag on the same rows), or `NULL`. A code flagged on any row is suffixed " (pre-major)", so a pre-major and the major it leads to never share a label ("Psychology (pre-major)" beside "Psychology").
 
 **Returns:** Named character vector, code to name, one entry per distinct code.
@@ -4257,7 +4256,7 @@ Transform MyReports data to CEDAR model  Loads parsed source files, calls each t
 
 - `data_dir` - Path to data directory (default: from config)
 - `use_qs` - Use .qs format (default: from config)
-- `tables` - Character vector of tables to run (default: all) Options: "sections", "students", "programs", "degrees", "faculty", "applicants", "lookups"
+- `tables` - Character vector of tables to run (default: all) Options: "sections", "students", "programs", "degrees", "faculty", "applicants"
 
 **Returns:** Invisibly: named list of save metadata for each table written
 

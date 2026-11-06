@@ -274,12 +274,15 @@ build_mapping_worklist <- function(files, programs, issues, audit, source_depart
     needs = work$needs, file = work$file, line = work$line,
     kind = unname(kind_label[work$kind]), code = work$value,
     # Name is the code's own name, or nothing: a program's from programs.csv
-    # (else the name its records most often carry), a unit's from units.csv. A
-    # course subject has none, and a college value no file names has none yet.
+    # (else the name its records most often carry, else the roster's), a
+    # unit's from units.csv. A course subject has none, and a college value no
+    # file names has none yet.
     name = dplyr::case_when(
       work$kind == "college_disagreement" ~
         files$programs$program_name[match(work$value, files$programs$program_code)],
-      work$kind == "program_code" ~ .program_data_names(work$value, programs),
+      work$kind == "program_code" ~ dplyr::coalesce(
+        .program_data_names(work$value, programs),
+        .roster_names(work$context)),
       work$kind == "unit_college" ~ unit_name(work$value),
       TRUE ~ NA_character_),
     taught_in = dplyr::if_else(work$kind == "subject", college_label(taught_codes), NA_character_),
@@ -330,6 +333,13 @@ build_mapping_worklist <- function(files, programs, issues, audit, source_depart
        n_expected = sum(audit$status == "expected"))
 }
 
+
+# The roster's name for a class-list major code, read back from the audit's
+# context ('class-list major "Cosmetology"'); NA for any other row.
+.roster_names <- function(context) {
+  quoted <- grepl('^class-list major "', context)
+  ifelse(quoted, sub('^class-list major "(.*)"$', "\\1", context), NA_character_)
+}
 
 # The name a program code's records most often carry, for codes with no
 # programs.csv row to name them; NA for a code with no program rows.

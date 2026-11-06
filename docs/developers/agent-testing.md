@@ -10,7 +10,7 @@ The complete test-infrastructure reference, moved out of `AGENTS.md` so it does 
 
 # Test Infrastructure
 
-All test data is hand-crafted tribbles in `tests/testthat/fixtures/designed_test_data.R` — that single file IS the test database and the source of truth. `setup.R` sources it and exposes the tables as `test_sections`, `test_sections_sf` (seatfinder-specific 2024/2025 terms), `test_students`, `test_programs`, `test_degrees`, `test_faculty`, plus `test_dims` (the mapping files as dimension tables), `test_lookups` (`major_code_to_name` alone) and a `data_objects` list. Every expected value is traceable to explicit rows in that file — no sampling, no binary fixtures, no regeneration step.
+All test data is hand-crafted tribbles in `tests/testthat/fixtures/designed_test_data.R` — that single file IS the test database and the source of truth. `setup.R` sources it and exposes the tables as `test_sections`, `test_sections_sf` (seatfinder-specific 2024/2025 terms), `test_students`, `test_programs`, `test_degrees`, `test_faculty`, plus `test_dims` (the demo institution's mapping files as dimension tables) and a `data_objects` list. Every expected value is traceable to explicit rows in that file — no sampling, no binary fixtures, no regeneration step.
 
 **Institution configuration is the one exception.** Files an institution
 authors (rather than rows its data produces) are tested against the demo

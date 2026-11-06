@@ -60,27 +60,21 @@ abbreviate_classification <- function(classification) {
 #' the academic studies primary major where the student has one, else the
 #' major Banner stamped on the roster (ADR-001 step 2; the rule is in
 #' docs/developers/student-terms.md). Nothing here re-derives it from the
-#' class list or from `programs`.
+#' class list.
 #'
 #' @param students Data frame of student enrollments from cedar_students.
 #' @param student_terms Data frame. The `cedar_student_terms` table, read for
 #'   `primary_major_code` and `is_pre_major` on each enrollment row's
 #'   student-term. Every registered row has one; a row without is an error.
-#' @param programs Data frame of program records from cedar_programs, read only
-#'   to name each code: its `program_name` is the mapping file's, with a
-#'   pre-major's "Pre" already taken off, where the class list's name keeps it.
+#' @param dims The dimension tables (`build_cedar_dims()`), read only to name
+#'   each code through `name_program_codes()`: programs.csv's name, with a
+#'   pre-major's "Pre" already taken off. A code the file does not carry is
+#'   shown as itself, and the mapping audit lists it.
 #' @param opt Options list. Supports course/term/campus/college filters accepted
-#'   by filter_class_list(), plus min_n and top_n for display grouping, and
-#'   optionally major_code_to_name (the cedar_lookups table of the same name,
-#'   a named character vector) to label a code \code{programs} never carries,
-#'   such as a class-list-only associate program. A code neither names is
-#'   shown as itself.
+#'   by filter_class_list(), plus min_n and top_n for display grouping.
 #' @return Tibble with major_label, n_enrollments, n_students, pct_enrollments.
-get_course_major_mix <- function(students, student_terms, programs, opt = list()) {
+get_course_major_mix <- function(students, student_terms, dims, opt = list()) {
   if (is.null(students) || nrow(students) == 0) {
-    return(tibble::tibble())
-  }
-  if (is.null(programs) || nrow(programs) == 0) {
     return(tibble::tibble())
   }
 
@@ -89,13 +83,6 @@ get_course_major_mix <- function(students, student_terms, programs, opt = list()
   if (length(missing_student_cols) > 0) {
     stop("[course-demographics.R] get_course_major_mix missing student columns: ",
          paste(missing_student_cols, collapse = ", "))
-  }
-
-  required_program_cols <- c("program_type", "program_name", "major_code")
-  missing_program_cols <- setdiff(required_program_cols, names(programs))
-  if (length(missing_program_cols) > 0) {
-    stop("[course-demographics.R] get_course_major_mix missing program columns: ",
-         paste(missing_program_cols, collapse = ", "))
   }
 
   required_term_cols <- c("student_id", "term", "primary_major_code", "is_pre_major")
@@ -141,8 +128,7 @@ get_course_major_mix <- function(students, student_terms, programs, opt = list()
 
   # One name per code, shared with every other reader of the table's primary
   # major (name_program_codes(), R/branches/student-terms.R).
-  labels <- name_program_codes(joined$primary_major_code, programs, opt$major_code_to_name,
-                               is_pre_major = joined$is_pre_major)
+  labels <- name_program_codes(joined$primary_major_code, dims, is_pre_major = joined$is_pre_major)
 
   major_counts <- joined %>%
     dplyr::mutate(

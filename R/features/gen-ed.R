@@ -141,7 +141,7 @@ plot_gen_ed_course_modality_trends <- function(enrl_by_course_modality, top_n = 
 
 
 get_gen_ed_profile <- function(students, sections, programs, degrees = NULL,
-                               student_terms, opt = list()) {
+                               student_terms, dims, opt = list()) {
   min_n <- suppressWarnings(as.integer(opt$min_n %||% 5L))
   if (length(min_n) == 0 || is.na(min_n) || min_n < 1L) min_n <- 5L
   include_associations <- isTRUE(opt$include_associations %||% TRUE)
@@ -307,12 +307,14 @@ get_gen_ed_profile <- function(students, sections, programs, degrees = NULL,
     min_n = min_n
   )
 
+  # Each seat's major is its student-term's primary major, named through the
+  # dimension tables (programs.csv), so the label here is the one Dept Trends
+  # and the Dept Dashboard show for the same code.
   major_mix <- get_course_major_mix(
     ge_students,
     student_terms,
-    programs,
-    opt = list(min_n = min_n, top_n = opt$major_mix_top_n %||% 10L,
-               major_code_to_name = opt$major_code_to_name)
+    dims,
+    opt = list(min_n = min_n, top_n = opt$major_mix_top_n %||% 10L)
   )
 
   instructor_dfw <- NULL

@@ -319,8 +319,9 @@ Plan: [ADR-002](docs/developers/adr-002-explicit-mapping-files.md).
   object attach the default unit columns once at load through
   `attach_unit(rows, dims, hierarchy)`, so no reader changes (PR 1, #204);
   the transform stores keys only and the deploy gate's mapping branch retires
-  (PR 2, #205); `dims` absorbs `cedar_lookups`, which keeps only
-  `major_code_to_name` (PR 3, 2026-11-06).
+  (PR 2, #205); `dims` absorbs `cedar_lookups` (PR 3, 2026-11-06), and
+  `cedar_lookups` retires once programs.csv names the class-list-only codes
+  (2026-11-06).
   Design written in full in
   [ADR-001](docs/developers/adr-001-domain-data-model.md#step-3-in-full-dimensions-and-how-data-reaches-a-cone).
 - [ ] Steps 4 and 5: `cedar_courses` with a stable id (I37, I45) and the

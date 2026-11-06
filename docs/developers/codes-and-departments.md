@@ -154,18 +154,25 @@ pre-major, the program it `leads_to`, and why. It replaced `premaj_canon`,
 | `program_names.csv` | `major_name_to_major_code` | program name → program code | transform, when an export has no code column |
 | `program_name_aliases.csv` | `program_name_aliases` | variant name → canonical program_name | transform |
 
-### `data/cedar_lookups.qs` (built at transform time)
+### `data/cedar_lookups.qs` (retired 2026-11-06)
 
-| Lookup | Content | Used by |
-|--------|---------|---------|
-| `major_code_to_name` | class-list Major Code → the name the class list prints | labelling a code `cedar_programs` never carries (Credit Hours by major, Gen Ed, course demographics) |
-
-The unit, college and subject lookups it used to hold (`dept_name_lookup`,
-`dept_lookup`, `college_code_to_name`, `subject_lookup`, `program_name_lookup`)
-are read off the dimension tables at load since ADR-001 step 3:
-`unit_names(dims)`, `college_code_names(dims)`, `subject_units(dims)` in
-`R/branches/dims.R`, and `headcount_program_names(programs)` for a department's
-program names.
+The transform no longer writes it and nothing reads it; a stale copy on disk is
+ignored. Every lookup it held is read off the dimension tables at load
+(ADR-001 step 3): `unit_names(dims)`, `college_code_names(dims)`,
+`subject_units(dims)` in `R/branches/dims.R`; `headcount_program_names(programs)`
+for a department's program names; and `name_program_codes(codes, dims)` for a
+program code's display name, which is programs.csv's. The last table it kept,
+`major_code_to_name` (the class lists' Major Code beside the name the class list
+prints), went when the 49 codes only a class list carries (a branch's
+Cosmetology, Barbering, CDL, massage therapy... 6,362 rows, 0.34% of the class
+lists) were added to programs.csv as proposed rows named from the class list.
+A code the file does not carry is shown as itself, and the mapping audit lists
+it (Admin > Mappings; `class_list_program_code`) with the roster's name as
+context. Measured when it retired: of 469 codes the data carries, 459 were
+named identically by both; the file's spelling wins on the rest (four
+Chicana/o Studies codes, FPHS, CHBI/FCHB), and three Banner organisation IDs
+in the major-code column are now their own label, as the audit already reports
+them.
 
 ### Runtime (Shiny app)
 

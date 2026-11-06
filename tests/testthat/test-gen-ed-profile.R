@@ -105,6 +105,7 @@ test_that("get_gen_ed_profile runs all-Gen-Ed default without department selecti
     gen_ed_assoc_sections,
     gen_ed_assoc_programs,
     student_terms = test_student_terms_gen_ed_assoc,
+    dims = test_dims,
     opt = list(data_edges = data_objects$cedar_edges, min_n = 1L, campus = "ABQ")
   )
 
@@ -145,6 +146,7 @@ test_that("get_gen_ed_profile applies core filters consistently", {
     gen_ed_assoc_sections,
     gen_ed_assoc_programs,
     student_terms = test_student_terms_gen_ed_assoc,
+    dims = test_dims,
     opt = list(data_edges = data_objects$cedar_edges, 
       campus = "ABQ",
       terms = 202010L,
@@ -174,6 +176,7 @@ test_that("get_gen_ed_profile can have section enrollment without qualifying stu
     gen_ed_assoc_sections,
     gen_ed_assoc_programs,
     student_terms = test_student_terms_gen_ed_assoc,
+    dims = test_dims,
     opt = list(data_edges = data_objects$cedar_edges, dept_code = "HIST", min_n = 5L)
   )
 
@@ -192,6 +195,7 @@ test_that("get_gen_ed_profile can include chair-facing instructor DFW rows", {
     gen_ed_assoc_sections,
     gen_ed_assoc_programs,
     student_terms = test_student_terms_gen_ed_assoc,
+    dims = test_dims,
     opt = list(data_edges = data_objects$cedar_edges, 
       dept_code = "HIST",
       min_n = 1L,
