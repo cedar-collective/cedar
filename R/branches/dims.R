@@ -21,9 +21,11 @@
 #
 # attach_default_units() is what a loader calls: it drops any stamped unit
 # column it finds on a fact table and attaches the default hierarchy, so the
-# in-memory tables look the same whatever the transform wrote. While the
-# transform still stamps the same columns (until step 3's second PR), the
-# result is identical to the row; the ADR records the measurement.
+# in-memory tables look the same whatever the transform wrote. The transform
+# writes keys only (the subject, the program code, the source's college) since
+# the step's second PR; a file stamped by an older transform loads the same
+# way, its copy dropped first. The ADR records the measurement that the two
+# agree on every row.
 #
 # A reader that wants another hierarchy -- a course under its instructor's
 # unit, a Gen Ed course under its awarding college -- calls attach_unit() with
@@ -246,13 +248,60 @@ attach_degree_units <- function(degrees, dims) {
                   student_college = college)
 }
 
+#' Attach the unit and college to sections (cedar_sections)
+#'
+#' The subject rule, keyed on the section's `subject`, then the two columns a
+#' crosslist group derives from its sections' units: `crosslist_external`,
+#' whether the group spans more than one unit, and `crosslist_partners`, the
+#' courses in an external group, sorted. Both follow the unit, so they are
+#' attached here rather than stored.
+attach_section_units <- function(sections, dims) {
+  rows <- attach_unit(sections, dims, "subject", keys = c(subject = "subject"))
+  needed <- c("term", "campus", "crosslist_group", "subject_course")
+  missing <- setdiff(needed, colnames(rows))
+  if (length(missing)) {
+    stop("[dims.R] attach_section_units: sections lack ", paste(missing, collapse = ", "))
+  }
+  present <- intersect(c("crosslist_external", "crosslist_partners"), colnames(rows))
+  if (length(present)) {
+    stop("[dims.R] attach_section_units: sections already carry ",
+         paste(present, collapse = ", "), "; drop the stamped columns first")
+  }
+  scope <- rows %>%
+    dplyr::filter(!is.na(crosslist_group)) %>%
+    dplyr::group_by(term, campus, crosslist_group) %>%
+    dplyr::summarize(
+      crosslist_external = dplyr::n_distinct(department) > 1L,
+      crosslist_partners = dplyr::if_else(
+        dplyr::n_distinct(department) > 1L,
+        paste(sort(unique(subject_course)), collapse = " / "), NA_character_),
+      .groups = "drop")
+  dplyr::left_join(rows, scope, by = c("term", "campus", "crosslist_group"))
+}
+
+#' Attach the primary major's unit and college to student-terms
+#'
+#' The program rule on the keys the student-term table stores: the primary
+#' major's code and the source's college for it (academic studies' Actual and
+#' Translated College where a programs row described the term, the roster's
+#' Student College Code where the class list did), written as
+#' `primary_dept_code`, `primary_college_code` and `primary_college_basis`.
+attach_student_term_units <- function(student_terms, dims) {
+  attach_unit(student_terms, dims, "program",
+              keys = c(program = "primary_major_code", college = "primary_source_college_code",
+                       banner = "primary_source_college"),
+              cols = c(unit = "primary_dept_code", college = "primary_college_code",
+                       basis = "primary_college_basis"))
+}
+
 # The unit columns each fact table carries once attached, which a loader drops
 # before attaching so a stamped file and an unstamped one load the same way.
 CEDAR_ATTACHED_UNIT_COLUMNS <- list(
-  cedar_sections = c("department", "college", "college_basis"),
+  cedar_sections = c("department", "college", "college_basis", "crosslist_external", "crosslist_partners"),
   cedar_students = c("department", "college", "college_basis"),
   cedar_programs = c("dept_code", "program_college", "college_code", "college_basis", "student_college"),
-  cedar_degrees  = c("dept_code", "college_code", "college_basis", "college", "student_college")
+  cedar_degrees  = c("dept_code", "college_code", "college_basis", "college", "student_college"),
+  cedar_student_terms = c("primary_dept_code", "primary_college_code", "primary_college_basis")
 )
 
 #' Attach the default unit columns to every fact table a loader holds
@@ -261,9 +310,8 @@ CEDAR_ATTACHED_UNIT_COLUMNS <- list(
 #'   loaded (NULL, or the empty tibble load_cedar_data() returns for a missing
 #'   file) is left alone and named in a message.
 #' @param dims The object build_cedar_dims() returns.
-#' @return `tables` with the four fact tables carrying their default
-#'   unit columns, the table's attributes kept, each attachment timed in a
-#'   message.
+#' @return `tables` with the five tables carrying their default unit
+#'   columns, the table's attributes kept, each attachment timed in a message.
 attach_default_units <- function(tables, dims) {
   validate_cedar_dims(dims)
   if (!is.list(tables)) stop("[dims.R] attach_default_units: tables must be a list")
@@ -277,10 +325,11 @@ attach_default_units <- function(tables, dims) {
     elapsed <- system.time({
       bare <- tbl[setdiff(colnames(tbl), stamped)]
       attached <- switch(name,
-        cedar_sections = attach_unit(bare, dims, "subject", keys = c(subject = "subject")),
-        cedar_students = attach_unit(bare, dims, "subject"),
-        cedar_programs = attach_program_units(bare, dims),
-        cedar_degrees  = attach_degree_units(bare, dims))
+        cedar_sections      = attach_section_units(bare, dims),
+        cedar_students      = attach_unit(bare, dims, "subject"),
+        cedar_programs      = attach_program_units(bare, dims),
+        cedar_degrees       = attach_degree_units(bare, dims),
+        cedar_student_terms = attach_student_term_units(bare, dims))
       attached <- .carry_attributes(attached, tbl)
     })[["elapsed"]]
     message(sprintf("[dims.R] %s: attached %s in %.2f s%s", name,

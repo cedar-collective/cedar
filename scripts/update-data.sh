@@ -6,8 +6,8 @@
 #   1. Fetch data from MyReports (via mrgather)
 #   2. Parse raw data files (parse-data.R)
 #   3. Transform to CEDAR model (transform-to-cedar.R)
-#   4. Rebuild cedar_programs if the department mappings changed since it was
-#      built (the deploy's gate too: rebuild-programs-if-mappings-changed.R)
+#   4. Build cedar_student_terms if it is missing or stale (the deploy's gate
+#      too: rebuild-programs-if-mappings-changed.R)
 #   5. Check projection freshness and rebuild only if missing or stale
 #   6. Keep today's registration counts for each term still in registration
 #   7. Warm report caches (restart-cedar.sh --update reloads the app afterwards)
@@ -547,18 +547,18 @@ fi
 record_step "transform-to-cedar.R" "$TRANSFORM_STATUS" "$((SECONDS - STEP_START))s" "$TRANSFORM_NOTE"
 echo
 
-# ── Rebuild cedar_programs if the mapping source changed ─────────────────────
-# A run that does not include Academic Studies (`as`) leaves cedar_programs as
-# it was, stamped with the mapping source it was built from. If the mapping
-# files have changed since, every department CEDAR shows came from the old
-# mappings, and Admin > Data & Usage says STALE. This is the same gate the
-# deploy runs: a no-op costing about a second when nothing moved, a programs-only
-# rebuild when something did. After the transform, so a run that just rebuilt
-# programs finds nothing to do; before projections, which read program units.
+# ── Build cedar_student_terms if it is stale ─────────────────────────────────
+# A run that did not transform students, programs or degrees leaves the
+# student-term table as it was; one that did rebuilt it already. This is the
+# same gate the deploy runs: a no-op costing about a second when the table is
+# current, a rebuild in its own process when it is missing, older than a
+# source, short a column or built under an older rule. (Units are attached at
+# every start from the mapping files since ADR-001 step 3, so a mapping edit
+# rebuilds nothing here.) After the transform, before projections.
 if [[ "$PIPELINE_SUCCESS" != true ]]; then
-    record_step "mapping check" "SKIPPED" "0s" "data refresh failed; cedar_programs not checked"
+    record_step "student-term check" "SKIPPED" "0s" "data refresh failed; cedar_student_terms not checked"
 else
-    log_step "Check department mappings and rebuild cedar_programs only if they changed"
+    log_step "Build cedar_student_terms only if it is stale"
     STEP_START=$SECONDS
     MAPPING_OUT=$(mktemp)
     if [[ "$MODE" == "production" ]]; then
@@ -574,12 +574,12 @@ else
         MAPPING_RC=${PIPESTATUS[0]}
     fi
     if [[ $MAPPING_RC -ne 0 ]]; then
-        log_error "Mapping check or cedar_programs rebuild failed; departments may be stale"
-        record_step "mapping check" "FAILED" "$((SECONDS - STEP_START))s" "exit $MAPPING_RC — see $LOG_FILE"
-    elif grep -q "cedar_programs rebuilt" "$MAPPING_OUT"; then
-        record_step "mapping check" "OK" "$((SECONDS - STEP_START))s" "mappings changed; cedar_programs rebuilt"
+        log_error "Student-term check or rebuild failed; the app may not start without the table"
+        record_step "student-term check" "FAILED" "$((SECONDS - STEP_START))s" "exit $MAPPING_RC — see $LOG_FILE"
+    elif grep -q "Rebuilt: cedar_student_terms" "$MAPPING_OUT"; then
+        record_step "student-term check" "OK" "$((SECONDS - STEP_START))s" "cedar_student_terms rebuilt"
     else
-        record_step "mapping check" "OK" "$((SECONDS - STEP_START))s" "mappings unchanged; no rebuild"
+        record_step "student-term check" "OK" "$((SECONDS - STEP_START))s" "cedar_student_terms current; no rebuild"
     fi
     rm -f "$MAPPING_OUT"
 fi

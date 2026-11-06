@@ -2980,12 +2980,16 @@ refuses a confirmed pre-major in a different unit from its target (tested in
 reviewer: check the target's name.
 
 **M26 — The mapping gate rebuilds cedar_programs only.** *Status: resolved
-2026-10-10.* The transform stamps programs, degrees, sections and class lists
-with their mapping provenance, and the gate rebuilds whichever are stale
-(`cedar_stale_mapped_tables()`), stopping if an export it needs is missing or a
-rebuilt table is still stale. Before, it rebuilt only `cedar_programs`, so a
-subject decision reached the course tables only at the next refresh. A
-rebuild now restarts the app so it serves them (I22).
+2026-10-10; superseded 2026-11-06.* The transform stamped programs, degrees,
+sections and class lists with their mapping provenance, and the gate rebuilt
+whichever were stale (`cedar_stale_mapped_tables()`), stopping if an export it
+needed was missing or a rebuilt table was still stale. Before, it rebuilt only
+`cedar_programs`, so a subject decision reached the course tables only at the
+next refresh. A rebuild restarted the app so it served them (I22). Since
+ADR-001 step 3 no table stores a unit: the loader attaches every one at start
+from the mapping files, so a mapping edit rebuilds nothing, and the stamps,
+`R/branches/mapping-provenance.R` and the gate's mapping branch are gone. The
+gate builds `cedar_student_terms` alone.
 
 ### Architecture rules (`AGENTS.md`)
 

@@ -208,22 +208,22 @@ jobs:
             # runs. A rebuild restarts the container all the same, so nothing
             # that may have started meanwhile outlives the tables it loaded
             # (app_idle_timeout 0); it has loaded nothing, so that is cheap.
-            echo "Checking whether the mapping source or the student-term table changed in this deploy..."
+            echo "Checking whether the student-term table needs rebuilding in this deploy..."
             MAPPING_LOG="$(mktemp)"
             if docker compose exec -T cedar-shiny \
                  Rscript --vanilla \
                  /srv/shiny-server/cedar/scripts/rebuild-programs-if-mappings-changed.R \
                  < /dev/null > "$MAPPING_LOG" 2>&1; then
               cat "$MAPPING_LOG"
-              echo "Mapping check complete."
-              if grep -q '^\[mappings\] Rebuilt:' "$MAPPING_LOG"; then
-                echo "Tables were rebuilt; restarting the container so the app starts from them."
+              echo "Student-term check complete."
+              if grep -q '^\[student-terms\] Rebuilt:' "$MAPPING_LOG"; then
+                echo "The table was rebuilt; restarting the container so the app starts from it."
                 docker compose restart cedar-shiny
               fi
             else
               cat "$MAPPING_LOG"
-              echo "WARNING: mapping check or rebuild of the mapped tables failed."
-              echo "The previous tables are retained; the next data refresh retries."
+              echo "WARNING: student-term check or rebuild failed."
+              echo "The previous table is retained; the next data refresh retries."
             fi
             rm -f "$MAPPING_LOG"
 

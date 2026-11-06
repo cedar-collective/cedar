@@ -13,8 +13,9 @@ Sys.setenv(docker = "TRUE", CEDAR_STUDENT_SALT = "public-synthetic-demo-only",
 suppressPackageStartupMessages(library(tidyverse))
 source("dev/demo-data.R")
 target <- if (length(args)) args[[1]] else "/srv/shiny-server/cedar/data"
-# The transform stamps cedar_programs with its mapping provenance and audits the
-# mapping files, both of which need CEDAR's functions loaded (ISSUES.md I13).
+# The transform reads the mapping files, builds the dimension tables for its
+# lookup inputs and audits the files, all of which need CEDAR's functions
+# loaded (ISSUES.md I13).
 # logging.R reads cedar_data_dir at load time for its log paths.
 cedar_base_dir <- getwd()
 cedar_data_dir <- target

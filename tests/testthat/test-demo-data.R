@@ -42,8 +42,18 @@ test_that("fixture institution survives production transforms with usable proven
   programs <- qs2::qs_read(file.path(target, "cedar_programs.qs"))
   grades <- qs2::qs_read(file.path(target, "cedar_grades.qs"))
   expect_identical(attr(grades, "cedar_outcome_policy_version"), CEDAR_OUTCOME_POLICY_VERSION)
-  # The demo is its own institution (ADR-002 Stage 5): PSYC-MIN has a unit only
-  # in institution/demo/, so reading UNM's files instead would leave it none.
+  # The saved tables carry keys, never a unit (ADR-001 step 3); the loader
+  # attaches it. The demo is its own institution (ADR-002 Stage 5): PSYC-MIN
+  # has a unit only in institution/demo/, so reading UNM's files instead would
+  # leave it none.
+  expect_false(any(c("dept_code", "college_code", "college_basis") %in% names(programs)))
+  expect_false(any(c("department", "college", "college_basis") %in% names(sections)))
+  demo_dims <- build_cedar_dims(read_institution_mappings(cedar_institution_dir(root, "demo")))
+  attached <- suppressMessages(attach_default_units(
+    list(cedar_students = students, cedar_sections = sections, cedar_programs = programs), demo_dims))
+  students <- attached$cedar_students
+  sections <- attached$cedar_sections
+  programs <- attached$cedar_programs
   expect_equal(unique(programs$dept_code[programs$major_code %in% "PSYC-MIN"]), "PSYC")
   expect_equal(nrow(anti_join(students, sections, by = c("term", "crn"))), 0L)
   expect_false(anyNA(students$synthetic_cohort))

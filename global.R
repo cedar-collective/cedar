@@ -197,11 +197,12 @@ for (key in names(cedar_files)) {
 }
 
 # ── Dimensions and the default unit (ADR-001 step 3) ─────────────────────────
-# The mapping files are the dimension tables, read at every start; the default
-# unit columns (department, college, dept_code, college_code) are attached
-# here, so a mapping edit changes the next start and rebuilds nothing. While
-# the transform still stamps the same columns, the loader drops its copy
-# first, and the result is identical to the row.
+# The mapping files are the dimension tables, read at every start; every unit
+# column (department, college, dept_code, college_code, the student-term's
+# primary_dept_code, and the crosslist columns that follow a department) is
+# attached here, so a mapping edit changes the next start and rebuilds
+# nothing. The saved tables carry keys only; a file stamped by an older
+# transform loads the same way, its copy dropped first.
 cedar_dims <- build_cedar_dims()
 data_objects <- attach_default_units(data_objects, cedar_dims)
 data_objects[["cedar_dims"]] <- cedar_dims
@@ -472,20 +473,6 @@ cedar_course_flows <- tryCatch({
           " — downstream signals will be unavailable.")
   NULL
 })
-
-# ── Ensure crosslist_external column exists ──────────────────────────────────
-# Added in transform-to-cedar.R after 2026-03; compute on-the-fly from older .qs files.
-if (!is.null(data_objects[["cedar_sections"]]) &&
-    !"crosslist_external" %in% colnames(data_objects[["cedar_sections"]])) {
-  message("[global.R] crosslist_external not found — computing from crosslist_group/department...")
-  xlist_dept_scope <- data_objects[["cedar_sections"]] %>%
-    filter(!is.na(crosslist_group)) %>%
-    group_by(term, crosslist_group) %>%
-    summarize(crosslist_external = n_distinct(department) > 1, .groups = "drop")
-  data_objects[["cedar_sections"]] <- data_objects[["cedar_sections"]] %>%
-    left_join(xlist_dept_scope, by = c("term", "crosslist_group"))
-  message("[global.R] ✅ crosslist_external computed for ", nrow(xlist_dept_scope), " crosslist groups")
-}
 
 # ── Pre-compute data summary for Data & Usage page ─────────────────────────
 # This avoids expensive reactive computations and makes the tab load instantly

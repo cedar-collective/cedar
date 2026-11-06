@@ -570,7 +570,7 @@ test_that("silent error fallbacks do not grow, and the backlog shrinks on record
     "R/modules/waitlist.R" = 1L,
     "R/trunk/logging.R" = 7L,
     "global.R" = 1L,
-    "server.R" = 9L
+    "server.R" = 8L
   )
   architecture_expect_ratchet(measured, allowance, "silent fallback(s)")
 })
@@ -603,11 +603,13 @@ test_that("units are resolved only by attach_unit() and the lists layer (ADR-001
   # R/branches/dims.R is that place; the lists layer holds the rules it wraps.
   # Everything else reads the attached column. A ratchet over today's
   # backlog, as for M11: each file's allowance is its count, which may only
-  # go down. The transform (R/data-parsers) still stamps until the step's
-  # second PR and is not measured here.
+  # go down. The transform writes no unit since the step's second PR; what it
+  # still reads from the files is a program's pre-major flag, and the
+  # subj_dept_map lookups the third PR retires with cedar_lookups.
   files <- c(
     r_files_under("R", "trunk"), r_files_under("R", "branches"), r_files_under("R", "cones"),
     r_files_under("R", "features"), r_files_under("R", "modules"),
+    r_files_under("R", "data-parsers"),
     file.path(project_root, c("global.R", "server.R"))
   )
   files <- files[!grepl("/R/branches/dims\\.R$", files)]
@@ -624,7 +626,10 @@ test_that("units are resolved only by attach_unit() and the lists layer (ADR-001
   # Measured 2026-11-06. Lower a number when you move a reader; never raise one.
   allowance <- c(
     "R/branches/mapping-audit.R" = 1L,
-    "R/branches/student-terms.R" = 5L,
+    "R/branches/student-terms.R" = 2L,
+    # Reads the files (2), a program's pre-major flag (1), and subj_dept_map
+    # for the lookups it still builds (10): nothing here resolves a unit.
+    "R/data-parsers/transform-to-cedar.R" = 13L,
     "R/features/dept-trends.R" = 4L,
     "R/modules/headcount.R" = 1L,
     "R/trunk/utils.R" = 1L,

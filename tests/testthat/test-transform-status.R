@@ -1,19 +1,15 @@
 context("Transform status metadata")
 
-load_transform_helpers <- function() {
-  env <- new.env(parent = .GlobalEnv)
-  env$SOURCED_FROM_PARSE_DATA <- TRUE
-  old_wd <- getwd()
-  setwd(cedar_base_dir)
-  on.exit(setwd(old_wd), add = TRUE)
-  sys.source(file.path(cedar_base_dir, "R/data-parsers/transform-to-cedar.R"),
-             envir = env)
-  env
-}
+# load_transform_helpers() is in helper-transform.R, shared with the gate's test.
 
 # Scaffolding: the ADR-002 mapping files a transform reads, as small frames.
 # Only HIST courses have a subject row; programs are passed per test.
 scaffold_mapping_files <- function(programs = NULL) {
+  if (is.null(programs)) {
+    programs <- as.data.frame(stats::setNames(
+      rep(list(character()), length(CEDAR_MAPPING_FILE_SPECS$programs)),
+      CEDAR_MAPPING_FILE_SPECS$programs))
+  }
   list(
     colleges = data.frame(college_code = c("AS", "FA", "PH"),
                           college_name = c("Arts and Sciences", "Fine Arts", "Pharmacy"),
@@ -23,9 +19,13 @@ scaffold_mapping_files <- function(programs = NULL) {
                           college_code = c("AS", "AS", "PH", "FA"), kind = "department", notes = ""),
     subjects = data.frame(subject_code = "HIST", in_college = "", in_level = "", unit_code = "HIST",
                           college_code = "", status = "confirmed", evidence = "", notes = ""),
-    programs = programs
+    programs = programs,
+    settings = data.frame(setting = character(), value = character())
   )
 }
+# The same files as the loader reads them: the transform stores keys, and
+# attach_unit() (R/branches/dims.R) resolves them at every start.
+scaffold_dims <- function(programs = NULL) build_cedar_dims(scaffold_mapping_files(programs))
 
 test_that("student transform saves audit-free outcomes with a persistent policy stamp", {
   env <- load_transform_helpers()
@@ -37,11 +37,16 @@ test_that("student transform saves audit-free outcomes with a persistent policy 
                                     major_name_to_major_code = c(History = "HIST")))
   saved <- qs2::qs_read(file.path(output_dir, "cedar_grades.qs"))
   expect_silent(validate_cedar_grades_policy(saved))
-  # Stage 3b: the course reports its unit's college; Banner's stays beside it.
+  # The saved rows carry Banner's course college as a key and no unit (ADR-001
+  # step 3); attached through the same files, the course reports its unit's
+  # college, with Banner's beside it.
   students <- qs2::qs_read(file.path(output_dir, "cedar_students.qs"))
-  expect_equal(unique(students$college), "AS")
+  expect_false(any(c("department", "college", "college_basis") %in% names(students)))
   expect_equal(unique(students$source_college), "ARTS")
-  expect_equal(unique(students$college_basis), "mapped")
+  attached <- attach_unit(students, scaffold_dims(), "subject")
+  expect_equal(unique(attached$department), "HIST")
+  expect_equal(unique(attached$college), "AS")
+  expect_equal(unique(attached$college_basis), "mapped")
   expect_equal(nrow(saved), 5L)
   expect_equal(sum(saved$outcome == "dfw"), 4L)
   expect_equal(sum(saved$outcome == "pass"), 1L)
@@ -112,7 +117,9 @@ test_that("applicant transform keeps only runtime comparison covariates", {
 # EC-14: a program's unit comes from programs.csv alone (ADR-002 Stage 3). A
 # confirmed row decides it, minors included; a proposed row or no row leaves
 # none -- never a department named after the code (ISSUES.md I7); and a
-# concentration takes its primary major's unit (I11).
+# concentration takes its primary major's unit (I11). Since ADR-001 step 3
+# the transform stores the keys (the code, Banner's two college values) and
+# the loader attaches the unit; this test runs both, as a start does.
 test_that("a program's unit comes from programs.csv; anything unconfirmed has none", {
   env <- load_transform_helpers()
   output_dir <- tempfile("programs-transform-")
@@ -131,10 +138,15 @@ test_that("a program's unit comes from programs.csv; anything unconfirmed has no
   # History concentration if it applied to concentrations (I21).
   maps <- list(
     mapping_files = scaffold_mapping_files(programs_csv),
+    dims = scaffold_dims(programs_csv),
     major_name_to_major_code = c(History = "HIST")
   )
   env$transform_programs(academic_studies_program_units, output_dir, ".qs", maps = maps)
-  programs <- qs2::qs_read(file.path(output_dir, "cedar_programs.qs"))
+  stored <- qs2::qs_read(file.path(output_dir, "cedar_programs.qs"))
+  expect_false(any(c("dept_code", "program_college", "college_code", "college_basis",
+                     "student_college") %in% names(stored)))
+  expect_true(all(c("source_college", "source_college_code") %in% names(stored)))
+  programs <- suppressMessages(attach_program_units(stored, scaffold_dims(programs_csv)))
   declared <- programs[!grepl("Concentration", programs$program_type), ]
   dept <- stats::setNames(declared$dept_code, declared$major_code)
 

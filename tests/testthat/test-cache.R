@@ -260,6 +260,10 @@ test_that("Dept Trends invalidates only tabs that consume the changed source", {
     # Credit Hours reads late drops' credit values from sections (3.0.0).
     cedar_sections = c("enrl", "ch"),
     cedar_lookups = c("hc", "enrl", "deg", "ch"),
+    # A mapping edit reaches the key through the unit columns attach_unit()
+    # writes on the hashed tables at load (ADR-001 step 3), never through
+    # the dimension tables themselves.
+    cedar_dims = character(0),
     # Edges enter the key through cedar_report_end_term and
     # cedar_report_latest_term, not as a hashed source table.
     cedar_edges = character(0)
