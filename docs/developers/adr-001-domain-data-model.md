@@ -510,12 +510,22 @@ instead of Fall 2021. The demo institution's file carries the RN01 fixtures'
 successions, one of them proposed, so `test-courses.R` shows a proposed row
 assigning nothing and a chain crossing kinds.
 
-**What has not happened, and the order it will.** No reader groups on
-`course_id`, so no number moved in PR 1. Next: the schedule history lookups
-read `course_id` where they follow a course across terms (Low Enrollment's
-schedule view, I36; Regstats baselines; Course Dynamics history; the
-enrollment projection inputs, which is a `model_version` decision), and
-I36's renumbered rows show their old offerings. Then `cedar_course_terms`
+**The readers, in order.** No reader grouped on `course_id` in PR 1, so no
+number moved there. **Reader PR 1 (2026-11-06): Low Enrollment.** Its
+schedule view and course histories (`get_enrollment_concerns()`,
+`get_course_enrollment_history()` and the batched form in `enrl.R`) key on
+`course_id`, require the column, and name the former codes behind the shown
+numbers in the history text. Measured on the 2026-10-08 pull for Fall 2026:
+2,199 scheduled course-campus rows, 42 with history under a former code (all
+PSYC behind PSY, the confirmed renames); SOCI 371 on ABQ has 19 terms of
+history where it had 12. With only the three subject renames confirmed, 4 of
+the 391 courses with no Fall history by code find it by id; were the 320
+proposed renumberings confirmed, 84 would (36 BUSA, 8 ACCT, 8 NURS, I37's
+list), which is why confirming them is a decision worth a person's hour.
+Next: Course Dynamics history (`get_course_crosslist_classlist_enrl()`,
+where former codes are one more kind of listing) and Regstats baselines
+(`history_keys`, with the cache version bumped); the enrollment projection
+inputs are a `model_version` decision. Then `cedar_course_terms`
 is promoted from `cedar_cl_enrls_base` and `cedar_attempts` from
 `cedar_grades`, both keyed on `course_id`, and `course-flows.R`'s precompute
 rebuilds on it. The Admin > Mappings surface for code history (when each

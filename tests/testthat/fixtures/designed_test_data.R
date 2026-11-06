@@ -4284,7 +4284,8 @@ cedar_students_xl_switch <- dplyr::bind_rows(
       section_id = sid, crn = crn_id, term = as.integer(trm), campus = "ABQ",
       subject = sub(" .*", "", course), course_number = sub(".* ", "", course),
       subject_course = course, course_title = title, level = lvl,
-      department = subject, college = "ARTS",
+      # SOC maps to the SOCI unit, as UNM's subjects.csv maps a renamed subject.
+      department = if (subject == "SOC") "SOCI" else subject, college = "ARTS",
       term_type = dplyr::case_when(term %% 100 == 10 ~ "spring", term %% 100 == 60 ~ "summer",
                                    TRUE ~ "fall"),
       enrolled = 2L, total_enrl = 2L, available = capacity - 2L,

@@ -334,9 +334,13 @@ Plan: [ADR-002](docs/developers/adr-002-explicit-mapping-files.md).
   Step 4 PR 1 (2026-11-06): `cedar_courses` / `cedar_course_codes` built at
   load from `code_history.csv` and `course_id` attached to sections and class
   lists; UNM's file carries the three section-evidenced subject renames
-  confirmed and 320 title-matched renumberings proposed. Next: the schedule
-  history lookups read `course_id` (I36's renumbered rows show their old
-  offerings), then `cedar_course_terms` and `cedar_attempts` keyed on it.
+  confirmed and 320 title-matched renumberings proposed. Reader PR 1
+  (2026-11-06): Low Enrollment's schedule view and course histories key on
+  `course_id` and name the former codes behind the shown numbers. Next:
+  Course Dynamics history and Regstats baselines, then `cedar_course_terms`
+  and `cedar_attempts` keyed on the id. Confirming the proposed Fall 2026
+  renumberings is a person's decision, and what makes I37's rows show their
+  old offerings.
   Design in full in
   [ADR-001](docs/developers/adr-001-domain-data-model.md#step-4-in-full-the-course-dimension-and-what-follows-it).
 

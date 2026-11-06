@@ -153,6 +153,7 @@ test_that("get_dashboard_enrollment_flags surfaces waitlists and threshold-based
     status = "A",
     section = "001",
     subject_course = c(rep("HIST 1110", 5), rep("HIST 490", 5)),
+    course_id = c(rep("HIST 1110", 5), rep("HIST 490", 5)),  # as the loader attaches it
     course_title = c(rep("World History", 5), rep("Senior Seminar", 5)),
     campus = "ABQ",
     level = "upper",
@@ -294,6 +295,7 @@ test_that("get_dashboard_enrollment_flags applies campus filter to high waitlist
     status = "A",
     section = c("001", "001", "002", "002"),
     subject_course = "COMM 1130",
+    course_id = "COMM 1130",  # as the loader attaches it
     course_title = "Public Speaking",
     campus = c("EA", "EA", "TA", "TA"),
     level = "lower",
