@@ -4310,7 +4310,7 @@ cedar_sections_rn <- dplyr::bind_rows(
 # The class list carries the renamed subject on the old sections (RN01A and
 # RN01C read SOCI where the schedule reads SOC), as Banner back-applies it.
 .rn_student <- function(ids, term, course, crn_id, title, lvl) {
-  .mc_row(ids, term, course, "ABQ", sub(" .*", "", course)) %>%
+  .mc_row(ids, term, course, "ABQ", sub(" .*", "", course), grade = "B") %>%
     dplyr::mutate(crn = crn_id, section_id = paste0("RN01-", crn_id),
                   course_title = title, level = lvl, as_of_date = as.Date("2021-06-01"))
 }

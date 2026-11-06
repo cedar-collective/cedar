@@ -1684,6 +1684,18 @@ output$enrl_classlist_download <- downloadHandler(
   # current registration, so the enrollment history marks them.
   cr_in_progress_terms <- cedar_in_progress_terms(data_objects[["cedar_edges"]])$term
 
+  # Course Dynamics follows a course across the codes it has carried (ADR-001
+  # step 4): every reader on this tab works on the class list keyed on
+  # course_id (key_on_course_id() shares every column; nothing is copied), and
+  # the picked code resolves to its course once. create_course_base_data()
+  # does the same for the main run, so the tabs agree on what the course is.
+  cr_students <- key_on_course_id(data_objects[["cedar_students"]], "server.R Course Dynamics")
+  cr_course_id <- reactive({
+    course <- input$cr_course
+    req(course, nzchar(course))
+    course_id_of(data_objects[["cedar_sections"]], course, "server.R Course Dynamics")
+  })
+
   invalidate_course_dynamics_results <- function() {
     course_report_data(NULL)
     cr_retention_data(NULL)
@@ -2065,10 +2077,19 @@ output$enrl_classlist_download <- downloadHandler(
     } else {
       NULL
     }
+    former_codes <- course_former_codes_note(
+      data$overview, data$course_code, data$selected_code
+    )
+    former_note <- if (!is.null(former_codes)) {
+      tagList(" ", tags$strong("One course, more than one code: "), former_codes)
+    } else {
+      NULL
+    }
     tags$p(
       class = "cedar-body text-hint",
       tags$strong(paste0(type_label, ";")),
       paste0(" campuses shown separately: ", paste(campuses, collapse = ", "), "."),
+      former_note,
       crosslist_note
     )
   })
@@ -3157,7 +3178,7 @@ output$enrl_classlist_download <- downloadHandler(
   # cannot use different definitions of "returned" (ISSUES.md I17).
   cr_retention_context <- reactive({
     build_retention_context(
-      data_objects[["cedar_students"]], data_objects[["cedar_degrees"]],
+      cr_students, data_objects[["cedar_degrees"]],
       list(data_edges = data_objects[["cedar_edges"]]),
       student_terms = data_objects[["cedar_student_terms"]]
     )
@@ -3672,9 +3693,9 @@ output$enrl_classlist_download <- downloadHandler(
     cr_college_retention_data(NULL)
     cr_course_retention_data(NULL)
 
-    students  <- data_objects[["cedar_students"]]
+    students  <- cr_students
     degrees   <- data_objects[["cedar_degrees"]]
-    course    <- input$cr_course
+    course    <- cr_course_id()
     n_terms   <- as.integer(input$cr_ret_n_terms %||% 4L)
     min_n     <- as.integer(input$cr_ret_min_n   %||% 10L)
 
@@ -4057,8 +4078,8 @@ output$enrl_classlist_download <- downloadHandler(
 
     # Reconstruct the level and dept/college labels for display.
     course_row <- tryCatch(
-      data_objects[["cedar_students"]] %>%
-        filter(subject_course == input$cr_course, !is.na(department)) %>%
+      cr_students %>%
+        filter(subject_course == cr_course_id(), !is.na(department)) %>%
         slice(1),
       error = function(e) data.frame()
     )
@@ -4132,8 +4153,8 @@ output$enrl_classlist_download <- downloadHandler(
   cr_course_dept <- reactive({
     course <- input$cr_course
     if (is.null(course) || !nzchar(course)) return(NA_character_)
-    d <- data_objects[["cedar_students"]] %>%
-      dplyr::filter(subject_course == course, !is.na(department)) %>%
+    d <- cr_students %>%
+      dplyr::filter(subject_course == cr_course_id(), !is.na(department)) %>%
       dplyr::slice(1) %>%
       dplyr::pull(department)
     if (length(d) == 0) NA_character_ else d[[1]]
@@ -4149,8 +4170,8 @@ output$enrl_classlist_download <- downloadHandler(
     course <- input$cr_course
     req(course, nzchar(course))
     get_downstream_course_options(
-      data_objects[["cedar_students"]],
-      course,
+      cr_students,
+      cr_course_id(),
       list(campus = if (length(input$cr_campus) > 0) input$cr_campus else NULL,
            min_n  = 15L,
            data_edges = data_objects[["cedar_edges"]])
@@ -4310,9 +4331,11 @@ output$enrl_classlist_download <- downloadHandler(
 
     gpa_min <- input$cr_impact_seq_gpa_min
     gpa_max <- input$cr_impact_seq_gpa_max
+    # Both courses by id: the Y picker lists schedule codes, former ones included.
     opt <- list(
-      course_x    = input$cr_course,
-      course_y    = input$cr_impact_seq_course_y,
+      course_x    = cr_course_id(),
+      course_y    = course_id_of(data_objects[["cedar_sections"]], input$cr_impact_seq_course_y,
+                                 "server.R Course Sequence"),
       min_n       = as.integer(input$cr_impact_seq_min_n %||% 15L),
       hs_gpa_min  = if (!is.na(gpa_min) && is.numeric(gpa_min)) gpa_min else NULL,
       hs_gpa_max  = if (!is.na(gpa_max) && is.numeric(gpa_max)) gpa_max else NULL,
@@ -4322,7 +4345,7 @@ output$enrl_classlist_download <- downloadHandler(
     withProgress(message = "Building sequence comparison...", value = 0.3, {
       tryCatch({
         result <- get_course_sequence_effect(
-          students     = data_objects[["cedar_students"]],
+          students     = cr_students,
           programs     = data_objects[["cedar_programs"]],
           applicants   = data_objects[["cedar_applicants"]],
           opt          = opt,
@@ -4525,9 +4548,13 @@ output$enrl_classlist_download <- downloadHandler(
       }
       y_sel <- same_dept$subject_course
     }
+    # By id: the follow-on options already are; the picker lists schedule codes.
+    y_sel <- unique(vapply(y_sel, course_id_of, character(1),
+                           tbl = data_objects[["cedar_sections"]],
+                           caller = "server.R Instructor Patterns"))
 
     opt <- list(
-      course_x = input$cr_course,
+      course_x = cr_course_id(),
       course_y = y_sel,
       min_n    = as.integer(input$cr_impact_inst_min_n %||% 15L),
       campus   = if (length(input$cr_campus) > 0) input$cr_campus else NULL
@@ -4536,7 +4563,7 @@ output$enrl_classlist_download <- downloadHandler(
     withProgress(message = "Comparing downstream success...", value = 0.3, {
       tryCatch({
         result <- get_instructor_effect(
-          students     = data_objects[["cedar_students"]],
+          students     = cr_students,
           programs     = data_objects[["cedar_programs"]],
           applicants   = data_objects[["cedar_applicants"]],
           opt          = opt,

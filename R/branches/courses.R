@@ -262,6 +262,100 @@ attach_course_ids <- function(tables, courses) {
   tables
 }
 
+#' Read a table by course rather than by code
+#'
+#' Returns `tbl` keyed on the course: `subject_course` carries each row's
+#' `course_id` and the code the source wrote moves to `listed_code`. A reader
+#' that filters, groups or joins on `subject_course` then follows every course
+#' across the codes it has carried, its grouping unchanged — Course Dynamics
+#' reads the class list and the sections this way, so SOCI 371's report
+#' includes its SOC 371 terms and its feeders count SOC 250 and SOCI 2315 as
+#' one course. This is a working frame, never a saved one (annotate, never
+#' mutate): the loaded tables keep the registrar's code, and `listed_code`
+#' keeps it here for any text that names it ("also listed as SOC 371"). A
+#' frame already keyed is returned as it is. Every column is shared with
+#' `tbl`; nothing is copied.
+#'
+#' @param tbl `cedar_sections` or `cedar_students` rows with `course_id`.
+#' @param caller Named in the error when the id was never attached.
+#' @return `tbl`, ungrouped, with `subject_course` set to `course_id` and the
+#'   original code in `listed_code`.
+key_on_course_id <- function(tbl, caller = "key_on_course_id") {
+  if (!is.data.frame(tbl)) stop("[courses.R] ", caller, ": tbl must be a data frame")
+  if ("listed_code" %in% names(tbl)) return(tbl)
+  if (!"course_id" %in% names(tbl)) {
+    stop("[courses.R] ", caller, "() needs column course_id on the table it reads; ",
+         "attach it with attach_course_ids() (R/branches/courses.R), as every loader does.")
+  }
+  .courses_need(tbl, "subject_course", paste0(caller, "'s table"))
+  tbl <- dplyr::ungroup(tbl)
+  tbl$listed_code <- tbl$subject_course
+  tbl$subject_course <- tbl$course_id
+  tbl
+}
+
+#' The course a code belongs to
+#'
+#' @param tbl Rows with `course_id`, keyed with key_on_course_id() or not.
+#' @param code One course code as a picker or a URL names it: the current
+#'   code or any former one (`SOC 371` finds SOCI 371's course).
+#' @param caller Named in the errors.
+#' @return The code's `course_id` in `tbl`. A code `tbl` does not carry is its
+#'   own course, with no history to follow. Stops on a code that maps to two
+#'   ids, which no table attach_course_ids() wrote can do.
+course_id_of <- function(tbl, code, caller = "course_id_of") {
+  code <- as.character(code)
+  if (length(code) != 1L || is.na(code) || !nzchar(code)) {
+    stop("[courses.R] ", caller, ": code must be one course code")
+  }
+  if (!"course_id" %in% names(tbl)) {
+    stop("[courses.R] ", caller, "() needs column course_id on the table it reads; ",
+         "attach it with attach_course_ids() (R/branches/courses.R), as every loader does.")
+  }
+  listed <- if ("listed_code" %in% names(tbl)) tbl$listed_code else tbl$subject_course
+  ids <- unique(tbl$course_id[!is.na(listed) & listed == code])
+  if (length(ids) > 1L) {
+    stop("[courses.R] ", caller, ": code ", code, " carries ", length(ids),
+         " course ids (", paste(ids, collapse = ", "), "); the table was not attached by ",
+         "attach_course_ids()")
+  }
+  if (length(ids) == 0L) return(code)
+  ids
+}
+
+#' The codes a course has been listed under in a table
+#'
+#' @param tbl Rows with `course_id`, keyed or not.
+#' @param course_id One course id, from course_id_of().
+#' @return The codes in `tbl` with that id, sorted; the id itself when the
+#'   table carries none of them.
+course_codes_of <- function(tbl, course_id) {
+  if (!"course_id" %in% names(tbl)) {
+    stop("[courses.R] course_codes_of() needs column course_id; attach it with attach_course_ids()")
+  }
+  listed <- if ("listed_code" %in% names(tbl)) tbl$listed_code else tbl$subject_course
+  codes <- sort(unique(listed[!is.na(tbl$course_id) & tbl$course_id == course_id]))
+  if (length(codes) == 0L) course_id else codes
+}
+
+#' Every code a table carries under another course id
+#'
+#' One line per rename the table shows (`"SOC 371 > SOCI 371"`), sorted: the
+#' fingerprint a cache key needs for a result read through key_on_course_id(),
+#' so a confirmed row in code_history.csv is a miss, never a stale hit.
+#'
+#' @param tbl Rows with `course_id`, keyed or not.
+#' @return A sorted character vector, empty when no code is renamed.
+course_code_renames <- function(tbl) {
+  if (!"course_id" %in% names(tbl)) {
+    stop("[courses.R] course_code_renames() needs column course_id; attach it with attach_course_ids()")
+  }
+  listed <- if ("listed_code" %in% names(tbl)) tbl$listed_code else tbl$subject_course
+  renamed <- !is.na(listed) & !is.na(tbl$course_id) & listed != tbl$course_id
+  if (!any(renamed)) return(character(0))
+  sort(unique(paste(listed[renamed], ">", tbl$course_id[renamed])))
+}
+
 #' Screen the data for codes that look like successions of other codes
 #'
 #' Candidates for code_history.csv, with the evidence; never verdicts. Two

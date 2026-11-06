@@ -127,7 +127,17 @@ for (.sec in c("test_sections", "test_sections_sf", "test_sections_topics", "tes
   assign(.sec, attach_test_course_ids(get(.sec), "sections"), envir = globalenv())
 }
 test_students <<- attach_test_course_ids(test_students, "students")
+test_students_xl_switch <<- attach_test_course_ids(test_students_xl_switch, "students")
 rm(.sec)
+# RN01 read with the demo institution's code_history.csv, as its tests read it:
+# both tables attached from one dimension built over both, as global.R does.
+rn01_course_tables <<- function() {
+  dims <- build_cedar_dims(read_institution_mappings(cedar_institution_dir(cedar_base_dir, "demo")))
+  courses <- suppressMessages(build_cedar_courses(test_sections_rn, test_students_rn, dims))
+  suppressMessages(attach_course_ids(
+    list(cedar_sections = test_sections_rn, cedar_students = test_students_rn), courses
+  ))
+}
 # Degree Explorer: the demo institution's designed catalog (institution/demo/),
 # two synthetic programs whose schedules are worked by hand in
 # test-degree-explorer.R. Independent of any real institution's annual catalog.

@@ -126,3 +126,38 @@ test_that("detect_course_renamings finds the shared section and the one-to-one t
   expect_true("SOCI 250 SOCI 2315" %in% paste(one$from_code, one$to_code))
   expect_false("SOC 250 SOCI 2315" %in% paste(one$from_code, one$to_code))
 })
+
+test_that("key_on_course_id reads a table by course and course_id_of resolves any code", {
+  rn <- rn01_course_tables()
+  keyed <- key_on_course_id(rn$cedar_sections)
+  # The id is the key; the schedule's code is kept beside it.
+  expect_equal(keyed$subject_course, rn$cedar_sections$course_id)
+  expect_equal(keyed$listed_code, rn$cedar_sections$subject_course)
+  expect_equal(keyed$subject_course[keyed$listed_code == "SOC 371"], "SOCI 371")
+  # Shared columns, not copies, and a keyed frame keyed again is unchanged.
+  expect_identical(key_on_course_id(keyed), keyed)
+  expect_equal(ncol(keyed), ncol(rn$cedar_sections) + 1L)
+
+  # Any code the course has carried names it; a code the table does not carry
+  # is its own course; a keyed frame resolves through the codes as listed.
+  expect_equal(course_id_of(rn$cedar_sections, "SOC 371"), "SOCI 371")
+  expect_equal(course_id_of(rn$cedar_sections, "SOCI 371"), "SOCI 371")
+  expect_equal(course_id_of(keyed, "SOC 250"), "SOCI 2315")
+  expect_equal(course_id_of(keyed, "SOCI 2315"), "SOCI 2315")
+  expect_equal(course_id_of(rn$cedar_sections, "MATH 9999"), "MATH 9999")
+  expect_error(course_id_of(rn$cedar_sections, c("SOC 371", "SOCI 371")), "one course code")
+  expect_error(course_id_of(test_sections_rn, "SOC 371"), "needs column course_id")
+  expect_error(key_on_course_id(test_sections_rn, "a reader"), "a reader\\(\\) needs column course_id")
+
+  # The codes a course has been listed under, and the renames a frame shows.
+  expect_equal(course_codes_of(rn$cedar_sections, "SOCI 2315"), c("SOC 250", "SOCI 2315"))
+  expect_equal(course_codes_of(keyed, "HIST 3201"), c("HIST 320", "HIST 3201"))
+  expect_equal(course_codes_of(rn$cedar_sections, "LING 2110"), "LING 2110")
+  expect_equal(
+    course_code_renames(rn$cedar_sections),
+    c("HIST 320 > HIST 3201", "SOC 250 > SOCI 2315", "SOC 371 > SOCI 371")
+  )
+  # The class list already carries SOCI on the old SOC sections.
+  expect_equal(course_code_renames(rn$cedar_students), c("HIST 320 > HIST 3201", "SOCI 250 > SOCI 2315"))
+  expect_equal(course_code_renames(test_sections), character(0))
+})

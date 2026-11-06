@@ -65,6 +65,7 @@ test_that("course overview separates selected-code and crosslist-family enrollme
       subject = "HIST",
       course_number = "480",
       subject_course = "HIST 480",
+      course_id = "HIST 480",  # as the loader attaches it
       course_title = "Advanced Topics in History",
       enrolled = 7L,
       total_enrl = 7L,
@@ -87,6 +88,7 @@ test_that("course overview separates selected-code and crosslist-family enrollme
       college = section$college,
       department = section$department,
       subject_course = section$subject_course,
+      course_id = section$subject_course,  # as the loader attaches it
       registration_status_code = "RE",
       registration_date = as.Date(NA),
       as_of_date = as.Date("2020-06-01")
@@ -528,4 +530,110 @@ test_that("overview plot builders return campus-separated Plotly charts", {
     campuses = c("ABQ", "EA")
   )
   expect_s3_class(enrollment_plot, "plotly")
+})
+
+# ---- The course, not the code (ADR-001 step 4) -----------------------------
+# RN01, read with the demo institution's code_history.csv: HIST 320 became
+# HIST 3201 in Spring 2021 (RN01E/F/G; students R2 in Sp20 and R5 in Sp21),
+# SOC 371 became SOCI 371 (RN01A/B). Before, a report for HIST 3201 began in
+# Spring 2021 and HIST 320's two terms were a different course.
+
+test_that("Course Dynamics follows a course across its codes and names the former ones", {
+  rn <- rn01_course_tables()
+  opt <- create_test_opt(list(course = "HIST 3201"))
+  payload <- assemble_course_enrollment_payload(rn$cedar_students, rn$cedar_sections, opt)
+
+  # Every term of the course, keyed on the current code.
+  lifecycle <- payload$overview$lifecycle
+  expect_equal(lifecycle$term, c(202010L, 202110L))
+  expect_equal(unique(lifecycle$subject_course), "HIST 3201")
+  expect_equal(lifecycle$current_enrl, c(1L, 1L))
+  expect_equal(payload$classlist$registered, c(1L, 1L))
+  sections <- payload$overview$sections
+  expect_equal(sections$term, c(202010L, 202080L, 202110L))
+  expect_equal(unique(sections$subject_course), "HIST 3201")
+  # The schedule's code for each term stays readable beside the id, and a
+  # former code is never a crosslist partner.
+  expect_equal(sections$listed_as, c("HIST 320", "HIST 320", "HIST 3201"))
+  expect_equal(unique(sections$crosslist_courses), "HIST 3201")
+  expect_false(any(sections$has_crosslist))
+  # Listings name one course, not one column per code.
+  expect_equal(unique(payload$overview$listings$subject_course), "HIST 3201")
+  expect_equal(nrow(payload$overview$overlap), 0L)
+
+  # The snapshot is plain: one code column, and the Spring 2020 term in the
+  # prior column where the course was listed as HIST 320.
+  spec <- prepare_course_snapshot_tables(payload$overview, "HIST 3201", term_type = "spring")[[1]]
+  expect_null(spec$sub_labels)
+  expect_equal(spec$current_label, "Spring 2021")
+  row <- function(label) spec$rows[[which(vapply(spec$rows, `[[`, "", "label") == label)]]
+  expect_equal(row("Final")$current, "1")
+  expect_equal(row("Final")$prior[[1]], "1")
+
+  # The page says so, with the terms each former code covered.
+  expect_equal(
+    course_former_codes_note(payload$overview, "HIST 3201"),
+    paste0("Also listed as HIST 320 (Spring 2020 to Fall 2020): every term under a ",
+           "former code is counted here as HIST 3201.")
+  )
+  expect_equal(
+    course_former_codes_note(payload$overview, "HIST 3201", selected_code = "HIST 320"),
+    paste0("HIST 320 is now HIST 3201. Also listed as HIST 320 (Spring 2020 to Fall 2020): ",
+           "every term under a former code is counted here as HIST 3201.")
+  )
+  # A course that has carried one code gets no note.
+  one_code <- assemble_course_enrollment_payload(
+    rn$cedar_students, rn$cedar_sections, create_test_opt(list(course = "LING 2110"))
+  )
+  expect_equal(one_code$overview$sections$listed_as, c("LING 2110", "LING 2110"))
+  expect_null(course_former_codes_note(one_code$overview, "LING 2110"))
+
+  # A former code picked from the schedule is the same course, named by its
+  # current code; a section table without the id is refused.
+  from_former <- assemble_course_enrollment_payload(
+    rn$cedar_students, rn$cedar_sections, create_test_opt(list(course = "HIST 320"))
+  )
+  expect_equal(from_former$overview$lifecycle, lifecycle)
+  expect_equal(from_former$overview$sections, sections)
+  expect_error(
+    assemble_course_enrollment_payload(rn$cedar_students, test_sections_rn, opt),
+    "needs column course_id"
+  )
+})
+
+test_that("the whole Course Dynamics payload is keyed on the course", {
+  rn <- rn01_course_tables()
+  rn_objects <- list(
+    cedar_students = rn$cedar_students, cedar_sections = rn$cedar_sections,
+    cedar_student_terms = attach_test_student_terms(suppressMessages(build_student_terms(
+      rn$cedar_students, programs = NULL, degrees = NULL,
+      edges = list(last_enrolled_complete = 202110L)
+    )))
+  )
+  base <- suppressMessages(
+    create_course_base_data(rn_objects, list(course = "HIST 320", skip_cache = TRUE))
+  )
+  # Named by the current code; what was picked is kept for the page.
+  expect_equal(base$course_code, "HIST 3201")
+  expect_equal(base$selected_code, "HIST 320")
+  expect_equal(base$opt$course, "HIST 3201")
+  expect_equal(base$overview$lifecycle$term, c(202010L, 202110L))
+  # Rollcall reads the class list by course: both terms, one course.
+  rollcall <- base$tables$rollcall_by_class_plot_data
+  expect_setequal(unique(rollcall$term), c(202010L, 202110L))
+  expect_equal(unique(rollcall$subject_course), "HIST 3201")
+
+  # The outcome cones read the same keyed class list, so DFW history begins
+  # where the course did, not where its current code did.
+  keyed <- key_on_course_id(rn$cedar_students)
+  edges <- cedar_data_edges(test_students, degrees = test_degrees)
+  outcomes <- suppressMessages(get_course_outcomes(
+    keyed, test_faculty, list(course = "HIST 3201", min_n = 1L, data_edges = edges)
+  ))
+  expect_setequal(outcomes$dfw_trend$term, c(202010L, 202110L))
+  # On the class list as stored, HIST 320's term is another course.
+  stored <- suppressMessages(get_course_outcomes(
+    rn$cedar_students, test_faculty, list(course = "HIST 3201", min_n = 1L, data_edges = edges)
+  ))
+  expect_equal(stored$dfw_trend$term, 202110L)
 })
