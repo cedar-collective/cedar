@@ -1,6 +1,4 @@
 program_code,in_college,program_name,unit_code,college_code,is_pre_major,leads_to,basis,status,evidence,notes
-0000,,Undeclared,,,FALSE,,unresolved,proposed,"1 class-list rows as the roster's major, Spring 2020; no evidence settles the unit",Class-list-only code: no program record carries it; the name is the class list's. Added 2026-11-06 when cedar_lookups retired.
-059,,Journalism,,,FALSE,,unresolved,proposed,"1 class-list rows as the roster's major, Spring 2022; 1 rows as Major; no evidence settles the unit",Named from the class list. Added 2026-11-06 when cedar_lookups retired.
 AAC,,Applied Arts & Crafts,,,FALSE,,unresolved,proposed,"21 class-list rows as the roster's major, Fall 2019–Fall 2025; no evidence settles the unit",Class-list-only code: no program record carries it; the name is the class list's. Added 2026-11-06 when cedar_lookups retired.
 AAHS,,Human Services,HMSV,,FALSE,,decided,confirmed,"21 rows as Major; source department ""Individual Fam Comm Educ IFCE"" on 100% of primary-major rows; students take FCS courses at 24.1x the overall rate (9 enrolments); assistant proposed FCS","Kept at its Stage 0 unit, a hand decision in program_code_maps.R; decided 2026-10-03."
 AASN,,Nursing,NURS,,FALSE,,name_match,confirmed,"2 rows as Major; source department ""Provost Branch Campuses"" on 100% of primary-major rows; unit named ""Nursing""",

@@ -1,0 +1,5 @@
+kind,from_code,to_code,effective_term,scope,basis,status,evidence,notes
+subject,SOC,SOCI,202080,,section_crn,confirmed,RN01: the Spring 2020 class list names sections RN01A and RN01C SOCI where the schedule says SOC; SOCI sections begin Fall 2020,The fixtures' subject rename (designed_test_data.R RN01).
+course,SOCI 250,SOCI 2315,202110,,catalog,confirmed,RN01: Social Problems renumbered in the Spring 2021 common course numbering,The fixtures' renumbering after a subject rename: SOC 250 resolves through SOCI 250 to SOCI 2315 (RN01).
+course,HIST 320,HIST 3201,202110,,title_match,confirmed,RN01: Historiography retired as HIST 320 after Fall 2020 and began as HIST 3201 in Spring 2021,The fixtures' renumbering (RN01).
+course,PHIL 150,PHIL 1115,202080,,title_match,proposed,RN01: Introduction to Logic retired as PHIL 150 after Spring 2020 and began as PHIL 1115 in Fall 2020; nobody has confirmed it,A proposed row assigns nothing: the dimension keeps two courses (RN01).

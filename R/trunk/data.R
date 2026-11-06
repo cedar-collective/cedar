@@ -123,6 +123,14 @@ load_cedar_model_data <- function(opt) {
   cedar_dims <- build_cedar_dims()
   data_objects <- attach_default_units(data_objects, cedar_dims)
   data_objects[["cedar_dims"]] <- cedar_dims
+  # The course dimension (ADR-001 step 4): one course_id per code, following the
+  # confirmed successions in code_history.csv, attached to the sections and the
+  # class lists beside subject_course. Never saved: a confirmed row changes it at
+  # the next start, as a unit decision does.
+  cedar_courses <- build_cedar_courses(data_objects[["cedar_sections"]], data_objects[["cedar_students"]], cedar_dims)
+  data_objects <- attach_course_ids(data_objects, cedar_courses)
+  data_objects[["cedar_courses"]] <- cedar_courses$courses
+  data_objects[["cedar_course_codes"]] <- cedar_courses$codes
 
   # Map CEDAR tables to legacy variable names for backward compatibility
   # sections table contains course section data (includes enrollment counts)

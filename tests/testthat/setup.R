@@ -58,6 +58,8 @@ test_programs_many_programs <<- cedar_programs_many_programs # EC-13: dept over 
 test_degrees_roadblocks <<- cedar_degrees_roadblocks
 test_sections_xl_switch <<- cedar_sections_xl_switch # EC-15: listing switch in a crosslist
 test_students_xl_switch <<- cedar_students_xl_switch
+test_sections_rn     <<- cedar_sections_rn       # RN01: codes that succeed one another (course dimension)
+test_students_rn     <<- cedar_students_rn
 test_degrees     <<- cedar_degrees
 
 # Student-term tables (cedar_student_terms), built by the production builder

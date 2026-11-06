@@ -1,0 +1,128 @@
+# The course dimension (ADR-001 step 4): one course_id per code, through the
+# confirmed successions in institution/<id>/code_history.csv. Fixtures: RN01
+# (designed_test_data.R) read with the demo institution's file (demo_dims).
+
+demo_files <- function() read_institution_mappings(cedar_institution_dir(cedar_base_dir, "demo"))
+# The demo institution's files, whichever institution load_funcs() read.
+demo_dims <- build_cedar_dims(demo_files())
+
+test_that("every code gets one course_id, following confirmed successions step by step", {
+  cc <- suppressMessages(build_cedar_courses(test_sections_rn, test_students_rn, demo_dims))
+  expect_s3_class(cc, "cedar_courses")
+  codes <- cc$codes
+  expect_equal(names(codes), CEDAR_COURSE_CODES_COLUMNS)
+  expect_equal(nrow(codes), 11L)
+  id_of <- function(code) codes$course_id[codes$subject_course == code]
+  steps_of <- function(code) codes$steps[codes$subject_course == code]
+  # The subject rename: one step.
+  expect_equal(id_of("SOC 371"), "SOCI 371")
+  expect_equal(steps_of("SOC 371"), 1L)
+  expect_equal(id_of("SOCI 371"), "SOCI 371")
+  # A chain across kinds: the subject's rename, then the course's renumbering.
+  expect_equal(id_of("SOC 250"), "SOCI 2315")
+  expect_equal(steps_of("SOC 250"), 2L)
+  expect_equal(id_of("SOCI 250"), "SOCI 2315")
+  expect_equal(id_of("HIST 320"), "HIST 3201")
+  # A proposed row assigns nothing.
+  expect_equal(id_of("PHIL 150"), "PHIL 150")
+  expect_equal(id_of("PHIL 1115"), "PHIL 1115")
+  # A class-list-only code is a row, never dropped.
+  expect_equal(id_of("SOCI 2120"), "SOCI 2120")
+  expect_false(codes$in_sections[codes$subject_course == "SOCI 2120"])
+  expect_true(codes$in_class_lists[codes$subject_course == "SOCI 2120"])
+  # SOC 371's class list already read SOCI 371, so that code is on both tables
+  # from Spring 2020 while the schedule's SOC 371 is sections-only (I45).
+  expect_false(codes$in_class_lists[codes$subject_course == "SOC 371"])
+  expect_equal(codes$first_term[codes$subject_course == "SOCI 371"], 202010L)
+})
+
+test_that("a course's row spans every code it has carried", {
+  cc <- suppressMessages(build_cedar_courses(test_sections_rn, test_students_rn, demo_dims))
+  courses <- cc$courses
+  expect_equal(names(courses), CEDAR_COURSES_COLUMNS)
+  expect_equal(nrow(courses), 7L)
+  expect_setequal(courses$course_id,
+                  c("SOCI 371", "SOCI 2315", "HIST 3201", "PHIL 150", "PHIL 1115", "SOCI 2120", "LING 2110"))
+  sp <- courses[courses$course_id == "SOCI 2315", ]
+  expect_equal(sp$n_codes, 3L)
+  expect_equal(sp$former_codes, "SOC 250, SOCI 250")
+  expect_equal(c(sp$first_term, sp$last_term), c(202010L, 202110L))
+  expect_equal(sp$course_title, "Social Problems")
+  expect_equal(c(sp$subject, sp$course_number, sp$level), c("SOCI", "2315", "lower"))
+  # SOCI 371's history begins where SOC 371's did (I45).
+  expect_equal(courses$first_term[courses$course_id == "SOCI 371"], 202010L)
+  expect_equal(courses$former_codes[courses$course_id == "SOCI 371"], "SOC 371")
+  # One code, one course: nothing to list.
+  expect_true(is.na(courses$former_codes[courses$course_id == "LING 2110"]))
+  expect_equal(courses$n_codes[courses$course_id == "LING 2110"], 1L)
+})
+
+test_that("the main fixtures build one course per code: the demo file touches none of them", {
+  cc <- suppressMessages(build_cedar_courses(test_sections, test_students, demo_dims))
+  expect_equal(nrow(cc$courses), nrow(cc$codes))
+  expect_true(all(cc$codes$steps == 0L))
+  expect_setequal(cc$codes$subject_course, union(test_sections$subject_course, test_students$subject_course))
+})
+
+test_that("attach_course_ids writes course_id beside subject_course, replacing a stamped one", {
+  cc <- suppressMessages(build_cedar_courses(test_sections_rn, test_students_rn, demo_dims))
+  stale <- dplyr::mutate(test_sections_rn, course_id = "STALE")
+  attr(stale, "cedar_provenance") <- "kept"
+  out <- suppressMessages(attach_course_ids(
+    list(cedar_sections = stale, cedar_students = test_students_rn, cedar_programs = test_programs), cc))
+  expect_equal(out$cedar_sections$course_id[out$cedar_sections$subject_course == "SOC 371"], "SOCI 371")
+  expect_equal(out$cedar_sections$course_id[out$cedar_sections$subject_course == "PHIL 150"], "PHIL 150")
+  expect_false(any(out$cedar_sections$course_id == "STALE"))
+  expect_equal(attr(out$cedar_sections, "cedar_provenance"), "kept")
+  expect_equal(out$cedar_students$course_id[out$cedar_students$subject_course == "SOCI 250"], "SOCI 2315")
+  # The code columns are untouched: annotate, never mutate.
+  expect_equal(out$cedar_sections$subject_course, test_sections_rn$subject_course)
+  expect_false("course_id" %in% names(out$cedar_programs))
+  # A table with a code the dimension never saw is a stop, not an NA.
+  expect_error(suppressMessages(attach_course_ids(list(cedar_sections = test_sections), cc)),
+               "does not know")
+})
+
+test_that("resolve_course_codes refuses a malformed code and a cycle the validator missed", {
+  history <- demo_files()$code_history
+  expect_error(resolve_course_codes(c("SOCI 371", "SOCI371"), history), "SUBJECT NUMBER")
+  looped <- rbind(history,
+                  data.frame(kind = "course", from_code = c("MATH 1", "MATH 2"), to_code = c("MATH 2", "MATH 1"),
+                             effective_term = "202080", scope = "", basis = "catalog", status = "confirmed",
+                             evidence = "", notes = ""))
+  expect_error(resolve_course_codes("MATH 1", looped), "cycle")
+})
+
+test_that("detect_course_renamings finds the shared section and the one-to-one title match", {
+  files <- demo_files()
+  cand <- detect_course_renamings(test_sections_rn, test_students_rn, files)
+  subj <- cand[cand$kind == "subject", ]
+  expect_equal(nrow(subj), 1L)
+  expect_equal(c(subj$from_code, subj$to_code, subj$basis), c("SOC", "SOCI", "section_crn"))
+  expect_equal(subj$n_evidence, 2L)              # RN01A and RN01C
+  expect_equal(subj$effective_term, 202080L)      # SOCI first on the schedule
+  expect_equal(subj$in_file, "confirmed")
+  expect_match(subj$evidence, "2 sections \\(Spring 2020\\) carry SOC on the schedule and SOCI on the class list")
+  crs <- cand[cand$kind == "course", ]
+  # Pairs the file already joins (HIST 320, SOCI 250) are not candidates.
+  expect_equal(nrow(crs), 1L)
+  expect_equal(c(crs$from_code, crs$to_code, crs$basis), c("PHIL 150", "PHIL 1115", "title_match"))
+  expect_equal(crs$effective_term, 202080L)
+  expect_equal(crs$in_file, "proposed")
+  expect_match(crs$evidence, "^Introduction to Logic retired as PHIL 150 after Spring 2020 and began as PHIL 1115 in Fall 2020")
+
+  # With nothing in the file: HIST 320's renumbering is found; "Social
+  # Problems" has two retired codes (SOC 250, SOCI 250) and is left to a person.
+  files$code_history <- files$code_history[0, ]
+  bare <- detect_course_renamings(test_sections_rn, test_students_rn, files)
+  expect_true(all(is.na(bare$in_file)))
+  expect_setequal(paste(bare$from_code, bare$to_code),
+                  c("SOC SOCI", "HIST 320 HIST 3201", "PHIL 150 PHIL 1115"))
+  # With only the subject rename confirmed, the two retired codes are one
+  # course, and the renumbering is found under the resolved code.
+  files$code_history <- demo_files()$code_history
+  files$code_history <- files$code_history[files$code_history$kind == "subject", ]
+  one <- detect_course_renamings(test_sections_rn, test_students_rn, files)
+  expect_true("SOCI 250 SOCI 2315" %in% paste(one$from_code, one$to_code))
+  expect_false("SOC 250 SOCI 2315" %in% paste(one$from_code, one$to_code))
+})

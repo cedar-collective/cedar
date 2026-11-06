@@ -100,17 +100,26 @@ test_that("load_global_data loads all required CEDAR model objects from configur
       cedar_degrees = c("major_code", "source_student_college", "source_college"),
       cedar_student_terms = c("primary_major_code", "primary_source_college_code", "primary_source_college")
     )
+    # The course dimension (step 4) reads a code, a title and a level from
+    # the sections and the class lists; a code must look like "SUBJ NUMBER".
     for (name in cedar_files) {
       row <- tibble::tibble(term = 202510L, as_of_date = as.Date("2026-07-30"), dataset = name)
       for (key in attach_keys[[name]]) row[[key]] <- NA_character_
+      if (name %in% c("cedar_sections", "cedar_students")) {
+        row$subject_course <- "HIST 101"
+        row$course_title <- "History"
+        row$level <- "lower"
+      }
       saveRDS(row, file.path(cedar_data_dir, paste0(name, ".Rds")))
     }
 
     suppressMessages(load_global_data(list(func = "course-report")))
 
     expect_true(exists("data_objects", envir = .GlobalEnv))
-    expect_setequal(names(data_objects), c(cedar_files, "cedar_dims"))
+    expect_setequal(names(data_objects), c(cedar_files, "cedar_dims", "cedar_courses", "cedar_course_codes"))
     expect_true("department" %in% names(data_objects$cedar_sections))
+    expect_equal(data_objects$cedar_sections$course_id, "HIST 101")
+    expect_equal(data_objects$cedar_students$course_id, "HIST 101")
     expect_true("dept_code" %in% names(programs))
     expect_equal(data_objects$cedar_sections$dataset, "cedar_sections")
     expect_equal(sections$dataset, "cedar_sections")

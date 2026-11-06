@@ -8,7 +8,7 @@ parent: Developer Guide
 
 This reference is auto-generated from roxygen2 comments in the source code.
 
-*Generated: 2026-11-06 14:06:26.839047*
+*Generated: 2026-11-06 14:54:40.166907*
 
 ---
 
@@ -699,6 +699,81 @@ Course Sequence Effect  Compares grades in course Y between students who passed 
 - `opt` - Named list: \describe{ \item{course_x}{Character. The preparatory course. Required.} \item{course_y}{Character. The outcome course. Required.} \item{campus}{Character vector. Optional campus filter.} \item{min_n}{Integer. Minimum students per group (default 15).} \item{filters}{Named list of covariate equality filters. Optional.} }
 
 **Returns:** Named list: \describe{ \item{course_x, course_y}{Course identifiers.} \item{outcomes}{Tibble: group, outcome (pass/dfw), n, pct.} \item{group_profile}{Compact covariate summary per group.} \item{balance}{From compute_balance().} \item{n_treatment, n_control}{Group sizes.} }
+
+---
+
+## courses
+
+### `resolve_course_codes()`
+
+*Source: courses.R*
+
+**Follow every code to the end of its confirmed succession chain**
+
+**Parameters:**
+
+- `codes` - Character: course codes as `subject_course` writes them (`SOCI 371`).
+- `code_history` - The institution's `code_history.csv` as a table.
+
+**Returns:** A tibble with `subject_course`, `course_id` (the chain's last code) and `steps` (how many confirmed rows were followed; 0 when the code is its own id). A course row names the code itself; a subject row renames every code of the subject, keeping the number. At each step a course row is taken before the subject's, so a course renumbered under its old subject still joins its subject's rename afterwards.
+
+---
+
+### `build_cedar_courses()`
+
+*Source: courses.R*
+
+**Build the course dimension**
+
+**Parameters:**
+
+- `sections` - `cedar_sections` as loaded (keys only or attached; the unit columns are not read).
+- `students` - `cedar_students` as loaded.
+- `dims` - The object build_cedar_dims() returns; its `code_history` is the crosswalk.
+
+**Returns:** An object of class `cedar_courses`: a list with `courses` (one row per course_id, CEDAR_COURSES_COLUMNS) and `codes` (one row per code in either table, CEDAR_COURSE_CODES_COLUMNS). Both ordered by code. A code that appears in the class lists and never on the schedule (the renamed subjects' early terms, I45) is a row with `in_sections = FALSE`, never dropped.
+
+---
+
+### `validate_cedar_courses()`
+
+*Source: courses.R*
+
+**Check a course dimension's shape**
+
+**Returns:** `courses`, invisibly; stops on a repeated course or code, a code whose id is not a course, or a missing column.
+
+---
+
+### `attach_course_ids()`
+
+*Source: courses.R*
+
+**Attach `course_id` to every fact table a loader holds**
+
+**Parameters:**
+
+- `tables` - A named list of loaded tables; one that is not loaded (NULL, or the empty tibble load_cedar_data() returns for a missing file) is left alone and named in a message.
+- `courses` - The object build_cedar_courses() returns.
+
+**Returns:** `tables` with `course_id` on cedar_sections and cedar_students, each table's attributes kept. A code the dimension does not know is a stop: the dimension is built from the same tables, so one can only mean the tables changed between the two calls.
+
+---
+
+### `detect_course_renamings()`
+
+*Source: courses.R*
+
+**Screen the data for codes that look like successions of other codes**
+
+Screen the data for codes that look like successions of other codes  Candidates for code_history.csv, with the evidence; never verdicts. Two screens, named by the `basis` each would be recorded with:  * `section_crn` (kind `subject`): a section the schedule lists under one subject and the class list under another, the number unchanged. Banner applies a subject's rename to old class lists but not to old schedules, so the pair appears on hundreds of sections (I45). * `title_match` (kind `course`): a title whose only retired code stopped before its only new code began, inside the data window. Codes are first resolved through the confirmed rows already in the file, so a pair the file already joins is not a candidate, and a retired code and its successor under a renamed subject are compared as one. Rotating-topics titles (`T:`) and blank titles are never matched. Many-to-many title groups are left out: they need a person, not a screen.
+
+**Parameters:**
+
+- `sections,students` - The loaded tables (`term`, `crn`, `subject_course`, `course_title`).
+- `files` - The institution's mapping files (read_institution_mappings()), for `code_history`.
+
+**Returns:** A tibble, one row per candidate: `kind`, `from_code`, `to_code`, `effective_term` (the first term the new code appears), `basis`, `n_evidence` (sections carrying the pair, or the retired and new codes' rows), `evidence` (one line, ready for the file), `in_file` (the file's status for the pair, NA when it has no row). Strongest evidence first.
 
 ---
 

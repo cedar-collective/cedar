@@ -78,8 +78,29 @@ CEDAR_MAPPING_FILE_SPECS <- list(
   programs = c("program_code", "in_college", "program_name", "unit_code",
                "college_code", "is_pre_major", "leads_to", "basis", "status",
                "evidence", "notes"),
+  # Which code replaced which (ADR-001 step 4; ROADMAP "Code history"): one
+  # row per succession. kind: subject (every course of the subject kept its
+  # number: SOC 371 became SOCI 371), course (one course renumbered: MGMT 340
+  # became ACCT 3401) or program. effective_term: the first term the new code
+  # was in use. scope: blank for a whole succession; a program row may name a
+  # partial one (undergraduate PHRD to FPHS) in words. Only confirmed subject
+  # and course rows reach the course dimension (course_id); a proposed row is
+  # the renaming screen's candidate, with its evidence. An annotation: it
+  # never rewrites a saved row to the new code.
+  code_history = c("kind", "from_code", "to_code", "effective_term", "scope",
+                   "basis", "status", "evidence", "notes"),
   settings = c("setting", "value")
 )
+
+# What a code_history.csv row is about, and how a succession was established.
+CEDAR_CODE_HISTORY_KINDS <- c("subject", "course", "program")
+#   section_crn: the same section carries the old code on the schedule and the
+#     new one on the class list (Banner back-applies a renamed subject).
+#   title_match: the old code's title reappears under the new code after the
+#     old one retired everywhere.
+#   catalog: the catalog records the renumbering.
+#   decided: a hand decision, with the reason in notes.
+CEDAR_CODE_HISTORY_BASES <- c("section_crn", "title_match", "catalog", "decided")
 
 # Settings every institution must declare in settings.csv.
 #   mapping_files_url: where people edit these files -- a GitHub "blob" URL for
@@ -563,7 +584,8 @@ validate_mapping_files <- function(files) {
     # The optional college qualifier and override, a pre-major's target, free
     # text, and a unit that is not yet proposed or is decided to be none
     # (checked below).
-    programs = c("in_college", "unit_code", "college_code", "leads_to", "evidence", "notes")
+    programs = c("in_college", "unit_code", "college_code", "leads_to", "evidence", "notes"),
+    code_history = c("scope", "evidence", "notes")
   )
   for (nm in names(CEDAR_MAPPING_FILE_SPECS)) {
     key_cols <- setdiff(CEDAR_MAPPING_FILE_SPECS[[nm]], may_be_blank[[nm]])
@@ -608,6 +630,7 @@ validate_mapping_files <- function(files) {
   if (length(d)) problems <- c(problems, paste("colleges.csv: names more than one college:", paste(d, collapse = ", ")))
 
   problems <- c(problems, .validate_program_rows(files))
+  problems <- c(problems, .validate_code_history_rows(files))
   d <- dup(files$settings, "setting")
   if (length(d)) problems <- c(problems, paste("settings.csv: duplicate setting", paste(d, collapse = ", ")))
   missing <- setdiff(CEDAR_REQUIRED_SETTINGS, files$settings$setting)
@@ -677,6 +700,66 @@ validate_mapping_files <- function(files) {
   add("basis no_unit with a unit_code:", pr$program_code[pr$basis == "no_unit" & !blank(pr$unit_code)])
   add("basis unresolved must be a proposed row with no unit_code:",
       pr$program_code[pr$basis == "unresolved" & (pr$status != "proposed" | !blank(pr$unit_code))])
+  problems
+}
+
+# code_history.csv: every succession the course dimension can follow is
+# well-formed, and the confirmed subject and course rows make course_id a
+# function (one successor per code, no cycles).
+.validate_code_history_rows <- function(files) {
+  ch <- files$code_history
+  problems <- character(0)
+  add <- function(msg, bad) {
+    if (length(bad)) problems <<- c(problems, paste0("code_history.csv: ", msg, " ",
+                                                     paste(unique(bad), collapse = ", ")))
+  }
+  blank <- function(x) is.na(x) | !nzchar(x)
+  if (nrow(ch) == 0) return(problems)
+  row_id <- function(i) sprintf("%s %s -> %s", ch$kind[i], ch$from_code[i], ch$to_code[i])
+  add("unknown kind", setdiff(ch$kind, CEDAR_CODE_HISTORY_KINDS))
+  add("unknown basis", setdiff(ch$basis, CEDAR_CODE_HISTORY_BASES))
+  add("unknown status", setdiff(ch$status, CEDAR_PROGRAM_STATUSES))
+  add("effective_term must be a term code YYYYSS (SS = 10, 60 or 80):",
+      ch$effective_term[!grepl("^[0-9]{4}(10|60|80)$", ch$effective_term)])
+  add("a code does not succeed itself:", row_id(which(ch$from_code == ch$to_code)))
+  key <- paste(ch$kind, ch$from_code, ch$to_code)
+  add("duplicate succession", row_id(which(duplicated(key))))
+  # A subject or program code has no space; a course code is "SUBJ NUMBER".
+  code_shape <- c(subject = "^[A-Z][A-Z0-9]*$", program = "^[A-Z0-9][A-Z0-9-]*$",
+                  course = "^[A-Z][A-Z0-9]* [A-Za-z0-9]+$")
+  for (k in intersect(names(code_shape), ch$kind)) {
+    rows <- which(ch$kind == k)
+    bad <- rows[!grepl(code_shape[[k]], ch$from_code[rows]) | !grepl(code_shape[[k]], ch$to_code[rows])]
+    add(paste0("a ", k, " row's codes must look like ",
+               switch(k, subject = "SOCI", program = "BA-PSY-AS", course = "SOCI 371"), ":"), row_id(bad))
+  }
+  # The course dimension follows whole successions only: a partial one cannot
+  # give a code one id.
+  add("scope must be blank on a subject or course row (the course dimension follows whole successions):",
+      row_id(which(ch$kind %in% c("subject", "course") & !blank(ch$scope))))
+  # Confirmed subject and course rows: one successor per code, and no cycle,
+  # so every code resolves to exactly one id.
+  # A duplicate row and a self-succession are reported above; here they would
+  # only read as a split and a cycle, so each pair is taken once and a code
+  # named as its own successor is left out.
+  live <- ch[ch$status == "confirmed" & ch$kind %in% c("subject", "course") & ch$from_code != ch$to_code, ]
+  live <- live[!duplicated(live[c("kind", "from_code", "to_code")]), ]
+  for (k in c("subject", "course")) {
+    rows <- live[live$kind == k, ]
+    split_from <- unique(rows$from_code[duplicated(rows$from_code)])
+    add(paste0("a confirmed ", k, " code succeeds to more than one code (a split cannot give it one id):"), split_from)
+    succ <- stats::setNames(rows$to_code, rows$from_code)
+    cyclic <- character(0)
+    for (start in names(succ)) {
+      seen <- start; code <- start
+      while (!is.na(succ[code])) {
+        code <- unname(succ[code])
+        if (code %in% seen) { cyclic <- c(cyclic, start); break }
+        seen <- c(seen, code)
+      }
+    }
+    add(paste0("confirmed ", k, " successions form a cycle, starting at:"), cyclic)
+  }
   problems
 }
 

@@ -217,6 +217,15 @@ rm(.key, .n_before)
 cedar_dims <- build_cedar_dims()
 data_objects <- attach_default_units(data_objects, cedar_dims)
 data_objects[["cedar_dims"]] <- cedar_dims
+
+# The course dimension (ADR-001 step 4): one course_id per code, following the
+# confirmed successions in code_history.csv, attached to the sections and the
+# class lists beside subject_course. Never saved: a confirmed row changes it at
+# the next start, as a unit decision does.
+cedar_courses <- build_cedar_courses(data_objects[["cedar_sections"]], data_objects[["cedar_students"]], cedar_dims)
+data_objects <- attach_course_ids(data_objects, cedar_courses)
+data_objects[["cedar_courses"]] <- cedar_courses$courses
+data_objects[["cedar_course_codes"]] <- cedar_courses$codes
 # The mapping files now decide the unit columns on the attached tables without
 # changing any saved file, so they are an input to every cache keyed on those
 # tables' fingerprints (caching cardinal rule 1): fold a fingerprint of dims
