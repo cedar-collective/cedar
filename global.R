@@ -203,9 +203,31 @@ for (key in names(cedar_files)) {
 # attached here, so a mapping edit changes the next start and rebuilds
 # nothing. The saved tables carry keys only; a file stamped by an older
 # transform loads the same way, its copy dropped first.
+#
+# Trim first (cedar_min_term, set in shiny_config.R): rows that go are never
+# attached, so the attach's transient copy is of the rows the app keeps.
+for (.key in c("cedar_sections", "cedar_students", "cedar_grades", "cedar_student_terms", "cedar_faculty", "cedar_degrees", "cedar_programs")) {
+  if (!is.null(data_objects[[.key]]) && "term" %in% names(data_objects[[.key]])) {
+    .n_before <- nrow(data_objects[[.key]])
+    data_objects[[.key]] <- dplyr::filter(data_objects[[.key]], term >= cedar_min_term)
+    message(sprintf("[global.R] %s: trimmed to term >= %s (%d -> %d rows)",
+                    .key, cedar_min_term, .n_before, nrow(data_objects[[.key]])))
+  }
+}
+rm(.key, .n_before)
+
 cedar_dims <- build_cedar_dims()
 data_objects <- attach_default_units(data_objects, cedar_dims)
 data_objects[["cedar_dims"]] <- cedar_dims
+# The mapping files now decide the unit columns on the attached tables without
+# changing any saved file, so they are an input to every cache keyed on those
+# tables' fingerprints (caching cardinal rule 1): fold a fingerprint of dims
+# into each attached table's, and a mapping edit is a miss.
+cedar_dims_hash <- substr(digest::digest(cedar_dims), 1, 12)
+for (.key in intersect(names(CEDAR_ATTACHED_UNIT_COLUMNS), names(cedar_source_fingerprints))) {
+  cedar_source_fingerprints[[.key]][["dims"]] <- cedar_dims_hash
+}
+rm(.key)
 
 message("[global.R] Data loading complete. Validating CEDAR data structure...")
 
@@ -249,17 +271,6 @@ if (validation_failed) {
 }
 
 message("[global.R] ✅ All CEDAR data validated successfully!")
-
-# Drop data older than cedar_min_term (set in shiny_config.R).
-for (.key in c("cedar_sections", "cedar_students", "cedar_grades", "cedar_student_terms", "cedar_faculty", "cedar_degrees", "cedar_programs")) {
-  if (!is.null(data_objects[[.key]]) && "term" %in% names(data_objects[[.key]])) {
-    .n_before <- nrow(data_objects[[.key]])
-    data_objects[[.key]] <- dplyr::filter(data_objects[[.key]], term >= cedar_min_term)
-    message(sprintf("[global.R] %s: trimmed to term >= %s (%d -> %d rows)",
-                    .key, cedar_min_term, .n_before, nrow(data_objects[[.key]])))
-  }
-}
-rm(.key, .n_before)
 
 # ── Data edges ──────────────────────────────────────────────────────────────
 # Read once from the loaded data, never derived from cedar_current_term. Local

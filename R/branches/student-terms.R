@@ -57,9 +57,8 @@ STUDENT_TERMS_COLUMNS <- c(
 )
 
 # Attached at load from the keys above, never stored (ADR-001 step 3):
-# attach_student_term_units() in R/branches/dims.R writes them.
-STUDENT_TERMS_ATTACHED_COLUMNS <- c("primary_dept_code", "primary_college_code",
-                                    "primary_college_basis")
+# attach_student_term_units() in R/branches/dims.R writes them, and names them.
+STUDENT_TERMS_ATTACHED_COLUMNS <- unname(CEDAR_STUDENT_TERM_UNIT_COLS)
 
 # Stamped on the built table as the attribute cedar_student_terms_build_version.
 # Bump it when the builder's rules change the values it writes without adding
@@ -165,9 +164,13 @@ build_student_terms <- function(students, programs = NULL, degrees = NULL,
   # Code as the college key the loader resolves it under (as a programs row's
   # Actual College is), and the pre-major flag from programs.csv. The unit and
   # college themselves are attached at load from these keys, exactly as a
-  # programs row's are. description_source already says "class_list" on these
-  # rows. A row with a programs pull is never filled, even when that pull
-  # holds no Major row.
+  # programs row's are. The roster gives a college CODE and no name, so both
+  # key columns hold the code on these rows, where a programs row's
+  # primary_source_college holds Banner's Translated College name; the
+  # loader's "banner" label translates either (translate_source_college()
+  # passes a code through), and description_source, already "class_list" on
+  # these rows, says which vocabulary a row holds. A row with a programs pull
+  # is never filled, even when that pull holds no Major row.
   from_classlist <- is.na(st$programs_as_of) & !is.na(st$cl_major_code)
   if (any(from_classlist)) {
     code <- st$cl_major_code[from_classlist]

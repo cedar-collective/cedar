@@ -117,6 +117,13 @@ load_cedar_model_data <- function(opt) {
     data_objects[[cedar_file]] <- timed_load_datafile(cedar_file, cedar_file)
   }
 
+  # Every loader attaches the unit columns from the mapping files (ADR-001
+  # step 3): the saved tables carry keys only, as global.R, the cache-warming
+  # scripts and cedar-repl.R all read them.
+  cedar_dims <- build_cedar_dims()
+  data_objects <- attach_default_units(data_objects, cedar_dims)
+  data_objects[["cedar_dims"]] <- cedar_dims
+
   # Map CEDAR tables to legacy variable names for backward compatibility
   # sections table contains course section data (includes enrollment counts)
   .GlobalEnv$sections <- data_objects[["cedar_sections"]]

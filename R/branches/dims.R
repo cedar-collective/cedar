@@ -284,15 +284,20 @@ attach_section_units <- function(sections, dims) {
 #' The program rule on the keys the student-term table stores: the primary
 #' major's code and the source's college for it (academic studies' Actual and
 #' Translated College where a programs row described the term, the roster's
-#' Student College Code where the class list did), written as
-#' `primary_dept_code`, `primary_college_code` and `primary_college_basis`.
+#' Student College Code in both key columns where the class list did), written
+#' as the three CEDAR_STUDENT_TERM_UNIT_COLS.
 attach_student_term_units <- function(student_terms, dims) {
   attach_unit(student_terms, dims, "program",
               keys = c(program = "primary_major_code", college = "primary_source_college_code",
                        banner = "primary_source_college"),
-              cols = c(unit = "primary_dept_code", college = "primary_college_code",
-                       basis = "primary_college_basis"))
+              cols = CEDAR_STUDENT_TERM_UNIT_COLS)
 }
+
+# The student-term table's attached columns, named once: attach_unit()'s
+# `cols` for attach_student_term_units(), the loader's drop list below, and
+# STUDENT_TERMS_ATTACHED_COLUMNS in student-terms.R all read this.
+CEDAR_STUDENT_TERM_UNIT_COLS <- c(unit = "primary_dept_code", college = "primary_college_code",
+                                  basis = "primary_college_basis")
 
 # The unit columns each fact table carries once attached, which a loader drops
 # before attaching so a stamped file and an unstamped one load the same way.
@@ -301,7 +306,7 @@ CEDAR_ATTACHED_UNIT_COLUMNS <- list(
   cedar_students = c("department", "college", "college_basis"),
   cedar_programs = c("dept_code", "program_college", "college_code", "college_basis", "student_college"),
   cedar_degrees  = c("dept_code", "college_code", "college_basis", "college", "student_college"),
-  cedar_student_terms = c("primary_dept_code", "primary_college_code", "primary_college_basis")
+  cedar_student_terms = unname(CEDAR_STUDENT_TERM_UNIT_COLS)
 )
 
 #' Attach the default unit columns to every fact table a loader holds
@@ -344,7 +349,11 @@ attach_default_units <- function(tables, dims) {
 # a policy version); carry them across so a loaded table keeps what its file
 # said about it.
 .carry_attributes <- function(new, old) {
-  keep <- setdiff(names(attributes(old)), c("names", "row.names", "class", "dim", "dimnames"))
+  # A file stamped by an older transform carries the provenance of unit columns
+  # the loader has just dropped; that stamp describes nothing on the attached
+  # table, so it is not carried.
+  keep <- setdiff(names(attributes(old)),
+                  c("names", "row.names", "class", "dim", "dimnames", "cedar_mapping_provenance"))
   for (a in keep) attr(new, a) <- attr(old, a)
   new
 }

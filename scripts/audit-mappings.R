@@ -37,6 +37,18 @@ D <- list(sections = read_tbl("cedar_sections"), students = read_tbl("cedar_stud
           faculty  = read_tbl("cedar_faculty"))
 missing <- names(D)[vapply(D, is.null, logical(1))]
 if (length(missing)) stop("Missing cedar tables in data/: ", paste(missing, collapse = ", "))
+# The saved tables carry keys only; the unit and college columns audited below
+# are attached from the mapping files, as every loader attaches them
+# (ADR-001 step 3).
+attached <- attach_default_units(
+  list(cedar_sections = D$sections, cedar_students = D$students,
+       cedar_programs = D$programs, cedar_degrees = D$degrees),
+  build_cedar_dims())
+D$sections <- attached$cedar_sections
+D$students <- attached$cedar_students
+D$programs <- attached$cedar_programs
+D$degrees  <- attached$cedar_degrees
+rm(attached)
 
 uv <- function(x) { x <- as.character(x); sort(unique(x[!is.na(x) & nzchar(x)])) }
 vals <- function(tb, col) if (is.null(D[[tb]][[col]])) character(0) else uv(D[[tb]][[col]])

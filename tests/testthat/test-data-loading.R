@@ -90,17 +90,28 @@ test_that("load_global_data loads all required CEDAR model objects from configur
       "cedar_programs", "cedar_degrees", "cedar_faculty", "cedar_applicants"
     )
 
+    # The loader attaches the unit columns from the mapping files (ADR-001
+    # step 3), so each attached table carries the key columns attach_unit()
+    # reads; an NA key resolves to no unit, which is all this test needs.
+    attach_keys <- list(
+      cedar_sections = c("subject", "source_college", "level", "campus", "crosslist_group", "subject_course"),
+      cedar_students = c("subject_code", "source_college", "level"),
+      cedar_programs = c("student_id", "program_type", "major_code", "source_college_code", "source_college"),
+      cedar_degrees = c("major_code", "source_student_college", "source_college"),
+      cedar_student_terms = c("primary_major_code", "primary_source_college_code", "primary_source_college")
+    )
     for (name in cedar_files) {
-      saveRDS(
-        tibble::tibble(term = 202510L, as_of_date = as.Date("2026-07-30"), dataset = name),
-        file.path(cedar_data_dir, paste0(name, ".Rds"))
-      )
+      row <- tibble::tibble(term = 202510L, as_of_date = as.Date("2026-07-30"), dataset = name)
+      for (key in attach_keys[[name]]) row[[key]] <- NA_character_
+      saveRDS(row, file.path(cedar_data_dir, paste0(name, ".Rds")))
     }
 
-    load_global_data(list(func = "course-report"))
+    suppressMessages(load_global_data(list(func = "course-report")))
 
     expect_true(exists("data_objects", envir = .GlobalEnv))
-    expect_setequal(names(data_objects), cedar_files)
+    expect_setequal(names(data_objects), c(cedar_files, "cedar_dims"))
+    expect_true("department" %in% names(data_objects$cedar_sections))
+    expect_true("dept_code" %in% names(programs))
     expect_equal(data_objects$cedar_sections$dataset, "cedar_sections")
     expect_equal(sections$dataset, "cedar_sections")
     expect_equal(students$dataset, "cedar_students")
