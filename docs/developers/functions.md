@@ -8,7 +8,7 @@ parent: Developer Guide
 
 This reference is auto-generated from roxygen2 comments in the source code.
 
-*Generated: 2026-11-06 09:51:15.448583*
+*Generated: 2026-11-06 13:07:37.89098*
 
 ---
 
@@ -1775,7 +1775,7 @@ Attach the unit and college to sections (cedar_sections)  The subject rule, keye
 
 **Attach the primary major's unit and college to student-terms**
 
-Attach the primary major's unit and college to student-terms  The program rule on the keys the student-term table stores: the primary major's code and the source's college for it (academic studies' Actual and Translated College where a programs row described the term, the roster's Student College Code where the class list did), written as `primary_dept_code`, `primary_college_code` and `primary_college_basis`.
+Attach the primary major's unit and college to student-terms  The program rule on the keys the student-term table stores: the primary major's code and the source's college for it (academic studies' Actual and Translated College where a programs row described the term, the roster's Student College Code in both key columns where the class list did), written as the three CEDAR_STUDENT_TERM_UNIT_COLS.
 
 ---
 
@@ -1791,6 +1791,36 @@ Attach the primary major's unit and college to student-terms  The program rule o
 - `dims` - The object build_cedar_dims() returns.
 
 **Returns:** `tables` with the five tables carrying their default unit columns, the table's attributes kept, each attachment timed in a message.
+
+---
+
+### `unit_names()`
+
+*Source: dims.R*
+
+**Unit code and display name, one row per unit in units.csv**
+
+**Returns:** A tibble with `dept_code` and `dept_name` (the column names every reader of the retired dept_name_lookup used).
+
+---
+
+### `college_code_names()`
+
+*Source: dims.R*
+
+**College code to display name, as a named character vector**
+
+---
+
+### `subject_units()`
+
+*Source: dims.R*
+
+**Which subjects each unit teaches**
+
+Which subjects each unit teaches  One row per confirmed (subject, unit, college) in subjects.csv. A subject taught under two units (or credited to two colleges) has a row for each; filter on `dept_code` and pull `subject_code` for a unit's subjects, which is what the retired data-derived subject_lookup served.
+
+**Returns:** A tibble with `subject_code`, `dept_code` and `college`.
 
 ---
 
@@ -2723,7 +2753,7 @@ Summarize Headcount Data  Helper function that groups and counts students from f
 - `df` - Filtered programs data frame (from filter_programs_by_opt)
 - `has_program_filter` - Boolean indicating if program filters were applied
 - `group_by` - Character vector of column names to group by. When NULL: - No program filter: groups by c("term", "student_level", "program_type") - Program filter active: groups by c("term", "student_level", "program_type", "program_name") Pass explicitly for custom aggregations (e.g. SFR: c("term", "dept_code", "student_level")).
-- `lookups` - Optional list with \code{dept_name_lookup} (dept_code → dept_name), used only to name departments when a broad program selection is rolled up to department totals (see Details).
+- `dims` - The dimension tables (\code{build_cedar_dims()}), used only to name departments through units.csv when a broad program selection is rolled up to department totals (see Details).
 
 **Returns:** Data frame with columns from group_by plus student_count (distinct student IDs)
 
@@ -3329,7 +3359,7 @@ Latest term whose outcomes are fully observable  Right-censoring guard shared by
 
 - `population_opt` - Option list used to build the population.
 - `programs` - cedar_programs.
-- `lookups` - cedar_lookups list; must include subject_lookup.
+- `dims` - The dimension tables (build_cedar_dims()); the subjects each unit teaches are read off them through subject_units().
 - `pop_programs` - Optional cedar_programs already filtered to population IDs.
 
 **Returns:** Character vector of subject_code values.

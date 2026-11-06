@@ -388,8 +388,7 @@ data at each.**
    **Done 2026-11-06.** The transform writes `source_college` on sections
    and class-list rows, `source_college` / `source_college_code` on programs
    and `source_student_college` / `source_college` on degrees, and nothing
-   else about a unit; `.sections_for_lookups()` / `.programs_for_lookups()`
-   attach through `dims` to build `cedar_lookups`. `cedar_student_terms`
+   else about a unit. `cedar_student_terms`
    stores `primary_source_college_code` / `primary_source_college` beside
    `primary_major_code`; `attach_student_term_units()` resolves the three
    attached columns, and `attach_section_units()` derives
@@ -406,6 +405,26 @@ data at each.**
    `subject_lookup`) are read off `dims`; the ones it builds from the data
    (`program_name_lookup`) move to a measure or stay a small saved table.
    Readers that take a `lookups` parameter take `dims`.
+   **Done 2026-11-06.** `unit_names(dims)`, `college_code_names(dims)` and
+   `subject_units(dims)` (`R/branches/dims.R`) replace `dept_name_lookup`,
+   `college_code_to_name` and `subject_lookup`; `headcount_program_names(programs)`
+   counts the modal unit per program name where `program_name_lookup` stored
+   it; `dept_lookup` had no reader. The transform's `build_lookups()` writes
+   `major_code_to_name` alone, the class lists' Major Code beside its name,
+   which no file knows, and runs when the students do. `dept_code_to_name`
+   (`R/lists/catalog_lookups.R`) names every unit in units.csv, no longer
+   only those teaching a subject, and `global.R` no longer overrides it from
+   the saved file. Headcount (`get_headcount()`, the module), Dept Trends'
+   headcount panel, the Pathways focal-subject helper and the department
+   choice lists take `dims`; the Gen Ed modules keep `lookups` for
+   `major_code_to_name`. Dept Trends' cache keys hash `cedar_dims` for every
+   tab that labels a unit and `cedar_lookups` for Credit Hours alone.
+   Measured on the 2026-10-08 pull before the change: every one of the saved
+   `subject_lookup`'s 214 subjects is among subjects.csv's rows (25 of them
+   with a second row differing only by college, which `subject_units()`
+   keeps); 162 of the 163 saved unit names are units.csv's verbatim and all
+   17 college names match colleges.csv; `program_name_lookup`'s 501 names
+   are reproduced by `headcount_program_names()` from the loaded table.
 
 **Cost, stated plainly.** Three PRs, no reader migration, and no number
 should move. The cost is startup time and a transient copy of the largest

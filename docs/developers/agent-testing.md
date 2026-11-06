@@ -10,7 +10,7 @@ The complete test-infrastructure reference, moved out of `AGENTS.md` so it does 
 
 # Test Infrastructure
 
-All test data is hand-crafted tribbles in `tests/testthat/fixtures/designed_test_data.R` — that single file IS the test database and the source of truth. `setup.R` sources it and exposes the tables as `test_sections`, `test_sections_sf` (seatfinder-specific 2024/2025 terms), `test_students`, `test_programs`, `test_degrees`, `test_faculty`, plus `test_lookups` and a `data_objects` list. Every expected value is traceable to explicit rows in that file — no sampling, no binary fixtures, no regeneration step.
+All test data is hand-crafted tribbles in `tests/testthat/fixtures/designed_test_data.R` — that single file IS the test database and the source of truth. `setup.R` sources it and exposes the tables as `test_sections`, `test_sections_sf` (seatfinder-specific 2024/2025 terms), `test_students`, `test_programs`, `test_degrees`, `test_faculty`, plus `test_dims` (the mapping files as dimension tables), `test_lookups` (`major_code_to_name` alone) and a `data_objects` list. Every expected value is traceable to explicit rows in that file — no sampling, no binary fixtures, no regeneration step.
 
 **Institution configuration is the one exception.** Files an institution
 authors (rather than rows its data produces) are tested against the demo
@@ -35,7 +35,7 @@ roadblocks ECON, major-change GEOG/`GES`, gen-ed-grads LING, and PHIL for the
 **Use real catalog codes for any new scenario.** This is not cosmetic. These
 rows *are* the demo institution (`dev/demo-data.R` adapts this file), so an
 invented code such as `RSTA` ships as a department the app cannot name:
-`dept_name_lookup` is built from `institution/<id>/units.csv` (via `R/lists/subj_dept_map.R`), and `ui.R`'s
+department names come from `institution/<id>/units.csv` (`unit_names(dims)`), and `ui.R`'s
 `.dept_choices` keeps only codes found there. The transform prints "Unknown dept
 codes" and continues, so the first visible symptom is a department missing from
 every dropdown — Regstats was unselectable in the synthetic app for exactly this

@@ -23,8 +23,7 @@ cedar_degrees <- data_objects[["cedar_degrees"]]
 cedar_faculty <- data_objects[["cedar_faculty"]]
 
 # Helper: named vector of dept choices (dept_name → dept_code) for selectizeInput dropdowns.
-# Source: cedar_lookups$dept_name_lookup, derived from subj_dept_map in transform-to-cedar.R.
-# Falls back to raw dept_codes if lookups not available.
+# Source: units.csv, read off data_objects[["cedar_dims"]] (unit_names()).
 .dept_choices <- local({
   # Restrict to departments with sections at main academic campuses (ABQ + EA).
   # This excludes branch-campus-only vocational/continuing-ed units (e.g., ADOB/Adobe)
@@ -36,14 +35,12 @@ cedar_faculty <- data_objects[["cedar_faculty"]]
     cedar_sections$department != "" &
     cedar_sections$campus %in% main_campus_codes
   ])
-  lkp <- data_objects[["cedar_lookups"]][["dept_name_lookup"]]
-  if (!is.null(lkp) && nrow(lkp) > 0) {
-    lkp <- lkp[lkp$dept_code %in% main_campus_depts, ]
-    lkp <- lkp[order(lkp$dept_name), ]
-    setNames(lkp$dept_code, lkp$dept_name)
-  } else {
-    sort(main_campus_depts)
-  }
+  # Named through units.csv: a department on a section is a unit the files
+  # name, so every choice has a name (ADR-001 step 3).
+  lkp <- unit_names(data_objects[["cedar_dims"]])
+  lkp <- lkp[lkp$dept_code %in% main_campus_depts, ]
+  lkp <- lkp[order(lkp$dept_name), ]
+  setNames(lkp$dept_code, lkp$dept_name)
 })
 
 cedar_home_card <- function(title, text, href, icon_name, meta = NULL) {

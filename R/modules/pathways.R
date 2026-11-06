@@ -24,7 +24,7 @@
 #
 # Exported functions:
 #   pathwaysUI(id, campus_choices, program_choices, dept_choices, course_campus_choices)
-#   pathwaysServer(id, students, programs, degrees, cedar_grades, cedar_student_terms, lookups, program_choices, dept_choices, edges, pathway_groups)
+#   pathwaysServer(id, students, programs, degrees, cedar_grades, cedar_student_terms, dims, program_choices, dept_choices, edges, pathway_groups)
 #
 # Internal sub-module:
 #   populationSelectorUI(id, campus_choices, program_choices, dept_choices)
@@ -965,7 +965,7 @@ pathways_start_panel <- function() {
 
 pathwaysServer <- function(id, students, programs, degrees = NULL,
                            cedar_grades = NULL, cedar_student_terms = NULL,
-                           lookups = list(), program_choices = character(),
+                           dims, program_choices = character(),
                            dept_choices = character(), edges, pathway_groups) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
@@ -1397,14 +1397,14 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
     # normal multi-select, so widening to other subjects is one click.
     #
     # Dept codes are not course prefixes (Geography is dept GES, courses GEOG),
-    # so the mapping goes through subject_lookup rather than being assumed.
+    # so the mapping goes through subjects.csv rather than being assumed.
     observeEvent(population_rv(), {
       subjects <- sort(unique(sub(" .*", "", students$subject_course[
         !is.na(students$subject_course) & nzchar(students$subject_course)
       ])))
       pop_opt <- tryCatch(population_rv()$opt, error = function(e) NULL) %||% list()
       focal <- tryCatch(
-        resolve_pathways_focal_subjects(pop_opt, programs, lookups),
+        resolve_pathways_focal_subjects(pop_opt, programs, dims),
         error = function(e) character(0)
       )
       focal <- intersect(focal, subjects)
@@ -2558,9 +2558,9 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
       )
 
       # Focal subject codes — used to split prior-course history into in-unit vs outside.
-      # Dept codes are not necessarily course prefixes, so resolve through subject_lookup.
+      # Dept codes are not necessarily course prefixes, so resolve through subjects.csv.
       focal_subjects <- resolve_pathways_focal_subjects(
-        population_opt, programs, lookups, pop_programs = pop_programs
+        population_opt, programs, dims, pop_programs = pop_programs
       )
 
       result <- tryCatch({
@@ -3750,7 +3750,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
       population_opt  <- population_rv()$opt %||% list()
       population_type <- population_opt$type %||% "preset"
       focal_dept_codes <- resolve_pathways_focal_dept_codes(population_opt, programs)
-      focal_subjects <- resolve_pathways_focal_subjects(population_opt, programs, lookups)
+      focal_subjects <- resolve_pathways_focal_subjects(population_opt, programs, dims)
 
       message("[course-to-major] population_type: ", population_type,
               " | focal_subjects: ", paste(focal_subjects, collapse = ", "),

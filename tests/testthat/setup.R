@@ -111,29 +111,17 @@ for (.st in c("test_student_terms", "test_student_terms_audits", "test_student_t
 test_degree_catalog  <<- read_degree_catalog(cedar_institution_dir(cedar_base_dir, "demo"))
 test_degree_roadmaps <<- read_degree_roadmaps(test_degree_catalog, cedar_institution_dir(cedar_base_dir, "demo"))
 test_faculty     <<- cedar_faculty
-test_dept_codes  <- sort(unique(test_programs$dept_code[!is.na(test_programs$dept_code)]))
+# cedar_lookups holds only major_code_to_name, the class lists' Major Code
+# beside its name (ADR-001 step 3, PR 3); unit, college and subject lookups
+# are read off test_dims (unit_names(), college_code_names(), subject_units()).
+.test_major_names <- test_programs %>%
+  filter(!is.na(major_code), major_code != "", !is.na(program_name), program_name != "") %>%
+  distinct(major_code, program_name) %>%
+  group_by(major_code) %>% slice_head(n = 1) %>% ungroup()
 test_lookups     <<- list(
-  program_name_lookup = test_programs %>%
-    filter(!is.na(program_name), program_name != "",
-           !is.na(dept_code), dept_code != "") %>%
-    distinct(program_name, dept_code),
-  dept_name_lookup = tibble::tibble(
-    dept_code = test_dept_codes,
-    dept_name = paste(test_dept_codes, "Department")
-  ),
-  college_code_to_name = c(
-    AS = "ARTS",
-    SC = "STEM",
-    SO = "SOSC",
-    ED = "EDU",
-    NR = "NURS",
-    AD = "BUS"
-  ),
-  subject_lookup = tibble::tibble(
-    subject_code = names(subj_to_dept),
-    dept_code    = unname(subj_to_dept)
-  )
+  major_code_to_name = stats::setNames(.test_major_names$program_name, .test_major_names$major_code)
 )
+rm(.test_major_names)
 
 data_objects <<- list(
   cedar_programs = test_programs,

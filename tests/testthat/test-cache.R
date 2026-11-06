@@ -242,9 +242,14 @@ test_that("Dept Trends invalidates only tabs that consume the changed source", {
     get_dept_cache_key("HIST", tab, objects)
   }, character(1))
   original <- keys(data_objects)
+  # A table loses all but its first row; a list of tables (cedar_dims) or of
+  # vectors (cedar_lookups) has each member shrunk, so the change is inside it.
+  shrink <- function(x) {
+    if (is.data.frame(x) || is.atomic(x)) head(x, 1) else lapply(x, shrink)
+  }
   changed_tabs <- lapply(names(data_objects), function(name) {
     changed <- data_objects
-    changed[[name]] <- head(changed[[name]], 1)
+    changed[[name]] <- shrink(changed[[name]])
     tabs[keys(changed) != original]
   })
   names(changed_tabs) <- names(data_objects)
@@ -259,11 +264,12 @@ test_that("Dept Trends invalidates only tabs that consume the changed source", {
     cedar_faculty = character(0),
     # Credit Hours reads late drops' credit values from sections (3.0.0).
     cedar_sections = c("enrl", "ch"),
-    cedar_lookups = c("hc", "enrl", "deg", "ch"),
+    # major_code_to_name labels Credit Hours' SCH by major and nothing else.
+    cedar_lookups = "ch",
     # A mapping edit reaches the key through the unit columns attach_unit()
-    # writes on the hashed tables at load (ADR-001 step 3), never through
-    # the dimension tables themselves.
-    cedar_dims = character(0),
+    # writes on the hashed tables at load (ADR-001 step 3), and a renamed
+    # unit through the dimension tables the named tabs read their labels off.
+    cedar_dims = c("hc", "enrl", "deg", "ch"),
     # Edges enter the key through cedar_report_end_term and
     # cedar_report_latest_term, not as a hashed source table.
     cedar_edges = character(0)

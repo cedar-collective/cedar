@@ -5,7 +5,7 @@
 #
 # Exported functions:
 #   headcountUI(id)
-#   headcountServer(id, programs, lookups)
+#   headcountServer(id, programs, dims, in_progress_terms)
 
 headcountUI <- function(id) {
   ns <- NS(id)
@@ -56,20 +56,22 @@ headcountUI <- function(id) {
   )
 }
 
-headcountServer <- function(id, programs, lookups, in_progress_terms, error_handler = NULL) {
+headcountServer <- function(id, programs, dims, in_progress_terms, error_handler = NULL) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
 
     hc_has_run <- reactiveVal(FALSE)
+
+    # The programs each department owns, by name, read off the attached
+    # programs once per session (ADR-001 step 3).
+    program_names <- headcount_program_names(programs)
 
     get_selected_dept_program_names <- function() {
       if (is.null(input$dept) || length(input$dept) == 0) {
         return(NULL)
       }
 
-      require_headcount_lookup(
-        lookups, "program_name_lookup", c("program_name", "dept_code")
-      ) %>%
+      program_names %>%
         filter(dept_code %in% input$dept) %>%
         pull(program_name)
     }
@@ -99,7 +101,7 @@ headcountServer <- function(id, programs, lookups, in_progress_terms, error_hand
     # concentrations are resolved against all programs for those students so that
     # cross-department combinations remain visible.
     update_downstream_filters <- function(filtered_data) {
-      # When a dept is selected, use program_name_lookup to find programs that
+      # When a dept is selected, use headcount_program_names() to find programs that
       # belong to that dept rather than deriving them from student enrollment records.
       # cedar_programs$dept_code only reflects a student's major, so going through
       # student IDs would show minors/concentrations from unrelated departments.
@@ -449,7 +451,7 @@ headcountServer <- function(id, programs, lookups, in_progress_terms, error_hand
       )
 
       result <- tryCatch({
-        hc_result <- get_headcount(programs, opt, lookups = lookups)
+        hc_result <- get_headcount(programs, opt, dims = dims)
         # Build plots here too, so the timer/overlay covers the actual slow part
         # (per-program subplot generation), not just the data filter/summarize step.
         hc_result$plots <- make_headcount_plots_by_level(hc_result)

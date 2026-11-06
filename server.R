@@ -250,7 +250,7 @@ server <- function(input, output, session) {
   # ===========================================================================
   # Headcount tab (Shiny module)
   # ===========================================================================
-  headcountServer("headcount", cedar_programs, data_objects[["cedar_lookups"]],
+  headcountServer("headcount", cedar_programs, data_objects[["cedar_dims"]],
                   in_progress_terms = cedar_in_progress_terms(data_objects[["cedar_edges"]])$term,
                   error_handler = handle_error)
 
@@ -544,13 +544,9 @@ enrl_data <- eventReactive(enrl_run(), {
   if (is.null(dept_filter) || length(dept_filter) == 0 || all(!nzchar(dept_filter)))
     return(NULL)
 
-  lkp <- data_objects[["cedar_lookups"]][["dept_name_lookup"]]
-  dept_display <- if (!is.null(lkp)) {
-    nms <- lkp$dept_name[lkp$dept_code %in% dept_filter]
-    if (length(nms) > 0) paste(nms, collapse = ", ") else paste(dept_filter, collapse = ", ")
-  } else {
-    paste(dept_filter, collapse = ", ")
-  }
+  lkp <- unit_names(data_objects[["cedar_dims"]])
+  nms <- lkp$dept_name[lkp$dept_code %in% dept_filter]
+  dept_display <- if (length(nms) > 0) paste(nms, collapse = ", ") else paste(dept_filter, collapse = ", ")
   dept_code_label <- paste(dept_filter, collapse = ", ")
 
   matched_sections <- cedar_sections %>% filter(department %in% dept_filter)
@@ -6361,7 +6357,7 @@ output$enrl_classlist_download <- downloadHandler(
   pathwaysServer("pathways", cedar_students, cedar_programs, degrees = cedar_degrees,
                  cedar_grades = cedar_grades,
                  cedar_student_terms = cedar_student_terms,
-                 lookups = data_objects[["cedar_lookups"]],
+                 dims = data_objects[["cedar_dims"]],
                  program_choices = cedar_pathways_choices$program_choices,
                  dept_choices = cedar_pathways_choices$dept_choices,
                  edges = data_objects[["cedar_edges"]], pathway_groups = CEDAR_PATHWAY_SUBJECT_GROUPS)

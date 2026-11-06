@@ -234,11 +234,15 @@ cedar_dept_cache_version <- 11L
 # Credit Hours reads class lists, sections for late drops' credit values, the
 # student-term table for each row's major and programs for its name; no
 # visible tab consumes faculty data.
+# cedar_dims: unit and college names are read off the dimension tables since
+# ADR-001 step 3, so a mapping edit that renames a unit must miss too.
+# cedar_lookups is major_code_to_name alone, which only Credit Hours reads
+# (the SCH-by-major labels).
 DEPT_CACHE_TABLES <- list(
-  hc = c("cedar_programs", "cedar_lookups"),
-  enrl = c("cedar_students", "cedar_sections", "cedar_programs", "cedar_lookups"),
-  deg = c("cedar_degrees", "cedar_lookups"),
-  ch = c("cedar_students", "cedar_sections", "cedar_student_terms", "cedar_programs", "cedar_lookups"),
+  hc = c("cedar_programs", "cedar_dims"),
+  enrl = c("cedar_students", "cedar_sections", "cedar_programs", "cedar_dims"),
+  deg = c("cedar_degrees", "cedar_dims"),
+  ch = c("cedar_students", "cedar_sections", "cedar_student_terms", "cedar_programs", "cedar_lookups", "cedar_dims"),
   demo = "cedar_programs"
 )
 

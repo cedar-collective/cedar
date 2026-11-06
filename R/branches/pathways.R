@@ -190,22 +190,20 @@ resolve_pathways_focal_dept_codes <- function(population_opt, programs,
 #'
 #' @param population_opt Option list used to build the population.
 #' @param programs cedar_programs.
-#' @param lookups cedar_lookups list; must include subject_lookup.
+#' @param dims The dimension tables (build_cedar_dims()); the subjects each
+#'   unit teaches are read off them through subject_units().
 #' @param pop_programs Optional cedar_programs already filtered to population IDs.
 #' @return Character vector of subject_code values.
 #' @keywords internal
 resolve_pathways_focal_subjects <- function(population_opt, programs,
-                                            lookups = list(),
+                                            dims,
                                             pop_programs = NULL) {
   dept_codes <- resolve_pathways_focal_dept_codes(
     population_opt, programs, pop_programs = pop_programs
   )
   if (length(dept_codes) == 0) return(character(0))
 
-  subject_lookup <- lookups$subject_lookup %||%
-    tibble::tibble(subject_code = character(), dept_code = character())
-
-  subject_lookup %>%
+  subject_units(dims) %>%
     dplyr::filter(dept_code %in% dept_codes) %>%
     dplyr::pull(subject_code) %>%
     unique() %>%

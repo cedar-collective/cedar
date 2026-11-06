@@ -357,3 +357,38 @@ attach_default_units <- function(tables, dims) {
   for (a in keep) attr(new, a) <- attr(old, a)
   new
 }
+
+# ── The lookups, read off the dimension tables (ADR-001 step 3, PR 3) ─────────
+# What cedar_lookups used to carry from the transform -- unit names, college
+# names, which subjects a unit teaches -- is the mapping files restated, so it
+# is read here at each start and never saved. The transform's cedar_lookups
+# keeps only what the files cannot know: major_code_to_name, from the class
+# lists. Measured on the 2026-10-08 pull: every saved (subject, unit) pair is
+# among the files' rows, every unit name and every college name is identical.
+
+#' Unit code and display name, one row per unit in units.csv
+#'
+#' @return A tibble with `dept_code` and `dept_name` (the column names every
+#'   reader of the retired dept_name_lookup used).
+unit_names <- function(dims) {
+  validate_cedar_dims(dims)
+  tibble::tibble(dept_code = dims$units$unit_code, dept_name = dims$units$unit_name)
+}
+
+#' College code to display name, as a named character vector
+college_code_names <- function(dims) {
+  validate_cedar_dims(dims)
+  stats::setNames(dims$colleges$college_name, dims$colleges$college_code)
+}
+
+#' Which subjects each unit teaches
+#'
+#' One row per confirmed (subject, unit, college) in subjects.csv. A subject taught under two units (or credited to two colleges) has a row
+#' for each; filter on `dept_code` and pull `subject_code` for a unit's
+#' subjects, which is what the retired data-derived subject_lookup served.
+#' @return A tibble with `subject_code`, `dept_code` and `college`.
+subject_units <- function(dims) {
+  validate_cedar_dims(dims)
+  build_subj_dept_map(dims) %>%
+    dplyr::distinct(subject_code, dept_code, college = college_code)
+}

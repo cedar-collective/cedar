@@ -206,15 +206,8 @@ test_that("a transform without the mapping files stops instead of guessing", {
 
 test_that("a lookups-only rebuild carries the saved major names forward and refuses an unreadable file", {
   env <- load_transform_helpers()
-  empty_maps <- list(
-    subj_dept_map = NULL, hr_org_desc_to_dept = character(0),
-    dept_code_to_name_catalog = character(0), college_name_to_code = character(0)
-  )
   rebuild <- function(dir) {
-    suppressMessages(env$build_lookups(
-      cedar_sections = NULL, cedar_programs = NULL, data_dir = dir, ext = ".qs",
-      maps = empty_maps, major_code_name_raw = NULL
-    ))
+    suppressMessages(env$build_lookups(data_dir = dir, ext = ".qs", major_code_name_raw = NULL))
     qs2::qs_read(file.path(dir, "cedar_lookups.qs"))
   }
 

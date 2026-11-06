@@ -86,7 +86,7 @@ if (is_docker()) {
 #   - cedar_programs.qs    - Program enrollments
 #   - cedar_degrees.qs     - Degrees awarded
 #   - cedar_faculty.qs     - Faculty data
-#   - cedar_lookups.qs     - Auto-generated normalization tables (program_lookup, dept_lookup, subject_lookup, major_code_to_name)
+#   - cedar_lookups.qs     - major_code_to_name, the one lookup the mapping files cannot supply (class-list Major Code → name)
 #
 # data_objects Structure (what cones expect):
 #   data_objects[["cedar_sections"]]  - Course sections
@@ -95,7 +95,7 @@ if (is_docker()) {
 #   data_objects[["cedar_programs"]]  - Program enrollments
 #   data_objects[["cedar_degrees"]]   - Degrees awarded
 #   data_objects[["cedar_faculty"]]   - Faculty data
-#   data_objects[["cedar_lookups"]]   - Normalization tables (list with program_lookup, dept_lookup, subject_lookup)
+#   data_objects[["cedar_lookups"]]   - list(major_code_to_name); unit, college and subject lookups are read off data_objects[["cedar_dims"]]
 #
 # Note: Runtime code should use the CEDAR table names above. Short aliases are
 #       provided only for analyst convenience in interactive sessions.
@@ -365,19 +365,8 @@ if (!is.null(data_objects[["cedar_lookups"]])) {
     major_code_to_name <- character(0)
     message("  - major_code_to_name: empty — re-run transform to generate data-derived version")
   }
-
-  # Build dept_code_to_name from data-derived dept_name_lookup so all downstream code
-  # (dept-report.R, dept-dashboard.R, ui.R dropdowns) uses data-driven department names.
-  # dept_display_names in mappings.R provides editorial overrides for a small set of codes;
-  # the transform applies those and stores the final result in dept_name_lookup.
-  if ("dept_name_lookup" %in% names(lookups) && nrow(lookups$dept_name_lookup) > 0) {
-    dept_code_to_name <- setNames(lookups$dept_name_lookup$dept_name,
-                                  lookups$dept_name_lookup$dept_code)
-    message("  - dept_code_to_name: built from data-derived dept_name_lookup (",
-            length(dept_code_to_name), " entries)")
-  } else {
-    message("  - dept_code_to_name: dept_name_lookup unavailable; re-run transform to generate")
-  }
+  # dept_code_to_name (unit code → name) is units.csv, read by
+  # R/lists/catalog_lookups.R at load; nothing here overrides it (ADR-001 step 3).
 }
 } # end data loading for docker
 
