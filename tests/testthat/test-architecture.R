@@ -596,3 +596,39 @@ test_that("cones and branches do not read global state (M12)", {
   })
   architecture_expect_ratchet(measured, integer(0), "global-state read(s)")
 })
+
+test_that("units are resolved only by attach_unit() and the lists layer (ADR-001 step 3)", {
+  # The invariant that prevents I9: one place reads the mapping files into a
+  # unit, so two readers cannot drift apart. attach_unit() in
+  # R/branches/dims.R is that place; the lists layer holds the rules it wraps.
+  # Everything else reads the attached column. A ratchet over today's
+  # backlog, as for M11: each file's allowance is its count, which may only
+  # go down. The transform (R/data-parsers) still stamps until the step's
+  # second PR and is not measured here.
+  files <- c(
+    r_files_under("R", "trunk"), r_files_under("R", "branches"), r_files_under("R", "cones"),
+    r_files_under("R", "features"), r_files_under("R", "modules"),
+    file.path(project_root, c("global.R", "server.R"))
+  )
+  files <- files[!grepl("/R/branches/dims\\.R$", files)]
+  pattern <- paste0(
+    "resolve_course_units\\(|resolve_program_units\\(|resolve_program_colleges\\(|",
+    "\\.confirmed_program_rows\\(|program_pre_major_flags\\(|read_institution_mappings\\(|",
+    "\\bsubj_dept_map\\b(?!\\.R)|\\bcedar_institution_files\\b|\\bsubj_to_dept\\b|\\bmajor_to_dept\\b"
+  )
+  measured <- architecture_count_by_file(files, function(file) {
+    lines <- readLines(file, warn = FALSE)
+    lines <- lines[!grepl("^\\s*#", lines)]
+    sum(grepl(pattern, lines, perl = TRUE))
+  })
+  # Measured 2026-11-06. Lower a number when you move a reader; never raise one.
+  allowance <- c(
+    "R/branches/mapping-audit.R" = 1L,
+    "R/branches/student-terms.R" = 5L,
+    "R/features/dept-trends.R" = 4L,
+    "R/modules/headcount.R" = 1L,
+    "R/trunk/utils.R" = 1L,
+    "server.R" = 8L
+  )
+  architecture_expect_ratchet(measured, allowance, "unit resolution(s) outside attach_unit()")
+})

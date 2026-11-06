@@ -26,11 +26,20 @@ cedar_data_dir <<- file.path(.cedar_root, "data")
 source(file.path(.cedar_root, "R", "trunk", "load-funcs.R"))
 load_funcs(cedar_base_dir = .cedar_root, modules = FALSE)
 
-# Load a local CEDAR table by name, e.g. cedar_read("cedar_students").
+# The dimension tables, read from institution/<id>/ as the app reads them.
+cedar_dims <- build_cedar_dims()
+
+# Load a local CEDAR table by name, e.g. cedar_read("cedar_students"). A fact
+# table gets its default unit columns attached here, as global.R attaches
+# them (ADR-001 step 3), so an ad-hoc number is on the app's units.
 cedar_read <- function(name) {
   path <- file.path(cedar_data_dir, paste0(name, ".qs"))
   if (!file.exists(path)) stop("[cedar-repl.R] No such data file: ", path)
-  qs2::qs_read(path)
+  tbl <- qs2::qs_read(path)
+  if (name %in% names(CEDAR_ATTACHED_UNIT_COLUMNS)) {
+    tbl <- suppressMessages(attach_default_units(stats::setNames(list(tbl), name), cedar_dims))[[name]]
+  }
+  tbl
 }
 
 # Tables load lazily so sourcing remains fast when only one is needed.

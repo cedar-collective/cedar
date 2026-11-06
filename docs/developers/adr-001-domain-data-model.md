@@ -355,6 +355,23 @@ data at each.**
    columns on 1.86M rows are measured here, against the projection build's
    ceiling. The ADR's own measurement of the join is 0.4–0.9 s on the full
    class list.
+   **Done 2026-11-06** (`R/branches/dims.R`; `global.R`, both cache-warming
+   scripts and `cedar-repl.R` call it). Measured on the 2026-10-08 pull in
+   shared-data, host R: every stamped value reproduced on all four tables.
+
+   | table | rows | attach | transient memory over the table |
+   |---|---|---|---|
+   | `cedar_sections` | 242,413 | 0.20 s | 63 MB over 100 MB |
+   | `cedar_students` | 1,853,633 | 1.21 s | 340 MB over 484 MB |
+   | `cedar_programs` | 622,385 | 1.2–1.8 s | 436 MB over 232 MB |
+   | `cedar_degrees` | 75,272 | 0.05 s | 67 MB over 57 MB |
+
+   The transient is freed once the table is attached, before any analysis
+   allocates, so the projection build's peak (3.2 of 3.8 GiB, reached in its
+   own working copies) is not raised. One rule was found only by this
+   comparison: a declaration row's `program_college` is the files' answer
+   alone (NA for an undecided code); the Banner fallback belongs to the
+   student's `college_code`, never the program's. 3,981 rows said so.
 2. **The transform stops stamping.** `cedar_students`, `cedar_sections`,
    `cedar_programs` and `cedar_degrees` are written with keys only;
    `cedar_student_terms` stores `primary_major_code` and the college key its
