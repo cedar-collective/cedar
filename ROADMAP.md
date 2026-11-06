@@ -316,9 +316,11 @@ Plan: [ADR-002](docs/developers/adr-002-explicit-mapping-files.md).
   of enrolled and returned, every description read off it (closed 2026-11-04;
   the per-reader measurements are in `docs/developers/student-terms.md`).
 - [ ] Step 3, dimensions from the mapping files: the shared loader and `dims`
-  object, `attach_unit(rows, dims, hierarchy)`, readers moved one PR at a
-  time, then the stamped columns and the deploy gate retire. Design written
-  in full in [ADR-001](docs/developers/adr-001-domain-data-model.md#step-3-in-full-dimensions-and-how-data-reaches-a-cone).
+  object attach the default unit columns once at load through
+  `attach_unit(rows, dims, hierarchy)`, so no reader changes; then the
+  transform stops stamping and the deploy gate retires; then `dims` absorbs
+  `cedar_lookups`. Three PRs. Design written in full in
+  [ADR-001](docs/developers/adr-001-domain-data-model.md#step-3-in-full-dimensions-and-how-data-reaches-a-cone).
 - [ ] Steps 4 and 5: `cedar_courses` with a stable id (I37, I45) and the
   course-term and attempt measures; then thin `cedar_students` and
   `cedar_programs` to keys and facts (closes I47).
