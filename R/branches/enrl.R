@@ -2745,12 +2745,23 @@ classify_low_enrollment_terms <- function(sections, terms, current_term,
 #'   no same-season history on its campus has `n_prior_terms` 0, `avg_enrl` NA,
 #'   and `other_history_text` listing its latest offerings that ran in other
 #'   seasons, on other campuses or as other topics (NA when there are none).
+# A history reader needs the course dimension's id on its rows (ADR-001 step
+# 4); every loader attaches it, so a table without it was not loaded by one.
+.require_course_id <- function(sections, caller) {
+  if (!"course_id" %in% names(sections)) {
+    stop("[enrl.R] ", caller, "() needs sections column course_id; attach it with ",
+         "attach_course_ids() (R/branches/courses.R), as every loader does.")
+  }
+  invisible(sections)
+}
+
 get_enrollment_concerns <- function(courses, opt, n_history_terms = 4) {
   future_term <- opt$term
   cedar_debug("[enrl.R] Getting enrollment concerns for future term: ", future_term)
   if (!"is_topics" %in% names(courses)) {
     stop("[enrl.R] get_enrollment_concerns() needs sections column is_topics.")
   }
+  .require_course_id(courses, "get_enrollment_concerns")
 
   # 1. Get scheduled courses for the future term
   opt$status <- "A"
@@ -2763,12 +2774,16 @@ get_enrollment_concerns <- function(courses, opt, n_history_terms = 4) {
     return(NULL)
   }
 
-  # 2. Aggregate to course-level per campus (one row per subject_course + course_title + campus).
-  #    Include course_title to differentiate topics courses with same subject_course.
+  # 2. Aggregate to course-level per campus (one row per course_id + course_title + campus).
+  #    The course is its course_id (ADR-001 step 4), so a schedule that still
+  #    lists a renamed subject's old code beside the new one is one course;
+  #    subject_course shows the code(s) as scheduled. Include course_title to
+  #    differentiate topics courses with the same number.
   #    Take the first value of descriptive columns; sum enrollment and count sections.
   scheduled_courses <- scheduled %>%
-    group_by(subject_course, course_title, campus) %>%
+    group_by(course_id, course_title, campus) %>%
     summarize(
+      subject_course = paste(sort(unique(subject_course)), collapse = " / "),
       level = first(level),
       is_split = any(is_split),
       department = first(department),
@@ -2800,10 +2815,10 @@ get_enrollment_concerns <- function(courses, opt, n_history_terms = 4) {
   #    its title gets reworded across terms. A course is a topics course when
   #    any of its sections carries a "T:" title, some of its topics do not (the
   #    rule get_course_enrollment_history() follows; ISSUES.md I36).
-  topics_courses <- unique(c(scheduled_courses$subject_course[scheduled_courses$is_topics],
-                             hist_data$subject_course[hist_data$is_topics %in% TRUE]))
+  topics_courses <- unique(c(scheduled_courses$course_id[scheduled_courses$is_topics],
+                             hist_data$course_id[hist_data$is_topics %in% TRUE]))
   with_topic_title <- function(df) {
-    mutate(df, topic_title = if_else(subject_course %in% topics_courses, course_title,
+    mutate(df, topic_title = if_else(course_id %in% topics_courses, course_title,
                                      NA_character_))
   }
   scheduled_courses <- with_topic_title(scheduled_courses)
@@ -2811,16 +2826,29 @@ get_enrollment_concerns <- function(courses, opt, n_history_terms = 4) {
 
   # 5+6. Aggregate the same season to a course-level per-term enrollment
   #      series, keeping the most recent n_history_terms per course.
+  same_season <- filter(hist_data, term_type == !!term_type)
   hist_recent <- summarize_term_enrl_series(
-    filter(hist_data, term_type == !!term_type),
-    keys    = c("subject_course", "topic_title", "campus"),
+    same_season,
+    keys    = c("course_id", "topic_title", "campus"),
     n_terms = n_history_terms
   )
+  #    The codes the shown history ran under that the schedule does not show
+  #    (SOC 371 behind SOCI 371), named in the history text so a reader can
+  #    see where the numbers came from. Only the terms kept above count: a
+  #    code retired before them is not behind any shown number.
+  former_codes <- same_season %>%
+    distinct(course_id, campus, term, subject_course) %>%
+    semi_join(hist_recent %>% distinct(course_id, campus, term),
+              by = c("course_id", "campus", "term")) %>%
+    anti_join(scheduled %>% distinct(course_id, campus, subject_course),
+              by = c("course_id", "campus", "subject_course")) %>%
+    group_by(course_id, campus) %>%
+    summarize(former_codes = paste(sort(unique(subject_course)), collapse = ", "), .groups = "drop")
 
   # 7. Compute averages (active terms only), trend, and history text.
   #    Cancelled terms appear in history_text as "C" but don't affect avg/trend.
   hist_stats <- hist_recent %>%
-    group_by(subject_course, topic_title, campus) %>%
+    group_by(course_id, topic_title, campus) %>%
     summarize(
       avg_enrl = {
         active_enrl <- term_enrl[has_active]
@@ -2848,9 +2876,16 @@ get_enrollment_concerns <- function(courses, opt, n_history_terms = 4) {
 
   # 9. Join scheduled courses with historical stats
   result <- scheduled_courses %>%
-    left_join(hist_stats, by = c("subject_course", "topic_title", "campus"),
+    left_join(hist_stats, by = c("course_id", "topic_title", "campus"),
               na_matches = "na") %>%
-    mutate(n_prior_terms = coalesce(n_prior_terms, 0L))
+    mutate(n_prior_terms = coalesce(n_prior_terms, 0L)) %>%
+    # CAMPUS_ROLLUP: former_codes is per course and campus, as the history is.
+    left_join(former_codes, by = c("course_id", "campus")) %>%
+    mutate(
+      former_codes = if_else(n_prior_terms > 0L | n_cancelled > 0L, former_codes, NA_character_),
+      history_text = if_else(is.na(former_codes), history_text,
+                             paste0(history_text, "; also as ", former_codes))
+    )
 
   # 10. A course with no same-season history on its campus may still have run
   #     in another season, on another campus or as another topic. Those
@@ -2860,10 +2895,10 @@ get_enrollment_concerns <- function(courses, opt, n_history_terms = 4) {
   #     CAMPUS_ROLLUP: one display list per course across campuses; every entry
   #     keeps its own campus label and no enrollment is summed across campuses.
   other_offerings <- hist_data %>%
-    filter(subject_course %in% result$subject_course[result$n_prior_terms == 0L]) %>%
-    summarize_term_enrl_series(keys = c("subject_course", "campus")) %>%
+    filter(course_id %in% result$course_id[result$n_prior_terms == 0L]) %>%
+    summarize_term_enrl_series(keys = c("course_id", "campus")) %>%
     filter(has_active) %>%
-    group_by(subject_course) %>%
+    group_by(course_id) %>%
     slice_max(term, n = n_history_terms, with_ties = FALSE) %>%
     arrange(term, campus, .by_group = TRUE) %>%
     summarize(
@@ -2873,7 +2908,7 @@ get_enrollment_concerns <- function(courses, opt, n_history_terms = 4) {
 
   result <- result %>%
     # CAMPUS_ROLLUP: other_offerings is already one labelled list per course.
-    left_join(other_offerings, by = "subject_course") %>%
+    left_join(other_offerings, by = "course_id") %>%
     mutate(
       other_history_text = if_else(n_prior_terms == 0L, other_history_text, NA_character_),
       history_text = coalesce(
@@ -2909,6 +2944,18 @@ get_enrollment_concerns <- function(courses, opt, n_history_terms = 4) {
 get_course_enrollment_history <- function(courses, campus, dept, subj_crse, crse_title, im,
                                          n_terms = 4, exclude_term = NULL, max_term = NULL) {
   cedar_debug("[enrl.R] Getting enrollment history for: ", crse_title, " - ", subj_crse)
+  .require_course_id(courses, "get_course_enrollment_history")
+
+  # The course is its course_id (ADR-001 step 4): the code asked for and every
+  # code it succeeded, so a renamed subject or renumbered course keeps one
+  # history (ISSUES.md I37, I45). A code that is on no section row has no
+  # history under any code; it is looked up as itself and returns no rows.
+  course_ids <- unique(courses$course_id[courses$subject_course == subj_crse])
+  if (length(course_ids) > 1L) {
+    stop("[enrl.R] ", subj_crse, " carries more than one course_id: ",
+         paste(course_ids, collapse = ", "))
+  }
+  if (length(course_ids) == 0L) course_ids <- subj_crse
 
   # Filter for the specific course. Delivery method is intentionally excluded: it
   # changes across terms (ENH -> blank) without the course changing.
@@ -2929,7 +2976,7 @@ get_course_enrollment_history <- function(courses, campus, dept, subj_crse, crse
     filter(
       campus == !!campus,
       department == !!dept,
-      subject_course == !!subj_crse
+      course_id == !!course_ids
     ) %>%
     drop_shell_sections()
 
@@ -2991,6 +3038,7 @@ get_course_enrollment_histories <- function(courses, course_keys,
     stop("[enrl.R] course_keys missing required columns: ",
          paste(missing_keys, collapse = ", "), call. = FALSE)
   }
+  .require_course_id(courses, "get_course_enrollment_histories")
 
   requested <- course_keys %>%
     ungroup() %>%
@@ -3002,10 +3050,22 @@ get_course_enrollment_histories <- function(courses, course_keys,
     return(requested)
   }
 
+  # Each requested code's course_id (ADR-001 step 4), so a history runs through
+  # every code the course has carried; a code on no section row is its own id
+  # and finds nothing, as the single-course function does.
+  # CAMPUS_ROLLUP: a code's id is the same on every campus (the course dimension).
+  code_ids <- courses %>% distinct(subject_course, course_id)
+  if (anyDuplicated(code_ids$subject_course)) {
+    stop("[enrl.R] a subject_course carries more than one course_id in courses")
+  }
+  requested <- requested %>%
+    left_join(code_ids, by = "subject_course", relationship = "many-to-one") %>%
+    mutate(course_id = coalesce(course_id, subject_course))
+
   source_keys <- requested %>%
-    distinct(campus, department, subject_course)
+    distinct(campus, department, course_id)
   history_columns <- c(
-    "campus", "department", "subject_course", "course_title", "term",
+    "campus", "department", "subject_course", "course_id", "course_title", "term",
     "status", "total_enrl", "instructor_name", "crosslist_group",
     "crosslist_role", "is_topics"
   )
@@ -3013,7 +3073,7 @@ get_course_enrollment_histories <- function(courses, course_keys,
     select(any_of(history_columns)) %>%
     semi_join(
       source_keys,
-      by = c("campus", "department", "subject_course")
+      by = c("campus", "department", "course_id")
     ) %>%
     drop_shell_sections()
 
@@ -3034,13 +3094,13 @@ get_course_enrollment_histories <- function(courses, course_keys,
   scoped$.topic_row <- topic_row
 
   topic_keys <- scoped %>%
-    group_by(campus, department, subject_course) %>%
+    group_by(campus, department, course_id) %>%
     summarize(.history_is_topic = any(.topic_row), .groups = "drop")
 
   requested <- requested %>%
     left_join(
       topic_keys,
-      by = c("campus", "department", "subject_course"),
+      by = c("campus", "department", "course_id"),
       relationship = "many-to-one"
     ) %>%
     mutate(
@@ -3051,7 +3111,7 @@ get_course_enrollment_histories <- function(courses, course_keys,
   scoped <- scoped %>%
     left_join(
       topic_keys,
-      by = c("campus", "department", "subject_course"),
+      by = c("campus", "department", "course_id"),
       relationship = "many-to-one"
     ) %>%
     mutate(
@@ -3066,7 +3126,7 @@ get_course_enrollment_histories <- function(courses, course_keys,
   }
 
   history_groups <- c(
-    "campus", "department", "subject_course", ".history_title"
+    "campus", "department", "course_id", ".history_title"
   )
   history_by_key <- scoped %>%
     keep_home_sections() %>%

@@ -526,3 +526,57 @@ test_that("a schedule check finds each course's history or lists its other offer
   expect_equal(concerns$other_history_text,
                c(NA, "16 (ABQ Fa20)", "14 (ABQ Sp20)", "12 (ABQ Sp20)", NA, NA))
 })
+
+
+# =============================================================================
+# The course is its course_id (ADR-001 step 4): a renamed subject or renumbered
+# course keeps one history. Fixture RN01 with the demo institution's
+# code_history.csv (SOC -> SOCI confirmed; SOCI 250 -> SOCI 2315 confirmed;
+# HIST 320 -> HIST 3201 confirmed; PHIL 150 -> PHIL 1115 proposed).
+# =============================================================================
+
+rn01_sections <- function() {
+  dims <- build_cedar_dims(read_institution_mappings(cedar_institution_dir(cedar_base_dir, "demo")))
+  courses <- suppressMessages(build_cedar_courses(test_sections_rn, test_students_rn, dims))
+  suppressMessages(attach_course_ids(list(cedar_sections = test_sections_rn), courses))$cedar_sections
+}
+
+test_that("a schedule check finds a renumbered course's history under its former codes (RN01)", {
+  concerns <- get_enrollment_concerns(rn01_sections(), list(term = "202110"), n_history_terms = 4) %>%
+    arrange(subject_course)
+  expect_equal(concerns$subject_course, c("HIST 3201", "LING 2110", "SOCI 2315"))
+  expect_equal(concerns$course_id, concerns$subject_course)
+  # HIST 3201 was HIST 320 in Spring 2020 (its Fall 2020 offering is another
+  # season); SOCI 2315 was SOC 250, through the subject rename and the
+  # renumbering; LING 2110 has carried one code.
+  expect_equal(concerns$n_prior_terms, c(1L, 1L, 1L))
+  expect_equal(concerns$avg_enrl, c(2, 2, 2))
+  expect_equal(concerns$former_codes, c("HIST 320", NA, "SOC 250"))
+  expect_equal(concerns$history_text,
+               c("2 (Sp20); also as HIST 320", "2 (Sp20)", "2 (Sp20); also as SOC 250"))
+  expect_true(all(is.na(concerns$other_history_text)))
+})
+
+test_that("a single course's history runs through every code it has carried (RN01)", {
+  sections <- rn01_sections()
+  history <- get_course_enrollment_history(sections, campus = "ABQ", dept = "SOCI",
+                                           subj_crse = "SOCI 2315", crse_title = "Social Problems",
+                                           im = NULL, n_terms = 10)
+  expect_equal(history$term, c(202010L, 202110L))
+  expect_equal(history$enrolled, c(2L, 2L))
+  # Asked for by a former code, the same course comes back.
+  expect_equal(get_course_enrollment_history(sections, "ABQ", "SOCI", "SOC 250", "Social Problems",
+                                             NULL, n_terms = 10), history)
+  # A proposed row joins nothing: PHIL 1115 has only its own term.
+  expect_equal(get_course_enrollment_history(sections, "ABQ", "PHIL", "PHIL 1115",
+                                             "Introduction to Logic", NULL, n_terms = 10)$term, 202080L)
+  # The batched form agrees.
+  keys <- tibble::tibble(campus = "ABQ", department = c("SOCI", "HIST"),
+                         subject_course = c("SOCI 2315", "HIST 3201"),
+                         course_title = c("Social Problems", "Historiography"))
+  batched <- get_course_enrollment_histories(sections, keys, n_terms = 10)
+  expect_equal(batched$history[[1]], history)
+  expect_equal(batched$history_text[[2]], "2, 2, 2 (Sp20, Fa20, Sp21)")
+  # A table no loader attached is refused, never matched on the code alone.
+  expect_error(get_enrollment_concerns(test_sections_rn, list(term = "202110")), "course_id")
+})

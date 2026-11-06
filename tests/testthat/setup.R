@@ -107,6 +107,27 @@ for (.st in c("test_student_terms", "test_student_terms_audits", "test_student_t
               "test_student_terms_rw", "test_student_terms_gen_ed_assoc", "test_student_terms_st")) {
   assign(.st, attach_test_student_terms(get(.st)), envir = globalenv())
 }
+# As global.R attaches at start (ADR-001 step 4): course_id on every section
+# and class-list fixture, from a dimension built over that table alone. Neither
+# institution's code_history.csv names a code these fixtures use, so the id is
+# the code itself whichever institution load_funcs() read; RN01 (test_sections_rn,
+# test_students_rn) is the exception and is attached by its tests with the demo
+# institution's file.
+attach_test_course_ids <<- function(tbl, role = c("sections", "students")) {
+  role <- match.arg(role)
+  empty <- tbl[0, intersect(c("term", "subject_course", "course_title", "level"), names(tbl))]
+  courses <- suppressMessages(if (role == "sections") build_cedar_courses(tbl, empty, test_dims)
+                              else build_cedar_courses(empty, tbl, test_dims))
+  name <- if (role == "sections") "cedar_sections" else "cedar_students"
+  suppressMessages(attach_course_ids(stats::setNames(list(tbl), name), courses))[[name]]
+}
+for (.sec in c("test_sections", "test_sections_sf", "test_sections_topics", "test_sections_schedule",
+               "test_sections_regstats", "test_sections_course_history", "test_sections_xl_switch",
+               "test_sections_intersession", "test_sections_pending_session")) {
+  assign(.sec, attach_test_course_ids(get(.sec), "sections"), envir = globalenv())
+}
+test_students <<- attach_test_course_ids(test_students, "students")
+rm(.sec)
 # Degree Explorer: the demo institution's designed catalog (institution/demo/),
 # two synthetic programs whose schedules are worked by hand in
 # test-degree-explorer.R. Independent of any real institution's annual catalog.
