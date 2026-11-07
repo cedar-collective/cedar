@@ -250,7 +250,7 @@ record keeps the decisions.
 | 2 | `cedar_student_terms`: one definition of an enrolled term and of return (closes I44) | done 2026-11-04 |
 | 3 | Dimensions from the mapping files, units attached at load | done 2026-11-06 |
 | 4 | `cedar_courses` and course ids at load (I37, I45); `cedar_course_terms`; `cedar_attempts` | courses and keying done 2026-11-07; `cedar_course_terms` done 2026-11-07; `cedar_attempts` done 2026-11-07 (`cedar_grades` retired); the course flows next |
-| 5 | Thin `cedar_students` and `cedar_programs` to keys and registration facts; rename to fact names | student-term columns off the loaded class list done 2026-11-07 (`thin_class_list()`), and off the saved file (`cedar_class_list_descriptions`); the section columns stay (decision below); `cedar_programs` and the rename remain |
+| 5 | Thin `cedar_students` and `cedar_programs` to keys and registration facts; rename to fact names | student-term columns off the loaded class list done 2026-11-07 (`thin_class_list()`), and off the saved file (`cedar_class_list_descriptions`); the section columns and `cedar_programs` stay (decisions below); the rename remains, after the open stack merges |
 
 Step 2's precedence rule: when the two source snapshots disagree, the
 academic-studies row wins, the row is flagged and the count reported, never
@@ -303,6 +303,13 @@ a silent coalesce.
   is short again. `total_credits` (no reader) left the class list with this
   decision. So the saved class list holds about 326 MB in memory on the
   2026-11-04 pull (22 columns), not the ~190 MB the first draft assumed.
+- **`cedar_programs` stays at its grain** (decided 2026-11-07). It holds 1.46
+  rows per student-term (622,385 rows, 426,241 student-terms, 181 MB), where
+  the class list holds four, so moving its 24 student-term columns to a
+  student-term table saves about 35 MB and rewrites every program reader
+  (Headcount, Pathways, the comparisons). The pull-stamped fields stay too:
+  their readers (the comparison covariates, the credit and GPA timelines,
+  major-change detection) use them under the field-reliability rules.
 
 Pull history is the one piece with a deadline and should be sized now.
 
