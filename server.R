@@ -1674,6 +1674,11 @@ output$enrl_classlist_download <- downloadHandler(
   # changes; otherwise a result can remain on screen under a new selection.
   course_report_data <- reactiveVal(NULL)
   cr_retention_data <- reactiveVal(NULL)
+  # Whether cr_retention_data() was computed with the instructor breakout. The
+  # renderers read this, never the checkbox: ticking the box before Run would
+  # otherwise re-render the previous course-only result as if it were split by
+  # instructor (ISSUES.md I49).
+  cr_retention_by_instructor <- reactiveVal(FALSE)
   cr_dept_retention_data <- reactiveVal(NULL)
   cr_college_retention_data <- reactiveVal(NULL)
   cr_course_retention_data <- reactiveVal(NULL)
@@ -3732,6 +3737,7 @@ output$enrl_classlist_download <- downloadHandler(
         degrees = degrees,
         context = retention_context
       )
+      cr_retention_by_instructor(isTRUE(opt$by_instructor))
       cr_retention_data(result)
       course_result <- if (!isTRUE(opt$by_instructor)) {
         filter_retention_min_n(result, min_n)
@@ -3808,7 +3814,7 @@ output$enrl_classlist_download <- downloadHandler(
   output$cr_retention_results <- renderUI({
     result <- cr_retention_data()
     if (is.null(result)) return(NULL)
-    by_instructor <- isTRUE(input$cr_ret_by_instructor)
+    by_instructor <- cr_retention_by_instructor()
     min_n <- as.integer(input$cr_ret_min_n %||% 10L)
     aggregate <- summarize_retention_by_term_type(
       result,
@@ -3834,7 +3840,7 @@ output$enrl_classlist_download <- downloadHandler(
     )
     tagList(
       uiOutput("cr_retention_benchmark_diff_ui"),
-      if (isTRUE(input$cr_ret_by_instructor)) uiOutput("cr_retention_instructor_highlights"),
+      if (by_instructor) uiOutput("cr_retention_instructor_highlights"),
       h5("Retention Rates by Term Type", style = "margin-top: 1em; color: #555;"),
       p(
         "These data-window rates combine like terms to emphasize persistent patterns that are more useful for planning than a single-semester result.",
@@ -4028,7 +4034,7 @@ output$enrl_classlist_download <- downloadHandler(
     result <- cr_retention_data()
     req(!is.null(result) && nrow(result) > 0)
 
-    by_instructor <- isTRUE(input$cr_ret_by_instructor)
+    by_instructor <- cr_retention_by_instructor()
     aggregate <- summarize_retention_by_term_type(
       result,
       by_instructor = by_instructor,
@@ -4042,7 +4048,7 @@ output$enrl_classlist_download <- downloadHandler(
     result <- cr_retention_data()
     req(!is.null(result) && nrow(result) > 0)
 
-    by_instructor <- isTRUE(input$cr_ret_by_instructor)
+    by_instructor <- cr_retention_by_instructor()
     min_n <- as.integer(input$cr_ret_min_n %||% 10L)
     display <- .retention_display_table(
       result %>% dplyr::filter(n >= min_n),

@@ -55,6 +55,7 @@ Kept until the next release, so a recurrence is recognisable; each entry below g
 
 | ID | Kind | Summary |
 |---|---|---|
+| [I49](#i49--ticking-break-out-by-instructor-errors-the-retention-tables-until-run) | Defect | Ticking "Break out by instructor" on Course Dynamics > Retention errored every retention table until Run, because the renderers read the checkbox rather than how the shown result was computed (resolved 2026-11-07) |
 | [I44](#i44--roadblocks-and-retention-disagree-on-whether-a-late-withdrawal-returned) | Defect | Roadblocks and Retention disagreed on whether a student who withdrew late next term returned: Fall 2025 to Spring 2026 read 82.7% on one and 81.7% on the other (284 students) (resolved 2026-11-04) |
 | [I42](#i42--a-saturated-course-whose-fall-changes-lower-its-forecast-is-still-called-a-floor) | Defect | A saturated course whose Fall changes lower its forecast was still called "a floor": ENGL 1120's Spring 2027 forecast is 2,164, below last Spring's 2,179, and the page said "so this is a floor" (resolved 2026-11-03) |
 | [I41](#i41--projection-labels-call-the-term-just-finished-fall-whatever-its-season) | Defect | Projection labels called the term just finished "Fall" whatever its season: once Spring 2027 settles, a Fall 2027 course whose Spring moved 25% would have been flagged "Fall enrollment +25%" (resolved 2026-11-03) |
@@ -73,6 +74,28 @@ Kept until the next release, so a recurrence is recognisable; each entry below g
 ---
 
 # Defects
+
+## I49 — Ticking "Break out by instructor" errors the retention tables until Run
+
+**Status:** resolved 2026-11-07.
+**Found:** 2026-11-07, in the app log of a full institutional browser run
+(`summarize_retention_by_term_type: instructor_id is required when
+by_instructor = TRUE`, four times).
+**Severity:** low: no wrong number reached a reader. But every retention table
+on Course Dynamics > Retention showed "An error has occurred" from the moment
+the box was ticked until Run was pressed again.
+**Cause:** the result renderers in `server.R` (`cr_retention_results`,
+`cr_retention_table`, `cr_retention_term_table`) read
+`input$cr_ret_by_instructor` live, so ticking the box re-rendered the previous
+course-only result as if it were split by instructor, and
+`summarize_retention_by_term_type()` stopped, correctly, on the missing
+`instructor_id`.
+**Reproduction:** Course Dynamics, any course, Retention, Run with the box
+unticked; then tick it without pressing Run.
+**Fix:** the run observer records how its result was computed
+(`cr_retention_by_instructor()`), and the renderers read that, never the
+checkbox. The reports browser suite (`--e2e retention`) ticks the box and
+asserts no output error before Run; it fails on the old renderers.
 
 ## I48 — A transform change to a fact table's stored columns is not rebuilt at deploy
 
