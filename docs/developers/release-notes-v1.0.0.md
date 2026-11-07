@@ -1,7 +1,8 @@
 ---
 title: CEDAR v1.0.0 Release Notes
-parent: Developer Guide
-nav_order: 10
+parent: Operations
+grand_parent: Developer Guide
+nav_order: 4
 ---
 
 # CEDAR v1.0.0 Release Notes

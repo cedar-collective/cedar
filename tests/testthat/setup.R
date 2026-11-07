@@ -60,6 +60,7 @@ test_sections_xl_switch <<- cedar_sections_xl_switch # EC-15: listing switch in 
 test_students_xl_switch <<- cedar_students_xl_switch
 test_sections_rn     <<- cedar_sections_rn       # RN01: codes that succeed one another (course dimension)
 test_students_rn     <<- cedar_students_rn
+test_students_rn02   <<- cedar_students_rn02     # RN02: waitlisted under two live codes
 test_degrees     <<- cedar_degrees
 
 # Student-term tables (cedar_student_terms), built by the production builder
@@ -126,17 +127,24 @@ for (.sec in c("test_sections", "test_sections_sf", "test_sections_topics", "tes
                "test_sections_intersession", "test_sections_pending_session")) {
   assign(.sec, attach_test_course_ids(get(.sec), "sections"), envir = globalenv())
 }
-test_students <<- attach_test_course_ids(test_students, "students")
-test_students_xl_switch <<- attach_test_course_ids(test_students_xl_switch, "students")
+for (.stu in c("test_students", "test_students_xl_switch", "test_students_regstats",
+               "test_students_course_history")) {
+  assign(.stu, attach_test_course_ids(get(.stu), "students"), envir = globalenv())
+}
+rm(.stu)
 rm(.sec)
 # RN01 read with the demo institution's code_history.csv, as its tests read it:
 # both tables attached from one dimension built over both, as global.R does.
-rn01_course_tables <<- function() {
+rn01_course_tables <<- function(students = test_students_rn) {
   dims <- build_cedar_dims(read_institution_mappings(cedar_institution_dir(cedar_base_dir, "demo")))
-  courses <- suppressMessages(build_cedar_courses(test_sections_rn, test_students_rn, dims))
+  courses <- suppressMessages(build_cedar_courses(test_sections_rn, students, dims))
   suppressMessages(attach_course_ids(
-    list(cedar_sections = test_sections_rn, cedar_students = test_students_rn), courses
+    list(cedar_sections = test_sections_rn, cedar_students = students), courses
   ))
+}
+# RN02 rides on RN01: its class-list rows added to RN01's.
+rn02_course_tables <<- function() {
+  rn01_course_tables(dplyr::bind_rows(test_students_rn, test_students_rn02))
 }
 # Degree Explorer: the demo institution's designed catalog (institution/demo/),
 # two synthetic programs whose schedules are worked by hand in

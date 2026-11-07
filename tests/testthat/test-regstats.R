@@ -129,21 +129,159 @@ test_that("Regstats saturation uses class-list census rather than DESR snapshot 
   )))
 })
 
-test_that("Regstats definition v4 records lifecycle and waitlist source repairs", {
+test_that("Regstats definition v5 records the course key, lifecycle and waitlist source repairs", {
   definition <- cedar_definition("regstats")
-  expect_identical(definition$version, "4.0.0")
+  expect_identical(definition$version, "5.0.0")
+  expect_match(definition$summary, "followed across the codes it has carried", fixed = TRUE)
   expect_match(definition$summary, "class-list census proxy", fixed = TRUE)
   expect_match(definition$summary, "drop-volume alerts remain count-based", fixed = TRUE)
   expect_match(definition$summary, "shared class-list true demand", fixed = TRUE)
   expect_match(definition$exclusions, "at least as large as Min Waiting", fixed = TRUE)
 })
 
-test_that("precomputed enrollment and raw class lists give identical Regstats", {
+test_that("cedar_course_terms and raw class lists give identical Regstats", {
   raw <- get_reg_stats(test_students_regstats, test_sections_regstats, regstats_history_opt())
-  base <- calc_cl_enrls(test_students_regstats, by_part_term = TRUE)
-  rlang::local_bindings(cedar_cl_enrls_base = base, .env = .GlobalEnv)
-  cached_base <- get_reg_stats(test_students_regstats, test_sections_regstats, regstats_history_opt())
-  expect_equal(cached_base[names(cached_base) != "cache_info"], raw[names(raw) != "cache_info"])
+  course_terms <- build_course_terms(test_students_regstats)
+  expect_true(course_terms_is_current(course_terms, test_students_regstats))
+  expect_identical(attr(course_terms, "code_renames"), character(0))
+  expect_identical(names(course_terms), COURSE_TERMS_COLUMNS)
+  from_table <- get_reg_stats(test_students_regstats, test_sections_regstats,
+                              regstats_history_opt(), course_terms = course_terms)
+  expect_equal(from_table[names(from_table) != "cache_info"], raw[names(raw) != "cache_info"])
+
+  # The table is a parameter, never a global (M12): a bogus table of the old
+  # or new name in the global environment changes nothing.
+  bogus <- course_terms %>% dplyr::mutate(registered = registered * 100L)
+  rlang::local_bindings(cedar_course_terms = bogus, cedar_cl_enrls_base = bogus,
+                        .env = .GlobalEnv)
+  no_table <- get_reg_stats(test_students_regstats, test_sections_regstats, regstats_history_opt())
+  expect_equal(no_table[names(no_table) != "cache_info"], raw[names(raw) != "cache_info"])
+})
+
+test_that("Regstats refuses a course-term table not counted by this build over these codes", {
+  # Counted by code, with no renames or build stamped on it: what global.R
+  # saved before ADR-001 step 4, or before a code_history.csv row was confirmed.
+  by_code <- calc_cl_enrls(test_students_regstats, by_part_term = TRUE)
+  expect_false(course_terms_is_current(by_code, test_students_regstats))
+  expect_error(
+    get_reg_stats(test_students_regstats, test_sections_regstats, regstats_history_opt(),
+                  course_terms = by_code),
+    "build_course_terms"
+  )
+  # Saved by an older build, or short a column: rebuilt, never read.
+  current <- build_course_terms(test_students_regstats)
+  older <- current
+  attr(older, "course_terms_build_version") <- COURSE_TERMS_BUILD_VERSION - 1L
+  expect_false(course_terms_is_current(older, test_students_regstats))
+  expect_false(course_terms_is_current(dplyr::select(current, -census_enrl), test_students_regstats))
+  # Counted over one class list's renames, it is not current for another's.
+  rn <- rn01_course_tables()
+  expect_false(course_terms_is_current(current, rn$cedar_students))
+  rn_base <- build_course_terms(rn$cedar_students)
+  expect_true(course_terms_is_current(rn_base, rn$cedar_students))
+  # The class list already names the renamed subject (I45), so its renames
+  # are the two renumberings; the schedule's SOC codes are on the sections.
+  expect_identical(attr(rn_base, "code_renames"),
+                   c("HIST 320 > HIST 3201", "SOCI 250 > SOCI 2315"))
+  expect_true(all(rn_base$subject_course %in% c("HIST 3201", "LING 2110", "PHIL 150", "PHIL 1115",
+                                                 "SOCI 2120", "SOCI 2315", "SOCI 371")))
+  expect_false(course_terms_is_current(NULL, test_students_regstats))
+})
+
+test_that("Regstats stops on a table no loader attached", {
+  expect_error(
+    get_reg_stats(dplyr::select(test_students_regstats, -course_id), test_sections_regstats,
+                  regstats_history_opt()),
+    "course_id"
+  )
+})
+
+test_that("Regstats follows a course across its codes (ADR-001 step 4)", {
+  rn <- rn01_course_tables()
+  # RN01 sections seat 20 and one student registers, so a 5% ceiling marks
+  # every offering at cap; one prior term at cap is Chronically full here.
+  opt <- regstats_history_opt(term = 202110L)
+  opt$thresholds$chronic_fill_rate <- 0.05
+  result <- get_reg_stats(rn$cedar_students, rn$cedar_sections, opt)
+
+  # HIST 3201's Spring 2021 fill is compared with HIST 320's Spring 2020,
+  # and the row says which code that history ran under.
+  sat <- result$sat %>% dplyr::arrange(subject_course)
+  expect_equal(sat$subject_course, c("HIST 3201", "LING 2110", "SOCI 2315"))
+  hist <- sat %>% dplyr::filter(subject_course == "HIST 3201")
+  expect_equal(hist$n_hist_terms, 1L)
+  expect_equal(hist$n_chronic_terms, 1L)
+  expect_true(hist$is_chronic_hist)
+  expect_equal(hist$fill_hist_terms[[1]], c(202010L, 202110L))
+  expect_equal(hist$former_codes, "HIST 320 (Spring 2020 to Fall 2020)")
+  # The two-step chain: both earlier codes, each with its term.
+  expect_equal(sat$former_codes[sat$subject_course == "SOCI 2315"],
+               "SOC 250 (Spring 2020), SOCI 250 (Spring 2020)")
+  # The control, offered twice under one code, names none.
+  expect_true(is.na(sat$former_codes[sat$subject_course == "LING 2110"]))
+  expect_false(any(c("HIST 320", "SOC 250", "SOCI 250") %in% result$all_flagged_courses))
+  expect_equal(result$course_key_info$n_renamed_courses, 2L)
+  expect_equal(result$course_key_info$renamed_courses, c("HIST 3201", "SOCI 2315"))
+  expect_match(result$course_key_info$note, "2 flagged courses also ran under another code", fixed = TRUE)
+  expect_identical(result$code_renames, course_code_renames(rn$cedar_students))
+  # Every flagged table carries the column, flagged or empty.
+  for (nm in c("bumps", "dips", "early_drops", "late_drops", "waits", "sat")) {
+    expect_true("former_codes" %in% names(result[[nm]]), info = nm)
+  }
+  # The proposed renumbering assigns nothing: PHIL 150 and PHIL 1115 stay two
+  # courses, and the Fall 2020 snapshot counts the schedule's courses by id.
+  fall <- get_reg_stats(rn$cedar_students, rn$cedar_sections, regstats_history_opt(term = 202080L))
+  expect_equal(fall$summary$lower$n_courses, 1L)
+  expect_equal(fall$summary$upper$n_courses, 2L)
+  expect_equal(fall$course_key_info$n_renamed_courses, 0L)
+  expect_match(fall$course_key_info$note, "no flagged course ran under another code", fixed = TRUE)
+
+  # A former code asked for is its course.
+  former_opt <- opt
+  former_opt$course <- "HIST 320"
+  former <- get_reg_stats(rn$cedar_students, rn$cedar_sections, former_opt)
+  expect_equal(former$sat$subject_course, "HIST 3201")
+  expect_equal(former$all_flagged_courses, "HIST 3201")
+  expect_equal(former$sat$former_codes, "HIST 320 (Spring 2020 to Fall 2020)")
+})
+
+test_that("Regstats excludes a course the list names by a former code, on every path", {
+  # Keyed on course_id, a list naming HIST 320 must drop the course HIST 3201
+  # in every term, from the raw recount and from the precomputed base alike;
+  # matched by code, the base's HIST 3201 rows would survive and flag.
+  rn <- rn01_course_tables()
+  opt <- regstats_history_opt(term = 202110L)
+  opt$thresholds$chronic_fill_rate <- 0.05
+  rlang::local_bindings(excluded_courses = "HIST 320", .env = .GlobalEnv)
+  raw <- get_reg_stats(rn$cedar_students, rn$cedar_sections, opt)
+  expect_false("HIST 3201" %in% raw$all_flagged_courses)
+  expect_equal(sort(raw$sat$subject_course), c("LING 2110", "SOCI 2315"))
+  # HIST 3201 is Spring 2021's only upper-division course, so the snapshot
+  # has no upper-division row once its course is excluded (1 by code).
+  expect_null(raw$summary$upper$n_courses)
+  expect_equal(raw$summary$lower$n_courses, 2L)
+
+  course_terms <- build_course_terms(rn$cedar_students)
+  expect_true("HIST 3201" %in% course_terms$subject_course)
+  from_base <- get_reg_stats(rn$cedar_students, rn$cedar_sections, opt, course_terms = course_terms)
+  expect_equal(from_base[names(from_base) != "cache_info"], raw[names(raw) != "cache_info"])
+
+  # A student-level filter recounts the class list; it excludes the same course.
+  filtered_opt <- opt
+  filtered_opt$student_campus <- "ABQ"
+  filtered <- get_reg_stats(rn$cedar_students, rn$cedar_sections, filtered_opt)
+  expect_false("HIST 3201" %in% filtered$all_flagged_courses)
+})
+
+test_that("the schedule's old code joins the class list's new one in Regstats saturation (I45)", {
+  rn <- rn01_course_tables()
+  # Spring 2020: SOC 371 and SOC 250 are on the schedule, SOCI 371 and
+  # SOCI 250 on the class list. By course every section finds its census.
+  result <- get_reg_stats(rn$cedar_students, rn$cedar_sections, regstats_history_opt(term = 202010L))
+  coverage <- result$baseline_info$saturation_coverage
+  expect_equal(coverage$matched, 5L)
+  expect_equal(coverage$unmatched, 0L)
+  expect_match(result$baseline_info$coverage_note, "5 target groups matched", fixed = TRUE)
 })
 
 test_that("title enrichment cannot duplicate a Regstats reporting group", {
@@ -187,6 +325,9 @@ test_that("Regstats cache preserves baseline coverage and ignores unversioned re
   expect_true(loaded$cache_info$loaded_from_cache)
   expect_equal(loaded$summary, fresh$summary)
   expect_equal(loaded$baseline_info, fresh$baseline_info)
+  # A payload counted over other course codes is a miss.
+  expect_identical(loaded$code_renames, character(0))
+  expect_null(load_regstats_cache(opt, "SOC 371 > SOCI 371"))
   filename <- create_regstats_cache_filename(opt)
   expect_match(filename, paste0("^regstats_v", cedar_regstats_cache_version, "_"))
   path <- file.path(cedar_data_dir, "regstats", filename)

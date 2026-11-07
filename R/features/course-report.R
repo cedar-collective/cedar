@@ -42,8 +42,6 @@ get_course_data <- function(data_objects, opt, skip_neighbors = FALSE,
   if (is.null(opt[["course"]]) || length(opt[["course"]]) == 0) {
     stop("[course_report.R] get_course_data requires opt$course")
   }
-  students <- key_on_course_id(students, "get_course_data")
-  courses <- key_on_course_id(courses, "get_course_data")
   opt[["course"]] <- course_id_of(courses, as.character(opt[["course"]])[[1]], "get_course_data")
 
   # init payload list for return value
@@ -1114,10 +1112,10 @@ create_course_base_data <- function(data_objects, opt) {
 compute_cr_flows_tab <- function(base, data_objects, min_contrib = 2,
                                  max_courses = 8, concurrent_top_n = 20) {
   opt      <- base$opt
-  # Read by course, as create_course_base_data() resolved opt$course to a
-  # course_id: a feeder or destination renumbered mid-history is one course.
-  students <- key_on_course_id(data_objects[["cedar_students"]], "compute_cr_flows_tab")
-  courses  <- key_on_course_id(data_objects[["cedar_sections"]], "compute_cr_flows_tab")
+  # The loaded tables are keyed on the course: a feeder or destination
+  # renumbered mid-history is one course.
+  students <- data_objects[["cedar_students"]]
+  courses  <- data_objects[["cedar_sections"]]
   myopt    <- opt
   myopt[["term"]] <- NULL
   observation_end <- cedar_longitudinal_edge(
@@ -1197,11 +1195,7 @@ compute_cr_flows_tab <- function(base, data_objects, min_contrib = 2,
 
 compute_cr_outcomes_tab <- function(base, data_objects) {
   outcome_opt <- modifyList(base$opt, list(data_edges = data_objects[["cedar_edges"]]))
-  # By course: base$opt$course is the course_id, and the class list is keyed on it.
-  get_course_outcomes(
-    key_on_course_id(data_objects[["cedar_students"]], "compute_cr_outcomes_tab"),
-    data_objects[["cedar_faculty"]], outcome_opt
-  )
+  get_course_outcomes(data_objects[["cedar_students"]], data_objects[["cedar_faculty"]], outcome_opt)
 }
 
 #' Prepare the compact downstream-by-instructor display

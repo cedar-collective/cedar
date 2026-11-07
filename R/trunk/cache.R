@@ -11,7 +11,9 @@ cedar_course_neighbors_cache_version <- 4L
 # v3 preserves one reporting row when source sections carry different titles;
 # v4 aligns saturation to class-list census and adds lifecycle drop-rate context.
 # v5 aligns High Waitlists to shared class-list true demand.
-cedar_regstats_cache_version <- 5L
+# v6 reads by course (course_id; ADR-001 step 4): the payload records the
+#    renames it was counted over, and a payload counted over others is a miss.
+cedar_regstats_cache_version <- 6L
 
 course_neighbors_content_hash <- function(df, relevant_cols) {
   cols <- intersect(relevant_cols, names(df))
@@ -229,7 +231,9 @@ clear_course_cache <- function(course_code) {
 #        with the end-of-term count beside it (credit-hours 3.0.0).
 #   v11 — SCH by major reads each row's major off cedar_student_terms, named
 #        through the programs table (credit_hours_by_major(); ADR-001 step 2).
-cedar_dept_cache_version <- 11L
+#   v12 — the loaded tables are keyed on the course (attach_course_ids()), so a
+#        renamed course's rows are one course in every tab (ADR-001 step 4).
+cedar_dept_cache_version <- 12L
 
 # Include lookup-derived labels/department metadata where a tab uses them.
 # Credit Hours reads class lists, sections for late drops' credit values, the
@@ -420,7 +424,10 @@ load_dept_demographics_cache <- function(dept_code, data_objects, opt = list()) 
 # v11 SCH shifts count census SCH (credit-hours 3.0.0).
 # v12 major donuts and composition shifts name codes from programs.csv (dims),
 #     not the retired cedar_lookups; the key hashes the dimension tables too.
-cedar_dept_dashboard_cache_version <- 12L
+# v13 reads by course (course_id; ADR-001 step 4): course history, flags and
+#     waitlist follow a course across its codes, and course tables carry
+#     former_codes. The key already hashes the dims, code_history included.
+cedar_dept_dashboard_cache_version <- 13L
 
 cache_value_or <- function(x, default) {
   if (is.null(x) || length(x) == 0) default else x
@@ -623,7 +630,9 @@ clear_population_benchmark_cache <- function() {
 # (cedar_sections_hash changes at startup after a data update).
 
 # v3 discards historical DFW rates computed before term-aware attempt deduplication.
-cedar_seatfinder_cache_version <- 3L
+# v4: the loaded tables are keyed on the course, so a renamed course's DFW
+# history is one course's (ADR-001 step 4).
+cedar_seatfinder_cache_version <- 4L
 
 get_seatfinder_cache_key <- function(opt) {
   sections_hash <- if (exists("cedar_sections_hash", envir = .GlobalEnv)) {

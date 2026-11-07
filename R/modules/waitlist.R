@@ -5,11 +5,22 @@
 #
 # Exported functions:
 #   waitlistUI(id, sections, default_term, dept_choices)
-#   waitlistServer(id, students, parent_session, sections, enrl_base)
+#   waitlistServer(id, students, parent_session, sections, course_terms)
 #
 # Cross-tab note: the regstats tab triggers navigation here via
 # Shiny.setInputValue('waitlist-wl_navigate', ...) — the namespace prefix is
 # required because wl_navigate lives inside this module.
+
+# A Course cell's drill into this tab for one course and term, and the row's
+# former_codes text (NA when the course has carried one code, or the table
+# does not carry the column).
+wl_drill_js <- function(course, term) {
+  term <- if (is.null(term) || length(term) == 0 || is.na(term)) "" else as.character(term)
+  sprintf("cedarWaitlistDrill('%s','%s')", htmltools::htmlEscape(course), htmltools::htmlEscape(term))
+}
+wl_former_codes_at <- function(df, i) {
+  if ("former_codes" %in% names(df)) df$former_codes[[i]] else NA_character_
+}
 
 prepare_waitlist_course_overview_table <- function(data) {
   if (is.null(data) || nrow(data) == 0) return(data)
@@ -60,7 +71,7 @@ make_waitlist_course_overview_reactable <- function(data,
 
   base_cols <- c(
     "campus", "college", "term", "term_type", "part_term",
-    "subject_course", "course_title", "count", "census_enrl",
+    "subject_course", "former_codes", "course_title", "count", "census_enrl",
     "census_enrl_mean", "enrl_trend"
   )
   if (include_hist_terms) base_cols <- c(base_cols, "n_hist_terms")
@@ -69,20 +80,16 @@ make_waitlist_course_overview_reactable <- function(data,
     dplyr::arrange(dplyr::desc(.data$count)) %>%
     dplyr::select(dplyr::any_of(base_cols))
 
+  # The cone keys every table on course_id and names the codes a course used
+  # to carry in former_codes; the shared cell shows them beneath the code.
   course_cell <- if (isTRUE(link_courses)) {
     function(v, i) {
       term_value <- if ("term" %in% names(data)) data$term[i] else drill_term
       if (is.null(term_value) || length(term_value) == 0 || is.na(term_value)) term_value <- ""
-      htmltools::tags$a(
-        href = "javascript:void(0)",
-        onclick = sprintf("cedarWaitlistDrill('%s','%s')",
-                          htmltools::htmlEscape(v),
-                          htmltools::htmlEscape(as.character(term_value))),
-        htmltools::span(class = "fw-semibold", v)
-      )
+      course_code_cell(v, wl_former_codes_at(data, i), onclick = wl_drill_js(v, term_value))
     }
   } else {
-    function(v) htmltools::span(class = "fw-semibold", v)
+    function(v, i) course_code_cell(v, wl_former_codes_at(data, i))
   }
 
   columns <- list(
@@ -92,6 +99,7 @@ make_waitlist_course_overview_reactable <- function(data,
     term_type        = reactable::colDef(show = FALSE),
     part_term        = cedar_pot_coldef(),
     subject_course   = reactable::colDef(name = "Course", minWidth = 88, cell = course_cell),
+    former_codes     = reactable::colDef(show = FALSE),
     course_title     = reactable::colDef(name = "Title", minWidth = 150),
     count            = reactable::colDef(name = "Waitlisted", minWidth = 92, maxWidth = 108, align = "right"),
     census_enrl      = reactable::colDef(name = "Enrolled", maxWidth = 80, align = "right"),
@@ -202,7 +210,7 @@ waitlistUI <- function(id, sections, default_term, dept_choices) {
 }
 
 waitlistServer <- function(id, students, parent_session, sections = NULL,
-                           enrl_base = NULL, student_terms = NULL) {
+                           course_terms = NULL, student_terms = NULL) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
 
@@ -293,7 +301,7 @@ waitlistServer <- function(id, students, parent_session, sections = NULL,
       # end_report_timer also feed the shared report-timing log).
       timer <- start_report_timer("waitlist", list(course = course, term = term))
       waitlist_data <- tryCatch(
-        inspect_waitlist(students, opt, sections, enrl_base = enrl_base,
+        inspect_waitlist(students, opt, sections, course_terms = course_terms,
                          student_terms = student_terms),
         error = function(e) {
           message("[waitlist] Error: ", conditionMessage(e))
@@ -353,14 +361,9 @@ waitlistServer <- function(id, students, parent_session, sections = NULL,
           term           = reactable::colDef(name = "Term",       maxWidth = 80),
           subject_course = reactable::colDef(name = "Course",     minWidth = 90,
             cell = function(v, i) {
-              t <- data$term[i]
-              htmltools::tags$a(
-                href = "javascript:void(0)",
-                onclick = sprintf("cedarWaitlistDrill('%s','%s')",
-                                  htmltools::htmlEscape(v), htmltools::htmlEscape(as.character(t))),
-                htmltools::span(class = "fw-semibold", v)
-              )
+              course_code_cell(v, wl_former_codes_at(data, i), onclick = wl_drill_js(v, data$term[i]))
             }),
+          former_codes   = reactable::colDef(show = FALSE),
           course_title   = reactable::colDef(name = "Title",      minWidth = 140),
           major_code     = reactable::colDef(name = "Program",    minWidth = 120),
           count          = reactable::colDef(name = "Waitlisted", maxWidth = 100, align = "right")
@@ -374,14 +377,9 @@ waitlistServer <- function(id, students, parent_session, sections = NULL,
           term                  = reactable::colDef(name = "Term",           maxWidth = 80),
           subject_course        = reactable::colDef(name = "Course",         minWidth = 90,
             cell = function(v, i) {
-              t <- data$term[i]
-              htmltools::tags$a(
-                href = "javascript:void(0)",
-                onclick = sprintf("cedarWaitlistDrill('%s','%s')",
-                                  htmltools::htmlEscape(v), htmltools::htmlEscape(as.character(t))),
-                htmltools::span(class = "fw-semibold", v)
-              )
+              course_code_cell(v, wl_former_codes_at(data, i), onclick = wl_drill_js(v, data$term[i]))
             }),
+          former_codes   = reactable::colDef(show = FALSE),
           course_title          = reactable::colDef(name = "Title",          minWidth = 140),
           student_classification = reactable::colDef(name = "Classification", minWidth = 130),
           count                 = reactable::colDef(name = "Waitlisted",     maxWidth = 100, align = "right")
@@ -395,7 +393,7 @@ waitlistServer <- function(id, students, parent_session, sections = NULL,
       session = session,
       root_session = parent_session,
       input_id = "wl_course",
-      choices = sort(unique(students$subject_course)),
+      choices = course_picker_choices(students),
       spec_title = "Waitlists",
       key = "course"
     )

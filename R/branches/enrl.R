@@ -126,7 +126,6 @@ calc_cl_enrls <- function(filtered_students, reg_status = NULL, by_part_term = F
   return (reg_stats_summary)
 }
 
-
 #' Match class-list records to a section scope
 #'
 #' CRNs can be reused across terms, so both fields are required. This helper is
@@ -1926,7 +1925,9 @@ get_enrl <- function(courses, opt) {
 
   # define standard columns to keep
   # Build list dynamically based on what exists in the data
-  desired_cols <- c("campus", "college", "department", "term", "term_type", "crn", "subject", "subject_course", "section", "level", "course_title", "is_topics", "delivery_method", "instructor_name", "job_cat", "enrolled", "total_enrl", "crosslist_role", "crosslist_external", "crosslist_primary", "crosslist_subject", "crosslist_code", "crosslist_partners", "is_split", "split_sections", "is_combined", "available", "waitlist_count", "gen_ed_area", "part_term")
+  # listed_code: the code the schedule used for a section that term, which a
+  # section listing shows; subject_course is the course (attach_course_ids()).
+  desired_cols <- c("campus", "college", "department", "term", "term_type", "crn", "subject", "subject_course", "listed_code", "section", "level", "course_title", "is_topics", "delivery_method", "instructor_name", "job_cat", "enrolled", "total_enrl", "crosslist_role", "crosslist_external", "crosslist_primary", "crosslist_subject", "crosslist_code", "crosslist_partners", "is_split", "split_sections", "is_combined", "available", "waitlist_count", "gen_ed_area", "part_term")
 
   # Only keep columns that actually exist in the data
   select_cols <- desired_cols[desired_cols %in% colnames(courses)]
@@ -2060,8 +2061,8 @@ add_avg_section_size <- function(history) {
 #'   report was asked for, current or former.
 #' @return Active section rows for the selected course, under every code it
 #'   has carried, and its crosslist family — keyed on the course
-#'   (key_on_course_id(): `subject_course` is the `course_id`, the schedule's
-#'   code is `listed_code`).
+#'   (as loaded: `subject_course` is the `course_id`, the schedule's code
+#'   is `listed_code`).
 get_course_crosslist_family_sections <- function(sections, opt) {
   selected_course <- opt[["course"]]
   if (is.null(selected_course) || length(selected_course) == 0 ||
@@ -2073,7 +2074,6 @@ get_course_crosslist_family_sections <- function(sections, opt) {
   # under any code it has carried, keyed on course_id, the schedule's code
   # kept in listed_code.
   .require_course_id(sections, "get_course_crosslist_family_sections")
-  sections <- key_on_course_id(sections, "get_course_crosslist_family_sections")
   selected_opt <- opt
   selected_opt[["course"]] <- unique(vapply(
     as.character(selected_course), course_id_of, character(1),
@@ -2122,7 +2122,7 @@ get_course_crosslist_family_sections <- function(sections, opt) {
 #' family — as registered if they hold a seat under either listing — while
 #' retaining the canonical registration-status buckets.
 #'
-#' Both tables are read by course (key_on_course_id()): the selected course's
+#' Both tables are read by course, as loaded: the selected course's
 #' rows under a former code are its own, not a partner's, so `selected` and
 #' `family` carry its history under every code and `listings` names a code
 #' column per course in the family, never one per code (ADR-001 step 4).
@@ -2143,8 +2143,6 @@ get_course_crosslist_family_sections <- function(sections, opt) {
 get_course_crosslist_classlist_enrl <- function(students, sections, opt) {
   .require_course_id(students, "get_course_crosslist_classlist_enrl")
   .require_course_id(sections, "get_course_crosslist_classlist_enrl")
-  students <- key_on_course_id(students, "get_course_crosslist_classlist_enrl")
-  sections <- key_on_course_id(sections, "get_course_crosslist_classlist_enrl")
   selected_course <- course_id_of(
     sections, as.character(opt[["course"]])[[1]], "get_course_crosslist_classlist_enrl"
   )
@@ -2214,7 +2212,6 @@ get_course_section_history <- function(sections, opt) {
   }
 
   .require_course_id(sections, "get_course_section_history")
-  sections <- key_on_course_id(sections, "get_course_section_history")
   selected_course <- course_id_of(
     sections, as.character(opt[["course"]])[[1]], "get_course_section_history"
   )
@@ -2787,9 +2784,9 @@ classify_low_enrollment_terms <- function(sections, terms, current_term,
 # A history reader needs the course dimension's id on its rows (ADR-001 step
 # 4); every loader attaches it, so a table without it was not loaded by one.
 .require_course_id <- function(sections, caller) {
-  if (!"course_id" %in% names(sections)) {
-    stop("[enrl.R] ", caller, "() needs column course_id on the table it reads; attach it ",
-         "with attach_course_ids() (R/branches/courses.R), as every loader does.")
+  if (!all(c("course_id", "listed_code") %in% names(sections))) {
+    stop("[enrl.R] ", caller, "() needs columns course_id and listed_code on the table it reads; ",
+         "every loader writes them with attach_course_ids() (R/branches/courses.R).")
   }
   invisible(sections)
 }
@@ -2876,13 +2873,13 @@ get_enrollment_concerns <- function(courses, opt, n_history_terms = 4) {
   #    see where the numbers came from. Only the terms kept above count: a
   #    code retired before them is not behind any shown number.
   former_codes <- same_season %>%
-    distinct(course_id, campus, term, subject_course) %>%
+    distinct(course_id, campus, term, listed_code) %>%
     semi_join(hist_recent %>% distinct(course_id, campus, term),
               by = c("course_id", "campus", "term")) %>%
-    anti_join(scheduled %>% distinct(course_id, campus, subject_course),
-              by = c("course_id", "campus", "subject_course")) %>%
+    anti_join(scheduled %>% distinct(course_id, campus, listed_code),
+              by = c("course_id", "campus", "listed_code")) %>%
     group_by(course_id, campus) %>%
-    summarize(former_codes = paste(sort(unique(subject_course)), collapse = ", "), .groups = "drop")
+    summarize(former_codes = paste(sort(unique(listed_code)), collapse = ", "), .groups = "drop")
 
   # 7. Compute averages (active terms only), trend, and history text.
   #    Cancelled terms appear in history_text as "C" but don't affect avg/trend.
@@ -2989,12 +2986,7 @@ get_course_enrollment_history <- function(courses, campus, dept, subj_crse, crse
   # code it succeeded, so a renamed subject or renumbered course keeps one
   # history (ISSUES.md I37, I45). A code that is on no section row has no
   # history under any code; it is looked up as itself and returns no rows.
-  course_ids <- unique(courses$course_id[courses$subject_course == subj_crse])
-  if (length(course_ids) > 1L) {
-    stop("[enrl.R] ", subj_crse, " carries more than one course_id: ",
-         paste(course_ids, collapse = ", "))
-  }
-  if (length(course_ids) == 0L) course_ids <- subj_crse
+  course_ids <- course_id_of(courses, subj_crse, "get_course_enrollment_history")
 
   # Filter for the specific course. Delivery method is intentionally excluded: it
   # changes across terms (ENH -> blank) without the course changing.
@@ -3093,12 +3085,10 @@ get_course_enrollment_histories <- function(courses, course_keys,
   # every code the course has carried; a code on no section row is its own id
   # and finds nothing, as the single-course function does.
   # CAMPUS_ROLLUP: a code's id is the same on every campus (the course dimension).
-  code_ids <- courses %>% distinct(subject_course, course_id)
-  if (anyDuplicated(code_ids$subject_course)) {
-    stop("[enrl.R] a subject_course carries more than one course_id in courses")
-  }
+  code_ids <- course_code_lookup(courses, "get_course_enrollment_histories")
   requested <- requested %>%
-    left_join(code_ids, by = "subject_course", relationship = "many-to-one") %>%
+    select(-any_of("course_id")) %>%
+    left_join(code_ids, by = c(subject_course = "code"), relationship = "many-to-one") %>%
     mutate(course_id = coalesce(course_id, subject_course))
 
   source_keys <- requested %>%

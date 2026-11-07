@@ -83,7 +83,7 @@ operation must carry a nearby
 the result. `tests/testthat/test-architecture.R` enforces that marker for
 literal `subject_course` groupings, while multi-campus fixtures pin the actual
 behavior of delivery metrics. See the
-[campus-grain audit](docs/developers/campus-grain-audit-2026-08.md) for the
+[campus-grain audit](audits/campus-grain-audit-2026-08.md) for the
 completed 1.0 inventory.
 
 The unfinished Healthcare what-if surface was retired before 1.0 rather than

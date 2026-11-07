@@ -231,7 +231,7 @@ server <- function(input, output, session) {
     session = session,
     root_session = session,
     input_id = "enrl_course",
-    choices = sort(unique(cedar_sections$subject_course)),
+    choices = course_picker_choices(cedar_sections),
     spec_title = "Enrollment",
     key = "course"
   )
@@ -240,7 +240,7 @@ server <- function(input, output, session) {
     session = session,
     root_session = session,
     input_id = "cr_course",
-    choices = sort(unique(cedar_sections$subject_course)),
+    choices = course_picker_choices(cedar_sections),
     spec_title = "Course Dynamics",
     key = "course"
   )
@@ -297,12 +297,14 @@ server <- function(input, output, session) {
     )
   }
 
+  # A section row names the code the schedule used that term (CCS 1150 where
+  # the course is CCST 1150); course rollups name the course.
   base_select <- c(
     Camp = "campus",
     Col = "college",
     Term = "term",
     TermType = "term_type",
-    Course = "subject_course",
+    Course = if ("listed_code" %in% names(data)) "listed_code" else "subject_course",
     Sec = "section"
   )
   if ("part_term" %in% names(data)) base_select <- c(base_select, PoT = "part_term")
@@ -1053,7 +1055,7 @@ output$enrl_classlist_download <- downloadHandler(
       secs <- secs[secs$department %in% input$enrl_dept, ]
     if (!is.null(input$enrl_subj) && length(input$enrl_subj) > 0)
       secs <- secs[secs$subject %in% input$enrl_subj, ]
-    choices <- sort(unique(secs$subject_course))
+    choices <- course_picker_choices(secs)
     selected <- isolate(input$enrl_course)
     selected <- selected[selected %in% choices]
     updateSelectizeInput(session, "enrl_course",
@@ -1674,6 +1676,11 @@ output$enrl_classlist_download <- downloadHandler(
   # changes; otherwise a result can remain on screen under a new selection.
   course_report_data <- reactiveVal(NULL)
   cr_retention_data <- reactiveVal(NULL)
+  # Whether cr_retention_data() was computed with the instructor breakout. The
+  # renderers read this, never the checkbox: ticking the box before Run would
+  # otherwise re-render the previous course-only result as if it were split by
+  # instructor (ISSUES.md I49).
+  cr_retention_by_instructor <- reactiveVal(FALSE)
   cr_dept_retention_data <- reactiveVal(NULL)
   cr_college_retention_data <- reactiveVal(NULL)
   cr_course_retention_data <- reactiveVal(NULL)
@@ -1685,11 +1692,10 @@ output$enrl_classlist_download <- downloadHandler(
   cr_in_progress_terms <- cedar_in_progress_terms(data_objects[["cedar_edges"]])$term
 
   # Course Dynamics follows a course across the codes it has carried (ADR-001
-  # step 4): every reader on this tab works on the class list keyed on
-  # course_id (key_on_course_id() shares every column; nothing is copied), and
-  # the picked code resolves to its course once. create_course_base_data()
-  # does the same for the main run, so the tabs agree on what the course is.
-  cr_students <- key_on_course_id(data_objects[["cedar_students"]], "server.R Course Dynamics")
+  # step 4): the loaded tables are keyed on the course, and the picked code
+  # resolves to its course once. create_course_base_data() does the same for
+  # the main run, so the tabs agree on what the course is.
+  cr_students <- data_objects[["cedar_students"]]
   cr_course_id <- reactive({
     course <- input$cr_course
     req(course, nzchar(course))
@@ -3732,6 +3738,7 @@ output$enrl_classlist_download <- downloadHandler(
         degrees = degrees,
         context = retention_context
       )
+      cr_retention_by_instructor(isTRUE(opt$by_instructor))
       cr_retention_data(result)
       course_result <- if (!isTRUE(opt$by_instructor)) {
         filter_retention_min_n(result, min_n)
@@ -3808,7 +3815,7 @@ output$enrl_classlist_download <- downloadHandler(
   output$cr_retention_results <- renderUI({
     result <- cr_retention_data()
     if (is.null(result)) return(NULL)
-    by_instructor <- isTRUE(input$cr_ret_by_instructor)
+    by_instructor <- cr_retention_by_instructor()
     min_n <- as.integer(input$cr_ret_min_n %||% 10L)
     aggregate <- summarize_retention_by_term_type(
       result,
@@ -3834,7 +3841,7 @@ output$enrl_classlist_download <- downloadHandler(
     )
     tagList(
       uiOutput("cr_retention_benchmark_diff_ui"),
-      if (isTRUE(input$cr_ret_by_instructor)) uiOutput("cr_retention_instructor_highlights"),
+      if (by_instructor) uiOutput("cr_retention_instructor_highlights"),
       h5("Retention Rates by Term Type", style = "margin-top: 1em; color: #555;"),
       p(
         "These data-window rates combine like terms to emphasize persistent patterns that are more useful for planning than a single-semester result.",
@@ -4028,7 +4035,7 @@ output$enrl_classlist_download <- downloadHandler(
     result <- cr_retention_data()
     req(!is.null(result) && nrow(result) > 0)
 
-    by_instructor <- isTRUE(input$cr_ret_by_instructor)
+    by_instructor <- cr_retention_by_instructor()
     aggregate <- summarize_retention_by_term_type(
       result,
       by_instructor = by_instructor,
@@ -4042,7 +4049,7 @@ output$enrl_classlist_download <- downloadHandler(
     result <- cr_retention_data()
     req(!is.null(result) && nrow(result) > 0)
 
-    by_instructor <- isTRUE(input$cr_ret_by_instructor)
+    by_instructor <- cr_retention_by_instructor()
     min_n <- as.integer(input$cr_ret_min_n %||% 10L)
     display <- .retention_display_table(
       result %>% dplyr::filter(n >= min_n),
@@ -4866,7 +4873,7 @@ output$enrl_classlist_download <- downloadHandler(
   # ===========================================================================
   waitlistServer("waitlist", cedar_students, session,
                  sections      = data_objects[["cedar_sections"]],
-                 enrl_base     = cedar_cl_enrls_base,
+                 course_terms  = data_objects[["cedar_course_terms"]],
                  student_terms = cedar_student_terms)
 
 
@@ -4878,7 +4885,8 @@ output$enrl_classlist_download <- downloadHandler(
     sections     = cedar_sections,
     course_flows = cedar_course_flows,
     data_summary = cedar_data_summary,
-    thresholds   = cedar_regstats_thresholds
+    thresholds   = cedar_regstats_thresholds,
+    course_terms = data_objects[["cedar_course_terms"]]
   )
 
   # ===========================================================================
@@ -5962,6 +5970,76 @@ output$enrl_classlist_download <- downloadHandler(
     .mapping_decisions_reactable("subjects", "No course subject decisions are waiting"))
   output$mapping_decisions_colleges_table <- reactable::renderReactable(
     .mapping_decisions_reactable("colleges", "No college decisions are waiting"))
+
+  # code_history.csv: which code replaced which, with when the schedule lists
+  # each (build_code_history_table()). Read-only like the tables above: a
+  # decision is an edit to the file, effective at the next restart.
+  # From cedar_dims, the files' own tables in file order, so a row's line holds.
+  .code_history <- reactive(build_code_history_table(data_objects[["cedar_dims"]],
+                                                     data_objects[["cedar_sections"]]))
+
+  output$code_history_summary <- renderUI({
+    ch <- .code_history()
+    if (nrow(ch) == 0) return(div(class = "alert alert-info", tags$strong("code_history.csv has no rows.")))
+    n_proposed <- sum(ch$status == "proposed")
+    n_checks <- sum(!is.na(ch$check))
+    div(
+      class = if (n_proposed > 0) "alert alert-warning" else "alert alert-success",
+      tags$strong(sprintf("%d successions: %d confirmed, %d proposed. ", nrow(ch),
+                          sum(ch$status == "confirmed"), n_proposed)),
+      if (n_proposed > 0) paste0(
+        "To confirm a proposed row, open its line and change status to confirmed, with a ",
+        "note saying why; to reject it, delete the row. "),
+      if (n_checks > 0) sprintf("%d row%s carr%s a schedule check worth a look. ", n_checks,
+                                if (n_checks == 1) "" else "s", if (n_checks == 1) "ies" else "y"),
+      # The offered columns read the schedule the app loaded, which can start
+      # after a code retired: say where, so a dash is not read as never offered.
+      sprintf("The offered columns read the schedule loaded here, %s onward; a code retired before then shows \u2014.",
+              fmt_term(min(as.integer(data_objects[["cedar_sections"]]$term))))
+    )
+  })
+
+  output$code_history_table <- reactable::renderReactable({
+    ch <- .code_history()
+    if (nrow(ch) == 0) {
+      return(.admin_reactable(data.frame(Message = "No code history rows"),
+                              pagination = FALSE, searchable = FALSE))
+    }
+    offered <- function(first, last, n) {
+      span <- ifelse(first == last, fmt_term(first), paste0(fmt_term(first), "\u2013", fmt_term(last)))
+      ifelse(is.na(first), "\u2014",
+             paste0(span, " \u00b7 ", format(n, big.mark = ","), ifelse(n == 1, " section", " sections")))
+    }
+    basis_label <- c(section_crn = "Same section, both codes", title_match = "Title match",
+                     catalog = "Catalog", decided = "Decided")
+    # What the row is and where to edit it first; then when each code was
+    # offered, the check, and the notes, which lead with why a row is held.
+    display <- data.frame(
+      status = ch$status, from_code = ch$from_code, to_code = ch$to_code,
+      where = paste0("code_history.csv:", ch$line),
+      effective = fmt_term(ch$effective_term),
+      from_offered = offered(ch$from_first, ch$from_last, ch$from_sections),
+      to_offered = offered(ch$to_first, ch$to_last, ch$to_sections),
+      check = ch$check, notes = ch$notes, basis = unname(basis_label[ch$basis]),
+      evidence = ch$evidence,
+      url = mapping_file_url(data_objects[["cedar_dims"]], "code_history", ch$line),
+      stringsAsFactors = FALSE)
+    .admin_reactable(display, page_size = 15L, columns = list(
+      status       = reactable::colDef(name = "Status", minWidth = 90, filterable = TRUE),
+      from_code    = reactable::colDef(name = "Old code", minWidth = 90, filterable = TRUE),
+      to_code      = reactable::colDef(name = "New code", minWidth = 90, filterable = TRUE),
+      effective    = reactable::colDef(name = "From", minWidth = 90),
+      from_offered = reactable::colDef(name = "Old code offered", minWidth = 190),
+      to_offered   = reactable::colDef(name = "New code offered", minWidth = 190),
+      check        = reactable::colDef(name = "Check", minWidth = 130, na = "\u2014"),
+      basis        = reactable::colDef(name = "Basis", minWidth = 120),
+      evidence     = reactable::colDef(name = "Evidence", minWidth = 280),
+      notes        = reactable::colDef(name = "Notes", minWidth = 320),
+      where        = reactable::colDef(name = "Where", minWidth = 150, cell = function(value, index) {
+        tags$a(href = display$url[index], target = "_blank", rel = "noopener", value)
+      }),
+      url          = reactable::colDef(show = FALSE)))
+  })
 
   output$mapping_other_summary <- renderUI({
     res <- .mapping_worklist()

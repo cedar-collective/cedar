@@ -1,7 +1,8 @@
 ---
 title: Deployment Maintenance Page
-parent: Developer Guide
-nav_order: 10
+parent: Operations
+grand_parent: Developer Guide
+nav_order: 2
 ---
 
 # Deployment Maintenance Page

@@ -395,3 +395,35 @@ Gen Ed card, and all lower/upper undergraduate offerings for an elective card.
 `get_gen_ed_planning_options(..., levels)` retains campus/college/session grain
 and exposes course level. No enrollment metadata is treated as prerequisite
 evidence. Existing numeric Gen Ed analytics mappings remain separate.
+
+## Where Degree Explorer lives
+
+Moved from `AGENTS.md` on 2026-11-07.
+
+**Before changing Degree Explorer, read [degree-explorer-rules.md](degree-explorer-rules.md).** It records the visual interface, course-family row alignment, early Gen Ed/later upper-level timing, 15/16-credit workload policy, planning colors and catalog evidence contract.
+
+Degree Explorer adds `R/branches/degree-requirements.R` (rule outlines, semester scheduling and descriptive
+grouping), `R/cones/grouped-student-paths.R` (`get_grouped_student_paths()`),
+`R/features/degree-explorer.R` (semester-roadmap and observed-path payloads), and
+`R/modules/degree-explorer.R` (`degreeExplorerUI/Server()`, Explore > Degree Explorer).
+`R/modules/observed-course-paths.R` mounts `observedCoursePathsUI/Server()` in
+Pathways > Course paths, sharing that tab's population. Degree Explorer displays
+one program and adapts its semester board to math/English starting points.
+Course-count/permission conditions are separate from named-course arrows; suggested
+Gen Ed tiles are labelled and lighter. Its popup uses one standard CEDAR table
+with reconstructed first-day enrollment, not a census substitute.
+Its versioned catalog excerpts, authored roadmap templates and subject groups live under `institution/<id>/`;
+they are not student audits or forecast inputs. Contract:
+[degree-requirements.md](degree-requirements.md).
+
+Shared University/Gen Ed/awarding-college references are annual JSON sets under
+`institution/<id>/shared_requirements/<year>/`, separate from degree CSVs.
+`R/branches/shared-requirements.R` validates scope, rule structure and optional
+source proof; the companion feature renders readable rules and captures new
+pinned-source candidates. `scripts/shared-requirements.R` is the offline entry
+point. The same annual rules now drive illustrative Gen Ed coverage and named
+area allocation inside existing allowance budgets, plus standard upper-credit
+context. Elective/minor cards may use any undergraduate level; grades, transfer,
+approvals and conditional alternatives remain outside this prototype. Flexible
+coverage stays visibly provisional while the recorded source conflict remains.
+They are not a student audit.

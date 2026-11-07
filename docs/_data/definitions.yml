@@ -469,7 +469,7 @@ definitions:
             functions: [get_course_sequence_effect]
 
   - id: waitlist
-    current_version: "2.0.0"
+    current_version: "3.0.0"
     versions:
       - version: "1.0.0"
         title: Class-list waitlist demand
@@ -509,13 +509,38 @@ definitions:
             functions: [get_true_waitlisted_rows, summarize_waitlist_demand, get_classlist_waitlist_demand]
           - file: R/cones/waitlist.R
             functions: [inspect_waitlist]
+
+      - version: "3.0.0"
+        title: Class-list waitlist demand
+        summary: Waitlists, Regstats, and the Department Dashboard count distinct WL students after removing anyone already registered in the same course, term, delivery-campus, college, and part-of-term scope, where a course is followed across the codes it has carried.
+        population: Class-list enrollment records in the selected course and term scope after the shared excluded-course list is applied; a course picked by a former code is its course.
+        unit: Student within course, course title, term, delivery campus, and available college/part-of-term keys, the course named by its current code.
+        numerator: Distinct WL students remaining after matching RE/RS/RR records are removed. A student waiting under one of a course's codes while registered under another holds a seat in the course and is not counted; students waiting under two codes of one course in one term are one course's demand.
+        denominator: Not applicable to the count; composition percentages use the remaining waitlisted population.
+        campus: Course delivery campus is part of the matching key; this is not a university-wide search for any alternative seat.
+        time_window: The retained class-list snapshot for the selected term. Waitlist status is most informative during active registration.
+        exclusions: Students with matching RE/RS/RR registered rows, duplicate waitlist rows within that group, and courses on the shared excluded-course list under any code they have carried.
+        limitations:
+          - Which codes are one course is the institution's decision, recorded in its code history file; a succession nobody has confirmed is two courses.
+          - Historical pulls can retain only students still waitlisted when the term closed, so a small past-term count is not evidence that earlier demand was small.
+          - Waiting is evidence of expressed interest, not proof that a new section will fill.
+        guide: users/waitlists
+        implementation:
+          - file: R/branches/waitlist-demand.R
+            functions: [get_true_waitlisted_rows, summarize_waitlist_demand, get_classlist_waitlist_demand]
+          - file: R/cones/waitlist.R
+            functions: [inspect_waitlist, attach_enrollment_history]
+          - file: R/branches/courses.R
+            functions: [attach_course_ids, course_ids_of, course_former_code_spans]
+          - file: R/features/dept-dashboard.R
+            functions: [create_dept_dashboard_data]
           - file: R/features/regstats.R
             functions: [get_reg_stats]
           - file: R/branches/enrl.R
             functions: [build_high_waitlist_review]
 
   - id: regstats
-    current_version: "4.0.0"
+    current_version: "5.0.0"
     versions:
       - version: "1.0.0"
         title: Registration anomaly screens
@@ -604,6 +629,29 @@ definitions:
             functions: [get_reg_stats]
           - file: R/branches/waitlist-demand.R
             functions: [get_true_waitlisted_rows, summarize_waitlist_demand]
+
+      - version: "5.0.0"
+        title: Registration anomaly screens
+        summary: Compares each term with strictly earlier matching offerings of the same course, followed across the codes it has carried. Saturation uses the class-list census proxy over DESR scheduled capacity, drop-volume alerts remain count-based with lifecycle rates for context, and High Waitlists uses shared class-list true demand.
+        population: Course groups within selected campus, term, part-of-term, and academic filters, where a course is its course id (every code it has carried under a confirmed succession in the institution's code history), not one course code. High Waitlists uses class-list groups after the shared excluded-course list is applied.
+        unit: Course, term, delivery campus, college, and part-of-term group, the course named by its current code; course title also for High Waitlists. Not an individual student's risk.
+        numerator: Retains the 4.0.0 definitions. A course's rows under a former code are its own, so a renamed or renumbered course's earlier offerings enter its count means, its drop means and its Terms at Cap, and the schedule's capacity for a section the class list names by the newer code joins that section's census.
+        denominator: Retains the 4.0.0 definitions.
+        campus: Delivery campus and college remain in every comparison and source-matching key.
+        time_window: Retains the 4.0.0 definitions; a course's history begins at its earliest code.
+        exclusions: Count SD screens require at least two prior observations and positive variation. Saturation excludes groups without matched class-list lifecycle counts, groups with unusable capacity, and groups below Min Impacted; source coverage appears in the scope bar. High Waitlists requires a true-demand count at least as large as Min Waiting and removes matching registered students, duplicate WL rows, and excluded courses. A renumbering recorded as proposed, not confirmed, keeps two courses apart until a person confirms it.
+        limitations:
+          - Which codes are one course is the institution's decision, recorded in its code history file; a succession nobody has confirmed is two courses, and a course that split into two codes has no record by design.
+          - The enrollment, drop, saturation and waitlist limitations recorded in 3.0.0 and 4.0.0 still apply.
+          - Versions before 5.0.0 keyed every comparison on the course code, so a renamed or renumbered course's history began at its newest code and the schedule's old code never matched the class list's new one. Earlier saved results must not be reused.
+        guide: users/regstats#how-the-comparisons-work
+        implementation:
+          - file: R/features/regstats.R
+            functions: [get_reg_stats, attach_regstats_former_codes, regstats_course_key_info]
+          - file: R/branches/courses.R
+            functions: [attach_course_ids, course_id_of, course_former_code_spans]
+          - file: R/branches/course-terms.R
+            functions: [build_course_terms, course_terms_is_current]
 
   - id: enrollment-projection
     current_version: "1.10.0"

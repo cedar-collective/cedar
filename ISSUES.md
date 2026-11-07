@@ -23,7 +23,14 @@ There are two kinds, in two sections:
 
 IDs are stable: code and docs cite them. Resolved entries stay, with
 `Status: resolved` and the resolving commit, until the next release, so that a
-recurrence is recognizable.
+recurrence is recognizable. **An entry's status lives here and nowhere
+else**: other files link to the entry instead of restating where it stands.
+
+**Order for the improvements** (from the 2026-10-07 audit): reconcile counts
+computed twice (I16, M1–M3, M24); then the architecture rules file by file
+(M11 silent fallbacks first, because they hide failures, then M13 logic in
+modules); then interface consistency one tab per PR (M17, M18); file size
+alongside other work (M14, M16).
 
 ## Open items
 
@@ -32,10 +39,10 @@ recurrence is recognizable.
 | [I48](#i48--a-transform-change-to-a-fact-tables-stored-columns-is-not-rebuilt-at-deploy) | Defect | Since the mapping stamps retired (ADR-001 step 3, 2026-11-06) the deploy gate rebuilds only `cedar_student_terms`: a transform change that adds or renames a stored column on sections, students, programs or degrees starts the app on files without it until the morning refresh, the I46 shape with no gate |
 | [I47](#i47--the-class-lists-student_classification-is-stamped-at-pull-time-when-a-term-is-pulled-late) | Defect | A class list pulled months after its term carries each student's classification as of the pull: Fall 2025's list (pulled 2026-03-07) puts 35% of ENGL 1120's registered student-terms one step ahead of the classification academic studies recorded for Fall 2025. Every grouping reader now takes the student-term table's value; the `classification` filter key and Regstats' sophomore screen still read the class list |
 | [I46](#i46--a-deploy-that-must-rebuild-a-table-the-app-cannot-start-without-takes-the-site-down) | Defect | The deploy's table gate ran after the health check, so a deploy that added a column to `cedar_student_terms` failed its health check on the missing column and never reached the gate: production served the restart page from 17:07 UTC on 2026-11-04 (gate moved before the first request) |
-| [I45](#i45--the-class-list-and-the-schedule-name-the-same-section-with-different-course-codes) | Defect | The class list and the schedule name the same section differently for renamed subjects (SOC to SOCI, PSY to PSYC, CCS to CCST): SOCI 371 has class-list history from Fall 2019 but no sections before Fall 2021 (crosswalk and `course_id` in place 2026-11-06; Low Enrollment and Course Dynamics read it, Regstats and the projection inputs still key on `subject_course`) |
+| [I45](#i45--the-class-list-and-the-schedule-name-the-same-section-with-different-course-codes) | Defect | The class list and the schedule name the same section with different course codes for renamed subjects (SOC to SOCI, PSY to PSYC): SOCI 371 had class-list history from Fall 2019 but no sections before Fall 2021 (fixed for every reader by keying the loaded tables on the course, 2026-11-07; open until the remaining successions are confirmed) |
 | [I43](#i43--every-scheduled-refresh-fails-because-the-default-asks-for-a-report-mrgather-never-fetches) | Defect | Every scheduled refresh has failed since 2026-10-24: the default asks for the applicants report, which production mrgather never fetches, so production tables have not been rebuilt since Oct 27 (default fixed; mrgather and per-report rebuilds remain) |
 | [I38](#i38--a-pathways-program-population-misses-pre-majors-whose-name-differs-from-their-major) | Defect | A Pathways program population misses pre-majors whose name differs from their major: "Film and Digital Arts" holds 1 of the 1,016 Film pre-majors who never declared the major, because `FFDA` is named "FDMA" |
-| [I37](#i37--renumbered-courses-lose-their-history) | Defect | Renumbered courses lose their history: no crosswalk exists, so ACCT 3401 (was MGMT 340) and the other Fall 2026 ACCT, BUSA and POPH courses read as new (crosswalk and `course_id` in place 2026-11-06, the renumberings proposed and awaiting confirmation; Low Enrollment and Course Dynamics read the id, Regstats and the projection inputs still key on `subject_course`) |
+| [I37](#i37--renumbered-courses-lose-their-history) | Defect | Renumbered courses lose their history: ACCT 3401 (was MGMT 340) and the other Fall 2026 ACCT, BUSA and POPH courses read as new (every reader follows a confirmed renumbering; 277 of the 320 title matches confirmed 2026-11-07, 6 deleted, 37 held for review with the reason on each row) |
 | [I33](#i33--a-crashed-myreports-download-is-recorded-as-a-successful-fetch) | Defect | A crashed MyReports download is recorded as a successful fetch: on Oct 23 class lists and applicants were never downloaded, and every step reported ✅ (partly fixed) |
 | [I32](#i32--a-scheduled-refresh-waits-forever-when-myreports-asks-for-a-2fa-code) | Defect | A scheduled refresh waits forever when MyReports asks for a 2FA code: the Oct 11 run sat 12 days at the prompt, unreported |
 | [I28](#i28--one-late-starting-session-makes-a-whole-courses-first-day-unknown) | Defect | One late-starting session makes a whole course's first day unknown: 257 Fall 2026 courses on the Oct 8 pull, 17 on Oct 23. Intersession is out of the forecast (model 0.24.0), and a session not yet begun is judged on its lower bound (model 0.25.0). A section with no start date still reads as having no status dates |
@@ -47,7 +54,7 @@ recurrence is recognizable.
 | [I8](#i8--a-timing-log-row-is-silently-dropped-when-the-write-lock-times-out) | Defect | A timing-log row is dropped when the write lock times out |
 | [I6](#i6--a-killed-projection-rebuild-strands-its-lock-and-blocks-every-later-refresh) | Defect | A killed projection rebuild strands its lock |
 | [I4](#i4--pre-change-course-ratios-are-confounded-by-career-stage) | Defect | Pre-change course ratios confounded by career stage (deferred) |
-| M1–M38 | Improvement | See [Improvements](#improvements) |
+| M1–M39 | Improvement | See [Improvements](#improvements) |
 
 ### Resolved since the last release
 
@@ -55,6 +62,7 @@ Kept until the next release, so a recurrence is recognisable; each entry below g
 
 | ID | Kind | Summary |
 |---|---|---|
+| [I49](#i49--ticking-break-out-by-instructor-errors-the-retention-tables-until-run) | Defect | Ticking "Break out by instructor" on Course Dynamics > Retention errored every retention table until Run, because the renderers read the checkbox rather than how the shown result was computed (resolved 2026-11-07) |
 | [I44](#i44--roadblocks-and-retention-disagree-on-whether-a-late-withdrawal-returned) | Defect | Roadblocks and Retention disagreed on whether a student who withdrew late next term returned: Fall 2025 to Spring 2026 read 82.7% on one and 81.7% on the other (284 students) (resolved 2026-11-04) |
 | [I42](#i42--a-saturated-course-whose-fall-changes-lower-its-forecast-is-still-called-a-floor) | Defect | A saturated course whose Fall changes lower its forecast was still called "a floor": ENGL 1120's Spring 2027 forecast is 2,164, below last Spring's 2,179, and the page said "so this is a floor" (resolved 2026-11-03) |
 | [I41](#i41--projection-labels-call-the-term-just-finished-fall-whatever-its-season) | Defect | Projection labels called the term just finished "Fall" whatever its season: once Spring 2027 settles, a Fall 2027 course whose Spring moved 25% would have been flagged "Fall enrollment +25%" (resolved 2026-11-03) |
@@ -73,6 +81,28 @@ Kept until the next release, so a recurrence is recognisable; each entry below g
 ---
 
 # Defects
+
+## I49 — Ticking "Break out by instructor" errors the retention tables until Run
+
+**Status:** resolved 2026-11-07.
+**Found:** 2026-11-07, in the app log of a full institutional browser run
+(`summarize_retention_by_term_type: instructor_id is required when
+by_instructor = TRUE`, four times).
+**Severity:** low: no wrong number reached a reader. But every retention table
+on Course Dynamics > Retention showed "An error has occurred" from the moment
+the box was ticked until Run was pressed again.
+**Cause:** the result renderers in `server.R` (`cr_retention_results`,
+`cr_retention_table`, `cr_retention_term_table`) read
+`input$cr_ret_by_instructor` live, so ticking the box re-rendered the previous
+course-only result as if it were split by instructor, and
+`summarize_retention_by_term_type()` stopped, correctly, on the missing
+`instructor_id`.
+**Reproduction:** Course Dynamics, any course, Retention, Run with the box
+unticked; then tick it without pressing Run.
+**Fix:** the run observer records how its result was computed
+(`cr_retention_by_instructor()`), and the renderers read that, never the
+checkbox. The reports browser suite (`--e2e retention`) ticks the box and
+asserts no output error before Run; it fails on the old renderers.
 
 ## I48 — A transform change to a fact table's stored columns is not rebuilt at deploy
 
@@ -218,8 +248,30 @@ renames are confirmed `subject` rows in `institution/unm/code_history.csv`
 (basis `section_crn`), and every section and class-list row carries a
 `course_id` that joins them: SOC 371 and SOCI 371 are one course from Fall
 2018. Low Enrollment's schedule view and course histories read it (reader PR
-1, 2026-11-06: SOCI 371 on ABQ shows 19 terms where it showed 12); Course
-Dynamics, Regstats and the projections still key on the code and move next.
+1, 2026-11-06: SOCI 371 on ABQ shows 19 terms where it showed 12), Course
+Dynamics reads both tables by course (reader PR 2), and Regstats keys both
+tables and its precomputed base on the id (reader PR 3, 2026-11-06), so the
+schedule's SOC 371 capacity joins the class list's SOCI 371 census in its
+saturation screen instead of reporting unmatched. Waitlists' enrollment
+history resolves each row's code to its course for the join
+(`attach_enrollment_history()`), so a waitlisted CCS course reads CCST's
+history too, and since reader PR 4 its counts follow the course as well (one
+row for a course waited for under two live codes). The Department Dashboard
+(reader PR 5) and the enrollment projections (reader PR 6, model 0.28.0)
+read by course as well. Since 2026-11-07 every loader keys the tables on the
+course (`attach_course_ids()`: `subject_course` the course, `listed_code` the
+term's code), so every reader does.
+**CCS corrected 2026-11-07.** The confirmed subject row CCS → CCST was wrong:
+CCST is the lower-division prefix (4-digit numbers) and CCS still the
+upper-division one, on the Fall 2026 schedule and class lists alike; the 524
+paired sections are pulls whose class lists printed CCST on 3-digit CCS
+courses. `code_history.csv` now joins each of the 61 CCST nnn codes to CCS
+nnn (course rows), so the CCS courses keep their own code as their id.
+CCS is not retired: measured on the 2026-10-08 pull, both CCS and CCST
+are on the schedule and the class list through Fall 2026 (CCS class-list
+rows from Summer 2021, 5,675 of them; 109 Fall 2026 sections as CCS, none as
+CCST), so a reader that joins a course-keyed table by the class list's code
+misses CCS courses in the current term, not only in old ones.
 **Found:** 2026-11-03, profiling which `cedar_students` columns could come from `cedar_sections`
 **Severity:** medium. 1.3% of class-list rows; every page that reads the
 schedule loses those terms for the courses affected.
@@ -639,7 +691,17 @@ programs).
 
 ## I37 — Renumbered courses lose their history
 
-**Status:** open; partly fixed 2026-11-06 (ADR-001 step 4, PR 1).
+**Status:** open; mostly fixed. On 2026-11-07, 277 of the 320 proposed title
+matches were confirmed in bulk by rule: the common course numbering
+conversions (3-digit to 4-digit at the same level, distinctive title) and
+subject prefix changes seen on several courses. Six coincidences of a shared
+title were deleted (NURS 419L → FDMA 2999, NURS 245 → SPCD 601, EMS 461 →
+NURS 711, HHHA 153 → HED 486, LAIS 199 → LAIS 301, PEP 474 → ATED 610). The
+37 still proposed change level (the NURS 5xx → 7xx doctoral series, ARTH,
+BIOL, ENVS), carry a generic title, or are a one-off subject change; each row's
+notes say which. Measured on the 2026-10-08 pull: ENGL 1120, MATH 1220,
+ACCT 3401 and BUSA 3220 each read as one course from 2018.
+Earlier history: partly fixed 2026-11-06 (ADR-001 step 4, PR 1).
 `institution/unm/code_history.csv` exists, validated at startup;
 `scripts/propose-code-history.R` wrote 320 one-to-one title matches as
 proposed rows (MGMT 340 → ACCT 3401 among them), each waiting for a person to
@@ -647,8 +709,15 @@ confirm; a confirmed row gives both codes one `course_id` at the next start.
 Low Enrollment's schedule view reads the id (reader PR 1, 2026-11-06): once
 the Fall 2026 renumberings are confirmed, 84 of its 391 Fall 2026 courses
 with no history by code show their old offerings (36 BUSA, 8 ACCT, 8 NURS).
-Regstats baselines, Course Dynamics history and the projections still key on
-`subject_course`.
+Course Dynamics (reader PR 2) and Regstats (reader PR 3, 2026-11-06) read
+the id: a confirmed renumbering's earlier offerings enter the course's
+baselines and its Terms at Cap, and the row names the former code. The
+enrollment projections read by course from model 0.28.0 (reader PR 6): a
+confirmed renumbering joins its earlier offerings to the course's spine,
+deltas and aftcasts. Waitlists' enrollment history
+reads the precomputed base by course, resolving each waitlist row's code to
+its id for the join, so a renumbered course's earlier offerings enter its
+history; since reader PR 4 its counts are by course too.
 **Found:** 2026-10-24, with I36
 **Severity:** moderate — a history keyed on `subject_course` starts over at a
 renumbering, so a renumbered course reads as new.
@@ -3102,14 +3171,15 @@ passes `base$prog_codes`, the set the module labels as home majors) instead of
 reading `major_to_dept` behind an `exists()` guard that fell back to the
 department code as a major code; `credit_hours_by_fac(students, faculty, …)`
 names its tables. `R/cones/waitlist.R` — `inspect_waitlist(students, opt,
-sections, enrl_base)` and `attach_enrollment_history()` take the precomputed
-`cedar_cl_enrls_base` from the Waitlists module, which gets it from `server.R`.
+sections, course_terms)` and `attach_enrollment_history()` take
+`cedar_course_terms` from the Waitlists module, which gets it from `server.R`.
 `R/cones/course-demographics.R` — `get_course_major_mix()` took the
 code-to-name table as `opt$major_code_to_name`, threaded from
 `data_objects[["cedar_lookups"]]` through the Gen Ed module's `lookups`
 argument; since 2026-11-06 it takes `dims` and names codes from programs.csv.
-The feature-layer read of `cedar_cl_enrls_base` in `R/features/regstats.R` is
-outside the rule's scope and remains; `R/features/dept-dashboard.R`'s read of
+The feature-layer read of the global `cedar_cl_enrls_base` in
+`R/features/regstats.R`, outside the rule's scope, went with it on 2026-11-07:
+`get_reg_stats()` takes `cedar_course_terms` as `course_terms`; `R/features/dept-dashboard.R`'s read of
 the global `major_code_to_name` went with `cedar_lookups` (2026-11-06).
 
 **M13 — Business logic in modules.** `R/modules/pathways.R` 38
@@ -3292,6 +3362,26 @@ undergraduates on real data. ST01
 uses production vocabulary on purpose. *Done when:* the base fixture's class
 list carries the codes and every test that filtered on the name is moved to
 the code (or to `cedar_student_terms`, which stores the code).
+
+**M39 — The excluded-course list is matched by code outside the keyed readers.**
+`excluded_courses` (`institution/<id>/excluded_courses.csv`) names codes. A
+table keyed on `course_id` (ADR-001 step 4) carries the course's current
+code in `subject_course`, so a list matched against that column by code
+misses every course the list names by an older code: UNM's list names CCS
+495, 597, 599, 697 and 699, the class list and schedule key them as CCST,
+and matched that way Regstats let 13 thesis and dissertation section groups
+into its Fall 2026 saturation screen (measured 2026-11-06, caught before
+merge). Since reader PR 3 the trunk `uel` filters drop a keyed table's rows
+by course (`drop_excluded_courses()`, `excluded_course_ids()` in
+`R/trunk/filter.R`: every row of a course the list names under any code it
+carries there), and `get_reg_stats()` drops the excluded courses from both
+whole tables once, so its class-list recount under a student-level filter
+excludes them too, which it never did. Tables read by code still match by
+code, so SOC 699 sections stay in where the list names only SOCI 699, and a
+keyed table filtered to a few terms first can only find the codes those
+terms carry. *Done when:* the list is resolved through the course dimension
+once at load (`resolve_course_codes()`), and every exclusion compares ids
+with ids.
 
 **M28 — The HR department list is a hand-kept R list.** **Done 2026-10-16.**
 `hr_org_desc_to_dept` (79 names to 32 departments) now comes from

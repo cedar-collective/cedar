@@ -522,3 +522,30 @@ test_that("instructor filtering with NA values works safely", {
   expect_equal(nrow(filtered), 2)
   expect_true(all(!is.na(filtered$instructor_name)))
 })
+
+test_that("the excluded-course list removes a course by any code it carries on a loaded table", {
+  # RN01: the schedule lists SOC 371 in Spring 2020 and SOCI 371 in Fall 2020,
+  # one course (SOCI 371). A list naming the old code removes the whole course
+  # from a loaded table, keyed on the course, and only the old code's row from
+  # the table as saved.
+  rn <- rn01_course_tables()
+  keyed <- rn$cedar_sections
+  sections <- test_sections_rn
+  expect_equal(excluded_course_ids(keyed, excl = "soc  371"), c("SOC 371", "SOCI 371"))
+  expect_error(excluded_course_ids(sections, excl = "SOC 371"), "attach_course_ids")
+
+  by_course <- drop_excluded_courses(keyed, excl = "SOC 371")
+  expect_false("SOCI 371" %in% by_course$subject_course)
+  expect_equal(nrow(by_course), nrow(keyed) - 2L)
+  by_code <- drop_excluded_courses(sections, excl = "SOC 371")
+  expect_equal(sort(unique(sections$subject_course[!sections$subject_course %in% by_code$subject_course])),
+               "SOC 371")
+  expect_true("SOCI 371" %in% by_code$subject_course)
+
+  # The filters' uel option reads the same rule.
+  rlang::local_bindings(excluded_courses = "SOC 371", .env = .GlobalEnv)
+  filtered <- filter_DESRs(keyed, list(uel = TRUE)) %>% ungroup()
+  expect_false(any(c("SOC 371", "SOCI 371") %in% filtered$subject_course))
+  filtered_by_code <- filter_DESRs(sections, list(uel = TRUE)) %>% ungroup()
+  expect_true("SOCI 371" %in% filtered_by_code$subject_course)
+})

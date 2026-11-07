@@ -378,9 +378,10 @@ export async function runReportChecks({ scope = 'smoke', synthetic = false } = {
         { type: 'text', id: 'regstats-rs_dashboard', disallowed: ['click Get Stats'] },
       ]);
       await page.waitForFunction(() => {
-        const note = document.querySelector('[data-definition-id="regstats"][data-definition-version="4.0.0"]');
+        const note = document.querySelector('[data-definition-id="regstats"][data-definition-version="5.0.0"]');
         const text = document.body.innerText;
         return !!note && text.includes('strictly earlier same-season/part-of-term means and population SD') &&
+          text.includes('followed across the codes it has carried') &&
           text.includes('Unscored SD comparisons: enrollment') &&
           text.includes('Saturation source coverage:') &&
           text.includes('distinct prior comparison term') &&
@@ -673,6 +674,15 @@ export async function runReportChecks({ scope = 'smoke', synthetic = false } = {
     await withStep(page, ['retention'], 'Course Dynamics Retention instructor breakout runs', async () => {
       await setInput(page, 'cr_ret_by_instructor', true);
       await setInput(page, 'cr_ret_min_n', 1);
+      // Ticking the box must not re-render the course-only result as an
+      // instructor split before Run (ISSUES.md I49).
+      await waitForIdle(page, { timeout: 60000 }).catch(() => {});
+      const earlyErrors = await page.evaluate(() =>
+        [...document.querySelectorAll('#cr_retention_results.shiny-output-error, #cr_retention_results .shiny-output-error')]
+          .map(el => el.innerText));
+      if (earlyErrors.length > 0) {
+        throw new Error(`retention results errored before Run: ${earlyErrors.join(' ; ')}`);
+      }
       await click(page, 'cr_ret_run');
       await waitForIdle(page, { timeout: 180000 }).catch(() => {});
       await waitForOutput(page, 'Course Dynamics Retention instructor breakout', [

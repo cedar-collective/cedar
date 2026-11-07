@@ -1,5 +1,7 @@
 ---
-title: Reviewing the mappings — a reader's guide
+title: Reviewing the Mappings
+parent: Developer Guide
+nav_order: 9
 ---
 
 # Reviewing the mappings
@@ -9,8 +11,8 @@ to find where CEDAR's mappings are wrong. No R required for most of it; the
 queries are here for when you want them.
 
 Mapping errors do not announce themselves. A wrong department produces a
-plausible number, and the last tier of the lookup chain guarantees a value even
-when nothing matched. So the job is not "look for errors" — it is "look at the
+plausible number, and a code with no confirmed row simply drops out of every
+department's report. So the job is not "look for errors" — it is "look at the
 places where a wrong answer would be invisible."
 
 ## Start here: the Admin page
@@ -76,8 +78,16 @@ this guide reports `major_code` unless it says otherwise.
 | Namespace | Lives in | Example | What it identifies |
 |---|---|---|---|
 | `major_code` | `cedar_programs`, `cedar_degrees`; `programs.csv` `program_code` | `RADS` | the program a student declared |
-| `dept_code` | `units.csv` `unit_code`, written onto every table | `RADS` | the academic department (unit) |
+| `dept_code` | `units.csv` `unit_code`, attached to every loaded table | `RADS` | the academic department (unit) |
 | `subject_code` | the prefix in `subject_course`; `subjects.csv` | `RADS 101` | the course subject |
+
+A subject code is how a course is *listed*, not who owns it: `GEOG` sections
+belong to Geography and Environmental Studies (`GES`), and `PHYC` and `ASTR`
+both to Physics. The section reports carry no department, so `subjects.csv` is
+the one mapping no data can supply. Several program codes can share a
+department (`CRWR`, `ENGL`, `ENGS`, `ENGP` are all English), and a department
+code is CEDAR's grouping, not a Banner field: no program is coded `GES`. A
+department's display name is `units.csv`'s `unit_name`.
 
 They often coincide, which is why the collisions are easy to miss. `FCS` is a
 pre-major code for Computer Science **and** the department code for Family and

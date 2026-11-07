@@ -284,18 +284,77 @@ opt_col_map_classlist <- list(
 )
 
 
+# The excluded-course list (`excluded_courses`, institution/<id>/excluded_courses.csv)
+# names codes. A table read by code drops the rows whose code it names. A
+# loaded table, keyed on the course (attach_course_ids(), R/branches/courses.R:
+# `subject_course` is the course, `listed_code` the registrar's code) drops every row of a course
+# the list names under any code it carries there, so the list's CCS 699 removes
+# the CCST 699 rows that course is keyed on, and an aggregate counted by course
+# can be filtered by the same ids. Read off the table given, so a keyed table
+# drops at least every row the by-code rule would (ISSUES M39).
+normalize_course_code <- function(x) stringr::str_squish(toupper(x))
+
+# Which of `x` normalize into `codes`; normalizes each distinct value once.
+course_code_in <- function(x, codes) {
+  u <- unique(x)
+  x %in% u[normalize_course_code(u) %in% codes]
+}
+
+#' The courses the excluded-course list removes from keyed tables
+#'
+#' @param ... Loaded tables, keyed on the course by attach_course_ids().
+#' @param excl The excluded-course list; `excluded_courses` by default.
+#' @return The listed codes and the course ids of every keyed row whose code is
+#'   listed, normalized, sorted.
+excluded_course_ids <- function(..., excl = excluded_courses) {
+  excl <- normalize_course_code(excl)
+  ids <- unlist(lapply(list(...), function(tbl) {
+    if (!all(c("subject_course", "listed_code") %in% names(tbl))) {
+      stop("[filter.R] excluded_course_ids() reads tables keyed on course_id; ",
+           "every loader keys them with attach_course_ids() (R/branches/courses.R)")
+    }
+    hit <- course_code_in(tbl$listed_code, excl) | course_code_in(tbl$subject_course, excl)
+    normalize_course_code(unique(tbl$subject_course[hit]))
+  }))
+  sort(unique(c(excl, ids)))
+}
+
+# Drop the excluded courses from one table: by course when it is keyed on
+# course_id, by code when it is not.
+drop_excluded_courses <- function(df, excl = excluded_courses) {
+  drop <- if ("listed_code" %in% names(df)) {
+    excluded_course_ids(df, excl = excl)
+  } else {
+    normalize_course_code(excl)
+  }
+  df %>%
+    mutate(subject_course = normalize_course_code(subject_course)) %>%
+    filter(!is.na(subject_course) & !(subject_course %in% drop))
+}
+
+# A picked course, by its current code or any former one, keeps the whole
+# course: a loaded table is keyed on the course (`subject_course`, with the
+# term's code in `listed_code`), so a picked former code (SOC 371, or CCS 1150
+# where the course is CCST 1150) adds the course it is listed under. A table
+# without listed_code is filtered by code.
+.course_filter <- function(df, value) {
+  picked <- convert_param_to_list(value)
+  if ("listed_code" %in% names(df)) {
+    picked <- union(picked, unique(df$subject_course[df$listed_code %in% picked]))
+  }
+  filter_by_col(df, "subject_course", picked)
+}
+
 special_filters_desr <- list(
   term = function(df, value) filter_by_term(df, value, "term"),
+  course = function(df, value) .course_filter(df, value),
   crosslist = function(df, value) .xlist_filter(df, value),
   enrl_min = function(df, value) df %>% filter(enrolled >= as.integer(value)),
   enrl_max = function(df, value) df %>% filter(enrolled <= as.integer(value)),
   uel = function(df, value) {
     # Only apply exclude list filter if value is TRUE
     if (isTRUE(value) && exists("excluded_courses")) {
-      excluded_norm <- stringr::str_squish(toupper(excluded_courses))
-      df %>%
-        mutate(subject_course = stringr::str_squish(toupper(subject_course))) %>%
-        filter(!is.na(subject_course) & !(subject_course %in% excluded_norm))
+      drop_excluded_courses(df)
     } else {
       df
     }
@@ -304,13 +363,11 @@ special_filters_desr <- list(
 
 special_filters_classlist <- list(
   term = function(df, value) filter_by_term(df, value, "term"),
+  course = function(df, value) .course_filter(df, value),
   uel = function(df, value) {
     # Only apply exclude list filter if value is TRUE
     if (isTRUE(value) && exists("excluded_courses")) {
-      excluded_norm <- stringr::str_squish(toupper(excluded_courses))
-      df %>%
-        mutate(subject_course = stringr::str_squish(toupper(subject_course))) %>%
-        filter(!is.na(subject_course) & !(subject_course %in% excluded_norm))
+      drop_excluded_courses(df)
     } else {
       df
     }
