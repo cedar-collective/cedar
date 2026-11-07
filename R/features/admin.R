@@ -493,7 +493,7 @@ build_code_history_table <- function(files, sections) {
 #' @param programs,sections,students cedar_programs, cedar_sections,
 #'   cedar_students as loaded.
 #' @return A tibble: rule, what, affects, coded_in.
-build_counting_rules <- function(files, programs, sections, students) {
+build_counting_rules <- function(files, programs, sections, students, student_terms) {
   need <- function(df, cols, what) {
     missing <- setdiff(cols, names(df))
     if (length(missing)) stop("[admin.R] build_counting_rules: ", what, " lacks ",
@@ -504,7 +504,9 @@ build_counting_rules <- function(files, programs, sections, students) {
        "cedar_programs")
   need(sections, c("term", "campus", "subject", "subject_course", "level", "department",
                    "college_basis", "crosslist_group", "crosslist_role"), "cedar_sections")
-  need(students, c("student_id", "term", "student_campus", "college_basis"), "cedar_students")
+  need(students, c("college_basis"), "cedar_students")
+  need(student_terms, c("student_id", "term", "student_campus", "declared", "class_list_rows"),
+       "cedar_student_terms")
   n <- function(x) format(x, big.mark = ",")
   pct <- function(a, b) if (b == 0) "—" else sprintf("%.1f%%", 100 * a / b)
   some <- function(codes, k = 6) {
@@ -526,10 +528,11 @@ build_counting_rules <- function(files, programs, sections, students) {
   # By course: the list names codes, the loaded sections are keyed on the course.
   excluded <- sections[sections$subject_course %in% excluded_course_ids(sections), ]
 
-  # Student-terms in the class lists with no program record (ISSUES.md I20).
-  st <- students %>% dplyr::distinct(student_id, term, student_campus)
-  has_program <- paste(st$student_id, st$term) %in%
-    unique(paste(programs$student_id, programs$term))
+  # Student-terms in the class lists with no program record (ISSUES.md I20),
+  # by home campus: the student-term table's, since the loaded class list
+  # carries no student description (ADR-001 step 5).
+  st <- student_terms[student_terms$class_list_rows > 0L, c("student_id", "term", "student_campus", "declared")]
+  has_program <- st$declared
   branch <- st$student_campus %in% CEDAR_CAMPUS_BRANCH
   main <- st$student_campus %in% CEDAR_CAMPUS_MAIN
 
@@ -583,9 +586,9 @@ build_counting_rules <- function(files, programs, sections, students) {
       sprintf("%s of %s student-terms (%s): %s at Albuquerque, %s at the branch campuses (ISSUES.md I20).",
               n(sum(!has_program)), n(nrow(st)), pct(sum(!has_program), nrow(st)),
               pct(sum(!has_program & main), sum(main)), pct(sum(!has_program & branch), sum(branch))),
-      sprintf("%s home-campus names in program records; %s campus codes in class lists.",
+      sprintf("%s home-campus names in program records; %s campus codes on the student-term table.",
               n(dplyr::n_distinct(stats::na.omit(programs$student_campus))),
-              n(dplyr::n_distinct(stats::na.omit(students$student_campus)))),
+              n(dplyr::n_distinct(stats::na.omit(student_terms$student_campus)))),
       sprintf("%s organisation names to %s departments.", n(length(hr_org_desc_to_dept)),
               n(dplyr::n_distinct(hr_org_desc_to_dept))),
       sprintf("%s names.", n(length(major_name_to_major_code)))),
@@ -608,17 +611,20 @@ build_counting_rules <- function(files, programs, sections, students) {
 #' The codes the institution's campuses.csv defines, plus any code the loaded data uses
 #' that it does not, so an unexplained code is visible rather than silently
 #' grouped. Sections and enrollments count where a course was taught
-#' (`campus`); home-campus rows count the student's home campus as class lists
-#' code it.
+#' (`campus`); home-campus rows count each enrollment under its student's home
+#' campus that term, off `cedar_student_terms`.
 #'
 #' @param sections,students cedar_sections and cedar_students as loaded.
+#' @param student_terms cedar_student_terms, for each enrollment's home campus.
 #' @return A tibble: campus, label, group, default_scope, sections,
 #'   enrollments_taught, enrollments_home.
-build_campus_reference <- function(sections, students) {
+build_campus_reference <- function(sections, students, student_terms) {
   if (!"campus" %in% names(sections)) stop("[admin.R] build_campus_reference: cedar_sections lacks campus")
-  if (!all(c("campus", "student_campus") %in% names(students))) {
-    stop("[admin.R] build_campus_reference: cedar_students lacks campus or student_campus")
+  if (!all(c("student_id", "term", "campus") %in% names(students))) {
+    stop("[admin.R] build_campus_reference: cedar_students lacks student_id, term or campus")
   }
+  students <- attach_student_descriptions(students[c("student_id", "term", "campus")],
+                                          student_terms, "student_campus")
   known <- c(CEDAR_CAMPUS_MAIN, CEDAR_CAMPUS_ONLINE, CEDAR_CAMPUS_BRANCH)
   seen <- unique(stats::na.omit(c(sections$campus, students$campus, students$student_campus)))
   codes <- c(known, sort(setdiff(seen[nzchar(seen)], known)))

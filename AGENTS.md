@@ -72,7 +72,7 @@ Lowercase snake_case columns; legacy uppercase names are deprecated. How each ta
 | Table | Grain | What it is |
 |---|---|---|
 | `cedar_sections` | DESR section row | `term`, `crn`, `subject_course`, `campus`, `department`, `enrolled`, `total_enrl`, `is_combined`, `is_topics` |
-| `cedar_students` | student × course × campus × term | the class list: `student_id`, `registration_status_code`, `final_grade`, `level`, `student_campus`, `major_code` |
+| `cedar_students` | student × course × campus × term | the class list: `student_id`, `registration_status_code`, `final_grade`, `level`, `part_term`. **Loaded without the student's description** (`thin_class_list()`): a reader attaches classification, major, home campus or level from `cedar_student_terms` (`attach_student_descriptions()`) |
 | `cedar_programs` | student × term × program | declarations: `program_code`, `dept_code`, `college_code`, demographics. Its `*_credits_*` columns are pull-stamped (field reliability) |
 | `cedar_degrees` | awarded degree | `degree`, `program_name`, `dept_code` |
 | `cedar_faculty` | instructor × term | `appointment_pct` is 0–100; divide by 100 for FTE |
@@ -93,7 +93,7 @@ The dimensions, `cedar_courses`, `cedar_attempts` and `cedar_course_terms` are b
 
 **The mapping files decide every unit.** A program's unit comes from `programs.csv`, a course's from `subjects.csv` (by subject, section college and level). **A code with no confirmed row has no unit (`NA`)** and is listed on Admin > Mappings and in the transform's mapping audit, never given a department named after itself. Programs no department owns are `basis = no_unit`. A code not yet decided reports Banner's college, labelled `college_basis = "banner"`. A decision is an edit to the file, through a PR, taking effect at the next start. **The self-named fallback must not return** (ISSUES I7; EC-14 in `test-transform-status.R` guards it). A department's rows are those whose own `dept_code` it is (`filter_programs_to_dept()`), never rows matched by program name (I15). A pre-major's flag and target are the file's (`is_pre_major`, `leads_to`), never inferred from an F prefix.
 
-**`dept_code` ≠ subject prefix.** Geography is `GES` but its courses are `GEOG`. Go through `subject_units(dims)`; never filter `subject_course` by `dept_code`. `cedar_students$major` is the raw Banner program code; never introduce an ad hoc program → department map.
+**`dept_code` ≠ subject prefix.** Geography is `GES` but its courses are `GEOG`. Go through `subject_units(dims)`; never filter `subject_course` by `dept_code`. A student-term's major is `cedar_student_terms$primary_major_code`, named through `name_program_codes()`; never introduce an ad hoc program → department map.
 
 **Course suffixes.** `C` (`BIOL 2110C`) is combined lecture+lab, `is_combined = TRUE`: count offerings with `n_distinct(subject_course)`, never `n_distinct(crn)`. `L` (`PHYS 151L`) is a standalone lab with no flag.
 

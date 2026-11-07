@@ -1254,8 +1254,12 @@ diagnose_new_this_term <- function(course_history, current_term) {
 #'   \code{upper_class_current}.
 #' @param dims The dimension tables (`build_cedar_dims()`), which name each
 #'   major code through `name_program_codes()`.
+#' @param student_terms The `cedar_student_terms` table: each seat's major
+#'   (the primary major) and class standing are the student-term's, never the
+#'   class list's (ADR-001 step 5; ISSUES.md I47).
 plot_dept_student_donuts <- function(cedar_students, cedar_sections, dept_code,
-                                     current_term, n_years = 5, campus = NULL, dims) {
+                                     current_term, n_years = 5, campus = NULL, dims,
+                                     student_terms) {
   message("[dept-dashboard.R] plot_dept_student_donuts for ", dept_code)
 
   # Home-dept CRNs only — excludes sections where this dept is a crosslist partner.
@@ -1282,6 +1286,9 @@ plot_dept_student_donuts <- function(cedar_students, cedar_sections, dept_code,
     message("[dept-dashboard.R] No student data found for donut plots")
     return(list())
   }
+  students <- attach_student_descriptions(
+    students, student_terms, c("major_code", "student_classification")
+  )
 
   # Each major code's name is programs.csv's, the same label the Gen Ed major
   # mix and Dept Trends show for it; a code the file does not carry is itself.
@@ -1423,7 +1430,8 @@ get_dashboard_composition_shifts <- function(cedar_students, cedar_sections,
                                              cedar_programs, dept_code,
                                              current_term, campus = NULL,
                                              n_years = 3L, min_current = 5L,
-                                             min_abs_diff = 10, dims) {
+                                             min_abs_diff = 10, dims,
+                                             student_terms) {
   message("[dept-dashboard.R] get_dashboard_composition_shifts for ", dept_code,
           " term ", current_term)
 
@@ -1554,6 +1562,7 @@ get_dashboard_composition_shifts <- function(cedar_students, cedar_sections,
   if (!is.null(campus) && length(campus) > 0) cl_opt$course_campus <- campus
   students <- filter_class_list(cedar_students, cl_opt) %>%
     dplyr::filter(crn %in% home_crns, level %in% c("lower", "upper")) %>%
+    attach_student_descriptions(student_terms, c("major_code", "student_classification")) %>%
     dplyr::mutate(
       major_label = translate_major(major_code),
       class_label = abbreviate_classification(student_classification)
@@ -1758,7 +1767,8 @@ create_dept_dashboard_data <- function(data_objects, opt) {
   result$repeated_topics        <- get_repeated_topics_courses(course_history, current_term)
   result$composition_shifts     <- get_dashboard_composition_shifts(
     cedar_students, cedar_sections, cedar_programs, dept_code, current_term, campus = campus,
-    dims = data_objects[["cedar_dims"]]
+    dims = data_objects[["cedar_dims"]],
+    student_terms = data_objects[["cedar_student_terms"]]
   )
 
   # Name the other codes each course has carried (NA when one) on the course

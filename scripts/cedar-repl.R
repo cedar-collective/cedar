@@ -37,6 +37,9 @@ cedar_read <- function(name) {
   path <- file.path(cedar_data_dir, paste0(name, ".qs"))
   if (!file.exists(path)) stop("[cedar-repl.R] No such data file: ", path)
   tbl <- qs2::qs_read(path)
+  # As global.R loads it: the student descriptions are read off
+  # cedar_student_terms, never the class list (ADR-001 step 5).
+  if (name == "cedar_students") tbl <- thin_class_list(tbl)
   if (name %in% names(CEDAR_ATTACHED_UNIT_COLUMNS)) {
     tbl <- suppressMessages(attach_default_units(stats::setNames(list(tbl), name), cedar_dims))[[name]]
   }

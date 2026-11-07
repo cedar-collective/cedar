@@ -166,6 +166,7 @@ build_one_enrollment_projection <- function(args, repo_root, refreshing) {
     cl_enrls = cl_enrls,
     sections = cedar_sections,
     students = cedar_students,
+    student_terms = cedar_student_terms,
     target_term = target_term,
     as_of_term = as_of_term,
     scope_courses = scope_courses,

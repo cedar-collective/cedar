@@ -356,3 +356,51 @@ test_that("name_program_codes reads programs.csv through dims, the every-college
   # No names, no entries.
   expect_equal(name_program_codes(c(NA, ""), test_dims), stats::setNames(character(0), character(0)))
 })
+
+test_that("the loaded class list carries no student description (ADR-001 step 5)", {
+  # The saved fixture has every column; the loaded one, as global.R and setup.R
+  # load it, has none of the student-term columns, which readers attach.
+  expect_true(all(c("major_code", "student_classification", "student_campus") %in%
+                    names(cedar_students)))
+  expect_length(intersect(CLASS_LIST_UNLOADED_COLUMNS, names(test_students)), 0L)
+  expect_length(intersect(CLASS_LIST_UNLOADED_COLUMNS, names(data_objects$cedar_students)), 0L)
+
+  stamped <- cedar_students
+  attr(stamped, "cedar_provenance") <- "transform"
+  thin <- thin_class_list(stamped)
+  expect_equal(attr(thin, "cedar_provenance"), "transform")
+  expect_equal(nrow(thin), nrow(stamped))
+  expect_identical(thin_class_list(thin), thin)
+  expect_error(thin_class_list(NULL), "class-list data frame")
+
+  # A reader that filters on classification attaches it first; on the loaded
+  # rows alone the filter stops loudly rather than matching nothing.
+  expect_error(filter_class_list(test_students, list(classification = "Freshman")),
+               "student_classification")
+})
+
+test_that("a classification filter selects on the student-term's value, not the class list's", {
+  # Give one student-term a classification the class list never carried: the
+  # filter in get_course_demographics() follows the table.
+  key <- test_students %>%
+    dplyr::filter(registration_status_code %in% STATUS_REGISTERED, term >= 201980L) %>%
+    dplyr::slice(1)
+  st <- test_student_terms
+  hit <- st$student_id == key$student_id & st$term == as.integer(key$term)
+  st$student_classification[hit] <- "Designed, Only Here"
+  out <- suppressMessages(get_course_demographics(
+    test_students, st,
+    list(classification = "Designed, Only Here",
+         group_cols = c("campus", "college", "term", "term_type", "subject_course",
+                        "course_title", "level"))
+  ))
+  expect_gt(nrow(out), 0L)
+  expect_true(key$subject_course %in% out$subject_course)
+  none <- suppressMessages(get_course_demographics(
+    test_students, test_student_terms,
+    list(classification = "Designed, Only Here",
+         group_cols = c("campus", "college", "term", "term_type", "subject_course",
+                        "course_title", "level"))
+  ))
+  expect_equal(nrow(none), 0L)
+})

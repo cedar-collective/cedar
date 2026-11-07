@@ -213,6 +213,11 @@ for (.key in c("cedar_sections", "cedar_students", "cedar_student_terms", "cedar
 }
 rm(.key, .n_before)
 
+# The class list's student-description columns stay on the saved file (the
+# transform builds cedar_student_terms from them) but are not loaded: readers
+# attach them from cedar_student_terms (ADR-001 step 5, thin_class_list()).
+data_objects[["cedar_students"]] <- thin_class_list(data_objects[["cedar_students"]])
+
 cedar_dims <- build_cedar_dims()
 data_objects <- attach_default_units(data_objects, cedar_dims)
 data_objects[["cedar_dims"]] <- cedar_dims

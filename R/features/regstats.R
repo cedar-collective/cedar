@@ -4,10 +4,15 @@
 #' considered for summer offerings. This helps with planning summer schedules by
 #' identifying courses with strong demand from students who will be juniors in fall.
 #'
+#' A standalone screen, not part of `get_reg_stats()`'s report: nothing on the
+#' page reads it.
+#'
 #' @param students Data frame of student enrollments from cedar_students table.
-#'   Must include columns: campus, college, term, term_type, student_classification,
+#'   Must include columns: campus, college, term, term_type,
 #'   subject_course, course_title, level
-#' @param courses Data frame of course sections (currently unused but kept for consistency)
+#' @param student_terms The `cedar_student_terms` table: the classification
+#'   that selects sophomores is the student-term's, never the class list's,
+#'   which a late pull stamps a step ahead (ISSUES.md I47).
 #' @param opt Options list (currently unused - function uses hardcoded filters)
 #'
 #' @return Data frame with single column:
@@ -31,24 +36,24 @@
 #' \dontrun{
 #' # Find popular sophomore fall courses
 #' opt <- list()
-#' high_soph_courses <- get_high_fall_sophs(cedar_students, cedar_sections, opt)
+#' high_soph_courses <- get_high_fall_sophs(cedar_students, cedar_student_terms, opt)
 #'
 #' # These courses could be summer offerings
 #' print(high_soph_courses$subject_course)
 #' }
 #'
 #' @seealso \code{\link{get_course_demographics}} for enrollment counting logic
-get_high_fall_sophs <- function (students,courses,opt) {
+get_high_fall_sophs <- function(students, student_terms, opt = list()) {
 
   cedar_debug("[regstats.R] Getting fall courses with 100+ sophomores for potential summer offerings...")
   myopt <- list()
-  # Sophomores are selected by the classification filter, so the count needs
-  # no grouping by classification; nothing here describes the student, which is
-  # why no student-term table is read.
+  # Sophomores are selected by the classification filter, which
+  # get_course_demographics() reads off the student-term table; the count needs
+  # no grouping by classification.
   myopt[["group_cols"]] <- c("campus", "college","term", "term_type", "subject_course","course_title","level")
   myopt[["classification"]] <- "Sophomore, 2nd Yr"
   myopt[["term"]] <- "fall"
-  demo_out <- get_course_demographics(students, NULL, myopt)
+  demo_out <- get_course_demographics(students, student_terms, myopt)
 
   # 100 is a bit arbitrary; not sure how to calc would what be a better threshold
   demo_out <- demo_out %>% filter(mean > 100)
@@ -582,7 +587,6 @@ regstats_course_key_info <- function(flagged) {
 #'     \item \code{course_key_info} - How many flagged courses ran under another code, and the sentence the page shows
 #'     \item \code{code_renames} - The renames the class list carried when this was counted (the cache compares them)
 #'     \item \code{tiered_summary} - Summary of concerns by severity tier
-#'     \item \code{high_fall_sophs} - Popular fall sophomore courses (non-Shiny only)
 #'     \item \code{thresholds} - Thresholds used for detection
 #'     \item \code{cache_info} - Cache metadata including age and parameters
 #'   }
@@ -786,16 +790,16 @@ get_reg_stats <- function(students, courses, opt, course_terms = NULL) {
     cedar_debug("[regstats.R] Skipping cache check due to custom thresholds.")
   }
 
-  # Build myopt without term so downstream code (waits, get_high_fall_sophs) has it.
+  # Build myopt without term so downstream code (waits) has it.
   myopt <- opt
   myopt[["term"]] <- NULL
 
   # Filter cedar_course_terms when given — avoids re-running calc_cl_enrls()
-  # on raw student rows on every request. Falls back for per-student filters (pt, im,
-  # inst, classification, major) that change which students count toward enrollment
-  # and therefore can't be applied post-hoc to the aggregated counts.
-  student_level_filters <- c("pt", "im", "inst", "classification", "major",
-                              "student_campus", "student_college")
+  # on raw student rows on every request. Falls back for per-row filters (pt, im,
+  # inst) that change which rows count toward enrollment and therefore can't be
+  # applied post-hoc to the aggregated counts. A classification filter needs
+  # the student-term table attached first (filter_class_list()).
+  student_level_filters <- c("pt", "im", "inst", "classification")
   has_student_filters <- any(vapply(student_level_filters, function(f) {
     v <- opt[[f]]
     !is.null(v) && length(v) > 0 && !identical(v, "")
@@ -1260,11 +1264,6 @@ flagged[["bumps"]] <- bumps %>% arrange(across(all_of(std_arrange_cols)))
   # Create tiered summary for dashboard
   flagged[["tiered_summary"]] <- create_tiered_summary(flagged)
   
-  # keep separate from flagged courses since we don't need to forecast for this all the time
-  if (as.logical(Sys.getenv("shiny")) == FALSE) {
-    flagged[["high_fall_sophs"]] <- get_high_fall_sophs(students, courses, myopt)
-  }
-
   # Snapshot summary: aggregate current-term stats for the registration overview cards.
   # Only computed when a specific numeric term code is selected (not term-type strings
   # like "fall"); convert_param_to_list can return those too so filter them out.

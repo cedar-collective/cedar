@@ -246,15 +246,34 @@ record keeps the decisions.
 | 2 | `cedar_student_terms`: one definition of an enrolled term and of return (closes I44) | done 2026-11-04 |
 | 3 | Dimensions from the mapping files, units attached at load | done 2026-11-06 |
 | 4 | `cedar_courses` and course ids at load (I37, I45); `cedar_course_terms`; `cedar_attempts` | courses and keying done 2026-11-07; `cedar_course_terms` done 2026-11-07; `cedar_attempts` done 2026-11-07 (`cedar_grades` retired); the course flows next |
-| 5 | Thin `cedar_students` and `cedar_programs` to keys and registration facts; rename to fact names | not started |
+| 5 | Thin `cedar_students` and `cedar_programs` to keys and registration facts; rename to fact names | student-term columns off the loaded class list done 2026-11-07 (`thin_class_list()`); the section columns next; the rename last |
 
 Step 2's precedence rule: when the two source snapshots disagree, the
 academic-studies row wins, the row is flagged and the count reported, never
-a silent coalesce. Three class-list description reads remain until step 5:
-`filter_class_list()`'s `classification`, `major`, `student_campus` and
-`student_college` keys and Regstats' sophomore screen (I47). The enrollment
-projections read `major_code` and `student_classification` as model inputs,
-so moving them is a `model_version` decision, not a data-model chore.
+a silent coalesce.
+
+#### Step 5: decisions (2026-11-07)
+
+- **Order:** the student-term columns leave the loaded class list first
+  (`student_level`, `student_classification`, `major_code`, `major_name`,
+  `student_college`, `student_campus`, `residency`, `dual_credit`, and the
+  unread `enrollment_id`: `CLASS_LIST_UNLOADED_COLUMNS`); the section columns
+  second; the rename last, as one mechanical PR. Each 1.85M-row column costs
+  about 14 MB whatever it holds.
+- **The saved file keeps them.** The transform builds `cedar_student_terms`
+  from them and the mapping audit reads the roster's major; every loader drops
+  them (`thin_class_list()`), so the app, the REPL, the cache warmers and the
+  tests read one shape.
+- **Readers attach, never re-derive:** `attach_student_descriptions()` reads
+  named columns off `cedar_student_terms` and refuses a class-list row the
+  table lacks. `filter_class_list()` keeps a `classification` key, which
+  filters a column the caller attached; the major, home-campus and
+  student-college keys are gone (nothing set them).
+- **The projections read the table too** (model 0.29.0): the classification
+  and primary major of each student-term, instead of the most common value on
+  its class-list rows (I47).
+- **Name:** `cedar_students` keeps its name until the rename PR, which answers
+  open question 1 with `cedar_registrations`.
 
 Pull history is the one piece with a deadline and should be sized now.
 
@@ -390,7 +409,8 @@ CSV edit. The vocabulary splits recur the next time a report changes.
 
 ### Open questions
 
-1. `cedar_registrations` vs `cedar_class_lists`: decide before step 5.
+1. ~~`cedar_registrations` vs `cedar_class_lists`: decide before step 5.~~
+   `cedar_registrations`, renamed last (step 5 decisions).
 2. Pulls layer: full extracts or a changes-only log? Size it first.
 3. ~~Does the renaming crosswalk live in a mapping file or derive from
    DESR history?~~ Answered by step 4: both. The screen derives candidates;

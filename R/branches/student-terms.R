@@ -615,3 +615,38 @@ attach_student_term <- function(rows, student_terms, cols) {
                    dplyr::select(student_terms, student_id, term, dplyr::all_of(cols)),
                    by = c("student_id", "term"))
 }
+
+# The class-list columns that describe the student rather than the
+# registration (ADR-001 step 5, first pass). The saved class list keeps them,
+# since the transform builds cedar_student_terms from them, but the loaded
+# table does not: each repeats one student-term value on every course row
+# (about 14 MB a column at 1.85M rows), and cedar_student_terms holds the
+# sanctioned value once, the programs row's where both sources have one
+# (I47: the class list's classification is stamped at the pull). Readers
+# attach what they need through attach_student_term() or
+# attach_student_descriptions(). enrollment_id is a row id nothing reads.
+CLASS_LIST_UNLOADED_COLUMNS <- c(
+  "student_level", "student_classification", "major_code", "major_name",
+  "student_college", "student_campus", "residency", "dual_credit",
+  "enrollment_id"
+)
+
+#' Drop the student-description columns from a loaded class list
+#'
+#' Every loader calls this on `cedar_students` before attaching units (global.R,
+#' scripts/cedar-repl.R, the cache-warming scripts, the test setup), so the
+#' app, an analyst's session and the tests read the same shape.
+#'
+#' @param students The class list as saved by the transform, or already thin.
+#' @return `students` without `CLASS_LIST_UNLOADED_COLUMNS`, its attributes kept.
+thin_class_list <- function(students) {
+  if (!is.data.frame(students)) {
+    stop("[student-terms.R] thin_class_list() needs the class-list data frame.")
+  }
+  drop <- intersect(CLASS_LIST_UNLOADED_COLUMNS, names(students))
+  if (length(drop) == 0L) return(students)
+  keep_attrs <- setdiff(names(attributes(students)), c("names", "row.names", "class"))
+  thin <- students[setdiff(names(students), drop)]
+  for (a in keep_attrs) attr(thin, a) <- attr(students, a)
+  thin
+}

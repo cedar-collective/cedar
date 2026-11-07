@@ -8,7 +8,7 @@ parent: Developer Guide
 
 This reference is auto-generated from roxygen2 comments in the source code.
 
-*Generated: 2026-11-07 12:21:48.014053*
+*Generated: 2026-11-07 14:00:23.564938*
 
 ---
 
@@ -366,6 +366,28 @@ Get Courses Adjacent to Student Entry or Exit Events  Finds courses taken in the
 
 ---
 
+## course-attempts
+
+### `get_course_dfw_demographics()`
+
+*Source: course-attempts.R*
+
+**DFW rate and composition by a student group**
+
+**Parameters:**
+
+- `students` - Class-list rows (the loaded `cedar_students`).
+- `student_terms` - The `cedar_student_terms` table; the group is read off it.
+- `opt` - Course-attempt options (`course`, `data_edges`, `passing_grades`, ...).
+- `group_col` - One of `DFW_DEMOGRAPHIC_GROUPS`.
+- `min_n` - Smallest attempt count a group needs to be shown.
+- `max_groups` - Optional cap on the groups returned, largest DFW count first.
+- `dims` - The dimension tables (`build_cedar_dims()`); required for `group_col = "major_code"`, whose groups are programs.csv's names.
+
+**Returns:** One row per group: counts, `dfw_pct`, `late_withdrawal_pct`, `early_drop_pct`, `share_of_dfw`, `share_of_attempts`.
+
+---
+
 ## course-demographics
 
 ### `abbreviate_classification()`
@@ -540,7 +562,7 @@ consistent_plots <- plot_demographics_with_consistent_colors(demographics_data, 
 
 **Summarize courses taken alongside a selected course**
 
-Summarize courses taken alongside a selected course  Collapses the classification and term-type detail returned by `get_concurrent_courses()` into one campus-course row. Counts use student-term enrollments, so a student who takes the selected course in two terms contributes twice. The denominator includes every registered selected-course student-term in the campus scope, including students who did not take a given companion course.
+Summarize courses taken alongside a selected course  Collapses the term-type detail returned by `get_concurrent_courses()` into one campus-course row. Counts use student-term enrollments, so a student who takes the selected course in two terms contributes twice. The denominator includes every registered selected-course student-term in the campus scope, including students who did not take a given companion course.
 
 **Parameters:**
 
@@ -4471,6 +4493,22 @@ Compute Stop-Out Rates for One Group in One Course  Given one selected observati
 - `is_pre_major` - Logical vector parallel to `codes` (the student-term table's flag on the same rows), or `NULL`. A code flagged on any row is suffixed " (pre-major)", so a pre-major and the major it leads to never share a label ("Psychology (pre-major)" beside "Psychology").
 
 **Returns:** Named character vector, code to name, one entry per distinct code.
+
+---
+
+### `thin_class_list()`
+
+*Source: student-terms.R*
+
+**Drop the student-description columns from a loaded class list**
+
+Drop the student-description columns from a loaded class list  Every loader calls this on `cedar_students` before attaching units (global.R, scripts/cedar-repl.R, the cache-warming scripts, the test setup), so the app, an analyst's session and the tests read the same shape.
+
+**Parameters:**
+
+- `students` - The class list as saved by the transform, or already thin.
+
+**Returns:** `students` without `CLASS_LIST_UNLOADED_COLUMNS`, its attributes kept.
 
 ---
 

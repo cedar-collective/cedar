@@ -12,8 +12,7 @@
 # flow and keeps downstream caches honest about scope.
 
 course_flow_required_cols <- c(
-  "student_id", "term", "subject_course", "campus", "college", "term_type",
-  "student_classification"
+  "student_id", "term", "subject_course", "campus", "college", "term_type"
 )
 
 empty_next_course_pairs <- function() {
@@ -57,8 +56,7 @@ prepare_course_flow_enrollments <- function(students, opt = list()) {
       }
     } %>%
     dplyr::distinct(
-      campus, college, student_id, term, subject_course, term_type,
-      student_classification
+      campus, college, student_id, term, subject_course, term_type
     )
 }
 
@@ -260,7 +258,7 @@ get_concurrent_courses <- function(students, opt = list()) {
   if (nrow(target) == 0L) {
     return(tibble::tibble(
       campus = character(), college = character(), subject_course = character(),
-      student_classification = character(), term_type = character(),
+      term_type = character(),
       enrl_from_target = numeric(), in_crse = character(),
       coenrolled_student_terms = integer(),
       target_student_terms = integer(), target_terms = integer()
@@ -287,7 +285,7 @@ get_concurrent_courses <- function(students, opt = list()) {
   if (nrow(concurrent) == 0L) {
     return(tibble::tibble(
       campus = character(), college = character(), subject_course = character(),
-      student_classification = character(), term_type = character(),
+      term_type = character(),
       enrl_from_target = numeric(), in_crse = character(),
       coenrolled_student_terms = integer(),
       target_student_terms = integer(), target_terms = integer()
@@ -296,8 +294,7 @@ get_concurrent_courses <- function(students, opt = list()) {
 
   concurrent %>%
     dplyr::group_by(
-      campus, college, target_course, subject_course,
-      student_classification, term_type
+      campus, college, target_course, subject_course, term_type
     ) %>%
     dplyr::summarise(
       coenrolled_student_terms = dplyr::n(),
@@ -316,7 +313,7 @@ get_concurrent_courses <- function(students, opt = list()) {
 
 #' Summarize courses taken alongside a selected course
 #'
-#' Collapses the classification and term-type detail returned by
+#' Collapses the term-type detail returned by
 #' `get_concurrent_courses()` into one campus-course row. Counts use
 #' student-term enrollments, so a student who takes the selected course in two
 #' terms contributes twice. The denominator includes every registered

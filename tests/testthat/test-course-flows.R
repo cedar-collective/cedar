@@ -61,10 +61,11 @@ test_that("concurrent course summaries keep student classification", {
     opt = list(course = source_course, campus = campus_scope)
   )
 
-  expect_true("student_classification" %in% names(concurrent))
+  # No classification split: the loaded class list carries none, and the
+  # summary collapsed it (ADR-001 step 5).
+  expect_false("student_classification" %in% names(concurrent))
   expect_true(nrow(concurrent) > 0)
   expect_true("TEST 999" %in% concurrent$subject_course)
-  expect_true(base_row$student_classification[[1]] %in% concurrent$student_classification)
 })
 
 test_that("concurrent course shares use every selected-course student-term", {

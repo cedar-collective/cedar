@@ -38,7 +38,6 @@ alongside other work (M14, M16).
 |---|---|---|
 | [I50](#i50--the-class-list-dedup-can-keep-an-early-drop-over-a-late-withdrawal) | Defect | The transform keeps one class-list row per student-course-campus-term but ranked only "registered first": a student who early-dropped one section and withdrew late from another could keep the early drop, so the W left the loaded class list (703 student-course-terms on the 2026-10-08 pull; 651 on the 2026-02-04 one). Every outcome reader now classifies that table (`cedar_attempts`); fixed in the transform, takes effect when the class lists are next transformed |
 | [I48](#i48--a-transform-change-to-a-fact-tables-stored-columns-is-not-rebuilt-at-deploy) | Defect | Since the mapping stamps retired (ADR-001 step 3, 2026-11-06) the deploy gate rebuilds only `cedar_student_terms`: a transform change that adds or renames a stored column on sections, students, programs or degrees starts the app on files without it until the morning refresh, the I46 shape with no gate |
-| [I47](#i47--the-class-lists-student_classification-is-stamped-at-pull-time-when-a-term-is-pulled-late) | Defect | A class list pulled months after its term carries each student's classification as of the pull: Fall 2025's list (pulled 2026-03-07) puts 35% of ENGL 1120's registered student-terms one step ahead of the classification academic studies recorded for Fall 2025. Every grouping reader now takes the student-term table's value; the `classification` filter key and Regstats' sophomore screen still read the class list |
 | [I46](#i46--a-deploy-that-must-rebuild-a-table-the-app-cannot-start-without-takes-the-site-down) | Defect | The deploy's table gate ran after the health check, so a deploy that added a column to `cedar_student_terms` failed its health check on the missing column and never reached the gate: production served the restart page from 17:07 UTC on 2026-11-04 (gate moved before the first request) |
 | [I45](#i45--the-class-list-and-the-schedule-name-the-same-section-with-different-course-codes) | Defect | The class list and the schedule name the same section with different course codes for renamed subjects (SOC to SOCI, PSY to PSYC): SOCI 371 had class-list history from Fall 2019 but no sections before Fall 2021 (fixed for every reader by keying the loaded tables on the course, 2026-11-07; open until the remaining successions are confirmed) |
 | [I43](#i43--every-scheduled-refresh-fails-because-the-default-asks-for-a-report-mrgather-never-fetches) | Defect | Every scheduled refresh has failed since 2026-10-24: the default asks for the applicants report, which production mrgather never fetches, so production tables have not been rebuilt since Oct 27 (default fixed; mrgather and per-report rebuilds remain) |
@@ -63,6 +62,8 @@ Kept until the next release, so a recurrence is recognisable; each entry below g
 
 | ID | Kind | Summary |
 |---|---|---|
+| [I51](#i51--a-classification-filter-matched-nobody-its-value-was-split-on-the-comma) | Defect | `filter_class_list()` split every filter value on commas, so a classification filter (`"Sophomore, 2nd Yr"`) became two values that match no row, and Regstats' sophomore screen never found a course (resolved 2026-11-07) |
+| [I47](#i47--the-class-lists-student_classification-is-stamped-at-pull-time-when-a-term-is-pulled-late) | Defect | A class list pulled months after its term carries each student's classification as of the pull (35% of ENGL 1120's Fall 2025 registered student-terms one step ahead); every reader now takes the student-term table's, and the loaded class list carries none (resolved 2026-11-07) |
 | [I49](#i49--ticking-break-out-by-instructor-errors-the-retention-tables-until-run) | Defect | Ticking "Break out by instructor" on Course Dynamics > Retention errored every retention table until Run, because the renderers read the checkbox rather than how the shown result was computed (resolved 2026-11-07) |
 | [I44](#i44--roadblocks-and-retention-disagree-on-whether-a-late-withdrawal-returned) | Defect | Roadblocks and Retention disagreed on whether a student who withdrew late next term returned: Fall 2025 to Spring 2026 read 82.7% on one and 81.7% on the other (284 students) (resolved 2026-11-04) |
 | [I42](#i42--a-saturated-course-whose-fall-changes-lower-its-forecast-is-still-called-a-floor) | Defect | A saturated course whose Fall changes lower its forecast was still called "a floor": ENGL 1120's Spring 2027 forecast is 2,164, below last Spring's 2,179, and the page said "so this is a floor" (resolved 2026-11-03) |
@@ -82,6 +83,27 @@ Kept until the next release, so a recurrence is recognisable; each entry below g
 ---
 
 # Defects
+
+## I51 — A classification filter matched nobody: its value was split on the comma
+
+**Status:** resolved 2026-11-07.
+**Found:** 2026-11-07, writing the test that a classification filter reads the
+student-term table (ADR-001 step 5): a designed value with a comma selected
+no rows.
+**Severity:** low in effect, since the only setter was the sophomore screen
+(`get_high_fall_sophs()`), which runs outside Shiny and which nothing reads.
+But that screen has never returned a course.
+**Cause:** `filter_by_col()` (`R/trunk/filter.R`) passes each filter value
+through `convert_param_to_list()`, which splits a single string on commas.
+Banner's classifications carry one (`"Sophomore, 2nd Yr"`, `"Freshman, 1st
+Yr, 1st Sem"`), so the filter looked for `"Sophomore"` and `"2nd Yr"`.
+Instructor names were already exempt.
+**Reproduction:** `filter_class_list(rows, list(classification = "Sophomore, 2nd Yr"))`
+on rows that carry the classification returns zero rows.
+**Fix:** `student_classification` is exempt from the split, beside
+`instructor_name`. "a classification filter selects on the student-term's
+value" in `test-student-terms.R` filters on a value with a comma; it fails
+with the split.
 
 ## I50 — The class-list dedup can keep an early drop over a late withdrawal
 
@@ -171,15 +193,16 @@ deploy nothing, which the retired stamp could not tell.
 
 ## I47 — The class list's `student_classification` is stamped at pull time when a term is pulled late
 
-**Status:** open; grouping readers resolved 2026-11-04. Course Dynamics'
-rollcall, the Waitlists splits, Pathways' classification axis and the Gen Ed
-graduate cohort now read `cedar_student_terms$student_classification`, which
-takes academic studies' per-term value and keeps the class list's only where
-no academic-studies row exists (`description_source`). What remains reads the
-class list: `filter_class_list()`'s `classification` key (every tab's
-classification filter) and the sophomore screen in `get_high_fall_sophs()`
-(`R/features/regstats.R`). Both move in ADR-001 step 5, when the filter keys
-join the table.
+**Status:** resolved 2026-11-07 (ADR-001 step 5). The grouping readers moved
+2026-11-04: Course Dynamics' rollcall, the Waitlists splits, Pathways'
+classification axis and the Gen Ed graduate cohort read
+`cedar_student_terms$student_classification`, which takes academic studies'
+per-term value and keeps the class list's only where no academic-studies row
+exists (`description_source`). On 2026-11-07 the loaded class list stopped
+carrying the column (`thin_class_list()`): `filter_class_list()`'s
+`classification` key filters a value the caller attached from the table, the
+sophomore screen and the projections read it there, and the Course Report's
+DFW by classification too. The reproduction below reads the saved file.
 **Found:** 2026-11-04, comparing Course Dynamics' rollcall by classification
 before and after the move (PR for the demographics readers).
 **Severity:** medium. A late-pulled term's classification filter selects the
@@ -226,7 +249,8 @@ value stamped at the pull.
 
 `filter_class_list()`'s `classification` key and `get_high_fall_sophs()` read
 the student-term table (ADR-001 step 5), and the Fall 2025 sophomore filter
-returns the students academic studies called sophomores that term.
+returns the students academic studies called sophomores that term. Done
+2026-11-07.
 
 ---
 

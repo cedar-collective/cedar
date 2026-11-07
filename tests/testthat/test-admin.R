@@ -331,7 +331,9 @@ test_that("a unit's scope names every confirmed subject and program row behind i
 # one PHRD undergraduate, rows reporting Banner's college. Sections: a cross-list
 # group spanning HIST and ENGL (home and partner) and one within HIST, an
 # excluded course, levels 3 lower / 1 upper / 1 grad. Students: S1-S3 in
-# 202080; S3 at TA has no program record.
+# 202080; S3 at TA has no program record. Student terms: their home campus and
+# whether they declared, as cedar_student_terms records it, plus S4, declared
+# with no class-list row, whom the no-program-record rule never counts.
 counting_rule_tables <- function() {
   programs <- tibble::tibble(
     student_id = c("S1", "S1", "S2", "S2", "S1", "S2"), term = 202080L,
@@ -360,16 +362,21 @@ counting_rule_tables <- function() {
   sections$listed_code <- sections$subject_course
   students <- tibble::tibble(
     student_id = c("S1", "S2", "S3", "S3"), term = 202080L,
-    student_campus = c("ABQ", "ABQ", "TA", "TA"), campus = c("ABQ", "EA", "TA", "ZZ"),
+    campus = c("ABQ", "EA", "TA", "ZZ"),
     college_basis = c("mapped", "mapped", "banner", "mapped"))
-  list(programs = programs, sections = sections, students = students)
+  student_terms <- tibble::tibble(
+    student_id = c("S1", "S2", "S3", "S4"), term = 202080L,
+    student_campus = c("ABQ", "ABQ", "TA", "ABQ"),
+    declared = c(TRUE, TRUE, FALSE, TRUE), class_list_rows = c(1L, 1L, 2L, 0L))
+  list(programs = programs, sections = sections, students = students,
+       student_terms = student_terms)
 }
 
 test_that("counting rules report what each touches in the loaded tables", {
   t <- counting_rule_tables()
   files <- review_files()
   files$subjects <- data.frame(subject_code = c("HIST", "HIST"), in_level = c("", "grad"))
-  rules <- build_counting_rules(files, t$programs, t$sections, t$students)
+  rules <- build_counting_rules(files, t$programs, t$sections, t$students, t$student_terms)
   affects <- stats::setNames(rules$affects, rules$rule)
 
   expect_equal(rules$rule[1], "Concentrations")
@@ -389,13 +396,13 @@ test_that("counting rules report what each touches in the loaded tables", {
                "^1 of 3 student-terms \\(33.3%\\): 0.0% at Albuquerque, 100.0% at the branch campuses")
   expect_match(affects[["Home campus"]], "^1 home-campus names in program records; 2 campus codes")
   expect_error(build_counting_rules(files, dplyr::select(t$programs, -pre_major_basis),
-                                    t$sections, t$students),
+                                    t$sections, t$students, t$student_terms),
                "cedar_programs lacks pre_major_basis")
 })
 
 test_that("the campus table lists every defined code and any the data adds", {
   t <- counting_rule_tables()
-  campuses <- build_campus_reference(t$sections, t$students)
+  campuses <- build_campus_reference(t$sections, t$students, t$student_terms)
   expect_equal(head(campuses$campus, 3), c("ABQ", "EA", "GA"))
   zz <- campuses[campuses$campus == "ZZ", ]
   expect_equal(zz$group, "Not in campuses.csv")                 # a code campuses.R lacks is shown
