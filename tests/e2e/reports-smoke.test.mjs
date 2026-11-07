@@ -674,6 +674,15 @@ export async function runReportChecks({ scope = 'smoke', synthetic = false } = {
     await withStep(page, ['retention'], 'Course Dynamics Retention instructor breakout runs', async () => {
       await setInput(page, 'cr_ret_by_instructor', true);
       await setInput(page, 'cr_ret_min_n', 1);
+      // Ticking the box must not re-render the course-only result as an
+      // instructor split before Run (ISSUES.md I49).
+      await waitForIdle(page, { timeout: 60000 }).catch(() => {});
+      const earlyErrors = await page.evaluate(() =>
+        [...document.querySelectorAll('#cr_retention_results.shiny-output-error, #cr_retention_results .shiny-output-error')]
+          .map(el => el.innerText));
+      if (earlyErrors.length > 0) {
+        throw new Error(`retention results errored before Run: ${earlyErrors.join(' ; ')}`);
+      }
       await click(page, 'cr_ret_run');
       await waitForIdle(page, { timeout: 180000 }).catch(() => {});
       await waitForOutput(page, 'Course Dynamics Retention instructor breakout', [
