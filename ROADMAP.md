@@ -51,7 +51,7 @@ The order work is taken in.
    projections](#section-needs-projections).
 3. **Degree maps.** The open items under [Degree Explorer](#degree-explorer-and-curriculum-informed-demand).
 
-**Decisions waiting on a person:** confirm the 320 proposed renumberings in
+**Decisions waiting on a person:** the 37 renumberings still proposed in
 `institution/unm/code_history.csv` ([I37](ISSUES.md)); decide the largest
 programs and subjects still proposed (Admin → Data & Usage → Mappings,
 `scripts/mapping-review.R`).
