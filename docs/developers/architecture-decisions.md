@@ -67,7 +67,7 @@ per-term claims. `gender` is constant per student.
 
 | table | rows | distinct student-terms | memory | if thinned to its own grain |
 |---|---|---|---|---|
-| `cedar_students` | 1,855,577 | 465,836 | 468 MB | 347 MB without the student columns; ~190 MB without the section columns too |
+| `cedar_students` | 1,855,577 | 465,836 | 468 MB | 347 MB without the student columns; ~190 MB without the section columns too (the first draft's estimate; most section columns are grouping keys and stay, see step 5's decisions) |
 | `cedar_programs` | 622,988 | 426,222 | 181 MB | — |
 | `cedar_sections` | 253,707 | — | 100 MB | already at its grain (`job_cat` was 100% NA; dropped 2026-11-07, I52) |
 
@@ -250,7 +250,7 @@ record keeps the decisions.
 | 2 | `cedar_student_terms`: one definition of an enrolled term and of return (closes I44) | done 2026-11-04 |
 | 3 | Dimensions from the mapping files, units attached at load | done 2026-11-06 |
 | 4 | `cedar_courses` and course ids at load (I37, I45); `cedar_course_terms`; `cedar_attempts` | courses and keying done 2026-11-07; `cedar_course_terms` done 2026-11-07; `cedar_attempts` done 2026-11-07 (`cedar_grades` retired); the course flows next |
-| 5 | Thin `cedar_students` and `cedar_programs` to keys and registration facts; rename to fact names | student-term columns off the loaded class list done 2026-11-07 (`thin_class_list()`), and off the saved file (`cedar_class_list_descriptions`); the section columns next; the rename last |
+| 5 | Thin `cedar_students` and `cedar_programs` to keys and registration facts; rename to fact names | student-term columns off the loaded class list done 2026-11-07 (`thin_class_list()`), and off the saved file (`cedar_class_list_descriptions`); the section columns stay (decision below); `cedar_programs` and the rename remain |
 
 Step 2's precedence rule: when the two source snapshots disagree, the
 academic-studies row wins, the row is flagged and the count reported, never
@@ -285,6 +285,24 @@ a silent coalesce.
   its class-list rows (I47).
 - **Name:** `cedar_students` keeps its name until the rename PR, which answers
   open question 1 with `cedar_registrations`.
+- **The section columns stay on the row** (decided 2026-11-07, after
+  measuring their readers). Of the thirteen, `subject_course`, `campus`,
+  `college`, `department`, `level`, `part_term` and `term_type` are the keys
+  nearly every course read groups or filters by (campus beside the course,
+  always), and `subject_code` and Banner's college are the keys `attach_unit()`
+  resolves at load: moving them off means a join on almost every read, which
+  is the cost the measure tables exist to avoid. `term_type` alone has a
+  dozen readers, the canonical counter and the `cedar_course_terms` cache
+  among them, for 14 MB. The status label stays beside its code: it is the
+  only explanation of a code CEDAR does not know (the unexpected-status
+  audit). What could move is `course_title` and `instructor_name` (29 MB,
+  about eight readers, the 149 rows with no section left untitled) and
+  `instructor_id`, which must wait until production's sections carry the
+  hashed ID (I52) or instructor DFW would group by employee IDs that join no
+  faculty row. Not worth the churn now; revisit with the rename if memory
+  is short again. `total_credits` (no reader) left the class list with this
+  decision. So the saved class list holds about 326 MB in memory on the
+  2026-11-04 pull (22 columns), not the ~190 MB the first draft assumed.
 
 Pull history is the one piece with a deadline and should be sized now.
 
