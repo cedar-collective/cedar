@@ -9,21 +9,21 @@ Open-source Shiny analytics platform for higher-ed curriculum, enrollment and st
 | Topic | Page |
 |---|---|
 | Table schemas; how each loaded table is built and gets its units and course ids | [data-model.md](docs/developers/data-model.md), [data-transformation-myreports.md](docs/developers/data-transformation-myreports.md) |
-| Where the data model is heading and why (the domain model) | [adr-001-domain-data-model.md](docs/developers/adr-001-domain-data-model.md) |
-| The mapping files that decide every unit | [adr-002-explicit-mapping-files.md](docs/developers/adr-002-explicit-mapping-files.md), [mapping-review-guide.md](docs/developers/mapping-review-guide.md) |
+| Where the data model is heading and why (the domain model) | [ADR-001](docs/developers/architecture-decisions.md#adr-001-move-cedars-tables-from-report-shaped-to-domain-shaped) |
+| The mapping files that decide every unit | [ADR-002](docs/developers/architecture-decisions.md#adr-002-explicit-mapping-files-replace-runtime-department-inference), [mapping-review-guide.md](docs/developers/mapping-review-guide.md) |
 | `cedar_student_terms`: one definition of enrolled and returned | [student-terms.md](docs/developers/student-terms.md) |
 | Which `academic_studies` fields may describe a past term | [field-reliability.md](docs/developers/field-reliability.md) |
 | DESR vs class-list enrollment; the term calendar; Regstats baselines | [enrollment-measures.md](docs/developers/enrollment-measures.md) |
 | The four right edges and the failures behind them | [right-edge-policy.md](docs/developers/right-edge-policy.md) |
 | Why every course metric is grouped by campus | [campus-policy.md](docs/developers/campus-policy.md) |
-| What is CEDAR and what is UNM | [institution-boundary-audit.md](docs/developers/institution-boundary-audit.md) |
+| What is CEDAR and what is UNM | [audits/institution-boundary-audit.md](docs/developers/audits/institution-boundary-audit.md) |
 | Recording what the data means; anomaly screens | [data-anomalies.md](docs/developers/data-anomalies.md) |
 | What each branch, cone, feature and trunk file is for | [layer-inventory.md](docs/developers/layer-inventory.md) (generated signatures: [functions.md](docs/developers/functions.md)) |
 | Cache keys and the incidents behind the cardinal rules | [caching.md](docs/developers/caching.md) |
 | Module tables, plots, CSS, URL state, page structure | [shiny-modules.md](docs/developers/shiny-modules.md) |
 | Enrollment projections: the contract | [enrollment-projections.md](docs/developers/enrollment-projections.md), [forecasting-lessons.md](docs/developers/forecasting-lessons.md) |
 | Degree Explorer and the catalog tooling | [degree-explorer-rules.md](docs/developers/degree-explorer-rules.md), [degree-requirements.md](docs/developers/degree-requirements.md), [catalog-scanning.md](docs/developers/catalog-scanning.md), [catalog-normalization.md](docs/developers/catalog-normalization.md) |
-| Running tests, fixtures, environments | [agent-testing.md](docs/developers/agent-testing.md), [testing.md](docs/developers/testing.md), [e2e-testing.md](docs/developers/e2e-testing.md), [adhoc-analysis.md](docs/developers/adhoc-analysis.md) |
+| Running tests, fixtures, environments | [testing.md](docs/developers/testing.md), [e2e-testing.md](docs/developers/e2e-testing.md) |
 | The synthetic institution | [synthetic-institution.md](docs/developers/synthetic-institution.md) |
 
 ---
@@ -298,7 +298,7 @@ All test data is in `tests/testthat/fixtures/designed_test_data.R`, which **is**
 
 **E2E rules** (`tests/e2e/lib.mjs` solves each): never `sleep()`, use `waitForIdle()` / `runAndWait()`; let `connect()` settle before touching inputs; `checkVisibility()`, not `offsetParent`; run `node tests/e2e/check-ids.mjs` for selector rot. `connect(page, { tab })` takes options; scope with `queryActive()`; module ids are namespaced.
 
-Full reference: [agent-testing.md](docs/developers/agent-testing.md), [e2e-testing.md](docs/developers/e2e-testing.md).
+Full reference: [testing.md](docs/developers/testing.md), [e2e-testing.md](docs/developers/e2e-testing.md).
 
 **Text-first previews.** A computation-heavy feature gets a committed text formatter over its payload before its Shiny surface. Tests and UI consume the typed payload, never the text. It is computational evidence, not UI evidence.
 

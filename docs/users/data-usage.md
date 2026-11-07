@@ -55,7 +55,7 @@ you browse. Join Integrity and usage analyses only start when opened.
 Mappings shows how CEDAR decides which department, college, and program every
 course and student belongs to, and what still needs a person's decision. Those
 relationships are stated in plain files under `institution/unm/` in the CEDAR
-repository (see [ADR-002](https://github.com/cedar-collective/cedar/blob/main/docs/developers/adr-002-explicit-mapping-files.md)), so
+repository (see [ADR-002](https://github.com/cedar-collective/cedar/blob/main/docs/developers/architecture-decisions.md#adr-002-explicit-mapping-files-replace-runtime-department-inference)), so
 every mapping is a reviewable line, not something CEDAR infers.
 
 At the top, a banner says whether the departments CEDAR is showing were built

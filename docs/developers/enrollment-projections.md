@@ -18,7 +18,7 @@ a vanilla R process without loading or restarting Shiny.
 
 ## The rules in brief
 
-The rules an agent must not violate, each written out in full below. This is the one summary: `AGENTS.md` and `agent-testing.md` link here.
+The rules an agent must not violate, each written out in full below. This is the one summary: `AGENTS.md` and `testing.md` link here.
 
 - The forecast target is **unique total class-list demand** — not DESR final enrollment, not census.
 - **Capacity is an audit and planning comparison, never a demand predictor.** Capacity reached means first-day occupancy filled 98% of the seats or more, never that ever-registered demand exceeded them; an unknown first day is unknown occupancy, neither reached nor unreached. A reached-capacity overprojection is labeled `Capacity-bounded`; never display its one-sided technical zero as ordinary 0% error.

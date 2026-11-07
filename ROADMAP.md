@@ -46,7 +46,7 @@ The order work is taken in.
 1. **Finish the domain data model (ADR-001 step 4, then 5).** `cedar_attempts`
    from `cedar_grades`, its DFW rate on `cedar_course_terms`, the course flows
    rebuilt on them; then thin `cedar_students` and `cedar_programs` (closes
-   [I47](ISSUES.md)). Design: [ADR-001](docs/developers/adr-001-domain-data-model.md).
+   [I47](ISSUES.md)). Design: [ADR-001](docs/developers/architecture-decisions.md#adr-001-move-cedars-tables-from-report-shaped-to-domain-shaped).
 2. **Projection adjustments.** The open items under [Section-needs
    projections](#section-needs-projections).
 3. **Degree maps.** The open items under [Degree Explorer](#degree-explorer-and-curriculum-informed-demand).

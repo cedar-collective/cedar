@@ -1,6 +1,6 @@
 # courses.R — the course dimension: one row per course in the loaded data
 #
-# ADR-001 step 4 (docs/developers/adr-001-domain-data-model.md). A course is
+# ADR-001 step 4 (docs/developers/architecture-decisions.md, ADR-001). A course is
 # the thing a department teaches across the years; a course code is what the
 # registrar calls it in one term. The two part company when a subject is
 # renamed (SOC became SOCI, ISSUES I45) or a course is renumbered (MGMT 340

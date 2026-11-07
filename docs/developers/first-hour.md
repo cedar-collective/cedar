@@ -179,7 +179,7 @@ institution-specific — replace the entries, keep the registry.
 A test fails if a `R/lists/` file declares neither, and another fails if
 institution codes appear as literals in platform code. The audit behind that
 boundary, including what is still mixed, is in
-[institution-boundary-audit.md](institution-boundary-audit.md).
+[institution-boundary-audit.md](audits/institution-boundary-audit.md).
 
 CEDAR also assumes Banner conventions in places — the F-prefix pre-major rule,
 program codes shaped `DEGREE-MAJOR-COLLEGE`, `YYYYSS` term codes. Those are not

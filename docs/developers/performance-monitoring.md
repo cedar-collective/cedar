@@ -1,7 +1,8 @@
 ---
 title: Performance Monitoring
-parent: Developer Guide
-nav_order: 13
+parent: Operations
+grand_parent: Developer Guide
+nav_order: 3
 ---
 
 # Performance Monitoring

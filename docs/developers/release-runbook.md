@@ -1,7 +1,8 @@
 ---
 title: Release Runbook
-parent: Developer Guide
-nav_order: 9
+parent: Operations
+grand_parent: Developer Guide
+nav_order: 1
 ---
 
 # Release Runbook

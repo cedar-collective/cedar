@@ -24,108 +24,41 @@ CEDAR's response to this is the **cone**: a focused, documented, shareable analy
 
 ## What a cone does
 
-A cone is an R function (or small set of functions) that:
+A cone is an R function in `R/cones/` that answers **one** analytical question:
 
-1. **Accepts** CEDAR-formatted data — `cedar_students`, `cedar_sections`, and related tables
-2. **Filters and groups** that data according to an options list (term, department, course, etc.)
-3. **Analyzes** it to answer a specific question
-4. **Returns** a structured result — a data frame, a summary, or a list combining both
-
-Every cone follows the same signature:
+1. **Accepts** the CEDAR tables it needs as parameters (`cedar_students`, `cedar_sections`, and so on), never reading them from global state;
+2. **Takes its choices** in an options list, `opt = list()`, always the last argument (term, department, campus, thresholds);
+3. **Returns** a tibble or a named list with a documented output contract.
 
 ```r
-cone_function <- function(students, courses, opt, additional_data = NULL) {
-  # students      = cedar_students (one row per student per section)
-  # courses       = cedar_sections (one row per section per term)
-  # opt           = named list: term, dept, course, and other filters
-  # additional_data = optional: degrees, programs, faculty, etc.
-}
-```
-
-And returns the same basic structure:
-
-```r
-return(list(
-  data     = result_data_frame,
-  summary  = summary_stats,       # optional
-  metadata = list(
-    function_name = "my_cone",
-    options_used  = opt,
-    row_count     = nrow(result_data_frame)
-  )
-))
-```
-
-This consistency is what makes cones composable. A department report cone can call an enrollment cone, a DFW cone, and a headcount cone, assemble their results, and return the whole picture.
-
----
-
-## A real example
-
-Here's a simplified version of the low enrollment cone — it identifies sections below a threshold before the drop deadline:
-
-```r
-flag_low_enrollment <- function(courses, opt = list()) {
-
-  # Resolve options — %||% is defined in trunk/utils.R
+get_low_enrollment_sections <- function(sections, opt = list()) {
   if (is.null(opt$term)) stop("opt$term is required")
   threshold <- opt$threshold %||% 10L
-  status    <- opt$status    %||% "A"
 
-  sections <- courses %>%
-    filter(
-      term   == opt$term,
-      status == status
-    )
-
-  if (!is.null(opt$dept_code)) {
-    sections <- sections %>% filter(department == opt$dept_code)
-  }
-
-  result <- sections %>%
+  sections %>%
+    filter(term == opt$term, status == "A") %>%
     filter(enrolled < threshold) %>%
-    arrange(enrolled) %>%
-    select(crn, subject_course, enrolled, total_enrl,
-           instructor_name, term_type, delivery_method)
-
-  return(list(
-    data = result,
-    metadata = list(
-      function_name = "flag_low_enrollment",
-      options_used  = opt,
-      row_count     = nrow(result)
-    )
-  ))
+    arrange(campus, enrolled) %>%
+    select(campus, crn, subject_course, enrolled, total_enrl)
 }
 ```
 
-The cone is short, readable, and does one thing. The question it answers — *which sections are at risk this term?* — is one that every scheduling coordinator at every institution faces. Written once in this form, it can be adapted anywhere.
+It stops loudly on missing input rather than guessing, groups any course result by campus, and reuses the shared helpers for every count (census enrollment, DFW, term math) instead of re-deriving them. **A cone never calls another cone**: assembling several analyses into a page is a feature's job (`R/features/`). The full rules are in [`AGENTS.md`](https://github.com/cedar-collective/cedar/blob/main/AGENTS.md) under "Writing a cone", and [layer-inventory.md](layer-inventory) lists the cones, branches and helpers that already exist, so check there first.
 
 ---
 
 ## Writing a cone
 
-### With an AI assistant
+The fastest path is often an AI assistant given the repository: it reads `AGENTS.md` and the existing cones. Describe the question plainly:
 
-The fastest path to a working cone is to describe your question to an AI assistant with enough context about the CEDAR data model for it to write correct, idiomatic code.
+> *I want to understand what students who succeed in the second course of a two-course sequence have in common with those who don't. Write a CEDAR cone that finds students who took course A before course B, groups them by their grade in A, and compares their outcomes in B.*
 
-CEDAR provides a compact reference document for exactly this purpose:
+Then verify the draft as you would anyone's:
 
-**[CEDAR AI Reference →](../ai-reference)** — paste this into your AI prompt along with your question.
-
-A prompt that works:
-
-> *I want to understand what students who succeed in the second course of a two-course sequence have in common compared to those who don't. [paste the CEDAR AI reference here]. Write a CEDAR cone that joins cedar_students across two terms, identifies students who took course A before course B, groups them by grade in A, and compares their outcomes in B.*
-
-The AI will produce a draft. Verify that:
-- Column names match the CEDAR schema exactly
-- Joins use the correct keys (`term` + `crn`, `student_id`)
-- The `opt` pattern is followed
-- The return structure matches the standard
-
-### From scratch
-
-If you prefer to write directly, the [cone standards documentation](cone-standards) has the full specification: function signatures, options handling, error patterns, and testing conventions.
+- Column names match the CEDAR schema ([data-model.md](data-model)).
+- Course results are grouped by campus, and grade outcomes go through the shared DFW classifier.
+- A follow-up analysis stops at the right data edge ([right-edge-policy.md](right-edge-policy)).
+- It has a test on the committed fixtures that fails when the logic is broken ([testing.md](testing)).
 
 ---
 
@@ -135,11 +68,11 @@ A cone that answers a question well — documented, tested, working on real data
 
 To contribute:
 
-1. **Write and test your cone** locally against your institution's CEDAR data
-2. **Generalize it** — replace any institution-specific hardcoding with `opt` parameters
+1. **Write and test your cone** against the committed fixtures and your institution's CEDAR data
+2. **Generalize it** — institution-specific values belong in the `institution/<id>/` files or in `opt`, never in the code
 3. **Document the question it answers** — one clear sentence at the top of the file
 4. **Open a pull request** on [GitHub](https://github.com/cedar-collective/cedar) with a description of the question, the approach, and example output
 
 You don't need to know whether other institutions have the same question. They do. That's the premise.
 
-[Cone standards →](cone-standards) \| [Contributing guide →](contributing) \| [CEDAR AI reference →](../ai-reference)
+[Contributing guide →](contributing) \| [Layer inventory →](layer-inventory)
