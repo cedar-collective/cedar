@@ -249,13 +249,24 @@ DEPT_CACHE_TABLES <- list(
   demo = "cedar_programs"
 )
 
+#' Hash an object's content without copying it
+#'
+#' digest::digest() serializes its whole argument into memory before hashing:
+#' 943 MB for the loaded class list, on top of the 496 MB table, which was the
+#' app's start-up peak (3.4 of 3.83 GiB in Docker, 2026-11-07).
+#' rlang::hash() streams the serialization into the hash instead (+1 MB, 2.5 s
+#' for the six dept-cache sources). Any change to a value, a column, the row
+#' order or an attribute changes it; the same content in the same
+#' representation gives the same hash.
+cedar_content_hash <- function(x) rlang::hash(x)
+
 # Compute once for the loaded snapshot in both the app and the cache warmer.
 # Hash values rather than file metadata: a corrected value invalidates even if
 # dimensions stay fixed, while copying or rewriting unchanged data does not.
 hash_dept_cache_sources <- function(data_objects,
                                     tables = unique(unlist(DEPT_CACHE_TABLES))) {
   stats::setNames(vapply(tables, function(name) {
-    digest::digest(data_objects[[name]], algo = "xxhash64")
+    cedar_content_hash(data_objects[[name]])
   }, character(1)), tables)
 }
 

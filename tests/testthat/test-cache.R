@@ -279,6 +279,22 @@ test_that("Dept Trends invalidates only tabs that consume the changed source", {
                info = "same-shape corrections must invalidate the affected tabs")
 })
 
+test_that("a table's content hash changes with any value, column, order or stamp", {
+  tbl <- test_students
+  base <- cedar_content_hash(tbl)
+  expect_identical(cedar_content_hash(tbl[seq_len(nrow(tbl)), ]), base)   # a copy
+  changed <- tbl; changed$final_grade[nrow(tbl)] <- "Z"
+  expect_false(identical(cedar_content_hash(changed), base))               # a late column's value
+  renamed <- tbl; names(renamed)[ncol(renamed)] <- "renamed"
+  expect_false(identical(cedar_content_hash(renamed), base))               # a column name
+  expect_false(identical(cedar_content_hash(tbl[rev(seq_len(nrow(tbl))), ]), base))  # row order
+  expect_false(identical(cedar_content_hash(tbl[-1, ]), base))             # a row
+  stamped <- tbl; attr(stamped, "code_renames") <- "A 1 > B 1"
+  expect_false(identical(cedar_content_hash(stamped), base))               # a table stamp
+  # Any object, not only a data frame.
+  expect_false(identical(cedar_content_hash(test_dims), cedar_content_hash(test_dims[-1])))
+})
+
 test_that("Dept Trends content hashes survive source-file rewrites", {
   with_temp_cache({
     source_file <- file.path(get_cache_dir(), "source.qs")
