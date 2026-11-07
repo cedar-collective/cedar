@@ -257,7 +257,9 @@ Each step is additive until its last sub-step, so the app runs throughout.
 4. **`cedar_courses` with a stable id and renaming crosswalk** (I37, I45),
    then `cedar_course_terms` promoted from `cedar_cl_enrls_base` and
    `cedar_attempts` from `cedar_grades`. **PR 1 done 2026-11-06:** the
-   dimension and `course_id` at load, no reader changed. Written out
+   dimension and `course_id` at load, no reader changed. Reader PRs 1 to 6
+   (same day): Low Enrollment, Course Dynamics, Regstats, Waitlists, the
+   Department Dashboard and the enrollment projections read by course. Written out
    [below](#step-4-in-full-the-course-dimension-and-what-follows-it).
 5. **Thin `cedar_students` and `cedar_programs`** to their keys and
    registration facts; rename to the fact names once no reader uses the old
@@ -611,8 +613,23 @@ unchanged in count. The hand-built course rows in `server.R` (above and
 below average, new, missing) show the course id without its former codes;
 the waitlist table shows them. The downstream-signals
 flows (`cedar_course_flows`) are still by code and rebuild on
-`cedar_course_terms`. Next: the enrollment projection inputs are a
-`model_version` decision. Then `cedar_course_terms` is promoted from
+`cedar_course_terms`.
+**Reader PR 6 (2026-11-06): the enrollment projections, model 0.28.0.**
+`enrollment_projection_course_scope()` resolves the course group and the
+forced courses to course ids and keys the class list and the sections, and
+`build_enrollment_projection_bundle()` keys them again (idempotent), refuses
+a demand history counted by code, and resolves the listed sequences
+(`projection_sequences.csv`) to their courses. The spine, the floor, every
+delta, the feeders and the aftcasts then follow the course. Schema 26 is
+unchanged; a bundle's `subject_course` is the course id. Measured on the
+2026-10-08 pull against 0.27.0 built on the same data: none of the 139
+critical courses or the six listed sequence courses carries a former code, so
+all 58 Spring 2027 and 66 Fall 2027 published rows are identical. The one
+change is a feeder: PSY 332 and PSYC 332, two codes before, are one course
+with enough shared students to enter the top eight feeders of ANTH 2190C and
+SOCI 2315, moving three Spring aftcasts of ANTH 2190C's adjusted candidate
+(its WAPE 6.24% to 6.51%) and one Fall aftcast of SOCI 2315's; neither
+candidate is published. Next: `cedar_course_terms` is promoted from
 `cedar_cl_enrls_base` and `cedar_attempts` from `cedar_grades`, both keyed on
 `course_id`, and `course-flows.R`'s precompute rebuilds on it. The Admin > Mappings surface for code history (when each
 code was in use, computed from the data; which replaced which, from the

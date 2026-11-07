@@ -891,6 +891,16 @@ recommendation pipeline.
 
 ## Saved Bundle
 
+Model 0.28.0 (schema 26, unchanged) reads by course (ADR-001 step 4). A
+bundle's `subject_course` is the course id: the last code of a confirmed
+succession in `code_history.csv`, which for a course never renamed is its
+code. `enrollment_projection_course_scope()` resolves the course group and the
+forced courses to course ids, so a group naming a former code projects its
+course; the builder refuses a demand history (`cl_enrls`) counted by code and
+resolves the listed sequences to their courses. A renamed course's earlier
+offerings are therefore its own spine, deltas and aftcasts, and a feeder
+carried under two codes counts as one.
+
 Schema 26 (model 0.27.0, no calculation change) adds the students left waiting
 in the term just finished: candidates gain `waitlisted_preceding`
 (`projection_preceding_waitlist()`), published as
