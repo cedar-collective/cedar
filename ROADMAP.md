@@ -43,9 +43,9 @@ Changelog (Admin). Cross-course Retention is built but hidden.
 
 The order work is taken in.
 
-1. **Finish the domain data model (ADR-001 step 4, then 5).** `cedar_attempts`
-   from `cedar_grades`, its DFW rate on `cedar_course_terms`, the course flows
-   rebuilt on them; then thin `cedar_students` and `cedar_programs` (closes
+1. **Finish the domain data model (ADR-001 step 4, then 5).** Move the readers
+   of saved `cedar_grades` to `cedar_attempts` and retire it, rebuild the
+   course flows on the keyed tables; then thin `cedar_students` and `cedar_programs` (closes
    [I47](ISSUES.md)). Design: [ADR-001](docs/developers/architecture-decisions.md#adr-001-move-cedars-tables-from-report-shaped-to-domain-shaped).
 2. **Projection adjustments.** The open items under [Section-needs
    projections](#section-needs-projections).

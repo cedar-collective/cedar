@@ -164,6 +164,13 @@ data_objects <<- list(
 )
 # global.R stores the data edges on data_objects; modules read them from there.
 data_objects$cedar_edges <<- cedar_data_edges(test_students, degrees = test_degrees)
+# The attempt and course-term measure tables as global.R builds them, over any
+# keyed class-list fixture: attempts to the graded edge, then the course terms
+# counted from the same class list with those attempts' outcomes.
+attempts_for <<- function(students, edges = data_objects$cedar_edges) build_attempts(students, edges)
+course_terms_for <<- function(students, edges = data_objects$cedar_edges) {
+  build_course_terms(students, attempts_for(students, edges))
+}
 
 Sys.setenv(shiny = "FALSE")
 

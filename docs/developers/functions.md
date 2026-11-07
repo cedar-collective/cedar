@@ -8,7 +8,58 @@ parent: Developer Guide
 
 This reference is auto-generated from roxygen2 comments in the source code.
 
-*Generated: 2026-11-07 10:38:59.707635*
+*Generated: 2026-11-07 11:59:16.550373*
+
+---
+
+## attempts
+
+### `build_attempts()`
+
+*Source: attempts.R*
+
+**Build cedar_attempts from the loaded class list**
+
+**Parameters:**
+
+- `students` - The loaded cedar_students, keyed on the course (attach_course_ids()), one row per student, course, campus and term.
+- `edges` - The startup edges (cedar_report_edges()$edges); `last_graded` bounds the table and fails closed when unknown.
+
+**Returns:** A tibble with ATTEMPTS_COLUMNS, stamped with `attempts_build_version`, `cedar_outcome_policy_version`, `graded_edge` and the class list's `code_renames`.
+
+---
+
+### `attempts_is_current()`
+
+*Source: attempts.R*
+
+**Whether an attempts table was built by this code from this class list and edge**
+
+**Returns:** TRUE only for a data frame with this build's version, outcome policy, columns and graded edge, counted over the class list's renames.
+
+---
+
+### `require_current_attempts()`
+
+*Source: attempts.R*
+
+**Refuse an attempts table this code did not build, or built over other codes**
+
+Refuse an attempts table this code did not build, or built over other codes  For readers handed `attempts` with the class list but not the edges: checks the build, policy, columns and renames, and returns the graded edge it was built to.
+
+---
+
+### `count_attempt_outcomes()`
+
+*Source: attempts.R*
+
+**Outcome counts per course term, at the course-terms grain**
+
+**Parameters:**
+
+- `attempts` - A current cedar_attempts.
+
+**Returns:** One row per campus, college, term, course and part of term with any attempt: `attempts` (passed + dfw: the DFW denominator), `passed`, `dfw`, and `withdrawn` (late withdrawals, a part of dfw).
 
 ---
 
@@ -710,13 +761,14 @@ Course Sequence Effect  Compares grades in course Y between students who passed 
 
 **Count the course-term measure table**
 
-Count the course-term measure table  The class-list counts of calc_cl_enrls() by part of term, with census enrollment (add_census_enrl()) and each course's level and department. `registered` is still registered at the pull (final, for a past term); `cl_total` is every non-waitlist registration (ever registered: `registered + dr_all`); `census_enrl` is `registered + dr_late`; `wl_all` counts waitlist rows, not true demand (`R/branches/waitlist-demand.R`).
+Count the course-term measure table  The class-list counts of calc_cl_enrls() by part of term, with census enrollment (add_census_enrl()) and each course's level and department. `registered` is still registered at the pull (final, for a past term); `cl_total` is every non-waitlist registration (ever registered: `registered + dr_all`); `census_enrl` is `registered + dr_late`; `wl_all` counts waitlist rows, not true demand (`R/branches/waitlist-demand.R`). The outcome counts are count_attempt_outcomes() over `attempts`.
 
 **Parameters:**
 
 - `students` - `cedar_students` keyed on the course (attach_course_ids()).
+- `attempts` - cedar_attempts built from the same class list (build_attempts()); its graded edge decides which terms carry outcomes.
 
-**Returns:** One row per campus, college, term, course and part of term, with exactly COURSE_TERMS_COLUMNS, ungrouped, stamped with `code_renames` and `course_terms_build_version`.
+**Returns:** One row per campus, college, term, course and part of term, with exactly COURSE_TERMS_COLUMNS, ungrouped, stamped with `code_renames`, `graded_edge` and `course_terms_build_version`.
 
 ---
 
@@ -732,6 +784,7 @@ Was this course-term table counted by this build over this class list?  TRUE whe
 
 - `course_terms` - A saved cedar_course_terms, or anything else.
 - `students` - `cedar_students` keyed on the course.
+- `graded_edge` - The loader's graded edge, to refuse a table whose outcome columns stop at another; NULL for a reader that does not read them.
 
 ---
 

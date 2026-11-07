@@ -81,9 +81,10 @@ Lowercase snake_case columns; legacy uppercase names are deprecated. How each ta
 | `cedar_terms` | term | the term dimension: the right edges as flags (`is_settled`, `is_graded`, `in_progress`, …), season, next/previous regular term, first day, census date |
 | `cedar_dims` | — | the mapping files as dimension tables (`colleges`, `units`, `subjects`, `programs`, `settings`); names through `unit_names()`, `college_code_names()`, `subject_units()`, `name_program_codes()` |
 | `cedar_courses` / `cedar_course_codes` | course / code | the course dimension: one `course_id` per chain of confirmed renames in `code_history.csv` |
-| `cedar_course_terms` | course × term × campus × part of term | the course-term measure table: class-list counts (`registered`, `dr_*`, `wl_all`, `cl_total`, `census_enrl`), no cross-term means ([course-terms.R](R/branches/course-terms.R)) |
+| `cedar_attempts` | student × course × campus × term | the attempt measure table: every graded attempt classified once (`outcome_category`; `outcome` pass / dfw / NA), to `last_graded` ([attempts.R](R/branches/attempts.R)) |
+| `cedar_course_terms` | course × term × campus × part of term | the course-term measure table: class-list counts (`registered`, `dr_*`, `wl_all`, `cl_total`, `census_enrl`) and outcome counts (`attempts`, `passed`, `dfw`, `withdrawn`; NA past `last_graded`), no cross-term means ([course-terms.R](R/branches/course-terms.R)) |
 
-The dimensions, `cedar_courses` and `cedar_course_terms` are built at startup and held in `data_objects`; none is a saved source of truth.
+The dimensions, `cedar_courses`, `cedar_attempts` and `cedar_course_terms` are built at startup and held in `data_objects`; none is a saved source of truth.
 
 **Every unit and every course id is attached at load, in one place.** No saved table stores a unit or a college. Every loader (`global.R`, the cache-warming scripts, `scripts/cedar-repl.R`) calls `attach_default_units()` and `attach_course_ids()`:
 

@@ -360,6 +360,49 @@ message("  - cedar_degrees: ", nrow(data_objects[["cedar_degrees"]]), " rows")
 message("  - cedar_faculty: ", nrow(data_objects[["cedar_faculty"]]), " rows")
 } # end data loading for docker
 
+# ── cedar_attempts: one classified outcome per graded attempt (ADR-001 step 4)
+# build_attempts() (R/branches/attempts.R) classifies the keyed class list
+# once, up to the graded edge, so readers share one pass/DFW/withdrawal answer
+# per attempt. Held at data_objects[["cedar_attempts"]] and passed to readers;
+# the copy saved beside the data is a cache, used only when it is newer than
+# the class list and attempts_is_current() finds this build, outcome policy,
+# graded edge and the class list's renames on it.
+if (!is.null(data_objects[["cedar_students"]]) && nrow(data_objects[["cedar_students"]]) > 0) {
+  attempts_path    <- file.path(data_dir, "cedar_attempts.qs")
+  students_qs_path <- file.path(data_dir, paste0("cedar_students", get_data_extension()))
+  saved_is_newer <- file.exists(attempts_path) && file.exists(students_qs_path) &&
+                    file.info(attempts_path)$mtime > file.info(students_qs_path)$mtime
+  saved_attempts <- NULL
+  if (saved_is_newer) {
+    saved_attempts <- tryCatch(qs2::qs_read(attempts_path), error = function(e) {
+      message("[global.R] Saved cedar_attempts unreadable: ", conditionMessage(e))
+      NULL
+    })
+  }
+  if (attempts_is_current(saved_attempts, data_objects[["cedar_students"]], cedar_edges)) {
+    data_objects[["cedar_attempts"]] <- saved_attempts
+    message(sprintf("[global.R] cedar_attempts loaded: %d rows", nrow(saved_attempts)))
+  } else {
+    if (saved_is_newer) {
+      message("[global.R] Saved cedar_attempts is from another build, policy, edge or course codes; rebuilding.")
+    }
+    t_at <- system.time({
+      data_objects[["cedar_attempts"]] <- build_attempts(data_objects[["cedar_students"]], cedar_edges)
+    })
+    message(sprintf("[global.R] cedar_attempts built: %d rows (%.1fs)",
+                    nrow(data_objects[["cedar_attempts"]]), t_at["elapsed"]))
+    tryCatch({
+      tmp_path <- paste0(attempts_path, ".tmp")
+      qs2::qs_save(data_objects[["cedar_attempts"]], tmp_path)
+      file.rename(tmp_path, attempts_path)
+      message("[global.R] cedar_attempts saved.")
+    }, error = function(e) {
+      message("[global.R] Warning: failed to save cedar_attempts: ", e$message)
+    })
+  }
+  rm(saved_attempts)
+}
+
 # ── cedar_course_terms: the course-term measure table (ADR-001 step 4) ──────
 # build_course_terms() (R/branches/course-terms.R) counts the keyed class list
 # once by course, term, campus and part of term, so Regstats, the Department
@@ -383,16 +426,18 @@ if (!is.null(data_objects[["cedar_students"]]) && nrow(data_objects[["cedar_stud
       NULL
     })
   }
-  if (course_terms_is_current(saved_course_terms, data_objects[["cedar_students"]])) {
+  if (course_terms_is_current(saved_course_terms, data_objects[["cedar_students"]],
+                              graded_edge = cedar_edges$last_graded)) {
     data_objects[["cedar_course_terms"]] <- saved_course_terms
     message(sprintf("[global.R] cedar_course_terms loaded: %d rows",
                     nrow(saved_course_terms)))
   } else {
     if (saved_is_newer) {
-      message("[global.R] Saved cedar_course_terms is from another build or other course codes; rebuilding.")
+      message("[global.R] Saved cedar_course_terms is from another build, graded edge or course codes; rebuilding.")
     }
     t_ct <- system.time({
-      data_objects[["cedar_course_terms"]] <- build_course_terms(data_objects[["cedar_students"]])
+      data_objects[["cedar_course_terms"]] <- build_course_terms(data_objects[["cedar_students"]],
+                                                                 data_objects[["cedar_attempts"]])
     })
     message(sprintf("[global.R] cedar_course_terms built: %d rows (%.1fs)",
                     nrow(data_objects[["cedar_course_terms"]]), t_ct["elapsed"]))

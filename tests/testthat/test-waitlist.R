@@ -436,7 +436,7 @@ test_that("attach_enrollment_history follows the course when the class list name
   # base row and reads no census and no history.
   rn <- rn01_course_tables()
   students <- rn$cedar_students
-  base <- build_course_terms(students)
+  base <- course_terms_for(students)
   expect_false("HIST 320" %in% base$subject_course)
   count_df <- students %>%
     filter(listed_code %in% c("HIST 320", "SOCI 250"), term == 202010L) %>%

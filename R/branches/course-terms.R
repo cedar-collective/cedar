@@ -21,6 +21,11 @@
 # over are stamped on it, so a saved copy made before a code_history.csv row
 # was confirmed is refused, as is one saved by an older build.
 #
+# Outcomes come from cedar_attempts (R/branches/attempts.R), classified once:
+# `attempts` (the DFW denominator: passed + dfw), `passed`, `dfw` and
+# `withdrawn` (late withdrawals, part of dfw). They are NA after the graded
+# edge, where no grade has posted: unknown, never zero.
+#
 # It carries counts for each course-term and nothing pooled across terms: a
 # mean or baseline is the reader's question (Regstats' baselines are
 # strictly prior, Waitlists' exclude the viewed term), and a table that held
@@ -28,14 +33,14 @@
 
 #' Build version of cedar_course_terms. Bump when a column is added, renamed
 #' or changes meaning, so a saved copy from the older build is rebuilt.
-COURSE_TERMS_BUILD_VERSION <- 1L
+COURSE_TERMS_BUILD_VERSION <- 2L
 
 #' The columns cedar_course_terms carries, in order.
 COURSE_TERMS_COLUMNS <- c(
   "campus", "college", "term", "term_type", "subject_course", "part_term",
   "level", "department",
   "registered", "dr_early", "dr_late", "dr_all", "wl_all", "cl_total",
-  "census_enrl"
+  "census_enrl", "attempts", "passed", "dfw", "withdrawn"
 )
 
 #' Count the course-term measure table
@@ -46,12 +51,15 @@ COURSE_TERMS_COLUMNS <- c(
 #' `cl_total` is every non-waitlist registration (ever registered:
 #' `registered + dr_all`); `census_enrl` is `registered + dr_late`; `wl_all`
 #' counts waitlist rows, not true demand (`R/branches/waitlist-demand.R`).
+#' The outcome counts are count_attempt_outcomes() over `attempts`.
 #'
 #' @param students `cedar_students` keyed on the course (attach_course_ids()).
+#' @param attempts cedar_attempts built from the same class list
+#'   (build_attempts()); its graded edge decides which terms carry outcomes.
 #' @return One row per campus, college, term, course and part of term, with
-#'   exactly COURSE_TERMS_COLUMNS, ungrouped, stamped with `code_renames`
-#'   and `course_terms_build_version`.
-build_course_terms <- function(students) {
+#'   exactly COURSE_TERMS_COLUMNS, ungrouped, stamped with `code_renames`,
+#'   `graded_edge` and `course_terms_build_version`.
+build_course_terms <- function(students, attempts) {
   .listed_codes(students, "build_course_terms")
   missing <- setdiff(c("part_term", "level", "department"), names(students))
   if (length(missing) > 0) {
@@ -59,6 +67,7 @@ build_course_terms <- function(students) {
          paste(missing, collapse = ", "), ".")
   }
   renames <- course_code_renames(students)
+  graded_edge <- require_current_attempts(attempts, students, "build_course_terms")
   counts <- calc_cl_enrls(students, by_part_term = TRUE) %>%
     ungroup() %>%
     add_census_enrl()
@@ -70,10 +79,28 @@ build_course_terms <- function(students) {
     ungroup() %>%
     distinct(subject_course, .keep_all = TRUE) %>%
     select(subject_course, level, department)
+  # Attempts are a subset of the class-list rows these counts are taken over,
+  # so every attempt's course-term is a row here; one that is not means the
+  # two were built from different tables.
+  key <- c("campus", "college", "term", "subject_course", "part_term")
+  outcomes <- count_attempt_outcomes(attempts)
+  orphans <- anti_join(outcomes, counts, by = key)
+  if (nrow(orphans) > 0) {
+    stop("[course-terms.R] build_course_terms(): ", nrow(orphans), " course-terms have ",
+         "attempts but no class-list counts (first: ", orphans$subject_course[1], " ",
+         orphans$term[1], "); attempts and students must come from one class list")
+  }
+  outcome_cols <- c("attempts", "passed", "dfw", "withdrawn")
   course_terms <- counts %>%
     left_join(course_meta, by = "subject_course", relationship = "many-to-one") %>%
+    left_join(outcomes, by = key, relationship = "one-to-one") %>%
+    # A graded term with no attempt row has none (all early drops or
+    # waitlists): zero. A term past the graded edge has no outcomes yet: NA.
+    mutate(across(all_of(outcome_cols),
+                  ~ if_else(as.integer(term) <= graded_edge, coalesce(.x, 0L), NA_integer_))) %>%
     select(all_of(COURSE_TERMS_COLUMNS))
   attr(course_terms, "code_renames") <- renames
+  attr(course_terms, "graded_edge") <- graded_edge
   attr(course_terms, "course_terms_build_version") <- COURSE_TERMS_BUILD_VERSION
   course_terms
 }
@@ -88,11 +115,18 @@ build_course_terms <- function(students) {
 #'
 #' @param course_terms A saved cedar_course_terms, or anything else.
 #' @param students `cedar_students` keyed on the course.
-course_terms_is_current <- function(course_terms, students) {
+#' @param graded_edge The loader's graded edge, to refuse a table whose
+#'   outcome columns stop at another; NULL for a reader that does not read
+#'   them.
+course_terms_is_current <- function(course_terms, students, graded_edge = NULL) {
   if (!is.data.frame(course_terms)) return(FALSE)
   if (!identical(attr(course_terms, "course_terms_build_version", exact = TRUE),
                  COURSE_TERMS_BUILD_VERSION)) return(FALSE)
   if (!identical(names(course_terms), COURSE_TERMS_COLUMNS)) return(FALSE)
+  if (!is.null(graded_edge) &&
+      !identical(attr(course_terms, "graded_edge", exact = TRUE), as.integer(graded_edge))) {
+    return(FALSE)
+  }
   renames <- attr(course_terms, "code_renames", exact = TRUE)
   if (is.null(renames)) return(FALSE)
   identical(as.character(renames), course_code_renames(students))

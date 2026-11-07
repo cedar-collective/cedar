@@ -245,7 +245,7 @@ record keeps the decisions.
 | 1 | `cedar_terms`: the right edges become a join | done |
 | 2 | `cedar_student_terms`: one definition of an enrolled term and of return (closes I44) | done 2026-11-04 |
 | 3 | Dimensions from the mapping files, units attached at load | done 2026-11-06 |
-| 4 | `cedar_courses` and course ids at load (I37, I45); `cedar_course_terms`; `cedar_attempts` | courses and keying done 2026-11-07; `cedar_course_terms` done 2026-11-07; `cedar_attempts` next |
+| 4 | `cedar_courses` and course ids at load (I37, I45); `cedar_course_terms`; `cedar_attempts` | courses and keying done 2026-11-07; `cedar_course_terms` done 2026-11-07; `cedar_attempts` built 2026-11-07, its readers next |
 | 5 | Thin `cedar_students` and `cedar_programs` to keys and registration facts; rename to fact names | not started |
 
 Step 2's precedence rule: when the two source snapshots disagree, the
@@ -347,14 +347,23 @@ course die and the new one arrive from nowhere.
   (`COURSE_TERMS_COLUMNS`, `COURSE_TERMS_BUILD_VERSION`, the class list's
   renames), never a global. First-day enrollment, DFW, fill and waitlist
   demand join it when a reader moves to them.
+- **`cedar_attempts` is built from the keyed class list, not from saved
+  `cedar_grades`** (2026-11-07). `cedar_grades` is pre-dedup, at CRN level,
+  and keyed on the registrar's code; the loaded class list is one row per
+  student, course, campus and term, the grain the ADR names. It is bounded at
+  `last_graded` and stamped with it, so a row with no posted grade is never
+  in it and a copy built to another edge is rebuilt. Its outcome comes from
+  the classifier's own flags, and its per-course-term counts equal
+  `get_course_outcome_rates()`. `cedar_course_terms` (build 2) carries the
+  counts: NA after the graded edge, unknown rather than zero.
 
 Confirming the 320 proposed renumberings is a person's decision: it is what
 makes I37's courses show their earlier offerings (84 Fall 2026 courses with
 no Fall history by code would find it).
 
-**Next.** `cedar_attempts` from `cedar_grades` on the keyed tables, its DFW
-rate joined onto `cedar_course_terms`, and `course-flows.R`'s precompute
-rebuilt on them. Then the Admin > Mappings surface for code history.
+**Next.** The readers of saved `cedar_grades` (Roadblocks, stopout, DFW
+rates, pathways) move to `cedar_attempts`, and `cedar_grades` retires; then
+`course-flows.R`'s precompute is rebuilt on the keyed tables.
 
 **Not doing.** Rewriting saved rows to the new code: the code the registrar
 used that term is a fact about the term. A surrogate integer id: a saved key

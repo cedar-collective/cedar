@@ -97,6 +97,10 @@ test_that("canonical DFW policy is exhaustive and the sub-C exception is narrow"
   ))
   expect_true(all(standard$is_dfw_legacy[4:15]))
   expect_false(any(standard$is_denominator_attempt[16:17]))
+  # The two classifiers agree on every kind of grade: cedar_attempts derives
+  # its outcome from these flags and must match classify_enrollment_outcomes().
+  expect_equal(classify_enrollment_outcomes(attempts)$outcome,
+               ifelse(standard$is_pass, "pass", "dfw")[standard$is_denominator_attempt])
 
   sub_c <- classify_attempt_outcomes(
     attempts,
@@ -489,4 +493,128 @@ test_that("get_course_outcome_rates computes expected course averages", {
   expect_equal(modern$failed, 4L)
   expect_equal(modern$late_dropped, 9L)
   expect_equal(modern$dfw_pct, 36.11)
+})
+
+
+# cedar_attempts (R/branches/attempts.R): the class list classified once, to
+# the graded edge. Its counts must be the ones get_course_outcome_rates()
+# computes per request, course by course, and its outcome the canonical
+# classifier's, row by row: a reader moving to the table must see no number
+# change. HIST 1110 in test_students is the course pinned above (36 attempts:
+# 23 pass, 4 fail, 9 late withdrawals).
+test_that("cedar_attempts reproduces the per-request outcome rates for every course", {
+  edges <- data_objects$cedar_edges
+  attempts <- attempts_for(test_students)
+  expect_equal(names(attempts), ATTEMPTS_COLUMNS)
+  expect_true(all(attempts$term <= edges$last_graded))
+
+  hist <- attempts %>% filter(subject_course == "HIST 1110")
+  expect_equal(sum(!is.na(hist$outcome)), 36L)
+  expect_equal(sum(hist$outcome %in% "pass"), 23L)
+  expect_equal(sum(hist$outcome %in% "dfw"), 13L)
+  expect_equal(sum(hist$outcome_category == "w_late_withdrawal"), 9L)
+
+  # Every course and term, against the per-request path over the same rows.
+  per_request <- get_course_outcome_rates(
+    test_students, list(term = sort(unique(test_students$term)), data_edges = edges),
+    group_cols = c("campus", "college", "term", "subject_course")) %>%
+    select(campus, college, term, subject_course, n_attempts, n_pass, n_dfw, n_w) %>%
+    filter(n_attempts > 0) %>%
+    arrange(campus, college, term, subject_course)
+  from_table <- count_attempt_outcomes(attempts) %>%
+    group_by(campus, college, term, subject_course) %>%
+    summarize(n_attempts = sum(attempts), n_pass = sum(passed), n_dfw = sum(dfw),
+              n_w = sum(withdrawn), .groups = "drop") %>%
+    filter(n_attempts > 0) %>%
+    arrange(campus, college, term, subject_course)
+  expect_gt(nrow(per_request), 10L)
+  expect_equal(as.data.frame(from_table), as.data.frame(per_request), ignore_attr = TRUE)
+
+  # Row by row, outcome is classify_enrollment_outcomes()'s; an early drop and
+  # a registered row with no grade carry none.
+  canonical <- classify_enrollment_outcomes(filter(test_students, term <= edges$last_graded)) %>%
+    select(student_id, term, campus, subject_course, canonical = outcome)
+  joined <- attempts %>% filter(!is.na(outcome)) %>%
+    full_join(canonical, by = c("student_id", "term", "campus", "subject_course"))
+  expect_equal(joined$outcome, joined$canonical)
+  expect_true(all(is.na(attempts$outcome[attempts$outcome_category %in% c("early_drop", "missing")])))
+  expect_true(all(attempts$final_grade[attempts$outcome_category == "early_drop"] == "Drop"))
+})
+
+
+test_that("cedar_attempts maps every kind of grade to the default policy", {
+  # The shared fixture holds no I, NC, NR, P, S or unfamiliar grade inside the
+  # graded edge, so the mapping is checked on graded class-list rows given each
+  # grade in turn: one registered row per grade, plus a late drop with no grade.
+  edges <- data_objects$cedar_edges
+  grades <- c("A+", "C", "CR", "C-", "D+", "D", "D-", "F", "W", "I",
+              "NC", "NR", "P", "S", "UNSEEN_CODE", "AUD", "")
+  rows <- test_students %>%
+    dplyr::filter(as.integer(term) <= edges$last_graded,
+                  registration_status_code %in% STATUS_REGISTERED) %>%
+    dplyr::slice_head(n = length(grades) + 1L)
+  rows$final_grade <- c(grades, NA_character_)
+  rows$registration_status_code[length(grades) + 1L] <- "DW"
+  attempts <- build_attempts(rows, edges)
+
+  by_grade <- setNames(attempts$outcome, attempts$final_grade)
+  expect_equal(unname(by_grade[c("A+", "C", "CR")]), rep("pass", 3))
+  dfw <- c("C-", "D+", "D", "D-", "F", "W", "I", "NC", "NR", "P", "S", "UNSEEN_CODE")
+  expect_equal(unname(by_grade[dfw]), rep("dfw", length(dfw)))
+  # The audit is not an attempt; the blank registered grade is unknown.
+  expect_false("AUD" %in% attempts$final_grade)
+  expect_equal(sum(is.na(attempts$outcome)), 1L)
+  # The late drop with no grade is a withdrawal, and DFW.
+  expect_equal(sum(attempts$outcome_category == "w_late_withdrawal"), 2L)
+  expect_equal(sum(attempts$outcome %in% "dfw"), length(dfw) + 1L)
+})
+
+
+test_that("cedar_attempts is refused when built to another edge, build or set of codes", {
+  edges <- data_objects$cedar_edges
+  attempts <- attempts_for(test_students)
+  expect_true(attempts_is_current(attempts, test_students, edges))
+  expect_false(attempts_is_current(attempts, test_students,
+                                   modifyList(edges, list(last_graded = 202080L))))
+  older <- attempts; attr(older, "attempts_build_version") <- ATTEMPTS_BUILD_VERSION - 1L
+  expect_false(attempts_is_current(older, test_students, edges))
+  expect_false(attempts_is_current(NULL, test_students, edges))
+  rn <- rn01_course_tables()
+  expect_false(attempts_is_current(attempts, rn$cedar_students, edges))
+  expect_error(require_current_attempts(attempts, rn$cedar_students, "a reader"), "build_attempts")
+  expect_error(build_attempts(test_students, modifyList(edges, list(last_graded = NULL))),
+               "graded edge")
+  expect_error(build_attempts(bind_rows(test_students, test_students[1, ]), edges),
+               "more than one class-list row")
+})
+
+
+# cedar_course_terms carries the attempts' outcome counts per course-term-
+# part-of-term: they sum to the table's, and a term past the graded edge has
+# NA, not zero. Built to an edge of Fall 2020, so Spring 2021 is ungraded.
+test_that("cedar_course_terms carries outcome counts, unknown past the graded edge", {
+  edges <- modifyList(data_objects$cedar_edges, list(last_graded = 202080L))
+  attempts <- attempts_for(test_students, edges)
+  course_terms <- build_course_terms(test_students, attempts)
+  expect_equal(names(course_terms), COURSE_TERMS_COLUMNS)
+  expect_identical(attr(course_terms, "graded_edge"), 202080L)
+
+  graded <- course_terms %>% filter(term <= 202080L)
+  ungraded <- course_terms %>% filter(term > 202080L)
+  expect_gt(nrow(ungraded), 0L)
+  for (col in c("attempts", "passed", "dfw", "withdrawn")) {
+    expect_true(all(is.na(ungraded[[col]])), info = col)
+    expect_false(anyNA(graded[[col]]), info = col)
+  }
+  expect_equal(sum(graded$attempts), sum(!is.na(attempts$outcome)))
+  expect_equal(sum(graded$dfw), sum(attempts$outcome %in% "dfw"))
+  expect_equal(sum(graded$passed) + sum(graded$dfw), sum(graded$attempts))
+  expect_true(all(graded$withdrawn <= graded$dfw))
+
+  expect_true(course_terms_is_current(course_terms, test_students, graded_edge = 202080L))
+  expect_false(course_terms_is_current(course_terms, test_students,
+                                       graded_edge = data_objects$cedar_edges$last_graded))
+  # Attempts from another class list: their course-terms are not this one's.
+  expect_error(build_course_terms(test_students, attempts_for(test_students_regstats)),
+               "must come from one class list")
 })
