@@ -265,57 +265,9 @@ the worked example.
 
 ### Enrollment projection contract
 
-Projection work has a stricter reusable-artifact boundary:
-
-- The forecast target is unique total class-list demand, not DESR final
-  enrollment and not census. Expected census is a separately saved retention
-  conversion.
-- Capacity is an audit and planning comparison, never a demand predictor. A
-  reached-capacity overprojection is labeled `Capacity-bounded`; never display
-  its one-sided technical zero as ordinary 0% error.
-- Observed-enrollment methods select the published demand row, and selection is
-  rolling: prior same-season is the default, a challenger must beat it on
-  earlier shared aftcasts, and the published accuracy is the realised record of
-  that rule. Broad population and major/classification methods are structural
-  evidence and do not silently replace or average with the selected method.
-- The adjusted candidate must reconcile: spine + floor uplift + repeat delta +
-  feeder delta is its projection, and `validate_spine_rows()` rejects any row
-  where it is not. Rates are learned only from pairs that precede the target;
-  the UI never derives a delta.
-- Weak rows remain visible with `Unrated` / `None` axis values and a reason. Do
-  not withhold them, relabel them, or invent a reassuring default.
-- Miss explanations say `Potential explanation` or `Potential contributor` and
-  retain their underlying enrollment/capacity changes. They are not causal
-  claims.
-- Shiny and Course Dynamics read validated artifacts through
-  `load_latest_enrollment_projection_bundle()` / `load_enrollment_projection_bundle()`
-  and `build_enrollment_projection_view()`. They never fit, aftcast, pressure-screen,
-  calibrate, or select a model in a user session. Discovery is per season:
-  `find_enrollment_projection_bundles()` lists saved targets, and a loader that
-  does not name a season or an exact target term is an error, not a default.
-- Morning projection refreshes run through `scripts/build-enrollment-projections.R
-  --refresh` after successful data transformation. The policy in
-  `config/enrollment-projections.yml` names one or more targets -- shipped as the
-  next Fall and next Spring after `cedar_data_edges()$last_enrolled_complete` --
-  with that edge as the cutoff for each. One refresh publishes every target,
-  nearest first, and each keeps its own rebuild decision.
-  `R/features/enrollment-projection-refresh.R` resolves the policy and compares
-  canonical prepared inputs and model-source hashes before fitting. Target-term
-  registrations and schedule context are relevant inputs too; pull dates and
-  unrelated post-cutoff registrations are not. Reused bundles are never rewritten.
-- `model_version` changes for calculation, selection, calibration, or scoring
-  behavior; `schema_version` changes for artifact shape. Every published bundle
-  retains validated hashes and embedded normalized source for the model files.
-  Official vintages should be built from a clean commit, but dirty development
-  artifacts remain auditable through their embedded source.
-- A new method is incomplete until the registry, branch candidate, rolling
-  aftcast, bundle validator, text preview, designed fixture, real-data audit,
-  and any affected UI/browser test agree.
-
-The full executable contract is in
-`docs/developers/enrollment-projections.md`; empirical findings and rejected
-assumptions are in `docs/developers/forecasting-lessons.md`. Keep the latter as
-an evidence ledger, not a second roadmap.
+The rules are summarised once, in [enrollment-projections.md — The rules in
+brief](enrollment-projections.md#the-rules-in-brief), and written out in full
+on that page. Read them before any projection change.
 
 ### The three environments
 

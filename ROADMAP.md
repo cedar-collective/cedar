@@ -1,555 +1,210 @@
 # CEDAR Roadmap
 
-This is CEDAR's plan for **new features and significant upgrades**. It answers:
+What CEDAR should do next: **strategy, new functionality, enhancements and
+significant upgrades**. Defects and improvements to what already exists live
+in [`ISSUES.md`](ISSUES.md). The test for which file: if someone could write
+"done when…" against existing code today, it is an issue; if it needs design
+or a decision about something new, it is here.
 
-- **What do we have?**
-- **Where is the product going, and in what order?**
-- **What might we build later?**
-
-Known problems and improvements to what already exists — defects, debt,
-inconsistencies, missing tests, interface standards — live in
-[`ISSUES.md`](ISSUES.md), and this file links to them rather than repeating
-them. The test for which file: if someone could write "done when…" for it today
-against existing code, it is an issue; if it needs design or a decision about
-something new, it is here.
-
-Completed work belongs in the repo, the changelog, release notes, and git
-history. `AGENTS.md` remains the architecture and coding reference.
+Each item is one line, `- [ ] **Name.** What and why, in a sentence or two`,
+linking an issue or design page rather than restating it. A shipped item is
+deleted: what was built lives in the code, the changelog and git, and each
+theme's first line says what exists. New ideas go in the [Inbox](#inbox) until
+someone gives them a theme.
 
 ---
 
-## Product Direction
+## Strategy
 
-CEDAR is a transparent, reproducible Shiny analytics platform for higher-ed
-curriculum, enrollment, and student experience work. Its strongest promise is
-not that every number is simple; it is that every number is explainable.
+CEDAR is a transparent, reproducible analytics platform for higher-ed
+curriculum, enrollment and student experience. Its promise is not that every
+number is simple; it is that every number is explainable. It should keep
+moving toward:
 
-The product should keep moving toward:
+- **Trustworthy numbers:** scope, counting rules and caveats visible beside
+  the table or plot, with the arithmetic one click away.
+- **Attention over reporting:** answer "where should I look?" rather than only
+  what a user already knew to ask.
+- **Reusable analysis:** logic in branches, cones and features; measure tables
+  a new cone filters and joins instead of re-deriving.
+- **Installable structure:** an adopter edits the files under
+  `institution/<id>/`, never code.
+- **Focused surfaces:** the Shiny app is the product; RStudio analysis is
+  supported through the same tables and functions.
 
-- **Trustworthy numbers:** scope, counting rules, and known caveats are visible
-  near the relevant table or plot.
-- **Reusable analysis:** business logic lives in branches/cones/features, not in
-  Shiny modules or `server.R`.
-- **Standard testing:** agents and humans use the standard test runner and do
-  not create custom one-off testing scripts.
-- **Feature highlighting:** CEDAR should increasingly answer "where should I
-  pay attention?" rather than only reporting what a user already knew to query.
-- **Installable structure:** UNM-specific mappings and vocabularies become
-  reviewable configuration rather than hardcoded assumptions.
-- **Focused surfaces:** the Shiny app is the primary product; RStudio analysis
-  is supported through the normalized tables and reusable functions.
-
----
-
-## Current Snapshot
-
-Use this only for scale and prioritization, not as a history log.
-
-Measured 2026-11-03, with `wc -l` on tracked files.
-
-| Surface | Current size / state |
-|---|---|
-| `server.R` | 6,398 lines; several legacy inline surfaces remain |
-| `R/modules/pathways.R` | 4,100 lines; still contains business logic (36 `group_by`/`summarize` calls) |
-| Largest files | `R/branches/enrl.R` 3,118 · `R/features/enrollment-projection-view.R` 2,471 · `R/features/dept-dashboard.R` 1,834 · `R/modules/enrollment-projections.R` 1,711 |
-| Total R code | 109,532 lines (tracked `.R` files, including tests and scripts) |
-| Cones / branches / features / modules | 26 / 37 / 18 / 16 files (the projection model is split into one branch file per stage) |
-| Test suites | 75 designed-fixture R test files; 13 browser suites (focused checks, demo, and the institutional release tour) |
-| Institution configuration | `institution/unm/` mapping files (ADR-002), validated at startup |
-| Other supported surface | RStudio analysis via `scripts/cedar-repl.R` and the normalized tables |
-
-Supported app surfaces: Dept Dashboard, Dept Trends, Pathways, Course Dynamics
-(top level); Regstats, Open Seats, Waitlists, Projections (Registration);
-Enrollment, Headcount, Gen Ed (Explore); Cancellations, Data & Usage, Changelog
-(Admin). Cross-course Retention is built but hidden until its comparison view
-is ready; single-course retention is in Course Dynamics.
+Supported surfaces: Dept Dashboard, Dept Trends, Pathways, Course Dynamics;
+Regstats, Open Seats, Waitlists, Projections (Registration); Enrollment,
+Headcount, Gen Ed, Degree Explorer (Explore); Cancellations, Data & Usage,
+Changelog (Admin). Cross-course Retention is built but hidden.
 
 ---
 
-## Big Product Priorities
+## Now
 
-These are larger direction-setting priorities. They should shape future feature
-work and refactors, even when the immediate task is small.
+The order work is taken in.
 
-### 1. Section-Needs Projections
+1. **Finish the domain data model (ADR-001 step 4, then 5).** `cedar_attempts`
+   from `cedar_grades`, its DFW rate on `cedar_course_terms`, the course flows
+   rebuilt on them; then thin `cedar_students` and `cedar_programs` (closes
+   [I47](ISSUES.md)). Design: [ADR-001](docs/developers/adr-001-domain-data-model.md).
+2. **Projection adjustments.** The open items under [Section-needs
+   projections](#section-needs-projections).
+3. **Degree maps.** The open items under [Degree Explorer](#degree-explorer-and-curriculum-informed-demand).
 
-CEDAR should help departments and colleges anticipate section demand before the
-schedule is locked. The goal is not a black-box forecast; it is a transparent
-projection workflow that shows likely section needs, the evidence behind them,
-and where human judgment still matters.
-
-This builds on:
-
-- historical classlist census enrollment and DESR scheduled capacity;
-- census/final enrollment distinctions;
-- campus and modality scope;
-- program populations and pathway/course-taking patterns;
-- low-enrollment risk and capacity signals.
-
-Waitlists are deliberately not a projection input. Class lists only began
-retaining waitlist rows in 2026 (Summer 2026: 543 rows; Fall 2026: 3,615); a
-past term's extract keeps only students still waiting when it closed, so there
-is no history to fit or test a waitlist method against yet.
-
-The first shareable Spring-demand pass is implemented: an explicit monitored
-course registry, pressure screening, two candidates (the prior same-season
-spine, and the spine plus a saturation floor and two Fall-enrollment deltas),
-rolling-origin aftcasts, leakage-safe rolling method selection whose published
-accuracy is out of sample, three evidence axes, census-based capacity
-assessment, a regime check on the term just finished, section recommendations
-sized from expected census, and versioned saved bundles with embedded
-model-source provenance. The retired candidates and their audit figures are in
-`docs/developers/forecasting-lessons.md`. The
-same feature builder runs in the persistent R lab and the standalone publisher.
-Registration > Projections reads the validated saved bundle and defaults to the
-always-monitored group with course-group, department, course, stability, and
-accuracy filters, export, and navigable drill-down evidence without recomputing
-models in a Shiny session.
-
-The projection contract and measured lessons are documented in
-`docs/developers/enrollment-projections.md` and
-`docs/developers/forecasting-lessons.md`. Remaining product work is:
-
-- [x] Define bundle refresh operations and an official-vintage retention rule:
-  automatic freshness checks after successful morning data transformation, replaceable
-  working bundles, and permanently retained labeled official vintages.
-- [x] Publish Fall targets from the same engine: one bundle per season and a
-  reader-chosen target term. The Spring structural methods stay inapplicable to
-  Fall by design; the Fall deltas drop out at a two-step
-  horizon, so the current Fall bundle is observed-baseline only. Measured no
-  accuracy penalty against Spring, thinner depth, and no structural demand
-  signal — see the audit in `docs/developers/enrollment-projections.md`.
-- [ ] Reuse the saved projection payload on Course Dynamics.
-- [ ] Pilot the table and explanations with chairs and associate deans.
-- [ ] Develop the *structural* Fall model — splitting continuing students from
-  the incoming cohort — which needs retained admissions/acceptance/NSO snapshots
-  that CEDAR does not archive today. Blocked on that data, not on the engine.
-- [x] Population-growth scenarios over a published bundle: the shared
-  `CEDAR_POPULATION_GROUPS` registry, `cohort_composition` saved in the bundle
-  (schema 18), and a Scenario sub-tab answering "if health professions grows
-  10% a year for five years". Arithmetic over saved rows; nothing is fitted in
-  a session.
-- [ ] Scenario extensions worth considering: more than one population at once,
-  a per-population growth rate, and showing how a population's share of a
-  course has moved over time rather than only at the baseline term.
-- [ ] Re-read the Fall deltas with posted grades in December (feeder
-  completions and DFW counts in place of enrollments) as a revision of the
-  published number for add/cancel decisions.
-- [x] Retain registration-to-date counts per course during registration, so
-  next year's Spring can be revised by pace against the same week a year
-  earlier: every refresh keeps each term in registration, or scheduled ahead
-  of it, in `output/registration-snapshots/` (registered, waiting, drops,
-  sections and seats per course, campus and part of term; no student IDs).
-  This also archives the draft schedule as it changes before registration opens.
-- [ ] Revise Spring by pace once a year of snapshots exists: this week's
-  registrations against the same week a year earlier, scored rolling against
-  the spine like any other candidate.
-- [x] Compare the plan with the draft schedule (Registration > Projections >
-  Draft schedule, model 0.23.0): short of day-one seats, short of the plan,
-  covering it, beyond it, or missing from the draft.
-- [ ] Project against the submitted draft schedule: "with these seats, expect
-  this; the last term was full; past expansions filled this share". Most
-  aftcast error moves with the seats, one registrant per seat (77% of Spring
-  2027's aftcast error, 83% of Fall 2027's). Needs the schedule archived when departments submit it,
-  which also separates planned seats from sections added or cancelled during
-  registration. Registration snapshots now keep the draft at every refresh
-  from October 2026; the submission date still has to be marked.
-- [ ] Rank feeders by lift rather than raw count, with one pooled rate, so the
-  feeder list a chair reads names prerequisites, not the largest freshman
-  courses. The strongest prerequisites are now declared sequences
-  (`projection_sequences.csv`, 0.26.0) and carry their own rate; review the
-  list each year as the carry-through evidence grows.
-- [ ] Record known policy changes (placement cutoffs, redesigned sequences,
-  new requirements) under `institution/<id>/` with their reason, shown as a
-  labelled adjustment and scored against the actuals afterwards.
-- [ ] Carry a waitlist into the next term, as a change from the year before,
-  once two years of retained waitlists exist (27% of Summer 2026's unserved
-  students took the course in Fall 2026).
-- [ ] Measure the pressure bump instead of assuming it. It is a flat 5% (or
-  the students left waiting, if more) for a course always near full; once two
-  years of retained waitlists exist, size it per course from how many waiting
-  students came back and how far added seats filled, and score it.
-- [ ] Any new candidate enters only as a challenger scored rolling against the
-  spine; none is added on in-sample fit.
-- [ ] Shape the reusable course-history spine so it supports section-needs
-  projections as well as low-enrollment alerts.
-
-The first useful version can be modest: highlight courses likely to need more,
-fewer, or differently scoped sections, with enough context for chairs,
-associate deans, and provost-level reviewers to understand the signal.
-
-### 2. Attention Dashboards Across Core Tabs
-
-CEDAR should move from data reporting toward feature highlighting. More tabs
-should open with a compact, opinionated dashboard of notable patterns so users
-do not have to hunt through controls and tables to find the story.
-
-Regstats is the closest current model: it scans for bumps, dips, saturation,
-and waitlist pressure rather than only displaying raw tables. Extend that idea
-to DFW reports, enrollment trends, headcount trends, Gen Ed, and other
-high-traffic views.
-
-Useful dashboards should be audience-aware:
-
-- **Chairs:** which courses, programs, or student groups need attention now?
-- **Associate deans:** which departments or patterns are changing unusually?
-- **Provost-level reviewers:** which cross-college patterns, bottlenecks, or
-  risks deserve strategic attention?
-
-First decide which core tabs get one: likely DFW, Enrollment Trends, Headcount
-Trends, and Gen Ed.
-
-The pattern to aim for: a first screen with a few ranked signals, concise
-explanations, and links into the detailed tables/plots that support each flag.
-This should make CEDAR feel less like a data warehouse front end and more like
-an analytical partner that points people toward the next useful question.
-
-### 3. Retention signals while there is time to act
-
-CEDAR's retention views look backward: Course Dynamics > Retention, Pathways
-outcomes and Roadblocks, and the hidden cross-course Retention tab. None is on
-the pages deans open first, and none says, while there is time to act, where
-students are slipping away. Last year 2,354 of 19,277 undergraduates did not
-return from Fall 2025 to Spring 2026; the 6,751 who had withdrawn late, failed
-a course or were on probation returned at 78%, against 93%, and were 63% of the
-loss. Not registering is earlier and broader: on Dec 1 a third had not
-registered, nearly every eventual non-returner among them, and 63% of them came
-back on their own. So the measure is pace against the same day a year earlier,
-never a count of losses. Every surface stays aggregate; advising acts on
-named students.
-
-- [x] Keep next-term registration of last term's students at every refresh,
-  by unit, standing and warning sign, with no student IDs (`return-*` files in
-  `output/registration-snapshots/`, `R/branches/return-snapshots.R`). A past
-  day cannot be rebuilt from status dates, which a drop overwrites.
-- [ ] **Return watch** on the Dept Dashboard, and UNM-wide under Registration:
-  continuing students not yet registered against the same day a year earlier,
-  by classification and standing, split by the warning signs. Exact from Fall
-  2027, once a year of snapshots exists; before that, last year rebuilt from
-  status dates and labelled approximate.
-- [ ] Roadblocks for the department's own courses on the Dept Dashboard,
-  ranked by its Impact column (`get_stopout()`).
-- [ ] Unhide cross-course Retention once its comparison view sets each course
-  against its department and college.
-- [ ] Near-completers who stopped out (seniors with no degree, by program, from
-  the credit timeline) and pre-majors who stall before declaring, as outreach
-  counts. Their long-term home is the departure-modelling item under
-  Established Analytical Methods.
+**Decisions waiting on a person:** confirm the 320 proposed renumberings in
+`institution/unm/code_history.csv` ([I37](ISSUES.md)); decide the largest
+programs and subjects still proposed (Admin → Data & Usage → Mappings,
+`scripts/mapping-review.R`).
 
 ---
 
-## Before New Features: Cleanup
+## Section-needs projections
 
-An audit on 2026-10-07 measured where CEDAR could disagree with itself, where it
-breaks its own architecture rules, and where pages are built inconsistently.
-The findings are entries in [`ISSUES.md`](ISSUES.md). Work them in this order,
-because new features build most cleanly on the first two:
+Built: a monitored course registry, the prior same-season spine and an
+adjusted challenger, rolling out-of-sample selection, three evidence axes,
+first-day capacity judgement, section plans from projected registrations with
+a pressure bump and feeder adjustment, a draft-schedule comparison, growth
+scenarios, and saved bundles per season with model provenance. Contract:
+[enrollment-projections.md](docs/developers/enrollment-projections.md);
+what was tried and rejected: [forecasting-lessons.md](docs/developers/forecasting-lessons.md).
+Waitlists are not an input until two years of retained waitlists exist.
 
-1. **Reconcile counts computed twice** — all three confirmed 2026-10-07; I17
-   (two "returned next term" definitions on Course Dynamics → Retention) fixed
-   in #119. I15 (headcount department scope) fixed with Stage 3. I16
-   (bottleneck waitlist pressure) is RStudio-only: decide its definition, or
-   retire it. Each gets one helper or a documented difference, with a cross-tab
-   test. Then M1–M3 and M24 (lifecycle labels).
-2. **Finish ADR-002** — done 2026-10-10: Stages 3–5 closed I7, I9, I11 and I12.
-   What remains is decisions (Admin → Mappings) and moving the other UNM lists
-   (below).
-3. **Architecture rules, file by file** — M11 (silent fallbacks) first, because
-   they hide failures; then M12 (global reads) and M13 (logic in modules).
-4. **Interface consistency, one tab per PR** — M17, M18.
-5. **File size alongside other work** — M14, M16.
+- [ ] **Projections on Course Dynamics.** Reuse the saved payload on the course page.
+- [ ] **Pilot with chairs and associate deans.** The table and its explanations.
+- [ ] **Structural Fall model.** Split continuing students from the incoming
+  cohort; blocked on retained admissions/acceptance/NSO snapshots CEDAR does
+  not archive.
+- [ ] **Scenario extensions.** Several populations at once, a rate per
+  population, and a population's share of a course over time.
+- [ ] **December revision.** Re-read the Fall deltas with posted grades
+  (completions and DFW in place of enrollments) as a revision for add/cancel
+  decisions.
+- [ ] **Revise Spring by pace.** This week's registrations against the same
+  week a year earlier, once a year of registration snapshots exists, scored
+  rolling against the spine.
+- [ ] **Project against the submitted draft.** "With these seats, expect
+  this": most aftcast error moves with the seats. Needs the submission date
+  marked in the snapshots.
+- [ ] **Rank feeders by lift,** not raw count, so a chair's feeder list names
+  prerequisites, not the largest freshman courses; review
+  `projection_sequences.csv` yearly.
+- [ ] **Record policy changes** (placement cutoffs, redesigned sequences) under
+  `institution/<id>/` as labelled adjustments, scored afterwards.
+- [ ] **Carry a waitlist forward and measure the pressure bump** once two
+  years of retained waitlists exist (27% of Summer 2026's unserved students
+  took the course in Fall 2026).
+- [ ] **One course-history spine** shared by projections and low-enrollment alerts.
 
----
+Any new candidate enters only as a challenger scored rolling against the spine.
 
-## Significant Upgrades
+## Attention dashboards
 
-Larger changes to how CEDAR works, each needing design. Smaller, concrete
-improvements are in [`ISSUES.md`](ISSUES.md).
+Regstats is the model: it scans for bumps, dips, saturation and waitlist
+pressure rather than displaying tables. Each dashboard opens with a few ranked
+signals, a sentence each, and links into the evidence, aimed at its audience
+(chairs: what needs attention now; associate deans: what is changing
+unusually; provost: cross-college patterns and risks).
 
-### 1. Explicit mapping files (ADR-002)
+- [ ] **Choose the tabs** that get one: likely DFW, Enrollment Trends,
+  Headcount Trends and Gen Ed.
 
-Every unit, college, and program relationship stated in reviewable files under
-`institution/<id>/`, so adopting CEDAR means editing files, not code.
-Plan: [ADR-002](docs/developers/adr-002-explicit-mapping-files.md).
+## Retention signals while there is time to act
 
-- Done: Stages 0–2 and colleges — the files and their validation, the mapping
-  assistant, the transform-time audit, and the Admin decisions table.
-- [ ] Decide the largest programs and course subjects still proposed (Admin →
-  Data & Usage → Mappings; `scripts/mapping-review.R`).
-- Done 2026-10-09: **Stage 3**, units — the transform takes every unit from the
-  files and creates no self-named department. Closed I7; I11's stored units.
-- Done 2026-10-10: **Stage 3b**, colleges — students under their primary
-  major's college, courses under their subject's, Banner's value labelled for
-  codes not yet decided. Closed I12.
-- Done 2026-10-10: **Stage 4** — `generate_program_map()`, `program_map.qs` and
-  `program_code_maps.R` retired; runtime lookups and pre-major flags come from
-  the files. Closed I9.
-- Done 2026-10-10: **Stage 5** — the demo runs on its own `institution/demo/`
-  files, with UNM's absent. ADR-002 is complete.
-- Done 2026-10-16: **Stage 6** — every remaining UNM R list moved into
-  `institution/<id>/` (campuses, course levels, Gen Ed areas, excluded
-  courses, population groups, projection scopes, and the three text maps), so
-  an adopter replaces files only; every `R/lists/` file is platform mechanism.
-- [ ] **Code history on Admin → Mappings:** each unit's program codes and course
-  subjects, old and new, with when each was in use and which code replaced
-  which.
-  - *When in use* is computed from the data on every load — first and last term
-    in program, degree, and class-list rows, read against the data edges (a code
-    in the first term was in use "since before" it) — never stored, because it
-    would go stale at every refresh.
-  - *Which replaced which* is recorded, because the data can only suggest it:
-    `code_history.csv` (`kind`, `from_code`, `to_code`, `effective_term`,
-    `scope`, `basis`, `status`, `evidence`, `notes`), one row per succession,
-    exists since 2026-11-06 (ADR-001 step 4) and is read for subjects and
-    courses; its `program` rows are validated and await this page. A partial
-    program succession (undergraduate `PHRD` → `FPHS`) is a `program` row with
-    a `scope`; a split (`RADS` → `RADS` + `FRAD`) is two `program` rows, which
-    the course dimension would refuse for a course. An annotation only: it
-    never rewrites old rows to the new code. `CEDAR_DATA_SEMANTICS` keeps
-    explaining what a code *meant*.
-  - A screen proposes candidates for review: course numbers carried across a
-    prefix change (`ALB 450` → `ALBS 450`), or a code that stops as a same-unit
-    code starts (`FING` → `FINN`). Timing alone confirms nothing — FING's last
-    students were not recoded — so those need the catalog.
-  - Until the file exists, lineage found during review goes in the row's `notes`.
+Built: next-term registration of last term's students kept at every refresh
+(`return-*` snapshots). Measured: of Fall 2025's undergraduates, the 6,751 who
+withdrew late, failed a course or were on probation returned at 78% against
+93% and were 63% of the loss; a third had not registered on Dec 1. The
+measure is pace against the same day a year earlier, always aggregate.
 
-### 2. Domain-shaped data model (ADR-001)
+- [ ] **Return watch** on the Dept Dashboard and UNM-wide: continuing students
+  not yet registered against the same day a year earlier, by classification,
+  standing and warning sign. Exact from Fall 2027.
+- [ ] **Roadblocks on the Dept Dashboard,** ranked by Impact (`get_stopout()`).
+- [ ] **Unhide cross-course Retention** once it sets each course against its
+  department and college.
+- [ ] **Near-completers and stalled pre-majors** as outreach counts.
 
-- [x] Step 1, `cedar_terms`: the term dimension with the right edges as flags.
-- [x] Step 2, `cedar_student_terms`: one row per student-term, one definition
-  of enrolled and returned, every description read off it (closed 2026-11-04;
-  the per-reader measurements are in `docs/developers/student-terms.md`).
-- [x] Step 3, dimensions from the mapping files: the shared loader and `dims`
-  object attach the default unit columns once at load through
-  `attach_unit(rows, dims, hierarchy)`, so no reader changes (PR 1, #204);
-  the transform stores keys only and the deploy gate's mapping branch retires
-  (PR 2, #205); `dims` absorbs `cedar_lookups` (PR 3, 2026-11-06), and
-  `cedar_lookups` retires once programs.csv names the class-list-only codes
-  (2026-11-06).
-  Design written in full in
-  [ADR-001](docs/developers/adr-001-domain-data-model.md#step-3-in-full-dimensions-and-how-data-reaches-a-cone).
-- [ ] Steps 4 and 5: `cedar_courses` with a stable id (I37, I45) and the
-  course-term and attempt measures; then thin `cedar_students` and
-  `cedar_programs` to keys and facts (closes I47).
-  Step 4 PR 1 (2026-11-06): `cedar_courses` / `cedar_course_codes` built at
-  load from `code_history.csv` and `course_id` attached to sections and class
-  lists; UNM's file carries the three section-evidenced subject renames
-  confirmed and 320 title-matched renumberings proposed. Reader PR 1
-  (2026-11-06): Low Enrollment's schedule view and course histories key on
-  `course_id` and name the former codes behind the shown numbers. Reader PR 2
-  (2026-11-06): Course Dynamics reads the class list and the sections by
-  course (`key_on_course_id()`), so a report for SOCI 371 carries its SOC 371
-  terms in every tab and says so. Reader PR 3 (2026-11-06): Regstats keys
-  both tables and its precomputed base on the id, names each flagged
-  course's former codes, and refuses a base or a day cache counted over other
-  codes; Waitlists' enrollment history joins that base by course. Reader PR 4
-  (2026-11-06): Waitlists keys both tables, so its counts, true-demand
-  de-dup and supply follow the course. Reader PR 5 (2026-11-06): the
-  Department Dashboard keys both tables, so a renamed course is no longer
-  "new this term". Reader PR 6 (2026-11-06): the enrollment projections read
-  by course (model 0.28.0). 2026-11-07: every loader keys the tables on the
-  course (`subject_course` the course, `listed_code` the term's code), so every
-  reader follows it and the per-reader shim is gone; CCS stays CCS (CCST is
-  the lower-division prefix). `cedar_course_terms` is the course-term measure table (2026-11-07); next, `cedar_attempts`. Confirming the proposed Fall 2026
-  renumberings is a person's decision, and what makes I37's rows show their
-  old offerings.
-  Design in full in
-  [ADR-001](docs/developers/adr-001-domain-data-model.md#step-4-in-full-the-course-dimension-and-what-follows-it).
+## Degree Explorer and curriculum-informed demand
 
-### 3. Operational monitoring
+Built: an illustrative semester board for about two dozen programs from the
+2026–27 catalog, with math/English starting points, prerequisite links,
+15/16-credit budgeting, annual shared University/Gen Ed/college rules, course
+popups with seats and first-day pressure, Pathways > Course paths, the offline
+catalog scanner, Admin Catalog Review, and reviewed AI-assisted draft
+interpretations. Rules: [degree-explorer-rules.md](docs/developers/degree-explorer-rules.md);
+contracts: [degree-requirements.md](docs/developers/degree-requirements.md),
+[catalog-scanning.md](docs/developers/catalog-scanning.md),
+[catalog-normalization.md](docs/developers/catalog-normalization.md).
 
-- [ ] Lightweight post-release monitoring for Shiny errors, usage-log parsing,
-  scheduled data-update outcomes, and cold-cache dashboard latency.
+- [ ] **Minors.** Pilot list (English, Spanish, History, …), placed in the top
+  band, with authored overlap rules.
+- [ ] **Elective guidance.** Reviewed, major-specific suggestions kept apart
+  from catalog rules, perhaps as institution Markdown files.
+- [ ] **Advising-reviewed audit.** Conditional alternatives, transfer, grades,
+  minor/residence/college constraints and selectable choices, without silently
+  adding credits or certifying completion.
+- [ ] **Compile approved rules** into runtime degree tables and route templates.
+- [ ] **AI automation** behind the same proposal/review boundary, evaluated on
+  the four-program pilot first.
+- [ ] **Routes and constraints.** Selectable elective/science routes, all
+  course restrictions, admission milestones, offering constraints, transfer
+  scenarios.
+- [ ] **More programs** with different entry rules, electives and
+  concentrations; reconcile source conflicts and equivalences.
+- [ ] **Catalog year and transfer evidence** before evaluating a major switch.
+- [ ] **Observed term portfolios** without inventing an order among
+  concurrent classes.
+- [ ] **A requirement-informed demand challenger,** scored through the rolling
+  projection contract.
 
----
+## Platform
 
-## Future Product Bets
+- [ ] **Code history on Admin → Mappings.** Each unit's program codes and
+  course subjects with when each was in use (computed from the data at load)
+  and which replaced which (`code_history.csv`, whose `program` rows are
+  validated and waiting for this page). A screen proposes candidates
+  (`ALB 450` → `ALBS 450`, `FING` → `FINN`); timing alone confirms nothing.
+- [ ] **Operational monitoring.** Shiny errors, usage logs, scheduled-refresh
+  outcomes and cold-cache latency after release.
+- [ ] **Standard CSV export** across user-facing tables through a shared helper.
 
-### Degree Explorer and curriculum-informed demand
+## Later
 
-- [x] Prototype: one degree at a time on an adaptive semester board, math/English
-  starting points, visible prerequisite connections and paired lecture/lab tiles.
-  Consistent interface for Computer Science B.S., Biology B.S., History B.A.,
-  Philosophy B.A., Business Administration B.B.A., Anthropology B.A. and Physics
-  B.S. using the 2026–2027 catalog. Selected concentrations/example routes are
-  explicit; light spaces accommodate other requirements.
-- [x] Program-specific math entry routes: calculus for the STEM examples,
-  required statistics for Business, illustrative Gen Ed statistics for the B.A.
-  examples. Degree changes preserve placement; each tile retains program evidence.
-- [x] Budget the complete planning workload at 15 credits usual / 16 maximum,
-  allowing additional semesters; show quoted, year-specific degree/prerequisite
-  evidence and distinct planning colors with ancestor and downstream counts.
-- [x] Prioritize Gen Ed/foundations in years 1–2 and upper-level requirements
-  from semester 5; distinguish early and later elective allowances.
-- [x] Separate Pathways > Course paths subtab uses the shared population, campus
-  keys, settled edge, coverage notes and small-cell guards.
-- [x] Course popups contain catalog evidence, prerequisite detail and historical
-  seasonal frequency, seats and first-day pressure by teaching campus in one
-  standard CEDAR table. Missing first-day dates remain unavailable.
-  Semester headers align across the full board, including extended plans.
-- [x] Separate coursework-count/permission conditions from named-course arrows;
-  visibly distinguish suggested Gen Ed courses from program requirements.
-- [x] Compact course-set previews with complete popup options. Group required
-  lecture/lab components within each alternative. CS's shared 14-credit science
-  block shows two lab-science slots and two additional science slots, with its
-  complete listed introductory pool; advanced options remain open for review.
-- [x] Early Gen Ed allowances occupy clickable course-sized slots, preserving
-  credit remainders and sequence alignment. Fall/spring examples list observed
-  courses, credits, seats and first-day enrollment, with explicit credit fit.
-  The first-semester season is selectable and shareable.
-- [ ] Add reviewed major-specific guidance for elective suggestions, separate
-  from mandatory catalog rules; consider institution Markdown guidance files.
-- [x] Offline undergraduate catalog scanner: immutable public-source captures,
-  explicit credential scope, draft AND/OR trees, unresolved prose review queue,
-  course-link closure, verified resume, offline extraction and edition diffs.
-  Contract: `docs/developers/catalog-scanning.md`. Scans do not update runtime
-  degree files or certify academic interpretation.
-- [x] Admin > Data & Usage > Catalog Review: local scan selection, degree/type
-  filters, narrative and source queues, full captured evidence and draft
-  structure, all-section validation inventory, and CSV export. Read-only;
-  inspection never promotes a rule or edits an archive.
-- [x] Recognize standard minimum-grade/list rules without an ignore list;
-  preserve grade scope, wrapped named groups, source citations and unreviewed
-  status. Qualified language and unresolved courses remain actionable flags.
-- [x] Extract shared class-standing and program-admission milestones, preserving
-  Junior/Senior alternatives, explicit exclusions, source IDs and admission-policy
-  context. Admin Catalog Review lists their uses; status is not inferred from
-  semesters, credits or completed coursework. Runtime enforcement awaits review.
-- [x] Evidence-bound AI export/import pilot for complete programs and separate
-  shared course units: fixed schema, complete source-passage coverage, validated
-  imports and attributed append-only human reviews. Admin defaults to Program
-  review; the phrase parser remains available as Extraction diagnostics.
-  Contract: `docs/developers/catalog-normalization.md`. API calls are deferred.
-- [x] Solo-maintainer review: versioned AI-assisted drafts for the four pilot
-  programs load automatically beside catalog evidence. File exchange UI is
-  commented out; one whole-unit sign-off replaces individual rule/passage clicks.
-  Unresolved cases remain explicit and block sign-off. Linked-course drafts and
-  runtime compilation remain separate work.
-- [x] Explain Degree Explorer with a shared readable rule list in the graph and
-  Admin, generated from the actual saved courses, groups, edges, conditions and
-  settings, with catalog wording/links and labeled preferences. Parser diagnostics
-  and optional draft approvals remain separate advanced views.
-- [x] Add Nursing (Freshman Direct Entry), Population Health, Medical Laboratory
-  Sciences and Radiologic Sciences (Nuclear Medicine) prototypes, preserving
-  source gaps/conflicts, required clinical blocks and the semester credit cap.
-- [x] Add Psychology (B.A. and B.S.), Chemistry (B.A. and B.S.), Biochemistry,
-  Criminology, Political Science, Electrical Engineering, Exercise Science,
-  Film and Digital Arts (B.A. and B.F.A.) and Architecture, with the Education
-  and Human Sciences, Fine Arts and Architecture and Planning college rules.
-  Each map names its own Banner program codes, so a B.A. and a B.S. in one field
-  stay apart; Pathways selection by degree remains ([M37](ISSUES.md)).
-- [x] Record annual University, Gen Ed and awarding-college reference rules
-  separately from degree-specific files, with one format, readable rulebook,
-  explicit program profiles, source hashes/locators and unresolved cases.
-- [x] Use annual shared rules for illustrative Gen Ed coverage, named area gaps,
-  overlap badges and standard upper-credit context. Elective/minor slots remain
-  any-level space; no additional credit is charged for overlapping requirements.
-  Flexible coverage is provisional while the policy-numbering conflict remains.
-- [ ] Extend illustrative allocation into an advising-reviewed transcript audit:
-  conditional alternatives, transfer, grades, minor/residence/college constraints,
-  selectable choices and confirmed flexible-area interpretation. Nursing can
-  expose Gen Ed needs that do not fit whole existing allowance slots; redistribute
-  the cohort template without silently adding credits or certifying completion.
-- [ ] Connect AI API automation to the same proposal/review boundary; evaluate
-  interpretations and omissions on the four-program pilot before scaling up.
-- [ ] Compile approved canonical catalog rules into runtime degree tables and
-  selected-route templates; review exports do not yet change degree plans.
-- [ ] Add selectable elective/science routes, all course restrictions, admission
-  milestones, offering constraints and transfer-credit scenarios.
-- [ ] Review complete programs with different entry rules, elective structures
-  and concentrations; reconcile source conflicts and course equivalences.
-- [ ] Keep a course renumbering map ([I37](ISSUES.md#i37--renumbered-courses-lose-their-history)).
-  Each year's catalog update proposes renumberings by comparing the edition's
-  courses with the last one; each term, a screen lists new codes whose title
-  matches a retired code. Reviewed entries go in an institution file that every
-  course-history lookup reads.
-- [ ] Establish applicable catalog year and transfer/waiver evidence before
-  evaluating progress or additional coursework for a major switch.
-- [ ] Explore frequent observed term portfolios and paths without inventing an
-  order among concurrent classes; measure remaining variety after grouping.
-- [ ] Evaluate a requirement-informed demand challenger through the rolling
-  projection contract. The prototype does not change published forecasts.
+- [ ] **Demographics** by race/ethnicity/gender on chair-facing or Explore
+  surfaces, with small-cell suppression.
+- [ ] **Named-instructor DFW,** if policy supports showing it.
+- [ ] **Faculty counts** through the existing faculty/FTE helpers.
+- [ ] **Low-enrollment exception workflow** for dean/chair decisions on
+  flagged courses.
 
-Contracts: [degree-requirements.md](docs/developers/degree-requirements.md);
-interface: [degree-explorer.md](docs/users/degree-explorer.md).
+### Established analytical methods
 
-These are not scheduled until the cleanup above is done.
+Evaluation opportunities, not claims CEDAR implements them. Each would expose
+its population, assumptions, uncertainty and limits through a versioned
+definition.
 
-- **Standard CSV/spreadsheet export** across user-facing tables through a shared
-  table helper.
-- **Demographics by race/ethnicity/gender** in the right chair-facing or
-  Explore surfaces, with small-cell suppression.
-- **Named-instructor DFW display**, if the policy/permissions decision supports
-  showing it in the web app.
-- **Faculty counts surfaced from CEDAR** through existing faculty/FTE helpers.
-- **Low-enrollment exception workflow** for collecting and tracking dean/chair
-  decisions against flagged low-enrollment courses.
-
-### Established Analytical Methods
-
-These are evaluation opportunities, not claims that CEDAR already implements
-the methods or meets an external reporting standard. Prioritize them after the
-underlying counts and shared definitions are reconciled. Each implementation
-should expose its population, assumptions, uncertainty, and interpretation
-limits through a versioned definition and the docs site.
-
-- [ ] **Separate enrollment growth from worsening outcomes.** Evaluate
-  denominator-aware proportion charts or models for drop/DFW rates in Regstats
-  and attention dashboards. Keep counts alongside rates to distinguish students
-  affected from outcome probability; show practical effect sizes and uncertainty.
-  Check independence, changing student mix, and baseline stability before using
-  control limits. Reference: [NIST proportion-chart methods](https://www.itl.nist.gov/div898/handbook/pmc/section3/pmc332.htm).
-- [ ] **Strengthen gateway-course and sequence comparisons.** Define eligibility,
-  prior completion, comparison time, and outcome window before assigning groups.
-  Improve baseline diagnostics and evaluate appropriate adjustment and research
-  designs without implying that measured balance establishes causality. A
-  difference of 0.25 SD is not automatically well balanced; applicable WWC
-  designs require adjustment for differences above 0.05 through 0.25 SD.
-  Reference: [WWC baseline-equivalence guidance](https://ies.ed.gov/ncee/wwc/Docs/ReferenceResources/WWC-Baseline-Brief-v6_508.pdf).
-- [ ] **Model departure, switching, graduation, and return separately.** Evaluate
-  time-to-event, competing-risk, or multistate methods for Pathways, with explicit
-  states, transitions, and censoring at the observation edge. Treat temporary
-  absence as distinguishable from permanent departure; acknowledge that leaving
-  UNM does not establish leaving higher education. Reference:
-  [Survival package multistate and competing-risk methods](https://cran.r-project.org/web/packages/survival/vignettes/compete.pdf).
-- [ ] **Identify structural curricular bottlenecks.** Combine observed
-  course-taking with a versioned catalog prerequisite graph. Evaluate blocking
-  and delay measures to distinguish difficult courses from courses whose
-  curricular position delays later requirements. Observed course pairs alone
-  must not be treated as prerequisites. Reference:
-  [Curricular Analytics framework](https://arxiv.org/abs/1811.09676).
-- [ ] **Evaluate section-planning decisions as well as forecast accuracy.**
-  Continue rolling-origin evaluation, then assess the complete model-selection
-  and calibration procedure on later held-out terms and comparable data vintages.
-  Report potential seat shortages and excess capacity alongside forecast error.
-  Reference: [Forecasting: Principles and Practice — time-series cross-validation](https://otexts.com/fpp3/tscv.html).
-- [ ] **Add early academic-momentum indicators.** Evaluate credit accumulation,
-  credit completion ratios, and first-year gateway completion with explicit
-  entering cohorts, transfer treatment, and attempted/completed-credit definitions.
-  Use reliable term-level data and reconstructed timelines, not pull-stamped
-  cumulative fields. Reference: [Postsecondary Data Partnership metrics](https://studentclearinghouse.org/academy/courses/postsecondary-data-partnership-an-introduction/lessons/the-postsecondary-data-partnership-metrics/).
-- [ ] **Set common interpretation safeguards for these analyses.** Separate
-  exploratory course flags from confirmatory findings. Where inferential tests
-  are retained, address repeated observations and multiple comparisons, and
-  report substantive importance alongside statistical evidence
-  ([NCES statistical guidance](https://nces.ed.gov/statprog/2002/std5_1.asp)).
-  Keep CEDAR's course-based return/retention measures distinct from the specified
-  entering cohort and interval in [IPEDS retention](https://nces.ed.gov/ipeds/search/viewtable?returnUrl=%2Fsearch&tableId=36543).
-  Review proposed methods for accurate, contextualized, transparent communication
-  using [AIR ethical principles](https://www.airweb.org/resources/publications/statement-of-ethical-principles/principles).
+- [ ] **Growth vs worsening outcomes:** denominator-aware proportion charts for
+  drop/DFW rates, counts beside rates ([NIST](https://www.itl.nist.gov/div898/handbook/pmc/section3/pmc332.htm)).
+- [ ] **Gateway and sequence comparisons:** eligibility, prior completion and
+  outcome windows defined first; balance is not causality ([WWC](https://ies.ed.gov/ncee/wwc/Docs/ReferenceResources/WWC-Baseline-Brief-v6_508.pdf)).
+- [ ] **Departure, switching, graduation and return** as competing risks or
+  multistate models, censored at the observation edge ([survival](https://cran.r-project.org/web/packages/survival/vignettes/compete.pdf)).
+- [ ] **Structural curricular bottlenecks** from a versioned prerequisite graph
+  plus observed course-taking ([Curricular Analytics](https://arxiv.org/abs/1811.09676)).
+- [ ] **Section-planning decisions** judged on seat shortage and excess as well
+  as forecast error ([FPP3](https://otexts.com/fpp3/tscv.html)).
+- [ ] **Early momentum indicators:** credit accumulation, completion ratios,
+  first-year gateway completion, from reliable term-level data ([PDP](https://studentclearinghouse.org/academy/courses/postsecondary-data-partnership-an-introduction/lessons/the-postsecondary-data-partnership-metrics/)).
+- [ ] **Interpretation safeguards:** exploratory flags apart from confirmatory
+  findings; multiple comparisons; course-based retention kept distinct from
+  [IPEDS](https://nces.ed.gov/statprog/2002/std5_1.asp) cohorts ([AIR principles](https://www.airweb.org/resources/publications/statement-of-ethical-principles/principles)).
 
 ---
 
-## Planning Rules
+## Inbox
 
-- Two live lists: this file for new features and significant upgrades;
-  [`ISSUES.md`](ISSUES.md) for defects and improvements to what exists. Link,
-  don't copy: a roadmap item names the issue IDs it depends on.
-- When a roadmap item ships, the leftover concrete work becomes issues.
-- Do not add completed-work narratives here. Close the loop in the code,
-  changelog, release notes, and commit history.
-- Every PR that adds or renames a cone, branch, feature, module, or user-facing
-  surface updates `AGENTS.md`, the relevant docs, and this roadmap in the same
-  diff.
-- Re-run the scale snapshot before major releases and whenever decomposition
-  work changes the shape of the project.
+Ideas not yet given a theme or an order. Add freely; triage moves an item into
+a theme above, into `ISSUES.md` if it is a fix to something that exists, or
+deletes it.
+
+- [ ] _(empty)_

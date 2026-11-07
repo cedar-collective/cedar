@@ -1,18 +1,13 @@
 # ADR-001: Move CEDAR's tables from report-shaped to domain-shaped
 
-- **Status:** Proposed. First written 2026-07-31; rewritten 2026-11-03 with the
-  measurements below and a target architecture, after the app's growth began
-  exposing the report-shaped tables (ISSUES.md I9, I15, I37, I44, I45).
-  Amended 2026-11-05: step 2 closed, and step 3 written out in full
-  ([below](#step-3-in-full-dimensions-and-how-data-reaches-a-cone)), with the
-  convention for how tables reach a cone. Revised 2026-11-06 after review:
-  the default unit is attached once at load, not joined by every reader, and
-  step 4 follows in the same order it did, no longer behind a reader
-  migration.
-- **Supersedes:** nothing yet. When step 3 below lands it supersedes
-  [ADR-002](adr-002-explicit-mapping-files.md) Stages 3 and 3b (units and
-  colleges stamped onto rows at transform time) with the same files read as
-  dimensions. ADR-002's files, rules and pipeline contract stand.
+- **Status:** Accepted, in progress (steps 1–3 done; step 4 under way). First
+  written 2026-07-31; rewritten 2026-11-03 with the measurements below.
+  Step 3's design revised 2026-11-06 after review; course keying decided
+  2026-11-07.
+- **Supersedes:** [ADR-002](adr-002-explicit-mapping-files.md) Stages 3 and
+  3b (units and colleges stamped onto rows at transform time): the same files
+  are read as dimensions at load. ADR-002's files, rules and pipeline
+  contract stand.
 - **Complements:** [source-to-cedar-manifest.md](source-to-cedar-manifest.md),
   [field-reliability.md](field-reliability.md), [right-edge-policy.md](right-edge-policy.md).
 
@@ -154,7 +149,7 @@ after the fact. It drops the student-term and section descriptions.
 | table | grain | source | what moves here |
 |---|---|---|---|
 | `cedar_terms` | term | derived from the data once per load | season, academic year, next/previous regular term, start and census dates, and the four right edges as flags (`is_settled`, `is_graded`, `is_latest_enrolled`, `has_degrees`) |
-| `cedar_courses` | course id | the sections, the class lists and `code_history.csv` | a **stable id** per course: the last code of its confirmed succession chain, so a renamed or renumbered course keeps one history (I37, I45); the codes it has carried are `cedar_course_codes`. Built 2026-11-06 (step 4, PR 1); written out [below](#step-4-in-full-the-course-dimension-and-what-follows-it) |
+| `cedar_courses` | course id | the sections, the class lists and `code_history.csv` | a **stable id** per course: the last code of its confirmed succession chain, so a renamed or renumbered course keeps one history (I37, I45); the codes it has carried are `cedar_course_codes`. Built 2026-11-06 (step 4, PR 1); written out [below](#step-4-the-course-dimension-and-what-follows-it) |
 | `cedar_subjects` | subject × college × level | `subjects.csv` | subject → unit → college, read as a table instead of stamped |
 | `cedar_program_catalog` | program code × college | `programs.csv` | program → unit, `is_pre_major`, `leads_to` |
 | `cedar_units`, `cedar_colleges`, `cedar_campuses` | code | `units.csv`, `colleges.csv`, `campuses.csv` | names, home college, aliases |
@@ -223,544 +218,131 @@ several, and the manifest's §1–5 become an appendix of that adapter.
 ### Migration path: strangler, in this order
 
 Each step is additive until its last sub-step, so the app runs throughout.
+What each PR changed and measured is in its PR description and commit; this
+record keeps the decisions.
 
-1. **`cedar_terms`.** Small; the right-edge policy becomes a join instead of
-   a parameter every cone passes and checks.
-2. **`cedar_student_terms`**, merging the two existing side tables with one
-   definition of an enrolled term and `return_observable` from `cedar_terms`.
-   Closes I44 (closed 2026-11-04: the app loads the table and Roadblocks
-   and Retention read it; `cedar_next_term` is gone). Precedence when the
-   two source snapshots disagree: the
-   academic-studies row wins (it is the student-level report), the row is
-   flagged and the count reported — never a silent coalesce. Measured on the
-   first build: 5,442 of 373,169 student-terms described by both sources
-   disagree, 4,210 of them in Fall 2025, pulled four months apart.
-   **Done 2026-11-04.** Every reader that groups, labels or places a student
-   by a description column reads the table (the per-reader measurements are
-   in [student-terms.md](student-terms.md)). Three reads of the class-list
-   copies remain, each assigned elsewhere: `filter_class_list()`'s
-   `classification`, `major`, `student_campus` and `student_college` keys
-   and Regstats' sophomore screen join the table in step 5, when the columns
-   go (until then a late-pulled term's classification filter selects the
-   wrong students, ISSUES.md I47); `course-flows.R` carries
-   `student_classification` into the `cedar_course_flows` precompute and
-   moves with step 4, which rebuilds that precompute; the enrollment
-   projection inputs read `major_code` and `student_classification` as model
-   inputs, so that change is a `model_version` decision, not a data-model
-   chore.
-3. **Dimensions from the mapping files**, loaded as one `dims` object by one
-   shared loader, which attaches the default unit columns to the fact tables
-   once at load through `attach_unit()`; the transform then stops stamping
-   them, and the provenance stamps and deploy gate go. No reader changes.
-   Supersedes ADR-002 Stages 3 and 3b. Written out in full
-   [below](#step-3-in-full-dimensions-and-how-data-reaches-a-cone).
-4. **`cedar_courses` with a stable id and renaming crosswalk** (I37, I45),
-   then `cedar_course_terms` promoted from `cedar_cl_enrls_base` and
-   `cedar_attempts` from `cedar_grades`. **PR 1 done 2026-11-06:** the
-   dimension and `course_id` at load, no reader changed. Reader PRs 1 to 6
-   (same day): Low Enrollment, Course Dynamics, Regstats, Waitlists, the
-   Department Dashboard and the enrollment projections read by course.
-   2026-11-07: every loader keys the tables on the course, and
-   `cedar_course_terms` replaces the base as a parameter. Written out
-   [below](#step-4-in-full-the-course-dimension-and-what-follows-it).
-5. **Thin `cedar_students` and `cedar_programs`** to their keys and
-   registration facts; rename to the fact names once no reader uses the old
-   columns.
+| Step | What | Status |
+|---|---|---|
+| 1 | `cedar_terms`: the right edges become a join | done |
+| 2 | `cedar_student_terms`: one definition of an enrolled term and of return (closes I44) | done 2026-11-04 |
+| 3 | Dimensions from the mapping files, units attached at load | done 2026-11-06 |
+| 4 | `cedar_courses` and course ids at load (I37, I45); `cedar_course_terms`; `cedar_attempts` | courses and keying done 2026-11-07; `cedar_course_terms` done 2026-11-07; `cedar_attempts` next |
+| 5 | Thin `cedar_students` and `cedar_programs` to keys and registration facts; rename to fact names | not started |
+
+Step 2's precedence rule: when the two source snapshots disagree, the
+academic-studies row wins, the row is flagged and the count reported, never
+a silent coalesce. Three class-list description reads remain until step 5:
+`filter_class_list()`'s `classification`, `major`, `student_campus` and
+`student_college` keys and Regstats' sophomore screen (I47). The enrollment
+projections read `major_code` and `student_classification` as model inputs,
+so moving them is a `model_version` decision, not a data-model chore.
 
 Pull history is the one piece with a deadline and should be sized now.
 
-### Step 3 in full: dimensions, and how data reaches a cone
+### Step 3: dimensions, and how data reaches a cone
 
-Decided 2026-11-05, before any code; revised 2026-11-06 after review. Three
-questions were open: whether the unit join runs once at load or where it is
-read; whether a reader may choose a hierarchy other than the subject's unit;
-and whether "every table a cone needs is a parameter" survives a model with
-twelve tables. The answers below are one design.
+Decided 2026-11-05; revised 2026-11-06 after review.
 
-**The mapping files are the dimension tables, and the default unit is
-attached once at load.** On disk, fact tables keep keys only: a class-list
-row its subject, section college and level; a section the same; a program or
-degree row its program code and college. The mapping files load as dimension
-tables beside `cedar_terms`: `subjects` (subject × college × level → unit),
-`programs` (code × college → unit, `is_pre_major`, `leads_to`), `units`,
-`colleges` and `campuses` (names, home college, aliases). The shared loader
-then attaches the default unit and college columns to every fact table, under
-the names every reader has always read (`department` and `college` on
-sections and class-list rows, `dept_code` and `college_code` on programs and
-degrees, `primary_dept_code` and `primary_college_code` on student-terms), so
-the in-memory tables look as they do today and **no reader changes**. A
-mapping edit changes the next start and rebuilds nothing.
+- **The mapping files are the dimension tables, and the default unit is
+  attached once at load.** On disk a fact table keeps keys only. The loader
+  attaches the default unit and college columns under the names every reader
+  already used (`department`, `college`, `dept_code`, `college_code`,
+  `primary_dept_code`, …), so no reader changed and a mapping edit rebuilds
+  nothing.
+- **Rejected: the star schema proper**, where every reader joins the
+  dimension it needs. Measured on 2026-11-06, 66 files (15 of 26 cones, 28 of
+  40 branches, 10 of 18 features, 13 of 16 modules) read a unit column,
+  almost all as a filter or a grouping. The join would have become a
+  mandatory step in each and in every future cone, and moved no number. The
+  concern behind it, that a column's name did not say which rule produced it
+  (how I7 and I9 stayed invisible), is answered by the naming rule.
+- **The naming rule.** The default columns always mean the default
+  hierarchy: the subject's unit on a section or class-list row, the
+  program's unit on a declaration or degree. Any other hierarchy is attached
+  under its own name (`instructor_unit`), never into the default columns.
+- **How data reaches a cone.** A cone names the fact tables that are its
+  input; one that needs a dimension by name takes a single `dims`. Features
+  keep taking `data_objects`. A single data bag for cones (`cone(data, opt)`)
+  was rejected: it hides the dependency the parameter rule exists to show.
+- **One function resolves a unit:** `attach_unit(rows, dims, hierarchy)`,
+  wrapping the two rules in `R/lists/institution_files.R`. A row the files do
+  not cover gets `NA` and a `unit_basis`, never a unit named after itself.
+  `test-architecture.R` forbids resolving a unit anywhere else, which is what
+  prevents I9.
 
-The alternative, the star schema proper, where every reader joins the
-dimension it needs and a cone or branch may not read a unit column off a fact
-table, was the 2026-11-05 design and was rejected on 2026-11-06. Measured on
-that day: 15 of 26 cones, 28 of 40 branches, 10 of 18 features and 13 of 16
-modules read a unit column, almost all as `filter(department == ...)` or
-`group_by(term, campus, college, department, ...)`. The end state would have
-turned that one-column read into a mandatory join step in 66 files, moved no
-number, and cost a migration six times the size of step 2 — and every future
-cone would carry the step. CEDAR's queries are mostly "filter registrations
-by a student or section attribute", which should need no join. The concern
-that had argued for the star schema, that a reader could not tell from a
-column's name which rule produced it (how I7 and I9 stayed invisible), is
-answered by a naming rule, not by removing the column: I7 and I9 came from a
-self-named fallback and a drifted duplicate list, both already gone under
-ADR-002.
+Consequences: the transform stopped stamping units, the provenance stamps
+and `CEDAR_MAPPED_TABLES` went, the deploy gate builds only
+`cedar_student_terms`, and `cedar_lookups` retired into `dims`
+(`unit_names()`, `college_code_names()`, `subject_units()`,
+`name_program_codes()`). One rule surfaced only by comparing on real data: a
+declaration's `program_college` is the files' answer alone (NA when
+undecided); the Banner fallback belongs to the student's `college_code`.
 
-**The naming rule.** `department`, `college`, `dept_code` and `college_code`
-always mean the default hierarchy: the subject's unit on a section or
-class-list row, the program's unit on a declaration or degree. Any other
-hierarchy a reader wants (a course under its instructor's unit, a Gen Ed
-course under its awarding college, a student under their primary major's
-college) is attached by `attach_unit()` under its own column name, never
-written into the default columns. A reader that sees `department` knows the
-rule; a reader that sees `instructor_unit` knows the other one.
+### Step 4: the course dimension, and what follows it
 
-**How data reaches a cone: facts explicit, `dims` as one object, `opt`
-last.** The rule that every table a cone needs is a parameter stays, for the
-reasons it was made: a cone is testable against a fixture, runnable in
-RStudio against any table, and says what it depends on. A cone names the one
-or two **fact** tables that are its actual input. A cone that needs a
-dimension by name (a unit's display name, a college's home, a non-default
-hierarchy) takes a single **`dims`** argument holding every dimension table,
-rather than five of them threaded through its signature. Most cones need
-neither: they read the attached column. `dims` is built once by one shared
-loader that every entry point calls (`global.R`, the two cache-warming
-scripts, `cedar-repl.R` and the scripts that source it, `dev/demo-data.R`,
-the projection build and the snapshot scripts), carries a class, is validated
-there, and absorbs `cedar_lookups`, which is already this object in all but
-name; the transform stopped writing `cedar_lookups` on 2026-11-06. Features keep
-taking `data_objects`; they are orchestrators. The M12 architecture test
-keeps forbidding global reads. A single data bag for cones (`cone(data, opt)`)
-was rejected: it hides the dependency the rule exists to show, and a test has
-to assemble everything to run anything.
+Decided 2026-11-06; the keying decision 2026-11-07.
 
-**How a unit is attached: one function, with the hierarchy as an argument.**
-`attach_unit(rows, dims, hierarchy)` is the only code that resolves a unit.
-It wraps `resolve_course_units()` and `resolve_program_units()`, which
-already hold the two default rules in `R/lists/institution_files.R`; it does
-not reimplement them. `hierarchy` names the rule (`"subject"`; `"program"`
-for declarations and degrees; others as readers need them). A row the files
-do not cover gets `NA` and a `unit_basis`, never a unit named after itself
-(the rule EC-14 guards). The invariant `test-architecture.R` enforces is the
-one that actually prevents I9: **no code outside `attach_unit()` and the
-lists layer resolves a unit** — no call to the resolve functions, no read of
-`subj_dept_map` or the mapping files, in a cone, branch, feature or module.
-Reading the dimension tables at load is what makes an institution's mapping
-work "edit a CSV and restart", and makes an adopter whose units are keyed on
-something other than subject a new hierarchy in one function.
+**The problem.** On the 2026-10-08 pull the data carries 7,641 course codes.
+Banner applies a subject's rename to old class lists but not old schedules
+(I45: 1,355 sections carry two codes), and the Fall 2019 common course
+numbering and the Fall 2026 renumberings started each affected course's
+history over (I37). Every reader grouping on `subject_course` saw the old
+course die and the new one arrive from nowhere.
 
-**How we get there: two code PRs and a small third, numbers compared on real
-data at each.**
+- **One file records successions: `institution/<id>/code_history.csv`.**
+  One row per succession, `kind` subject / course / program. A subject row
+  renames every number under it; a course row renumbers one course; a chain
+  may mix them (SOC 250 → SOCI 250 → SOCI 2315). The validator refuses a
+  self-succession, a malformed term, a confirmed code with two successors (a
+  split: one code cannot have two ids) and a cycle.
+- **Only confirmed rows take effect.** A proposed row is a candidate with its
+  evidence and assigns nothing. `detect_course_renamings()` proposes (a
+  section under two codes; a title whose retired code stopped before its new
+  one began); `scripts/propose-code-history.R --write` appends what it finds;
+  a person confirms through a pull request.
+- **`course_id` is the last code of the chain**, not a surrogate: readable,
+  stable until the next confirmed rename, and never saved, so there is no key
+  to migrate.
+- **Keyed at load (decided by the user, 2026-11-07).** The first readers each
+  opted in through a per-reader shim, so `subject_course` meant the code or
+  the course depending on which function had run, and both regressions caught
+  in the Regstats PR came from that. Of three end states (key once at load;
+  group on `course_id` openly everywhere, with a ratchet; keep the shim), the
+  user chose the first, so a cone written naively on `subject_course` is
+  right by default. `attach_course_ids()` sets `subject_course` to the
+  course on the loaded sections, class list and grades, keeps the
+  registrar's code in `listed_code`, and the saved files are never rewritten.
+  The two code-level functions read the registrar's code back
+  (`.registrar_codes()`).
+- **CCS is not renamed to CCST** (corrected by the user, 2026-11-07). CCST is
+  the lower-division prefix and CCS still the upper-division one; the first
+  confirmed subject row would have renamed every current CCS course. It is
+  61 course rows instead, CCST nnn → CCS nnn.
+- **`cedar_course_terms` replaces `cedar_cl_enrls_base`** (2026-11-07).
+  Its grain is course × term × campus × part of term: Regstats compares a
+  full-term section with its half-term siblings, and since the class list is
+  one row per student, course, campus and term, the part-of-term rows sum
+  exactly to the ADR's grain. It carries counts only, nothing pooled across
+  terms: a measure table holding a mean would hold a later term's counts in
+  an earlier term's row. It is a parameter with a declared contract
+  (`COURSE_TERMS_COLUMNS`, `COURSE_TERMS_BUILD_VERSION`, the class list's
+  renames), never a global. First-day enrollment, DFW, fill and waitlist
+  demand join it when a reader moves to them.
 
-1. **The loader and `dims`.** One function every entry point calls reads the
-   mapping files into `dims`, drops any stamped unit column it finds on a
-   fact table, and attaches the default columns through `attach_unit()`.
-   The transform still stamps at this point, so the before-and-after
-   comparison must be identical to the row (same resolve functions, same
-   files); the join time and the peak memory of dropping and re-attaching
-   columns on 1.86M rows are measured here, against the projection build's
-   ceiling. The ADR's own measurement of the join is 0.4–0.9 s on the full
-   class list.
-   **Done 2026-11-06** (`R/branches/dims.R`; `global.R`, both cache-warming
-   scripts and `cedar-repl.R` call it). Measured on the 2026-10-08 pull in
-   shared-data, host R: every stamped value reproduced on all four tables.
-
-   | table | rows | attach | transient memory over the table |
-   |---|---|---|---|
-   | `cedar_sections` | 242,413 | 0.20 s | 63 MB over 100 MB |
-   | `cedar_students` | 1,853,633 | 1.21 s | 340 MB over 484 MB |
-   | `cedar_programs` | 622,385 | 1.2–1.8 s | 436 MB over 232 MB |
-   | `cedar_degrees` | 75,272 | 0.05 s | 67 MB over 57 MB |
-
-   The transient is freed once the table is attached, before any analysis
-   allocates, so the projection build's peak (3.2 of 3.8 GiB, reached in its
-   own working copies) is not raised. One rule was found only by this
-   comparison: a declaration row's `program_college` is the files' answer
-   alone (NA for an undecided code); the Banner fallback belongs to the
-   student's `college_code`, never the program's. 3,981 rows said so.
-2. **The transform stops stamping.** `cedar_students`, `cedar_sections`,
-   `cedar_programs` and `cedar_degrees` are written with keys only;
-   `cedar_student_terms` stores `primary_major_code` and the college key its
-   resolution uses, and the loader attaches `primary_dept_code` and
-   `primary_college_code` the same way, so a mapping edit no longer rebuilds
-   it either. The provenance stamps, `CEDAR_MAPPED_TABLES` and
-   `scripts/rebuild-programs-if-mappings-changed.R`'s mapping branch go (its
-   student-terms branch stays until step 5). AGENTS.md's "every stored unit
-   comes from the mapping files" paragraph is rewritten to "every unit is
-   attached at load". Because the loader already drops any stamped column, a
-   file written by either transform loads the same way, and the deploy needs
-   no startup sequencing of the kind I46 was about.
-   **Done 2026-11-06.** The transform writes `source_college` on sections
-   and class-list rows, `source_college` / `source_college_code` on programs
-   and `source_student_college` / `source_college` on degrees, and nothing
-   else about a unit. `cedar_student_terms`
-   stores `primary_source_college_code` / `primary_source_college` beside
-   `primary_major_code`; `attach_student_term_units()` resolves the three
-   attached columns, and `attach_section_units()` derives
-   `crosslist_external` / `crosslist_partners` from the attached department.
-   `R/branches/mapping-provenance.R` and `CEDAR_MAPPED_TABLES` are gone; the
-   gate is `build_student_terms_if_stale()` and nothing else. Measured on the
-   2026-10-08 pull: the new builder rebuilds the saved table's 518,894
-   student-terms (136.6 s) and, attached (0.39 s, 368 MB transient over a
-   136 MB table), `primary_major_code`, `primary_dept_code`,
-   `primary_college_code` and `is_pre_major` match the stamped values on
-   every row (14,086 under a Banner college, 451,940 mapped, 52,868 none).
-3. **`dims` absorbs `cedar_lookups`.** The lookups the transform builds from
-   the files (`dept_lookup`, `dept_name_lookup`, `college_code_to_name`,
-   `subject_lookup`) are read off `dims`; the ones it builds from the data
-   (`program_name_lookup`) move to a measure or stay a small saved table.
-   Readers that take a `lookups` parameter take `dims`.
-   **Done 2026-11-06.** `unit_names(dims)`, `college_code_names(dims)` and
-   `subject_units(dims)` (`R/branches/dims.R`) replace `dept_name_lookup`,
-   `college_code_to_name` and `subject_lookup`; `headcount_program_names(programs)`
-   counts the modal unit per program name where `program_name_lookup` stored
-   it; `dept_lookup` had no reader. The transform's `build_lookups()` writes
-   `major_code_to_name` alone, the class lists' Major Code beside its name,
-   which no file knows, and runs when the students do. `dept_code_to_name`
-   (`R/lists/catalog_lookups.R`) names every unit in units.csv, no longer
-   only those teaching a subject, and `global.R` no longer overrides it from
-   the saved file. Headcount (`get_headcount()`, the module), Dept Trends'
-   headcount panel, the Pathways focal-subject helper and the department
-   choice lists take `dims`. Dept Trends' cache keys hash `cedar_dims` for
-   every tab that labels a unit.
-   **`cedar_lookups` retired 2026-11-06.** Its last table, `major_code_to_name`,
-   named the codes only a class list carries. Those 49 codes (6,362 class-list
-   rows, 0.34%) are now proposed rows in programs.csv, named from the class
-   list, so `name_program_codes(codes, dims)` names every code the data
-   carries from the file alone, and the Gen Ed major mix, Dept Trends' SCH by
-   major and the Dept Dashboard's donuts show one name per code. The mapping
-   audit reads the class lists' major codes too (`class_list_program_code`),
-   so a new class-list-only code is listed the day it arrives, with the
-   roster's name as context. Measured before the switch: 459 of 469 codes
-   named identically; the file's spelling wins on the rest.
-   Measured on the 2026-10-08 pull before the change: every one of the saved
-   `subject_lookup`'s 214 subjects is among subjects.csv's rows (25 of them
-   with a second row differing only by college, which `subject_units()`
-   keeps); 162 of the 163 saved unit names are units.csv's verbatim and all
-   17 college names match colleges.csv; `program_name_lookup`'s 501 names
-   are reproduced by `headcount_program_names()` from the loaded table.
-
-**Cost, stated plainly.** Three PRs, no reader migration, and no number
-should move. The cost is startup time and a transient copy of the largest
-table, both measured in the first PR. Step 4 then follows directly, and that
-is where a new cone gains something to reuse: `cedar_course_terms` and
-`cedar_attempts` are what let it filter a measure table and join rather than
-re-derive from 1.86M rows.
-
-### Step 4 in full: the course dimension, and what follows it
-
-**Decided 2026-11-06, with the first PR.** Step 3 gave every row its unit
-from the files at load. Step 4 does the same for the course: every section
-and class-list row gets a `course_id` at load, from the files, and the code
-the registrar used that term stays beside it.
-
-**The problem, measured on the 2026-10-08 pull** (terms Fall 2018 to Fall
-2026). The data carries 7,641 distinct `subject_course` codes: 7,573 on the
-schedule, 6,598 on class lists, 68 on class lists only (61 CCST, 4 SOCI, 3
-PSYC). Those 68 are I45: Banner applies a subject's rename to old class lists
-and not to old schedules, so 1,355 `(term, crn)` sections carry two codes, 180
-distinct pairs, every one a same-number rename (CCS → CCST on 524 sections,
-PSY → PSYC on 611, SOC → SOCI on 220). CCS persists on the schedule to Fall
-2026 beside CCST, which began Fall 2019. Across terms the same gap is I37:
-the Fall 2019 common course numbering and the Fall 2026 Anderson and
-Population Health renumberings each started every affected course's history
-over. 36 R files group on `subject_course`; each one sees the old course die
-and the new one arrive from nowhere.
-
-**The decision.**
-
-- **One file records successions: `institution/<id>/code_history.csv`**,
-  the file the ROADMAP's "Code history" item planned, with a `status`. One
-  row per succession, `kind` subject / course / program, `from_code`,
-  `to_code`, `effective_term`, `scope`, `basis`, `status`, `evidence`,
-  `notes`. A subject row renames every number under the subject; a course
-  row renumbers one course; a chain may mix the two (SOC 250 → SOCI 250 →
-  SOCI 2315). The validator refuses a self-succession, a term that is not a
-  term code, a `scope` on a subject or course row, a confirmed code with two
-  successors (a split: one code cannot have two ids), and a cycle.
-- **Only confirmed rows take effect**, as with a unit mapping. A proposed row
-  is the screen's candidate, with its evidence, and assigns nothing until a
-  person confirms it. The data can only suggest a succession; recording one
-  is a decision, taken by a pull request, effective at the next start.
-- **`course_id` is the last code of the chain**, not a surrogate. It is
-  readable, it is stable until the next confirmed rename (a decision, like a
-  unit's), and since nothing is saved there is no key to migrate when it
-  moves. `cedar_courses` is one row per id (current subject and number,
-  level, latest title, first and last term over every code, how many codes
-  and which); `cedar_course_codes` one row per code with its id, where it
-  appears and how many steps it took.
-- **Attached at load, never saved.** `build_cedar_courses()` runs in every
-  loader after the units and `attach_course_ids()` writes `course_id` onto
-  `cedar_sections` and `cedar_students`. The saved files are never rewritten
-  (annotate, never mutate). 8 s to build and under a second to attach on the
-  full pull. *Amended 2026-11-07:* the loader now keys the loaded tables on
-  the course as well, `subject_course` the id and `listed_code` the term's
-  code ([below](#keyed-at-load-2026-11-07)); until then `subject_course`
-  stayed the registrar's code in memory too.
-- **A screen proposes; a script writes.** `detect_course_renamings()` finds a
-  section under two subjects (`section_crn`) and a title whose one retired
-  code stopped before its one new code began (`title_match`), resolving codes
-  through the file first so a pair already joined is not a candidate.
-  `scripts/propose-code-history.R --write` appends what it finds as proposed
-  rows, with a floor of 20 rows between the two codes.
-
-**What the first PR produced.** UNM's file carries the three section-evidenced
-subject renames confirmed and 320 title matches proposed: 117 effective Fall
-2019 (the common course numbering: ENGL 112 → ENGL 1120 on 30,400 rows, MATH
-121 → MATH 1220, CJ 130 → COMM 1130), 64 effective Fall 2026 (MGMT 326 → BUSA
-3260 and the rest of I37's list), the remainder spread across the years
-between. With the three confirmed rows the dimension has 7,450 courses from
-7,641 codes; 229 codes resolve to another, joining 191 courses (79 PSYC, 61
-CCST, 51 SOCI; the CCS row was later replaced, [below](#keyed-at-load-2026-11-07)). SOCI 371's history now begins Fall 2018, where SOC 371's did,
-instead of Fall 2021. The demo institution's file carries the RN01 fixtures'
-successions, one of them proposed, so `test-courses.R` shows a proposed row
-assigning nothing and a chain crossing kinds.
-
-**The readers, in order.** No reader grouped on `course_id` in PR 1, so no
-number moved there. **Reader PR 1 (2026-11-06): Low Enrollment.** Its
-schedule view and course histories (`get_enrollment_concerns()`,
-`get_course_enrollment_history()` and the batched form in `enrl.R`) key on
-`course_id`, require the column, and name the former codes behind the shown
-numbers in the history text. Measured on the 2026-10-08 pull for Fall 2026:
-2,199 scheduled course-campus rows, 42 with history under a former code (all
-PSYC behind PSY, the confirmed renames); SOCI 371 on ABQ has 19 terms of
-history where it had 12. With only the three subject renames confirmed, 4 of
-the 391 courses with no Fall history by code find it by id; were the 320
-proposed renumberings confirmed, 84 would (36 BUSA, 8 ACCT, 8 NURS, I37's
-list), which is why confirming them is a decision worth a person's hour.
-**Reader PR 2 (2026-11-06): Course Dynamics.** The whole tab reads by
-course. `key_on_course_id()` (`courses.R`) returns a working frame whose
-`subject_course` is the `course_id` and whose registrar's code is
-`listed_code` — every column shared, nothing copied, the loaded tables
-untouched — so a reader's filters, groupings, joins and flows on
-`subject_course` follow the course with no change to their grain, and
-`course_id_of()` resolves the picked code, current or former, to its course.
-`create_course_base_data()` resolves once and names the report by the id
-(`course_code`; the picked code stays as `selected_code`); the crosslist-family
-functions in `enrl.R` key both tables the same way, so a former code is the
-course's own history and never a partner listing; the flows, outcomes,
-rollcall, retention and downstream readers take the keyed class list
-(`cr_students` in `server.R`); the page says which codes the course has
-carried and when (`course_former_codes_note()`, reading `listed_as` off the
-section history); and the neighbors cache keys the frame's renames
-(`course_code_renames()`, version 4). Former codes were not made a kind of
-listing after all: a listing is a code students register under *in the same
-term*, and a former code is the same course in an earlier one, so it belongs
-in the course's own row with a note, not in a split column. Measured on the
-2026-10-08 pull: keying the 1.85M-row class list takes no measurable time
-(two column pointers); SOCI 371 on ABQ has 19 terms of section history where
-it had 12 and 17 terms of class-list lifecycle where it had the 12 the
-sections reached (the class list already carried SOCI on the old sections,
-I45, so the grade-reading and flow cones were whole by code; the sections and
-everything joined through them were not); PSYC 302 likewise, 19 and 17 where
-it had 9. SOCI 371's feeders drop from 1,175 rows to 1,154 with the same
-4,728 students: 21 feeder codes united with their renames.
-
-**Reader PR 3 (2026-11-06): Regstats.** `get_reg_stats()` keys both tables
-on `course_id` before anything reads them, so `history_keys` follow the
-course unchanged in name: a renumbered course's strictly earlier offerings
-are its own count means, drop means and Terms at Cap, and the schedule's
-capacity for a section the class list names by the newer code (I45) joins
-its census instead of reporting unmatched. A picked code, current or former,
-resolves once (`course_id_of()` over the codes both tables carry). The
-precomputed base it filters moved into a branch helper,
-`build_cl_enrls_base()`, which counts the keyed class list and stamps the
-renames it saw on the result; `cl_enrls_base_is_current()` refuses a base
-saved before the current `code_history.csv` rows were confirmed, in
-`global.R` (recompute) and in `get_reg_stats()` (stop). The day cache is v6
-and records the renames it was counted over, so a confirmed row is a miss
-the same day. Every flagged table carries `former_codes`
-(`course_former_code_spans()`, "HIST 320 (Spring 2020 to Fall 2020)"), shown
-beneath the code, and the scope bar says how many flagged courses ran under
-another code. The excluded-course list is applied by course on both
-whole tables before anything reads them (`excluded_course_ids()`; ISSUES
-M39), since a list naming CCS 699 matched by code misses the CCST 699 the
-course is keyed on. Measured on the 2026-10-08 pull: 551 flagged courses
-for Fall 2026 by course and by code (seven CCS courses report as CCST with
-both codes' counts, and 30 name a former code), 557 against 548 for Spring
-2026 (PSYC, SOCI and CCST courses whose PSY, SOC and CCS offerings are
-now their baselines); the saturation universe is the same 3,685 groups
-either way; the base builds in 7.6 s as before. Definition regstats 5.0.0. Waitlists reads the same keyed
-base: `attach_enrollment_history()` resolves each waitlist row's code to its
-course for the join and puts the code back, so the history follows the
-course. That is needed today, not only after a confirmation: UNM's class
-lists carry CCS beside CCST through Fall 2026 (201 CCS codes from Spring
-2026 on, 109 Fall 2026 sections), and joined by code a waitlisted CCS course
-would read no history from the keyed base.
-
-**Reader PR 4 (2026-11-06): Waitlists.** `inspect_waitlist()` keys both
-tables on `course_id` and resolves a picked code once (`course_ids_of()`,
-shared with Regstats), so the true-demand de-dup, the three tables and the
-section supply follow the course: students waiting under CCS 370 and CCST
-370 in one term are one row, and a student waiting under one code while
-registered under the other holds a seat and is not counted. Every table
-carries `former_codes`, shown beneath the code by `course_code_cell()`,
-which now takes the drill link (`onclick`). Definition waitlist 3.0.0.
-Measured on the 2026-10-08 pull: Fall 2026 has the same 732 rows and 3,865
-waiting students by course and by code (no student in this pull waits
-under two codes of one course), 39 rows name a former code, and one more
-row reads enrollment history. Regstats rows, which carry course ids since
-reader PR 3, now drill into a Waitlists view that finds every code's rows.
-**Reader PR 5 (2026-11-06): the Department Dashboard.**
-`create_dept_dashboard_data()` keys both tables once, after reading them,
-so the course history it builds with `get_enrl()` and every reader of it
-(new this term, missing from earlier, repeated topics, above and below
-average), the low-enrollment review, the waitlist block and the Regstats
-flags follow the course; the waitlist and low-enrollment tables, new this
-term and missing from earlier carry `former_codes`, and the payload records
-its renames (`course_code_renames`). Cache v13; the key already hashes the
-dims, `code_history` among them. Measured on the 2026-10-08 pull: PSYC no
-longer calls PSYC 539 and PSYC 644 new in Fall 2026, nor PSYC 416 in Spring
-2026; SOCI no longer calls SOCI 307 new in Fall 2026; the CCS department's
-new courses are named CCST. Missing-from-earlier and the waitlist rows are
-unchanged in count. The hand-built course rows in `server.R` (above and
-below average, new, missing) show the course id without its former codes;
-the waitlist table shows them. The downstream-signals
-flows (`cedar_course_flows`) are still by code and rebuild on
-`cedar_course_terms`.
-**Reader PR 6 (2026-11-06): the enrollment projections, model 0.28.0.**
-`enrollment_projection_course_scope()` resolves the course group and the
-forced courses to course ids and keys the class list and the sections, and
-`build_enrollment_projection_bundle()` keys them again (idempotent), refuses
-a demand history counted by code, and resolves the listed sequences
-(`projection_sequences.csv`) to their courses. The spine, the floor, every
-delta, the feeders and the aftcasts then follow the course. Schema 26 is
-unchanged; a bundle's `subject_course` is the course id. Measured on the
-2026-10-08 pull against 0.27.0 built on the same data: none of the 139
-critical courses or the six listed sequence courses carries a former code, so
-all 58 Spring 2027 and 66 Fall 2027 published rows are identical. The one
-change is a feeder: PSY 332 and PSYC 332, two codes before, are one course
-with enough shared students to enter the top eight feeders of ANTH 2190C and
-SOCI 2315, moving three Spring aftcasts of ANTH 2190C's adjusted candidate
-(its WAPE 6.24% to 6.51%) and one Fall aftcast of SOCI 2315's; neither
-candidate is published.
-
-#### Keyed at load (2026-11-07)
-
-**Decided 2026-11-07 by the user**, asked how the per-reader shim should
-retire. Reader PRs 2 to 6 each opened with `key_on_course_id()`, which
-returned a working frame whose `subject_course` was the course and whose
-`listed_code` was the registrar's code. Thirty-odd other readers (Roadblocks,
-Gen Ed, Dept Trends, Enrollment, the flows) still grouped by code, so one
-column meant two things depending on which function had run, and both
-regressions caught in the Regstats PR came from that. Three end states were
-offered:
-
-1. Key once at load.
-2. Group on `course_id` openly in every reader, with a ratcheting test.
-3. Keep the opt-in shim.
-
-The user chose the first: a cone written naively on `subject_course` is then
-right by default.
-
-**What it does.** `attach_course_ids()` keys `cedar_sections`,
-`cedar_students` and `cedar_grades` in every loader:
-
-- `subject_course` becomes the `course_id`;
-- the term's code moves to `listed_code`;
-- `course_id` sits beside them, one vector shared.
-
-`key_on_course_id()` and its twenty calls are gone. The helpers that took
-either kind of frame now require `listed_code` (`.listed_codes()`), so there
-is one mode.
-
-**Resolving codes.**
-
-- The two code-level functions read the registrar's code back
-  (`.registrar_codes()`): `build_cedar_courses()` and
-  `detect_course_renamings()`.
-- A picked code, current or former, keeps its whole course in the shared
-  `course` filter (`filter_DESRs()`, `filter_class_list()`), and through
-  `course_id_of()` / `course_ids_of()`.
-- The pickers whose readers resolve offer both codes and courses
-  (`course_picker_choices()`).
-- `course_code_lookup()` maps rows that arrive with either a code or an id.
-
-**Display.** A section row on Enrollment shows `listed_code`. Course rollups
-show the course, with former codes named where a reader already did.
-
-**Caches.** The course flows precomputed in `global.R` are stamped with the
-class list's renames and recomputed on a mismatch. Dept Trends went to v12
-and Seatfinder to v4.
-
-**Institution lists.** They name codes. On the 2026-10-08 pull only
-`excluded_courses.csv` names a former code (five PSY), and the `uel` rule
-already drops by course. Confirming the 320 proposed renumberings would add
-one, a MGMT code in a catalog interpretation.
-
-**Measured on the 2026-10-08 pull.** Rows whose code is not their course's:
-
-| Table | Rows | Share |
-|---|---:|---:|
-| Sections (PSY, SOC) | 4,066 | 1.7% |
-| Class-list rows (CCST, PSY, SOC) | 11,954 | 0.6% |
-| Graded attempts | 10,517 | 0.7% |
-
-Keying takes under a tenth of a second per table.
-
-**CCS is not renamed to CCST: correction, 2026-11-07.** The first PR
-confirmed a subject row CCS → CCST from 524 sections that the schedule lists
-as CCS and the class list as CCST. The user corrected it: CCST is the
-lower-division prefix (4-digit numbers: CCST 1110, 1125, 2110, 2996), and CCS
-is still the upper-division one. The Fall 2026 schedule and class lists both
-list CCS 310 to CCS 699, and the CCST codes on 3-digit numbers appear on class
-lists only, in some pulls (2019–21, 2024–25).
-
-The subject row would have named every current CCS course CCST once the
-tables were keyed. It is replaced by 61 course rows, CCST nnn → CCS nnn, each
-with its section evidence. 7,450 courses from 7,641 codes, as before; 216
-codes resolve to another.
-
-`detect_course_renamings()` no longer proposes a subject rename for section
-pairs the file joins course by course.
-
-#### The course-term measure table (2026-11-07)
-
-`cedar_course_terms` replaces `cedar_cl_enrls_base`. `build_course_terms()`
-(`R/branches/course-terms.R`) counts the keyed class list once at start and
-`global.R` holds it at `data_objects[["cedar_course_terms"]]`. Three
-decisions:
-
-- **Grain: course × term × campus × part of term.** Regstats compares a
-  full-term section with its half-term siblings as distinct offerings, so
-  the part of term stays. The ADR's grain costs nothing: the class list is
-  one row per student, course, campus and term, so no student is in two
-  parts of one course-term-campus (none of 1,853,633 on the 2026-10-08
-  pull) and the part-of-term rows sum exactly. College is the course's, one
-  per course-term-campus.
-- **Counts only, nothing pooled across terms.** The old base carried
-  calc_cl_enrls()'s all-history means, which Regstats discarded for its
-  strictly prior baselines and Waitlists never read. A measure table that
-  held one would hold a later term's counts in an earlier term's row. A
-  baseline is the reader's question.
-- **A parameter with a declared contract, never a global.** It carries
-  exactly `COURSE_TERMS_COLUMNS`, stamped with `COURSE_TERMS_BUILD_VERSION`
-  and the class list's renames. The saved copy is a cache, rebuilt when
-  `course_terms_is_current()` fails. Regstats read it as a global behind
-  `exists()`; it and Waitlists now take it as `course_terms` and stop on
-  one not current for their class list (`require_current_course_terms()`).
-
-Measured on the 2026-10-08 pull: 61,006 rows, 6 MB, built in 7 s, with
-counts identical to the base it replaces. First-day enrollment, DFW, fill
-and waitlist demand are not yet columns; each joins when a reader moves to
-it, rather than being computed for no one.
+Confirming the 320 proposed renumberings is a person's decision: it is what
+makes I37's courses show their earlier offerings (84 Fall 2026 courses with
+no Fall history by code would find it).
 
 **Next.** `cedar_attempts` from `cedar_grades` on the keyed tables, its DFW
 rate joined onto `cedar_course_terms`, and `course-flows.R`'s precompute
-rebuilt on them. The Admin > Mappings surface for code history (when each
-code was in use, computed from the data; which replaced which, from the
-file) is its own PR, and `program` rows are validated now so it has
-something to read.
+rebuilt on them. Then the Admin > Mappings surface for code history.
 
 **Not doing.** Rewriting saved rows to the new code: the code the registrar
-used that term is a fact about the term, and a reader that wants it keeps
-it. A surrogate integer id: it would need saving, and a saved key is a
-migration every time it moves. Inferring successions at runtime from titles:
-the title screen is a proposer, and proposes one-to-one matches only, because
-a many-to-many title group (BIOL 429 matched BIOL 201L) needs a person.
-Recording a split: a course that becomes two courses is two courses, and the
-history before the split belongs to neither alone.
+used that term is a fact about the term. A surrogate integer id: a saved key
+is a migration every time it moves. Inferring successions at runtime from
+titles: the title screen proposes one-to-one matches only, because a
+many-to-many group needs a person. Recording a split: a course that becomes
+two courses is two courses.
 
 ### Not doing this
 
@@ -775,9 +357,8 @@ CSV edit. The vocabulary splits recur the next time a report changes.
 
 1. `cedar_registrations` vs `cedar_class_lists`: decide before step 5.
 2. Pulls layer: full extracts or a changes-only log? Size it first.
-3. Does the renaming crosswalk live in `institution/<id>/` as a mapping file
-   (I37's proposal), or is it derived from DESR history where a CRN's code
-   differs between tables (I45's evidence)? Probably both: derived candidates,
-   confirmed in the file.
+3. ~~Does the renaming crosswalk live in a mapping file or derive from
+   DESR history?~~ Answered by step 4: both. The screen derives candidates;
+   the file holds the confirmed rows.
 4. Which measure columns on `cedar_student_terms` need a campus variant
    (home campus is a dimension; delivery campus is on the attempt).

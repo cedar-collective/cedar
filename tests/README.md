@@ -31,4 +31,4 @@ automatically retried.
 
 The complete testing policy, fixture rules, environment details, and reporting
 requirements live in [the developer testing guide](../docs/developers/testing.md)
-and `AGENTS.md` under **Standard Testing Procedure**.
+and [agent-testing.md](../docs/developers/agent-testing.md).
