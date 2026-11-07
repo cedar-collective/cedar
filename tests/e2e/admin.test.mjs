@@ -107,6 +107,20 @@ try {
     /taught in college/i.test(subjects) || subjects.includes('No course subject decisions'));
   check('each subject decision links to the line or file that takes it', subjectLinks.every(linkOk));
   check('other problems are listed separately', /other problem\(s\)/.test(work.other));
+  // Code history: every code_history.csv row, proposed first, each linked to
+  // its line, with when the schedule lists each code.
+  await readyAll(['code_history_summary', 'code_history_table']);
+  const history = await page.evaluate(() => ({
+    summary: document.getElementById('code_history_summary').innerText,
+    table: document.getElementById('code_history_table').innerText,
+  }));
+  const historyLinks = await linksIn('code_history_table');
+  check('code history summarises confirmed and proposed rows',
+    /\d+ successions: \d+ confirmed, \d+ proposed/.test(history.summary));
+  check('code history shows when each code was offered',
+    /old code offered/i.test(history.table) && /new code offered/i.test(history.table));
+  check('each code history row links to its line',
+    historyLinks.length > 0 && historyLinks.every(href => /code_history\.csv\?plain=1#L\d+$/.test(href)));
   await openSubTab(page, 'Program to Dept');
   await readyAll(['program_dept_mapping_table']);
   const programRef = await page.evaluate(() =>
@@ -391,8 +405,10 @@ try {
     const status = document.getElementById('enrollment_projections-bundle_status');
     return (scope?.innerText || '') + (status?.innerText || '');
   });
+  // The scope line a loaded bundle writes ("Spring 2027 projections | Data
+  // window: ..."), or the empty state when no bundle validates.
   check('deferred projections initialize when opened',
-    projection.includes('demand') || projection.includes('No validated enrollment projection bundle'));
+    projection.includes('projections | Data window') || projection.includes('No validated enrollment projection bundle'));
   check('no browser JavaScript errors', jsErrors.length === 0);
   console.log(`${passed} passed; screenshot /tmp/cedar-admin-freshness.png`);
 } catch (error) {

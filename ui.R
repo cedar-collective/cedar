@@ -1889,6 +1889,13 @@ nav_panel(
             )
           ),
           card(
+            card_header("Code history"),
+            p(paste0("Which course or subject code replaced which, from institution/", cedar_institution_id(), "/code_history.csv. A confirmed row makes both codes one course in every report from the next restart; a proposed row changes nothing until someone confirms it. Rows still proposed come first. Where opens the row in the file. Old code offered and New code offered are the terms and sections the loaded schedule lists under each code; Check flags a schedule that disagrees with the row's term, a candidate for a look rather than an error. A held row's Notes say why it is held."),
+              class = "text-hint"),
+            uiOutput("code_history_summary"),
+            reactable::reactableOutput("code_history_table")
+          ),
+          card(
             card_header("Other problems in the data"),
             p("Problems no mapping can fix, found by the same checks: values that are errors in the source data. They are listed so they can be reported to whoever owns the source.",
               class = "text-hint"),
