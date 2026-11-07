@@ -1669,8 +1669,13 @@ create_dept_dashboard_data <- function(data_objects, opt) {
           if (!is.null(campus)) paste0(" [campus: ", paste(campus, collapse = ","), "]") else "")
 
   cedar_programs <- data_objects[["cedar_programs"]]
-  cedar_students <- data_objects[["cedar_students"]]
-  cedar_sections <- data_objects[["cedar_sections"]]
+  # The dashboard follows the course, not the code (ADR-001 step 4): both
+  # tables are read keyed on course_id, so a renumbered or renamed course is
+  # one course in its history, its waitlist and its flags. HIST 3201 is not
+  # "new this term" when it ran as HIST 320 last year, and HIST 320 is not
+  # "missing" from it.
+  cedar_students <- key_on_course_id(data_objects[["cedar_students"]], "create_dept_dashboard_data")
+  cedar_sections <- key_on_course_id(data_objects[["cedar_sections"]], "create_dept_dashboard_data")
 
   # Campus is passed through each function's opt as course_campus (the Cedar standard
   # key for the campus column in cedar_sections and cedar_students). Headcount functions
@@ -1755,6 +1760,21 @@ create_dept_dashboard_data <- function(data_objects, opt) {
     cedar_students, cedar_sections, cedar_programs, dept_code, current_term, campus = campus,
     dims = data_objects[["cedar_dims"]]
   )
+
+  # Name the other codes each course has carried (NA when one) on the course
+  # tables the page shows, read off the whole keyed tables.
+  spans <- course_former_code_spans(cedar_students, cedar_sections)
+  attach_spans <- function(df) {
+    if (!is.data.frame(df) || !"subject_course" %in% names(df)) return(df)
+    df %>%
+      dplyr::select(-dplyr::any_of("former_codes")) %>%
+      dplyr::left_join(spans, by = "subject_course", relationship = "many-to-one")
+  }
+  result$enrollment_flags$high_waitlist <- attach_spans(result$enrollment_flags$high_waitlist)
+  result$enrollment_flags$low_enrollment <- attach_spans(result$enrollment_flags$low_enrollment)
+  result$new_this_term <- attach_spans(result$new_this_term)
+  result$missing_from_earlier <- attach_spans(result$missing_from_earlier)
+  result$course_code_renames <- course_code_renames(cedar_students)
 
   message("[dept-dashboard.R] Dashboard data ready for ", dept_code)
   result
