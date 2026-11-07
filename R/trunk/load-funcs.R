@@ -84,6 +84,7 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
   source_file("branches/registration-snapshots.R")
   source_file("branches/return-snapshots.R")      # next-term registration of last term's students
   source_file("branches/enrl.R")
+  source_file("branches/course-terms.R")          # cedar_course_terms: the course-term measure table (ADR-001 step 4)
   source_file("branches/credit-hours.R")
   source_file("branches/data-edges.R")            # where the loaded data starts/stops; see the right-edge policy in AGENTS.md
   source_file("branches/cedar-terms.R")           # the term dimension: one row per term, the edges as flags (ADR-001 step 1)

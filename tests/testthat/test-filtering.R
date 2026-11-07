@@ -523,15 +523,16 @@ test_that("instructor filtering with NA values works safely", {
   expect_true(all(!is.na(filtered$instructor_name)))
 })
 
-test_that("the excluded-course list removes a course by any code it carries on a keyed table", {
+test_that("the excluded-course list removes a course by any code it carries on a loaded table", {
   # RN01: the schedule lists SOC 371 in Spring 2020 and SOCI 371 in Fall 2020,
   # one course (SOCI 371). A list naming the old code removes the whole course
-  # from a table keyed on course_id, and only the old code's row by code.
+  # from a loaded table, keyed on the course, and only the old code's row from
+  # the table as saved.
   rn <- rn01_course_tables()
-  sections <- rn$cedar_sections
-  keyed <- key_on_course_id(sections)
+  keyed <- rn$cedar_sections
+  sections <- test_sections_rn
   expect_equal(excluded_course_ids(keyed, excl = "soc  371"), c("SOC 371", "SOCI 371"))
-  expect_error(excluded_course_ids(sections, excl = "SOC 371"), "key_on_course_id")
+  expect_error(excluded_course_ids(sections, excl = "SOC 371"), "attach_course_ids")
 
   by_course <- drop_excluded_courses(keyed, excl = "SOC 371")
   expect_false("SOCI 371" %in% by_course$subject_course)

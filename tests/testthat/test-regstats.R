@@ -139,39 +139,53 @@ test_that("Regstats definition v5 records the course key, lifecycle and waitlist
   expect_match(definition$exclusions, "at least as large as Min Waiting", fixed = TRUE)
 })
 
-test_that("precomputed enrollment and raw class lists give identical Regstats", {
+test_that("cedar_course_terms and raw class lists give identical Regstats", {
   raw <- get_reg_stats(test_students_regstats, test_sections_regstats, regstats_history_opt())
-  base <- build_cl_enrls_base(test_students_regstats)
-  expect_true(cl_enrls_base_is_current(base, test_students_regstats))
-  expect_identical(attr(base, "code_renames"), character(0))
-  expect_true(all(c("level", "department", "part_term") %in% names(base)))
-  rlang::local_bindings(cedar_cl_enrls_base = base, .env = .GlobalEnv)
-  cached_base <- get_reg_stats(test_students_regstats, test_sections_regstats, regstats_history_opt())
-  expect_equal(cached_base[names(cached_base) != "cache_info"], raw[names(raw) != "cache_info"])
+  course_terms <- build_course_terms(test_students_regstats)
+  expect_true(course_terms_is_current(course_terms, test_students_regstats))
+  expect_identical(attr(course_terms, "code_renames"), character(0))
+  expect_identical(names(course_terms), COURSE_TERMS_COLUMNS)
+  from_table <- get_reg_stats(test_students_regstats, test_sections_regstats,
+                              regstats_history_opt(), course_terms = course_terms)
+  expect_equal(from_table[names(from_table) != "cache_info"], raw[names(raw) != "cache_info"])
+
+  # The table is a parameter, never a global (M12): a bogus table of the old
+  # or new name in the global environment changes nothing.
+  bogus <- course_terms %>% dplyr::mutate(registered = registered * 100L)
+  rlang::local_bindings(cedar_course_terms = bogus, cedar_cl_enrls_base = bogus,
+                        .env = .GlobalEnv)
+  no_table <- get_reg_stats(test_students_regstats, test_sections_regstats, regstats_history_opt())
+  expect_equal(no_table[names(no_table) != "cache_info"], raw[names(raw) != "cache_info"])
 })
 
-test_that("Regstats refuses a precomputed base counted over other course codes", {
-  # A base counted by code, with no renames stamped on it: what global.R saved
-  # before ADR-001 step 4, or before a code_history.csv row was confirmed.
+test_that("Regstats refuses a course-term table not counted by this build over these codes", {
+  # Counted by code, with no renames or build stamped on it: what global.R
+  # saved before ADR-001 step 4, or before a code_history.csv row was confirmed.
   by_code <- calc_cl_enrls(test_students_regstats, by_part_term = TRUE)
-  expect_false(cl_enrls_base_is_current(by_code, test_students_regstats))
-  rlang::local_bindings(cedar_cl_enrls_base = by_code, .env = .GlobalEnv)
+  expect_false(course_terms_is_current(by_code, test_students_regstats))
   expect_error(
-    get_reg_stats(test_students_regstats, test_sections_regstats, regstats_history_opt()),
-    "build_cl_enrls_base"
+    get_reg_stats(test_students_regstats, test_sections_regstats, regstats_history_opt(),
+                  course_terms = by_code),
+    "build_course_terms"
   )
-  # A base counted over one class list's renames is not current for another's.
+  # Saved by an older build, or short a column: rebuilt, never read.
+  current <- build_course_terms(test_students_regstats)
+  older <- current
+  attr(older, "course_terms_build_version") <- COURSE_TERMS_BUILD_VERSION - 1L
+  expect_false(course_terms_is_current(older, test_students_regstats))
+  expect_false(course_terms_is_current(dplyr::select(current, -census_enrl), test_students_regstats))
+  # Counted over one class list's renames, it is not current for another's.
   rn <- rn01_course_tables()
-  expect_false(cl_enrls_base_is_current(build_cl_enrls_base(test_students_regstats), rn$cedar_students))
-  rn_base <- build_cl_enrls_base(rn$cedar_students)
-  expect_true(cl_enrls_base_is_current(rn_base, rn$cedar_students))
+  expect_false(course_terms_is_current(current, rn$cedar_students))
+  rn_base <- build_course_terms(rn$cedar_students)
+  expect_true(course_terms_is_current(rn_base, rn$cedar_students))
   # The class list already names the renamed subject (I45), so its renames
   # are the two renumberings; the schedule's SOC codes are on the sections.
   expect_identical(attr(rn_base, "code_renames"),
                    c("HIST 320 > HIST 3201", "SOCI 250 > SOCI 2315"))
   expect_true(all(rn_base$subject_course %in% c("HIST 3201", "LING 2110", "PHIL 150", "PHIL 1115",
                                                  "SOCI 2120", "SOCI 2315", "SOCI 371")))
-  expect_false(cl_enrls_base_is_current(NULL, test_students_regstats))
+  expect_false(course_terms_is_current(NULL, test_students_regstats))
 })
 
 test_that("Regstats stops on a table no loader attached", {
@@ -247,10 +261,9 @@ test_that("Regstats excludes a course the list names by a former code, on every 
   expect_null(raw$summary$upper$n_courses)
   expect_equal(raw$summary$lower$n_courses, 2L)
 
-  base <- build_cl_enrls_base(rn$cedar_students)
-  expect_true("HIST 3201" %in% base$subject_course)
-  rlang::local_bindings(cedar_cl_enrls_base = base, .env = .GlobalEnv)
-  from_base <- get_reg_stats(rn$cedar_students, rn$cedar_sections, opt)
+  course_terms <- build_course_terms(rn$cedar_students)
+  expect_true("HIST 3201" %in% course_terms$subject_course)
+  from_base <- get_reg_stats(rn$cedar_students, rn$cedar_sections, opt, course_terms = course_terms)
   expect_equal(from_base[names(from_base) != "cache_info"], raw[names(raw) != "cache_info"])
 
   # A student-level filter recounts the class list; it excludes the same course.

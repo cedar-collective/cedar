@@ -775,3 +775,44 @@ test_that("enrollment trend plot selection keeps campus keys separate", {
       keys_by_campus$series_key[keys_by_campus$campus == "EA"]
   )
 })
+
+test_that("cedar_course_terms counts each course-term once and sums exactly over part of term", {
+  # EC-11's class list splits a course-term into a full term and a 2H half.
+  course_terms <- build_course_terms(test_students_regstats)
+  expect_identical(names(course_terms), COURSE_TERMS_COLUMNS)
+  expect_false(dplyr::is_grouped_df(course_terms))
+  expect_identical(attr(course_terms, "course_terms_build_version"), COURSE_TERMS_BUILD_VERSION)
+  # One row per campus, college, term, course and part of term.
+  expect_equal(nrow(dplyr::distinct(course_terms, campus, college, term, subject_course, part_term)),
+               nrow(course_terms))
+  # No cross-term mean or baseline: those are the reader's (Regstats'
+  # baselines are strictly prior), and a pooled column would put later
+  # terms' counts in an earlier term's row.
+  expect_false(any(grepl("_mean$|_sd$|hist", names(course_terms))))
+  expect_equal(course_terms$census_enrl, course_terms$registered + course_terms$dr_late)
+
+  # The class list holds one row per student, course, campus and term, so the
+  # part-of-term rows sum to the course-term-campus count of distinct students.
+  whole <- calc_cl_enrls(test_students_regstats) %>% dplyr::ungroup() %>%
+    dplyr::select(campus, college, term, subject_course, registered, dr_late, cl_total)
+  summed <- course_terms %>%
+    dplyr::summarize(dplyr::across(c(registered, dr_late, cl_total), sum),
+                     .by = c(campus, college, term, subject_course))
+  joined <- dplyr::inner_join(whole, summed, by = c("campus", "college", "term", "subject_course"),
+                              suffix = c("_whole", "_parts"))
+  expect_equal(nrow(joined), nrow(whole))
+  expect_equal(joined$registered_parts, joined$registered_whole)
+  expect_equal(joined$cl_total_parts, joined$cl_total_whole)
+  expect_true(any(duplicated(dplyr::select(course_terms, campus, term, subject_course))),
+              info = "the fixture must carry a course-term split across parts of term")
+})
+
+test_that("Waitlists refuses a course-term table counted over other course codes", {
+  rn <- rn01_course_tables()
+  stale <- build_course_terms(test_students)
+  expect_error(
+    inspect_waitlist(rn$cedar_students, list(term = 202010L), sections = rn$cedar_sections,
+                     course_terms = stale),
+    "build_course_terms"
+  )
+})
