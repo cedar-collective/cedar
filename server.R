@@ -4867,7 +4867,7 @@ output$enrl_classlist_download <- downloadHandler(
   # ===========================================================================
   waitlistServer("waitlist", cedar_students, session,
                  sections      = data_objects[["cedar_sections"]],
-                 enrl_base     = cedar_cl_enrls_base,
+                 course_terms  = data_objects[["cedar_course_terms"]],
                  student_terms = cedar_student_terms)
 
 
@@ -4879,7 +4879,8 @@ output$enrl_classlist_download <- downloadHandler(
     sections     = cedar_sections,
     course_flows = cedar_course_flows,
     data_summary = cedar_data_summary,
-    thresholds   = cedar_regstats_thresholds
+    thresholds   = cedar_regstats_thresholds,
+    course_terms = data_objects[["cedar_course_terms"]]
   )
 
   # ===========================================================================

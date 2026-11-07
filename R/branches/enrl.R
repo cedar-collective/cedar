@@ -126,58 +126,6 @@ calc_cl_enrls <- function(filtered_students, reg_status = NULL, by_part_term = F
   return (reg_stats_summary)
 }
 
-#' The app's precomputed course-term enrollment base, by course
-#'
-#' calc_cl_enrls() over the whole class list, by part of term, with each
-#' course's level and department beside it: the table get_reg_stats() filters
-#' instead of recounting the class list on every request, and the history
-#' Waitlists reads. Built once at start (global.R), saved beside the data.
-#'
-#' The base follows the course, not the code (ADR-001 step 4): it is counted
-#' over the loaded class list, keyed on the course (attach_course_ids()), so
-#' `subject_course` is the course_id and a renumbered course's terms are one
-#' course's rows. The renames in the class list it was counted from are
-#' stamped on it (`attr(, "code_renames")`), so cl_enrls_base_is_current()
-#' can tell a base saved before a code_history.csv row was confirmed from one
-#' that matches the class list now loaded.
-#'
-#' @param students `cedar_students` with `course_id` attached.
-#' @return One row per campus, college, course, term and part of term with
-#'   calc_cl_enrls()'s counts and means plus `level` and `department`,
-#'   ungrouped.
-build_cl_enrls_base <- function(students) {
-  renames <- course_code_renames(students)
-  base <- calc_cl_enrls(students, by_part_term = TRUE) %>% ungroup()
-  # One row per course for the level/department lookup; the first row stands
-  # for the rare crosslisted course listed under more than one department.
-  # CAMPUS_ROLLUP: a course's level and department do not vary by campus; the
-  # counts this lookup joins onto are grouped by campus.
-  course_meta <- students %>%
-    distinct(subject_course, .keep_all = TRUE) %>%
-    select(subject_course, level, department)
-  base <- left_join(base, course_meta, by = "subject_course", relationship = "many-to-one")
-  attr(base, "code_renames") <- renames
-  base
-}
-
-#' Was the saved enrollment base counted over this class list's course codes?
-#'
-#' TRUE when the base carries the part-of-term dimension and the renames
-#' stamped on it are the class list's now. FALSE for a base saved before
-#' part_term, before it was keyed on course_id, or before a code_history.csv
-#' row was confirmed: global.R rebuilds such a base, and get_reg_stats()
-#' refuses it.
-#'
-#' @param base The saved base, or anything else (FALSE).
-#' @param students `cedar_students` with `course_id` attached.
-cl_enrls_base_is_current <- function(base, students) {
-  if (!is.data.frame(base) || !"part_term" %in% names(base)) return(FALSE)
-  renames <- attr(base, "code_renames", exact = TRUE)
-  if (is.null(renames)) return(FALSE)
-  identical(as.character(renames), course_code_renames(students))
-}
-
-
 #' Match class-list records to a section scope
 #'
 #' CRNs can be reused across terms, so both fields are required. This helper is

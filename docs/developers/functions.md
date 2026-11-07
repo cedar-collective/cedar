@@ -8,7 +8,7 @@ parent: Developer Guide
 
 This reference is auto-generated from roxygen2 comments in the source code.
 
-*Generated: 2026-11-07 07:15:14.667986*
+*Generated: 2026-11-07 09:03:00.579354*
 
 ---
 
@@ -699,6 +699,53 @@ Course Sequence Effect  Compares grades in course Y between students who passed 
 - `opt` - Named list: \describe{ \item{course_x}{Character. The preparatory course. Required.} \item{course_y}{Character. The outcome course. Required.} \item{campus}{Character vector. Optional campus filter.} \item{min_n}{Integer. Minimum students per group (default 15).} \item{filters}{Named list of covariate equality filters. Optional.} }
 
 **Returns:** Named list: \describe{ \item{course_x, course_y}{Course identifiers.} \item{outcomes}{Tibble: group, outcome (pass/dfw), n, pct.} \item{group_profile}{Compact covariate summary per group.} \item{balance}{From compute_balance().} \item{n_treatment, n_control}{Group sizes.} }
+
+---
+
+## course-terms
+
+### `build_course_terms()`
+
+*Source: course-terms.R*
+
+**Count the course-term measure table**
+
+Count the course-term measure table  The class-list counts of calc_cl_enrls() by part of term, with census enrollment (add_census_enrl()) and each course's level and department. `registered` is still registered at the pull (final, for a past term); `cl_total` is every non-waitlist registration (ever registered: `registered + dr_all`); `census_enrl` is `registered + dr_late`; `wl_all` counts waitlist rows, not true demand (`R/branches/waitlist-demand.R`).
+
+**Parameters:**
+
+- `students` - `cedar_students` keyed on the course (attach_course_ids()).
+
+**Returns:** One row per campus, college, term, course and part of term, with exactly COURSE_TERMS_COLUMNS, ungrouped, stamped with `code_renames` and `course_terms_build_version`.
+
+---
+
+### `course_terms_is_current()`
+
+*Source: course-terms.R*
+
+**Was this course-term table counted by this build over this class list?**
+
+Was this course-term table counted by this build over this class list?  TRUE when it carries the current build version, exactly its columns, and the renames of the class list now loaded. FALSE for anything else, including a table saved by an older build, a table counted by code, or NULL: the loader rebuilds it, and a reader refuses it (require_current_course_terms()).
+
+**Parameters:**
+
+- `course_terms` - A saved cedar_course_terms, or anything else.
+- `students` - `cedar_students` keyed on the course.
+
+---
+
+### `require_current_course_terms()`
+
+*Source: course-terms.R*
+
+**Stop unless a course-term table is current for this class list**
+
+**Parameters:**
+
+- `course_terms` - cedar_course_terms as passed to a reader.
+- `students` - The class list the reader also holds.
+- `caller` - The reader's name, for the error.
 
 ---
 
@@ -2016,37 +2063,6 @@ Which subjects each unit teaches  One row per confirmed (subject, unit, college)
 ---
 
 ## enrl
-
-### `build_cl_enrls_base()`
-
-*Source: enrl.R*
-
-**The app's precomputed course-term enrollment base, by course**
-
-The app's precomputed course-term enrollment base, by course  calc_cl_enrls() over the whole class list, by part of term, with each course's level and department beside it: the table get_reg_stats() filters instead of recounting the class list on every request, and the history Waitlists reads. Built once at start (global.R), saved beside the data.  The base follows the course, not the code (ADR-001 step 4): it is counted over the loaded class list, keyed on the course (attach_course_ids()), so `subject_course` is the course_id and a renumbered course's terms are one course's rows. The renames in the class list it was counted from are stamped on it (`attr(, "code_renames")`), so cl_enrls_base_is_current() can tell a base saved before a code_history.csv row was confirmed from one that matches the class list now loaded.
-
-**Parameters:**
-
-- `students` - `cedar_students` with `course_id` attached.
-
-**Returns:** One row per campus, college, course, term and part of term with calc_cl_enrls()'s counts and means plus `level` and `department`, ungrouped.
-
----
-
-### `cl_enrls_base_is_current()`
-
-*Source: enrl.R*
-
-**Was the saved enrollment base counted over this class list's course codes?**
-
-Was the saved enrollment base counted over this class list's course codes?  TRUE when the base carries the part-of-term dimension and the renames stamped on it are the class list's now. FALSE for a base saved before part_term, before it was keyed on course_id, or before a code_history.csv row was confirmed: global.R rebuilds such a base, and get_reg_stats() refuses it.
-
-**Parameters:**
-
-- `base` - The saved base, or anything else (FALSE).
-- `students` - `cedar_students` with `course_id` attached.
-
----
 
 ### `filter_classlist_to_sections()`
 
@@ -4608,13 +4624,13 @@ waitlist_counts <- get_unique_waitlisted(filtered, opt)
 
 *Source: waitlist.R*
 
-**Scope the enrollment base to waitlist course keys**
+**Scope the course-term counts to waitlist course keys**
 
-Scope the enrollment base to waitlist course keys  Keeps every historical term for the course keys present in a waitlist result, while dropping unrelated courses before census-history aggregation begins.
+Scope the course-term counts to waitlist course keys  Keeps every historical term for the course keys present in a waitlist result, while dropping unrelated courses before census-history aggregation begins.
 
 **Parameters:**
 
-- `enrl_base` - Precomputed course-term enrollment rows.
+- `enrl_base` - Course-term enrollment rows (cedar_course_terms or a scoped recount).
 - `count_df` - Waitlist course-overview rows.
 
 **Returns:** A list containing scoped `data` and the shared `match_keys`.
@@ -4627,13 +4643,13 @@ Scope the enrollment base to waitlist course keys  Keeps every historical term f
 
 **Attach per-course census-enrollment context to the waitlist course overview**
 
-Attach per-course census-enrollment context to the waitlist course overview  Enriches the waitlist count table with each course's current-term census enrollment, its historical average census enrollment (same term type, viewed term excluded), the count of reference terms behind that average, and the same-term-type census series used to draw a sparkline in the UI. This reference can include later terms when reviewing an older target; Regstats instead uses a strictly prior baseline. The count uses registered plus late drops (see \code{\link{add_census_enrl}}), the same class-list lifecycle numerator Regstats matches to DESR scheduled capacity for saturation. It is not a frozen census roster.  Enrollment history comes from \code{enrl_base}, the app's precomputed course-term enrollment table (\code{cedar_cl_enrls_base}, built in global.R and handed down by the caller). Without one (tests, standalone scripts) it is recomputed via \code{\link{calc_cl_enrls}}, scoped to just the courses in the overview so the recompute stays cheap. The cone never looks the table up by name.
+Attach per-course census-enrollment context to the waitlist course overview  Enriches the waitlist count table with each course's current-term census enrollment, its historical average census enrollment (same term type, viewed term excluded), the count of reference terms behind that average, and the same-term-type census series used to draw a sparkline in the UI. This reference can include later terms when reviewing an older target; Regstats instead uses a strictly prior baseline. The count uses registered plus late drops (see \code{\link{add_census_enrl}}), the same class-list lifecycle numerator Regstats matches to DESR scheduled capacity for saturation. It is not a frozen census roster.  Enrollment history comes from \code{course_terms}, the course-term measure table (\code{cedar_course_terms}, \code{\link{build_course_terms}}, built at start and handed down by the caller). Without one (tests, standalone scripts) it is recomputed via \code{\link{calc_cl_enrls}}, scoped to just the courses in the overview so the recompute stays cheap. The cone never looks the table up by name.
 
 **Parameters:**
 
 - `count_df` - Waitlist course-overview table (one row per campus/college/ term/part_term/subject_course) from \code{\link{get_unique_waitlisted}}.
-- `students` - Student enrollment rows, used to recompute enrollment history when no precomputed base table is passed.
-- `enrl_base` - Optional precomputed course-term enrollment rows (\code{calc_cl_enrls(students, by_part_term = TRUE)} over the whole class list). NULL recomputes from \code{students}.
+- `students` - Student enrollment rows, used to recompute enrollment history when no course-term table is passed.
+- `course_terms` - Optional \code{cedar_course_terms} (\code{\link{build_course_terms}}). NULL recounts the overview's courses from \code{students}.
 
 **Returns:** \code{count_df} with added columns \code{census_enrl} (current-term census enrollment), \code{census_enrl_mean} (historical average, viewed term excluded), \code{n_hist_terms} (reference terms behind the average), and the \code{trend_hist} / \code{trend_terms} list-columns the module renders as a sparkline. Returned unchanged when no enrollment source is available.
 
@@ -4651,7 +4667,7 @@ Inspect Waitlist by Major and Classification  Comprehensive waitlist analysis th
 
 - `students` - Data frame of student enrollments from cedar_students table, with \code{course_id} attached (as every loader does); read keyed on it, so every \code{subject_course} in the result is a course id and each table carries \code{former_codes} (the other codes the course has carried, with their terms; NA when one). Must include columns: campus, college, term, term_type, major, student_classification, subject_course, course_title, level, and registration_status_code (or the backward-compatible registration_status).
 - `opt` - Options list for filtering: \itemize{ \item \code{course} - Course identifier(s) (e.g., "MATH 1430"), current or former: each resolves to its course \item \code{term} - Term code(s) (e.g., 202510) \item \code{subject} - Subject code(s) (e.g., "MATH") \item Other filtering options supported by \code{filter_class_list()} }
-- `enrl_base` - Optional precomputed course-term enrollment table (\code{cedar_cl_enrls_base}); passed on to \code{\link{attach_enrollment_history}}, which recomputes a scoped base from \code{students} when this is NULL.
+- `course_terms` - Optional \code{cedar_course_terms} (\code{\link{build_course_terms}}), checked against \code{students}' course codes and passed on to \code{\link{attach_enrollment_history}}, which recomputes a scoped base from \code{students} when this is NULL.
 - `sections` - Optional cedar_sections table; only needed if students lacks a course_title column (titles are joined by term/subject_course)
 - `student_terms` - The `cedar_student_terms` table. The majors and classifications splits read each waiting student's description off it (`primary_major_code`, `student_classification`), never off the class-list row (ADR-001 step 2). Required.
 

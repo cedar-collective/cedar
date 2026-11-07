@@ -259,7 +259,9 @@ Each step is additive until its last sub-step, so the app runs throughout.
    `cedar_attempts` from `cedar_grades`. **PR 1 done 2026-11-06:** the
    dimension and `course_id` at load, no reader changed. Reader PRs 1 to 6
    (same day): Low Enrollment, Course Dynamics, Regstats, Waitlists, the
-   Department Dashboard and the enrollment projections read by course. Written out
+   Department Dashboard and the enrollment projections read by course.
+   2026-11-07: every loader keys the tables on the course, and
+   `cedar_course_terms` replaces the base as a parameter. Written out
    [below](#step-4-in-full-the-course-dimension-and-what-follows-it).
 5. **Thin `cedar_students` and `cedar_programs`** to their keys and
    registration facts; rename to the fact names once no reader uses the old
@@ -713,9 +715,40 @@ codes resolve to another.
 `detect_course_renamings()` no longer proposes a subject rename for section
 pairs the file joins course by course.
 
-**Next.** `cedar_course_terms` is promoted from `cedar_cl_enrls_base` and
-`cedar_attempts` from `cedar_grades`, both on the keyed tables, and
-`course-flows.R`'s precompute rebuilds on it. The Admin > Mappings surface for code history (when each
+#### The course-term measure table (2026-11-07)
+
+`cedar_course_terms` replaces `cedar_cl_enrls_base`. `build_course_terms()`
+(`R/branches/course-terms.R`) counts the keyed class list once at start and
+`global.R` holds it at `data_objects[["cedar_course_terms"]]`. Three
+decisions:
+
+- **Grain: course × term × campus × part of term.** Regstats compares a
+  full-term section with its half-term siblings as distinct offerings, so
+  the part of term stays. The ADR's grain costs nothing: the class list is
+  one row per student, course, campus and term, so no student is in two
+  parts of one course-term-campus (none of 1,853,633 on the 2026-10-08
+  pull) and the part-of-term rows sum exactly. College is the course's, one
+  per course-term-campus.
+- **Counts only, nothing pooled across terms.** The old base carried
+  calc_cl_enrls()'s all-history means, which Regstats discarded for its
+  strictly prior baselines and Waitlists never read. A measure table that
+  held one would hold a later term's counts in an earlier term's row. A
+  baseline is the reader's question.
+- **A parameter with a declared contract, never a global.** It carries
+  exactly `COURSE_TERMS_COLUMNS`, stamped with `COURSE_TERMS_BUILD_VERSION`
+  and the class list's renames. The saved copy is a cache, rebuilt when
+  `course_terms_is_current()` fails. Regstats read it as a global behind
+  `exists()`; it and Waitlists now take it as `course_terms` and stop on
+  one not current for their class list (`require_current_course_terms()`).
+
+Measured on the 2026-10-08 pull: 61,006 rows, 6 MB, built in 7 s, with
+counts identical to the base it replaces. First-day enrollment, DFW, fill
+and waitlist demand are not yet columns; each joins when a reader moves to
+it, rather than being computed for no one.
+
+**Next.** `cedar_attempts` from `cedar_grades` on the keyed tables, its DFW
+rate joined onto `cedar_course_terms`, and `course-flows.R`'s precompute
+rebuilt on them. The Admin > Mappings surface for code history (when each
 code was in use, computed from the data; which replaced which, from the
 file) is its own PR, and `program` rows are validated now so it has
 something to read.

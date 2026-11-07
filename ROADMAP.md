@@ -350,7 +350,7 @@ Plan: [ADR-002](docs/developers/adr-002-explicit-mapping-files.md).
   by course (model 0.28.0). 2026-11-07: every loader keys the tables on the
   course (`subject_course` the course, `listed_code` the term's code), so every
   reader follows it and the per-reader shim is gone; CCS stays CCS (CCST is
-  the lower-division prefix). Next: `cedar_course_terms` and `cedar_attempts`. Confirming the proposed Fall 2026
+  the lower-division prefix). `cedar_course_terms` is the course-term measure table (2026-11-07); next, `cedar_attempts`. Confirming the proposed Fall 2026
   renumberings is a person's decision, and what makes I37's rows show their
   old offerings.
   Design in full in

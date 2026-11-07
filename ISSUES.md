@@ -3131,14 +3131,15 @@ passes `base$prog_codes`, the set the module labels as home majors) instead of
 reading `major_to_dept` behind an `exists()` guard that fell back to the
 department code as a major code; `credit_hours_by_fac(students, faculty, …)`
 names its tables. `R/cones/waitlist.R` — `inspect_waitlist(students, opt,
-sections, enrl_base)` and `attach_enrollment_history()` take the precomputed
-`cedar_cl_enrls_base` from the Waitlists module, which gets it from `server.R`.
+sections, course_terms)` and `attach_enrollment_history()` take
+`cedar_course_terms` from the Waitlists module, which gets it from `server.R`.
 `R/cones/course-demographics.R` — `get_course_major_mix()` took the
 code-to-name table as `opt$major_code_to_name`, threaded from
 `data_objects[["cedar_lookups"]]` through the Gen Ed module's `lookups`
 argument; since 2026-11-06 it takes `dims` and names codes from programs.csv.
-The feature-layer read of `cedar_cl_enrls_base` in `R/features/regstats.R` is
-outside the rule's scope and remains; `R/features/dept-dashboard.R`'s read of
+The feature-layer read of the global `cedar_cl_enrls_base` in
+`R/features/regstats.R`, outside the rule's scope, went with it on 2026-11-07:
+`get_reg_stats()` takes `cedar_course_terms` as `course_terms`; `R/features/dept-dashboard.R`'s read of
 the global `major_code_to_name` went with `cedar_lookups` (2026-11-06).
 
 **M13 — Business logic in modules.** `R/modules/pathways.R` 38

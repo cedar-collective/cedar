@@ -76,7 +76,8 @@ regstatsUI <- function(id, sections, thresholds, dept_choices, default_term = NU
 }
 
 
-regstatsServer <- function(id, students, sections, course_flows, data_summary, thresholds) {
+regstatsServer <- function(id, students, sections, course_flows, data_summary, thresholds,
+                           course_terms = NULL) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
 
@@ -273,7 +274,7 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
       ))
 
       tryCatch({
-        result       <- get_reg_stats(students, sections, opt)
+        result       <- get_reg_stats(students, sections, opt, course_terms = course_terms)
         cache_info   <- result$cache_info %||% list()
         is_cached    <- isTRUE(cache_info$loaded_from_cache) || isTRUE(cache_info$cached)
         duration_sec <- end_report_timer(timer, cached = is_cached, result = result)
@@ -297,7 +298,7 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
 
       regen_start <- Sys.time()
       tryCatch({
-        result       <- get_reg_stats(students, sections, opt)
+        result       <- get_reg_stats(students, sections, opt, course_terms = course_terms)
         duration_sec <- round(as.numeric(difftime(Sys.time(), regen_start, units = "secs")), 1)
         signals_data(NULL)
         regstats_data(list(flagged = result, opt = opt, generated_at = Sys.time(),
