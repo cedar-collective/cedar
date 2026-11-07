@@ -213,13 +213,23 @@ for (.key in c("cedar_sections", "cedar_students", "cedar_student_terms", "cedar
 }
 rm(.key, .n_before)
 
-# The class list's student-description columns stay on the saved file (the
-# transform builds cedar_student_terms from them) but are not loaded: readers
-# attach them from cedar_student_terms (ADR-001 step 5, thin_class_list()).
-# The roster's own major names are kept as a small summary for Admin >
-# Mappings' audit, which names a code programs.csv lacks by them.
-data_objects[["cedar_class_list_majors"]] <- summarize_class_list_majors(data_objects[["cedar_students"]])
+# The class list carries no student description (ADR-001 step 5): the
+# transform saves it once per student-term and pull as
+# cedar_class_list_descriptions, and readers attach cedar_student_terms'
+# values. The app reads the description table only for the roster's own major
+# names, which Admin > Mappings' audit uses to name a code programs.csv lacks,
+# and keeps that small summary. A class list saved before 2026-11-07 still
+# carries the columns: they are read from it and dropped (thin_class_list()).
+local({
+  path <- file.path(data_dir, paste0("cedar_class_list_descriptions", get_data_extension()))
+  descriptions <- resolve_class_list_descriptions(
+    if (file.exists(path)) timed_read_data(path, basename(path)) else NULL,
+    data_objects[["cedar_students"]], "global.R")
+  descriptions <- descriptions[descriptions$term >= cedar_min_term, , drop = FALSE]
+  data_objects[["cedar_class_list_majors"]] <<- summarize_class_list_majors(descriptions)
+})
 data_objects[["cedar_students"]] <- thin_class_list(data_objects[["cedar_students"]])
+gc(verbose = FALSE)
 
 cedar_dims <- build_cedar_dims()
 data_objects <- attach_default_units(data_objects, cedar_dims)

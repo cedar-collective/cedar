@@ -72,7 +72,7 @@ Lowercase snake_case columns; legacy uppercase names are deprecated. How each ta
 | Table | Grain | What it is |
 |---|---|---|
 | `cedar_sections` | DESR section row | `term`, `crn`, `subject_course`, `campus`, `department`, `enrolled`, `total_enrl`, `is_combined`, `is_topics` |
-| `cedar_students` | student × course × campus × term | the class list: `student_id`, `registration_status_code`, `final_grade`, `level`, `part_term`. **Loaded without the student's description** (`thin_class_list()`): a reader attaches classification, major, home campus or level from `cedar_student_terms` (`attach_student_descriptions()`) |
+| `cedar_students` | student × course × campus × term | the class list: `student_id`, `registration_status_code`, `final_grade`, `level`, `part_term`. **Saved and loaded without the student's description** (`thin_class_list()`; the transform saves it once per student-term as `cedar_class_list_descriptions`, which builds `cedar_student_terms`): a reader attaches classification, major, home campus or level from `cedar_student_terms` (`attach_student_descriptions()`) |
 | `cedar_programs` | student × term × program | declarations: `program_code`, `dept_code`, `college_code`, demographics. Its `*_credits_*` columns are pull-stamped (field reliability) |
 | `cedar_degrees` | awarded degree | `degree`, `program_name`, `dept_code` |
 | `cedar_faculty` | instructor × term | `appointment_pct` is 0–100; divide by 100 for FTE |

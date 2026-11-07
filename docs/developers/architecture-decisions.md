@@ -246,7 +246,7 @@ record keeps the decisions.
 | 2 | `cedar_student_terms`: one definition of an enrolled term and of return (closes I44) | done 2026-11-04 |
 | 3 | Dimensions from the mapping files, units attached at load | done 2026-11-06 |
 | 4 | `cedar_courses` and course ids at load (I37, I45); `cedar_course_terms`; `cedar_attempts` | courses and keying done 2026-11-07; `cedar_course_terms` done 2026-11-07; `cedar_attempts` done 2026-11-07 (`cedar_grades` retired); the course flows next |
-| 5 | Thin `cedar_students` and `cedar_programs` to keys and registration facts; rename to fact names | student-term columns off the loaded class list done 2026-11-07 (`thin_class_list()`); the section columns next; the rename last |
+| 5 | Thin `cedar_students` and `cedar_programs` to keys and registration facts; rename to fact names | student-term columns off the loaded class list done 2026-11-07 (`thin_class_list()`), and off the saved file (`cedar_class_list_descriptions`); the section columns next; the rename last |
 
 Step 2's precedence rule: when the two source snapshots disagree, the
 academic-studies row wins, the row is flagged and the count reported, never
@@ -260,10 +260,17 @@ a silent coalesce.
   unread `enrollment_id`: `CLASS_LIST_UNLOADED_COLUMNS`); the section columns
   second; the rename last, as one mechanical PR. Each 1.85M-row column costs
   about 14 MB whatever it holds.
-- **The saved file keeps them.** The transform builds `cedar_student_terms`
-  from them and the mapping audit reads the roster's major; every loader drops
-  them (`thin_class_list()`), so the app, the REPL, the cache warmers and the
-  tests read one shape.
+- **The saved file is thin too** (second PR). The transform saves the
+  columns once per student, term and pull as `cedar_class_list_descriptions`
+  (`build_class_list_descriptions()`, with `rows`, how many class-list rows
+  carried each), builds `cedar_student_terms` from that table, and saves the
+  class list without them. The mapping audit and Admin > Mappings read the
+  roster's majors off it (`summarize_class_list_majors()`). Loading a thin
+  file cuts the container's high-water mark, which dropping columns after
+  reading a full file did not (R keeps the pages it frees). Every loader
+  still calls `thin_class_list()`, so a class list saved before 2026-11-07
+  loads in the same shape, its descriptions derived from it with a log line
+  (`resolve_class_list_descriptions()`; I48).
 - **Readers attach, never re-derive:** `attach_student_descriptions()` reads
   named columns off `cedar_student_terms` and refuses a class-list row the
   table lacks. `filter_class_list()` keeps a `classification` key, which

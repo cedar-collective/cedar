@@ -122,8 +122,13 @@ The complete transformation logic is in [R/data-parsers/transform-to-cedar.R](ht
   - Analyses that need a student enrollment anchor use the minimum observed
     `cedar_students$term`, which means the first class-list term present in CEDAR.
     This is not a formal Banner matriculation/start-term field.
+  - The student's description on the roster (level, classification, major,
+    home college and campus, residency, dual credit) is saved once per
+    student, term and pull as `cedar_class_list_descriptions`
+    (`build_class_list_descriptions()`, with `rows`), and the class list is
+    saved without it (`thin_class_list()`; ADR-001 step 5).
 
-**2a. cedar_students (+ programs, degrees) → cedar_student_terms**
+**2a. cedar_students and cedar_class_list_descriptions (+ programs, degrees) → cedar_student_terms**
 - One row per `student_id + term` with any class-list row or declaration
   (`build_student_terms()`, ADR-001 step 2; contract in `student-terms.md`).
 - Counts observed registered UNM credits from class-list rows with

@@ -176,7 +176,7 @@ The flags are the startup edges from `cedar_data_edges()` passed in, never recom
 | `registration_status` | string | Enrollment status | "Registered", "Dropped" | 3 uses |
 | `registration_status_code` | string | Status code | "RE", "RS", "DR", "W" | 14 uses |
 | `final_grade` | string | Final grade (if term complete) | "A", "B+", "W", "I" | 40 uses! |
-| `student_level`, `student_classification`, `major_code`, `major_name`, `student_college`, `student_campus`, `residency`, `dual_credit` | string | The student's description as the roster printed it. **Saved, not loaded** (`thin_class_list()`, ADR-001 step 5): the transform builds `cedar_student_terms` from them; readers attach the table's values (`attach_student_descriptions()`) | "UG", "Sophomore, 2nd Yr" | transform only |
+| `student_level`, `student_classification`, `major_code`, `major_name`, `student_college`, `student_campus`, `residency`, `dual_credit` | string | The student's description as the roster printed it. **Neither saved nor loaded** (ADR-001 step 5): the transform saves them once per student-term and pull as `cedar_class_list_descriptions` (below) and builds `cedar_student_terms` from that; readers attach the table's values (`attach_student_descriptions()`). A file saved before 2026-11-07 still carries them; `thin_class_list()` drops them at load | "UG", "Sophomore, 2nd Yr" | transform only |
 | `term_type` | string | Term type (denormalized) | "fall", "spring" | Rollcall analysis |
 | `as_of_date` | date | When data was extracted | "2025-01-10" | Data freshness |
 
@@ -600,7 +600,8 @@ How each loaded table is built, and how every row gets its unit and its course a
 | Table | Rows | What it is / most-used columns |
 |-------|------|-------------------------------|
 | `cedar_sections` | ~50k | One row per DESR section row. `term`, `crn`, `subject_course`, `campus`, `department`, `enrolled`, `total_enrl`, `is_combined`, `is_topics` |
-| `cedar_students` | ~1.9M | One row per student-course-term. `student_id`, `term`, `subject_course`, `campus`, `level`, `final_grade`, `registration_status_code`. Loaded without the student-description columns, which stay on the saved file (`thin_class_list()`) |
+| `cedar_students` | ~1.9M | One row per student-course-term. `student_id`, `term`, `subject_course`, `campus`, `level`, `final_grade`, `registration_status_code`. Saved and loaded without the student-description columns (`thin_class_list()`) |
+| `cedar_class_list_descriptions` | ~470k | Saved by the transform; the app reads it at start only to summarise the roster's majors, then lets it go. One row per `student_id`, `term`, `as_of_date` and distinct roster description (`student_level`, `student_classification`, `major_code`, `major_name`, `student_college`, `student_campus`, `residency`, `dual_credit`), with `rows`, the class-list rows that carried it (`build_class_list_descriptions()`). `build_student_terms()` reads it; the summary (`summarize_class_list_majors()`, `data_objects$cedar_class_list_majors`) lets Admin > Mappings name an unmapped roster major. About 7 MB saved against 8 MB of columns on the class list file, and 56 MB in memory against 122 MB |
 | `cedar_programs` | ~200k | One row per student-term program declaration. `program_name`, `program_code`, `dept_code`, `college_code`, `student_campus`, `pell_eligible`, `first_gen`, `ipeds_race`, `gender`, `time_status`. Its `*_credits_*` columns are pull-stamped — see the field reliability contract |
 | `cedar_degrees` | ~20k | Awarded degrees. `degree`, `program_name`, `dept_code`, `cumulative_gpa`, `cumulative_credits` |
 | `cedar_faculty` | ~5k × terms | `instructor_id`, `instructor_name`, `department`, `job_category`, `appointment_pct` (0–100; divide by 100 for FTE), `college` |

@@ -188,6 +188,12 @@ host, see the memory-kill note under I46), then `cedar_student_terms`, which
 their file times make stale. An unstamped file predates stamping and is
 rebuilt once. A transform edit that changes no stored column then costs the
 deploy nothing, which the retired stamp could not tell.
+**Worked around once (2026-11-07):** the thin saved class list (ADR-001 step
+5) drops columns and adds `cedar_class_list_descriptions`. Every loader and
+the transform's student-term stage accept the older full file, deriving its
+descriptions from it and logging that they did
+(`resolve_class_list_descriptions()`), so production keeps starting until its
+next class-list transform. That path is the workaround, not the fix.
 **Affects:** `.github/workflows/deploy.yml`,
 `scripts/rebuild-programs-if-mappings-changed.R`, `transform-to-cedar.R`.
 
@@ -202,7 +208,8 @@ exists (`description_source`). On 2026-11-07 the loaded class list stopped
 carrying the column (`thin_class_list()`): `filter_class_list()`'s
 `classification` key filters a value the caller attached from the table, the
 sophomore screen and the projections read it there, and the Course Report's
-DFW by classification too. The reproduction below reads the saved file.
+DFW by classification too. Since the saved class list went thin as well, the
+reproduction below reads the roster's value from `cedar_class_list_descriptions`.
 **Found:** 2026-11-04, comparing Course Dynamics' rollcall by classification
 before and after the move (PR for the demographics readers).
 **Severity:** medium. A late-pulled term's classification filter selects the
@@ -229,7 +236,10 @@ source("scripts/cedar-repl.R")
 cl <- cedar_students %>%
   filter(subject_course == "ENGL 1120", term == 202580L,
          registration_status_code %in% STATUS_REGISTERED) %>%
-  distinct(student_id, term, roster = student_classification)
+  distinct(student_id, term) %>%
+  inner_join(distinct(cedar_class_list_descriptions, student_id, term,
+                      roster = student_classification),
+             by = c("student_id", "term"))
 j <- inner_join(cl, select(cedar_student_terms, student_id, term,
                            student_classification, description_conflict),
                 by = c("student_id", "term"))
@@ -237,7 +247,7 @@ count(j, roster != student_classification)   # 535 of 1,543 differ
 count(filter(j, roster != student_classification), roster, student_classification, sort = TRUE)
 # Sophomore -> Freshman 2nd Sem 157; Freshman 2nd Sem -> Freshman 1st Sem 148;
 # Sophomore -> Freshman 1st Sem 138; Junior -> Sophomore 76; Senior -> Junior 15
-unique(filter(cedar_students, term == 202580L)$as_of_date)   # 2026-03-07
+unique(filter(cedar_class_list_descriptions, term == 202580L)$as_of_date)   # 2026-03-07
 ```
 
 Every differing row is `description_conflict = TRUE` with

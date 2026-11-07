@@ -404,3 +404,39 @@ test_that("a classification filter selects on the student-term's value, not the 
   ))
   expect_equal(nrow(none), 0L)
 })
+
+test_that("the student-term table builds the same from the thin class list and its descriptions", {
+  # ST01 exercises every description rule (two pulls with different
+  # classifications, a programs row that disagrees, two majors, no programs
+  # row). Built from the class list as the transform saves it -- thin, with
+  # the description table beside it -- it is the table built from the full rows.
+  full <- suppressMessages(build_student_terms(cedar_students_st, cedar_programs_st, cedar_degrees_st))
+  descriptions <- build_class_list_descriptions(cedar_students_st)
+  expect_equal(sum(descriptions$rows), nrow(cedar_students_st))
+  from_saved <- suppressMessages(build_student_terms(
+    thin_class_list(cedar_students_st), cedar_programs_st, cedar_degrees_st,
+    edges = cedar_data_edges(cedar_students_st, degrees = cedar_degrees_st),
+    class_list_descriptions = descriptions))
+  expect_equal(from_saved, full)
+
+  # A thin class list with no description table is refused, never built
+  # as if no student had a description.
+  expect_error(suppressMessages(build_student_terms(
+    thin_class_list(cedar_students_st), cedar_programs_st, cedar_degrees_st,
+    edges = cedar_data_edges(cedar_students_st, degrees = cedar_degrees_st))),
+    "Build it before thin_class_list")
+
+  # A class list saved before 2026-11-07 carries its own descriptions and has
+  # no table beside it: they are read from it. Neither is refused.
+  expect_message(legacy <- resolve_class_list_descriptions(NULL, cedar_students_st, "test"),
+                 "saved before 2026-11-07")
+  expect_equal(legacy, descriptions)
+  expect_identical(resolve_class_list_descriptions(descriptions, NULL, "test"), descriptions)
+  expect_error(resolve_class_list_descriptions(NULL, thin_class_list(cedar_students_st), "test"),
+               "Re-run the transform")
+  expect_error(resolve_class_list_descriptions(dplyr::select(descriptions, -rows), NULL, "test"),
+               "lacks rows")
+
+  # The roster's majors read the same off the description table as off the rows.
+  expect_equal(summarize_class_list_majors(descriptions), summarize_class_list_majors(cedar_students_st))
+})
