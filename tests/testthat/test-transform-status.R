@@ -103,6 +103,16 @@ test_that("the class-list dedup keeps the row of record for each student-course-
   expect_error(env$dedup_class_list_rows(dplyr::select(rows, -crn)), "lacks crn")
 })
 
+test_that("an instructor ID is hashed as parse-data.R hashes it, once (I52)", {
+  env <- load_transform_helpers()
+  hashed <- digest::digest("100000231", algo = "md5")
+  # The DESR's employee ID becomes the class list's and HR's hash; a hash is
+  # kept, and a missing instructor stays missing rather than becoming one.
+  expect_identical(env$hash_instructor_id(c("100000231", hashed, NA, "100000231")),
+                   c(hashed, hashed, NA, hashed))
+  expect_identical(env$hash_instructor_id(100000231), hashed)
+})
+
 test_that("cedar-status writer emits valid JSON with null metadata", {
   env <- load_transform_helpers()
   status_file <- tempfile(fileext = ".json")

@@ -69,7 +69,7 @@ per-term claims. `gender` is constant per student.
 |---|---|---|---|---|
 | `cedar_students` | 1,855,577 | 465,836 | 468 MB | 347 MB without the student columns; ~190 MB without the section columns too |
 | `cedar_programs` | 622,988 | 426,222 | 181 MB | — |
-| `cedar_sections` | 253,707 | — | 100 MB | already at its grain (`job_cat` is 100% NA) |
+| `cedar_sections` | 253,707 | — | 100 MB | already at its grain (`job_cat` was 100% NA; dropped 2026-11-07, I52) |
 
 A student-term table carrying the eight student columns is 53 MB.
 
@@ -84,7 +84,11 @@ A student-term table carrying the eight student columns is 53 MB.
   tables.
 - **Instructor IDs.** Both tables have `instructor_id`; the class list's is a
   32-character hash and the DESR's a 9-digit ID. Zero values match. Nothing
-  joins on it yet; the first join will return nothing, silently.
+  joins on it yet; the first join will return nothing, silently. *(The
+  transform's HR merge onto the DESR was that join: it matched nothing and
+  left `job_cat` NA on every section. Fixed 2026-11-07, ISSUES I52: the
+  transform hashes every instructor ID alike, and sections carry no faculty
+  attribute.)*
 - **Classification.** 111 student-terms carry two classifications on the class
   list, every one from rows pulled on two dates. ADR-001's first draft found
   116 adjacent-level disagreements between the class list and academic

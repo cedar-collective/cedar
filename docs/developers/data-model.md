@@ -106,7 +106,7 @@ The flags are the startup edges from `cedar_data_edges()` passed in, never recom
 | `campus` | string | Campus code | "Main", "ABQ", "Online" | Filter (34 uses) |
 | `college` | string | College code | "AS" (Arts & Sciences) | Filter (30 uses) |
 | `department` | string | Department code | "MATH" | Filter (58 uses) |
-| `instructor_id` | string | Primary instructor ID | "123456" | FK to faculty |
+| `instructor_id` | string | Primary instructor ID, md5-hashed as on `cedar_students` and `cedar_faculty` (`hash_instructor_id()`, ISSUES I52; a file transformed before 2026-11-07 carries the employee ID). A section carries no faculty attribute: join `cedar_faculty` on `term` and `instructor_id` | "07c10c7c…" | FK to faculty |
 | `instructor_name` | string | Instructor full name | "Smith, John" | Instructor filter |
 | `enrolled` | integer | Current enrollment | 28 | Analytics (11 uses) |
 | `capacity` | integer | Maximum enrollment | 30 | Seat analysis |
@@ -358,7 +358,7 @@ Class Lists, not the frozen Academic Studies `inst_credits_attempted` field.
 - `department` uses **department codes** from HR data (e.g., "MATH", "ANTH")
 - `job_category` uses **Title Case** values from parse-HRreport.R (see values below)
 - `appointment_pct` is stored as **decimal 0.0-1.0**, not percentage (e.g., 0.5 = 50%)
-- `instructor_id` is **encrypted** to match the encryption used in cedar_sections
+- `instructor_id` is the same md5 hash as on `cedar_sections` and `cedar_students` (I52). An instructor can hold several appointments a term, so a join from a section or a class-list row on `term` and `instructor_id` can return several rows: pick the appointment deliberately
 
 ### Job Categories
 
