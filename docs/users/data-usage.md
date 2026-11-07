@@ -58,9 +58,10 @@ relationships are stated in plain files under `institution/unm/` in the CEDAR
 repository (see [ADR-002](https://github.com/cedar-collective/cedar/blob/main/docs/developers/architecture-decisions.md#adr-002-explicit-mapping-files-replace-runtime-department-inference)), so
 every mapping is a reviewable line, not something CEDAR infers.
 
-At the top, a banner says whether the departments CEDAR is showing were built
-from the mapping files now deployed (**current**) or from older ones (**STALE**:
-the next data refresh or deploy rebuilds them).
+At the top, a banner says how many program, subject and department rows the
+app read from the mapping files when it started. Every department follows the
+files as deployed: an edit takes effect at the next restart, and nothing is
+rebuilt.
 
 **Mapping decisions** lists everything settled by editing a mapping file,
 largest first, in three tabs:
@@ -87,6 +88,26 @@ Each row opens with what it is, then what it needs:
 To accept a suggestion, change the row's `status` to `confirmed`. To choose a
 different unit, also change `unit_code`. Decisions are made in the files and
 reviewed like any other change; the app never edits them.
+
+**Code history** lists every row of `code_history.csv`: which course or
+subject code replaced which, and from which term. A confirmed row makes the two
+codes one course everywhere in CEDAR, so a renumbered course keeps its history;
+a proposed row changes nothing until someone confirms it. Rows still proposed
+come first, and their **Notes** open with why each is held (a level change, a
+generic title, or a one-off subject change).
+
+| Column | What it means |
+|---|---|
+| **Status** | `confirmed` or `proposed` |
+| **Old code**, **New code** | The code that retired and the one that replaced it, for example `MGMT 340` and `ACCT 3401` |
+| **Where** | The file and line, as a link to that row |
+| **From** | The first term of the new code |
+| **Old code offered**, **New code offered** | The terms and number of sections the schedule loaded in the app lists under each code. A code retired before the loaded schedule starts shows a dash; the summary says where it starts |
+| **Check** | Set when the schedule disagrees with the row's term: the old code still listed at or after it, or the new one listed before it. A reason to look, not an error: a cross-listing or a late section can do either |
+| **Notes**, **Basis**, **Evidence** | Why the row is there and how it was established: the same section listed under both codes, a title match, the catalog, or a decision |
+
+To confirm a proposed row, open its line and change `status` to `confirmed`,
+with a note saying why; to reject it, delete the row.
 
 **Other problems in the data** lists what no mapping can fix — for example,
 Banner organization IDs that appear in the major-code column — so they can be
