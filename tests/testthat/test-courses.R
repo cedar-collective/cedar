@@ -161,3 +161,23 @@ test_that("key_on_course_id reads a table by course and course_id_of resolves an
   expect_equal(course_code_renames(rn$cedar_students), c("HIST 320 > HIST 3201", "SOCI 250 > SOCI 2315"))
   expect_equal(course_code_renames(test_sections), character(0))
 })
+
+test_that("course_former_code_spans names each course's former codes with their terms", {
+  rn <- rn01_course_tables()
+  spans <- course_former_code_spans(rn$cedar_students, rn$cedar_sections)
+  expect_equal(spans$subject_course, c("HIST 3201", "SOCI 2315", "SOCI 371"))
+  expect_equal(spans$former_codes, c(
+    "HIST 320 (Spring 2020 to Fall 2020)",
+    "SOC 250 (Spring 2020), SOCI 250 (Spring 2020)",
+    "SOC 371 (Spring 2020)"
+  ))
+  # Keyed frames read the same codes off listed_code.
+  keyed <- course_former_code_spans(key_on_course_id(rn$cedar_sections))
+  expect_equal(keyed$subject_course, c("HIST 3201", "SOCI 2315", "SOCI 371"))
+  expect_equal(keyed$former_codes[keyed$subject_course == "SOCI 2315"], "SOC 250 (Spring 2020)")
+  # No renames: no rows, the two columns.
+  none <- course_former_code_spans(test_sections, test_students)
+  expect_equal(nrow(none), 0L)
+  expect_equal(names(none), c("subject_course", "former_codes"))
+  expect_error(course_former_code_spans(dplyr::select(test_sections, -course_id)), "course_id")
+})

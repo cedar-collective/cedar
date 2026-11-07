@@ -134,6 +134,31 @@ scope_waitlist_enrollment_base <- function(enrl_base, count_df) {
 attach_enrollment_history <- function(count_df, students, enrl_base = NULL) {
   if (is.null(count_df) || nrow(count_df) == 0) return(count_df)
 
+  # The history follows the course, not the code (ADR-001 step 4): the app's
+  # base is counted by course_id (build_cl_enrls_base()), while the waitlist
+  # rows carry the class list's code, and the two differ wherever the class
+  # list still uses a former code (UNM lists CCS beside CCST through Fall
+  # 2026). Each row's code is resolved to its course for the join and put
+  # back after, and the recompute below counts by course the same way.
+  students <- key_on_course_id(students, "attach_enrollment_history")
+  code_ids <- students %>% distinct(listed_code, course_id)
+  if (anyDuplicated(code_ids$listed_code)) {
+    stop("[waitlist.R] attach_enrollment_history(): a course code carries two course ids; ",
+         "the class list was not attached by attach_course_ids()")
+  }
+  count_df <- count_df %>%
+    ungroup() %>%
+    mutate(.listed_code = subject_course) %>%
+    left_join(code_ids, by = c(subject_course = "listed_code"), relationship = "many-to-one")
+  if (anyNA(count_df$course_id)) {
+    stop("[waitlist.R] attach_enrollment_history(): waitlist rows name codes the class list does not carry: ",
+         paste(unique(count_df$subject_course[is.na(count_df$course_id)]), collapse = ", "))
+  }
+  count_df <- count_df %>% mutate(subject_course = course_id) %>% select(-course_id)
+  restore_codes <- function(df) {
+    df %>% mutate(subject_course = .listed_code) %>% select(-.listed_code)
+  }
+
   # Use the caller's precomputed base when given; otherwise a scoped recompute
   # so tests and standalone-script callers still get enrollment context.
   if (is.null(enrl_base)) {
@@ -146,7 +171,7 @@ attach_enrollment_history <- function(count_df, students, enrl_base = NULL) {
     scoped <- students %>%
       ungroup() %>%
       semi_join(raw_scope, by = raw_match_keys)
-    if (nrow(scoped) == 0) return(count_df)
+    if (nrow(scoped) == 0) return(restore_codes(count_df))
     by_pt <- "part_term" %in% names(scoped)
     # tryCatch is intentional: missing enrollment context must not sink the
     # waitlist inspection — a failed recompute just leaves the extra columns off.
@@ -157,11 +182,11 @@ attach_enrollment_history <- function(count_df, students, enrl_base = NULL) {
         NULL
       }
     )
-    if (is.null(enrl_base)) return(count_df)
+    if (is.null(enrl_base)) return(restore_codes(count_df))
   }
 
   if (!all(c("registered", "dr_late", "term", "term_type") %in% names(enrl_base)))
-    return(count_df)
+    return(restore_codes(count_df))
 
   # The app-wide enrollment base contains every course and term. Restrict it to
   # the course keys in this waitlist result before any mutate/group/summarize
@@ -191,7 +216,7 @@ attach_enrollment_history <- function(count_df, students, enrl_base = NULL) {
            trend_hist       = census_hist,
            trend_terms      = census_hist_terms)
 
-  count_df
+  restore_codes(count_df)
 }
 
 

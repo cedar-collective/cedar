@@ -126,8 +126,11 @@ for (.sec in c("test_sections", "test_sections_sf", "test_sections_topics", "tes
                "test_sections_intersession", "test_sections_pending_session")) {
   assign(.sec, attach_test_course_ids(get(.sec), "sections"), envir = globalenv())
 }
-test_students <<- attach_test_course_ids(test_students, "students")
-test_students_xl_switch <<- attach_test_course_ids(test_students_xl_switch, "students")
+for (.stu in c("test_students", "test_students_xl_switch", "test_students_regstats",
+               "test_students_course_history")) {
+  assign(.stu, attach_test_course_ids(get(.stu), "students"), envir = globalenv())
+}
+rm(.stu)
 rm(.sec)
 # RN01 read with the demo institution's code_history.csv, as its tests read it:
 # both tables attached from one dimension built over both, as global.R does.

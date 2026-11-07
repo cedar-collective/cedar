@@ -601,6 +601,25 @@ trend_cell_html <- function(series, terms, cur_term, pct = FALSE,
 #     they are analyzed as distinct offerings rather than folded into the course.
 # The header opts out of the theme's uppercase transform so it reads "PoT" (lowercase
 # o), not "POT".
+#' A course code cell that names the codes the course used to carry
+#'
+#' The code in the table's usual weight, with the course's former codes and
+#' their terms beneath it in the sub-text style, so a reader of a table keyed
+#' on course_id (ADR-001 step 4) can see which history is behind the row.
+#'
+#' @param code The course's code (its `course_id`).
+#' @param former_codes The row's `former_codes` text, or NA when the course
+#'   has carried one code.
+course_code_cell <- function(code, former_codes = NA_character_) {
+  if (length(former_codes) != 1L || is.na(former_codes) || !nzchar(former_codes)) {
+    return(htmltools::span(class = "fw-semibold", code))
+  }
+  htmltools::tagList(
+    htmltools::span(class = "fw-semibold", code),
+    htmltools::div(class = "text-sub", paste0("also ", former_codes))
+  )
+}
+
 cedar_pot_coldef <- function(name = "PoT", maxWidth = 52, align = "center") {
   reactable::colDef(
     name        = name,

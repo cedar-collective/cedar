@@ -362,12 +362,14 @@ message("  - cedar_faculty: ", nrow(data_objects[["cedar_faculty"]]), " rows")
 # ── Pre-compute enrollment stats base table for regstats ─────────────────────
 # calc_cl_enrls() on all students is the dominant cost in get_reg_stats() — it
 # re-runs 5 dplyr passes over millions of raw student rows on every button click.
-# Pre-computing it once lets get_reg_stats() filter a small aggregated table instead.
+# build_cl_enrls_base() (R/branches/enrl.R) computes it once, keyed on course_id
+# (ADR-001 step 4), with level/department joined on so post-hoc filtering works,
+# so get_reg_stats() filters a small aggregated table instead.
 #
 # This is valid because calc_cl_enrls() groups by (campus, college, subject_course,
 # term_type): the per-course stats don't depend on what other courses are in the
-# filtered set. We add level/department as a lookup join so post-hoc filtering works.
-# Courses that are crosslisted across departments get one row (most-common dept/level).
+# filtered set. Courses that are crosslisted across departments get one row
+# (first dept/level seen).
 if (!is.null(data_objects[["cedar_students"]]) && nrow(data_objects[["cedar_students"]]) > 0) {
   base_cache_path    <- file.path(data_dir, "cedar_cl_enrls_base.qs")
   students_qs_path   <- file.path(data_dir, paste0("cedar_students", get_data_extension()))
@@ -375,37 +377,31 @@ if (!is.null(data_objects[["cedar_students"]]) && nrow(data_objects[["cedar_stud
                  file.exists(students_qs_path) &&
                  file.info(base_cache_path)$mtime > file.info(students_qs_path)$mtime
 
-  # Shape guard: a base cached before the part_term dimension was added is
-  # mtime-valid but missing the column, which would break the part-aware
-  # regstats groupings. Treat a base without part_term as stale so it recomputes.
+  # Shape guard: a base saved before the part_term dimension, before it was
+  # keyed on course_id, or before a code_history.csv row was confirmed is
+  # mtime-valid and wrong. cl_enrls_base_is_current() reads the renames stamped
+  # on it against the class list's; a base that fails is recomputed.
+  cached_base <- NULL
   if (cache_valid) {
-    cached_cols <- tryCatch(names(qs2::qs_read(base_cache_path)), error = function(e) character(0))
-    if (!"part_term" %in% cached_cols) {
-      message("[global.R] Cached enrollment base predates part_term; recomputing.")
+    cached_base <- tryCatch(qs2::qs_read(base_cache_path), error = function(e) {
+      message("[global.R] Cached enrollment base unreadable: ", conditionMessage(e))
+      NULL
+    })
+    if (!cl_enrls_base_is_current(cached_base, data_objects[["cedar_students"]])) {
+      message("[global.R] Cached enrollment base predates part_term or the current course codes; recomputing.")
       cache_valid <- FALSE
     }
   }
 
   if (cache_valid) {
     message("[global.R] Loading cached enrollment base table...")
-    t_base <- system.time({ cedar_cl_enrls_base <- qs2::qs_read(base_cache_path) })
-    message(sprintf("[global.R] Enrollment base table loaded: %d rows (%.1fs)",
-                    nrow(cedar_cl_enrls_base), t_base["elapsed"]))
+    cedar_cl_enrls_base <- cached_base
+    message(sprintf("[global.R] Enrollment base table loaded: %d rows",
+                    nrow(cedar_cl_enrls_base)))
   } else {
     message("[global.R] Pre-computing enrollment stats base table for regstats...")
     t_base <- system.time({
-      cedar_cl_enrls_base <- calc_cl_enrls(data_objects[["cedar_students"]], by_part_term = TRUE)
-
-      # One row per subject_course for level/department lookup; slice(1) handles
-      # rare crosslist cases where the same course appears under multiple departments.
-      course_meta <- data_objects[["cedar_students"]] %>%
-        group_by(subject_course) %>%
-        slice(1) %>%
-        ungroup() %>%
-        select(subject_course, level, department)
-
-      cedar_cl_enrls_base <- cedar_cl_enrls_base %>%
-        left_join(course_meta, by = "subject_course")
+      cedar_cl_enrls_base <- build_cl_enrls_base(data_objects[["cedar_students"]])
     })
     message(sprintf("[global.R] Enrollment base table ready: %d rows (%.1fs)",
                     nrow(cedar_cl_enrls_base), t_base["elapsed"]))
@@ -416,6 +412,7 @@ if (!is.null(data_objects[["cedar_students"]]) && nrow(data_objects[["cedar_stud
       message("[global.R] Warning: Failed to cache enrollment base table: ", e$message)
     })
   }
+  rm(cached_base)
 } else {
   cedar_cl_enrls_base <- NULL
 }

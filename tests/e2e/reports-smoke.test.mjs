@@ -378,9 +378,10 @@ export async function runReportChecks({ scope = 'smoke', synthetic = false } = {
         { type: 'text', id: 'regstats-rs_dashboard', disallowed: ['click Get Stats'] },
       ]);
       await page.waitForFunction(() => {
-        const note = document.querySelector('[data-definition-id="regstats"][data-definition-version="4.0.0"]');
+        const note = document.querySelector('[data-definition-id="regstats"][data-definition-version="5.0.0"]');
         const text = document.body.innerText;
         return !!note && text.includes('strictly earlier same-season/part-of-term means and population SD') &&
+          text.includes('followed across the codes it has carried') &&
           text.includes('Unscored SD comparisons: enrollment') &&
           text.includes('Saturation source coverage:') &&
           text.includes('distinct prior comparison term') &&

@@ -339,7 +339,11 @@ Plan: [ADR-002](docs/developers/adr-002-explicit-mapping-files.md).
   `course_id` and name the former codes behind the shown numbers. Reader PR 2
   (2026-11-06): Course Dynamics reads the class list and the sections by
   course (`key_on_course_id()`), so a report for SOCI 371 carries its SOC 371
-  terms in every tab and says so. Next: Regstats baselines, then
+  terms in every tab and says so. Reader PR 3 (2026-11-06): Regstats keys
+  both tables and its precomputed base on the id, names each flagged
+  course's former codes, and refuses a base or a day cache counted over other
+  codes; Waitlists' enrollment history joins that base by course. Next:
+  Waitlists' counts, the projection inputs, then
   `cedar_course_terms` and `cedar_attempts` keyed on the id. Confirming the proposed Fall 2026
   renumberings is a person's decision, and what makes I37's rows show their
   old offerings.

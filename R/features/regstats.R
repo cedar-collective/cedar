@@ -212,7 +212,11 @@ create_regstats_cache_filename <- function(opt) {
 # Helper function to check if cache file exists and is fresh.
 # Cache is valid only if written today (after midnight) — data refreshes each morning,
 # so any cache from a prior calendar day is stale regardless of how many hours ago.
-load_regstats_cache <- function(opt) {
+#
+# `code_renames` is the renames the loaded class list carries
+# (course_code_renames()); a payload counted over others — saved before a
+# code_history.csv row was confirmed — is a miss, never a stale hit.
+load_regstats_cache <- function(opt, code_renames = character(0)) {
   # tryCatch is intentional (exempt from the no-fallback rule): an unreadable or
   # corrupt cache file is semantically a cache miss — NULL triggers a recompute.
   tryCatch({
@@ -230,6 +234,10 @@ load_regstats_cache <- function(opt) {
                 " (", round(cache_age, 2), " hours old)")
 
         cached_data <- readRDS(cache_path)
+        if (!identical(as.character(cached_data[["code_renames"]]), as.character(code_renames))) {
+          cedar_debug("[regstats.R] Cache was counted over other course codes, expired: ", cache_filename)
+          return(NULL)
+        }
 
         # Add cache metadata
         cached_data[["cache_info"]] <- list(
@@ -415,6 +423,7 @@ get_regstats_baseline_info <- function(enrollment, saturation, opt,
     scope = "strictly earlier same-season/part-of-term means and population SD",
     n_hist_terms = n_distinct(earlier$history_term),
     unscored = unscored,
+    saturation_coverage = saturation_coverage,
     coverage_note = paste0(
       "Unscored SD comparisons: enrollment ", unscored[["enrollment"]],
       ", early drops ", unscored[["early_drops"]], ", late drops ", unscored[["late_drops"]],
@@ -496,6 +505,43 @@ attach_regstats_titles <- function(flagged, courses) {
 }
 
 
+# Name the former codes behind each flagged course (ADR-001 step 4). Display
+# enrichment like the titles: one text per course, read off both keyed frames
+# (course_former_code_spans()), NA for a course that has carried one code.
+attach_regstats_former_codes <- function(flagged, students, courses) {
+  spans <- course_former_code_spans(students, courses)
+  for (nm in c("bumps", "dips", "early_drops", "late_drops", "waits", "sat")) {
+    df <- flagged[[nm]]
+    if (is.null(df) || !"subject_course" %in% names(df)) next
+    flagged[[nm]] <- df %>%
+      dplyr::select(-dplyr::any_of("former_codes")) %>%
+      dplyr::left_join(spans, by = "subject_course", relationship = "many-to-one")
+  }
+  flagged
+}
+
+
+# What the page says about following courses across their codes: how many
+# flagged courses also ran under another code. The module renders
+# the sentence; the counts stay typed beside it.
+regstats_course_key_info <- function(flagged) {
+  renamed <- unique(unlist(lapply(c("bumps", "dips", "early_drops", "late_drops", "waits", "sat"),
+    function(nm) {
+      df <- flagged[[nm]]
+      if (is.null(df) || !all(c("subject_course", "former_codes") %in% names(df))) return(character(0))
+      as.character(df$subject_course[!is.na(df$former_codes)])
+    })))
+  n <- length(renamed)
+  note <- if (n == 0L) {
+    "Each course is followed across the codes it has carried; no flagged course ran under another code."
+  } else {
+    paste0("Each course is followed across the codes it has carried: ", n, " flagged course",
+           if (n == 1L) "" else "s", " also ran under another code, named in the Course column.")
+  }
+  list(keyed_on = "course_id", n_renamed_courses = n, renamed_courses = sort(renamed), note = note)
+}
+
+
 #' Detect Registration Anomalies and Enrollment Concerns
 #'
 #' Analyzes historical enrollment patterns to identify courses with unusual registration
@@ -504,16 +550,19 @@ attach_regstats_titles <- function(flagged, courses) {
 #' waitlists. This is the primary tool for identifying enrollment concerns that need
 #' administrative attention.
 #'
-#' @param students Data frame of student enrollments from cedar_students table.
+#' @param students Data frame of student enrollments from cedar_students table,
+#'   with \code{course_id} attached (as every loader does).
 #'   Must include columns: campus, college, term, term_type, subject_course,
 #'   course_title, level, student_id, registration_status
-#' @param courses Data frame of course sections from cedar_sections table.
+#' @param courses Data frame of course sections from cedar_sections table,
+#'   with \code{course_id} attached.
 #'   Must include columns: campus, college, term, subject_course, gen_ed_area,
 #'   enrolled, waiting, avail
 #' @param opt Options list for filtering and thresholds:
 #'   \itemize{
 #'     \item \code{term} - Term code(s) to analyze (e.g., 202510)
-#'     \item \code{course} - Course identifier(s) to analyze (e.g., "MATH 1430")
+#'     \item \code{course} - Course identifier(s) to analyze (e.g., "MATH 1430"),
+#'       current or former: each resolves to its course
 #'     \item \code{course_college} - College code(s) to filter (e.g., "AS")
 #'     \item \code{course_campus} - Campus code(s) to filter (e.g., "MAIN")
 #'     \item \code{level} - Course level(s) to filter (e.g., "undergrad")
@@ -530,6 +579,8 @@ attach_regstats_titles <- function(flagged, courses) {
 #'     \item \code{running_hot_sat} - "Running hot" courses: fill above their own prior pattern by the configured SD band
 #'     \item \code{chronic_sat} - "Chronically full" courses: above the selected fill ceiling for the required number of prior same-type terms
 #'     \item \code{all_flagged_courses} - Character vector of all flagged course identifiers
+#'     \item \code{course_key_info} - How many flagged courses ran under another code, and the sentence the page shows
+#'     \item \code{code_renames} - The renames the class list carried when this was counted (the cache compares them)
 #'     \item \code{tiered_summary} - Summary of concerns by severity tier
 #'     \item \code{high_fall_sophs} - Popular fall sophomore courses (non-Shiny only)
 #'     \item \code{thresholds} - Thresholds used for detection
@@ -537,6 +588,14 @@ attach_regstats_titles <- function(flagged, courses) {
 #'   }
 #'
 #' @details
+#' ## The course, not the code
+#' Both tables are read keyed on \code{course_id} (ADR-001 step 4), so every
+#' \code{subject_course} in the result is a course id: a course's strictly
+#' earlier offerings under a former code are its own baseline, the schedule's
+#' capacity for a section the class list names by the newer code joins its
+#' census, and each flagged row's \code{former_codes} names the other codes
+#' the course has carried with their terms.
+#'
 #' ## Detection Methodology
 #' Each target uses strictly earlier offerings of the same course, campus, college,
 #' season, and part of term. Means and population SD use that identical history;
@@ -627,6 +686,27 @@ attach_regstats_titles <- function(flagged, courses) {
 get_reg_stats <- function(students, courses, opt) {
   cedar_debug("[regstats.R] Welcome to get_reg_stats!")
 
+  # Regstats follows the course, not the code (ADR-001 step 4): both tables are
+  # read keyed on course_id, so a course's strictly earlier offerings under a
+  # former code are its own baseline, the schedule's capacity for a section the
+  # class list names by the newer code joins its census, and a code asked for,
+  # current or former, resolves to its course once. The renames in the class
+  # list fingerprint the result: the cache and the precomputed base must have
+  # been counted over the same ones.
+  students <- key_on_course_id(students, "get_reg_stats")
+  courses <- key_on_course_id(courses, "get_reg_stats")
+  if (!is.null(opt[["course"]]) && !identical(opt[["course"]], "")) {
+    known_codes <- dplyr::bind_rows(
+      dplyr::distinct(students, course_id, listed_code),
+      dplyr::distinct(courses, course_id, listed_code)
+    )
+    opt[["course"]] <- unique(vapply(
+      convert_param_to_list(opt[["course"]]), course_id_of, character(1),
+      tbl = known_codes, caller = "get_reg_stats"
+    ))
+  }
+  code_renames <- course_code_renames(students)
+
   # cedar_cl_enrls_base is an OPTIONAL precomputed enrollment base table built in
   # global.R as a performance cache. In the running app it is always defined (the
   # table, or NULL when caching is disabled). Outside the app (tests, CLI scripts)
@@ -638,6 +718,19 @@ get_reg_stats <- function(students, courses, opt) {
     get("cedar_cl_enrls_base", inherits = TRUE)
   } else {
     NULL
+  }
+
+  # The excluded-course list by course, read once over both whole tables: a
+  # course the list names under any code it has carried is excluded in every
+  # term and from the base counted by course (drop_excluded_courses(), M39).
+  # Every pass below then reads the same courses, including the class-list
+  # recount used when a student-level filter is set, which used to keep them.
+  # The base's renames are checked against the class list before it is cut.
+  base_counted_over_these_codes <- cl_enrls_base_is_current(cl_enrls_base, students)
+  excluded_ids <- if (exists("excluded_courses")) excluded_course_ids(students, courses) else character(0)
+  if (length(excluded_ids) > 0) {
+    students <- students[!course_code_in(students$subject_course, excluded_ids), ]
+    courses <- courses[!course_code_in(courses$subject_course, excluded_ids), ]
   }
 
   # For studio testing
@@ -698,7 +791,7 @@ get_reg_stats <- function(students, courses, opt) {
   # Only check cache if using a named threshold profile and bypass not requested.
   if (!using_custom_thresholds && !isTRUE(opt[["bypass_cache"]])) {
     cedar_debug("[regstats.R] Checking for cached regstats (", threshold_profile, " thresholds)...")
-    cached_results <- load_regstats_cache(opt)
+    cached_results <- load_regstats_cache(opt, code_renames)
     if (!is.null(cached_results)) {
       cedar_debug("[regstats.R] Found valid cached regstats!")
       return(cached_results)
@@ -723,6 +816,10 @@ get_reg_stats <- function(students, courses, opt) {
   }, logical(1)))
 
   if (!is.null(cl_enrls_base) && !has_student_filters) {
+    if (!base_counted_over_these_codes) {
+      stop("[regstats.R] cedar_cl_enrls_base was not counted over this class list's course codes; ",
+           "build it with build_cl_enrls_base() (R/branches/enrl.R), as global.R does at start.")
+    }
     cedar_debug("[regstats.R] Using precomputed enrollment base table...")
     regstats <- cl_enrls_base
     if (!is.null(opt[["course_college"]]) && length(opt[["course_college"]]) > 0) {
@@ -744,10 +841,10 @@ get_reg_stats <- function(students, courses, opt) {
     # Remove lookup columns — they're not expected by downstream anomaly detection code.
     regstats <- regstats %>% select(-any_of(c("level", "department")))
     # Apply excluded_courses list so dissertations/independent-study don't skew stats.
+    # The base is counted by course, so the list is applied by course too.
     if (exists("excluded_courses")) {
-      excl <- stringr::str_squish(toupper(excluded_courses))
       regstats <- regstats %>%
-        filter(!stringr::str_squish(toupper(subject_course)) %in% excl)
+        filter(!normalize_course_code(subject_course) %in% excluded_ids)
     }
     cedar_debug("[regstats.R] Precomputed base filtered to ", nrow(regstats), " rows.")
   } else {
@@ -1090,6 +1187,8 @@ flagged[["bumps"]] <- bumps %>% arrange(across(all_of(std_arrange_cols)))
   # Titles are display enrichment. Preserve one row per analytical reporting
   # group even when its source sections carry multiple titles.
   flagged <- attach_regstats_titles(flagged, courses)
+  flagged <- attach_regstats_former_codes(flagged, students, courses)
+  flagged[["course_key_info"]] <- regstats_course_key_info(flagged)
   flagged[["waitlist_info"]] <- list(
     source = "classlist_true_demand",
     definition_id = "waitlist",
@@ -1160,7 +1259,7 @@ flagged[["bumps"]] <- bumps %>% arrange(across(all_of(std_arrange_cols)))
   cedar_debug("[regstats.R] Gathering flagged courses...")
   flagged_courses <- c()
   for (flag in flagged) {
-    if (!is.null(flag$subject_course)) {
+    if (is.data.frame(flag) && "subject_course" %in% names(flag)) {
       flagged_courses <- c(flagged_courses, as.character(flag$subject_course))
     }
   }
@@ -1169,8 +1268,9 @@ flagged[["bumps"]] <- bumps %>% arrange(across(all_of(std_arrange_cols)))
 
   flagged[["all_flagged_courses"]] <- sort(unique(flagged_courses))
 
-  # save thresholds for adding to report
-  flagged[["thresholds"]] <- thresholds 
+  # save thresholds for adding to report, and the renames this was counted over
+  flagged[["thresholds"]] <- thresholds
+  flagged[["code_renames"]] <- code_renames
   flagged[["baseline_info"]] <- get_regstats_baseline_info(
     regstats, sat, opt, saturation_coverage
   )
@@ -1205,9 +1305,8 @@ flagged[["bumps"]] <- bumps %>% arrange(across(all_of(std_arrange_cols)))
       if (!is.null(opt$dept_code)      && length(opt$dept_code)      > 0)
         snap_secs <- snap_secs %>% dplyr::filter(department %in% opt$dept_code)
       if (exists("excluded_courses")) {
-        excl <- stringr::str_squish(toupper(excluded_courses))
         snap_secs <- snap_secs %>%
-          dplyr::filter(!stringr::str_squish(toupper(subject_course)) %in% excl)
+          dplyr::filter(!normalize_course_code(subject_course) %in% excluded_ids)
       }
 
       make_level_snap <- function(secs) {
@@ -1248,9 +1347,8 @@ flagged[["bumps"]] <- bumps %>% arrange(across(all_of(std_arrange_cols)))
         if (!is.null(opt$dept_code)      && length(opt$dept_code)      > 0)
           ch_trend <- ch_trend %>% dplyr::filter(department %in% opt$dept_code)
         if (exists("excluded_courses")) {
-          excl <- stringr::str_squish(toupper(excluded_courses))
           ch_trend <- ch_trend %>%
-            dplyr::filter(!stringr::str_squish(toupper(subject_course)) %in% excl)
+            dplyr::filter(!normalize_course_code(subject_course) %in% excluded_ids)
         }
         ch_by_term <- ch_trend %>%
           dplyr::group_by(term) %>%

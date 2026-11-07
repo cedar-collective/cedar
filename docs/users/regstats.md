@@ -65,6 +65,15 @@ historical variation. The scope bar reports those counts separately for
 enrollment, early drops, late drops, and fill. **Unscored does not mean normal.**
 Two observations permit a calculation but are still a small evidence base.
 
+A course is followed across the codes it has carried. When the institution's
+code history records that one code succeeded another (a subject renamed, a
+course renumbered), the earlier offerings count as the same course's history:
+its comparison means, its spread, and its Terms at Cap include them, and the
+Course column names the former code with the terms it covered ("also HIST 320
+(Spring 2020 to Fall 2020)"). A succession nobody has confirmed keeps the two
+codes as two courses. The scope bar says how many flagged courses ran under
+another code.
+
 ---
 
 ## Signal categories

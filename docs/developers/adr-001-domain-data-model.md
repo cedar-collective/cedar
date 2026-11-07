@@ -548,12 +548,46 @@ sections reached (the class list already carried SOCI on the old sections,
 I45, so the grade-reading and flow cones were whole by code; the sections and
 everything joined through them were not); PSYC 302 likewise, 19 and 17 where
 it had 9. SOCI 371's feeders drop from 1,175 rows to 1,154 with the same
-4,728 students: 21 feeder codes united with their renames. Next: Regstats
-baselines (`history_keys`, with the cache version bumped); the enrollment
-projection inputs are a `model_version` decision. Then `cedar_course_terms`
-is promoted from `cedar_cl_enrls_base` and `cedar_attempts` from
-`cedar_grades`, both keyed on `course_id`, and `course-flows.R`'s precompute
-rebuilds on it. The Admin > Mappings surface for code history (when each
+4,728 students: 21 feeder codes united with their renames.
+
+**Reader PR 3 (2026-11-06): Regstats.** `get_reg_stats()` keys both tables
+on `course_id` before anything reads them, so `history_keys` follow the
+course unchanged in name: a renumbered course's strictly earlier offerings
+are its own count means, drop means and Terms at Cap, and the schedule's
+capacity for a section the class list names by the newer code (I45) joins
+its census instead of reporting unmatched. A picked code, current or former,
+resolves once (`course_id_of()` over the codes both tables carry). The
+precomputed base it filters moved into a branch helper,
+`build_cl_enrls_base()`, which counts the keyed class list and stamps the
+renames it saw on the result; `cl_enrls_base_is_current()` refuses a base
+saved before the current `code_history.csv` rows were confirmed, in
+`global.R` (recompute) and in `get_reg_stats()` (stop). The day cache is v6
+and records the renames it was counted over, so a confirmed row is a miss
+the same day. Every flagged table carries `former_codes`
+(`course_former_code_spans()`, "HIST 320 (Spring 2020 to Fall 2020)"), shown
+beneath the code, and the scope bar says how many flagged courses ran under
+another code. The excluded-course list is applied by course on both
+whole tables before anything reads them (`excluded_course_ids()`; ISSUES
+M39), since a list naming CCS 699 matched by code misses the CCST 699 the
+course is keyed on. Measured on the 2026-10-08 pull: 551 flagged courses
+for Fall 2026 by course and by code (seven CCS courses report as CCST with
+both codes' counts, and 30 name a former code), 557 against 548 for Spring
+2026 (PSYC, SOCI and CCST courses whose PSY, SOC and CCS offerings are
+now their baselines); the saturation universe is the same 3,685 groups
+either way; the base builds in 7.6 s as before. Definition regstats 5.0.0. Waitlists reads the same keyed
+base: `attach_enrollment_history()` resolves each waitlist row's code to its
+course for the join and puts the code back, so the history follows the
+course. That is needed today, not only after a confirmation: UNM's class
+lists carry CCS beside CCST through Fall 2026 (201 CCS codes from Spring
+2026 on, 109 Fall 2026 sections), and joined by code a waitlisted CCS course
+would read no history from the keyed base. Its waitlist counts are still by
+code, so a term with both CCS 370 and CCST 370 waitlisted shows two rows
+with one course's history; keying the counts is the next reader. The downstream-signals
+flows (`cedar_course_flows`) are still by code and rebuild on
+`cedar_course_terms`. Next: the enrollment projection inputs are a
+`model_version` decision. Then `cedar_course_terms` is promoted from
+`cedar_cl_enrls_base` and `cedar_attempts` from `cedar_grades`, both keyed on
+`course_id`, and `course-flows.R`'s precompute rebuilds on it. The Admin > Mappings surface for code history (when each
 code was in use, computed from the data; which replaced which, from the
 file) is its own PR, and `program` rows are validated now so it has
 something to read.
