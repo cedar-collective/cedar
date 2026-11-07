@@ -6,246 +6,366 @@ parent: Developer Guide
 
 # Testing
 
-**Status:** Current — all unit tests run against hand-crafted designed fixtures.
+What the test data is and why, which checks a change needs, how to run them,
+and how to work on a calculation outside Shiny. The hard rules are in
+`AGENTS.md` under **Tests**; the browser harness is
+[E2E and Browser Testing](e2e-testing.html).
 
-Covers what the test data is and why, what belongs in the shared fixture versus
-a single test file, how to change fixtures, and how to run the suite.
+---
 
-## Summary
+## The test data
 
-All unit test data lives in a single file:
-`tests/testthat/fixtures/designed_test_data.R`. It defines every CEDAR table
-as hand-crafted tribbles, and `tests/testthat/setup.R` sources it and exposes
-the tables as `test_sections`, `test_students`, `test_programs`,
-`test_degrees`, `test_faculty`, plus `test_dims` and a `data_objects` list.
-
-There is no fixture generation step, no binary fixture files, and no
-dependency on production data — the file **is** the test database.
-
-The [synthetic developer institution](synthetic-institution.md) uses these same
-authored records. Its adapter completes missing app metadata and copies whole
-histories into five traceable cohorts. Unit tests continue using their original
-small populations; the expanded institution supports exploration and integration.
-
-## Philosophy
-
-**Every expected value is traceable to explicit rows.**
-
-- No sampling, no random seeds — failures are diagnosable by reading the
-  fixture file, without running the full data pipeline.
-- The header of `designed_test_data.R` is a pinned block of expected values
-  (row counts by department, term, campus, status, level; crosslist scenario
-  summaries; regstats design values). Test files hard-code assertions against
-  those pinned counts.
-- The fixture schema mirrors the authoritative schema in
-  `R/data-parsers/transform-to-cedar.R`. If a column is added, renamed, or
-  removed there, mirror the change in `designed_test_data.R` — test failures
-  are the drift signal.
-
-## What belongs in the shared fixture, and what doesn't
-
-The rule "don't build test data inside test files" is easy to misread as *use
-real data instead of invented data*. That isn't it — and the History section at
-the bottom of this page explains why. **None of CEDAR's test data is real.**
-Every row in `designed_test_data.R` is hand-written. The project deliberately
-moved *away* from sampling production data because binary fixtures were opaque.
-
-So the question is never "is this data real?" It is:
-
-> **Does this data have a real-world counterpart it has to be faithful to?**
-
-**Yes — it enters the system.** `cedar_students`, `cedar_sections`,
-`cedar_programs`, `cedar_degrees` are the shapes institutional data arrives in.
-There is a real version of each, so the fixture can be faithful or unfaithful to
-it, and that is checkable. Real UNM data spans ten campuses; a fixture with one
-campus is unfaithful in a way that matters. These belong in
-`designed_test_data.R`, where every analytic touching them gets the same shape.
-
-**No — it only exists inside the pipeline.** `compute_stopout_for_group()` takes
-a frame with `outcome` and `stopped_out` already derived by an upstream step.
-There is no real-world version of that frame; its shape is defined entirely by
-the function that produces it. Asking whether it "mirrors real data" has no
-answer. Putting it in the shared fixture would be worse than leaving it local —
-it would sit beside genuine institutional tables while being an implementation
-detail, and the next reader would take it for something it isn't.
-
-The same reasoning covers expected-value tables (the thing you assert *against*),
-test scaffolding (`test-data-loading.R` writes throwaway `.Rds` files so the
-loader has something to find), and scenarios that turn on term spacing the
-stable terms deliberately don't provide (relative-term sequences in
-`test-pathway.R`, data-boundary rows in `test-population.R`).
-
-### The failure this actually guards against
-
-Not "invented data is bad." Something narrower and easier to miss:
-
-> **A fixture that cannot express the bug produces a test that passes forever
-> without checking anything.**
-
-A worked example from July 2026. `cedar_students` was 100% ABQ. Campus-grouping
-tests written against it passed — because a single-campus fixture cannot tell a
-campus-aware grouping from a campus-blind one. The tests were decorative. They
-only started testing anything once the fixture gained a second campus (MC01–MC03
-at the end of `designed_test_data.R`), at which point they immediately caught a
-join that had been dropping campus and attaching the wrong comparison rate.
-
-That is why the boundary tables are the ones under discipline. They are what has
-to keep looking like the institution, so that tests written against them fail
-when the code stops handling the institution correctly.
-
-**When in doubt, the tell is reusability:** if a second test file would want the
-same rows, it is domain data and belongs in the shared fixture.
-
-## Fixture Contents
+All unit test data lives in one file,
+`tests/testthat/fixtures/designed_test_data.R`. It defines every CEDAR table as
+hand-crafted tribbles; `tests/testthat/setup.R` sources it and exposes:
 
 | Variable | Contents |
 |----------|----------|
-| `test_sections` | Sections centered on HIST, MATH, ANTH, NURS, with variety rows in PSYC, BIOL, MGMT, ENGL, POLS, AMST |
-| `test_sections_sf` | Seatfinder-specific sections using 2024/2025 terms |
+| `test_sections` | Sections centred on HIST, MATH, ANTH, NURS, with variety rows in PSYC, BIOL, MGMT, ENGL, POLS, AMST |
+| `test_sections_sf` | Seatfinder sections using 2024/2025 terms |
 | `test_students` | Students enrolled in those sections |
 | `test_programs` | Program declarations, including health-college samples |
 | `test_degrees` | Degrees awarded in stable terms |
-| `test_faculty` | Faculty across nine departments (MGMT and POLS are Term Teachers only) |
+| `test_faculty` | Faculty in HIST, MATH, ANTH, PSYC, BIOL, NURS, MGMT, ENGL, POLS; MGMT and POLS have only Term Teacher rows, so they drop out of permanent-faculty counts |
+| `test_dims` | The demo institution's mapping files as dimension tables |
+| `data_objects` | The tables as the app holds them |
 
-**Stable terms:** 202010, 202060, 202080, 202110 (Spring/Summer/Fall 2020,
-Spring 2021) — completed academic periods whose real-world counterparts never
-change.
+There is no generation step, no binary fixture and no dependency on production
+data: the file **is** the test database. Every expected value is traceable to
+explicit rows, so a failure is diagnosable by reading the file.
 
-## Changing Fixtures
+- **Stable terms:** 202010, 202060, 202080, 202110 (Spring, Summer, Fall 2020,
+  Spring 2021): completed periods whose real counterparts never change.
+- **Pinned counts:** the file's header is a block of expected values (rows by
+  department, term, campus, status and level; crosslist scenarios; Regstats
+  design values) that test files assert against.
+- **Schema:** mirrors `R/data-parsers/transform-to-cedar.R`. When a column is
+  added, renamed or removed there, mirror it here; test failures are the drift
+  signal. A missing column is added to the fixture, never papered over with
+  fallback logic in a test.
+- **The synthetic institution** ([synthetic-institution.md](synthetic-institution.html))
+  is these same rows, adapted by `dev/demo-data.R` into five traceable
+  cohorts. Unit tests keep the small populations.
 
-Edit `designed_test_data.R` directly, then run the tests:
+**Institution configuration is the one exception.** Files an institution
+authors, rather than rows its data produces, are tested against the demo
+institution's own files: the Degree Explorer suite reads
+`institution/demo/degree_*.csv` through `test_degree_catalog` /
+`test_degree_roadmaps`, so a real institution's catalog review never breaks a
+unit test. Its schedules are worked by hand in the header of
+`test-degree-explorer.R`; edit the two together.
 
-```bash
-cd <project root>
-Rscript --vanilla -e "testthat::test_dir('tests/testthat')"
-```
+### Use real catalog codes
 
-When adding rows:
+Scenario tables keep their own departments so their pinned counts cannot
+disturb HIST's, but those departments are **real UNM subjects and unit
+codes**: Regstats uses SOCI, multi-campus SPAN, retention COMM/`CJ`, Roadblocks
+ECON, major change GEOG/`GES`, Gen Ed graduates LING, and PHIL for "some other
+department". These rows *are* the demo institution, so an invented code such as
+`RSTA` ships as a department the app cannot name (names come from `units.csv`,
+and `ui.R`'s `.dept_choices` keeps only codes found there). Regstats was once
+unselectable in the synthetic app for exactly this reason.
 
-1. Follow the naming conventions already in the file:
-   - **EC-xx** — numbered edge cases (continue the sequence from the highest
-     existing number)
-   - **XLxx** — crosslist/split scenarios
-   - **SVARxx** — section variety rows (unusual statuses, NA fields)
-2. Update the pinned expected-value counts in the file's header comment.
-3. Update hard-coded expected values in affected test files.
+Prefer a pair whose subject differs from its unit where the scenario allows:
+COMM → `CJ` and GEOG → `GES` exist because, before them, every fixture code had
+`subject == dept_code`, so code that wrongly filtered `subject_course` by
+`dept_code` passed the suite.
 
-**Domain data goes here, not in test files.** Anything representing a shape real
-institutional data arrives in belongs in `designed_test_data.R`; tests filter
-from the `test_*` variables. Intermediate frames, expected-value tables, and
-scaffolding stay local to their test file — see *What belongs in the shared
-fixture* above, and say in a comment why the data is local.
+### What belongs in the shared fixture, and what doesn't
 
-## Running Tests
+None of CEDAR's test data is real: every row is hand-written, deliberately,
+because the sampled binary fixtures it replaced were opaque. So the question is
+never "is this data real?" It is:
 
-CEDAR is a Shiny app, not an R package — `devtools::test()`,
-`pkgload::load_all()`, `library(cedar)`, and `testthat::test_local()` all fail;
-there is no `DESCRIPTION` file.
+> **Does this data have a real-world counterpart it has to be faithful to?**
 
-### Choose the smallest relevant browser check
+**Yes: it enters the system.** `cedar_students`, `cedar_sections`,
+`cedar_programs`, `cedar_degrees` are the shapes institutional data arrives in.
+Multi-campus delivery, waitlisted students, crosslists and repeat enrolments
+are facts about how the data looks, and every analytic touching them needs the
+same shape. These belong in `designed_test_data.R`; tests filter from the
+`test_*` variables.
 
-Run from the repository root through `run-tests.sh`. Calculation changes use
-focused committed R tests during editing and the full R suite once at the end.
-UI or module-wiring changes also need the relevant browser scenario. For prose
-or CSS-only work, check links or inspect the affected appearance; do not run the
-full application tour solely because a file changed.
+**No: it exists only inside the pipeline.** Build it locally at the top of the
+test file, with its expected values documented directly above and a comment
+saying why it is local. The legitimate cases:
+
+- **Intermediate frames.** `compute_stopout_for_group()` takes a frame with
+  `outcome` and `stopped_out` already derived; that shape is one function's
+  contract, and in the shared fixture it would pass for institutional data.
+- **Expected-value tables,** the thing you assert *against*.
+- **Scaffolding.** `test-data-loading.R` writes throwaway `.Rds` files for the
+  loader to find.
+- **Term spacing the stable terms lack.** The relative-term sequences in
+  `test-pathway.R` and the data-boundary rows in `test-population.R`; the
+  former's header shows the pattern.
+
+When in doubt, the tell is reusability: if a second test file would want the
+same rows, they are domain data.
+
+**The failure this guards against** is narrower than "invented data is bad":
+*a fixture that cannot express the bug produces a test that passes forever.* In
+July 2026 `cedar_students` was 100% ABQ, so every campus-grouping test asserted
+nothing. Once the fixture gained a second campus (MC01–MC03), the same tests
+immediately caught a join that dropped campus and attached the wrong comparison
+rate. When a fixture cannot represent a case (it once had no waitlisted
+students, because the status map knew only `RE`), extend the fixture; don't
+build a one-off scenario or extract a helper solely so a test can reach it.
+
+### Changing fixtures
+
+Edit `designed_test_data.R` directly, then, in the same change:
+
+1. Name new rows by the file's conventions, continuing each sequence:
+   **EC-xx** numbered edge cases (EC-01..03 were used by the legacy sampler;
+   don't reuse them), **XLxx** crosslist/split scenarios, **SVARxx** section
+   variety rows (unusual statuses, NA fields).
+2. Update the pinned counts in the header.
+3. Update the hard-coded expectations in the affected tests.
+
+Expected values are hard-coded from running the function against the fixtures,
+then committed. If one changes, the function or fixture changed: investigate
+before updating. To learn the value for a new assertion, assert something
+obviously wrong and read the real value from the failure diff.
+
+Filter tests use `make_opt(uel = FALSE)`: the `uel = TRUE` default applies the
+excluded-courses list and changes `subject_course`.
+
+`tests/testthat/create-test-fixtures.R` once sampled real data into binary
+`cedar_*_test.qs` files. Nothing loads them; the script is kept, under a legacy
+banner, only as the recipe for a stratified real-data sample. Never add rows to
+it.
+
+---
+
+## Which checks a change needs
+
+Choose checks by the behavior changed. A fresh container and the breadth of
+browser coverage are separate decisions.
+
+| Change / occasion | Required checks |
+|---|---|
+| Calculation or data contract | Focused committed R tests while editing; `./run-tests.sh` once when finished |
+| UI, routing or module wiring | R gate plus `./run-tests.sh --e2e <suite>` covering the change; look at layout changes |
+| Representative app check | `./run-tests.sh --e2e` (same as `--e2e smoke`): Enrollment and Course Dynamics |
+| PR acceptance | The synthetic CI gate ([below](#pull-request-checks-without-institutional-data)) |
+| Release candidate or major pipeline change | `./run-tests.sh --all`: rebuild and run every institutional browser suite |
+| Dependency, R or Docker toolchain | Native and Docker dependency checks, their R gates and synthetic acceptance; the institutional release gate stays separate |
+| Documentation or presentation only | Check links or appearance; no full run for prose, spacing or colour |
+
+What the R suite cannot see:
+
+| You changed | Also do this | Why |
+|---|---|---|
+| A `group_cols`, join key or grouping grain | a real-data check | Fixtures are often single-valued on the axis you changed; a campus-blind grouping once shipped green |
+| A cone's `list(...)` return shape | grep the renderers that read it | A balance table was returned and silently dropped by the UI for months with the suite green |
+| Module UI, `ui.R`, `server.R` | parse, render the UI function, look | Module code is not loaded by the suite ([below](#the-suite-does-not-load-shiny-modules)) |
+| CSS | check no later rule overrides yours, then look | testthat cannot see it |
+| Anything user-visible, before a release | rebuild the container and look | |
+
+### `run-tests.sh`
+
+Run from the host repository root.
 
 ```bash
 ./run-tests.sh                         # selector check + full R suite
-./run-tests.sh --project-library       # same gate with prepared native packages
+./run-tests.sh --project-library       # same, with the prepared native library
+./run-tests.sh --changed               # stages chosen from the diff
 ./run-tests.sh --e2e                   # R gate + short smoke (two reports)
-./run-tests.sh --e2e dept-trends       # R gate + the changed report
-./run-tests.sh --e2e credit-timeline   # credit wiring and truncation disclosure
-./run-tests.sh --e2e reports           # full institutional report tour
-./run-tests.sh --all                   # rebuild + all institutional browser suites
-./run-tests.sh --all smoke             # rebuild + short smoke only
+./run-tests.sh --e2e dept-trends       # R gate + one suite (one --e2e at a time)
+./run-tests.sh --e2e reports           # full 16-scenario institutional report tour
+./run-tests.sh --all                   # rebuild + every institutional browser suite
+./run-tests.sh --all smoke             # rebuild + smoke only
 ```
 
-The short smoke checks Enrollment (DESR and class-list output) and Course
-Dynamics (overview and enrollment detail). The broader report tour retains all
-16 scenarios, including Roadblocks, Retention, and combined Headcount filters.
-Focused report names are `dept-trends`, `roadblocks`, `retention`, and
-`headcount`. Other named suites such as `nav`, `admin`, and `demo` still work.
-Course Timing's wiring and truncation checks share one population setup in
-`credit-timeline`.
+Focused report scopes are `dept-trends`, `roadblocks`, `retention` and
+`headcount`; other named suites include `nav`, `admin`, `credit-timeline`
+(Course Timing wiring and the truncation disclosure, one population setup),
+`harness` (run it when `tests/e2e/lib.mjs` changes) and `demo`.
 
-Keep full institutional validation for release candidates and major data-pipeline
-changes. A routine source edit needs current application code and the relevant
-browser check. The gate stops at the first failed suite without automatic retries;
-diagnose the failure before rerunning the focused committed script. A timeout
-may indicate application work, a harness problem, or resource pressure. Report
-its observed duration and cause when known, separately from correctness.
+The gate stops at the first failed suite and the report tour at its first
+failed step; neither retries. Diagnose app, setup or resource failures before
+an explicit rerun. A timeout does not identify its cause: report its duration
+separately from correctness. Report the command, pass/fail counts, meaningful
+skips, whether Chrome and the app came up and whether the app ran current
+source; never call focused or synthetic success a full institutional pass.
 
-Use one native environment for routine checks. System R remains the default;
-`--project-library` selects the prepared copied library and verifies its pins.
-Dependency, R-version, or Docker-toolchain changes require native/Docker checks
-and synthetic acceptance; do not repeat that comparison for unrelated edits.
-Setup never runs inside the test gate. See [native setup](installation.html#prepare-the-same-r-packages-as-docker).
+**`--changed`** reads the diff and prints one line of reasoning per file:
 
-For a tight edit loop:
+| changed | selected |
+|---|---|
+| `R/cones/**`, `R/branches/**`, `tests/testthat/**` | R suite only, no browser |
+| `ui.R`, `server.R`, `R/modules/**`, `www/**` | R suite + browser |
+| `tests/e2e/<name>.test.mjs` | that suite; R suite skipped |
+| `tests/e2e/lib.mjs` | `harness` |
+| `renv.lock`, `Dockerfile*`, `scripts/r-environment.R` | dependency check + R suite |
+| `dev/**` | R suite + `demo` |
+| `docs/**`, `*.md` only | nothing |
+
+It selects; it never certifies. It cannot know a cone change moved a rendered
+number, so widen it by hand when the blast radius is larger than the paths.
+
+Observed costs on the development machine, for judging what to skip, not as
+budgets: R suite ~2 min; `check-ids` under a second; app warm-up ~14 s; the
+institutional report tour ~1 m 45 s; the other browser suites together
+~3 m 40 s. The gate polls the app for responsiveness between suites rather than
+sleeping.
+
+### The three environments
+
+| Environment | Used for | Ready when |
+|---|---|---|
+| **`Rscript --vanilla`** | cones, branches, features, everything in `tests/testthat` | system packages installed, or the prepared native library selected |
+| **Dockerized app** | anything rendered: UI, routing, CSS, module wiring | `docker ps` shows `cedar-shiny` *and* it was rebuilt since your last code change |
+| **Headless Chrome** | driving the running app, screenshots | `tests/e2e/node_modules` exists |
+
+A UI change verified only by a green R suite is unverified.
+
+**The container bakes source with `COPY`.** Only data is mounted, so a running
+container does not pick up code changes; one up for hours runs whatever the
+source was when it was built. Check before trusting anything you see:
 
 ```bash
-Rscript --vanilla -e "testthat::test_file('tests/testthat/test-population.R')"
+docker ps --format '{{.Names}}\t{{.Status}}'   # is it up, and how old?
+./rebuild-and-test.sh                           # rebuild + restart + wait
 ```
 
-Recent native gates took roughly two minutes. Runtime varies by host, library,
-data, and cache state; the historical 28–35-second estimates are obsolete.
+Application-only changes reuse cached package layers. A test-script or
+documentation edit needs no rebuild, and rebuilding does not imply running
+every suite. Chrome setup failures are reported separately from app failures.
 
-### Keep the environment current
+| Where | Path | Applies to |
+|---|---|---|
+| **Host** | `/Users/fwgibbs/Dropbox/projects/cedar-project/cedar` | `run-tests.sh`, `Rscript`, `node tests/e2e/*` |
+| **Container** | `/srv/shiny-server/cedar` | any `docker compose exec` |
 
-R tests load functions without Shiny modules by default. Browser checks verify
-that the selected controls and outputs actually work; R success alone does not
-verify UI wiring. Explicitly load modules when an R test needs a UI function.
+`setup.R`, `load_funcs()`, the fixtures and every e2e helper resolve relative to
+the host root, so `cd` there first. Inside the container the app is **not** at
+`/srv/shiny-server` (the stock Shiny sample directory); running there gives
+`No test files found`, which reads like a broken image:
 
-The ordinary Docker app bakes application source into its image. After changing
-that source, use `./rebuild-and-test.sh` before the relevant browser check.
-Changing host-run browser scripts or documentation alone does not require a
-rebuild. Rebuilding does not imply running every browser suite.
+```bash
+docker compose exec -T -w /srv/shiny-server/cedar cedar-shiny Rscript -e '...'
+```
 
-Chrome setup failures must be reported separately from app failures. State the
-command, result, meaningful skips, and whether the app used current source.
-Focused success does not establish full release success.
+Looking at the app (`node tests/e2e/shot.mjs <tab>`), the `connect()` options
+and the memory limits of the browser stages are on
+[E2E and Browser Testing](e2e-testing.html).
 
-### Keep coverage useful
+---
 
-Preserve numerical, data-integrity, and meaningful input-contract tests. Remove
-assertions that merely repeat source spelling, CSS spacing, internal variable
-names, or prose. Extend an existing relevant suite and reuse population setup
-before adding another file. Do not create separate runners or scratch browser
-scripts. The Headcount filter failure and Roadblocks/Retention timeouts once
-tracked here were resolved on 2026-09-05 as a single resource failure, not three
-defects: the Shiny worker was OOM-killed mid-tour and `www/cedar-disconnect.js`
-reloaded the page, so puppeteer blamed whichever step was running. All twelve
-browser suites pass. See AGENTS.md → "The browser stages are memory-bound".
+## Running the R suite
 
-Within one scenario, calculate the result once and check its output contract
-once. Collect related numerical expectations in a small table, as in the
-Enrollment, Pathways, and Regstats tests. Keep different inputs and policy
-boundaries separate. The aim is less repeated computation and maintenance;
-combining assertions without removing repeated work does not make testing faster.
+CEDAR is a Shiny app, not an R package: `devtools::test()`,
+`pkgload::load_all()`, `library(cedar)` and `testthat::test_local()` all fail,
+because there is no `DESCRIPTION`. Always use `--vanilla`, which skips
+`.Rprofile` and automatic data loading:
 
-Retire obligations as well as repeated setup. Code exercised by a behavior test
-does not need separate file/function-existence checks. Test a generic renderer's
-distinct branches with representative inputs; do not repeat its checks for every
-configured record. Keep calculation regressions in the layer that owns them and
-use integration tests to prove wiring, without repeating the component checklist.
+```bash
+# One file: the default while iterating
+Rscript --vanilla -e "testthat::test_file('tests/testthat/test-course-retention.R')"
+
+# Several files by name pattern
+Rscript --vanilla -e "testthat::test_dir('tests/testthat', filter='retention|pathway')"
+
+# Everything: once after a non-trivial change (./run-tests.sh does this too)
+Rscript --vanilla -e "testthat::test_dir('tests/testthat')"
+```
+
+Add `stop_on_failure = FALSE` to finish the run and report every failure.
+Repeat the full gate only for later code changes or an unresolved failure, not
+for each browser retry.
+
+### The suite does not load Shiny modules
+
+`helper-load-functions.R` calls `load_funcs(cedar_base_dir, modules = FALSE)`,
+so `subtab_header()`, `deptProfileGenEdUI()` and every other module function is
+absent; a test calling one fails with "could not find function". To exercise a
+UI function, rerun the loader with modules on, rather than hand-sourcing
+`R/modules/*.R` (which pulls a dependency chain):
+
+```r
+setwd("tests/testthat")
+for (f in list.files(".", "^helper")) source(f)
+suppressPackageStartupMessages({library(shiny); library(reactable); library(bslib)})
+load_funcs(cedar_base_dir, modules = TRUE)      # cedar_base_dir set by the helper
+
+h <- as.character(deptProfileGenEdUI("g"))
+grepl("cedar-subtab-title", h)                   # assert what should have rendered
+```
+
+### Prove a new test catches the bug
+
+A test written alongside a fix often passes for the wrong reason. Reintroduce
+the bug and confirm it fails; this is mandatory for a guard on a join key, a
+grouping grain or a dedup:
+
+```bash
+cp R/cones/thing.R /tmp/thing.bak
+# revert the fix by hand
+Rscript --vanilla -e "testthat::test_file('tests/testthat/test-thing.R')"   # expect FAIL
+cp /tmp/thing.bak R/cones/thing.R
+Rscript --vanilla -e "testthat::test_file('tests/testthat/test-thing.R')"   # expect PASS
+```
+
+### After a failing run
+
+A failed run writes `tests/testthat/_problems/` and
+`tests/testthat/testthat-problems.rds`, neither ignored by git. Delete them
+before staging:
+
+```bash
+rm -rf tests/testthat/_problems tests/testthat/testthat-problems.rds
+```
+
+### What not to do
+
+- Never write custom testing scripts: temporary runners, one-off browser
+  scripts, shell wrappers, copied e2e variants, Python probes, R scratch tests,
+  bespoke smoke commands. They become a second, untrusted test system. The entry
+  points are the gates above, `test_file()` / `test_dir()` on committed files,
+  and `tests/e2e/`. Exploratory diagnostics stay in a scratchpad, never in the
+  repository, and are never presented as verification.
+- Don't `source("setup.R")` from outside `tests/testthat` (the paths resolve
+  wrong); from inside it is the way to load the fixtures.
+- Don't `source("global.R")`: it starts the interactive setup wizard.
+- Don't hand-source `R/modules/*.R`; use `load_funcs(..., modules = TRUE)`.
+
+---
+
+## Keeping coverage useful
+
+Preserve numerical, data-integrity and meaningful input-contract tests. Prefer
+observed behavior over assertions about source text, CSS values, variable names
+or prose. Extend an existing suite and reuse its population setup before adding
+a file.
+
+Within one scenario, compute the result once and check its output contract once,
+collecting related expectations in a small table as the Enrollment, Pathways and
+Regstats tests do; keep different inputs and policy boundaries separate.
+Combining assertions without removing repeated work does not make testing
+faster.
+
+Retire obligations as well as setup. Code exercised by a behavior test needs no
+separate file- or function-existence check. Test a generic renderer's distinct
+branches with representative inputs, not once per configured record. Keep a
+regression in the layer that owns the behavior; integration tests prove wiring
+without repeating the component's checklist.
+
+---
 
 ## Pull-request checks without institutional data
 
 `.github/workflows/pr-checks.yml` runs **Synthetic checks** on PRs targeting
-`main`, including documentation-only changes. It tests the proposed merge on a
-disposable GitHub-hosted runner, with read-only repository permissions and no
-deployment secrets. First-time fork contributions may need a maintainer to
-approve the workflow run.
+`main`, documentation-only ones included. It tests the proposed merge on a
+disposable GitHub-hosted runner with read-only permissions and no deployment
+secrets; a first-time fork contribution may need a maintainer to approve the
+run. Requiring the check is a repository-admin ruleset step.
 
-The workflow builds the normal app image, starts the isolated synthetic demo,
-and invokes the same `run-tests.sh` gate: selector validation, the full R suite,
-then the demo browser checks. R runs in the built image; Node and Chrome run on
-the host. App logs and the demo screenshot are retained for seven days. The
-production deployment workflow remains separate.
-
-With Docker, Node, and Chrome installed, reproduce that path locally from the
-repository root:
+The workflow builds the app image, starts the isolated synthetic demo and runs
+the same `run-tests.sh` gate: selector validation, the full R suite, then the
+demo browser checks. R runs in the image; Node and Chrome on the host. App logs
+and the demo screenshot are kept for seven days. Reproduce it locally:
 
 ```bash
 npm ci --prefix tests/e2e
@@ -254,261 +374,172 @@ CEDAR_DEV_IMAGE=cedar:pr-test docker compose --env-file /dev/null -p cedar-demo 
 ./run-tests.sh --test-image cedar:pr-test --e2e demo
 ```
 
-Rebuild the test image after editing: `--test-image` deliberately uses its
-baked-in source, not a host mount. It does not skip or reduce the R suite. This
-route needs no host R or institutional data and does not change the ordinary
-native-R test path. Synthetic acceptance does **not** replace the full
+`--test-image` uses the image's baked-in source, so rebuild it after editing;
+it does not reduce the R suite. Synthetic acceptance does **not** replace the
 institutional release gate or production-scale reconciliation.
 
-On memory-constrained Docker hosts, run synthetic acceptance and institutional
-release checks sequentially. A 4 GB Docker VM can run out of memory when the
-full-data Shiny worker, demo worker, and Docker R suite run together. After the
-synthetic gate, stop its worker without removing data:
+On a memory-constrained Docker host (a 4 GB VM), run the synthetic and
+institutional gates one after the other: the full-data worker, the demo worker
+and the Docker R suite together can run out of memory. Stop the demo worker
+without removing data before the institutional gate:
 
 ```bash
 docker compose --env-file /dev/null -p cedar-demo -f compose.dev.yml stop cedar-dev
 ```
 
-Then run the institutional release gate. A restart screen during browser tests
-can mean the R worker was killed for memory pressure; inspect the container's
-OOM state before interpreting missing controls as a UI regression.
+A restart screen during browser tests can mean the worker was killed for
+memory; check the container's OOM state before reading missing controls as a UI
+regression ([e2e-testing.md](e2e-testing.html)).
 
-## Computational Prototyping Without Shiny
+---
 
-Shiny is the presentation and integration boundary, not the development loop for
-analytical code. Branches, cones, backtests, and artifact builders must be usable
-and testable without starting the app. Do not use repeated Shiny restarts to
-develop a calculation that can be exercised directly in R.
+## Dependencies
 
-CEDAR has two deliberately separate non-UI environments:
+`renv.lock` pins the Docker application's packages and R version. Docker runs
+`scripts/r-environment.R restore-docker` during its build, before copying app
+source. Native setup is `Rscript --vanilla scripts/r-environment.R restore`: it
+copies exact installed matches and restores missing versions into
+`renv/library/cedar/R-<version>/<platform>/`, never cache symlinks, and never
+rewrites startup files, system libraries, data or the old renv library.
+`check` / `check-native` are read-only drift checks; a readiness marker rejects
+a native library prepared against a different lockfile. `.Rprofile` prefers a
+prepared native library and never downloads packages. Setup never runs inside
+the test gate. Procedures: [installation.md](installation.html).
 
-1. **Designed-fixture tests** provide deterministic release evidence. They are
-   fast, inspectable, committed, and independent of local institutional data.
-2. **A persistent real-data lab** supports exploration, performance measurement,
-   and repeated method development against the local CEDAR snapshot. Its results
-   guide development but are not release evidence.
+- `./run-tests.sh` tests system R; `--project-library` the pinned native
+  library. Use one native environment for routine work.
+- **Never run `renv::deactivate()` or a bare `renv::restore()`** to fix a
+  library error: it rewrites `.Rprofile` (commit `e4237fd`, reverted). Use the
+  setup helper.
+- Don't snapshot an arbitrary system environment over the lockfile.
+- Data files are **qs2**, not qs: `qs::qread()` fails with "QS format not
+  detected".
 
-The Dockerized app and browser tests come later, after the computational behavior
-is stable and the feature has a UI to integrate.
+---
 
-### Persistent Real-Data Lab
+## Working on a calculation without Shiny
 
-Start one long-lived vanilla R process from the repository root:
+Shiny is the presentation boundary, not the development loop. Branches, cones,
+backtests and artifact builders must be usable and testable without the app;
+don't develop a calculation through repeated Shiny restarts. Two environments
+serve different purposes:
+
+1. **Designed-fixture tests** are deterministic, committed evidence.
+2. **A persistent real-data lab** is for exploration, performance and method
+   development against the local snapshot. It guides development and is not
+   release evidence.
+
+| Layer | Purpose | Data | Evidence |
+|---|---|---|---|
+| Focused unit tests | Formulas, edge cases, policy invariants | Designed fixtures | Committed `testthat` expectations |
+| Persistent lab | Real distributions, performance, method choices | Local CEDAR snapshot | Reproducible commands and summarized findings |
+| Artifact tests | Build, validate, save, reload | Fixtures and `tempdir()` | Round-trip and metadata assertions |
+| Release gate | The whole source and UI | Dockerized app and browser | `./run-tests.sh --all` |
+
+An exploratory result becomes production behavior only once a committed test
+represents it. A real-data run cannot replace a fixture test, and a fixture test
+cannot say whether a method is useful on the current population.
+
+### The persistent real-data lab
+
+Don't hand-roll the bootstrap; it has four gotchas. For a one-off question:
 
 ```bash
-R --vanilla --quiet
+Rscript --vanilla -e 'source("scripts/cedar-repl.R"); nrow(cedar_students)'
 ```
 
-Then bootstrap the non-Shiny environment once:
+`cedar-repl.R` sets `cedar_base_dir` and `cedar_data_dir` (required globals with
+no defaults), loads lists, trunk, branches, cones and features with
+`modules = FALSE`, and binds each CEDAR table lazily, so a table is read on
+first use. For method development keep one `R --vanilla --quiet` process
+alive, source the helper once, and re-source only the changed file:
 
 ```r
 source("scripts/cedar-repl.R")
-```
-
-`cedar-repl.R` loads lists, trunk, branches, cones, and features with
-`modules = FALSE`. Local CEDAR tables are exposed through lazy bindings, so each
-table is read only on first use:
-
-```r
-nrow(cedar_sections)  # materializes cedar_sections
-nrow(cedar_students)  # materializes cedar_students
-```
-
-Keep that R process alive while editing. Re-source only the changed analytical
-file, then rerun the focused calculation:
-
-```r
-source("R/branches/example-analysis.R")
-source("R/cones/example-question.R")
-
-prepared_inputs <- prepare_example_inputs(
-  students = cedar_students,
-  sections = cedar_sections
-)
-
+prepared_inputs <- prepare_example_inputs(students = cedar_students, sections = cedar_sections)
 result <- get_example_answer(prepared_inputs, opt = list(...))
 
-# After editing a method, retain the loaded tables and prepared inputs.
-source("R/branches/example-analysis.R")
+source("R/cones/example-question.R")      # after an edit; tables stay loaded
 result <- get_example_answer(prepared_inputs, opt = list(...))
 ```
 
-If several function files changed, calling
-`load_funcs(cedar_base_dir, modules = FALSE)` is also inexpensive and does not
-reload materialized tables. Do not re-source `scripts/cedar-repl.R` inside the
-same session merely to reload code: its job is to establish the session and lazy
-table bindings.
-
-Prepared inputs are part of the speed strategy. Expensive, method-independent
-work such as canonical census histories, student-term population spines, or
-course-flow tables should be constructed once and held in memory. Rebuild them
-only when their preparation code, parameters, or source data changes. Formula
-changes should normally require only re-sourcing the method file.
-
-Spring inputs precompute preceding-Fall population cells and matched/unmatched
-course cohorts once. For a focused formula audit, pass
+`load_funcs(cedar_base_dir, modules = FALSE)` reloads several changed files
+without reloading tables; don't re-source `cedar-repl.R` to reload code. Build
+expensive, method-independent inputs (census histories, student-term spines,
+course-flow tables) once and hold them; rebuild them only when their code,
+parameters or data change. For a focused projection formula audit, pass
 `opt$projection_methods` to `backtest_course_projection_methods()` so unrelated
-student-level methods are not recomputed. Omitting it runs the complete
-registered method set, as publication does.
+methods are not recomputed. Restart R when a `.qs` file changes (a resident
+table is a snapshot) and when checking clean-session behavior or memory.
 
-Restart the R process when any underlying `.qs` data file changes. A resident
-table is a snapshot; it does not refresh itself when the file on disk is
-replaced. Also restart when validating clean-session behavior or memory use.
-
-### Rules for Lab Code
-
-- Analytical functions retain the normal CEDAR layer rules. Branches and cones
-  receive every table as an argument and never read the REPL's global tables.
-- Lab helpers may select local tables and parameters, but they call production
-  branch/cone functions rather than reimplementing calculations.
-- Use `--vanilla`. Keep system R, or explicitly select the prepared native
-  library before loading packages (see the installation guide). Do not activate
-  the old cache-linked renv library or reload data just to test an edited function.
-- Never copy local institutional rows into committed tests, documentation, or
-  snapshots. Add faithful designed rows to `designed_test_data.R` instead.
-- Store disposable real-data diagnostics under `output/`, not `tests/` or
-  `data/`, and do not treat them as assertions.
-- Record the data cutoff, target term, campus scope, and method version in any
-  diagnostic that will be compared across sessions.
-
-### Text-First Feature Previews
-
-Computation-heavy features should expose one canonical text preview before a
-Shiny table is built. This gives method and payload changes a fast, inspectable
-development loop while source data and prepared inputs remain resident in the
-R session.
-
-The preview function belongs in production code and accepts the same feature
-payload or validated saved artifact that the UI will consume. It may format,
-label, order, and select display columns; it must not calculate a second answer.
-The underlying payload remains the contract. Tests and UI code must never parse
-the rendered text back into data.
-
-A useful preview includes enough context to prevent a plausible but ambiguous
-table: target and cutoff terms, scope, enrollment measure, selected method,
-accuracy and signed bias, confidence or caveats, and recent comparable evidence.
-Its shape and critical labels should be covered by designed-fixture tests. Real
-institutional rows may be printed in the persistent lab for diagnosis, but are
-not committed as snapshots.
-
-For enrollment projections, the worked example is:
+Questions a test diff cannot answer (how many rows does this affect, does this
+grouping change a real number) need a scratch script, kept in the session
+scratchpad. To combine fixtures with real data from a script:
 
 ```r
-bundle <- read_enrollment_projection_bundle(
-  "output/projections/enrollment-projections-202710-latest.qs"
-)
-print_enrollment_projection_preview(
-  bundle,
-  courses = c("MATH 1215", "CHEM 1215")
-)
+setwd("tests/testthat")
+for (f in list.files(".", "^helper")) source(f)   # cone/branch functions
+source("setup.R")                                  # test_students, test_sections, ...
+students <- qs2::qs_read("../../data/cedar_students.qs")   # qs2; qs::qread fails
 ```
 
-This preview verifies computation and the table contract without starting
-Shiny. It does not verify column sizing, responsive behavior, accessibility,
-reactivity, routing, or styling; those remain Docker and browser work for the
-existing Registration > Projections module.
+Two things the helpers don't do, both of which look like broken code:
+`optparse` is not loaded (anything reaching `filter_class_list()`, including
+`prepare_course_attempts()`, fails with `could not find function "print_help"`;
+add `library(optparse)`), and an empty `opt` is a CLI path, not a no-op
+(`prepare_course_attempts(s, list())` reaches the "no filters supplied" branch
+and dies; pass at least one filter, `list(course = "ENGL 1120")`).
 
-### Validation Layers for a Computational Feature
+**Rules for lab code.** Analytical functions keep the layer rules: branches and
+cones take every table as an argument and never read the lab's globals. Lab
+helpers select tables and parameters and call production functions; they never
+reimplement a calculation. Never copy institutional rows into committed tests,
+docs or snapshots; add faithful designed rows instead. Keep disposable
+diagnostics under `output/` or the scratchpad, and record the data cutoff,
+target term, campus scope and method version in any diagnostic compared across
+sessions.
 
-| Layer | Purpose | Data | Required evidence |
-|---|---|---|---|
-| Focused unit tests | Prove formulas, edge cases, and policy invariants | Designed fixtures | Committed `testthat` expectations |
-| Persistent lab | Explore real distributions, performance, and method choices | Local CEDAR snapshot | Reproducible commands and summarized findings |
-| Artifact tests | Prove build, validation, save, and reload behavior | Designed fixtures and `tempdir()` | Round-trip and metadata assertions |
-| Release gate | Verify the complete source and UI environment | Dockerized app plus browser fixtures | `./run-tests.sh --all` |
+### Text-first feature previews
 
-An exploratory result becomes production behavior only after it is represented
-in a committed test. A successful real-data run cannot replace a fixture test,
-and a fixture test cannot answer whether a method is useful on the current local
-population. Both are necessary, for different reasons.
+A computation-heavy feature gets one canonical text preview before its Shiny
+surface: a committed production formatter over the feature payload or validated
+saved artifact, never a scratch script or a second implementation. It formats,
+labels, orders and selects columns; it never recomputes. Tests and the UI
+consume the typed payload and never parse the text.
 
-### Projection Workflow Example
+A useful preview shows enough context to rule out a plausible but ambiguous
+table: target and cutoff terms, scope, measure, selected method, accuracy and
+signed bias, caveats and recent evidence. Cover its shape and critical labels
+with fixture tests; print it from the lab while iterating, without committing
+real rows. It is computational evidence, not UI evidence: layout, reactivity,
+accessibility, CSS and routing still need the app. The worked example:
 
-Enrollment projections should follow this sequence entirely outside Shiny:
+```r
+bundle <- read_enrollment_projection_bundle("output/projections/enrollment-projections-202710-latest.qs")
+print_enrollment_projection_preview(bundle, courses = c("MATH 1215", "CHEM 1215"))
+```
 
-1. Prepare reusable class-list, census, registration-capacity, student-term,
-   target-roster, broad-population, and major/classification inputs, plus the
-   unfiltered preceding-term series.
-2. Apply the inexpensive pressure screen and retain its inclusion reasons.
-3. Run candidate projection methods only for the resulting course-market roster.
-4. Backtest each method using an explicit historical `as_of_term` cutoff.
-5. Audit WAPE, signed bias, error variability, and directional consistency.
-6. Replay the selection rule at every fold using only earlier aftcasts.
-7. Select and explain the row-level method and its floor and delta evidence.
-8. Build a versioned projection bundle and validate its schema and metadata.
-9. Save and reload the bundle in a round-trip test before the app consumes it.
+### The projection workflow
 
-The standalone builder and the persistent lab must call the same branch and cone
-functions. The builder owns publication; Shiny only reads the published bundle.
-Before changing the projection module, inspect the saved bundle through
-`print_enrollment_projection_preview()` and keep its formatter expectations
-green. The module should consume the same typed tables and labels, never the
-rendered Markdown text.
-The projection test suite should cover at least census semantics, cross-campus
-student deduplication, delivery-component reconciliation, rolling selection
-(a fixture whose in-sample winner fits 2% and whose honest record is 8%),
-spine / floor / delta reconciliation, the saturation floor and waitlist count,
-Fall delta carry-through rates, historical leakage, pressure-screen
-inclusion, signed-error direction, census-based capacity censoring, rolling
-method selection, and artifact round trips before a
-projection display contract changes in the app.
-
-The current publisher is runnable from the repository root:
+Projections are built entirely outside Shiny; the contract and its rules are
+[Enrollment Projection Architecture](enrollment-projections.html#the-rules-in-brief).
+The sequence: prepare reusable inputs (class lists, census, capacity,
+student-terms, rosters, populations, the unfiltered preceding-term series);
+apply the pressure screen and keep its reasons; run candidate methods only for
+the screened roster; backtest each at explicit `as_of_term` cutoffs; audit WAPE,
+signed bias, variability and direction; replay selection at every fold using
+only earlier aftcasts; build, validate, save and reload a versioned bundle.
 
 ```bash
 Rscript --vanilla scripts/build-enrollment-projections.R \
-  --target-term 202680 \
-  --as-of-term 202660 \
-  --group critical_courses
+  --target-term 202680 --as-of-term 202660 --group critical_courses
+Rscript --vanilla -e "testthat::test_dir('tests/testthat', filter='enrollment-projections|architecture')"
 ```
 
-The named group supplies the exact Gen Ed/FYEX/gateway roster and ABQ/EA campus
-scope. It pressure-screens the roster before running student-level methods.
-Explicit `--courses` runs must also provide `--campuses` and `--market-id`;
-those selected courses are forced through so an analyst can diagnose a row below
-the usual thresholds.
-
-Published bundles contain the pressure-screen audit, one selected projection per
-course market, every campus/part-term delivery component, every current
-candidate method, rolling-origin backtests, and row-level performance metrics.
-Raw class-list WAPE, registration-cap-censored WAPE, and uncensored-term
-WAPE are stored separately; they answer different questions and must not be
-collapsed into one confidence score. WAPE remains unsigned and is paired with
-weighted signed bias, directional consistency, and the term-level signed error
-history. The spine and the adjusted candidate remain side by side, and the
-adjusted one is published only after beating the spine on earlier shared
-aftcasts under the rolling rule.
-The target term and exact method-specific aftcast terms must accompany row-level
-accuracy. See
-[Enrollment Projection Architecture](enrollment-projections.html) for the
-demand-censoring and method-pairing contract. The Shiny module and a future
-Course Dynamics panel must read this contract through
-`read_enrollment_projection_bundle()`; it must not invoke the models or rebuild
-their tables.
-
-Run the focused computational and architecture checks while iterating:
-
-```bash
-Rscript --vanilla -e \
-  "testthat::test_dir('tests/testthat', filter='enrollment-projections|architecture')"
-```
-
-`tests/testthat/test-architecture.R` keeps projection code independent of Shiny
-and global data. `tests/testthat/test-enrollment-projections.R` owns formula,
-cutoff, selection, empty-scope, and artifact-contract behavior. Changes to a
-method are incomplete until both the designed fixture and real-data aftcast have
-been rerun.
-
-## History: the Real-Data Pipeline (legacy)
-
-Before designed fixtures, unit tests loaded binary fixture files
-(`cedar_*_test.qs`) sampled from real CEDAR data by
-`tests/testthat/create-test-fixtures.R`. That approach was replaced because
-binary fixtures are opaque: expected values could not be traced to visible
-rows, and regeneration coupled the test suite to local production data.
-
-The `.qs` files have been deleted. The sampling script is kept, with a
-prominent legacy banner, purely as the documented recipe for drawing a
-stratified real-data sample in case that pipeline is ever revived. **Do not
-add fixture rows or edge cases to it** — nothing in the test suite loads its
-output.
+A named group supplies the roster and campus scope; explicit `--courses` runs
+also need `--campuses` and `--market-id`, and those courses are forced through
+the screen for diagnosis. The builder and the lab call the same functions; Shiny
+only reads the published bundle. `test-architecture.R` keeps projection code
+free of Shiny and globals; `test-enrollment-projections.R` owns formula,
+cutoff, selection, empty-scope and artifact-contract behavior. A method change
+is incomplete until both the fixture tests and the real-data aftcast are rerun.

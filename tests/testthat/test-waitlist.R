@@ -204,11 +204,11 @@ test_that("inspect_waitlist structure is correct", {
   expect_true(exists("inspect_waitlist"))
 
   # Function should take students, opt, an optional sections table (only needed
-  # when students lack a course_title column), an optional precomputed
-  # enrollment base (M12: never looked up by name) and the student-term table
+  # when students lack a course_title column), the optional course-term
+  # measure table (M12: never looked up by name) and the student-term table
   # that describes each waiting student.
   args <- formals(inspect_waitlist)
-  expect_equal(names(args), c("students", "opt", "sections", "enrl_base", "student_terms"))
+  expect_equal(names(args), c("students", "opt", "sections", "course_terms", "student_terms"))
 
   message("  inspect_waitlist function signature verified")
 })
@@ -413,17 +413,17 @@ test_that("attach_enrollment_history adds census enrollment context", {
   expect_equal(res$trend_terms[[1]], c(202080L, 202180L, 202280L))
   expect_equal(res$trend_hist[[1]], c(3, 4, 8))         # census series, oldest → newest
 
-  # A precomputed base passed in gives the same answer as the scoped recompute,
+  # Course-term counts passed in give the same answer as the scoped recompute,
   # and a global of the same name is not consulted (M12): a bogus
-  # cedar_cl_enrls_base in the global environment must change nothing.
+  # cedar_course_terms in the global environment must change nothing.
   base <- calc_cl_enrls(students, by_part_term = TRUE)
-  res_base <- attach_enrollment_history(count_df, students, enrl_base = base)
+  res_base <- attach_enrollment_history(count_df, students, course_terms = base)
   expect_equal(res_base$census_enrl, res$census_enrl)
   expect_equal(res_base$census_enrl_mean, res$census_enrl_mean)
   expect_equal(res_base$trend_hist[[1]], res$trend_hist[[1]])
 
   bogus <- base %>% dplyr::mutate(registered = registered * 100L)
-  rlang::local_bindings(cedar_cl_enrls_base = bogus, .env = .GlobalEnv)
+  rlang::local_bindings(cedar_course_terms = bogus, .env = .GlobalEnv)
   res_global <- attach_enrollment_history(count_df, students)
   expect_equal(res_global$census_enrl, 8)
   expect_equal(res_global$trend_hist[[1]], c(3, 4, 8))
@@ -431,12 +431,12 @@ test_that("attach_enrollment_history adds census enrollment context", {
 
 test_that("attach_enrollment_history follows the course when the class list names a former code", {
   # RN01: HIST 320's class list in Spring 2020 is the course HIST 3201, whose
-  # Spring 2021 offering the base counts under its id (build_cl_enrls_base()).
+  # Spring 2021 offering cedar_course_terms counts under its id (build_course_terms()).
   # A waitlist row names the class list's code; matched by code it finds no
   # base row and reads no census and no history.
   rn <- rn01_course_tables()
   students <- rn$cedar_students
-  base <- build_cl_enrls_base(students)
+  base <- build_course_terms(students)
   expect_false("HIST 320" %in% base$subject_course)
   count_df <- students %>%
     filter(listed_code %in% c("HIST 320", "SOCI 250"), term == 202010L) %>%
@@ -444,7 +444,7 @@ test_that("attach_enrollment_history follows the course when the class list name
     arrange(subject_course) %>%
     mutate(count = 1L)
 
-  with_base <- attach_enrollment_history(count_df, students, enrl_base = base)
+  with_base <- attach_enrollment_history(count_df, students, course_terms = base)
   recomputed <- attach_enrollment_history(count_df, students)
   for (res in list(with_base, recomputed)) {
     # The rows keep the codes they arrived with, and no helper column leaks.
@@ -462,7 +462,7 @@ test_that("attach_enrollment_history follows the course when the class list name
   expect_equal(with_base$census_enrl_mean, recomputed$census_enrl_mean)
 
   expect_error(
-    attach_enrollment_history(count_df, dplyr::select(students, -course_id), enrl_base = base),
+    attach_enrollment_history(count_df, dplyr::select(students, -course_id), course_terms = base),
     "course_id"
   )
 })

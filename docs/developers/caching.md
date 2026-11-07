@@ -35,10 +35,12 @@ row changes the result the same day. Keys that hash the dims already see it
 record `course_code_renames()`. Regstats' baselines are the worked example. Its filename
 cannot carry that, so the payload records the class list's renames
 (`code_renames`, from `course_code_renames()`) and `load_regstats_cache()`
-returns `NULL` when the loaded class list's differ (cache v6). The precomputed
-base in `global.R` does the same with `attr(, "code_renames")`, checked by
-`cl_enrls_base_is_current()`, and so do the course flows precomputed beside
-it. Keying at load changed what every by-code cache had counted, so Dept
+returns `NULL` when the loaded class list's differ (cache v6). The saved
+copy of `cedar_course_terms` does the same with `attr(, "code_renames")` and
+its build version (`COURSE_TERMS_BUILD_VERSION`), checked by
+`course_terms_is_current()` in `global.R` (rebuild) and by each reader
+(`require_current_course_terms()`, stop), and so do the course flows
+precomputed beside it. Keying at load changed what every by-code cache had counted, so Dept
 Trends went to v12 and Seatfinder to v4 with it.
 
 **The second cardinal rule: never persist configuration into a cached payload.**

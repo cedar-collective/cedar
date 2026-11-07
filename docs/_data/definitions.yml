@@ -650,8 +650,8 @@ definitions:
             functions: [get_reg_stats, attach_regstats_former_codes, regstats_course_key_info]
           - file: R/branches/courses.R
             functions: [attach_course_ids, course_id_of, course_former_code_spans]
-          - file: R/branches/enrl.R
-            functions: [build_cl_enrls_base, cl_enrls_base_is_current]
+          - file: R/branches/course-terms.R
+            functions: [build_course_terms, course_terms_is_current]
 
   - id: enrollment-projection
     current_version: "1.10.0"

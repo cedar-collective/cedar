@@ -1,4 +1,15 @@
+---
+title: Mapping Audit (2026-07)
+parent: Audits
+grand_parent: Developer Guide
+nav_order: 1
+---
+
 # Mapping and Schema Audit — 2026-07-31
+
+> **A dated audit, kept as the record of what was measured on 2026-07-31.** Its
+> findings became rules in `AGENTS.md`, entries in `ISSUES.md` or the mapping
+> files; where this page and those disagree, they are current and this is not.
 
 Every claim here was verified against the live tables in `data/` (241,941 sections;
 1,687,084 class-list rows; 464,011 program rows; 63,284 degrees; 37,675 faculty

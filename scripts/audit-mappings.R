@@ -3,7 +3,7 @@
 # audit-mappings.R — verify CEDAR's lookups and join keys against real data.
 #
 # Re-run after any change to transform-to-cedar.R or R/lists/. Findings as of
-# 2026-07-31 are written up in docs/developers/mapping-audit-2026-07.md.
+# 2026-07-31 are written up in docs/developers/audits/mapping-audit-2026-07.md.
 #
 # Checks, in order:
 #   1. Cross-table vocabulary — does the same concept use the same values in
@@ -142,4 +142,4 @@ print(as.data.frame(pairs))
 amb <- pairs %>% group_by(label) %>% filter(n() > 1) %>% ungroup()
 cat("   ambiguous labels:", if (nrow(amb) == 0) "NONE — clean 1:1\n" else paste(nrow(amb), "\n"))
 
-cat("\nDone. Narrative: docs/developers/mapping-audit-2026-07.md\n")
+cat("\nDone. Narrative: docs/developers/audits/mapping-audit-2026-07.md\n")

@@ -4867,7 +4867,7 @@ output$enrl_classlist_download <- downloadHandler(
   # ===========================================================================
   waitlistServer("waitlist", cedar_students, session,
                  sections      = data_objects[["cedar_sections"]],
-                 enrl_base     = cedar_cl_enrls_base,
+                 course_terms  = data_objects[["cedar_course_terms"]],
                  student_terms = cedar_student_terms)
 
 
@@ -4879,7 +4879,8 @@ output$enrl_classlist_download <- downloadHandler(
     sections     = cedar_sections,
     course_flows = cedar_course_flows,
     data_summary = cedar_data_summary,
-    thresholds   = cedar_regstats_thresholds
+    thresholds   = cedar_regstats_thresholds,
+    course_terms = data_objects[["cedar_course_terms"]]
   )
 
   # ===========================================================================
@@ -5963,6 +5964,76 @@ output$enrl_classlist_download <- downloadHandler(
     .mapping_decisions_reactable("subjects", "No course subject decisions are waiting"))
   output$mapping_decisions_colleges_table <- reactable::renderReactable(
     .mapping_decisions_reactable("colleges", "No college decisions are waiting"))
+
+  # code_history.csv: which code replaced which, with when the schedule lists
+  # each (build_code_history_table()). Read-only like the tables above: a
+  # decision is an edit to the file, effective at the next restart.
+  # From cedar_dims, the files' own tables in file order, so a row's line holds.
+  .code_history <- reactive(build_code_history_table(data_objects[["cedar_dims"]],
+                                                     data_objects[["cedar_sections"]]))
+
+  output$code_history_summary <- renderUI({
+    ch <- .code_history()
+    if (nrow(ch) == 0) return(div(class = "alert alert-info", tags$strong("code_history.csv has no rows.")))
+    n_proposed <- sum(ch$status == "proposed")
+    n_checks <- sum(!is.na(ch$check))
+    div(
+      class = if (n_proposed > 0) "alert alert-warning" else "alert alert-success",
+      tags$strong(sprintf("%d successions: %d confirmed, %d proposed. ", nrow(ch),
+                          sum(ch$status == "confirmed"), n_proposed)),
+      if (n_proposed > 0) paste0(
+        "To confirm a proposed row, open its line and change status to confirmed, with a ",
+        "note saying why; to reject it, delete the row. "),
+      if (n_checks > 0) sprintf("%d row%s carr%s a schedule check worth a look. ", n_checks,
+                                if (n_checks == 1) "" else "s", if (n_checks == 1) "ies" else "y"),
+      # The offered columns read the schedule the app loaded, which can start
+      # after a code retired: say where, so a dash is not read as never offered.
+      sprintf("The offered columns read the schedule loaded here, %s onward; a code retired before then shows \u2014.",
+              fmt_term(min(as.integer(data_objects[["cedar_sections"]]$term))))
+    )
+  })
+
+  output$code_history_table <- reactable::renderReactable({
+    ch <- .code_history()
+    if (nrow(ch) == 0) {
+      return(.admin_reactable(data.frame(Message = "No code history rows"),
+                              pagination = FALSE, searchable = FALSE))
+    }
+    offered <- function(first, last, n) {
+      span <- ifelse(first == last, fmt_term(first), paste0(fmt_term(first), "\u2013", fmt_term(last)))
+      ifelse(is.na(first), "\u2014",
+             paste0(span, " \u00b7 ", format(n, big.mark = ","), ifelse(n == 1, " section", " sections")))
+    }
+    basis_label <- c(section_crn = "Same section, both codes", title_match = "Title match",
+                     catalog = "Catalog", decided = "Decided")
+    # What the row is and where to edit it first; then when each code was
+    # offered, the check, and the notes, which lead with why a row is held.
+    display <- data.frame(
+      status = ch$status, from_code = ch$from_code, to_code = ch$to_code,
+      where = paste0("code_history.csv:", ch$line),
+      effective = fmt_term(ch$effective_term),
+      from_offered = offered(ch$from_first, ch$from_last, ch$from_sections),
+      to_offered = offered(ch$to_first, ch$to_last, ch$to_sections),
+      check = ch$check, notes = ch$notes, basis = unname(basis_label[ch$basis]),
+      evidence = ch$evidence,
+      url = mapping_file_url(data_objects[["cedar_dims"]], "code_history", ch$line),
+      stringsAsFactors = FALSE)
+    .admin_reactable(display, page_size = 15L, columns = list(
+      status       = reactable::colDef(name = "Status", minWidth = 90, filterable = TRUE),
+      from_code    = reactable::colDef(name = "Old code", minWidth = 90, filterable = TRUE),
+      to_code      = reactable::colDef(name = "New code", minWidth = 90, filterable = TRUE),
+      effective    = reactable::colDef(name = "From", minWidth = 90),
+      from_offered = reactable::colDef(name = "Old code offered", minWidth = 190),
+      to_offered   = reactable::colDef(name = "New code offered", minWidth = 190),
+      check        = reactable::colDef(name = "Check", minWidth = 130, na = "\u2014"),
+      basis        = reactable::colDef(name = "Basis", minWidth = 120),
+      evidence     = reactable::colDef(name = "Evidence", minWidth = 280),
+      notes        = reactable::colDef(name = "Notes", minWidth = 320),
+      where        = reactable::colDef(name = "Where", minWidth = 150, cell = function(value, index) {
+        tags$a(href = display$url[index], target = "_blank", rel = "noopener", value)
+      }),
+      url          = reactable::colDef(show = FALSE)))
+  })
 
   output$mapping_other_summary <- renderUI({
     res <- .mapping_worklist()

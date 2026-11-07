@@ -382,7 +382,7 @@ Prefer bare function names for packages already loaded by the app/test harness (
 ## Every change ships with
 
 - A test in `tests/testthat/` filtering from the committed fixtures (never inline tibbles), run with `Rscript --vanilla -e "testthat::test_file('tests/testthat/test-<name>.R')"` from the repo root.
-- Updated AGENTS.md tables if you added or renamed a cone, branch, or module.
+- An updated [layer-inventory.md](layer-inventory.md) row if you added or renamed a cone, branch, feature or module.
 - No custom testing scripts. Use the committed test harnesses and gates below; do not create ad hoc shell, R, Node, Python, or browser-driver scripts to "just check" behavior unless the user explicitly asks for a new permanent test tool.
 
 ---

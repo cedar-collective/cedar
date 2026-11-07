@@ -1750,7 +1750,8 @@ create_dept_dashboard_data <- function(data_objects, opt) {
       course_campus = campus,
       term = current_term,
       threshold_profile = "dashboard"
-    )
+    ),
+    course_terms = data_objects[["cedar_course_terms"]]
   )
   result$new_this_term          <- get_new_this_term(course_history, current_term)
   result$missing_from_earlier   <- get_missing_from_earlier(course_history, current_term)

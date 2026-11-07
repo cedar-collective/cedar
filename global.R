@@ -360,62 +360,52 @@ message("  - cedar_degrees: ", nrow(data_objects[["cedar_degrees"]]), " rows")
 message("  - cedar_faculty: ", nrow(data_objects[["cedar_faculty"]]), " rows")
 } # end data loading for docker
 
-# ── Pre-compute enrollment stats base table for regstats ─────────────────────
-# calc_cl_enrls() on all students is the dominant cost in get_reg_stats() — it
-# re-runs 5 dplyr passes over millions of raw student rows on every button click.
-# build_cl_enrls_base() (R/branches/enrl.R) computes it once, keyed on course_id
-# (ADR-001 step 4), with level/department joined on so post-hoc filtering works,
-# so get_reg_stats() filters a small aggregated table instead.
-#
-# This is valid because calc_cl_enrls() groups by (campus, college, subject_course,
-# term_type): the per-course stats don't depend on what other courses are in the
-# filtered set. Courses that are crosslisted across departments get one row
-# (first dept/level seen).
+# ── cedar_course_terms: the course-term measure table (ADR-001 step 4) ──────
+# build_course_terms() (R/branches/course-terms.R) counts the keyed class list
+# once by course, term, campus and part of term, so Regstats, the Department
+# Dashboard and Waitlists filter a small table instead of recounting millions
+# of rows on every request. It is held at data_objects[["cedar_course_terms"]]
+# and passed to each reader. The copy saved beside the data is a cache only:
+# it is used when it is newer than the class list and course_terms_is_current()
+# finds this build's version and columns and the class list's renames on it;
+# otherwise it is rebuilt.
 if (!is.null(data_objects[["cedar_students"]]) && nrow(data_objects[["cedar_students"]]) > 0) {
-  base_cache_path    <- file.path(data_dir, "cedar_cl_enrls_base.qs")
-  students_qs_path   <- file.path(data_dir, paste0("cedar_students", get_data_extension()))
-  cache_valid <- file.exists(base_cache_path) &&
-                 file.exists(students_qs_path) &&
-                 file.info(base_cache_path)$mtime > file.info(students_qs_path)$mtime
+  course_terms_path <- file.path(data_dir, "cedar_course_terms.qs")
+  students_qs_path  <- file.path(data_dir, paste0("cedar_students", get_data_extension()))
+  saved_is_newer <- file.exists(course_terms_path) &&
+                    file.exists(students_qs_path) &&
+                    file.info(course_terms_path)$mtime > file.info(students_qs_path)$mtime
 
-  # Shape guard: a base saved before the part_term dimension, before it was
-  # keyed on course_id, or before a code_history.csv row was confirmed is
-  # mtime-valid and wrong. cl_enrls_base_is_current() reads the renames stamped
-  # on it against the class list's; a base that fails is recomputed.
-  cached_base <- NULL
-  if (cache_valid) {
-    cached_base <- tryCatch(qs2::qs_read(base_cache_path), error = function(e) {
-      message("[global.R] Cached enrollment base unreadable: ", conditionMessage(e))
+  saved_course_terms <- NULL
+  if (saved_is_newer) {
+    saved_course_terms <- tryCatch(qs2::qs_read(course_terms_path), error = function(e) {
+      message("[global.R] Saved cedar_course_terms unreadable: ", conditionMessage(e))
       NULL
     })
-    if (!cl_enrls_base_is_current(cached_base, data_objects[["cedar_students"]])) {
-      message("[global.R] Cached enrollment base predates part_term or the current course codes; recomputing.")
-      cache_valid <- FALSE
-    }
   }
-
-  if (cache_valid) {
-    message("[global.R] Loading cached enrollment base table...")
-    cedar_cl_enrls_base <- cached_base
-    message(sprintf("[global.R] Enrollment base table loaded: %d rows",
-                    nrow(cedar_cl_enrls_base)))
+  if (course_terms_is_current(saved_course_terms, data_objects[["cedar_students"]])) {
+    data_objects[["cedar_course_terms"]] <- saved_course_terms
+    message(sprintf("[global.R] cedar_course_terms loaded: %d rows",
+                    nrow(saved_course_terms)))
   } else {
-    message("[global.R] Pre-computing enrollment stats base table for regstats...")
-    t_base <- system.time({
-      cedar_cl_enrls_base <- build_cl_enrls_base(data_objects[["cedar_students"]])
+    if (saved_is_newer) {
+      message("[global.R] Saved cedar_course_terms is from another build or other course codes; rebuilding.")
+    }
+    t_ct <- system.time({
+      data_objects[["cedar_course_terms"]] <- build_course_terms(data_objects[["cedar_students"]])
     })
-    message(sprintf("[global.R] Enrollment base table ready: %d rows (%.1fs)",
-                    nrow(cedar_cl_enrls_base), t_base["elapsed"]))
+    message(sprintf("[global.R] cedar_course_terms built: %d rows (%.1fs)",
+                    nrow(data_objects[["cedar_course_terms"]]), t_ct["elapsed"]))
     tryCatch({
-      qs2::qs_save(cedar_cl_enrls_base, base_cache_path)
-      message("[global.R] Enrollment base table cached to disk.")
+      tmp_path <- paste0(course_terms_path, ".tmp")
+      qs2::qs_save(data_objects[["cedar_course_terms"]], tmp_path)
+      file.rename(tmp_path, course_terms_path)
+      message("[global.R] cedar_course_terms saved.")
     }, error = function(e) {
-      message("[global.R] Warning: Failed to cache enrollment base table: ", e$message)
+      message("[global.R] Warning: failed to save cedar_course_terms: ", e$message)
     })
   }
-  rm(cached_base)
-} else {
-  cedar_cl_enrls_base <- NULL
+  rm(saved_course_terms)
 }
 
 # ── Pre-compute campus-scoped course pair flow table for downstream signals ───

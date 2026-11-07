@@ -405,6 +405,79 @@ build_mapping_reference_tables <- function(files) {
 }
 
 
+#' Every code_history.csv row, with when each of its codes was offered
+#'
+#' Admin > Mappings > Code history. One row per succession in the file, rows
+#' still proposed first, each with the terms and sections the loaded schedule
+#' lists under its old and its new code (the registrar's code, `listed_code`,
+#' not the course id the succession gives them). A subject row counts every
+#' course under the subject; a program row has no section counts. `check`
+#' names a schedule that disagrees with the succession's term: the old code
+#' still listed at or after it, or the new one listed before it (never on a
+#' `section_crn` row, whose schedule keeps the old code). A check is a
+#' candidate for a look, never a verdict: a cross-listing or a late section
+#' can do either.
+#'
+#' @param files Mapping files from read_institution_mappings(), or the
+#'   `cedar_dims` built from them (the same tables, in file order).
+#' @param sections cedar_sections as loaded (needs `term` and `listed_code`).
+#' @return A tibble, one row per code_history.csv row: status, kind,
+#'   from_code, to_code, effective_term, basis, evidence, notes, line (its line
+#'   in the file), from_first/from_last/from_sections, to_first/to_last/
+#'   to_sections, and check.
+build_code_history_table <- function(files, sections) {
+  ch <- files$code_history
+  if (is.null(ch)) stop("build_code_history_table(): files has no code_history table")
+  missing <- setdiff(c("term", "listed_code"), names(sections))
+  if (length(missing)) {
+    stop("build_code_history_table(): sections lacks ", paste(missing, collapse = ", "),
+         " (attach_course_ids() sets listed_code at load)")
+  }
+  ch <- tibble::as_tibble(ch) %>%
+    dplyr::mutate(line = dplyr::row_number() + 1L, effective_term = as.integer(effective_term))
+
+  # When each code was offered: per course code, and per subject prefix for
+  # subject rows. Program rows match neither and keep no counts.
+  listed <- sections %>%
+    dplyr::ungroup() %>%
+    dplyr::transmute(term = as.integer(term), listed_code,
+                     subject = sub(" .*$", "", listed_code))
+  span <- function(df, key) {
+    df %>%
+      dplyr::group_by(code = .data[[key]]) %>%
+      dplyr::summarize(first = min(term), last = max(term), n = dplyr::n(), .groups = "drop")
+  }
+  offered <- dplyr::bind_rows(dplyr::mutate(span(listed, "listed_code"), kind = "course"),
+                              dplyr::mutate(span(listed, "subject"), kind = "subject"))
+  attach_span <- function(df, side) {
+    found <- dplyr::rename(offered, !!paste0(side, "_code") := code,
+                           !!paste0(side, "_first") := first, !!paste0(side, "_last") := last,
+                           !!paste0(side, "_sections") := n)
+    # Many-to-one: one span per (code, kind).
+    dplyr::left_join(df, found, by = c(paste0(side, "_code"), "kind"), relationship = "many-to-one")
+  }
+  ch <- ch %>% attach_span("from") %>% attach_span("to") %>%
+    dplyr::mutate(from_sections = dplyr::coalesce(from_sections, 0L),
+                  to_sections = dplyr::coalesce(to_sections, 0L))
+
+  out <- ch %>%
+    dplyr::mutate(
+      check = dplyr::case_when(
+        # section_crn: the schedule keeps the old code by definition.
+        kind == "program" | basis == "section_crn" ~ NA_character_,
+        !is.na(from_last) & from_last >= effective_term ~
+          paste0("Old code still listed in ", fmt_term(from_last)),
+        !is.na(to_first) & to_first < effective_term ~
+          paste0("New code listed from ", fmt_term(to_first), ", before the change"),
+        TRUE ~ NA_character_),
+      status_order = match(status, c("proposed", "confirmed")))
+  out %>%
+    dplyr::arrange(status_order, effective_term, from_code) %>%
+    dplyr::select(status, kind, from_code, to_code, effective_term, basis, evidence, notes, line,
+                  from_first, from_last, from_sections, to_first, to_last, to_sections, check)
+}
+
+
 #' The counting rules CEDAR applies without a mapping-file row
 #'
 #' Admin > Mappings lists every decision the files hold. These are the rules

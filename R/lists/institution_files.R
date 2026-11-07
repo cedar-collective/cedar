@@ -3,7 +3,7 @@
 #
 # An institution describes its own units, subjects and colleges in plain CSV
 # files under institution/<id>/, so adopting CEDAR means editing reviewed text
-# files rather than code. See docs/developers/adr-002-explicit-mapping-files.md.
+# files rather than code. See docs/developers/architecture-decisions.md, ADR-002.
 #
 # This file holds the mechanism only. It knows the file names and their
 # columns; it contains no institution's codes. Sourced before any list that
