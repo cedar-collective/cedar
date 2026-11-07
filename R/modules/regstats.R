@@ -129,6 +129,13 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
     # enrollment sparkline. They're sourced before this module and used unchanged
     # by create_regstats_reactable(), the snapshot cards, and the saturation table.
 
+    # The report keys every table on course_id and names the codes a course
+    # used to carry in former_codes (NA when one code); the Course cell shows
+    # them beneath the code through the shared course_code_cell().
+    former_codes_at <- function(df, i) {
+      if ("former_codes" %in% names(df)) df$former_codes[[i]] else NA_character_
+    }
+
     create_regstats_reactable <- function(table_data) {
       if (is.null(table_data) || nrow(table_data) == 0) return(NULL)
       table_data <- dplyr::ungroup(table_data)
@@ -164,7 +171,8 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
       col_defs <- list(
         concern_tier   = reactable::colDef(name = "Tier",       width = 105, cell = tier_badge),
         subject_course = reactable::colDef(name = "Course",     minWidth = 90,
-          cell = function(v) htmltools::span(class = "fw-semibold", v)),
+          cell = function(v, index) course_code_cell(v, former_codes_at(table_data, index))),
+        former_codes   = reactable::colDef(show = FALSE),
         course_title   = reactable::colDef(name = "Title",      minWidth = 130,
           cell = function(v) if (!is.na(v)) htmltools::span(class = "text-sub", v) else ""),
         part_term      = cedar_pot_coldef(),
@@ -579,9 +587,11 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
           )
         }
 
+        course_key_note <- data$flagged$course_key_info$note
         div(class = "rs-snapshot",
           tags$p(class = "rs-snap-scope", hist_lbl),
           tags$p(class = "rs-snap-scope", scope_note),
+          if (!is.null(course_key_note)) tags$p(class = "rs-snap-scope", course_key_note),
           make_level_row("Lower", s$lower),
           make_level_row("Upper", s$upper)
         )
@@ -714,8 +724,8 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
         # Title · PoT · …). Drops get_enrl's leaked extras (sections, xl_sections,
         # reg_sections, avg_size, total_enrl, enrolled, avail) so only the waitlist view
         # shows, matching the other regstats tables.
-        dplyr::select(dplyr::any_of(c("term", "campus", "college", "subject_course", "course_title",
-                                      "part_term", "gen_ed_area", "waiting")))
+        dplyr::select(dplyr::any_of(c("term", "campus", "college", "subject_course", "former_codes",
+                                      "course_title", "part_term", "gen_ed_area", "waiting")))
       reactable::reactable(
         df,
         theme               = cedar_tbl_theme,
@@ -729,7 +739,8 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
           defs <- list(
             campus         = reactable::colDef(name = "Campus", maxWidth = 80),
             subject_course = reactable::colDef(name = "Course",   minWidth = 90,
-              cell = function(v) htmltools::span(class = "fw-semibold", v)),
+              cell = function(v, index) course_code_cell(v, former_codes_at(df, index))),
+            former_codes   = reactable::colDef(show = FALSE),
             course_title   = reactable::colDef(name = "Title",    minWidth = 130,
               cell = function(v) if (!is.na(v)) htmltools::span(class = "text-sub", v) else ""),
             college        = reactable::colDef(name = "College",  maxWidth = 80),
@@ -819,7 +830,7 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
       # avg_size, total_enrl, waiting, avail, campus, the is_* flag + fill_hist columns)
       # is dropped here.
       display_order <- c(
-        "term", "college", "subject_course", "course_title", "part_term", "status",
+        "term", "college", "subject_course", "former_codes", "course_title", "part_term", "status",
         "census_enrl", "capacity", "sections",
         "fill_rate", "fill_rate_mean", "fill_trend", "sd_above_mean", "n_chronic_terms", "n_hist_terms",
         "enrolled", "desr_snapshot_fill", "dr_late"
@@ -831,7 +842,8 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
         desr_snapshot_fill = reactable::colDef(show = FALSE),
         dr_late         = reactable::colDef(show = FALSE),
         subject_course  = reactable::colDef(name = "Course", minWidth = 82,
-          cell = function(v) htmltools::span(class = "fw-semibold", v)),
+          cell = function(v, index) course_code_cell(v, former_codes_at(df, index))),
+        former_codes    = reactable::colDef(show = FALSE),
         course_title    = reactable::colDef(name = "Title", minWidth = 150,
           cell = function(v) if (!is.na(v)) htmltools::span(class = "text-sub", v) else ""),
         college         = reactable::colDef(name = "College", maxWidth = 64, align = "center"),

@@ -356,6 +356,49 @@ course_code_renames <- function(tbl) {
   sort(unique(paste(listed[renamed], ">", tbl$course_id[renamed])))
 }
 
+#' Name each course's former codes with the terms they covered
+#'
+#' One row per course the tables list under more than one code: every code
+#' other than its `course_id`, each with the terms it ran under, oldest first
+#' (`"HIST 320 (Spring 2020 to Fall 2020)"`). The text a scan over many
+#' courses puts beside a course it follows across its codes, as
+#' course_former_codes_note() does for one course.
+#'
+#' @param ... Tables with `course_id` and `term`, keyed or not; a code is
+#'   read from `listed_code` when the table is keyed, else `subject_course`.
+#' @return A tibble with `subject_course` (the `course_id`) and
+#'   `former_codes`; one row per course with a former code, none when none.
+course_former_code_spans <- function(...) {
+  pieces <- lapply(list(...), function(tbl) {
+    if (!"course_id" %in% names(tbl)) {
+      stop("[courses.R] course_former_code_spans() needs column course_id on every table; ",
+           "attach it with attach_course_ids()")
+    }
+    .courses_need(tbl, c("term", "subject_course"), "course_former_code_spans()'s table")
+    listed <- if ("listed_code" %in% names(tbl)) tbl$listed_code else tbl$subject_course
+    tibble::tibble(course_id = tbl$course_id, listed_code = listed, term = tbl$term) %>%
+      dplyr::filter(!is.na(course_id), !is.na(listed_code), listed_code != course_id) %>%
+      dplyr::distinct()
+  })
+  former <- dplyr::bind_rows(pieces)
+  if (nrow(former) == 0L) {
+    return(tibble::tibble(subject_course = character(), former_codes = character()))
+  }
+  former %>%
+    dplyr::group_by(course_id, listed_code) %>%
+    dplyr::summarize(first = min(term), last = max(term), .groups = "drop") %>%
+    dplyr::arrange(course_id, first, listed_code) %>%
+    dplyr::mutate(span = paste0(
+      listed_code, " (",
+      ifelse(first == last, fmt_term(first), paste(fmt_term(first), "to", fmt_term(last))),
+      ")"
+    )) %>%
+    # CAMPUS_ROLLUP: which codes a course has carried is a fact about the
+    # course, the same on every campus; the rows this text joins keep theirs.
+    dplyr::group_by(subject_course = course_id) %>%
+    dplyr::summarize(former_codes = paste(span, collapse = ", "), .groups = "drop")
+}
+
 #' Screen the data for codes that look like successions of other codes
 #'
 #' Candidates for code_history.csv, with the evidence; never verdicts. Two

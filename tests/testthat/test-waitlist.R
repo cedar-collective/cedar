@@ -388,7 +388,7 @@ test_that("attach_enrollment_history adds census enrollment context", {
   mk <- function(term, n_re, n_wl = 0, n_dw = 0) {
     tibble::tibble(
       campus = "ABQ", college = "ARTS", term = as.integer(term),
-      subject_course = "WLST 1000", part_term = "1", term_type = "fall",
+      subject_course = "WLST 1000", course_id = "WLST 1000", part_term = "1", term_type = "fall",
       student_id = paste0("S", term, "_", seq_len(n_re + n_wl + n_dw)),
       registration_status_code = c(rep("RE", n_re), rep("WL", n_wl), rep("DW", n_dw))
     )
@@ -424,6 +424,44 @@ test_that("attach_enrollment_history adds census enrollment context", {
   res_global <- attach_enrollment_history(count_df, students)
   expect_equal(res_global$census_enrl, 8)
   expect_equal(res_global$trend_hist[[1]], c(3, 4, 8))
+})
+
+test_that("attach_enrollment_history follows the course when the class list names a former code", {
+  # RN01: HIST 320's class list in Spring 2020 is the course HIST 3201, whose
+  # Spring 2021 offering the base counts under its id (build_cl_enrls_base()).
+  # A waitlist row names the class list's code; matched by code it finds no
+  # base row and reads no census and no history.
+  rn <- rn01_course_tables()
+  students <- rn$cedar_students
+  base <- build_cl_enrls_base(students)
+  expect_false("HIST 320" %in% base$subject_course)
+  count_df <- students %>%
+    filter(subject_course %in% c("HIST 320", "SOCI 250"), term == 202010L) %>%
+    distinct(campus, college, term, part_term, subject_course, course_title) %>%
+    arrange(subject_course) %>%
+    mutate(count = 1L)
+
+  with_base <- attach_enrollment_history(count_df, students, enrl_base = base)
+  recomputed <- attach_enrollment_history(count_df, students)
+  for (res in list(with_base, recomputed)) {
+    # The rows keep the codes they arrived with, and no helper column leaks.
+    expect_equal(res$subject_course, c("HIST 320", "SOCI 250"))
+    expect_equal(names(res)[seq_along(count_df)], names(count_df))
+    expect_false(any(c(".listed_code", "course_id") %in% names(res)))
+    hist <- res %>% filter(subject_course == "HIST 320")
+    expect_equal(hist$census_enrl, 1)
+    expect_equal(hist$trend_terms[[1]], c(202010L, 202110L))
+    expect_equal(hist$n_hist_terms, 1L)
+    # The two-step chain SOCI 250 -> SOCI 2315 reaches Spring 2021 too.
+    soci <- res %>% filter(subject_course == "SOCI 250")
+    expect_equal(soci$trend_terms[[1]], c(202010L, 202110L))
+  }
+  expect_equal(with_base$census_enrl_mean, recomputed$census_enrl_mean)
+
+  expect_error(
+    attach_enrollment_history(count_df, dplyr::select(students, -course_id), enrl_base = base),
+    "course_id"
+  )
 })
 
 test_that("waitlist.R uses consistent message prefixes", {

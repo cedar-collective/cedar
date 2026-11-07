@@ -11,7 +11,9 @@ cedar_course_neighbors_cache_version <- 4L
 # v3 preserves one reporting row when source sections carry different titles;
 # v4 aligns saturation to class-list census and adds lifecycle drop-rate context.
 # v5 aligns High Waitlists to shared class-list true demand.
-cedar_regstats_cache_version <- 5L
+# v6 reads by course (course_id; ADR-001 step 4): the payload records the
+#    renames it was counted over, and a payload counted over others is a miss.
+cedar_regstats_cache_version <- 6L
 
 course_neighbors_content_hash <- function(df, relevant_cols) {
   cols <- intersect(relevant_cols, names(df))
