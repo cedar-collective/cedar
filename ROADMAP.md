@@ -51,7 +51,7 @@ The order work is taken in.
    projections](#section-needs-projections).
 3. **Degree maps.** The open items under [Degree Explorer](#degree-explorer-and-curriculum-informed-demand).
 
-**Decisions waiting on a person:** confirm the 320 proposed renumberings in
+**Decisions waiting on a person:** the 37 renumberings still proposed in
 `institution/unm/code_history.csv` ([I37](ISSUES.md)); decide the largest
 programs and subjects still proposed (Admin → Data & Usage → Mappings,
 `scripts/mapping-review.R`).
@@ -159,11 +159,10 @@ contracts: [degree-requirements.md](docs/developers/degree-requirements.md),
 
 ## Platform
 
-- [ ] **Code history on Admin → Mappings.** Each unit's program codes and
-  course subjects with when each was in use (computed from the data at load)
-  and which replaced which (`code_history.csv`, whose `program` rows are
-  validated and waiting for this page). A screen proposes candidates
-  (`ALB 450` → `ALBS 450`, `FING` → `FINN`); timing alone confirms nothing.
+- [ ] **Code history by unit.** Admin → Mappings → Code history lists every
+  `code_history.csv` row with when each code was offered. Still to do: each
+  unit's program codes and course subjects with when each was in use, and the
+  `program` rows, which are validated but no reader follows yet.
 - [ ] **Operational monitoring.** Shiny errors, usage logs, scheduled-refresh
   outcomes and cold-cache latency after release.
 - [ ] **Standard CSV export** across user-facing tables through a shared helper.
