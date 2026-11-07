@@ -346,8 +346,9 @@ Plan: [ADR-002](docs/developers/adr-002-explicit-mapping-files.md).
   (2026-11-06): Waitlists keys both tables, so its counts, true-demand
   de-dup and supply follow the course. Reader PR 5 (2026-11-06): the
   Department Dashboard keys both tables, so a renamed course is no longer
-  "new this term". Next: the projection inputs, then
-  `cedar_course_terms` and `cedar_attempts` keyed on the id. Confirming the proposed Fall 2026
+  "new this term". Reader PR 6 (2026-11-06): the enrollment projections read
+  by course (model 0.28.0). Next: `cedar_course_terms` and `cedar_attempts`
+  keyed on the id, then retiring the keyed-frame shim. Confirming the proposed Fall 2026
   renumberings is a person's decision, and what makes I37's rows show their
   old offerings.
   Design in full in

@@ -10,6 +10,9 @@
 # Groups are monitoring scopes. Projection rows use the named market and course;
 # campus and part-term allocation remains in saved delivery components.
 
+# 0.28.0 (schema 26): reads by course (ADR-001 step 4). The class list, the
+# sections, the scope and the listed sequences are keyed on course_id, so a
+# renamed or renumbered course's earlier offerings are its own history.
 # 0.27.0 (schema 25): the plan's feeder adjustment applies to Spring targets
 # only (plan_feeder_seasons). On past forecasts, Fall feeder changes improved
 # Spring forecasts and did not improve Fall ones: a Spring feeder change
@@ -60,7 +63,7 @@
 # saturation floor and two Fall-enrollment deltas and must beat the spine on
 # rolling aftcasts. (0.19.0 introduced rolling selection and the
 # occupancy-based capacity signal.)
-CEDAR_ENROLLMENT_PROJECTION_MODEL_VERSION <- "0.27.0"
+CEDAR_ENROLLMENT_PROJECTION_MODEL_VERSION <- "0.28.0"
 
 # Schema 26: candidates and projections carry the students left waiting in
 # the term just finished (waitlisted_preceding), shown as context only.
