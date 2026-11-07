@@ -56,6 +56,8 @@ reproduce the linked count.
 
 Program and classification values come from student enrollment records. They are useful for context, but they may not fully explain why a student needs the course.
 
+A course is counted across the codes it has carried. When the institution's code history records that one code succeeded another, students waiting under either code in a term are one course's waitlist, a student waiting under one code while registered under the other already holds a seat and is not counted, and the enrollment history includes the earlier code's terms. The Course column names the other code beneath the current one ("also SOC 371 (Spring 2020)"), and picking either code shows the course.
+
 ---
 
 ## Related Analyses

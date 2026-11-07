@@ -32,10 +32,10 @@ recurrence is recognizable.
 | [I48](#i48--a-transform-change-to-a-fact-tables-stored-columns-is-not-rebuilt-at-deploy) | Defect | Since the mapping stamps retired (ADR-001 step 3, 2026-11-06) the deploy gate rebuilds only `cedar_student_terms`: a transform change that adds or renames a stored column on sections, students, programs or degrees starts the app on files without it until the morning refresh, the I46 shape with no gate |
 | [I47](#i47--the-class-lists-student_classification-is-stamped-at-pull-time-when-a-term-is-pulled-late) | Defect | A class list pulled months after its term carries each student's classification as of the pull: Fall 2025's list (pulled 2026-03-07) puts 35% of ENGL 1120's registered student-terms one step ahead of the classification academic studies recorded for Fall 2025. Every grouping reader now takes the student-term table's value; the `classification` filter key and Regstats' sophomore screen still read the class list |
 | [I46](#i46--a-deploy-that-must-rebuild-a-table-the-app-cannot-start-without-takes-the-site-down) | Defect | The deploy's table gate ran after the health check, so a deploy that added a column to `cedar_student_terms` failed its health check on the missing column and never reached the gate: production served the restart page from 17:07 UTC on 2026-11-04 (gate moved before the first request) |
-| [I45](#i45--the-class-list-and-the-schedule-name-the-same-section-with-different-course-codes) | Defect | The class list and the schedule name the same section differently for renamed subjects (SOC to SOCI, PSY to PSYC, CCS to CCST): SOCI 371 has class-list history from Fall 2019 but no sections before Fall 2021 (crosswalk and `course_id` in place 2026-11-06; Low Enrollment, Course Dynamics, Regstats and Waitlists' enrollment history read it, the projection inputs and Waitlists' counts still key on `subject_course`) |
+| [I45](#i45--the-class-list-and-the-schedule-name-the-same-section-with-different-course-codes) | Defect | The class list and the schedule name the same section differently for renamed subjects (SOC to SOCI, PSY to PSYC, CCS to CCST): SOCI 371 has class-list history from Fall 2019 but no sections before Fall 2021 (crosswalk and `course_id` in place 2026-11-06; Low Enrollment, Course Dynamics, Regstats and Waitlists read it, the projection inputs and the Department Dashboard's waitlist block still key on `subject_course`) |
 | [I43](#i43--every-scheduled-refresh-fails-because-the-default-asks-for-a-report-mrgather-never-fetches) | Defect | Every scheduled refresh has failed since 2026-10-24: the default asks for the applicants report, which production mrgather never fetches, so production tables have not been rebuilt since Oct 27 (default fixed; mrgather and per-report rebuilds remain) |
 | [I38](#i38--a-pathways-program-population-misses-pre-majors-whose-name-differs-from-their-major) | Defect | A Pathways program population misses pre-majors whose name differs from their major: "Film and Digital Arts" holds 1 of the 1,016 Film pre-majors who never declared the major, because `FFDA` is named "FDMA" |
-| [I37](#i37--renumbered-courses-lose-their-history) | Defect | Renumbered courses lose their history: no crosswalk exists, so ACCT 3401 (was MGMT 340) and the other Fall 2026 ACCT, BUSA and POPH courses read as new (crosswalk and `course_id` in place 2026-11-06, the renumberings proposed and awaiting confirmation; Low Enrollment, Course Dynamics, Regstats and Waitlists' enrollment history read the id, the projection inputs and Waitlists' counts still key on `subject_course`) |
+| [I37](#i37--renumbered-courses-lose-their-history) | Defect | Renumbered courses lose their history: no crosswalk exists, so ACCT 3401 (was MGMT 340) and the other Fall 2026 ACCT, BUSA and POPH courses read as new (crosswalk and `course_id` in place 2026-11-06, the renumberings proposed and awaiting confirmation; Low Enrollment, Course Dynamics, Regstats and Waitlists read the id, the projection inputs and the Department Dashboard's waitlist block still key on `subject_course`) |
 | [I33](#i33--a-crashed-myreports-download-is-recorded-as-a-successful-fetch) | Defect | A crashed MyReports download is recorded as a successful fetch: on Oct 23 class lists and applicants were never downloaded, and every step reported ✅ (partly fixed) |
 | [I32](#i32--a-scheduled-refresh-waits-forever-when-myreports-asks-for-a-2fa-code) | Defect | A scheduled refresh waits forever when MyReports asks for a 2FA code: the Oct 11 run sat 12 days at the prompt, unreported |
 | [I28](#i28--one-late-starting-session-makes-a-whole-courses-first-day-unknown) | Defect | One late-starting session makes a whole course's first day unknown: 257 Fall 2026 courses on the Oct 8 pull, 17 on Oct 23. Intersession is out of the forecast (model 0.24.0), and a session not yet begun is judged on its lower bound (model 0.25.0). A section with no start date still reads as having no status dates |
@@ -225,7 +225,8 @@ schedule's SOC 371 capacity joins the class list's SOCI 371 census in its
 saturation screen instead of reporting unmatched. Waitlists' enrollment
 history resolves each row's code to its course for the join
 (`attach_enrollment_history()`), so a waitlisted CCS course reads CCST's
-history too; its waitlist counts are still by code. The projections still
+history too, and since reader PR 4 its counts follow the course as well (one
+row for a course waited for under two live codes). The projections still
 key on the code and move next.
 CCS is not retired: measured on the 2026-10-08 pull, both CCS and CCST
 are on the schedule and the class list through Fall 2026 (CCS class-list
@@ -665,7 +666,7 @@ baselines and its Terms at Cap, and the row names the former code. The
 projections still key on `subject_course`. Waitlists' enrollment history
 reads the precomputed base by course, resolving each waitlist row's code to
 its id for the join, so a renumbered course's earlier offerings enter its
-history; its waitlist counts are still by code and key on the id next.
+history; since reader PR 4 its counts are by course too.
 **Found:** 2026-10-24, with I36
 **Severity:** moderate — a history keyed on `subject_course` starts over at a
 renumbering, so a renumbered course reads as new.
