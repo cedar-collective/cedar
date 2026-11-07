@@ -231,7 +231,7 @@ server <- function(input, output, session) {
     session = session,
     root_session = session,
     input_id = "enrl_course",
-    choices = sort(unique(cedar_sections$subject_course)),
+    choices = course_picker_choices(cedar_sections),
     spec_title = "Enrollment",
     key = "course"
   )
@@ -240,7 +240,7 @@ server <- function(input, output, session) {
     session = session,
     root_session = session,
     input_id = "cr_course",
-    choices = sort(unique(cedar_sections$subject_course)),
+    choices = course_picker_choices(cedar_sections),
     spec_title = "Course Dynamics",
     key = "course"
   )
@@ -297,12 +297,14 @@ server <- function(input, output, session) {
     )
   }
 
+  # A section row names the code the schedule used that term (CCS 1150 where
+  # the course is CCST 1150); course rollups name the course.
   base_select <- c(
     Camp = "campus",
     Col = "college",
     Term = "term",
     TermType = "term_type",
-    Course = "subject_course",
+    Course = if ("listed_code" %in% names(data)) "listed_code" else "subject_course",
     Sec = "section"
   )
   if ("part_term" %in% names(data)) base_select <- c(base_select, PoT = "part_term")
@@ -1053,7 +1055,7 @@ output$enrl_classlist_download <- downloadHandler(
       secs <- secs[secs$department %in% input$enrl_dept, ]
     if (!is.null(input$enrl_subj) && length(input$enrl_subj) > 0)
       secs <- secs[secs$subject %in% input$enrl_subj, ]
-    choices <- sort(unique(secs$subject_course))
+    choices <- course_picker_choices(secs)
     selected <- isolate(input$enrl_course)
     selected <- selected[selected %in% choices]
     updateSelectizeInput(session, "enrl_course",
@@ -1685,11 +1687,10 @@ output$enrl_classlist_download <- downloadHandler(
   cr_in_progress_terms <- cedar_in_progress_terms(data_objects[["cedar_edges"]])$term
 
   # Course Dynamics follows a course across the codes it has carried (ADR-001
-  # step 4): every reader on this tab works on the class list keyed on
-  # course_id (key_on_course_id() shares every column; nothing is copied), and
-  # the picked code resolves to its course once. create_course_base_data()
-  # does the same for the main run, so the tabs agree on what the course is.
-  cr_students <- key_on_course_id(data_objects[["cedar_students"]], "server.R Course Dynamics")
+  # step 4): the loaded tables are keyed on the course, and the picked code
+  # resolves to its course once. create_course_base_data() does the same for
+  # the main run, so the tabs agree on what the course is.
+  cr_students <- data_objects[["cedar_students"]]
   cr_course_id <- reactive({
     course <- input$cr_course
     req(course, nzchar(course))

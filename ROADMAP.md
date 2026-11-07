@@ -347,8 +347,10 @@ Plan: [ADR-002](docs/developers/adr-002-explicit-mapping-files.md).
   de-dup and supply follow the course. Reader PR 5 (2026-11-06): the
   Department Dashboard keys both tables, so a renamed course is no longer
   "new this term". Reader PR 6 (2026-11-06): the enrollment projections read
-  by course (model 0.28.0). Next: `cedar_course_terms` and `cedar_attempts`
-  keyed on the id, then retiring the keyed-frame shim. Confirming the proposed Fall 2026
+  by course (model 0.28.0). 2026-11-07: every loader keys the tables on the
+  course (`subject_course` the course, `listed_code` the term's code), so every
+  reader follows it and the per-reader shim is gone; CCS stays CCS (CCST is
+  the lower-division prefix). Next: `cedar_course_terms` and `cedar_attempts`. Confirming the proposed Fall 2026
   renumberings is a person's decision, and what makes I37's rows show their
   old offerings.
   Design in full in

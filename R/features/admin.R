@@ -450,7 +450,8 @@ build_counting_rules <- function(files, programs, sections, students) {
   xl_groups <- xl %>% dplyr::distinct(term, campus, crosslist_group, department) %>%
     dplyr::count(term, campus, crosslist_group, name = "n_depts")
   partners <- sum(!xl$crosslist_role %in% c("home", "internal"))
-  excluded <- sections[sections$subject_course %in% excluded_courses, ]
+  # By course: the list names codes, the loaded sections are keyed on the course.
+  excluded <- sections[sections$subject_course %in% excluded_course_ids(sections), ]
 
   # Student-terms in the class lists with no program record (ISSUES.md I20).
   st <- students %>% dplyr::distinct(student_id, term, student_campus)

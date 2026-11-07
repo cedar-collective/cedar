@@ -22,11 +22,17 @@
 #                       and when the code appears, how many successions it
 #                       took to reach the id
 #
-# The id is attached to cedar_sections and cedar_students at every load by
-# attach_course_ids(), beside `subject_course`, and never saved: a confirmed
-# row in the file changes it at the next start, as a unit decision does. The
-# code columns stay as the source wrote them (annotate, never mutate), so a
-# reader that wants the code the registrar used that term still has it.
+# Every loader keys its tables on the course once, in attach_course_ids()
+# (decided 2026-11-07): `subject_course` on the loaded cedar_sections,
+# cedar_students and cedar_grades carries each row's `course_id`, and the code
+# the registrar used that term moves to `listed_code`. A reader that filters,
+# groups or joins on `subject_course` therefore follows the course across its
+# codes with nothing to remember, and a reader that names the term's code (a
+# section listing, "also listed as SOC 371") reads `listed_code`. Nothing is
+# saved: the files keep the registrar's code, and a confirmed row in
+# code_history.csv changes the ids at the next start, as a unit decision does.
+# The two code-level functions, build_cedar_courses() and
+# detect_course_renamings(), read the registrar's code (.registrar_codes()).
 #
 # CAMPUS_ROLLUP: a course is one course wherever it is taught; the dimension
 # has no campus, and attaching an id to a row takes nothing from the row's
@@ -44,12 +50,31 @@ CEDAR_COURSE_CODES_COLUMNS <- c(
   "first_term", "last_term", "in_sections", "in_class_lists", "steps"
 )
 
-# The column attach_course_ids() writes on each fact table, which a loader
+# The columns attach_course_ids() writes on each fact table, which a loader
 # drops before attaching so a stamped file and an unstamped one load the same.
 CEDAR_ATTACHED_COURSE_COLUMNS <- list(
-  cedar_sections = "course_id",
-  cedar_students = "course_id"
+  cedar_sections = c("course_id", "listed_code"),
+  cedar_students = c("course_id", "listed_code"),
+  cedar_grades = c("course_id", "listed_code")
 )
+
+# A loaded table as the registrar wrote it: `subject_course` the term's code.
+# For the code-level functions only (the dimension and the renaming screen),
+# which are called on saved tables and on loaded ones alike.
+.registrar_codes <- function(tbl) {
+  if (!"listed_code" %in% names(tbl)) return(tbl)
+  tbl$subject_course <- tbl$listed_code
+  tbl[setdiff(names(tbl), c("listed_code", "course_id"))]
+}
+
+# The registrar's codes on a loaded table, which every loader keys.
+.listed_codes <- function(tbl, caller) {
+  if (!all(c("course_id", "listed_code") %in% names(tbl))) {
+    stop("[courses.R] ", caller, "() needs columns course_id and listed_code on the table it ",
+         "reads; every loader writes them with attach_course_ids() (R/branches/courses.R).")
+  }
+  tbl$listed_code
+}
 
 .courses_need <- function(df, cols, what) {
   if (!is.data.frame(df)) stop("[courses.R] ", what, " must be a data frame")
@@ -126,6 +151,8 @@ resolve_course_codes <- function(codes, code_history) {
 #'   dropped.
 build_cedar_courses <- function(sections, students, dims) {
   validate_cedar_dims(dims)
+  sections <- .registrar_codes(sections)
+  students <- .registrar_codes(students)
   key_cols <- c("term", "subject_course", "course_title", "level")
   .courses_need(sections, key_cols, "sections")
   .courses_need(students, key_cols, "students")
@@ -222,16 +249,25 @@ validate_cedar_courses <- function(courses) {
   invisible(courses)
 }
 
-#' Attach `course_id` to every fact table a loader holds
+#' Key every fact table a loader holds on the course
+#'
+#' Writes each row's `course_id`, moves the code the registrar used that term
+#' to `listed_code`, and sets `subject_course` to the `course_id`, on
+#' cedar_sections, cedar_students and cedar_grades. Every loader calls it once
+#' (global.R, R/trunk/data.R, the cache-warming scripts, cedar-repl.R), so every
+#' reader groups, filters and joins by course on `subject_course`. A table
+#' already keyed is keyed again from its `listed_code`, so attaching twice, or
+#' after a code_history.csv row changed, gives the same table. `course_id`
+#' stays beside `subject_course` as the explicit name; the two share one vector.
 #'
 #' @param tables A named list of loaded tables; one that is not loaded (NULL,
 #'   or the empty tibble load_cedar_data() returns for a missing file) is left
 #'   alone and named in a message.
 #' @param courses The object build_cedar_courses() returns.
-#' @return `tables` with `course_id` on cedar_sections and cedar_students,
-#'   each table's attributes kept. A code the dimension does not know is a
-#'   stop: the dimension is built from the same tables, so one can only mean
-#'   the tables changed between the two calls.
+#' @return `tables` keyed on the course, each table's attributes kept and its
+#'   rows ungrouped. A code the dimension does not know is a stop: the
+#'   dimension is built from the same tables, so one can only mean the tables
+#'   changed between the two calls.
 attach_course_ids <- function(tables, courses) {
   validate_cedar_courses(courses)
   if (!is.list(tables)) stop("[courses.R] attach_course_ids: tables must be a list")
@@ -243,60 +279,35 @@ attach_course_ids <- function(tables, courses) {
       next
     }
     .courses_need(tbl, "subject_course", name)
+    rekeyed <- "listed_code" %in% colnames(tbl)
     stamped <- intersect(CEDAR_ATTACHED_COURSE_COLUMNS[[name]], colnames(tbl))
     elapsed <- system.time({
-      attached <- tbl[setdiff(colnames(tbl), stamped)]
-      attached$course_id <- codes$course_id[match(attached$subject_course, codes$subject_course)]
-      unknown <- unique(attached$subject_course[is.na(attached$course_id)])
+      listed <- if (rekeyed) tbl$listed_code else tbl$subject_course
+      attached <- dplyr::ungroup(tbl[setdiff(colnames(tbl), stamped)])
+      ids <- codes$course_id[match(listed, codes$subject_course)]
+      unknown <- unique(listed[is.na(ids)])
       if (length(unknown)) {
         stop("[courses.R] ", name, " carries code(s) the course dimension does not know: ",
              paste(head(unknown, 10), collapse = ", "),
              ". Build the dimension from the tables it is attached to.")
       }
+      attached$subject_course <- ids
+      attached$course_id <- ids
+      attached$listed_code <- listed
       attached <- .carry_attributes(attached, tbl)
     })[["elapsed"]]
-    message(sprintf("[courses.R] %s: attached course_id in %.2f s%s", name, elapsed,
-                    if (length(stamped)) " (a stamped column dropped first)" else ""))
+    message(sprintf("[courses.R] %s: keyed on course_id in %.2f s%s", name, elapsed,
+                    if (rekeyed) " (keyed again from listed_code)"
+                    else if (length(stamped)) " (a stamped column dropped first)" else ""))
     tables[[name]] <- attached
   }
   tables
 }
 
-#' Read a table by course rather than by code
-#'
-#' Returns `tbl` keyed on the course: `subject_course` carries each row's
-#' `course_id` and the code the source wrote moves to `listed_code`. A reader
-#' that filters, groups or joins on `subject_course` then follows every course
-#' across the codes it has carried, its grouping unchanged — Course Dynamics
-#' reads the class list and the sections this way, so SOCI 371's report
-#' includes its SOC 371 terms and its feeders count SOC 250 and SOCI 2315 as
-#' one course. This is a working frame, never a saved one (annotate, never
-#' mutate): the loaded tables keep the registrar's code, and `listed_code`
-#' keeps it here for any text that names it ("also listed as SOC 371"). A
-#' frame already keyed is returned as it is. Every column is shared with
-#' `tbl`; nothing is copied.
-#'
-#' @param tbl `cedar_sections` or `cedar_students` rows with `course_id`.
-#' @param caller Named in the error when the id was never attached.
-#' @return `tbl`, ungrouped, with `subject_course` set to `course_id` and the
-#'   original code in `listed_code`.
-key_on_course_id <- function(tbl, caller = "key_on_course_id") {
-  if (!is.data.frame(tbl)) stop("[courses.R] ", caller, ": tbl must be a data frame")
-  if ("listed_code" %in% names(tbl)) return(tbl)
-  if (!"course_id" %in% names(tbl)) {
-    stop("[courses.R] ", caller, "() needs column course_id on the table it reads; ",
-         "attach it with attach_course_ids() (R/branches/courses.R), as every loader does.")
-  }
-  .courses_need(tbl, "subject_course", paste0(caller, "'s table"))
-  tbl <- dplyr::ungroup(tbl)
-  tbl$listed_code <- tbl$subject_course
-  tbl$subject_course <- tbl$course_id
-  tbl
-}
-
 #' The course a code belongs to
 #'
-#' @param tbl Rows with `course_id`, keyed with key_on_course_id() or not.
+#' @param tbl A loaded table (keyed by attach_course_ids()), or any frame with
+#'   `course_id` and `listed_code`.
 #' @param code One course code as a picker or a URL names it: the current
 #'   code or any former one (`SOC 371` finds SOCI 371's course).
 #' @param caller Named in the errors.
@@ -308,11 +319,7 @@ course_id_of <- function(tbl, code, caller = "course_id_of") {
   if (length(code) != 1L || is.na(code) || !nzchar(code)) {
     stop("[courses.R] ", caller, ": code must be one course code")
   }
-  if (!"course_id" %in% names(tbl)) {
-    stop("[courses.R] ", caller, "() needs column course_id on the table it reads; ",
-         "attach it with attach_course_ids() (R/branches/courses.R), as every loader does.")
-  }
-  listed <- if ("listed_code" %in% names(tbl)) tbl$listed_code else tbl$subject_course
+  listed <- .listed_codes(tbl, caller)
   ids <- unique(tbl$course_id[!is.na(listed) & listed == code])
   if (length(ids) > 1L) {
     stop("[courses.R] ", caller, ": code ", code, " carries ", length(ids),
@@ -323,6 +330,45 @@ course_id_of <- function(tbl, code, caller = "course_id_of") {
   ids
 }
 
+#' Every code and course id a loaded table names, with its course
+#'
+#' A row per registrar's code (`SOC 371` -> `SOCI 371`) and per course id
+#' (`SOCI 371` -> `SOCI 371`), so rows that name either one join to their
+#' course: a list that arrives with the registrar's code (a waitlist row, a
+#' requested history) and one that arrives with the course both find it. The
+#' two agree because a course id is the last code of its chain.
+#'
+#' @param tbl A loaded table.
+#' @param caller Named in the errors.
+#' @return A tibble of `code` and `course_id`, one row per code. Stops on a
+#'   code that names two courses, which no table attach_course_ids() keyed can
+#'   carry.
+course_code_lookup <- function(tbl, caller = "course_code_lookup") {
+  listed <- .listed_codes(tbl, caller)
+  lookup <- dplyr::distinct(dplyr::bind_rows(
+    tibble::tibble(code = listed, course_id = tbl$course_id),
+    tibble::tibble(code = tbl$course_id, course_id = tbl$course_id)
+  ))
+  if (anyDuplicated(lookup$code)) {
+    stop("[courses.R] ", caller, "(): a course code names two course ids; the table was ",
+         "not keyed by attach_course_ids()")
+  }
+  lookup
+}
+
+#' A course picker's choices: every course and every code it has carried
+#'
+#' For a picker whose reader resolves a picked code to its course (the shared
+#' `course` filter in filter.R, course_id_of(), course_ids_of()), so a reader
+#' can find a course by the code it knows: SOC 371 and SOCI 371 both pick the
+#' one course.
+#'
+#' @param tbl A loaded table.
+#' @return The sorted course ids and registrar's codes, each once.
+course_picker_choices <- function(tbl) {
+  sort(unique(c(tbl$subject_course, .listed_codes(tbl, "course_picker_choices"))))
+}
+
 #' The courses a list of picked codes belongs to
 #'
 #' What a picker or a URL sends (one code or a comma-separated list, each
@@ -330,17 +376,13 @@ course_id_of <- function(tbl, code, caller = "course_id_of") {
 #' course_id: course_id_of() over the codes both tables carry, each id once.
 #'
 #' @param codes Picked codes; NULL or "" is no pick.
-#' @param ... The reader's tables, keyed with key_on_course_id() or not.
+#' @param ... The reader's loaded tables.
 #' @param caller Named in the errors.
 #' @return The ids, in pick order; NULL for no pick.
 course_ids_of <- function(codes, ..., caller = "course_ids_of") {
   if (is.null(codes) || length(codes) == 0L || identical(codes, "")) return(NULL)
   known <- dplyr::bind_rows(lapply(list(...), function(tbl) {
-    if (!"course_id" %in% names(tbl)) {
-      stop("[courses.R] ", caller, "() needs column course_id on the table it reads; ",
-           "attach it with attach_course_ids() (R/branches/courses.R), as every loader does.")
-    }
-    listed <- if ("listed_code" %in% names(tbl)) tbl$listed_code else tbl$subject_course
+    listed <- .listed_codes(tbl, caller)
     dplyr::distinct(tibble::tibble(course_id = tbl$course_id, listed_code = listed))
   }))
   unique(vapply(convert_param_to_list(codes), course_id_of, character(1),
@@ -349,15 +391,12 @@ course_ids_of <- function(codes, ..., caller = "course_ids_of") {
 
 #' The codes a course has been listed under in a table
 #'
-#' @param tbl Rows with `course_id`, keyed or not.
+#' @param tbl A loaded table.
 #' @param course_id One course id, from course_id_of().
 #' @return The codes in `tbl` with that id, sorted; the id itself when the
 #'   table carries none of them.
 course_codes_of <- function(tbl, course_id) {
-  if (!"course_id" %in% names(tbl)) {
-    stop("[courses.R] course_codes_of() needs column course_id; attach it with attach_course_ids()")
-  }
-  listed <- if ("listed_code" %in% names(tbl)) tbl$listed_code else tbl$subject_course
+  listed <- .listed_codes(tbl, "course_codes_of")
   codes <- sort(unique(listed[!is.na(tbl$course_id) & tbl$course_id == course_id]))
   if (length(codes) == 0L) course_id else codes
 }
@@ -365,16 +404,13 @@ course_codes_of <- function(tbl, course_id) {
 #' Every code a table carries under another course id
 #'
 #' One line per rename the table shows (`"SOC 371 > SOCI 371"`), sorted: the
-#' fingerprint a cache key needs for a result read through key_on_course_id(),
+#' fingerprint a cache key needs for any result computed over a loaded table,
 #' so a confirmed row in code_history.csv is a miss, never a stale hit.
 #'
-#' @param tbl Rows with `course_id`, keyed or not.
+#' @param tbl A loaded table.
 #' @return A sorted character vector, empty when no code is renamed.
 course_code_renames <- function(tbl) {
-  if (!"course_id" %in% names(tbl)) {
-    stop("[courses.R] course_code_renames() needs column course_id; attach it with attach_course_ids()")
-  }
-  listed <- if ("listed_code" %in% names(tbl)) tbl$listed_code else tbl$subject_course
+  listed <- .listed_codes(tbl, "course_code_renames")
   renamed <- !is.na(listed) & !is.na(tbl$course_id) & listed != tbl$course_id
   if (!any(renamed)) return(character(0))
   sort(unique(paste(listed[renamed], ">", tbl$course_id[renamed])))
@@ -388,18 +424,13 @@ course_code_renames <- function(tbl) {
 #' courses puts beside a course it follows across its codes, as
 #' course_former_codes_note() does for one course.
 #'
-#' @param ... Tables with `course_id` and `term`, keyed or not; a code is
-#'   read from `listed_code` when the table is keyed, else `subject_course`.
+#' @param ... Loaded tables (with `term`).
 #' @return A tibble with `subject_course` (the `course_id`) and
 #'   `former_codes`; one row per course with a former code, none when none.
 course_former_code_spans <- function(...) {
   pieces <- lapply(list(...), function(tbl) {
-    if (!"course_id" %in% names(tbl)) {
-      stop("[courses.R] course_former_code_spans() needs column course_id on every table; ",
-           "attach it with attach_course_ids()")
-    }
-    .courses_need(tbl, c("term", "subject_course"), "course_former_code_spans()'s table")
-    listed <- if ("listed_code" %in% names(tbl)) tbl$listed_code else tbl$subject_course
+    .courses_need(tbl, "term", "course_former_code_spans()'s table")
+    listed <- .listed_codes(tbl, "course_former_code_spans")
     tibble::tibble(course_id = tbl$course_id, listed_code = listed, term = tbl$term) %>%
       dplyr::filter(!is.na(course_id), !is.na(listed_code), listed_code != course_id) %>%
       dplyr::distinct()
@@ -450,6 +481,8 @@ course_former_code_spans <- function(...) {
 #'   rows), `evidence` (one line, ready for the file), `in_file` (the file's
 #'   status for the pair, NA when it has no row). Strongest evidence first.
 detect_course_renamings <- function(sections, students, files) {
+  sections <- .registrar_codes(sections)
+  students <- .registrar_codes(students)
   .courses_need(sections, c("term", "crn", "subject_course", "course_title"), "sections")
   .courses_need(students, c("term", "crn", "subject_course", "course_title"), "students")
   history <- files$code_history
@@ -469,11 +502,25 @@ detect_course_renamings <- function(sections, students, files) {
                   from_number = sub("^[^ ]+ ", "", schedule_code),
                   to_number = sub("^[^ ]+ ", "", class_list_code)) %>%
     dplyr::filter(from_code != to_code, from_number == to_number)
+  # A pair the file already joins course by course is not a subject rename:
+  # UNM's class lists carry CCST on 3-digit CCS sections, and CCS stays the
+  # upper-division prefix beside CCST's 4-digit courses, so code_history.csv
+  # joins each CCST nnn to its CCS nnn rather than renaming the subject.
+  pair_ids <- resolve_course_codes(unique(c(pairs$schedule_code, pairs$class_list_code)), history)
+  pair_id <- function(code) pair_ids$course_id[match(code, pair_ids$subject_course)]
+  subject_in_file <- paste(history$from_code, history$to_code)[history$kind == "subject"]
+  pairs <- pairs %>%
+    dplyr::filter(pair_id(schedule_code) != pair_id(class_list_code) |
+                    paste(from_code, to_code) %in% subject_in_file)
   new_subject_first <- sections %>%
     dplyr::mutate(subject = sub(" .*", "", subject_course)) %>%
     dplyr::group_by(subject) %>%
     dplyr::summarize(first_scheduled = min(term), .groups = "drop")
-  subject_rows <- pairs %>%
+  subject_rows <- if (nrow(pairs) == 0L) {
+    tibble::tibble(kind = character(), from_code = character(), to_code = character(),
+                   effective_term = integer(), basis = character(), n_evidence = integer(),
+                   evidence = character())
+  } else pairs %>%
     dplyr::group_by(from_code, to_code) %>%
     dplyr::summarize(n_evidence = dplyr::n_distinct(term, crn), first = min(term), last = max(term),
                      .groups = "drop") %>%

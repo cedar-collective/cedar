@@ -219,9 +219,10 @@ data_objects <- attach_default_units(data_objects, cedar_dims)
 data_objects[["cedar_dims"]] <- cedar_dims
 
 # The course dimension (ADR-001 step 4): one course_id per code, following the
-# confirmed successions in code_history.csv, attached to the sections and the
-# class lists beside subject_course. Never saved: a confirmed row changes it at
-# the next start, as a unit decision does.
+# confirmed successions in code_history.csv. attach_course_ids() keys the
+# sections, the class lists and the grades on it: subject_course is the course
+# from here on, and listed_code the code the registrar used that term. Never
+# saved: a confirmed row changes it at the next start, as a unit decision does.
 cedar_courses <- build_cedar_courses(data_objects[["cedar_sections"]], data_objects[["cedar_students"]], cedar_dims)
 data_objects <- attach_course_ids(data_objects, cedar_courses)
 data_objects[["cedar_courses"]] <- cedar_courses$courses
@@ -423,6 +424,10 @@ if (!is.null(data_objects[["cedar_students"]]) && nrow(data_objects[["cedar_stud
 # used by Course Dynamics.
 # Invalidated automatically when cedar_students.qs changes. The v2 filename
 # avoids loading older cache files that did not include campus in the schema.
+# Counted over the loaded class list, which is keyed on the course, so a pair
+# follows each course across its codes; the renames it was counted over are
+# stamped on it and checked here, so a confirmed code_history.csv row (or a
+# file counted by code) is recomputed rather than read.
 cedar_course_flows <- tryCatch({
   if (is.null(data_objects[["cedar_students"]]) || nrow(data_objects[["cedar_students"]]) == 0) {
     NULL
@@ -433,16 +438,22 @@ cedar_course_flows <- tryCatch({
                          file.exists(students_qs_path) &&
                          file.info(flows_cache_path)$mtime > file.info(students_qs_path)$mtime
 
-    if (flows_cache_valid) {
-      message("[global.R] Loading cached course pair flows...")
-      t_flows <- system.time({ result <- qs2::qs_read(flows_cache_path) })
-      message(sprintf("[global.R] Course flows loaded: %d rows (%.1fs)",
-                      nrow(result), t_flows["elapsed"]))
-      result
+    students_renames <- course_code_renames(data_objects[["cedar_students"]])
+    cached_flows <- if (flows_cache_valid) qs2::qs_read(flows_cache_path) else NULL
+    if (!is.null(cached_flows) &&
+        !identical(attr(cached_flows, "code_renames", exact = TRUE), students_renames)) {
+      message("[global.R] Cached course pair flows were counted over other course codes; recomputing.")
+      cached_flows <- NULL
+    }
+
+    if (!is.null(cached_flows)) {
+      message(sprintf("[global.R] Course flows loaded: %d rows", nrow(cached_flows)))
+      cached_flows
     } else {
       message("[global.R] Pre-computing course pair flows for downstream signals...")
       t_flows <- system.time({
         result <- get_next_course_pairs(data_objects[["cedar_students"]], opt = list(summer = FALSE))
+        attr(result, "code_renames") <- students_renames
       })
       message(sprintf("[global.R] Course flows ready: %d rows (%.1fs)",
                       nrow(result), t_flows["elapsed"]))

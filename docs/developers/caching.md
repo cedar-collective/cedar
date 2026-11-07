@@ -27,14 +27,19 @@ reused a stale cache file. When you add a new filter/option to a cached feature
 same change, and verify the key string actually changes when the input changes.
 
 A data input the key cannot name can be recorded in the payload and compared
-at load instead, as long as a mismatch is a miss. Regstats reads by course
-(ADR-001 step 4), so which codes are one course is an input: a confirmed
-`code_history.csv` row changes the baselines the same day. Its filename
+at load instead, as long as a mismatch is a miss. Every loader keys the tables
+on the course (ADR-001 step 4; `attach_course_ids()`), so which codes are one
+course is an input to every cache over them: a confirmed `code_history.csv`
+row changes the result the same day. Keys that hash the dims already see it
+(Dept Trends, the Dashboard: `code_history` is one of the dims); the others
+record `course_code_renames()`. Regstats' baselines are the worked example. Its filename
 cannot carry that, so the payload records the class list's renames
 (`code_renames`, from `course_code_renames()`) and `load_regstats_cache()`
 returns `NULL` when the loaded class list's differ (cache v6). The precomputed
 base in `global.R` does the same with `attr(, "code_renames")`, checked by
-`cl_enrls_base_is_current()`.
+`cl_enrls_base_is_current()`, and so do the course flows precomputed beside
+it. Keying at load changed what every by-code cache had counted, so Dept
+Trends went to v12 and Seatfinder to v4 with it.
 
 **The second cardinal rule: never persist configuration into a cached payload.**
 A cache stores *data*. Configuration — palettes, thresholds, feature flags,

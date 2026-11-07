@@ -8,7 +8,7 @@ parent: Developer Guide
 
 This reference is auto-generated from roxygen2 comments in the source code.
 
-*Generated: 2026-11-06 16:12:01.288426*
+*Generated: 2026-11-07 07:15:14.667986*
 
 ---
 
@@ -749,31 +749,16 @@ Course Sequence Effect  Compares grades in course Y between students who passed 
 
 *Source: courses.R*
 
-**Attach `course_id` to every fact table a loader holds**
+**Key every fact table a loader holds on the course**
+
+Key every fact table a loader holds on the course  Writes each row's `course_id`, moves the code the registrar used that term to `listed_code`, and sets `subject_course` to the `course_id`, on cedar_sections, cedar_students and cedar_grades. Every loader calls it once (global.R, R/trunk/data.R, the cache-warming scripts, cedar-repl.R), so every reader groups, filters and joins by course on `subject_course`. A table already keyed is keyed again from its `listed_code`, so attaching twice, or after a code_history.csv row changed, gives the same table. `course_id` stays beside `subject_course` as the explicit name; the two share one vector.
 
 **Parameters:**
 
 - `tables` - A named list of loaded tables; one that is not loaded (NULL, or the empty tibble load_cedar_data() returns for a missing file) is left alone and named in a message.
 - `courses` - The object build_cedar_courses() returns.
 
-**Returns:** `tables` with `course_id` on cedar_sections and cedar_students, each table's attributes kept. A code the dimension does not know is a stop: the dimension is built from the same tables, so one can only mean the tables changed between the two calls.
-
----
-
-### `key_on_course_id()`
-
-*Source: courses.R*
-
-**Read a table by course rather than by code**
-
-Read a table by course rather than by code  Returns `tbl` keyed on the course: `subject_course` carries each row's `course_id` and the code the source wrote moves to `listed_code`. A reader that filters, groups or joins on `subject_course` then follows every course across the codes it has carried, its grouping unchanged — Course Dynamics reads the class list and the sections this way, so SOCI 371's report includes its SOC 371 terms and its feeders count SOC 250 and SOCI 2315 as one course. This is a working frame, never a saved one (annotate, never mutate): the loaded tables keep the registrar's code, and `listed_code` keeps it here for any text that names it ("also listed as SOC 371"). A frame already keyed is returned as it is. Every column is shared with `tbl`; nothing is copied.
-
-**Parameters:**
-
-- `tbl` - `cedar_sections` or `cedar_students` rows with `course_id`.
-- `caller` - Named in the error when the id was never attached.
-
-**Returns:** `tbl`, ungrouped, with `subject_course` set to `course_id` and the original code in `listed_code`.
+**Returns:** `tables` keyed on the course, each table's attributes kept and its rows ungrouped. A code the dimension does not know is a stop: the dimension is built from the same tables, so one can only mean the tables changed between the two calls.
 
 ---
 
@@ -785,11 +770,62 @@ Read a table by course rather than by code  Returns `tbl` keyed on the course: `
 
 **Parameters:**
 
-- `tbl` - Rows with `course_id`, keyed with key_on_course_id() or not.
+- `tbl` - A loaded table (keyed by attach_course_ids()), or any frame with `course_id` and `listed_code`.
 - `code` - One course code as a picker or a URL names it: the current code or any former one (`SOC 371` finds SOCI 371's course).
 - `caller` - Named in the errors.
 
 **Returns:** The code's `course_id` in `tbl`. A code `tbl` does not carry is its own course, with no history to follow. Stops on a code that maps to two ids, which no table attach_course_ids() wrote can do.
+
+---
+
+### `course_code_lookup()`
+
+*Source: courses.R*
+
+**Every code and course id a loaded table names, with its course**
+
+Every code and course id a loaded table names, with its course  A row per registrar's code (`SOC 371` -> `SOCI 371`) and per course id (`SOCI 371` -> `SOCI 371`), so rows that name either one join to their course: a list that arrives with the registrar's code (a waitlist row, a requested history) and one that arrives with the course both find it. The two agree because a course id is the last code of its chain.
+
+**Parameters:**
+
+- `tbl` - A loaded table.
+- `caller` - Named in the errors.
+
+**Returns:** A tibble of `code` and `course_id`, one row per code. Stops on a code that names two courses, which no table attach_course_ids() keyed can carry.
+
+---
+
+### `course_picker_choices()`
+
+*Source: courses.R*
+
+**A course picker's choices: every course and every code it has carried**
+
+A course picker's choices: every course and every code it has carried  For a picker whose reader resolves a picked code to its course (the shared `course` filter in filter.R, course_id_of(), course_ids_of()), so a reader can find a course by the code it knows: SOC 371 and SOCI 371 both pick the one course.
+
+**Parameters:**
+
+- `tbl` - A loaded table.
+
+**Returns:** The sorted course ids and registrar's codes, each once.
+
+---
+
+### `course_ids_of()`
+
+*Source: courses.R*
+
+**The courses a list of picked codes belongs to**
+
+The courses a list of picked codes belongs to  What a picker or a URL sends (one code or a comma-separated list, each current or former) as the course ids of the tables a reader keys on course_id: course_id_of() over the codes both tables carry, each id once.
+
+**Parameters:**
+
+- `codes` - Picked codes; NULL or "" is no pick.
+- `...` - The reader's loaded tables.
+- `caller` - Named in the errors.
+
+**Returns:** The ids, in pick order; NULL for no pick.
 
 ---
 
@@ -801,7 +837,7 @@ Read a table by course rather than by code  Returns `tbl` keyed on the course: `
 
 **Parameters:**
 
-- `tbl` - Rows with `course_id`, keyed or not.
+- `tbl` - A loaded table.
 - `course_id` - One course id, from course_id_of().
 
 **Returns:** The codes in `tbl` with that id, sorted; the id itself when the table carries none of them.
@@ -814,13 +850,29 @@ Read a table by course rather than by code  Returns `tbl` keyed on the course: `
 
 **Every code a table carries under another course id**
 
-Every code a table carries under another course id  One line per rename the table shows (`"SOC 371 > SOCI 371"`), sorted: the fingerprint a cache key needs for a result read through key_on_course_id(), so a confirmed row in code_history.csv is a miss, never a stale hit.
+Every code a table carries under another course id  One line per rename the table shows (`"SOC 371 > SOCI 371"`), sorted: the fingerprint a cache key needs for any result computed over a loaded table, so a confirmed row in code_history.csv is a miss, never a stale hit.
 
 **Parameters:**
 
-- `tbl` - Rows with `course_id`, keyed or not.
+- `tbl` - A loaded table.
 
 **Returns:** A sorted character vector, empty when no code is renamed.
+
+---
+
+### `course_former_code_spans()`
+
+*Source: courses.R*
+
+**Name each course's former codes with the terms they covered**
+
+Name each course's former codes with the terms they covered  One row per course the tables list under more than one code: every code other than its `course_id`, each with the terms it ran under, oldest first (`"HIST 320 (Spring 2020 to Fall 2020)"`). The text a scan over many courses puts beside a course it follows across its codes, as course_former_codes_note() does for one course.
+
+**Parameters:**
+
+- `...` - Loaded tables (with `term`).
+
+**Returns:** A tibble with `subject_course` (the `course_id`) and `former_codes`; one row per course with a former code, none when none.
 
 ---
 
@@ -1965,6 +2017,37 @@ Which subjects each unit teaches  One row per confirmed (subject, unit, college)
 
 ## enrl
 
+### `build_cl_enrls_base()`
+
+*Source: enrl.R*
+
+**The app's precomputed course-term enrollment base, by course**
+
+The app's precomputed course-term enrollment base, by course  calc_cl_enrls() over the whole class list, by part of term, with each course's level and department beside it: the table get_reg_stats() filters instead of recounting the class list on every request, and the history Waitlists reads. Built once at start (global.R), saved beside the data.  The base follows the course, not the code (ADR-001 step 4): it is counted over the loaded class list, keyed on the course (attach_course_ids()), so `subject_course` is the course_id and a renumbered course's terms are one course's rows. The renames in the class list it was counted from are stamped on it (`attr(, "code_renames")`), so cl_enrls_base_is_current() can tell a base saved before a code_history.csv row was confirmed from one that matches the class list now loaded.
+
+**Parameters:**
+
+- `students` - `cedar_students` with `course_id` attached.
+
+**Returns:** One row per campus, college, course, term and part of term with calc_cl_enrls()'s counts and means plus `level` and `department`, ungrouped.
+
+---
+
+### `cl_enrls_base_is_current()`
+
+*Source: enrl.R*
+
+**Was the saved enrollment base counted over this class list's course codes?**
+
+Was the saved enrollment base counted over this class list's course codes?  TRUE when the base carries the part-of-term dimension and the renames stamped on it are the class list's now. FALSE for a base saved before part_term, before it was keyed on course_id, or before a code_history.csv row was confirmed: global.R rebuilds such a base, and get_reg_stats() refuses it.
+
+**Parameters:**
+
+- `base` - The saved base, or anything else (FALSE).
+- `students` - `cedar_students` with `course_id` attached.
+
+---
+
 ### `filter_classlist_to_sections()`
 
 *Source: enrl.R*
@@ -2407,7 +2490,7 @@ Resolve every active section in a selected course's crosslist family  The select
 - `sections` - `cedar_sections`, with `course_id` attached.
 - `opt` - Standard CEDAR filter options including `course`: the code the report was asked for, current or former.
 
-**Returns:** Active section rows for the selected course, under every code it has carried, and its crosslist family — keyed on the course (key_on_course_id(): `subject_course` is the `course_id`, the schedule's code is `listed_code`).
+**Returns:** Active section rows for the selected course, under every code it has carried, and its crosslist family — keyed on the course (as loaded: `subject_course` is the `course_id`, the schedule's code is `listed_code`).
 
 ---
 
@@ -2417,7 +2500,7 @@ Resolve every active section in a selected course's crosslist family  The select
 
 **Build crosslist-family class-list enrollment for one course**
 
-Build crosslist-family class-list enrollment for one course  Student records are matched to the selected course's full active section family through `(term, crn)`, then canonicalized to the selected course and its college before the standard `calc_cl_enrls()` calculation. This counts a student once when the same person appears under two codes in one crosslist family — as registered if they hold a seat under either listing — while retaining the canonical registration-status buckets.  Both tables are read by course (key_on_course_id()): the selected course's rows under a former code are its own, not a partner's, so `selected` and `family` carry its history under every code and `listings` names a code column per course in the family, never one per code (ADR-001 step 4).
+Build crosslist-family class-list enrollment for one course  Student records are matched to the selected course's full active section family through `(term, crn)`, then canonicalized to the selected course and its college before the standard `calc_cl_enrls()` calculation. This counts a student once when the same person appears under two codes in one crosslist family — as registered if they hold a seat under either listing — while retaining the canonical registration-status buckets.  Both tables are read by course, as loaded: the selected course's rows under a former code are its own, not a partner's, so `selected` and `family` carry its history under every code and `listings` names a code column per course in the family, never one per code (ADR-001 step 4).
 
 **Parameters:**
 
@@ -4566,8 +4649,8 @@ Inspect Waitlist by Major and Classification  Comprehensive waitlist analysis th
 
 **Parameters:**
 
-- `students` - Data frame of student enrollments from cedar_students table. Must include columns: campus, college, term, term_type, major, student_classification, subject_course, course_title, level, and registration_status_code (or the backward-compatible registration_status).
-- `opt` - Options list for filtering: \itemize{ \item \code{course} - Course identifier(s) (e.g., "MATH 1430") \item \code{term} - Term code(s) (e.g., 202510) \item \code{subject} - Subject code(s) (e.g., "MATH") \item Other filtering options supported by \code{filter_class_list()} }
+- `students` - Data frame of student enrollments from cedar_students table, with \code{course_id} attached (as every loader does); read keyed on it, so every \code{subject_course} in the result is a course id and each table carries \code{former_codes} (the other codes the course has carried, with their terms; NA when one). Must include columns: campus, college, term, term_type, major, student_classification, subject_course, course_title, level, and registration_status_code (or the backward-compatible registration_status).
+- `opt` - Options list for filtering: \itemize{ \item \code{course} - Course identifier(s) (e.g., "MATH 1430"), current or former: each resolves to its course \item \code{term} - Term code(s) (e.g., 202510) \item \code{subject} - Subject code(s) (e.g., "MATH") \item Other filtering options supported by \code{filter_class_list()} }
 - `enrl_base` - Optional precomputed course-term enrollment table (\code{cedar_cl_enrls_base}); passed on to \code{\link{attach_enrollment_history}}, which recomputes a scoped base from \code{students} when this is NULL.
 - `sections` - Optional cedar_sections table; only needed if students lacks a course_title column (titles are joined by term/subject_course)
 - `student_terms` - The `cedar_student_terms` table. The majors and classifications splits read each waiting student's description off it (`primary_major_code`, `student_classification`), never off the class-list row (ADR-001 step 2). Required.

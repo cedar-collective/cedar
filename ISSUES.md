@@ -228,7 +228,15 @@ history resolves each row's code to its course for the join
 history too, and since reader PR 4 its counts follow the course as well (one
 row for a course waited for under two live codes). The Department Dashboard
 (reader PR 5) and the enrollment projections (reader PR 6, model 0.28.0)
-read by course as well.
+read by course as well. Since 2026-11-07 every loader keys the tables on the
+course (`attach_course_ids()`: `subject_course` the course, `listed_code` the
+term's code), so every reader does.
+**CCS corrected 2026-11-07.** The confirmed subject row CCS → CCST was wrong:
+CCST is the lower-division prefix (4-digit numbers) and CCS still the
+upper-division one, on the Fall 2026 schedule and class lists alike; the 524
+paired sections are pulls whose class lists printed CCST on 3-digit CCS
+courses. `code_history.csv` now joins each of the 61 CCST nnn codes to CCS
+nnn (course rows), so the CCS courses keep their own code as their id.
 CCS is not retired: measured on the 2026-10-08 pull, both CCS and CCST
 are on the schedule and the class list through Fall 2026 (CCS class-list
 rows from Summer 2021, 5,675 of them; 109 Fall 2026 sections as CCS, none as

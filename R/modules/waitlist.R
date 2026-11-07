@@ -393,7 +393,7 @@ waitlistServer <- function(id, students, parent_session, sections = NULL,
       session = session,
       root_session = parent_session,
       input_id = "wl_course",
-      choices = sort(unique(students$subject_course)),
+      choices = course_picker_choices(students),
       spec_title = "Waitlists",
       key = "course"
     )

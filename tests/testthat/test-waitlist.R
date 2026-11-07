@@ -390,7 +390,8 @@ test_that("attach_enrollment_history adds census enrollment context", {
   mk <- function(term, n_re, n_wl = 0, n_dw = 0) {
     tibble::tibble(
       campus = "ABQ", college = "ARTS", term = as.integer(term),
-      subject_course = "WLST 1000", course_id = "WLST 1000", part_term = "1", term_type = "fall",
+      subject_course = "WLST 1000", course_id = "WLST 1000", listed_code = "WLST 1000",
+      part_term = "1", term_type = "fall",
       student_id = paste0("S", term, "_", seq_len(n_re + n_wl + n_dw)),
       registration_status_code = c(rep("RE", n_re), rep("WL", n_wl), rep("DW", n_dw))
     )
@@ -438,8 +439,8 @@ test_that("attach_enrollment_history follows the course when the class list name
   base <- build_cl_enrls_base(students)
   expect_false("HIST 320" %in% base$subject_course)
   count_df <- students %>%
-    filter(subject_course %in% c("HIST 320", "SOCI 250"), term == 202010L) %>%
-    distinct(campus, college, term, part_term, subject_course, course_title) %>%
+    filter(listed_code %in% c("HIST 320", "SOCI 250"), term == 202010L) %>%
+    distinct(campus, college, term, part_term, subject_course = listed_code, course_title) %>%
     arrange(subject_course) %>%
     mutate(count = 1L)
 
@@ -489,7 +490,7 @@ test_that("inspect_waitlist counts a course's waitlist across its live codes (RN
   expect_equal(unique(out$majors$former_codes), "SOC 371 (Spring 2020)")
 
   # Read by code, the same rows split in two and W3 counts as waiting.
-  by_code <- lapply(rn, function(tbl) dplyr::mutate(tbl, course_id = subject_course))
+  by_code <- lapply(rn, function(tbl) dplyr::mutate(tbl, subject_course = listed_code, course_id = listed_code))
   split <- inspect_waitlist(by_code$cedar_students, opt, sections = by_code$cedar_sections,
                             student_terms = student_terms)$count %>%
     arrange(subject_course)

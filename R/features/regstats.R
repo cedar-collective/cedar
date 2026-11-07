@@ -693,8 +693,6 @@ get_reg_stats <- function(students, courses, opt) {
   # current or former, resolves to its course once. The renames in the class
   # list fingerprint the result: the cache and the precomputed base must have
   # been counted over the same ones.
-  students <- key_on_course_id(students, "get_reg_stats")
-  courses <- key_on_course_id(courses, "get_reg_stats")
   if (!is.null(opt[["course"]]) && !identical(opt[["course"]], "")) {
     opt[["course"]] <- course_ids_of(opt[["course"]], students, courses, caller = "get_reg_stats")
   }

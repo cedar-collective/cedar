@@ -489,10 +489,13 @@ and the new one arrive from nowhere.
   and which); `cedar_course_codes` one row per code with its id, where it
   appears and how many steps it took.
 - **Attached at load, never saved.** `build_cedar_courses()` runs in every
-  loader after the units, `attach_course_ids()` writes `course_id` onto
-  `cedar_sections` and `cedar_students`, and `subject_course` is never
-  rewritten (annotate, never mutate). 8 s to build and under a second to
-  attach on the full pull.
+  loader after the units and `attach_course_ids()` writes `course_id` onto
+  `cedar_sections` and `cedar_students`. The saved files are never rewritten
+  (annotate, never mutate). 8 s to build and under a second to attach on the
+  full pull. *Amended 2026-11-07:* the loader now keys the loaded tables on
+  the course as well, `subject_course` the id and `listed_code` the term's
+  code ([below](#keyed-at-load-2026-11-07)); until then `subject_course`
+  stayed the registrar's code in memory too.
 - **A screen proposes; a script writes.** `detect_course_renamings()` finds a
   section under two subjects (`section_crn`) and a title whose one retired
   code stopped before its one new code began (`title_match`), resolving codes
@@ -507,7 +510,7 @@ subject renames confirmed and 320 title matches proposed: 117 effective Fall
 3260 and the rest of I37's list), the remainder spread across the years
 between. With the three confirmed rows the dimension has 7,450 courses from
 7,641 codes; 229 codes resolve to another, joining 191 courses (79 PSYC, 61
-CCST, 51 SOCI). SOCI 371's history now begins Fall 2018, where SOC 371's did,
+CCST, 51 SOCI; the CCS row was later replaced, [below](#keyed-at-load-2026-11-07)). SOCI 371's history now begins Fall 2018, where SOC 371's did,
 instead of Fall 2021. The demo institution's file carries the RN01 fixtures'
 successions, one of them proposed, so `test-courses.R` shows a proposed row
 assigning nothing and a chain crossing kinds.
@@ -629,9 +632,90 @@ change is a feeder: PSY 332 and PSYC 332, two codes before, are one course
 with enough shared students to enter the top eight feeders of ANTH 2190C and
 SOCI 2315, moving three Spring aftcasts of ANTH 2190C's adjusted candidate
 (its WAPE 6.24% to 6.51%) and one Fall aftcast of SOCI 2315's; neither
-candidate is published. Next: `cedar_course_terms` is promoted from
-`cedar_cl_enrls_base` and `cedar_attempts` from `cedar_grades`, both keyed on
-`course_id`, and `course-flows.R`'s precompute rebuilds on it. The Admin > Mappings surface for code history (when each
+candidate is published.
+
+#### Keyed at load (2026-11-07)
+
+**Decided 2026-11-07 by the user**, asked how the per-reader shim should
+retire. Reader PRs 2 to 6 each opened with `key_on_course_id()`, which
+returned a working frame whose `subject_course` was the course and whose
+`listed_code` was the registrar's code. Thirty-odd other readers (Roadblocks,
+Gen Ed, Dept Trends, Enrollment, the flows) still grouped by code, so one
+column meant two things depending on which function had run, and both
+regressions caught in the Regstats PR came from that. Three end states were
+offered:
+
+1. Key once at load.
+2. Group on `course_id` openly in every reader, with a ratcheting test.
+3. Keep the opt-in shim.
+
+The user chose the first: a cone written naively on `subject_course` is then
+right by default.
+
+**What it does.** `attach_course_ids()` keys `cedar_sections`,
+`cedar_students` and `cedar_grades` in every loader:
+
+- `subject_course` becomes the `course_id`;
+- the term's code moves to `listed_code`;
+- `course_id` sits beside them, one vector shared.
+
+`key_on_course_id()` and its twenty calls are gone. The helpers that took
+either kind of frame now require `listed_code` (`.listed_codes()`), so there
+is one mode.
+
+**Resolving codes.**
+
+- The two code-level functions read the registrar's code back
+  (`.registrar_codes()`): `build_cedar_courses()` and
+  `detect_course_renamings()`.
+- A picked code, current or former, keeps its whole course in the shared
+  `course` filter (`filter_DESRs()`, `filter_class_list()`), and through
+  `course_id_of()` / `course_ids_of()`.
+- The pickers whose readers resolve offer both codes and courses
+  (`course_picker_choices()`).
+- `course_code_lookup()` maps rows that arrive with either a code or an id.
+
+**Display.** A section row on Enrollment shows `listed_code`. Course rollups
+show the course, with former codes named where a reader already did.
+
+**Caches.** The course flows precomputed in `global.R` are stamped with the
+class list's renames and recomputed on a mismatch. Dept Trends went to v12
+and Seatfinder to v4.
+
+**Institution lists.** They name codes. On the 2026-10-08 pull only
+`excluded_courses.csv` names a former code (five PSY), and the `uel` rule
+already drops by course. Confirming the 320 proposed renumberings would add
+one, a MGMT code in a catalog interpretation.
+
+**Measured on the 2026-10-08 pull.** Rows whose code is not their course's:
+
+| Table | Rows | Share |
+|---|---:|---:|
+| Sections (PSY, SOC) | 4,066 | 1.7% |
+| Class-list rows (CCST, PSY, SOC) | 11,954 | 0.6% |
+| Graded attempts | 10,517 | 0.7% |
+
+Keying takes under a tenth of a second per table.
+
+**CCS is not renamed to CCST: correction, 2026-11-07.** The first PR
+confirmed a subject row CCS → CCST from 524 sections that the schedule lists
+as CCS and the class list as CCST. The user corrected it: CCST is the
+lower-division prefix (4-digit numbers: CCST 1110, 1125, 2110, 2996), and CCS
+is still the upper-division one. The Fall 2026 schedule and class lists both
+list CCS 310 to CCS 699, and the CCST codes on 3-digit numbers appear on class
+lists only, in some pulls (2019–21, 2024–25).
+
+The subject row would have named every current CCS course CCST once the
+tables were keyed. It is replaced by 61 course rows, CCST nnn → CCS nnn, each
+with its section evidence. 7,450 courses from 7,641 codes, as before; 216
+codes resolve to another.
+
+`detect_course_renamings()` no longer proposes a subject rename for section
+pairs the file joins course by course.
+
+**Next.** `cedar_course_terms` is promoted from `cedar_cl_enrls_base` and
+`cedar_attempts` from `cedar_grades`, both on the keyed tables, and
+`course-flows.R`'s precompute rebuilds on it. The Admin > Mappings surface for code history (when each
 code was in use, computed from the data; which replaced which, from the
 file) is its own PR, and `program` rows are validated now so it has
 something to read.

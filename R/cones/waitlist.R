@@ -140,22 +140,13 @@ attach_enrollment_history <- function(count_df, students, enrl_base = NULL) {
   # list still uses a former code (UNM lists CCS beside CCST through Fall
   # 2026). Each row's code is resolved to its course for the join and put
   # back after, and the recompute below counts by course the same way.
-  students <- key_on_course_id(students, "attach_enrollment_history")
-  # A row may name a code (the class list's) or a course (inspect_waitlist()
-  # keys its rows): every code maps to its course and every course to itself,
-  # which agree because a course id is the last code of its chain.
-  code_ids <- dplyr::bind_rows(
-    students %>% distinct(listed_code, course_id),
-    students %>% distinct(listed_code = course_id, course_id)
-  ) %>% distinct()
-  if (anyDuplicated(code_ids$listed_code)) {
-    stop("[waitlist.R] attach_enrollment_history(): a course code carries two course ids; ",
-         "the class list was not attached by attach_course_ids()")
-  }
+  # A row may name a code (the class list's) or a course (inspect_waitlist()'s
+  # rows are courses): course_code_lookup() maps either to its course.
+  code_ids <- course_code_lookup(students, "attach_enrollment_history")
   count_df <- count_df %>%
     ungroup() %>%
     mutate(.listed_code = subject_course) %>%
-    left_join(code_ids, by = c(subject_course = "listed_code"), relationship = "many-to-one")
+    left_join(code_ids, by = c(subject_course = "code"), relationship = "many-to-one")
   if (anyNA(count_df$course_id)) {
     stop("[waitlist.R] attach_enrollment_history(): waitlist rows name codes the class list does not carry: ",
          paste(unique(count_df$subject_course[is.na(count_df$course_id)]), collapse = ", "))
@@ -330,8 +321,6 @@ inspect_waitlist <- function(students, opt, sections = NULL, enrl_base = NULL,
   # waiting under one code while registered under the other holds a seat and is
   # not counted, and the section supply and history are the course's. A picked
   # code, current or former, resolves to its course once.
-  students <- key_on_course_id(students, "inspect_waitlist")
-  if (!is.null(sections)) sections <- key_on_course_id(sections, "inspect_waitlist")
   if (!is.null(opt[["course"]]) && !identical(opt[["course"]], "")) {
     opt[["course"]] <- if (is.null(sections)) {
       course_ids_of(opt[["course"]], students, caller = "inspect_waitlist")

@@ -355,6 +355,9 @@ counting_rule_tables <- function() {
     college_basis = c("mapped", "mapped", "mapped", "mapped", "banner"),
     crosslist_group = c("G1", "G1", "G2", "G2", NA),
     crosslist_role = c("home", "partner", "internal", "internal", NA))
+  # As the loader keys them (attach_course_ids()); no code is renamed here.
+  sections$course_id <- sections$subject_course
+  sections$listed_code <- sections$subject_course
   students <- tibble::tibble(
     student_id = c("S1", "S2", "S3", "S3"), term = 202080L,
     student_campus = c("ABQ", "ABQ", "TA", "TA"), campus = c("ABQ", "EA", "TA", "ZZ"),

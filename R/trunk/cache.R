@@ -231,7 +231,9 @@ clear_course_cache <- function(course_code) {
 #        with the end-of-term count beside it (credit-hours 3.0.0).
 #   v11 — SCH by major reads each row's major off cedar_student_terms, named
 #        through the programs table (credit_hours_by_major(); ADR-001 step 2).
-cedar_dept_cache_version <- 11L
+#   v12 — the loaded tables are keyed on the course (attach_course_ids()), so a
+#        renamed course's rows are one course in every tab (ADR-001 step 4).
+cedar_dept_cache_version <- 12L
 
 # Include lookup-derived labels/department metadata where a tab uses them.
 # Credit Hours reads class lists, sections for late drops' credit values, the
@@ -628,7 +630,9 @@ clear_population_benchmark_cache <- function() {
 # (cedar_sections_hash changes at startup after a data update).
 
 # v3 discards historical DFW rates computed before term-aware attempt deduplication.
-cedar_seatfinder_cache_version <- 3L
+# v4: the loaded tables are keyed on the course, so a renamed course's DFW
+# history is one course's (ADR-001 step 4).
+cedar_seatfinder_cache_version <- 4L
 
 get_seatfinder_cache_key <- function(opt) {
   sections_hash <- if (exists("cedar_sections_hash", envir = .GlobalEnv)) {
