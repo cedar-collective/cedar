@@ -262,11 +262,12 @@ test_that("inspect_waitlist excludes registered overlap from every summary", {
   expect_equal(sum(classification_count$count), 28L)
   expect_named(
     out$majors,
-    c("campus", "term", "major_code", "subject_course", "course_title", "count")
+    c("campus", "term", "major_code", "subject_course", "course_title", "count", "former_codes")
   )
   expect_named(
     out$classifications,
-    c("campus", "term", "student_classification", "subject_course", "course_title", "count")
+    c("campus", "term", "student_classification", "subject_course", "course_title", "count",
+      "former_codes")
   )
 })
 
@@ -337,12 +338,14 @@ test_that("Waitlists, Regstats, and Department Dashboard reconcile true demand",
   expect_equal(regstats$waiting, 28L)
 })
 
-test_that("waitlist definition v2 records cross-surface reconciliation", {
+test_that("waitlist definition v3 follows the course and names the dashboard's lag", {
   definition <- cedar_definition("waitlist")
-  expect_identical(definition$version, "2.0.0")
-  expect_match(definition$summary, "Waitlists, Regstats, and the Department Dashboard",
-               fixed = TRUE)
+  expect_identical(definition$version, "3.0.0")
+  expect_match(definition$summary, "followed across the codes it has carried", fixed = TRUE)
+  expect_match(definition$numerator, "holds a seat in the course", fixed = TRUE)
   expect_match(definition$exclusions, "RE/RS/RR", fixed = TRUE)
+  expect_true(any(grepl("Department Dashboard still matches by course code",
+                        definition$limitations, fixed = TRUE)))
 })
 
 test_that("inspect_waitlist requires sections when course titles are absent", {
@@ -462,6 +465,44 @@ test_that("attach_enrollment_history follows the course when the class list name
     attach_enrollment_history(count_df, dplyr::select(students, -course_id), enrl_base = base),
     "course_id"
   )
+})
+
+test_that("inspect_waitlist counts a course's waitlist across its live codes (RN02)", {
+  # RN02: in Spring 2020 W1 waits under SOC 371, W2 under SOCI 371, and W3
+  # waits under SOC 371 while registered under SOCI 371, one course.
+  rn <- rn02_course_tables()
+  # The description table is scaffolding: one row per class-list student-term.
+  student_terms <- rn$cedar_students %>%
+    distinct(student_id, term) %>%
+    mutate(student_classification = "Junior", primary_major_code = "SOCI")
+  opt <- create_test_opt(list(term = 202010, uel = FALSE))
+  out <- inspect_waitlist(rn$cedar_students, opt, sections = rn$cedar_sections,
+                          student_terms = student_terms)
+
+  # One row for the course: W1 and W2 wait; W3 holds a seat in it.
+  expect_equal(out$count$subject_course, "SOCI 371")
+  expect_equal(out$count$count, 2L)
+  expect_equal(out$count$former_codes, "SOC 371 (Spring 2020)")
+  # The schedule's SOC 371 section is the course's supply.
+  expect_equal(out$count$n_sections, 1L)
+  expect_equal(sum(out$majors$count), 2L)
+  expect_equal(sum(out$classifications$count), 2L)
+  expect_equal(unique(out$majors$former_codes), "SOC 371 (Spring 2020)")
+
+  # Read by code, the same rows split in two and W3 counts as waiting.
+  by_code <- lapply(rn, function(tbl) dplyr::mutate(tbl, course_id = subject_course))
+  split <- inspect_waitlist(by_code$cedar_students, opt, sections = by_code$cedar_sections,
+                            student_terms = student_terms)$count %>%
+    arrange(subject_course)
+  expect_equal(split$subject_course, c("SOC 371", "SOCI 371"))
+  expect_equal(split$count, c(2L, 1L))
+
+  # A former code asked for is its course.
+  picked <- inspect_waitlist(rn$cedar_students,
+                             create_test_opt(list(course = "SOC 371", term = 202010, uel = FALSE)),
+                             sections = rn$cedar_sections, student_terms = student_terms)
+  expect_equal(picked$count$subject_course, "SOCI 371")
+  expect_equal(picked$count$count, 2L)
 })
 
 test_that("waitlist.R uses consistent message prefixes", {

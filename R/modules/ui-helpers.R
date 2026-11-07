@@ -610,12 +610,18 @@ trend_cell_html <- function(series, terms, cur_term, pct = FALSE,
 #' @param code The course's code (its `course_id`).
 #' @param former_codes The row's `former_codes` text, or NA when the course
 #'   has carried one code.
-course_code_cell <- function(code, former_codes = NA_character_) {
+#' @param onclick Optional JavaScript run when the code is clicked (a drill);
+#'   the code is then a link and the former codes stay plain text beneath it.
+course_code_cell <- function(code, former_codes = NA_character_, onclick = NULL) {
+  label <- htmltools::span(class = "fw-semibold", code)
+  if (!is.null(onclick)) {
+    label <- htmltools::tags$a(href = "javascript:void(0)", onclick = onclick, label)
+  }
   if (length(former_codes) != 1L || is.na(former_codes) || !nzchar(former_codes)) {
-    return(htmltools::span(class = "fw-semibold", code))
+    return(label)
   }
   htmltools::tagList(
-    htmltools::span(class = "fw-semibold", code),
+    label,
     htmltools::div(class = "text-sub", paste0("also ", former_codes))
   )
 }

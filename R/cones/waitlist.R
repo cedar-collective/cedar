@@ -141,7 +141,13 @@ attach_enrollment_history <- function(count_df, students, enrl_base = NULL) {
   # 2026). Each row's code is resolved to its course for the join and put
   # back after, and the recompute below counts by course the same way.
   students <- key_on_course_id(students, "attach_enrollment_history")
-  code_ids <- students %>% distinct(listed_code, course_id)
+  # A row may name a code (the class list's) or a course (inspect_waitlist()
+  # keys its rows): every code maps to its course and every course to itself,
+  # which agree because a course id is the last code of its chain.
+  code_ids <- dplyr::bind_rows(
+    students %>% distinct(listed_code, course_id),
+    students %>% distinct(listed_code = course_id, course_id)
+  ) %>% distinct()
   if (anyDuplicated(code_ids$listed_code)) {
     stop("[waitlist.R] attach_enrollment_history(): a course code carries two course ids; ",
          "the class list was not attached by attach_course_ids()")
@@ -226,13 +232,18 @@ attach_enrollment_history <- function(count_df, students, enrl_base = NULL) {
 #' major and classification. This provides insight into which student populations
 #' are being waitlisted and helps with enrollment planning and advising.
 #'
-#' @param students Data frame of student enrollments from cedar_students table.
+#' @param students Data frame of student enrollments from cedar_students table,
+#'   with \code{course_id} attached (as every loader does); read keyed on it,
+#'   so every \code{subject_course} in the result is a course id and each table
+#'   carries \code{former_codes} (the other codes the course has carried, with
+#'   their terms; NA when one).
 #'   Must include columns: campus, college, term, term_type, major,
 #'   student_classification, subject_course, course_title, level, and
 #'   registration_status_code (or the backward-compatible registration_status).
 #' @param opt Options list for filtering:
 #'   \itemize{
-#'     \item \code{course} - Course identifier(s) (e.g., "MATH 1430")
+#'     \item \code{course} - Course identifier(s) (e.g., "MATH 1430"), current
+#'       or former: each resolves to its course
 #'     \item \code{term} - Term code(s) (e.g., 202510)
 #'     \item \code{subject} - Subject code(s) (e.g., "MATH")
 #'     \item Other filtering options supported by \code{filter_class_list()}
@@ -313,6 +324,22 @@ inspect_waitlist <- function(students, opt, sections = NULL, enrl_base = NULL,
 
   message("[waitlist.R] Welcome to inspect_waitlist!")
 
+  # Waitlists follows the course, not the code (ADR-001 step 4): both tables
+  # are read keyed on course_id, so a student waiting under CCS 370 and one
+  # waiting under CCST 370 in the same term are one course's demand, a student
+  # waiting under one code while registered under the other holds a seat and is
+  # not counted, and the section supply and history are the course's. A picked
+  # code, current or former, resolves to its course once.
+  students <- key_on_course_id(students, "inspect_waitlist")
+  if (!is.null(sections)) sections <- key_on_course_id(sections, "inspect_waitlist")
+  if (!is.null(opt[["course"]]) && !identical(opt[["course"]], "")) {
+    opt[["course"]] <- if (is.null(sections)) {
+      course_ids_of(opt[["course"]], students, caller = "inspect_waitlist")
+    } else {
+      course_ids_of(opt[["course"]], students, sections, caller = "inspect_waitlist")
+    }
+  }
+
   message("[waitlist.R] Filtering students from params...")
   filtered_students <- filter_class_list(students, opt)
 
@@ -388,6 +415,15 @@ inspect_waitlist <- function(students, opt, sections = NULL, enrl_base = NULL,
   # so each waitlist row reads against how full the course usually runs.
   waitlist_data[["count"]] <- attach_enrollment_history(waitlist_data[["count"]], students,
                                                         enrl_base = enrl_base)
+
+  # Name the other codes each course has carried, beside the course (NA when
+  # one), on every table, from the whole keyed tables.
+  spans <- if (is.null(sections)) course_former_code_spans(students) else
+    course_former_code_spans(students, sections)
+  for (nm in c("count", "majors", "classifications")) {
+    waitlist_data[[nm]] <- waitlist_data[[nm]] %>%
+      left_join(spans, by = "subject_course", relationship = "many-to-one")
+  }
 
   message("[waitlist.R] Returning waitlist data...")
 

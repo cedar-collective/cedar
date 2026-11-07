@@ -323,6 +323,30 @@ course_id_of <- function(tbl, code, caller = "course_id_of") {
   ids
 }
 
+#' The courses a list of picked codes belongs to
+#'
+#' What a picker or a URL sends (one code or a comma-separated list, each
+#' current or former) as the course ids of the tables a reader keys on
+#' course_id: course_id_of() over the codes both tables carry, each id once.
+#'
+#' @param codes Picked codes; NULL or "" is no pick.
+#' @param ... The reader's tables, keyed with key_on_course_id() or not.
+#' @param caller Named in the errors.
+#' @return The ids, in pick order; NULL for no pick.
+course_ids_of <- function(codes, ..., caller = "course_ids_of") {
+  if (is.null(codes) || length(codes) == 0L || identical(codes, "")) return(NULL)
+  known <- dplyr::bind_rows(lapply(list(...), function(tbl) {
+    if (!"course_id" %in% names(tbl)) {
+      stop("[courses.R] ", caller, "() needs column course_id on the table it reads; ",
+           "attach it with attach_course_ids() (R/branches/courses.R), as every loader does.")
+    }
+    listed <- if ("listed_code" %in% names(tbl)) tbl$listed_code else tbl$subject_course
+    dplyr::distinct(tibble::tibble(course_id = tbl$course_id, listed_code = listed))
+  }))
+  unique(vapply(convert_param_to_list(codes), course_id_of, character(1),
+                tbl = known, caller = caller))
+}
+
 #' The codes a course has been listed under in a table
 #'
 #' @param tbl Rows with `course_id`, keyed or not.

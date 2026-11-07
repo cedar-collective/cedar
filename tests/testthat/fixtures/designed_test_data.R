@@ -270,6 +270,14 @@
 #   SOCI 2120 is on a class list and never on the schedule (in_sections FALSE).
 #   LING 2110 is offered twice under one code: the control.
 #
+# RN02 (separate cedar_students_rn02 rows, read with RN01's tables and the
+#   demo code_history.csv): a waitlist while both codes are live, as UNM's
+#   class lists carry CCS beside CCST. Spring 2020, section RN01A (SOC 371 on
+#   the schedule): RN02-W1 waits under SOC 371, RN02-W2 under SOCI 371, and
+#   RN02-W3 waits under SOC 371 while registered under SOCI 371. By course
+#   (SOCI 371) the true demand is W1 and W2: 2 students, one row; W3 holds a
+#   seat. By code it reads SOC 371 = 2 (W1, W3) and SOCI 371 = 1 (W2).
+#
 # EC-15 (separate cedar_sections_xl_switch / cedar_students_xl_switch tables):
 #   MATH 3750 + CS 3750 share one Spring 2021 ABQ section; MATH 3750 also has
 #   its own. Two students switch from CS to MATH inside the shared section.
@@ -4326,4 +4334,16 @@ cedar_students_rn <- dplyr::bind_rows(
   .rn_student("RN01-R5",               202010L, "SOCI 2120", "RN01K", "Social Research",        "lower"),
   .rn_student("RN01-R1",               202010L, "LING 2110", "RN01J", "Language Matters",       "lower"),
   .rn_student("RN01-R5",               202110L, "LING 2110", "RN01L", "Language Matters",       "lower")
+)
+# RN02 — waitlisted under two live codes for one course (see the header).
+.rn02_row <- function(id, course, status) {
+  .rn_student(id, 202010L, course, "RN01A", "Sociology of Education", "upper") %>%
+    dplyr::mutate(registration_status_code = status, final_grade = NA_character_,
+                  enrollment_id = paste0(enrollment_id, "-", status))
+}
+cedar_students_rn02 <- dplyr::bind_rows(
+  .rn02_row("RN02-W1", "SOC 371",  "WL"),
+  .rn02_row("RN02-W2", "SOCI 371", "WL"),
+  .rn02_row("RN02-W3", "SOC 371",  "WL"),
+  .rn02_row("RN02-W3", "SOCI 371", "RE")
 )

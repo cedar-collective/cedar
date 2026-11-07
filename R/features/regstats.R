@@ -696,14 +696,7 @@ get_reg_stats <- function(students, courses, opt) {
   students <- key_on_course_id(students, "get_reg_stats")
   courses <- key_on_course_id(courses, "get_reg_stats")
   if (!is.null(opt[["course"]]) && !identical(opt[["course"]], "")) {
-    known_codes <- dplyr::bind_rows(
-      dplyr::distinct(students, course_id, listed_code),
-      dplyr::distinct(courses, course_id, listed_code)
-    )
-    opt[["course"]] <- unique(vapply(
-      convert_param_to_list(opt[["course"]]), course_id_of, character(1),
-      tbl = known_codes, caller = "get_reg_stats"
-    ))
+    opt[["course"]] <- course_ids_of(opt[["course"]], students, courses, caller = "get_reg_stats")
   }
   code_renames <- course_code_renames(students)
 

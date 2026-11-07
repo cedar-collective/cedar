@@ -181,3 +181,17 @@ test_that("course_former_code_spans names each course's former codes with their 
   expect_equal(names(none), c("subject_course", "former_codes"))
   expect_error(course_former_code_spans(dplyr::select(test_sections, -course_id)), "course_id")
 })
+
+test_that("course_ids_of resolves picked codes, current or former, over a reader's tables", {
+  rn <- rn01_course_tables()
+  expect_equal(course_ids_of("SOC 250, HIST 3201", rn$cedar_sections, rn$cedar_students),
+               c("SOCI 2315", "HIST 3201"))
+  # Two codes of one course are one id; a keyed table reads listed_code.
+  expect_equal(course_ids_of(c("SOC 371", "SOCI 371"), key_on_course_id(rn$cedar_sections)),
+               "SOCI 371")
+  # A code no table carries is its own course; no pick is NULL.
+  expect_equal(course_ids_of("ZZZ 101", rn$cedar_sections), "ZZZ 101")
+  expect_null(course_ids_of(NULL, rn$cedar_sections))
+  expect_null(course_ids_of("", rn$cedar_sections))
+  expect_error(course_ids_of("SOC 371", dplyr::select(rn$cedar_sections, -course_id)), "course_id")
+})

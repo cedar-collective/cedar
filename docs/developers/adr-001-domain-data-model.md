@@ -580,9 +580,24 @@ course for the join and puts the code back, so the history follows the
 course. That is needed today, not only after a confirmation: UNM's class
 lists carry CCS beside CCST through Fall 2026 (201 CCS codes from Spring
 2026 on, 109 Fall 2026 sections), and joined by code a waitlisted CCS course
-would read no history from the keyed base. Its waitlist counts are still by
-code, so a term with both CCS 370 and CCST 370 waitlisted shows two rows
-with one course's history; keying the counts is the next reader. The downstream-signals
+would read no history from the keyed base.
+
+**Reader PR 4 (2026-11-06): Waitlists.** `inspect_waitlist()` keys both
+tables on `course_id` and resolves a picked code once (`course_ids_of()`,
+shared with Regstats), so the true-demand de-dup, the three tables and the
+section supply follow the course: students waiting under CCS 370 and CCST
+370 in one term are one row, and a student waiting under one code while
+registered under the other holds a seat and is not counted. Every table
+carries `former_codes`, shown beneath the code by `course_code_cell()`,
+which now takes the drill link (`onclick`). Definition waitlist 3.0.0.
+Measured on the 2026-10-08 pull: Fall 2026 has the same 732 rows and 3,865
+waiting students by course and by code (no student in this pull waits
+under two codes of one course), 39 rows name a former code, and one more
+row reads enrollment history. Regstats rows, which carry course ids since
+reader PR 3, now drill into a Waitlists view that finds every code's rows.
+The Department Dashboard's waitlist block still matches by code (its
+enrollment history comes from `get_enrl()` by code and it caches its own
+payload); it is the next reader, and the definition says so. The downstream-signals
 flows (`cedar_course_flows`) are still by code and rebuild on
 `cedar_course_terms`. Next: the enrollment projection inputs are a
 `model_version` decision. Then `cedar_course_terms` is promoted from
