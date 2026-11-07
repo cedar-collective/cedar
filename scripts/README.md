@@ -151,7 +151,7 @@ The script automatically detects whether it's running in Docker or locally:
 
 *Option 1: Docker-based (recommended for environment consistency)*
 - Docker and docker-compose installed
-- `docker-compose.dev.yml` in CEDAR directory (see [DOCKER-DEV.md](../DOCKER-DEV.md))
+- `compose.dev.yml` in the CEDAR directory (see [synthetic-institution.md](../docs/developers/synthetic-institution.md))
 - mrgather directory at `../mrgather` with `docker-compose.yml`
 - MyReports credentials configured in mrgather `.env`
 - **No local R, Python, or xlsx2csv needed!**
@@ -444,7 +444,7 @@ Formal behavior belongs in the designed-fixture `testthat` suite, and release
 validation still runs through `./run-tests.sh --all`. Restart the REPL whenever
 the underlying data files change.
 
-See [Computational Prototyping Without Shiny](../docs/developers/testing.md#computational-prototyping-without-shiny)
+See [Working on a calculation without Shiny](../docs/developers/testing.md#working-on-a-calculation-without-shiny)
 for the complete workflow and evidence requirements.
 
 ---

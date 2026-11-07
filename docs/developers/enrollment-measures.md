@@ -15,7 +15,7 @@ CEDAR carries **two independent enrollment counts** that do not mean the same th
 | **DESR enrolled** | `enrolled`, `available` | `cedar_sections` (DESR snapshot) | Section headcount **as of the file pull** (`as_of_date`). Only **one snapshot is retained per term** (a newer DESR replaces the term's rows — see `R/data-parsers/parse-data.R`). |
 | **Classlist registered** | `registered` (from `calc_cl_enrls`, `R/branches/enrl.R`) | `cedar_students` | Distinct students in `STATUS_REGISTERED` (RE/RS/RR) — those **still registered** when the classlist was pulled. |
 
-**Neither is a census freeze.** The DESR `CENSUS1`/`CENSUS2` fields are census *dates*, not counts (see [DESR Input Schema](#desr-input-schema-cedar_sections-source)). No census-frozen headcount exists anywhere in the raw data.
+**Neither is a census freeze.** The DESR `CENSUS1`/`CENSUS2` fields are census *dates*, not counts (see [DESR Input Schema](data-transformation-myreports.md#desr-input-schema-cedar_sections-source)). No census-frozen headcount exists anywhere in the raw data.
 
 **DESR snapshot timing varies by term** (`as_of_date` vs term end), and this is the trap:
 - **Upcoming / current term** — retained DESR was pulled during active registration, *before* census → `enrolled` = live, pre-drop count (≈ peak demand).
@@ -74,8 +74,7 @@ a single explicit lifecycle point rather than the DESR `enrolled` snapshot.
 Census `registered + dr_late` is the right denominator for census occupancy and
 attrition reporting, but **not** for deciding whether a course was full: census
 is the 15th day of instruction, and three weeks of drops separate it from the
-first day (the term calendar is stated once, in AGENTS.md's Enrollment Measures
-section). Enrollment projections (0.21.0) count capacity reached at
+first day (the term calendar is stated once, [below](#the-term-calendar-and-seat-fill)). Enrollment projections (0.21.0) count capacity reached at
 `first_day_enrl / scheduled_capacity >= 0.98`, with `first_day_enrl` from
 `calc_first_day_enrl()`; over-cap overrides still count as reached. The
 ever-registered `classlist_total` is not an occupancy at all, because seats
@@ -83,3 +82,20 @@ that turned over were never all held at once. Where the class lists carry no
 status dates there is no first-day count and the term is not judged. Reporting
 class-list registrations, first-day, census, and final enrollment together
 keeps those lifecycle questions separate.
+
+## The term calendar and seat fill
+
+Moved from `AGENTS.md` on 2026-11-07, which keeps the rules.
+
+**The term calendar — the canonical statement; link here rather than restating an interval.** At UNM a Fall or Spring term moves through four points:
+
+| Point | When | Recorded as | Count |
+|---|---|---|---|
+| Registration | from months before the term | each class-list row's `registration_date` (status date) | ever-registered: `registered + dr_all` |
+| First day of classes | the section's start (a Monday for full-term sections) | `cedar_sections$start_date` | `calc_first_day_enrl()` |
+| Census | the **15th day of instruction**: the third Friday, 18 calendar days after a Monday start | `cedar_sections$census1`, per section | `registered + dr_late` (`add_census_enrl()`) |
+| Final | end of term | — | `registered` |
+
+Census is three weeks of instruction after the first day, **not "a week later"**. `census1 − start_date` is 18 days for 93% of Fall and Spring sections in each of the 17 terms Fall 2018–Fall 2026; the rest are part-term and late-start sections, which carry their own dates. Census is also the drop line, which is why `registered + dr_late` reconstructs it: 90% of dated early drops (`DR`/`DD`) fall on or before their section's census date and 98% of late drops (`DG`/`DW`) after it. Summer runs a different calendar; read `census1` rather than assume an offset. Code reads `start_date` and `census1` per section and never hardcodes the interval.
+
+**For saturation/capacity work:** derive fill rate from classlist headcounts at a single explicit lifecycle point, never from the DESR `enrolled` snapshot. **Two words, two levels, on every page:** a course is *near full* at `CEDAR_NEAR_FULL_FILL` (90%) and *full* at `CEDAR_FULL_FILL` (98% of its seats on the first day; pooled seats rarely fill to the last one). Both live in `R/lists/seat_fill.R` and are defined in `definitions.yml` (`seat-fill`); never write either as a literal, and never call a 90% course full. Enrollment projections judge seats on the first day of classes: capacity is reached at `first_day_enrl / scheduled_capacity >= CEDAR_FULL_FILL`, from `calc_first_day_enrl()` (status dates against each section's start). Ever-registered counts seat churn and flagged 72% of course-terms full; census follows three weeks of drops (see the term calendar above) and missed 199 of 598 course-terms that were full on day one. A term whose class lists carry no status dates has no first-day count and is not judged — never filled in from census. A term pulled before one of its later sessions began has none either (`first_day_basis = "sessions_pending"`); its begun sessions' count is a lower bound, read through `projection_judged_first_day()` only where it already reaches the level being judged (ISSUES.md I28).

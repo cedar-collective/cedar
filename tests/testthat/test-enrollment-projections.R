@@ -2540,9 +2540,9 @@ test_that("standalone feature builder runs without Shiny or global data", {
 })
 
 test_that("projections follow a course across a former code (0.28.0, ADR-001 step 4)", {
-  # MATH 1215Z's history before Spring 2021 relabelled as MATH 1215, the
-  # course id kept: as a confirmed renumbering reads after attach_course_ids().
-  # By course the projection is the untouched data's; the code changes nothing.
+  # MATH 1215Z's history before Spring 2021 listed as MATH 1215, the course id
+  # kept: as a confirmed renumbering loads (attach_course_ids()). By course the
+  # projection is the untouched data's; the former code changes nothing.
   settle <- function(students) {
     students %>% dplyr::mutate(
       as_of_date = .cedar_term_start(term) + 30L,
@@ -2552,8 +2552,8 @@ test_that("projections follow a course across a former code (0.28.0, ADR-001 ste
     )
   }
   relabel <- function(tbl) {
-    old <- tbl$subject_course == "MATH 1215Z" & tbl$term < 202110L
-    tbl$subject_course[old] <- "MATH 1215"
+    old <- tbl$listed_code == "MATH 1215Z" & tbl$term < 202110L
+    tbl$listed_code[old] <- "MATH 1215"
     tbl
   }
   build <- function(students, sections, cl_students = students, scope = "MATH 1215Z") {
@@ -2571,23 +2571,28 @@ test_that("projections follow a course across a former code (0.28.0, ADR-001 ste
   original <- build(students, test_sections)
   renamed_students <- relabel(students)
   renamed_sections <- relabel(test_sections)
-  keyed <- enrollment_projection_course_scope(renamed_students, renamed_sections, "MATH 1215")
-  expect_equal(keyed$scope_courses, "MATH 1215Z")
-  expect_null(keyed$force_courses)
-  renamed <- build(renamed_students, renamed_sections, cl_students = keyed$students,
-                   scope = "MATH 1215")
+  scope <- enrollment_projection_course_scope(renamed_students, renamed_sections, "MATH 1215")
+  expect_equal(scope$scope_courses, "MATH 1215Z")
+  expect_null(scope$force_courses)
+  renamed <- build(renamed_students, renamed_sections, scope = "MATH 1215")
   cols <- c("subject_course", "projected_classlist_total", "planned_registrations", "method_id")
   expect_equal(renamed$projections[, cols], original$projections[, cols])
   expect_equal(renamed$scope_courses, "MATH 1215Z")
 
-  # Read by code, the relabelled history is another course's and the
-  # projection loses it.
-  by_code <- function(tbl) dplyr::mutate(relabel(tbl), course_id = subject_course)
+  # Read by code (each code its own course), the relabelled history is another
+  # course's and the projection loses it.
+  by_code <- function(tbl) {
+    tbl <- relabel(tbl)
+    tbl$subject_course <- tbl$listed_code
+    tbl$course_id <- tbl$listed_code
+    tbl
+  }
   split <- build(by_code(students), by_code(test_sections))
   expect_false(isTRUE(all.equal(split$projections[, cols], original$projections[, cols])))
 
   # A demand history counted by code is refused rather than read short.
-  expect_error(build(renamed_students, renamed_sections), "counted by course code")
+  expect_error(build(renamed_students, renamed_sections, cl_students = by_code(students)),
+               "counted by course code")
 })
 
 test_that("published projection builder accepts Fall and refuses Summer", {

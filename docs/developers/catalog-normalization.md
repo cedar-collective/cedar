@@ -176,3 +176,22 @@ unresolved-case blocking, revisions and stale writers. Browser coverage in
 controls, then exercises flags, edits, one-click sign-off and persistence on an
 explicitly attributed disposable workflow fixture. It removes only that fixture
 and its receipts afterward; no real program is approved by a test.
+
+## Where draft interpretations live
+
+Moved from `AGENTS.md` on 2026-11-07.
+
+Catalog interpretation uses versioned, complete-program AI drafts plus
+separate reusable course units, not a growing semantic phrase grammar.
+`R/branches/catalog-normalization.R` validates graphs, citations and complete
+passage coverage; `R/features/catalog-normalization.R` preserves immutable
+packets/proposals and hash-linked human review revisions. Maintainer drafts in
+`institution/<id>/catalog_interpretations/<edition>/` stage automatically; exchange
+controls and their observer are commented out for future shared use. Sign-off is
+one explicit action per complete unit, blocked by unresolved cases; routine rules
+and passages need no individual approval clicks. Edits reopen sign-off. This
+optional workflow is under **Draft interpretations**; old queues are **Extraction
+diagnostics**, loaded only on demand. `scripts/normalize-degree-catalog.R` and
+`config/catalog-normalization*` define the exchange contract. No AI API calls,
+automatic approvals or runtime compilation occur. See
+[catalog-normalization.md](catalog-normalization.md).

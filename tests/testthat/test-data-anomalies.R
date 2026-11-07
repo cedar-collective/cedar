@@ -3,7 +3,7 @@ context("Data semantics registry and anomaly screens")
 # Self-mapping uses the shared HP01 fixture: those are raw program rows in the
 # stable term set. The ratio screens below need three distinct degree YEARS,
 # which is outside that set, so they are built locally with their expected
-# values stated -- the boundary documented in developers/agent-testing.md.
+# values stated -- the boundary documented in developers/testing.md.
 
 test_that("the registry annotates a scope and stays out of everything else", {
   entry <- Filter(function(e) e$id == "rads-major-code-records-intent",

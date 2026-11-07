@@ -1,6 +1,6 @@
 # cedar-terms.R — the term dimension: one row per term in the loaded data
 #
-# ADR-001 step 1 (docs/developers/adr-001-domain-data-model.md). Every fact
+# ADR-001 step 1 (docs/developers/architecture-decisions.md, ADR-001). Every fact
 # about a term that CEDAR today recomputes at each use lives here once:
 #
 #   season, academic year, whether the term is a regular (Fall/Spring) one
