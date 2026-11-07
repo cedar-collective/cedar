@@ -8,7 +8,7 @@ parent: Developer Guide
 
 This reference is auto-generated from roxygen2 comments in the source code.
 
-*Generated: 2026-11-06 14:54:40.166907*
+*Generated: 2026-11-06 16:12:01.288426*
 
 ---
 
@@ -757,6 +757,70 @@ Course Sequence Effect  Compares grades in course Y between students who passed 
 - `courses` - The object build_cedar_courses() returns.
 
 **Returns:** `tables` with `course_id` on cedar_sections and cedar_students, each table's attributes kept. A code the dimension does not know is a stop: the dimension is built from the same tables, so one can only mean the tables changed between the two calls.
+
+---
+
+### `key_on_course_id()`
+
+*Source: courses.R*
+
+**Read a table by course rather than by code**
+
+Read a table by course rather than by code  Returns `tbl` keyed on the course: `subject_course` carries each row's `course_id` and the code the source wrote moves to `listed_code`. A reader that filters, groups or joins on `subject_course` then follows every course across the codes it has carried, its grouping unchanged — Course Dynamics reads the class list and the sections this way, so SOCI 371's report includes its SOC 371 terms and its feeders count SOC 250 and SOCI 2315 as one course. This is a working frame, never a saved one (annotate, never mutate): the loaded tables keep the registrar's code, and `listed_code` keeps it here for any text that names it ("also listed as SOC 371"). A frame already keyed is returned as it is. Every column is shared with `tbl`; nothing is copied.
+
+**Parameters:**
+
+- `tbl` - `cedar_sections` or `cedar_students` rows with `course_id`.
+- `caller` - Named in the error when the id was never attached.
+
+**Returns:** `tbl`, ungrouped, with `subject_course` set to `course_id` and the original code in `listed_code`.
+
+---
+
+### `course_id_of()`
+
+*Source: courses.R*
+
+**The course a code belongs to**
+
+**Parameters:**
+
+- `tbl` - Rows with `course_id`, keyed with key_on_course_id() or not.
+- `code` - One course code as a picker or a URL names it: the current code or any former one (`SOC 371` finds SOCI 371's course).
+- `caller` - Named in the errors.
+
+**Returns:** The code's `course_id` in `tbl`. A code `tbl` does not carry is its own course, with no history to follow. Stops on a code that maps to two ids, which no table attach_course_ids() wrote can do.
+
+---
+
+### `course_codes_of()`
+
+*Source: courses.R*
+
+**The codes a course has been listed under in a table**
+
+**Parameters:**
+
+- `tbl` - Rows with `course_id`, keyed or not.
+- `course_id` - One course id, from course_id_of().
+
+**Returns:** The codes in `tbl` with that id, sorted; the id itself when the table carries none of them.
+
+---
+
+### `course_code_renames()`
+
+*Source: courses.R*
+
+**Every code a table carries under another course id**
+
+Every code a table carries under another course id  One line per rename the table shows (`"SOC 371 > SOCI 371"`), sorted: the fingerprint a cache key needs for a result read through key_on_course_id(), so a confirmed row in code_history.csv is a miss, never a stale hit.
+
+**Parameters:**
+
+- `tbl` - Rows with `course_id`, keyed or not.
+
+**Returns:** A sorted character vector, empty when no code is renamed.
 
 ---
 
@@ -2340,10 +2404,10 @@ Resolve every active section in a selected course's crosslist family  The select
 
 **Parameters:**
 
-- `sections` - `cedar_sections`.
-- `opt` - Standard CEDAR filter options including `course`.
+- `sections` - `cedar_sections`, with `course_id` attached.
+- `opt` - Standard CEDAR filter options including `course`: the code the report was asked for, current or former.
 
-**Returns:** Active section rows for the selected course and its crosslist family.
+**Returns:** Active section rows for the selected course, under every code it has carried, and its crosslist family — keyed on the course (key_on_course_id(): `subject_course` is the `course_id`, the schedule's code is `listed_code`).
 
 ---
 
@@ -2353,15 +2417,15 @@ Resolve every active section in a selected course's crosslist family  The select
 
 **Build crosslist-family class-list enrollment for one course**
 
-Build crosslist-family class-list enrollment for one course  Student records are matched to the selected course's full active section family through `(term, crn)`, then canonicalized to the selected course and its college before the standard `calc_cl_enrls()` calculation. This counts a student once when the same person appears under two codes in one crosslist family — as registered if they hold a seat under either listing — while retaining the canonical registration-status buckets.
+Build crosslist-family class-list enrollment for one course  Student records are matched to the selected course's full active section family through `(term, crn)`, then canonicalized to the selected course and its college before the standard `calc_cl_enrls()` calculation. This counts a student once when the same person appears under two codes in one crosslist family — as registered if they hold a seat under either listing — while retaining the canonical registration-status buckets.  Both tables are read by course (key_on_course_id()): the selected course's rows under a former code are its own, not a partner's, so `selected` and `family` carry its history under every code and `listings` names a code column per course in the family, never one per code (ADR-001 step 4).
 
 **Parameters:**
 
-- `students` - `cedar_students`.
-- `sections` - `cedar_sections`.
-- `opt` - Standard CEDAR filter options including `course`.
+- `students` - `cedar_students`, with `course_id` attached.
+- `sections` - `cedar_sections`, with `course_id` attached.
+- `opt` - Standard CEDAR filter options including `course`: the code the report was asked for, current or former.
 
-**Returns:** A list with `listings` (each code in the family under its own code and college), `selected` (the chosen code's rows of `listings`), and `family` (every listing, labeled with the selected course and each student counted once), all calculated by `calc_cl_enrls()` with `calc_first_day_enrl()`'s `first_day_enrl` joined on, plus `overlap` from `summarize_listing_overlap()`. A student who switched listings appears in each listing's own status buckets, so listing counts need not sum to the family count.
+**Returns:** A list with `listings` (each course in the family under its own `course_id` and college), `selected` (the chosen course's rows of `listings`), and `family` (every listing, labeled with the selected course and each student counted once), all calculated by `calc_cl_enrls()` with `calc_first_day_enrl()`'s `first_day_enrl` joined on, plus `overlap` from `summarize_listing_overlap()`. A student who switched listings appears in each listing's own status buckets, so listing counts need not sum to the family count. `subject_course` on every element is a `course_id`.
 
 ---
 
@@ -2375,10 +2439,10 @@ Build reusable section history for one course  Uses the canonical DESR enrollmen
 
 **Parameters:**
 
-- `sections` - `cedar_sections`.
-- `opt` - Standard CEDAR filter options including `course`.
+- `sections` - `cedar_sections`, with `course_id` attached.
+- `opt` - Standard CEDAR filter options including `course`: the code the report was asked for, current or former.
 
-**Returns:** One row per campus, term, and course with total enrollment, active section count, and average section size.
+**Returns:** One row per campus, term, and course with total enrollment, active section count, and average section size. `subject_course` is the course's `course_id`; `listed_as` is the code (or codes, ` / `-joined) the schedule listed the course under that term, so a page can say "also listed as SOC 371"; `crosslist_courses` names the family's courses by id.
 
 ---
 
@@ -2493,24 +2557,6 @@ Which Low Enrollment view each selected term gets  A term after `current_term` w
 - `min_days_after_start` - Integer. The edges' `min_days_after_start`.
 
 **Returns:** Tibble, one row per selected term: `term` (as selected), `upcoming`, `has_enrollment`, `view` ("concerns" or "alerts"), `pulled_on` (newest DESR pull for the term; NA for a term type or a term with no sections) and `registration_open` (NA when there is no pull date).
-
----
-
-### `get_enrollment_concerns()`
-
-*Source: enrl.R*
-
-**Get enrollment concerns for a future term**
-
-Get enrollment concerns for a future term  Analyzes a future term's scheduled courses against historical enrollment patterns from prior terms of the same type (fall/spring/summer). Returns each scheduled course with its historical average enrollment, trend, and history text for display in the concerns tab.
-
-**Parameters:**
-
-- `courses` - Data frame of course sections (cedar_sections)
-- `opt` - Options list with filters (term, course_campus, dept, etc.)
-- `n_history_terms` - Number of prior same-type terms to average (default 4)
-
-**Returns:** Data frame with schedule + historical stats per course. A course with no same-season history on its campus has `n_prior_terms` 0, `avg_enrl` NA, and `other_history_text` listing its latest offerings that ran in other seasons, on other campuses or as other topics (NA when there are none).
 
 ---
 

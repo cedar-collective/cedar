@@ -522,10 +522,35 @@ history where it had 12. With only the three subject renames confirmed, 4 of
 the 391 courses with no Fall history by code find it by id; were the 320
 proposed renumberings confirmed, 84 would (36 BUSA, 8 ACCT, 8 NURS, I37's
 list), which is why confirming them is a decision worth a person's hour.
-Next: Course Dynamics history (`get_course_crosslist_classlist_enrl()`,
-where former codes are one more kind of listing) and Regstats baselines
-(`history_keys`, with the cache version bumped); the enrollment projection
-inputs are a `model_version` decision. Then `cedar_course_terms`
+**Reader PR 2 (2026-11-06): Course Dynamics.** The whole tab reads by
+course. `key_on_course_id()` (`courses.R`) returns a working frame whose
+`subject_course` is the `course_id` and whose registrar's code is
+`listed_code` — every column shared, nothing copied, the loaded tables
+untouched — so a reader's filters, groupings, joins and flows on
+`subject_course` follow the course with no change to their grain, and
+`course_id_of()` resolves the picked code, current or former, to its course.
+`create_course_base_data()` resolves once and names the report by the id
+(`course_code`; the picked code stays as `selected_code`); the crosslist-family
+functions in `enrl.R` key both tables the same way, so a former code is the
+course's own history and never a partner listing; the flows, outcomes,
+rollcall, retention and downstream readers take the keyed class list
+(`cr_students` in `server.R`); the page says which codes the course has
+carried and when (`course_former_codes_note()`, reading `listed_as` off the
+section history); and the neighbors cache keys the frame's renames
+(`course_code_renames()`, version 4). Former codes were not made a kind of
+listing after all: a listing is a code students register under *in the same
+term*, and a former code is the same course in an earlier one, so it belongs
+in the course's own row with a note, not in a split column. Measured on the
+2026-10-08 pull: keying the 1.85M-row class list takes no measurable time
+(two column pointers); SOCI 371 on ABQ has 19 terms of section history where
+it had 12 and 17 terms of class-list lifecycle where it had the 12 the
+sections reached (the class list already carried SOCI on the old sections,
+I45, so the grade-reading and flow cones were whole by code; the sections and
+everything joined through them were not); PSYC 302 likewise, 19 and 17 where
+it had 9. SOCI 371's feeders drop from 1,175 rows to 1,154 with the same
+4,728 students: 21 feeder codes united with their renames. Next: Regstats
+baselines (`history_keys`, with the cache version bumped); the enrollment
+projection inputs are a `model_version` decision. Then `cedar_course_terms`
 is promoted from `cedar_cl_enrls_base` and `cedar_attempts` from
 `cedar_grades`, both keyed on `course_id`, and `course-flows.R`'s precompute
 rebuilds on it. The Admin > Mappings surface for code history (when each

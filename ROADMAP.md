@@ -336,9 +336,11 @@ Plan: [ADR-002](docs/developers/adr-002-explicit-mapping-files.md).
   lists; UNM's file carries the three section-evidenced subject renames
   confirmed and 320 title-matched renumberings proposed. Reader PR 1
   (2026-11-06): Low Enrollment's schedule view and course histories key on
-  `course_id` and name the former codes behind the shown numbers. Next:
-  Course Dynamics history and Regstats baselines, then `cedar_course_terms`
-  and `cedar_attempts` keyed on the id. Confirming the proposed Fall 2026
+  `course_id` and name the former codes behind the shown numbers. Reader PR 2
+  (2026-11-06): Course Dynamics reads the class list and the sections by
+  course (`key_on_course_id()`), so a report for SOCI 371 carries its SOC 371
+  terms in every tab and says so. Next: Regstats baselines, then
+  `cedar_course_terms` and `cedar_attempts` keyed on the id. Confirming the proposed Fall 2026
   renumberings is a person's decision, and what makes I37's rows show their
   old offerings.
   Design in full in

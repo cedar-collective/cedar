@@ -2055,9 +2055,13 @@ add_avg_section_size <- function(history) {
 #' Delivery-campus and term filters are retained; academic ownership filters
 #' are intentionally removed so they cannot hide a crosslist partner.
 #'
-#' @param sections `cedar_sections`.
-#' @param opt Standard CEDAR filter options including `course`.
-#' @return Active section rows for the selected course and its crosslist family.
+#' @param sections `cedar_sections`, with `course_id` attached.
+#' @param opt Standard CEDAR filter options including `course`: the code the
+#'   report was asked for, current or former.
+#' @return Active section rows for the selected course, under every code it
+#'   has carried, and its crosslist family — keyed on the course
+#'   (key_on_course_id(): `subject_course` is the `course_id`, the schedule's
+#'   code is `listed_code`).
 get_course_crosslist_family_sections <- function(sections, opt) {
   selected_course <- opt[["course"]]
   if (is.null(selected_course) || length(selected_course) == 0 ||
@@ -2065,7 +2069,16 @@ get_course_crosslist_family_sections <- function(sections, opt) {
     stop("[enrl.R] get_course_crosslist_family_sections requires opt$course")
   }
 
+  # The course, not the code (ADR-001 step 4): every section of the course
+  # under any code it has carried, keyed on course_id, the schedule's code
+  # kept in listed_code.
+  .require_course_id(sections, "get_course_crosslist_family_sections")
+  sections <- key_on_course_id(sections, "get_course_crosslist_family_sections")
   selected_opt <- opt
+  selected_opt[["course"]] <- unique(vapply(
+    as.character(selected_course), course_id_of, character(1),
+    tbl = sections, caller = "get_course_crosslist_family_sections"
+  ))
   selected_opt[["status"]] <- "A"
   selected_opt[["uel"]] <- TRUE
   selected_opt[["crosslist"]] <- "all"
@@ -2109,19 +2122,32 @@ get_course_crosslist_family_sections <- function(sections, opt) {
 #' family — as registered if they hold a seat under either listing — while
 #' retaining the canonical registration-status buckets.
 #'
-#' @param students `cedar_students`.
-#' @param sections `cedar_sections`.
-#' @param opt Standard CEDAR filter options including `course`.
-#' @return A list with `listings` (each code in the family under its own code
-#'   and college), `selected` (the chosen code's rows of `listings`), and
-#'   `family` (every listing, labeled with the selected course and each student
-#'   counted once), all calculated by `calc_cl_enrls()` with
-#'   `calc_first_day_enrl()`'s `first_day_enrl` joined on, plus `overlap`
-#'   from `summarize_listing_overlap()`. A student who switched listings
-#'   appears in each listing's own status buckets, so listing counts need not
-#'   sum to the family count.
+#' Both tables are read by course (key_on_course_id()): the selected course's
+#' rows under a former code are its own, not a partner's, so `selected` and
+#' `family` carry its history under every code and `listings` names a code
+#' column per course in the family, never one per code (ADR-001 step 4).
+#'
+#' @param students `cedar_students`, with `course_id` attached.
+#' @param sections `cedar_sections`, with `course_id` attached.
+#' @param opt Standard CEDAR filter options including `course`: the code the
+#'   report was asked for, current or former.
+#' @return A list with `listings` (each course in the family under its own
+#'   `course_id` and college), `selected` (the chosen course's rows of
+#'   `listings`), and `family` (every listing, labeled with the selected
+#'   course and each student counted once), all calculated by
+#'   `calc_cl_enrls()` with `calc_first_day_enrl()`'s `first_day_enrl` joined
+#'   on, plus `overlap` from `summarize_listing_overlap()`. A student who
+#'   switched listings appears in each listing's own status buckets, so
+#'   listing counts need not sum to the family count. `subject_course` on
+#'   every element is a `course_id`.
 get_course_crosslist_classlist_enrl <- function(students, sections, opt) {
-  selected_course <- as.character(opt[["course"]])[[1]]
+  .require_course_id(students, "get_course_crosslist_classlist_enrl")
+  .require_course_id(sections, "get_course_crosslist_classlist_enrl")
+  students <- key_on_course_id(students, "get_course_crosslist_classlist_enrl")
+  sections <- key_on_course_id(sections, "get_course_crosslist_classlist_enrl")
+  selected_course <- course_id_of(
+    sections, as.character(opt[["course"]])[[1]], "get_course_crosslist_classlist_enrl"
+  )
   history_opt <- opt
   history_opt[["term"]] <- NULL
   family_sections <- get_course_crosslist_family_sections(sections, history_opt)
@@ -2173,16 +2199,25 @@ get_course_crosslist_classlist_enrl <- function(students, sections, opt) {
 #' separate rows. This is the course-level counterpart to the section history
 #' used by the department dashboard.
 #'
-#' @param sections `cedar_sections`.
-#' @param opt Standard CEDAR filter options including `course`.
+#' @param sections `cedar_sections`, with `course_id` attached.
+#' @param opt Standard CEDAR filter options including `course`: the code the
+#'   report was asked for, current or former.
 #' @return One row per campus, term, and course with total enrollment, active
-#'   section count, and average section size.
+#'   section count, and average section size. `subject_course` is the
+#'   course's `course_id`; `listed_as` is the code (or codes, ` / `-joined)
+#'   the schedule listed the course under that term, so a page can say
+#'   "also listed as SOC 371"; `crosslist_courses` names the family's
+#'   courses by id.
 get_course_section_history <- function(sections, opt) {
   if (is.null(opt[["course"]]) || length(opt[["course"]]) == 0) {
     stop("[enrl.R] get_course_section_history requires opt$course")
   }
 
-  selected_course <- as.character(opt[["course"]])[[1]]
+  .require_course_id(sections, "get_course_section_history")
+  sections <- key_on_course_id(sections, "get_course_section_history")
+  selected_course <- course_id_of(
+    sections, as.character(opt[["course"]])[[1]], "get_course_section_history"
+  )
   history_opt <- opt
   history_opt[["term"]] <- NULL
   family_sections <- get_course_crosslist_family_sections(sections, history_opt)
@@ -2193,6 +2228,9 @@ get_course_section_history <- function(sections, opt) {
     dplyr::summarize(
       crosslist_courses = paste(sort(unique(subject_course)), collapse = " + "),
       has_crosslist = dplyr::n_distinct(subject_course) > 1L,
+      listed_as = paste(
+        sort(unique(listed_code[subject_course == .env$selected_course])), collapse = " / "
+      ),
       .groups = "drop"
     )
 
@@ -2211,6 +2249,7 @@ get_course_section_history <- function(sections, opt) {
     )
 
   selected_opt <- history_opt
+  selected_opt[["course"]] <- selected_course
   selected_opt[["status"]] <- "A"
   selected_opt[["uel"]] <- TRUE
   selected_opt[["crosslist"]] <- "all"
@@ -2749,8 +2788,8 @@ classify_low_enrollment_terms <- function(sections, terms, current_term,
 # 4); every loader attaches it, so a table without it was not loaded by one.
 .require_course_id <- function(sections, caller) {
   if (!"course_id" %in% names(sections)) {
-    stop("[enrl.R] ", caller, "() needs sections column course_id; attach it with ",
-         "attach_course_ids() (R/branches/courses.R), as every loader does.")
+    stop("[enrl.R] ", caller, "() needs column course_id on the table it reads; attach it ",
+         "with attach_course_ids() (R/branches/courses.R), as every loader does.")
   }
   invisible(sections)
 }

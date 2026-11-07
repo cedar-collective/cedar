@@ -35,6 +35,17 @@ get_course_data <- function(data_objects, opt, skip_neighbors = FALSE,
 
   cedar_debug("[course_report.R] Students: ", nrow(students), " rows / Courses: ", nrow(courses), " rows")
 
+  # Course Dynamics follows the course, not the code (ADR-001 step 4): both
+  # tables are read keyed on course_id, so every filter, grouping and flow
+  # below sees SOCI 371's SOC 371 terms as its own and a feeder renumbered
+  # mid-history as one course. The code asked for resolves to its course once.
+  if (is.null(opt[["course"]]) || length(opt[["course"]]) == 0) {
+    stop("[course_report.R] get_course_data requires opt$course")
+  }
+  students <- key_on_course_id(students, "get_course_data")
+  courses <- key_on_course_id(courses, "get_course_data")
+  opt[["course"]] <- course_id_of(courses, as.character(opt[["course"]])[[1]], "get_course_data")
+
   # init payload list for return value
   course_data <- list()
 
@@ -78,7 +89,6 @@ get_course_data <- function(data_objects, opt, skip_neighbors = FALSE,
   if (!skip_neighbors) {
     use_cache <- is.null(opt[["skip_cache"]]) || !opt[["skip_cache"]]
     campus_scope <- opt[["course_campus"]] %||% opt[["campus"]] %||% NULL
-    cache_scope <- list(course_campus = campus_scope)
     neighbor_students <- students
     neighbor_courses <- courses
 
@@ -86,6 +96,12 @@ get_course_data <- function(data_objects, opt, skip_neighbors = FALSE,
       neighbor_students <- neighbor_students %>% dplyr::filter(campus %in% .env$campus_scope)
       neighbor_courses <- neighbor_courses %>% dplyr::filter(campus %in% .env$campus_scope)
     }
+    # The renames in the frame are an input to a result read by course, so
+    # they are in the key: a newly confirmed code_history row is a miss.
+    cache_scope <- list(
+      course_campus = campus_scope,
+      code_renames = course_code_renames(neighbor_students)
+    )
 
     if (use_cache) {
       course_neighbors_cache <- load_course_neighbors_cache(
@@ -548,6 +564,55 @@ course_listing_overlap_note <- function(overlap, n_codes) {
     " listed under ", where, ": ", joined, ". ",
     "All counts each student once, so the code columns can add up to more than All."
   )
+}
+
+
+#' Say which other codes the course has been listed under
+#'
+#' Reads `listed_as` off the overview's section history: the schedule's code
+#' for the course in each campus-term, beside the `course_id` the report is
+#' keyed on. Names every former code with the terms it covered, so a reader
+#' knows the SOC 371 years are in SOCI 371's charts and why.
+#'
+#' @param overview Overview payload from `assemble_course_overview()`.
+#' @param course_code The course's id, the code the report is named by.
+#' @param selected_code The code that was picked, when it differs.
+#' @return One or two sentences, or NULL when the course has carried one code.
+course_former_codes_note <- function(overview, course_code, selected_code = NULL) {
+  sections <- overview$sections
+  spans <- character(0)
+  former <- tibble::tibble(listed_as = character(), term = integer())
+  if (!is.null(sections) && nrow(sections) > 0 && "listed_as" %in% names(sections)) {
+    former <- sections %>%
+      dplyr::filter(!is.na(listed_as), nzchar(listed_as)) %>%
+      tidyr::separate_rows(listed_as, sep = " / ") %>%
+      dplyr::filter(listed_as != .env$course_code)
+  }
+  if (nrow(former) > 0) {
+    former <- former %>%
+      dplyr::group_by(listed_as) %>%
+      dplyr::summarize(first = min(term), last = max(term), .groups = "drop") %>%
+      dplyr::arrange(first)
+    spans <- paste0(
+      former$listed_as, " (",
+      ifelse(former$first == former$last, fmt_term(former$first),
+             paste(fmt_term(former$first), "to", fmt_term(former$last))),
+      ")"
+    )
+  }
+  picked <- if (!is.null(selected_code) && !identical(selected_code, course_code)) {
+    paste0(selected_code, " is now ", course_code, ". ")
+  } else {
+    ""
+  }
+  if (length(spans) == 0 && !nzchar(picked)) return(NULL)
+  listed <- if (length(spans) > 0) {
+    paste0("Also listed as ", paste(spans, collapse = ", "),
+           ": every term under a former code is counted here as ", course_code, ".")
+  } else {
+    ""
+  }
+  paste0(picked, listed)
 }
 
 
@@ -1015,8 +1080,18 @@ build_retention_benchmark_plot <- function(diff_data) {
 
 create_course_base_data <- function(data_objects, opt) {
   cedar_debug("[course_report.R] create_course_base_data: ", opt[["course"]])
+  if (is.null(opt[["course"]]) || length(opt[["course"]]) == 0) {
+    stop("[course_report.R] create_course_base_data requires opt$course")
+  }
+  # The report is for the course (ADR-001 step 4), named by its current code:
+  # a former code picked from the schedule resolves to it here, once, and every
+  # tab below reads opt$course as that course_id. `selected_code` keeps what
+  # was picked so the page can say "SOC 371 is now SOCI 371".
+  sections <- data_objects[["cedar_sections"]]
+  selected_code <- as.character(opt[["course"]])[[1]]
+  opt[["course"]] <- course_id_of(sections, selected_code, "create_course_base_data")
   enrollment_payload <- assemble_course_enrollment_payload(
-    data_objects[["cedar_students"]], data_objects[["cedar_sections"]], opt
+    data_objects[["cedar_students"]], sections, opt
   )
   course_data <- get_course_data(
     data_objects, opt, skip_neighbors = TRUE,
@@ -1025,6 +1100,7 @@ create_course_base_data <- function(data_objects, opt) {
   list(
     course_code  = opt[["course"]],
     course_name  = opt[["course"]],
+    selected_code = selected_code,
     overview     = enrollment_payload$overview,
     plots        = list(),
     tables       = course_data,
@@ -1038,8 +1114,10 @@ create_course_base_data <- function(data_objects, opt) {
 compute_cr_flows_tab <- function(base, data_objects, min_contrib = 2,
                                  max_courses = 8, concurrent_top_n = 20) {
   opt      <- base$opt
-  students <- data_objects[["cedar_students"]]
-  courses  <- data_objects[["cedar_sections"]]
+  # Read by course, as create_course_base_data() resolved opt$course to a
+  # course_id: a feeder or destination renumbered mid-history is one course.
+  students <- key_on_course_id(data_objects[["cedar_students"]], "compute_cr_flows_tab")
+  courses  <- key_on_course_id(data_objects[["cedar_sections"]], "compute_cr_flows_tab")
   myopt    <- opt
   myopt[["term"]] <- NULL
   observation_end <- cedar_longitudinal_edge(
@@ -1051,12 +1129,15 @@ compute_cr_flows_tab <- function(base, data_objects, min_contrib = 2,
   students <- students %>% dplyr::filter(term <= .env$observation_end)
   courses  <- courses %>% dplyr::filter(term <= .env$observation_end)
   campus_scope <- opt[["course_campus"]] %||% opt[["campus"]] %||% NULL
-  cache_scope <- list(course_campus = campus_scope, observation_end = observation_end)
 
   if (!is.null(campus_scope) && length(campus_scope) > 0) {
     students <- students %>% dplyr::filter(campus %in% .env$campus_scope)
     courses <- courses %>% dplyr::filter(campus %in% .env$campus_scope)
   }
+  cache_scope <- list(
+    course_campus = campus_scope, observation_end = observation_end,
+    code_renames = course_code_renames(students)
+  )
 
   use_cache <- is.null(opt[["skip_cache"]]) || !opt[["skip_cache"]]
   if (use_cache) {
@@ -1116,8 +1197,10 @@ compute_cr_flows_tab <- function(base, data_objects, min_contrib = 2,
 
 compute_cr_outcomes_tab <- function(base, data_objects) {
   outcome_opt <- modifyList(base$opt, list(data_edges = data_objects[["cedar_edges"]]))
+  # By course: base$opt$course is the course_id, and the class list is keyed on it.
   get_course_outcomes(
-    data_objects[["cedar_students"]], data_objects[["cedar_faculty"]], outcome_opt
+    key_on_course_id(data_objects[["cedar_students"]], "compute_cr_outcomes_tab"),
+    data_objects[["cedar_faculty"]], outcome_opt
   )
 }
 

@@ -4,7 +4,8 @@
 # v2 filters to final registered rows and adds exact concurrent-course
 # student-term denominators used by the Course Dynamics treemap/table.
 # v3 includes every analytical scope field and source-content fingerprints.
-cedar_course_neighbors_cache_version <- 3L
+# v4 reads by course (course_id; ADR-001 step 4) and keys the renames in scope.
+cedar_course_neighbors_cache_version <- 4L
 
 # Regstats v2 uses a separate prior-only baseline for every reported term;
 # v3 preserves one reporting row when source sections carry different titles;
