@@ -114,6 +114,11 @@ The complete transformation logic is in [R/data-parsers/transform-to-cedar.R](ht
   - `Student ID` → `student_id` (encrypted with SHA-256)
   - `Course Campus Code` → `campus` (denormalized for performance)
   - `Final Grade` → `grade` (lowercase)
+  - One row per student, course, campus and term (`dedup_class_list_rows()`):
+    Banner's one row per CRN collapses to the row of record, the one
+    `STATUS_PRECEDENCE` ranks first (registered, late drop, waitlist, early
+    drop), a posted non-audit grade before none, then the lowest CRN. No
+    classified outcome is saved; `cedar_attempts` classifies at load.
   - Analyses that need a student enrollment anchor use the minimum observed
     `cedar_students$term`, which means the first class-list term present in CEDAR.
     This is not a formal Banner matriculation/start-term field.

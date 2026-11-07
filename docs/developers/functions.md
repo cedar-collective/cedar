@@ -8,7 +8,7 @@ parent: Developer Guide
 
 This reference is auto-generated from roxygen2 comments in the source code.
 
-*Generated: 2026-11-07 11:59:16.550373*
+*Generated: 2026-11-07 12:21:48.014053*
 
 ---
 
@@ -36,6 +36,16 @@ This reference is auto-generated from roxygen2 comments in the source code.
 **Whether an attempts table was built by this code from this class list and edge**
 
 **Returns:** TRUE only for a data frame with this build's version, outcome policy, columns and graded edge, counted over the class list's renames.
+
+---
+
+### `require_attempts_build()`
+
+*Source: attempts.R*
+
+**Refuse an attempts table this build did not make**
+
+Refuse an attempts table this build did not make  For a reader handed `attempts` without the class list it came from (a cone given a population-windowed copy): checks the build, outcome policy and columns, which survive filtering, and returns the graded edge it was built to. The loader checks the course codes (attempts_is_current()).
 
 ---
 
@@ -851,7 +861,7 @@ Was this course-term table counted by this build over this class list?  TRUE whe
 
 **Key every fact table a loader holds on the course**
 
-Key every fact table a loader holds on the course  Writes each row's `course_id`, moves the code the registrar used that term to `listed_code`, and sets `subject_course` to the `course_id`, on cedar_sections, cedar_students and cedar_grades. Every loader calls it once (global.R, R/trunk/data.R, the cache-warming scripts, cedar-repl.R), so every reader groups, filters and joins by course on `subject_course`. A table already keyed is keyed again from its `listed_code`, so attaching twice, or after a code_history.csv row changed, gives the same table. `course_id` stays beside `subject_course` as the explicit name; the two share one vector.
+Key every fact table a loader holds on the course  Writes each row's `course_id`, moves the code the registrar used that term to `listed_code`, and sets `subject_course` to the `course_id`, on cedar_sections and cedar_students. Every loader calls it once (global.R, R/trunk/data.R, the cache-warming scripts, cedar-repl.R), so every reader groups, filters and joins by course on `subject_course`. A table already keyed is keyed again from its `listed_code`, so attaching twice, or after a code_history.csv row changed, gives the same table. `course_id` stays beside `subject_course` as the explicit name; the two share one vector.
 
 **Parameters:**
 
@@ -4315,11 +4325,11 @@ Roadblocks: First-Outcome Stop-Out Comparisons  For each course and delivery cam
 
 **Parameters:**
 
-- `students` - Full `cedar_students` enrollment history, read only to classify outcomes when `cedar_grades` is not supplied.
+- `students` - Full `cedar_students` enrollment history, read only to classify outcomes when `attempts` is not supplied.
 - `population` - Output of [build_population()], with `student_id` and `population_label`. Callers apply population membership windows to outcome rows before this function; the return lookup must remain unwindowed.
 - `degrees` - Optional degree records; a degree in the outcome term counts as completion rather than stop-out.
 - `opt` - List of options: `term`, `campus`, `level`, and `subject_code` restrict course outcomes; `min_n` (default 15) is the minimum selected population students per course/campus; `min_dfw_n` (default 5) is the minimum selected DFW students; `graded_through` caps outcomes; `observation_end_term` requires the next regular term to be observable. Reporting thresholds do not guarantee statistical validity. Standalone callers must supply appropriate edges.
-- `cedar_grades` - Optional preclassified outcomes with the current saved outcome-policy version, already respecting the caller's population window.
+- `attempts` - Optional `cedar_attempts` (build_attempts()), the outcomes classified once at load, already respecting the caller's population window. Refused unless this build and outcome policy made it.
 - `student_terms` - `cedar_student_terms`, the full history, never windowed: `returned_next_regular_term` and `return_observable` per student-term. Required.
 
 **Returns:** List containing `by_course` (one row per campus/course), `population_size`, eligible anchor `term_range`, and `observation_info` (coverage counts before size thresholds, including `n_return_unobservable`: anchors omitted because the next regular term is past the settled edge or has no class list). Course rows contain `pop_` and `baseline_` columns: `n_dfw`, `n_pass`, `n_graded`, `dfw_rate`, `dfw_stopout_rate`, `pass_stopout_rate`, `stopout_gap`, and `p_value`. Statistics retain full precision; round only for display.
@@ -4355,6 +4365,7 @@ Get DFW Rates by Course for a Population  For each course taken by population st
 - `students` - Data frame. The `cedar_students` table.
 - `population` - Data frame. Output of `build_population()`. Must have `student_id`.
 - `opt` - List of options: \describe{ \item{`level`}{Character vector. Course levels to include. Optional.} \item{`campus`}{Character vector. Campus codes to include. Optional.} \item{`min_n`}{Integer. Min population students graded in a course. Default: `10`.} \item{`min_dfw_n`}{Integer. Min population DFW students. Default: `5`.} }
+- `attempts` - Optional `cedar_attempts`, as for `get_stopout()`.
 
 **Returns:** Data frame with one row per campus and course, columns: `campus`, `subject_course`, `pop_n_graded`, `pop_n_dfw`, `pop_dfw_rate`, `baseline_n_graded`, `baseline_n_dfw`, `baseline_dfw_rate`.
 
@@ -4464,6 +4475,22 @@ Compute Stop-Out Rates for One Group in One Course  Given one selected observati
 ---
 
 ## transform-to-cedar
+
+### `dedup_class_list_rows()`
+
+*Source: transform-to-cedar.R*
+
+**Keep one class-list row per student, course, campus and term**
+
+Keep one class-list row per student, course, campus and term  Banner emits one row per CRN, so a student in a combined course (BIOL 302C: a lecture CRN and a lab CRN), a student who switched sections, or one in two sections of a topics course appears more than once. Campus is part of delivery identity: the same student can take one course at two campuses.  The row kept is the one STATUS_PRECEDENCE (R/lists/status_codes.R) ranks first: registered (any registered code), then a late drop (the withdrawal is the outcome of record), then a waitlist row, then an early drop. Within a status, a row with a posted grade beats one without (a combined course's graded lecture over its ungraded lab; a credit attempt over an audit in a second section of a topics course), then the lowest CRN, so the choice never depends on row order. Before 2026-11-07 only "registered first" was applied, so a student who early-dropped one section and withdrew late from another could keep the early drop and lose the W: 703 student-course-terms on the 2026-10-08 pull (ISSUES I50).
+
+**Parameters:**
+
+- `students` - Pre-dedup cedar_students rows.
+
+**Returns:** The rows, one per student_id, term, campus and subject_course.
+
+---
 
 ### `transform_student_terms()`
 

@@ -432,16 +432,16 @@ export async function runReportChecks({ scope = 'smoke', synthetic = false } = {
       }
     });
 
-    await withStep(page, ['roadblocks'], 'Pathways Roadblocks uses current saved outcomes', async () => {
-      // Building a population never reads cedar_grades. Exercise its consumer too,
-      // so an obsolete file in the actual Docker data mount cannot pass unnoticed.
+    await withStep(page, ['roadblocks'], 'Pathways Roadblocks reads the attempt table', async () => {
+      // Building a population never reads cedar_attempts. Exercise its consumer
+      // too, so a table the module cannot read fails here, not for a dean.
       await clickSubTabIn(page, 'pathways-analysis_tabs', 'Roadblocks');
       await click(page, 'pathways-so_run');
-      await waitForOutput(page, 'Roadblocks saved outcomes', [
+      await waitForOutput(page, 'Roadblocks attempt outcomes', [
         { type: 'reactable', id: 'pathways-so_table' },
       ]);
       await page.waitForFunction(() => {
-        const note = document.querySelector('[data-definition-id="roadblocks"][data-definition-version="2.1.0"]');
+        const note = document.querySelector('[data-definition-id="roadblocks"][data-definition-version="2.2.0"]');
         const scope = document.getElementById('pathways-so_meta')?.innerText || '';
         const table = document.getElementById('pathways-so_table')?.innerText || '';
         return !!note && scope.includes('first eligible student-course-campus observations') &&

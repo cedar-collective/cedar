@@ -57,7 +57,7 @@ delayedAssign("cedar_courses", {
 
 # Tables load lazily so sourcing remains fast when only one is needed.
 for (.nm in c("cedar_students", "cedar_programs", "cedar_degrees",
-              "cedar_sections", "cedar_grades", "cedar_student_terms",
+              "cedar_sections", "cedar_student_terms",
               "cedar_applicants")) {
   local({
     name <- .nm
@@ -67,5 +67,10 @@ for (.nm in c("cedar_students", "cedar_programs", "cedar_degrees",
   })
 }
 rm(.nm)
+
+# cedar_attempts, every graded attempt classified once, as global.R builds it
+# (R/branches/attempts.R): over the keyed class list, to the graded edge.
+delayedAssign("cedar_attempts", build_attempts(
+  cedar_students, cedar_report_edges(cedar_students, degrees = cedar_degrees)$edges))
 
 message("[cedar-repl.R] Ready. Tables load on first use; cedar_read(\"<name>\") for others.")

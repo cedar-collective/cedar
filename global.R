@@ -107,7 +107,6 @@ cedar_files <- list(
   cedar_programs   = "cedar_programs",
   cedar_degrees    = "cedar_degrees",
   cedar_faculty    = "cedar_faculty",
-  cedar_grades     = "cedar_grades",     # Pre-classified outcomes (pass/dfw) — speeds up Roadblocks
   cedar_student_terms = "cedar_student_terms", # One row per student-term: enrolled, returned (ADR-001 step 2)
   cedar_applicants = "cedar_applicants"  # Admissions data — used for course impact covariate matching
 )
@@ -204,7 +203,7 @@ for (key in names(cedar_files)) {
 #
 # Trim first (cedar_min_term, set in shiny_config.R): rows that go are never
 # attached, so the attach's transient copy is of the rows the app keeps.
-for (.key in c("cedar_sections", "cedar_students", "cedar_grades", "cedar_student_terms", "cedar_faculty", "cedar_degrees", "cedar_programs")) {
+for (.key in c("cedar_sections", "cedar_students", "cedar_student_terms", "cedar_faculty", "cedar_degrees", "cedar_programs")) {
   if (!is.null(data_objects[[.key]]) && "term" %in% names(data_objects[[.key]])) {
     .n_before <- nrow(data_objects[[.key]])
     data_objects[[.key]] <- dplyr::filter(data_objects[[.key]], term >= cedar_min_term)

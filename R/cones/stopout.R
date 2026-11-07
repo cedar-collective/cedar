@@ -27,7 +27,7 @@
 #' establishes that a course caused a student to leave.
 #'
 #' @param students Full `cedar_students` enrollment history, read only to
-#'   classify outcomes when `cedar_grades` is not supplied.
+#'   classify outcomes when `attempts` is not supplied.
 #' @param population Output of [build_population()], with `student_id` and
 #'   `population_label`. Callers apply population membership windows to outcome
 #'   rows before this function; the return lookup must remain unwindowed.
@@ -40,8 +40,9 @@
 #'   `graded_through` caps outcomes; `observation_end_term` requires the next
 #'   regular term to be observable. Reporting thresholds do not guarantee
 #'   statistical validity. Standalone callers must supply appropriate edges.
-#' @param cedar_grades Optional preclassified outcomes with the current saved
-#'   outcome-policy version, already respecting the caller's population window.
+#' @param attempts Optional `cedar_attempts` (build_attempts()), the outcomes
+#'   classified once at load, already respecting the caller's population
+#'   window. Refused unless this build and outcome policy made it.
 #' @param student_terms `cedar_student_terms`, the full history, never
 #'   windowed: `returned_next_regular_term` and `return_observable` per
 #'   student-term. Required.
@@ -56,7 +57,7 @@
 #' @seealso [build_population()], [prepare_roadblock_results()]
 #' @export
 get_stopout <- function(students, population, degrees = NULL, opt = list(),
-                        cedar_grades = NULL, student_terms = NULL) {
+                        attempts = NULL, student_terms = NULL) {
 
   message("[stopout.R] Starting stop-out analysis...")
 
@@ -75,21 +76,13 @@ get_stopout <- function(students, population, degrees = NULL, opt = list(),
   min_dfw_n   <- opt$min_dfw_n %||% 5L   # suppress rates where fewer than 5 students had DFW
   population_ids  <- unique(population$student_id)
 
-  # Classify grades into pass / DFW.
-  # If cedar_grades is provided (pre-computed at transform time, already windowed
-  # for relevant_until by the caller), validate its policy before applying filters.
-  # Otherwise fall back to classifying from the raw students table — correct but
-  # expensive on large datasets.
-  if (!is.null(cedar_grades) && nrow(cedar_grades) > 0) {
-    validate_cedar_grades_policy(cedar_grades)
-    message("[stopout.R] Using pre-computed cedar_grades...")
-    graded <- cedar_grades
-    if (!is.null(opt$term)   && length(opt$term)   > 0) graded <- filter(graded, term   %in% opt$term)
-    if (!is.null(opt$campus) && length(opt$campus) > 0) graded <- filter(graded, campus %in% opt$campus)
-    if (!is.null(opt$level)  && length(opt$level)  > 0) graded <- filter(graded, level  %in% opt$level)
-    graded <- .filter_stopout_subject(graded, opt$subject_code)
+  # Pass / DFW per attempt: from cedar_attempts when the caller holds it
+  # (classified once at load, windowed by the caller), otherwise classified
+  # here from the class-list rows given, the standalone path.
+  if (!is.null(attempts)) {
+    graded <- .stopout_attempt_outcomes(attempts, opt, "get_stopout")
   } else {
-    message("[stopout.R] Classifying grades from raw students (cedar_grades not available)...")
+    message("[stopout.R] Classifying grades from the class-list rows given (no attempts table)...")
     filtered_students <- students
     if (!is.null(opt$term)   && length(opt$term)   > 0) filtered_students <- filter(filtered_students, term   %in% opt$term)
     if (!is.null(opt$campus) && length(opt$campus) > 0) filtered_students <- filter(filtered_students, campus %in% opt$campus)
@@ -305,23 +298,20 @@ prepare_roadblock_results <- function(stopout_by_course) {
 #'       Default: `10`.}
 #'     \item{`min_dfw_n`}{Integer. Min population DFW students. Default: `5`.}
 #'   }
+#' @param attempts Optional `cedar_attempts`, as for `get_stopout()`.
 #'
 #' @return Data frame with one row per campus and course, columns:
 #'   `campus`, `subject_course`, `pop_n_graded`, `pop_n_dfw`, `pop_dfw_rate`,
 #'   `baseline_n_graded`, `baseline_n_dfw`, `baseline_dfw_rate`.
 #'
 #' @keywords internal
-get_dfw_rates <- function(students, population, opt = list(), cedar_grades = NULL) {
+get_dfw_rates <- function(students, population, opt = list(), attempts = NULL) {
   min_n     <- opt$min_n     %||% 10L  # minimum course enrollment to report DFW rates
   min_dfw_n <- opt$min_dfw_n %||% 5L   # suppress rates where fewer than 5 students had DFW
   population_ids <- unique(population$student_id)
 
-  if (!is.null(cedar_grades) && nrow(cedar_grades) > 0) {
-    validate_cedar_grades_policy(cedar_grades)
-    graded <- cedar_grades
-    if (!is.null(opt$level)  && length(opt$level)  > 0) graded <- dplyr::filter(graded, level  %in% opt$level)
-    if (!is.null(opt$campus) && length(opt$campus) > 0) graded <- dplyr::filter(graded, campus %in% opt$campus)
-    graded <- .filter_stopout_subject(graded, opt$subject_code)
+  if (!is.null(attempts)) {
+    graded <- .stopout_attempt_outcomes(attempts, opt[setdiff(names(opt), "term")], "get_dfw_rates")
   } else {
     filtered <- students
     if (!is.null(opt$level)  && length(opt$level)  > 0) filtered <- filtered %>% dplyr::filter(level  %in% opt$level)
@@ -374,9 +364,20 @@ get_dfw_rates <- function(students, population, opt = list(), cedar_grades = NUL
 # Helpers
 # ---------------------------------------------------------------------------
 
-# Restrict to courses whose subject prefix is in `subject_code`.
-#
-# cedar_grades does not retain subject_code, so derive the prefix from
+# The pass/DFW rows of cedar_attempts in the scope opt names (term, campus,
+# level, subject): an early drop or a row with no grade has no outcome and is
+# left out, as classify_outcomes() leaves it out of the class-list path.
+.stopout_attempt_outcomes <- function(attempts, opt, caller) {
+  require_attempts_build(attempts, caller)
+  graded <- dplyr::filter(attempts, !is.na(outcome))
+  if (!is.null(opt$term)   && length(opt$term)   > 0) graded <- dplyr::filter(graded, term   %in% opt$term)
+  if (!is.null(opt$campus) && length(opt$campus) > 0) graded <- dplyr::filter(graded, campus %in% opt$campus)
+  if (!is.null(opt$level)  && length(opt$level)  > 0) graded <- dplyr::filter(graded, level  %in% opt$level)
+  graded <- .filter_stopout_subject(graded, opt$subject_code)
+  dplyr::select(graded, student_id, term, campus, subject_course, level, outcome)
+}
+
+# Restrict to courses whose subject prefix is in `subject_code`, read from
 # subject_course ("HIST 1150"). NULL or empty means every subject.
 .filter_stopout_subject <- function(df, subject_code = NULL) {
   if (is.null(subject_code) || length(subject_code) == 0) return(df)

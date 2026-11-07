@@ -40,8 +40,8 @@ test_that("fixture institution survives production transforms with usable proven
   students <- qs2::qs_read(file.path(target, "cedar_students.qs"))
   sections <- qs2::qs_read(file.path(target, "cedar_sections.qs"))
   programs <- qs2::qs_read(file.path(target, "cedar_programs.qs"))
-  grades <- qs2::qs_read(file.path(target, "cedar_grades.qs"))
-  expect_identical(attr(grades, "cedar_outcome_policy_version"), CEDAR_OUTCOME_POLICY_VERSION)
+  # Outcomes are classified at load (cedar_attempts), never saved.
+  expect_false(file.exists(file.path(target, "cedar_grades.qs")))
   # The saved tables carry keys, never a unit (ADR-001 step 3); the loader
   # attaches it. The demo is its own institution (ADR-002 Stage 5): PSYC-MIN
   # has a unit only in institution/demo/, so reading UNM's files instead would

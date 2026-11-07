@@ -146,24 +146,39 @@ attempts_is_current <- function(attempts, students, edges) {
 }
 
 
+#' Refuse an attempts table this build did not make
+#'
+#' For a reader handed `attempts` without the class list it came from (a cone
+#' given a population-windowed copy): checks the build, outcome policy and
+#' columns, which survive filtering, and returns the graded edge it was built
+#' to. The loader checks the course codes (attempts_is_current()).
+require_attempts_build <- function(attempts, caller) {
+  ok <- is.data.frame(attempts) &&
+    identical(attr(attempts, "attempts_build_version", exact = TRUE), ATTEMPTS_BUILD_VERSION) &&
+    identical(attr(attempts, "cedar_outcome_policy_version", exact = TRUE),
+              CEDAR_OUTCOME_POLICY_VERSION) &&
+    identical(names(attempts), ATTEMPTS_COLUMNS)
+  if (!ok) {
+    stop("[attempts.R] ", caller, ": attempts was not built by build_attempts() under this ",
+         "build and outcome policy (build, outcome policy or columns differ); rebuild it with ",
+         "build_attempts()")
+  }
+  invisible(attr(attempts, "graded_edge", exact = TRUE))
+}
+
+
 #' Refuse an attempts table this code did not build, or built over other codes
 #'
 #' For readers handed `attempts` with the class list but not the edges: checks
 #' the build, policy, columns and renames, and returns the graded edge it was
 #' built to.
 require_current_attempts <- function(attempts, students, caller) {
-  ok <- is.data.frame(attempts) &&
-    identical(attr(attempts, "attempts_build_version", exact = TRUE), ATTEMPTS_BUILD_VERSION) &&
-    identical(attr(attempts, "cedar_outcome_policy_version", exact = TRUE),
-              CEDAR_OUTCOME_POLICY_VERSION) &&
-    identical(names(attempts), ATTEMPTS_COLUMNS) &&
-    identical(attr(attempts, "code_renames", exact = TRUE), course_code_renames(students))
-  if (!ok) {
+  graded_edge <- require_attempts_build(attempts, caller)
+  if (!identical(attr(attempts, "code_renames", exact = TRUE), course_code_renames(students))) {
     stop("[attempts.R] ", caller, ": attempts was not built by build_attempts() from this ",
-         "class list (build, outcome policy, columns or course codes differ); rebuild it with ",
-         "build_attempts()")
+         "class list (its course codes differ); rebuild it with build_attempts()")
   }
-  invisible(attr(attempts, "graded_edge", exact = TRUE))
+  invisible(graded_edge)
 }
 
 

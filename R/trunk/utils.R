@@ -675,10 +675,11 @@ classify_grades <- function(students) {
 #' Canonical pass/DFW classification of enrollment records
 #'
 #' The single source of truth for turning class-list rows into pass/DFW
-#' outcomes (see "CEDAR-wide DFW policy" in AGENTS.md). Used by the
-#' cedar_grades pre-computation in transform-to-cedar.R and by
-#' classify_outcomes() in cones/stopout.R — do not re-implement this
-#' classification inline elsewhere.
+#' outcomes (see "CEDAR-wide DFW policy" in AGENTS.md). Used by
+#' classify_outcomes() in cones/stopout.R and get_course_outcome_rates();
+#' cedar_attempts (R/branches/attempts.R) classifies through
+#' classify_attempt_outcomes(), which the tests hold to the same answer. Do not
+#' re-implement this classification inline elsewhere.
 #'
 #' Policy:
 #' - Default pass = A+ through C and CR, including equivalent retake grades.
@@ -722,22 +723,6 @@ classify_enrollment_outcomes <- function(students, passing_values = GRADES_PASS)
     ) %>%
     dplyr::filter(!is.na(outcome)) %>%
     dplyr::select(-.grade, -.has_outcome)
-}
-
-
-#' Reject saved outcomes classified under an unknown or obsolete policy
-#'
-#' cedar_grades omits raw grades/statuses and preserves CRN-level outcomes that
-#' cedar_students has already collapsed. Rebuild from class_lists; neither
-#' re-labeling an old cache nor reconstructing it from cedar_students is safe.
-validate_cedar_grades_policy <- function(graded) {
-  if (!identical(attr(graded, "cedar_outcome_policy_version", exact = TRUE),
-                 CEDAR_OUTCOME_POLICY_VERSION)) {
-    stop("Saved cedar_grades uses an unknown or outdated outcome policy. ",
-         "Rebuild from the current class_lists with transform_to_cedar(tables = 'students') ",
-         "before using saved outcomes.", call. = FALSE)
-  }
-  invisible(graded)
 }
 
 

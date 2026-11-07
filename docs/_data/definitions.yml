@@ -110,7 +110,7 @@ definitions:
             functions: [projection_capacity_metrics]
 
   - id: dfw
-    current_version: "3.0.0"
+    current_version: "3.1.0"
     versions:
       - version: "1.0.0"
         title: Course DFW / nonpassing rate
@@ -172,6 +172,29 @@ definitions:
             functions: [prepare_course_attempts, classify_attempt_outcomes, get_course_outcome_rates]
           - file: R/trunk/utils.R
             functions: [classify_enrollment_outcomes, validate_cedar_grades_policy]
+
+      - version: "3.1.0"
+        title: Course DFW / nonpassing rate
+        summary: The share of classified course attempts that did not pass. By default only A+ through C, CR, and passing retake equivalents pass; non-audit late drops count as DFW. AUD is excluded even with late-drop status. Every attempt is classified once at load, into the attempt table every reader shares.
+        population: Registered or late-drop, non-audit course attempts with an observable outcome in the selected scope, to the last graded term.
+        unit: One attempt per student, course, delivery campus and term, the loaded class list's grain; repeats in later terms remain separate. When a student holds several sections of one course in a term, the row of record stands for them (registered, then late drop, then waitlist, then early drop; a posted grade before none).
+        numerator: Nonpassing attempts, including C-, D-range, F, W, I, NC, NR, P, S, unfamiliar recorded non-audit grades, and non-audit late drops.
+        denominator: Passing plus nonpassing classified attempts; rates are pooled counts rather than an unweighted mean of section percentages.
+        campus: Course delivery campus under the visible filters.
+        time_window: Grade outcomes are bounded by last_graded; a term after it has no outcomes, unknown rather than zero. Later enrollment follow-up uses its own observation edge.
+        exclusions: AUD is excluded from numerator and denominator regardless of registration status, including DG/DW. Early drops never count as DFW. Blank/NA grades are excluded unless late-drop status supplies the withdrawal outcome.
+        limitations:
+          - A visible opt-in control may also count C- and D-range work as passing; it does not make P or S pass.
+          - Before 3.1.0, a student who dropped one section early and withdrew late from another section of the same course could lose the withdrawal from the class list (708 DFW outcomes on the 2026-10-08 pull); it counts once the class lists are next transformed.
+          - Two sections of a topics course taken in one term are one attempt at the loaded grain.
+        guide: users/course-reports
+        implementation:
+          - file: R/branches/attempts.R
+            functions: [build_attempts, count_attempt_outcomes]
+          - file: R/branches/course-attempts.R
+            functions: [prepare_course_attempts, classify_attempt_outcomes, get_course_outcome_rates]
+          - file: R/trunk/utils.R
+            functions: [classify_enrollment_outcomes]
 
   - id: program-headcount
     current_version: "2.0.0"
@@ -299,8 +322,32 @@ definitions:
             functions: [build_student_terms]
 
   - id: roadblocks
-    current_version: "2.1.0"
+    current_version: "2.2.0"
     versions:
+      - version: "2.2.0"
+        title: Roadblocks stop-out comparison
+        summary: Compares the DFW-versus-pass stop-out gap for the selected population with the same gap for other students, using each student's first eligible observed outcome in a course and campus. A return is read from the student-term table, the one definition CEDAR uses everywhere; each outcome is read from the attempt table, classified once at load.
+        population: Students with classifiable outcomes and an observable next-regular-term window in the selected course scope and population window.
+        unit: One observation per student, course, and delivery campus; the same observations supply counts, rates, DFW context, and tests.
+        numerator: Selected students not enrolled anywhere at UNM in the next fall or spring (enrolled meaning registered, or registered and withdrawn after census), except those with a degree in the outcome term.
+        denominator: Selected students in each mutually exclusive first-outcome DFW/pass group. DFW context divides the DFW count by the combined DFW and pass counts.
+        campus: Outcomes are compared separately by course delivery campus; return is checked across UNM, including other campuses.
+        time_window: Apply course filters, the population window, the grade edge, and complete next-term follow-up eligibility before choosing the first observed outcome. An outcome whose next regular term is past the settled edge, or has no class list, is omitted and counted in the coverage note.
+        exclusions: Later outcomes do not add observations. The loaded class list holds one row of record per student, course, campus and term, so a first-term outcome is never in conflict. Coverage notes report these counts, invalid records and unobservable returns before size thresholds.
+        limitations:
+          - Before 2.2.0, a student holding a pass on one section and a DFW on another of the same course in the first term was left out of that comparison; the row of record now decides (305 comparisons on the 2026-02-04 class list).
+          - First eligible observed does not mean first lifetime attempt. The result describes first outcomes within the available, selected window, not repeat-attempt outcomes or permanent departure.
+          - The chi-square test uses Yates correction within each population, not a test of the difference between population and baseline gaps. At least five students per outcome group does not guarantee adequate expected cell counts; p-values are unadjusted across courses.
+          - Return is the student-term table's returned_next_regular_term, the same column Course Dynamics retention reads, so the two pages agree on who returned. Students receiving a degree in the outcome term are counted as completed rather than stopped out.
+          - Impact is the positive excess gap multiplied by the population DFW count, using unrounded proportions. It is a descriptive ranking score, not an estimate of students lost because of a course. These are associations, not causal course effects.
+        guide: users/pathways#roadblocks
+        implementation:
+          - file: R/cones/stopout.R
+            functions: [get_stopout, select_stopout_observations, compute_stopout_for_group, prepare_roadblock_results]
+          - file: R/branches/attempts.R
+            functions: [build_attempts]
+          - file: R/branches/student-terms.R
+            functions: [build_student_terms]
       - version: "2.1.0"
         title: Roadblocks stop-out comparison
         summary: Compares the DFW-versus-pass stop-out gap for the selected population with the same gap for other students, using each student's first eligible observed outcome in a course and campus. A return is read from the student-term table, the one definition CEDAR uses everywhere.

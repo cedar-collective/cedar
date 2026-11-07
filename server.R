@@ -28,8 +28,6 @@ server <- function(input, output, session) {
   cedar_programs  <- data_objects[["cedar_programs"]]
   cedar_degrees   <- data_objects[["cedar_degrees"]]
   cedar_faculty   <- data_objects[["cedar_faculty"]]
-  # Optional pre-computed tables — NULL/empty if files don't exist yet (before transform runs)
-  cedar_grades    <- data_objects[["cedar_grades"]]
   # One row per student-term (ADR-001 step 2): the one definition of enrolled
   # and returned, read by Roadblocks and Course Dynamics retention.
   cedar_student_terms <- data_objects[["cedar_student_terms"]]
@@ -5746,7 +5744,7 @@ output$enrl_classlist_download <- downloadHandler(
     if (is.null(students) || nrow(students) == 0) return(NULL)
 
     candidates <- c("cedar_programs", "cedar_degrees", "cedar_applicants",
-                    "cedar_student_terms", "cedar_grades")
+                    "cedar_student_terms")
     tables <- Filter(
       function(d) !is.null(d) && nrow(d) > 0 &&
         all(c("student_id", "term") %in% names(d)),
@@ -6460,7 +6458,7 @@ output$enrl_classlist_download <- downloadHandler(
   # Pathways tab — population-aware curriculum analytics (Shiny module)
   # =============================================================================
   pathwaysServer("pathways", cedar_students, cedar_programs, degrees = cedar_degrees,
-                 cedar_grades = cedar_grades,
+                 attempts = data_objects[["cedar_attempts"]],
                  cedar_student_terms = cedar_student_terms,
                  dims = data_objects[["cedar_dims"]],
                  program_choices = cedar_pathways_choices$program_choices,

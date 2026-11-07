@@ -428,13 +428,78 @@ transform_sections <- function(desrs, data_dir, ext, maps) {
 }
 
 
+# ── 2a. dedup_class_list_rows: one row per student-course-campus-term ───────
+
+#' Keep one class-list row per student, course, campus and term
+#'
+#' Banner emits one row per CRN, so a student in a combined course (BIOL 302C:
+#' a lecture CRN and a lab CRN), a student who switched sections, or one in two
+#' sections of a topics course appears more than once. Campus is part of
+#' delivery identity: the same student can take one course at two campuses.
+#'
+#' The row kept is the one STATUS_PRECEDENCE (R/lists/status_codes.R) ranks
+#' first: registered (any registered code), then a late drop (the withdrawal
+#' is the outcome of record), then a waitlist row, then an early drop. Within
+#' a status, a row with a posted grade beats one without (a combined course's
+#' graded lecture over its ungraded lab; a credit attempt over an audit in a
+#' second section of a topics course), then the lowest CRN, so the choice
+#' never depends on row order. Before 2026-11-07 only "registered first" was
+#' applied, so a student who early-dropped one section and withdrew late from
+#' another could keep the early drop and lose the W: 703 student-course-terms
+#' on the 2026-10-08 pull (ISSUES I50).
+#'
+#' @param students Pre-dedup cedar_students rows.
+#' @return The rows, one per student_id, term, campus and subject_course.
+dedup_class_list_rows <- function(students) {
+  missing <- setdiff(c("student_id", "term", "campus", "subject_course", "crn",
+                       "registration_status_code", "final_grade"), names(students))
+  if (length(missing)) {
+    stop("[transform-to-cedar.R] dedup_class_list_rows(): students lacks ",
+         paste(missing, collapse = ", "))
+  }
+  status <- students$registration_status_code
+  # An audit is no outcome: a credit attempt in another section beats it.
+  grade <- trimws(students$final_grade)
+  graded <- !is.na(grade) & nzchar(grade) & !grade %in% GRADES_EXCLUDED_FROM_OUTCOMES
+  # Every registered code is one tier; an unlisted status ranks last.
+  tier <- match(status, STATUS_PRECEDENCE)
+  tier[status %in% STATUS_REGISTERED] <- 0L
+  tier[is.na(tier)] <- length(STATUS_PRECEDENCE) + 1L
+  keys <- c("student_id", "term", "campus", "subject_course")
+  ranked <- students %>%
+    dplyr::mutate(.tier = tier, .ungraded = !graded) %>%
+    dplyr::arrange(student_id, term, campus, subject_course, .tier, .ungraded, crn)
+  kept_first <- !duplicated(ranked[keys])
+  # What the ranking decided, for the transform log: a key whose rows hold more
+  # than one rank had its row chosen by the ranking, not by being alone.
+  in_dup <- duplicated(ranked[keys]) | duplicated(ranked[keys], fromLast = TRUE)
+  decided <- ranked[in_dup, , drop = FALSE] %>%
+    dplyr::group_by(dplyr::across(dplyr::all_of(keys))) %>%
+    dplyr::filter(dplyr::n_distinct(.tier) > 1L) %>%
+    dplyr::summarize(kept = dplyr::first(.tier), .groups = "drop")
+  out <- ranked[kept_first, , drop = FALSE] %>% dplyr::select(-.tier, -.ungraded)
+  n_removed <- nrow(students) - nrow(out)
+  if (n_removed > 0) {
+    kept <- ifelse(decided$kept == 0L, "registered",
+                   ifelse(decided$kept > length(STATUS_PRECEDENCE), "other",
+                          STATUS_PRECEDENCE[pmax(decided$kept, 1L)]))
+    kinds <- table(kept)
+    kinds <- kinds[kinds > 0]
+    message("  Removed ", n_removed, " duplicate section rows; ", nrow(decided),
+            " student-course-terms held rows of different statuses; kept: ",
+            paste0(names(kinds), " ", as.integer(kinds), collapse = ", "))
+  }
+  out
+}
+
+
 # ── 2. transform_students: class_lists → cedar_students ──────────────────────
 
 #' @param class_lists Raw class_lists data frame (output of parse-data.R)
 #' @param data_dir    Path to data directory
 #' @param ext         File extension
 #' @param maps        Named list of lookup vectors
-#' @return list(saved = list(students, grades))
+#' @return list(saved = list(students))
 transform_students <- function(class_lists, data_dir, ext, maps) {
   message("──────────────────────────────────────────────────────")
   message("2. Transforming class_lists → cedar_students")
@@ -564,60 +629,10 @@ transform_students <- function(class_lists, data_dir, ext, maps) {
     # Keeping all three strings on ~1.7M rows adds substantial runtime memory.
     select(-instructor_last_name, -instructor_first_name)
 
-  # ── cedar_grades ─────────────────────────────────────────────────────────
-  # Built from pre-dedup cedar_students (CRN-level) so topics courses sharing
-  # a subject_course code are preserved as separate rows.
-  # Outcome classification is the canonical CEDAR pass/DFW policy from
-  # classify_enrollment_outcomes() (trunk/utils.R): A+ through C and CR pass;
-  # every other recorded non-audit outcome plus non-audit late drops is DFW. Early drops
-  # are NEVER DFW (see AGENTS.md, "CEDAR-wide DFW policy").
-  message("  Computing cedar_grades (pre-classified outcomes, CRN-level dedup)...")
-  # classify first (it restricts to registered + late-drop rows), THEN dedup —
-  # otherwise an excluded row (e.g. an early drop) could win the CRN dedup and
-  # shadow the student's real outcome row.
-  #
-  # Dedup key MUST include term: Banner recycles CRNs across terms, so a retake
-  # of a course under a recycled CRN is a distinct outcome, not a duplicate
-  # (~20k student-crn pairs span multiple terms in real data).
-  #
-  # Tie-break within (student, crn, term): a late-drop row wins over a
-  # coexisting registered row — the withdrawal is the outcome of record.
-  # arrange() makes the previously data-order-dependent choice deterministic.
-  cedar_grades_tbl <- cedar_students %>%
-    classify_enrollment_outcomes() %>%
-    arrange(student_id, term, crn,
-            desc(registration_status_code %in% STATUS_DROP_LATE)) %>%
-    distinct(student_id, crn, term, .keep_all = TRUE) %>%
-    select(student_id, term, subject_course, outcome, campus, level)
-  # Stamp only newly classified rows. Consumers reject unversioned/old artifacts
-  # because the saved table no longer carries the raw grade/status needed to fix it.
-  attr(cedar_grades_tbl, "cedar_outcome_policy_version") <- CEDAR_OUTCOME_POLICY_VERSION
-  grades_meta <- save_cedar_file(cedar_grades_tbl, "grades", data_dir, ext)
-  message("  ✅ cedar_grades: ", nrow(cedar_grades_tbl), " rows, ", ncol(cedar_grades_tbl), " columns")
-  rm(cedar_grades_tbl)
-
-  # Deduplicate: Banner emits one row per CRN, so students in combined courses
-  # (e.g. BIOL 302C = lecture CRN + lab CRN) appear twice. Keep one row per
-  # student-course-campus per term. Campus is part of delivery identity: the
-  # same student can legitimately take the same course at two campuses.
-  # cedar_grades is computed above (pre-dedup) to preserve topics enrollments.
-  #
-  # Tie-break within (student, term, campus, course): a registered row wins over
-  # a coexisting waitlist row — a student holding a seat is enrolled, not
-  # waiting. Same reasoning as the cedar_grades dedup above: arrange() makes a
-  # previously data-order-dependent choice deterministic. Without it the WL row
-  # could win and delete the evidence that the student ever registered, which is
-  # exactly what the class-list waitlist-demand rule needs in order to exclude
-  # them (R/branches/waitlist-demand.R). Rare but real: 7 student-course-campus
-  # terms in the current data hold both statuses.
-  n_before_dedup <- nrow(cedar_students)
-  cedar_students <- cedar_students %>%
-    arrange(student_id, term, campus, subject_course,
-            desc(registration_status_code %in% STATUS_REGISTERED)) %>%
-    distinct(student_id, term, campus, subject_course, .keep_all = TRUE)
-  n_removed <- n_before_dedup - nrow(cedar_students)
-  if (n_removed > 0)
-    message("  Removed ", n_removed, " duplicate section rows (combined lecture+lab courses)")
+  # One row per student, course, campus and term (dedup_class_list_rows()).
+  # Every outcome is classified from this table at load (cedar_attempts,
+  # R/branches/attempts.R); nothing classified is saved.
+  cedar_students <- dedup_class_list_rows(cedar_students)
 
   # Fill missing major_codes via name → code map
   if (length(major_name_to_major_code) > 0) {
@@ -647,8 +662,7 @@ transform_students <- function(class_lists, data_dir, ext, maps) {
 
   list(
     saved = list(
-      students = students_meta,
-      grades = grades_meta
+      students = students_meta
     )
   )
 }

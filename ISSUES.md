@@ -36,6 +36,7 @@ alongside other work (M14, M16).
 
 | ID | Kind | Summary |
 |---|---|---|
+| [I50](#i50--the-class-list-dedup-can-keep-an-early-drop-over-a-late-withdrawal) | Defect | The transform keeps one class-list row per student-course-campus-term but ranked only "registered first": a student who early-dropped one section and withdrew late from another could keep the early drop, so the W left the loaded class list (703 student-course-terms on the 2026-10-08 pull; 651 on the 2026-02-04 one). Every outcome reader now classifies that table (`cedar_attempts`); fixed in the transform, takes effect when the class lists are next transformed |
 | [I48](#i48--a-transform-change-to-a-fact-tables-stored-columns-is-not-rebuilt-at-deploy) | Defect | Since the mapping stamps retired (ADR-001 step 3, 2026-11-06) the deploy gate rebuilds only `cedar_student_terms`: a transform change that adds or renames a stored column on sections, students, programs or degrees starts the app on files without it until the morning refresh, the I46 shape with no gate |
 | [I47](#i47--the-class-lists-student_classification-is-stamped-at-pull-time-when-a-term-is-pulled-late) | Defect | A class list pulled months after its term carries each student's classification as of the pull: Fall 2025's list (pulled 2026-03-07) puts 35% of ENGL 1120's registered student-terms one step ahead of the classification academic studies recorded for Fall 2025. Every grouping reader now takes the student-term table's value; the `classification` filter key and Regstats' sophomore screen still read the class list |
 | [I46](#i46--a-deploy-that-must-rebuild-a-table-the-app-cannot-start-without-takes-the-site-down) | Defect | The deploy's table gate ran after the health check, so a deploy that added a column to `cedar_student_terms` failed its health check on the missing column and never reached the gate: production served the restart page from 17:07 UTC on 2026-11-04 (gate moved before the first request) |
@@ -81,6 +82,35 @@ Kept until the next release, so a recurrence is recognisable; each entry below g
 ---
 
 # Defects
+
+## I50 — The class-list dedup can keep an early drop over a late withdrawal
+
+**Status:** fixed in the transform 2026-11-07; open until production's class
+lists are transformed again (a transform edit is not rebuilt at deploy, I48).
+**Found:** 2026-11-07, comparing saved `cedar_grades` (classified before the
+dedup, one row per CRN) with `cedar_attempts` (classified from the loaded,
+deduplicated class list) before moving Roadblocks onto the second.
+**Severity:** medium. 708 DFW outcomes on the 2026-10-08 pull (0.3% of DFW)
+were in `cedar_grades` and not in the class list every other reader counts;
+the late withdrawals were missing from every class-list DFW and W count.
+**Cause:** `transform_students()` keeps one row per student, term, campus and
+course, ordering only by "registered first". A key holding an early drop
+(DR/DD) on one CRN and a late drop (DG/DW) on another kept whichever came
+first. On the same pull it also kept an audit row over a credit attempt in a
+second section of a topics course (14 keys) and an ungraded lab over a
+graded lecture (128 keys).
+**Reproduction:** on a pre-dedup class list, a student with DR on one section
+and DW on another of the same course and term: the old transform keeps either.
+On the 2026-10-08 pull, 720 student-course-terms have an outcome in
+`cedar_grades` and none in `cedar_attempts`; 703 kept an early drop.
+**Fix:** `dedup_class_list_rows()` keeps the row `STATUS_PRECEDENCE` ranks
+first (registered, late drop, waitlist, early drop), a row with a posted,
+non-audit grade first within a status, then the lowest CRN. Run on the
+2026-02-04 class list against the old transform: 3,045 kept rows change; 2
+student-course-terms keep an outcome only in `cedar_grades` (from 720 on
+the later pull); Roadblocks' first observations match the old path on every
+one of 1,328,766 and add the 305 it had excluded as conflicting.
+`test-transform-status.R` covers each rank.
 
 ## I49 — Ticking "Break out by instructor" errors the retention tables until Run
 
@@ -2687,7 +2717,7 @@ own). A new salt changes every student ID, consistently across terms within a
 rebuilt table, since the transform rehashes every term from the stored MD5s.
 But tables built under different salts no longer join, so the change must be
 one complete rebuild of every table holding student IDs (`cedar_programs`,
-`cedar_degrees`, `cedar_students`, `cedar_grades`, `cedar_student_terms`,
+`cedar_degrees`, `cedar_students`, `cedar_student_terms`,
 `cedar_applicants`; the course-flow and enrollment caches hold none; `cedar_student_term_credits`
 and `cedar_next_term` are retired), checked afterwards on Admin >
 Join Integrity. Salting the parse stage too means a one-time migration of the

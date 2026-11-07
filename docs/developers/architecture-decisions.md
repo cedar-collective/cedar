@@ -185,7 +185,7 @@ gate's mapping branch retired with the stamped columns (step 3, 2026-11-06).
 | table | grain | promoted from | carries |
 |---|---|---|---|
 | `cedar_student_terms` (measure columns) | student × term | `cedar_student_term_credits` + `cedar_next_term` | `enrolled` (registered or late-dropped: census participation, as everywhere else in CEDAR), `returned_next_regular_term`, `return_observable` (from `cedar_terms`), DFW count, late withdrawals, credits entering/after, `timeline_valid` |
-| `cedar_attempts` | student × course × term × campus | `cedar_grades` | one outcome per attempt from `classify_enrollment_outcomes()`, `cedar_outcome_policy_version` |
+| `cedar_attempts` | student × course × term × campus | `cedar_grades` (retired 2026-11-07) | one outcome per attempt from `classify_enrollment_outcomes()`, `cedar_outcome_policy_version` |
 | `cedar_course_terms` | course × term × campus | `cedar_cl_enrls_base` | first-day, census and final enrollment, waitlist demand, DFW rate, fill |
 
 These three already exist in partial, ad hoc form. The change is to declare
@@ -245,7 +245,7 @@ record keeps the decisions.
 | 1 | `cedar_terms`: the right edges become a join | done |
 | 2 | `cedar_student_terms`: one definition of an enrolled term and of return (closes I44) | done 2026-11-04 |
 | 3 | Dimensions from the mapping files, units attached at load | done 2026-11-06 |
-| 4 | `cedar_courses` and course ids at load (I37, I45); `cedar_course_terms`; `cedar_attempts` | courses and keying done 2026-11-07; `cedar_course_terms` done 2026-11-07; `cedar_attempts` built 2026-11-07, its readers next |
+| 4 | `cedar_courses` and course ids at load (I37, I45); `cedar_course_terms`; `cedar_attempts` | courses and keying done 2026-11-07; `cedar_course_terms` done 2026-11-07; `cedar_attempts` done 2026-11-07 (`cedar_grades` retired); the course flows next |
 | 5 | Thin `cedar_students` and `cedar_programs` to keys and registration facts; rename to fact names | not started |
 
 Step 2's precedence rule: when the two source snapshots disagree, the
@@ -361,9 +361,16 @@ Confirming the 320 proposed renumberings is a person's decision: it is what
 makes I37's courses show their earlier offerings (84 Fall 2026 courses with
 no Fall history by code would find it).
 
-**Next.** The readers of saved `cedar_grades` (Roadblocks, stopout, DFW
-rates, pathways) move to `cedar_attempts`, and `cedar_grades` retires; then
-`course-flows.R`'s precompute is rebuilt on the keyed tables.
+- **`cedar_grades` retires; Roadblocks reads `cedar_attempts`** (2026-11-07).
+  Comparing the two found the class-list dedup could keep an early drop over
+  a late withdrawal (ISSUES I50): the transform now keeps the row
+  `STATUS_PRECEDENCE` ranks first, a posted grade before none. On one pull
+  run both ways, Roadblocks' first observations match the saved-grades path
+  on every one of 1,328,766 and add the 305 it excluded as conflicting: the
+  loaded class list holds one row of record per course-term, so a
+  first-term outcome is never in conflict (Roadblocks 2.2.0).
+
+**Next.** `course-flows.R`'s precompute is rebuilt on the keyed tables.
 
 **Not doing.** Rewriting saved rows to the new code: the code the registrar
 used that term is a fact about the term. A surrogate integer id: a saved key
