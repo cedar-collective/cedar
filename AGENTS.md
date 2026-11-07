@@ -1,759 +1,325 @@
 # CEDAR Development Reference
 
-Open-source Shiny analytics platform for higher ed curriculum, enrollment, and student experience at UNM. Primary data sources are Banner/MyReports extracts. Primary audience is IR staff and deans using the Shiny app, with a secondary audience of analysts using the cones directly in RStudio.
+Open-source Shiny analytics platform for higher-ed curriculum, enrollment and student experience at UNM. Data comes from Banner/MyReports extracts. The primary audience is IR staff and deans using the app; the secondary audience is analysts calling cones in RStudio.
 
-**Instructions for agents:** Trust the layer rules (trunk/branches/cones/features/modules) and the coding standards — they reflect hard-won decisions, not suggestions. Known defects and improvements to existing code — the cleanup backlog — live in `ISSUES.md`; new features and significant upgrades in `ROADMAP.md`. When in doubt about data structure, the authoritative source is `R/data-parsers/transform-to-cedar.R`.
+**This file carries the rules.** They are hard-won decisions, not suggestions. The evidence, measurements, history and per-function detail live in `docs/developers/` and are **linked, not imported**: read a page when the work needs it. Defects and cleanup are in `ISSUES.md`; new functionality, enhancements and strategy are in `ROADMAP.md`. When in doubt about data structure, the authoritative source is `R/data-parsers/transform-to-cedar.R`.
 
-**Where the rest of the documentation lives.** This file carries the rules. The evidence, measurements, and per-function detail behind them live in `docs/developers/` and are **linked, not imported** — read a page when you need it, so it does not sit in every context window.
+**One home per fact.** A rule lives here, its reasoning and measurements on the linked page, a defect's status in `ISSUES.md`, a plan in `ROADMAP.md`, and what a PR changed in git. Do not restate one in another; link to it.
 
 | Topic | Page |
 |---|---|
-| Which `academic_studies` fields may describe a past term, and the measurements | [field-reliability.md](docs/developers/field-reliability.md) |
-| DESR vs classlist enrollment; the Regstats baseline contract | [enrollment-measures.md](docs/developers/enrollment-measures.md) |
-| Why the data has four right edges, and the failures that proved it | [right-edge-policy.md](docs/developers/right-edge-policy.md) |
+| Table schemas; how each loaded table is built and gets its units and course ids | [data-model.md](docs/developers/data-model.md), [data-transformation-myreports.md](docs/developers/data-transformation-myreports.md) |
+| Where the data model is heading and why (the domain model) | [ADR-001](docs/developers/architecture-decisions.md#adr-001-move-cedars-tables-from-report-shaped-to-domain-shaped) |
+| The mapping files that decide every unit | [ADR-002](docs/developers/architecture-decisions.md#adr-002-explicit-mapping-files-replace-runtime-department-inference), [mapping-review-guide.md](docs/developers/mapping-review-guide.md) |
+| `cedar_student_terms`: one definition of enrolled and returned | [student-terms.md](docs/developers/student-terms.md) |
+| Which `academic_studies` fields may describe a past term | [field-reliability.md](docs/developers/field-reliability.md) |
+| DESR vs class-list enrollment; the term calendar; Regstats baselines | [enrollment-measures.md](docs/developers/enrollment-measures.md) |
+| The four right edges and the failures behind them | [right-edge-policy.md](docs/developers/right-edge-policy.md) |
 | Why every course metric is grouped by campus | [campus-policy.md](docs/developers/campus-policy.md) |
-| Per-function index of branches, cones, features, and trunk helpers | [layer-inventory.md](docs/developers/layer-inventory.md) |
+| What is CEDAR and what is UNM | [audits/institution-boundary-audit.md](docs/developers/audits/institution-boundary-audit.md) |
+| Recording what the data means; anomaly screens | [data-anomalies.md](docs/developers/data-anomalies.md) |
+| What each branch, cone, feature and trunk file is for | [layer-inventory.md](docs/developers/layer-inventory.md) (generated signatures: [functions.md](docs/developers/functions.md)) |
+| Cache keys and the incidents behind the cardinal rules | [caching.md](docs/developers/caching.md) |
 | Module tables, plots, CSS, URL state, page structure | [shiny-modules.md](docs/developers/shiny-modules.md) |
-| Cache keys, the two cardinal rules, and the incidents behind them | [caching.md](docs/developers/caching.md) |
-| Testing philosophy, fixtures, prototyping without Shiny | [testing.md](docs/developers/testing.md) |
-| Driving the running app with headless Chrome | [e2e-testing.md](docs/developers/e2e-testing.md) |
-| Ad-hoc data checks; proving a test catches its bug | [adhoc-analysis.md](docs/developers/adhoc-analysis.md) |
-| Recording what the data means, and screens that find anomalies | [data-anomalies.md](docs/developers/data-anomalies.md) |
-| What is CEDAR and what is UNM; the mapping pipeline audit | [institution-boundary-audit.md](docs/developers/institution-boundary-audit.md) |
-| Finding mappings that need help, by reading the files | [mapping-review-guide.md](docs/developers/mapping-review-guide.md) |
-| The planned replacement for runtime department inference | [adr-002-explicit-mapping-files.md](docs/developers/adr-002-explicit-mapping-files.md) |
-| Where the data model is heading, with the measured duplication behind it | [adr-001-domain-data-model.md](docs/developers/adr-001-domain-data-model.md) |
-| `cedar_student_terms`: one row per student-term, one definition of enrolled and returned (ADR-001 step 2, not yet built) | [student-terms.md](docs/developers/student-terms.md) |
-| Enrollment projections — the executable contract | [enrollment-projections.md](docs/developers/enrollment-projections.md) |
-| Full table schemas, DESR input fields, source-to-CEDAR mapping | [data-model.md](docs/developers/data-model.md), [data-transformation-myreports.md](docs/developers/data-transformation-myreports.md) |
+| Enrollment projections: the contract | [enrollment-projections.md](docs/developers/enrollment-projections.md), [forecasting-lessons.md](docs/developers/forecasting-lessons.md) |
+| Degree Explorer and the catalog tooling | [degree-explorer-rules.md](docs/developers/degree-explorer-rules.md), [degree-requirements.md](docs/developers/degree-requirements.md), [catalog-scanning.md](docs/developers/catalog-scanning.md), [catalog-normalization.md](docs/developers/catalog-normalization.md) |
+| Running tests, fixtures, environments | [testing.md](docs/developers/testing.md), [e2e-testing.md](docs/developers/e2e-testing.md) |
+| The synthetic institution | [synthetic-institution.md](docs/developers/synthetic-institution.md) |
 
 ---
 
 ## Architecture Layers
 
 ```
-app.R                  — 3 lines: loads ui/server, calls shinyApp()
-global.R               — data loading, library loading, load_funcs()
-ui.R                   — page_navbar() structure; mounts module UIs
-server.R               — module wiring + legacy inline handlers
-R/lists/               — static constants, domain lookups, grade/status codes
-R/trunk/               — pure infrastructure (filter, utils, cache, logging, data I/O)
-R/branches/            — reusable cedar domain computations (enrl, grades, cohort)
-R/cones/               — single-question analyses; call trunk/branches, never other cones
-R/features/            — app-facing orchestrators/payload builders for visible features
-R/modules/             — Shiny UI/server pairs
-tests/testthat/        — unit tests for cones and branches
+app.R          — 3 lines: loads ui/server, calls shinyApp()
+global.R       — data loading, library loading, load_funcs()
+ui.R           — page_navbar() structure; mounts module UIs
+server.R       — module wiring + legacy inline handlers
+R/lists/       — static constants and the readers of the institution files
+R/trunk/       — pure infrastructure (filter, utils, cache, logging, data I/O)
+R/branches/    — reusable CEDAR domain computations
+R/cones/       — single-question analyses
+R/features/    — app-facing orchestrators and payload builders
+R/modules/     — Shiny UI/server pairs
+tests/testthat — unit tests
 ```
 
-**Platform vs institution.** Every file in `R/lists/` opens with `# CEDAR-PLATFORM:` or `# CEDAR-INSTITUTION:`, and a test enforces it. The subject → department → college hierarchy now lives in plain CSV files under `institution/<id>/` (chosen by the `CEDAR_INSTITUTION` environment variable, default `unm`), validated at startup by `R/lists/institution_files.R`, as does every other institution list: campuses (with the spellings the exports use for them), student levels (`student_levels.csv`: the class list's code, the readable name, and academic studies' spelling), course-level bands, Gen Ed areas, excluded courses, population groups, projection scopes, the text maps (program names to codes, name aliases, HR organisations to units), and which code replaced which (`code_history.csv`: one row per succession, `kind` subject / course / program, followed by the course dimension only when `status = confirmed`). Each `R/lists/` file is platform mechanism that reads its file through `CEDAR_CONFIG_FILE_SPECS` and builds a named constant ([ADR-002](docs/developers/adr-002-explicit-mapping-files.md), Stage 6). An adopter replaces exactly the files under `institution/<id>/`. **Platform code may READ institution constants through a name; it may never contain one.** A hardcoded institution list inside `transform-to-cedar.R` drifted from its counterpart in `R/lists/` and misclassified 23,272 student-term rows before anyone noticed (ISSUES.md I9), which is why `tests/testthat/test-architecture.R` now fails on institution codes appearing as literals outside `R/lists/`. Mark a deliberate exception `INSTITUTION-OK:` with a reason. Full classification: [institution-boundary-audit.md](docs/developers/institution-boundary-audit.md). The same test file enforces two other rules from this document: silent `tryCatch` fallbacks (ISSUES.md M11) are ratcheted — each file's allowance is today's count and may only go down; a fix lowers the number, a new violation fails — and global-state reads in cones and branches (M12) fail outright, the backlog having been cleared on 2026-10-16.
-
-**Load order (trunk/load-funcs.R):** lists → trunk → branches → cones → features → modules.
+**Load order (`R/trunk/load-funcs.R`):** lists → trunk → branches → cones → features → modules.
 
 | Layer | Calls | Never calls | Test |
-|-------|-------|-------------|------|
+|---|---|---|---|
 | lists | nothing | — | Is it a static constant or lookup? |
-| trunk | lists | branches, cones, features, modules | Could this work for a different analytics project? If yes → trunk |
-| branches | trunk, lists | cones, features, modules | Is it reused by multiple cones/features/modules? If yes → branch |
-| cones | trunk, branches | other cones, features, modules | Does it answer exactly one analytical question? If yes → cone |
-| features | trunk, branches, cones | modules | Does it assemble multiple analyses into a feature payload? If yes → feature |
-| modules | trunk, branches, cones, features | — | Is it a Shiny UI/server pair? → module |
+| trunk | lists | branches, cones, features, modules | Would it work for a different analytics project? |
+| branches | trunk, lists | cones, features, modules | Is it reused by several cones/features/modules? |
+| cones | trunk, branches | other cones, features, modules | Does it answer exactly one analytical question? |
+| features | trunk, branches, cones | modules | Does it assemble several analyses into a payload? |
+| modules | trunk, branches, cones, features | — | Is it a Shiny UI/server pair? |
 
-**The key rule: cones never call other cones.** If a function needs to call multiple cones, it belongs in `features/` or `modules/`.
+Hard rules, no exceptions:
 
-Two companion hard rules, no exceptions:
+- **Cones never call other cones.** A function that needs several belongs in `features/` or `modules/`.
+- **Cones and branches never touch global state.** No `exists("cedar_sections")`, no reading `data_objects`: every table is a parameter, optional enrichment an optional parameter (`get_course_outcomes(students, cedar_faculty, opt)`). `tests/testthat/test-architecture.R` fails on a global read (M12).
+- **Modules contain zero business logic.** No `group_by`/`summarize` pipelines in a module server: collect inputs into `opt`, call a cone or branch, render.
 
-- **Cones never touch global state.** No `exists("cedar_sections")`, no reading `data_objects` — every table a cone needs is a parameter. Optional enrichment tables are optional parameters (see how `get_course_outcomes(students, cedar_faculty, opt)` handles optional faculty).
-- **Modules contain zero business logic.** No `group_by`/`summarize` pipelines in a module server — collect inputs into an `opt` list, call a cone/branch, render the result.
+**Platform vs institution.** Every file in `R/lists/` opens with `# CEDAR-PLATFORM:` or `# CEDAR-INSTITUTION:`. Institution data lives in plain CSVs under `institution/<id>/` (chosen by `CEDAR_INSTITUTION`, default `unm`): the subject → department → college hierarchy, programs, campuses, student levels, course-level bands, Gen Ed areas, excluded courses, population groups, projection scopes, text maps, and `code_history.csv` (which code replaced which). Each is validated at startup by `R/lists/institution_files.R` through `CEDAR_CONFIG_FILE_SPECS`. An adopter replaces exactly those files. **Platform code may read an institution constant through a name; it may never contain one.** `test-architecture.R` fails on institution codes as literals outside `R/lists/`; mark a deliberate exception `INSTITUTION-OK:` with a reason. The same test ratchets silent `tryCatch` fallbacks per file (M11): each file's allowance may only go down.
 
 ---
 
 ## CEDAR Data Tables
 
-All tables use lowercase snake_case columns. Legacy uppercase names (CAMP, DEPT, TERM) are fully deprecated. Authoritative schema source: `R/data-parsers/transform-to-cedar.R`; full column listings in [data-model.md](docs/developers/data-model.md).
+Lowercase snake_case columns; legacy uppercase names are deprecated. How each table is built, every column, and how rows get their units and course ids: [data-model.md](docs/developers/data-model.md).
 
-| Table | Rows | What it is / most-used columns |
-|-------|------|-------------------------------|
-| `cedar_sections` | ~50k | One row per DESR section row. `term`, `crn`, `subject_course`, `campus`, `department`, `enrolled`, `total_enrl`, `is_combined`, `is_topics` |
-| `cedar_students` | ~1.9M | One row per student-course-term. `student_id`, `term`, `subject_course`, `campus`, `level`, `final_grade`, `registration_status_code`, `student_classification`, `student_campus`, `major_code` |
-| `cedar_programs` | ~200k | One row per student-term program declaration. `program_name`, `program_code`, `dept_code`, `college_code`, `student_campus`, `pell_eligible`, `first_gen`, `ipeds_race`, `gender`, `time_status`. Its `*_credits_*` columns are pull-stamped — see the field reliability contract |
-| `cedar_degrees` | ~20k | Awarded degrees. `degree`, `program_name`, `dept_code`, `cumulative_gpa`, `cumulative_credits` |
-| `cedar_faculty` | ~5k × terms | `instructor_id`, `instructor_name`, `department`, `job_category`, `appointment_pct` (0–100; divide by 100 for FTE), `college` |
-| `cedar_student_terms` | ~520k | One row per student-term with any class-list row or declaration. Built by `build_student_terms()` in the transform from students, programs and degrees (ADR-001 step 2; contract [student-terms.md](docs/developers/student-terms.md)). `enrolled` (registered or late-dropped: **CEDAR's one definition of an enrolled student-term**), `returned_next_regular_term` / `return_observable`, description columns in code vocabulary with the source and any conflict flagged, per-term and running (`cumulative_*`) attempted and completed UNM credits with `unm_credits_entering` and `timeline_valid`, `dfw_grades`, `degree_awarded`. Loaded by the app, which stops without it. Roadblocks reads its return, Course Dynamics retention its `enrolled` (I44 closed), every credit position its running totals through `build_credit_timeline()` (`cedar_student_term_credits` is retired) and the Gen Ed major mix its `primary_major_code`, Pathways' classification axis and the Gen Ed graduate cohort its `student_classification`, Dept Trends' SCH by major its `primary_major_code` (named through `name_program_codes()`), Course Dynamics' rollcall and the Waitlists splits its `student_classification` and `primary_major_code` (`attach_student_descriptions()`); the remaining readers move in ADR-001's order |
-| `cedar_courses` / `cedar_course_codes` | ~7.5k / ~7.6k | **The course dimension** (ADR-001 step 4), built at startup by `build_cedar_courses()` (`R/branches/courses.R`) from the sections, the class lists and `code_history.csv`; never saved. `cedar_courses` is one row per `course_id`: the last code of a confirmed succession chain (`SOC 371` → `SOCI 371`; `SOC 250` → `SOCI 250` → `SOCI 2315`) or the code itself, with the current `subject` and `course_number`, `level`, latest `course_title`, `first_term` / `last_term` over every code, `n_codes` and `former_codes`. `cedar_course_codes` is one row per code in the data with its `course_id`, where it appears (`in_sections`, `in_class_lists`) and `steps`. `attach_course_ids()` writes `course_id` onto `cedar_sections` and `cedar_students` beside `subject_course` at every start; the code columns stay as the source wrote them. **A reader that follows a course across terms keys on `course_id`, never on `subject_course`**, and requires the column (`.require_course_id()` in `enrl.R` stops on a table no loader attached). Low Enrollment's schedule view and course histories (`get_enrollment_concerns()`, `get_course_enrollment_history()`, `get_course_enrollment_histories()`) do, naming the former codes behind the shown numbers (`"2 (Sp20); also as SOC 250"`). Course Dynamics reads both tables **by course**: `key_on_course_id()` (`courses.R`) returns a working frame whose `subject_course` is the `course_id` and whose registrar's code is `listed_code` (shared columns, nothing copied, the saved tables untouched), `course_id_of()` resolves the picked code, current or former, to its course, and every filter, grouping, flow, outcome and retention cohort on the tab then follows the course (`create_course_base_data()`, the crosslist-family functions in `enrl.R`, `cr_students` in `server.R`); the page names the former codes and their terms (`course_former_codes_note()`), and the neighbors cache keys the renames in the frame (`course_code_renames()`). Regstats follows the course too: `get_reg_stats()` keys both tables, resolves a picked code to its course, and names each flagged course's former codes (`former_codes`, from `course_former_code_spans()`); the precomputed base it filters is built by course at start (`build_cl_enrls_base()`, stamped with the class list's renames so `cl_enrls_base_is_current()` can refuse a stale one) and its day cache records the renames it was counted over (v6). The projection inputs still key on the code and move next, then `cedar_course_terms` and `cedar_attempts` keyed on the id (ISSUES I37, I45) |
-| `cedar_dims` | — | The mapping files as dimension tables (`colleges`, `units`, `subjects`, `programs`, `settings`), built once at startup by `build_cedar_dims()` (`R/branches/dims.R`) and held at `data_objects[["cedar_dims"]]`. Never saved. A cone that needs a dimension by name takes it as `dims`; `attach_unit()` reads it (ADR-001 step 3). Every lookup the retired `cedar_lookups.qs` used to carry is read off it: `unit_names(dims)`, `college_code_names(dims)`, `subject_units(dims)`, and `name_program_codes(codes, dims)` for a program code's display name (programs.csv's, which names every code the data carries, the class-list-only ones as proposed rows; a code with no row is shown as itself and listed by the mapping audit). A department's program names are counted from the programs table by `headcount_program_names()` |
+| Table | Grain | What it is |
+|---|---|---|
+| `cedar_sections` | DESR section row | `term`, `crn`, `subject_course`, `campus`, `department`, `enrolled`, `total_enrl`, `is_combined`, `is_topics` |
+| `cedar_students` | student × course × campus × term | the class list: `student_id`, `registration_status_code`, `final_grade`, `level`, `student_campus`, `major_code` |
+| `cedar_programs` | student × term × program | declarations: `program_code`, `dept_code`, `college_code`, demographics. Its `*_credits_*` columns are pull-stamped (field reliability) |
+| `cedar_degrees` | awarded degree | `degree`, `program_name`, `dept_code` |
+| `cedar_faculty` | instructor × term | `appointment_pct` is 0–100; divide by 100 for FTE |
+| `cedar_grades` | attempt | pre-classified outcomes, stamped `cedar_outcome_policy_version` |
+| `cedar_student_terms` | student × term | **CEDAR's one definition of an enrolled student-term** (`enrolled`) and of return (`returned_next_regular_term`, `return_observable`); running credits (`cumulative_*`, `timeline_valid`); primary major and classification. Built in the transform; the app stops without it ([student-terms.md](docs/developers/student-terms.md)) |
+| `cedar_terms` | term | the term dimension: the right edges as flags (`is_settled`, `is_graded`, `in_progress`, …), season, next/previous regular term, first day, census date |
+| `cedar_dims` | — | the mapping files as dimension tables (`colleges`, `units`, `subjects`, `programs`, `settings`); names through `unit_names()`, `college_code_names()`, `subject_units()`, `name_program_codes()` |
+| `cedar_courses` / `cedar_course_codes` | course / code | the course dimension: one `course_id` per chain of confirmed renames in `code_history.csv` |
+| `cedar_course_terms` | course × term × campus × part of term | the course-term measure table: class-list counts (`registered`, `dr_*`, `wl_all`, `cl_total`, `census_enrl`), no cross-term means ([course-terms.R](R/branches/course-terms.R)) |
 
-**Every unit is attached at load, by one function (ADR-001 step 3, 2026-11-06).** No saved table stores a unit or a college. `cedar_sections` and `cedar_students` carry the subject and Banner's section college (`source_college`); `cedar_programs` and `cedar_degrees` carry the program code and Banner's two college values (`source_college` and `source_college_code` / `source_student_college`); `cedar_student_terms` carries its primary major's code and the source's college for it (`primary_source_college_code`, `primary_source_college`). The in-memory `department` / `college` / `college_basis` on sections and class-list rows, `dept_code` / `program_college` / `college_code` / `college_basis` / `student_college` on programs and degrees, `primary_dept_code` / `primary_college_code` / `primary_college_basis` on student-terms, and the `crosslist_external` / `crosslist_partners` that follow a department, are written by `attach_default_units()` in `R/branches/dims.R` at every start (`global.R`, the cache-warming scripts, `cedar-repl.R`) through `attach_unit(rows, dims, hierarchy)`: the only code that resolves a unit, wrapping the two rules in `R/lists/institution_files.R`. `tests/testthat/test-architecture.R` ratchets every other resolution site, the transform included. A file stamped by an older transform loads the same way: the loader drops its copy first. The default columns always mean the subject's unit (sections, class lists) or the program's unit (declarations, degrees, student-terms); a reader that wants another hierarchy calls `attach_unit()` with its own `cols`, never into those names. Measured on the 2026-10-08 pull: every value the transform used to stamp is reproduced on all five tables.
+The dimensions, `cedar_courses` and `cedar_course_terms` are built at startup and held in `data_objects`; none is a saved source of truth.
 
-**Every course code gets its id at load the same way (ADR-001 step 4, 2026-11-06).** `build_cedar_courses(sections, students, dims)` in `R/branches/courses.R` gives every `subject_course` in either table one `course_id`, following the confirmed rows of `institution/<id>/code_history.csv` step by step (a subject row renames every number under it; a course row renumbers one course; a chain may mix the two), and `attach_course_ids()` writes it onto `cedar_sections` and `cedar_students` at every loader beside the units. A proposed row assigns nothing: it is `detect_course_renamings()`'s candidate, written by `scripts/propose-code-history.R --write` with its evidence, and the dimension keeps the two codes as two courses until someone confirms it, exactly as a proposed unit mapping assigns no unit. `subject_course` is never rewritten (annotate, never mutate). Measured on the 2026-10-08 pull: 7,450 courses from 7,641 codes, the three confirmed subject renames (CCS, PSY, SOC) joining 229 codes; SOCI 371's history now begins Fall 2018 instead of Fall 2021. Build 8 s, attach under a second. A course that splits into two codes has no row by design: the validator refuses a confirmed code with two successors, because one code cannot have two ids.
+**Every unit and every course id is attached at load, in one place.** No saved table stores a unit or a college. Every loader (`global.R`, the cache-warming scripts, `scripts/cedar-repl.R`) calls `attach_default_units()` and `attach_course_ids()`:
 
-**The mapping files decide every unit (ADR-002 Stage 3).** A program's unit is the one its row in `institution/<id>/programs.csv` names: the confirmed row for (code, college), else the code's every-college row. Concentrations take the unit of the student's primary major that term. A course's unit comes the same way from `subjects.csv`, keyed on subject, section college (translated through `colleges.csv`, so a renamed college still matches) and level. **A code with no confirmed row has no unit (`NA`)** and is listed on Admin > Data & Usage > Mappings and in the end-of-transform mapping audit: the designed state for a code awaiting a decision, never a department named after itself. Programs no department owns (Non-Degree, Undecided) are `basis = no_unit`. A decision is an edit to the file, through a pull request; it takes effect at the next start, and the deploy restarts the app. Nothing is rebuilt for it. The deploy gate (`scripts/rebuild-programs-if-mappings-changed.R`, also run by every refresh; the name is historical) now builds only `cedar_student_terms`: when it is missing, older than the students, programs or degrees file it reads (by file time), short a column the builder now writes, or stamped with an older rule version than `STUDENT_TERMS_BUILD_VERSION` (bump it when the builder's rules change the values it writes), it is built in its own R process (`--tables student_terms`), so the app never starts without it. The transform keeps every stage's heap until it exits, and one process carrying four tables into the student-term stage was killed for memory on an 8.6 GB host.
+- **Units:** `attach_unit(rows, dims, hierarchy)` (`R/branches/dims.R`) is the only code that resolves a unit; `test-architecture.R` ratchets every other site. The default columns (`department`, `college`, `dept_code`, …) mean the subject's unit (sections, class lists) or the program's unit (declarations, degrees, student-terms). A reader that wants another hierarchy calls `attach_unit()` with its own `cols`, never into those names.
+- **Course ids:** on the loaded `cedar_sections`, `cedar_students` and `cedar_grades`, `subject_course` **is the course** (`course_id`), and `listed_code` is the code the registrar used that term. A reader that filters, groups or joins on `subject_course` follows a renamed course with nothing to remember; one that names the term's code reads `listed_code`. A picked code resolves through `course_id_of()` / `course_ids_of()` or the shared `course` filter. The saved files keep the registrar's code: annotate, never mutate.
+- **A cache over the loaded tables records `course_code_renames()`** in its key or on its payload.
 
-**Colleges come from the files too (Stage 3b).** A student counts under their primary major's college that term, on all their rows (`college_code`, `student_college`; each row's own is `program_college`); a course under its subject row's `college_code`, else its unit's home college; a degree under its program's. A code not yet decided reports Banner's college, labelled `college_basis = "banner"`. Banner's values stay beside as `source_college` (and `source_college_code`): the mapping audit reads those, reports never should.
+**The mapping files decide every unit.** A program's unit comes from `programs.csv`, a course's from `subjects.csv` (by subject, section college and level). **A code with no confirmed row has no unit (`NA`)** and is listed on Admin > Mappings and in the transform's mapping audit, never given a department named after itself. Programs no department owns are `basis = no_unit`. A code not yet decided reports Banner's college, labelled `college_basis = "banner"`. A decision is an edit to the file, through a PR, taking effect at the next start. **The self-named fallback must not return** (ISSUES I7; EC-14 in `test-transform-status.R` guards it). A department's rows are those whose own `dept_code` it is (`filter_programs_to_dept()`), never rows matched by program name (I15). A pre-major's flag and target are the file's (`is_pre_major`, `leads_to`), never inferred from an F prefix.
 
-**The self-named fallback is gone and must not return.** The old chain ended at `major_code` itself, giving an unmapped program a department named after its own code that no report could tell from a real one — which is how Radiologic Sciences reported 35 students at department level when it had 229 (ISSUES.md I7). EC-14 in `tests/testthat/test-transform-status.R` fails if it comes back. `program_map.qs` and `R/lists/program_code_maps.R` were retired at Stage 4: the runtime lookups in `catalog_lookups.R` come from the files too, and a pre-major's flag and target are the file's (`is_pre_major`, `leads_to`), never inferred from an F prefix. A department's rows are the rows whose own `dept_code` it is — `filter_programs_to_dept()` in `R/branches/headcount.R`, shared by Headcount, Dept Trends and the Dept Dashboard — never rows matched by program name (ISSUES.md I15).
+**`dept_code` ≠ subject prefix.** Geography is `GES` but its courses are `GEOG`. Go through `subject_units(dims)`; never filter `subject_course` by `dept_code`. `cedar_students$major` is the raw Banner program code; never introduce an ad hoc program → department map.
 
-**`dept_code` ≠ subject prefix in `subject_course`.** Geography has `dept_code = "GES"` but courses appear as `"GEOG 101"`. `major_code` is also not a reliable subject prefix. Always go through `subject_units(dims)` (subjects.csv as a table); never filter `subject_course` by `dept_code` directly:
+**Course suffixes.** `C` (`BIOL 2110C`) is combined lecture+lab, `is_combined = TRUE`: count offerings with `n_distinct(subject_course)`, never `n_distinct(crn)`. `L` (`PHYS 151L`) is a standalone lab with no flag.
 
-```r
-# Subject prefixes for dept "GES" → c("GEOG")
-subject_units(data_objects[["cedar_dims"]]) %>% filter(dept_code == "GES") %>% pull(subject_code)
-```
+**Data semantics are recorded as data, not coded as exceptions.** When a code changes meaning or joins only by a non-obvious key, write it into `CEDAR_DATA_SEMANTICS` (`R/lists/data_semantics.R`). **Annotate, never mutate:** an entry explains a value and must never rewrite rows. A mapping error is corrected in the mapping files. Anomaly screens (`R/branches/data-anomalies.R`) produce candidates, never verdicts ([data-anomalies.md](docs/developers/data-anomalies.md)).
 
-**`cedar_students$major`** is the raw Banner program code (e.g. `"NURS"`), not a readable name. Join against `cedar_programs` or use the validated catalog lookups; do not introduce a new ad hoc program→department map.
+**Term codes** are `YYYYSS`: 10 spring, 60 summer, 80 fall; numeric sort is chronological. A term code is an identifier: six digits, no separator or decimal (`202580`). Prefer `Fall 2025` on reader-facing surfaces.
 
-**Course suffix flags.** **C suffix** (`BIOL 2110C`) = combined lecture+lab, `is_combined = TRUE`; multiple CRNs share one `subject_course`, so count offerings with `n_distinct(subject_course)`, never `n_distinct(crn)` or `n()`. **L suffix** (`PHYS 151L`) = standalone lab, no flag (`is_lab` was removed as unused); filter on `grepl("[Ll]$", course_number)` if exclusion is ever needed.
+### Field reliability — what may be claimed about a past term
 
-**Data semantics are recorded as data, not coded as exceptions.** When a code changes meaning, records intent rather than status, or joins to another table only by a non-obvious key, write it into `CEDAR_DATA_SEMANTICS` (`R/lists/data_semantics.R`) so every consumer can read it — do not code the caveat into whichever surface tripped over it first. The one hard rule is **annotate, never mutate**: an entry explains what a value means and must never be used to rewrite rows so they mean something else. A mapping *error* is a different thing and belongs in `program_code_maps.R`, where it can be corrected retroactively; and no annotation can supply information nobody recorded, so a derived measure stays code. Screens that find new instances live in `R/branches/data-anomalies.R` and produce candidates for review, never verdicts. Details and the measured thresholds: [data-anomalies.md](docs/developers/data-anomalies.md).
-
-**Term codes:** YYYYSS. SS = 10 (spring), 60 (summer), 80 (fall); numeric sort is chronological. A term code is an **identifier** even when numeric: display all six digits with no thousands separator and no decimal (`202580`, never `202,580`). Prefer a human label such as `Fall 2025` on reader-facing surfaces.
-
-### Field reliability contract — what may be claimed about a past term
-
-**A hard rule, in the same class as the campus and DFW policies.** MyReports' Academic Studies report returns *cumulative* figures as of the moment you pull, stamped onto every historical row it hands back. A row keyed `(student_id, term = 202180)` does not necessarily describe Fall 2021.
-
-A field may be used in a claim about a past term only if it passes **both** tests: **pull independence** (re-pulling the same `(student, term)` later returns the same value) and **within-history variation** (inside a single pull, the value moves from term to term for the same student).
+**A hard rule.** MyReports' Academic Studies returns cumulative figures as of the pull, stamped onto every historical row. A field may be used in a claim about a past term only if it is **pull-independent** and **varies within a student's history**.
 
 | Field (`academic_studies`) | Verdict |
 |---|---|
-| `Semester Credits Attempted` / `Earned`, `Total Credits`, `Semester GPA` | **safe** — per-term loads, not running totals |
-| `Student Classification`, `Student Level`, `Academic Standing` | **safe** |
-| `Major` / program | **safe**, after normalising the `Pre-` prefix |
-| `Institution Credits Attempted` / `Earned` | **BANNED for per-term claims** |
-| `Overall Credits Attempted` / `Earned` | **BANNED for per-term claims** |
-| `Institution GPA` | **BANNED for per-term claims and for matching** |
+| Semester credits attempted/earned, total credits, semester GPA | safe |
+| Student classification, level, academic standing | safe |
+| Major / program (after normalising `Pre-`) | safe |
+| Institution credits, overall credits | **banned** for per-term claims |
+| Institution GPA | **banned** for per-term claims and for matching |
 
-The banned fields vary across a student's own history only ~16% of the time: they are that student's totals *at pull time*, printed on every historical row.
-
-**Permitted:** when a student took a course; when they changed program and to what; their classification, level, standing, per-term credit load and per-term GPA at any past term.
-
-**Forbidden:** any "how far into their degree were they" claim sourced from a banned field — credit bands on a timing axis, "credits at the time of the major change", "credits at first declaration", credit-band cohorts.
-
-**The three sanctioned replacements:**
-
-- **`build_credit_timeline(student_terms, programs, opt)`** (`R/branches/credit-timeline.R`) — the single sanctioned source for a per-term credit position, read off `cedar_student_terms`' running totals. Returns `unm_credits_entering` / `_after`, `total_credits_entering` / `_after`, and `timeline_valid` (the table's flag, set over the whole data, so a slice of the table cannot change it). `attach_credit_position()` joins it onto any event table.
-- **`build_gpa_timeline()`** (`R/branches/gpa-timeline.R`) — a cumulative GPA that moves. `gpa_entering` is the matchable one: it excludes the term's own grades, which in a course-effect study *are* the outcome.
-- **`student_classification`** — per-term, pull-stable, monotone, transfer-aware. The default Pathways x-axis. Prefer it unless the question is specifically about credit progress.
-
-**`timeline_valid` is not optional — filter on it.** The running total starts at zero on a student's first term *in the data*, so the ~30% of students already enrolled when the window opens begin mid-career reading zero. Any surface placing students on a credit axis must drop `timeline_valid == FALSE` rows (failing closed on NA) and **say how many it dropped** — see `timing_meta$n_truncated` in `get_course_timing()`.
-
-**Descriptive vs matched.** A frozen field is barred from temporal claims *and from matching*, but may still be displayed as a current-state description if the page says so. `cum_gpa_entering` belongs in a balance table; `current_unm_gpa` (Banner Institution GPA) belongs in a group profile beside a clear label. Never add a pull-stamped field to `continuous_cols`.
-
-**Small-cell guards are mandatory on any progress axis.** Eligibility thins sharply toward the far end of every one of these axes. Guard the **band** (minimum students who reached it) and the **cell** (minimum students in it) separately — they fail differently. `get_gen_ed_grad_profile()`'s `min_band_n` / `min_n` are the worked example.
-
-**Adding a field:** run it through both tests and add it to the table in the docs before it ships. The contract's guards are `tests/testthat/test-credit-timeline.R` (the CT01 fixtures, including the within-history property the frozen columns fail) and `tests/testthat/test-declaration-context.R` (no credit position read off a frozen column); pull independence is measured on real re-pulls, recorded in [field-reliability.md](docs/developers/field-reliability.md).
-
-Measurements, the canonical illustration, and the per-consumer migration table: [field-reliability.md](docs/developers/field-reliability.md).
+Forbidden: any "how far into their degree" claim from a banned field. The sanctioned replacements: `build_credit_timeline()` (running totals from `cedar_student_terms`), `build_gpa_timeline()` (`gpa_entering` excludes the term's own grades), and `student_classification`. **Filter on `timeline_valid`** (fail closed on NA) and say how many rows were dropped. A frozen field may be displayed as a labelled current-state description, never matched on; never add one to `continuous_cols`. **Guard small cells on any progress axis**, the band and the cell separately (`get_gen_ed_grad_profile()`'s `min_band_n` / `min_n`). Add a field only after running it through both tests: [field-reliability.md](docs/developers/field-reliability.md).
 
 ---
 
 ## Registration Status Codes
 
-Defined in `R/lists/status_codes.R`. Use these constants instead of inline strings.
+Defined in `R/lists/status_codes.R`; never inline the strings.
 
 | Constant | Values | Meaning |
-|----------|--------|---------|
-| `STATUS_REGISTERED` | `c("RE", "RS", "RR")` | Currently registered (RE=enrolled, RS=section change, RR=reserve seat) |
-| `STATUS_WAITLIST` | `c("WL")` | Waitlisted |
-| `STATUS_DROP_EARLY` | `c("DR", "DD")` | Early drop/drop-delete (before grade consequence, no DFW outcome) |
-| `STATUS_DROP_LATE` | `c("DG", "DW")` | Late drop (after deadline, grade consequence) |
-| `STATUS_DROP_ALL` | `c("DR", "DD", "DG", "DW")` | All drops |
-| `STATUS_DROP_OTHER` | `character(0)` | Administrative/other drops not already counted above |
+|---|---|---|
+| `STATUS_REGISTERED` | `RE`, `RS`, `RR` | currently registered |
+| `STATUS_WAITLIST` | `WL` | waitlisted |
+| `STATUS_DROP_EARLY` | `DR`, `DD` | early drop: no grade consequence, never DFW |
+| `STATUS_DROP_LATE` | `DG`, `DW` | late drop: a withdrawal |
+| `STATUS_DROP_ALL` | all four drops | |
 
-**Waitlist demand.** CEDAR's user-facing waitlist count is **class-list true demand**: distinct WL students after removing anyone with an RE/RS/RR registration in the same course title, term, delivery campus, college, and part-of-term group; duplicate WL rows within that group count once. Canonical helpers are in `R/branches/waitlist-demand.R`; Waitlists, Regstats, and the Department Dashboard must use them rather than summing `cedar_sections$waitlist_count` or `calc_cl_enrls()$wl_all`. `cedar_sections$waitlist_count` is a DESR snapshot field with a different source and grain, usable only as an explicitly labeled fallback. Historical extracts can retain only students still waiting when the term closed, so a small past-term count does not establish that earlier demand was small.
+**Waitlist demand is class-list true demand:** distinct WL students after removing anyone registered in the same course title, term, delivery campus, college and part-of-term group, through `R/branches/waitlist-demand.R`. Never sum `cedar_sections$waitlist_count` or `calc_cl_enrls()$wl_all` for it; the DESR count is a labelled fallback only. A past term's small count does not show earlier demand was small.
 
----
+## Enrollment Measures
 
-## Enrollment Measures: DESR `enrolled` vs Classlist `registered`
+DESR `enrolled` (`cedar_sections`) is the section headcount at the file pull: near peak for the current term, post-drop for past terms. Class-list `registered` counts students still registered at the pull. **Neither is a census freeze**, and comparing them, or one across terms pulled at different points, biases any demand or capacity analysis.
 
-CEDAR carries **two independent enrollment counts** that do not mean the same thing. Comparing them — or comparing one measure across terms whose snapshots were taken at different points in the term — silently biases any demand/capacity analysis.
+Reconstruct a lifecycle point from status codes: **census** = `registered + dr_late` (`add_census_enrl()`), **final** = `registered`, **ever registered** = `registered + dr_all`. **First day** is `calc_first_day_enrl()`, from status dates against each section's start. Census is the 15th day of instruction, three weeks after the first day, not "a week later"; read `start_date` and `census1` per section and never hardcode the interval ([enrollment-measures.md](docs/developers/enrollment-measures.md) has the calendar). Baselines: `calc_census_enrl_baselines()`, `prior_only = TRUE` for Regstats.
 
-| Measure | Column(s) | Source | What it is |
-|---------|-----------|--------|------------|
-| **DESR enrolled** | `enrolled`, `available` | `cedar_sections` | Section headcount **as of the file pull** (`as_of_date`). One snapshot retained per term. |
-| **Classlist registered** | `registered` (`calc_cl_enrls`, `R/branches/enrl.R`) | `cedar_students` | Distinct students in `STATUS_REGISTERED` — those **still registered** when the classlist was pulled. |
+**Fill.** Derive it from class-list counts at one explicit lifecycle point, never from the DESR snapshot. A course is *near full* at `CEDAR_NEAR_FULL_FILL` (90%) and *full* at `CEDAR_FULL_FILL` (98% of seats on the first day), both in `R/lists/seat_fill.R`; never write either as a literal and never call a 90% course full. A term with no status dates has no first-day count and is not judged, never filled in from census.
 
-**Neither is a census freeze.** `CENSUS1`/`CENSUS2` are census *dates*, not counts. No census-frozen headcount exists anywhere in the raw data.
+## Grades and the DFW policy
 
-**DESR snapshot timing varies by term, and this is the trap.** For the current term the retained DESR was pulled during active registration (≈ peak demand); for past terms it was pulled after the term ended (≈ final, post-drop count).
+Use the constants in `R/lists/grades.R` (`GRADES_DFW`, `GRADES_PASS`, `GRADES_PASS_SUB_C_OPT_IN`, `passing_grades`); never hardcode grade strings.
 
-Reconstruct any lifecycle point from classlist status codes: **census / peak** = `registered + dr_late`; **final / end-of-term** = `registered`; **total ever-registered** = `registered + dr_all`. Early drops (`DR`/`DD`) are registration churn and appear in neither census nor final counts. Late drops (`DG`/`DW`) are counted at census and gone from the final count — they are what make a course look *less* saturated at term end than it was at census.
+**Only A+ through C and CR pass by default. Every other recorded, non-audit grade, plus late drops, is DFW. Early drops are never DFW.** Not negotiable per cone:
 
-**The term calendar — the canonical statement; link here rather than restating an interval.** At UNM a Fall or Spring term moves through four points:
+- C-, D grades, F, W, I, NC, NR, P, S, retake variants and unfamiliar codes are DFW. AUD is excluded regardless of status. A blank grade is excluded unless late-drop status supplies the withdrawal.
+- A visible page control may opt in to `GRADES_PASS_SUB_C_OPT_IN` (C- and D pass); it must never activate silently, and a page without the control says it uses the default.
+- Most withdrawals post as DG/DW status, not W grades: a grade-only DFW undercounts W. Track early drops separately (`dr_early`), never in DFW.
 
-| Point | When | Recorded as | Count |
-|---|---|---|---|
-| Registration | from months before the term | each class-list row's `registration_date` (status date) | ever-registered: `registered + dr_all` |
-| First day of classes | the section's start (a Monday for full-term sections) | `cedar_sections$start_date` | `calc_first_day_enrl()` |
-| Census | the **15th day of instruction**: the third Friday, 18 calendar days after a Monday start | `cedar_sections$census1`, per section | `registered + dr_late` (`add_census_enrl()`) |
-| Final | end of term | — | `registered` |
+The classifier is **`classify_enrollment_outcomes()`** (`R/trunk/utils.R`); `classify_grades()` for grade-only frames. Course-level rates go through `get_course_outcome_rates()`. Saved `cedar_grades` is checked by `validate_cedar_grades_policy()`: bump `CEDAR_OUTCOME_POLICY_VERSION` when classification changes and rebuild it from the parsed class lists through `transform_to_cedar(tables = "students")`, never from the deduplicated `cedar_students`. Docker mounts `CEDAR_DATA_DIR` from `.env`, which need not be the repository's `data/`.
 
-Census is three weeks of instruction after the first day, **not "a week later"**. `census1 − start_date` is 18 days for 93% of Fall and Spring sections in each of the 17 terms Fall 2018–Fall 2026; the rest are part-term and late-start sections, which carry their own dates. Census is also the drop line, which is why `registered + dr_late` reconstructs it: 90% of dated early drops (`DR`/`DD`) fall on or before their section's census date and 98% of late drops (`DG`/`DW`) after it. Summer runs a different calendar; read `census1` rather than assume an offset. Code reads `start_date` and `census1` per section and never hardcodes the interval.
+## Right edges
 
-**Use the canonical helpers, don't re-derive the formula:** `add_census_enrl(df)` adds `census_enrl = registered + dr_late`; `calc_census_enrl_baselines()` lives beside it in `R/branches/enrl.R`. Regstats uses `prior_only = TRUE` (mean and population SD from strictly earlier matching terms); the default `FALSE` preserves the Waitlists all-history reference.
-
-**For saturation/capacity work:** derive fill rate from classlist headcounts at a single explicit lifecycle point, never from the DESR `enrolled` snapshot. **Two words, two levels, on every page:** a course is *near full* at `CEDAR_NEAR_FULL_FILL` (90%) and *full* at `CEDAR_FULL_FILL` (98% of its seats on the first day; pooled seats rarely fill to the last one). Both live in `R/lists/seat_fill.R` and are defined in `definitions.yml` (`seat-fill`); never write either as a literal, and never call a 90% course full. Enrollment projections judge seats on the first day of classes: capacity is reached at `first_day_enrl / scheduled_capacity >= CEDAR_FULL_FILL`, from `calc_first_day_enrl()` (status dates against each section's start). Ever-registered counts seat churn and flagged 72% of course-terms full; census follows three weeks of drops (see the term calendar above) and missed 199 of 598 course-terms that were full on day one. A term whose class lists carry no status dates has no first-day count and is not judged — never filled in from census. A term pulled before one of its later sessions began has none either (`first_day_basis = "sessions_pending"`); its begun sessions' count is a lower bound, read through `projection_judged_first_day()` only where it already reaches the level being judged (ISSUES.md I28).
-
-Regstats baseline contract (definition 3.0.0) and the Saturation report's exclusion rules: [enrollment-measures.md](docs/developers/enrollment-measures.md).
-
----
-
-## Grade Constants
-
-Defined in `R/lists/grades.R`. Use these constants for analytics; do not hardcode grade strings in cones.
-
-| Constant | Purpose |
-|----------|---------|
-| `GRADES_DFW` | Known nonpassing outcomes: C-, D-range, F, W, I, NC, NR, P, S, and retake variants. Canonical classifiers also fail closed on unfamiliar recorded grades. |
-| `GRADES_PASS` | Default analytics pass set: A+ through C, CR, and passing retake variants. |
-| `GRADES_PASS_SUB_C_OPT_IN` | Explicit exception that also treats C- and D-range grades as passing. Never the default. |
-| `passing_grades` | Grades that earn credit hours in the credit timeline. |
-
-### CEDAR-wide DFW policy
-
-**CEDAR's default DFW threshold treats only A+ through C and CR as passing. Every other recorded, non-audit grade plus late drops (`STATUS_DROP_LATE`) counts as DFW/nonpassing. Early drops (`STATUS_DROP_EARLY`) are NEVER DFW.** This definition is not negotiable per-cone:
-
-- C-, every D grade, F, W, I, NC, NR, P, S, their retake equivalents, and unfamiliar nonblank grade codes count as DFW by default. AUD is excluded regardless of registration status, including DG/DW. Blank/NA grades are excluded unless late-drop status supplies the withdrawal outcome.
-- A visible page control may opt in to `GRADES_PASS_SUB_C_OPT_IN`; that exception adds only C- and D-range grades to passing. It does not make P or S pass, and **it must never activate silently.** A page without the control uses the default and says so.
-- A **late drop** (DG/DW) is the registration-status form of a W. Most withdrawals post as late-drop status rows, *not* as W grades, so any DFW computation that looks only at grades undercounts W.
-- An **early drop** (DR) posts no grade. It is registration churn, not an academic outcome; counting it as DFW inflates failure rates with non-failures. Track early drops **separately** (`dr_early`, `n_early_drop`), never folded into DFW.
-
-The canonical classifier is **`classify_enrollment_outcomes()` in `R/trunk/utils.R`** — used by the `cedar_grades` pre-computation and by `classify_outcomes()` (`cones/stopout.R`). Grade-only frames use `classify_grades()`. Do not write a new inline pass/DFW classification. Course-level DFW outputs flow through `get_course_outcome_rates()` (`R/branches/course-attempts.R`).
-
-Saved `cedar_grades` carries `cedar_outcome_policy_version`, checked by `validate_cedar_grades_policy()` before Pathways outcome consumers use it. Bump `CEDAR_OUTCOME_POLICY_VERSION` when classification changes and rebuild from the current parsed `class_lists` through `transform_to_cedar(tables = "students")` — never stamp an old file, and never rebuild from the already course-deduplicated `cedar_students` (that would lose legitimate separate CRN outcomes). Docker mounts `CEDAR_DATA_DIR` from `.env`, which need not be the repository's `data/`; check the actual mount before refreshing saved files, update both runtime copies when separate, and restart the app.
-
----
-
-## CEDAR-wide right-edge policy
-
-**Never bound an analysis with `max(term)`, a hardcoded term, or arithmetic on `cedar_current_term`.** Use the edges computed once at startup by `cedar_report_edges()` (`R/branches/data-edges.R`). This is the same class of rule as the campus and DFW policies.
-
-CEDAR's local data runs behind the registrar, and a term does not arrive all at once — registration appears months early, grades land weeks late. So "the last term in the data" is at least two different terms depending on what you ask.
+**Never bound an analysis with `max(term)`, a hardcoded term, or arithmetic on `cedar_current_term`.** Use the edges `cedar_report_edges()` computes once at startup (`R/branches/data-edges.R`), also on `cedar_terms` as flags:
 
 | Edge | Use it for |
 |---|---|
-| `last_graded` (`cedar_graded_through`) | anything reading a grade: DFW, pass rates, grade distributions, stop-out after a DFW, course outcomes |
-| `last_enrolled_complete` (`cedar_report_end_term`) | settled enrollment reporting, and the hard observation edge for every longitudinal analysis |
-| `last_enrolled` (`cedar_report_latest_term`) | descriptive current-registration charts — headcount, course enrollment, attempted SCH — **only with every term after `last_graded` labelled in progress** (`cedar_in_progress_terms()`, `mark_plotly_terms()`). Never a trend comparison, a longitudinal denominator, or a grade-based rate |
+| `last_graded` | anything that reads a grade |
+| `last_enrolled_complete` | settled enrollment reporting; the hard edge for every longitudinal analysis |
+| `last_enrolled` | descriptive current-registration charts only, with every term after `last_graded` labelled in progress (`mark_plotly_terms()`) |
 | `last_degree` | completions |
 
-**Current enrollment is never hidden.** A term with registrations appears on descriptive charts the day it lands, labelled, rather than waiting to settle or be graded: hiding it made Fall 2026 vanish from Dept Trends for its first weeks, and earned-only SCH hid it until grades posted. That is why SCH is *attempted* hours (`filter_sch_rows()`, definition credit-hours 3.0.0) — a grade is an outcome, and outcomes keep their own edge. It is counted at census, still registered plus late drops (late drops at their section's credit value, because Banner zeroes theirs), with the end-of-term count beside it on the main Credit Hours chart; census matches UNM's official enrollment report.
+- **Current enrollment is never hidden** from descriptive charts; it is labelled. SCH is attempted hours at census (`filter_sch_rows()`).
+- A term counts as settled by pull date against its start, never by comparing row counts to prior years. An edge that cannot be determined is `NULL` and fails closed; startup stops without the settled and graded edges. Say which edge you used (`cedar_edge_note()`).
+- **Longitudinal follow-up** (retention, persistence, flows, sequences) stops at `last_enrolled_complete`, or `cedar_longitudinal_edge(edges, grade_dependent = TRUE)` when it reads a grade. Never let a partial term into a cohort, denominator or cache key.
+- **A row with no posted grade is unknown, never a failure.** Filter to `last_graded` before classifying; no catch-all `TRUE ~ "failed"`.
+- **An A→B analysis needs an opportunity edge:** drop A rows whose follow-up term is past `last_enrolled_complete`, report how many, and keep that separate from B's outcome edge.
+- Distinguish strictly earlier (`term_y < term_x`) from same-term completion; never call a concurrent course "before".
+- `cedar_current_term` and `cedar_default_term` (`config/shiny_config.R`) are settings, not edges.
 
-**The edges are computed in one place.** `cedar_report_edges()` sets all four at startup, for `global.R` and the cache-warming scripts alike, so the app and the caches it reads agree; none is hand-maintained. A term counts as settled when the newest pull covering it happened at least `min_days_after_start` days (default 14) after the term began — **never by comparing row counts to prior years**, which cannot distinguish a real enrollment decline from an unfinished term. An edge `cedar_data_edges()` cannot determine is `NULL`, never a guess: fail closed. The app cannot run without the settled and graded edges (Pathways reads a `NULL` bound as no bound), so `cedar_report_edges()` stops startup without them rather than guess from the current term. **Say which edge you used** — `cedar_edge_note()` produces the sentence. The same edges are on the term dimension `cedar_terms` (`build_cedar_terms()`, `R/branches/cedar-terms.R`; `data_objects[["cedar_terms"]]`) as per-term flags — `is_settled`, `is_graded`, `in_progress`, `has_degrees`, `is_upcoming` — beside each term's season, academic year, next and previous regular term, first day and census date, so a reader can `filter(is_settled)` or join `next_regular_term` instead of re-deriving them. The flags are the startup edges passed in, never recomputed; a NULL edge is NA on every row (ADR-001 step 1). A Fall or Spring with no class list inside the enrolled run is a row with zero enrollment, named at startup, never a stop: the synthetic institution has such gaps by design, and `cedar_student_terms` judges no return into one.
+Details and the failures behind each: [right-edge-policy.md](docs/developers/right-edge-policy.md).
 
-**Term settings: two are set by hand, and neither is an edge.** `config/shiny_config.R` sets `cedar_current_term`, the term the institution is in — a later term with sections but no enrollments is upcoming, which puts Enrollment's low-enrollment view into comparing the schedule with each course's history — and `cedar_default_term`, the term every picker opens on. Loading a new term changes neither: pickers list every term in the data, and the edges move on their own. Nothing caps the edges at `cedar_current_term`, so a term registering ahead of it reaches the descriptive charts, labelled in progress, the day it lands. What each setting does in practice: `config/shiny_config_template.R`.
+## Campus
 
-### Grade outcomes and longitudinal follow-up require two separate right edges
+**Any analytic grouped by course is also grouped by campus.** Wherever `subject_course` is in a `group_cols`, `group_by()`, `count()` or join key, `campus` is beside it. A campus-blind aggregate is not an error; it is a plausible number wrong by 25–35%.
 
-**Do not cap an entire page merely because it contains a longitudinal panel.** Current registration is valid descriptive data. The hard right edge belongs to computations needing comparable history or a later observation — retention, next-term persistence, course flows, sequence effects, downstream success. Those stop at `last_enrolled_complete`; if they also read a grade, use `cedar_longitudinal_edge(edges, grade_dependent = TRUE)`. Never let a partial current term enter a longitudinal cohort, lookup, denominator, cache key, or outcome.
+- Group, don't just filter; a campus filter is the user's scope choice, never a substitute for the key.
+- Carry campus through every join and into plot keys.
+- Keep headline totals independent of the display grain; sibling tables on one page share a grain.
+- `campus` is the campus that taught the section; `student_campus` is the student's home campus. They disagree on 28% of rows. Course analytics scope on `campus`, through `cedar_filter_campus()` / `CEDAR_CAMPUS_DEFAULT`, never a bare `c("ABQ", "EA")`.
+- Scoping the cohort is not scoping the outcome: retention's outcome is UNM-wide.
+- A deliberate campus-neutral operation carries a `CAMPUS_ROLLUP:` comment with the reason; `test-architecture.R` enforces it. The existing ones: `get_course_pairs()`, `get_course_timing(opt$group_campus = FALSE)`, and the projections' `abq_ea_course_market`.
 
-**A row with no posted grade is unknown, never a failure or a non-pass.** Filter grade-dependent rows to `last_graded` *before* selecting an attempt or classifying its outcome, then pass them through `classify_enrollment_outcomes()`. Never use a catch-all `TRUE ~ "failed"`: blank grades, incompletes, audits, and NR/NC are excluded from the denominator and reported as unobserved.
-
-An A→B analysis also needs an **opportunity edge** for the A cohort. A student who took A too recently to have the declared follow-up interval is right-censored, not a non-continuer. For a one-regular-term window:
-
-1. Compute the first possible follow-up with `add_next_term_col(..., summer = FALSE)`.
-2. Exclude A rows whose follow-up term is after `last_enrolled_complete` from the continuation denominator.
-3. Report the number excluded and show the data window in the page methodology.
-4. Keep this separate from the B outcome edge.
-
-For prerequisite/order questions, distinguish **strictly earlier** (`term_y < term_x`) from **same-term** (`term_y == term_x`) completion. Concurrent courses must never be described as passed "before" the focal course. When a single downstream course was already passed strictly earlier, exclude that student from the progression denominator and surface the count; for a multi-course rollup, show prior completions as context but do not infer that passing one member makes the student ineligible for every course in the set.
-
-**Roadblocks observation grain:** `get_stopout()` selects the first eligible outcome per student/course/delivery campus after scope, population-window, and right-edge filtering. Agreeing first-term records collapse; conflicting ones exclude the comparison and are reported in `observation_info`. This does not change CEDAR's all-attempt course DFW rates — `get_dfw_rates()` is a separate ever-DFW measure and must not supply Roadblocks context.
-
-The measured failures that established these rules: [right-edge-policy.md](docs/developers/right-edge-policy.md).
+Reasoning and the inventory: [campus-policy.md](docs/developers/campus-policy.md).
 
 ---
 
-## CEDAR-wide campus policy
+## Writing a cone
 
-**Any analytic grouped by course must also be grouped by campus.** Wherever `subject_course` appears in a `group_cols` vector, a `group_by()`, a `count()`, or a join key, `campus` belongs beside it. Not a display preference — the same class of rule as the DFW policy, and not negotiable per-cone.
+Each cone is one file in `R/cones/` answering one question. It takes CEDAR tables plus `opt = list()` and returns a tibble or named list: no Shiny, no side effects, no other cones. **Before writing anything, check [layer-inventory.md](docs/developers/layer-inventory.md) and `grep` the source**: an existing function may already answer it.
 
-UNM is not one campus: `ABQ` is 61% of enrollment rows, online `EA` 24%, and eight branch campuses 15%. **21% of all courses are taught on more than one campus**, and they are the high-enrollment ones people actually analyse. A campus-blind aggregate is not an error or an empty table; it is a plausible number wrong by 25–35%, which is why it survives review.
+- Validate required columns up front and stop loudly.
+- Reuse `filter_DESRs()` / `filter_class_list()`, and `ungroup()` immediately after `filter_DESRs()`.
+- Define an explicit output contract; no trailing `everything()` unless documented.
+- `cedar_debug()` for key counts (guard with `exists("cedar_log_level")` if sourced standalone); `%||%` for `opt` defaults.
+- Never silently recover from missing schema, malformed input, or an impossible empty join.
+- Tests use the committed fixtures, never inline tibbles.
 
-Grouping is **not** filtering. Filtering to `ABQ` answers one question and discards the rest; grouping keeps every campus visible as its own row. Prefer grouping. A campus filter is a user's choice about scope, never a substitute for the grouping key.
+**Grades in cones:** `get_course_outcome_rates()` (DFW, W, D/F, below-C, early drop), `get_grade_distribution()`, and `prepare_course_attempts()` for row-level attempts. `dfw_pct = (failed + late_dropped) / (passed + failed + late_dropped) * 100`.
 
-- **Group, don't just filter.** `group_cols = c("campus", "department", "subject_course")`.
-- **Carry campus through every join.** A one-row-per-campus table joined on `(department, subject_course)` fans out silently and attaches the wrong comparison value. See `R/features/gen-ed.R`.
-- **Carry campus into plot keys.** A chart keyed on `subject_course` alone draws two campuses over each other with no warning. See `instructor_dfw_plot` in `R/modules/gen-ed.R`.
-- **Keep headline totals independent of the display grain.** Compute totals from their own unfiltered pass, not by summing a small-cell-guarded table.
-- **Sibling tables on one page must share a grain**, or the page reads as though the data disagrees with itself.
+**Plots** may live in the domain file they draw, in marked calculation / plot-prep / plotting sections. They take prepared results and never re-filter raw tables, read globals or recompute. `prepare_*_plot_data()` shapes, `plot_*()` builds; `term_axis_factor()` for term axes; colours from `build_color_map()` / `CEDAR_PALETTE` / `CEDAR_SEMANTIC_COLORS`. **Native `plot_ly()` only**; convert a `ggplotly()` when you touch it. No `brewer.pal()` outside `utils.R`, no tab-local palettes.
 
-**Two campus fields.** `campus` is the campus that **taught the section**; `student_campus` is the student's **home campus**. **They disagree on 28% of enrollment rows** — Albuquerque-home students take hundreds of thousands of rows through EA and the branches. A filter on `student_campus` does *not* keep branch-delivered course rows out of a main-campus view. Course-level analytics scope on `campus`. Use `cedar_filter_campus()` / `cedar_require_campus()` (`R/lists/campuses.R`) and `CEDAR_CAMPUS_DEFAULT` rather than a bare `c("ABQ", "EA")` literal.
+**Populations.** A population is a tibble of `student_id`s built by `build_population()` (`R/branches/population.R`) and passed to population-aware cones as `population` (never `cohort`). Read the CONCEPTS block at the top of `population.R` before working there. Never re-derive entry terms from a student's whole program history: `population$first_unit_term` is scoped to the focal programs. New population types are `build_X_population()` helpers wired into `build_population()`. Observational comparisons use `build_comparison()` / `compute_balance()` (`branches/comparison.R`).
 
-**Cohort vs outcome.** Scoping the cohort is not scoping the outcome. Retention's cohort is campus-scoped, but the outcome — still enrolled anywhere at UNM — is deliberately UNM-wide; narrowing it would count every inter-campus transfer as attrition. See `.build_enrolled_lookup()` in `R/branches/retention-context.R`, which reads `cedar_student_terms$enrolled`.
+**Trunk helpers first** (`R/trunk/utils.R`, `filter.R`): `add_next_term_col()`, `add_term_type_col()`, `term_diff()`, `fmt_term()`, `keep_home_sections()`, `validate_population()`, `compute_trend()` / `compute_windowed_trend()`. Gotchas:
 
-**Deliberate exceptions** are allowed and must be commented at the site with the reason. The three that exist: `get_course_pairs()` (a pair is one student's path and may legitimately span campuses); `get_course_timing()` under `opt$group_campus = FALSE` only (trajectory questions); and enrollment projections' named `market_id = "abq_ea_course_market"` (ABQ and EA as one planning market — must prefilter to declared campuses, count each student-course once, pool capacity, and save every campus/part-term row in `delivery_components`). Other analyses may not infer an exception merely because they also use `CEDAR_CAMPUS_DEFAULT`.
+- `filter_DESRs()` may return grouped data: `ungroup()` before `count()`, `summarize()` or a join.
+- Never scalar `&&` / `||` inside `filter()` with row-vector logic; branch outside the pipeline.
+- A summary with a different filter scope is its own named output, documented on the page.
+- Set the status option explicitly for each filter pass.
+- `compute_windowed_trend()` with `group_modify` over course pairs hangs; use vectorized `group_by + summarize`.
 
-**Audit enforcement.** A campus-neutral curriculum, trajectory, or named planning-market operation must carry a nearby `CAMPUS_ROLLUP:` comment explaining why no single delivery campus belongs on the result. `tests/testthat/test-architecture.R` enforces that marker for literal `subject_course` groupings.
+**Opt lists:** `opt = list()` is the last argument, resolved with `%||%`. Common keys: `term`, `campus`, `dept_code`, `college`, `level`, `min_n`, `subject_code`, `include_summer`. Option objects use `dept_code`; the table column is `department`; `department_code` is not used.
 
-Full reasoning and the 1.0 inventory: [campus-policy.md](docs/developers/campus-policy.md), [campus-grain audit](docs/developers/campus-grain-audit-2026-08.md).
-
----
-
-## Cone Architecture
-
-**Before changing Degree Explorer, read [degree-explorer-rules.md](docs/developers/degree-explorer-rules.md).** It records the visual interface, course-family row alignment, early Gen Ed/later upper-level timing, 15/16-credit workload policy, planning colors and catalog evidence contract.
-
-Degree Explorer adds `R/branches/degree-requirements.R` (rule outlines, semester scheduling and descriptive
-grouping), `R/cones/grouped-student-paths.R` (`get_grouped_student_paths()`),
-`R/features/degree-explorer.R` (semester-roadmap and observed-path payloads), and
-`R/modules/degree-explorer.R` (`degreeExplorerUI/Server()`, Explore > Degree Explorer).
-`R/modules/observed-course-paths.R` mounts `observedCoursePathsUI/Server()` in
-Pathways > Course paths, sharing that tab's population. Degree Explorer displays
-one program and adapts its semester board to math/English starting points.
-Course-count/permission conditions are separate from named-course arrows; suggested
-Gen Ed tiles are labelled and lighter. Its popup uses one standard CEDAR table
-with reconstructed first-day enrollment, not a census substitute.
-Its versioned catalog excerpts, authored roadmap templates and subject groups live under `institution/<id>/`;
-they are not student audits or forecast inputs. Contract:
-[degree-requirements.md](docs/developers/degree-requirements.md).
-
-Shared University/Gen Ed/awarding-college references are annual JSON sets under
-`institution/<id>/shared_requirements/<year>/`, separate from degree CSVs.
-`R/branches/shared-requirements.R` validates scope, rule structure and optional
-source proof; the companion feature renders readable rules and captures new
-pinned-source candidates. `scripts/shared-requirements.R` is the offline entry
-point. The same annual rules now drive illustrative Gen Ed coverage and named
-area allocation inside existing allowance budgets, plus standard upper-credit
-context. Elective/minor cards may use any undergraduate level; grades, transfer,
-approvals and conditional alternatives remain outside this prototype. Flexible
-coverage stays visibly provisional while the recorded source conflict remains.
-They are not a student audit.
-
-The offline catalog scanner adds `R/trunk/source-snapshots.R` (HTTP capture,
-hashes and verified reads), `R/branches/catalog-extraction.R` / `catalog-comparison.R`
-(draft trees and language differences), `R/branches/catalog-milestones.R`
-(shared standing/admission gates and captured program-link resolution), and `R/features/catalog-capture.R` /
-`catalog-analysis.R` (capture/resume and review artifacts). Its CLI is
-`scripts/scan-degree-catalog.R`; source, credential-scope and phase maps live in
-`institution/<id>/catalog_scan_*.csv`. Acquisition never runs in Shiny and never
-modifies reviewed degree files. `R/branches/catalog-review.R` builds actionable
-review rows and program reference scopes; `R/features/catalog-review.R` discovers
-local analyses, verifies their artifacts and sources, and retrieves complete source
-sections. `catalogReviewUI(id, catalog, roadmaps)` / `catalogReviewServer(id, root, active,
-catalog, roadmaps, review_root, shared)` in
-`R/modules/catalog-review.R` mounts at Admin > Data & Usage > Catalog Review.
-It reuses prepared data in a content-keyed app memory cache, verifies derived
-artifacts before cache lookup and original source bytes on Inspect, preserves
-state on return, and renders table controls only for visible rows. Full offline
-scanning/extraction still verifies all sources. It shows source checks separately from narrative flags,
-and exposes every unreviewed section. Viewing/exporting never approves rules or
-edits source/runtime files. Extracted rules remain unreviewed. Contract:
-[catalog-scanning.md](docs/developers/catalog-scanning.md).
-
-Admin Catalog Review defaults to **Visualization rules**, generated by
-`build_degree_plan_rules(catalog, roadmaps, view)` from the same inputs as Degree
-Explorer. `degreePlanRulesUI/Server(id, catalog, roadmaps)` and the graph's rules
-dialog share its renderer. This explains the prototype without an approval
-workflow: distinguish recorded policies from enforced ordering/budget constraints
-and CEDAR preferences, retain quotes/links, and never show parser limitations as
-broken chart rules. Required clinical blocks retain every component and their
-actual component count for chain metrics.
-
-Catalog interpretation uses versioned, complete-program AI drafts plus
-separate reusable course units, not a growing semantic phrase grammar.
-`R/branches/catalog-normalization.R` validates graphs, citations and complete
-passage coverage; `R/features/catalog-normalization.R` preserves immutable
-packets/proposals and hash-linked human review revisions. Maintainer drafts in
-`institution/<id>/catalog_interpretations/<edition>/` stage automatically; exchange
-controls and their observer are commented out for future shared use. Sign-off is
-one explicit action per complete unit, blocked by unresolved cases; routine rules
-and passages need no individual approval clicks. Edits reopen sign-off. This
-optional workflow is under **Draft interpretations**; old queues are **Extraction
-diagnostics**, loaded only on demand. `scripts/normalize-degree-catalog.R` and
-`config/catalog-normalization*` define the exchange contract. No AI API calls,
-automatic approvals or runtime compilation occur. See
-[catalog-normalization.md](docs/developers/catalog-normalization.md).
-
-Each cone is a focused file in `R/cones/` answering one analytical question. Cones take CEDAR tables plus `opt = list()` and return a tibble or named list. No Shiny dependencies, no side effects, no calls to other cones.
-
-**Before writing anything, read [layer-inventory.md](docs/developers/layer-inventory.md)** — the per-function index of branches, cones, features, and trunk helpers, with the parameters and behavioral caveats this file no longer carries. An existing function may already answer your question; `grep` the source for the authoritative signature.
-
-- **`R/branches/`** — `dims.R` (`build_cedar_dims()`, `attach_unit()`, `attach_default_units()`: the dimension tables and the one place a row gets its unit, on every table a loader holds) · `courses.R` (`build_cedar_courses()`, `attach_course_ids()`, `resolve_course_codes()`, `detect_course_renamings()`: the course dimension, one `course_id` per code through `code_history.csv`, attached at load; `data_objects[["cedar_courses"]]`, `data_objects[["cedar_course_codes"]]`; `key_on_course_id()`, `course_id_of()`, `course_codes_of()`, `course_code_renames()`: reading a table by course rather than by code) · `population.R` (`build_population()`, the central cohort builder) · `comparison.R` (`build_comparison()`, `compute_balance()`) · `enrl.R` (`calc_cl_enrls()`, `get_enrl()`, census and history helpers) · `course-attempts.R` (`get_course_outcome_rates()`, `get_grade_distribution()`) · `data-edges.R` · `cedar-terms.R` (`build_cedar_terms()`: the term dimension, one row per term with the edges as flags, next/previous regular term, first day and census date; `data_objects[["cedar_terms"]]`) · `student-terms.R` (`build_student_terms()`: one row per student-term, the one definition of enrolled and returned, built in the transform; `attach_student_term()` joins its columns onto any rows) · `credit-timeline.R` · `gpa-timeline.R` · `course-flows.R` · `major-change-detection.R` · `retention-context.R` · `relative-terms.R` · `waitlist-demand.R` · `demographics.R` · `headcount.R` · `credit-hours.R` · `degrees.R` · `pathways.R` · `data-anomalies.R` · `enrollment-projections.R` plus its stage files `enrollment-projection-{inputs,candidates,context,backtests,history,plan,error-sources,bundle}.R` (all model source) · `registration-snapshots.R` (`build_registration_snapshot()`: a term's registration and schedule counts on the day they were pulled) · `return-snapshots.R` (`build_return_snapshot()`: which of last term's students have registered for the Fall or Spring term in registration, by unit, standing and warning sign, on the day pulled) · `mapping-audit.R` (`audit_mapping_coverage()`: every value the mapping files do not cover, run at the end of every transform and live on Admin > Mappings)
-- **`R/cones/`** — `pathway.R` (course timing + curriculum map) · `course-pairs.R` · `course-adjacency.R` · `course-sequence-effect.R` · `course-instructor-effect.R` · `course-outcomes.R` · `course-retention.R` · `retention-summaries.R` · `stopout.R` · `major-changes.R` · `gen-ed-grads.R` · `gen-ed-conversion.R` · `bottleneck.R` · `waitlist.R` · `seatfinder.R` · `cancellations.R` · `declaration-context.R` · `entry-heatmap.R` · `course-demographics.R` · `population-trend.R` · `sfr.R` · `course-neighbors.R` · `data-integrity.R` · `enrollment-projections.R`
-- **`R/features/`** — `course-report.R` (Course Dynamics) · `enrollment.R` (Enrollment tab) · `dept-trends.R` · `dept-dashboard.R` · `gen-ed.R` · `regstats.R` · `admin.R` · `enrollment-projections.R` · `enrollment-projection-view.R` (the page payload; not model source) · `enrollment-projection-refresh.R` · `enrollment-projection-scenario.R` · `registration-snapshots.R` (one course file and one return file per term in registration per pull, written by `scripts/record-registration-snapshot.R` after each refresh)
-
-**Grade data in cones:** `get_course_outcome_rates()` for DFW, W, D/F, C-, below-C, and early-drop metrics (returns `n_attempts`, `n_pass`, `n_c_minus`, `n_d`, `n_f`, `n_w`, `n_early_drop`, `dfw_pct`, `w_pct`, `df_pct`, `below_c_pct`); `get_grade_distribution()` for A/B/C/D/F/W/Other; `prepare_course_attempts()` only for row-level cleaned attempts. `dfw_pct` is `(failed + late_dropped) / (passed + failed + late_dropped) * 100`, where `failed` includes C- and other non-passing, non-W grades.
-
-**Plot function placement.** Plot functions may live in the domain file they visualize; split files into marked calculation / plot-prep / plotting sections rather than adding a plotting layer. They accept already-prepared tibbles or result lists from their sibling helpers — never re-filter raw `cedar_*` tables, reload cached data, read global state, or recompute the analysis. Use `prepare_*_plot_data()` for shaping and `plot_*()` for construction; `term_axis_factor()` / `term_axis_levels()` for ordered term axes; `build_color_map()`, `cedar_plotly_palette()`, `CEDAR_PALETTE`, `CEDAR_SEMANTIC_COLORS` from `R/trunk/utils.R` for colour. **Native `plot_ly()` only** — no new `ggplot()` + `ggplotly()`; convert when you touch one. Never call `RColorBrewer::brewer.pal()` outside `utils.R` or create tab-local categorical palettes.
-
-### New cone checklist
-
-- One analytical question; never calls another cone; `opt = list()` is the final argument.
-- Validate required input columns up front and stop loudly if any are missing.
-- Reuse trunk/branch helpers (`filter_DESRs()`, `filter_class_list()`). After `filter_DESRs()`, call `ungroup()` immediately — it may return grouped data.
-- Define an explicit output contract. Do not append `everything()` unless the cone documents that it returns pass-through columns.
-- `cedar_debug()` for key row counts and branch points, guarded with `exists("cedar_log_level")` if the cone may be sourced standalone; `%||%` for optional `opt` defaults.
-- Never silently recover from missing schema, malformed inputs, or empty joins that should be impossible.
-- Add focused tests using the committed fixtures; no inline test tibbles.
-
----
-
-## Population Architecture
-
-A population is a tibble of `student_id`s (plus classification columns) built by `build_population()` in `R/branches/population.R` and passed to any population-aware cone. Population building is completely separate from analysis — cones accept a `population` argument and don't care how it was constructed.
-
-**Before working in this code, read the CONCEPTS block at the top of `R/branches/population.R`.** It defines the shared ontology every Pathways analysis assumes: the six outcomes and their precedence (and why `stopped_out` is a residual, not a detection), the three independent entry axes (`origin` / `entry_method` / `entry_status`), the six per-student timestamps, the `relevant_until` enrollment-ceiling contract, and the two data-boundary rules.
-
-```r
-population <- build_population(cedar_programs, degrees = cedar_degrees, student_terms = cedar_student_terms,
-  opt = list(
-    focal_names        = c("Nursing", "Radiologic Sciences"),
-    pre_major_names    = c("Biology", "Biochemistry"),
-    include_pre_majors = "split"   # "majors_only" | "pre_only" | "lump" | "split"
-  ))
-
-get_bottlenecks(population, cedar_students, opt = list())
-```
-
-Key options: `focal_names`, `pre_major_names`, `include_pre_majors`, `campus` (restricts by `student_campus`), `term`.
-
-**Cone parameter name:** population-aware cones use `population`, not `cohort`. Check the signature before passing — e.g. `detect_major_changes(programs, population = NULL, opt)`.
-
-**`population$first_unit_term` is scoped to the focal programs.** Do NOT re-derive entry terms with `programs %>% filter(student_id %in% focal_ids) %>% group_by(student_id) %>% summarize(min(term))` — that picks up a student's entire program history, not just the focal program.
-
-**Adding a population type:** add a `build_X_population(programs, opt)` helper in `population.R` and wire it into `build_population()`. Shiny wiring lives in `R/modules/pathways.R`.
-
-**Observational comparisons:** use `build_comparison()` and `compute_balance()` from `branches/comparison.R`. See `course-sequence-effect.R` for the reference pattern.
-
----
-
-## Trunk Helpers
-
-Always check `R/trunk/utils.R` and `R/trunk/filter.R` before writing equivalent logic in a cone or branch. Full function tables: [layer-inventory.md](docs/developers/layer-inventory.md).
-
-The ones you will reach for most: `add_next_term_col()` / `add_prev_term_col()` / `add_acad_year()` / `add_term_type_col()` / `term_diff()` / `fmt_term()` for term math; `filter_class_list()` and `filter_DESRs()` for the standard opt-driven filters; `keep_home_sections()` for crosslist de-dup; `validate_population()` at the top of any cone taking a population; `compute_trend()` and `compute_windowed_trend()` instead of hand-rolled `lm()` slopes.
-
-### Filter / dplyr gotchas
-
-- `filter_DESRs()` may return grouped data. Always `ungroup()` immediately before `count()`, `summarize()`, `group_by()`, or downstream joins.
-- Do not use scalar `&&` / `||` inside `filter()` when the right-hand side is row-vector logic — it coerces a column-length vector to one TRUE/FALSE and fails on real data. Branch outside the pipeline or use vectorized `&` / `|`:
-
-```r
-filtered <- df %>%
-  {
-    if (length(seasons) == 0) .
-    else filter(., term_type %in% seasons)
-  }
-```
-
-- If a summary table intentionally uses a different filter scope than the main result, compute it as a separate named output in the cone and document that in the module caption or scope stripe.
-- When filtering by status codes, set the status option explicitly for each separate filter pass. Do not assume a copied `opt` shares later mutations.
-- **`compute_windowed_trend()` with `group_modify` over course *pairs* hangs** (thousands of groups × closure overhead). Use vectorized `group_by + summarize` for pair trends.
-
----
+**Data-flow notes.** Dept Trends passes unfiltered `cedar_students` to `get_credit_hours_for_dept_trends()` and filtered students to `credit_hours_by_major()`; every SCH function also takes `cedar_sections`. `credit_hours_data$level` includes `"total"`: filter to it to avoid double counting. `get_stopout()` calls `add_next_term_col()` internally.
 
 ## Caching
 
-General cache infrastructure lives in `R/trunk/cache.R`; Regstats keeps its own in `R/features/regstats.R`. All follow the same shape: a key builder, save/load helpers writing `.qs`/`.Rds` under `get_cache_dir()`, and a miss returning `NULL` so the caller recomputes.
+Infrastructure is in `R/trunk/cache.R` (Regstats keeps its own). A miss returns `NULL` and the caller recomputes; write atomically (`.tmp` then rename).
 
-**Cardinal rule 1: the cache key must encode every input that changes the result.** A filter not in the key makes two different requests collide, and the second silently gets the first's result — the filter appears dead even though the compute path is correct. When you add a filter or option to a cached feature, add it to that feature's key function *in the same change*, and verify the key string actually changes when the input changes.
+- **Cardinal rule 1: the key encodes every input that changes the result.** Add a new option to the key in the same change, and check the key string changes. Cover data freshness and a manual version counter; prefer hashing the whole option set.
+- **Cardinal rule 2: never persist configuration in a payload.** Palettes, thresholds, flags are read live; if a payload must record its config, put it in the key.
+- `DEPT_CACHE_TABLES` declares each Dept tab's sources. `cache_dept_tab()` strips `data_objects_filt` and the palette. Dept Trends fingerprints the palette in its key; the Dashboard does not, so a palette change there bumps `cedar_dept_dashboard_cache_version`.
 
-**Cardinal rule 2: never persist configuration into a cached payload.** A cache stores *data*. Palettes, thresholds, feature flags, anything from `config/` belongs to the running app and must be read live on every load. A payload written under an old config otherwise keeps forcing that config on everything rebuilt from it, and the key has nothing that could notice. If a payload must record which config produced it, put that in the **key**, so a config change is a cache miss instead of a silent override.
+The incidents behind the rules: [caching.md](docs/developers/caching.md).
 
-A key must cover **every result-affecting option** (prefer hashing the whole option set over hand-listing keys, which is easy to under-specify), **data freshness** (a data hash, the current term, or a short time window — *a time-based key alone is the weakest option* and must be paired with a version counter), and **a manual version counter** bumped whenever the shape or logic of the cached output changes.
+## Shiny modules
 
-Conventions: loads return `NULL` on miss and the caller recomputes (a documented supported state, not a silent fallback); non-standard requests may bypass the cache rather than pollute it; write atomically (`.tmp` then `file.rename`) and keep live `data_objects` and configuration out of payloads. Dept Trends and the Dept Dashboard both retain built plot objects to avoid reconstructing charts; `cache_dept_tab()` strips `data_objects_filt` and `palette` and compacts the Plotly objects before saving. Dept Trends fingerprints the palette in its **key**, so a palette change is a miss; the Dashboard does not, so a palette change there requires bumping `cedar_dept_dashboard_cache_version`. `DEPT_CACHE_TABLES` declares each tab's source dependencies — add one when a tab starts reading a new source. `scripts/warm-dept-trends-cache.R` warms the standard production scope after a data refresh.
+Every new tab is a module (`R/modules/pathways.R` is the full pattern, `headcount.R` the extraction template). Don't refactor inline `server.R` tabs unless you are touching them anyway. Details: [shiny-modules.md](docs/developers/shiny-modules.md).
 
-The two incidents behind the cardinal rules: [caching.md](docs/developers/caching.md).
+- **Data lives in `data_objects`, not bare globals**; pass tables to the module server explicitly.
+- One file per module, sourced after cones; UI in `ui.R`, server in `server.R`.
+- Errors caught with `tryCatch` + `showNotification()`; slow work in `withProgress()`; large choice lists with `updateSelectizeInput(server = TRUE)`.
+- An Explore tool modeled on Open Seats or Regstats copies the whole run pattern: overlay, report timer, `*_load_complete` message, URL copy, autorun.
+- **Input values match data values**: level is `"lower"`/`"upper"`/`"grad"`; map labels to values in the server.
+- **Tables are interfaces**: pick an explicit display-column order in the module.
+- Shared UI helpers and CSS classes only; no inline `style =` or one-off classes.
+- **Every section is a heading plus one sentence** giving scope, denominator and exclusions (`subtab_header()` → `dashboard_section()` → `section_heading()`); never a bare `h3()`–`h6()`. Two sections showing the same numbers is a bug. Shared metric text comes from `docs/_data/definitions.yml` via `cedar_definition_note()`.
 
----
-
-## Shiny Module Pattern
-
-Use for all new feature tabs. Do not refactor existing inline `server.R` tabs unless touching them for another reason — the `enrl_data` reactive feeds 8+ output handlers and has non-obvious shared state. Reference: `R/modules/pathways.R` (full pattern), `R/modules/headcount.R` (extraction template). Module inventory, mount points, and the table/plot/CSS gotchas: [shiny-modules.md](docs/developers/shiny-modules.md).
-
-**CEDAR data lives in `data_objects`, not bare globals.** Tables and lookups are at `data_objects[["cedar_X"]]` and are NOT in scope inside a module server. Pass them explicitly: `pathwaysServer("pathways", cedar_students, cedar_programs, dims = data_objects[["cedar_dims"]])`.
-
-- One file per module in `R/modules/`; sourced in `load-funcs.R` after cones; UI wired in `ui.R`, server in `server.R`.
-- **Never put business logic in a module** — collect inputs into `opt`, call a cone, render.
-- Errors caught with `tryCatch` + `showNotification()`. Slow operations in `withProgress()`. Large choice lists server-side via `updateSelectizeInput(server = TRUE)`. Do not call `handle_error()` unless it is passed in as a parameter.
-- An Explore tool modeled on Open Seats or Regstats copies the full run pattern, not just the filters: loading overlay, `start_report_timer()` / `end_report_timer()`, `session$sendCustomMessage("*_load_complete", ...)`, URL copy and autorun.
-- **Input values must match actual data values.** Check `transform-to-cedar.R` before hardcoding `choices =`. Level stores `"lower"`/`"upper"`/`"grad"`, not `"undergrad"`; map labels to values in the server (`opt$level <- c("lower", "upper")`), never in `choices`.
-- **Tables are user interfaces, not raw cone dumps.** Each table picks an explicit display-column order; hide fields in the module `select()`, not by removing them from the cone output.
-- **Prefer shared UI helpers and existing CSS classes** over tab-local styling — no inline `style =` or one-off classes; extend a shared helper and migrate callers. Reuse display components across related tables (one course-overview reactable serves four tabs).
-- **Every section is a heading plus a one-sentence description** giving scope, denominator, and exclusions. `filter_bar()` → `subtab_header()` → `dashboard_section()` → `dashboard_subsection()` → `section_heading()`. A subtab opens with `subtab_header()`, never a section bar. **Never use a bare `h3()`–`h6()`.** Two sections showing the same numbers is a bug. Shared metric text is authored in `docs/_data/definitions.yml` and rendered with `cedar_definition_note()` / `cedar_definition_panel()`.
-
-### URL deep links & shareable state
-
-One registry, `CEDAR_SHARE_SPECS` (`R/trunk/url-state.R`), drives **both** directions of the round-trip so they cannot drift. Each entry is keyed by the exact navbar tab title and declares `slug`, `prefix`/`sep`, ordered `fields` (the only accepted URL keys, in dependency order), `run`, and optional `types`/`aliases`/`overlay`.
-
-- **Copy:** `cedar_copy_url_observer(input, session, copy_id, values_fn, spec_title)`.
-- **Bootstrap:** `ui.R` sends `cedar_link_bootstrap` once; `cedar_link_server()` parses that exact string. Never read `clientData$url_search` independently.
-- **Restore:** `cedar_schedule_link_restore()` applies fields one at a time in registry order, waiting for each to round-trip. If a value cannot be restored, autorun does not run with a different scope.
-- **Run:** the ordinary observer consumes `cedar_run_trigger()`. One entry point — no synthetic browser click, no tab-specific autorun observer.
-- **Tabs:** `CEDAR_TAB_SLUGS` is serialized to the browser; never add a hand-maintained JavaScript slug map.
-- **Server-side selectize stays module-owned:** initialize through `cedar_linked_server_selectize()` and declare the key `type = "select_server"`. A second controller-side write can make a transient value look ready before module init settles.
-
-**Headcount is deliberately not deep-linkable in 1.0** — six cascading server-side selectizes, no share spec, no copy button. Its program filters intersect `(student_id, term)` pairs: AND across filters, OR within each selection. Never intersect student IDs across history to claim simultaneous membership.
+**URL state.** One registry, `CEDAR_SHARE_SPECS` (`R/trunk/url-state.R`), drives copy and restore. Copy with `cedar_copy_url_observer()`; `cedar_link_server()` parses the single `cedar_link_bootstrap` string (never read `clientData$url_search` yourself); `cedar_schedule_link_restore()` restores fields in registry order and does not autorun a different scope; the run observer consumes `cedar_run_trigger()`. Server-side selectizes stay module-owned (`cedar_linked_server_selectize()`, `type = "select_server"`). Headcount is deliberately not deep-linkable.
 
 ---
 
-## Opt List Convention
+## Coding standards
 
-All cones accept `opt = list()` as their last argument, resolved inside the function with `%||%`:
+**No silent fallbacks.** A missing column, an impossible empty join or malformed input raises an error; never substitute a default, return an empty result or skip.
 
 ```r
-min_n  <- opt$min_n  %||% 10L
-campus <- opt$campus %||% NULL
+result <- tryCatch(get_something(df), error = function(e) tibble())   # wrong
+dept   <- df$dept_code %||% df$department                             # wrong
+if (!"dept_code" %in% names(df)) stop("dept_code column required")    # right
 ```
 
-Common keys: `term`, `campus`, `dept_code`, `college`, `level`, `min_n`, `cohort_ids`, `subject_code`, `start_classification`, `include_summer`.
+`tryCatch` is allowed only in a module server that shows the error via `showNotification()`, and around a genuinely fallible statistic where `NA` is the right answer. `tryCatch(..., error = function(e) NULL)` around a data pipeline is always a bug.
+
+**Reuse before writing.** Search `R/trunk/utils.R` and `filter.R`, then `R/lists/`, then `R/branches/`, then the cones. There is one canonical way to count each thing: census `add_census_enrl()`, DFW `classify_enrollment_outcomes()`, term type `add_term_type_col()`, enrollment history `summarize_term_enrl_series()` / `format_term_history()`. Shared visuals (sparklines, fill bars, badges) live in `R/modules/ui-helpers.R`. Duplicated logic is consolidated up a layer, never copied sideways.
+
+**Numbers.** Round for display only, once, in the display adapter. Counts whole, percentages one decimal, GPA and means two, SMDs three; more when the default would collapse a reported difference. Missing values show as an em dash. Identifiers (terms, CRNs, IDs, course numbers) get no separators or decimals. Don't apply one formatter to different kinds of column.
+
+**Style.** Bare function names for attached packages; a namespace only to disambiguate or flag an unusual dependency. Cone functions under ~150 lines, cone files under ~500, module servers under ~300. **No new dependencies without explicit approval.**
+
+**Every change ships with** regression coverage for changed analytical behavior, in the existing suite, on the committed fixtures; and updated docs where its rule or table changed (here only for a rule; the inventory for a new file). Prose, CSS spacing and rearrangement need no assertions.
 
 ---
 
-## Naming Conventions
+## Tests
 
-| Context | Name | Example |
-|---------|------|---------|
-| CEDAR table column | `department` | `filter(department == "HIST")` |
-| Filter option objects | `dept_code` | `opt$dept_code` |
-| Report parameter objects | `dept_code` | `d_params$dept_code` |
+All test data is in `tests/testthat/fixtures/designed_test_data.R`, which **is** the test database; `setup.R` exposes `test_sections`, `test_students`, `test_programs`, `test_degrees`, `test_faculty`, `test_dims`, `data_objects`. Its header pins expected counts: update it and the affected tests in the same change as any fixture edit. New rows follow EC-xx / XLxx / SVARxx.
 
-Option objects use `dept_code` because the value is a code. Leave the CEDAR table column name `department` alone; this is a code convention, not a schema rename. `department_code` is not used anywhere.
+- Expected values are committed after running against fixtures; if one changes, investigate before updating it.
+- Domain rows belong in the shared fixture; one function's intermediate frames are built locally with documented expectations.
+- **A fixture too simple to express the bug gives a test that passes forever.** Reintroduce the bug and confirm the test fails before trusting it; mandatory for any guard on a join key, grouping grain or dedup.
+- **Never write custom testing scripts** (scratch runners, probes, ad-hoc smoke tests). The entry points are the gates below, `testthat::test_file()` / `test_dir()` on committed files, and `tests/e2e/`. Exploratory diagnostics stay in the session scratchpad.
 
-Known variations still in use: student count (`enrolled`, `registered`, `count` in `enrl.R`), drop types (`dr_early`, `dr_late`, `dr_all`, `drops`), program reference (`prog_codes`, `prog_names`, `program_code`, `program_name`).
-
----
-
-## Key Data Flow Notes
-
-- `dept-trends.R` passes **unfiltered** `cedar_students` to `get_credit_hours_for_dept_trends` (needed for college vs. dept comparison), but **filtered** students to `credit_hours_by_major`. Every SCH function also takes `cedar_sections`, for late drops' credit values.
-- `credit_hours_data` has a `level` column: `"lower"`, `"upper"`, `"grad"`, `"total"`. Filter to `"total"` to avoid double-counting.
-- `appointment_pct` in `cedar_faculty` is stored as 0–100; divide by 100 for FTE.
-- `get_stopout()` requires `add_next_term_col()` from utils.R — called internally.
-- `%||%` is defined in `utils.R`. Cones sourced standalone include a local fallback at the bottom of the file.
-- The cleanup backlog lives in `ISSUES.md` (improvements, `M` numbers) and its recommended order in `ROADMAP.md` — check both before touching a file they name.
-
----
-
-## Coding Standards
-
-### No fallback behavior
-
-**Never write silent fallbacks.** If a required column is missing, a join produces no rows, or an input is malformed, raise an explicit error. Do not substitute defaults, return empty results, or silently skip.
-
-```r
-result <- tryCatch(get_something(df), error = function(e) tibble())   # Wrong — hides the problem
-dept   <- df$dept_code %||% df$department                             # Wrong — silent coalesce
-if (!"dept_code" %in% names(df)) stop("dept_code column required")    # Right — fail loudly
-```
-
-Applies everywhere: cones, branches, trunk, pipeline scripts, test helpers. Only two `tryCatch` uses are allowed: in a Shiny module server where the error is immediately shown via `showNotification()`, and around a genuinely fallible *statistic* (`chisq.test` on a degenerate table) where `NA` is the correct mathematical answer. **`tryCatch(..., error = function(e) NULL)` around a data pipeline is always a bug.**
-
-### Reuse before writing
-
-Search in order: `R/trunk/utils.R` and `filter.R` → `R/lists/` (never inline `c("RE","RS","RR")` or grade strings) → `R/branches/` → the cone inventory. Concretely: `grep -rn "your_concept" R/trunk R/branches R/lists` before writing a helper. Duplicated logic found later gets consolidated *up* a layer, never copied sideways.
-
-**Standardize counts and shared visuals — always prefer a helper.** There is exactly one canonical definition of each way of counting: census enrollment is `add_census_enrl()` / `calc_census_enrl_baselines()`, DFW is `classify_enrollment_outcomes()`, term type is `add_term_type_col()`. Don't re-derive `registered + dr_late`, a grade filter, or `substr(term, 5, 6)` by hand. Enrollment history has `summarize_term_enrl_series()`, `format_term_history()` (values first, terms after — `"12, C, 10 (Fa22, Sp23, Fa23)"`), and `drop_shell_sections()`. Shared visuals — sparklines, fill bars, tier badges, trend cells, reactable column defs — live in `R/modules/ui-helpers.R`; a new tab uses the shared sparkline, it does not hand-roll SVG. When a computation is inline and you touch nearby code, promote it to a helper and migrate the other callers.
-
-### Numeric precision and identifier display
-
-**Round for display only.** Calculations use unrounded values; round once in the final display adapter. Never round an input or intermediate before computing a rate, difference, average, trend, or SMD.
-
-- **Do not apply one generic formatter to semantically different columns.** Counts, percentages, continuous means, diagnostics, and numeric-looking identifiers need separate column definitions or a row-aware shared formatter.
-- Counts whole (thousands separators fine); percentages one decimal; GPA and means two; SMDs three. Increase precision when the default would collapse meaningfully different values — never render `3.26` and `2.98` as `3` beside a reported difference.
-- Missing values display as an em dash, not `0`, unless zero is measured.
-- **Identifiers are not quantities** — term codes, CRNs, student IDs, and course numbers get no separators, decimals, or abbreviation.
-- Prefer or extend shared formatters in `R/modules/ui-helpers.R`; keep cone outputs numeric and analysis-ready.
-
-### Readable package calls
-
-Prefer bare function names for packages the app already loads (`filter()`, `mutate()`, `bind_rows()`). Use an explicit namespace only to prevent ambiguity, to call a package that is not normally attached, or to flag an uncommon dependency.
-
-### Complexity budget
-
-New cone functions under ~150 lines; a cone file past ~500 lines splits by sub-question or extracts branch helpers. A module is UI + server for one tab in one file; a module server past ~300 lines means business logic has leaked in. **No new dependencies without explicit user approval** — prefer what `renv.lock` pins.
-
-### Every change ships with
-
-- For changed analytical behavior, regression coverage in the existing relevant `tests/testthat/` suite, filtering from the committed fixtures (never inline tibbles). Prose, CSS spacing, and source rearrangement do not need assertions that restate the edit. Extend an existing suite before adding a file.
-- Updated tables in this file if you added or renamed a cone, branch, or module — and in [layer-inventory.md](docs/developers/layer-inventory.md) if a signature changed.
-- **No custom testing scripts.** Use the committed harnesses and gates below.
-
----
-
-## Test Infrastructure
-
-Full reference: **[agent-testing.md](docs/developers/agent-testing.md)** (fixture
-conventions, environments, module loading, ad-hoc workflows),
-[testing.md](docs/developers/testing.md) (philosophy),
-[e2e-testing.md](docs/developers/e2e-testing.md) (browser harness).
-
-All test data is hand-crafted tribbles in
-`tests/testthat/fixtures/designed_test_data.R` — that file IS the test database.
-`setup.R` exposes `test_sections`, `test_sections_sf`, `test_students`,
-`test_programs`, `test_degrees`, `test_faculty`, `test_dims`, `data_objects`.
-Stable terms 202010/202060/202080/202110. Its header holds pinned expected counts
-that tests hard-code against — **update the header and the affected tests in the
-same change** as any fixture edit. New rows follow **EC-xx** / **XLxx** /
-**SVARxx**. No regeneration script, no drift check: test failures are the signal.
-`tests/testthat/create-test-fixtures.R` is dead legacy; rows added there are seen
-by no test.
-
-- Expected values are committed after running against fixtures. If one changes, the function or fixture changed — investigate before updating.
-- Missing fixture columns get added to `designed_test_data.R`. Never add fallback logic in tests or fixtures. Use `uel = FALSE` in filter tests to isolate from `excluded_courses`.
-- **Domain data belongs in `designed_test_data.R`; one function's input contract does not.** The failure this prevents is a test passing because the fixture *cannot express the bug*. Raw enrollment/section/program/degree rows — multi-campus delivery, waitlists, crosslists, repeats — go in the shared fixture. Intermediate frames, expected-value tables, scaffolding, and scenarios needing terms outside the stable set are built locally with expected values documented above them. The tell is reusability.
-- **Never write throwaway/scratch tests, and don't fragment code or fixtures just to make something testable.** If the fixtures can't represent the case, fix the fixtures — that is the correct path, and it makes the case reusable.
-- **A fixture too simple to express the bug produces a test that passes forever without checking anything.** Reintroduce the bug and confirm the test fails before trusting it. Mandatory for any test guarding a join key, a grouping grain, or a dedup.
-
-### Running tests
-
-**NEVER WRITE CUSTOM TESTING SCRIPTS.** No temporary runners, one-off browser
-scripts, shell wrappers, copied e2e variants, Python probes, R scratch tests, or
-bespoke "smoke" commands — they become a second, untrusted test system. The only
-allowed entry points are the gates below, focused `testthat::test_file()` /
-`test_dir()` against committed files, and the committed scripts in `tests/e2e/`.
-Exploratory diagnostics stay in the session scratchpad, never in the repo, and are
-never presented as release verification.
-
-Start from the host repo root: `/Users/fwgibbs/Dropbox/projects/cedar-project/cedar`.
-
-Choose checks by the behavior changed. A fresh container and the breadth of
-browser coverage are separate decisions.
-
-| Change / occasion | Required checks |
+| Change | Required checks |
 |---|---|
-| Calculation or data contract | Focused committed R tests while editing; `./run-tests.sh` once when finished |
-| UI, routing, or module wiring | R gate plus `./run-tests.sh --e2e <suite>` covering the changed behavior; inspect layout changes visually |
-| Representative app check | `./run-tests.sh --e2e` (same as `--e2e smoke`): Enrollment and Course Dynamics |
-| PR acceptance | The Docker/synthetic CI gate (`.github/workflows/pr-checks.yml`, check name `Synthetic checks`) |
-| Release candidate or major data-pipeline change | `./run-tests.sh --all`: rebuild and run the full institutional browser suite |
-| Dependency / R / Docker toolchain change | Verify the pinned native and Docker environments; run their R gates and synthetic acceptance |
-| Documentation or presentation-only edit | Check links or affected appearance; no full R/browser run for prose, spacing, or colour alone |
+| Calculation or data contract | focused R tests while editing; `./run-tests.sh` when finished |
+| UI, routing, module wiring | the R gate plus `./run-tests.sh --e2e <suite>` for the changed behavior; look at layout changes |
+| `global.R`, or a validator that can stop startup | also `bash scripts/dev.sh up && ./run-tests.sh --e2e demo` |
+| A grouping grain or join key | also a real-data check (`scripts/cedar-repl.R`): fixtures are often single-valued on the axis you changed |
+| Release candidate or major pipeline change | `./run-tests.sh --all` |
+| Documentation or presentation only | check links or appearance |
 
-**`./run-tests.sh --changed` reads the diff and selects the stages from it**,
-printing one line of reasoning per file — a cone edit gets the R suite and no
-browser, an `R/modules/**` edit gets both, a docs-only edit gets nothing. It
-selects; it never certifies. It cannot know that a cone change moved a rendered
-number, so widen it by hand when the blast radius is larger than the paths
-suggest, and it is never a release pass.
+`./run-tests.sh --changed` picks stages from the diff; it selects, it never certifies. When reporting, name the exact command, pass/fail counts, skips, whether Chrome and the app came up, and whether the image was rebuilt.
 
-The gate stops at the first failed suite and is not automatically retried;
-diagnose an app, setup, or resource failure before rerunning. **Do not quote
-runtimes as budgets** — cost depends on the machine, emulation, data, and cache
-state, and a timeout does not identify its own cause. **When reporting results:**
-name the exact command, pass/fail counts, known skips, whether Chrome/app setup
-succeeded, and whether the image was rebuilt. A run that failed before Chrome
-launched is a setup failure, not an app failure; a browser run against an old
-container is not release evidence, and focused or synthetic success is not a
-full institutional pass.
+**Gotchas that cost an hour each:**
 
-**One CEDAR app, one port.** Every browser suite targets `http://localhost:3838/`,
-and only one CEDAR app runs at a time. The synthetic stack (`compose.dev.yml`)
-and the institutional one (`docker-compose.yml`) are alternatives that share the
-port, not neighbours — stop one to start the other. `run-tests.sh` reads the
-served page to identify which surface answered and refuses a suite aimed at the
-other. Details and the memory-pressure failure mode: [e2e-testing.md](docs/developers/e2e-testing.md).
+- **`--vanilla` is required**; CEDAR is not a package (`devtools::test()` fails). Data files are **qs2**, not qs.
+- Host path `/Users/fwgibbs/Dropbox/projects/cedar-project/cedar`; in the container, `/srv/shiny-server/cedar` (not `/srv/shiny-server`).
+- **The container bakes source with `COPY`**: a running container has old code until rebuilt. Check `docker ps`.
+- One CEDAR app, one port (3838): the synthetic and institutional stacks are alternatives.
+- **Module code is not loaded by the R suite** (`load_funcs(..., modules = FALSE)`): parse, render and look.
+- Dependencies go through `scripts/r-environment.R`, never a bare renv call; never `renv::deactivate()`.
+- Don't `source("setup.R")` from outside `tests/testthat`, `source("global.R")`, or hand-source modules. After a failing run, `rm -rf tests/testthat/_problems tests/testthat/testthat-problems.rds`.
+- Real-data checks: `Rscript --vanilla -e 'source("scripts/cedar-repl.R"); nrow(cedar_students)'`.
 
-**Two paths, and they cost an hour every time they are forgotten.** Host:
-`/Users/fwgibbs/Dropbox/projects/cedar-project/cedar` for everything local.
-Inside the container: `/srv/shiny-server/cedar` — **not** `/srv/shiny-server`,
-which is the stock Shiny sample directory and gives `No test files found`, reading
-like a broken image rather than a wrong `-w`.
+**E2E rules** (`tests/e2e/lib.mjs` solves each): never `sleep()`, use `waitForIdle()` / `runAndWait()`; let `connect()` settle before touching inputs; `checkVisibility()`, not `offsetParent`; run `node tests/e2e/check-ids.mjs` for selector rot. `connect(page, { tab })` takes options; scope with `queryActive()`; module ids are namespaced.
 
-**`--vanilla` is required.** Cedar is a Shiny app, not an R package —
-`devtools::test()`, `pkgload::load_all()`, and `test_local()` all fail, there is
-no `DESCRIPTION`. `--vanilla` skips `.Rprofile` and automatic data loading, which
-keeps CLI and test startup explicit. A missing-package error usually means you
-omitted `--vanilla`, or named the wrong package: the data files are **qs2**, not
-qs, and `qs::qread()` fails with the unhelpful "QS format not detected".
+Full reference: [testing.md](docs/developers/testing.md), [e2e-testing.md](docs/developers/e2e-testing.md).
 
-**Dependencies go through `scripts/r-environment.R`, never a bare renv call.**
-`renv.lock` pins the tested packages and R version; there is no runtime
-activation. Native setup is `Rscript --vanilla scripts/r-environment.R restore`,
-which copies exact matches into `renv/library/cedar/...` rather than cache
-symlinks and rewrites no startup files; `check` / `check-native` are read-only
-drift checks. `./run-tests.sh` tests system R by default, `--project-library`
-selects the prepared native library. **Never run `renv::deactivate()` or a bare
-`renv::restore()` to repair a library error** — `deactivate()` rewrites
-`.Rprofile` as a side effect and already caused one unrelated startup regression
-(`e4237fd`, reverted). Setup procedures: [installation.md](docs/developers/installation.md).
-
-**Three environments; the failure mode is skipping the one that would have caught
-the bug.** `Rscript --vanilla` for cones/branches/features; the Dockerized app for
-anything rendered; headless Chrome for driving it. Cost depends on the machine,
-architecture/emulation, data, and cold caches — do not turn one measured runtime
-into a guarantee or a budget. **A UI change verified only by a green R suite is
-unverified.** **The container bakes source with `COPY`** — only `data/`
-is bind-mounted, so a running container does *not* pick up code changes. Check
-`docker ps` before trusting what you see; rebuild with `./rebuild-and-test.sh`.
-
-What the R suite cannot see:
-
-| You changed | Also do this |
-|---|---|
-| One cone / branch function | nothing extra — pure functions over fixtures |
-| A `group_cols`, join key, or grouping grain | an ad-hoc real-data check — fixtures are often single-valued on the axis you changed, so they pass while production breaks (this is how a campus-blind grouping shipped green) |
-| A `list(...)` return shape from a cone | grep the renderers that read it — nothing checks that the UI still reads every field |
-| Module UI / `ui.R` / `server.R` | parse check, render the UI function, then look at it — **module code is not loaded by the test suite** (`load_funcs(..., modules = FALSE)`) |
-| `global.R`, or a validator that can stop startup | `bash scripts/dev.sh up && ./run-tests.sh --e2e demo` as well — the synthetic institution has what production never shows (Fall/Spring terms with no class list, one small college), and a startup stop it trips passes every R test and the institutional browser run (the term-dimension gap check, #190) |
-| CSS only | check no later rule overrides yours, then look at it |
-| Anything user-visible, before a release | rebuild the container and actually look |
-
-**What NOT to do:** `source('setup.R')` from outside `tests/testthat`; `source('global.R')`
-(triggers the setup wizard); hand-sourcing `R/modules/*.R` (use `load_funcs(..., modules = TRUE)`);
-running R just to discover an expected value (assert something obviously wrong and
-read the real value from the failure diff); leaving scratch scripts in `tests/`.
-After a failing run, `rm -rf tests/testthat/_problems tests/testthat/testthat-problems.rds` —
-neither is gitignored.
-
-**Ad-hoc checks against real data:** don't hand-roll the bootstrap, it has four
-gotchas. `Rscript --vanilla -e 'source("scripts/cedar-repl.R"); nrow(cedar_students)'`
-sets both required globals, loads the functions, and lazily exposes the tables.
-
-**Text-first feature previews.** For a computation-heavy feature, stabilize a
-canonical non-Shiny text preview before building its Shiny surface. It must be a
-**committed production formatter** over the feature payload — not a scratch
-script, not a second implementation. The formatter owns display formatting only;
-neither tests nor the UI may parse its rendered text, both consume the typed
-payload. **A text preview is computational evidence, not UI evidence.**
-
-### Enrollment projection contract
-
-Full contract: [enrollment-projections.md](docs/developers/enrollment-projections.md).
-Findings and rejected assumptions: [forecasting-lessons.md](docs/developers/forecasting-lessons.md).
-The rules an agent must not violate:
-
-- The forecast target is **unique total class-list demand** — not DESR final enrollment, not census.
-- **Capacity is an audit and planning comparison, never a demand predictor.** Capacity reached means first-day occupancy filled 98% of the seats or more, never that ever-registered demand exceeded them; an unknown first day is unknown occupancy, neither reached nor unreached. A reached-capacity overprojection is labeled `Capacity-bounded`; never display its one-sided technical zero as ordinary 0% error.
-- **Selection is rolling and the published accuracy is out of sample.** Prior same-season is the default; a challenger replaces it only by beating it by `selection_challenger_margin` on at least `selection_min_backtests` (3) earlier shared aftcasts, the rule is replayed at every historical fold, and `wape` / Depth / Accuracy on the published row are the realised error of what the rule would have picked. Never report a winner's fit on the folds that chose it (the 0.18.0 engine did: 13.7% reported, 16.5% honest, 15.9% for doing nothing).
-- **Two candidates, one idea (0.20.0; seats judged on the first day from 0.21.0).** Prior same-season is the spine. The adjusted candidate is the spine plus a floor where the prior term was saturated (first-day fill at or above 90%: the students still waiting who are on no campus's class list in the market, added to the spine in its own ever-registered units, never to first-day enrollment — ISSUES.md I27) plus deltas read from the term just finished: the course's own enrollment change, the change in its listed predecessor (`projection_sequences.csv`, the course taken the term before it; 0.26.0) at that pair's own rate, and its other feeders' pooled change, each times the historical carry-through rate. A listed predecessor's students leave the pooled feeders, so none counts twice. Enrollments, never grades. `validate_spine_rows()` rejects an adjusted row whose parts do not sum. No other level estimator and no bias correction: the audits are in `forecasting-lessons.md`, and a new candidate enters only as a challenger that beats the spine rolling. Planning sections and seat gaps are sized from projected registrations (`projected_classlist_total`), not first-day seats (0.23.0). Registrations run a median 8% above the first day, and that margin is deliberate: running short of seats costs more than an empty one. Sized on the first day, 61% of 207 past aftcasts planned fewer seats than were filled on day one; sized on registrations, 32%, with seats short and spare in balance. `projected_first_day_equivalent` (registrations times the course's first-day retention) is shown beside it as context, never as the planning number.
-- **Intersession is out of the forecast (0.24.0).** `prepare_enrollment_projection_inputs()` drops sections and class-list rows in an `intersession_parts_of_term` part of term (`settings.csv`; UNM's December `INT`) before anything reads them. It starts weeks after the term's first day and registers after the term settles, so counting it blanked first days (ISSUES.md I28) and read the Fall spine from a partial Fall (I35).
-- **The pressure bump is a planning allowance, never a forecast (0.23.0; 5% from 0.26.0).** A course near full on the first day in every one of its last three same-season offerings with a known first day (at least two) is planned for 5% more registrations than last time, or for the students left waiting if that is more. A near-full course's registrations follow its seats — given 10% or more seats they filled them (89 course-terms), held flat they stayed flat (139), cut they fell by the cut (51) — so its count understates demand. 5% is the median always-full Fall 2026 course's waiting backlog (4.7%), chosen over 10% because new sections need instructors who may not exist; feeders never cancel it, because the backlog does not leave with them. The bump raises `planned_registrations` and the sections, never `projected_classlist_total`, WAPE or the accuracy axes. The 5% is an allowance until retained waitlists can measure it; it must not be silently tuned.
-- **The plan follows the term just finished (0.26.0).** Where the published projection is the spine, `projection_plan_feeder_adjustment()` adds the adjusted candidate's listed-predecessor change every time and its pooled feeder change only when the feeders moved `plan_feeder_change` (5%) or more either way; where the adjusted candidate is published, its projection already holds both and the plan adds nothing. Only Spring plans follow feeders (`plan_feeder_seasons`, 0.27.0): following Fall feeders made past Spring forecasts closer, while a Spring feeder's change pointed the way the Fall course moved no more often than chance, so a Fall plan adds nothing and says why. `planned_registrations = max(0, projected + feeder adjustment + bump)`; `validate_pressure_bump_rows()` rejects any other sum, and the page states how much each part added. The sequence list is the institution's (`projection_sequences.csv`): a pair belongs on it only when most of the earlier course's students take the later one the next term and its changes have shown up there — not courses that merely share students, such as a cohort block.
-- **Weak rows remain visible** with an explicit `Unrated`/`None` axis value and a reason. Do not withhold them, relabel them, or invent a default. Projections carry three independent reader-facing axes — `stability` (model-free, from the course's own history), `depth` (comparable aftcast evidence), `accuracy` (how close those aftcasts landed; shown to readers as **Reliability**, High / Moderate / Low, since 0.23.0) — plus `seat_consistency` (how often the course's seats moved 10% or more across the same aftcast terms), shown as counts beneath reliability. Readers see stability as **Own history** and depth as **Evidence**. They may disagree; never collapse them into one label. **Whose miss it was is read per aftcast, never off the seat count** (`projection_fold_miss_cause()`, ISSUES.md I40): the schedule's when a near-full course's seats moved the way the forecast missed or held at near full, the forecast's own when the course had seats to spare, whatever its seats did.
-- **Where error comes from is shown, not asserted.** `annotate_projection_fold_conditions()` tags every aftcast with its seat change and whether the term before it was near full; `summarize_projection_error_sources()` sums the published rule's error by whose miss each aftcast was (`projection_fold_miss_cause()`, the same rule each course's reading uses), and the page's "Where forecast error comes from" panel renders it from the loaded bundle. Most error came when a near-full course's seats moved the way of the miss or held (80% of Spring 2027's aftcast error, 92% of Fall 2027's); only the rest, with seats to spare or seats moving against the miss, is the forecast's own.
-- **The term just finished's waiting students are context, never the plan (schema 26).** `adjusted_waitlisted_preceding` counts the students left waiting in the term before the target on no class list for the course in the market; `NA`, never zero, when that term is unobserved or kept no waitlist rows. The page flags, states and sums it; nothing adds it to the forecast or the plan until Spring class lists can measure how many of them register.
-- **The draft comparison is arithmetic over saved rows.** `build_enrollment_projection_draft_comparison()` sets each course's planned registrations beside the target term's schedule as the bundle captured it (`target_schedule_as_of`), separating a draft short of the students expected on day one from one short only of the planning margin. A changed draft rebuilds the bundle on the next refresh; Shiny never refits to compare.
-- Miss explanations say `Potential explanation` / `Potential contributor` — not causal claims.
-- Shiny and Course Dynamics read validated artifacts through `load_latest_enrollment_projection_bundle()` / `load_enrollment_projection_bundle()` and `build_enrollment_projection_view()`. They **never** fit, aftcast, pressure-screen, calibrate, or select a model in a user session.
-- **Horizon, not season, decides which adjustments apply.** The Fall deltas read the term immediately before the target; two steps past the settled edge that term is itself unobserved, so the adjusted candidate carries the spine and the floor only and says so. Which season is the two-step target alternates through the year. A saturated prior term with no retained waitlist rows reports the spine as its own floor — an absence of evidence, never evidence that there is no latent demand.
-- **One bundle per season, never "the latest".** Spring and Fall publish separately and neither supersedes the other, so discovery is season-aware: `find_enrollment_projection_bundles()` lists what is saved and every loader names either a season or an exact target term. Picking the highest saved target term would hide Spring the day Fall publishes. Summer is refused at the builder — a different demand regime with no comparable evidence base.
-- **A growth scenario is arithmetic over saved rows, never a second forecast.** `build_enrollment_projection_scenario()` grows one named population's cohort and holds every other student in the course flat. Year 1 *is* the published projection at any growth rate; later years are labeled `Scenario`, carry no accuracy axes, and never borrow year 1's. Show the population's share of the course — 10% growth on 13% of a roster is a 1.3% course effect, and a reader who cannot see the share will assume the whole course grew.
-- **Named populations come from `CEDAR_POPULATION_GROUPS`** (`institution/<id>/population_groups.csv`, read by `R/lists/population-presets.R`), shared by Pathways and projections so a group means one thing everywhere. Groups declare *program names*; `population_group_major_codes()` resolves them to Banner codes through both name matching and each pre-major's `leads_to` in `programs.csv` (`premajor_leads_to`), because each alone misses real pre-majors. Never hand-list codes in a caller, and run `population_group_audit()` when adding a group — its `near_miss` output is how a drifted name is caught instead of silently dropped.
-- `model_version` changes for calculation/selection/calibration/scoring; `schema_version` for artifact shape. Reused bundles are never rewritten.
-- A new method is incomplete until the registry, branch candidate, rolling aftcast, bundle validator, text preview, designed fixture, real-data audit, and any affected UI/browser test agree.
-
-### E2E rules — the four that cause every flake
-
-`tests/e2e/lib.mjs` solves each; use the helper rather than re-deriving it.
-
-1. **Never `sleep()` to wait for Shiny — use `waitForIdle()` / `runAndWait()`.** A fixed sleep races the app, and "wait for non-empty text" passes instantly on the *previous* run's output. Only visible outputs count toward idle.
-2. **`connect()` must settle before you touch inputs** — inputs set before the landing tab's first reactive flush are overwritten by the app's own initialisation.
-3. **`offsetParent !== null` is not a visibility test** — it also returns null inside `position: fixed`/`sticky` ancestors, which in bslib includes the sub-tab bars. Use `Element.checkVisibility()`.
-4. **Selectors rot silently — run `node tests/e2e/check-ids.mjs`** (stage 1 of `run-tests.sh`). For a string a test asserts is *absent*: `// check-ids-ignore: <names>`.
-
-`connect(page, { tab })` takes options, not a URL. Scope queries with
-`queryActive()` / `activeText()` — every tab's markup is in the DOM at once.
-Module input ids are namespaced (`gen_ed-ge_button`). `openSubTab()` waits for the
-pane; `clickSubTab()` only fires the click.
+**Text-first previews.** A computation-heavy feature gets a committed text formatter over its payload before its Shiny surface. Tests and UI consume the typed payload, never the text. It is computational evidence, not UI evidence.
 
 ---
 
-## Sample Data
+## Enrollment projections
 
-`bash scripts/dev.sh up` starts the standalone `compose.dev.yml` project on localhost:3838 — the same port as the institutional app, so stop one before starting the other. It mounts source read-only, uses private demo-only Docker volumes, and never reads production `.env` or mounts institutional data. Use `restart` after edits and `test` to invoke the standard gate inside a disposable image. Production Compose still bakes source and requires rebuilding.
+The full contract and the one summary of its rules: [enrollment-projections.md](docs/developers/enrollment-projections.md#the-rules-in-brief). Read the summary before any projection change. The rules most often at risk:
 
-`dev/demo-data.R` adapts the `designed_test_data.R` scenarios into a synthetic multi-year institution; the unit fixtures themselves are never rewritten. Five copied cohorts retain `fixture_source`, `fixture_student_id`, and `synthetic_cohort` provenance — select cohort 1 and the relevant scenario to recover the original expectations. The generator uses the production transforms and fixes the current term at Fall 2025. Extend `test-demo-data.R` when changing its known answers. **Do not weaken analytical rules or small-cell guards to populate a demo.** See [synthetic-institution.md](docs/developers/synthetic-institution.md) for export and provenance, and `docs/developers/first-hour.md` for contributor steps.
+- The target is **unique total class-list demand**, not DESR final enrollment or census.
+- **Capacity is a planning comparison, never a predictor.** Capacity reached is first-day fill of 98% or more; an unknown first day is unknown.
+- **Selection is rolling and published accuracy is out of sample.** A challenger replaces the prior same-season spine only by beating it on earlier aftcasts.
+- **The pressure bump and feeder adjustment change the plan, never the forecast or its accuracy.**
+- **Shiny never fits a model:** it reads validated bundles (`load_enrollment_projection_bundle()`), one per season.
+- `model_version` changes for calculation; `schema_version` for shape. **Editing any model-source file rebuilds both bundles on deploy**; page text belongs in `R/features/enrollment-projection-view.R`.
+- Named populations come from `CEDAR_POPULATION_GROUPS`; run `population_group_audit()` when adding one.
 
-`data/samples/desr_sample.csv` — 297 rows of real DESR data (gitignored), covering split-level XL, non-split XL, SHORT_TEXT variations, multi-way XL, zero-enrollment, and lab sections. See `data/samples/README.md`.
+## Degree Explorer and the catalog tooling
+
+Before changing Degree Explorer, read [degree-explorer-rules.md](docs/developers/degree-explorer-rules.md). Its catalog excerpts, roadmap templates and shared requirements live under `institution/<id>/`; they are illustrative plans, **not student audits or forecast inputs**. Catalog acquisition runs offline (`scripts/scan-degree-catalog.R`), never in Shiny, and never edits reviewed degree files. Extracted rules stay unreviewed until a person signs off a complete unit; no AI API calls or automatic approvals occur. Where each piece lives: [degree-requirements.md](docs/developers/degree-requirements.md), [catalog-scanning.md](docs/developers/catalog-scanning.md), [catalog-normalization.md](docs/developers/catalog-normalization.md).
+
+## Sample data
+
+`bash scripts/dev.sh up` starts the synthetic institution (`compose.dev.yml`) on port 3838, with source mounted read-only and no institutional data; `restart` after edits. `dev/demo-data.R` adapts the fixture scenarios into a multi-year institution with provenance columns; extend `test-demo-data.R` when its answers change. **Do not weaken analytical rules or small-cell guards to populate a demo.** [synthetic-institution.md](docs/developers/synthetic-institution.md), `docs/developers/first-hour.md`.

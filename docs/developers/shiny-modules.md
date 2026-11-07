@@ -36,6 +36,7 @@ columns <- columns[names(columns) %in% names(df)]
 Reactable errors if `columns` includes names not present in `data`.
 - For narrow inspection tables, use `fullWidth = FALSE` so striped rows do not stretch across the whole viewport. Keep wide raw-data tables full width.
 - Sort inspection tables in the order users scan them. For trend backing tables, prefer chronological term, then descending count, then label.
+- **A Course column keyed on `course_id` uses `course_code_cell(code, former_codes, onclick = NULL)`** (`ui-helpers.R`): the code in the table's weight, a drill link when `onclick` is given, and the course's former codes with their terms beneath it (`also SOC 371 (Spring 2020)`), from the `former_codes` column the cone returns (`course_former_code_spans()`); hide that column with `colDef(show = FALSE)`. Regstats and Waitlists use it.
 - **Part-of-Term columns use the shared `cedar_pot_coldef()` helper** (`ui-helpers.R`), never a hand-rolled colDef. It renders `1` → "Full", blank/`NA` → "—", and half/nonstandard terms (`1H`, `2H`, `INT`, …) in semibold, so the label and cell treatment stay identical across tabs (regstats, seatfinder, cancellations, …). Any new table with a `part_term` column should call it.
 - **`cedar_tbl_theme` uppercases every header** (`textTransform: uppercase`). A header that must keep mixed case — e.g. "PoT" rather than "POT" — has to override it with `headerStyle = list(textTransform = "none")` on its colDef. `cedar_pot_coldef()` already does this; hand-rolled colDefs that set `name = "PoT"` will silently render "POT".
 
@@ -381,7 +382,7 @@ Prefer bare function names for packages already loaded by the app/test harness (
 ## Every change ships with
 
 - A test in `tests/testthat/` filtering from the committed fixtures (never inline tibbles), run with `Rscript --vanilla -e "testthat::test_file('tests/testthat/test-<name>.R')"` from the repo root.
-- Updated AGENTS.md tables if you added or renamed a cone, branch, or module.
+- An updated [layer-inventory.md](layer-inventory.md) row if you added or renamed a cone, branch, feature or module.
 - No custom testing scripts. Use the committed test harnesses and gates below; do not create ad hoc shell, R, Node, Python, or browser-driver scripts to "just check" behavior unless the user explicitly asks for a new permanent test tool.
 
 ---

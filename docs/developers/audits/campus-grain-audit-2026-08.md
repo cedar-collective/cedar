@@ -1,10 +1,15 @@
 ---
 title: Campus-Grain Audit (2026-08)
-parent: Developer Guide
-nav_order: 9
+parent: Audits
+grand_parent: Developer Guide
+nav_order: 2
 ---
 
 # Campus-Grain Audit - 2026-08-09
+
+> **A dated audit, kept as the record of what was measured on 2026-08-09.** Its
+> findings became rules in `AGENTS.md`, entries in `ISSUES.md` or the mapping
+> files; where this page and those disagree, they are current and this is not.
 
 CEDAR's campus rule is about **delivery identity**, not display preference. A
 course metric is keyed by `(campus, subject_course)` because the same course at

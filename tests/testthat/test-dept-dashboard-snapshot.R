@@ -153,7 +153,8 @@ test_that("get_dashboard_enrollment_flags surfaces waitlists and threshold-based
     status = "A",
     section = "001",
     subject_course = c(rep("HIST 1110", 5), rep("HIST 490", 5)),
-    course_id = c(rep("HIST 1110", 5), rep("HIST 490", 5)),  # as the loader attaches it
+    course_id = c(rep("HIST 1110", 5), rep("HIST 490", 5)),  # as the loader keys it
+    listed_code = c(rep("HIST 1110", 5), rep("HIST 490", 5)),
     course_title = c(rep("World History", 5), rep("Senior Seminar", 5)),
     campus = "ABQ",
     level = "upper",
@@ -295,7 +296,7 @@ test_that("get_dashboard_enrollment_flags applies campus filter to high waitlist
     status = "A",
     section = c("001", "001", "002", "002"),
     subject_course = "COMM 1130",
-    course_id = "COMM 1130",  # as the loader attaches it
+    course_id = "COMM 1130", listed_code = "COMM 1130",  # as the loader keys it
     course_title = "Public Speaking",
     campus = c("EA", "EA", "TA", "TA"),
     level = "lower",
@@ -382,4 +383,23 @@ test_that("dashboard headcount scope stops loudly without pre-major flags", {
     dashboard_headcount_scope_facts(dplyr::select(test_programs, -is_pre_major), "HIST", 202080L),
     "is_pre_major"
   )
+})
+
+test_that("the dashboard follows a renumbered course instead of calling it new (RN01)", {
+  # RN01: HIST 320 ran in Spring and Fall 2020 and became HIST 3201 in
+  # Spring 2021, a confirmed renumbering. Read by code, Spring 2021 shows
+  # HIST 3201 as new. (Missing-from-earlier compares the same term two years
+  # back, which RN01 does not reach.)
+  rn <- rn01_course_tables()
+  objects <- list(cedar_programs = test_programs, cedar_students = rn$cedar_students,
+                  cedar_sections = rn$cedar_sections, cedar_dims = test_dims)
+  opt <- list(dept_code = "HIST", term = 202110L)
+  dashboard <- suppressMessages(create_dept_dashboard_data(objects, opt))
+  expect_false("HIST 3201" %in% dashboard$new_this_term$subject_course)
+  expect_identical(dashboard$course_code_renames, course_code_renames(rn$cedar_students))
+
+  by_code <- lapply(objects[c("cedar_students", "cedar_sections")],
+                    function(tbl) dplyr::mutate(tbl, subject_course = listed_code, course_id = listed_code))
+  split <- suppressMessages(create_dept_dashboard_data(utils::modifyList(objects, by_code), opt))
+  expect_true("HIST 3201" %in% split$new_this_term$subject_course)
 })

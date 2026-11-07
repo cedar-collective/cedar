@@ -74,11 +74,12 @@ get_unique_waitlisted <- function(filtered_students, opt, sections = NULL) {
 #    Because the same filtered students feed every table, their counts describe
 #    the same population; only the grouping changes.
 
-#' Scope the enrollment base to waitlist course keys
+#' Scope the course-term counts to waitlist course keys
 #'
 #' Keeps every historical term for the course keys present in a waitlist result,
 #' while dropping unrelated courses before census-history aggregation begins.
-#' @param enrl_base Precomputed course-term enrollment rows.
+#' @param enrl_base Course-term enrollment rows (cedar_course_terms or a
+#'   scoped recount).
 #' @param count_df Waitlist course-overview rows.
 #' @return A list containing scoped `data` and the shared `match_keys`.
 #' @keywords internal
@@ -111,9 +112,9 @@ scope_waitlist_enrollment_base <- function(enrl_base, count_df) {
 #' Regstats matches to DESR scheduled capacity for saturation. It is not a frozen
 #' census roster.
 #'
-#' Enrollment history comes from \code{enrl_base}, the app's precomputed
-#' course-term enrollment table (\code{cedar_cl_enrls_base}, built in global.R
-#' and handed down by the caller). Without one (tests, standalone scripts) it is
+#' Enrollment history comes from \code{course_terms}, the course-term measure
+#' table (\code{cedar_course_terms}, \code{\link{build_course_terms}}, built
+#' at start and handed down by the caller). Without one (tests, standalone scripts) it is
 #' recomputed via \code{\link{calc_cl_enrls}}, scoped to just the courses in
 #' the overview so the recompute stays cheap. The cone never looks the table up
 #' by name.
@@ -121,35 +122,32 @@ scope_waitlist_enrollment_base <- function(enrl_base, count_df) {
 #' @param count_df Waitlist course-overview table (one row per campus/college/
 #'   term/part_term/subject_course) from \code{\link{get_unique_waitlisted}}.
 #' @param students Student enrollment rows, used to recompute enrollment history
-#'   when no precomputed base table is passed.
-#' @param enrl_base Optional precomputed course-term enrollment rows
-#'   (\code{calc_cl_enrls(students, by_part_term = TRUE)} over the whole class
-#'   list). NULL recomputes from \code{students}.
+#'   when no course-term table is passed.
+#' @param course_terms Optional \code{cedar_course_terms}
+#'   (\code{\link{build_course_terms}}). NULL recounts the overview's courses
+#'   from \code{students}.
 #' @return \code{count_df} with added columns \code{census_enrl} (current-term
 #'   census enrollment), \code{census_enrl_mean} (historical average, viewed term
 #'   excluded), \code{n_hist_terms} (reference terms behind the average), and the
 #'   \code{trend_hist} / \code{trend_terms} list-columns the module renders as a
 #'   sparkline. Returned unchanged when no enrollment source is available.
 #' @keywords internal
-attach_enrollment_history <- function(count_df, students, enrl_base = NULL) {
+attach_enrollment_history <- function(count_df, students, course_terms = NULL) {
   if (is.null(count_df) || nrow(count_df) == 0) return(count_df)
 
   # The history follows the course, not the code (ADR-001 step 4): the app's
-  # base is counted by course_id (build_cl_enrls_base()), while the waitlist
+  # course_terms is counted by course_id (build_course_terms()), while the waitlist
   # rows carry the class list's code, and the two differ wherever the class
   # list still uses a former code (UNM lists CCS beside CCST through Fall
   # 2026). Each row's code is resolved to its course for the join and put
   # back after, and the recompute below counts by course the same way.
-  students <- key_on_course_id(students, "attach_enrollment_history")
-  code_ids <- students %>% distinct(listed_code, course_id)
-  if (anyDuplicated(code_ids$listed_code)) {
-    stop("[waitlist.R] attach_enrollment_history(): a course code carries two course ids; ",
-         "the class list was not attached by attach_course_ids()")
-  }
+  # A row may name a code (the class list's) or a course (inspect_waitlist()'s
+  # rows are courses): course_code_lookup() maps either to its course.
+  code_ids <- course_code_lookup(students, "attach_enrollment_history")
   count_df <- count_df %>%
     ungroup() %>%
     mutate(.listed_code = subject_course) %>%
-    left_join(code_ids, by = c(subject_course = "listed_code"), relationship = "many-to-one")
+    left_join(code_ids, by = c(subject_course = "code"), relationship = "many-to-one")
   if (anyNA(count_df$course_id)) {
     stop("[waitlist.R] attach_enrollment_history(): waitlist rows name codes the class list does not carry: ",
          paste(unique(count_df$subject_course[is.na(count_df$course_id)]), collapse = ", "))
@@ -161,6 +159,7 @@ attach_enrollment_history <- function(count_df, students, enrl_base = NULL) {
 
   # Use the caller's precomputed base when given; otherwise a scoped recompute
   # so tests and standalone-script callers still get enrollment context.
+  enrl_base <- course_terms
   if (is.null(enrl_base)) {
     raw_match_keys <- intersect(
       c("campus", "college", "subject_course", "part_term"),
@@ -185,8 +184,11 @@ attach_enrollment_history <- function(count_df, students, enrl_base = NULL) {
     if (is.null(enrl_base)) return(restore_codes(count_df))
   }
 
-  if (!all(c("registered", "dr_late", "term", "term_type") %in% names(enrl_base)))
-    return(restore_codes(count_df))
+  missing_counts <- setdiff(c("registered", "dr_late", "term", "term_type"), names(enrl_base))
+  if (length(missing_counts) > 0) {
+    stop("[waitlist.R] attach_enrollment_history(): the course-term counts lack ",
+         paste(missing_counts, collapse = ", "), ".")
+  }
 
   # The app-wide enrollment base contains every course and term. Restrict it to
   # the course keys in this waitlist result before any mutate/group/summarize
@@ -226,19 +228,25 @@ attach_enrollment_history <- function(count_df, students, enrl_base = NULL) {
 #' major and classification. This provides insight into which student populations
 #' are being waitlisted and helps with enrollment planning and advising.
 #'
-#' @param students Data frame of student enrollments from cedar_students table.
+#' @param students Data frame of student enrollments from cedar_students table,
+#'   with \code{course_id} attached (as every loader does); read keyed on it,
+#'   so every \code{subject_course} in the result is a course id and each table
+#'   carries \code{former_codes} (the other codes the course has carried, with
+#'   their terms; NA when one).
 #'   Must include columns: campus, college, term, term_type, major,
 #'   student_classification, subject_course, course_title, level, and
 #'   registration_status_code (or the backward-compatible registration_status).
 #' @param opt Options list for filtering:
 #'   \itemize{
-#'     \item \code{course} - Course identifier(s) (e.g., "MATH 1430")
+#'     \item \code{course} - Course identifier(s) (e.g., "MATH 1430"), current
+#'       or former: each resolves to its course
 #'     \item \code{term} - Term code(s) (e.g., 202510)
 #'     \item \code{subject} - Subject code(s) (e.g., "MATH")
 #'     \item Other filtering options supported by \code{filter_class_list()}
 #'   }
-#' @param enrl_base Optional precomputed course-term enrollment table
-#'   (\code{cedar_cl_enrls_base}); passed on to
+#' @param course_terms Optional \code{cedar_course_terms}
+#'   (\code{\link{build_course_terms}}), checked against \code{students}'
+#'   course codes and passed on to
 #'   \code{\link{attach_enrollment_history}}, which recomputes a scoped base
 #'   from \code{students} when this is NULL.
 #' @param sections Optional cedar_sections table; only needed if students
@@ -308,10 +316,25 @@ attach_enrollment_history <- function(count_df, students, enrl_base = NULL) {
 #' \code{\link{get_unique_waitlisted}} for unique student counts
 #'
 #' @export
-inspect_waitlist <- function(students, opt, sections = NULL, enrl_base = NULL,
+inspect_waitlist <- function(students, opt, sections = NULL, course_terms = NULL,
                              student_terms = NULL) {
 
   message("[waitlist.R] Welcome to inspect_waitlist!")
+  if (!is.null(course_terms)) require_current_course_terms(course_terms, students, "inspect_waitlist")
+
+  # Waitlists follows the course, not the code (ADR-001 step 4): both tables
+  # are read keyed on course_id, so a student waiting under CCS 370 and one
+  # waiting under CCST 370 in the same term are one course's demand, a student
+  # waiting under one code while registered under the other holds a seat and is
+  # not counted, and the section supply and history are the course's. A picked
+  # code, current or former, resolves to its course once.
+  if (!is.null(opt[["course"]]) && !identical(opt[["course"]], "")) {
+    opt[["course"]] <- if (is.null(sections)) {
+      course_ids_of(opt[["course"]], students, caller = "inspect_waitlist")
+    } else {
+      course_ids_of(opt[["course"]], students, sections, caller = "inspect_waitlist")
+    }
+  }
 
   message("[waitlist.R] Filtering students from params...")
   filtered_students <- filter_class_list(students, opt)
@@ -387,7 +410,16 @@ inspect_waitlist <- function(students, opt, sections = NULL, enrl_base = NULL,
   # Add enrollment context (current enrollment, historical average, trend series)
   # so each waitlist row reads against how full the course usually runs.
   waitlist_data[["count"]] <- attach_enrollment_history(waitlist_data[["count"]], students,
-                                                        enrl_base = enrl_base)
+                                                        course_terms = course_terms)
+
+  # Name the other codes each course has carried, beside the course (NA when
+  # one), on every table, from the whole keyed tables.
+  spans <- if (is.null(sections)) course_former_code_spans(students) else
+    course_former_code_spans(students, sections)
+  for (nm in c("count", "majors", "classifications")) {
+    waitlist_data[[nm]] <- waitlist_data[[nm]] %>%
+      left_join(spans, by = "subject_course", relationship = "many-to-one")
+  }
 
   message("[waitlist.R] Returning waitlist data...")
 

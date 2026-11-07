@@ -645,6 +645,12 @@ regstats_course_key_info <- function(flagged) {
 #'   \item \strong{Chronically full:} Fill rate above absolute ceiling for 3+ past same-type terms
 #' }
 #'
+#' @param course_terms Optional \code{cedar_course_terms}
+#'   (\code{\link{build_course_terms}}), the course-term counts it filters
+#'   instead of recounting the class list. NULL recounts. A table not counted
+#'   by this build over \code{students}' course codes is refused. It is not
+#'   read when a student-level filter is set: those change which students count.
+#'
 #' @examples
 #' \dontrun{
 #' # Analyze all Arts & Sciences courses for Fall 2025
@@ -683,7 +689,7 @@ regstats_course_key_info <- function(flagged) {
 #' \code{\link{get_enrl}} for current enrollment data
 #'
 #' @export
-get_reg_stats <- function(students, courses, opt) {
+get_reg_stats <- function(students, courses, opt, course_terms = NULL) {
   cedar_debug("[regstats.R] Welcome to get_reg_stats!")
 
   # Regstats follows the course, not the code (ADR-001 step 4): both tables are
@@ -691,42 +697,22 @@ get_reg_stats <- function(students, courses, opt) {
   # former code are its own baseline, the schedule's capacity for a section the
   # class list names by the newer code joins its census, and a code asked for,
   # current or former, resolves to its course once. The renames in the class
-  # list fingerprint the result: the cache and the precomputed base must have
-  # been counted over the same ones.
-  students <- key_on_course_id(students, "get_reg_stats")
-  courses <- key_on_course_id(courses, "get_reg_stats")
+  # list fingerprint the result: the cache and course_terms must have been
+  # counted over the same ones.
   if (!is.null(opt[["course"]]) && !identical(opt[["course"]], "")) {
-    known_codes <- dplyr::bind_rows(
-      dplyr::distinct(students, course_id, listed_code),
-      dplyr::distinct(courses, course_id, listed_code)
-    )
-    opt[["course"]] <- unique(vapply(
-      convert_param_to_list(opt[["course"]]), course_id_of, character(1),
-      tbl = known_codes, caller = "get_reg_stats"
-    ))
+    opt[["course"]] <- course_ids_of(opt[["course"]], students, courses, caller = "get_reg_stats")
   }
   code_renames <- course_code_renames(students)
 
-  # cedar_cl_enrls_base is an OPTIONAL precomputed enrollment base table built in
-  # global.R as a performance cache. In the running app it is always defined (the
-  # table, or NULL when caching is disabled). Outside the app (tests, CLI scripts)
-  # the name is absent entirely, so reference it through exists()/get() and treat
-  # absence the same as the NULL "no precomputed base" case the logic below already
-  # handles by recomputing via calc_cl_enrls(). This is not a silent fallback — NULL
-  # is a documented, supported state, not a masked error.
-  cl_enrls_base <- if (exists("cedar_cl_enrls_base", inherits = TRUE)) {
-    get("cedar_cl_enrls_base", inherits = TRUE)
-  } else {
-    NULL
-  }
+  # course_terms is checked against the class list before either is cut, so a
+  # table counted over other course codes is refused, not filtered.
+  if (!is.null(course_terms)) require_current_course_terms(course_terms, students, "get_reg_stats")
 
   # The excluded-course list by course, read once over both whole tables: a
   # course the list names under any code it has carried is excluded in every
-  # term and from the base counted by course (drop_excluded_courses(), M39).
+  # term and from course_terms, counted by course (drop_excluded_courses(), M39).
   # Every pass below then reads the same courses, including the class-list
   # recount used when a student-level filter is set, which used to keep them.
-  # The base's renames are checked against the class list before it is cut.
-  base_counted_over_these_codes <- cl_enrls_base_is_current(cl_enrls_base, students)
   excluded_ids <- if (exists("excluded_courses")) excluded_course_ids(students, courses) else character(0)
   if (length(excluded_ids) > 0) {
     students <- students[!course_code_in(students$subject_course, excluded_ids), ]
@@ -804,10 +790,10 @@ get_reg_stats <- function(students, courses, opt) {
   myopt <- opt
   myopt[["term"]] <- NULL
 
-  # Use the precomputed base table when possible — avoids re-running calc_cl_enrls()
+  # Filter cedar_course_terms when given — avoids re-running calc_cl_enrls()
   # on raw student rows on every request. Falls back for per-student filters (pt, im,
   # inst, classification, major) that change which students count toward enrollment
-  # and therefore can't be applied post-hoc to the aggregated base.
+  # and therefore can't be applied post-hoc to the aggregated counts.
   student_level_filters <- c("pt", "im", "inst", "classification", "major",
                               "student_campus", "student_college")
   has_student_filters <- any(vapply(student_level_filters, function(f) {
@@ -815,13 +801,9 @@ get_reg_stats <- function(students, courses, opt) {
     !is.null(v) && length(v) > 0 && !identical(v, "")
   }, logical(1)))
 
-  if (!is.null(cl_enrls_base) && !has_student_filters) {
-    if (!base_counted_over_these_codes) {
-      stop("[regstats.R] cedar_cl_enrls_base was not counted over this class list's course codes; ",
-           "build it with build_cl_enrls_base() (R/branches/enrl.R), as global.R does at start.")
-    }
-    cedar_debug("[regstats.R] Using precomputed enrollment base table...")
-    regstats <- cl_enrls_base
+  if (!is.null(course_terms) && !has_student_filters) {
+    cedar_debug("[regstats.R] Filtering cedar_course_terms...")
+    regstats <- course_terms
     if (!is.null(opt[["course_college"]]) && length(opt[["course_college"]]) > 0) {
       regstats <- regstats %>% filter(college %in% opt[["course_college"]])
     }
@@ -841,12 +823,12 @@ get_reg_stats <- function(students, courses, opt) {
     # Remove lookup columns — they're not expected by downstream anomaly detection code.
     regstats <- regstats %>% select(-any_of(c("level", "department")))
     # Apply excluded_courses list so dissertations/independent-study don't skew stats.
-    # The base is counted by course, so the list is applied by course too.
+    # course_terms is counted by course, so the list is applied by course too.
     if (exists("excluded_courses")) {
       regstats <- regstats %>%
         filter(!normalize_course_code(subject_course) %in% excluded_ids)
     }
-    cedar_debug("[regstats.R] Precomputed base filtered to ", nrow(regstats), " rows.")
+    cedar_debug("[regstats.R] course_terms filtered to ", nrow(regstats), " rows.")
   } else {
     cedar_debug("[regstats.R] Falling back to filter_class_list + calc_cl_enrls (student-level filters active)...")
     filtered_students <- filter_class_list(students, myopt)
