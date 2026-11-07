@@ -31,4 +31,4 @@ automatically retried.
 
 The complete testing policy, fixture rules, environment details, and reporting
 requirements live in [the developer testing guide](../docs/developers/testing.md)
-and `AGENTS.md` under **Standard Testing Procedure**.
+and [the browser testing guide](../docs/developers/e2e-testing.md).

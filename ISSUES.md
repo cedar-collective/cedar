@@ -23,7 +23,14 @@ There are two kinds, in two sections:
 
 IDs are stable: code and docs cite them. Resolved entries stay, with
 `Status: resolved` and the resolving commit, until the next release, so that a
-recurrence is recognizable.
+recurrence is recognizable. **An entry's status lives here and nowhere
+else**: other files link to the entry instead of restating where it stands.
+
+**Order for the improvements** (from the 2026-10-07 audit): reconcile counts
+computed twice (I16, M1–M3, M24); then the architecture rules file by file
+(M11 silent fallbacks first, because they hide failures, then M13 logic in
+modules); then interface consistency one tab per PR (M17, M18); file size
+alongside other work (M14, M16).
 
 ## Open items
 
@@ -32,10 +39,10 @@ recurrence is recognizable.
 | [I48](#i48--a-transform-change-to-a-fact-tables-stored-columns-is-not-rebuilt-at-deploy) | Defect | Since the mapping stamps retired (ADR-001 step 3, 2026-11-06) the deploy gate rebuilds only `cedar_student_terms`: a transform change that adds or renames a stored column on sections, students, programs or degrees starts the app on files without it until the morning refresh, the I46 shape with no gate |
 | [I47](#i47--the-class-lists-student_classification-is-stamped-at-pull-time-when-a-term-is-pulled-late) | Defect | A class list pulled months after its term carries each student's classification as of the pull: Fall 2025's list (pulled 2026-03-07) puts 35% of ENGL 1120's registered student-terms one step ahead of the classification academic studies recorded for Fall 2025. Every grouping reader now takes the student-term table's value; the `classification` filter key and Regstats' sophomore screen still read the class list |
 | [I46](#i46--a-deploy-that-must-rebuild-a-table-the-app-cannot-start-without-takes-the-site-down) | Defect | The deploy's table gate ran after the health check, so a deploy that added a column to `cedar_student_terms` failed its health check on the missing column and never reached the gate: production served the restart page from 17:07 UTC on 2026-11-04 (gate moved before the first request) |
-| [I45](#i45--the-class-list-and-the-schedule-name-the-same-section-with-different-course-codes) | Defect | The class list and the schedule name the same section differently for renamed subjects (SOC to SOCI, PSY to PSYC, CCS to CCST): SOCI 371 has class-list history from Fall 2019 but no sections before Fall 2021 (crosswalk and `course_id` in place 2026-11-06; Low Enrollment, Course Dynamics, Regstats, Waitlists, the Department Dashboard and the enrollment projections read it) |
+| [I45](#i45--the-class-list-and-the-schedule-name-the-same-section-with-different-course-codes) | Defect | The class list and the schedule name the same section with different course codes for renamed subjects (SOC to SOCI, PSY to PSYC): SOCI 371 had class-list history from Fall 2019 but no sections before Fall 2021 (fixed for every reader by keying the loaded tables on the course, 2026-11-07; open until the remaining successions are confirmed) |
 | [I43](#i43--every-scheduled-refresh-fails-because-the-default-asks-for-a-report-mrgather-never-fetches) | Defect | Every scheduled refresh has failed since 2026-10-24: the default asks for the applicants report, which production mrgather never fetches, so production tables have not been rebuilt since Oct 27 (default fixed; mrgather and per-report rebuilds remain) |
 | [I38](#i38--a-pathways-program-population-misses-pre-majors-whose-name-differs-from-their-major) | Defect | A Pathways program population misses pre-majors whose name differs from their major: "Film and Digital Arts" holds 1 of the 1,016 Film pre-majors who never declared the major, because `FFDA` is named "FDMA" |
-| [I37](#i37--renumbered-courses-lose-their-history) | Defect | Renumbered courses lose their history: no crosswalk exists, so ACCT 3401 (was MGMT 340) and the other Fall 2026 ACCT, BUSA and POPH courses read as new (crosswalk and `course_id` in place 2026-11-06, the renumberings proposed and awaiting confirmation; Low Enrollment, Course Dynamics, Regstats, Waitlists, the Department Dashboard and the enrollment projections read the id) |
+| [I37](#i37--renumbered-courses-lose-their-history) | Defect | Renumbered courses lose their history: ACCT 3401 (was MGMT 340) and the other Fall 2026 ACCT, BUSA and POPH courses read as new (every reader follows a confirmed renumbering; 277 of the 320 title matches confirmed 2026-11-07, 6 deleted, 37 held for review with the reason on each row) |
 | [I33](#i33--a-crashed-myreports-download-is-recorded-as-a-successful-fetch) | Defect | A crashed MyReports download is recorded as a successful fetch: on Oct 23 class lists and applicants were never downloaded, and every step reported ✅ (partly fixed) |
 | [I32](#i32--a-scheduled-refresh-waits-forever-when-myreports-asks-for-a-2fa-code) | Defect | A scheduled refresh waits forever when MyReports asks for a 2FA code: the Oct 11 run sat 12 days at the prompt, unreported |
 | [I28](#i28--one-late-starting-session-makes-a-whole-courses-first-day-unknown) | Defect | One late-starting session makes a whole course's first day unknown: 257 Fall 2026 courses on the Oct 8 pull, 17 on Oct 23. Intersession is out of the forecast (model 0.24.0), and a session not yet begun is judged on its lower bound (model 0.25.0). A section with no start date still reads as having no status dates |
@@ -661,7 +668,17 @@ programs).
 
 ## I37 — Renumbered courses lose their history
 
-**Status:** open; partly fixed 2026-11-06 (ADR-001 step 4, PR 1).
+**Status:** open; mostly fixed. On 2026-11-07, 277 of the 320 proposed title
+matches were confirmed in bulk by rule: the common course numbering
+conversions (3-digit to 4-digit at the same level, distinctive title) and
+subject prefix changes seen on several courses. Six coincidences of a shared
+title were deleted (NURS 419L → FDMA 2999, NURS 245 → SPCD 601, EMS 461 →
+NURS 711, HHHA 153 → HED 486, LAIS 199 → LAIS 301, PEP 474 → ATED 610). The
+37 still proposed change level (the NURS 5xx → 7xx doctoral series, ARTH,
+BIOL, ENVS), carry a generic title, or are a one-off subject change; each row's
+notes say which. Measured on the 2026-10-08 pull: ENGL 1120, MATH 1220,
+ACCT 3401 and BUSA 3220 each read as one course from 2018.
+Earlier history: partly fixed 2026-11-06 (ADR-001 step 4, PR 1).
 `institution/unm/code_history.csv` exists, validated at startup;
 `scripts/propose-code-history.R` wrote 320 one-to-one title matches as
 proposed rows (MGMT 340 → ACCT 3401 among them), each waiting for a person to

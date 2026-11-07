@@ -3,7 +3,7 @@
 CEDAR reads these files to decide which unit (department) every course and
 program belongs to. Edit them here; no code changes are needed. They are validated at startup,
 and a malformed file stops the app with every problem listed.
-See `docs/developers/adr-002-explicit-mapping-files.md`.
+See `docs/developers/architecture-decisions.md, ADR-002`.
 
 University, Gen Ed and college references are separate from unit mappings and
 degree-specific rules. Start with [shared_requirements/README.md](shared_requirements/README.md)
