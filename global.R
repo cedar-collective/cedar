@@ -216,6 +216,9 @@ rm(.key, .n_before)
 # The class list's student-description columns stay on the saved file (the
 # transform builds cedar_student_terms from them) but are not loaded: readers
 # attach them from cedar_student_terms (ADR-001 step 5, thin_class_list()).
+# The roster's own major names are kept as a small summary for Admin >
+# Mappings' audit, which names a code programs.csv lacks by them.
+data_objects[["cedar_class_list_majors"]] <- summarize_class_list_majors(data_objects[["cedar_students"]])
 data_objects[["cedar_students"]] <- thin_class_list(data_objects[["cedar_students"]])
 
 cedar_dims <- build_cedar_dims()

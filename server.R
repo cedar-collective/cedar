@@ -5845,7 +5845,8 @@ output$enrl_classlist_download <- downloadHandler(
                                     sections = data_objects[["cedar_sections"]],
                                     students = data_objects[["cedar_students"]],
                                     programs = data_objects[["cedar_programs"]],
-                                    degrees  = data_objects[["cedar_degrees"]])
+                                    degrees  = data_objects[["cedar_degrees"]],
+                                    class_list_majors = data_objects[["cedar_class_list_majors"]])
     build_mapping_worklist(cedar_institution_files, data_objects[["cedar_programs"]],
                            .mapping_issues(), audit,
                            source_departments = read_institution_file("source_departments"))

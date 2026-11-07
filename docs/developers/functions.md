@@ -8,7 +8,7 @@ parent: Developer Guide
 
 This reference is auto-generated from roxygen2 comments in the source code.
 
-*Generated: 2026-11-07 14:00:23.564938*
+*Generated: 2026-11-07 14:20:44.267928*
 
 ---
 
@@ -3457,6 +3457,7 @@ Courses students were taking in the term before a major switch appeared  Answers
 
 - `files` - The list read_institution_mappings() returns.
 - `sections,students,programs,degrees` - CEDAR tables; any may be NULL, and the kinds that need it are then not checked (and say so in `checked`).
+- `class_list_majors` - The roster's majors as `summarize_class_list_majors()` returns them, for the loaded (thinned) class list; a saved class list, which keeps its major columns, is summarised from `students` instead.
 
 **Returns:** Tibble: kind, value, context, rows, first_term, last_term, status ("unmapped", "review", or "expected"), consequence, needs (what someone must supply, in words), file (the mapping file that takes it, without extension), line (the row to edit there, NA where the fix is a new row). Attribute `checked`: the kinds checked.
 
@@ -3467,6 +3468,22 @@ Courses students were taking in the term before a major switch appeared  Answers
 *Source: mapping-audit.R*
 
 **One line for a log: what the audit found**
+
+---
+
+### `summarize_class_list_majors()`
+
+*Source: mapping-audit.R*
+
+**The roster's majors, summarised before the class list is thinned**
+
+The roster's majors, summarised before the class list is thinned  The class list prints each student's major code and name on every row; the loaded table drops both (thin_class_list(), ADR-001 step 5), so a loader keeps this summary for the mapping audit's class-list check, which names a code programs.csv lacks by the roster's own name.
+
+**Parameters:**
+
+- `students` - The class list as saved, with `major_code`, `major_name` and `term`.
+
+**Returns:** One row per code and roster name: `major_code`, `major_name`, `rows`, `first_term`, `last_term`. Rows with no code are left out.
 
 ---
 

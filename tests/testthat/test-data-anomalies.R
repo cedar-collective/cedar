@@ -384,6 +384,19 @@ test_that("the mapping audit lists a class-list major code no programs.csv row n
   # The class lists must carry the roster's name column to be checked.
   expect_error(audit_mapping_coverage(audit_files(), students = dplyr::select(test_students_st, -major_name)),
                "cedar_students lacks major_name")
+  # The loaded class list carries neither column (thin_class_list()): the
+  # loader's summary of the roster's majors gives the same finding, and
+  # without it the check is not run and the audit says so.
+  majors <- summarize_class_list_majors(test_students_st)
+  from_summary <- audit_mapping_coverage(audit_files(), students = thin_class_list(test_students_st),
+                                         class_list_majors = majors)
+  expect_equal(from_summary %>% dplyr::filter(value == "SPAN") %>%
+                 dplyr::select(context, rows, first_term, last_term),
+               span %>% dplyr::select(context, rows, first_term, last_term))
+  skipped <- audit_mapping_coverage(audit_files(), students = thin_class_list(test_students_st))
+  expect_false("class_list_program_code" %in% attr(skipped, "checked"))
+  expect_error(summarize_class_list_majors(thin_class_list(test_students_st)),
+               "before thin_class_list")
 })
 
 test_that("the mapping audit checks only the tables it is given, and says so", {

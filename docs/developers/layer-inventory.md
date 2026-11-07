@@ -103,7 +103,8 @@ What each file in `R/branches/`, `R/cones/`, `R/features/` and `R/trunk/` is for
 
 | Function | Purpose |
 |---|---|
-| `audit_mapping_coverage(files, sections, students, programs, degrees)` | Every value the loaded data uses that `institution/<id>/` does not cover — course subjects, section colleges, program codes, source college names, units with no college — plus programs whose mapped college differs from Banner's Translated College (pre-majors' differences marked `expected`). Any table may be NULL; the `checked` attribute says which kinds ran. Fails loudly on a missing column |
+| `audit_mapping_coverage(files, sections, students, programs, degrees, class_list_majors)` | Every value the loaded data uses that `institution/<id>/` does not cover — course subjects, section colleges, program codes, source college names, units with no college — plus programs whose mapped college differs from Banner's Translated College (pre-majors' differences marked `expected`). Any table may be NULL; the `checked` attribute says which kinds ran. Fails loudly on a missing column. The roster's majors come from a saved class list or, for the loaded one, `class_list_majors` |
+| `summarize_class_list_majors(students)` | The roster's major codes and names with rows and term span, taken by every loader before `thin_class_list()` (`data_objects$cedar_class_list_majors`) so Admin > Mappings can name an unmapped code by the roster's name |
 | `summarize_mapping_audit(audit)` | One log line; the transform prints it at the end of every run |
 
 Student level and home campus vocabulary (`R/lists/student_levels.R`, `R/lists/campuses.R`): `cedar_level_code_from_source(values)` and `cedar_campus_code_from_source(values)` translate a code, a name or a spelling listed in the file's `source_names` to the code, NA where the file does not list the value. `CEDAR_STUDENT_LEVELS` and `CEDAR_STUDENT_LEVEL_LABELS` expose `student_levels.csv`.
