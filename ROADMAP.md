@@ -344,8 +344,9 @@ Plan: [ADR-002](docs/developers/adr-002-explicit-mapping-files.md).
   course's former codes, and refuses a base or a day cache counted over other
   codes; Waitlists' enrollment history joins that base by course. Reader PR 4
   (2026-11-06): Waitlists keys both tables, so its counts, true-demand
-  de-dup and supply follow the course. Next: the Department Dashboard's
-  waitlist block, the projection inputs, then
+  de-dup and supply follow the course. Reader PR 5 (2026-11-06): the
+  Department Dashboard keys both tables, so a renamed course is no longer
+  "new this term". Next: the projection inputs, then
   `cedar_course_terms` and `cedar_attempts` keyed on the id. Confirming the proposed Fall 2026
   renumberings is a person's decision, and what makes I37's rows show their
   old offerings.

@@ -422,7 +422,10 @@ load_dept_demographics_cache <- function(dept_code, data_objects, opt = list()) 
 # v11 SCH shifts count census SCH (credit-hours 3.0.0).
 # v12 major donuts and composition shifts name codes from programs.csv (dims),
 #     not the retired cedar_lookups; the key hashes the dimension tables too.
-cedar_dept_dashboard_cache_version <- 12L
+# v13 reads by course (course_id; ADR-001 step 4): course history, flags and
+#     waitlist follow a course across its codes, and course tables carry
+#     former_codes. The key already hashes the dims, code_history included.
+cedar_dept_dashboard_cache_version <- 13L
 
 cache_value_or <- function(x, default) {
   if (is.null(x) || length(x) == 0) default else x

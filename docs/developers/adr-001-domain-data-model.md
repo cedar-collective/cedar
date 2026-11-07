@@ -595,9 +595,21 @@ waiting students by course and by code (no student in this pull waits
 under two codes of one course), 39 rows name a former code, and one more
 row reads enrollment history. Regstats rows, which carry course ids since
 reader PR 3, now drill into a Waitlists view that finds every code's rows.
-The Department Dashboard's waitlist block still matches by code (its
-enrollment history comes from `get_enrl()` by code and it caches its own
-payload); it is the next reader, and the definition says so. The downstream-signals
+**Reader PR 5 (2026-11-06): the Department Dashboard.**
+`create_dept_dashboard_data()` keys both tables once, after reading them,
+so the course history it builds with `get_enrl()` and every reader of it
+(new this term, missing from earlier, repeated topics, above and below
+average), the low-enrollment review, the waitlist block and the Regstats
+flags follow the course; the waitlist and low-enrollment tables, new this
+term and missing from earlier carry `former_codes`, and the payload records
+its renames (`course_code_renames`). Cache v13; the key already hashes the
+dims, `code_history` among them. Measured on the 2026-10-08 pull: PSYC no
+longer calls PSYC 539 and PSYC 644 new in Fall 2026, nor PSYC 416 in Spring
+2026; SOCI no longer calls SOCI 307 new in Fall 2026; the CCS department's
+new courses are named CCST. Missing-from-earlier and the waitlist rows are
+unchanged in count. The hand-built course rows in `server.R` (above and
+below average, new, missing) show the course id without its former codes;
+the waitlist table shows them. The downstream-signals
 flows (`cedar_course_flows`) are still by code and rebuild on
 `cedar_course_terms`. Next: the enrollment projection inputs are a
 `model_version` decision. Then `cedar_course_terms` is promoted from

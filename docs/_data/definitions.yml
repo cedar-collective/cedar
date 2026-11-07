@@ -512,7 +512,7 @@ definitions:
 
       - version: "3.0.0"
         title: Class-list waitlist demand
-        summary: Waitlists and Regstats count distinct WL students after removing anyone already registered in the same course, term, delivery-campus, college, and part-of-term scope, where a course is followed across the codes it has carried.
+        summary: Waitlists, Regstats, and the Department Dashboard count distinct WL students after removing anyone already registered in the same course, term, delivery-campus, college, and part-of-term scope, where a course is followed across the codes it has carried.
         population: Class-list enrollment records in the selected course and term scope after the shared excluded-course list is applied; a course picked by a former code is its course.
         unit: Student within course, course title, term, delivery campus, and available college/part-of-term keys, the course named by its current code.
         numerator: Distinct WL students remaining after matching RE/RS/RR records are removed. A student waiting under one of a course's codes while registered under another holds a seat in the course and is not counted; students waiting under two codes of one course in one term are one course's demand.
@@ -522,7 +522,6 @@ definitions:
         exclusions: Students with matching RE/RS/RR registered rows, duplicate waitlist rows within that group, and courses on the shared excluded-course list under any code they have carried.
         limitations:
           - Which codes are one course is the institution's decision, recorded in its code history file; a succession nobody has confirmed is two courses.
-          - The Department Dashboard still matches by course code, so for a course listed under two live codes in one term (UNM's CCS and CCST) its waitlist rows can split where Waitlists shows one.
           - Historical pulls can retain only students still waitlisted when the term closed, so a small past-term count is not evidence that earlier demand was small.
           - Waiting is evidence of expressed interest, not proof that a new section will fill.
         guide: users/waitlists
@@ -533,6 +532,8 @@ definitions:
             functions: [inspect_waitlist, attach_enrollment_history]
           - file: R/branches/courses.R
             functions: [key_on_course_id, course_ids_of, course_former_code_spans]
+          - file: R/features/dept-dashboard.R
+            functions: [create_dept_dashboard_data]
           - file: R/features/regstats.R
             functions: [get_reg_stats]
           - file: R/branches/enrl.R

@@ -338,14 +338,13 @@ test_that("Waitlists, Regstats, and Department Dashboard reconcile true demand",
   expect_equal(regstats$waiting, 28L)
 })
 
-test_that("waitlist definition v3 follows the course and names the dashboard's lag", {
+test_that("waitlist definition v3 follows the course on every surface", {
   definition <- cedar_definition("waitlist")
   expect_identical(definition$version, "3.0.0")
   expect_match(definition$summary, "followed across the codes it has carried", fixed = TRUE)
   expect_match(definition$numerator, "holds a seat in the course", fixed = TRUE)
   expect_match(definition$exclusions, "RE/RS/RR", fixed = TRUE)
-  expect_true(any(grepl("Department Dashboard still matches by course code",
-                        definition$limitations, fixed = TRUE)))
+  expect_match(definition$summary, "Waitlists, Regstats, and the Department Dashboard", fixed = TRUE)
 })
 
 test_that("inspect_waitlist requires sections when course titles are absent", {
