@@ -58,68 +58,76 @@ build_attempts <- function(students, edges) {
   }
   graded_edge <- as.integer(graded_edge)
 
-  # One pass over the class list decides every row, so it is copied once and
-  # only in the columns the table keeps: the whole 34-column class list,
-  # filtered then mutated and classified, peaked 1.5 GB above the loaded tables
-  # on the 2026-10-08 pull, and the app's 3.8 GB container was killed at start.
+  # Built a term at a time. Every key holds the term, so each term's rows are
+  # decided, checked and classified alone, and the class list is never copied
+  # whole: over the whole 34-column class list at once the build peaked 1.5 GB
+  # above the loaded tables, and in the app's 3.8 GiB container even a
+  # 12-column copy with the garbage collected between steps reached 3.5 GiB
+  # and was killed at start (2026-11-07). Per term, the peak is the pieces and
+  # the bound table.
   # Kept: registered, early-drop and late-drop rows to the graded edge, less
   # audits (an early drop is "Drop" whatever its grade, so it is never an
   # audit), the rows prepare_course_attempts() keeps.
-  status <- students$registration_status_code
-  raw_grade <- trimws(as.character(students$final_grade))
-  keep <- as.integer(students$term) <= graded_edge &
-    status %in% c(STATUS_REGISTERED, STATUS_DROP_EARLY, STATUS_DROP_LATE) &
-    !(!status %in% STATUS_DROP_EARLY & raw_grade %in% GRADES_EXCLUDED_FROM_OUTCOMES)
-  keep[is.na(keep)] <- FALSE
+  term <- as.integer(students$term)
+  candidates <- which(term <= graded_edge &
+                        students$registration_status_code %in%
+                          c(STATUS_REGISTERED, STATUS_DROP_EARLY, STATUS_DROP_LATE))
+  by_term <- split(candidates, term[candidates])
+  rm(term, candidates)
   source_cols <- setdiff(ATTEMPTS_COLUMNS, c("outcome_category", "outcome"))
-  rows <- dplyr::ungroup(students)[keep, source_cols]
-  raw_grade <- dplyr::na_if(raw_grade[keep], "")
-  rm(status, keep)
-  n_keys <- nrow(dplyr::distinct(rows, student_id, term, campus, subject_course))
-  if (n_keys != nrow(rows)) {
-    dup <- rows[duplicated(rows[c("student_id", "term", "campus", "subject_course")]), ]
-    stop("[attempts.R] build_attempts(): ", nrow(rows) - n_keys, " student-course-campus-terms ",
-         "hold more than one class-list row (first: ", dup$student_id[1], " ",
-         dup$subject_course[1], " ", dup$term[1], "); the loaded class list should hold one")
+  students <- dplyr::ungroup(students)
+  pieces <- lapply(by_term, function(i) .attempts_for_rows(students[i, source_cols]))
+  rm(by_term)
+  out <- if (length(pieces)) {
+    dplyr::bind_rows(pieces)[, ATTEMPTS_COLUMNS]
+  } else {
+    # No graded attempt at all: the empty table, with every column.
+    dplyr::mutate(students[0, source_cols], outcome_category = character(),
+                  outcome = character())[, ATTEMPTS_COLUMNS]
   }
-
-  # The grade as prepare_course_attempts() reads it: an early drop is "Drop",
-  # and a late drop with no grade posted is "W".
-  rows$final_grade <- dplyr::case_when(
-    rows$registration_status_code %in% STATUS_DROP_EARLY ~ "Drop",
-    rows$registration_status_code %in% STATUS_DROP_LATE & is.na(raw_grade) ~ "W",
-    TRUE ~ raw_grade)
-  rm(raw_grade)
-
-  # Classified a term at a time on the two columns the classifier reads, with
-  # the garbage collected between terms: at once, its flag columns and their
-  # temporaries peaked near 1 GB, and R collects against a ~3 GB live heap
-  # only late. The category and outcome come from the classifier's own flags,
-  # so they cannot drift from it.
-  gc(verbose = FALSE)
-  category <- outcome <- rep(NA_character_, nrow(rows))
-  for (i in split(seq_len(nrow(rows)), rows$term)) {
-    classified <- classify_attempt_outcomes(rows[i, c("registration_status_code", "final_grade")])
-    category[i] <- classified$outcome_category
-    outcome[i] <- dplyr::case_when(classified$is_pass ~ "pass",
-                                   classified$is_dfw_legacy ~ "dfw",
-                                   TRUE ~ NA_character_)
-    rm(classified)
-    gc(verbose = FALSE)
-  }
-  if (any(category == "other")) {
-    stop("[attempts.R] build_attempts(): ", sum(category == "other"),
-         " attempts fell through every outcome category")
-  }
-  rows$outcome_category <- category
-  rows$outcome <- outcome
-  out <- rows[, ATTEMPTS_COLUMNS]
+  rm(pieces)
 
   attr(out, "attempts_build_version") <- ATTEMPTS_BUILD_VERSION
   attr(out, "cedar_outcome_policy_version") <- CEDAR_OUTCOME_POLICY_VERSION
   attr(out, "graded_edge") <- graded_edge
   attr(out, "code_renames") <- course_code_renames(students)
   out
+}
+
+
+# One term's class-list rows (registered and dropped, to the graded edge) as
+# attempts: audits out, the grade as prepare_course_attempts() reads it, one
+# row per student, course and campus, classified by classify_attempt_outcomes()
+# with the outcome taken from its own flags, so it cannot drift from it.
+.attempts_for_rows <- function(rows) {
+  status <- rows$registration_status_code
+  grade <- dplyr::na_if(trimws(as.character(rows$final_grade)), "")
+  audit <- !status %in% STATUS_DROP_EARLY & grade %in% GRADES_EXCLUDED_FROM_OUTCOMES
+  rows <- rows[!audit, ]
+  status <- status[!audit]
+  grade <- grade[!audit]
+  dup <- duplicated(rows[c("student_id", "campus", "subject_course")])
+  if (any(dup)) {
+    stop("[attempts.R] build_attempts(): ", sum(dup), " student-course-campus-terms in ",
+         rows$term[1], " hold more than one class-list row (first: ",
+         rows$student_id[dup][1], " ", rows$subject_course[dup][1],
+         "); the loaded class list should hold one")
+  }
+  # An early drop is "Drop"; a late drop with no grade posted is "W".
+  rows$final_grade <- dplyr::case_when(
+    status %in% STATUS_DROP_EARLY ~ "Drop",
+    status %in% STATUS_DROP_LATE & is.na(grade) ~ "W",
+    TRUE ~ grade)
+  classified <- classify_attempt_outcomes(rows[c("registration_status_code", "final_grade")])
+  if (any(classified$outcome_category == "other")) {
+    stop("[attempts.R] build_attempts(): ", sum(classified$outcome_category == "other"),
+         " attempts in ", rows$term[1], " fell through every outcome category")
+  }
+  rows$outcome_category <- classified$outcome_category
+  rows$outcome <- dplyr::case_when(classified$is_pass ~ "pass",
+                                   classified$is_dfw_legacy ~ "dfw",
+                                   TRUE ~ NA_character_)
+  rows
 }
 
 

@@ -386,6 +386,10 @@ if (!is.null(data_objects[["cedar_students"]]) && nrow(data_objects[["cedar_stud
     if (saved_is_newer) {
       message("[global.R] Saved cedar_attempts is from another build, policy, edge or course codes; rebuilding.")
     }
+    # Loading and attaching the tables leaves garbage R has not yet collected;
+    # collect it before the build, or the start runs past the 3.8 GiB
+    # container on the worst-case start (both caches stale).
+    gc(verbose = FALSE)
     t_at <- system.time({
       data_objects[["cedar_attempts"]] <- build_attempts(data_objects[["cedar_students"]], cedar_edges)
     })
@@ -435,6 +439,7 @@ if (!is.null(data_objects[["cedar_students"]]) && nrow(data_objects[["cedar_stud
     if (saved_is_newer) {
       message("[global.R] Saved cedar_course_terms is from another build, graded edge or course codes; rebuilding.")
     }
+    gc(verbose = FALSE)
     t_ct <- system.time({
       data_objects[["cedar_course_terms"]] <- build_course_terms(data_objects[["cedar_students"]],
                                                                  data_objects[["cedar_attempts"]])
