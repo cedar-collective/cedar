@@ -355,6 +355,9 @@ counting_rule_tables <- function() {
     college_basis = c("mapped", "mapped", "mapped", "mapped", "banner"),
     crosslist_group = c("G1", "G1", "G2", "G2", NA),
     crosslist_role = c("home", "partner", "internal", "internal", NA))
+  # As the loader keys them (attach_course_ids()); no code is renamed here.
+  sections$course_id <- sections$subject_course
+  sections$listed_code <- sections$subject_course
   students <- tibble::tibble(
     student_id = c("S1", "S2", "S3", "S3"), term = 202080L,
     student_campus = c("ABQ", "ABQ", "TA", "TA"), campus = c("ABQ", "EA", "TA", "ZZ"),
@@ -424,4 +427,46 @@ test_that("a suggestion's confidence follows the evidence the assistant recorded
   expect_equal(sub(":.*", "", got),
                c("Strong", "Strong", "Plausible", "Weak", "Weak", "Weak", "None"))
   expect_match(got[3], "7.7x")
+})
+
+
+# Admin > Mappings > Code history, over RN01 and the demo institution's
+# code_history.csv. Expected, from the RN01 rows in designed_test_data.R:
+#   PHIL 150 -> PHIL 1115 (proposed, Fall 2020) first: PHIL 150 listed Spring
+#     2020 only (1 section), PHIL 1115 Fall 2020 (1).
+#   SOC -> SOCI (subject, section_crn, Fall 2020): every SOC course on the
+#     schedule, SOC 371 and SOC 250, both Spring 2020 (2 sections); SOCI 371
+#     Fall 2020 and SOCI 2315 Spring 2021 (2). A subject row counts by prefix:
+#     matched as a whole code it would find no sections at all.
+#   HIST 320 -> HIST 3201 (Spring 2021): Spring 2020-Fall 2020 (2), Spring 2021 (1).
+#   SOCI 250 -> SOCI 2315: the schedule never lists SOCI 250 (it says SOC 250).
+test_that("the code history lists every succession with when each code was offered", {
+  files <- read_institution_mappings(cedar_institution_dir(cedar_base_dir, "demo"))
+  sections <- rn01_course_tables()$cedar_sections
+  got <- build_code_history_table(files, sections)
+
+  expect_equal(got$from_code, c("PHIL 150", "SOC", "HIST 320", "SOCI 250"))
+  expect_equal(got$status, c("proposed", "confirmed", "confirmed", "confirmed"))
+  expect_equal(got$line, c(5L, 2L, 4L, 3L))
+  expect_equal(got$from_first, c(202010L, 202010L, 202010L, NA))
+  expect_equal(got$from_last, c(202010L, 202010L, 202080L, NA))
+  expect_equal(got$from_sections, c(1L, 2L, 2L, 0L))
+  expect_equal(got$to_first, c(202080L, 202080L, 202110L, 202110L))
+  expect_equal(got$to_last, c(202080L, 202110L, 202110L, 202110L))
+  expect_equal(got$to_sections, c(1L, 2L, 1L, 1L))
+  expect_true(all(is.na(got$check)))
+  # The app passes cedar_dims: the same tables in file order, so the same lines.
+  expect_equal(build_code_history_table(build_cedar_dims(files), sections), got)
+
+  # A schedule that disagrees with the succession's term is flagged, except on
+  # a section_crn row, whose schedule keeps the old code by definition.
+  files$code_history$effective_term[files$code_history$from_code == "PHIL 150"] <- "202010"
+  files$code_history$effective_term[files$code_history$from_code == "HIST 320"] <- "202180"
+  files$code_history$effective_term[files$code_history$from_code == "SOC"] <- "201980"
+  got <- build_code_history_table(files, sections)
+  expect_equal(got$check[got$from_code == "PHIL 150"], "Old code still listed in Spring 2020")
+  expect_equal(got$check[got$from_code == "HIST 320"], "New code listed from Spring 2021, before the change")
+  expect_true(is.na(got$check[got$from_code == "SOC"]))
+
+  expect_error(build_code_history_table(files, dplyr::select(sections, -listed_code)), "listed_code")
 })

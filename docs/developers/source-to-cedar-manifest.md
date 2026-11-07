@@ -426,7 +426,7 @@ are the same concept. Pick one.
 ## 9. What this manifest would have prevented
 
 Of the mapping defects found in the 2026-07 audit
-([mapping-audit-2026-07.md](mapping-audit-2026-07.md)):
+([mapping-audit-2026-07.md](audits/mapping-audit-2026-07.md)):
 
 **Would have been caught** — these are source→column decisions, visible the
 moment two rows sit next to each other in a table like §2/§3:

@@ -1669,13 +1669,12 @@ create_dept_dashboard_data <- function(data_objects, opt) {
           if (!is.null(campus)) paste0(" [campus: ", paste(campus, collapse = ","), "]") else "")
 
   cedar_programs <- data_objects[["cedar_programs"]]
-  # The dashboard follows the course, not the code (ADR-001 step 4): both
-  # tables are read keyed on course_id, so a renumbered or renamed course is
-  # one course in its history, its waitlist and its flags. HIST 3201 is not
-  # "new this term" when it ran as HIST 320 last year, and HIST 320 is not
-  # "missing" from it.
-  cedar_students <- key_on_course_id(data_objects[["cedar_students"]], "create_dept_dashboard_data")
-  cedar_sections <- key_on_course_id(data_objects[["cedar_sections"]], "create_dept_dashboard_data")
+  # The loaded tables are keyed on the course (attach_course_ids()), so a
+  # renumbered or renamed course is one course in the dashboard's history, its
+  # waitlist and its flags: HIST 3201 is not "new this term" when it ran as
+  # HIST 320 last year, and HIST 320 is not "missing" from it.
+  cedar_students <- data_objects[["cedar_students"]]
+  cedar_sections <- data_objects[["cedar_sections"]]
 
   # Campus is passed through each function's opt as course_campus (the Cedar standard
   # key for the campus column in cedar_sections and cedar_students). Headcount functions
@@ -1751,7 +1750,8 @@ create_dept_dashboard_data <- function(data_objects, opt) {
       course_campus = campus,
       term = current_term,
       threshold_profile = "dashboard"
-    )
+    ),
+    course_terms = data_objects[["cedar_course_terms"]]
   )
   result$new_this_term          <- get_new_this_term(course_history, current_term)
   result$missing_from_earlier   <- get_missing_from_earlier(course_history, current_term)

@@ -188,6 +188,26 @@ enrollment_projection_model_source <- function(bundle, path = NULL) {
 }
 
 
+#' The projection scope as courses (ADR-001 step 4)
+#'
+#' A projection group names codes as the institution wrote them, current or
+#' former; each is its course. The loaded tables are keyed on the course, so
+#' once the scope is resolved the spine, the floor, the feeders and the
+#' first-day seats are one course's across its codes.
+#'
+#' @param students,sections The loaded `cedar_students` and `cedar_sections`.
+#' @param scope_courses,force_courses Course codes, current or former.
+#' @return A list of the resolved, sorted `scope_courses` and `force_courses`
+#'   (NULL when none).
+enrollment_projection_course_scope <- function(students, sections, scope_courses,
+                                               force_courses = NULL) {
+  resolve <- function(codes) {
+    ids <- course_ids_of(codes, students, sections, caller = "enrollment_projection_course_scope")
+    if (is.null(ids)) NULL else sort(unique(ids))
+  }
+  list(scope_courses = resolve(scope_courses), force_courses = resolve(force_courses))
+}
+
 build_enrollment_projection_bundle <- function(cl_enrls, sections, students,
                                                target_term, as_of_term,
                                                scope_courses,
@@ -249,7 +269,34 @@ build_enrollment_projection_bundle <- function(cl_enrls, sections, students,
       call. = FALSE
     )
   }
+  # The model reads by course, not by code (0.28.0; ADR-001 step 4): the
+  # scope resolved to course ids, and cl_enrls counted over the loaded class
+  # list, which is keyed on the course. A code that is not its own course in
+  # cl_enrls means it was counted over unkeyed rows.
+  .listed_codes(students, "build_enrollment_projection_bundle")
+  scope <- enrollment_projection_course_scope(students, sections, scope_courses, force_courses)
+  scope_courses <- scope$scope_courses
+  force_courses <- scope$force_courses
+  projection_require_columns(cl_enrls, "subject_course", "build_enrollment_projection_bundle()")
+  by_code <- setdiff(unique(cl_enrls$subject_course), unique(students$course_id))
+  if (length(by_code) > 0L) {
+    stop(
+      "[enrollment-projections.R] cl_enrls was counted by course code, not by course: ",
+      paste(head(sort(by_code), 5), collapse = ", "),
+      ". Count it over the loaded class list, which attach_course_ids() keys.",
+      call. = FALSE
+    )
+  }
   opt <- enrollment_projection_model_config(opt)
+  # A listed sequence names codes as the institution wrote them; each side is
+  # its course, so a renumbered predecessor still feeds its successor.
+  if (nrow(opt$sequences) > 0L) {
+    to_id <- function(codes) vapply(codes, course_id_of, character(1), tbl = students,
+                                    caller = "build_enrollment_projection_bundle", USE.NAMES = FALSE)
+    opt$sequences <- opt$sequences %>%
+      dplyr::mutate(from_course = to_id(from_course), to_course = to_id(to_course)) %>%
+      dplyr::distinct(from_course, to_course, .keep_all = TRUE)
+  }
   graded_through_term <- edges$last_graded
 
   inputs <- prepare_enrollment_projection_inputs(

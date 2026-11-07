@@ -14,7 +14,7 @@
 #   subject_code  — course subject (many-to-one with dept_code)
 #
 # To change a mapping, edit the CSV, not this file.
-# See docs/developers/adr-002-explicit-mapping-files.md.
+# See docs/developers/architecture-decisions.md, ADR-002.
 
 # Kept whole as well: Admin > Mappings lists the programs.csv rows awaiting a
 # decision, and links each to its line using settings.csv.

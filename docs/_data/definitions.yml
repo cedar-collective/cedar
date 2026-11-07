@@ -531,7 +531,7 @@ definitions:
           - file: R/cones/waitlist.R
             functions: [inspect_waitlist, attach_enrollment_history]
           - file: R/branches/courses.R
-            functions: [key_on_course_id, course_ids_of, course_former_code_spans]
+            functions: [attach_course_ids, course_ids_of, course_former_code_spans]
           - file: R/features/dept-dashboard.R
             functions: [create_dept_dashboard_data]
           - file: R/features/regstats.R
@@ -649,9 +649,9 @@ definitions:
           - file: R/features/regstats.R
             functions: [get_reg_stats, attach_regstats_former_codes, regstats_course_key_info]
           - file: R/branches/courses.R
-            functions: [key_on_course_id, course_id_of, course_former_code_spans]
-          - file: R/branches/enrl.R
-            functions: [build_cl_enrls_base, cl_enrls_base_is_current]
+            functions: [attach_course_ids, course_id_of, course_former_code_spans]
+          - file: R/branches/course-terms.R
+            functions: [build_course_terms, course_terms_is_current]
 
   - id: enrollment-projection
     current_version: "1.10.0"

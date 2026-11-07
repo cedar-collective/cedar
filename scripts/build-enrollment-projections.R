@@ -141,13 +141,20 @@ build_one_enrollment_projection <- function(args, repo_root, refreshing) {
   } else NULL
 
   message("[build-enrollment-projections.R] Preparing class-list demand history...")
+  # By course, not by code (0.28.0): the scope resolved to course ids, and
+  # the demand history counted over the loaded class list, keyed on the course.
+  course_scope <- enrollment_projection_course_scope(
+    cedar_students, cedar_sections, scope_courses, force_courses
+  )
+  scope_courses <- course_scope$scope_courses
+  force_courses <- course_scope$force_courses
   scoped_classlists <- cedar_students %>%
     dplyr::filter(
       campus %in% .env$scope_campuses,
       subject_course %in% .env$scope_courses
     )
   cl_enrls <- calc_cl_enrls(scoped_classlists, by_part_term = TRUE)
-  rm(scoped_classlists)
+  rm(scoped_classlists, course_scope)
 
   message(
     "[build-enrollment-projections.R] Projecting ", length(scope_courses),

@@ -65,7 +65,7 @@ test_that("course overview separates selected-code and crosslist-family enrollme
       subject = "HIST",
       course_number = "480",
       subject_course = "HIST 480",
-      course_id = "HIST 480",  # as the loader attaches it
+      course_id = "HIST 480", listed_code = "HIST 480",  # as the loader keys it
       course_title = "Advanced Topics in History",
       enrolled = 7L,
       total_enrl = 7L,
@@ -88,7 +88,8 @@ test_that("course overview separates selected-code and crosslist-family enrollme
       college = section$college,
       department = section$department,
       subject_course = section$subject_course,
-      course_id = section$subject_course,  # as the loader attaches it
+      course_id = section$subject_course,  # as the loader keys it
+      listed_code = section$subject_course,
       registration_status_code = "RE",
       registration_date = as.Date(NA),
       as_of_date = as.Date("2020-06-01")
@@ -597,7 +598,7 @@ test_that("Course Dynamics follows a course across its codes and names the forme
   expect_equal(from_former$overview$sections, sections)
   expect_error(
     assemble_course_enrollment_payload(rn$cedar_students, test_sections_rn, opt),
-    "needs column course_id"
+    "needs columns course_id and listed_code"
   )
 })
 
@@ -623,17 +624,17 @@ test_that("the whole Course Dynamics payload is keyed on the course", {
   expect_setequal(unique(rollcall$term), c(202010L, 202110L))
   expect_equal(unique(rollcall$subject_course), "HIST 3201")
 
-  # The outcome cones read the same keyed class list, so DFW history begins
+  # The outcome cones read the same loaded class list, so DFW history begins
   # where the course did, not where its current code did.
-  keyed <- key_on_course_id(rn$cedar_students)
+  keyed <- rn$cedar_students
   edges <- cedar_data_edges(test_students, degrees = test_degrees)
   outcomes <- suppressMessages(get_course_outcomes(
     keyed, test_faculty, list(course = "HIST 3201", min_n = 1L, data_edges = edges)
   ))
   expect_setequal(outcomes$dfw_trend$term, c(202010L, 202110L))
-  # On the class list as stored, HIST 320's term is another course.
+  # On the class list as saved, HIST 320's term is another course.
   stored <- suppressMessages(get_course_outcomes(
-    rn$cedar_students, test_faculty, list(course = "HIST 3201", min_n = 1L, data_edges = edges)
+    test_students_rn, test_faculty, list(course = "HIST 3201", min_n = 1L, data_edges = edges)
   ))
   expect_equal(stored$dfw_trend$term, 202110L)
 })

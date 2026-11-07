@@ -95,7 +95,7 @@ The transformation script will:
 
 ## Transformation Details
 
-The complete transformation logic is in [R/data-parsers/transform-to-cedar.R](../R/data-parsers/transform-to-cedar.R).
+The complete transformation logic is in [R/data-parsers/transform-to-cedar.R](https://github.com/cedar-collective/cedar/blob/main/R/data-parsers/transform-to-cedar.R).
 
 ### Key Transformations:
 
@@ -262,8 +262,8 @@ After transformation completes:
 ## See Also
 
 - [data-model.md](data-model.md) - Complete CEDAR schema specification
-- [CEDAR-DATA-MODEL-SUMMARY.md](CEDAR-DATA-MODEL-SUMMARY.md) - Migration rationale and plan
-- [R/data-parsers/transform-to-cedar.R](../R/data-parsers/transform-to-cedar.R) - Actual transformation code
+- [Architecture Decisions](architecture-decisions.md) - why the data model is shaped as it is
+- [R/data-parsers/transform-to-cedar.R](https://github.com/cedar-collective/cedar/blob/main/R/data-parsers/transform-to-cedar.R) - Actual transformation code
 
 ## DESR Input Schema (cedar_sections source)
 
@@ -285,7 +285,7 @@ Source: MyReports "Department Enrollment Status Report." Key fields:
 | `MAX_ENROLLED` | Capacity |
 | `XL_TOTAL_ENROLLMENT` | Combined XL group enrollment (crosslisted only) |
 | `WAIT_COUNT` | Waitlist count |
-| `CENSUS1`, `CENSUS2` | Census **dates** (mm/dd/yyyy), **not** enrollment counts — parser reads `CENSUS1` as a date (`census1`). No census-frozen headcount exists in the DESR; `ENROLLED` is always the count as of the file pull. See [Enrollment Measures](#enrollment-measures-desr-enrolled-vs-classlist-registered). |
+| `CENSUS1`, `CENSUS2` | Census **dates** (mm/dd/yyyy), **not** enrollment counts — parser reads `CENSUS1` as a date (`census1`). No census-frozen headcount exists in the DESR; `ENROLLED` is always the count as of the file pull. See [Enrollment Measures](enrollment-measures.md). |
 
 ## Crosslist Fields
 | Column | Description |

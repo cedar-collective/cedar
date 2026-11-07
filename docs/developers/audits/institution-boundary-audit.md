@@ -1,8 +1,15 @@
 ---
-title: Mapping pipeline audit — platform vs institution
+title: Platform vs Institution Audit (2026-09)
+parent: Audits
+grand_parent: Developer Guide
+nav_order: 3
 ---
 
 # Mapping pipeline audit: what is CEDAR, and what is UNM
+
+> **A dated audit, kept as the record of what was measured on 2026-09-09.** Its
+> findings became rules in `AGENTS.md`, entries in `ISSUES.md` or the mapping
+> files; where this page and those disagree, they are current and this is not.
 
 Audited 2026-09-09, after ISSUES.md I7 showed a mapping defect hiding 85% of a
 program's students. The question this answers: **is UNM-specific configuration

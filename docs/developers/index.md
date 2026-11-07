@@ -56,19 +56,17 @@ See [Installation](installation.html) for detailed setup instructions.
 | Map institutional data into CEDAR | [Data Integration Guide](data-integration-guide.html) |
 | Know exactly which source field fills which CEDAR column | [Source → CEDAR Field Manifest](source-to-cedar-manifest.html) |
 | Understand the data model | [Data Model](data-model.html) |
-| Understand subject, program, and dept codes | [Codes and Departments](codes-and-departments.html) |
-| Check whether the mappings and join keys hold | [Mapping Audit (2026-07)](mapping-audit-2026-07.html) |
-| Review campus grouping decisions and exceptions | [Campus-Grain Audit (2026-08)](campus-grain-audit-2026-08.html) |
+| Understand subject, program, and dept codes, and review the mappings | [Reviewing the Mappings](mapping-review-guide.html) |
+| Read the dated audits behind the mapping and campus rules | [Audits](audits/) |
 | Understand projection methods, aftcasts, and demand censoring | [Enrollment Projection Architecture](enrollment-projections.html) |
 | Review forecasting findings, failed assumptions, and next model ideas | [Enrollment Forecasting Lessons](forecasting-lessons.html) |
-| Understand where the data model is heading | [ADR-001: Domain Data Model](adr-001-domain-data-model.html) |
+| Understand where the data model is heading | [ADR-001: Domain Data Model](architecture-decisions.html#adr-001-move-cedars-tables-from-report-shaped-to-domain-shaped) |
 | Build or read the student-term table | [cedar_student_terms contract](student-terms.html) |
-| Understand how units, subjects and programs will be mapped | [ADR-002: Explicit Mapping Files](adr-002-explicit-mapping-files.html) |
+| Understand how units, subjects and programs are mapped | [ADR-002: Explicit Mapping Files](architecture-decisions.html#adr-002-explicit-mapping-files-replace-runtime-department-inference) |
 | Look up function documentation | [Function Reference](functions.html) |
+| Run the tests or change the fixtures | [Testing](testing.html) |
 | Contribute code or docs | [Contributing](contributing.html) |
-| Prepare a release or production deploy | [Release Runbook](release-runbook.html) |
-| Diagnose slow reports, memory growth, or load contention | [Performance Monitoring](performance-monitoring.html) |
-| Configure the restart notice during deploys | [Deployment Maintenance Page](deployment-maintenance.html) |
+| Prepare a release, deploy, or diagnose production performance | [Operations](operations.html) |
 
 ## Project Structure
 
@@ -99,45 +97,18 @@ CEDAR's architecture is layered like a tree. At the base are the **lists** (stat
 
 Adding a cone for a new question means defining what you want to find out and assembling pieces that already exist — the underlying infrastructure doesn't change. Specific questions live in cones, reusable logic lives below them, and neither needs to know too much about the other. That separation is what keeps the system extensible, and what makes a cone developed at one institution adaptable at another.
 
-Current cones (in `R/cones/`):
-
-| Cone | What It Does |
-|:-----|:-------------|
-| `bottleneck.R` | Waitlist pressure and unmet enrollment demand |
-| `cancellations.R` | Cancelled course sections |
-| `course-demographics.R` | Major and classification breakdown per course |
-| `course-instructor-effect.R` | Downstream grades in Y by the student's upstream instructor in X, with a pairwise balance diagnostic |
-| `course-neighbors.R` | What students take before, after, and alongside a course |
-| `course-outcomes.R` | Next-term persistence by grade, DFW trends, instructor DFW comparison |
-| `course-retention.R` | Descriptive next-term retention rates across courses |
-| `course-sequence-effect.R` | Observational comparison: do students who passed X before Y earn better grades in Y than comparable students who didn't? |
-| `retention-summaries.R` | Pooling, benchmarks, and instructor rows over a retention result |
-| `gen-ed-conversion.R` | Where students who took gen-ed courses ended up (major flows) |
-| `major-changes.R` | Analyses over detected major changes: timing, pathways, surrounding coursework |
-| `declaration-context.R` | Credits and prior coursework at first declaration |
-| `entry-heatmap.R` | Courses taken before students entered the focal major |
-| `pathway.R` | When students in a population take each course, plus the curriculum map |
-| `course-pairs.R` | Ordered A→B course sequences within a population |
-| `course-adjacency.R` | Courses taken around a student entry or exit event |
-| `population-trend.R` | Entry-type distribution over time |
-| `seatfinder.R` | Seat availability across terms |
-| `sfr.R` | Faculty FTE by department |
-| `stopout.R` | Stop-out rates after DFW vs. passing outcomes |
-| `waitlist.R` | Waitlist counts by course and major |
-
-The full function-level reference — including the branch and report layers — is in the auto-generated [Function Reference](functions.html); the architecture rules live in `AGENTS.md` at the repository root.
+What each branch, cone and feature is for is listed in the
+[Branch, Cone, and Feature Inventory](layer-inventory.html). The full function-level reference — including the branch and report layers — is in the auto-generated [Function Reference](functions.html); the architecture rules live in `AGENTS.md` at the repository root.
 
 ## CEDAR Data Model
 
-CEDAR uses a normalized data model with five main tables:
-
-| Table | Contents |
-|:------|:---------|
-| `cedar_sections` | Course offerings |
-| `cedar_students` | Student enrollments |
-| `cedar_programs` | Student majors/minors |
-| `cedar_degrees` | Degrees awarded |
-| `cedar_faculty` | Faculty information |
+CEDAR's tables are facts (sections, class lists, program declarations,
+degrees, faculty, grades), dimensions built from the institution's mapping
+files (units, colleges, subjects, programs, courses, terms) and measure tables
+computed once under the canonical definitions (student-terms, course-terms).
+[Data Model](data-model.html) has every table and column;
+[Architecture Decisions](architecture-decisions.html) says why it is shaped
+that way.
 
 This model is institution-agnostic after local source data has been normalized
 into the CEDAR contract. The integration work is mapping local SIS/reporting
