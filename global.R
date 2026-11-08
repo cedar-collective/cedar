@@ -248,7 +248,7 @@ data_objects[["cedar_course_codes"]] <- cedar_courses$codes
 # changing any saved file, so they are an input to every cache keyed on those
 # tables' fingerprints (caching cardinal rule 1): fold a fingerprint of dims
 # into each attached table's, and a mapping edit is a miss.
-cedar_dims_hash <- substr(digest::digest(cedar_dims), 1, 12)
+cedar_dims_hash <- cedar_dims_fingerprint(cedar_dims)
 for (.key in intersect(names(CEDAR_ATTACHED_UNIT_COLUMNS), names(cedar_source_fingerprints))) {
   cedar_source_fingerprints[[.key]][["dims"]] <- cedar_dims_hash
 }
@@ -377,152 +377,42 @@ message("  - cedar_degrees: ", nrow(data_objects[["cedar_degrees"]]), " rows")
 message("  - cedar_faculty: ", nrow(data_objects[["cedar_faculty"]]), " rows")
 } # end data loading for docker
 
-# ── cedar_attempts: one classified outcome per graded attempt (ADR-001 step 4)
-# build_attempts() (R/branches/attempts.R) classifies the keyed class list
-# once, up to the graded edge, so readers share one pass/DFW/withdrawal answer
-# per attempt. Held at data_objects[["cedar_attempts"]] and passed to readers;
-# the copy saved beside the data is a cache, used only when it is newer than
-# the class list and attempts_is_current() finds this build, outcome policy,
-# graded edge and the class list's renames on it.
+# ── The measure tables (ADR-001 step 6): built by the transform, loaded here ──
+# cedar_attempts (every graded attempt classified once, R/branches/attempts.R),
+# cedar_course_terms (the class list counted by course, term, campus and part
+# of term, course-terms.R) and cedar_course_flows (every next-term course
+# pair, course-flows.R) are built by transform_measures() over the class list
+# as this file loads it: trimmed to cedar_min_term, keyed on the course and
+# carrying the default units from the same mapping files. The app never
+# builds one: a restart is a load. Each is refused, and the start stops, when
+# it is missing, older than the class list, built from other mapping files or
+# over another first term, or (its own check) from another build, outcome
+# policy, edge or set of course codes. The deploy gate
+# (scripts/rebuild-programs-if-mappings-changed.R) and the data refresh build
+# them; by hand, CEDAR_MEASURES_REBUILD_HINT.
 if (!is.null(data_objects[["cedar_registrations"]]) && nrow(data_objects[["cedar_registrations"]]) > 0) {
-  attempts_path    <- file.path(data_dir, "cedar_attempts.qs")
-  students_qs_path <- file.path(data_dir, paste0(cedar_files[["cedar_registrations"]], get_data_extension()))
-  saved_is_newer <- file.exists(attempts_path) && file.exists(students_qs_path) &&
-                    file.info(attempts_path)$mtime > file.info(students_qs_path)$mtime
-  saved_attempts <- NULL
-  if (saved_is_newer) {
-    saved_attempts <- tryCatch(qs2::qs_read(attempts_path), error = function(e) {
-      message("[global.R] Saved cedar_attempts unreadable: ", conditionMessage(e))
-      NULL
-    })
-  }
-  if (attempts_is_current(saved_attempts, data_objects[["cedar_registrations"]], cedar_edges)) {
-    data_objects[["cedar_attempts"]] <- saved_attempts
-    message(sprintf("[global.R] cedar_attempts loaded: %d rows", nrow(saved_attempts)))
-  } else {
-    if (saved_is_newer) {
-      message("[global.R] Saved cedar_attempts is from another build, policy, edge or course codes; rebuilding.")
+  .class_list_path <- file.path(data_dir, paste0(cedar_files[["cedar_registrations"]], get_data_extension()))
+  .measure_checks <- list(
+    cedar_attempts = function(tbl) {
+      attempts_is_current(tbl, data_objects[["cedar_registrations"]], cedar_edges)
+    },
+    cedar_course_terms = function(tbl) {
+      course_terms_is_current(tbl, data_objects[["cedar_registrations"]],
+                              graded_edge = cedar_edges$last_graded)
+    },
+    cedar_course_flows = function(tbl) {
+      course_flows_is_current(tbl, data_objects[["cedar_registrations"]], cedar_edges)
     }
-    # Loading and attaching the tables leaves garbage R has not yet collected;
-    # collect it before the build, or the start runs past the 3.8 GiB
-    # container on the worst-case start (both caches stale).
-    gc(verbose = FALSE)
-    t_at <- system.time({
-      data_objects[["cedar_attempts"]] <- build_attempts(data_objects[["cedar_registrations"]], cedar_edges)
+  )
+  for (.name in CEDAR_MEASURE_TABLES) {
+    .t <- system.time({
+      data_objects[[.name]] <- cedar_load_measure_table(
+        .name, data_dir, .class_list_path, .measure_checks[[.name]], cedar_dims_hash, cedar_min_term)
     })
-    message(sprintf("[global.R] cedar_attempts built: %d rows (%.1fs)",
-                    nrow(data_objects[["cedar_attempts"]]), t_at["elapsed"]))
-    tryCatch({
-      tmp_path <- paste0(attempts_path, ".tmp")
-      qs2::qs_save(data_objects[["cedar_attempts"]], tmp_path)
-      file.rename(tmp_path, attempts_path)
-      message("[global.R] cedar_attempts saved.")
-    }, error = function(e) {
-      message("[global.R] Warning: failed to save cedar_attempts: ", e$message)
-    })
+    message(sprintf("[global.R] %s loaded: %d rows (%.1fs)", .name,
+                    nrow(data_objects[[.name]]), .t["elapsed"]))
   }
-  rm(saved_attempts)
-}
-
-# ── cedar_course_terms: the course-term measure table (ADR-001 step 4) ──────
-# build_course_terms() (R/branches/course-terms.R) counts the keyed class list
-# once by course, term, campus and part of term, so Regstats, the Department
-# Dashboard and Waitlists filter a small table instead of recounting millions
-# of rows on every request. It is held at data_objects[["cedar_course_terms"]]
-# and passed to each reader. The copy saved beside the data is a cache only:
-# it is used when it is newer than the class list and course_terms_is_current()
-# finds this build's version and columns and the class list's renames on it;
-# otherwise it is rebuilt.
-if (!is.null(data_objects[["cedar_registrations"]]) && nrow(data_objects[["cedar_registrations"]]) > 0) {
-  course_terms_path <- file.path(data_dir, "cedar_course_terms.qs")
-  students_qs_path  <- file.path(data_dir, paste0(cedar_files[["cedar_registrations"]], get_data_extension()))
-  saved_is_newer <- file.exists(course_terms_path) &&
-                    file.exists(students_qs_path) &&
-                    file.info(course_terms_path)$mtime > file.info(students_qs_path)$mtime
-
-  saved_course_terms <- NULL
-  if (saved_is_newer) {
-    saved_course_terms <- tryCatch(qs2::qs_read(course_terms_path), error = function(e) {
-      message("[global.R] Saved cedar_course_terms unreadable: ", conditionMessage(e))
-      NULL
-    })
-  }
-  if (course_terms_is_current(saved_course_terms, data_objects[["cedar_registrations"]],
-                              graded_edge = cedar_edges$last_graded)) {
-    data_objects[["cedar_course_terms"]] <- saved_course_terms
-    message(sprintf("[global.R] cedar_course_terms loaded: %d rows",
-                    nrow(saved_course_terms)))
-  } else {
-    if (saved_is_newer) {
-      message("[global.R] Saved cedar_course_terms is from another build, graded edge or course codes; rebuilding.")
-    }
-    gc(verbose = FALSE)
-    t_ct <- system.time({
-      data_objects[["cedar_course_terms"]] <- build_course_terms(data_objects[["cedar_registrations"]],
-                                                                 data_objects[["cedar_attempts"]])
-    })
-    message(sprintf("[global.R] cedar_course_terms built: %d rows (%.1fs)",
-                    nrow(data_objects[["cedar_course_terms"]]), t_ct["elapsed"]))
-    tryCatch({
-      tmp_path <- paste0(course_terms_path, ".tmp")
-      qs2::qs_save(data_objects[["cedar_course_terms"]], tmp_path)
-      file.rename(tmp_path, course_terms_path)
-      message("[global.R] cedar_course_terms saved.")
-    }, error = function(e) {
-      message("[global.R] Warning: failed to save cedar_course_terms: ", e$message)
-    })
-  }
-  rm(saved_course_terms)
-}
-
-# ── cedar_course_flows: every next-term course pair (ADR-001 step 4) ────────
-# build_course_flows() (R/branches/course-flows.R) counts, once, which courses
-# each course's students took the next regular term, campus by campus, over
-# the keyed class list (a pair follows a course across its codes) and only to
-# the longitudinal edge: a destination term still registering is not a
-# follow-up. Regstats' downstream signals read it from
-# data_objects[["cedar_course_flows"]]. The copy saved beside the data is a
-# cache: used when it is newer than the class list and course_flows_is_current()
-# finds this build, the edge and the class list's renames on it; otherwise
-# rebuilt.
-if (!is.null(data_objects[["cedar_registrations"]]) && nrow(data_objects[["cedar_registrations"]]) > 0) {
-  course_flows_path <- file.path(data_dir, "cedar_course_flows.qs")
-  students_qs_path  <- file.path(data_dir, paste0(cedar_files[["cedar_registrations"]], get_data_extension()))
-  saved_is_newer <- file.exists(course_flows_path) &&
-                    file.exists(students_qs_path) &&
-                    file.info(course_flows_path)$mtime > file.info(students_qs_path)$mtime
-
-  saved_course_flows <- NULL
-  if (saved_is_newer) {
-    saved_course_flows <- tryCatch(qs2::qs_read(course_flows_path), error = function(e) {
-      message("[global.R] Saved cedar_course_flows unreadable: ", conditionMessage(e))
-      NULL
-    })
-  }
-  if (course_flows_is_current(saved_course_flows, data_objects[["cedar_registrations"]], cedar_edges)) {
-    data_objects[["cedar_course_flows"]] <- saved_course_flows
-    message(sprintf("[global.R] cedar_course_flows loaded: %d rows", nrow(saved_course_flows)))
-  } else {
-    if (saved_is_newer) {
-      message("[global.R] Saved cedar_course_flows is from another build, edge or course codes; rebuilding.")
-    }
-    gc(verbose = FALSE)
-    t_cf <- system.time({
-      data_objects[["cedar_course_flows"]] <- build_course_flows(data_objects[["cedar_registrations"]],
-                                                                 cedar_edges)
-    })
-    message(sprintf("[global.R] cedar_course_flows built: %d rows (%.1fs)",
-                    nrow(data_objects[["cedar_course_flows"]]), t_cf["elapsed"]))
-    tryCatch({
-      tmp_path <- paste0(course_flows_path, ".tmp")
-      qs2::qs_save(data_objects[["cedar_course_flows"]], tmp_path)
-      file.rename(tmp_path, course_flows_path)
-      message("[global.R] cedar_course_flows saved.")
-    }, error = function(e) {
-      message("[global.R] Warning: failed to save cedar_course_flows: ", e$message)
-    })
-  }
-  rm(saved_course_flows)
+  rm(.class_list_path, .measure_checks, .name, .t)
 }
 
 # ── Pre-compute data summary for Data & Usage page ─────────────────────────

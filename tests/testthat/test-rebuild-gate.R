@@ -15,7 +15,7 @@ context("The deploy's table gate")
 test_that("the deploy's table gate runs before the first request and restarts on a rebuild", {
   # The script's lines as written; bash ignores their YAML indentation.
   deploy <- readLines("../../.github/workflows/deploy.yml", warn = FALSE)
-  first <- grep("Checking whether the student-term table needs rebuilding", deploy, fixed = TRUE)
+  first <- grep("Checking whether the student-term table or the measure tables need rebuilding", deploy, fixed = TRUE)
   last <- grep('rm -f "$MAPPING_LOG"', deploy, fixed = TRUE)
   expect_length(first, 1L)
   expect_length(last, 1L)
@@ -38,11 +38,43 @@ test_that("the deploy's table gate runs before the first request and restarts on
   expect_true("DOCKER:compose restart cedar-shiny" %in% rebuilt)
   # The restart page stays up until the health check that follows the block.
   expect_false(any(grepl("WAIT|CLEAR", rebuilt)))
-  unchanged <- run_gate("[student-terms] cedar_student_terms is current; no rebuild.")
+  # The measure tables restart the app the same way (ADR-001 step 6).
+  measures <- run_gate(paste0("[student-terms] cedar_student_terms is current; no rebuild.\n",
+                              "[measures] Rebuilt: cedar_attempts, cedar_course_terms, cedar_course_flows."))
+  expect_true("DOCKER:compose restart cedar-shiny" %in% measures)
+  unchanged <- run_gate(paste0("[student-terms] cedar_student_terms is current; no rebuild.\n",
+                               "[measures] The measure tables are current; no rebuild."))
   expect_false(any(grepl("restart", unchanged)))
   failed <- run_gate("Error: cedar_student_terms needs cedar_programs.qs, which has not been built.", rc = 1L)
   expect_false(any(grepl("DOCKER:compose restart", failed)))
-  expect_true(any(grepl("WARNING: student-term check", failed, fixed = TRUE)))
+  expect_true(any(grepl("WARNING: student-term or measure-table check", failed, fixed = TRUE)))
+})
+
+# The gate's decision for the measure tables, with the child process stubbed,
+# mirrors the student-term one: current means no rebuild; stale, missing or
+# forced means one build of the measures stage, checked again afterwards.
+test_that("the gate builds the measure tables only when they are stale or forced", {
+  dir <- withr::local_tempdir()
+  env <- new.env(parent = globalenv())
+  sys.source("../../scripts/rebuild-programs-if-mappings-changed.R", envir = env)
+  built <- character(0)
+  state <- new.env(); state$reason <- "cedar_attempts has not been built"
+  staleness <- function(data_dir) state$reason
+  rebuild <- function(tables) { built <<- c(built, tables); state$reason <- NULL }
+  gate <- function(force = FALSE, rebuild_with = rebuild) suppressMessages(
+    env$build_measures_if_stale(dir, rebuild_with, force = force, staleness = staleness))
+
+  expect_true(gate())
+  expect_equal(built, "measures")
+  expect_false(gate())
+  expect_equal(built, "measures")
+  state$reason <- "cedar_students newer than cedar_attempts"
+  expect_true(gate())
+  expect_equal(built, c("measures", "measures"))
+  expect_true(gate(force = TRUE))
+  expect_equal(built, rep("measures", 3L))
+  state$reason <- "saved cedar_attempts was built from other mapping files"
+  expect_error(gate(rebuild_with = function(tables) NULL), "still stale")
 })
 
 # The gate's own decision, with the child process stubbed: current means no

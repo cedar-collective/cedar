@@ -40,8 +40,17 @@ sources <- c("dev/demo-data.R", "dev/generate-demo.R", "dev/shiny_config.R",
              list.files("R", pattern = "\\.R$", recursive = TRUE, full.names = TRUE),
              list.files(file.path("institution", cedar_institution_id()), full.names = TRUE))
 signature <- digest::digest(tools::md5sum(sources), algo = "sha256")
+# The measure tables last: they are rebuilt after the provenance columns are
+# written onto the class list (below), so they are newer than it, as the
+# loader requires (ADR-001 step 6).
 outputs <- paste0("cedar_", c("sections", "students", "class_list_descriptions", "programs",
-                             "degrees", "faculty", "student_terms", "applicants"), ".qs")
+                             "degrees", "faculty", "student_terms", "applicants",
+                             "attempts", "course_terms", "course_flows"), ".qs")
+# The measure tables start at the demo's first term, the setting the demo app
+# reads (dev/shiny_config.R is its config/shiny_config.R).
+demo_settings <- new.env()
+sys.source("dev/shiny_config.R", envir = demo_settings)
+demo_min_term <- get("cedar_min_term", envir = demo_settings)
 if (file.exists(marker) && identical(readLines(marker), signature) &&
     all(file.exists(file.path(target, outputs)))) {
   message("Synthetic demo already matches the source; reusing it.")
@@ -52,9 +61,12 @@ stage <- tempfile("demo-build-")
 dir.create(stage)
 raw <- build_demo_sources()
 for (nm in names(raw)) qs2::qs_save(raw[[nm]], file.path(stage, paste0(nm, ".qs")))
-transform_to_cedar(data_dir = stage, use_qs = TRUE)
+transform_to_cedar(data_dir = stage, use_qs = TRUE, min_term = demo_min_term)
 stopifnot(all(file.exists(file.path(stage, outputs))))
 summary <- write_demo_provenance(raw, stage)
+# The provenance columns rewrote the class list, so the measure tables counted
+# over it are rebuilt from the file as it will be loaded.
+transform_to_cedar(data_dir = stage, use_qs = TRUE, tables = "measures", min_term = demo_min_term)
 writeLines("building", marker)
 for (nm in c(outputs, paste0(names(raw), ".qs"), "cedar-status.json",
              "fixture-people.csv", "fixture-sections.csv", "synthetic-institution.json")) {

@@ -409,6 +409,20 @@ test_that("Docker data directory is configured before data paths are resolved", 
   expect_lt(assignment, first_use)
 })
 
+# ADR-001 step 6: the transform builds every table the app holds; the app and
+# the analysis helper load. A build call in either is a startup that computes.
+test_that("no loader builds a measure table", {
+  builders <- "\\bbuild_(attempts|course_terms|course_flows)\\("
+  for (loader in c("global.R", "scripts/cedar-repl.R",
+                   "scripts/warm-dept-dashboard-cache.R", "scripts/warm-dept-trends-cache.R")) {
+    lines <- readLines(file.path(project_root, loader), warn = FALSE)
+    code <- sub("#.*$", "", lines)
+    expect_false(any(grepl(builders, code)), info = loader)
+  }
+  transform <- readLines(file.path(project_root, "R/data-parsers/transform-to-cedar.R"), warn = FALSE)
+  expect_true(any(grepl("build_attempts\\(", transform)))
+})
+
 test_that("legacy custom test runners stay retired", {
   retired <- c(
     "tests/run-tests.sh",

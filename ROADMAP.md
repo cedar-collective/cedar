@@ -43,10 +43,9 @@ Changelog (Admin). Cross-course Retention is built but hidden.
 
 The order work is taken in.
 
-1. **Finish the domain data model (ADR-001 steps 6 and 7).** Move the measure
-   tables' build into the transform so the app only loads and verifies (a restart
-   is a load, ~47 s today; a stale table is a startup error, never a rebuild);
-   then re-point the cones onto the measure tables one group at a time, deleting
+1. **Finish the domain data model (ADR-001 step 7).** The measure tables are
+   now built by the transform and only loaded by the app (step 6, 2026-11-08).
+   Next: re-point the cones onto the measure tables one group at a time, deleting
    each re-derivation, and rename the class-list file last. Design and the
    progress metrics: [ADR-001 steps 6 and 7](docs/developers/architecture-decisions.md#steps-6-and-7-where-compute-lives-and-the-cone-migration-planned-2026-11-08).
 2. **Projection adjustments.** The open items under [Section-needs

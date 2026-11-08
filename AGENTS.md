@@ -83,7 +83,7 @@ Lowercase snake_case columns; legacy uppercase names are deprecated. How each ta
 | `cedar_attempts` | student × course × campus × term | the attempt measure table: every graded attempt classified once (`outcome_category`; `outcome` pass / dfw / NA), to `last_graded` ([attempts.R](R/branches/attempts.R)) |
 | `cedar_course_terms` | course × term × campus × part of term | the course-term measure table: class-list counts (`registered`, `dr_*`, `wl_all`, `cl_total`, `census_enrl`) and outcome counts (`attempts`, `passed`, `dfw`, `withdrawn`; NA past `last_graded`), no cross-term means ([course-terms.R](R/branches/course-terms.R)) |
 
-The dimensions, `cedar_courses`, `cedar_attempts` and `cedar_course_terms` are built at startup and held in `data_objects`; none is a saved source of truth.
+The dimensions and `cedar_courses` are built at startup and held in `data_objects`; neither is saved. **The measure tables (`cedar_attempts`, `cedar_course_terms`, `cedar_course_flows`) are built by the transform** (`transform_measures()`, ADR-001 step 6) over the class list as the app loads it, stamped with the mapping files and `cedar_min_term`, and **the app only loads them**: a stale or missing one stops startup with the rebuild command (`cedar_load_measure_table()`); the deploy gate rebuilds them in its own process. No loader builds a measure table (`test-architecture.R`).
 
 **Every unit and every course id is attached at load, in one place.** No saved table stores a unit or a college. Every loader (`global.R`, the cache-warming scripts, `scripts/cedar-repl.R`) calls `attach_default_units()` and `attach_course_ids()`:
 
@@ -149,7 +149,7 @@ Use the constants in `R/lists/grades.R` (`GRADES_DFW`, `GRADES_PASS`, `GRADES_PA
 - A visible page control may opt in to `GRADES_PASS_SUB_C_OPT_IN` (C- and D pass); it must never activate silently, and a page without the control says it uses the default.
 - Most withdrawals post as DG/DW status, not W grades: a grade-only DFW undercounts W. Track early drops separately (`dr_early`), never in DFW.
 
-The classifier is **`classify_enrollment_outcomes()`** (`R/trunk/utils.R`); `classify_grades()` for grade-only frames. Course-level rates go through `get_course_outcome_rates()`; a reader that wants every attempt's outcome reads `cedar_attempts`, classified once at load, never a saved classification. Bump `CEDAR_OUTCOME_POLICY_VERSION` when classification changes: a cached `cedar_attempts` under another version is rebuilt at start. The transform keeps one class-list row per student, course, campus and term, the row `STATUS_PRECEDENCE` ranks first (`dedup_class_list_rows()`). Docker mounts `CEDAR_DATA_DIR` from `.env`, which need not be the repository's `data/`.
+The classifier is **`classify_enrollment_outcomes()`** (`R/trunk/utils.R`); `classify_grades()` for grade-only frames. Course-level rates go through `get_course_outcome_rates()`; a reader that wants every attempt's outcome reads `cedar_attempts`, classified once at load, never a saved classification. Bump `CEDAR_OUTCOME_POLICY_VERSION` when classification changes: a saved `cedar_attempts` under another version is refused by the app and rebuilt by the transform (at deploy, by the gate). The transform keeps one class-list row per student, course, campus and term, the row `STATUS_PRECEDENCE` ranks first (`dedup_class_list_rows()`). Docker mounts `CEDAR_DATA_DIR` from `.env`, which need not be the repository's `data/`.
 
 ## Right edges
 

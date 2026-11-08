@@ -83,9 +83,31 @@ delayedAssign("cedar_class_list_descriptions", local({
 }))
 delayedAssign("cedar_class_list_majors", summarize_class_list_majors(cedar_class_list_descriptions))
 
-# cedar_attempts, every graded attempt classified once, as global.R builds it
-# (R/branches/attempts.R): over the keyed class list, to the graded edge.
-delayedAssign("cedar_attempts", build_attempts(
-  cedar_registrations, cedar_report_edges(cedar_registrations, degrees = cedar_degrees)$edges))
+# The measure tables (cedar_attempts, cedar_course_terms, cedar_course_flows),
+# as the transform saved them (ADR-001 step 6): counted over the class list
+# trimmed to the app's first term, keyed on the course, under the mapping files
+# of that run. The app refuses one whose stamps disagree with what it loaded
+# (cedar_load_measure_table()); this helper does not trim the class list, so
+# it checks the file exists and prints the stamps for the analyst to judge.
+cedar_read_measure <- function(name) {
+  if (!name %in% CEDAR_MEASURE_TABLES) stop("[cedar-repl.R] ", name, " is not a measure table")
+  path <- file.path(cedar_data_dir, paste0(name, ".qs"))
+  if (!file.exists(path)) {
+    stop("[cedar-repl.R] ", name, " has not been built here; the transform builds it: ",
+         CEDAR_MEASURES_REBUILD_HINT)
+  }
+  tbl <- qs2::qs_read(path)
+  message(sprintf("[cedar-repl.R] %s: %s rows, terms from %s, mapping files %s, saved %s", name,
+                  format(nrow(tbl), big.mark = ","), attr(tbl, "cedar_min_term"),
+                  attr(tbl, "cedar_dims_fingerprint"), format(file.mtime(path), "%Y-%m-%d %H:%M")))
+  tbl
+}
+for (.nm in CEDAR_MEASURE_TABLES) {
+  local({
+    name <- .nm
+    delayedAssign(name, cedar_read_measure(name), assign.env = .GlobalEnv)
+  })
+}
+rm(.nm)
 
 message("[cedar-repl.R] Ready. Tables load on first use; cedar_read(\"<name>\") for others.")

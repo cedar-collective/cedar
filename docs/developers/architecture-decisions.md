@@ -251,7 +251,7 @@ record keeps the decisions.
 | 3 | Dimensions from the mapping files, units attached at load | done 2026-11-06 |
 | 4 | `cedar_courses` and course ids at load (I37, I45); `cedar_course_terms`; `cedar_attempts` | courses and keying done 2026-11-07; `cedar_course_terms` done 2026-11-07; `cedar_attempts` done 2026-11-07 (`cedar_grades` retired); `cedar_course_flows` done 2026-11-07 |
 | 5 | Thin `cedar_students` and `cedar_programs` to keys and registration facts; rename to fact names | student-term columns off the loaded class list done 2026-11-07 (`thin_class_list()`), and off the saved file (`cedar_class_list_descriptions`); the section columns and `cedar_programs` stay (decisions below); renamed `cedar_registrations` 2026-11-07, its file still `cedar_students.qs` (`CEDAR_TABLE_FILES`) |
-| 6 | The measure tables become transform outputs: the app loads and verifies, never builds (decisions below) | planned 2026-11-08 |
+| 6 | The measure tables become transform outputs: the app loads and verifies, never builds (decisions below) | done 2026-11-08 (`transform_measures()`, `cedar_load_measure_table()`, the gate's `build_measures_if_stale()`) |
 | 7 | Re-point the cones onto the measure tables, deleting each re-derivation; then rename the class-list file | planned 2026-11-08; progress is the count of cones that take `cedar_registrations` (18 of 26 on 2026-11-08) and the cone line count (8,908) |
 
 Step 2's precedence rule: when the two source snapshots disagree, the
@@ -293,12 +293,21 @@ files.
   measure (an outcome-policy bump, a confirmed rename) therefore needs the
   transform re-run before the restart; deploy already gates
   `cedar_student_terms` this way and the measure tables join that gate.
-- **Units and course ids stay attached at load** (step 3's decision stands):
-  about 15 s per restart buys a mapping PR that takes effect at the next
-  start without a transform run, which is worth more than the seconds. The
-  attach block gets timing lines so the trade is measured, not assumed.
+- **Units and course ids stay attached at load** (step 3's decision stands)
+  for the fact tables: about 15 s per restart buys a mapping PR that takes
+  effect at the next start without a transform run. **The measure tables
+  carry unit columns** (`college`, `department`, `source_college`), so they
+  cannot: each is stamped with `cedar_dims_fingerprint()` of the mapping
+  files and with the first term it was counted from (`cedar_min_term`, which
+  decides which course-code renames the trimmed class list shows), and the
+  gate rebuilds them when either changes. A mapping PR therefore costs
+  minutes at deploy, in the gate's own process, and the app that starts
+  afterwards still only loads.
+- **The stage is one process and builds one table at a time**, saving and
+  dropping each before the next, because the morning refresh runs it beside
+  the live app on the 3.8 GiB production host.
 - **The AGENTS.md sentence** that the measures are built at startup and are
-  not a saved source of truth is replaced when the code lands, not before.
+  not a saved source of truth was replaced with the code (2026-11-08).
 
 **Step 7: the cone migration.** The measure tables exist, but on 2026-11-08
 eighteen of the twenty-six cones take `cedar_registrations`, eleven of them
