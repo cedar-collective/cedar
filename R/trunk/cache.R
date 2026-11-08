@@ -5,7 +5,9 @@
 # student-term denominators used by the Course Dynamics treemap/table.
 # v3 includes every analytical scope field and source-content fingerprints.
 # v4 reads by course (course_id; ADR-001 step 4) and keys the renames in scope.
-cedar_course_neighbors_cache_version <- 4L
+# v5 drops the concurrent courses' classification split, which no reader used
+# and the loaded class list no longer carries (ADR-001 step 5).
+cedar_course_neighbors_cache_version <- 5L
 
 # Regstats v2 uses a separate prior-only baseline for every reported term;
 # v3 preserves one reporting row when source sections carry different titles;
@@ -75,7 +77,7 @@ get_course_neighbors_cache_key <- function(course_code, students, courses, scope
     course_neighbors_content_hash(
       students,
       c("student_id", "term", "subject_course", "campus", "college",
-        "term_type", "student_classification", "registration_status_code")
+        "term_type", "registration_status_code")
     )
   }
 
@@ -233,7 +235,9 @@ clear_course_cache <- function(course_code) {
 #        through the programs table (credit_hours_by_major(); ADR-001 step 2).
 #   v12 — the loaded tables are keyed on the course (attach_course_ids()), so a
 #        renamed course's rows are one course in every tab (ADR-001 step 4).
-cedar_dept_cache_version <- 12L
+#   v13 — the student donuts read each seat's major and class standing off
+#        cedar_student_terms (ADR-001 step 5); the enrl tab hashes it.
+cedar_dept_cache_version <- 13L
 
 # Include lookup-derived labels/department metadata where a tab uses them.
 # Credit Hours reads class lists, sections for late drops' credit values, the
@@ -243,7 +247,7 @@ cedar_dept_cache_version <- 12L
 # tables since ADR-001 step 3, so a mapping edit that renames one must miss too.
 DEPT_CACHE_TABLES <- list(
   hc = c("cedar_programs", "cedar_dims"),
-  enrl = c("cedar_students", "cedar_sections", "cedar_programs", "cedar_dims"),
+  enrl = c("cedar_students", "cedar_sections", "cedar_student_terms", "cedar_programs", "cedar_dims"),
   deg = c("cedar_degrees", "cedar_dims"),
   ch = c("cedar_students", "cedar_sections", "cedar_student_terms", "cedar_programs", "cedar_dims"),
   demo = "cedar_programs"
@@ -438,7 +442,9 @@ load_dept_demographics_cache <- function(dept_code, data_objects, opt = list()) 
 # v13 reads by course (course_id; ADR-001 step 4): course history, flags and
 #     waitlist follow a course across its codes, and course tables carry
 #     former_codes. The key already hashes the dims, code_history included.
-cedar_dept_dashboard_cache_version <- 13L
+# v14 major donuts and composition shifts read each seat's major and class
+#     standing off cedar_student_terms (ADR-001 step 5).
+cedar_dept_dashboard_cache_version <- 14L
 
 cache_value_or <- function(x, default) {
   if (is.null(x) || length(x) == 0) default else x
@@ -481,6 +487,11 @@ get_dept_dashboard_cache_key <- function(opt, data_objects, cache_date = Sys.Dat
     students_hash = get_cache_table_dim_hash(data_objects, "cedar_students", "cedar_students_hash"),
     sections_hash = get_cache_table_dim_hash(data_objects, "cedar_sections", "cedar_sections_hash"),
     programs_hash = get_cache_table_dim_hash(data_objects, "cedar_programs", "cedar_programs_hash"),
+    # Each seat's major and class standing on the donuts and composition shifts
+    # (ADR-001 step 5); global.R hashes it once at start for Dept Trends.
+    student_terms_hash = get0("cedar_dept_source_hashes", envir = .GlobalEnv,
+                              ifnotfound = list())[["cedar_student_terms"]] %||%
+      cedar_content_hash(data_objects[["cedar_student_terms"]]),
     # The mapping files name every major on the dashboard, so a renamed program
     # or a decided unit is a miss (ADR-001 step 3); the tables are small.
     dims_hash = digest::digest(data_objects[["cedar_dims"]], algo = "xxhash64")

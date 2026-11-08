@@ -37,6 +37,10 @@ D <- list(sections = read_tbl("cedar_sections"), students = read_tbl("cedar_stud
           faculty  = read_tbl("cedar_faculty"))
 missing <- names(D)[vapply(D, is.null, logical(1))]
 if (length(missing)) stop("Missing cedar tables in data/: ", paste(missing, collapse = ", "))
+# The roster's description of each student-term (ADR-001 step 5): saved beside
+# the thin class list, or carried by a class list saved before 2026-11-07.
+D$descriptions <- resolve_class_list_descriptions(read_tbl("cedar_class_list_descriptions"),
+                                                  D$students, "audit-mappings.R")
 # The saved tables carry keys only; the unit and college columns audited below
 # are attached from the mapping files, as every loader attaches them
 # (ADR-001 step 3).
@@ -61,7 +65,7 @@ concepts <- list(
   college    = list(sections="college", students="college", degrees="college", programs="college_code"),
   campus     = list(sections="campus", students="campus", degrees="campus", programs="student_campus"),
   subject    = list(sections="subject", students="subject_code"),
-  major      = list(students="major_code", programs="major_code", degrees="major_code")
+  major      = list(descriptions="major_code", programs="major_code", degrees="major_code")
 )
 for (cn in names(concepts)) {
   m <- concepts[[cn]]
@@ -132,7 +136,7 @@ chk("degrees:  major_code -> dept_code", D$degrees,  "major_code", "dept_code")
 # Campus label <-> code, derived by joining the two vocabularies on student+term.
 cat("\n-- campus label <-> code, derived from student_id + term\n")
 j <- inner_join(
-  D$students %>% select(student_id, term, code = student_campus) %>%
+  D$descriptions %>% select(student_id, term, code = student_campus) %>%
     filter(!is.na(code), nzchar(code)) %>% distinct(),
   D$programs %>% select(student_id, term, label = student_campus) %>%
     filter(!is.na(label), nzchar(label)) %>% distinct(),

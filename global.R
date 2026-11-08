@@ -213,6 +213,24 @@ for (.key in c("cedar_sections", "cedar_students", "cedar_student_terms", "cedar
 }
 rm(.key, .n_before)
 
+# The class list carries no student description (ADR-001 step 5): the
+# transform saves it once per student-term and pull as
+# cedar_class_list_descriptions, and readers attach cedar_student_terms'
+# values. The app reads the description table only for the roster's own major
+# names, which Admin > Mappings' audit uses to name a code programs.csv lacks,
+# and keeps that small summary. A class list saved before 2026-11-07 still
+# carries the columns: they are read from it and dropped (thin_class_list()).
+local({
+  path <- file.path(data_dir, paste0("cedar_class_list_descriptions", get_data_extension()))
+  descriptions <- resolve_class_list_descriptions(
+    if (file.exists(path)) timed_read_data(path, basename(path)) else NULL,
+    data_objects[["cedar_students"]], "global.R")
+  descriptions <- descriptions[descriptions$term >= cedar_min_term, , drop = FALSE]
+  data_objects[["cedar_class_list_majors"]] <<- summarize_class_list_majors(descriptions)
+})
+data_objects[["cedar_students"]] <- thin_class_list(data_objects[["cedar_students"]])
+gc(verbose = FALSE)
+
 cedar_dims <- build_cedar_dims()
 data_objects <- attach_default_units(data_objects, cedar_dims)
 data_objects[["cedar_dims"]] <- cedar_dims
@@ -457,58 +475,55 @@ if (!is.null(data_objects[["cedar_students"]]) && nrow(data_objects[["cedar_stud
   rm(saved_course_terms)
 }
 
-# ── Pre-compute campus-scoped course pair flow table for downstream signals ───
-# get_next_course_pairs() owns the course-sequencing methodology. Precomputing
-# it once keeps Regstats fast while preserving the same campus-scoped join policy
-# used by Course Dynamics.
-# Invalidated automatically when cedar_students.qs changes. The v2 filename
-# avoids loading older cache files that did not include campus in the schema.
-# Counted over the loaded class list, which is keyed on the course, so a pair
-# follows each course across its codes; the renames it was counted over are
-# stamped on it and checked here, so a confirmed code_history.csv row (or a
-# file counted by code) is recomputed rather than read.
-cedar_course_flows <- tryCatch({
-  if (is.null(data_objects[["cedar_students"]]) || nrow(data_objects[["cedar_students"]]) == 0) {
-    NULL
-  } else {
-    flows_cache_path  <- file.path(data_dir, "cedar_course_flows_v2.qs")
-    students_qs_path  <- file.path(data_dir, paste0("cedar_students", get_data_extension()))
-    flows_cache_valid <- file.exists(flows_cache_path) &&
-                         file.exists(students_qs_path) &&
-                         file.info(flows_cache_path)$mtime > file.info(students_qs_path)$mtime
+# ── cedar_course_flows: every next-term course pair (ADR-001 step 4) ────────
+# build_course_flows() (R/branches/course-flows.R) counts, once, which courses
+# each course's students took the next regular term, campus by campus, over
+# the keyed class list (a pair follows a course across its codes) and only to
+# the longitudinal edge: a destination term still registering is not a
+# follow-up. Regstats' downstream signals read it from
+# data_objects[["cedar_course_flows"]]. The copy saved beside the data is a
+# cache: used when it is newer than the class list and course_flows_is_current()
+# finds this build, the edge and the class list's renames on it; otherwise
+# rebuilt.
+if (!is.null(data_objects[["cedar_students"]]) && nrow(data_objects[["cedar_students"]]) > 0) {
+  course_flows_path <- file.path(data_dir, "cedar_course_flows.qs")
+  students_qs_path  <- file.path(data_dir, paste0("cedar_students", get_data_extension()))
+  saved_is_newer <- file.exists(course_flows_path) &&
+                    file.exists(students_qs_path) &&
+                    file.info(course_flows_path)$mtime > file.info(students_qs_path)$mtime
 
-    students_renames <- course_code_renames(data_objects[["cedar_students"]])
-    cached_flows <- if (flows_cache_valid) qs2::qs_read(flows_cache_path) else NULL
-    if (!is.null(cached_flows) &&
-        !identical(attr(cached_flows, "code_renames", exact = TRUE), students_renames)) {
-      message("[global.R] Cached course pair flows were counted over other course codes; recomputing.")
-      cached_flows <- NULL
-    }
-
-    if (!is.null(cached_flows)) {
-      message(sprintf("[global.R] Course flows loaded: %d rows", nrow(cached_flows)))
-      cached_flows
-    } else {
-      message("[global.R] Pre-computing course pair flows for downstream signals...")
-      t_flows <- system.time({
-        result <- get_next_course_pairs(data_objects[["cedar_students"]], opt = list(summer = FALSE))
-        attr(result, "code_renames") <- students_renames
-      })
-      message(sprintf("[global.R] Course flows ready: %d rows (%.1fs)",
-                      nrow(result), t_flows["elapsed"]))
-      tryCatch(
-        { qs2::qs_save(result, flows_cache_path)
-          message("[global.R] Course flows cached to disk.") },
-        error = function(e) message("[global.R] Warning: Failed to cache course flows: ", e$message)
-      )
-      result
-    }
+  saved_course_flows <- NULL
+  if (saved_is_newer) {
+    saved_course_flows <- tryCatch(qs2::qs_read(course_flows_path), error = function(e) {
+      message("[global.R] Saved cedar_course_flows unreadable: ", conditionMessage(e))
+      NULL
+    })
   }
-}, error = function(e) {
-  message("[global.R] Warning: course pair flow pre-computation failed: ", e$message,
-          " — downstream signals will be unavailable.")
-  NULL
-})
+  if (course_flows_is_current(saved_course_flows, data_objects[["cedar_students"]], cedar_edges)) {
+    data_objects[["cedar_course_flows"]] <- saved_course_flows
+    message(sprintf("[global.R] cedar_course_flows loaded: %d rows", nrow(saved_course_flows)))
+  } else {
+    if (saved_is_newer) {
+      message("[global.R] Saved cedar_course_flows is from another build, edge or course codes; rebuilding.")
+    }
+    gc(verbose = FALSE)
+    t_cf <- system.time({
+      data_objects[["cedar_course_flows"]] <- build_course_flows(data_objects[["cedar_students"]],
+                                                                 cedar_edges)
+    })
+    message(sprintf("[global.R] cedar_course_flows built: %d rows (%.1fs)",
+                    nrow(data_objects[["cedar_course_flows"]]), t_cf["elapsed"]))
+    tryCatch({
+      tmp_path <- paste0(course_flows_path, ".tmp")
+      qs2::qs_save(data_objects[["cedar_course_flows"]], tmp_path)
+      file.rename(tmp_path, course_flows_path)
+      message("[global.R] cedar_course_flows saved.")
+    }, error = function(e) {
+      message("[global.R] Warning: failed to save cedar_course_flows: ", e$message)
+    })
+  }
+  rm(saved_course_flows)
+}
 
 # ── Pre-compute data summary for Data & Usage page ─────────────────────────
 # This avoids expensive reactive computations and makes the tab load instantly

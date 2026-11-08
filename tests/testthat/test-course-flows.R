@@ -61,10 +61,11 @@ test_that("concurrent course summaries keep student classification", {
     opt = list(course = source_course, campus = campus_scope)
   )
 
-  expect_true("student_classification" %in% names(concurrent))
+  # No classification split: the loaded class list carries none, and the
+  # summary collapsed it (ADR-001 step 5).
+  expect_false("student_classification" %in% names(concurrent))
   expect_true(nrow(concurrent) > 0)
   expect_true("TEST 999" %in% concurrent$subject_course)
-  expect_true(base_row$student_classification[[1]] %in% concurrent$student_classification)
 })
 
 test_that("concurrent course shares use every selected-course student-term", {
@@ -139,4 +140,58 @@ test_that("course report flow tab returns sankey plots from branch outputs", {
   sankey_names <- names(payload$plots)[grepl("^sankey_.*_plot$", names(payload$plots))]
   expect_true(length(sankey_names) > 0)
   expect_true("concurrent_courses" %in% names(payload$tables))
+})
+
+test_that("the start-up course flows stop at the longitudinal edge (ADR-001 step 4)", {
+  unbounded <- get_next_course_pairs(test_students, opt = list(summer = FALSE))
+  # The edge is the last term before the newest destination term, so the
+  # pairs into that term are past it: the shape of a registration still open.
+  next_terms <- sort(unique(unbounded$next_term))
+  terms <- sort(unique(test_students$term))
+  edge <- max(terms[terms < max(next_terms)])
+  edges <- list(last_enrolled_complete = edge)
+  expect_gt(sum(unbounded$next_term > edge), 0L)
+
+  flows <- build_course_flows(test_students, edges)
+  expect_true(all(flows$next_term <= edge))
+  expected <- dplyr::filter(unbounded, next_term <= edge)
+  expect_equal(nrow(flows), nrow(expected))
+  expect_equal(sum(flows$n_students), sum(expected$n_students))
+  expect_identical(attr(flows, "enrolled_edge"), as.integer(edge))
+  expect_identical(attr(flows, "code_renames"), course_code_renames(test_students))
+
+  # A saved copy is read only for this build, this edge and these codes.
+  expect_true(course_flows_is_current(flows, test_students, edges))
+  expect_false(course_flows_is_current(flows, test_students,
+                                       list(last_enrolled_complete = max(next_terms))))
+  stale <- flows
+  attr(stale, "course_flows_build_version") <- COURSE_FLOWS_BUILD_VERSION - 1L
+  expect_false(course_flows_is_current(stale, test_students, edges))
+  recoded <- flows
+  attr(recoded, "code_renames") <- c(attr(flows, "code_renames"), "SOC 371 -> SOCI 371")
+  expect_false(course_flows_is_current(recoded, test_students, edges))
+  expect_false(course_flows_is_current(NULL, test_students, edges))
+  expect_error(build_course_flows(test_students, list()), "last_enrolled_complete")
+})
+
+test_that("Regstats' downstream signals read the flows they are given", {
+  # The fixture settles no term (its edges carry no last_enrolled_complete),
+  # so the edge is given, as the other follow-up tests give theirs.
+  flows <- build_course_flows(test_students, list(last_enrolled_complete = max(test_students$term)))
+  unstamped <- flows
+  attr(unstamped, "enrolled_edge") <- NULL
+  expect_error(get_next_term_signals(list(), NULL), "build_course_flows")
+  expect_error(get_next_term_signals(list(), unstamped), "build_course_flows")
+  expect_error(get_downstream_course_flows("HIST 1110", NULL), "build_course_flows")
+
+  # The source course with the most next-term students: a bump there names
+  # only destinations its own flows hold, and the page is told the edge.
+  source <- flows %>% dplyr::count(source_course, wt = n_students, sort = TRUE) %>%
+    dplyr::slice(1) %>% dplyr::pull(source_course)
+  signals <- get_next_term_signals(list(bumps = tibble::tibble(subject_course = source)), flows)
+  expect_identical(signals$enrolled_edge, attr(flows, "enrolled_edge"))
+  expect_true(all(signals$downstream$dest_course %in%
+                    flows$dest_course[flows$source_course == source]))
+  expect_equal(nrow(get_downstream_course_flows(source, flows)),
+               sum(flows$source_course == source))
 })

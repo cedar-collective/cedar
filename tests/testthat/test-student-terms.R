@@ -356,3 +356,87 @@ test_that("name_program_codes reads programs.csv through dims, the every-college
   # No names, no entries.
   expect_equal(name_program_codes(c(NA, ""), test_dims), stats::setNames(character(0), character(0)))
 })
+
+test_that("the loaded class list carries no student description (ADR-001 step 5)", {
+  # The saved fixture has every column; the loaded one, as global.R and setup.R
+  # load it, has none of the student-term columns, which readers attach.
+  expect_true(all(c("major_code", "student_classification", "student_campus") %in%
+                    names(cedar_students)))
+  expect_length(intersect(CLASS_LIST_UNLOADED_COLUMNS, names(test_students)), 0L)
+  expect_length(intersect(CLASS_LIST_UNLOADED_COLUMNS, names(data_objects$cedar_students)), 0L)
+
+  stamped <- cedar_students
+  attr(stamped, "cedar_provenance") <- "transform"
+  thin <- thin_class_list(stamped)
+  expect_equal(attr(thin, "cedar_provenance"), "transform")
+  expect_equal(nrow(thin), nrow(stamped))
+  expect_identical(thin_class_list(thin), thin)
+  expect_error(thin_class_list(NULL), "class-list data frame")
+
+  # A reader that filters on classification attaches it first; on the loaded
+  # rows alone the filter stops loudly rather than matching nothing.
+  expect_error(filter_class_list(test_students, list(classification = "Freshman")),
+               "student_classification")
+})
+
+test_that("a classification filter selects on the student-term's value, not the class list's", {
+  # Give one student-term a classification the class list never carried: the
+  # filter in get_course_demographics() follows the table.
+  key <- test_students %>%
+    dplyr::filter(registration_status_code %in% STATUS_REGISTERED, term >= 201980L) %>%
+    dplyr::slice(1)
+  st <- test_student_terms
+  hit <- st$student_id == key$student_id & st$term == as.integer(key$term)
+  st$student_classification[hit] <- "Designed, Only Here"
+  out <- suppressMessages(get_course_demographics(
+    test_students, st,
+    list(classification = "Designed, Only Here",
+         group_cols = c("campus", "college", "term", "term_type", "subject_course",
+                        "course_title", "level"))
+  ))
+  expect_gt(nrow(out), 0L)
+  expect_true(key$subject_course %in% out$subject_course)
+  none <- suppressMessages(get_course_demographics(
+    test_students, test_student_terms,
+    list(classification = "Designed, Only Here",
+         group_cols = c("campus", "college", "term", "term_type", "subject_course",
+                        "course_title", "level"))
+  ))
+  expect_equal(nrow(none), 0L)
+})
+
+test_that("the student-term table builds the same from the thin class list and its descriptions", {
+  # ST01 exercises every description rule (two pulls with different
+  # classifications, a programs row that disagrees, two majors, no programs
+  # row). Built from the class list as the transform saves it -- thin, with
+  # the description table beside it -- it is the table built from the full rows.
+  full <- suppressMessages(build_student_terms(cedar_students_st, cedar_programs_st, cedar_degrees_st))
+  descriptions <- build_class_list_descriptions(cedar_students_st)
+  expect_equal(sum(descriptions$rows), nrow(cedar_students_st))
+  from_saved <- suppressMessages(build_student_terms(
+    thin_class_list(cedar_students_st), cedar_programs_st, cedar_degrees_st,
+    edges = cedar_data_edges(cedar_students_st, degrees = cedar_degrees_st),
+    class_list_descriptions = descriptions))
+  expect_equal(from_saved, full)
+
+  # A thin class list with no description table is refused, never built
+  # as if no student had a description.
+  expect_error(suppressMessages(build_student_terms(
+    thin_class_list(cedar_students_st), cedar_programs_st, cedar_degrees_st,
+    edges = cedar_data_edges(cedar_students_st, degrees = cedar_degrees_st))),
+    "Build it before thin_class_list")
+
+  # A class list saved before 2026-11-07 carries its own descriptions and has
+  # no table beside it: they are read from it. Neither is refused.
+  expect_message(legacy <- resolve_class_list_descriptions(NULL, cedar_students_st, "test"),
+                 "saved before 2026-11-07")
+  expect_equal(legacy, descriptions)
+  expect_identical(resolve_class_list_descriptions(descriptions, NULL, "test"), descriptions)
+  expect_error(resolve_class_list_descriptions(NULL, thin_class_list(cedar_students_st), "test"),
+               "Re-run the transform")
+  expect_error(resolve_class_list_descriptions(dplyr::select(descriptions, -rows), NULL, "test"),
+               "lacks rows")
+
+  # The roster's majors read the same off the description table as off the rows.
+  expect_equal(summarize_class_list_majors(descriptions), summarize_class_list_majors(cedar_students_st))
+})

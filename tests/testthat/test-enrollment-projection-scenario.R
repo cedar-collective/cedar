@@ -14,6 +14,7 @@ scenario_test_bundle <- function(composition = NULL) {
     cl_enrls = calc_cl_enrls(settled_students, by_part_term = TRUE),
     sections = test_sections,
     students = settled_students,
+    student_terms = test_student_terms,
     target_term = 202110L,
     as_of_term = 202080L,
     scope_courses = "MATH 1215Z",

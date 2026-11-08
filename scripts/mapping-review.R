@@ -24,7 +24,8 @@ at    <- function(file, line) ifelse(is.na(line), file.path(dir, paste0(file, ".
 issues <- build_admin_mapping_issues(NULL, cedar_programs,
                                      files$units$unit_code)
 audit  <- audit_mapping_coverage(files, sections = cedar_sections, students = cedar_students,
-                                 programs = cedar_programs, degrees = cedar_degrees)
+                                 programs = cedar_programs, degrees = cedar_degrees,
+                                 class_list_majors = cedar_class_list_majors)
 work   <- build_mapping_worklist(files, cedar_programs, issues, audit,
                                  source_departments = read_institution_file(
                                    "source_departments", cedar_institution_dir(cedar_base_dir)))

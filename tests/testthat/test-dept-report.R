@@ -92,8 +92,6 @@ test_that("Dept Trends preloads every non-Gen-Ed analysis tab", {
 
 test_that("Dept Trends prepares tabs and Refresh bypasses every main-tab cache", {
   data_objects <- make_data_objects()
-  data_objects$cedar_students <- data_objects$cedar_students %>%
-    dplyr::mutate(major_name = major_code)
   errors <- character(0)
   headcount_writes <- 0L
   cached_base <- create_dept_report_base(
@@ -160,8 +158,6 @@ test_that("Dept Trends prepares tabs and Refresh bypasses every main-tab cache",
 
 test_that("compute_dept_enrl_tab carries historical enrollment plots", {
   data_objects <- make_data_objects()
-  data_objects$cedar_students <- data_objects$cedar_students %>%
-    dplyr::mutate(major_name = major_code)
   base <- list(
     dept_code = "HIST",
     palette = "Set2",
@@ -183,8 +179,6 @@ test_that("compute_dept_enrl_tab carries historical enrollment plots", {
 
 test_that("Dept Trends data-only tab payloads rebuild their plots", {
   data_objects <- make_data_objects()
-  data_objects$cedar_students <- data_objects$cedar_students %>%
-    dplyr::mutate(major_name = major_code)
   base <- list(
     dept_code = "HIST",
     dept_name = "History",

@@ -321,7 +321,7 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
 
       tryCatch({
         campus_filter <- data$opt$course_campus
-        signals_result <- get_next_term_signals(data$flagged, students, campus = campus_filter)
+        signals_result <- get_next_term_signals(data$flagged, course_flows, campus = campus_filter)
 
         log_data_filter(session, "downstream_campus_filter",
           paste0("[", paste(campus_filter, collapse = ","), "] rows_before=",
@@ -678,6 +678,10 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
                 } else if (downstream_count > 0) {
                   tagList(
                     tags$p(class = "text-muted-sm", downstream_scope_note),
+                    tags$p(class = "text-muted-sm", paste0(
+                      "Flow history runs through ", fmt_term(signals$enrolled_edge),
+                      ", the most recent term with complete enrollment: a term still ",
+                      "registering is not counted as anyone's next term.")),
                     reactable::reactableOutput(ns("rs_signals_downstream_table"))
                   )
                 } else {

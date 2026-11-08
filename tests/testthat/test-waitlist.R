@@ -278,10 +278,11 @@ test_that("inspect_waitlist describes waiting students from the student-term tab
 
   # The roster's own major and classification are never read: stamp them with
   # values the table does not carry and the splits still show the table's.
+  # (The loaded roster carries neither; a caller's copy that did is ignored.)
   roster <- test_students %>%
-    mutate(major_code = if_else(student_id %in% waiting$student_id, "ROSTER", major_code),
+    mutate(major_code = if_else(student_id %in% waiting$student_id, "ROSTER", NA_character_),
            student_classification = if_else(student_id %in% waiting$student_id,
-                                            "Roster Class", student_classification))
+                                            "Roster Class", NA_character_))
   table <- test_student_terms %>%
     mutate(primary_major_code = if_else(student_id %in% waiting$student_id & term == 202080L,
                                         "NURS-BSN", primary_major_code))

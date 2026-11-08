@@ -2651,34 +2651,21 @@ output$enrl_classlist_download <- downloadHandler(
     campus_filter <- get_campus_filter()
     if (!is.null(campus_filter)) opt$course_campus <- campus_filter$values
 
-    major_col <- if ("major_name" %in% names(students)) {
-      "major_name"
-    } else if ("major" %in% names(students)) {
-      "major"
-    } else {
-      NA_character_
-    }
+    student_terms <- data_objects[["cedar_student_terms"]]
 
     list(
-      classification = if ("student_classification" %in% names(students)) {
-        get_course_dfw_demographics(
-          students, opt,
-          group_col = "student_classification",
-          min_n = 1L
-        )
-      } else {
-        tibble()
-      },
-      major = if (!is.na(major_col)) {
-        get_course_dfw_demographics(
-          students, opt,
-          group_col = major_col,
-          min_n = 1L,
-          max_groups = 25L
-        )
-      } else {
-        tibble()
-      }
+      classification = get_course_dfw_demographics(
+        students, student_terms, opt,
+        group_col = "student_classification",
+        min_n = 1L
+      ),
+      major = get_course_dfw_demographics(
+        students, student_terms, opt,
+        group_col = "major_code",
+        min_n = 1L,
+        max_groups = 25L,
+        dims = data_objects[["cedar_dims"]]
+      )
     )
   })
 
@@ -3002,7 +2989,7 @@ output$enrl_classlist_download <- downloadHandler(
       hr(),
       dashboard_subsection(
         "Who Is DFWing?",
-        "These tables show which student groups account for DFW outcomes in the selected course. Use DFW % to see risk within a group, and Share of DFW to see how much that group contributes to the course's total DFW count."
+        "These tables show which student groups account for DFW outcomes in the selected course. Use DFW % to see risk within a group, and Share of DFW to see how much that group contributes to the course's total DFW count. Each student's classification and primary major are the ones recorded for the term they took the course."
       ),
       if (has_class) {
         div(class = "mb-4",
@@ -4881,7 +4868,7 @@ output$enrl_classlist_download <- downloadHandler(
   regstatsServer("regstats",
     students     = cedar_students,
     sections     = cedar_sections,
-    course_flows = cedar_course_flows,
+    course_flows = data_objects[["cedar_course_flows"]],
     data_summary = cedar_data_summary,
     thresholds   = cedar_regstats_thresholds,
     course_terms = data_objects[["cedar_course_terms"]]
@@ -5858,7 +5845,8 @@ output$enrl_classlist_download <- downloadHandler(
                                     sections = data_objects[["cedar_sections"]],
                                     students = data_objects[["cedar_students"]],
                                     programs = data_objects[["cedar_programs"]],
-                                    degrees  = data_objects[["cedar_degrees"]])
+                                    degrees  = data_objects[["cedar_degrees"]],
+                                    class_list_majors = data_objects[["cedar_class_list_majors"]])
     build_mapping_worklist(cedar_institution_files, data_objects[["cedar_programs"]],
                            .mapping_issues(), audit,
                            source_departments = read_institution_file("source_departments"))
@@ -6099,11 +6087,12 @@ output$enrl_classlist_download <- downloadHandler(
       depts        = reactable::colDef(name = "Departments", minWidth = 90, align = "right"))))
 
   # Campus codes, and where each is counted. Sections and enrollments count the
-  # campus that taught them; home-campus rows the student's, as class lists
-  # code it.
+  # campus that taught them; home-campus rows the student's that term, off
+  # cedar_student_terms.
   output$campus_mapping_table <- reactable::renderReactable({
     campuses <- build_campus_reference(data_objects[["cedar_sections"]],
-                                       data_objects[["cedar_students"]])
+                                       data_objects[["cedar_students"]],
+                                       data_objects[["cedar_student_terms"]])
     whole <- reactable::colFormat(separators = TRUE, digits = 0)
     .admin_reactable(campuses, page_size = 25L, columns = list(
       campus             = reactable::colDef(name = "Campus code", minWidth = 80),
@@ -6120,7 +6109,8 @@ output$enrl_classlist_download <- downloadHandler(
   # each touches in the loaded tables.
   output$counting_rules_table <- reactable::renderReactable({
     rules <- build_counting_rules(cedar_institution_files, data_objects[["cedar_programs"]],
-                                  data_objects[["cedar_sections"]], data_objects[["cedar_students"]])
+                                  data_objects[["cedar_sections"]], data_objects[["cedar_students"]],
+                                  data_objects[["cedar_student_terms"]])
     .admin_reactable(rules, pagination = FALSE, searchable = FALSE, columns = list(
       rule     = reactable::colDef(name = "Rule", minWidth = 130),
       what     = reactable::colDef(name = "What CEDAR does", minWidth = 340),
