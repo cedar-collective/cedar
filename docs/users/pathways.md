@@ -51,10 +51,11 @@ The courses may lie outside the focal department if selected students take them.
 Roadblocks uses the **first eligible observed outcome** for each student in each
 course and delivery campus. A student who first receives a DFW and later passes
 remains in the DFW comparison; the repeat can still demonstrate next-term return.
-If pass and DFW records conflict in the first eligible term, that comparison is
-excluded, rather than choosing an outcome or advancing to a later term. The scope
-note reports omitted later records, collapsed agreeing records, and exclusions
-across the selected scope before minimum-size thresholds are applied.
+A student who held two sections of one course in a term (switched sections, or a
+lecture and its lab) has one outcome there: the section of record, a registered
+section before a late withdrawal, and a posted grade before none. The scope note
+reports omitted later records and invalid records across the selected scope
+before minimum-size thresholds are applied.
 
 Read the columns together:
 

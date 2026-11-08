@@ -81,7 +81,7 @@
 #     produced : here, in build_population()
 #     enforced : apply_pathways_population_window() in branches/pathways.R
 #     consumed : every Pathways-tab analysis via the module's
-#                filtered_students()/filtered_cedar_grades() reactives
+#                filtered_students()/filtered_attempts() reactives
 #   If you build a new population-aware analysis, apply the window — a cone
 #   that ignores relevant_until quietly mixes post-departure behavior in.
 #

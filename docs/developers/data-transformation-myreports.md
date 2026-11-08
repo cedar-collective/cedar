@@ -106,6 +106,10 @@ The complete transformation logic is in [R/data-parsers/transform-to-cedar.R](ht
   - `SUBJ_CRSE` → `subject_course` (parser-created field)
   - `total_enrl` → `enrolled` (parser-created field)
   - Includes computed fields: `level`, `term_type`, `gen_ed_area`, `is_lab`
+  - `PRIM_INST_ID` → `instructor_id`, md5-hashed as `parse-data.R` hashes the
+    class list's and HR's (`hash_instructor_id()`, applied to all three in
+    the transform), so a section joins both. No HR field is merged onto a
+    section; join `cedar_faculty` (ISSUES I52).
 
 **2. class_lists → cedar_students**
 - Keeps: 18 of 74 columns
@@ -114,11 +118,21 @@ The complete transformation logic is in [R/data-parsers/transform-to-cedar.R](ht
   - `Student ID` → `student_id` (encrypted with SHA-256)
   - `Course Campus Code` → `campus` (denormalized for performance)
   - `Final Grade` → `grade` (lowercase)
+  - One row per student, course, campus and term (`dedup_class_list_rows()`):
+    Banner's one row per CRN collapses to the row of record, the one
+    `STATUS_PRECEDENCE` ranks first (registered, late drop, waitlist, early
+    drop), a posted non-audit grade before none, then the lowest CRN. No
+    classified outcome is saved; `cedar_attempts` classifies at load.
   - Analyses that need a student enrollment anchor use the minimum observed
     `cedar_students$term`, which means the first class-list term present in CEDAR.
     This is not a formal Banner matriculation/start-term field.
+  - The student's description on the roster (level, classification, major,
+    home college and campus, residency, dual credit) is saved once per
+    student, term and pull as `cedar_class_list_descriptions`
+    (`build_class_list_descriptions()`, with `rows`), and the class list is
+    saved without it (`thin_class_list()`; ADR-001 step 5).
 
-**2a. cedar_students (+ programs, degrees) → cedar_student_terms**
+**2a. cedar_students and cedar_class_list_descriptions (+ programs, degrees) → cedar_student_terms**
 - One row per `student_id + term` with any class-list row or declaration
   (`build_student_terms()`, ADR-001 step 2; contract in `student-terms.md`).
 - Counts observed registered UNM credits from class-list rows with

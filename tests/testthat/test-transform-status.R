@@ -30,7 +30,7 @@ scaffold_mapping_files <- function(programs = NULL) {
 # attach_unit() (R/branches/dims.R) resolves them at every start.
 scaffold_dims <- function(programs = NULL) build_cedar_dims(scaffold_mapping_files(programs))
 
-test_that("student transform saves audit-free outcomes with a persistent policy stamp", {
+test_that("student transform saves one class-list row per course-term and no classified outcomes", {
   env <- load_transform_helpers()
   output_dir <- tempfile("audit-transform-")
   dir.create(output_dir)
@@ -38,8 +38,8 @@ test_that("student transform saves audit-free outcomes with a persistent policy 
   env$transform_students(class_lists_audits, output_dir, ".qs",
                         maps = list(mapping_files = scaffold_mapping_files(),
                                     major_name_to_major_code = c(History = "HIST")))
-  saved <- qs2::qs_read(file.path(output_dir, "cedar_grades.qs"))
-  expect_silent(validate_cedar_grades_policy(saved))
+  # Outcomes are classified at load (cedar_attempts), never saved.
+  expect_false(file.exists(file.path(output_dir, "cedar_grades.qs")))
   # The saved rows carry Banner's course college as a key and no unit (ADR-001
   # step 3); attached through the same files, the course reports its unit's
   # college, with Banner's beside it.
@@ -50,9 +50,67 @@ test_that("student transform saves audit-free outcomes with a persistent policy 
   expect_equal(unique(attached$department), "HIST")
   expect_equal(unique(attached$college), "AS")
   expect_equal(unique(attached$college_basis), "mapped")
-  expect_equal(nrow(saved), 5L)
-  expect_equal(sum(saved$outcome == "dfw"), 4L)
-  expect_equal(sum(saved$outcome == "pass"), 1L)
+  # EC-09 is one row per student: nothing to collapse, and the loaded class
+  # list's attempts carry the audit exclusions the saved outcomes used to.
+  expect_equal(nrow(students), nrow(class_lists_audits))
+  keyed <- attach_test_course_ids(attached, "students")
+  attempts <- build_attempts(keyed, list(last_graded = 202110L))
+  expect_equal(sum(attempts$outcome %in% "dfw"), 4L)
+  expect_equal(sum(attempts$outcome %in% "pass"), 1L)
+  # The class list is saved without the student's description (ADR-001 step
+  # 5), which is saved once per student-term and pull beside it, with how many
+  # rows carried it: the two together hold what the transform built.
+  expect_length(intersect(CLASS_LIST_UNLOADED_COLUMNS, names(students)), 0L)
+  descriptions <- qs2::qs_read(file.path(output_dir, "cedar_class_list_descriptions.qs"))
+  expect_true(all(c("student_id", "term", "as_of_date", "rows", CLASS_LIST_DESCRIPTION_REQUIRED) %in%
+                    names(descriptions)))
+  expect_equal(sum(descriptions$rows), nrow(students))
+  expect_equal(anyDuplicated(descriptions[setdiff(names(descriptions), "rows")]), 0L)
+})
+
+test_that("the class-list dedup keeps the row of record for each student-course-term", {
+  env <- load_transform_helpers()
+  # One student-course-term per case, on two or three CRNs; the expected row
+  # is the one a reader of the loaded class list must see (ISSUES I50).
+  rows <- tibble::tribble(
+    ~student_id, ~crn,  ~registration_status_code, ~final_grade, ~want,
+    "early-late", "201", "DR", NA,    FALSE,   # the late withdrawal is the outcome
+    "early-late", "202", "DW", "W",   TRUE,
+    "late-reg",   "211", "DG", "W",   FALSE,   # a seat held beats a withdrawal
+    "late-reg",   "212", "RE", "B",   TRUE,
+    "wl-reg",     "221", "WL", NA,    FALSE,   # enrolled, not waiting
+    "wl-reg",     "222", "RS", NA,    TRUE,
+    "early-wl",   "231", "DR", NA,    FALSE,   # still waiting is demand
+    "early-wl",   "232", "WL", NA,    TRUE,
+    "lab-lec",    "241", "RE", "",    FALSE,   # the graded lecture over the ungraded lab
+    "lab-lec",    "242", "RE", "A",   TRUE,
+    "aud-credit", "251", "RE", "AUD", FALSE,   # a credit attempt over an audit
+    "aud-credit", "252", "RE", "C",   TRUE,
+    "tie",        "262", "RE", "B",   FALSE,   # same status and grade: lowest CRN
+    "tie",        "261", "RE", "A",   TRUE,
+    "alone",      "271", "DR", NA,    TRUE
+  ) %>% dplyr::mutate(term = 202080L, campus = "ABQ", subject_course = "HIST 1110")
+  # Row order must not decide: the reversed input keeps the same rows.
+  for (input in list(rows, rows[rev(seq_len(nrow(rows))), ])) {
+    kept <- suppressMessages(env$dedup_class_list_rows(dplyr::select(input, -want)))
+    expect_equal(nrow(kept), dplyr::n_distinct(rows$student_id))
+    expect_setequal(paste(kept$student_id, kept$crn),
+                    paste(rows$student_id, rows$crn)[rows$want])
+  }
+  # A second campus is a second delivery, never a duplicate.
+  two_campus <- dplyr::bind_rows(rows[15, ], dplyr::mutate(rows[15, ], campus = "EA", crn = "272"))
+  expect_equal(nrow(suppressMessages(env$dedup_class_list_rows(dplyr::select(two_campus, -want)))), 2L)
+  expect_error(env$dedup_class_list_rows(dplyr::select(rows, -crn)), "lacks crn")
+})
+
+test_that("an instructor ID is hashed as parse-data.R hashes it, once (I52)", {
+  env <- load_transform_helpers()
+  hashed <- digest::digest("100000231", algo = "md5")
+  # The DESR's employee ID becomes the class list's and HR's hash; a hash is
+  # kept, and a missing instructor stays missing rather than becoming one.
+  expect_identical(env$hash_instructor_id(c("100000231", hashed, NA, "100000231")),
+                   c(hashed, hashed, NA, hashed))
+  expect_identical(env$hash_instructor_id(100000231), hashed)
 })
 
 test_that("cedar-status writer emits valid JSON with null metadata", {

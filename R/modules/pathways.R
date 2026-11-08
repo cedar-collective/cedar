@@ -24,7 +24,7 @@
 #
 # Exported functions:
 #   pathwaysUI(id, campus_choices, program_choices, dept_choices, course_campus_choices)
-#   pathwaysServer(id, students, programs, degrees, cedar_grades, cedar_student_terms, dims, program_choices, dept_choices, edges, pathway_groups)
+#   pathwaysServer(id, students, programs, degrees, attempts, cedar_student_terms, dims, program_choices, dept_choices, edges, pathway_groups)
 #
 # Internal sub-module:
 #   populationSelectorUI(id, campus_choices, program_choices, dept_choices)
@@ -964,7 +964,7 @@ pathways_start_panel <- function() {
 # =============================================================================
 
 pathwaysServer <- function(id, students, programs, degrees = NULL,
-                           cedar_grades = NULL, cedar_student_terms = NULL,
+                           attempts, cedar_student_terms = NULL,
                            dims, program_choices = character(),
                            dept_choices = character(), edges, pathway_groups) {
   moduleServer(id, function(input, output, session) {
@@ -1366,17 +1366,12 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
       apply_pathways_population_window(students, pop, analysis_through)
     })
 
-    # Pre-windowed cedar_grades: apply the same analysis_through + relevant_until
-    # windowing as filtered_students, but to the pre-classified grade table.
-    # This is passed to get_stopout so it skips the expensive
-    # classify_outcomes(1.7M rows) call entirely.
-    # Returns NULL if cedar_grades was not loaded (file doesn't exist yet).
-    filtered_cedar_grades <- reactive({
-      g <- cedar_grades
-      if (is.null(g) || nrow(g) == 0) return(NULL)
-
+    # cedar_attempts (classified once at load) with the same analysis_through
+    # and relevant_until windowing as filtered_students: Roadblocks reads its
+    # outcomes instead of classifying the class list per run.
+    filtered_attempts <- reactive({
       pop <- tryCatch(population_rv()$population, error = function(e) NULL)
-      apply_pathways_population_window(g, pop, analysis_through)
+      apply_pathways_population_window(attempts, pop, analysis_through)
     })
 
     # Populate subject code choices for course timing and pairs
@@ -1911,24 +1906,16 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
       # summer terms.
       so_grade_boundary <- graded_through()
 
-      # Evaluate cedar_grades once (boundary-capped); use it to decide whether
-      # the expensive filtered_students() fallback is needed. get_stopout() only
-      # touches `students` when cedar_grades is absent — avoid the scan otherwise.
-      so_grades <- filtered_cedar_grades()
-      if (!is.null(so_grades) && !is.null(so_grade_boundary)) {
-        so_grades <- dplyr::filter(so_grades, term <= so_grade_boundary)
-      }
-      so_students <- if (!is.null(so_grades) && nrow(so_grades) > 0) {
-        NULL
-      } else {
-        s <- filtered_students()
-        if (!is.null(so_grade_boundary)) s <- dplyr::filter(s, term <= so_grade_boundary)
-        s
+      # cedar_attempts stops at the graded edge it was built to; the boundary
+      # caps it again when the page's edge is earlier.
+      so_attempts <- filtered_attempts()
+      if (!is.null(so_grade_boundary)) {
+        so_attempts <- dplyr::filter(so_attempts, term <= so_grade_boundary)
       }
 
       result <- tryCatch({
         get_stopout(
-          so_students, get_analysis_population(),
+          NULL, get_analysis_population(),
           degrees        = degrees,
           opt            = list(
             min_n        = as.integer(input$so_min_n),
@@ -1938,7 +1925,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
             graded_through = so_grade_boundary,
             observation_end_term = analysis_through
           ),
-          cedar_grades    = so_grades,
+          attempts        = so_attempts,
           student_terms   = cedar_student_terms
         )
       }, error = function(e) {

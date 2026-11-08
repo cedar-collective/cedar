@@ -398,6 +398,18 @@ export async function runReportChecks({ scope = 'smoke', synthetic = false } = {
         ]);
         assert.match(await page.$eval('#regstats-rs_dips_table', el => el.innerText), /SOCI 101/);
       }
+      // Downstream concerns read the start-up course flows (cedar_course_flows),
+      // passed to the module: loading them must neither error nor recount the
+      // class list, and the page names the edge the flows stop at.
+      await clickSubTabIn(page, 'regstats-rs_tabs', 'Downstream Concerns');
+      await click(page, 'regstats-rs_load_signals');
+      await page.waitForFunction(() => {
+        const text = document.body.innerText;
+        return text.includes('Flow history runs through') ||
+          text.includes('No downstream concerns found for the current scope.');
+      }, { timeout: STEP_TIMEOUT, polling: 500 });
+      const notices = await page.$$eval('.shiny-notification', els => els.map(el => el.innerText).join(' | '));
+      assert.doesNotMatch(notices, /error|build_course_flows/i);
     });
 
     await withStep(page, ['roadblocks'], 'Pathways population builds', async () => {
@@ -432,16 +444,16 @@ export async function runReportChecks({ scope = 'smoke', synthetic = false } = {
       }
     });
 
-    await withStep(page, ['roadblocks'], 'Pathways Roadblocks uses current saved outcomes', async () => {
-      // Building a population never reads cedar_grades. Exercise its consumer too,
-      // so an obsolete file in the actual Docker data mount cannot pass unnoticed.
+    await withStep(page, ['roadblocks'], 'Pathways Roadblocks reads the attempt table', async () => {
+      // Building a population never reads cedar_attempts. Exercise its consumer
+      // too, so a table the module cannot read fails here, not for a dean.
       await clickSubTabIn(page, 'pathways-analysis_tabs', 'Roadblocks');
       await click(page, 'pathways-so_run');
-      await waitForOutput(page, 'Roadblocks saved outcomes', [
+      await waitForOutput(page, 'Roadblocks attempt outcomes', [
         { type: 'reactable', id: 'pathways-so_table' },
       ]);
       await page.waitForFunction(() => {
-        const note = document.querySelector('[data-definition-id="roadblocks"][data-definition-version="2.1.0"]');
+        const note = document.querySelector('[data-definition-id="roadblocks"][data-definition-version="2.2.0"]');
         const scope = document.getElementById('pathways-so_meta')?.innerText || '';
         const table = document.getElementById('pathways-so_table')?.innerText || '';
         return !!note && scope.includes('first eligible student-course-campus observations') &&

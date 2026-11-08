@@ -228,52 +228,51 @@ test_that("get_course_outcome_rates exposes nuanced DFW components", {
 })
 
 
-test_that("get_course_dfw_demographics summarizes rate and composition", {
+# The groups are the student-term table's, never the class list's (ADR-001
+# step 5): the loaded class list carries no description, so each designed seat
+# gets its classification and primary major from a student-term row built here.
+dfw_demo_rows <- function(ids, statuses, grades) {
   base_row <- test_students %>%
     dplyr::filter(subject_course == "HIST 1110") %>%
     dplyr::slice(1)
-
-  designed <- dplyr::bind_rows(
+  dplyr::bind_rows(lapply(seq_along(ids), function(i) {
     base_row %>% dplyr::mutate(
-      student_id = "demo-01", crn = "93001",
-      registration_status_code = "RE", final_grade = "A",
-      student_classification = "Freshman", major_name = "History"
-    ),
-    base_row %>% dplyr::mutate(
-      student_id = "demo-02", crn = "93002",
-      registration_status_code = "RE", final_grade = "F",
-      student_classification = "Freshman", major_name = "History"
-    ),
-    base_row %>% dplyr::mutate(
-      student_id = "demo-03", crn = "93003",
-      registration_status_code = "DW", final_grade = NA_character_,
-      student_classification = "Freshman", major_name = "History"
-    ),
-    base_row %>% dplyr::mutate(
-      student_id = "demo-04", crn = "93004",
-      registration_status_code = "DR", final_grade = NA_character_,
-      student_classification = "Freshman", major_name = "History"
-    ),
-    base_row %>% dplyr::mutate(
-      student_id = "demo-05", crn = "93005",
-      registration_status_code = "RE", final_grade = "C-",
-      student_classification = "Sophomore", major_name = "Biology"
-    ),
-    base_row %>% dplyr::mutate(
-      student_id = "demo-06", crn = "93006",
-      registration_status_code = "RE", final_grade = "A",
-      student_classification = "Sophomore", major_name = "Biology"
+      student_id = ids[[i]], crn = as.character(93000 + i),
+      registration_status_code = statuses[[i]], final_grade = grades[[i]]
     )
+  }))
+}
+dfw_demo_terms <- function(rows, classification, major, pre_major = FALSE) {
+  tibble::tibble(
+    student_id = rows$student_id, term = as.integer(rows$term),
+    student_classification = classification,
+    primary_major_code = major, is_pre_major = pre_major
+  )
+}
+
+test_that("get_course_dfw_demographics summarizes rate and composition", {
+  designed <- dfw_demo_rows(
+    paste0("demo-0", 1:6),
+    c("RE", "RE", "DW", "DR", "RE", "RE"),
+    c("A", "F", NA, NA, "C-", "A")
+  )
+  # Two codes programs.csv does not carry, so each is named as itself; the
+  # second is a pre-major, so it reads with the suffix every major table uses.
+  st <- dfw_demo_terms(
+    designed,
+    classification = c(rep("Freshman", 4), "Sophomore", "Sophomore"),
+    major = c(rep("ZZHIST", 4), "ZZBIOL", "ZZBIOL"),
+    pre_major = c(rep(FALSE, 4), TRUE, TRUE)
   )
 
   result <- get_course_dfw_demographics(
-    designed,
+    designed, st,
     opt = list(course = "HIST 1110", data_edges = data_objects$cedar_edges),
-    group_col = "major_name"
+    group_col = "major_code", dims = test_dims
   )
 
-  history <- result %>% dplyr::filter(group == "History")
-  biology <- result %>% dplyr::filter(group == "Biology")
+  history <- result %>% dplyr::filter(group == "ZZHIST")
+  biology <- result %>% dplyr::filter(group == "ZZBIOL (pre-major)")
 
   expect_equal(history$n_attempts, 3L)
   expect_equal(history$n_dfw, 2L)
@@ -282,29 +281,41 @@ test_that("get_course_dfw_demographics summarizes rate and composition", {
   expect_equal(history$share_of_dfw, 66.7)
   expect_equal(biology$n_attempts, 2L)
   expect_equal(biology$n_dfw, 1L)
+
+  by_class <- get_course_dfw_demographics(
+    designed, st,
+    opt = list(course = "HIST 1110", data_edges = data_objects$cedar_edges),
+    group_col = "student_classification"
+  )
+  expect_equal(sort(by_class$group), c("Freshman", "Sophomore"))
+  expect_equal(by_class$n_dfw[by_class$group == "Freshman"], 2L)
+
+  # A seat with no student-term row is refused, never grouped as missing.
+  expect_error(
+    get_course_dfw_demographics(
+      designed, st[-1, ],
+      opt = list(course = "HIST 1110", data_edges = data_objects$cedar_edges)
+    ),
+    "no row on cedar_student_terms"
+  )
+  # Grouping by major needs the mapping files that name each program.
+  expect_error(
+    get_course_dfw_demographics(
+      designed, st,
+      opt = list(course = "HIST 1110", data_edges = data_objects$cedar_edges),
+      group_col = "major_code"
+    ),
+    "pass dims"
+  )
 })
 
 
 test_that("get_course_dfw_demographics honors caller-supplied passing grades", {
-  base_row <- test_students %>%
-    dplyr::filter(subject_course == "HIST 1110") %>%
-    dplyr::slice(1)
-
-  designed <- dplyr::bind_rows(
-    base_row %>% dplyr::mutate(
-      student_id = "threshold-01", crn = "94001",
-      registration_status_code = "RE", final_grade = "C-",
-      student_classification = "Sophomore", major_name = "Biology"
-    ),
-    base_row %>% dplyr::mutate(
-      student_id = "threshold-02", crn = "94002",
-      registration_status_code = "RE", final_grade = "A",
-      student_classification = "Sophomore", major_name = "Biology"
-    )
-  )
+  designed <- dfw_demo_rows(c("threshold-01", "threshold-02"), c("RE", "RE"), c("C-", "A"))
+  st <- dfw_demo_terms(designed, classification = "Sophomore", major = "ZZBIOL")
 
   result <- get_course_dfw_demographics(
-    designed,
+    designed, st,
     opt = list(
       course = "HIST 1110",
       passing_grades = GRADES_PASS_SUB_C_OPT_IN,

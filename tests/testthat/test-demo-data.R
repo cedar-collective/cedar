@@ -40,8 +40,8 @@ test_that("fixture institution survives production transforms with usable proven
   students <- qs2::qs_read(file.path(target, "cedar_students.qs"))
   sections <- qs2::qs_read(file.path(target, "cedar_sections.qs"))
   programs <- qs2::qs_read(file.path(target, "cedar_programs.qs"))
-  grades <- qs2::qs_read(file.path(target, "cedar_grades.qs"))
-  expect_identical(attr(grades, "cedar_outcome_policy_version"), CEDAR_OUTCOME_POLICY_VERSION)
+  # Outcomes are classified at load (cedar_attempts), never saved.
+  expect_false(file.exists(file.path(target, "cedar_grades.qs")))
   # The saved tables carry keys, never a unit (ADR-001 step 3); the loader
   # attaches it. The demo is its own institution (ADR-002 Stage 5): PSYC-MIN
   # has a unit only in institution/demo/, so reading UNM's files instead would
@@ -56,6 +56,18 @@ test_that("fixture institution survives production transforms with usable proven
   programs <- attached$cedar_programs
   expect_equal(unique(programs$dept_code[programs$major_code %in% "PSYC-MIN"]), "PSYC")
   expect_equal(nrow(anti_join(students, sections, by = c("term", "crn"))), 0L)
+  # One instructor ID in every table (I52): the transform hashes each source
+  # alike, so a section's instructor is its class-list rows' and joins
+  # cedar_faculty. Sections carry no faculty attribute.
+  faculty <- qs2::qs_read(file.path(target, "cedar_faculty.qs"))
+  expect_false("job_cat" %in% names(sections))
+  expect_true(all(grepl("^[0-9a-f]{32}$", stats::na.omit(sections$instructor_id))))
+  same_section <- students %>% distinct(term, crn, roster_id = instructor_id) %>%
+    inner_join(distinct(sections, term, crn, instructor_id), by = c("term", "crn"))
+  expect_gt(nrow(same_section), 0L)
+  expect_equal(sum(same_section$roster_id != same_section$instructor_id, na.rm = TRUE), 0L)
+  expect_gt(nrow(semi_join(distinct(sections, term, instructor_id), faculty,
+                           by = c("term", "instructor_id"))), 0L)
   expect_false(anyNA(students$synthetic_cohort))
   expect_setequal(students$synthetic_cohort, 1:5)
   original <- students %>% filter(synthetic_cohort == 1L, fixture_source == "base")

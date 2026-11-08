@@ -37,6 +37,9 @@ cedar_read <- function(name) {
   path <- file.path(cedar_data_dir, paste0(name, ".qs"))
   if (!file.exists(path)) stop("[cedar-repl.R] No such data file: ", path)
   tbl <- qs2::qs_read(path)
+  # As global.R loads it: the student descriptions are read off
+  # cedar_student_terms, never the class list (ADR-001 step 5).
+  if (name == "cedar_students") tbl <- thin_class_list(tbl)
   if (name %in% names(CEDAR_ATTACHED_UNIT_COLUMNS)) {
     tbl <- suppressMessages(attach_default_units(stats::setNames(list(tbl), name), cedar_dims))[[name]]
   }
@@ -57,7 +60,7 @@ delayedAssign("cedar_courses", {
 
 # Tables load lazily so sourcing remains fast when only one is needed.
 for (.nm in c("cedar_students", "cedar_programs", "cedar_degrees",
-              "cedar_sections", "cedar_grades", "cedar_student_terms",
+              "cedar_sections", "cedar_student_terms",
               "cedar_applicants")) {
   local({
     name <- .nm
@@ -67,5 +70,22 @@ for (.nm in c("cedar_students", "cedar_programs", "cedar_degrees",
   })
 }
 rm(.nm)
+
+# The class list's own description of each student-term and pull, as the
+# transform saves it (or, for a class list saved before 2026-11-07, as read off
+# it), and the roster's majors summarised from it as global.R keeps them.
+delayedAssign("cedar_class_list_descriptions", local({
+  path <- file.path(cedar_data_dir, "cedar_class_list_descriptions.qs")
+  resolve_class_list_descriptions(
+    if (file.exists(path)) qs2::qs_read(path) else NULL,
+    if (file.exists(path)) NULL else qs2::qs_read(file.path(cedar_data_dir, "cedar_students.qs")),
+    "cedar-repl.R")
+}))
+delayedAssign("cedar_class_list_majors", summarize_class_list_majors(cedar_class_list_descriptions))
+
+# cedar_attempts, every graded attempt classified once, as global.R builds it
+# (R/branches/attempts.R): over the keyed class list, to the graded edge.
+delayedAssign("cedar_attempts", build_attempts(
+  cedar_students, cedar_report_edges(cedar_students, degrees = cedar_degrees)$edges))
 
 message("[cedar-repl.R] Ready. Tables load on first use; cedar_read(\"<name>\") for others.")

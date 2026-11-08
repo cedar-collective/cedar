@@ -102,9 +102,10 @@ test_that("automatic runs share the manual lock, retry failures, and honor reque
 test_that("prepared input changes control fitting, not file dates or row order", {
   students <- test_students %>%
     mutate(as_of_date = .cedar_term_start(term) + 30L)
-  build <- function(s = students, sections = test_sections, previous = NULL) {
+  build <- function(s = students, sections = test_sections, previous = NULL,
+                    st = test_student_terms) {
     build_enrollment_projection_bundle(
-      calc_cl_enrls(s, by_part_term = TRUE), sections, s,
+      calc_cl_enrls(s, by_part_term = TRUE), sections, s, st,
       target_term = 202110L, as_of_term = 202080L,
       scope_courses = "MATH 1215Z", scope_campuses = "ABQ",
       scope_market_id = "abq_course_market", force_courses = "MATH 1215Z",
@@ -141,11 +142,16 @@ test_that("prepared input changes control fitting, not file dates or row order",
   unrelated$student_id[index] <- paste0(unrelated$student_id[index], "-changed")
   expect_true(attr(build(unrelated, previous = bundle), "projection_reused"))
 
+  # A corrected student id before the cutoff, on the class list and the
+  # student-term table alike, as a re-run transform would write both.
   corrected <- students
   index <- which(corrected$term <= 202080L)
   expect_gt(length(index), 0L)
-  corrected$student_id[index] <- paste0("corrected-", seq_along(index))
-  expect_null(attr(build(corrected, previous = bundle), "projection_reused"))
+  corrected$student_id[index] <- paste0("corrected-", corrected$student_id[index])
+  corrected_st <- test_student_terms
+  st_index <- corrected_st$term <= 202080L
+  corrected_st$student_id[st_index] <- paste0("corrected-", corrected_st$student_id[st_index])
+  expect_null(attr(build(corrected, previous = bundle, st = corrected_st), "projection_reused"))
   current <- students
   index <- which(current$term == 202110L & current$subject_course == "MATH 1215Z")
   expect_gt(length(index), 0L)
@@ -166,7 +172,7 @@ test_that("the deploy gate detects model drift without touching CEDAR tables", {
   students <- test_students %>%
     mutate(as_of_date = .cedar_term_start(term) + 30L)
   bundle <- build_enrollment_projection_bundle(
-    calc_cl_enrls(students, by_part_term = TRUE), test_sections, students,
+    calc_cl_enrls(students, by_part_term = TRUE), test_sections, students, test_student_terms,
     target_term = 202110L, as_of_term = 202080L,
     scope_courses = "MATH 1215Z", scope_campuses = "ABQ",
     scope_market_id = "abq_course_market", force_courses = "MATH 1215Z",
@@ -194,7 +200,7 @@ test_that("each half of the model signature is reported by name", {
   students <- test_students %>%
     mutate(as_of_date = .cedar_term_start(term) + 30L)
   bundle <- build_enrollment_projection_bundle(
-    calc_cl_enrls(students, by_part_term = TRUE), test_sections, students,
+    calc_cl_enrls(students, by_part_term = TRUE), test_sections, students, test_student_terms,
     target_term = 202110L, as_of_term = 202080L,
     scope_courses = "MATH 1215Z", scope_campuses = "ABQ",
     scope_market_id = "abq_course_market", force_courses = "MATH 1215Z",

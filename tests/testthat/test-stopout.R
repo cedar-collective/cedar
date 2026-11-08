@@ -10,26 +10,35 @@ library(dplyr)
 
 context("Stopout: Stop-Out Analysis")
 
-test_that("saved outcomes require a current policy and agree with raw AUD exclusions", {
+# cedar_attempts as production builds it from a CRN-level class-list fixture:
+# the transform's dedup (one row per student, course, campus and term), keyed
+# on the course, classified to the graded edge.
+fixture_attempts <- function(students, last_graded) {
+  rows <- load_transform_helpers()$dedup_class_list_rows(students)
+  build_attempts(attach_test_course_ids(rows, "students"), list(last_graded = last_graded))
+}
+
+test_that("Roadblocks refuses attempts this build did not make and agrees with raw AUD exclusions", {
   students <- test_students_audits
   population <- students %>% distinct(student_id) %>% mutate(population_label = "EC09")
   opt <- list(min_n = 1L, min_dfw_n = 1L, campus = "ABQ", observation_end_term = 202110L)
-  saved <- classify_enrollment_outcomes(students) %>%
+
+  # A hand-classified frame, or a table built under another policy, is refused.
+  unbuilt <- classify_enrollment_outcomes(students) %>%
     select(student_id, term, subject_course, outcome, campus, level)
+  expect_error(get_dfw_rates(students, population, opt, attempts = unbuilt), "not built by build_attempts")
+  saved <- fixture_attempts(students, 202110L)
+  stale <- saved
+  attr(stale, "cedar_outcome_policy_version") <- 0L
+  expect_error(get_stopout(students, population, opt = opt, attempts = stale,
+                           student_terms = test_student_terms_audits), "outcome policy")
 
-  expect_error(get_dfw_rates(students, population, opt, cedar_grades = saved), "Rebuild from the current class_lists")
-  expect_error(get_stopout(students, population, opt = opt, cedar_grades = saved,
-                           student_terms = test_student_terms_audits), "outdated outcome policy")
-  attr(saved, "cedar_outcome_policy_version") <- 0L
-  expect_error(validate_cedar_grades_policy(saved), "outdated outcome policy")
-
-  attr(saved, "cedar_outcome_policy_version") <- CEDAR_OUTCOME_POLICY_VERSION
   # Pathways windows this table before calling the cones: the stamp must survive.
   saved <- apply_pathways_population_window(
     saved, population %>% mutate(relevant_until = 202080L), analysis_through = 202110L
   ) %>% filter(campus == "ABQ")
   raw_rates <- get_dfw_rates(students, population, opt)
-  saved_rates <- get_dfw_rates(students, population, opt, cedar_grades = saved)
+  saved_rates <- get_dfw_rates(students, population, opt, attempts = saved)
   expect_equal(saved_rates, raw_rates, ignore_attr = TRUE)
   expect_equal(saved_rates$pop_n_graded, 5L)
   expect_equal(saved_rates$pop_n_dfw, 4L)
@@ -37,7 +46,7 @@ test_that("saved outcomes require a current policy and agree with raw AUD exclus
 
   raw_stopout <- get_stopout(students, population, opt = opt,
                              student_terms = test_student_terms_audits)
-  saved_stopout <- get_stopout(students, population, opt = opt, cedar_grades = saved,
+  saved_stopout <- get_stopout(students, population, opt = opt, attempts = saved,
                                student_terms = test_student_terms_audits)
   expect_equal(saved_stopout, raw_stopout, ignore_attr = TRUE)
   expect_equal(saved_stopout$by_course$pop_n_dfw, 4L)
@@ -627,21 +636,41 @@ test_that("Roadblocks uses mutually exclusive first-outcome groups for every sta
   expect_equal(result$observation_info$n_duplicates, 1L)
 })
 
-test_that("Roadblocks raw and saved paths ignore row order and repeated extract rows", {
+test_that("Roadblocks ignores row order and repeated extract rows on both paths", {
   students <- test_students_roadblocks
   opt <- roadblocks_options()
   raw <- get_stopout(students, roadblocks_population(), opt = opt,
                      student_terms = test_student_terms_roadblocks)
-  saved <- classify_outcomes(students) %>% mutate(level = "lower")
-  saved <- bind_rows(saved, saved) %>% arrange(desc(term), desc(outcome))
-  attr(saved, "cedar_outcome_policy_version") <- CEDAR_OUTCOME_POLICY_VERSION
-  cached <- get_stopout(NULL, roadblocks_population(), opt = opt,
-    cedar_grades = saved, student_terms = test_student_terms_roadblocks)
-  expect_equal(cached$by_course, raw$by_course)
-  expect_equal(cached$term_range, raw$term_range)
-  expect_equal(cached$observation_info$n_ambiguous, 1L)
-  # More duplicated source rows can change coverage counts, never the analysis.
-  expect_gt(cached$observation_info$n_duplicates, raw$observation_info$n_duplicates)
+  # The class-list path: repeated, reordered extract rows never change the
+  # analysis (classify_outcomes() collapses identical rows).
+  repeated <- bind_rows(students, students) %>% arrange(desc(term), desc(final_grade))
+  raw_repeated <- get_stopout(repeated, roadblocks_population(), opt = opt,
+                              student_terms = test_student_terms_roadblocks)
+  expect_equal(raw_repeated$by_course, raw$by_course)
+  expect_equal(raw_repeated$term_range, raw$term_range)
+
+  # cedar_attempts holds one row per student, course, campus and term, so its
+  # order cannot matter either.
+  attempts <- fixture_attempts(students, 202110L)
+  from_attempts <- get_stopout(NULL, roadblocks_population(), opt = opt,
+    attempts = attempts, student_terms = test_student_terms_roadblocks)
+  shuffled <- attempts[rev(seq_len(nrow(attempts))), ]
+  expect_equal(get_stopout(NULL, roadblocks_population(), opt = opt, attempts = shuffled,
+                           student_terms = test_student_terms_roadblocks)$by_course,
+               from_attempts$by_course)
+  expect_equal(from_attempts$term_range, raw$term_range)
+
+  # The one difference is by design. RB_P11 holds an A and an F in ECON 100 in
+  # Spring 2020 on two CRNs: the class-list path cannot tell which is the
+  # outcome and leaves P11 out; the loaded class list keeps one row of record
+  # (dedup_class_list_rows(): both registered and graded, so the lower CRN), and
+  # P11 counts once.
+  expect_equal(raw$observation_info$n_ambiguous, 1L)
+  expect_equal(from_attempts$observation_info$n_ambiguous, 0L)
+  econ <- function(r) filter(r$by_course, campus == "ABQ", subject_course == "ECON 100")
+  expect_equal(econ(from_attempts)$pop_n_graded, econ(raw)$pop_n_graded + 1L)
+  other <- function(r) filter(r$by_course, !(campus == "ABQ" & subject_course == "ECON 100"))
+  expect_equal(other(from_attempts), other(raw))
 })
 
 test_that("Roadblocks selects after term scope and both observation edges", {
@@ -675,11 +704,13 @@ test_that("Roadblocks group statistics reject repeated or incomplete observation
 
 test_that("Roadblocks retains completion correction and full-history returns after windowing", {
   pop <- roadblocks_population() %>% mutate(relevant_until = 202010L)
-  grades <- classify_outcomes(test_students_roadblocks) %>% mutate(level = "lower")
-  attr(grades, "cedar_outcome_policy_version") <- CEDAR_OUTCOME_POLICY_VERSION
-  grades <- apply_pathways_population_window(grades, pop, analysis_through = 202110L)
+  # RB_P11's conflicting CRNs are the row-order test's case; left out here so
+  # the counts are the class-list path's.
+  attempts <- fixture_attempts(filter(test_students_roadblocks, student_id %in% "RB_P11" == FALSE),
+                               202110L)
+  attempts <- apply_pathways_population_window(attempts, pop, analysis_through = 202110L)
   result <- get_stopout(NULL, pop, degrees = test_degrees_roadblocks,
-    opt = roadblocks_options(), cedar_grades = grades,
+    opt = roadblocks_options(), attempts = attempts,
     student_terms = test_student_terms_roadblocks)
   row <- result$by_course %>% filter(campus == "ABQ", subject_course == "ECON 100")
   expect_equal(row$pop_n_dfw, 5L)
