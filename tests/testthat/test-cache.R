@@ -272,7 +272,11 @@ test_that("Dept Trends invalidates only tabs that consume the changed source", {
     cedar_dims = c("hc", "enrl", "deg", "ch"),
     # Edges enter the key through cedar_report_end_term and
     # cedar_report_latest_term, not as a hashed source table.
-    cedar_edges = character(0)
+    cedar_edges = character(0),
+    # No Dept Trends tab reads a measure table (the Dashboard's Regstats
+    # flags do, under its own cache version).
+    cedar_attempts = character(0),
+    cedar_course_terms = character(0)
   ))
 
   corrected <- data_objects

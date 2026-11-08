@@ -404,6 +404,53 @@ filter_attempts <- function(attempts, opt) {
   filter_data(attempts, opt, opt_col_map_attempts, special_filters_classlist)
 }
 
+# Maps the filter options to cedar_course_terms' columns
+# (R/branches/course-terms.R): the course, unit and part-of-term keys a
+# class-list or schedule reader takes, so a caller's `opt` scopes the measure.
+opt_col_map_course_terms <- list(
+  course            = "subject_course",
+  subj              = "subject_code",
+  dept_code         = "department",
+  term              = "term",
+  term_type         = "term_type",
+  course_campus     = "campus",
+  course_college    = "college",
+  level             = "level",
+  pt                = "part_term",
+  uel               = ""
+)
+
+# Options the class list or the schedule answers and cedar_course_terms
+# cannot: anything about one section (its CRN, instructor, delivery method,
+# title, crosslist role, size) or one student (classification, registration
+# status). `status` is the one schedule option it does answer, by definition:
+# its offerings are the active sections, so `status = "A"` is its own scope
+# and any other status is an error.
+COURSE_TERMS_UNSUPPORTED_OPTS <- c("crn", "inst", "im", "course_title", "gen_ed",
+                                   "crosslist", "enrl_min", "enrl_max", "reg_status_code",
+                                   "classification")
+
+#' Scope cedar_course_terms by the standard filter options
+#'
+#' @param course_terms The course-term measure table, or rows of it.
+#' @param opt The options (`course`, `term`, `course_campus`, `dept_code`, `pt`, ...).
+#' @return The rows matching every option set; an option the measure cannot
+#'   answer is an error, never ignored.
+filter_course_terms <- function(course_terms, opt) {
+  is_set <- function(name) !is.null(opt[[name]]) && !identical(opt[[name]], "")
+  set <- Filter(is_set, COURSE_TERMS_UNSUPPORTED_OPTS)
+  if (length(set)) {
+    stop("[filter.R] filter_course_terms(): opt$", paste(set, collapse = ", opt$"),
+         " scopes a column cedar_course_terms does not carry; it counts every section and ",
+         "every student of a course-term. Scope the sections or the class list instead.")
+  }
+  if (is_set("status") && !all(opt[["status"]] == "A")) {
+    stop("[filter.R] filter_course_terms(): opt$status = ", paste(opt[["status"]], collapse = ", "),
+         "; cedar_course_terms counts the active sections (status A) and no other.")
+  }
+  filter_data(course_terms, opt, opt_col_map_course_terms, special_filters_classlist)
+}
+
 special_filters_classlist <- list(
   term = function(df, value) filter_by_term(df, value, "term"),
   course = function(df, value) .course_filter(df, value),

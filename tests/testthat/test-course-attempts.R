@@ -641,15 +641,20 @@ test_that("cedar_attempts is refused when built to another edge, build or set of
 test_that("cedar_course_terms carries outcome counts, unknown past the graded edge", {
   edges <- modifyList(data_objects$cedar_edges, list(last_graded = 202080L))
   attempts <- attempts_for(test_students, edges)
-  course_terms <- build_course_terms(test_students, attempts)
+  course_terms <- build_course_terms(test_students, attempts, test_sections)
   expect_equal(names(course_terms), COURSE_TERMS_COLUMNS)
   expect_identical(attr(course_terms, "graded_edge"), 202080L)
 
-  graded <- course_terms %>% filter(term <= 202080L)
+  # The outcome counts are the class list's side: a graded course-term the
+  # schedule alone offers (no class-list row) has unknown outcomes, not zero.
+  graded <- course_terms %>% filter(term <= 202080L, !is.na(registered))
+  offered_only <- course_terms %>% filter(term <= 202080L, is.na(registered))
   ungraded <- course_terms %>% filter(term > 202080L)
   expect_gt(nrow(ungraded), 0L)
+  expect_gt(nrow(offered_only), 0L)
   for (col in c("attempts", "passed", "dfw", "withdrawn")) {
     expect_true(all(is.na(ungraded[[col]])), info = col)
+    expect_true(all(is.na(offered_only[[col]])), info = col)
     expect_false(anyNA(graded[[col]]), info = col)
   }
   expect_equal(sum(graded$attempts), sum(!is.na(attempts$outcome)))
@@ -661,6 +666,6 @@ test_that("cedar_course_terms carries outcome counts, unknown past the graded ed
   expect_false(course_terms_is_current(course_terms, test_students,
                                        graded_edge = data_objects$cedar_edges$last_graded))
   # Attempts from another class list: their course-terms are not this one's.
-  expect_error(build_course_terms(test_students, attempts_for(test_students_regstats)),
+  expect_error(build_course_terms(test_students, attempts_for(test_students_regstats), test_sections),
                "must come from one class list")
 })

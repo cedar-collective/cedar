@@ -1139,21 +1139,21 @@ test_that("the loaded institution's roadmaps keep every planning rule in every s
 test_that("history components are explicit, and unenumerated groups and new codes stay unresolved", {
   r <- roadmaps()
   expect_setequal(r$courses$subject_course[r$courses$node_id == "chem1"], c("CHEM 1215", "CHEM 1215L"))
-  group <- build_degree_course_history(test_sections, test_students, history_edges, r, BIOLOGY, "bioelective")
+  group <- build_degree_course_history(test_sections, test_course_terms, history_edges, r, BIOLOGY, "bioelective")
   expect_equal(group$state, "choice")
   # None of the physical-science options has a section in the window.
-  science <- build_degree_course_history(test_sections, test_students, history_edges, r, BIOLOGY, "biosci")
+  science <- build_degree_course_history(test_sections, test_course_terms, history_edges, r, BIOLOGY, "biosci")
   expect_equal(science$state, "empty")
   expect_setequal(science$missing_courses, r$options$subject_course[r$options$node_id == "biosci"])
-  world <- build_degree_course_history(test_sections, test_students, history_edges, r, HISTORY, "histchoice")
+  world <- build_degree_course_history(test_sections, test_course_terms, history_edges, r, HISTORY, "histchoice")
   expect_equal(world$state, "ready")
   expect_match(world$note, "alternatives", fixed = TRUE)
   expect_setequal(unique(world$table$subject_course), c("HIST 327", "HIST 395"))
   expect_setequal(world$missing_courses, c("HIST 1160", "HIST 401"))
-  course <- build_degree_course_history(test_sections, test_students, history_edges, r, BIOLOGY, "phys1")
+  course <- build_degree_course_history(test_sections, test_course_terms, history_edges, r, BIOLOGY, "phys1")
   expect_equal(course$state, "empty")
   expect_equal(course$missing_courses, "PHYS 1310")
-  expect_error(build_degree_course_history(test_sections, test_students, history_edges, r, BIOLOGY, "nope"),
+  expect_error(build_degree_course_history(test_sections, test_course_terms, history_edges, r, BIOLOGY, "nope"),
     "Unknown degree course selection")
 })
 
@@ -1162,15 +1162,15 @@ test_that("history components are explicit, and unenumerated groups and new code
 test_that("a course popup keeps every campus, bundle component and alternative at its own grain", {
   r <- roadmaps()
   r$courses$subject_course[r$courses$node_id == "calc1"] <- "SOCI 100"
-  h <- build_degree_course_history(test_sections_regstats, test_students_regstats, history_edges, r, BIOLOGY, "calc1")
+  h <- build_degree_course_history(test_sections_regstats, test_course_terms_regstats, history_edges, r, BIOLOGY, "calc1")
   expect_setequal(h$table$campus, c("ABQ", "EA"))
   expect_true(is.numeric(h$table$capacity) && is.numeric(h$table$first_day_enrl))
   # Lecture and lab may have different campus histories; never cross their sets.
   r$courses$subject_course[r$courses$node_id == "chem1"] <- c("SOCI 100", "SOCI 101")
-  bundle <- build_degree_course_history(test_sections_regstats, test_students_regstats, history_edges, r, BIOLOGY, "chem1")
+  bundle <- build_degree_course_history(test_sections_regstats, test_course_terms_regstats, history_edges, r, BIOLOGY, "chem1")
   expect_equal(nrow(distinct(bundle$table, subject_course, campus)), 3L)
   r$options$subject_course[r$options$node_id == "histchoice"][1:3] <- c("SOCI 100", "SOCI 101", "SOCI 104")
-  set <- build_degree_course_history(test_sections_regstats, test_students_regstats, history_edges, r, HISTORY, "histchoice")
+  set <- build_degree_course_history(test_sections_regstats, test_course_terms_regstats, history_edges, r, HISTORY, "histchoice")
   expect_setequal(unique(set$table$subject_course), c("SOCI 100", "SOCI 101", "SOCI 104"))
   full <- set$table[set$table$subject_course == "SOCI 100" & set$table$campus == "ABQ" &
     set$table$part_term == "1" & set$table$term == 202080L, ]
@@ -1186,7 +1186,7 @@ test_that("allowance popups disclose credit fit and exclude courses the plan alr
     english_start = "composition", start_season = "fall", node_id = remainder)
   membership <- rbind(planning_gen_ed(), data.frame(subject_course = c("MATH 1512", "ENGL 1120"),
     area_label = c("2: Math", "1: Communication")))
-  h <- build_degree_popup_history(test_sections_regstats, test_students_regstats, history_edges,
+  h <- build_degree_popup_history(test_sections_regstats, test_course_terms_regstats, history_edges,
     catalog(), roadmaps(), membership, selection)
   expect_equal(h$kind, "allowance")
   expect_equal(h$season, "fall")
@@ -1197,7 +1197,7 @@ test_that("allowance popups disclose credit fit and exclude courses the plan alr
   expect_match(format_degree_allowance_preview(h), "SOCI 100 · ABQ", fixed = TRUE)
   expect_false(any(c("student_id", "crn") %in% names(h$table)))
   selection$node_id <- "allowance-99-1"
-  expect_error(build_degree_popup_history(test_sections_regstats, test_students_regstats, history_edges,
+  expect_error(build_degree_popup_history(test_sections_regstats, test_course_terms_regstats, history_edges,
     catalog(), roadmaps(), membership, selection), "Unknown degree allowance")
 })
 
@@ -1245,7 +1245,7 @@ test_that("popup history renders one standard table with first-day seats", {
   withr::local_package("shiny")
   r <- roadmaps()
   r$courses$subject_course[r$courses$node_id == "calc1"] <- "SOCI 100"
-  h <- build_degree_course_history(test_sections_regstats, test_students_regstats, history_edges, r, BIOLOGY, "calc1")
+  h <- build_degree_course_history(test_sections_regstats, test_course_terms_regstats, history_edges, r, BIOLOGY, "calc1")
   html <- as.character(degree_course_history_ui(h, "history_table"))
   expect_match(html, "filled at first class day", fixed = TRUE)
   expect_match(html, "history_table", fixed = TRUE)
@@ -1256,7 +1256,7 @@ test_that("popup history renders one standard table with first-day seats", {
   v <- view_of()
   selection <- list(type = "allowance", catalog_id = BIOLOGY, math_start = "calculus",
     english_start = "composition", start_season = "fall", node_id = v$allowances$node_id[1])
-  suggestions <- build_degree_popup_history(test_sections_regstats, test_students_regstats, history_edges,
+  suggestions <- build_degree_popup_history(test_sections_regstats, test_course_terms_regstats, history_edges,
     catalog(), roadmaps(), planning_gen_ed(), selection)
   expect_s3_class(degree_allowance_table(suggestions), "reactable")
   html <- as.character(degree_allowance_history_ui(suggestions, "suggestion_table"))

@@ -828,10 +828,12 @@ transform_measures <- function(data_dir, ext, min_term, dims = build_cedar_dims(
   sections <- sections[sections$term >= min_term, , drop = FALSE]
   message(sprintf("  Class list trimmed to term >= %d: %s rows", min_term,
                   format(nrow(students), big.mark = ",")))
-  students <- attach_default_units(list(cedar_registrations = students), dims)$cedar_registrations
-  courses  <- build_cedar_courses(sections, students, dims)
-  students <- attach_course_ids(list(cedar_registrations = students), courses)$cedar_registrations
-  rm(sections, courses); gc(verbose = FALSE)
+  keyed    <- attach_default_units(list(cedar_registrations = students, cedar_sections = sections), dims)
+  courses  <- build_cedar_courses(keyed$cedar_sections, keyed$cedar_registrations, dims)
+  keyed    <- attach_course_ids(keyed, courses)
+  students <- keyed$cedar_registrations
+  sections <- keyed$cedar_sections
+  rm(keyed, courses); gc(verbose = FALSE)
   if (is.null(edges)) {
     degrees <- load_saved("degrees")
     degrees <- degrees[degrees$term >= min_term, , drop = FALSE]
@@ -850,9 +852,9 @@ transform_measures <- function(data_dir, ext, min_term, dims = build_cedar_dims(
   saved <- list()
   attempts <- stamp(build_attempts(students, edges))
   saved$attempts <- save_cedar_file(attempts, "attempts", data_dir, ext)
-  course_terms <- stamp(build_course_terms(students, attempts))
+  course_terms <- stamp(build_course_terms(students, attempts, sections))
   saved$course_terms <- save_cedar_file(course_terms, "course_terms", data_dir, ext)
-  rm(attempts, course_terms); gc(verbose = FALSE)
+  rm(attempts, course_terms, sections); gc(verbose = FALSE)
   flows <- stamp(build_course_flows(students, edges))
   saved$course_flows <- save_cedar_file(flows, "course_flows", data_dir, ext)
   rm(flows, students); gc(verbose = FALSE)

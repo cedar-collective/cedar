@@ -220,7 +220,8 @@ test_that("inspect_waitlist course overview reports college and section supply",
   # 28 waitlisted students (registration_status_code WL). See the waitlist design
   # block in fixtures/designed_test_data.R.
   opt <- create_test_opt(list(term = 202080, uel = FALSE))
-  out <- inspect_waitlist(test_students, opt, sections = test_sections, student_terms = test_student_terms)
+  out <- inspect_waitlist(test_students, opt, sections = test_sections, course_terms = test_course_terms,
+                          student_terms = test_student_terms)
 
   cnt <- out[["count"]]
   expect_true(all(c("campus", "college", "subject_course", "course_title",
@@ -246,7 +247,8 @@ test_that("inspect_waitlist course overview reports college and section supply",
 
 test_that("inspect_waitlist excludes registered overlap from every summary", {
   opt <- create_test_opt(list(term = 202080, uel = FALSE))
-  out <- inspect_waitlist(test_students, opt, sections = test_sections, student_terms = test_student_terms)
+  out <- inspect_waitlist(test_students, opt, sections = test_sections, course_terms = test_course_terms,
+                          student_terms = test_student_terms)
 
   course_count <- out$count %>%
     filter(subject_course == "NURS 2010", campus == "ABQ")
@@ -286,7 +288,8 @@ test_that("inspect_waitlist describes waiting students from the student-term tab
   table <- test_student_terms %>%
     mutate(primary_major_code = if_else(student_id %in% waiting$student_id & term == 202080L,
                                         "NURS-BSN", primary_major_code))
-  out <- inspect_waitlist(roster, opt, sections = test_sections, student_terms = table)
+  out <- inspect_waitlist(roster, opt, sections = test_sections, course_terms = test_course_terms,
+                          student_terms = table)
 
   majors <- out$majors %>% filter(subject_course == "NURS 2010", campus == "ABQ")
   expect_setequal(unique(majors$major_code), "NURS-BSN")
@@ -296,7 +299,7 @@ test_that("inspect_waitlist describes waiting students from the student-term tab
   expect_equal(sum(classes$count), 28L)
 
   expect_error(
-    inspect_waitlist(test_students, opt, sections = test_sections),
+    inspect_waitlist(test_students, opt, sections = test_sections, course_terms = test_course_terms),
     "reads cedar_student_terms"
   )
 })
@@ -306,14 +309,15 @@ test_that("Waitlists, Regstats, and Department Dashboard reconcile true demand",
     term = 202080L, course = "NURS 2010", course_campus = "ABQ",
     dept_code = "NURS", uel = TRUE
   ))
-  waitlists <- inspect_waitlist(test_students, wait_opt, sections = test_sections, student_terms = test_student_terms)$count %>%
+  waitlists <- inspect_waitlist(test_students, wait_opt, sections = test_sections, course_terms = test_course_terms,
+                                student_terms = test_student_terms)$count %>%
     filter(subject_course == "NURS 2010") %>%
     transmute(campus, college, term, part_term, subject_course, course_title,
               waiting = count)
 
   reg_opt <- wait_opt
   reg_opt$thresholds <- modifyList(cedar_regstats_thresholds, list(min_wait = 28))
-  regstats <- get_reg_stats(test_students, test_sections, reg_opt)$waits %>%
+  regstats <- get_reg_stats(test_students, test_sections, reg_opt, course_terms = test_course_terms)$waits %>%
     filter(subject_course == "NURS 2010") %>%
     select(all_of(names(waitlists)))
 
@@ -354,25 +358,29 @@ test_that("inspect_waitlist requires sections when course titles are absent", {
   opt <- create_test_opt(list(term = 202080, uel = FALSE))
 
   expect_error(
-    inspect_waitlist(students_without_titles, opt, student_terms = test_student_terms),
+    inspect_waitlist(students_without_titles, opt, course_terms = test_course_terms,
+                     student_terms = test_student_terms),
     "input has no course_title column and no sections table was supplied",
     fixed = TRUE
   )
 })
 
 test_that("enrollment history scope drops unrelated courses but keeps all terms", {
-  enrl_base <- calc_cl_enrls(test_students, by_part_term = TRUE)
+  enrl_base <- test_course_terms
   focal_row <- test_students %>%
     filter(subject_course == "HIST 1110") %>%
     slice(1) %>%
     transmute(campus, college, term, part_term, subject_course, course_title, count = 1L)
 
   scoped <- scope_waitlist_enrollment_base(enrl_base, focal_row)
+  # A course-term the class list has no row for (the schedule's offering
+  # nobody registered under) has no census and is not in the history.
   expected <- enrl_base %>%
     filter(campus == focal_row$campus,
            college == focal_row$college,
            subject_course == focal_row$subject_course,
-           (is.na(part_term) & is.na(focal_row$part_term)) | part_term == focal_row$part_term)
+           (is.na(part_term) & is.na(focal_row$part_term)) | part_term == focal_row$part_term,
+           !is.na(census_enrl))
 
   expect_equal(unique(scoped$data$subject_course), "HIST 1110")
   expect_equal(sort(unique(scoped$data$term)), sort(unique(expected$term)))
@@ -388,17 +396,32 @@ test_that("attach_enrollment_history adds census enrollment context", {
   #   202080: 2 RE + 1 DW → census 3
   #   202180: 4 RE        → census 4
   #   202280: 6 RE + 2 DW (+3 WL, viewed term) → census 8
+  # The class-list rows carry what build_course_terms() counts (the status
+  # dates are blank: the first day is "undated", which the census ignores).
   mk <- function(term, n_re, n_wl = 0, n_dw = 0) {
     tibble::tibble(
       campus = "ABQ", college = "ARTS", term = as.integer(term),
       subject_course = "WLST 1000", course_id = "WLST 1000", listed_code = "WLST 1000",
-      part_term = "1", term_type = "fall",
+      subject_code = "WLST", level = "lower", department = "WLST",
+      part_term = "1", term_type = "fall", crn = paste0("WL", term),
       student_id = paste0("S", term, "_", seq_len(n_re + n_wl + n_dw)),
-      registration_status_code = c(rep("RE", n_re), rep("WL", n_wl), rep("DW", n_dw))
+      registration_status_code = c(rep("RE", n_re), rep("WL", n_wl), rep("DW", n_dw)),
+      final_grade = NA_character_, registration_date = as.Date(NA), as_of_date = as.Date("2022-10-01"),
+      instructor_id = "WL-INST", instructor_name = "Waitlist Instructor"
     )
   }
   students <- dplyr::bind_rows(mk(202080, 2, n_dw = 1), mk(202180, 4),
                                mk(202280, 6, n_wl = 3, n_dw = 2))
+  # One active section of 10 seats per offering, in the schedule's shape.
+  sections <- dplyr::bind_rows(lapply(c(202080L, 202180L, 202280L), function(term) {
+    test_sections %>% filter(section_id == "S10001") %>%
+      mutate(section_id = paste0("WL", term), crn = paste0("WL", term), term = term, term_type = "fall",
+             subject = "WLST", subject_course = "WLST 1000", course_id = "WLST 1000",
+             listed_code = "WLST 1000", course_title = "Waitlist Studies", department = "WLST",
+             college = "ARTS", campus = "ABQ", part_term = "1", status = "A",
+             enrolled = 6L, total_enrl = 6L, capacity = 10L, available = 4L)
+  }))
+  course_terms <- build_course_terms(students, attempts_for(students), sections)
 
   # Course overview row for the viewed (latest) term, as get_unique_waitlisted builds it.
   count_df <- tibble::tibble(
@@ -406,7 +429,7 @@ test_that("attach_enrollment_history adds census enrollment context", {
     subject_course = "WLST 1000", course_title = "Waitlist Studies", count = 3L
   )
 
-  res <- attach_enrollment_history(count_df, students)
+  res <- attach_enrollment_history(count_df, students, course_terms)
 
   expect_equal(res$census_enrl, 8)                      # census this term (6 RE + 2 DW)
   expect_equal(res$census_enrl_mean, 3.5)               # mean(3, 4), viewed term excluded
@@ -414,20 +437,16 @@ test_that("attach_enrollment_history adds census enrollment context", {
   expect_equal(res$trend_terms[[1]], c(202080L, 202180L, 202280L))
   expect_equal(res$trend_hist[[1]], c(3, 4, 8))         # census series, oldest → newest
 
-  # Course-term counts passed in give the same answer as the scoped recompute,
-  # and a global of the same name is not consulted (M12): a bogus
-  # cedar_course_terms in the global environment must change nothing.
-  base <- calc_cl_enrls(students, by_part_term = TRUE)
-  res_base <- attach_enrollment_history(count_df, students, course_terms = base)
-  expect_equal(res_base$census_enrl, res$census_enrl)
-  expect_equal(res_base$census_enrl_mean, res$census_enrl_mean)
-  expect_equal(res_base$trend_hist[[1]], res$trend_hist[[1]])
-
-  bogus <- base %>% dplyr::mutate(registered = registered * 100L)
+  # The table is a parameter: a bogus cedar_course_terms in the global
+  # environment changes nothing (M12), and a recount is not the table.
+  bogus <- course_terms %>% dplyr::mutate(census_enrl = census_enrl * 100)
   rlang::local_bindings(cedar_course_terms = bogus, .env = .GlobalEnv)
-  res_global <- attach_enrollment_history(count_df, students)
+  res_global <- attach_enrollment_history(count_df, students, course_terms)
   expect_equal(res_global$census_enrl, 8)
   expect_equal(res_global$trend_hist[[1]], c(3, 4, 8))
+  expect_error(attach_enrollment_history(count_df, students, calc_cl_enrls(students, by_part_term = TRUE)),
+               "build_course_terms")
+  expect_error(attach_enrollment_history(count_df, students), "course_terms")
 })
 
 test_that("attach_enrollment_history follows the course when the class list names a former code", {
@@ -437,7 +456,7 @@ test_that("attach_enrollment_history follows the course when the class list name
   # base row and reads no census and no history.
   rn <- rn01_course_tables()
   students <- rn$cedar_registrations
-  base <- course_terms_for(students)
+  base <- course_terms_for(students, rn$cedar_sections)
   expect_false("HIST 320" %in% base$subject_course)
   count_df <- students %>%
     filter(listed_code %in% c("HIST 320", "SOCI 250"), term == 202010L) %>%
@@ -446,8 +465,7 @@ test_that("attach_enrollment_history follows the course when the class list name
     mutate(count = 1L)
 
   with_base <- attach_enrollment_history(count_df, students, course_terms = base)
-  recomputed <- attach_enrollment_history(count_df, students)
-  for (res in list(with_base, recomputed)) {
+  for (res in list(with_base)) {
     # The rows keep the codes they arrived with, and no helper column leaks.
     expect_equal(res$subject_course, c("HIST 320", "SOCI 250"))
     expect_equal(names(res)[seq_along(count_df)], names(count_df))
@@ -460,8 +478,6 @@ test_that("attach_enrollment_history follows the course when the class list name
     soci <- res %>% filter(subject_course == "SOCI 250")
     expect_equal(soci$trend_terms[[1]], c(202010L, 202110L))
   }
-  expect_equal(with_base$census_enrl_mean, recomputed$census_enrl_mean)
-
   expect_error(
     attach_enrollment_history(count_df, dplyr::select(students, -course_id), course_terms = base),
     "course_id"
@@ -477,8 +493,9 @@ test_that("inspect_waitlist counts a course's waitlist across its live codes (RN
     distinct(student_id, term) %>%
     mutate(student_classification = "Junior", primary_major_code = "SOCI")
   opt <- create_test_opt(list(term = 202010, uel = FALSE))
+  rn_terms <- course_terms_for(rn$cedar_registrations, rn$cedar_sections)
   out <- inspect_waitlist(rn$cedar_registrations, opt, sections = rn$cedar_sections,
-                          student_terms = student_terms)
+                          course_terms = rn_terms, student_terms = student_terms)
 
   # One row for the course: W1 and W2 wait; W3 holds a seat in it.
   expect_equal(out$count$subject_course, "SOCI 371")
@@ -493,6 +510,7 @@ test_that("inspect_waitlist counts a course's waitlist across its live codes (RN
   # Read by code, the same rows split in two and W3 counts as waiting.
   by_code <- lapply(rn, function(tbl) dplyr::mutate(tbl, subject_course = listed_code, course_id = listed_code))
   split <- inspect_waitlist(by_code$cedar_registrations, opt, sections = by_code$cedar_sections,
+                            course_terms = course_terms_for(by_code$cedar_registrations, by_code$cedar_sections),
                             student_terms = student_terms)$count %>%
     arrange(subject_course)
   expect_equal(split$subject_course, c("SOC 371", "SOCI 371"))
@@ -501,7 +519,8 @@ test_that("inspect_waitlist counts a course's waitlist across its live codes (RN
   # A former code asked for is its course.
   picked <- inspect_waitlist(rn$cedar_registrations,
                              create_test_opt(list(course = "SOC 371", term = 202010, uel = FALSE)),
-                             sections = rn$cedar_sections, student_terms = student_terms)
+                             sections = rn$cedar_sections, course_terms = rn_terms,
+                             student_terms = student_terms)
   expect_equal(picked$count$subject_course, "SOCI 371")
   expect_equal(picked$count$count, 2L)
 })

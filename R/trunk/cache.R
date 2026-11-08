@@ -15,7 +15,10 @@ cedar_course_neighbors_cache_version <- 5L
 # v5 aligns High Waitlists to shared class-list true demand.
 # v6 reads by course (course_id; ADR-001 step 4): the payload records the
 #    renames it was counted over, and a payload counted over others is a miss.
-cedar_regstats_cache_version <- 6L
+# v7 reads the lifecycle history and the saturation seats off cedar_course_terms
+#    (ADR-001 step 7, group 3): unknown seats are NA capacity, never the
+#    headcount, and a zero-seat, zero-student section is not an offering.
+cedar_regstats_cache_version <- 7L
 
 course_neighbors_content_hash <- function(df, relevant_cols) {
   cols <- intersect(relevant_cols, names(df))

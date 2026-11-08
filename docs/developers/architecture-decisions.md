@@ -354,6 +354,38 @@ graded edge) cannot answer, and the comparison's covariates read the class
 list, both of which move with group 4. Neither cone classifies a grade any
 more.
 
+Group 3, the count and fill readers, followed the same day, and changed the
+table before it changed the readers. `cedar_course_terms` build 3 is the
+full join of the class list's side (the counts, census, and now the first
+day through `calc_first_day_enrl()`) and the schedule's side (the active
+offerings through `get_enrl()`: sections, seats, whether the seats are
+known, the DESR headcount, and how many of the sections the class list has a
+row in), because every reader in the group compared the two sources
+itself. The join is full and **NA on a side means that source has no row**:
+an offering nobody is listed in is unknown, not empty (EC-11b), and a
+cancelled offering students dropped from has no sections. Regstats' lifecycle
+history and saturation seats, Waitlists' census history, and the Course
+Planning History behind Degree Explorer's tiles read the table scoped by
+`filter_course_terms()`, which answers the class list's option names and
+refuses a section's or a student's; the recount fallbacks and the
+`add_census_enrl()` / `calc_cl_enrls()` / `get_enrl()` calls they wrapped are
+deleted, and `get_reg_stats()` and `inspect_waitlist()` require the table.
+Regstats' saturation now follows the planning history's capacity rule
+instead of its own sum, and the real-data comparison (Fall 2026, 634 rows
+before) shows what that changes: an active section with no seats (`enrolled
++ available` not finite or not positive) makes the course-term's capacity
+unknown, so twelve rows whose fill was computed over a sum that counted such
+a section as zero seats (ARCH 2315 at 104% of 80 seats from four sections,
+three with none) leave the table and are counted in `invalid_capacity`; a
+zero-seat, zero-student section is not an offering, so four rows count one
+or two fewer sections, fourteen course-terms nobody could register for are
+no longer "unmatched", and CHEM 304L, whose Summer 2020 row of four empty
+sections had poisoned its fill history, enters the table. Dips, waits, early
+drops, the waitlist counts and the planning history are identical row for
+row, and Regstats runs in 57 s instead of 74 s. Still counting the class list per
+request (group 3b): Open Seats' class-list tab, the Course Report's lifecycle
+history, the registration snapshots and the demographics' census.
+
 #### Step 5: decisions (2026-11-07)
 
 - **Order:** the student-term columns leave the loaded class list first

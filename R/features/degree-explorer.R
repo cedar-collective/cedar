@@ -385,7 +385,7 @@ format_degree_explorer_preview <- function(view) {
 
 #' Assemble history for a selected tile; authored components distinguish bundles
 #' from unresolved choices and never infer historical course equivalences.
-build_degree_course_history <- function(sections, students, edges, roadmaps, catalog_id, node_id) {
+build_degree_course_history <- function(sections, course_terms, edges, roadmaps, catalog_id, node_id) {
   node <- roadmaps$nodes[roadmaps$nodes$catalog_id %in% c("*", catalog_id) & roadmaps$nodes$node_id == node_id, ]
   if (nrow(node) != 1L) stop("[degree-explorer.R] Unknown degree course selection")
   components <- roadmaps$courses$subject_course[roadmaps$courses$catalog_id %in% c("*", catalog_id) &
@@ -397,7 +397,7 @@ build_degree_course_history <- function(sections, students, edges, roadmaps, cat
     return(list(state = "choice", node_id = node_id,
       note = "Choose a specific course in this group before checking offering history or seat pressure."))
   }
-  history <- get_course_planning_history(sections, students, components, edges)
+  history <- get_course_planning_history(sections, course_terms, components, edges)
   if (length(alternatives)) {
     history$note <- paste("History for the alternatives, with each course shown separately.", history$note)
   }
@@ -416,10 +416,10 @@ build_degree_course_history <- function(sections, students, edges, roadmaps, cat
 }
 
 #' Resolve a clicked card against the current plan, never client-supplied credits.
-build_degree_popup_history <- function(sections, students, edges, catalog, roadmaps, gen_ed, selection, shared = NULL) {
+build_degree_popup_history <- function(sections, course_terms, edges, catalog, roadmaps, gen_ed, selection, shared = NULL) {
   if (!selection$type %in% c("course", "allowance")) stop("[degree-explorer.R] Unknown degree card type")
   if (selection$type == "course") {
-    history <- build_degree_course_history(sections, students, edges, roadmaps,
+    history <- build_degree_course_history(sections, course_terms, edges, roadmaps,
       selection$catalog_id, selection$node_id)
     history$kind <- "course"
     return(history)
@@ -456,7 +456,7 @@ build_degree_popup_history <- function(sections, students, edges, catalog, roadm
     levels <- c("lower", "upper")
   }
   pool <- pool[!pool$subject_course %in% represented, ]
-  history <- get_course_planning_history(sections, students, pool$subject_course, edges)
+  history <- get_course_planning_history(sections, course_terms, pool$subject_course, edges)
   history$kind <- "allowance"
   history$node_id <- slot$node_id
   history$season <- slot$season

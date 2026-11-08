@@ -11,11 +11,11 @@ context("The measure tables are built by the transform (ADR-001 step 6)")
 # The fixtures are already keyed and attached; written as saved tables they
 # round-trip, because attach_course_ids() keys again from listed_code and
 # attach_default_units() drops the stamped unit columns first. The saved class
-# list also carries Banner's section college (source_college), the key the
-# attach reads, which the fixture never needed: the fixture's own college
-# stands in for it.
+# list and schedule also carry Banner's section college (source_college), the
+# key the attach reads, which the fixtures never needed: each fixture's own
+# college stands in for it.
 write_saved_fixtures <- function(dir) {
-  qs2::qs_save(test_sections, file.path(dir, "cedar_sections.qs"))
+  qs2::qs_save(dplyr::mutate(test_sections, source_college = college), file.path(dir, "cedar_sections.qs"))
   qs2::qs_save(dplyr::mutate(test_students, source_college = college), file.path(dir, "cedar_students.qs"))
   qs2::qs_save(test_degrees, file.path(dir, "cedar_degrees.qs"))
   invisible(dir)
@@ -27,6 +27,20 @@ write_saved_fixtures <- function(dir) {
 fixture_edges <- function() {
   terms <- sort(unique(test_students$term))
   modifyList(data_objects$cedar_edges, list(last_enrolled_complete = terms[length(terms) - 1L]))
+}
+
+# The saved fixtures as the loader (and transform_measures()) holds them:
+# units attached from the mapping files and course ids keyed. The fixtures'
+# own colleges are not UNM's, so the attached rows carry the files' verdict
+# (NA for a college the files do not know), and a table keyed on the college
+# has to be compared over these rows, not the fixtures as designed.
+loaded_fixtures <- function(students, sections) {
+  keyed <- attach_default_units(
+    list(cedar_registrations = dplyr::mutate(students, source_college = college),
+         cedar_sections = dplyr::mutate(sections, source_college = college)),
+    test_dims)
+  courses <- build_cedar_courses(keyed$cedar_sections, keyed$cedar_registrations, test_dims)
+  attach_course_ids(keyed, courses)
 }
 
 test_that("transform_measures() builds the three tables the app loads, as the app would have built them", {
@@ -52,10 +66,14 @@ test_that("transform_measures() builds the three tables the app loads, as the ap
   expect_true(course_terms_is_current(course_terms, test_students, graded_edge = edges$last_graded))
   expect_true(course_flows_is_current(flows, test_students, edges))
 
-  # The same rows the app used to build at start.
-  expect_equal(nrow(attempts), nrow(attempts_for(test_students, edges)))
-  expect_equal(nrow(course_terms), nrow(course_terms_for(test_students, edges)))
-  expect_equal(nrow(flows), nrow(build_course_flows(test_students, edges)))
+  # The same rows the app used to build at start, over the tables as loaded
+  # (the schedule trimmed to the first term as well: the fixtures offer
+  # ANTH 2190C a term before the class list begins).
+  loaded <- suppressMessages(loaded_fixtures(test_students, dplyr::filter(test_sections, term >= min_term)))
+  expect_equal(nrow(attempts), nrow(attempts_for(loaded$cedar_registrations, edges)))
+  expect_equal(nrow(course_terms),
+               nrow(course_terms_for(loaded$cedar_registrations, loaded$cedar_sections, edges)))
+  expect_equal(nrow(flows), nrow(build_course_flows(loaded$cedar_registrations, edges)))
 
   # Stamped with the mapping files and the first term, for the loader's refusal.
   for (tbl in list(attempts, course_terms, flows)) {
@@ -68,19 +86,20 @@ test_that("transform_measures() builds the three tables the app loads, as the ap
   # way (the fixtures have no same-campus next-term pair after Fall 2020, so
   # the flows are legitimately empty on this window).
   later <- 202080L
-  window <- dplyr::filter(test_students, term >= later)
+  window <- suppressMessages(loaded_fixtures(dplyr::filter(test_students, term >= later),
+                                             dplyr::filter(test_sections, term >= later)))
   trim_edges <- modifyList(edges, list(last_enrolled_complete = max(test_students$term)))
   suppressMessages(env$transform_measures(dir, ".qs", min_term = later, dims = test_dims, edges = trim_edges))
   trimmed <- qs2::qs_read(file.path(dir, "cedar_attempts.qs"))
   expect_true(all(trimmed$term >= later))
   expect_lt(nrow(trimmed), nrow(attempts))
   expect_gt(nrow(trimmed), 0L)
-  expect_equal(nrow(trimmed), nrow(attempts_for(window, trim_edges)))
+  expect_equal(nrow(trimmed), nrow(attempts_for(window$cedar_registrations, trim_edges)))
   expect_identical(attr(trimmed, "cedar_min_term"), as.integer(later))
   expect_equal(nrow(qs2::qs_read(file.path(dir, "cedar_course_terms.qs"))),
-               nrow(course_terms_for(window, trim_edges)))
+               nrow(course_terms_for(window$cedar_registrations, window$cedar_sections, trim_edges)))
   expect_equal(nrow(qs2::qs_read(file.path(dir, "cedar_course_flows.qs"))),
-               nrow(build_course_flows(window, trim_edges)))
+               nrow(build_course_flows(window$cedar_registrations, trim_edges)))
 
   # The first term is required, not defaulted.
   expect_error(env$transform_measures(dir, ".qs", min_term = NULL, dims = test_dims, edges = edges), "min_term")

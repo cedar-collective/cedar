@@ -574,11 +574,12 @@ regstats_course_key_info <- function(flagged) {
 #'   \item \strong{Chronically full:} Fill rate above absolute ceiling for 3+ past same-type terms
 #' }
 #'
-#' @param course_terms Optional \code{cedar_course_terms}
-#'   (\code{\link{build_course_terms}}), the course-term counts it filters
-#'   instead of recounting the class list. NULL recounts. A table not counted
-#'   by this build over \code{students}' course codes is refused. It is not
-#'   read when a student-level filter is set: those change which students count.
+#' @param course_terms \code{cedar_course_terms} (\code{\link{build_course_terms}}),
+#'   required: the course-term counts and the schedule's seats it filters
+#'   (ADR-001 step 7). A table not counted by this build over \code{students}'
+#'   course codes is refused. An option about one section or one student
+#'   (\code{inst}, \code{im}, \code{classification}, ...) is an error: the
+#'   table counts every section and every student of a course-term.
 #'
 #' @examples
 #' \dontrun{
@@ -612,14 +613,17 @@ regstats_course_key_info <- function(flagged) {
 #' }
 #'
 #' @seealso
-#' \code{\link{calc_cl_enrls}} for enrollment statistics calculation,
+#' \code{\link{build_course_terms}} for the counts and seats it screens,
 #' \code{\link{assign_concern_tier}} for severity classification,
-#' \code{\link{create_tiered_summary}} for dashboard summaries,
-#' \code{\link{get_enrl}} for current enrollment data
+#' \code{\link{create_tiered_summary}} for dashboard summaries
 #'
 #' @export
-get_reg_stats <- function(students, courses, opt, course_terms = NULL) {
+get_reg_stats <- function(students, courses, opt, course_terms) {
   cedar_debug("[regstats.R] Welcome to get_reg_stats!")
+  if (missing(course_terms) || is.null(course_terms)) {
+    stop("[regstats.R] get_reg_stats(): course_terms (cedar_course_terms, as the loader ",
+         "holds it) is required.", call. = FALSE)
+  }
 
   # Regstats follows the course, not the code (ADR-001 step 4): both tables are
   # read keyed on course_id, so a course's strictly earlier offerings under a
@@ -635,13 +639,12 @@ get_reg_stats <- function(students, courses, opt, course_terms = NULL) {
 
   # course_terms is checked against the class list before either is cut, so a
   # table counted over other course codes is refused, not filtered.
-  if (!is.null(course_terms)) require_current_course_terms(course_terms, students, "get_reg_stats")
+  require_current_course_terms(course_terms, students, "get_reg_stats")
 
   # The excluded-course list by course, read once over both whole tables: a
   # course the list names under any code it has carried is excluded in every
   # term and from course_terms, counted by course (drop_excluded_courses(), M39).
-  # Every pass below then reads the same courses, including the class-list
-  # recount used when a student-level filter is set, which used to keep them.
+  # Every pass below then reads the same courses.
   excluded_ids <- if (exists("excluded_courses")) excluded_course_ids(students, courses) else character(0)
   if (length(excluded_ids) > 0) {
     students <- students[!course_code_in(students$subject_course, excluded_ids), ]
@@ -719,50 +722,31 @@ get_reg_stats <- function(students, courses, opt, course_terms = NULL) {
   myopt <- opt
   myopt[["term"]] <- NULL
 
-  # Filter cedar_course_terms when given — avoids re-running calc_cl_enrls()
-  # on raw student rows on every request. Falls back for per-row filters (pt, im,
-  # inst) that change which rows count toward enrollment and therefore can't be
-  # applied post-hoc to the aggregated counts. A classification filter needs
-  # the student-term table attached first (filter_class_list()).
-  student_level_filters <- c("pt", "im", "inst", "classification")
-  has_student_filters <- any(vapply(student_level_filters, function(f) {
-    v <- opt[[f]]
-    !is.null(v) && length(v) > 0 && !identical(v, "")
-  }, logical(1)))
-
-  if (!is.null(course_terms) && !has_student_filters) {
-    cedar_debug("[regstats.R] Filtering cedar_course_terms...")
-    regstats <- course_terms
-    if (!is.null(opt[["course_college"]]) && length(opt[["course_college"]]) > 0) {
-      regstats <- regstats %>% filter(college %in% opt[["course_college"]])
-    }
-    if (!is.null(opt[["course_campus"]]) && length(opt[["course_campus"]]) > 0) {
-      regstats <- regstats %>% filter(campus %in% opt[["course_campus"]])
-    }
-    if (!is.null(opt[["level"]]) && length(opt[["level"]]) > 0) {
-      regstats <- regstats %>% filter(level %in% opt[["level"]])
-    }
-    if (!is.null(opt[["dept_code"]]) && length(opt[["dept_code"]]) > 0) {
-      regstats <- regstats %>% filter(department %in% opt[["dept_code"]])
-    }
-    if (!is.null(opt[["course"]]) && !identical(opt[["course"]], "")) {
-      course_list <- convert_param_to_list(opt[["course"]])
-      regstats <- regstats %>% filter(subject_course %in% course_list)
-    }
-    # Remove lookup columns — they're not expected by downstream anomaly detection code.
-    regstats <- regstats %>% select(-any_of(c("level", "department")))
-    # Apply excluded_courses list so dissertations/independent-study don't skew stats.
-    # course_terms is counted by course, so the list is applied by course too.
-    if (exists("excluded_courses")) {
-      regstats <- regstats %>%
-        filter(!normalize_course_code(subject_course) %in% excluded_ids)
-    }
-    cedar_debug("[regstats.R] course_terms filtered to ", nrow(regstats), " rows.")
-  } else {
-    cedar_debug("[regstats.R] Falling back to filter_class_list + calc_cl_enrls (student-level filters active)...")
-    filtered_students <- filter_class_list(students, myopt)
-    regstats <- calc_cl_enrls(filtered_students, by_part_term = TRUE)
+  # The course-term measure table, scoped by the request's options
+  # (filter_course_terms(): an option about one section or one student is an
+  # error, never ignored) and cut to the courses the exclusion list leaves,
+  # by course, as the class list and the schedule were above (M39). Every
+  # term is kept: each target term's baseline is its own earlier offerings.
+  cedar_debug("[regstats.R] Filtering cedar_course_terms...")
+  course_terms <- filter_course_terms(course_terms, myopt)
+  if (length(excluded_ids) > 0) {
+    course_terms <- course_terms %>%
+      filter(!normalize_course_code(subject_course) %in% excluded_ids)
   }
+  cedar_debug("[regstats.R] course_terms filtered to ", nrow(course_terms), " rows.")
+  # The schedule's side of every row, for the saturation pass: the active
+  # offerings and their seats. The class-list side screens only the
+  # course-terms the class list has a row for (NA counts: the schedule offered
+  # it and nobody registered under it, unknown rather than zero).
+  schedule <- course_terms %>%
+    select(campus, college, subject_course, term, part_term,
+           sections, sections_matched, seats, seats_known, desr_enrl)
+  regstats <- course_terms %>%
+    filter(!is.na(registered)) %>%
+    select(-any_of(c("level", "department", "subject_code",
+                     "first_day_enrl", "first_day_basis", "first_day_started_enrl",
+                     "sections", "sections_matched", "seats", "seats_known", "desr_enrl",
+                     "attempts", "passed", "dfw", "withdrawn")))
 
   # Every reported term has its own strictly earlier, same-season baseline.
   # Preserve the full observations for sparklines, but never use the target or
@@ -945,20 +929,17 @@ flagged[["bumps"]] <- bumps %>% arrange(across(all_of(std_arrange_cols)))
   chronic_threshold      <- thresholds[["chronic_fill_rate"]] %||% CEDAR_NEAR_FULL_FILL
   min_sat_terms          <- as.integer(thresholds[["min_sat_terms"]] %||% 3L)
 
-  # Seats/capacity come from the DESR sections (crosslist-corrected by get_enrl).
-  # Saturation baselines need full DESR capacity history, so call get_enrl()
-  # without the term filter.
-  sat_opt <- opt
-  sat_opt[["term"]] <- NULL
-  sat_opt[["uel"]] <- TRUE
-  sat_opt[["group_cols"]] <- c("campus", "college", "term", "subject_course", "part_term")
-  sat_enrls <- get_enrl(courses, sat_opt)
+  # Seats come from the schedule's side of the measure table (the active
+  # offerings, crosslist-aware through get_enrl() in build_course_terms()),
+  # over every term, so each target term has its own prior fill history. A
+  # course-term whose capacity is not known on every section (`seats_known`)
+  # has no capacity: unknown, never the headcount standing in for the seats.
+  # The class-list side is joined back so an offering nobody registered under
+  # is reported as unmatched, never as empty.
+  sat_enrls <- schedule %>% filter(!is.na(sections), sections > 0)
   message("[regstats.R] sat_enrls: ", nrow(sat_enrls), " rows, terms: ",
           paste(sort(unique(sat_enrls$term)), collapse = ", "))
 
-  # The class-list table is already unique at this reporting grain. A left join
-  # keeps DESR groups long enough to report missing class-list coverage; only
-  # matched groups can enter the analytical saturation series.
   lifecycle_lookup <- regstats %>%
     dplyr::select(campus, college, subject_course, term, part_term,
                   census_enrl, classlist_registered = registered, dr_late)
@@ -972,8 +953,10 @@ flagged[["bumps"]] <- bumps %>% arrange(across(all_of(std_arrange_cols)))
     ) %>%
     mutate(
       source_matched = !is.na(census_enrl),
-      capacity = enrolled + avail
-    )
+      enrolled = desr_enrl,
+      capacity = if_else(seats_known, seats, NA_real_)
+    ) %>%
+    select(-seats, -seats_known, -desr_enrl, -sections_matched)
   sat_candidates <- dplyr::bind_cols(
     sat_candidates,
     capacity_saturation_metrics(

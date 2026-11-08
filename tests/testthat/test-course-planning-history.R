@@ -1,10 +1,14 @@
 # EC-11 and EC-11b provide raw institutional boundary rows. Edges and metadata
 # below are explicit analytical parameters, not institutional fixture tables.
+# The history reads the course-term measure table (ADR-001 step 7), counted
+# here over each fixture's class list and schedule as the transform counts it.
 history_edges <- list(last_enrolled_complete = 202080L, last_enrolled = 202180L)
 course_history <- function(courses = "SOCI 100", sections = test_sections_regstats,
-                           students = test_students_regstats) {
-  get_course_planning_history(sections, students, courses, history_edges)
+                           course_terms = test_course_terms_regstats) {
+  get_course_planning_history(sections, course_terms, courses, history_edges)
 }
+course_history_terms <- course_terms_for(test_students_course_history, test_sections_course_history)
+pending_session_terms <- course_terms_for(test_students_pending_session, test_sections_pending_session)
 
 # Catalog membership is analytical scaffolding over EC-11's recorded histories.
 planning_gen_ed <- function() data.frame(subject_course = c("SOCI 100", "SOCI 101", "SOCI 104"),
@@ -26,7 +30,7 @@ test_that("Gen Ed suggestions retain season, campus and session and suppress sma
   expect_setequal(spring$term, 202010L)
   expect_true(all(spring$season_frequency == "1 of 1"))
   # An earlier source edge makes EA's small 2018 offering the latest one.
-  early <- get_course_planning_history(test_sections_regstats, test_students_regstats, "SOCI 100",
+  early <- get_course_planning_history(test_sections_regstats, test_course_terms_regstats, "SOCI 100",
     list(last_enrolled_complete = 201880L))
   small <- get_gen_ed_planning_options(test_sections_regstats, early, planning_gen_ed(), "fall", 3)
   expect_true(is.na(small$first_day_enrl[small$campus == "EA"]))
@@ -48,10 +52,14 @@ test_that("course pressure retains campus, college and session and uses first-da
   expect_equal(half$first_day_fill, .28)
   expect_equal(online$first_day_enrl, 58)
   expect_equal(online$first_day_fill, .58)
+  # The table's first day is calc_first_day_enrl()'s over the same rows.
   first_day <- calc_first_day_enrl(test_students_regstats, test_sections_regstats, by_part_term = TRUE)
   at <- first_day %>% filter(campus == "ABQ", subject_course == "SOCI 100", term == 202080L)
   expect_equal(at$first_day_enrl[at$part_term == "1"], 107L)
   expect_equal(at$first_day_enrl[at$part_term == "1H"], 28L)
+  tbl <- test_course_terms_regstats %>% filter(campus == "ABQ", subject_course == "SOCI 100", term == 202080L)
+  expect_equal(tbl$first_day_enrl[tbl$part_term == "1"], 107L)
+  expect_equal(tbl$first_day_enrl[tbl$part_term == "1H"], 28L)
   expect_false(any(h$pressure$term > history_edges$last_enrolled_complete))
   term <- h$terms %>% filter(campus == "ABQ", term == 202080L)
   expect_equal(term$capacity, 200)
@@ -94,6 +102,12 @@ test_that("a session not yet begun leaves the first day pending, with the begun 
   expect_true(is.na(later$first_day_enrl))
   expect_equal(later$first_day_basis, "sessions_pending")
   expect_equal(later$first_day_started_enrl, 0L)
+  # The table carries the same verdicts per session.
+  tbl <- pending_session_terms %>% arrange(part_term)
+  expect_equal(tbl$part_term, c("1", "2H"))
+  expect_equal(tbl$first_day_basis, c("complete", "sessions_pending"))
+  expect_equal(tbl$first_day_enrl, c(8L, NA_integer_))
+  expect_equal(tbl$first_day_started_enrl, c(8L, 0L))
   # One undated row is a different failure: no lower bound, and no session to wait for.
   undated <- calc_first_day_enrl(test_students_course_history, test_sections_course_history) %>%
     filter(subject_course == "SOCI 101", term == 201980L)
@@ -101,7 +115,7 @@ test_that("a session not yet begun leaves the first day pending, with the begun 
   expect_equal(undated$first_day_basis, "undated")
   expect_true(is.na(undated$first_day_started_enrl))
   # Course history names the reason per session.
-  h <- get_course_planning_history(test_sections_pending_session, test_students_pending_session,
+  h <- get_course_planning_history(test_sections_pending_session, pending_session_terms,
     "SOCI 100", list(last_enrolled_complete = 202180L))
   expect_equal(h$pressure$pressure_status[h$pressure$part_term == "2H"], "Session not yet begun")
   expect_false(h$pressure$pressure_status[h$pressure$part_term == "1"] == "Session not yet begun")
@@ -129,7 +143,7 @@ test_that("frequency includes observed source terms when a course was absent", {
 
 test_that("unmatched, implausible, small and missing capacity histories fail closed", {
   h <- course_history(c("SOCI 100", "SOCI 101", "SOCI 102", "SOCI 103", "SOCI 104"),
-    test_sections_course_history, test_students_course_history)
+    test_sections_course_history, course_history_terms)
   p <- h$pressure
   expect_false(any(p$subject_course == "SOCI 102" & p$term == 202080L))
   expect_true(is.na(p$capacity[p$subject_course == "SOCI 103" & p$term == 202080L]))
@@ -154,9 +168,12 @@ test_that("unmatched, implausible, small and missing capacity histories fail clo
   expect_true(is.na(undated$first_day_enrl))
   expect_equal(undated$pressure_status, "First-day dates unavailable")
   expect_true(is.na(partial$first_day_enrl)) # A partial match never exposes a partial count.
-  expect_equal(get_course_planning_history(test_sections, test_students, "none", list())$state, "unavailable")
+  expect_equal(get_course_planning_history(test_sections, test_course_terms, "none", list())$state, "unavailable")
   expect_equal(course_history("CSCI 1260")$state, "empty")
   expect_error(course_history(sections = select(test_sections_regstats, -available)), "missing: available")
+  # The table is the measure's, not a recount's.
+  expect_error(course_history(course_terms = calc_cl_enrls(test_students_regstats, by_part_term = TRUE)),
+    "build_course_terms")
 })
 
 # Missing rows and source windows are fixture-backed; they are not zeros in a chart.
@@ -171,5 +188,7 @@ test_that("the single history table distinguishes non-offerings and missing sour
   expect_true(is.na(summer$capacity))
   pair <- course_history(c("SOCI 100", "SOCI 101"))
   expect_false(any(pair$offerings$subject_course == "SOCI 101" & pair$offerings$campus == "EA"))
-  expect_error(course_history(students = select(test_students_regstats, -registration_date)), "missing: registration_date")
+  # The first-day count needs dated statuses; the builder, not the reader, says so.
+  expect_error(build_course_terms(select(test_students_regstats, -registration_date),
+    attempts_for(test_students_regstats), test_sections_regstats), "registration_date")
 })
