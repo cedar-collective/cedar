@@ -22,16 +22,21 @@
 # that a student still has an opportunity to continue, and Y grade outcomes stop
 # at the grade edge. See the right-edge policy in AGENTS.md.
 #
+# Two tables, by what is read (ADR-001 step 7): the Y outcomes are read off
+# cedar_attempts, classified once (`outcome_category`), so this cone decides
+# nothing about grades; the X cohort, which reads enrollment to the settled
+# edge, and the comparison's covariates still read the class list.
+#
 # Split from the former cones/course-impact.R on 2026-09-07. The sequence
 # question that shared that file now lives in cones/course-sequence-effect.R;
 # the two shared no code, only a filename.
 #
 # Depends on: build_comparison() (branches/comparison.R)
 #             get_downstream_pair_audit() (branches/course-flows.R)
-#             classify_enrollment_outcomes(), add_next_term_col() (trunk/utils.R)
+#             prepare_course_attempts() (branches/course-attempts.R)
+#             add_next_term_col() (trunk/utils.R)
 #             cedar_longitudinal_edge() (branches/data-edges.R)
-#             STATUS_REGISTERED, STATUS_DROP_LATE (lists/status_codes.R)
-#             GRADES_PASS (lists/grades.R)
+#             STATUS_REGISTERED (lists/status_codes.R)
 
 
 # ── Downstream Success by Instructor ──────────────────────────────────────────
@@ -45,7 +50,9 @@
 #' The balance table reveals whether instructor sections self-selected different
 #' kinds of students — the most common confounder in multi-section courses.
 #'
-#' @param students cedar_registrations data frame.
+#' @param students cedar_registrations data frame: the X cohort and the
+#'   comparison's covariates.
+#' @param attempts The attempt measure table (`cedar_attempts`): the Y outcomes.
 #' @param programs cedar_programs data frame.
 #' @param applicants cedar_applicants data frame, or NULL.
 #' @param opt Named list:
@@ -78,7 +85,7 @@
 #'   outcomes stop at the earlier of that edge and `last_graded`. Cohorts without
 #'   one subsequent regular term before the complete-enrollment edge are excluded
 #'   from the continuation denominator.
-get_instructor_effect <- function(students, programs, applicants = NULL,
+get_instructor_effect <- function(students, attempts, programs, applicants = NULL,
                                    opt = list(), student_terms = NULL,
                                    data_edges = NULL) {
   course_x <- opt$course_x
@@ -119,20 +126,15 @@ get_instructor_effect <- function(students, programs, applicants = NULL,
     stop("[course-instructor-effect.R] No course-level downstream cohort was available.")
   }
 
-  # Students who took Y — include late drops (DG/DW) so they count as DFW outcomes
-  took_y <- students %>%
-    filter(
-      subject_course %in% course_y,
-      registration_status_code %in% c(STATUS_REGISTERED, STATUS_DROP_LATE),
-      term <= analysis_end_term
-  )
-  if (!is.null(campus)) took_y <- filter(took_y, campus %in% .env$campus)
+  # Students who took Y: their attempts, late drops included so they count as
+  # DFW outcomes, early drops out (no outcome), to the longitudinal grade edge.
+  took_y <- prepare_course_attempts(attempts, list(course = course_y, course_campus = campus)) %>%
+    filter(term <= analysis_end_term, outcome_category != "early_drop")
   # CAMPUS_ROLLUP: Y is one student-level follow-on outcome after campus scope.
   took_y <- took_y %>%
     distinct(student_id, term, subject_course, .keep_all = TRUE) %>%
     select(student_id, term_y = term, subject_course_y = subject_course,
-           grade_y = final_grade, status_y = registration_status_code)
-
+           category_y = outcome_category)
 
 
   if (nrow(took_y) == 0)
@@ -180,7 +182,7 @@ get_instructor_effect <- function(students, programs, applicants = NULL,
   # set does not establish ineligibility for the others, so prior completion is
   # descriptive only and is not removed from the denominator.
   prior_y <- took_y %>%
-    filter(grade_y %in% GRADES_PASS) %>%
+    filter(category_y == "pass") %>%
     inner_join(select(x_instructor, student_id, term_x), by = "student_id") %>%
     group_by(student_id) %>%
     summarize(
@@ -268,18 +270,18 @@ get_instructor_effect <- function(students, programs, applicants = NULL,
                              instructor_name %in% instructor_counts$instructor_name)
 
   # Grade outcomes in Y by instructor — wide format (one row per instructor).
-  # Three mutually exclusive *observed* outcomes:
-  #   dropped = late drop (DG/DW registration status)
-  #   failed  = registered with any recorded nonpassing outcome
-  #   pass    = A+ through C or CR
-  # Blank and audit grades remain in the continuation count but are excluded
-  # from every grade-rate denominator. I, NC, NR, P, and S are nonpassing.
+  # Three mutually exclusive *observed* outcomes, read off the attempt's
+  # stored category:
+  #   dropped = a late withdrawal (w_late_withdrawal)
+  #   failed  = any recorded nonpassing outcome (c_minus, d, f, other_nonpassing)
+  #   pass    = A+ through C or CR (pass)
+  # A registered attempt with no grade (missing) remains in the continuation
+  # count but is excluded from every grade-rate denominator.
   observed_outcomes <- instructor_data %>%
-    mutate(registration_status_code = status_y, final_grade = grade_y) %>%
-    classify_enrollment_outcomes() %>%
+    filter(category_y != "missing") %>%
     mutate(outcome = case_when(
-      outcome == "pass" ~ "pass",
-      status_y %in% STATUS_DROP_LATE ~ "dropped",
+      category_y == "pass" ~ "pass",
+      category_y == "w_late_withdrawal" ~ "dropped",
       TRUE ~ "failed"
     ))
 

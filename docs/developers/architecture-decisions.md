@@ -342,6 +342,18 @@ next-term rows). The measure (classified once, dedup'd once) also settled
 what a reader of the class list had to re-derive: the AUD, recycled-CRN and
 drop-normalisation tests now exercise the table.
 
+Group 2, the two grade-reading cones, followed the same day:
+`get_course_sequence_effect()` reads both courses' outcomes off
+`cedar_attempts` (`outcome`: pass, dfw, or NA for an early drop or an
+ungraded registration, which is what "classifiable" meant), and
+`get_instructor_effect()` reads the Y outcomes off it (`outcome_category`:
+pass, a late withdrawal is dropped, any other graded category failed,
+missing unobserved). Each takes `attempts` beside `students`: the X cohort
+reads enrollment to the settled edge, which the attempt table (bounded at the
+graded edge) cannot answer, and the comparison's covariates read the class
+list, both of which move with group 4. Neither cone classifies a grade any
+more.
+
 #### Step 5: decisions (2026-11-07)
 
 - **Order:** the student-term columns leave the loaded class list first

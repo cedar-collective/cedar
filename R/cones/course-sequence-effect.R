@@ -24,9 +24,9 @@
 #   is served by get_retention_trend() in that file.)
 #
 # Depends on: build_comparison(), compute_balance() (branches/comparison.R)
-#             classify_enrollment_outcomes() (trunk/utils.R)
+#             prepare_course_attempts() (branches/course-attempts.R): both
+#               courses' outcomes come off cedar_attempts (ADR-001 step 7)
 #             cedar_longitudinal_edge() (branches/data-edges.R)
-#             STATUS_REGISTERED, STATUS_DROP_LATE (lists/status_codes.R)
 
 # ── Internal helpers ──────────────────────────────────────────────────────────
 
@@ -96,7 +96,9 @@
 #' first such Y attempt occurred without a prior in-scope X pass (control).
 #' Surfaces whether completing X meaningfully prepares students for Y.
 #'
-#' @param students cedar_registrations data frame.
+#' @param students cedar_registrations data frame: the comparison's covariates.
+#' @param attempts The attempt measure table (`cedar_attempts`): both courses'
+#'   outcomes, classified once (ADR-001 step 7).
 #' @param programs cedar_programs data frame.
 #' @param applicants cedar_applicants data frame, or NULL.
 #' @param data_edges Optional output of [cedar_data_edges()]. Y outcomes stop at
@@ -119,7 +121,7 @@
 #'     \item{balance}{From compute_balance().}
 #'     \item{n_treatment, n_control}{Group sizes.}
 #'   }
-get_course_sequence_effect <- function(students, programs, applicants = NULL,
+get_course_sequence_effect <- function(students, attempts, programs, applicants = NULL,
                                        opt = list(), student_terms = NULL,
                                        data_edges = NULL) {
   course_x <- opt$course_x
@@ -139,25 +141,18 @@ get_course_sequence_effect <- function(students, programs, applicants = NULL,
 
   # Apply the delivery-campus scope once, before deriving either side of the
   # sequence. Otherwise an excluded-campus X pass can relabel an in-scope Y
-  # student as treatment.
-  scoped_students <- students %>%
-    filter(term <= analysis_end_term)
-  if (!is.null(campus)) {
-    scoped_students <- scoped_students %>%
-      filter(campus %in% .env$campus)
-  }
+  # student as treatment. Both sides are read off cedar_attempts: `outcome` is
+  # the stored pass / dfw, NA for an early drop or an ungraded registration,
+  # which is what "classifiable" means here.
+  scoped <- prepare_course_attempts(attempts, list(course = c(course_x, course_y),
+                                                   course_campus = campus)) %>%
+    filter(term <= analysis_end_term, !is.na(outcome))
 
   # Select one Y outcome per student: the earliest in-scope term with a
-  # classifiable registered or late-drop outcome. Multiple CRNs in that term
-  # collapse to one outcome, with any DFW taking precedence over a pass.
-  took_y <- scoped_students %>%
-    filter(
-      subject_course %in% course_y,
-      registration_status_code %in% c(STATUS_REGISTERED, STATUS_DROP_LATE)
-    ) %>%
-    distinct(student_id, term, crn, registration_status_code, final_grade,
-             .keep_all = TRUE) %>%
-    classify_enrollment_outcomes() %>%
+  # classifiable outcome. Attempts on several campuses in that term collapse
+  # to one outcome, with any DFW taking precedence over a pass.
+  took_y <- scoped %>%
+    filter(subject_course %in% course_y) %>%
     group_by(student_id, term) %>%
     summarize(
       y_outcome = if_else(any(outcome == "dfw"), "dfw", "pass"),
@@ -173,13 +168,8 @@ get_course_sequence_effect <- function(students, programs, applicants = NULL,
     stop("[course-sequence-effect.R] No students found for course_y: ", course_y)
 
   # When did each student first pass X inside the same campus and grade edge?
-  passed_x <- scoped_students %>%
-    filter(
-      subject_course %in% course_x,
-      registration_status_code %in% c(STATUS_REGISTERED, STATUS_DROP_LATE)
-    ) %>%
-    classify_enrollment_outcomes() %>%
-    filter(outcome == "pass") %>%
+  passed_x <- scoped %>%
+    filter(subject_course %in% course_x, outcome == "pass") %>%
     group_by(student_id) %>%
     summarize(term_x = min(term), .groups = "drop")
 
