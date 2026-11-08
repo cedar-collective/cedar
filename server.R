@@ -4338,6 +4338,7 @@ output$enrl_classlist_download <- downloadHandler(
       tryCatch({
         result <- get_course_sequence_effect(
           students     = cr_students,
+          attempts     = data_objects[["cedar_attempts"]],
           programs     = data_objects[["cedar_programs"]],
           applicants   = data_objects[["cedar_applicants"]],
           opt          = opt,
@@ -4556,6 +4557,7 @@ output$enrl_classlist_download <- downloadHandler(
       tryCatch({
         result <- get_instructor_effect(
           students     = cr_students,
+          attempts     = data_objects[["cedar_attempts"]],
           programs     = data_objects[["cedar_programs"]],
           applicants   = data_objects[["cedar_applicants"]],
           opt          = opt,

@@ -23,6 +23,9 @@ context("Course impact — observational machinery")
   last_graded = 202110L,
   last_degree = NULL
 )
+# The two cones read outcomes off cedar_attempts (ADR-001 step 7): MC02's
+# attempt table, built to these edges; a test that adds rows rebuilds it.
+.impact_attempts <- keyed_attempts(test_students_mc, .impact_edges)
 
 # ── build_comparison ─────────────────────────────────────────────────────────
 
@@ -364,6 +367,7 @@ test_that("sequence effect uses one canonical Y outcome and scopes both courses"
   fixture <- .sequence_audit_fixture()
   result <- suppressMessages(get_course_sequence_effect(
     fixture$students,
+    keyed_attempts(fixture$students, .impact_edges),
     fixture$programs,
     opt = list(
       course_x = "SEQ 101", course_y = "SEQ 201", campus = "ABQ", min_n = 1L
@@ -395,6 +399,7 @@ test_that("an active HS GPA band excludes and reports missing GPAs", {
 
   result <- suppressMessages(get_course_sequence_effect(
     fixture$students,
+    keyed_attempts(fixture$students, .impact_edges),
     fixture$programs,
     applicants = applicants,
     opt = list(
@@ -534,7 +539,7 @@ test_that("a co-requisite in the rollup set does not erase students", {
   # the filter then discards it, and the student vanishes from the rollup
   # despite having taken SPAN 201 later.
   r <- suppressMessages(get_instructor_effect(
-    test_students_mc, test_programs_mc, NULL,
+    test_students_mc, .impact_attempts, test_programs_mc, NULL,
     list(course_x = "SPAN 101",
          course_y = c("SPAN 101L", "SPAN 201"),   # lab sorts first
          min_n = 1L), data_edges = .impact_edges))
@@ -550,7 +555,7 @@ test_that("n_took_y counts students, not enrolments, when a course is repeated",
   # They are one student. Counting enrolments instead double-weights them and
   # reports a pass rate over attempts while labelling it students.
   r <- suppressMessages(get_instructor_effect(
-    test_students_mc, test_programs_mc, NULL,
+    test_students_mc, .impact_attempts, test_programs_mc, NULL,
     list(course_x = "SPAN 101", course_y = "SPAN 201", min_n = 1L),
     data_edges = .impact_edges))
 
@@ -573,7 +578,7 @@ test_that("pct_took_y divides students by students when course X is repeated", {
   students <- dplyr::bind_rows(test_students_mc, repeated_x)
 
   r <- suppressMessages(get_instructor_effect(
-    students, test_programs_mc, NULL,
+    students, keyed_attempts(students, .impact_edges), test_programs_mc, NULL,
     list(course_x = "SPAN 101", course_y = "SPAN 201", min_n = 1L),
     data_edges = .impact_edges))
 
@@ -591,7 +596,7 @@ test_that("ungraded future registrations are not downstream failures", {
   students <- dplyr::bind_rows(test_students_mc, future_y)
 
   r <- suppressMessages(get_instructor_effect(
-    students, test_programs_mc, NULL,
+    students, keyed_attempts(students, .impact_edges), test_programs_mc, NULL,
     list(course_x = "SPAN 101", course_y = "SPAN 201", min_n = 1L),
     data_edges = .impact_edges
   ))
@@ -610,7 +615,7 @@ test_that("recent X cohorts without a complete follow-up term are right-censored
   students <- dplyr::bind_rows(test_students_mc, recent_x)
 
   r <- suppressMessages(get_instructor_effect(
-    students, test_programs_mc, NULL,
+    students, keyed_attempts(students, .impact_edges), test_programs_mc, NULL,
     list(course_x = "SPAN 101", course_y = "SPAN 201", min_n = 1L),
     data_edges = .impact_edges
   ))
@@ -634,7 +639,7 @@ test_that("strictly prior and same-term passes are not conflated", {
   students <- dplyr::bind_rows(test_students_mc, prior_pass, same_term_pass)
 
   r <- suppressMessages(get_instructor_effect(
-    students, test_programs_mc, NULL,
+    students, keyed_attempts(students, .impact_edges), test_programs_mc, NULL,
     list(course_x = "SPAN 101", course_y = "SPAN 201", min_n = 1L),
     data_edges = .impact_edges
   ))
@@ -695,7 +700,7 @@ test_that("unclassifiable grades inside the graded window are unknown, not failu
     )
 
   r <- suppressMessages(get_instructor_effect(
-    students, test_programs_mc, NULL,
+    students, keyed_attempts(students, .impact_edges), test_programs_mc, NULL,
     list(course_x = "SPAN 101", course_y = "SPAN 201", min_n = 1L),
     data_edges = .impact_edges
   ))
