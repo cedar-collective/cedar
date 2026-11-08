@@ -335,7 +335,9 @@ test_that("dashboard payload includes headcount line data", {
     cedar_registrations = test_students,
     cedar_student_terms = test_student_terms,
     cedar_sections = test_sections,
-    cedar_dims     = test_dims
+    cedar_dims     = test_dims,
+    cedar_attempts = test_attempts,
+    cedar_course_terms = test_course_terms
   )
 
   expect_error(
@@ -396,7 +398,9 @@ test_that("the dashboard follows a renumbered course instead of calling it new (
                   cedar_student_terms = attach_test_student_terms(suppressMessages(build_student_terms(
                     test_students_rn, programs = NULL,
                     edges = list(last_enrolled_complete = max(test_students_rn$term))))),
-                  cedar_sections = rn$cedar_sections, cedar_dims = test_dims)
+                  cedar_sections = rn$cedar_sections, cedar_dims = test_dims,
+                  cedar_attempts = attempts_for(rn$cedar_registrations),
+                  cedar_course_terms = course_terms_for(rn$cedar_registrations, rn$cedar_sections))
   opt <- list(dept_code = "HIST", term = 202110L)
   dashboard <- suppressMessages(create_dept_dashboard_data(objects, opt))
   expect_false("HIST 3201" %in% dashboard$new_this_term$subject_course)
@@ -404,6 +408,11 @@ test_that("the dashboard follows a renumbered course instead of calling it new (
 
   by_code <- lapply(objects[c("cedar_registrations", "cedar_sections")],
                     function(tbl) dplyr::mutate(tbl, subject_course = listed_code, course_id = listed_code))
-  split <- suppressMessages(create_dept_dashboard_data(utils::modifyList(objects, by_code), opt))
+  # The measure tables are the class list's: counted over the codes it carries.
+  by_code$cedar_attempts <- attempts_for(by_code$cedar_registrations)
+  by_code$cedar_course_terms <- course_terms_for(by_code$cedar_registrations, by_code$cedar_sections)
+  split_objects <- objects
+  split_objects[names(by_code)] <- by_code   # modifyList() would merge the tibbles column-wise
+  split <- suppressMessages(create_dept_dashboard_data(split_objects, opt))
   expect_true("HIST 3201" %in% split$new_this_term$subject_course)
 })

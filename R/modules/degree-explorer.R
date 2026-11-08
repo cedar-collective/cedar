@@ -27,7 +27,7 @@ degreeExplorerUI <- function(id, catalog, roadmaps) {
     tags$p(class = "text-hint", "Want to see what students actually take? Open Pathways → Course paths."))
 }
 
-degreeExplorerServer <- function(id, catalog, roadmaps, sections, students, edges, shared = NULL) {
+degreeExplorerServer <- function(id, catalog, roadmaps, sections, course_terms, edges, shared = NULL) {
   if (!nrow(catalog$catalogs)) return(invisible(NULL))
   moduleServer(id, function(input, output, session) {
     observeEvent(input$dx_catalog_id, {
@@ -89,7 +89,7 @@ degreeExplorerServer <- function(id, catalog, roadmaps, sections, students, edge
       selection <- input$course_node
       req(selection$catalog_id %in% catalog$catalogs$catalog_id, selection$node_id)
       tryCatch(
-        build_degree_popup_history(sections, students, edges, catalog, roadmaps, CEDAR_GEN_ED_COURSES, selection, shared),
+        build_degree_popup_history(sections, course_terms, edges, catalog, roadmaps, CEDAR_GEN_ED_COURSES, selection, shared),
         error = function(e) {
           showNotification(conditionMessage(e), type = "error", duration = NULL)
           list(state = "error", kind = selection$type, node_id = selection$node_id, note = conditionMessage(e))

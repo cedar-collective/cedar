@@ -131,7 +131,7 @@ for (.sec in c("test_sections", "test_sections_sf", "test_sections_topics", "tes
 # (thin_class_list(), ADR-001 step 5); a reader attaches them from the
 # student-term table built above from the full fixtures.
 for (.stu in c("test_students", "test_students_xl_switch", "test_students_regstats",
-               "test_students_course_history")) {
+               "test_students_course_history", "test_students_pending_session")) {
   assign(.stu, attach_test_course_ids(thin_class_list(get(.stu)), "students"), envir = globalenv())
 }
 rm(.stu)
@@ -167,12 +167,13 @@ data_objects <<- list(
 )
 # global.R stores the data edges on data_objects; modules read them from there.
 data_objects$cedar_edges <<- cedar_data_edges(test_students, degrees = test_degrees)
-# The attempt and course-term measure tables as global.R builds them, over any
-# keyed class-list fixture: attempts to the graded edge, then the course terms
-# counted from the same class list with those attempts' outcomes.
+# The attempt and course-term measure tables as the transform builds them, over
+# any keyed class-list fixture: attempts to the graded edge, then the course
+# terms counted from the same class list and schedule with those attempts'
+# outcomes.
 attempts_for <<- function(students, edges = data_objects$cedar_edges) build_attempts(students, edges)
-course_terms_for <<- function(students, edges = data_objects$cedar_edges) {
-  build_course_terms(students, attempts_for(students, edges))
+course_terms_for <<- function(students, sections, edges = data_objects$cedar_edges) {
+  build_course_terms(students, attempts_for(students, edges), sections)
 }
 # A class list as a test designs it (extract rows, duplicates and all), made
 # into the attempt table the outcome hub reads (ADR-001 step 7) the way the
@@ -193,6 +194,12 @@ keyed_attempts <<- function(students, edges = data_objects$cedar_edges) {
 }
 test_attempts         <<- attempts_for(test_students)
 gen_ed_assoc_attempts <<- keyed_attempts(gen_ed_assoc_students)
+# The course-term table over the main fixtures and over EC-11's, the two class
+# list and schedule pairs the readers of cedar_course_terms are tested on.
+test_course_terms          <<- course_terms_for(test_students, test_sections)
+test_course_terms_regstats <<- course_terms_for(test_students_regstats, test_sections_regstats)
+data_objects$cedar_attempts     <<- test_attempts
+data_objects$cedar_course_terms <<- test_course_terms
 
 Sys.setenv(shiny = "FALSE")
 

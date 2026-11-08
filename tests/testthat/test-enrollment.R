@@ -778,7 +778,7 @@ test_that("enrollment trend plot selection keeps campus keys separate", {
 
 test_that("cedar_course_terms counts each course-term once and sums exactly over part of term", {
   # EC-11's class list splits a course-term into a full term and a 2H half.
-  course_terms <- course_terms_for(test_students_regstats)
+  course_terms <- course_terms_for(test_students_regstats, test_sections_regstats)
   expect_identical(names(course_terms), COURSE_TERMS_COLUMNS)
   expect_false(dplyr::is_grouped_df(course_terms))
   expect_identical(attr(course_terms, "course_terms_build_version"), COURSE_TERMS_BUILD_VERSION)
@@ -809,7 +809,7 @@ test_that("cedar_course_terms counts each course-term once and sums exactly over
 
 test_that("Waitlists refuses a course-term table counted over other course codes", {
   rn <- rn01_course_tables()
-  stale <- course_terms_for(test_students)
+  stale <- course_terms_for(test_students, test_sections)
   expect_error(
     inspect_waitlist(rn$cedar_registrations, list(term = 202010L), sections = rn$cedar_sections,
                      course_terms = stale),

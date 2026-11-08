@@ -1,20 +1,20 @@
 #' Historical availability and first-class-day pressure for exact course codes
 #'
 #' The last nine possible terms end at settled enrollment. Keep course, delivery
-#' campus, college and session together. First day is reconstructed only from
-#' dated class-list statuses, never substituted with census or ever-registered.
-get_course_planning_history <- function(sections, students, subject_courses, edges,
+#' campus, college and session together. Seats, the first-day count and the
+#' class-list match are read off `cedar_course_terms` (ADR-001 step 7): first
+#' day is reconstructed there from dated class-list statuses, never substituted
+#' with census or ever-registered. The schedule still says which terms each
+#' campus's source covers and which offerings exist.
+get_course_planning_history <- function(sections, course_terms, subject_courses, edges,
                                         min_n = 10L) {
   edge <- cedar_longitudinal_edge(edges, grade_dependent = FALSE)
   if (is.null(edge)) return(list(state = "unavailable", note = "Settled enrollment coverage is unavailable."))
-  required <- list(sections = c("campus", "college", "part_term", "subject_course", "term", "crn",
-    "status", "enrolled", "available", "total_enrl", "crosslist_code", "start_date"),
-    students = c("campus", "college", "part_term", "subject_course", "term", "term_type",
-      "crn", "student_id", "registration_status_code", "registration_date", "as_of_date"))
-  for (name in names(required)) {
-    missing <- setdiff(required[[name]], names(if (name == "sections") sections else students))
-    if (length(missing)) stop("[course-planning-history.R] Course history ", name, " missing: ", paste(missing, collapse = ", "))
-  }
+  required <- c("campus", "college", "part_term", "subject_course", "term", "crn",
+    "status", "enrolled", "available", "total_enrl", "crosslist_code", "start_date")
+  missing <- setdiff(required, names(sections))
+  if (length(missing)) stop("[course-planning-history.R] Course history sections missing: ", paste(missing, collapse = ", "))
+  require_course_terms_build(course_terms, "get_course_planning_history")
   if (!is.finite(min_n) || min_n < 10) stop("[course-planning-history.R] Course history minimum cell size must be at least 10")
   year <- as.integer(substr(as.character(edge), 1, 4))
   possible <- as.integer(names(make_term_sequence(year - 3L, year)))
@@ -27,27 +27,16 @@ get_course_planning_history <- function(sections, students, subject_courses, edg
   if (!nrow(selected)) return(list(state = "empty", note = note,
     missing_courses = subject_courses, coverage = coverage))
   keys <- c("campus", "college", "subject_course", "term", "part_term")
-  quality <- selected %>% group_by(across(all_of(keys))) %>%
-    summarize(capacity_known = all(is.finite(enrolled) & is.finite(available) &
-      enrolled + available > 0), .groups = "drop")
-  seats <- get_enrl(selected, list(uel = FALSE, group_cols = keys)) %>% ungroup() %>%
-    mutate(capacity = enrolled + avail) %>%
-    left_join(quality, by = keys, relationship = "one-to-one") %>%
-    mutate(capacity = if_else(capacity_known, capacity, NA_real_))
-  scoped_students <- students %>% ungroup() %>%
-    filter(term %in% window, subject_course %in% subject_courses) %>%
-    filter_classlist_to_sections(selected)
-  section_keys <- c(keys, "crn")
-  matches <- selected %>% distinct(across(all_of(section_keys))) %>%
-    left_join(scoped_students %>% distinct(across(all_of(section_keys))) %>% mutate(.matched = TRUE),
-      by = section_keys, relationship = "one-to-one") %>%
-    group_by(across(all_of(keys))) %>%
-    summarize(classlist_complete = all(!is.na(.matched)), .groups = "drop")
-  first_day <- calc_first_day_enrl(scoped_students, selected, by_part_term = TRUE) %>%
-    select(-first_day_started_enrl)
-  pressure <- seats %>% left_join(first_day, by = keys, relationship = "one-to-one") %>%
-    left_join(matches, by = keys, relationship = "one-to-one") %>%
-    mutate(source_matched = classlist_complete,
+  # One row per offering (an active section with seats or students, the
+  # table's rule): its scheduled seats when every section's capacity is known,
+  # and its first day only when the class list has a row for every section,
+  # so a partial match never exposes a partial count.
+  pressure <- course_terms %>% ungroup() %>%
+    filter(term %in% window, subject_course %in% subject_courses, !is.na(sections)) %>%
+    transmute(across(all_of(keys)),
+      capacity = if_else(seats_known, seats, NA_real_),
+      source_matched = sections_matched == sections,
+      first_day_basis,
       first_day_enrl = if_else(source_matched, as.numeric(first_day_enrl), NA_real_),
       first_day_known = is.finite(first_day_enrl), small_cell = first_day_known & first_day_enrl < min_n)
   metrics <- enrollment_capacity_metrics(pressure$first_day_enrl, pressure$capacity) %>%

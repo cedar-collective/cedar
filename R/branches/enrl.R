@@ -485,9 +485,10 @@ enrollment_capacity_metrics <- function(enrollment, capacity,
 #' grouping (e.g. multiple part-of-term rows when \code{part_term} is not a key) is
 #' summed per term first so the series lists one census figure per term.
 #'
-#' @param df Course-term enrollment rows (e.g. \code{cedar_cl_enrls_base} or a
-#'   \code{\link{calc_cl_enrls}} result). Needs \code{registered}, \code{dr_late},
-#'   \code{term}, and the grouping keys.
+#' @param df Course-term enrollment rows: \code{cedar_course_terms}, which
+#'   carries \code{census_enrl}, or a \code{\link{calc_cl_enrls}} result, whose
+#'   \code{registered} and \code{dr_late} it is counted from. Needs \code{term}
+#'   and the grouping keys.
 #' @param target_terms With \code{prior_only = TRUE}, select the terms to report
 #'   (NULL reports every term). Otherwise, exclude these terms from the all-history
 #'   reference mean/count; this legacy mode can include terms later than the target.
@@ -502,7 +503,7 @@ enrollment_capacity_metrics <- function(enrollment, capacity,
 #' @seealso \code{\link{add_census_enrl}}
 calc_census_enrl_baselines <- function(df, target_terms = NULL,
     keys = c("campus", "college", "subject_course", "term_type"), prior_only = FALSE) {
-  df <- add_census_enrl(df)
+  if (!"census_enrl" %in% names(df)) df <- add_census_enrl(df)
   if ("part_term" %in% names(df)) keys <- unique(c(keys, "part_term"))
   keys <- intersect(keys, names(df))
   target <- if (length(target_terms) > 0) unique(target_terms) else df$term[0]

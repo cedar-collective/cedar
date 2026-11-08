@@ -16,7 +16,8 @@ regstats_history_opt <- function(term = 202080L) {
 }
 
 test_that("Regstats uses earlier matching terms for every mean and population SD", {
-  result <- get_reg_stats(test_students_regstats, test_sections_regstats, regstats_history_opt())
+  result <- get_reg_stats(test_students_regstats, test_sections_regstats, regstats_history_opt(),
+                         course_terms = test_course_terms_regstats)
   focal <- function(df) df %>% filter(subject_course == "SOCI 100", campus == "ABQ", part_term == "1")
   bump <- focal(result$bumps)
   expect_equal(nrow(bump), 1L)
@@ -59,9 +60,12 @@ test_that("Regstats uses earlier matching terms for every mean and population SD
 })
 
 test_that("later data cannot change past Regstats flags or baselines", {
-  full <- get_reg_stats(test_students_regstats, test_sections_regstats, regstats_history_opt())
-  past <- get_reg_stats(filter(test_students_regstats, term <= 202080L),
-                       filter(test_sections_regstats, term <= 202080L), regstats_history_opt())
+  full <- get_reg_stats(test_students_regstats, test_sections_regstats, regstats_history_opt(),
+                         course_terms = test_course_terms_regstats)
+  past_students <- filter(test_students_regstats, term <= 202080L)
+  past_sections <- filter(test_sections_regstats, term <= 202080L)
+  past <- get_reg_stats(past_students, past_sections, regstats_history_opt(),
+                        course_terms = course_terms_for(past_students, past_sections))
   for (name in c("bumps", "dips", "early_drops", "late_drops", "sat")) {
     # Full-series sparklines intentionally retain later context; the analytical
     # columns deciding an earlier flag must be identical without those terms.
@@ -74,10 +78,10 @@ test_that("later data cannot change past Regstats flags or baselines", {
 
 test_that("multi-term Regstats gives each term its own earlier baseline", {
   combined <- get_reg_stats(test_students_regstats, test_sections_regstats,
-                           regstats_history_opt(c(202080L, 202180L)))
+                           regstats_history_opt(c(202080L, 202180L)), course_terms = test_course_terms_regstats)
   for (term_value in c(202080L, 202180L)) {
     single <- get_reg_stats(test_students_regstats, test_sections_regstats,
-                           regstats_history_opt(term_value))
+                           regstats_history_opt(term_value), course_terms = test_course_terms_regstats)
     for (name in c("bumps", "dips", "early_drops", "late_drops", "sat")) {
       expect_equal(filter(combined[[name]], term == term_value), single[[name]], info = name)
     }
@@ -85,7 +89,8 @@ test_that("multi-term Regstats gives each term its own earlier baseline", {
 })
 
 test_that("no, single-term, and flat histories do not generate SD flags", {
-  result <- get_reg_stats(test_students_regstats, test_sections_regstats, regstats_history_opt())
+  result <- get_reg_stats(test_students_regstats, test_sections_regstats, regstats_history_opt(),
+                         course_terms = test_course_terms_regstats)
   for (name in c("bumps", "dips", "early_drops", "late_drops", "running_hot_sat")) {
     expect_false(any(result[[name]]$subject_course %in% c("SOCI 102", "SOCI 103", "SOCI 104")))
     score <- if (name == "running_hot_sat") result[[name]]$sd_above_mean else result[[name]]$sd_deviation
@@ -101,7 +106,7 @@ test_that("no, single-term, and flat histories do not generate SD flags", {
 
 test_that("Regstats saturation uses class-list census rather than DESR snapshot enrollment", {
   base <- get_reg_stats(test_students_regstats, test_sections_regstats,
-                        regstats_history_opt())
+                        regstats_history_opt(), course_terms = test_course_terms_regstats)
   shifted_sections <- test_sections_regstats %>%
     mutate(
       .target = subject_course == "SOCI 100" & campus == "ABQ" &
@@ -111,8 +116,8 @@ test_that("Regstats saturation uses class-list census rather than DESR snapshot 
       available = if_else(.target, available + 15L, available)
     ) %>%
     select(-.target)
-  shifted <- get_reg_stats(test_students_regstats, shifted_sections,
-                           regstats_history_opt())
+  shifted <- get_reg_stats(test_students_regstats, shifted_sections, regstats_history_opt(),
+                           course_terms = course_terms_for(test_students_regstats, shifted_sections))
   focal <- function(df) df %>%
     filter(subject_course == "SOCI 100", campus == "ABQ", part_term == "1")
 
@@ -139,23 +144,36 @@ test_that("Regstats definition v5 records the course key, lifecycle and waitlist
   expect_match(definition$exclusions, "at least as large as Min Waiting", fixed = TRUE)
 })
 
-test_that("cedar_course_terms and raw class lists give identical Regstats", {
-  raw <- get_reg_stats(test_students_regstats, test_sections_regstats, regstats_history_opt())
-  course_terms <- course_terms_for(test_students_regstats)
+test_that("Regstats reads the course-term table, requires it, and refuses an option it cannot answer", {
+  # The class list is no longer recounted (ADR-001 step 7): no table, no report.
+  expect_error(get_reg_stats(test_students_regstats, test_sections_regstats, regstats_history_opt()),
+               "course_terms")
+  expect_error(get_reg_stats(test_students_regstats, test_sections_regstats, regstats_history_opt(),
+                             course_terms = NULL), "course_terms")
+  course_terms <- test_course_terms_regstats
   expect_true(course_terms_is_current(course_terms, test_students_regstats))
   expect_identical(attr(course_terms, "code_renames"), character(0))
   expect_identical(names(course_terms), COURSE_TERMS_COLUMNS)
-  from_table <- get_reg_stats(test_students_regstats, test_sections_regstats,
-                              regstats_history_opt(), course_terms = course_terms)
-  expect_equal(from_table[names(from_table) != "cache_info"], raw[names(raw) != "cache_info"])
+  result <- get_reg_stats(test_students_regstats, test_sections_regstats, regstats_history_opt(),
+                          course_terms = course_terms)
 
   # The table is a parameter, never a global (M12): a bogus table of the old
   # or new name in the global environment changes nothing.
   bogus <- course_terms %>% dplyr::mutate(registered = registered * 100L)
   rlang::local_bindings(cedar_course_terms = bogus, cedar_cl_enrls_base = bogus,
                         .env = .GlobalEnv)
-  no_table <- get_reg_stats(test_students_regstats, test_sections_regstats, regstats_history_opt())
-  expect_equal(no_table[names(no_table) != "cache_info"], raw[names(raw) != "cache_info"])
+  again <- get_reg_stats(test_students_regstats, test_sections_regstats, regstats_history_opt(),
+                         course_terms = course_terms)
+  expect_equal(again[names(again) != "cache_info"], result[names(result) != "cache_info"])
+
+  # An option about one section or one student changes which rows count; the
+  # table counts them all, so it is an error, never silently ignored.
+  for (bad in list(list(inst = "Someone"), list(im = "ONL"), list(classification = "Freshman"))) {
+    expect_error(
+      get_reg_stats(test_students_regstats, test_sections_regstats,
+                    c(regstats_history_opt(), bad), course_terms = course_terms),
+      "does not carry", info = names(bad))
+  }
 })
 
 test_that("Regstats refuses a course-term table not counted by this build over these codes", {
@@ -169,7 +187,7 @@ test_that("Regstats refuses a course-term table not counted by this build over t
     "build_course_terms"
   )
   # Saved by an older build, or short a column: rebuilt, never read.
-  current <- course_terms_for(test_students_regstats)
+  current <- test_course_terms_regstats
   older <- current
   attr(older, "course_terms_build_version") <- COURSE_TERMS_BUILD_VERSION - 1L
   expect_false(course_terms_is_current(older, test_students_regstats))
@@ -177,7 +195,7 @@ test_that("Regstats refuses a course-term table not counted by this build over t
   # Counted over one class list's renames, it is not current for another's.
   rn <- rn01_course_tables()
   expect_false(course_terms_is_current(current, rn$cedar_registrations))
-  rn_base <- course_terms_for(rn$cedar_registrations)
+  rn_base <- course_terms_for(rn$cedar_registrations, rn$cedar_sections)
   expect_true(course_terms_is_current(rn_base, rn$cedar_registrations))
   # The class list already names the renamed subject (I45), so its renames
   # are the two renumberings; the schedule's SOC codes are on the sections.
@@ -191,7 +209,7 @@ test_that("Regstats refuses a course-term table not counted by this build over t
 test_that("Regstats stops on a table no loader attached", {
   expect_error(
     get_reg_stats(dplyr::select(test_students_regstats, -course_id), test_sections_regstats,
-                  regstats_history_opt()),
+                  regstats_history_opt(), course_terms = test_course_terms_regstats),
     "course_id"
   )
 })
@@ -200,9 +218,10 @@ test_that("Regstats follows a course across its codes (ADR-001 step 4)", {
   rn <- rn01_course_tables()
   # RN01 sections seat 20 and one student registers, so a 5% ceiling marks
   # every offering at cap; one prior term at cap is Chronically full here.
+  rn_terms <- course_terms_for(rn$cedar_registrations, rn$cedar_sections)
   opt <- regstats_history_opt(term = 202110L)
   opt$thresholds$chronic_fill_rate <- 0.05
-  result <- get_reg_stats(rn$cedar_registrations, rn$cedar_sections, opt)
+  result <- get_reg_stats(rn$cedar_registrations, rn$cedar_sections, opt, course_terms = rn_terms)
 
   # HIST 3201's Spring 2021 fill is compared with HIST 320's Spring 2020,
   # and the row says which code that history ran under.
@@ -230,7 +249,8 @@ test_that("Regstats follows a course across its codes (ADR-001 step 4)", {
   }
   # The proposed renumbering assigns nothing: PHIL 150 and PHIL 1115 stay two
   # courses, and the Fall 2020 snapshot counts the schedule's courses by id.
-  fall <- get_reg_stats(rn$cedar_registrations, rn$cedar_sections, regstats_history_opt(term = 202080L))
+  fall <- get_reg_stats(rn$cedar_registrations, rn$cedar_sections, regstats_history_opt(term = 202080L),
+                        course_terms = rn_terms)
   expect_equal(fall$summary$lower$n_courses, 1L)
   expect_equal(fall$summary$upper$n_courses, 2L)
   expect_equal(fall$course_key_info$n_renamed_courses, 0L)
@@ -239,7 +259,7 @@ test_that("Regstats follows a course across its codes (ADR-001 step 4)", {
   # A former code asked for is its course.
   former_opt <- opt
   former_opt$course <- "HIST 320"
-  former <- get_reg_stats(rn$cedar_registrations, rn$cedar_sections, former_opt)
+  former <- get_reg_stats(rn$cedar_registrations, rn$cedar_sections, former_opt, course_terms = rn_terms)
   expect_equal(former$sat$subject_course, "HIST 3201")
   expect_equal(former$all_flagged_courses, "HIST 3201")
   expect_equal(former$sat$former_codes, "HIST 320 (Spring 2020 to Fall 2020)")
@@ -247,37 +267,29 @@ test_that("Regstats follows a course across its codes (ADR-001 step 4)", {
 
 test_that("Regstats excludes a course the list names by a former code, on every path", {
   # Keyed on course_id, a list naming HIST 320 must drop the course HIST 3201
-  # in every term, from the raw recount and from the precomputed base alike;
-  # matched by code, the base's HIST 3201 rows would survive and flag.
+  # in every term, from the course-term table and the waits pass's class list
+  # alike; matched by code, the table's HIST 3201 rows would survive and flag.
   rn <- rn01_course_tables()
+  rn_terms <- course_terms_for(rn$cedar_registrations, rn$cedar_sections)
+  expect_true("HIST 3201" %in% rn_terms$subject_course)
   opt <- regstats_history_opt(term = 202110L)
   opt$thresholds$chronic_fill_rate <- 0.05
   rlang::local_bindings(excluded_courses = "HIST 320", .env = .GlobalEnv)
-  raw <- get_reg_stats(rn$cedar_registrations, rn$cedar_sections, opt)
+  raw <- get_reg_stats(rn$cedar_registrations, rn$cedar_sections, opt, course_terms = rn_terms)
   expect_false("HIST 3201" %in% raw$all_flagged_courses)
   expect_equal(sort(raw$sat$subject_course), c("LING 2110", "SOCI 2315"))
   # HIST 3201 is Spring 2021's only upper-division course, so the snapshot
   # has no upper-division row once its course is excluded (1 by code).
   expect_null(raw$summary$upper$n_courses)
   expect_equal(raw$summary$lower$n_courses, 2L)
-
-  course_terms <- course_terms_for(rn$cedar_registrations)
-  expect_true("HIST 3201" %in% course_terms$subject_course)
-  from_base <- get_reg_stats(rn$cedar_registrations, rn$cedar_sections, opt, course_terms = course_terms)
-  expect_equal(from_base[names(from_base) != "cache_info"], raw[names(raw) != "cache_info"])
-
-  # A student-level filter recounts the class list; it excludes the same course.
-  filtered_opt <- opt
-  filtered_opt$student_campus <- "ABQ"
-  filtered <- get_reg_stats(rn$cedar_registrations, rn$cedar_sections, filtered_opt)
-  expect_false("HIST 3201" %in% filtered$all_flagged_courses)
 })
 
 test_that("the schedule's old code joins the class list's new one in Regstats saturation (I45)", {
   rn <- rn01_course_tables()
   # Spring 2020: SOC 371 and SOC 250 are on the schedule, SOCI 371 and
   # SOCI 250 on the class list. By course every section finds its census.
-  result <- get_reg_stats(rn$cedar_registrations, rn$cedar_sections, regstats_history_opt(term = 202010L))
+  result <- get_reg_stats(rn$cedar_registrations, rn$cedar_sections, regstats_history_opt(term = 202010L),
+                          course_terms = course_terms_for(rn$cedar_registrations, rn$cedar_sections))
   coverage <- result$baseline_info$saturation_coverage
   expect_equal(coverage$matched, 5L)
   expect_equal(coverage$unmatched, 0L)
@@ -319,9 +331,9 @@ test_that("title enrichment cannot duplicate a Regstats reporting group", {
 test_that("Regstats cache preserves baseline coverage and ignores unversioned results", {
   rlang::local_bindings(cedar_data_dir = withr::local_tempdir(), .env = .GlobalEnv)
   opt <- list(term = 202080L, bypass_cache = TRUE)
-  fresh <- get_reg_stats(test_students_regstats, test_sections_regstats, opt)
+  fresh <- get_reg_stats(test_students_regstats, test_sections_regstats, opt, course_terms = test_course_terms_regstats)
   opt$bypass_cache <- FALSE
-  loaded <- get_reg_stats(test_students_regstats, test_sections_regstats, opt)
+  loaded <- get_reg_stats(test_students_regstats, test_sections_regstats, opt, course_terms = test_course_terms_regstats)
   expect_true(loaded$cache_info$loaded_from_cache)
   expect_equal(loaded$summary, fresh$summary)
   expect_equal(loaded$baseline_info, fresh$baseline_info)
@@ -520,7 +532,7 @@ test_that("create_regstats_cache_filename encodes part-of-term so PoT requests d
 
 test_that("get_reg_stats supplies the report contract and expected default fixture flags", {
   opt <- create_test_opt(list(term = 202010))
-  result <- get_reg_stats(test_students, test_sections, opt)
+  result <- get_reg_stats(test_students, test_sections, opt, course_terms = test_course_terms)
 
   expect_type(result, "list")
   for (field in c("early_drops", "late_drops", "dips", "bumps", "waits",
@@ -572,7 +584,7 @@ test_that("get_reg_stats applies dashboard threshold profile", {
     term = 202010,
     threshold_profile = "dashboard"
   ))
-  result <- get_reg_stats(test_students, test_sections, opt)
+  result <- get_reg_stats(test_students, test_sections, opt, course_terms = test_course_terms)
 
   expect_equal(result$thresholds$min_impacted, 5)
   expect_equal(result$thresholds$pct_sd, 0.5)
@@ -593,7 +605,7 @@ test_that("get_reg_stats applies custom thresholds and marks their cache metadat
       min_impacted = 5, pct_sd = 0.5, chronic_fill_rate = 0.80, min_wait = 5
     )
   )
-  result <- get_reg_stats(test_students, test_sections, opt)
+  result <- get_reg_stats(test_students, test_sections, opt, course_terms = test_course_terms)
 
   expect_equal(result$thresholds$min_impacted, 5)
   expect_equal(result$thresholds$pct_sd, 0.5)
@@ -623,7 +635,7 @@ test_that("lowering Min Impacted cannot turn future enrollment into baseline evi
       section_proximity = 0.3
     )
   )
-  result <- get_reg_stats(test_students, test_sections, opt)
+  result <- get_reg_stats(test_students, test_sections, opt, course_terms = test_course_terms)
 
   expect_equal(nrow(result$bumps), 0)
   expect_equal(result$baseline_info$n_hist_terms, 0L)
@@ -639,14 +651,15 @@ test_that("get_reg_stats handles empty student data gracefully", {
   empty_students <- test_students %>% filter(FALSE)
   opt            <- create_test_opt(list(term = 202010))
 
-  result <- get_reg_stats(empty_students, test_sections, opt)
+  result <- get_reg_stats(empty_students, test_sections, opt,
+                          course_terms = course_terms_for(empty_students, test_sections))
 
   expect_type(result, "list")
 })
 
 test_that("get_reg_stats handles course filter — returns character all_flagged_courses", {
   opt    <- create_test_opt(list(term = 202010, course = "HIST 1110"))
-  result <- get_reg_stats(test_students, test_sections, opt)
+  result <- get_reg_stats(test_students, test_sections, opt, course_terms = test_course_terms)
 
   expect_type(result$all_flagged_courses, "character")
 })
