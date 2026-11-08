@@ -62,7 +62,7 @@ abbreviate_classification <- function(classification) {
 #' docs/developers/student-terms.md). Nothing here re-derives it from the
 #' class list.
 #'
-#' @param students Data frame of student enrollments from cedar_students.
+#' @param students Data frame of student enrollments from cedar_registrations.
 #' @param student_terms Data frame. The `cedar_student_terms` table, read for
 #'   `primary_major_code` and `is_pre_major` on each enrollment row's
 #'   student-term. Every registered row has one; a row without is an error.
@@ -449,7 +449,7 @@ plot_demographics_summary <- function(demographics_data, fill_column = "student_
 #' in a course or set of courses over time. Returns counts, means across terms,
 #' and percentages of course enrollment — answering "who is in this course?"
 #'
-#' @param students Data frame of student enrollments from cedar_students table.
+#' @param students Data frame of student enrollments from cedar_registrations table.
 #' @param student_terms The `cedar_student_terms` table. A grouping by
 #'   `student_classification` or `major_code` reads the student's description
 #'   off it, never off the class-list row (ADR-001 step 2). May be `NULL` only
@@ -475,14 +475,14 @@ plot_demographics_summary <- function(demographics_data, fill_column = "student_
 #'   course     = "BIOL 2305",
 #'   group_cols = c("campus", "term", "term_type", "major_code", "subject_course")
 #' )
-#' major_breakdown <- get_course_demographics(cedar_students, cedar_student_terms, opt)
+#' major_breakdown <- get_course_demographics(cedar_registrations, cedar_student_terms, opt)
 #'
 #' # Classification breakdown across all MATH courses
 #' opt <- list(
 #'   subject    = "MATH",
 #'   group_cols = c("campus", "term", "student_classification", "subject_course")
 #' )
-#' class_breakdown <- get_course_demographics(cedar_students, cedar_student_terms, opt)
+#' class_breakdown <- get_course_demographics(cedar_registrations, cedar_student_terms, opt)
 #' }
 #'
 #' @seealso

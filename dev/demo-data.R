@@ -19,10 +19,10 @@ build_demo_sources <- function(cohorts = 5L,
   sections <- collect(c(base = "cedar_sections", regstats = "cedar_sections_regstats",
     seatfinder = "cedar_sections_sf", topics = "cedar_sections_topics",
     gen_ed = "gen_ed_assoc_sections"))
-  students <- collect(c(base = "cedar_students", regstats = "cedar_students_regstats",
-    gen_ed = "gen_ed_assoc_students", campus = "cedar_students_mc",
-    retention = "cedar_students_mcret", graduates = "cedar_students_gg",
-    major_entry = "cedar_students_pcc"))
+  students <- collect(c(base = "cedar_registrations", regstats = "cedar_registrations_regstats",
+    gen_ed = "gen_ed_assoc_students", campus = "cedar_registrations_mc",
+    retention = "cedar_registrations_mcret", graduates = "cedar_registrations_gg",
+    major_entry = "cedar_registrations_pcc"))
   programs <- collect(c(base = "cedar_programs", gen_ed = "gen_ed_assoc_programs",
     campus = "cedar_programs_mc", major_entry = "cedar_programs_pcc"))
   # EC-10 contains valid simultaneous declarations alongside deliberately

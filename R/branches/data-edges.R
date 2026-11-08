@@ -57,7 +57,7 @@
 
 #' Where the loaded data starts and stops
 #'
-#' @param students Data frame. `cedar_students`. Required.
+#' @param students Data frame. `cedar_registrations`. Required.
 #' @param degrees Data frame or NULL. `cedar_degrees`, for `last_degree`.
 #' @param min_graded_share Numeric 0-1. Share of a term's enrollment rows that
 #'   must carry a final grade before the term counts as gradeable. Default
@@ -193,7 +193,7 @@ cedar_registration_settled <- function(term, pulled, min_days_after_start) {
 #' data cannot determine stops startup rather than being guessed from the
 #' configured current term or silently lifted.
 #'
-#' @param students Data frame. `cedar_students`.
+#' @param students Data frame. `cedar_registrations`.
 #' @param degrees Data frame or NULL. `cedar_degrees`, for `last_degree`.
 #' @return Named list: `edges` (the full [cedar_data_edges()] result),
 #'   `graded_through` (`last_graded`), `report_end_term`
@@ -204,7 +204,7 @@ cedar_report_edges <- function(students, degrees = NULL) {
   if (is.null(edges$last_enrolled_complete)) {
     stop("[data-edges.R] The settled edge cannot be determined: no term was pulled ",
          edges$min_days_after_start, " or more days after it began",
-         if (!"as_of_date" %in% names(students)) " (cedar_students has no as_of_date)", ".")
+         if (!"as_of_date" %in% names(students)) " (cedar_registrations has no as_of_date)", ".")
   }
   if (is.null(edges$last_graded)) {
     stop("[data-edges.R] The graded edge cannot be determined: no term has final ",

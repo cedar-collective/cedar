@@ -57,7 +57,7 @@ cedar_faculty.qs (8 columns)
 | MyReports Report | MyReports File | → | CEDAR Table |
 |------------------|----------------|---|-------------|
 | **DESR** (Department Enrollment Status Report) | DESRs.qs | → | `cedar_sections` |
-| **Class Lists** | class_lists.qs | → | `cedar_students` |
+| **Class Lists** | class_lists.qs | → | `cedar_registrations` |
 | **Academic Study Detail** | academic_studies.qs | → | `cedar_programs` |
 | **Graduates & Pending Graduates** | degrees.qs | → | `cedar_degrees` |
 | **HR Report** (optional) | hr_data.qs | → | `cedar_faculty` |
@@ -111,7 +111,7 @@ The complete transformation logic is in [R/data-parsers/transform-to-cedar.R](ht
     the transform), so a section joins both. No HR field is merged onto a
     section; join `cedar_faculty` (ISSUES I52).
 
-**2. class_lists → cedar_students**
+**2. class_lists → cedar_registrations**
 - Keeps: 18 of 74 columns
 - Key changes:
   - `Academic Period Code` → `term` (no backticks!)
@@ -124,7 +124,7 @@ The complete transformation logic is in [R/data-parsers/transform-to-cedar.R](ht
     drop), a posted non-audit grade before none, then the lowest CRN. No
     classified outcome is saved; `cedar_attempts` classifies at load.
   - Analyses that need a student enrollment anchor use the minimum observed
-    `cedar_students$term`, which means the first class-list term present in CEDAR.
+    `cedar_registrations$term`, which means the first class-list term present in CEDAR.
     This is not a formal Banner matriculation/start-term field.
   - The student's description on the roster (level, classification, major,
     home college and campus, residency, dual credit) is saved once per
@@ -132,7 +132,7 @@ The complete transformation logic is in [R/data-parsers/transform-to-cedar.R](ht
     (`build_class_list_descriptions()`, with `rows`), and the class list is
     saved without it (`thin_class_list()`; ADR-001 step 5).
 
-**2a. cedar_students and cedar_class_list_descriptions (+ programs, degrees) → cedar_student_terms**
+**2a. cedar_registrations and cedar_class_list_descriptions (+ programs, degrees) → cedar_student_terms**
 - One row per `student_id + term` with any class-list row or declaration
   (`build_student_terms()`, ADR-001 step 2; contract in `student-terms.md`).
 - Counts observed registered UNM credits from class-list rows with

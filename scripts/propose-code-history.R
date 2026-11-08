@@ -41,7 +41,7 @@ files <- read_institution_mappings(dir)
 pull  <- max(as.Date(cedar_sections$as_of_date), na.rm = TRUE)
 message("Sections pulled ", pull, "; ", nrow(files$code_history), " rows in code_history.csv")
 
-cand <- detect_course_renamings(cedar_sections, cedar_students, files)
+cand <- detect_course_renamings(cedar_sections, cedar_registrations, files)
 enough <- ifelse(cand$kind == "subject", cand$n_evidence >= min_sections, cand$n_evidence >= min_rows)
 new <- cand[is.na(cand$in_file) & enough, ]
 skipped_thin <- sum(is.na(cand$in_file) & !enough)

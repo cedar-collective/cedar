@@ -10,7 +10,7 @@ Why every course-level analytic is grouped by campus, what that requires in prac
 
 **Any analytic grouped by course must also be grouped by campus.** Wherever `subject_course` appears in a `group_cols` vector, a `group_by()`, a `count()`, or a join key, `campus` belongs beside it. This is not a display preference — it is the same class of rule as the DFW policy above and is not negotiable per-cone.
 
-UNM is not one campus. `cedar_students` carries ten campus codes:
+UNM is not one campus. `cedar_registrations` carries ten campus codes:
 
 | | Code | Share of enrollment rows |
 |---|---|---|
@@ -42,12 +42,12 @@ Grouping is also **not** the same as filtering. Filtering to `ABQ` answers one q
 
 ## Two campus fields, and why filtering on the wrong one leaks
 
-`cedar_students` carries **both**:
+`cedar_registrations` carries **both**:
 
 | Column | Meaning | Lives on |
 |---|---|---|
-| `campus` | the campus that **taught the section** | `cedar_students` |
-| `student_campus` | the student's **home campus** | `cedar_programs`, `cedar_students` |
+| `campus` | the campus that **taught the section** | `cedar_registrations` |
+| `student_campus` | the student's **home campus** | `cedar_programs`, `cedar_registrations` |
 
 **They disagree on 28% of enrollment rows.** Albuquerque-home students take 404,684 rows online through EA and roughly 61,000 rows at branch campuses. A filter on `student_campus` therefore does *not* keep branch-delivered course rows out of a main-campus view — course-level analytics must scope on `campus`.
 

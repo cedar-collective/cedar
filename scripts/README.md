@@ -276,9 +276,9 @@ needs:
 
 ```r
 nrow(cedar_sections)
-nrow(cedar_students)
+nrow(cedar_registrations)
 
-critical_students <- cedar_students |>
+critical_students <- cedar_registrations |>
   dplyr::filter(subject_course %in% c("BIOL 1140", "CHEM 1215", "MATH 1215"))
 ```
 
@@ -294,11 +294,11 @@ critical_market <- projection_course_group_market_id("critical_courses")
 always_monitored_courses <-
   projection_course_group_always_monitored_courses("critical_courses")
 
-cl_enrls <- calc_cl_enrls(cedar_students, by_part_term = TRUE)
+cl_enrls <- calc_cl_enrls(cedar_registrations, by_part_term = TRUE)
 prepared_inputs <- prepare_enrollment_projection_inputs(
   cl_enrls = cl_enrls,
   sections = cedar_sections,
-  students = cedar_students,
+  students = cedar_registrations,
   target_courses = critical_courses,
   target_campuses = critical_campuses,
   target_market_id = critical_market,

@@ -317,7 +317,7 @@ DFW_DEMOGRAPHIC_GROUPS <- c("student_classification", "major_code")
 
 #' DFW rate and composition by a student group
 #'
-#' @param students Class-list rows (the loaded `cedar_students`).
+#' @param students Class-list rows (the loaded `cedar_registrations`).
 #' @param student_terms The `cedar_student_terms` table; the group is read off it.
 #' @param opt Course-attempt options (`course`, `data_edges`, `passing_grades`, ...).
 #' @param group_col One of `DFW_DEMOGRAPHIC_GROUPS`.

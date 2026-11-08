@@ -4,7 +4,7 @@
 #
 # DEPENDENCIES (loaded via global.R):
 #   - data_objects[["cedar_sections"]]  - Course sections (DESRs)
-#   - data_objects[["cedar_students"]]  - Student enrollments (class lists)
+#   - data_objects[["cedar_registrations"]]  - Student enrollments (class lists)
 #   - data_objects[["cedar_programs"]]  - Student programs (academic studies)
 #   - data_objects[["cedar_degrees"]]   - Degree completions
 #   - data_objects[["cedar_faculty"]]   - Faculty information
@@ -17,7 +17,7 @@
 
 # Convenience variables for UI (all from data_objects loaded in global.R)
 cedar_sections <- data_objects[["cedar_sections"]]
-cedar_students <- data_objects[["cedar_students"]]
+cedar_registrations <- data_objects[["cedar_registrations"]]
 cedar_programs <- data_objects[["cedar_programs"]]
 cedar_degrees <- data_objects[["cedar_degrees"]]
 cedar_faculty <- data_objects[["cedar_faculty"]]
@@ -684,7 +684,7 @@ nav_panel(
 
   {
     # Use campus codes from cedar_sections — these match the campus column in
-    # cedar_students and cedar_sections used by the dashboard filters.
+    # cedar_registrations and cedar_sections used by the dashboard filters.
     campus_vals <- sort(unique(cedar_sections$campus[
       !is.na(cedar_sections$campus) & cedar_sections$campus != ""]))
     # Default to ABQ (main campus) + EA (online).
@@ -884,7 +884,7 @@ nav_panel(
     ])),
     program_choices = cedar_pathways_choices$program_choices,
     dept_choices = cedar_pathways_choices$dept_choices,
-    course_campus_choices = cedar_campus_choices(cedar_students)
+    course_campus_choices = cedar_campus_choices(cedar_registrations)
   )
 ), # end Pathways nav_panel
 
@@ -1841,7 +1841,7 @@ nav_panel(
         div(
           p("Whether the loaded tables can actually be joined to each other on student_id. Student IDs are hashed once at ingest and frozen into the stored file, so a MyReports pull that presents the raw ID in a different surface form produces a different hash for the same person — rows that can never be joined again. Nothing downstream can repair it.",
             class = "cedar-body"),
-          p("Every table is compared term by term against cedar_students, whose class lists are the only source ingested as one continuous series. A term with records and zero matches is the signature of a hash mismatch; a table covering a different population (applicants who never enrolled) sits partway in every term and never at zero.",
+          p("Every table is compared term by term against cedar_registrations, whose class lists are the only source ingested as one continuous series. A term with records and zero matches is the signature of a hash mismatch; a table covering a different population (applicants who never enrolled) sits partway in every term and never at zero.",
             class = "text-hint"),
           uiOutput("id_integrity_summary"),
           card(

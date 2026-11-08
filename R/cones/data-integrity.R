@@ -37,7 +37,7 @@
 #' differences: the same table joins perfectly in some terms and not at all in
 #' others, which means it holds two ID spaces.
 #'
-#' @param spine  Data frame whose ID space is canonical. Pass `cedar_students`:
+#' @param spine  Data frame whose ID space is canonical. Pass `cedar_registrations`:
 #'   the class lists are the only source ingested as one continuous series, and
 #'   every other student table is meant to join to them.
 #' @param tables Named list of data frames to check. Names are used as labels.

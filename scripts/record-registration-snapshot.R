@@ -36,14 +36,14 @@ record_registration_snapshot_cli <- function(args) {
   }
 
   source(file.path(repo_root, "scripts", "cedar-repl.R"))
-  recorded <- record_registration_snapshot(cedar_students, cedar_sections, output_dir)
+  recorded <- record_registration_snapshot(cedar_registrations, cedar_sections, output_dir)
   for (i in seq_len(nrow(recorded))) {
     message(sprintf("[registration-snapshots] %s, class list %s, schedule %s: %s (%d rows) %s",
                     fmt_term(recorded$term[[i]]), format(recorded$classlist_as_of[[i]]),
                     format(recorded$sections_as_of[[i]]), recorded$status[[i]],
                     recorded$rows[[i]], recorded$path[[i]]))
   }
-  returning <- record_return_snapshot(cedar_students, cedar_student_terms, output_dir)
+  returning <- record_return_snapshot(cedar_registrations, cedar_student_terms, output_dir)
   for (i in seq_len(nrow(returning))) {
     message(sprintf("[registration-snapshots] %s from %s, class list %s: %s registered of %s (%d rows) %s %s",
                     fmt_term(returning$term[[i]]), fmt_term(returning$anchor_term[[i]]),

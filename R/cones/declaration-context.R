@@ -45,7 +45,7 @@
 #' declared the focal program
 #'
 #' @param programs   cedar_programs filtered to population students
-#' @param students   cedar_students (full, will be filtered internally)
+#' @param students   cedar_registrations (full, will be filtered internally)
 #' @param population Population tibble from build_population() — needs
 #'   first_unm_term for terms-to-declaration calculation
 #' @param focal_subjects Character vector of subject codes that belong to the

@@ -105,7 +105,7 @@ require_cols(sections, "cedar_sections", c(
   "campus", "term_type", "is_combined", "comments", "census1"
 ))
 
-require_cols(students, "cedar_students", c(
+require_cols(students, "cedar_registrations", c(
   "student_id", "term", "crn", "subject_course", "department",
   "registration_status_code", "final_grade", "credits"
 ))

@@ -332,7 +332,7 @@ test_that("get_dashboard_enrollment_flags applies campus filter to high waitlist
 test_that("dashboard payload includes headcount line data", {
   data_objects <- list(
     cedar_programs = test_programs,
-    cedar_students = test_students,
+    cedar_registrations = test_students,
     cedar_student_terms = test_student_terms,
     cedar_sections = test_sections,
     cedar_dims     = test_dims
@@ -392,7 +392,7 @@ test_that("the dashboard follows a renumbered course instead of calling it new (
   # HIST 3201 as new. (Missing-from-earlier compares the same term two years
   # back, which RN01 does not reach.)
   rn <- rn01_course_tables()
-  objects <- list(cedar_programs = test_programs, cedar_students = rn$cedar_students,
+  objects <- list(cedar_programs = test_programs, cedar_registrations = rn$cedar_registrations,
                   cedar_student_terms = attach_test_student_terms(suppressMessages(build_student_terms(
                     test_students_rn, programs = NULL,
                     edges = list(last_enrolled_complete = max(test_students_rn$term))))),
@@ -400,9 +400,9 @@ test_that("the dashboard follows a renumbered course instead of calling it new (
   opt <- list(dept_code = "HIST", term = 202110L)
   dashboard <- suppressMessages(create_dept_dashboard_data(objects, opt))
   expect_false("HIST 3201" %in% dashboard$new_this_term$subject_course)
-  expect_identical(dashboard$course_code_renames, course_code_renames(rn$cedar_students))
+  expect_identical(dashboard$course_code_renames, course_code_renames(rn$cedar_registrations))
 
-  by_code <- lapply(objects[c("cedar_students", "cedar_sections")],
+  by_code <- lapply(objects[c("cedar_registrations", "cedar_sections")],
                     function(tbl) dplyr::mutate(tbl, subject_course = listed_code, course_id = listed_code))
   split <- suppressMessages(create_dept_dashboard_data(utils::modifyList(objects, by_code), opt))
   expect_true("HIST 3201" %in% split$new_this_term$subject_course)

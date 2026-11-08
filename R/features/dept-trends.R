@@ -108,7 +108,7 @@ set_payload <- function(dept_code, prog_focus = NULL) {
 
 filter_data_objects <- function(data_objects, campus_filter) {
   if (!is.null(campus_filter) && length(campus_filter) > 0) {
-    data_objects[["cedar_students"]] <- data_objects[["cedar_students"]] %>%
+    data_objects[["cedar_registrations"]] <- data_objects[["cedar_registrations"]] %>%
       dplyr::filter(campus %in% campus_filter)
     data_objects[["cedar_sections"]] <- data_objects[["cedar_sections"]] %>%
       dplyr::filter(campus %in% campus_filter)
@@ -179,7 +179,7 @@ rehydrate_dept_tab_payload <- function(cached, base, rebuild,
 
 create_dept_report_base <- function(data_objects, opt) {
   required_datasets <- c(
-    "cedar_students", "cedar_degrees", "cedar_sections", "cedar_programs",
+    "cedar_registrations", "cedar_degrees", "cedar_sections", "cedar_programs",
     "cedar_student_terms"
   )
   missing_datasets <- setdiff(required_datasets, names(data_objects))
@@ -452,7 +452,7 @@ compute_dept_enrl_tab <- function(base, data_objects, campus_filter = NULL) {
   enrl$tables["enrl_gen_ed_college_context"] <- list(gen_ed_context$table)
 
   credit_hours_by_level <- get_credit_hours_by_level_data(
-    scoped_data[["cedar_students"]],
+    scoped_data[["cedar_registrations"]],
     scoped_data[["cedar_sections"]],
     base$dept_code,
     n_years = 5
@@ -488,7 +488,7 @@ compute_dept_enrl_tab <- function(base, data_objects, campus_filter = NULL) {
   enrl$plots$majors_with_minor <- plot_cross_dept_program_donut(majors_with_minor)
   enrl$plots["enrl_majors_with_minor"] <- list(enrl$plots$majors_with_minor)
   student_donuts <- plot_dept_student_donuts(
-    scoped_data[["cedar_students"]],
+    scoped_data[["cedar_registrations"]],
     scoped_data[["cedar_sections"]],
     base$dept_code,
     base$current_term,
@@ -593,11 +593,11 @@ compute_dept_credit_hours_tab <- function(base, data_objects,
   # As with Enrollment, retain this campus-scoped copy only for the duration of
   # a cold computation. Cached Credit Hours tabs rebuild from summary tables.
   do_filt <- filter_data_objects(data_objects, campus_filter)
-  filtered_cl <- do_filt[["cedar_students"]] %>%
+  filtered_cl <- do_filt[["cedar_registrations"]] %>%
     dplyr::filter(department == base$dept_code)
 
   sch_college <- get_credit_hours_for_dept_trends(
-    do_filt[["cedar_students"]],
+    do_filt[["cedar_registrations"]],
     do_filt[["cedar_sections"]],
     base$dept_code,
     base$subj_codes,

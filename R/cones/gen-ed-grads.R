@@ -6,7 +6,7 @@
 #
 # THE SAMPLING RULE, AND WHY IT IS STRICT
 #
-# CEDAR's enrollment history starts at the first term in cedar_students. A
+# CEDAR's enrollment history starts at the first term in cedar_registrations. A
 # student already enrolled in that term may have been a freshman or may have
 # been a senior; the data cannot tell the difference, and their earlier Gen Ed
 # coursework is simply absent. Counting them would understate every Gen Ed rate
@@ -20,7 +20,7 @@
 # first enrollment falls strictly after the first term in the data, that
 # enrollment PRECEDES the degree, and the degree is an awarded one from the
 # department. The middle condition is not redundant — cedar_degrees reaches
-# further back than cedar_students, so a graduate who finished before the window
+# further back than cedar_registrations, so a graduate who finished before the window
 # and re-enrolled later would otherwise qualify on enrollment that has nothing to
 # do with the degree being counted. That is a real restriction,
 # not a rounding detail — it drops most graduates in the early years of the data
@@ -38,7 +38,7 @@
 #' Graduates of `opt$dept_code` whose whole UNM enrollment history is inside the
 #' data window — see the sampling rule at the top of this file.
 #'
-#' @param students Data frame. The `cedar_students` table. Supplies the
+#' @param students Data frame. The `cedar_registrations` table. Supplies the
 #'   enrollment bookends that decide whether a graduate's record is complete.
 #' @param degrees Data frame. The `cedar_degrees` table.
 #' @param student_terms Data frame. The `cedar_student_terms` table, read for
@@ -64,7 +64,7 @@
 #'
 #'   Carries a `cohort_meta` attribute: `dept_code`, `min_data_term`,
 #'   `max_data_term`, `n_awarded` (all awarded graduates in scope),
-#'   `n_no_records` (awarded graduates absent from `cedar_students`),
+#'   `n_no_records` (awarded graduates absent from `cedar_registrations`),
 #'   `n_left_truncated` (awarded graduates whose first enrollment is the first
 #'   term in the data, so their start is unreadable), `n_post_grad_entry`
 #'   (graduates whose only visible enrollment postdates the degree — they
@@ -164,7 +164,7 @@ get_gen_ed_grad_cohort <- function(students, degrees, student_terms, opt = list(
 
   # A degree conferred before the student's first visible enrollment describes a
   # career this data cannot see. cedar_degrees reaches further back than
-  # cedar_students does (Fall 2018 vs Fall 2019 on current data), so a student
+  # cedar_registrations does (Fall 2018 vs Fall 2019 on current data), so a student
   # who finished before the enrollment window opened and re-enrolled later —
   # a second degree, a few non-degree courses — clears the first_unm_term test
   # on the strength of that later enrollment while none of it belongs to the
@@ -263,7 +263,7 @@ get_gen_ed_grad_cohort <- function(students, degrees, student_terms, opt = list(
 #' enrollments up to and including each student's graduation term count — post-
 #' degree coursework is not part of the degree these numbers describe.
 #'
-#' @param students Data frame. The `cedar_students` table.
+#' @param students Data frame. The `cedar_registrations` table.
 #' @param cohort Data frame. Output of [get_gen_ed_grad_cohort()]; needs
 #'   `student_id` and `grad_term`.
 #' @param gen_ed_lu Data frame. Gen Ed course lookup with `subject_course`,

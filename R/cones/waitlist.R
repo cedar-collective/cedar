@@ -4,7 +4,7 @@
 #' counts by campus and course. This helps identify "true" waitlist demand by excluding
 #' students who are registered for another section.
 #'
-#' @param filtered_students Data frame of student enrollments from cedar_students table,
+#' @param filtered_students Data frame of student enrollments from cedar_registrations table,
 #'   already filtered by opt parameters. Must include columns:
 #'   campus, term, subject_course, course_title, student_id, registration_status
 #' @param opt Options list (currently unused but kept for consistency)
@@ -39,7 +39,7 @@
 #' \dontrun{
 #' # Get waitlist counts for MATH courses
 #' opt <- list(subject = "MATH", term = "202510")
-#' filtered <- filter_class_list(cedar_students, opt)
+#' filtered <- filter_class_list(cedar_registrations, opt)
 #' waitlist_counts <- get_unique_waitlisted(filtered, opt)
 #' }
 #'
@@ -228,7 +228,7 @@ attach_enrollment_history <- function(count_df, students, course_terms = NULL) {
 #' major and classification. This provides insight into which student populations
 #' are being waitlisted and helps with enrollment planning and advising.
 #'
-#' @param students Data frame of student enrollments from cedar_students table,
+#' @param students Data frame of student enrollments from cedar_registrations table,
 #'   with \code{course_id} attached (as every loader does); read keyed on it,
 #'   so every \code{subject_course} in the result is a course id and each table
 #'   carries \code{former_codes} (the other codes the course has carried, with
@@ -292,7 +292,7 @@ attach_enrollment_history <- function(count_df, students, course_terms = NULL) {
 #' \dontrun{
 #' # Analyze waitlist for specific course
 #' opt <- list(course = "MATH 1430", term = 202510)
-#' waitlist_analysis <- inspect_waitlist(cedar_students, opt)
+#' waitlist_analysis <- inspect_waitlist(cedar_registrations, opt)
 #'
 #' # View by major
 #' head(waitlist_analysis$majors)
@@ -302,7 +302,7 @@ attach_enrollment_history <- function(count_df, students, course_terms = NULL) {
 #'
 #' # Analyze all BIOL courses in a term
 #' opt <- list(subject = "BIOL", term = "202510")
-#' bio_waitlist <- inspect_waitlist(cedar_students, opt)
+#' bio_waitlist <- inspect_waitlist(cedar_registrations, opt)
 #' }
 #'
 #' @param student_terms The `cedar_student_terms` table. The majors and

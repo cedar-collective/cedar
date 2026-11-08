@@ -25,21 +25,21 @@
 #' library(qs2); library(dplyr)
 #'
 #' cedar_programs <- qs_read("data/cedar_programs.qs")
-#' cedar_students <- qs_read("data/cedar_students.qs")
+#' cedar_registrations <- qs_read("data/cedar_students.qs")
 #'
 #' # Build a health track cohort, then find enrollment bottlenecks
 #' cohort <- build_population(cedar_programs, opt = list(type = "health"))
-#' result <- get_bottlenecks(cohort, cedar_students, opt = list())
+#' result <- get_bottlenecks(cohort, cedar_registrations, opt = list())
 #' result$waitlist
 #'
 #' # Restrict to a single term
-#' result <- get_bottlenecks(cohort, cedar_students, opt = list(term = 202510))
+#' result <- get_bottlenecks(cohort, cedar_registrations, opt = list(term = 202510))
 #'
 #' # Analyze pre-major and declared major cohorts separately
 #' cohort_split <- build_population(cedar_programs,
 #'                              opt = list(type = "health",
 #'                                         include_pre_majors = "split"))
-#' result_split <- get_bottlenecks(cohort_split, cedar_students, opt = list())
+#' result_split <- get_bottlenecks(cohort_split, cedar_registrations, opt = list())
 #' result_split$by_label
 #' ```
 #'
@@ -58,7 +58,7 @@
 #'
 #' @param cohort Data frame. Output of `build_population()`. Must have columns
 #'   `student_id` and `population_label`.
-#' @param students Data frame. The `cedar_students` table.
+#' @param students Data frame. The `cedar_registrations` table.
 #' @param opt List of options:
 #'   \describe{
 #'     \item{`term`}{Integer or character vector of term codes to restrict to.
@@ -81,10 +81,10 @@
 #' @examples
 #' \dontrun{
 #' cedar_programs <- qs_read("data/cedar_programs.qs")
-#' cedar_students <- qs_read("data/cedar_students.qs")
+#' cedar_registrations <- qs_read("data/cedar_students.qs")
 #'
 #' cohort <- build_population(cedar_programs, opt = list(type = "health"))
-#' result <- get_bottlenecks(cohort, cedar_students, opt = list())
+#' result <- get_bottlenecks(cohort, cedar_registrations, opt = list())
 #' result$waitlist
 #' result$population_size
 #' }
@@ -153,7 +153,7 @@ get_bottlenecks <- function(population, students, opt = list()) {
 #' Students who are both waitlisted and registered (hedging across sections)
 #' are excluded from the count.
 #'
-#' @param students Data frame. The `cedar_students` table, optionally
+#' @param students Data frame. The `cedar_registrations` table, optionally
 #'   pre-filtered by term/campus.
 #' @param cohort_ids Character vector of student IDs to include.
 #'

@@ -52,7 +52,7 @@ calc_cl_enrls <- function(filtered_students, reg_status = NULL, by_part_term = F
   # Regstats turns it on so a full-term section and its 8-week half-term
   # siblings are counted — and anomaly-compared — as the distinct entities they
   # are, rather than lumped into one course total. Requires part_term on the
-  # input (present in cedar_students).
+  # input (present in cedar_registrations).
   if (isTRUE(by_part_term) && !"part_term" %in% names(filtered_students)) {
     stop("[enrl.R] calc_cl_enrls(by_part_term = TRUE) requires a part_term column in filtered_students")
   }
@@ -61,7 +61,7 @@ calc_cl_enrls <- function(filtered_students, reg_status = NULL, by_part_term = F
   reg_stats_summary <- tibble()
 
   # get distinct rows within courses; use subject_course to lump all sections topics courses together.
-  # cedar_students already holds one row per student-course-campus-term, so
+  # cedar_registrations already holds one row per student-course-campus-term, so
   # duplicates arise only when a caller merges listings (a crosslist family
   # relabeled under one code). Rank statuses before keeping the first row:
   # left to data order, a student who dropped CS 375 and re-registered as
@@ -222,7 +222,7 @@ add_classlist_lifecycle_enrl <- function(df) {
 #' is re-pulled. Surfaces report that from here instead of naming terms in prose,
 #' which goes stale the day the term is re-pulled.
 #'
-#' @param students cedar_students (term, registration_status_code, registration_date).
+#' @param students cedar_registrations (term, registration_status_code, registration_date).
 #' @return Tibble: term, n_rows (registered or dropped rows), n_dated,
 #'   coverage ("none", "partial" or "complete"), one row per term.
 class_list_status_date_coverage <- function(students) {
@@ -2127,7 +2127,7 @@ get_course_crosslist_family_sections <- function(sections, opt) {
 #' `family` carry its history under every code and `listings` names a code
 #' column per course in the family, never one per code (ADR-001 step 4).
 #'
-#' @param students `cedar_students`, with `course_id` attached.
+#' @param students `cedar_registrations`, with `course_id` attached.
 #' @param sections `cedar_sections`, with `course_id` attached.
 #' @param opt Standard CEDAR filter options including `course`: the code the
 #'   report was asked for, current or former.

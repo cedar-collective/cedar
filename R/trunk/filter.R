@@ -261,7 +261,7 @@ opt_col_map_desr <- list(
 )
 
 # CEDAR students filter options map
-# Maps user-facing filter option names to cedar_students column names.
+# Maps user-facing filter option names to cedar_registrations column names.
 # The loaded class list describes the registration, not the student
 # (ADR-001 step 5): `classification` filters a column the caller attached from
 # cedar_student_terms (attach_student_descriptions()), and stops loudly on
@@ -280,7 +280,7 @@ opt_col_map_classlist <- list(
   classification    = "student_classification",
   level             = "level",
   pt                = "part_term",
-  # gen_ed          = "gen_ed_area",  # REMOVED: gen_ed_area doesn't exist in cedar_students (only in cedar_sections)
+  # gen_ed          = "gen_ed_area",  # REMOVED: gen_ed_area doesn't exist in cedar_registrations (only in cedar_sections)
   reg_status_code   = "registration_status_code",
   im                = "delivery_method",
   uel               = ""

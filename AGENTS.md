@@ -72,7 +72,7 @@ Lowercase snake_case columns; legacy uppercase names are deprecated. How each ta
 | Table | Grain | What it is |
 |---|---|---|
 | `cedar_sections` | DESR section row | `term`, `crn`, `subject_course`, `campus`, `department`, `enrolled`, `total_enrl`, `is_combined`, `is_topics` |
-| `cedar_students` | student × course × campus × term | the class list: `student_id`, `registration_status_code`, `final_grade`, `level`, `part_term`. **Saved and loaded without the student's description** (`thin_class_list()`; the transform saves it once per student-term as `cedar_class_list_descriptions`, which builds `cedar_student_terms`): a reader attaches classification, major, home campus or level from `cedar_student_terms` (`attach_student_descriptions()`) |
+| `cedar_registrations` | student × course × campus × term | the class list (was `cedar_students`; its file is still `cedar_students.qs`, read through `cedar_table_file()`): `student_id`, `registration_status_code`, `final_grade`, `level`, `part_term`. **Saved and loaded without the student's description** (`thin_class_list()`; the transform saves it once per student-term as `cedar_class_list_descriptions`, which builds `cedar_student_terms`): a reader attaches classification, major, home campus or level from `cedar_student_terms` (`attach_student_descriptions()`) |
 | `cedar_programs` | student × term × program | declarations: `program_code`, `dept_code`, `college_code`, demographics. Its `*_credits_*` columns are pull-stamped (field reliability) |
 | `cedar_degrees` | awarded degree | `degree`, `program_name`, `dept_code` |
 | `cedar_faculty` | instructor × term | `appointment_pct` is 0–100; divide by 100 for FTE |
@@ -88,7 +88,7 @@ The dimensions, `cedar_courses`, `cedar_attempts` and `cedar_course_terms` are b
 **Every unit and every course id is attached at load, in one place.** No saved table stores a unit or a college. Every loader (`global.R`, the cache-warming scripts, `scripts/cedar-repl.R`) calls `attach_default_units()` and `attach_course_ids()`:
 
 - **Units:** `attach_unit(rows, dims, hierarchy)` (`R/branches/dims.R`) is the only code that resolves a unit; `test-architecture.R` ratchets every other site. The default columns (`department`, `college`, `dept_code`, …) mean the subject's unit (sections, class lists) or the program's unit (declarations, degrees, student-terms). A reader that wants another hierarchy calls `attach_unit()` with its own `cols`, never into those names.
-- **Course ids:** on the loaded `cedar_sections` and `cedar_students`, `subject_course` **is the course** (`course_id`), and `listed_code` is the code the registrar used that term. A reader that filters, groups or joins on `subject_course` follows a renamed course with nothing to remember; one that names the term's code reads `listed_code`. A picked code resolves through `course_id_of()` / `course_ids_of()` or the shared `course` filter. The saved files keep the registrar's code: annotate, never mutate.
+- **Course ids:** on the loaded `cedar_sections` and `cedar_registrations`, `subject_course` **is the course** (`course_id`), and `listed_code` is the code the registrar used that term. A reader that filters, groups or joins on `subject_course` follows a renamed course with nothing to remember; one that names the term's code reads `listed_code`. A picked code resolves through `course_id_of()` / `course_ids_of()` or the shared `course` filter. The saved files keep the registrar's code: annotate, never mutate.
 - **A cache over the loaded tables records `course_code_renames()`** in its key or on its payload.
 
 **The mapping files decide every unit.** A program's unit comes from `programs.csv`, a course's from `subjects.csv` (by subject, section college and level). **A code with no confirmed row has no unit (`NA`)** and is listed on Admin > Mappings and in the transform's mapping audit, never given a department named after itself. Programs no department owns are `basis = no_unit`. A code not yet decided reports Banner's college, labelled `college_basis = "banner"`. A decision is an edit to the file, through a PR, taking effect at the next start. **The self-named fallback must not return** (ISSUES I7; EC-14 in `test-transform-status.R` guards it). A department's rows are those whose own `dept_code` it is (`filter_programs_to_dept()`), never rows matched by program name (I15). A pre-major's flag and target are the file's (`is_pre_major`, `leads_to`), never inferred from an F prefix.
@@ -214,7 +214,7 @@ Each cone is one file in `R/cones/` answering one question. It takes CEDAR table
 
 **Opt lists:** `opt = list()` is the last argument, resolved with `%||%`. Common keys: `term`, `campus`, `dept_code`, `college`, `level`, `min_n`, `subject_code`, `include_summer`. Option objects use `dept_code`; the table column is `department`; `department_code` is not used.
 
-**Data-flow notes.** Dept Trends passes unfiltered `cedar_students` to `get_credit_hours_for_dept_trends()` and filtered students to `credit_hours_by_major()`; every SCH function also takes `cedar_sections`. `credit_hours_data$level` includes `"total"`: filter to it to avoid double counting. `get_stopout()` calls `add_next_term_col()` internally.
+**Data-flow notes.** Dept Trends passes unfiltered `cedar_registrations` to `get_credit_hours_for_dept_trends()` and filtered students to `credit_hours_by_major()`; every SCH function also takes `cedar_sections`. `credit_hours_data$level` includes `"total"`: filter to it to avoid double counting. `get_stopout()` calls `add_next_term_col()` internally.
 
 ## Caching
 
@@ -294,7 +294,7 @@ All test data is in `tests/testthat/fixtures/designed_test_data.R`, which **is**
 - **Module code is not loaded by the R suite** (`load_funcs(..., modules = FALSE)`): parse, render and look.
 - Dependencies go through `scripts/r-environment.R`, never a bare renv call; never `renv::deactivate()`.
 - Don't `source("setup.R")` from outside `tests/testthat`, `source("global.R")`, or hand-source modules. After a failing run, `rm -rf tests/testthat/_problems tests/testthat/testthat-problems.rds`.
-- Real-data checks: `Rscript --vanilla -e 'source("scripts/cedar-repl.R"); nrow(cedar_students)'`.
+- Real-data checks: `Rscript --vanilla -e 'source("scripts/cedar-repl.R"); nrow(cedar_registrations)'`.
 
 **E2E rules** (`tests/e2e/lib.mjs` solves each): never `sleep()`, use `waitForIdle()` / `runAndWait()`; let `connect()` settle before touching inputs; `checkVisibility()`, not `offsetParent`; run `node tests/e2e/check-ids.mjs` for selector rot. `connect(page, { tab })` takes options; scope with `queryActive()`; module ids are namespaced.
 

@@ -85,6 +85,16 @@ get_data_extension <- function(use_qs = NULL) {
 
 
 
+# The file each table is saved in, where its name differs. The class list is
+# cedar_registrations (ADR-001 step 5); the transform still saves it as
+# cedar_students, the name production's files carry, so a loader asks for the
+# table and reads the file named here.
+CEDAR_TABLE_FILES <- c(cedar_registrations = "cedar_students")
+
+cedar_table_file <- function(name) {
+  if (name %in% names(CEDAR_TABLE_FILES)) CEDAR_TABLE_FILES[[name]] else name
+}
+
 # Load CEDAR data model files (only supported model - no legacy fallbacks)
 load_global_data <- function(opt) {
   message("[data.R] Loading CEDAR data model...")
@@ -97,7 +107,7 @@ load_global_data <- function(opt) {
 load_cedar_model_data <- function(opt) {
   # Define CEDAR files to load
   cedar_files <- c(
-    "cedar_sections", "cedar_students", "cedar_student_terms",
+    "cedar_sections", "cedar_registrations", "cedar_student_terms",
     "cedar_programs", "cedar_degrees", "cedar_faculty", "cedar_applicants"
   )
   message("[data.R] cedar_files: ", paste(cedar_files, collapse=", "))
@@ -114,7 +124,7 @@ load_cedar_model_data <- function(opt) {
   data_objects <- list()
 
   for (cedar_file in cedar_files) {
-    data_objects[[cedar_file]] <- timed_load_datafile(cedar_file, cedar_file)
+    data_objects[[cedar_file]] <- timed_load_datafile(cedar_table_file(cedar_file), cedar_file)
   }
 
   # Every loader attaches the unit columns from the mapping files (ADR-001
@@ -127,7 +137,7 @@ load_cedar_model_data <- function(opt) {
   # confirmed successions in code_history.csv, attached to the sections and the
   # class lists beside subject_course. Never saved: a confirmed row changes it at
   # the next start, as a unit decision does.
-  cedar_courses <- build_cedar_courses(data_objects[["cedar_sections"]], data_objects[["cedar_students"]], cedar_dims)
+  cedar_courses <- build_cedar_courses(data_objects[["cedar_sections"]], data_objects[["cedar_registrations"]], cedar_dims)
   data_objects <- attach_course_ids(data_objects, cedar_courses)
   data_objects[["cedar_courses"]] <- cedar_courses$courses
   data_objects[["cedar_course_codes"]] <- cedar_courses$codes
@@ -139,7 +149,7 @@ load_cedar_model_data <- function(opt) {
 
   if (is.null(opt) || opt[["func"]] != "enrl") {
     # students table contains class lists (student enrollments in sections)
-    .GlobalEnv$students <- data_objects[["cedar_students"]]
+    .GlobalEnv$students <- data_objects[["cedar_registrations"]]
     .GlobalEnv$cedar_student_terms <- data_objects[["cedar_student_terms"]]
     .GlobalEnv$programs <- data_objects[["cedar_programs"]]
     .GlobalEnv$degrees <- data_objects[["cedar_degrees"]]
@@ -192,7 +202,7 @@ get_data_status <- function (data_objects) {
   
   message("[data.R] Welcome to get_data_status!")
   
-  students <- data_objects[["cedar_students"]]
+  students <- data_objects[["cedar_registrations"]]
   courses <- data_objects[["cedar_sections"]]
   academic_studies <- data_objects[["cedar_programs"]]
   degrees <- data_objects[["cedar_degrees"]]
@@ -255,8 +265,8 @@ get_data_status <- function (data_objects) {
   
   # Gather stats for each dataset
   if (!is.null(students)) {
-    message("getting cedar_students status...")
-    stats <- get_dataset_stats(students, "cedar_students")
+    message("getting cedar_registrations status...")
+    stats <- get_dataset_stats(students, "cedar_registrations")
     if (!is.null(stats)) data_status <- rbind(data_status, stats)
   }
 

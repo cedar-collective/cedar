@@ -240,7 +240,7 @@ list was refreshed on that date. Consult the source dates when comparing terms.
 
 ## Data sources
 
-Source: cedar_students (classlist registrations), cedar_sections (section capacity and status), and the course-flow history counted at start (`cedar_course_flows`), which runs to the most recent term with complete enrollment. Anomaly detection and downstream flow assembly live in `R/features/regstats.R`.
+Source: cedar_registrations (classlist registrations), cedar_sections (section capacity and status), and the course-flow history counted at start (`cedar_course_flows`), which runs to the most recent term with complete enrollment. Anomaly detection and downstream flow assembly live in `R/features/regstats.R`.
 
 ---
 

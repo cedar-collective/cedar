@@ -1206,7 +1206,7 @@ and `FMDL` would have missed 1,281 of those seats.
 ### Real-data audit of the saved composition
 
 The check the designed fixtures cannot make: `cohort_composition` keys on
-`cedar_students$major_code` while a population group resolves against
+`cedar_registrations$major_code` while a population group resolves against
 `cedar_programs$major_code`. If those vocabularies disagreed, every cohort would
 silently be zero and the scenario would report a flat line as a finding. They
 agree:

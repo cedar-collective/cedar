@@ -33,7 +33,7 @@
 #'   Must already exclude treatment_ids and any ineligible students.
 #' @param programs cedar_programs data frame.
 #' @param applicants cedar_applicants data frame, or NULL to skip admissions covariates.
-#' @param students cedar_students data frame, used to determine each student's
+#' @param students cedar_registrations data frame, used to determine each student's
 #'   entry term (first term with any enrollment). If NULL, entry term is derived
 #'   from programs instead.
 #' @param covariate_terms Optional named integer vector or two-column tibble
@@ -61,7 +61,7 @@ build_comparison <- function(treatment_ids, pool_ids, programs,
 
   all_ids <- union(treatment_ids, pool_ids)
 
-  # Entry term: first term in cedar_students (most reliable) or cedar_programs fallback.
+  # Entry term: first term in cedar_registrations (most reliable) or cedar_programs fallback.
   # Used as fallback when covariate_terms doesn't cover a student.
   if (!is.null(students) && nrow(students) > 0) {
     entry_terms <- students %>%
@@ -218,7 +218,7 @@ build_comparison <- function(treatment_ids, pool_ids, programs,
 #' start mid-career.
 #'
 #' @param groups Tibble with `student_id` and `covariate_term`.
-#' @param students cedar_students, or NULL.
+#' @param students cedar_registrations, or NULL.
 #' @param programs cedar_programs, for the transfer block.
 #' @param student_terms cedar_student_terms, or NULL.
 #' @return `groups` with the three columns added.

@@ -324,7 +324,7 @@ test_that("Waitlists, Regstats, and Department Dashboard reconcile true demand",
   )) %>% ungroup() %>% filter(enrolled > 0)
   dashboard_flags <- get_dashboard_enrollment_flags(
     test_sections, course_history, "NURS", 202080L, campus = "ABQ",
-    cedar_students = test_students
+    cedar_registrations = test_students
   )
   dashboard <- dashboard_flags$high_waitlist %>%
     filter(subject_course == "NURS 2010") %>%
@@ -436,7 +436,7 @@ test_that("attach_enrollment_history follows the course when the class list name
   # A waitlist row names the class list's code; matched by code it finds no
   # base row and reads no census and no history.
   rn <- rn01_course_tables()
-  students <- rn$cedar_students
+  students <- rn$cedar_registrations
   base <- course_terms_for(students)
   expect_false("HIST 320" %in% base$subject_course)
   count_df <- students %>%
@@ -473,11 +473,11 @@ test_that("inspect_waitlist counts a course's waitlist across its live codes (RN
   # waits under SOC 371 while registered under SOCI 371, one course.
   rn <- rn02_course_tables()
   # The description table is scaffolding: one row per class-list student-term.
-  student_terms <- rn$cedar_students %>%
+  student_terms <- rn$cedar_registrations %>%
     distinct(student_id, term) %>%
     mutate(student_classification = "Junior", primary_major_code = "SOCI")
   opt <- create_test_opt(list(term = 202010, uel = FALSE))
-  out <- inspect_waitlist(rn$cedar_students, opt, sections = rn$cedar_sections,
+  out <- inspect_waitlist(rn$cedar_registrations, opt, sections = rn$cedar_sections,
                           student_terms = student_terms)
 
   # One row for the course: W1 and W2 wait; W3 holds a seat in it.
@@ -492,14 +492,14 @@ test_that("inspect_waitlist counts a course's waitlist across its live codes (RN
 
   # Read by code, the same rows split in two and W3 counts as waiting.
   by_code <- lapply(rn, function(tbl) dplyr::mutate(tbl, subject_course = listed_code, course_id = listed_code))
-  split <- inspect_waitlist(by_code$cedar_students, opt, sections = by_code$cedar_sections,
+  split <- inspect_waitlist(by_code$cedar_registrations, opt, sections = by_code$cedar_sections,
                             student_terms = student_terms)$count %>%
     arrange(subject_course)
   expect_equal(split$subject_course, c("SOC 371", "SOCI 371"))
   expect_equal(split$count, c(2L, 1L))
 
   # A former code asked for is its course.
-  picked <- inspect_waitlist(rn$cedar_students,
+  picked <- inspect_waitlist(rn$cedar_registrations,
                              create_test_opt(list(course = "SOC 371", term = 202010, uel = FALSE)),
                              sections = rn$cedar_sections, student_terms = student_terms)
   expect_equal(picked$count$subject_course, "SOCI 371")

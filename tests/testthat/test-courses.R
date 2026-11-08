@@ -69,7 +69,7 @@ test_that("attach_course_ids keys each table on the course, the registrar's code
   stale <- dplyr::mutate(test_sections_rn, course_id = "STALE")
   attr(stale, "cedar_provenance") <- "kept"
   out <- suppressMessages(attach_course_ids(
-    list(cedar_sections = stale, cedar_students = test_students_rn, cedar_programs = test_programs), cc))
+    list(cedar_sections = stale, cedar_registrations = test_students_rn, cedar_programs = test_programs), cc))
   secs <- out$cedar_sections
   # subject_course is the course; the code the schedule used that term is kept.
   expect_equal(secs$subject_course[secs$listed_code == "SOC 371"], "SOCI 371")
@@ -78,13 +78,13 @@ test_that("attach_course_ids keys each table on the course, the registrar's code
   expect_equal(secs$course_id, secs$subject_course)
   expect_false(any(secs$course_id == "STALE"))
   expect_equal(attr(secs, "cedar_provenance"), "kept")
-  expect_equal(out$cedar_students$subject_course[out$cedar_students$listed_code == "SOCI 250"], "SOCI 2315")
+  expect_equal(out$cedar_registrations$subject_course[out$cedar_registrations$listed_code == "SOCI 250"], "SOCI 2315")
   expect_false("course_id" %in% names(out$cedar_programs))
   # Keying a keyed table again reads its listed_code: the same table.
   again <- suppressMessages(attach_course_ids(out["cedar_sections"], cc))$cedar_sections
   expect_identical(again, secs)
   # The code-level functions read the registrar's code off a keyed table.
-  expect_equal(suppressMessages(build_cedar_courses(secs, out$cedar_students, demo_dims))$codes, cc$codes)
+  expect_equal(suppressMessages(build_cedar_courses(secs, out$cedar_registrations, demo_dims))$codes, cc$codes)
   # A table with a code the dimension never saw is a stop, not an NA.
   expect_error(suppressMessages(attach_course_ids(list(cedar_sections = test_sections), cc)),
                "does not know")
@@ -168,13 +168,13 @@ test_that("course_id_of resolves any code a loaded table carries to its course",
     c("HIST 320 > HIST 3201", "SOC 250 > SOCI 2315", "SOC 371 > SOCI 371")
   )
   # The class list already carries SOCI on the old SOC sections.
-  expect_equal(course_code_renames(rn$cedar_students), c("HIST 320 > HIST 3201", "SOCI 250 > SOCI 2315"))
+  expect_equal(course_code_renames(rn$cedar_registrations), c("HIST 320 > HIST 3201", "SOCI 250 > SOCI 2315"))
   expect_equal(course_code_renames(test_sections), character(0))
 })
 
 test_that("course_former_code_spans names each course's former codes with their terms", {
   rn <- rn01_course_tables()
-  spans <- course_former_code_spans(rn$cedar_students, rn$cedar_sections)
+  spans <- course_former_code_spans(rn$cedar_registrations, rn$cedar_sections)
   expect_equal(spans$subject_course, c("HIST 3201", "SOCI 2315", "SOCI 371"))
   expect_equal(spans$former_codes, c(
     "HIST 320 (Spring 2020 to Fall 2020)",
@@ -194,7 +194,7 @@ test_that("course_former_code_spans names each course's former codes with their 
 
 test_that("course_ids_of resolves picked codes, current or former, over a reader's tables", {
   rn <- rn01_course_tables()
-  expect_equal(course_ids_of("SOC 250, HIST 3201", rn$cedar_sections, rn$cedar_students),
+  expect_equal(course_ids_of("SOC 250, HIST 3201", rn$cedar_sections, rn$cedar_registrations),
                c("SOCI 2315", "HIST 3201"))
   # Two codes of one course are one id.
   expect_equal(course_ids_of(c("SOC 371", "SOCI 371"), rn$cedar_sections), "SOCI 371")

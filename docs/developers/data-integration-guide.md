@@ -22,7 +22,7 @@ CEDAR analyses expect a small set of normalized tables:
 | Table | Represents |
 |:------|:-----------|
 | `cedar_sections` | Course offerings and section-level enrollment context |
-| `cedar_students` | Student course registrations, grades, and course-level attributes |
+| `cedar_registrations` | Student course registrations, grades, and course-level attributes |
 | `cedar_student_terms` | One row per student-term: enrolled, returned, description, and the observed term-level and cumulative UNM credit timeline |
 | `cedar_programs` | Student majors, minors, concentrations, and program attributes by term |
 | `cedar_degrees` | Degrees awarded or pending |
@@ -135,7 +135,7 @@ silently into a generic bucket.
 
 CEDAR tables should not contain plaintext student identifiers. The transform
 process should hash or otherwise pseudonymize student IDs before writing
-`cedar_students`, `cedar_programs`, `cedar_degrees`, or related tables.
+`cedar_registrations`, `cedar_programs`, `cedar_degrees`, or related tables.
 
 Institutions remain responsible for:
 

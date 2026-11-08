@@ -20,7 +20,7 @@ file changes, update this one in the same commit — see
 
 | CEDAR table | source file (in `data/`) | UNM origin | rows | status |
 |---|---|---|---|---|
-| `cedar_students` | `class_lists` | MyReports class lists | 1,687,084 | **core** — enrollment backbone |
+| `cedar_registrations` | `class_lists` | MyReports class lists | 1,687,084 | **core** — enrollment backbone |
 | `cedar_programs` | `academic_studies` | MyReports academic studies | 464,011 | **core** — declared programs |
 | `cedar_degrees` | `degrees` | Degrees awarded | 63,284 | **core** — completions |
 | `cedar_sections` | `DESRs` | Dept Enrollment Status Report | 241,941 | **core** — the schedule students enroll in |
@@ -35,14 +35,14 @@ CEDAR column with the right vocabulary.
 ### The student-data path at a glance
 
 ```
-class_lists      → cedar_students   ─┐ student_id + term
+class_lists      → cedar_registrations   ─┐ student_id + term
 academic_studies → cedar_programs   ─┤────────────────────→ one student's
 degrees          → cedar_degrees    ─┘                       full record
                                      
 DESRs            → cedar_sections   ←── section_id / subject_course + term
 ```
 
-A student's story is assembled by joining `cedar_students` (what they enrolled
+A student's story is assembled by joining `cedar_registrations` (what they enrolled
 in) to `cedar_programs` (what they declared) on `student_id + term`, then to
 `cedar_degrees` (what they finished) on `student_id`. Those three joins are
 safe. **The joins that are not safe are on campus, college, and student level —
@@ -101,7 +101,7 @@ The course schedule. One row per section per term.
 
 ---
 
-## 2. `cedar_students` ← `class_lists`
+## 2. `cedar_registrations` ← `class_lists`
 
 Enrollment records. One row per student per section per term. **The largest
 table and the backbone of most analysis.**
@@ -192,7 +192,7 @@ Pathways populations, and demographics.
 
 ⚠ **`student_campus`, `student_college`, and `student_level` here are NAMES**
 (`Albuquerque/Main`, `College of Arts and Sciences`, `Undergraduate`) while the
-same columns in `cedar_students` hold codes. For campus this is forced —
+same columns in `cedar_registrations` hold codes. For campus this is forced —
 `academic_studies` exposes **no** `Student Campus Code` column. For level and
 college the source offers both forms and this transform chose the label. See
 §6a.
@@ -233,7 +233,7 @@ Completions. One row per student per awarded program.
 | `degree_abbr` | leading token of `program_code` |
 
 ⚠ `college`, `student_college`, and `campus` are all **NAMES** here, so they do
-not join to `cedar_sections` / `cedar_students`, which use codes.
+not join to `cedar_sections` / `cedar_registrations`, which use codes.
 
 ---
 
@@ -309,13 +309,13 @@ values present in both):
 This is the whole defect, visible in the mapping:
 
 ```
-cedar_students.student_level   ←  `Student Level Code`   →  UG, GR, AD, LW …
+cedar_registrations.student_level   ←  `Student Level Code`   →  UG, GR, AD, LW …
 cedar_programs.student_level   ←  `Student Level`        →  Undergraduate, Graduate/GASM …
 
-cedar_students.student_campus  ←  `Student Campus Code`  →  ABQ, GA, LA, TA, VA
+cedar_registrations.student_campus  ←  `Student Campus Code`  →  ABQ, GA, LA, TA, VA
 cedar_programs.student_campus  ←  `Student Campus`       →  Albuquerque/Main, Gallup …
 
-cedar_students.student_college ←  `Student College Code` →  AS, EH, FA …
+cedar_registrations.student_college ←  `Student College Code` →  AS, EH, FA …
 cedar_programs.student_college ←  `Translated College`   →  College of Arts and Sciences …
 ```
 
@@ -386,7 +386,7 @@ clean 1:1: `Albuquerque/Main↔ABQ`, `Valencia↔VA`, `Gallup↔GA`,
 
 ### Rule 2: never reuse a column name for a different vocabulary
 
-`student_campus` and `student_college` each mean one thing in `cedar_students`
+`student_campus` and `student_college` each mean one thing in `cedar_registrations`
 (code) and another in `cedar_programs` (name). If two columns cannot hold the
 same values, they must not share a name.
 
@@ -431,7 +431,7 @@ Of the mapping defects found in the 2026-07 audit
 **Would have been caught** — these are source→column decisions, visible the
 moment two rows sit next to each other in a table like §2/§3:
 
-- `cedar_students.student_campus ← Student Campus Code` vs
+- `cedar_registrations.student_campus ← Student Campus Code` vs
   `cedar_programs.student_campus ← Student Campus`
 - the same split for `student_college`
 - `cedar_degrees` shipping names for `college`/`campus`

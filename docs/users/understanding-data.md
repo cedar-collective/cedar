@@ -38,7 +38,7 @@ Detailed student-level enrollment records:
 
 {% include definition-summary.html id="registered" %}
 
-CEDAR derives `cedar_students$term` from the Class Lists `Academic Period Code`
+CEDAR derives `cedar_registrations$term` from the Class Lists `Academic Period Code`
 field. When an analysis needs a student's enrollment anchor, CEDAR may use the
 minimum observed class-list term for that student. This means "first observed
 class-list enrollment," not a formal Banner matriculation or start-term field.

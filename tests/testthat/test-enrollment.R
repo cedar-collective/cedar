@@ -811,7 +811,7 @@ test_that("Waitlists refuses a course-term table counted over other course codes
   rn <- rn01_course_tables()
   stale <- course_terms_for(test_students)
   expect_error(
-    inspect_waitlist(rn$cedar_students, list(term = 202010L), sections = rn$cedar_sections,
+    inspect_waitlist(rn$cedar_registrations, list(term = 202010L), sections = rn$cedar_sections,
                      course_terms = stale),
     "build_course_terms"
   )

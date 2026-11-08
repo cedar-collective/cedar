@@ -86,7 +86,7 @@ colleges <- tibble(code = academic_studies$`Major Code`,
 enrolments <- cedar_programs %>%
   filter(!grepl("Concentration", program_type), !is.na(major_code)) %>%
   distinct(student_id, term, code = major_code)
-courses <- cedar_students %>% filter(!is.na(department)) %>%
+courses <- cedar_registrations %>% filter(!is.na(department)) %>%
   select(student_id, term, unit_code = department)
 class_lists <- qs2::qs_read(file.path(source_dir, "class_lists.qs"))
 course_rows <- tibble(subject = class_lists$`Subject Code`,

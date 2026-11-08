@@ -54,9 +54,9 @@ audit_mapping_coverage <- function(files, sections = NULL, students = NULL,
 
   # Course subjects with no subjects.csv row at all.
   course_rows <- if (!is.null(students)) {
-    need(students, c("subject_code", "term"), "cedar_students")
+    need(students, c("subject_code", "term"), "cedar_registrations")
     tibble::tibble(subject = students$subject_code,
-                   college = banner_col(students, "source_college", "college", "cedar_students"),
+                   college = banner_col(students, "source_college", "college", "cedar_registrations"),
                    term = students$term)
   } else if (!is.null(sections)) {
     need(sections, c("subject", "term"), "cedar_sections")
@@ -101,7 +101,7 @@ audit_mapping_coverage <- function(files, sections = NULL, students = NULL,
   # keeps them, is summarised here.
   if (is.null(class_list_majors) && !is.null(students) &&
       any(c("major_code", "major_name") %in% names(students))) {
-    need(students, c("major_code", "major_name", "term"), "cedar_students")
+    need(students, c("major_code", "major_name", "term"), "cedar_registrations")
     class_list_majors <- summarize_class_list_majors(students)
   }
   if (!is.null(class_list_majors)) {
@@ -294,7 +294,7 @@ summarize_mapping_audit <- function(audit) {
 summarize_class_list_majors <- function(students) {
   missing <- setdiff(c("major_code", "major_name", "term"), names(students))
   if (length(missing)) {
-    stop("[mapping-audit.R] summarize_class_list_majors: cedar_students lacks ",
+    stop("[mapping-audit.R] summarize_class_list_majors: cedar_registrations lacks ",
          paste(missing, collapse = ", "), "; summarise the class list before thin_class_list(), ",
          "or pass cedar_class_list_descriptions.")
   }

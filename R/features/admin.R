@@ -491,7 +491,7 @@ build_code_history_table <- function(files, sections) {
 #'
 #' @param files Mapping files from read_institution_mappings().
 #' @param programs,sections,students cedar_programs, cedar_sections,
-#'   cedar_students as loaded.
+#'   cedar_registrations as loaded.
 #' @return A tibble: rule, what, affects, coded_in.
 build_counting_rules <- function(files, programs, sections, students, student_terms) {
   need <- function(df, cols, what) {
@@ -504,7 +504,7 @@ build_counting_rules <- function(files, programs, sections, students, student_te
        "cedar_programs")
   need(sections, c("term", "campus", "subject", "subject_course", "level", "department",
                    "college_basis", "crosslist_group", "crosslist_role"), "cedar_sections")
-  need(students, c("college_basis"), "cedar_students")
+  need(students, c("college_basis"), "cedar_registrations")
   need(student_terms, c("student_id", "term", "student_campus", "declared", "class_list_rows"),
        "cedar_student_terms")
   n <- function(x) format(x, big.mark = ",")
@@ -614,14 +614,14 @@ build_counting_rules <- function(files, programs, sections, students, student_te
 #' (`campus`); home-campus rows count each enrollment under its student's home
 #' campus that term, off `cedar_student_terms`.
 #'
-#' @param sections,students cedar_sections and cedar_students as loaded.
+#' @param sections,students cedar_sections and cedar_registrations as loaded.
 #' @param student_terms cedar_student_terms, for each enrollment's home campus.
 #' @return A tibble: campus, label, group, default_scope, sections,
 #'   enrollments_taught, enrollments_home.
 build_campus_reference <- function(sections, students, student_terms) {
   if (!"campus" %in% names(sections)) stop("[admin.R] build_campus_reference: cedar_sections lacks campus")
   if (!all(c("student_id", "term", "campus") %in% names(students))) {
-    stop("[admin.R] build_campus_reference: cedar_students lacks student_id, term or campus")
+    stop("[admin.R] build_campus_reference: cedar_registrations lacks student_id, term or campus")
   }
   students <- attach_student_descriptions(students[c("student_id", "term", "campus")],
                                           student_terms, "student_campus")

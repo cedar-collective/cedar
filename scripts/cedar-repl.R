@@ -1,6 +1,6 @@
 # cedar-repl.R - bootstrap for interactive analysis against local CEDAR data.
 #
-#   Rscript --vanilla -e 'source("scripts/cedar-repl.R"); nrow(cedar_students)'
+#   Rscript --vanilla -e 'source("scripts/cedar-repl.R"); nrow(cedar_registrations)'
 #
 # Run from the repository root and always with --vanilla. This is an analysis
 # helper, not a test runner, and its output is never release evidence.
@@ -29,17 +29,17 @@ load_funcs(cedar_base_dir = .cedar_root, modules = FALSE)
 # The dimension tables, read from institution/<id>/ as the app reads them.
 cedar_dims <- build_cedar_dims()
 
-# Load a local CEDAR table by name, e.g. cedar_read("cedar_students"). A fact
+# Load a local CEDAR table by name, e.g. cedar_read("cedar_registrations"). A fact
 # table gets its default unit columns attached here, as global.R attaches
 # them (ADR-001 step 3), so an ad-hoc number is on the app's units; sections
 # and class lists also get course_id (step 4), from the dimension below.
 cedar_read <- function(name) {
-  path <- file.path(cedar_data_dir, paste0(name, ".qs"))
+  path <- file.path(cedar_data_dir, paste0(cedar_table_file(name), ".qs"))
   if (!file.exists(path)) stop("[cedar-repl.R] No such data file: ", path)
   tbl <- qs2::qs_read(path)
   # As global.R loads it: the student descriptions are read off
   # cedar_student_terms, never the class list (ADR-001 step 5).
-  if (name == "cedar_students") tbl <- thin_class_list(tbl)
+  if (name == "cedar_registrations") tbl <- thin_class_list(tbl)
   if (name %in% names(CEDAR_ATTACHED_UNIT_COLUMNS)) {
     tbl <- suppressMessages(attach_default_units(stats::setNames(list(tbl), name), cedar_dims))[[name]]
   }
@@ -54,17 +54,17 @@ cedar_read <- function(name) {
 # global.R builds it. cedar_courses$courses and cedar_courses$codes are the
 # two tables the app holds as cedar_courses and cedar_course_codes.
 delayedAssign("cedar_courses", {
-  raw <- function(name) qs2::qs_read(file.path(cedar_data_dir, paste0(name, ".qs")))
-  build_cedar_courses(raw("cedar_sections"), raw("cedar_students"), cedar_dims)
+  raw <- function(name) qs2::qs_read(file.path(cedar_data_dir, paste0(cedar_table_file(name), ".qs")))
+  build_cedar_courses(raw("cedar_sections"), raw("cedar_registrations"), cedar_dims)
 })
 
 # Tables load lazily so sourcing remains fast when only one is needed.
-for (.nm in c("cedar_students", "cedar_programs", "cedar_degrees",
+for (.nm in c("cedar_registrations", "cedar_programs", "cedar_degrees",
               "cedar_sections", "cedar_student_terms",
               "cedar_applicants")) {
   local({
     name <- .nm
-    if (file.exists(file.path(cedar_data_dir, paste0(name, ".qs")))) {
+    if (file.exists(file.path(cedar_data_dir, paste0(cedar_table_file(name), ".qs")))) {
       delayedAssign(name, cedar_read(name), assign.env = .GlobalEnv)
     }
   })
@@ -78,7 +78,7 @@ delayedAssign("cedar_class_list_descriptions", local({
   path <- file.path(cedar_data_dir, "cedar_class_list_descriptions.qs")
   resolve_class_list_descriptions(
     if (file.exists(path)) qs2::qs_read(path) else NULL,
-    if (file.exists(path)) NULL else qs2::qs_read(file.path(cedar_data_dir, "cedar_students.qs")),
+    if (file.exists(path)) NULL else qs2::qs_read(file.path(cedar_data_dir, paste0(cedar_table_file("cedar_registrations"), ".qs"))),
     "cedar-repl.R")
 }))
 delayedAssign("cedar_class_list_majors", summarize_class_list_majors(cedar_class_list_descriptions))
@@ -86,6 +86,6 @@ delayedAssign("cedar_class_list_majors", summarize_class_list_majors(cedar_class
 # cedar_attempts, every graded attempt classified once, as global.R builds it
 # (R/branches/attempts.R): over the keyed class list, to the graded edge.
 delayedAssign("cedar_attempts", build_attempts(
-  cedar_students, cedar_report_edges(cedar_students, degrees = cedar_degrees)$edges))
+  cedar_registrations, cedar_report_edges(cedar_registrations, degrees = cedar_degrees)$edges))
 
 message("[cedar-repl.R] Ready. Tables load on first use; cedar_read(\"<name>\") for others.")

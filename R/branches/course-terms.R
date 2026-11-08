@@ -53,7 +53,7 @@ COURSE_TERMS_COLUMNS <- c(
 #' counts waitlist rows, not true demand (`R/branches/waitlist-demand.R`).
 #' The outcome counts are count_attempt_outcomes() over `attempts`.
 #'
-#' @param students `cedar_students` keyed on the course (attach_course_ids()).
+#' @param students `cedar_registrations` keyed on the course (attach_course_ids()).
 #' @param attempts cedar_attempts built from the same class list
 #'   (build_attempts()); its graded edge decides which terms carry outcomes.
 #' @return One row per campus, college, term, course and part of term, with
@@ -114,7 +114,7 @@ build_course_terms <- function(students, attempts) {
 #' (require_current_course_terms()).
 #'
 #' @param course_terms A saved cedar_course_terms, or anything else.
-#' @param students `cedar_students` keyed on the course.
+#' @param students `cedar_registrations` keyed on the course.
 #' @param graded_edge The loader's graded edge, to refuse a table whose
 #'   outcome columns stop at another; NULL for a reader that does not read
 #'   them.

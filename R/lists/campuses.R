@@ -3,7 +3,7 @@
 # institution's campuses.csv (read and validated here at load); the functions
 # below are the platform's campus guards. This file contains no campus code.
 #
-# UNM is not one campus. `cedar_students` carries ten campus codes, and roughly
+# UNM is not one campus. `cedar_registrations` carries ten campus codes, and roughly
 # 15% of enrollment rows come from branch campuses. 21% of courses are taught on
 # more than one campus, concentrated in the high-enrollment Gen Ed courses people
 # actually analyse — the largest run on six campuses and draw a quarter to a

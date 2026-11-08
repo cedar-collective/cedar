@@ -14,7 +14,7 @@
 #'
 #' Data requirements (passed via data_objects):
 #' - cedar_programs: student_id, term, dept_code, program_type, program_name
-#' - cedar_students: student_id, term, department, level, credits, final_grade, major
+#' - cedar_registrations: student_id, term, department, level, credits, final_grade, major
 #' - cedar_sections: term, department, subject_course, course_title, enrolled, crosslist_primary
 
 # compute_trend() — the canonical slope/direction helper — now lives in
@@ -23,13 +23,13 @@
 
 # ── Credit hours by level trendlines ─────────────────────────────────────────
 
-get_credit_hours_by_level_data <- function(cedar_students, cedar_sections, dept_code,
+get_credit_hours_by_level_data <- function(cedar_registrations, cedar_sections, dept_code,
                                            n_years = 5, campus = NULL) {
   current_year <- as.integer(format(Sys.Date(), "%Y"))
   cutoff_year  <- current_year - (n_years - 1)
 
   # Census SCH (definition credit-hours 3.0.0), the same count Dept Trends uses.
-  cedar_students %>%
+  cedar_registrations %>%
     dplyr::filter(
       department   == dept_code,
       level        %in% c("lower", "upper", "grad"),
@@ -54,17 +54,17 @@ get_credit_hours_by_level_data <- function(cedar_students, cedar_sections, dept_
 #' (lower division, upper division, graduate). Useful for seeing whether
 #' a department's instructional mix is shifting over time.
 #'
-#' @param cedar_students CEDAR students data frame (cedar_students).
+#' @param cedar_registrations CEDAR students data frame (cedar_registrations).
 #' @param cedar_sections CEDAR sections data frame, for late drops' credit values.
 #' @param dept_code Department code string (e.g., "HIST").
 #' @param n_years Number of years to include (default 5). Filters to
 #'   academic years >= current_year - (n_years - 1).
 #' @return A plotly object, or NULL if insufficient data.
-plot_credit_hours_by_level <- function(cedar_students, cedar_sections, dept_code,
+plot_credit_hours_by_level <- function(cedar_registrations, cedar_sections, dept_code,
                                        n_years = 5, campus = NULL) {
   message("[dept-dashboard.R] plot_credit_hours_by_level for ", dept_code)
 
-  ch <- get_credit_hours_by_level_data(cedar_students, cedar_sections, dept_code, n_years, campus)
+  ch <- get_credit_hours_by_level_data(cedar_registrations, cedar_sections, dept_code, n_years, campus)
 
   plot_credit_hours_by_level_data(ch)
 }
@@ -102,7 +102,7 @@ plot_credit_hours_by_level_data <- function(ch) {
     )
 }
 
-get_dashboard_credit_hour_shifts <- function(cedar_students, cedar_sections, dept_code, current_term,
+get_dashboard_credit_hour_shifts <- function(cedar_registrations, cedar_sections, dept_code, current_term,
                                              campus = NULL, n_years = 5L,
                                              hist_terms = 3L,
                                              min_abs_diff = 25,
@@ -123,7 +123,7 @@ get_dashboard_credit_hour_shifts <- function(cedar_students, cedar_sections, dep
   current_term <- as.integer(current_term[[1]])
   current_type <- get_term_type(current_term)
 
-  ch <- get_credit_hours_by_level_data(cedar_students, cedar_sections, dept_code, n_years, campus)
+  ch <- get_credit_hours_by_level_data(cedar_registrations, cedar_sections, dept_code, n_years, campus)
   if (nrow(ch) == 0 || !any(ch$term == current_term)) return(empty)
 
   ch <- ch %>%
@@ -784,7 +784,7 @@ get_new_this_term <- function(course_history, current_term) {
 #' @param dept_code Department code.
 #' @param current_term Selected term.
 #' @param campus Optional campus filter.
-#' @param cedar_students Optional class-list rows. When supplied, high-waitlist
+#' @param cedar_registrations Optional class-list rows. When supplied, high-waitlist
 #'   flags use the shared true-demand definition; otherwise the section snapshot
 #'   count is retained as an explicitly reported fallback.
 #' @param low_thresholds Named low-enrollment thresholds for lower, upper, split,
@@ -795,7 +795,7 @@ get_dashboard_enrollment_flags <- function(cedar_sections, course_history, dept_
                                            low_thresholds = NULL,
                                            perennial_threshold = 0.70,
                                            min_prior_terms = 3L,
-                                           cedar_students = NULL) {
+                                           cedar_registrations = NULL) {
   message("[dept-dashboard.R] get_dashboard_enrollment_flags for ", dept_code,
           " term ", current_term)
 
@@ -812,7 +812,7 @@ get_dashboard_enrollment_flags <- function(cedar_sections, course_history, dept_
 
   high_waitlist <- build_high_waitlist_review(
     cedar_sections, course_history, dept_code, current_term, campus = campus_filter,
-    students = cedar_students
+    students = cedar_registrations
   )
 
   low_opt <- list(
@@ -836,7 +836,7 @@ get_dashboard_enrollment_flags <- function(cedar_sections, course_history, dept_
     perennial_threshold  = perennial_threshold
   )
 
-  waitlist_source <- if (is.null(cedar_students)) {
+  waitlist_source <- if (is.null(cedar_registrations)) {
     "desr_snapshot_fallback"
   } else {
     "classlist_true_demand"
@@ -1241,7 +1241,7 @@ diagnose_new_this_term <- function(course_history, current_term) {
 #' Only home-dept sections are counted (crosslist partner sections excluded),
 #' matching the home-department filtering used throughout the dashboard.
 #'
-#' @param cedar_students CEDAR student class-list data frame.
+#' @param cedar_registrations CEDAR student class-list data frame.
 #' @param cedar_sections CEDAR sections data frame (used for home-CRN lookup).
 #' @param dept_code Department code string (e.g., "HIST").
 #' @param current_term Integer term code for the selected-term snapshot.
@@ -1257,7 +1257,7 @@ diagnose_new_this_term <- function(course_history, current_term) {
 #' @param student_terms The `cedar_student_terms` table: each seat's major
 #'   (the primary major) and class standing are the student-term's, never the
 #'   class list's (ADR-001 step 5; ISSUES.md I47).
-plot_dept_student_donuts <- function(cedar_students, cedar_sections, dept_code,
+plot_dept_student_donuts <- function(cedar_registrations, cedar_sections, dept_code,
                                      current_term, n_years = 5, campus = NULL, dims,
                                      student_terms) {
   message("[dept-dashboard.R] plot_dept_student_donuts for ", dept_code)
@@ -1275,7 +1275,7 @@ plot_dept_student_donuts <- function(cedar_students, cedar_sections, dept_code,
   cl_opt <- list(dept_code = dept_code, status = "A")
   if (!is.null(campus) && length(campus) > 0) cl_opt$course_campus <- campus
 
-  students <- filter_class_list(cedar_students, cl_opt) %>%
+  students <- filter_class_list(cedar_registrations, cl_opt) %>%
     dplyr::filter(
       crn %in% home_crns,
       level %in% c("lower", "upper"),
@@ -1426,7 +1426,7 @@ plot_dept_student_donuts <- function(cedar_students, cedar_sections, dept_code,
   ifelse(is.na(translated), codes, translated)
 }
 
-get_dashboard_composition_shifts <- function(cedar_students, cedar_sections,
+get_dashboard_composition_shifts <- function(cedar_registrations, cedar_sections,
                                              cedar_programs, dept_code,
                                              current_term, campus = NULL,
                                              n_years = 3L, min_current = 5L,
@@ -1560,7 +1560,7 @@ get_dashboard_composition_shifts <- function(cedar_students, cedar_sections,
 
   cl_opt <- list(dept_code = dept_code, status = "A")
   if (!is.null(campus) && length(campus) > 0) cl_opt$course_campus <- campus
-  students <- filter_class_list(cedar_students, cl_opt) %>%
+  students <- filter_class_list(cedar_registrations, cl_opt) %>%
     dplyr::filter(crn %in% home_crns, level %in% c("lower", "upper")) %>%
     attach_student_descriptions(student_terms, c("major_code", "student_classification")) %>%
     dplyr::mutate(
@@ -1614,11 +1614,11 @@ get_dashboard_composition_shifts <- function(cedar_students, cedar_sections,
 #' and then reused by get_new_courses() and get_dormant_courses() to avoid
 #' redundant data passes.
 #'
-#' @param data_objects Named list containing cedar_programs, cedar_students,
+#' @param data_objects Named list containing cedar_programs, cedar_registrations,
 #'   cedar_sections (same structure as used by dept-trends.R).
 #' @param opt Named list. Required: opt[["dept_code"]] — department code string.
 #'   Optional: opt[["campus"]] — campus code(s) applied once at the top of this
-#'   function to cedar_programs (student_campus), cedar_students (campus), and
+#'   function to cedar_programs (student_campus), cedar_registrations (campus), and
 #'   cedar_sections (campus). All downstream functions receive pre-filtered data.
 #'   NULL or "" means no campus filter.
 #' @return Named list with:
@@ -1682,11 +1682,11 @@ create_dept_dashboard_data <- function(data_objects, opt) {
   # renumbered or renamed course is one course in the dashboard's history, its
   # waitlist and its flags: HIST 3201 is not "new this term" when it ran as
   # HIST 320 last year, and HIST 320 is not "missing" from it.
-  cedar_students <- data_objects[["cedar_students"]]
+  cedar_registrations <- data_objects[["cedar_registrations"]]
   cedar_sections <- data_objects[["cedar_sections"]]
 
   # Campus is passed through each function's opt as course_campus (the Cedar standard
-  # key for the campus column in cedar_sections and cedar_students). Headcount functions
+  # key for the campus column in cedar_sections and cedar_registrations). Headcount functions
   # use cedar_programs which tracks student home campus separately — not filtered here.
 
   # dept is already a short code (e.g. "HIST", "CS") from the dropdown,
@@ -1731,7 +1731,7 @@ create_dept_dashboard_data <- function(data_objects, opt) {
     dashboard_headcount_scope_facts(programs_for_hc, dept_code, current_term)
 
   result$credit_hour_shifts <- get_dashboard_credit_hour_shifts(
-    cedar_students, cedar_sections, dept_code, current_term, campus = campus
+    cedar_registrations, cedar_sections, dept_code, current_term, campus = campus
   )
 
   # Build course enrollment history via get_enrl (one row per course per campus per
@@ -1749,10 +1749,10 @@ create_dept_dashboard_data <- function(data_objects, opt) {
   result$current_enrl_vs_avg    <- get_current_enrl_vs_avg(course_history, current_term)
   result$enrollment_flags       <- get_dashboard_enrollment_flags(
     cedar_sections, course_history, dept_code, current_term, campus = campus,
-    cedar_students = cedar_students
+    cedar_registrations = cedar_registrations
   )
   result$regstats_flags         <- get_reg_stats(
-    cedar_students, cedar_sections,
+    cedar_registrations, cedar_sections,
     list(
       shiny = TRUE,
       dept_code = dept_code,
@@ -1766,14 +1766,14 @@ create_dept_dashboard_data <- function(data_objects, opt) {
   result$missing_from_earlier   <- get_missing_from_earlier(course_history, current_term)
   result$repeated_topics        <- get_repeated_topics_courses(course_history, current_term)
   result$composition_shifts     <- get_dashboard_composition_shifts(
-    cedar_students, cedar_sections, cedar_programs, dept_code, current_term, campus = campus,
+    cedar_registrations, cedar_sections, cedar_programs, dept_code, current_term, campus = campus,
     dims = data_objects[["cedar_dims"]],
     student_terms = data_objects[["cedar_student_terms"]]
   )
 
   # Name the other codes each course has carried (NA when one) on the course
   # tables the page shows, read off the whole keyed tables.
-  spans <- course_former_code_spans(cedar_students, cedar_sections)
+  spans <- course_former_code_spans(cedar_registrations, cedar_sections)
   attach_spans <- function(df) {
     if (!is.data.frame(df) || !"subject_course" %in% names(df)) return(df)
     df %>%
@@ -1784,7 +1784,7 @@ create_dept_dashboard_data <- function(data_objects, opt) {
   result$enrollment_flags$low_enrollment <- attach_spans(result$enrollment_flags$low_enrollment)
   result$new_this_term <- attach_spans(result$new_this_term)
   result$missing_from_earlier <- attach_spans(result$missing_from_earlier)
-  result$course_code_renames <- course_code_renames(cedar_students)
+  result$course_code_renames <- course_code_renames(cedar_registrations)
 
   message("[dept-dashboard.R] Dashboard data ready for ", dept_code)
   result

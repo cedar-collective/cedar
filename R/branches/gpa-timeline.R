@@ -66,7 +66,7 @@ CEDAR_GRADE_POINTS <- c(
 #' One row per (student, term in which they earned graded hours) giving the
 #' credit-weighted cumulative GPA entering and after that term.
 #'
-#' @param students Data frame. `cedar_students`. Needs `student_id`, `term`,
+#' @param students Data frame. `cedar_registrations`. Needs `student_id`, `term`,
 #'   `final_grade` and `credits`.
 #' @param opt List of options:
 #'   \describe{
@@ -91,7 +91,7 @@ build_gpa_timeline <- function(students, opt = list()) {
   if (length(missing_cols) > 0) {
     stop("[gpa-timeline.R] students is missing required column(s): ",
          paste(missing_cols, collapse = ", "),
-         ". Expected the cedar_students table.")
+         ". Expected the cedar_registrations table.")
   }
 
   st <- students

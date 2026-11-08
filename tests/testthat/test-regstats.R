@@ -176,9 +176,9 @@ test_that("Regstats refuses a course-term table not counted by this build over t
   expect_false(course_terms_is_current(dplyr::select(current, -census_enrl), test_students_regstats))
   # Counted over one class list's renames, it is not current for another's.
   rn <- rn01_course_tables()
-  expect_false(course_terms_is_current(current, rn$cedar_students))
-  rn_base <- course_terms_for(rn$cedar_students)
-  expect_true(course_terms_is_current(rn_base, rn$cedar_students))
+  expect_false(course_terms_is_current(current, rn$cedar_registrations))
+  rn_base <- course_terms_for(rn$cedar_registrations)
+  expect_true(course_terms_is_current(rn_base, rn$cedar_registrations))
   # The class list already names the renamed subject (I45), so its renames
   # are the two renumberings; the schedule's SOC codes are on the sections.
   expect_identical(attr(rn_base, "code_renames"),
@@ -202,7 +202,7 @@ test_that("Regstats follows a course across its codes (ADR-001 step 4)", {
   # every offering at cap; one prior term at cap is Chronically full here.
   opt <- regstats_history_opt(term = 202110L)
   opt$thresholds$chronic_fill_rate <- 0.05
-  result <- get_reg_stats(rn$cedar_students, rn$cedar_sections, opt)
+  result <- get_reg_stats(rn$cedar_registrations, rn$cedar_sections, opt)
 
   # HIST 3201's Spring 2021 fill is compared with HIST 320's Spring 2020,
   # and the row says which code that history ran under.
@@ -223,14 +223,14 @@ test_that("Regstats follows a course across its codes (ADR-001 step 4)", {
   expect_equal(result$course_key_info$n_renamed_courses, 2L)
   expect_equal(result$course_key_info$renamed_courses, c("HIST 3201", "SOCI 2315"))
   expect_match(result$course_key_info$note, "2 flagged courses also ran under another code", fixed = TRUE)
-  expect_identical(result$code_renames, course_code_renames(rn$cedar_students))
+  expect_identical(result$code_renames, course_code_renames(rn$cedar_registrations))
   # Every flagged table carries the column, flagged or empty.
   for (nm in c("bumps", "dips", "early_drops", "late_drops", "waits", "sat")) {
     expect_true("former_codes" %in% names(result[[nm]]), info = nm)
   }
   # The proposed renumbering assigns nothing: PHIL 150 and PHIL 1115 stay two
   # courses, and the Fall 2020 snapshot counts the schedule's courses by id.
-  fall <- get_reg_stats(rn$cedar_students, rn$cedar_sections, regstats_history_opt(term = 202080L))
+  fall <- get_reg_stats(rn$cedar_registrations, rn$cedar_sections, regstats_history_opt(term = 202080L))
   expect_equal(fall$summary$lower$n_courses, 1L)
   expect_equal(fall$summary$upper$n_courses, 2L)
   expect_equal(fall$course_key_info$n_renamed_courses, 0L)
@@ -239,7 +239,7 @@ test_that("Regstats follows a course across its codes (ADR-001 step 4)", {
   # A former code asked for is its course.
   former_opt <- opt
   former_opt$course <- "HIST 320"
-  former <- get_reg_stats(rn$cedar_students, rn$cedar_sections, former_opt)
+  former <- get_reg_stats(rn$cedar_registrations, rn$cedar_sections, former_opt)
   expect_equal(former$sat$subject_course, "HIST 3201")
   expect_equal(former$all_flagged_courses, "HIST 3201")
   expect_equal(former$sat$former_codes, "HIST 320 (Spring 2020 to Fall 2020)")
@@ -253,7 +253,7 @@ test_that("Regstats excludes a course the list names by a former code, on every 
   opt <- regstats_history_opt(term = 202110L)
   opt$thresholds$chronic_fill_rate <- 0.05
   rlang::local_bindings(excluded_courses = "HIST 320", .env = .GlobalEnv)
-  raw <- get_reg_stats(rn$cedar_students, rn$cedar_sections, opt)
+  raw <- get_reg_stats(rn$cedar_registrations, rn$cedar_sections, opt)
   expect_false("HIST 3201" %in% raw$all_flagged_courses)
   expect_equal(sort(raw$sat$subject_course), c("LING 2110", "SOCI 2315"))
   # HIST 3201 is Spring 2021's only upper-division course, so the snapshot
@@ -261,15 +261,15 @@ test_that("Regstats excludes a course the list names by a former code, on every 
   expect_null(raw$summary$upper$n_courses)
   expect_equal(raw$summary$lower$n_courses, 2L)
 
-  course_terms <- course_terms_for(rn$cedar_students)
+  course_terms <- course_terms_for(rn$cedar_registrations)
   expect_true("HIST 3201" %in% course_terms$subject_course)
-  from_base <- get_reg_stats(rn$cedar_students, rn$cedar_sections, opt, course_terms = course_terms)
+  from_base <- get_reg_stats(rn$cedar_registrations, rn$cedar_sections, opt, course_terms = course_terms)
   expect_equal(from_base[names(from_base) != "cache_info"], raw[names(raw) != "cache_info"])
 
   # A student-level filter recounts the class list; it excludes the same course.
   filtered_opt <- opt
   filtered_opt$student_campus <- "ABQ"
-  filtered <- get_reg_stats(rn$cedar_students, rn$cedar_sections, filtered_opt)
+  filtered <- get_reg_stats(rn$cedar_registrations, rn$cedar_sections, filtered_opt)
   expect_false("HIST 3201" %in% filtered$all_flagged_courses)
 })
 
@@ -277,7 +277,7 @@ test_that("the schedule's old code joins the class list's new one in Regstats sa
   rn <- rn01_course_tables()
   # Spring 2020: SOC 371 and SOC 250 are on the schedule, SOCI 371 and
   # SOCI 250 on the class list. By course every section finds its census.
-  result <- get_reg_stats(rn$cedar_students, rn$cedar_sections, regstats_history_opt(term = 202010L))
+  result <- get_reg_stats(rn$cedar_registrations, rn$cedar_sections, regstats_history_opt(term = 202010L))
   coverage <- result$baseline_info$saturation_coverage
   expect_equal(coverage$matched, 5L)
   expect_equal(coverage$unmatched, 0L)

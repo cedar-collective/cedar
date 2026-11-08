@@ -53,14 +53,14 @@ split_env <- function(name, default = character(0)) {
 
 resolve_data_path <- function(name) {
   use_small <- exists("cedar_use_small_data") && isTRUE(cedar_use_small_data)
-  preferred <- file.path(cedar_data_dir, paste0(name, get_data_extension()))
+  preferred <- file.path(cedar_data_dir, paste0(cedar_table_file(name), get_data_extension()))
   alternate <- if (grepl("\\.qs$", preferred, ignore.case = TRUE)) {
     sub("\\.qs$", ".Rds", preferred, ignore.case = TRUE)
   } else {
     sub("\\.Rds$", ".qs", preferred, ignore.case = TRUE)
   }
   candidates <- c(
-    if (use_small) file.path(cedar_data_dir, paste0(name, c("_small.qs", "_small.Rds"))),
+    if (use_small) file.path(cedar_data_dir, paste0(cedar_table_file(name), c("_small.qs", "_small.Rds"))),
     preferred,
     alternate
   )
@@ -79,7 +79,7 @@ load_object <- function(name) {
 
 data_objects <- list(
   cedar_sections = load_object("cedar_sections"),
-  cedar_students = load_object("cedar_students"),
+  cedar_registrations = load_object("cedar_registrations"),
   # Credit Hours reads each row's major off the student-term table.
   cedar_student_terms = load_object("cedar_student_terms"),
   cedar_programs = load_object("cedar_programs"),
@@ -98,7 +98,7 @@ if (exists("cedar_min_term", inherits = TRUE)) {
 
 # The class list as global.R loads it: no student-description columns
 # (thin_class_list(), ADR-001 step 5).
-data_objects[["cedar_students"]] <- thin_class_list(data_objects[["cedar_students"]])
+data_objects[["cedar_registrations"]] <- thin_class_list(data_objects[["cedar_registrations"]])
 
 # The default unit columns, attached at load as global.R attaches them, so the
 # cache the app reads was built on the same units (ADR-001 step 3).
@@ -110,7 +110,7 @@ data_objects[["cedar_dims"]] <- cedar_dims
 # confirmed successions in code_history.csv, attached to the sections and the
 # class lists beside subject_course. Never saved: a confirmed row changes it at
 # the next start, as a unit decision does.
-cedar_courses <- build_cedar_courses(data_objects[["cedar_sections"]], data_objects[["cedar_students"]], cedar_dims)
+cedar_courses <- build_cedar_courses(data_objects[["cedar_sections"]], data_objects[["cedar_registrations"]], cedar_dims)
 data_objects <- attach_course_ids(data_objects, cedar_courses)
 data_objects[["cedar_courses"]] <- cedar_courses$courses
 data_objects[["cedar_course_codes"]] <- cedar_courses$codes
@@ -118,7 +118,7 @@ data_objects[["cedar_course_codes"]] <- cedar_courses$codes
 
 # The same edges global.R computes, so the cache keys match what the app asks for.
 report_edges <- cedar_report_edges(
-  data_objects[["cedar_students"]],
+  data_objects[["cedar_registrations"]],
   degrees = data_objects[["cedar_degrees"]]
 )
 cedar_edges <- report_edges$edges

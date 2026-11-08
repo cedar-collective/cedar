@@ -71,8 +71,8 @@ save_qs_cache_atomic <- function(value, cache_file) {
 # to avoid re-running digest::digest() on the full data dimensions every lookup.
 # Falls back to computing the hash inline if the globals are absent (e.g. in tests).
 get_course_neighbors_cache_key <- function(course_code, students, courses, scope = list()) {
-  students_hash <- if (exists("cedar_students_hash", envir = .GlobalEnv)) {
-    cedar_students_hash
+  students_hash <- if (exists("cedar_registrations_hash", envir = .GlobalEnv)) {
+    cedar_registrations_hash
   } else {
     course_neighbors_content_hash(
       students,
@@ -247,9 +247,9 @@ cedar_dept_cache_version <- 13L
 # tables since ADR-001 step 3, so a mapping edit that renames one must miss too.
 DEPT_CACHE_TABLES <- list(
   hc = c("cedar_programs", "cedar_dims"),
-  enrl = c("cedar_students", "cedar_sections", "cedar_student_terms", "cedar_programs", "cedar_dims"),
+  enrl = c("cedar_registrations", "cedar_sections", "cedar_student_terms", "cedar_programs", "cedar_dims"),
   deg = c("cedar_degrees", "cedar_dims"),
-  ch = c("cedar_students", "cedar_sections", "cedar_student_terms", "cedar_programs", "cedar_dims"),
+  ch = c("cedar_registrations", "cedar_sections", "cedar_student_terms", "cedar_programs", "cedar_dims"),
   demo = "cedar_programs"
 )
 
@@ -484,7 +484,7 @@ get_dept_dashboard_cache_key <- function(opt, data_objects, cache_date = Sys.Dat
     term = as.character(term),
     campus = sort(campus_values),
     date = date_key,
-    students_hash = get_cache_table_dim_hash(data_objects, "cedar_students", "cedar_students_hash"),
+    students_hash = get_cache_table_dim_hash(data_objects, "cedar_registrations", "cedar_registrations_hash"),
     sections_hash = get_cache_table_dim_hash(data_objects, "cedar_sections", "cedar_sections_hash"),
     programs_hash = get_cache_table_dim_hash(data_objects, "cedar_programs", "cedar_programs_hash"),
     # Each seat's major and class standing on the donuts and composition shifts

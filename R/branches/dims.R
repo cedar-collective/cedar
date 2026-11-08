@@ -303,7 +303,7 @@ CEDAR_STUDENT_TERM_UNIT_COLS <- c(unit = "primary_dept_code", college = "primary
 # before attaching so a stamped file and an unstamped one load the same way.
 CEDAR_ATTACHED_UNIT_COLUMNS <- list(
   cedar_sections = c("department", "college", "college_basis", "crosslist_external", "crosslist_partners"),
-  cedar_students = c("department", "college", "college_basis"),
+  cedar_registrations = c("department", "college", "college_basis"),
   cedar_programs = c("dept_code", "program_college", "college_code", "college_basis", "student_college"),
   cedar_degrees  = c("dept_code", "college_code", "college_basis", "college", "student_college"),
   cedar_student_terms = unname(CEDAR_STUDENT_TERM_UNIT_COLS)
@@ -331,7 +331,7 @@ attach_default_units <- function(tables, dims) {
       bare <- tbl[setdiff(colnames(tbl), stamped)]
       attached <- switch(name,
         cedar_sections      = attach_section_units(bare, dims),
-        cedar_students      = attach_unit(bare, dims, "subject"),
+        cedar_registrations      = attach_unit(bare, dims, "subject"),
         cedar_programs      = attach_program_units(bare, dims),
         cedar_degrees       = attach_degree_units(bare, dims),
         cedar_student_terms = attach_student_term_units(bare, dims))

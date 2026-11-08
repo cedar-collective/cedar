@@ -18,7 +18,7 @@
 # === MULTI-CAMPUS SCENARIOS (MC01-MC03, defined at the end of this file) ===
 #
 # The base fixtures below are campus-thin: cedar_sections has ABQ/EA/GA rows but
-# cedar_students is 100% ABQ, so campus-grouping analytics tested against them
+# cedar_registrations is 100% ABQ, so campus-grouping analytics tested against them
 # passed without checking anything. MC01-MC03 exist to fix that.
 #
 #   MC01 — gen_ed_assoc_* extended onto EA. HIST 1110 on two campuses, same two
@@ -28,7 +28,7 @@
 #          Existing gen-ed expectations are ABQ-scoped; look-ups by instructor
 #          name must also filter on campus.
 #
-#   MC02 — cedar_students_mc (14 rows) + cedar_programs_mc (7 rows).
+#   MC02 — cedar_registrations_mc (14 rows) + cedar_programs_mc (7 rows).
 #          SPAN 101 gateway: ABQ=4 students (MC_A1..A4), GA=2 (MC_G1, MC_G2).
 #          SPAN 101L is a CO-REQUISITE in the same term as SPAN 101 (MC_A1, MC_A2).
 #          SPAN 201 is the genuine follow-on: 4 distinct students reach it
@@ -59,37 +59,37 @@
 #          Biology: BIOL declared (3) — a non-health control that must never
 #            resolve into a health group.
 #
-#   RP01 — cedar_students_rp (13 rows) + cedar_degrees_rp (1 row). HIST 499:
+#   RP01 — cedar_registrations_rp (13 rows) + cedar_degrees_rp (1 row). HIST 499:
 #          "returned next term" = registered next fall/spring OR graduated.
 #          pass 6 anchors, 4 returned; fail 1/1; early drop 1/1. Matches
 #          get_retention_trend() ret_1 (202010 n=6 r=4; 202080 n=1 r=1).
 #
-#   MC03 — cedar_students_mcret (7 rows). COMM 101 anchor at 202110:
+#   MC03 — cedar_registrations_mcret (7 rows). COMM 101 anchor at 202110:
 #          ABQ cohort n=2 (both return) -> ret_1 = 1.0
 #          GA  cohort n=2 (MC_R3 returns AT ABQ, MC_R4 does not) -> ret_1 = 0.5
 #          A campus-blind grouping reports a single 0.75 and hides both facts.
 #
-#   WL01 — cedar_students_wlmkt (13 rows). PSYC 1110, Fall 2020, a waitlist in
+#   WL01 — cedar_registrations_wlmkt (13 rows). PSYC 1110, Fall 2020, a waitlist in
 #          the pooled ABQ+EA projection market. 7 students carry a waitlist row;
 #          2 are waiting in the market. The canonical per-campus rule alone
 #          counts 4: it also keeps a student holding an EA seat and an early
 #          drop already on the class list (ISSUES.md I27).
 #
-#   IS01 — cedar_sections_intersession (3 rows) + cedar_students_intersession
+#   IS01 — cedar_sections_intersession (3 rows) + cedar_registrations_intersession
 #          (7 rows). BIOL 1140, Fall 2020, with a December intersession section
 #          at EA, pulled before it began. Projections leave intersession out:
 #          class-list total 4, first day 4, seats 50. Read as a regular
 #          session it makes the first day unknown, the seats 65 and the
 #          class-list total 5 (ISSUES.md I28, I35).
 #
-#   RW01 — cedar_students_rw (18 rows) + cedar_programs_rw (9 rows). Fall 2020
+#   RW01 — cedar_registrations_rw (18 rows) + cedar_programs_rw (9 rows). Fall 2020
 #          students and their Spring 2021 registration, both pulled 2020-11-20.
 #          Population 7 (an early drop and a new student are out); registered
 #          2, one of them on another campus; 1 waitlisted only, 1 dropped only.
 #          Six groups by unit, standing, late withdrawal and posted DFW grades.
 #          Used by test-registration-snapshots.R.
 #
-#   ST01 — cedar_students_st (19 rows) + cedar_programs_st (13 rows) +
+#   ST01 — cedar_registrations_st (19 rows) + cedar_programs_st (13 rows) +
 #          cedar_degrees_st (1 row). Eleven students ST_A..ST_K, every class
 #          list row pulled 2021-02-15 so the settled edge is Spring 2021.
 #          build_student_terms(): 17 student-terms, 14 enrolled, 1 declared
@@ -153,7 +153,7 @@
 #
 # === CEDAR_STUDENTS ===
 #
-# EC-08 — cedar_students_reused_crn: 5 extract rows, 4 distinct attempts.
+# EC-08 — cedar_registrations_reused_crn: 5 extract rows, 4 distinct attempts.
 #   CRN 91001 is reused in 202010, 202080, and 202110. EC08-A takes HIST 1110
 #   twice (A then F); the F row is duplicated within 202080. EC08-B also takes
 #   that fall section and earns A. EC08-A later withdraws from HIST 1120 under
@@ -161,7 +161,7 @@
 #   Kept separate from the base counts below so this extract-duplicate scenario
 #   can be reused by outcome consumers without changing unrelated cohorts.
 #
-# EC-09 — cedar_students_audits: 15 rows, 5 academic outcomes, 4 DFW (80%).
+# EC-09 — cedar_registrations_audits: 15 rows, 5 academic outcomes, 4 DFW (80%).
 #   AUD across every registered/drop status, including a padded late-drop AUD,
 #   is excluded. Blank/NA late drops and a late drop with A remain DFW.
 #   Early-drop F and registered blank have no academic outcome.
@@ -192,7 +192,7 @@
 # ANTH 2175 (spring only): 202010 registered=62, 202110 registered=21.
 # Its earlier term has no prior history, so later enrollment must not qualify
 # 202010 as a bump. EC-11 below supplies genuine earlier comparison terms.
-# EC-11 (separate cedar_students_regstats / cedar_sections_regstats tables):
+# EC-11 (separate cedar_registrations_regstats / cedar_sections_regstats tables):
 #   SOCI 100 ABQ/full-term fall 202080: prior census mean=54, population SD=10;
 #     early drops mean=4/SD=2, late drops mean=6/SD=2; prior fill mean=.54/SD=.10.
 #     n_hist_terms=2; one prior term at/above .60 fill. With Min SDs=1, census
@@ -216,7 +216,7 @@
 #   30 begins after the pull. Course first day NA, basis "sessions_pending",
 #   started-session count 8; by session, full-term 8 complete, 2H pending.
 #
-# EC-12 (separate cedar_students_roadblocks table):
+# EC-12 (separate cedar_registrations_roadblocks table):
 #   ECON 100 ABQ first eligible outcomes: population 5 pass / 5 DFW,
 #   next-term stop-outs 1/5 pass, 4/5 DFW; baseline 5 pass / 5 DFW,
 #   stop-outs 2/5 in each group. Excess gap=.6; impact=3; pop DFW rate=.5.
@@ -254,7 +254,7 @@
 #   own dept_code it is: ASPE has 2 majors, ENG 3. Matching by program name
 #   gave ASPE all 5 (ISSUES I15).
 #
-# RN01 (separate cedar_sections_rn / cedar_students_rn tables, read with
+# RN01 (separate cedar_sections_rn / cedar_registrations_rn tables, read with
 #   institution/demo/code_history.csv): course codes that succeed one another,
 #   for the course dimension (ADR-001 step 4). Eleven codes, seven courses.
 #   SOC 371 (Spring 2020, section RN01A) is SOCI 371 on its class list and on
@@ -270,7 +270,7 @@
 #   SOCI 2120 is on a class list and never on the schedule (in_sections FALSE).
 #   LING 2110 is offered twice under one code: the control.
 #
-# RN02 (separate cedar_students_rn02 rows, read with RN01's tables and the
+# RN02 (separate cedar_registrations_rn02 rows, read with RN01's tables and the
 #   demo code_history.csv): a waitlist while both codes are live, as UNM's
 #   class lists carry CCS beside CCST. Spring 2020, section RN01A (SOC 371 on
 #   the schedule): RN02-W1 waits under SOC 371, RN02-W2 under SOCI 371, and
@@ -278,7 +278,7 @@
 #   (SOCI 371) the true demand is W1 and W2: 2 students, one row; W3 holds a
 #   seat. By code it reads SOC 371 = 2 (W1, W3) and SOCI 371 = 1 (W2).
 #
-# EC-15 (separate cedar_sections_xl_switch / cedar_students_xl_switch tables):
+# EC-15 (separate cedar_sections_xl_switch / cedar_registrations_xl_switch tables):
 #   MATH 3750 + CS 3750 share one Spring 2021 ABQ section; MATH 3750 also has
 #   its own. Two students switch from CS to MATH inside the shared section.
 #   From MATH 3750: all listings 11 current / 12 census; MATH 7 / 7, CS 4 / 5.
@@ -1826,7 +1826,7 @@ cedar_sections_schedule <- cedar_sections_topics[rep(4, nrow(.sc01)), ] %>%
 #   NURS 2010  202010 (2)  — NF part_term, MOPS delivery variety
 #   NURS 3020  202010 (2)  — NF part_term, MOPS, upper-level variety
 
-cedar_students <- tribble(
+cedar_registrations <- tribble(
   ~enrollment_id,        ~section_id, ~student_id,           ~term,
   ~subject_course,       ~campus,     ~college,    ~department,
   ~registration_status_code, ~final_grade, ~credits, ~term_type, ~student_level,
@@ -1991,8 +1991,8 @@ cedar_students <- tribble(
 # Design: 62 RE in 202010 and 21 RE in 202110 (same term_type=spring).
 # registered_mean=(62+21)/2=41.5, pop_sd=20.5, sd_deviation@202010=1.0,
 # impacted@202010=20.5 → flags as moderate_high bump when term=202010 filtered.
-cedar_students <- dplyr::bind_rows(
-  cedar_students,
+cedar_registrations <- dplyr::bind_rows(
+  cedar_registrations,
   tibble::tibble(
     enrollment_id            = sprintf("AN2175-SP10-%03d", 1:62),
     section_id               = "S10008",
@@ -2063,11 +2063,11 @@ cedar_students <- dplyr::bind_rows(
   )
 )
 
-# Add columns present in real cedar_students that are derived or NA in designed data.
+# Add columns present in real cedar_registrations that are derived or NA in designed data.
 # crn comes from the row's section, as it does in a Banner class list. A late
 # drop's credits are zero, as Banner records them; census SCH reads the credits
 # back from the section (filter_sch_rows(), credit-hours 3.0.0).
-cedar_students <- cedar_students %>%
+cedar_registrations <- cedar_registrations %>%
   dplyr::mutate(
     crn                   = cedar_sections$crn[match(section_id, cedar_sections$section_id)],
     credits               = dplyr::if_else(registration_status_code %in% c("DG", "DW"), 0, credits),
@@ -2114,7 +2114,7 @@ cedar_students <- cedar_students %>%
 
 
 # EC-08 — recycled CRNs across terms, including an exact same-term duplicate.
-cedar_students_reused_crn <- tribble(
+cedar_registrations_reused_crn <- tribble(
   ~student_id, ~term, ~subject_course, ~crn, ~registration_status_code, ~final_grade,
   "EC08-A", 202010L, "HIST 1110", "91001", "RE", "A",
   "EC08-A", 202080L, "HIST 1110", "91001", "RE", "F",
@@ -2139,7 +2139,7 @@ cedar_students_reused_crn <- tribble(
 
 # =============================================================================
 # EC-09 — audit exclusions must take precedence over late-drop status.
-cedar_students_audits <- tribble(
+cedar_registrations_audits <- tribble(
   ~student_id, ~registration_status_code, ~final_grade,
   "EC09-RE-AUD", "RE", "AUD",
   "EC09-RS-AUD", "RS", "AUD",
@@ -2176,16 +2176,16 @@ cedar_students_audits <- tribble(
 # and the Fall 2020 returns are observable on the student-term table (a return
 # into a term with no class list is unobservable, never FALSE). No grade, so
 # no outcome classifier counts the row.
-cedar_students_audits <- dplyr::bind_rows(
-  cedar_students_audits,
-  cedar_students_audits %>%
+cedar_registrations_audits <- dplyr::bind_rows(
+  cedar_registrations_audits,
+  cedar_registrations_audits %>%
     dplyr::filter(student_id == "EC09-RE-A") %>%
     dplyr::mutate(term = 202110L, subject_course = "HIST 2110", crn = "92100",
                   course_title = "Survey of History II", final_grade = NA_character_,
                   as_of_date = as.Date("2021-01-25"))
 )
 
-class_lists_audits <- cedar_students_audits %>%
+class_lists_audits <- cedar_registrations_audits %>%
   dplyr::transmute(
     `Academic Period Code` = term, `Course Reference Number` = crn,
     `Student ID` = student_id, `Subject Code` = subject_code,
@@ -2214,7 +2214,7 @@ class_lists_audits <- cedar_students_audits %>%
 # =============================================================================
 # CEDAR_PROGRAMS — explicit hand-coded fixture
 # =============================================================================
-# student_level: "Undergraduate" / "Graduate" (matches cedar_students).
+# student_level: "Undergraduate" / "Graduate" (matches cedar_registrations).
 #
 # HIST population design (for pathway/stopout pipeline tests):
 #   202010 declared (14): SP1-001..004 (graduated), SP1-005..014 (stopped_out)
@@ -2285,7 +2285,7 @@ cedar_programs <- bind_rows(
 
   # ── HIST graduate students 202010 (2) ───────────────────────────────────
   # Fixes critical gap: HIST 601 enrollment rows exist but no program rows.
-  # student_level "Graduate" matches cedar_students grad rows.
+  # student_level "Graduate" matches cedar_registrations grad rows.
   tibble(
     student_id             = c("STU-HGRAD-SP10-001", "STU-HGRAD-SP10-002"),
     term                   = 202010L,
@@ -2903,7 +2903,7 @@ gen_ed_assoc_sections <- cedar_sections[0, ] %>%
     as_of_date = as.Date(c("2020-01-13", "2020-08-17"))
   ))
 
-gen_ed_assoc_students <- cedar_students[0, ] %>%
+gen_ed_assoc_students <- cedar_registrations[0, ] %>%
   dplyr::bind_rows(tibble::tibble(
     enrollment_id = paste0("GEA-STU-", 1:6),
     section_id = c("GEA001", "GEA001", "GEA001", "GEA002", "GEA002", "GEA002"),
@@ -2981,7 +2981,7 @@ gen_ed_assoc_programs <- cedar_programs[0, ] %>%
 # UNM is not one campus: roughly 15% of real enrollment rows come from branch
 # campuses, and 21% of courses are taught on more than one. The base fixtures
 # above could not express that — cedar_sections has campus variety but
-# cedar_students is entirely ABQ — so every campus-grouping analytic tested
+# cedar_registrations is entirely ABQ — so every campus-grouping analytic tested
 # against them passed without checking anything.
 #
 # These blocks give campus-aware tests something real to assert on. See the
@@ -3094,7 +3094,7 @@ gen_ed_assoc_students <- dplyr::bind_rows(
   )
 }
 
-cedar_students_mc <- dplyr::bind_rows(
+cedar_registrations_mc <- dplyr::bind_rows(
   # T1 — SPAN 101 on both campuses, plus the co-requisite lab for two students
   .mc_row("MC_A1", 202010, "SPAN 101",  "ABQ", "SPAN", "A", "MC_I1"),
   .mc_row("MC_A2", 202010, "SPAN 101",  "ABQ", "SPAN", "A", "MC_I1"),
@@ -3176,7 +3176,7 @@ cedar_programs_mc <- dplyr::bind_rows(
 # Pinned: ABQ cohort n=2, ret_1 = 1.0.  GA cohort n=2, ret_1 = 0.5.
 # A campus-blind grouping reports a single 0.75 and hides both facts.
 
-cedar_students_mcret <- dplyr::bind_rows(
+cedar_registrations_mcret <- dplyr::bind_rows(
   .mc_row("MC_R1", 202110, "COMM 101", "ABQ", "CJ", "A", "MC_I3"),
   .mc_row("MC_R2", 202110, "COMM 101", "ABQ", "CJ", "B", "MC_I3"),
   .mc_row("MC_R3", 202110, "COMM 101", "GA",  "CJ", "A", "MC_I4"),
@@ -3222,7 +3222,7 @@ cedar_students_mcret <- dplyr::bind_rows(
       )
     )
 }
-cedar_students_wlmkt <- dplyr::bind_rows(
+cedar_registrations_wlmkt <- dplyr::bind_rows(
   .wl_row("WL_A", "ABQ", "WL"), .wl_row("WL_A", "EA", "WL"),
   .wl_row("WL_B", "ABQ", "WL"),
   .wl_row("WL_C", "ABQ", "WL"), .wl_row("WL_C", "ABQ", "RE"),
@@ -3300,7 +3300,7 @@ cedar_sections_intersession <- cedar_sections_topics[c(2, 2, 2), ] %>%
       as_of_date = as.Date("2020-10-23")
     )
 }
-cedar_students_intersession <- dplyr::bind_rows(
+cedar_registrations_intersession <- dplyr::bind_rows(
   .is_row("IS_A", "41001", "ABQ", "RE", "2020-08-01"),
   .is_row("IS_B", "41002", "EA",  "RE", "2020-08-01"),
   .is_row("IS_C", "41003", "EA",  "RE", "2020-10-01"),
@@ -3354,7 +3354,7 @@ cedar_students_intersession <- dplyr::bind_rows(
       as_of_date = as.Date("2020-11-20")
     )
 }
-cedar_students_rw <- dplyr::bind_rows(
+cedar_registrations_rw <- dplyr::bind_rows(
   .rw_row("RW_A", 202080L, "HIST 1110", "RE", "A"),
   .rw_row("RW_A", 202080L, "ENGL 1110", "RE", "B"),
   .rw_row("RW_A", 202110L, "HIST 2110", "RE"),
@@ -3441,7 +3441,7 @@ cedar_programs_rw <- dplyr::bind_rows(
       as_of_date = as.Date(as_of)
     )
 }
-cedar_students_st <- dplyr::bind_rows(
+cedar_registrations_st <- dplyr::bind_rows(
   .st_row("ST_A", 202010L, "HIST 1110", "RE", "A"),
   .st_row("ST_A", 202080L, "HIST 2110", "DW"),
   .st_row("ST_B", 202010L, "HIST 1110", "RE", "A"),
@@ -3524,7 +3524,7 @@ cedar_degrees_st <- tibble::tibble(
 # The old definition gave pass 4 of 5 distinct students (RP_DROP "returned",
 # RP_GRAD did not, RP_REP counted once below and twice above).
 
-cedar_students_rp <- dplyr::bind_rows(
+cedar_registrations_rp <- dplyr::bind_rows(
   .mc_row("RP_GRAD",  202010, "HIST 499", "ABQ", "HIST", "A",  "RP_I1"),
   .mc_row("RP_BACK",  202010, "HIST 499", "ABQ", "HIST", "B",  "RP_I1"),
   .mc_row("RP_DROP",  202010, "HIST 499", "ABQ", "HIST", "B",  "RP_I1"),
@@ -3556,7 +3556,7 @@ cedar_degrees_rp <- tibble::tibble(
 #
 # The whole point of that cone is WHO IT EXCLUDES, so the fixture is built around
 # the three exclusion paths, not around the happy one. Data window is 201980
-# (the earliest term in cedar_students_gg) through 202410.
+# (the earliest term in cedar_registrations_gg) through 202410.
 #
 #   student   first term  degree              in cohort?
 #   GG_IN1    202080      LING 202410 Awarded   yes
@@ -3622,7 +3622,7 @@ cedar_degrees_rp <- tibble::tibble(
   )
 }
 
-cedar_students_gg <- dplyr::bind_rows(
+cedar_registrations_gg <- dplyr::bind_rows(
   # GG_TRUNC is the only student in 201980, which is what makes 201980 the first
   # term in the window and makes GG_TRUNC left-truncated.
   .gg_row("GG_TRUNC", 201980, "ENGL 1120", "ENGL"),
@@ -3793,7 +3793,7 @@ cedar_student_terms_mcc <- tibble::tribble(
 # Pinned (min_n = 1): n_switches = 3, n_switches_with_courses = 3,
 #   n_students = 3, n_baseline_terms = 12, 3 rows ordered GEOG 100, 250, 260.
 
-cedar_students_pcc <- dplyr::bind_rows(
+cedar_registrations_pcc <- dplyr::bind_rows(
   # 202010 — everyone in GEOG 100; N1 is the only baseline sighting of GEOG 250
   .mc_row("PCC_S1", 202010, "GEOG 100", "ABQ", "GES", "A"),
   .mc_row("PCC_S2", 202010, "GEOG 100", "ABQ", "GES", "B"),
@@ -4003,7 +4003,7 @@ cedar_programs_concurrent <- dplyr::bind_rows(
   "SOCI 103", "ABQ", "1", 202080L, 60L,  0L,  0L,
   "SOCI 104", "ABQ", "1", 202080L, 60L,  0L,  0L
 )
-cedar_students_regstats <- dplyr::bind_rows(lapply(seq_len(nrow(.rs_history)), function(i) {
+cedar_registrations_regstats <- dplyr::bind_rows(lapply(seq_len(nrow(.rs_history)), function(i) {
   row <- .rs_history[i, ]
   statuses <- rep(c("RE", "DR", "DW"), c(row$registered, row$early, row$late))
   .mc_row(paste0("EC11-", i, "-", seq_along(statuses)), row$term, row$course,
@@ -4042,7 +4042,7 @@ cedar_sections_regstats <- dplyr::bind_rows(lapply(seq_len(nrow(.rs_history)), f
 cedar_sections_course_history <- cedar_sections_regstats %>%
   dplyr::mutate(status = ifelse(subject_course == "SOCI 102" & term == 202080L, "C", status),
     available = ifelse(subject_course == "SOCI 103" & term == 202080L, NA_real_, available))
-cedar_students_course_history <- cedar_students_regstats %>%
+cedar_registrations_course_history <- cedar_registrations_regstats %>%
   dplyr::filter(!(subject_course == "SOCI 104" & term == 202080L)) %>%
   # One undated status withholds the entire first-day group, not a partial count.
   dplyr::mutate(registration_date = dplyr::if_else(subject_course == "SOCI 101" &
@@ -4069,8 +4069,8 @@ cedar_sections_pending_session <- dplyr::bind_rows(
                   enrolled = 30L, total_enrl = 30L, capacity = 30L, available = 0L,
                   start_date = as.Date("2022-03-01"), end_date = as.Date("2022-05-01"))
 )
-cedar_students_pending_session <- dplyr::bind_rows(
-  .ec11c_full_term(cedar_students_regstats),
+cedar_registrations_pending_session <- dplyr::bind_rows(
+  .ec11c_full_term(cedar_registrations_regstats),
   .mc_row(paste0("EC11C-", 1:30), 202180, "SOCI 100", "ABQ", "SOCI") %>%
     dplyr::mutate(part_term = "2H", registration_status = "Registered",
                   registration_date = as.Date("2022-01-10"),
@@ -4079,7 +4079,7 @@ cedar_students_pending_session <- dplyr::bind_rows(
 )
 
 # ── EC-12 — Roadblocks first eligible student/course/campus observations ────
-cedar_students_roadblocks <- dplyr::bind_rows(
+cedar_registrations_roadblocks <- dplyr::bind_rows(
   .mc_row(paste0("RB_P", sprintf("%02d", 1:10)), 202010, "ECON 100", "ABQ", "ECON",
           c(rep("A", 5), rep("F", 5))),
   .mc_row(paste0("RB_B", sprintf("%02d", 1:10)), 202010, "ECON 100", "ABQ", "ECON",
@@ -4264,7 +4264,7 @@ cedar_sections_xl_switch <- dplyr::bind_rows(
       )
     )
 }
-cedar_students_xl_switch <- dplyr::bind_rows(
+cedar_registrations_xl_switch <- dplyr::bind_rows(
   .ec15_student(c(paste0("EC15-C", 1:4), "EC15-S1", "EC15-S2", "EC15-C5", "EC15-D1"),
                 "CS 3750", "ENGR", "CS", "EC15C1",
                 c(rep("RE", 4), "DR", "WL", "DW", "DR"),
@@ -4322,7 +4322,7 @@ cedar_sections_rn <- dplyr::bind_rows(
     dplyr::mutate(crn = crn_id, section_id = paste0("RN01-", crn_id),
                   course_title = title, level = lvl, as_of_date = as.Date("2021-06-01"))
 }
-cedar_students_rn <- dplyr::bind_rows(
+cedar_registrations_rn <- dplyr::bind_rows(
   .rn_student(c("RN01-R1", "RN01-R2"), 202010L, "SOCI 371",  "RN01A", "Sociology of Education", "upper"),
   .rn_student("RN01-R3",               202080L, "SOCI 371",  "RN01B", "Sociology of Education", "upper"),
   .rn_student("RN01-R1",               202010L, "SOCI 250",  "RN01C", "Social Problems",        "lower"),
@@ -4341,7 +4341,7 @@ cedar_students_rn <- dplyr::bind_rows(
     dplyr::mutate(registration_status_code = status, final_grade = NA_character_,
                   enrollment_id = paste0(enrollment_id, "-", status))
 }
-cedar_students_rn02 <- dplyr::bind_rows(
+cedar_registrations_rn02 <- dplyr::bind_rows(
   .rn02_row("RN02-W1", "SOC 371",  "WL"),
   .rn02_row("RN02-W2", "SOCI 371", "WL"),
   .rn02_row("RN02-W3", "SOC 371",  "WL"),

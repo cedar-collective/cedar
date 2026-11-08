@@ -36,7 +36,7 @@ empty_next_course_pairs <- function() {
 prepare_course_flow_enrollments <- function(students, opt = list()) {
   missing_cols <- setdiff(course_flow_required_cols, names(students))
   if (length(missing_cols) > 0) {
-    stop("[course-flows.R] Missing required cedar_students columns: ",
+    stop("[course-flows.R] Missing required cedar_registrations columns: ",
          paste(missing_cols, collapse = ", "), call. = FALSE)
   }
 
@@ -129,7 +129,7 @@ COURSE_FLOWS_BUILD_VERSION <- 1L
 #' in progress and read as a fall in flow (right-edge policy). Source terms
 #' whose next regular term is past the edge contribute no pair.
 #'
-#' @param students `cedar_students` keyed on the course (attach_course_ids()).
+#' @param students `cedar_registrations` keyed on the course (attach_course_ids()).
 #' @param edges `cedar_report_edges()$edges`; needs `last_enrolled_complete`.
 #' @return get_next_course_pairs()'s columns, stamped with `code_renames`,
 #'   `enrolled_edge` and `course_flows_build_version`.
@@ -526,7 +526,7 @@ empty_downstream_options <- function() {
 #' table keys a student to the calendar year of their first X attempt and shows
 #' whether they had already passed Y strictly earlier or in that same term.
 #'
-#' @param students cedar_students.
+#' @param students cedar_registrations.
 #' @param course_x Character. Upstream course.
 #' @param course_y Character vector. Selected downstream course(s).
 #' @param opt Named list with `campus` and `data_edges`.
@@ -618,7 +618,7 @@ get_downstream_pair_audit <- function(students, course_x, course_y, opt = list()
 
 #' Courses students took after a given course
 #'
-#' @param students cedar_students.
+#' @param students cedar_registrations.
 #' @param course_x Character. The upstream course.
 #' @param opt Named list:
 #'   \describe{
