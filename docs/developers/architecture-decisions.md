@@ -249,7 +249,7 @@ record keeps the decisions.
 | 1 | `cedar_terms`: the right edges become a join | done |
 | 2 | `cedar_student_terms`: one definition of an enrolled term and of return (closes I44) | done 2026-11-04 |
 | 3 | Dimensions from the mapping files, units attached at load | done 2026-11-06 |
-| 4 | `cedar_courses` and course ids at load (I37, I45); `cedar_course_terms`; `cedar_attempts` | courses and keying done 2026-11-07; `cedar_course_terms` done 2026-11-07; `cedar_attempts` done 2026-11-07 (`cedar_grades` retired); the course flows next |
+| 4 | `cedar_courses` and course ids at load (I37, I45); `cedar_course_terms`; `cedar_attempts` | courses and keying done 2026-11-07; `cedar_course_terms` done 2026-11-07; `cedar_attempts` done 2026-11-07 (`cedar_grades` retired); `cedar_course_flows` done 2026-11-07 |
 | 5 | Thin `cedar_students` and `cedar_programs` to keys and registration facts; rename to fact names | student-term columns off the loaded class list done 2026-11-07 (`thin_class_list()`), and off the saved file (`cedar_class_list_descriptions`); the section columns and `cedar_programs` stay (decisions below); the rename remains, after the open stack merges |
 
 Step 2's precedence rule: when the two source snapshots disagree, the
@@ -425,7 +425,16 @@ no Fall history by code would find it).
   loaded class list holds one row of record per course-term, so a
   first-term outcome is never in conflict (Roadblocks 2.2.0).
 
-**Next.** `course-flows.R`'s precompute is rebuilt on the keyed tables.
+- **`cedar_course_flows` is a measure held in `data_objects`, bounded at the
+  longitudinal edge** (2026-11-07). The precompute Regstats' downstream
+  signals read was a bare global the feature found with `exists()`, counted
+  into the registration still in progress, recomputed silently from the
+  class list when absent, and returned NULL on any error. It is now
+  `build_course_flows(students, edges)`: every next-term pair to
+  `cedar_longitudinal_edge()`, stamped and checked like `cedar_course_terms`
+  (`course_flows_is_current()`), passed to `get_next_term_signals()` as a
+  parameter, which refuses anything else. The Course Report's flows tab
+  already trimmed to the same edge.
 
 **Not doing.** Rewriting saved rows to the new code: the code the registrar
 used that term is a fact about the term. A surrogate integer id: a saved key

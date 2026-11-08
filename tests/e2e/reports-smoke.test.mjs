@@ -398,6 +398,18 @@ export async function runReportChecks({ scope = 'smoke', synthetic = false } = {
         ]);
         assert.match(await page.$eval('#regstats-rs_dips_table', el => el.innerText), /SOCI 101/);
       }
+      // Downstream concerns read the start-up course flows (cedar_course_flows),
+      // passed to the module: loading them must neither error nor recount the
+      // class list, and the page names the edge the flows stop at.
+      await clickSubTabIn(page, 'regstats-rs_tabs', 'Downstream Concerns');
+      await click(page, 'regstats-rs_load_signals');
+      await page.waitForFunction(() => {
+        const text = document.body.innerText;
+        return text.includes('Flow history runs through') ||
+          text.includes('No downstream concerns found for the current scope.');
+      }, { timeout: STEP_TIMEOUT, polling: 500 });
+      const notices = await page.$$eval('.shiny-notification', els => els.map(el => el.innerText).join(' | '));
+      assert.doesNotMatch(notices, /error|build_course_flows/i);
     });
 
     await withStep(page, ['roadblocks'], 'Pathways population builds', async () => {

@@ -6,13 +6,16 @@
 # - get_course_feeders(): summarized courses taken before a target course
 # - get_concurrent_courses(): summarized courses taken in the same term
 # - get_course_flow_neighbors(): named list combining destinations/feeders/concurrent
+# - build_course_flows(): every next-term pair, bounded at the longitudinal
+#   edge and stamped, counted once at start (Regstats' downstream signals)
 #
 # Course sequencing always joins and groups by campus. This prevents students at
 # different campuses from being treated as part of the same source/destination
 # flow and keeps downstream caches honest about scope.
 
 course_flow_required_cols <- c(
-  "student_id", "term", "subject_course", "campus", "college", "term_type"
+  "student_id", "term", "subject_course", "campus", "college", "term_type",
+  "registration_status_code"
 )
 
 empty_next_course_pairs <- function() {
@@ -41,13 +44,7 @@ prepare_course_flow_enrollments <- function(students, opt = list()) {
 
   students %>%
     dplyr::ungroup() %>%
-    {
-      if ("registration_status_code" %in% names(.)) {
-        dplyr::filter(., registration_status_code %in% STATUS_REGISTERED)
-      } else {
-        .
-      }
-    } %>%
+    dplyr::filter(registration_status_code %in% STATUS_REGISTERED) %>%
     {
       if (!is.null(campus_scope) && length(campus_scope) > 0) {
         dplyr::filter(., campus %in% .env$campus_scope)
@@ -65,6 +62,11 @@ get_next_course_pairs <- function(students, opt = list(), source_courses = NULL)
   source_courses <- source_courses %||% opt[["course"]] %||% opt[["courses"]] %||% NULL
 
   enrollments <- prepare_course_flow_enrollments(students, opt)
+  # opt$through_term: no term after it, as source or destination (the
+  # longitudinal edge, build_course_flows()).
+  if (!is.null(opt[["through_term"]])) {
+    enrollments <- dplyr::filter(enrollments, term <= .env$opt[["through_term"]])
+  }
 
   src <- enrollments %>%
     {
@@ -110,6 +112,63 @@ get_next_course_pairs <- function(students, opt = list(), source_courses = NULL)
       name = "n_students"
     ) %>%
     dplyr::arrange(campus, source_course, term, dplyr::desc(n_students))
+}
+
+# ── cedar_course_flows: every next-term pair, counted once (ADR-001 step 4) ──
+
+# Bump when the pairs counted or the stamps change; a saved copy built under
+# another version is rebuilt at start.
+COURSE_FLOWS_BUILD_VERSION <- 1L
+
+#' Count every course's next-term destinations, to the longitudinal edge
+#'
+#' get_next_course_pairs() over the whole keyed class list, regular terms
+#' only, after dropping every term past `cedar_longitudinal_edge(edges)`. A
+#' pair is a follow-up: its destination term must be complete for
+#' enrollment, or the newest source term's pairs count a registration still
+#' in progress and read as a fall in flow (right-edge policy). Source terms
+#' whose next regular term is past the edge contribute no pair.
+#'
+#' @param students `cedar_students` keyed on the course (attach_course_ids()).
+#' @param edges `cedar_report_edges()$edges`; needs `last_enrolled_complete`.
+#' @return get_next_course_pairs()'s columns, stamped with `code_renames`,
+#'   `enrolled_edge` and `course_flows_build_version`.
+build_course_flows <- function(students, edges) {
+  edge <- cedar_longitudinal_edge(edges, grade_dependent = FALSE)
+  if (is.null(edge)) {
+    stop("[course-flows.R] build_course_flows(): edges carry no last_enrolled_complete; ",
+         "course flows are a follow-up and need it.", call. = FALSE)
+  }
+  # The edge is applied inside, to the distinct enrollments: filtering the
+  # whole class list first copies every row of it even when nothing is past
+  # the edge, at start-up's memory peak.
+  flows <- get_next_course_pairs(students, opt = list(summer = FALSE, through_term = edge))
+  cedar_debug("[course-flows.R] build_course_flows(): ", nrow(flows),
+              " next-term pairs through ", edge, ".")
+  attr(flows, "code_renames") <- course_code_renames(students)
+  attr(flows, "enrolled_edge") <- as.integer(edge)
+  attr(flows, "course_flows_build_version") <- COURSE_FLOWS_BUILD_VERSION
+  flows
+}
+
+#' Is a course-flow table this build's, for this class list and edge?
+#'
+#' @param flows A saved or held cedar_course_flows, or NULL.
+#' @param students The keyed class list it should have been counted over.
+#' @param edges The edges it should be bounded at.
+#' @return TRUE when the build version, columns, enrollment edge and the class
+#'   list's course-code renames all match.
+course_flows_is_current <- function(flows, students, edges) {
+  if (!is.data.frame(flows)) return(FALSE)
+  if (!identical(attr(flows, "course_flows_build_version", exact = TRUE),
+                 COURSE_FLOWS_BUILD_VERSION)) return(FALSE)
+  if (!identical(names(flows), names(empty_next_course_pairs()))) return(FALSE)
+  edge <- cedar_longitudinal_edge(edges, grade_dependent = FALSE)
+  if (is.null(edge) || !identical(attr(flows, "enrolled_edge", exact = TRUE), as.integer(edge))) {
+    return(FALSE)
+  }
+  renames <- attr(flows, "code_renames", exact = TRUE)
+  !is.null(renames) && identical(as.character(renames), course_code_renames(students))
 }
 
 get_previous_course_pairs <- function(students, opt = list(), target_courses = NULL) {
