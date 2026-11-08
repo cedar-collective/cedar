@@ -643,12 +643,14 @@ attach_student_term <- function(rows, student_terms, cols) {
 # roster's majors off it (summarize_class_list_majors()). Readers of the
 # loaded tables attach the student-term table's values through
 # attach_student_term() or attach_student_descriptions(). enrollment_id is a
-# row id nothing reads.
+# row id nothing reads; total_credits is the student's registered hours that
+# term as Banner printed it, which nothing reads either (cedar_student_terms
+# counts its own from the rows). Both stay on the raw class_lists file.
 CLASS_LIST_DESCRIPTION_COLUMNS <- c(
   "student_level", "student_classification", "major_code", "major_name",
   "student_college", "student_campus", "residency", "dual_credit"
 )
-CLASS_LIST_UNLOADED_COLUMNS <- c(CLASS_LIST_DESCRIPTION_COLUMNS, "enrollment_id")
+CLASS_LIST_UNLOADED_COLUMNS <- c(CLASS_LIST_DESCRIPTION_COLUMNS, "enrollment_id", "total_credits")
 # The ones build_student_terms() reads; the others are kept where present.
 CLASS_LIST_DESCRIPTION_REQUIRED <- c(
   "student_level", "student_classification", "student_campus", "residency",
