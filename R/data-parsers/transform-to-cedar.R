@@ -134,6 +134,23 @@ encrypt_if_needed <- function(id) {
   unname(enc[id_chr])
 }
 
+# Hash an instructor ID the way parse-data.R hashes the class list's and the
+# HR report's (md5 of the ID), unless it already is a hash. The DESR's report
+# spec hashes nothing, so its PRIM_INST_ID arrived as the employee ID: the HR
+# merge below never matched (job_cat was NA on every section) and the saved
+# sections joined neither the class list nor cedar_faculty (ISSUES I52).
+# Applied to all four sources, so files that never went through parse-data
+# (the synthetic institution's) come out the same way. NA stays NA.
+hash_instructor_id <- function(id) {
+  id_chr <- as.character(id)
+  todo <- !is.na(id_chr) & !grepl("^[0-9a-f]{32}$", id_chr)
+  if (!any(todo)) return(id_chr)
+  raw <- unique(id_chr[todo])
+  hashed <- vapply(raw, digest::digest, character(1), algo = "md5", USE.NAMES = FALSE)
+  id_chr[todo] <- hashed[match(id_chr[todo], raw)]
+  id_chr
+}
+
 # Convert a character vector of column names to snake_case
 to_snake <- function(x) {
   x <- gsub("[^a-zA-Z0-9]+", "_", x)  # non-alphanumeric → underscore
@@ -207,25 +224,13 @@ transform_sections <- function(desrs, data_dir, ext, maps) {
   # subject with no confirmed row is listed by the end-of-transform mapping
   # audit and on Admin > Mappings.
 
-  # ── HR merge (job_cat / title enrichment) ────────────────────────────────
-  hr_file <- file.path(data_dir, paste0("hr_data", ext))
-  if (file.exists(hr_file)) {
-    message("  Pre-processing: merging HR data for job_cat/title fields...")
-    hr_desrs <- load_file(hr_file, ext)
-    hr_desrs  <- hr_desrs %>% dplyr::select(-dplyr::any_of("as_of_date"))
-    desrs$PRIM_INST_ID <- as.character(desrs$PRIM_INST_ID)
-    desrs$TERM         <- as.character(desrs$TERM)
-    desrs <- desrs %>%
-      dplyr::left_join(hr_desrs,
-                       by     = c("TERM" = "term_code", "PRIM_INST_ID" = "UNM ID"),
-                       suffix = c("", ".hr")) %>%
-      dplyr::select(-dplyr::any_of("DEPT.hr"))
-    rm(hr_desrs); gc(verbose = FALSE)
-    message("  ✅ HR merge complete: ", nrow(desrs), " rows")
-  } else {
-    desrs$job_cat <- NA_character_
-    message("  ⚠️  hr_data not found: ", hr_file, " — job_cat will be NA")
-  }
+  # The instructor ID is hashed as the class list's and cedar_faculty's are,
+  # so a section joins both (I52). A section carries no faculty attribute: a
+  # reader that wants one joins cedar_faculty on term and instructor_id. (The
+  # HR merge that stood here joined the employee ID to hashed IDs, matched
+  # nothing, and left job_cat NA on every section; an instructor holding
+  # several appointments a term would also have duplicated the section.)
+  desrs$PRIM_INST_ID <- hash_instructor_id(desrs$PRIM_INST_ID)
 
   # ── Transmute to CEDAR model ─────────────────────────────────────────────
   message("  Transforming to CEDAR model...")
@@ -258,7 +263,6 @@ transform_sections <- function(desrs, data_dir, ext, maps) {
       source_college = COLLEGE,
       instructor_id   = as.character(PRIM_INST_ID),
       instructor_name = INST_NAME,
-      job_cat      = if ("job_cat" %in% names(.)) job_cat else NA_character_,
       enrolled     = as.integer(ENROLLED),
       total_enrl   = as.integer(total_enrl),
       capacity     = if ("SECT_CAP" %in% names(.)) as.integer(SECT_CAP) else as.integer(ROOM_CAP),
@@ -590,7 +594,7 @@ transform_students <- function(class_lists, data_dir, ext, maps) {
       subject_code   = sub(" .*", "", SUBJ_CRSE),
       course_title   = if ("Short Course Title" %in% names(.)) `Short Course Title` else NA_character_,
       level = dplyr::coalesce(COURSE_LEVEL, "unknown"),
-      instructor_id         = if ("Primary Instructor ID"         %in% names(.)) `Primary Instructor ID`         else NA_character_,
+      instructor_id         = if ("Primary Instructor ID"         %in% names(.)) hash_instructor_id(`Primary Instructor ID`) else NA_character_,
       instructor_last_name  = if ("Primary Instructor Last Name"  %in% names(.)) `Primary Instructor Last Name`  else NA_character_,
       instructor_first_name = if ("Primary Instructor First Name" %in% names(.)) `Primary Instructor First Name` else NA_character_,
       instructor_name = case_when(
@@ -1085,7 +1089,7 @@ transform_faculty <- function(hr_data, data_dir, ext) {
 
   cedar_faculty <- hr_data %>%
     transmute(
-      instructor_id   = as.character(`UNM ID`),
+      instructor_id   = hash_instructor_id(`UNM ID`),
       term            = as.integer(term_code),
       instructor_name = Name,
       department      = DEPT,

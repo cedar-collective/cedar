@@ -67,9 +67,9 @@ per-term claims. `gender` is constant per student.
 
 | table | rows | distinct student-terms | memory | if thinned to its own grain |
 |---|---|---|---|---|
-| `cedar_students` | 1,855,577 | 465,836 | 468 MB | 347 MB without the student columns; ~190 MB without the section columns too |
+| `cedar_students` | 1,855,577 | 465,836 | 468 MB | 347 MB without the student columns; ~190 MB without the section columns too (the first draft's estimate; most section columns are grouping keys and stay, see step 5's decisions) |
 | `cedar_programs` | 622,988 | 426,222 | 181 MB | — |
-| `cedar_sections` | 253,707 | — | 100 MB | already at its grain (`job_cat` is 100% NA) |
+| `cedar_sections` | 253,707 | — | 100 MB | already at its grain (`job_cat` was 100% NA; dropped 2026-11-07, I52) |
 
 A student-term table carrying the eight student columns is 53 MB.
 
@@ -84,7 +84,11 @@ A student-term table carrying the eight student columns is 53 MB.
   tables.
 - **Instructor IDs.** Both tables have `instructor_id`; the class list's is a
   32-character hash and the DESR's a 9-digit ID. Zero values match. Nothing
-  joins on it yet; the first join will return nothing, silently.
+  joins on it yet; the first join will return nothing, silently. *(The
+  transform's HR merge onto the DESR was that join: it matched nothing and
+  left `job_cat` NA on every section. Fixed 2026-11-07, ISSUES I52: the
+  transform hashes every instructor ID alike, and sections carry no faculty
+  attribute.)*
 - **Classification.** 111 student-terms carry two classifications on the class
   list, every one from rows pulled on two dates. ADR-001's first draft found
   116 adjacent-level disagreements between the class list and academic
@@ -245,8 +249,8 @@ record keeps the decisions.
 | 1 | `cedar_terms`: the right edges become a join | done |
 | 2 | `cedar_student_terms`: one definition of an enrolled term and of return (closes I44) | done 2026-11-04 |
 | 3 | Dimensions from the mapping files, units attached at load | done 2026-11-06 |
-| 4 | `cedar_courses` and course ids at load (I37, I45); `cedar_course_terms`; `cedar_attempts` | courses and keying done 2026-11-07; `cedar_course_terms` done 2026-11-07; `cedar_attempts` done 2026-11-07 (`cedar_grades` retired); the course flows next |
-| 5 | Thin `cedar_students` and `cedar_programs` to keys and registration facts; rename to fact names | student-term columns off the loaded class list done 2026-11-07 (`thin_class_list()`), and off the saved file (`cedar_class_list_descriptions`); the section columns next; the rename last |
+| 4 | `cedar_courses` and course ids at load (I37, I45); `cedar_course_terms`; `cedar_attempts` | courses and keying done 2026-11-07; `cedar_course_terms` done 2026-11-07; `cedar_attempts` done 2026-11-07 (`cedar_grades` retired); `cedar_course_flows` done 2026-11-07 |
+| 5 | Thin `cedar_students` and `cedar_programs` to keys and registration facts; rename to fact names | student-term columns off the loaded class list done 2026-11-07 (`thin_class_list()`), and off the saved file (`cedar_class_list_descriptions`); the section columns and `cedar_programs` stay (decisions below); the rename remains, after the open stack merges |
 
 Step 2's precedence rule: when the two source snapshots disagree, the
 academic-studies row wins, the row is flagged and the count reported, never
@@ -281,6 +285,31 @@ a silent coalesce.
   its class-list rows (I47).
 - **Name:** `cedar_students` keeps its name until the rename PR, which answers
   open question 1 with `cedar_registrations`.
+- **The section columns stay on the row** (decided 2026-11-07, after
+  measuring their readers). Of the thirteen, `subject_course`, `campus`,
+  `college`, `department`, `level`, `part_term` and `term_type` are the keys
+  nearly every course read groups or filters by (campus beside the course,
+  always), and `subject_code` and Banner's college are the keys `attach_unit()`
+  resolves at load: moving them off means a join on almost every read, which
+  is the cost the measure tables exist to avoid. `term_type` alone has a
+  dozen readers, the canonical counter and the `cedar_course_terms` cache
+  among them, for 14 MB. The status label stays beside its code: it is the
+  only explanation of a code CEDAR does not know (the unexpected-status
+  audit). What could move is `course_title` and `instructor_name` (29 MB,
+  about eight readers, the 149 rows with no section left untitled) and
+  `instructor_id`, which must wait until production's sections carry the
+  hashed ID (I52) or instructor DFW would group by employee IDs that join no
+  faculty row. Not worth the churn now; revisit with the rename if memory
+  is short again. `total_credits` (no reader) left the class list with this
+  decision. So the saved class list holds about 326 MB in memory on the
+  2026-11-04 pull (22 columns), not the ~190 MB the first draft assumed.
+- **`cedar_programs` stays at its grain** (decided 2026-11-07). It holds 1.46
+  rows per student-term (622,385 rows, 426,241 student-terms, 181 MB), where
+  the class list holds four, so moving its 24 student-term columns to a
+  student-term table saves about 35 MB and rewrites every program reader
+  (Headcount, Pathways, the comparisons). The pull-stamped fields stay too:
+  their readers (the comparison covariates, the credit and GPA timelines,
+  major-change detection) use them under the field-reliability rules.
 
 Pull history is the one piece with a deadline and should be sized now.
 
@@ -396,7 +425,16 @@ no Fall history by code would find it).
   loaded class list holds one row of record per course-term, so a
   first-term outcome is never in conflict (Roadblocks 2.2.0).
 
-**Next.** `course-flows.R`'s precompute is rebuilt on the keyed tables.
+- **`cedar_course_flows` is a measure held in `data_objects`, bounded at the
+  longitudinal edge** (2026-11-07). The precompute Regstats' downstream
+  signals read was a bare global the feature found with `exists()`, counted
+  into the registration still in progress, recomputed silently from the
+  class list when absent, and returned NULL on any error. It is now
+  `build_course_flows(students, edges)`: every next-term pair to
+  `cedar_longitudinal_edge()`, stamped and checked like `cedar_course_terms`
+  (`course_flows_is_current()`), passed to `get_next_term_signals()` as a
+  parameter, which refuses anything else. The Course Report's flows tab
+  already trimmed to the same edge.
 
 **Not doing.** Rewriting saved rows to the new code: the code the registrar
 used that term is a fact about the term. A surrogate integer id: a saved key

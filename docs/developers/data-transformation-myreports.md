@@ -106,6 +106,10 @@ The complete transformation logic is in [R/data-parsers/transform-to-cedar.R](ht
   - `SUBJ_CRSE` → `subject_course` (parser-created field)
   - `total_enrl` → `enrolled` (parser-created field)
   - Includes computed fields: `level`, `term_type`, `gen_ed_area`, `is_lab`
+  - `PRIM_INST_ID` → `instructor_id`, md5-hashed as `parse-data.R` hashes the
+    class list's and HR's (`hash_instructor_id()`, applied to all three in
+    the transform), so a section joins both. No HR field is merged onto a
+    section; join `cedar_faculty` (ISSUES I52).
 
 **2. class_lists → cedar_students**
 - Keeps: 18 of 74 columns

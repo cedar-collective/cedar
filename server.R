@@ -4868,7 +4868,7 @@ output$enrl_classlist_download <- downloadHandler(
   regstatsServer("regstats",
     students     = cedar_students,
     sections     = cedar_sections,
-    course_flows = cedar_course_flows,
+    course_flows = data_objects[["cedar_course_flows"]],
     data_summary = cedar_data_summary,
     thresholds   = cedar_regstats_thresholds,
     course_terms = data_objects[["cedar_course_terms"]]
