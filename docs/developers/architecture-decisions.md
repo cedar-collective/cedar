@@ -382,9 +382,36 @@ or two fewer sections, fourteen course-terms nobody could register for are
 no longer "unmatched", and CHEM 304L, whose Summer 2020 row of four empty
 sections had poisoned its fill history, enters the table. Dips, waits, early
 drops, the waitlist counts and the planning history are identical row for
-row, and Regstats runs in 57 s instead of 74 s. Still counting the class list per
-request (group 3b): Open Seats' class-list tab, the Course Report's lifecycle
-history, the registration snapshots and the demographics' census.
+row, and Regstats runs in 57 s instead of 74 s.
+
+Group 3b, the same day, took the last per-request counts onto the table and
+corrected the table once more. **Build 4 counts a crosslisted section once,
+under its home listing**: the active sections pass `keep_home_sections()` and
+`get_enrl(crosslist = "home")`, so a partner listing (ANTH 490 beside HIST
+490, XL04) has students and no sections or seats, and a home listing's seats
+are no longer summed over every listing that shares the room. On the real
+data the table shrinks from 67,983 rows to 67,539 and the readers move only
+where a partner section had been counted as the home course's offering:
+Regstats' saturation loses eight rows and gains two (the coverage's matched
+course-terms 2,839 → 2,690, unmatched 170 → 156, `invalid_capacity` 53 → 50,
+`below_minimum` 1,546 → 1,402); the planning history keeps every row, with
+nine capacities and five first-day counts changed and two offerings moving
+from "No class-list match" to a real status; dips, waits, early drops and the
+waitlist counts are identical. The registration snapshot
+(`build_registration_snapshot()`) reads the table's `registered`, `dr_early`,
+`dr_late`, `sections` and `seats` and keeps only the waitlist on the class
+list (true demand is a student set, not a count); the demographics'
+denominator (`summarize_student_demographics()`) reads `registered` from the
+table, so a cut roster still reports the whole class and the mean is over
+the terms the table has. Both are part-of-term rows summed to the course
+grain, which is exact because the transform keeps one row per student,
+course, campus and term (checked over all 57,284 real course-terms: none
+differ). The Dept Dashboard's cache key hashes the table (v15). Two counts
+stay deliberately on the class list, marked where they count: Open Seats'
+class-list tab is scoped to the sections picked by CRN, and the Course
+Report's lifecycle counts a crosslist family's students once across its
+listings; `get_high_fall_sophs()`, which nothing calls, takes the table and
+waits for a caller.
 
 #### Step 5: decisions (2026-11-07)
 

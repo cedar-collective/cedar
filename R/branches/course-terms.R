@@ -29,11 +29,16 @@
 # reconstructed from status dates (calc_first_day_enrl(), over the rows that
 # sit in an active section). The schedule's side is the active offerings:
 # sections with seats or students (a zero-seat, zero-enrollment active
-# section is a placeholder, not an offering), their scheduled seats
-# (get_enrl(): enrolled + available, crosslist-aware), the DESR headcount at
-# the pull, whether every section's capacity is known, and how many of them
-# the class list has a row for. **NA on one side means that source has no
-# row for the course-term**: no class-list registration under the course
+# section is a placeholder, not an offering), each crosslisted section once,
+# under its home listing (keep_home_sections(), the house rule the Department
+# Dashboard and the registration snapshots apply), their scheduled seats
+# (get_enrl(): enrolled + available), the DESR headcount at the pull, whether
+# every section's capacity is known, and how many of them the class list has
+# a row for. A partner listing's row therefore holds students and no
+# section: the seats are the family's, counted once under the home code, and
+# a fill read against them needs the family (the Course Report's crosslist
+# payload), not one listing. **NA on one side means that source has no row
+# for the course-term**: no class-list registration under the course
 # (unknown, never zero enrollment: EC-11b), or no active offering in the
 # schedule. A reader that compares the two reads both and says which is
 # missing (Regstats' saturation coverage, the planning history's
@@ -52,7 +57,8 @@
 #' Build version of cedar_course_terms. Bump when a column is added, renamed
 #' or changes meaning, so a saved copy from the older build is rebuilt.
 #' 3: first-day enrollment, the schedule's offerings and seats, subject_code.
-COURSE_TERMS_BUILD_VERSION <- 3L
+#' 4: a crosslisted section is counted once, under its home listing.
+COURSE_TERMS_BUILD_VERSION <- 4L
 
 #' The row key: a course offered on a campus in a part of one term.
 COURSE_TERMS_KEY <- c("campus", "college", "term", "subject_course", "part_term")
@@ -80,19 +86,20 @@ COURSE_TERMS_COLUMNS <- c(
 #' `first_day_enrl` is counted over the class-list rows in an active
 #' section, NA with `first_day_basis` saying why when a status or start
 #' date is missing or a session had not begun at the pull. `sections` counts
-#' the active offerings, `sections_matched` those with a class-list row,
-#' `seats` their scheduled seats (`enrolled + available`, crosslist-aware),
-#' `seats_known` whether every one has a finite capacity, and `desr_enrl`
-#' the schedule's headcount at the pull. NA on either side means that source
-#' has no row for the course-term. The outcome counts are
-#' count_attempt_outcomes() over `attempts`.
+#' the active offerings (a crosslisted section once, under its home listing),
+#' `sections_matched` those with a class-list row, `seats` their scheduled
+#' seats (`enrolled + available`), `seats_known` whether every one has a
+#' finite capacity, and `desr_enrl` the schedule's headcount at the pull. NA
+#' on either side means that source has no row for the course-term. The
+#' outcome counts are count_attempt_outcomes() over `attempts`.
 #'
 #' @param students `cedar_registrations` keyed on the course (attach_course_ids()),
 #'   with `registration_date` and `as_of_date`.
 #' @param attempts cedar_attempts built from the same class list
 #'   (build_attempts()); its graded edge decides which terms carry outcomes.
 #' @param sections `cedar_sections` keyed on the course, with `status`,
-#'   `enrolled`, `available`, `total_enrl`, `crosslist_code` and `start_date`.
+#'   `enrolled`, `available`, `total_enrl`, `crosslist_code`, `crosslist_group`,
+#'   `crosslist_role` and `start_date`.
 #' @return One row per campus, college, term, course and part of term, with
 #'   exactly COURSE_TERMS_COLUMNS, ungrouped, stamped with `code_renames`,
 #'   `graded_edge` and `course_terms_build_version`.
@@ -107,7 +114,8 @@ build_course_terms <- function(students, attempts, sections) {
          paste(missing, collapse = ", "), ".")
   }
   need_sections <- c(COURSE_TERMS_KEY, "crn", "status", "enrolled", "available", "total_enrl",
-                     "crosslist_code", "start_date", "level", "department", "subject")
+                     "crosslist_code", "crosslist_group", "crosslist_role", "start_date",
+                     "level", "department", "subject")
   missing <- setdiff(need_sections, names(sections))
   if (length(missing) > 0) {
     stop("[course-terms.R] build_course_terms(): sections lack ",
@@ -128,11 +136,15 @@ build_course_terms <- function(students, attempts, sections) {
 
   # The schedule's side: the active offerings. A section with no seats and no
   # enrollment is a placeholder; one whose capacity is unknown still offers.
+  # A crosslisted section is one offering, counted under its home listing
+  # (keep_home_sections()): a partner listing's row has students and no section.
   active <- sections %>%
     filter(status == "A",
-           !is.finite(enrolled + available) | enrolled + available > 0 | total_enrl > 0)
+           !is.finite(enrolled + available) | enrolled + available > 0 | total_enrl > 0) %>%
+    keep_home_sections()
   if (nrow(active) > 0) {
-    supply <- get_enrl(active, list(status = "A", uel = FALSE, group_cols = key)) %>%
+    supply <- get_enrl(active, list(status = "A", uel = FALSE, crosslist = "home",
+                                    group_cols = key)) %>%
       ungroup() %>%
       transmute(across(all_of(key)),
                 sections  = as.integer(sections),

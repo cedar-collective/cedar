@@ -184,9 +184,8 @@ get_course_major_mix <- function(students, student_terms, dims, opt = list()) {
 }
 
 
-# summarize_student_demographics() and summarize_classifications() moved to
-# R/branches/demographics.R — they are consumed by multiple cones
-# (course-demographics.R and waitlist.R), so they belong in the branch layer.
+# summarize_student_demographics() lives in R/branches/demographics.R: it is
+# consumed by more than one cone, so it belongs in the branch layer.
 
 
 #' Create Consistent Color Palette for Demographics Plots
@@ -475,15 +474,20 @@ plot_demographics_summary <- function(demographics_data, fill_column = "student_
 #'   course     = "BIOL 2305",
 #'   group_cols = c("campus", "term", "term_type", "major_code", "subject_course")
 #' )
-#' major_breakdown <- get_course_demographics(cedar_registrations, cedar_student_terms, opt)
+#' major_breakdown <- get_course_demographics(cedar_registrations, cedar_student_terms,
+#'                                            cedar_course_terms, opt)
 #'
 #' # Classification breakdown across all MATH courses
 #' opt <- list(
 #'   subject    = "MATH",
 #'   group_cols = c("campus", "term", "student_classification", "subject_course")
 #' )
-#' class_breakdown <- get_course_demographics(cedar_registrations, cedar_student_terms, opt)
+#' class_breakdown <- get_course_demographics(cedar_registrations, cedar_student_terms,
+#'                                            cedar_course_terms, opt)
 #' }
+#'
+#' @param course_terms `cedar_course_terms`: the course enrollment the shares
+#'   are taken against (ADR-001 step 7), never recounted from the rows.
 #'
 #' @seealso
 #' \code{\link{summarize_student_demographics}} for the aggregation function,
@@ -491,7 +495,7 @@ plot_demographics_summary <- function(demographics_data, fill_column = "student_
 #' \code{\link{plot_demographics_summary}} for visualization
 #'
 #' @export
-get_course_demographics <- function(students, student_terms, opt = list()) {
+get_course_demographics <- function(students, student_terms, course_terms, opt = list()) {
   message("[course-demographics.R] Starting course demographics analysis...")
 
   if (is.null(opt[["group_cols"]])) {
@@ -522,7 +526,7 @@ get_course_demographics <- function(students, student_terms, opt = list()) {
   filtered_students      <- filtered_students %>% filter(term >= 201980)
 
   message("[course-demographics.R] Aggregating student demographics...")
-  summary <- summarize_student_demographics(filtered_students, student_terms, opt)
+  summary <- summarize_student_demographics(filtered_students, student_terms, course_terms, opt)
 
   message("[course-demographics.R] Returning summary from get_course_demographics...")
   return(summary)

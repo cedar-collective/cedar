@@ -66,12 +66,13 @@ registration_snapshot_path <- function(output_dir, term, classlist_as_of, sectio
 #' Record today's snapshot of every term in registration
 #'
 #' @param students,sections `cedar_registrations`, `cedar_sections`.
+#' @param course_terms `cedar_course_terms`, current for `students`.
 #' @param output_dir Directory to write into; created if absent.
 #' @param terms Terms to record; default, those still in registration or
 #'   scheduled and not yet open.
 #' @return One row per term: `term`, `classlist_as_of`, `sections_as_of`,
 #'   `path`, `rows`, and `status` ("written" or "already recorded").
-record_registration_snapshot <- function(students, sections, output_dir,
+record_registration_snapshot <- function(students, sections, course_terms, output_dir,
                                          terms = registration_snapshot_terms(students, sections)) {
   if (length(terms) == 0L) {
     message("[registration-snapshots] No term is in registration or scheduled ahead; nothing recorded.")
@@ -80,7 +81,7 @@ record_registration_snapshot <- function(students, sections, output_dir,
                   rows = integer(0), status = character(0)))
   }
   dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
-  snapshot <- build_registration_snapshot(students, sections, list(terms = terms))
+  snapshot <- build_registration_snapshot(students, sections, course_terms, list(terms = terms))
 
   results <- lapply(split(snapshot, snapshot$term), function(rows) {
     term <- rows$term[[1]]

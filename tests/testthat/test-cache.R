@@ -402,7 +402,7 @@ test_that("dept dashboard cache key includes request scope and daily date", {
   expect_true(grepl("^dashboard_dept_HIST_202110_ABQ-EA_20260730_", key))
 })
 
-test_that("dept dashboard cache key differs by term, campus, date, and the mapping files", {
+test_that("dept dashboard cache key differs by term, campus, date, the mapping files and the course-term table", {
   base <- get_dept_dashboard_cache_key(
     list(dept_code = "HIST", campus = c("ABQ", "EA"), term = 202110L),
     data_objects,
@@ -431,11 +431,21 @@ test_that("dept dashboard cache key differs by term, campus, date, and the mappi
     renamed,
     cache_date = as.Date("2026-07-30")
   )
+  # The demographics denominator reads cedar_course_terms: a rebuilt table (one
+  # more or fewer course-term, a changed count) is a different key.
+  rebuilt <- data_objects
+  rebuilt$cedar_course_terms <- rebuilt$cedar_course_terms[-1, ]
+  other_course_terms <- get_dept_dashboard_cache_key(
+    list(dept_code = "HIST", campus = c("ABQ", "EA"), term = 202110L),
+    rebuilt,
+    cache_date = as.Date("2026-07-30")
+  )
 
   expect_false(base == other_term)
   expect_false(base == other_campus)
   expect_false(base == other_date)
   expect_false(base == other_dims)
+  expect_false(base == other_course_terms)
 })
 
 test_that("dept dashboard cache save/load roundtrips one dashboard payload", {

@@ -17,6 +17,10 @@
 #'   off it (`student_classification`, `primary_major_code`), never off the
 #'   class-list row (ADR-001 step 2); the class-list copies are dropped first.
 #'   May be `NULL` only when no grouping column describes the student.
+#' @param course_terms `cedar_course_terms`: the course enrollment each
+#'   group's share is taken against (`registered`, summed over part of term
+#'   for the course-terms the rows come from, and its mean across terms of one
+#'   type), never recounted from the rows (ADR-001 step 7).
 #' @param opt Options list containing:
 #'   \itemize{
 #'     \item \code{group_cols} - Character vector of column names to group by.
@@ -45,10 +49,12 @@
 #'
 #' @seealso
 #' \code{\link{get_course_demographics}} for the main entry point,
-#' \code{\link{calc_cl_enrls}} for enrollment counts
+#' \code{\link{build_course_terms}} for the enrollment the shares are taken against
 #'
 #' @export
-summarize_student_demographics <- function(filtered_students, student_terms, opt = list()) {
+summarize_student_demographics <- function(filtered_students, student_terms, course_terms,
+                                           opt = list()) {
+  require_course_terms_build(course_terms, "summarize_student_demographics")
   message("[demographics.R] Welcome to summarize_student_demographics!")
 
   group_cols <- opt[["group_cols"]]
@@ -105,12 +111,33 @@ summarize_student_demographics <- function(filtered_students, student_terms, opt
     group_by_at(average_cols) %>%
     mutate(mean = round(mean(count), digits = 1))
 
-  # Count course enrollments and percentages
-  reg_summary <- calc_cl_enrls(filtered_students)
-
-  crse_enrollment <- reg_summary %>%
+  # The course enrollment each share is taken against: the course-term
+  # table's registered count, summed over part of term, for the course-terms
+  # the rows come from; its mean across terms of one type is the counterpart
+  # of `mean` above (over the same offered terms). A part-of-term or level
+  # scope in opt reaches the table through its own filter; options about the
+  # student or the grouping do not scope the denominator.
+  denom_keys <- c("campus", "college", "term", "subject_course")
+  scope_opt <- opt[setdiff(names(opt), c("group_cols", "reg_status_code", "registration_status_code",
+                                         "classification", "student_campus"))]
+  offered <- filtered_students %>%
     ungroup() %>%
-    select(c(campus, college, subject_course, term, registered, registered_mean))
+    mutate(term = as.integer(term)) %>%
+    distinct(across(all_of(denom_keys)))
+  crse_enrollment <- filter_course_terms(course_terms, scope_opt) %>%
+    filter(!is.na(registered)) %>%
+    semi_join(offered, by = denom_keys) %>%
+    group_by(across(all_of(c(denom_keys, "term_type")))) %>%
+    summarize(registered = sum(registered), .groups = "drop") %>%
+    group_by(campus, college, subject_course, term_type) %>%
+    mutate(registered_mean = round(mean(registered), digits = 2)) %>%
+    ungroup() %>%
+    select(all_of(denom_keys), registered, registered_mean)
+  if (nrow(crse_enrollment) < nrow(offered)) {
+    stop("[demographics.R] summarize_student_demographics(): ", nrow(offered) - nrow(crse_enrollment),
+         " course-term(s) in the rows have no registered count in cedar_course_terms; ",
+         "the rows and the table must come from one class list.")
+  }
 
   merge_sum_enrl <- merge(summary, crse_enrollment, by = c("campus", "college",
                                                            "term", "subject_course"))
@@ -172,9 +199,3 @@ attach_student_descriptions <- function(rows, student_terms, cols) {
   rename(joined, !!!setNames(unname(term_cols), cols))
 }
 
-#' @describeIn summarize_student_demographics Deprecated name for backward compatibility
-#' @export
-summarize_classifications <- function(filtered_students, student_terms, opt = list()) {
-  warning("[demographics.R] summarize_classifications() is deprecated. Use summarize_student_demographics() instead.")
-  summarize_student_demographics(filtered_students, student_terms, opt)
-}

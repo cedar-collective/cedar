@@ -472,6 +472,10 @@ enrl_data <- eventReactive(enrl_run(), {
   )
   cedar_debug("[server.R] Filtered students to ", nrow(filtered_students), " rows for class list stats")
 
+  # Counted from the class list, not read off cedar_course_terms (ADR-001 step
+  # 7): this table is scoped to the sections the DESR filters selected, by CRN,
+  # so an instructor, method or status choice narrows it, and the course-term
+  # table cannot answer a question about one section.
   timer_cl <- start_report_timer("calc_cl_enrls")
   cl_data <- calc_cl_enrls(filtered_students)
   end_report_timer(timer_cl, result = cl_data)
