@@ -134,6 +134,23 @@ encrypt_if_needed <- function(id) {
   unname(enc[id_chr])
 }
 
+# Hash an instructor ID the way parse-data.R hashes the class list's and the
+# HR report's (md5 of the ID), unless it already is a hash. The DESR's report
+# spec hashes nothing, so its PRIM_INST_ID arrived as the employee ID: the HR
+# merge below never matched (job_cat was NA on every section) and the saved
+# sections joined neither the class list nor cedar_faculty (ISSUES I52).
+# Applied to all four sources, so files that never went through parse-data
+# (the synthetic institution's) come out the same way. NA stays NA.
+hash_instructor_id <- function(id) {
+  id_chr <- as.character(id)
+  todo <- !is.na(id_chr) & !grepl("^[0-9a-f]{32}$", id_chr)
+  if (!any(todo)) return(id_chr)
+  raw <- unique(id_chr[todo])
+  hashed <- vapply(raw, digest::digest, character(1), algo = "md5", USE.NAMES = FALSE)
+  id_chr[todo] <- hashed[match(id_chr[todo], raw)]
+  id_chr
+}
+
 # Convert a character vector of column names to snake_case
 to_snake <- function(x) {
   x <- gsub("[^a-zA-Z0-9]+", "_", x)  # non-alphanumeric → underscore
@@ -207,25 +224,13 @@ transform_sections <- function(desrs, data_dir, ext, maps) {
   # subject with no confirmed row is listed by the end-of-transform mapping
   # audit and on Admin > Mappings.
 
-  # ── HR merge (job_cat / title enrichment) ────────────────────────────────
-  hr_file <- file.path(data_dir, paste0("hr_data", ext))
-  if (file.exists(hr_file)) {
-    message("  Pre-processing: merging HR data for job_cat/title fields...")
-    hr_desrs <- load_file(hr_file, ext)
-    hr_desrs  <- hr_desrs %>% dplyr::select(-dplyr::any_of("as_of_date"))
-    desrs$PRIM_INST_ID <- as.character(desrs$PRIM_INST_ID)
-    desrs$TERM         <- as.character(desrs$TERM)
-    desrs <- desrs %>%
-      dplyr::left_join(hr_desrs,
-                       by     = c("TERM" = "term_code", "PRIM_INST_ID" = "UNM ID"),
-                       suffix = c("", ".hr")) %>%
-      dplyr::select(-dplyr::any_of("DEPT.hr"))
-    rm(hr_desrs); gc(verbose = FALSE)
-    message("  ✅ HR merge complete: ", nrow(desrs), " rows")
-  } else {
-    desrs$job_cat <- NA_character_
-    message("  ⚠️  hr_data not found: ", hr_file, " — job_cat will be NA")
-  }
+  # The instructor ID is hashed as the class list's and cedar_faculty's are,
+  # so a section joins both (I52). A section carries no faculty attribute: a
+  # reader that wants one joins cedar_faculty on term and instructor_id. (The
+  # HR merge that stood here joined the employee ID to hashed IDs, matched
+  # nothing, and left job_cat NA on every section; an instructor holding
+  # several appointments a term would also have duplicated the section.)
+  desrs$PRIM_INST_ID <- hash_instructor_id(desrs$PRIM_INST_ID)
 
   # ── Transmute to CEDAR model ─────────────────────────────────────────────
   message("  Transforming to CEDAR model...")
@@ -258,7 +263,6 @@ transform_sections <- function(desrs, data_dir, ext, maps) {
       source_college = COLLEGE,
       instructor_id   = as.character(PRIM_INST_ID),
       instructor_name = INST_NAME,
-      job_cat      = if ("job_cat" %in% names(.)) job_cat else NA_character_,
       enrolled     = as.integer(ENROLLED),
       total_enrl   = as.integer(total_enrl),
       capacity     = if ("SECT_CAP" %in% names(.)) as.integer(SECT_CAP) else as.integer(ROOM_CAP),
@@ -590,7 +594,7 @@ transform_students <- function(class_lists, data_dir, ext, maps) {
       subject_code   = sub(" .*", "", SUBJ_CRSE),
       course_title   = if ("Short Course Title" %in% names(.)) `Short Course Title` else NA_character_,
       level = dplyr::coalesce(COURSE_LEVEL, "unknown"),
-      instructor_id         = if ("Primary Instructor ID"         %in% names(.)) `Primary Instructor ID`         else NA_character_,
+      instructor_id         = if ("Primary Instructor ID"         %in% names(.)) hash_instructor_id(`Primary Instructor ID`) else NA_character_,
       instructor_last_name  = if ("Primary Instructor Last Name"  %in% names(.)) `Primary Instructor Last Name`  else NA_character_,
       instructor_first_name = if ("Primary Instructor First Name" %in% names(.)) `Primary Instructor First Name` else NA_character_,
       instructor_name = case_when(
@@ -652,6 +656,13 @@ transform_students <- function(class_lists, data_dir, ext, maps) {
   message("  Output columns: ", paste(names(cedar_students), collapse = ", "))
   rm(class_lists); gc(verbose = FALSE)
 
+  # The student's description is saved once per student-term and pull, and the
+  # class list without it (ADR-001 step 5): each description column repeated
+  # on every course row cost about 14 MB loaded, and every reader takes the
+  # student-term table's value. cedar_student_terms is built from the two.
+  descriptions_meta <- save_cedar_file(build_class_list_descriptions(cedar_students),
+                                       "class_list_descriptions", data_dir, ext)
+  cedar_students <- thin_class_list(cedar_students)
   students_meta <- save_cedar_file(cedar_students, "students", data_dir, ext)
 
   # The per-term and running credit totals that cedar_student_term_credits
@@ -662,7 +673,8 @@ transform_students <- function(class_lists, data_dir, ext, maps) {
 
   list(
     saved = list(
-      students = students_meta
+      students = students_meta,
+      class_list_descriptions = descriptions_meta
     )
   )
 }
@@ -691,11 +703,17 @@ transform_student_terms <- function(data_dir, ext) {
     load_file(path, ext)
   }
   students <- load_saved("students")
+  descriptions_path <- file.path(data_dir, paste0("cedar_class_list_descriptions", ext))
+  descriptions <- resolve_class_list_descriptions(
+    if (file.exists(descriptions_path)) load_file(descriptions_path, ext) else NULL,
+    students, "transform_student_terms()")
+  students <- thin_class_list(students)
   programs <- load_saved("programs")
   degrees  <- load_saved("degrees")
   edges <- cedar_data_edges(students, degrees = degrees)
-  student_terms <- build_student_terms(students, programs, degrees, edges = edges)
-  rm(students, programs, degrees); gc(verbose = FALSE)
+  student_terms <- build_student_terms(students, programs, degrees, edges = edges,
+                                       class_list_descriptions = descriptions)
+  rm(students, descriptions, programs, degrees); gc(verbose = FALSE)
   meta <- save_cedar_file(student_terms, "student_terms", data_dir, ext)
   message("  ✅ cedar_student_terms: ", nrow(student_terms), " rows, ", ncol(student_terms), " columns")
   list(saved = list(student_terms = meta))
@@ -718,7 +736,8 @@ transform_student_terms <- function(data_dir, ext) {
 cedar_student_terms_staleness <- function(data_dir, ext = ".qs") {
   target <- file.path(data_dir, paste0("cedar_student_terms", ext))
   if (!file.exists(target)) return("cedar_student_terms has not been built")
-  sources <- file.path(data_dir, paste0("cedar_", c("students", "programs", "degrees"), ext))
+  sources <- file.path(data_dir, paste0("cedar_", c("students", "class_list_descriptions",
+                                                    "programs", "degrees"), ext))
   sources <- sources[file.exists(sources)]
   newer <- sources[file.mtime(sources) > file.mtime(target)]
   if (length(newer) > 0L) {
@@ -1070,7 +1089,7 @@ transform_faculty <- function(hr_data, data_dir, ext) {
 
   cedar_faculty <- hr_data %>%
     transmute(
-      instructor_id   = as.character(`UNM ID`),
+      instructor_id   = hash_instructor_id(`UNM ID`),
       term            = as.integer(term_code),
       instructor_name = Name,
       department      = DEPT,
@@ -1377,14 +1396,24 @@ transform_to_cedar <- function(data_dir = NULL, use_qs = NULL, tables = NULL,
       path <- file.path(data_dir, paste0(name, ext))
       if (file.exists(path)) load_file(path, ext) else NULL
     })
+  # The roster's majors are on the description table (or, in a class list
+  # saved before 2026-11-07, on the class list itself).
+  descriptions_path <- file.path(data_dir, paste0("cedar_class_list_descriptions", ext))
+  audit_majors <- if (!is.null(audit_tables$students)) {
+    summarize_class_list_majors(resolve_class_list_descriptions(
+      if (file.exists(descriptions_path)) load_file(descriptions_path, ext) else NULL,
+      audit_tables$students, "mapping audit"))
+  }
+  audit_tables$students <- if (!is.null(audit_tables$students)) thin_class_list(audit_tables$students)
   mapping_audit <- do.call(audit_mapping_coverage,
-                           c(list(files = read_institution_mappings()), audit_tables))
+                           c(list(files = read_institution_mappings()), audit_tables,
+                             list(class_list_majors = audit_majors)))
   message("  ", summarize_mapping_audit(mapping_audit))
   for (i in which(mapping_audit$status == "unmapped")) {
     message(sprintf("    %-14s %-10s %s rows, %s", mapping_audit$kind[i], mapping_audit$value[i],
                     format(mapping_audit$rows[i], big.mark = ","), mapping_audit$context[i]))
   }
-  rm(audit_tables, mapping_audit); gc(verbose = FALSE)
+  rm(audit_tables, audit_majors, mapping_audit); gc(verbose = FALSE)
 
   # Write cedar-status.json for fast CLI queries
   status_file <- file.path(data_dir, "cedar-status.json")

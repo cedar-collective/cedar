@@ -209,6 +209,7 @@ enrollment_projection_course_scope <- function(students, sections, scope_courses
 }
 
 build_enrollment_projection_bundle <- function(cl_enrls, sections, students,
+                                               student_terms,
                                                target_term, as_of_term,
                                                scope_courses,
                                                scope_campuses,
@@ -303,6 +304,7 @@ build_enrollment_projection_bundle <- function(cl_enrls, sections, students,
     cl_enrls = cl_enrls,
     sections = sections,
     students = students,
+    student_terms = student_terms,
     target_courses = scope_courses,
     target_campuses = scope_campuses,
     target_market_id = scope_market_id,

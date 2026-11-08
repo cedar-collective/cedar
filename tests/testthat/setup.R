@@ -127,9 +127,12 @@ for (.sec in c("test_sections", "test_sections_sf", "test_sections_topics", "tes
                "test_sections_intersession", "test_sections_pending_session")) {
   assign(.sec, attach_test_course_ids(get(.sec), "sections"), envir = globalenv())
 }
+# Loaded as global.R loads them: without the student-description columns
+# (thin_class_list(), ADR-001 step 5); a reader attaches them from the
+# student-term table built above from the full fixtures.
 for (.stu in c("test_students", "test_students_xl_switch", "test_students_regstats",
                "test_students_course_history")) {
-  assign(.stu, attach_test_course_ids(get(.stu), "students"), envir = globalenv())
+  assign(.stu, attach_test_course_ids(thin_class_list(get(.stu)), "students"), envir = globalenv())
 }
 rm(.stu)
 rm(.sec)

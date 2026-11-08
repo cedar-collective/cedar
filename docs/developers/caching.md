@@ -109,7 +109,12 @@ Other conventions in use, worth matching:
   for manual invalidation; reach for a version bump or a data-hash/term/date key
   before relying on manual clears.
 
-Dept Trends uses content-addressed, per-tab caches. Headcount, Degrees, and
+Dept Trends uses content-addressed, per-tab caches: each source table's
+content is hashed once at start (`hash_dept_cache_sources()`, through
+`cedar_content_hash()`, which is `rlang::hash()`). Never hash a loaded table with
+`digest::digest()`: it serializes the whole table into memory first, 943 MB for
+the class list, and that copy was the app's start-up peak (3.4 of 3.83 GiB,
+2026-11-07); `rlang::hash()` streams it (+1 MB). Headcount, Degrees, and
 Demographics are department/report-window artifacts; Enrollment also keys on
 campus, current term, and calendar year, while Credit Hours keys on campus.
 `scripts/warm-dept-trends-cache.R` prepares the standard production scope after

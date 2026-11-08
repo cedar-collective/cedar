@@ -72,7 +72,9 @@ STUDENT_TERMS_BUILD_VERSION <- 2L
 
 #' Build the student-term table
 #'
-#' @param students `cedar_students`.
+#' @param students `cedar_students`: the registration facts. Its description
+#'   columns are read from `class_list_descriptions` when that is given, and
+#'   off `students` otherwise.
 #' @param programs `cedar_programs`, or NULL for class lists alone: then no
 #'   row is declared, every row is described by the class list, and the build
 #'   says so.
@@ -86,17 +88,28 @@ STUDENT_TERMS_BUILD_VERSION <- 2L
 #'   transform. Its unit and college are not read here: the table stores the
 #'   code and the roster's college as keys, and the loader attaches them.
 #' @param opt Unused; present for the branch calling convention.
+#' @param class_list_descriptions The saved `cedar_class_list_descriptions`
+#'   (build_class_list_descriptions()), which the transform saves beside the
+#'   thin class list; NULL to read the descriptions off `students`.
 #' @return A tibble with `STUDENT_TERMS_COLUMNS`, one row per student-term,
 #'   carrying `STUDENT_TERMS_BUILD_VERSION` as the attribute
 #'   `cedar_student_terms_build_version`.
 build_student_terms <- function(students, programs = NULL, degrees = NULL,
                                 edges = cedar_data_edges(students, degrees = degrees),
                                 files = read_institution_mappings(),
-                                opt = list()) {
+                                opt = list(),
+                                class_list_descriptions = NULL) {
   required_students <- c("student_id", "term", "registration_status_code", "final_grade",
-                         "credits", "subject_course", "course_title", "student_level",
-                         "student_classification", "student_campus", "residency",
-                         "major_code", "student_college", "as_of_date")
+                         "credits", "subject_course", "course_title", "as_of_date")
+  if (is.null(class_list_descriptions)) {
+    class_list_descriptions <- build_class_list_descriptions(students)
+  } else {
+    missing_d <- setdiff(c("student_id", "term", "as_of_date", CLASS_LIST_DESCRIPTION_REQUIRED),
+                         names(class_list_descriptions))
+    if (length(missing_d) > 0L) {
+      stop("[student-terms.R] class_list_descriptions lacks: ", paste(missing_d, collapse = ", "))
+    }
+  }
   required_programs <- c("student_id", "term", "program_type", "major_code",
                          "source_college_code", "source_college", "is_pre_major", "student_level",
                          "student_classification", "student_campus", "academic_standing",
@@ -122,7 +135,8 @@ build_student_terms <- function(students, programs = NULL, degrees = NULL,
 
   # ── Class list: enrollment facts and the class list's description ────────
   enrollment <- .student_terms_enrollment(students)
-  from_cl <- .student_terms_classlist_description(students)
+  from_cl <- .student_terms_classlist_description(
+    dplyr::mutate(dplyr::ungroup(class_list_descriptions), term = as.integer(term)))
 
   # ── Academic studies: description and declarations ───────────────────────
   from_programs <- .student_terms_programs_description(programs)
@@ -614,4 +628,105 @@ attach_student_term <- function(rows, student_terms, cols) {
   dplyr::left_join(rows,
                    dplyr::select(student_terms, student_id, term, dplyr::all_of(cols)),
                    by = c("student_id", "term"))
+}
+
+# The class-list columns that describe the student rather than the
+# registration (ADR-001 step 5). Each repeats one student-term value on every
+# course row (about 14 MB a column at 1.85M rows), and cedar_student_terms
+# holds the sanctioned value once, the programs row's where both sources have
+# one (I47: the class list's classification is stamped at the pull).
+#
+# The transform saves them once per student-term and pull, with how many rows
+# carried them, as cedar_class_list_descriptions
+# (build_class_list_descriptions()), and saves the class list without them.
+# The student-term build reads that table; the mapping audit reads the
+# roster's majors off it (summarize_class_list_majors()). Readers of the
+# loaded tables attach the student-term table's values through
+# attach_student_term() or attach_student_descriptions(). enrollment_id is a
+# row id nothing reads; total_credits is the student's registered hours that
+# term as Banner printed it, which nothing reads either (cedar_student_terms
+# counts its own from the rows). Both stay on the raw class_lists file.
+CLASS_LIST_DESCRIPTION_COLUMNS <- c(
+  "student_level", "student_classification", "major_code", "major_name",
+  "student_college", "student_campus", "residency", "dual_credit"
+)
+CLASS_LIST_UNLOADED_COLUMNS <- c(CLASS_LIST_DESCRIPTION_COLUMNS, "enrollment_id", "total_credits")
+# The ones build_student_terms() reads; the others are kept where present.
+CLASS_LIST_DESCRIPTION_REQUIRED <- c(
+  "student_level", "student_classification", "student_campus", "residency",
+  "major_code", "student_college"
+)
+
+#' The class list's description of each student-term, once per pull
+#'
+#' @param students The class list with its description columns (the
+#'   transform's, or a file saved before 2026-11-07).
+#' @return One row per distinct student, term, pull date and description:
+#'   `student_id`, `term`, `as_of_date`, the description columns
+#'   (`CLASS_LIST_DESCRIPTION_REQUIRED`, and the rest of
+#'   `CLASS_LIST_DESCRIPTION_COLUMNS` the class list carries), and `rows`, the
+#'   class-list rows that carried it.
+build_class_list_descriptions <- function(students) {
+  missing <- setdiff(c("student_id", "term", "as_of_date", CLASS_LIST_DESCRIPTION_REQUIRED),
+                     names(students))
+  if (length(missing) > 0L) {
+    stop("[student-terms.R] build_class_list_descriptions(): the class list lacks ",
+         paste(missing, collapse = ", "), ". Build it before thin_class_list().")
+  }
+  needed <- c("student_id", "term", "as_of_date",
+              intersect(CLASS_LIST_DESCRIPTION_COLUMNS, names(students)))
+  rows <- students[needed]
+  rows$term <- as.integer(rows$term)
+  dplyr::count(rows, dplyr::across(dplyr::all_of(needed)), name = "rows")
+}
+
+#' The saved class-list descriptions, or the older class list's own
+#'
+#' A class list saved before 2026-11-07 still carries its description columns
+#' and has no description table beside it; its descriptions are taken from it,
+#' and the log says so. Until the next transform, production reads that file
+#' (ISSUES.md I48).
+#'
+#' @param descriptions The saved `cedar_class_list_descriptions`, or NULL when
+#'   no file exists.
+#' @param students The saved class list as read.
+#' @param where Who is asking, for the messages.
+#' @return The description table.
+resolve_class_list_descriptions <- function(descriptions, students, where) {
+  if (!is.null(descriptions)) {
+    missing <- setdiff(c("student_id", "term", "as_of_date", "rows", CLASS_LIST_DESCRIPTION_REQUIRED),
+                       names(descriptions))
+    if (length(missing) > 0L) {
+      stop("[student-terms.R] ", where, ": cedar_class_list_descriptions lacks ",
+           paste(missing, collapse = ", "))
+    }
+    return(descriptions)
+  }
+  if (!is.null(students) && all(CLASS_LIST_DESCRIPTION_REQUIRED %in% names(students))) {
+    message("[student-terms.R] ", where, ": no cedar_class_list_descriptions; the class list ",
+            "was saved before 2026-11-07 and carries its own, which are read from it.")
+    return(build_class_list_descriptions(students))
+  }
+  stop("[student-terms.R] ", where, ": neither cedar_class_list_descriptions nor a class list ",
+       "carrying its description columns. Re-run the transform's class-list stage.")
+}
+
+#' Drop the student-description columns from a class list
+#'
+#' The transform saves the class list thin; every loader calls this too
+#' (global.R, scripts/cedar-repl.R, the cache warmers, the test setup), so a
+#' file saved before 2026-11-07 loads in the same shape.
+#'
+#' @param students The class list, with or without the columns.
+#' @return `students` without `CLASS_LIST_UNLOADED_COLUMNS`, its attributes kept.
+thin_class_list <- function(students) {
+  if (!is.data.frame(students)) {
+    stop("[student-terms.R] thin_class_list() needs the class-list data frame.")
+  }
+  drop <- intersect(CLASS_LIST_UNLOADED_COLUMNS, names(students))
+  if (length(drop) == 0L) return(students)
+  keep_attrs <- setdiff(names(attributes(students)), c("names", "row.names", "class"))
+  thin <- students[setdiff(names(students), drop)]
+  for (a in keep_attrs) attr(thin, a) <- attr(students, a)
+  thin
 }

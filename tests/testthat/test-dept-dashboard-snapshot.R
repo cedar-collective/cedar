@@ -333,6 +333,7 @@ test_that("dashboard payload includes headcount line data", {
   data_objects <- list(
     cedar_programs = test_programs,
     cedar_students = test_students,
+    cedar_student_terms = test_student_terms,
     cedar_sections = test_sections,
     cedar_dims     = test_dims
   )
@@ -392,6 +393,9 @@ test_that("the dashboard follows a renumbered course instead of calling it new (
   # back, which RN01 does not reach.)
   rn <- rn01_course_tables()
   objects <- list(cedar_programs = test_programs, cedar_students = rn$cedar_students,
+                  cedar_student_terms = attach_test_student_terms(suppressMessages(build_student_terms(
+                    test_students_rn, programs = NULL,
+                    edges = list(last_enrolled_complete = max(test_students_rn$term))))),
                   cedar_sections = rn$cedar_sections, cedar_dims = test_dims)
   opt <- list(dept_code = "HIST", term = 202110L)
   dashboard <- suppressMessages(create_dept_dashboard_data(objects, opt))

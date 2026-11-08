@@ -479,7 +479,12 @@ projection_additional_sections <- function(recommended_sections,
 }
 
 
-prepare_projection_student_inputs <- function(students, target_courses,
+# Each student-term's classification and major are cedar_student_terms' (the
+# classification, and the primary major as major_code), never the class list's
+# (0.29.0; ADR-001 step 5): the loaded class list carries no student
+# description, and a late pull stamps its classification a step ahead (I47).
+# Every class-list student-term must have a row there.
+prepare_projection_student_inputs <- function(students, student_terms, target_courses,
                                               campuses = NULL,
                                               through_term = NULL,
                                               from_term = NULL,
@@ -487,10 +492,20 @@ prepare_projection_student_inputs <- function(students, target_courses,
   projection_require_columns(
     students,
     c("student_id", "term", "campus", "college", "subject_course",
-      "part_term", "registration_status_code", "major_code",
-      "student_classification", "final_grade"),
+      "part_term", "registration_status_code", "final_grade"),
     "prepare_projection_student_inputs()"
   )
+  projection_require_columns(
+    student_terms,
+    c("student_id", "term", "student_classification", "primary_major_code"),
+    "prepare_projection_student_inputs() student_terms"
+  )
+  describe <- function(rows) {
+    attach_student_descriptions(
+      dplyr::distinct(rows, student_id, term),
+      student_terms, c("major_code", "student_classification")
+    )
+  }
 
   all_classlist_rows <- students %>%
     dplyr::ungroup() %>%
@@ -515,12 +530,7 @@ prepare_projection_student_inputs <- function(students, target_courses,
     )
   }
 
-  university_student_terms <- all_classlist_rows %>%
-    dplyr::group_by(student_id, term) %>%
-    dplyr::summarise(
-      student_classification = projection_mode_character(student_classification),
-      .groups = "drop"
-    )
+  university_student_terms <- describe(all_classlist_rows)
   university_term_signals <- university_student_terms %>%
     dplyr::group_by(term) %>%
     dplyr::summarise(
@@ -543,14 +553,8 @@ prepare_projection_student_inputs <- function(students, target_courses,
   course_enrollments <- classlist_rows %>%
     dplyr::distinct(student_id, term, subject_course)
 
-  student_terms <- classlist_rows %>%
-    dplyr::group_by(student_id, term) %>%
-    dplyr::summarise(
-      major_code = projection_mode_character(major_code),
-      student_classification = projection_mode_character(student_classification),
-      .groups = "drop"
-    )
-  market_term_signals <- student_terms %>%
+  market_student_terms <- describe(classlist_rows)
+  market_term_signals <- market_student_terms %>%
     dplyr::group_by(term) %>%
     dplyr::summarise(
       market_students = dplyr::n(),
@@ -605,7 +609,7 @@ prepare_projection_student_inputs <- function(students, target_courses,
 
   list(
     course_enrollments = course_enrollments,
-    student_terms = student_terms,
+    student_terms = market_student_terms,
     target_students = target_students,
     university_term_signals = university_term_signals,
     market_term_signals = market_term_signals,
@@ -671,6 +675,7 @@ prepare_projection_waitlist_history <- function(students, courses, campuses,
 
 
 prepare_enrollment_projection_inputs <- function(cl_enrls, sections, students,
+                                                 student_terms,
                                                  target_courses,
                                                  target_campuses,
                                                  target_market_id,
@@ -699,7 +704,7 @@ prepare_enrollment_projection_inputs <- function(cl_enrls, sections, students,
   students <- drop_intersession(dplyr::select(students, dplyr::all_of(c(
     "student_id", "term", "campus", "college", "subject_course", "part_term",
     "crn", "registration_status_code", "registration_date", "as_of_date",
-    "major_code", "student_classification", "final_grade"
+    "final_grade"
   ))))
   if (is.null(target_courses) || length(target_courses) == 0) {
     stop("[enrollment-projection-inputs.R] target_courses is required.", call. = FALSE)
@@ -790,7 +795,7 @@ prepare_enrollment_projection_inputs <- function(cl_enrls, sections, students,
       through_term = enrollment_through_term
     ),
     students = prepare_projection_student_inputs(
-      students, target_courses = target_courses,
+      students, student_terms, target_courses = target_courses,
       campuses = target_campuses,
       through_term = enrollment_through_term,
       from_term = student_source_start,

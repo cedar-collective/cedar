@@ -89,6 +89,10 @@ if (exists("cedar_min_term", inherits = TRUE)) {
   }
 }
 
+# The class list as global.R loads it: no student-description columns
+# (thin_class_list(), ADR-001 step 5).
+data_objects[["cedar_students"]] <- thin_class_list(data_objects[["cedar_students"]])
+
 # The default unit columns, attached at load as global.R attaches them, so the
 # cache the app reads was built on the same units (ADR-001 step 3).
 cedar_dims <- build_cedar_dims()

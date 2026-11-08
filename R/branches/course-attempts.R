@@ -308,20 +308,53 @@ get_course_outcome_rates <- function(students, opt = list(),
 }
 
 
-get_course_dfw_demographics <- function(students, opt = list(),
+# The student groups the Course Report's DFW tables split by. Each is read off
+# cedar_student_terms, never the class list (ADR-001 step 5): the
+# classification is the student-term's (I47), and a major is the primary
+# major, named by programs.csv (name_program_codes()), so a pre-major reads
+# "Psychology (pre-major)" here as on every other major table.
+DFW_DEMOGRAPHIC_GROUPS <- c("student_classification", "major_code")
+
+#' DFW rate and composition by a student group
+#'
+#' @param students Class-list rows (the loaded `cedar_students`).
+#' @param student_terms The `cedar_student_terms` table; the group is read off it.
+#' @param opt Course-attempt options (`course`, `data_edges`, `passing_grades`, ...).
+#' @param group_col One of `DFW_DEMOGRAPHIC_GROUPS`.
+#' @param min_n Smallest attempt count a group needs to be shown.
+#' @param max_groups Optional cap on the groups returned, largest DFW count first.
+#' @param dims The dimension tables (`build_cedar_dims()`); required for
+#'   `group_col = "major_code"`, whose groups are programs.csv's names.
+#' @return One row per group: counts, `dfw_pct`, `late_withdrawal_pct`,
+#'   `early_drop_pct`, `share_of_dfw`, `share_of_attempts`.
+get_course_dfw_demographics <- function(students, student_terms, opt = list(),
                                         group_col = "student_classification",
                                         min_n = 1L,
-                                        max_groups = NULL) {
+                                        max_groups = NULL,
+                                        dims = NULL) {
   opt <- normalize_course_attempt_opt(opt)
   group_col <- as.character(group_col)[[1]]
+  if (!group_col %in% DFW_DEMOGRAPHIC_GROUPS) {
+    stop("[course-attempts.R] group_col must be one of ",
+         paste(DFW_DEMOGRAPHIC_GROUPS, collapse = ", "), "; got ", group_col)
+  }
+  if (group_col == "major_code" && !inherits(dims, "cedar_dims")) {
+    stop("[course-attempts.R] Grouping by major names each program through ",
+         "programs.csv; pass dims = cedar_dims.")
+  }
   min_n <- suppressWarnings(as.integer(min_n %||% 1L))
   if (length(min_n) == 0 || is.na(min_n) || min_n < 1L) min_n <- 1L
 
   attempts <- prepare_course_attempts(students, opt)
   if (nrow(attempts) == 0) return(tibble::tibble())
 
-  if (!group_col %in% names(attempts)) {
-    stop("[course-attempts.R] Missing demographic grouping column: ", group_col)
+  if (group_col == "major_code") {
+    attempts <- attach_student_descriptions(attempts, student_terms, c("major_code", "is_pre_major"))
+    labels <- name_program_codes(attempts$major_code, dims, attempts$is_pre_major)
+    attempts$group_value <- unname(labels[attempts$major_code])
+  } else {
+    attempts <- attach_student_descriptions(attempts, student_terms, group_col)
+    attempts$group_value <- attempts[[group_col]]
   }
 
   safe_pct <- function(num, den) {
@@ -337,7 +370,7 @@ get_course_dfw_demographics <- function(students, opt = list(),
     passing_values = opt$passing_grades %||% GRADES_PASS
   )
   classified$group_col <- group_col
-  classified$group <- trimws(as.character(classified[[group_col]]))
+  classified$group <- trimws(as.character(classified$group_value))
   classified$group[is.na(classified$group) | classified$group == ""] <- "(Missing)"
 
   result <- classified %>%
