@@ -43,9 +43,12 @@ Changelog (Admin). Cross-course Retention is built but hidden.
 
 The order work is taken in.
 
-1. **Finish the domain data model (ADR-001 step 4, then 5).** Rebuild the
-   course flows on the keyed tables; then thin `cedar_registrations` and `cedar_programs` (closes
-   [I47](ISSUES.md)). Design: [ADR-001](docs/developers/architecture-decisions.md#adr-001-move-cedars-tables-from-report-shaped-to-domain-shaped).
+1. **Finish the domain data model (ADR-001 steps 6 and 7).** Move the measure
+   tables' build into the transform so the app only loads and verifies (a restart
+   is a load, ~47 s today; a stale table is a startup error, never a rebuild);
+   then re-point the cones onto the measure tables one group at a time, deleting
+   each re-derivation, and rename the class-list file last. Design and the
+   progress metrics: [ADR-001 steps 6 and 7](docs/developers/architecture-decisions.md#steps-6-and-7-where-compute-lives-and-the-cone-migration-planned-2026-11-08).
 2. **Projection adjustments.** The open items under [Section-needs
    projections](#section-needs-projections).
 3. **Degree maps.** The open items under [Degree Explorer](#degree-explorer-and-curriculum-informed-demand).
