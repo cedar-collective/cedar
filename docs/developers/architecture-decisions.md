@@ -19,10 +19,10 @@ in git, and open defects in [`ISSUES.md`](https://github.com/cedar-collective/ce
 
 ## ADR-001: Move CEDAR's tables from report-shaped to domain-shaped
 
-- **Status:** Accepted, in progress (steps 1–3 done; step 4 under way). First
-  written 2026-07-31; rewritten 2026-11-03 with the measurements below.
-  Step 3's design revised 2026-11-06 after review; course keying decided
-  2026-11-07.
+- **Status:** Accepted, in progress (steps 1–5 done; steps 6 and 7 planned
+  2026-11-08). First written 2026-07-31; rewritten 2026-11-03 with the
+  measurements below. Step 3's design revised 2026-11-06 after review; course
+  keying decided 2026-11-07.
 - **Supersedes:** [ADR-002](#adr-002-explicit-mapping-files-replace-runtime-department-inference) Stages 3 and
   3b (units and colleges stamped onto rows at transform time): the same files
   are read as dimensions at load. ADR-002's files, rules and pipeline
@@ -251,10 +251,72 @@ record keeps the decisions.
 | 3 | Dimensions from the mapping files, units attached at load | done 2026-11-06 |
 | 4 | `cedar_courses` and course ids at load (I37, I45); `cedar_course_terms`; `cedar_attempts` | courses and keying done 2026-11-07; `cedar_course_terms` done 2026-11-07; `cedar_attempts` done 2026-11-07 (`cedar_grades` retired); `cedar_course_flows` done 2026-11-07 |
 | 5 | Thin `cedar_students` and `cedar_programs` to keys and registration facts; rename to fact names | student-term columns off the loaded class list done 2026-11-07 (`thin_class_list()`), and off the saved file (`cedar_class_list_descriptions`); the section columns and `cedar_programs` stay (decisions below); renamed `cedar_registrations` 2026-11-07, its file still `cedar_students.qs` (`CEDAR_TABLE_FILES`) |
+| 6 | The measure tables become transform outputs: the app loads and verifies, never builds (decisions below) | planned 2026-11-08 |
+| 7 | Re-point the cones onto the measure tables, deleting each re-derivation; then rename the class-list file | planned 2026-11-08; progress is the count of cones that take `cedar_registrations` (18 of 26 on 2026-11-08) and the cone line count (8,908) |
 
 Step 2's precedence rule: when the two source snapshots disagree, the
 academic-studies row wins, the row is flagged and the count reported, never
 a silent coalesce.
+
+#### Steps 6 and 7: where compute lives, and the cone migration (planned 2026-11-08)
+
+**The principle.** The transform runs once a day and may take as long as it
+needs; a restart should be as fast as a load, and does not need fresher data
+than the last transform (re-run the transform when it does). So every table
+the app holds is *built* in the transform and *loaded* at start, and the app
+never builds a table in its own process.
+
+**What this changes.** Until now `cedar_attempts`, `cedar_course_terms` and
+`cedar_course_flows` were startup caches: the saved copy was used when
+`*_is_current()` matched the class list, the outcome-policy version, the
+graded edge and the course renames, and otherwise the app rebuilt the table
+at start. That is the slow, memory-heavy start (the worst case measured
+about 2.7 of 3.83 GiB, from the build-time transient copies), and it is the
+opposite of the principle. Measured on 2026-11-08 with every cache current,
+a restart takes 47 s to *Listening*: about 10 s reading the six saved tables
+(the class list 6 s), about 19 s trimming, deriving the class-list
+descriptions, building the dimensions and course ids and attaching units
+(one block, not yet instrumented), 6 s for the edges, `cedar_terms` and the
+cache hashes, 2 s per measure table, and 6 s for the summary and the Shiny
+files.
+
+**Step 6 decisions.**
+
+- **The transform builds and saves the three measure tables** after it saves
+  the class list, under the same `build_*()` functions and the same currency
+  stamp (`CEDAR_OUTCOME_POLICY_VERSION`, the graded edge, the renames). The
+  stamp stays: it is what lets the app refuse a stale table.
+- **The app loads and verifies; a stale or missing measure table is a
+  startup error** that names the table and the command to run, in the fail-closed
+  form the edges already use. No rebuild path remains in `global.R`, the
+  cache-warming scripts or `scripts/cedar-repl.R`. A code change that alters a
+  measure (an outcome-policy bump, a confirmed rename) therefore needs the
+  transform re-run before the restart; deploy already gates
+  `cedar_student_terms` this way and the measure tables join that gate.
+- **Units and course ids stay attached at load** (step 3's decision stands):
+  about 15 s per restart buys a mapping PR that takes effect at the next
+  start without a transform run, which is worth more than the seconds. The
+  attach block gets timing lines so the trade is measured, not assumed.
+- **The AGENTS.md sentence** that the measures are built at startup and are
+  not a saved source of truth is replaced when the code lands, not before.
+
+**Step 7: the cone migration.** The measure tables exist, but on 2026-11-08
+eighteen of the twenty-six cones take `cedar_registrations`, eleven of them
+take it and none of the measure tables (bottleneck, course-adjacency,
+course-instructor-effect, course-pairs, course-sequence-effect,
+data-integrity, declaration-context, entry-heatmap, grouped-student-paths,
+major-changes, seatfinder), five still classify grades or compute census
+themselves, and only one cone each reads `cedar_attempts` and
+`cedar_course_terms`. The payoff of the model — a new cone is a filter and a
+join — holds for new cones and not yet for the existing 8,908 lines. The
+migration goes one group at a time, each PR deleting the re-derivation it
+replaces: outcome cones onto `cedar_attempts`; count and fill cones onto
+`cedar_course_terms`; flow, retention and sequence cones onto
+`cedar_student_terms` and `cedar_course_flows`. Each migrated cone keeps its
+output contract and its fixture expectations, so the committed tests are the
+regression check. When a re-transform is routine, the class-list file is
+renamed `cedar_registrations.qs` (one line in `CEDAR_TABLE_FILES`, one in
+the transform's save), closing step 5.
 
 #### Step 5: decisions (2026-11-07)
 
