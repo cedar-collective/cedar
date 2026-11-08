@@ -13,7 +13,7 @@ context("Gen Ed campus split")
 
 ge_profile <- function(min_n = 1L, instructor = TRUE) {
   suppressMessages(get_gen_ed_profile(
-    test_students, test_sections, test_programs, NULL, test_student_terms, test_dims,
+    test_students, test_attempts, test_sections, test_programs, NULL, test_student_terms, test_dims,
     list(min_n = min_n,
          include_instructor_dfw = instructor,
          include_associations = FALSE,
@@ -27,6 +27,7 @@ ge_profile <- function(min_n = 1L, instructor = TRUE) {
 ge_two_campus_profile <- function(min_n = 1L) {
   suppressMessages(get_gen_ed_profile(
     gen_ed_assoc_students,
+    gen_ed_assoc_attempts,
     gen_ed_assoc_sections,
     gen_ed_assoc_programs,
     student_terms = test_student_terms_gen_ed_assoc,

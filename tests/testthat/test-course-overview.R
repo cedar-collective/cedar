@@ -624,17 +624,13 @@ test_that("the whole Course Dynamics payload is keyed on the course", {
   expect_setequal(unique(rollcall$term), c(202010L, 202110L))
   expect_equal(unique(rollcall$subject_course), "HIST 3201")
 
-  # The outcome cones read the same loaded class list, so DFW history begins
-  # where the course did, not where its current code did.
-  keyed <- rn$cedar_registrations
+  # The outcome cones read the attempt table built over the same keyed class
+  # list, so DFW history begins where the course did, not where its current
+  # code did.
   edges <- cedar_data_edges(test_students, degrees = test_degrees)
   outcomes <- suppressMessages(get_course_outcomes(
-    keyed, test_faculty, list(course = "HIST 3201", min_n = 1L, data_edges = edges)
+    attempts_for(rn$cedar_registrations, edges), test_faculty,
+    list(course = "HIST 3201", min_n = 1L, data_edges = edges)
   ))
   expect_setequal(outcomes$dfw_trend$term, c(202010L, 202110L))
-  # On the class list as saved, HIST 320's term is another course.
-  stored <- suppressMessages(get_course_outcomes(
-    test_students_rn, test_faculty, list(course = "HIST 3201", min_n = 1L, data_edges = edges)
-  ))
-  expect_equal(stored$dfw_trend$term, 202110L)
 })

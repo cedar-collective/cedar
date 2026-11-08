@@ -23,18 +23,36 @@
 # w_late_withdrawal, early_drop, missing), so a page with the visible C-/D
 # opt-in can count c_minus and d as passing without reclassifying.
 #
-# Like cedar_course_terms, it is built at load, held in data_objects and passed
-# to readers as a parameter; a copy saved beside the data is a cache, checked
-# by attempts_is_current() before it is used.
+# Like cedar_course_terms, it is built by the transform (ADR-001 step 6),
+# loaded into data_objects at start after attempts_is_current() accepts it,
+# and passed to readers as a parameter. The outcome hub
+# (R/branches/course-attempts.R: get_course_outcome_rates() and the rest)
+# reads it, scoped by the same options a class-list reader takes
+# (filter_attempts()), and counts attempt_outcome_flags(), so no reader
+# decides again which class-list rows are attempts or what they earned.
+#
+# Besides the keys and the outcome it carries the section's instructor
+# (`instructor_id`, `instructor_name`) and the subject, because the readers
+# group and scope by them (the Course Report's instructor comparison, the Gen
+# Ed instructor table, the `subj` option). It carries no description of the
+# student: a reader that groups by classification or major attaches it from
+# cedar_student_terms (attach_student_descriptions()).
 
-# Bump when a column or the row rule changes, so a cached copy is rebuilt.
-ATTEMPTS_BUILD_VERSION <- 1L
+# Bump when a column or the row rule changes: the deploy gate and the
+# transform rebuild a saved copy under another version, and the app refuses it.
+ATTEMPTS_BUILD_VERSION <- 2L
 
 ATTEMPTS_COLUMNS <- c(
   "student_id", "term", "campus", "college", "part_term", "subject_course",
-  "listed_code", "level", "department", "crn", "registration_status_code",
+  "listed_code", "subject_code", "level", "department", "crn",
+  "instructor_id", "instructor_name", "registration_status_code",
   "final_grade", "outcome_category", "outcome"
 )
+
+# The finer categories build_attempts() writes, and the ones that hold a grade.
+ATTEMPT_OUTCOME_CATEGORIES <- c("pass", "c_minus", "d", "f", "other_nonpassing",
+                                "w_late_withdrawal", "early_drop", "missing")
+ATTEMPT_GRADED_CATEGORIES <- c("pass", "c_minus", "d", "f", "other_nonpassing")
 
 #' Build cedar_attempts from the loaded class list
 #'
@@ -179,6 +197,55 @@ require_current_attempts <- function(attempts, students, caller) {
          "class list (its course codes differ); rebuild it with build_attempts()")
   }
   invisible(graded_edge)
+}
+
+
+#' The outcome flags of attempts, read off their stored classification
+#'
+#' What the per-request readers count (summarize_attempt_outcomes() and the
+#' rest of R/branches/course-attempts.R). Every flag is read off
+#' `outcome_category`, which build_attempts() wrote once with
+#' classify_attempt_outcomes(), so a reader never decides again whether an
+#' attempt passed, failed or withdrew. The one grade read is a page's visible
+#' C-/D opt-in: `is_pass` is a graded category whose `final_grade` is in
+#' `passing_values`, which under the default GRADES_PASS is exactly the
+#' `pass` category (tests/testthat/test-course-attempts.R pins that).
+#'
+#' @param attempts Rows of cedar_attempts, scoped or not; needs
+#'   `outcome_category` and `final_grade`.
+#' @param passing_values The grades that pass; GRADES_PASS, or
+#'   GRADES_PASS_SUB_C_OPT_IN from a page's visible control.
+#' @return `attempts` with the `is_*` flags classify_attempt_outcomes() writes.
+attempt_outcome_flags <- function(attempts, passing_values = GRADES_PASS) {
+  missing <- setdiff(c("outcome_category", "final_grade"), names(attempts))
+  if (length(missing)) {
+    stop("[attempts.R] attempt_outcome_flags(): attempts lacks ", paste(missing, collapse = ", "))
+  }
+  passing_values <- as.character(passing_values %||% GRADES_PASS)
+  category <- attempts$outcome_category
+  unknown <- setdiff(unique(category), ATTEMPT_OUTCOME_CATEGORIES)
+  if (length(unknown)) {
+    stop("[attempts.R] attempt_outcome_flags(): outcome_category holds ",
+         paste(unknown, collapse = ", "), ", which build_attempts() never writes")
+  }
+  graded <- category %in% ATTEMPT_GRADED_CATEGORIES
+  grade <- trimws(as.character(attempts$final_grade))
+  attempts %>%
+    dplyr::mutate(
+      is_blank_outcome = .env$category == "missing",
+      is_early_drop = .env$category == "early_drop",
+      is_late_withdrawal = .env$category == "w_late_withdrawal",
+      is_pass = .env$graded & .env$grade %in% .env$passing_values,
+      is_c_minus = .env$category == "c_minus",
+      is_d = .env$category == "d",
+      is_f = .env$category == "f",
+      is_other_nonpassing = .env$category == "other_nonpassing" & !is_pass,
+      is_failed_legacy = .env$graded & !is_pass,
+      is_denominator_attempt = .env$graded | is_late_withdrawal,
+      is_dfw_legacy = is_failed_legacy | is_late_withdrawal,
+      is_dfw_strict = is_d | is_f | is_late_withdrawal,
+      is_below_c = is_c_minus | is_d | is_f | is_other_nonpassing | is_late_withdrawal
+    )
 }
 
 

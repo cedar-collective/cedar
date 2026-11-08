@@ -327,6 +327,21 @@ regression check. When a re-transform is routine, the class-list file is
 renamed `cedar_registrations.qs` (one line in `CEDAR_TABLE_FILES`, one in
 the transform's save), closing step 5.
 
+Group 1, the outcome hub, moved on 2026-11-08: every function in
+`R/branches/course-attempts.R` but the status-exclusion report takes
+`cedar_attempts`, scoped by the class list's options through
+`filter_attempts()` and counted through `attempt_outcome_flags()` off the
+stored `outcome_category`, so the per-request path no longer decides which
+rows are attempts or reclassifies a grade. The table gained the section's
+instructor and the subject (`ATTEMPTS_BUILD_VERSION` 2) because the Course
+Report and Gen Ed group by them. Course Dynamics' outcomes, Open Seats' DFW
+column and the Gen Ed profile's outcome tables read it; `seatfinder()` no
+longer takes the class list at all, and `get_course_outcomes()` takes the
+attempts (the persistence analyses beside it still read the class list's
+next-term rows). The measure (classified once, dedup'd once) also settled
+what a reader of the class list had to re-derive: the AUD, recycled-CRN and
+drop-normalisation tests now exercise the table.
+
 #### Step 5: decisions (2026-11-07)
 
 - **Order:** the student-term columns leave the loaded class list first

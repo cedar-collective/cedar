@@ -121,7 +121,9 @@ resolve_course_codes <- function(codes, code_history) {
     subject <- sub(" .*", "", current)
     number <- sub("^[^ ]+ ", "", current)
     renamed <- unname(succ_subject[subject])
-    via_subject <- ifelse(is.na(renamed), NA_character_, paste(renamed, number))
+    # if_else, not ifelse: over no codes at all (an empty table keyed at load)
+    # ifelse returns logical(0), which coalesce() refuses beside a character.
+    via_subject <- dplyr::if_else(is.na(renamed), NA_character_, paste(renamed, number))
     nxt <- dplyr::coalesce(via_course, via_subject)
     moving <- !is.na(nxt)
     if (!any(moving)) break

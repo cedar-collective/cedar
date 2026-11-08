@@ -157,7 +157,7 @@ normalize_inst_method <- function (courses) {
 #' by comparing course offerings between terms (typically year-over-year). Helps
 #' identify capacity needs, enrollment trends, and gen ed course availability.
 #'
-#' @param students Data frame from cedar_registrations table (used for DFW rate calculation)
+#' @param attempts The attempt measure table (`cedar_attempts`), for each course's DFW rate
 #' @param courses Data frame from cedar_sections table with enrollment and capacity data
 #' @param cedar_faculty Data frame from cedar_faculty table (used for instructor job category in grades)
 #' @param opt Options list with required and optional parameters:
@@ -212,14 +212,14 @@ normalize_inst_method <- function (courses) {
 #' \dontrun{
 #' # Compare Fall 2025 to Fall 2024 (default one-year comparison)
 #' opt <- list(term = "202580", part_term = "FT", department = "MATH")
-#' results <- seatfinder(cedar_registrations, cedar_sections, cedar_faculty, opt)
+#' results <- seatfinder(cedar_attempts, cedar_sections, cedar_faculty, opt)
 #'
 #' # View courses with largest availability decreases
 #' head(results$type_summary %>% arrange(avail_diff))
 #'
 #' # Compare specific terms
 #' opt <- list(term = "202410,202510")  # Spring 2024 vs Spring 2025
-#' results <- seatfinder(cedar_registrations, cedar_sections, cedar_faculty, opt)
+#' results <- seatfinder(cedar_attempts, cedar_sections, cedar_faculty, opt)
 #'
 #' # Check gen ed availability
 #' head(results$gen_ed_summary)
@@ -231,7 +231,7 @@ normalize_inst_method <- function (courses) {
 #' \code{\link{get_courses_diff}} for new/discontinued courses
 #'
 #' @export
-seatfinder <- function (students, courses, cedar_faculty, opt) {
+seatfinder <- function (attempts, courses, cedar_faculty, opt) {
   
   cedar_debug("[seatfinder.R] Welcome to seatfinder!")
   
@@ -280,20 +280,15 @@ seatfinder <- function (students, courses, cedar_faculty, opt) {
   }
 
 
-  # Add mean DFW rate for course using the shared course outcome API.
+  # Add each course's DFW rate from the attempt measure table, in the college,
+  # department or subject scope already in opt (the left join below keeps the
+  # courses in the enrollment summary), over every graded term.
   myopt <- opt
-  # Use college/dept filters already in opt rather than enumerating every course code.
-  # For a college-wide search, building a list of 200+ course codes causes
-  # filter_class_list to scan all of cedar_registrations across all historical terms
-  # for each code. The college/dept/subj filters already copied from opt are
-  # single-value filters that cover the same scope and are much faster. The
-  # left-join with enrl_summary keeps only the courses we need.
   myopt$course <- NULL
-  myopt$term <- NULL # remove term param to get dfw rates across all historical terms
+  myopt$term <- NULL
 
-  # Safety: if no scope-limiting filter is present (college/dept/subj), removing the
-  # term filter would force a full scan of all of cedar_registrations. Fall back to term in
-  # that case to bound the query.
+  # With no college, department or subject scope the rate is bounded to the
+  # two compared terms, as it always has been here.
   has_scope <- isTRUE(nzchar(myopt$course_college %||% "")) ||
                isTRUE(nzchar(myopt$dept_code %||% "")) ||
                isTRUE(nzchar(myopt$subj %||% ""))
@@ -303,11 +298,8 @@ seatfinder <- function (students, courses, cedar_faculty, opt) {
   }
 
   cedar_debug("[seatfinder.R] Getting DFW rates for courses in enrollment summary...")
-  # get_course_outcome_rates() applies the authoritative graded-data edge. Pass
-  # the original table so Open Seats does not allocate a near-full copy merely
-  # to remove one term before the scoped outcome filtering begins.
   grades <- get_course_outcome_rates(
-    students, myopt,
+    attempts, myopt,
     group_cols = c("campus", "college", "subject_course"),
     min_n = 1L
   )

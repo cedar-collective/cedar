@@ -13,7 +13,8 @@
 # This is course-first analysis. For cohort-first stop-out analysis (which
 # courses are bleeding a specific student population?), see stopout.R.
 #
-# All functions take cedar_registrations as primary input.
+# The outcome analyses take cedar_attempts (ADR-001 step 7); the persistence
+# analyses take cedar_registrations, whose next-term rows they still read.
 #
 # DFW calculations delegate to get_course_outcome_rates() so cones use the
 # shared course-attempt/outcome contract.
@@ -37,8 +38,8 @@
 #' DFW trend and instructor comparison delegate to get_course_outcome_rates()
 #' so the DFW formula and component fields match the rest of the app.
 #'
-#' @param students cedar_registrations data frame.
-#' @param cedar_faculty cedar_faculty data frame, or NULL to skip DFW analyses.
+#' @param attempts The attempt measure table (`cedar_attempts`).
+#' @param cedar_faculty cedar_faculty data frame; kept for the callers, unread here.
 #' @param opt Options list:
 #'   \itemize{
 #'     \item \code{course}  — character vector of subject_course values (required)
@@ -56,7 +57,7 @@
 #'       dfw_pct, course_avg_dfw, dfw_diff}
 #'     \item{courses}{Character vector of courses analyzed}
 #'   }
-get_course_outcomes <- function(students, cedar_faculty = NULL, opt = list()) {
+get_course_outcomes <- function(attempts, cedar_faculty = NULL, opt = list()) {
 
   message("[course-outcomes.R] Welcome to get_course_outcomes!")
 
@@ -67,26 +68,17 @@ get_course_outcomes <- function(students, cedar_faculty = NULL, opt = list()) {
   courses <- as.character(courses)
   message("[course-outcomes.R] Courses: ", paste(courses, collapse = ", "))
 
+  # The longitudinal edge: the earlier of the settled and graded edges, so a
+  # term whose enrollment is still open never enters the trend.
   analysis_end <- cedar_longitudinal_edge(opt$data_edges, grade_dependent = TRUE)
-  outcome_students <- students
+  outcome_attempts <- attempts
   if (!is.null(analysis_end)) {
-    outcome_students <- dplyr::filter(outcome_students, term <= .env$analysis_end)
+    outcome_attempts <- dplyr::filter(outcome_attempts, term <= .env$analysis_end)
   }
 
-  # Rows for the requested course and scope, to report what was found. DFW
-  # analyses re-filter internally via get_course_outcome_rates().
-  filtered <- outcome_students %>%
-    filter(
-      subject_course %in% courses,
-      registration_status_code %in% c(STATUS_REGISTERED, STATUS_DROP_EARLY, STATUS_DROP_LATE)
-    )
-
-  if (!is.null(opt$term) && length(opt$term) > 0)
-    filtered <- filtered %>% filter(term %in% opt$term)
-  if (!is.null(opt$campus) && length(opt$campus) > 0)
-    filtered <- filtered %>% filter(campus %in% opt$campus)
-
-  filtered <- dedup_enrollment(filtered, level = "course")
+  # The attempts in scope, to report what was found; the rates below read the
+  # same scope through get_course_outcome_rates().
+  filtered <- prepare_course_attempts(outcome_attempts, opt)
 
   if (nrow(filtered) == 0) {
     message("[course-outcomes.R] No records after filtering.")
@@ -107,19 +99,19 @@ get_course_outcomes <- function(students, cedar_faculty = NULL, opt = list()) {
   min_n <- opt$min_n %||% 1L
 
   dfw_trend_out <- get_course_outcome_rates(
-    outcome_students, opt,
+    outcome_attempts, opt,
     group_cols = c("campus", "college", "subject_course", "term"),
     min_n = min_n
   )
   message("[course-outcomes.R] DFW trend: ", nrow(dfw_trend_out), " term rows.")
 
   ci <- get_course_outcome_rates(
-    outcome_students, opt,
+    outcome_attempts, opt,
     group_cols = c("campus", "college", "subject_course", "instructor_id", "instructor_name"),
     min_n = min_n
   )
   ca <- get_course_outcome_rates(
-    outcome_students, opt,
+    outcome_attempts, opt,
     group_cols = c("campus", "college", "subject_course"),
     min_n = 1L
   )

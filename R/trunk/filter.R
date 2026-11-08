@@ -364,6 +364,46 @@ special_filters_desr <- list(
   }
 )
 
+# Maps the filter options to cedar_attempts' columns (R/branches/attempts.R),
+# the same option names a class-list reader takes, so a caller's `opt` scopes
+# either table. The measure carries the class list's course, section and
+# instructor keys and no description of the student.
+opt_col_map_attempts <- list(
+  crn               = "crn",
+  course            = "subject_course",
+  subj              = "subject_code",
+  dept_code         = "department",
+  term              = "term",
+  inst              = "instructor_name",
+  course_campus     = "campus",
+  course_college    = "college",
+  level             = "level",
+  pt                = "part_term",
+  reg_status_code   = "registration_status_code",
+  uel               = ""
+)
+
+# Options the class list answers and cedar_attempts cannot. A classification
+# or major is the student-term's (attach_student_descriptions()); a title or
+# delivery method is the section's.
+ATTEMPTS_UNSUPPORTED_OPTS <- c("course_title", "classification", "im")
+
+#' Scope cedar_attempts by the standard filter options
+#'
+#' @param attempts The attempt measure table, or rows of it.
+#' @param opt The options (`course`, `term`, `course_campus`, `inst`, ...).
+#' @return The rows matching every option set; an option the measure cannot
+#'   answer is an error, never ignored.
+filter_attempts <- function(attempts, opt) {
+  set <- Filter(function(name) !is.null(opt[[name]]), ATTEMPTS_UNSUPPORTED_OPTS)
+  if (length(set)) {
+    stop("[filter.R] filter_attempts(): opt$", paste(set, collapse = ", opt$"),
+         " scopes a column cedar_attempts does not carry; attach a student description from ",
+         "cedar_student_terms, or scope the sections, instead.")
+  }
+  filter_data(attempts, opt, opt_col_map_attempts, special_filters_classlist)
+}
+
 special_filters_classlist <- list(
   term = function(df, value) filter_by_term(df, value, "term"),
   course = function(df, value) .course_filter(df, value),
