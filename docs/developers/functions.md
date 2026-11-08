@@ -8,7 +8,7 @@ parent: Developer Guide
 
 This reference is auto-generated from roxygen2 comments in the source code.
 
-*Generated: 2026-11-07 15:13:05.799862*
+*Generated: 2026-11-07 18:16:51.36032*
 
 ---
 
@@ -555,6 +555,39 @@ consistent_plots <- plot_demographics_with_consistent_colors(demographics_data, 
 ---
 
 ## course-flows
+
+### `build_course_flows()`
+
+*Source: course-flows.R*
+
+**Count every course's next-term destinations, to the longitudinal edge**
+
+Count every course's next-term destinations, to the longitudinal edge  get_next_course_pairs() over the whole keyed class list, regular terms only, after dropping every term past `cedar_longitudinal_edge(edges)`. A pair is a follow-up: its destination term must be complete for enrollment, or the newest source term's pairs count a registration still in progress and read as a fall in flow (right-edge policy). Source terms whose next regular term is past the edge contribute no pair.
+
+**Parameters:**
+
+- `students` - `cedar_students` keyed on the course (attach_course_ids()).
+- `edges` - `cedar_report_edges()$edges`; needs `last_enrolled_complete`.
+
+**Returns:** get_next_course_pairs()'s columns, stamped with `code_renames`, `enrolled_edge` and `course_flows_build_version`.
+
+---
+
+### `course_flows_is_current()`
+
+*Source: course-flows.R*
+
+**Is a course-flow table this build's, for this class list and edge?**
+
+**Parameters:**
+
+- `flows` - A saved or held cedar_course_flows, or NULL.
+- `students` - The keyed class list it should have been counted over.
+- `edges` - The edges it should be bounded at.
+
+**Returns:** TRUE when the build version, columns, enrollment edge and the class list's course-code renames all match.
+
+---
 
 ### `summarize_concurrent_courses()`
 
