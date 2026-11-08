@@ -1927,7 +1927,7 @@ get_enrl <- function(courses, opt) {
   # Build list dynamically based on what exists in the data
   # listed_code: the code the schedule used for a section that term, which a
   # section listing shows; subject_course is the course (attach_course_ids()).
-  desired_cols <- c("campus", "college", "department", "term", "term_type", "crn", "subject", "subject_course", "listed_code", "section", "level", "course_title", "is_topics", "delivery_method", "instructor_name", "job_cat", "enrolled", "total_enrl", "crosslist_role", "crosslist_external", "crosslist_primary", "crosslist_subject", "crosslist_code", "crosslist_partners", "is_split", "split_sections", "is_combined", "available", "waitlist_count", "gen_ed_area", "part_term")
+  desired_cols <- c("campus", "college", "department", "term", "term_type", "crn", "subject", "subject_course", "listed_code", "section", "level", "course_title", "is_topics", "delivery_method", "instructor_name", "enrolled", "total_enrl", "crosslist_role", "crosslist_external", "crosslist_primary", "crosslist_subject", "crosslist_code", "crosslist_partners", "is_split", "split_sections", "is_combined", "available", "waitlist_count", "gen_ed_area", "part_term")
 
   # Only keep columns that actually exist in the data
   select_cols <- desired_cols[desired_cols %in% colnames(courses)]

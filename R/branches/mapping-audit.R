@@ -285,20 +285,26 @@ summarize_mapping_audit <- function(audit) {
 #' keeps this summary for the mapping audit's class-list check, which names a
 #' code programs.csv lacks by the roster's own name.
 #'
-#' @param students The class list as saved, with `major_code`, `major_name`
-#'   and `term`.
+#' @param students A class list carrying `major_code`, `major_name` and
+#'   `term`, or the saved `cedar_class_list_descriptions`, whose `rows` say how
+#'   many class-list rows each description stood for.
 #' @return One row per code and roster name: `major_code`, `major_name`,
-#'   `rows`, `first_term`, `last_term`. Rows with no code are left out.
+#'   `rows` (class-list rows), `first_term`, `last_term`. Rows with no code
+#'   are left out.
 summarize_class_list_majors <- function(students) {
   missing <- setdiff(c("major_code", "major_name", "term"), names(students))
   if (length(missing)) {
     stop("[mapping-audit.R] summarize_class_list_majors: cedar_students lacks ",
-         paste(missing, collapse = ", "), "; summarise the class list before thin_class_list().")
+         paste(missing, collapse = ", "), "; summarise the class list before thin_class_list(), ",
+         "or pass cedar_class_list_descriptions.")
   }
-  rows <- students[!is.na(students$major_code) & nzchar(students$major_code),
-                   c("major_code", "major_name", "term")]
+  keep <- !is.na(students$major_code) & nzchar(students$major_code)
+  rows <- students[keep, c("major_code", "major_name", "term")]
+  rows$.weight <- if ("rows" %in% names(students)) students$rows[keep] else 1L
+  # A major seen only on rows with no term has no first or last term, not Inf.
+  edge <- function(x, f) if (all(is.na(x))) NA_integer_ else as.integer(f(x, na.rm = TRUE))
   rows %>%
     dplyr::group_by(major_code, major_name) %>%
-    dplyr::summarize(rows = dplyr::n(), first_term = as.integer(min(term)),
-                     last_term = as.integer(max(term)), .groups = "drop")
+    dplyr::summarize(rows = as.integer(sum(.weight)), first_term = edge(term, min),
+                     last_term = edge(term, max), .groups = "drop")
 }

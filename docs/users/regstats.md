@@ -207,6 +207,8 @@ Courses expected to see extra demand next term, based on enrollment flow pattern
 
 **Top feeders** shows up to 3 upstream bump courses by historical flow volume (for Bump signals), or the drop signal types (for Drop signals).
 
+A bump's destinations are ranked by their average flow over the two most recent regular terms in the flow history. That history stops at the most recent term with complete enrollment, so a term whose registration is still open never counts as anyone's next term and never pulls the average down.
+
 This tab requires scanning the full enrollment history and takes longer to generate. Click **Load Downstream Concerns** when you are ready.
 
 {: .note }
@@ -238,7 +240,7 @@ list was refreshed on that date. Consult the source dates when comparing terms.
 
 ## Data sources
 
-Source: cedar_students (classlist registrations), cedar_sections (section capacity and status), and precomputed course-flow history when available. Anomaly detection and downstream flow assembly live in `R/features/regstats.R`.
+Source: cedar_students (classlist registrations), cedar_sections (section capacity and status), and the course-flow history counted at start (`cedar_course_flows`), which runs to the most recent term with complete enrollment. Anomaly detection and downstream flow assembly live in `R/features/regstats.R`.
 
 ---
 

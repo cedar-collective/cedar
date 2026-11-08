@@ -36,6 +36,7 @@ alongside other work (M14, M16).
 
 | ID | Kind | Summary |
 |---|---|---|
+| [I52](#i52--sections-stored-the-instructors-employee-id-so-they-joined-no-other-table) | Defect | The DESR's instructor ID was saved as the employee ID while the class list and HR hash theirs: the transform's HR merge matched nothing (`job_cat` NA on all 242,413 sections) and sections joined neither table. Fixed in the transform (every source hashed alike, the merge and `job_cat` removed); takes effect when the DESRs are next transformed |
 | [I50](#i50--the-class-list-dedup-can-keep-an-early-drop-over-a-late-withdrawal) | Defect | The transform keeps one class-list row per student-course-campus-term but ranked only "registered first": a student who early-dropped one section and withdrew late from another could keep the early drop, so the W left the loaded class list (703 student-course-terms on the 2026-10-08 pull; 651 on the 2026-02-04 one). Every outcome reader now classifies that table (`cedar_attempts`); fixed in the transform, takes effect when the class lists are next transformed |
 | [I48](#i48--a-transform-change-to-a-fact-tables-stored-columns-is-not-rebuilt-at-deploy) | Defect | Since the mapping stamps retired (ADR-001 step 3, 2026-11-06) the deploy gate rebuilds only `cedar_student_terms`: a transform change that adds or renames a stored column on sections, students, programs or degrees starts the app on files without it until the morning refresh, the I46 shape with no gate |
 | [I46](#i46--a-deploy-that-must-rebuild-a-table-the-app-cannot-start-without-takes-the-site-down) | Defect | The deploy's table gate ran after the health check, so a deploy that added a column to `cedar_student_terms` failed its health check on the missing column and never reached the gate: production served the restart page from 17:07 UTC on 2026-11-04 (gate moved before the first request) |
@@ -83,6 +84,47 @@ Kept until the next release, so a recurrence is recognisable; each entry below g
 ---
 
 # Defects
+
+## I52 — Sections stored the instructor's employee ID, so they joined no other table
+
+**Status:** fixed in the transform 2026-11-07; open until production's DESRs
+are next transformed (I43, I48).
+**Found:** 2026-11-07, checking whether the class list's section columns could
+be read from `cedar_sections` instead (ADR-001 step 5).
+**Severity:** medium. `parse-data.R` md5-hashes `Primary Instructor ID` on the
+class list and `UNM ID` on the HR report, but the DESR's report spec names no
+ID column, so `PRIM_INST_ID` reached `cedar_sections` as the 9-digit employee
+ID, in the clear. The transform then left-joined the HR report onto the DESR
+by that ID against HR's hash: it matched nothing, and `job_cat` was NA on
+every section while the log said "HR merge complete". A merge that had
+matched would have duplicated sections, since HR holds several appointments
+for 1,858 instructor-terms. Nothing in the app read the section's ID or
+`job_cat`, so no page was wrong; the data model's sections → faculty key
+(data-model.md) did not hold.
+**Reproduction** (on the 2026-11-04 files):
+
+```r
+d <- Sys.getenv("CEDAR_DATA_DIR")   # the app's data, not the repo's data/
+s <- qs2::qs_read(file.path(d, "cedar_sections.qs"))
+mean(is.na(s$job_cat))                   # 1
+table(nchar(s$instructor_id))            # 9 only
+f <- qs2::qs_read(file.path(d, "cedar_faculty.qs"))
+mean(s$instructor_id %in% f$instructor_id)   # 0
+# md5-hashed, the section's ID is the class list's on 108,362 of 108,497 sections
+```
+
+**Fix:** `hash_instructor_id()` in the transform hashes the DESR's, the class
+list's and HR's instructor IDs as `parse-data.R` does, leaving a hash and NA
+alone, so files that never went through parse-data (the synthetic
+institution's) come out the same. The HR merge and `job_cat` are gone: a
+section carries no faculty attribute, and a reader that wants one joins
+`cedar_faculty` on `term` and `instructor_id` and picks the appointment.
+`test-demo-data.R` checks the three tables share the ID (fails without the
+fix); `test-transform-status.R` the hashing. On the 2026-11-04 DESRs the
+rebuilt sections are identical but for the ID and `job_cat`, and 30.7% of
+section-terms find their instructor in `cedar_faculty` (none before).
+**Affects:** `R/data-parsers/transform-to-cedar.R`; `cedar_sections` columns
+`instructor_id`, `job_cat`.
 
 ## I51 — A classification filter matched nobody: its value was split on the comma
 
@@ -188,6 +230,12 @@ host, see the memory-kill note under I46), then `cedar_student_terms`, which
 their file times make stale. An unstamped file predates stamping and is
 rebuilt once. A transform edit that changes no stored column then costs the
 deploy nothing, which the retired stamp could not tell.
+**Worked around once (2026-11-07):** the thin saved class list (ADR-001 step
+5) drops columns and adds `cedar_class_list_descriptions`. Every loader and
+the transform's student-term stage accept the older full file, deriving its
+descriptions from it and logging that they did
+(`resolve_class_list_descriptions()`), so production keeps starting until its
+next class-list transform. That path is the workaround, not the fix.
 **Affects:** `.github/workflows/deploy.yml`,
 `scripts/rebuild-programs-if-mappings-changed.R`, `transform-to-cedar.R`.
 
@@ -202,7 +250,8 @@ exists (`description_source`). On 2026-11-07 the loaded class list stopped
 carrying the column (`thin_class_list()`): `filter_class_list()`'s
 `classification` key filters a value the caller attached from the table, the
 sophomore screen and the projections read it there, and the Course Report's
-DFW by classification too. The reproduction below reads the saved file.
+DFW by classification too. Since the saved class list went thin as well, the
+reproduction below reads the roster's value from `cedar_class_list_descriptions`.
 **Found:** 2026-11-04, comparing Course Dynamics' rollcall by classification
 before and after the move (PR for the demographics readers).
 **Severity:** medium. A late-pulled term's classification filter selects the
@@ -229,7 +278,10 @@ source("scripts/cedar-repl.R")
 cl <- cedar_students %>%
   filter(subject_course == "ENGL 1120", term == 202580L,
          registration_status_code %in% STATUS_REGISTERED) %>%
-  distinct(student_id, term, roster = student_classification)
+  distinct(student_id, term) %>%
+  inner_join(distinct(cedar_class_list_descriptions, student_id, term,
+                      roster = student_classification),
+             by = c("student_id", "term"))
 j <- inner_join(cl, select(cedar_student_terms, student_id, term,
                            student_classification, description_conflict),
                 by = c("student_id", "term"))
@@ -237,7 +289,7 @@ count(j, roster != student_classification)   # 535 of 1,543 differ
 count(filter(j, roster != student_classification), roster, student_classification, sort = TRUE)
 # Sophomore -> Freshman 2nd Sem 157; Freshman 2nd Sem -> Freshman 1st Sem 148;
 # Sophomore -> Freshman 1st Sem 138; Junior -> Sophomore 76; Senior -> Junior 15
-unique(filter(cedar_students, term == 202580L)$as_of_date)   # 2026-03-07
+unique(filter(cedar_class_list_descriptions, term == 202580L)$as_of_date)   # 2026-03-07
 ```
 
 Every differing row is `description_conflict = TRUE` with

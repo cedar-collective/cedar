@@ -8,7 +8,7 @@ parent: Developer Guide
 
 This reference is auto-generated from roxygen2 comments in the source code.
 
-*Generated: 2026-11-07 14:20:44.267928*
+*Generated: 2026-11-07 18:16:51.36032*
 
 ---
 
@@ -555,6 +555,39 @@ consistent_plots <- plot_demographics_with_consistent_colors(demographics_data, 
 ---
 
 ## course-flows
+
+### `build_course_flows()`
+
+*Source: course-flows.R*
+
+**Count every course's next-term destinations, to the longitudinal edge**
+
+Count every course's next-term destinations, to the longitudinal edge  get_next_course_pairs() over the whole keyed class list, regular terms only, after dropping every term past `cedar_longitudinal_edge(edges)`. A pair is a follow-up: its destination term must be complete for enrollment, or the newest source term's pairs count a registration still in progress and read as a fall in flow (right-edge policy). Source terms whose next regular term is past the edge contribute no pair.
+
+**Parameters:**
+
+- `students` - `cedar_students` keyed on the course (attach_course_ids()).
+- `edges` - `cedar_report_edges()$edges`; needs `last_enrolled_complete`.
+
+**Returns:** get_next_course_pairs()'s columns, stamped with `code_renames`, `enrolled_edge` and `course_flows_build_version`.
+
+---
+
+### `course_flows_is_current()`
+
+*Source: course-flows.R*
+
+**Is a course-flow table this build's, for this class list and edge?**
+
+**Parameters:**
+
+- `flows` - A saved or held cedar_course_flows, or NULL.
+- `students` - The keyed class list it should have been counted over.
+- `edges` - The edges it should be bounded at.
+
+**Returns:** TRUE when the build version, columns, enrollment edge and the class list's course-code renames all match.
+
+---
 
 ### `summarize_concurrent_courses()`
 
@@ -3481,9 +3514,9 @@ The roster's majors, summarised before the class list is thinned  The class list
 
 **Parameters:**
 
-- `students` - The class list as saved, with `major_code`, `major_name` and `term`.
+- `students` - A class list carrying `major_code`, `major_name` and `term`, or the saved `cedar_class_list_descriptions`, whose `rows` say how many class-list rows each description stood for.
 
-**Returns:** One row per code and roster name: `major_code`, `major_name`, `rows`, `first_term`, `last_term`. Rows with no code are left out.
+**Returns:** One row per code and roster name: `major_code`, `major_name`, `rows` (class-list rows), `first_term`, `last_term`. Rows with no code are left out.
 
 ---
 
@@ -4469,12 +4502,13 @@ Compute Stop-Out Rates for One Group in One Course  Given one selected observati
 
 **Parameters:**
 
-- `students` - `cedar_students`.
+- `students` - `cedar_students`: the registration facts. Its description columns are read from `class_list_descriptions` when that is given, and off `students` otherwise.
 - `programs` - `cedar_programs`, or NULL for class lists alone: then no row is declared, every row is described by the class list, and the build says so.
 - `degrees` - `cedar_degrees` or NULL; without it `degree_awarded` is FALSE everywhere and the build says so.
 - `edges` - The result of [cedar_data_edges()] on the same tables. Required to carry `last_enrolled_complete`; the build stops without it.
 - `files` - The institution's mapping files, as [read_institution_mappings()] returns them: a primary major the class list supplies takes its pre-major flag from `programs.csv`, as a programs row's flag is the file's in the transform. Its unit and college are not read here: the table stores the code and the roster's college as keys, and the loader attaches them.
 - `opt` - Unused; present for the branch calling convention.
+- `class_list_descriptions` - The saved `cedar_class_list_descriptions` (build_class_list_descriptions()), which the transform saves beside the thin class list; NULL to read the descriptions off `students`.
 
 **Returns:** A tibble with `STUDENT_TERMS_COLUMNS`, one row per student-term, carrying `STUDENT_TERMS_BUILD_VERSION` as the attribute `cedar_student_terms_build_version`.
 
@@ -4513,17 +4547,49 @@ Compute Stop-Out Rates for One Group in One Course  Given one selected observati
 
 ---
 
+### `build_class_list_descriptions()`
+
+*Source: student-terms.R*
+
+**The class list's description of each student-term, once per pull**
+
+**Parameters:**
+
+- `students` - The class list with its description columns (the transform's, or a file saved before 2026-11-07).
+
+**Returns:** One row per distinct student, term, pull date and description: `student_id`, `term`, `as_of_date`, the description columns (`CLASS_LIST_DESCRIPTION_REQUIRED`, and the rest of `CLASS_LIST_DESCRIPTION_COLUMNS` the class list carries), and `rows`, the class-list rows that carried it.
+
+---
+
+### `resolve_class_list_descriptions()`
+
+*Source: student-terms.R*
+
+**The saved class-list descriptions, or the older class list's own**
+
+The saved class-list descriptions, or the older class list's own  A class list saved before 2026-11-07 still carries its description columns and has no description table beside it; its descriptions are taken from it, and the log says so. Until the next transform, production reads that file (ISSUES.md I48).
+
+**Parameters:**
+
+- `descriptions` - The saved `cedar_class_list_descriptions`, or NULL when no file exists.
+- `students` - The saved class list as read.
+- `where` - Who is asking, for the messages.
+
+**Returns:** The description table.
+
+---
+
 ### `thin_class_list()`
 
 *Source: student-terms.R*
 
-**Drop the student-description columns from a loaded class list**
+**Drop the student-description columns from a class list**
 
-Drop the student-description columns from a loaded class list  Every loader calls this on `cedar_students` before attaching units (global.R, scripts/cedar-repl.R, the cache-warming scripts, the test setup), so the app, an analyst's session and the tests read the same shape.
+Drop the student-description columns from a class list  The transform saves the class list thin; every loader calls this too (global.R, scripts/cedar-repl.R, the cache warmers, the test setup), so a file saved before 2026-11-07 loads in the same shape.
 
 **Parameters:**
 
-- `students` - The class list as saved by the transform, or already thin.
+- `students` - The class list, with or without the columns.
 
 **Returns:** `students` without `CLASS_LIST_UNLOADED_COLUMNS`, its attributes kept.
 

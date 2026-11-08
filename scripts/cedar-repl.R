@@ -71,10 +71,17 @@ for (.nm in c("cedar_students", "cedar_programs", "cedar_degrees",
 }
 rm(.nm)
 
-# The roster's majors, summarised from the saved class list before it is
-# thinned, as global.R keeps them for the mapping audit.
-delayedAssign("cedar_class_list_majors", summarize_class_list_majors(
-  qs2::qs_read(file.path(cedar_data_dir, "cedar_students.qs"))))
+# The class list's own description of each student-term and pull, as the
+# transform saves it (or, for a class list saved before 2026-11-07, as read off
+# it), and the roster's majors summarised from it as global.R keeps them.
+delayedAssign("cedar_class_list_descriptions", local({
+  path <- file.path(cedar_data_dir, "cedar_class_list_descriptions.qs")
+  resolve_class_list_descriptions(
+    if (file.exists(path)) qs2::qs_read(path) else NULL,
+    if (file.exists(path)) NULL else qs2::qs_read(file.path(cedar_data_dir, "cedar_students.qs")),
+    "cedar-repl.R")
+}))
+delayedAssign("cedar_class_list_majors", summarize_class_list_majors(cedar_class_list_descriptions))
 
 # cedar_attempts, every graded attempt classified once, as global.R builds it
 # (R/branches/attempts.R): over the keyed class list, to the graded edge.

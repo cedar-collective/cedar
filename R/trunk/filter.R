@@ -254,7 +254,6 @@ opt_col_map_desr <- list(
   gen_ed        = "gen_ed_area",
   level         = "level",
   im            = "delivery_method",
-  job_cat       = "job_cat",
   enrl_min      = "enrolled",
   enrl_max      = "enrolled",
   uel           = "",

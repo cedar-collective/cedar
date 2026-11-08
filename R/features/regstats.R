@@ -67,81 +67,6 @@ get_high_fall_sophs <- function(students, student_terms, opt = list()) {
 }
 
 
-#' Identify Courses Taken After Enrollment Bumps
-#'
-#' For courses experiencing enrollment bumps (unusually high registration), identifies
-#' the top 5 courses that students take next. This helps with capacity planning by
-#' anticipating downstream enrollment pressure from bump courses.
-#'
-#' @param bumps Data frame of bump courses (output from get_reg_stats()$bumps).
-#'   Must include column: subject_course
-#' @param students Data frame of student enrollments from cedar_students table
-#' @param courses Data frame of course sections from cedar_sections table
-#' @param opt Options list passed through to \code{get_course_destinations()} for filtering
-#'
-#' @return Data frame with single column:
-#'   \itemize{
-#'     \item \code{subject_course} - Unique courses frequently taken after bump courses
-#'   }
-#'
-#' @details
-#' For each bump course, the function:
-#' \enumerate{
-#'   \item Calls \code{get_course_destinations()} to find courses students take next
-#'   \item Ranks by average contribution to those next courses
-#'   \item Selects top 5 downstream courses
-#'   \item Aggregates across all bump courses and returns unique list
-#' }
-#'
-#' This is useful for enrollment forecasting - if MATH 1430 has a bump and students
-#' typically take MATH 1440 next, MATH 1440 will likely see increased demand next term.
-#'
-#' @examples
-#' \dontrun{
-#' # Get bump courses and their downstream effects
-#' opt <- list(term = "202510", course_college = "AS")
-#' flagged <- get_reg_stats(cedar_students, cedar_sections, opt)
-#' after_bumps <- get_after_bumps(flagged$bumps, cedar_students, cedar_sections, opt)
-#'
-#' # These courses may need capacity increases next term
-#' print(after_bumps$subject_course)
-#' }
-#'
-#' @seealso \code{\link{get_course_destinations}} for next-course analysis, \code{\link{get_reg_stats}} for bump detection
-get_after_bumps <- function (bumps, students, courses, opt) {
-
-  bumps <- bumps$subject_course
-  after_bumps <- c()
-
-  # reset temp opt params
-  myopt <- opt
-
-  # loop through bumps to see what courses students take next, and add those to the list
-  for (course in bumps) {
-
-    # for studio testing...
-    #course <- bumps[1]
-    #message("now processing: ",course,"...")
-
-    myopt[["course"]] <- course
-
-    # get top 5 courses where students go after a bump course (than than normal enrollment)
-    where_tos <- get_course_destinations(students, myopt) %>%
-      arrange(desc(avg_contrib))
-    next_courses <- head(where_tos,n=5)
-    after_bumps <- c(after_bumps, next_courses$subject_course)
-
-  } # end loop through bumps to find next courses
-
-  after_bumps <- unique(tibble(subject_course = after_bumps))
-
-  cedar_debug("[regstats.R] Done assembling after bumps.")
-
-  return(after_bumps)
-}
-
-
-
 # Helper function to create cache filename following CEDAR patterns
 create_regstats_cache_filename <- function(opt) {
   cedar_debug("[regstats.R] Creating cache filename from opt parameters...")
@@ -1234,13 +1159,6 @@ flagged[["bumps"]] <- bumps %>% arrange(across(all_of(std_arrange_cols)))
     )
   }
 
-  ##### COURSES AFTER BUMPS (if not from shiny)
-  if (as.logical(Sys.getenv("shiny")) == FALSE) {
-    # message("finding courses students take after bumps...")
-    # disabling until we have a better way of using these...
-    #flagged[["courses_after_bumps"]] <- get_after_bumps(flagged[["bumps"]], students, courses, opt)
-  }
-
   # gather subject_course col into separate list
   cedar_debug("[regstats.R] Gathering flagged courses...")
   flagged_courses <- c()
@@ -1438,34 +1356,36 @@ flagged[["bumps"]] <- bumps %>% arrange(across(all_of(std_arrange_cols)))
 # Next Term Signals
 # ---------------------------------------------------------------------------
 
-#' Compute historical enrollment flows from source courses to destination courses
+#' The next-term destinations of some source courses
 #'
-#' For each source course, finds which courses students historically took in the
-#' following non-summer term. Uses a single vectorized join across all source
-#' courses so cost is independent of the number of inputs.
+#' A filter on cedar_course_flows (build_course_flows()), which global.R counts
+#' once over the keyed class list, to the longitudinal edge.
 #'
-#' @param source_courses Character vector of subject_course values to analyze.
-#' @param students       Cedar students data frame (must include student_id,
-#'   term, subject_course columns).
-#' @return Tibble with columns including campus, source_course, dest_course,
-#'   term, next_term, and n_students.
-#'   Returns an empty tibble if no flows are found.
-get_downstream_course_flows <- function(source_courses, students, campus = NULL) {
-  # Fast path: filter the pre-computed global summary table (set in global.R).
-  # This avoids a raw student join entirely — just a filter on a small table.
-  if (exists("cedar_course_flows") && !is.null(cedar_course_flows)) {
-    flows <- cedar_course_flows %>% filter(source_course %in% source_courses)
-    if (!is.null(campus) && length(campus) > 0 && "campus" %in% names(flows)) {
-      flows <- flows %>% filter(campus %in% .env$campus)
-    }
-    return(flows)
+#' @param source_courses Character vector of subject_course values (courses).
+#' @param course_flows cedar_course_flows.
+#' @param campus Optional campuses to keep.
+#' @return The flows rows for those sources: campus, source_course,
+#'   dest_course, term, next_term, n_students and the rest of
+#'   build_course_flows()'s columns.
+get_downstream_course_flows <- function(source_courses, course_flows, campus = NULL) {
+  require_course_flows(course_flows, "get_downstream_course_flows")
+  flows <- course_flows %>% filter(source_course %in% source_courses)
+  if (!is.null(campus) && length(campus) > 0) {
+    flows <- flows %>% filter(campus %in% .env$campus)
   }
+  flows
+}
 
-  get_next_course_pairs(
-    students,
-    opt = list(summer = FALSE, campus = campus),
-    source_courses = source_courses
-  )
+# A course-flow table is required, never recomputed here: an absent one is a
+# start-up failure to report, not a reason to count the class list again.
+require_course_flows <- function(course_flows, caller) {
+  needed <- c("campus", "source_course", "dest_course", "term", "next_term", "n_students")
+  if (!is.data.frame(course_flows) || length(setdiff(needed, names(course_flows))) > 0L ||
+      is.null(attr(course_flows, "enrolled_edge", exact = TRUE))) {
+    stop("[regstats.R] ", caller, "(): course_flows must be cedar_course_flows as ",
+         "build_course_flows() counts it (global.R holds it in data_objects).", call. = FALSE)
+  }
+  invisible(course_flows)
 }
 
 
@@ -1474,34 +1394,31 @@ get_downstream_course_flows <- function(source_courses, students, campus = NULL)
 #' Answers "which courses are likely to face extra demand next term?" by
 #' identifying courses downstream of enrollment bumps (students tend to take
 #' them after bump courses) and courses with drop anomalies (unmet demand —
-#' students who dropped will try to re-enroll).
+#' students who dropped will try to re-enroll). A bump's destinations are
+#' ranked by their average flow over the two most recent regular source terms
+#' in cedar_course_flows, whose pairs stop at the longitudinal edge, so a
+#' destination term still registering never lowers that average.
 #'
 #' @param flagged  Named list returned by get_reg_stats().
-#' @param students Cedar students data frame passed to get_downstream_course_flows().
+#' @param course_flows cedar_course_flows (build_course_flows()).
+#' @param campus Optional campuses to keep.
 #' @return Named list:
 #'   downstream — tibble(dest_course, reason, top_feeders); one row per
 #'                (dest_course, reason) pair. reason is "Bump" or "Drop".
 #'                top_feeders lists up to 3 upstream courses (Bump) or drop
 #'                signal types (Drop). Empty tibble if no signals or no flow data.
-get_next_term_signals <- function(flagged, students, campus = NULL) {
-
-  flow_terms <- if (exists("cedar_course_flows") && !is.null(cedar_course_flows)) {
-    flows_for_terms <- cedar_course_flows
-    if (!is.null(campus) && length(campus) > 0 && "campus" %in% names(flows_for_terms)) {
-      flows_for_terms <- flows_for_terms %>% filter(campus %in% .env$campus)
-    }
-    flows_for_terms$term
-  } else {
-    cedar_debug("[regstats.R] cedar_course_flows not available — computing downstream signals from source-course rows.")
-    term_students <- students
-    if (!is.null(campus) && length(campus) > 0 && "campus" %in% names(term_students)) {
-      term_students <- term_students %>% filter(campus %in% .env$campus)
-    }
-    term_students$term
+#'   enrolled_edge — the last source-pair term the flows could observe.
+get_next_term_signals <- function(flagged, course_flows, campus = NULL) {
+  require_course_flows(course_flows, "get_next_term_signals")
+  flows_for_terms <- course_flows
+  if (!is.null(campus) && length(campus) > 0) {
+    flows_for_terms <- flows_for_terms %>% filter(campus %in% .env$campus)
   }
+  flow_terms <- flows_for_terms$term
 
   all_main_terms <- sort(unique(flow_terms[flow_terms %% 100L != 60L]))
-  if (length(all_main_terms) == 0L) return(list(downstream = tibble()))
+  edge <- attr(course_flows, "enrolled_edge", exact = TRUE)
+  if (length(all_main_terms) == 0L) return(list(downstream = tibble(), enrolled_edge = edge))
   recent_terms <- tail(all_main_terms, 2L)
 
   .win_avg <- function(vals, terms) {
@@ -1518,7 +1435,7 @@ get_next_term_signals <- function(flagged, students, campus = NULL) {
   bump_rows <- tibble()
   if (!is.null(flagged$bumps) && nrow(flagged$bumps) > 0L) {
     bump_sources <- unique(flagged$bumps$subject_course)
-    flows <- get_downstream_course_flows(bump_sources, students, campus = campus)
+    flows <- get_downstream_course_flows(bump_sources, course_flows, campus = campus)
     if (nrow(flows) > 0L) {
       pair_avgs <- flows %>%
         filter(term %in% all_main_terms) %>%
@@ -1582,7 +1499,7 @@ get_next_term_signals <- function(flagged, students, campus = NULL) {
   downstream <- bind_rows(bump_rows, drop_rows) %>%
     arrange(reason, dest_course)
 
-  list(downstream = downstream)
+  list(downstream = downstream, enrolled_edge = edge)
 }
 
 

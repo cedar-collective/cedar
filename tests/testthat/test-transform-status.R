@@ -57,6 +57,15 @@ test_that("student transform saves one class-list row per course-term and no cla
   attempts <- build_attempts(keyed, list(last_graded = 202110L))
   expect_equal(sum(attempts$outcome %in% "dfw"), 4L)
   expect_equal(sum(attempts$outcome %in% "pass"), 1L)
+  # The class list is saved without the student's description (ADR-001 step
+  # 5), which is saved once per student-term and pull beside it, with how many
+  # rows carried it: the two together hold what the transform built.
+  expect_length(intersect(CLASS_LIST_UNLOADED_COLUMNS, names(students)), 0L)
+  descriptions <- qs2::qs_read(file.path(output_dir, "cedar_class_list_descriptions.qs"))
+  expect_true(all(c("student_id", "term", "as_of_date", "rows", CLASS_LIST_DESCRIPTION_REQUIRED) %in%
+                    names(descriptions)))
+  expect_equal(sum(descriptions$rows), nrow(students))
+  expect_equal(anyDuplicated(descriptions[setdiff(names(descriptions), "rows")]), 0L)
 })
 
 test_that("the class-list dedup keeps the row of record for each student-course-term", {
@@ -92,6 +101,16 @@ test_that("the class-list dedup keeps the row of record for each student-course-
   two_campus <- dplyr::bind_rows(rows[15, ], dplyr::mutate(rows[15, ], campus = "EA", crn = "272"))
   expect_equal(nrow(suppressMessages(env$dedup_class_list_rows(dplyr::select(two_campus, -want)))), 2L)
   expect_error(env$dedup_class_list_rows(dplyr::select(rows, -crn)), "lacks crn")
+})
+
+test_that("an instructor ID is hashed as parse-data.R hashes it, once (I52)", {
+  env <- load_transform_helpers()
+  hashed <- digest::digest("100000231", algo = "md5")
+  # The DESR's employee ID becomes the class list's and HR's hash; a hash is
+  # kept, and a missing instructor stays missing rather than becoming one.
+  expect_identical(env$hash_instructor_id(c("100000231", hashed, NA, "100000231")),
+                   c(hashed, hashed, NA, hashed))
+  expect_identical(env$hash_instructor_id(100000231), hashed)
 })
 
 test_that("cedar-status writer emits valid JSON with null metadata", {
