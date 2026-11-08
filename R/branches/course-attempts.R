@@ -1,11 +1,23 @@
-# Shared course-attempt and outcome helpers.
+# The outcome hub: course outcomes read off cedar_attempts.
 #
-# New cones should prefer:
-#   get_course_outcome_rates() for DFW/W/D/F/C- metrics
-#   get_grade_distribution() for letter-grade distributions
+# Every grade-reading analysis goes through here, over the attempt measure
+# table (R/branches/attempts.R), never the class list (ADR-001 step 7):
+#   get_course_outcome_rates()      DFW, W, D/F, below-C and early-drop rates
+#   get_grade_distribution()        letter-grade distributions
+#   get_course_dfw_demographics()   a course's DFW by classification or major
+#   get_course_dfw_context()        the same-term workload of a course's DFW students
+#   prepare_course_attempts()       the scoped attempt rows, for a reader that
+#                                   needs them row by row
+# The table already decided which class-list rows are attempts (registered and
+# dropped rows to the graded edge, audits out, one row per student, course,
+# campus and term, an early drop "Drop" and an ungraded late drop "W") and what
+# each earned (`outcome_category`); the functions here scope it by the standard
+# options (filter_attempts()) and count attempt_outcome_flags(). The one
+# function still on the class list is summarize_outcome_status_exclusions(),
+# which reports the rows the table leaves out.
 #
-# Active grade and DFW analytics should use the course-attempt/outcome APIs in
-# this file.
+# classify_attempt_outcomes() is the classifier build_attempts() writes the
+# table with; a reader never calls it on the class list.
 
 
 normalize_course_attempt_opt <- function(opt = list()) {
@@ -21,105 +33,94 @@ normalize_course_attempt_opt <- function(opt = list()) {
 # The term window every grade-reading path shares.
 #
 # The GRADED edge, not the enrollment edge. Every consumer of these functions
-# reads final_grade, and a term whose grades have not posted contributes a full
+# reads an outcome, and a term whose grades have not posted contributes a full
 # denominator with almost no numerator: the newest term read 0.3% DFW against
 # 6-8% elsewhere before the edge was applied. See the right-edge policy in
-# AGENTS.md. The edges are a parameter (`opt$data_edges`, the output of
-# cedar_data_edges()), never a global: a cone must be callable from a script
-# that never ran global.R and must fail closed when the edge is unknown.
-course_attempt_term_window <- function(opt) {
+# AGENTS.md. The edge is never a global: a reader of cedar_attempts takes the
+# edge the table was built to (`graded_edge`, from require_attempts_build()),
+# and a caller that also passes `opt$data_edges` (cedar_data_edges() output)
+# must agree with it; a reader of the class list
+# (summarize_outcome_status_exclusions()) has only `opt$data_edges`, which is
+# then required and fails closed when the edge is unknown.
+course_attempt_term_window <- function(opt, graded_edge = NULL) {
   edges <- opt$data_edges
-  if (is.null(edges) || !is.list(edges)) {
-    stop("[course-attempts.R] opt$data_edges (cedar_data_edges() output) is ",
-         "required to bound grade-based outcomes at the graded edge.",
+  if (!is.null(edges) && !is.list(edges)) {
+    stop("[course-attempts.R] opt$data_edges must be cedar_data_edges() output.",
          call. = FALSE)
   }
-  end <- edges$last_graded
-  if (is.null(end) || length(end) != 1L || is.na(end)) {
-    stop("[course-attempts.R] data_edges$last_graded is undetermined; refusing ",
-         "to read grades without a graded edge.", call. = FALSE)
+  claimed <- edges$last_graded
+  if (is.null(graded_edge)) {
+    if (is.null(edges)) {
+      stop("[course-attempts.R] opt$data_edges (cedar_data_edges() output) is ",
+           "required to bound grade-based outcomes at the graded edge.",
+           call. = FALSE)
+    }
+    if (is.null(claimed) || length(claimed) != 1L || is.na(claimed)) {
+      stop("[course-attempts.R] data_edges$last_graded is undetermined; refusing ",
+           "to read grades without a graded edge.", call. = FALSE)
+    }
+    end <- as.integer(claimed)
+  } else {
+    if (length(graded_edge) != 1L || is.na(graded_edge)) {
+      stop("[course-attempts.R] the attempts carry no graded edge.", call. = FALSE)
+    }
+    end <- as.integer(graded_edge)
+    if (!is.null(claimed) && !identical(as.integer(claimed), end)) {
+      stop("[course-attempts.R] opt$data_edges$last_graded is ", claimed, " but cedar_attempts ",
+           "was built to ", end, "; the transform rebuilds the table to the current edge (",
+           CEDAR_MEASURES_REBUILD_HINT, ").", call. = FALSE)
+    }
   }
   start <- opt$min_term
   if (!is.null(start) && (length(start) != 1L || is.na(start))) {
     stop("[course-attempts.R] opt$min_term must be one term code or NULL.",
          call. = FALSE)
   }
-  list(start = if (is.null(start)) NULL else as.integer(start),
-       end = as.integer(end))
+  list(start = if (is.null(start)) NULL else as.integer(start), end = end)
 }
 
 
-
-
-#' @param opt Filter options. `data_edges` (the output of [cedar_data_edges()])
-#'   is required: grade-based outcomes stop at `data_edges$last_graded`.
-#'   `min_term` optionally sets a left edge; there is no default literal.
-prepare_course_attempts <- function(students, opt = list()) {
-  message("[course-attempts.R] Preparing course attempts from ", nrow(students), " rows")
+#' The attempt rows in scope
+#'
+#' @param attempts The attempt measure table (`cedar_attempts`), or rows of it
+#'   that keep its stamps (a dplyr filter does).
+#' @param opt The standard filter options (filter_attempts(): `course`, `crn`,
+#'   `term`, `course_campus`, `course_college`, `dept_code`, `subj`, `inst`,
+#'   `level`, `pt`, `uel`), plus `population_ids` (or `cohort_ids`) to keep
+#'   those students' attempts, `min_term` for a left edge, and optionally
+#'   `data_edges`, which must agree with the edge the table was built to.
+#' @return The rows in scope, with the table's columns; zero rows when nothing
+#'   matches.
+prepare_course_attempts <- function(attempts, opt = list()) {
+  graded_edge <- require_attempts_build(attempts, "prepare_course_attempts")
   opt <- normalize_course_attempt_opt(opt)
-
-  attempts <- filter_class_list(students, opt)
+  scoped <- filter_attempts(attempts, opt)
 
   pop_ids <- opt$population_ids %||% opt$cohort_ids %||% NULL
   if (!is.null(pop_ids) && length(pop_ids) > 0) {
-    message("[course-attempts.R] Restricting to supplied student population.")
-    attempts <- attempts %>% dplyr::filter(student_id %in% .env$pop_ids)
+    scoped <- scoped %>% dplyr::filter(student_id %in% .env$pop_ids)
   }
 
-  if (nrow(attempts) == 0) {
-    message("[course-attempts.R] No rows after filtering.")
-    return(tibble::tibble())
-  }
-
-  # Both edges come from the caller, never from global state (ISSUES.md M12).
-  # The left edge is optional: global.R already trims every table to its
-  # configured start, and a standalone caller passes opt$min_term when it
-  # wants one. The graded edge is required and fails closed.
-  window <- course_attempt_term_window(opt)
+  window <- course_attempt_term_window(opt, graded_edge)
   if (!is.null(window$start)) {
-    attempts <- attempts %>% dplyr::filter(term >= window$start)
+    scoped <- scoped %>% dplyr::filter(term >= window$start)
   }
-  message("[course-attempts.R] Excluding terms after the graded edge: ", window$end)
-  attempts <- attempts %>% dplyr::filter(term <= window$end)
-
-  if (nrow(attempts) == 0) {
-    message("[course-attempts.R] No rows after term filtering.")
-    return(tibble::tibble())
+  # Every row is at or before the edge the table was built to; a later one is
+  # not this table's.
+  if (any(as.integer(scoped$term) > window$end)) {
+    stop("[course-attempts.R] cedar_attempts holds a term after its graded edge ", window$end)
   }
-
-  outcome_status_codes <- c(STATUS_REGISTERED, STATUS_DROP_EARLY, STATUS_DROP_LATE)
-  attempts <- attempts %>%
-    dplyr::filter(registration_status_code %in% outcome_status_codes)
-
-  if (nrow(attempts) == 0) {
-    message("[course-attempts.R] No registered/drop rows for outcome analysis.")
-    return(tibble::tibble())
-  }
-
-  attempts <- attempts %>%
-    dplyr::mutate(
-      final_grade_raw = dplyr::na_if(trimws(as.character(final_grade)), ""),
-      final_grade = dplyr::case_when(
-        registration_status_code %in% STATUS_DROP_EARLY ~ "Drop",
-        registration_status_code %in% STATUS_DROP_LATE &
-          is.na(final_grade_raw) ~ "W",
-        TRUE ~ final_grade_raw
-      )
-    ) %>%
-    dplyr::filter(!final_grade %in% GRADES_EXCLUDED_FROM_OUTCOMES) %>%
-    # Banner recycles CRNs across terms. Keep each term's attempt, including
-    # retakes, while collapsing duplicate rows within that term (definition: dfw).
-    dplyr::distinct(student_id, term, campus, college, crn, .keep_all = TRUE)
-
-  if ("points" %in% names(attempts)) attempts$points <- NULL
-  attempts <- attempts %>%
-    dplyr::left_join(grades_to_points, by = c("final_grade" = "grade"))
-
-  message("[course-attempts.R] Prepared attempts: ", nrow(attempts), " rows")
-  attempts
+  cedar_debug("[course-attempts.R] ", nrow(scoped), " of ", nrow(attempts),
+              " attempts in scope, graded through ", window$end)
+  scoped
 }
 
 
+#' The class-list rows cedar_attempts leaves out, by status
+#'
+#' A data-quality report, so it reads the class list, not the measure: rows in
+#' scope whose status is neither registered nor a drop (waitlist, a code Banner
+#' added), with how many carry a grade anyway. `opt$data_edges` is required.
 summarize_outcome_status_exclusions <- function(students, opt = list()) {
   opt <- normalize_course_attempt_opt(opt)
   expected_codes <- c(STATUS_REGISTERED, STATUS_DROP_EARLY, STATUS_DROP_LATE)
@@ -296,15 +297,20 @@ summarize_attempt_outcomes <- function(classified, group_cols, min_n = 1L) {
 }
 
 
-get_course_outcome_rates <- function(students, opt = list(),
+#' Outcome rates by group
+#'
+#' @param attempts The attempt measure table (`cedar_attempts`).
+#' @param opt prepare_course_attempts()' options, plus `passing_grades` (default
+#'   GRADES_PASS; a page's visible opt-in passes GRADES_PASS_SUB_C_OPT_IN).
+#' @param group_cols Columns of the table to group by; campus beside the course.
+#' @param min_n Smallest DFW denominator a group needs to be shown.
+#' @return summarize_attempt_outcomes()' columns per group.
+get_course_outcome_rates <- function(attempts, opt = list(),
                                      group_cols = c("campus", "college", "subject_course"),
                                      min_n = 1L) {
-  attempts <- prepare_course_attempts(students, opt)
-  classified <- classify_attempt_outcomes(
-    attempts,
-    passing_values = opt$passing_grades %||% GRADES_PASS
-  )
-  summarize_attempt_outcomes(classified, group_cols = group_cols, min_n = min_n)
+  scoped <- prepare_course_attempts(attempts, opt)
+  flagged <- attempt_outcome_flags(scoped, passing_values = opt$passing_grades %||% GRADES_PASS)
+  summarize_attempt_outcomes(flagged, group_cols = group_cols, min_n = min_n)
 }
 
 
@@ -317,9 +323,9 @@ DFW_DEMOGRAPHIC_GROUPS <- c("student_classification", "major_code")
 
 #' DFW rate and composition by a student group
 #'
-#' @param students Class-list rows (the loaded `cedar_registrations`).
+#' @param attempts The attempt measure table (`cedar_attempts`).
 #' @param student_terms The `cedar_student_terms` table; the group is read off it.
-#' @param opt Course-attempt options (`course`, `data_edges`, `passing_grades`, ...).
+#' @param opt Course-attempt options (`course`, `passing_grades`, ...).
 #' @param group_col One of `DFW_DEMOGRAPHIC_GROUPS`.
 #' @param min_n Smallest attempt count a group needs to be shown.
 #' @param max_groups Optional cap on the groups returned, largest DFW count first.
@@ -327,7 +333,7 @@ DFW_DEMOGRAPHIC_GROUPS <- c("student_classification", "major_code")
 #'   `group_col = "major_code"`, whose groups are programs.csv's names.
 #' @return One row per group: counts, `dfw_pct`, `late_withdrawal_pct`,
 #'   `early_drop_pct`, `share_of_dfw`, `share_of_attempts`.
-get_course_dfw_demographics <- function(students, student_terms, opt = list(),
+get_course_dfw_demographics <- function(attempts, student_terms, opt = list(),
                                         group_col = "student_classification",
                                         min_n = 1L,
                                         max_groups = NULL,
@@ -345,7 +351,7 @@ get_course_dfw_demographics <- function(students, student_terms, opt = list(),
   min_n <- suppressWarnings(as.integer(min_n %||% 1L))
   if (length(min_n) == 0 || is.na(min_n) || min_n < 1L) min_n <- 1L
 
-  attempts <- prepare_course_attempts(students, opt)
+  attempts <- prepare_course_attempts(attempts, opt)
   if (nrow(attempts) == 0) return(tibble::tibble())
 
   if (group_col == "major_code") {
@@ -365,10 +371,7 @@ get_course_dfw_demographics <- function(students, student_terms, opt = list(),
     ifelse(den > 0, round(100 * num / den, 1), NA_real_)
   }
 
-  classified <- classify_attempt_outcomes(
-    attempts,
-    passing_values = opt$passing_grades %||% GRADES_PASS
-  )
+  classified <- attempt_outcome_flags(attempts, passing_values = opt$passing_grades %||% GRADES_PASS)
   classified$group_col <- group_col
   classified$group <- trimws(as.character(classified$group_value))
   classified$group[is.na(classified$group) | classified$group == ""] <- "(Missing)"
@@ -404,7 +407,14 @@ get_course_dfw_demographics <- function(students, student_terms, opt = list(),
 }
 
 
-get_course_dfw_context <- function(students, opt = list(), min_cell = 5L) {
+#' The same-term workload of a course's DFW students
+#'
+#' @param attempts The attempt measure table (`cedar_attempts`): the focal
+#'   course's attempts are read in the caller's scope, then every attempt of
+#'   its DFW students in the same terms, campus-blind.
+#' @param opt Course-attempt options; `course` is required.
+#' @param min_cell Smallest bucket shown; thinner ones merge into a neighbour.
+get_course_dfw_context <- function(attempts, opt = list(), min_cell = 5L) {
   opt <- normalize_course_attempt_opt(opt)
   courses <- opt$course %||% opt$courses
   if (is.null(courses) || length(courses) == 0) {
@@ -427,17 +437,15 @@ get_course_dfw_context <- function(students, opt = list(), min_cell = 5L) {
     )
   }
 
-  focal_attempts <- prepare_course_attempts(students, opt)
+  passing <- opt$passing_grades %||% GRADES_PASS
+  focal_attempts <- prepare_course_attempts(attempts, opt)
   if (nrow(focal_attempts) == 0) {
     return(empty_result("No course attempts found for the selected scope."))
   }
 
   # CAMPUS_ROLLUP: identify the selected focal DFW event once per student-term-
   # course after the caller's campus scope has already been applied.
-  classified_focal <- classify_attempt_outcomes(
-    focal_attempts,
-    passing_values = opt$passing_grades %||% GRADES_PASS
-  ) %>%
+  classified_focal <- attempt_outcome_flags(focal_attempts, passing_values = passing) %>%
     dplyr::filter(is_dfw_legacy) %>%
     dplyr::distinct(student_id, term, subject_course, .keep_all = TRUE)
 
@@ -458,7 +466,7 @@ get_course_dfw_context <- function(students, opt = list(), min_cell = 5L) {
   context_opt$term <- sort(unique(focal_student_terms$term))
   context_opt$population_ids <- unique(focal_student_terms$student_id)
 
-  context_attempts <- prepare_course_attempts(students, context_opt)
+  context_attempts <- prepare_course_attempts(attempts, context_opt)
   if (nrow(context_attempts) == 0) {
     return(empty_result("No same-term course attempts found for DFW students."))
   }
@@ -466,10 +474,7 @@ get_course_dfw_context <- function(students, opt = list(), min_cell = 5L) {
   # CAMPUS_ROLLUP: this is the student's institution-wide same-term workload
   # context. Campus is deliberately cleared above so campus moves and mixed-
   # campus schedules do not turn one course into multiple workload attempts.
-  context_courses <- classify_attempt_outcomes(
-    context_attempts,
-    passing_values = opt$passing_grades %||% GRADES_PASS
-  ) %>%
+  context_courses <- attempt_outcome_flags(context_attempts, passing_values = passing) %>%
     dplyr::semi_join(focal_student_terms, by = c("student_id", "term")) %>%
     dplyr::filter(is_denominator_attempt) %>%
     # CAMPUS_ROLLUP: one institution-wide workload attempt per student-course.
@@ -645,12 +650,20 @@ get_course_dfw_context <- function(students, opt = list(), min_cell = 5L) {
 }
 
 
-get_grade_distribution <- function(students, opt = list(), group_cols,
+#' Letter-grade distribution by group
+#'
+#' @param attempts The attempt measure table (`cedar_attempts`).
+#' @param opt prepare_course_attempts()' options.
+#' @param group_cols Columns of the table to group by; campus beside the course.
+#' @param min_n Smallest denominator a group needs to be shown.
+#' @return Per group: counts and percentages of A, B, C, D, F, W and Other
+#'   over the DFW denominator (early drops and ungraded rows excluded).
+get_grade_distribution <- function(attempts, opt = list(), group_cols,
                                    min_n = 1L) {
   min_n <- suppressWarnings(as.integer(min_n %||% 1L))
   if (length(min_n) == 0 || is.na(min_n) || min_n < 1L) min_n <- 1L
 
-  attempts <- prepare_course_attempts(students, opt)
+  attempts <- prepare_course_attempts(attempts, opt)
   if (nrow(attempts) == 0) return(tibble::tibble())
 
   group_cols <- as.character(convert_param_to_list(group_cols))
@@ -663,7 +676,7 @@ get_grade_distribution <- function(students, opt = list(), group_cols,
   grade_levels <- c("A", "B", "C", "D", "F", "W", "Other")
 
   dist <- attempts %>%
-    classify_attempt_outcomes() %>%
+    attempt_outcome_flags() %>%
     dplyr::filter(is_denominator_attempt) %>%
     dplyr::mutate(grade_group = dplyr::case_when(
       final_grade %in% c("A", "A+", "A-", "RA", "RA+", "RA-") ~ "A",

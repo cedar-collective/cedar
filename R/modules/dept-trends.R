@@ -123,6 +123,7 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
 
     deptProfileGenEdServer("gen_ed",
       students = students,
+      attempts = data_objects[["cedar_attempts"]],
       sections = sections,
       programs = programs,
       degrees = degrees,

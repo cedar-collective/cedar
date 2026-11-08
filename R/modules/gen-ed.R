@@ -483,7 +483,7 @@ gen_ed_table_output_or_note <- function(data, output_id, message, label = "table
 #'   when a run finishes. Must equal the `id` passed to cedar_loading_overlay()
 #'   in the UI. NULL for the auto-running Dept Trends variant, which is covered
 #'   by the parent Dept Trends overlay.
-gen_ed_module_server <- function(input, output, session, students, sections, programs,
+gen_ed_module_server <- function(input, output, session, students, attempts, sections, programs,
                                  degrees, student_terms, dims, current_term, opt_builder,
                                  report_timer_name,
                                  run_id = "run", instructor_dfw_enabled = FALSE,
@@ -512,7 +512,8 @@ gen_ed_module_server <- function(input, output, session, students, sections, pro
     uses_overlay <- !is.null(overlay_id)
     timer <- start_report_timer(report_timer_name)
     result <- tryCatch(
-      get_gen_ed_profile(students, sections, programs, degrees, student_terms, dims, opt_builder()),
+      get_gen_ed_profile(students, attempts, sections, programs, degrees, student_terms, dims,
+                         opt_builder()),
       error = function(e) {
         showNotification(paste("Gen Ed profile failed:", e$message), type = "error")
         NULL
@@ -1141,7 +1142,7 @@ gen_ed_module_server <- function(input, output, session, students, sections, pro
 }
 
 
-genEdExploreServer <- function(id, students, sections, programs, degrees = NULL,
+genEdExploreServer <- function(id, students, attempts, sections, programs, degrees = NULL,
                                student_terms = NULL, edges, current_term = NULL,
                                dims) {
   moduleServer(id, function(input, output, session) {
@@ -1169,7 +1170,7 @@ genEdExploreServer <- function(id, students, sections, programs, degrees = NULL,
     })
 
     gen_ed_module_server(
-      input, output, session, students, sections, programs, degrees, student_terms, dims,
+      input, output, session, students, attempts, sections, programs, degrees, student_terms, dims,
       current_term, opt_builder, "gen-ed-explore", run_id = "ge_button",
       overlay_id = id, run_spec_title = "Gen Ed"
     )
@@ -1182,7 +1183,7 @@ genEdExploreServer <- function(id, students, sections, programs, degrees = NULL,
 #'   NULL hides that section rather than drawing it against a different credit
 #'   source — the program-record credit fields cannot answer the question. See
 #'   `R/features/gen-ed.R`.
-deptProfileGenEdServer <- function(id, students, sections, programs, degrees = NULL,
+deptProfileGenEdServer <- function(id, students, attempts, sections, programs, degrees = NULL,
                                    dept, edges, campus = NULL, active = NULL,
                                    current_term = NULL, dfw_password = NULL,
                                    student_terms = NULL, dims) {
@@ -1214,7 +1215,7 @@ deptProfileGenEdServer <- function(id, students, sections, programs, degrees = N
     })
 
     gen_ed_module_server(
-      input, output, session, students, sections, programs, degrees, student_terms, dims,
+      input, output, session, students, attempts, sections, programs, degrees, student_terms, dims,
       current_term, opt_builder, "dept-profile-gen-ed",
       run_id = NULL,
       instructor_dfw_enabled = TRUE,

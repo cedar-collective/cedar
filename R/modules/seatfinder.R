@@ -4,7 +4,7 @@
 #
 # Exported functions:
 #   seatfinderUI(id, sections, default_term, dept_choices)
-#   seatfinderServer(id, students, sections, faculty, error_handler = NULL)
+#   seatfinderServer(id, attempts, sections, faculty, edges, error_handler = NULL)
 
 seatfinderUI <- function(id, sections, default_term, dept_choices) {
   ns <- NS(id)
@@ -65,7 +65,7 @@ seatfinderUI <- function(id, sections, default_term, dept_choices) {
   )
 }
 
-seatfinderServer <- function(id, students, sections, faculty, edges,
+seatfinderServer <- function(id, attempts, sections, faculty, edges,
                              error_handler = NULL) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
@@ -367,7 +367,7 @@ seatfinderServer <- function(id, students, sections, faculty, edges,
           duration_sec <- end_report_timer(timer, cached = TRUE, result = cached)
           signal_load_complete(session, id, duration_sec = duration_sec, cached = TRUE)
         } else {
-          courses_list <- seatfinder(students, sections, faculty, opt)
+          courses_list <- seatfinder(attempts, sections, faculty, opt)
           sf_data(courses_list)
           save_seatfinder_cache(opt, courses_list)
           duration_sec <- end_report_timer(timer, cached = FALSE,

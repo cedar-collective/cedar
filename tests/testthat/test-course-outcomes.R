@@ -244,8 +244,10 @@ test_that("persistence refuses to run without degrees", {
 # get_course_outcomes() tests
 # =============================================================================
 
+# The outcome analyses read cedar_attempts (ADR-001 step 7): test_attempts is
+# test_students' attempt table, gen_ed_assoc_attempts the Gen Ed fixture's.
 test_that("get_course_outcomes returns correct list structure", {
-  result <- get_course_outcomes(test_students, cedar_faculty = NULL,
+  result <- get_course_outcomes(test_attempts, cedar_faculty = NULL,
                                 opt = list(course = "HIST 1110", min_n = 1, data_edges = data_objects$cedar_edges))
 
   expect_type(result, "list")
@@ -266,7 +268,7 @@ test_that("get_course_persistence has pass/fail/late drop rows for HIST 1110", {
 
 test_that("get_course_outcomes dfw_trend has 4 rows for HIST 1110 (grades in all 4 terms)", {
   # Designed fixture assigns grades to HIST 1110 across all 4 terms
-  result <- get_course_outcomes(test_students, cedar_faculty = NULL,
+  result <- get_course_outcomes(test_attempts, cedar_faculty = NULL,
                                 opt = list(course = "HIST 1110", data_edges = data_objects$cedar_edges))
 
   expect_equal(nrow(result$dfw_trend), 4)
@@ -274,7 +276,7 @@ test_that("get_course_outcomes dfw_trend has 4 rows for HIST 1110 (grades in all
 })
 
 test_that("get_course_outcomes instructor_dfw has required columns", {
-  result <- get_course_outcomes(gen_ed_assoc_students, cedar_faculty = NULL,
+  result <- get_course_outcomes(gen_ed_assoc_attempts, cedar_faculty = NULL,
                                 opt = list(course = "HIST 1110", data_edges = data_objects$cedar_edges))
 
   expect_gt(nrow(result$instructor_dfw), 0)
@@ -287,7 +289,7 @@ test_that("get_course_outcomes instructor_dfw has required columns", {
 })
 
 test_that("get_course_outcomes dfw_diff equals instructor_dfw_pct minus course_avg", {
-  result <- get_course_outcomes(test_students, cedar_faculty = NULL,
+  result <- get_course_outcomes(test_attempts, cedar_faculty = NULL,
                                 opt = list(course = "HIST 1110", data_edges = data_objects$cedar_edges))
 
   if (nrow(result$instructor_dfw) > 0) {
@@ -297,12 +299,12 @@ test_that("get_course_outcomes dfw_diff equals instructor_dfw_pct minus course_a
 })
 
 test_that("get_course_outcomes requires opt$course", {
-  expect_error(get_course_outcomes(test_students),
+  expect_error(get_course_outcomes(test_attempts),
                regexp = "opt\\$course is required")
 })
 
 test_that("get_course_outcomes returns empty tibbles for nonexistent course", {
-  result <- get_course_outcomes(test_students, cedar_faculty = NULL,
+  result <- get_course_outcomes(test_attempts, cedar_faculty = NULL,
                                 opt = list(course = "NONEXISTENT 9999", data_edges = data_objects$cedar_edges))
 
   expect_equal(nrow(result$dfw_trend),      0)
@@ -318,8 +320,8 @@ test_that("get_course_persistence only contains the requested course", {
 })
 
 test_that("get_course_outcomes dfw_trend and instructor_dfw are non-empty even when cedar_faculty = NULL", {
-  # DFW trend and instructor DFW come from class-list outcome data alone.
-  result <- get_course_outcomes(test_students, cedar_faculty = NULL, opt = list(course = "HIST 1110", data_edges = data_objects$cedar_edges))
+  # DFW trend and instructor DFW come from the attempt table alone.
+  result <- get_course_outcomes(test_attempts, cedar_faculty = NULL, opt = list(course = "HIST 1110", data_edges = data_objects$cedar_edges))
   expect_equal(nrow(result$dfw_trend),      4)
   expect_equal(nrow(result$instructor_dfw), 1)
 })

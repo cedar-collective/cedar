@@ -2165,6 +2165,7 @@ cedar_registrations_audits <- tribble(
     student_level = "UG", student_classification = "Sophomore",
     student_campus = "ABQ", student_college = "ARTS", major_code = "HIST",
     course_title = "Survey of History", residency = "Resident",
+    instructor_id = "EC09-INST", instructor_name = "Fixture Instructor",
     as_of_date = as.Date("2020-12-20"),
     registration_status = case_when(
       registration_status_code %in% c("RE", "RS", "RR") ~ "Student Registered",

@@ -102,6 +102,7 @@ test_that("old instructor conversion function name is intentionally absent", {
 test_that("get_gen_ed_profile runs all-Gen-Ed default without department selection", {
   result <- get_gen_ed_profile(
     gen_ed_assoc_students,
+    gen_ed_assoc_attempts,
     gen_ed_assoc_sections,
     gen_ed_assoc_programs,
     student_terms = test_student_terms_gen_ed_assoc,
@@ -143,6 +144,7 @@ test_that("get_gen_ed_profile runs all-Gen-Ed default without department selecti
 test_that("get_gen_ed_profile applies core filters consistently", {
   result <- get_gen_ed_profile(
     gen_ed_assoc_students,
+    gen_ed_assoc_attempts,
     gen_ed_assoc_sections,
     gen_ed_assoc_programs,
     student_terms = test_student_terms_gen_ed_assoc,
@@ -173,6 +175,7 @@ test_that("get_gen_ed_profile can have section enrollment without qualifying stu
 
   result <- get_gen_ed_profile(
     no_matching_students,
+    keyed_attempts(no_matching_students),
     gen_ed_assoc_sections,
     gen_ed_assoc_programs,
     student_terms = test_student_terms_gen_ed_assoc,
@@ -192,6 +195,7 @@ test_that("get_gen_ed_profile can have section enrollment without qualifying stu
 test_that("get_gen_ed_profile can include chair-facing instructor DFW rows", {
   result <- get_gen_ed_profile(
     gen_ed_assoc_students,
+    gen_ed_assoc_attempts,
     gen_ed_assoc_sections,
     gen_ed_assoc_programs,
     student_terms = test_student_terms_gen_ed_assoc,

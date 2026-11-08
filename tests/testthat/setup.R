@@ -174,6 +174,25 @@ attempts_for <<- function(students, edges = data_objects$cedar_edges) build_atte
 course_terms_for <<- function(students, edges = data_objects$cedar_edges) {
   build_course_terms(students, attempts_for(students, edges))
 }
+# A class list as a test designs it (extract rows, duplicates and all), made
+# into the attempt table the outcome hub reads (ADR-001 step 7) the way the
+# data reaches a reader: one row per student, course, campus and term
+# (dedup_class_list_rows(), the transform's), thin and keyed on the course
+# (as global.R loads it), then build_attempts() to the edge.
+.transform_helpers <- load_transform_helpers()
+keyed_attempts <<- function(students, edges = data_objects$cedar_edges) {
+  students <- .transform_helpers$dedup_class_list_rows(students)
+  students <- thin_class_list(students[setdiff(names(students), c("course_id", "listed_code"))])
+  if (nrow(students) == 0L) {
+    # No rows, no courses to key: the empty class list with the key columns.
+    students$course_id <- character()
+    students$listed_code <- character()
+    return(attempts_for(students, edges))
+  }
+  attempts_for(attach_test_course_ids(students, "students"), edges)
+}
+test_attempts         <<- attempts_for(test_students)
+gen_ed_assoc_attempts <<- keyed_attempts(gen_ed_assoc_students)
 
 Sys.setenv(shiny = "FALSE")
 

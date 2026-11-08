@@ -19,10 +19,11 @@ test_that("AUD is excluded across classifiers without erasing genuine withdrawal
   expect_false(any(direct$is_dfw_legacy[direct$student_id %in% audit_ids]))
 
   edges <- data_objects$cedar_edges
-  prepared <- prepare_course_attempts(students, list(course = "HIST 1110", data_edges = edges))
-  classified <- classify_attempt_outcomes(prepared)
+  attempts <- keyed_attempts(students)
+  prepared <- prepare_course_attempts(attempts, list(course = "HIST 1110", data_edges = edges))
+  classified <- attempt_outcome_flags(prepared)
   expect_setequal(classified$student_id[which(classified$is_denominator_attempt)], expected_ids)
-  rate <- get_course_outcome_rates(students, list(course = "HIST 1110", data_edges = edges))
+  rate <- get_course_outcome_rates(attempts, list(course = "HIST 1110", data_edges = edges))
   expect_equal(rate$n_attempts, 5L)
   expect_equal(rate$n_dfw, 4L)
   expect_equal(rate$n_pass, 1L)
@@ -33,9 +34,7 @@ test_that("AUD is excluded across classifiers without erasing genuine withdrawal
 
 
 test_that("recycled CRNs preserve later attempts while same-term duplicates collapse", {
-  attempts <- prepare_course_attempts(
-    test_students_reused_crn, list(subj = "HIST", data_edges = data_objects$cedar_edges)
-  )
+  attempts <- prepare_course_attempts(keyed_attempts(test_students_reused_crn), list(subj = "HIST"))
 
   expect_equal(nrow(attempts), 4L)
   repeated <- attempts %>% filter(student_id == "EC08-A", subject_course == "HIST 1110")
@@ -47,9 +46,10 @@ test_that("recycled CRNs preserve later attempts while same-term duplicates coll
 
 
 test_that("course outcomes reconcile across term partitions and wider course scope", {
+  attempts <- keyed_attempts(test_students_reused_crn)
   opt <- list(course = "HIST 1110", course_campus = "ABQ",
               data_edges = data_objects$cedar_edges)
-  pooled <- get_course_outcome_rates(test_students_reused_crn, opt)
+  pooled <- get_course_outcome_rates(attempts, opt)
   expect_equal(pooled$n_attempts, 3L)
   expect_equal(pooled$n_pass, 2L)
   expect_equal(pooled$n_dfw, 1L)
@@ -60,20 +60,17 @@ test_that("course outcomes reconcile across term partitions and wider course sco
   separate_terms <- bind_rows(lapply(c(202010L, 202080L), function(term) {
     term_opt <- opt
     term_opt$term <- term
-    get_course_outcome_rates(test_students_reused_crn, term_opt)
+    get_course_outcome_rates(attempts, term_opt)
   }))
   expect_equal(sum(separate_terms$n_attempts), pooled$n_attempts)
   expect_equal(sum(separate_terms$n_dfw), pooled$n_dfw)
 
-  wider <- get_course_outcome_rates(
-    test_students_reused_crn, list(subj = "HIST", data_edges = data_objects$cedar_edges)
-  )
+  wider <- get_course_outcome_rates(attempts, list(subj = "HIST"))
   expect_equal(filter(wider, subject_course == "HIST 1110"), pooled)
   expect_equal(wider$n_attempts[wider$subject_course == "HIST 1120"], 1L)
   expect_equal(wider$n_dfw[wider$subject_course == "HIST 1120"], 1L)
 
-  grades <- get_grade_distribution(test_students_reused_crn, opt,
-                                   group_cols = "subject_course")
+  grades <- get_grade_distribution(attempts, opt, group_cols = "subject_course")
   expect_equal(grades$total, pooled$n_attempts)
   expect_equal(grades$A, 2L)
   expect_equal(grades$F, 1L)
@@ -121,7 +118,10 @@ test_that("canonical DFW policy is exhaustive and the sub-C exception is narrow"
 })
 
 
-test_that("prepare_course_attempts normalizes drops, excludes audits, and deduplicates", {
+# What the class list goes through before a reader sees an attempt: the
+# transform's dedup, then build_attempts() (keyed_attempts(), setup.R). The
+# hub reads the result and decides nothing again.
+test_that("the attempt table normalizes drops, excludes audits, and deduplicates", {
   base_row <- test_students %>%
     dplyr::filter(subject_course == "HIST 1110") %>%
     dplyr::slice(1)
@@ -162,7 +162,7 @@ test_that("prepare_course_attempts normalizes drops, excludes audits, and dedupl
   )
 
   result <- prepare_course_attempts(
-    designed, opt = list(course = "HIST 1110", data_edges = data_objects$cedar_edges)
+    keyed_attempts(designed), opt = list(course = "HIST 1110", data_edges = data_objects$cedar_edges)
   )
 
   expect_false("attempt-aud" %in% result$student_id)
@@ -172,7 +172,41 @@ test_that("prepare_course_attempts normalizes drops, excludes audits, and dedupl
   expect_equal(result$final_grade[result$student_id == "attempt-dw"], "W")
   expect_true(is.na(result$final_grade[result$student_id == "attempt-blank"]))
   expect_equal(sum(result$student_id == "attempt-dup"), 1L)
-  expect_true("final_grade_raw" %in% names(result))
+  expect_equal(names(result), ATTEMPTS_COLUMNS)
+  # The scope is the table's own: a different claimed edge is refused, an
+  # option the table cannot answer is refused, and a class list is not a table.
+  expect_error(
+    prepare_course_attempts(keyed_attempts(designed),
+                            list(course = "HIST 1110",
+                                 data_edges = modifyList(data_objects$cedar_edges,
+                                                         list(last_graded = 201980L)))),
+    "was built to")
+  expect_error(prepare_course_attempts(keyed_attempts(designed), list(classification = "Freshman")),
+               "does not carry")
+  expect_error(prepare_course_attempts(designed, list(course = "HIST 1110")), "build_attempts")
+})
+
+
+# The hub counts attempt_outcome_flags(), read off the stored category; they
+# must be the classifier's flags over the same rows, under the default policy
+# and under the page's C-/D opt-in, and under the default `is_pass` is the
+# stored `pass` category itself.
+test_that("attempt_outcome_flags reproduces the classifier from the stored category", {
+  attempts <- test_attempts
+  flag_cols <- grep("^is_", names(classify_attempt_outcomes(attempts[1, ])), value = TRUE)
+  for (passing in list(GRADES_PASS, GRADES_PASS_SUB_C_OPT_IN)) {
+    from_table <- attempt_outcome_flags(attempts, passing_values = passing)
+    reclassified <- classify_attempt_outcomes(attempts, passing_values = passing)
+    expect_equal(as.data.frame(from_table[flag_cols]), as.data.frame(reclassified[flag_cols]))
+  }
+  default <- attempt_outcome_flags(attempts)
+  expect_equal(default$is_pass, attempts$outcome_category == "pass")
+  expect_equal(default$is_dfw_legacy, attempts$outcome %in% "dfw")
+  expect_gt(sum(default$is_pass), 0L)
+  expect_gt(sum(attempt_outcome_flags(attempts, GRADES_PASS_SUB_C_OPT_IN)$is_pass), sum(default$is_pass))
+
+  odd <- attempts[1, ]; odd$outcome_category <- "other"
+  expect_error(attempt_outcome_flags(odd), "never writes")
 })
 
 
@@ -212,7 +246,7 @@ test_that("summarize_outcome_status_exclusions reports excluded status rows and 
 
 test_that("get_course_outcome_rates exposes nuanced DFW components", {
   result <- get_course_outcome_rates(
-    test_students,
+    test_attempts,
     opt = list(course = "HIST 1110", data_edges = data_objects$cedar_edges),
     group_cols = "subject_course",
     min_n = 1L
@@ -265,8 +299,9 @@ test_that("get_course_dfw_demographics summarizes rate and composition", {
     pre_major = c(rep(FALSE, 4), TRUE, TRUE)
   )
 
+  attempts <- keyed_attempts(designed)
   result <- get_course_dfw_demographics(
-    designed, st,
+    attempts, st,
     opt = list(course = "HIST 1110", data_edges = data_objects$cedar_edges),
     group_col = "major_code", dims = test_dims
   )
@@ -283,7 +318,7 @@ test_that("get_course_dfw_demographics summarizes rate and composition", {
   expect_equal(biology$n_dfw, 1L)
 
   by_class <- get_course_dfw_demographics(
-    designed, st,
+    attempts, st,
     opt = list(course = "HIST 1110", data_edges = data_objects$cedar_edges),
     group_col = "student_classification"
   )
@@ -293,7 +328,7 @@ test_that("get_course_dfw_demographics summarizes rate and composition", {
   # A seat with no student-term row is refused, never grouped as missing.
   expect_error(
     get_course_dfw_demographics(
-      designed, st[-1, ],
+      attempts, st[-1, ],
       opt = list(course = "HIST 1110", data_edges = data_objects$cedar_edges)
     ),
     "no row on cedar_student_terms"
@@ -301,7 +336,7 @@ test_that("get_course_dfw_demographics summarizes rate and composition", {
   # Grouping by major needs the mapping files that name each program.
   expect_error(
     get_course_dfw_demographics(
-      designed, st,
+      attempts, st,
       opt = list(course = "HIST 1110", data_edges = data_objects$cedar_edges),
       group_col = "major_code"
     ),
@@ -315,7 +350,7 @@ test_that("get_course_dfw_demographics honors caller-supplied passing grades", {
   st <- dfw_demo_terms(designed, classification = "Sophomore", major = "ZZBIOL")
 
   result <- get_course_dfw_demographics(
-    designed, st,
+    keyed_attempts(designed), st,
     opt = list(
       course = "HIST 1110",
       passing_grades = GRADES_PASS_SUB_C_OPT_IN,
@@ -370,7 +405,7 @@ test_that("get_course_dfw_context summarizes same-term DFW uniqueness", {
   )
 
   result <- get_course_dfw_context(
-    designed,
+    keyed_attempts(designed),
     opt = list(course = "HIST 1110", data_edges = data_objects$cedar_edges),
     min_cell = 1L
   )
@@ -415,7 +450,7 @@ test_that("get_course_dfw_context suppresses small context displays", {
   )
 
   result <- get_course_dfw_context(
-    designed,
+    keyed_attempts(designed),
     opt = list(course = "HIST 1110", data_edges = data_objects$cedar_edges),
     min_cell = 5L
   )
@@ -458,7 +493,7 @@ test_that("get_course_dfw_context merges thin buckets instead of hiding the pane
   })
 
   result <- get_course_dfw_context(
-    dplyr::bind_rows(focal_only, paired),
+    keyed_attempts(dplyr::bind_rows(focal_only, paired)),
     opt = list(course = "HIST 1110", data_edges = data_objects$cedar_edges),
     min_cell = 5L
   )
@@ -475,7 +510,7 @@ test_that("get_course_dfw_context merges thin buckets instead of hiding the pane
 
 test_that("get_grade_distribution returns counts and percentages", {
   result <- get_grade_distribution(
-    test_students,
+    test_attempts,
     opt = list(course = "HIST 1110", data_edges = data_objects$cedar_edges),
     group_cols = "subject_course",
     min_n = 1L
@@ -490,7 +525,7 @@ test_that("get_grade_distribution returns counts and percentages", {
 
 test_that("get_course_outcome_rates computes expected course averages", {
   modern <- get_course_outcome_rates(
-    test_students,
+    test_attempts,
     opt = list(course = "HIST 1110", data_edges = data_objects$cedar_edges),
     group_cols = c("campus", "college", "subject_course"),
     min_n = 1L
@@ -508,11 +543,11 @@ test_that("get_course_outcome_rates computes expected course averages", {
 
 
 # cedar_attempts (R/branches/attempts.R): the class list classified once, to
-# the graded edge. Its counts must be the ones get_course_outcome_rates()
-# computes per request, course by course, and its outcome the canonical
-# classifier's, row by row: a reader moving to the table must see no number
-# change. HIST 1110 in test_students is the course pinned above (36 attempts:
-# 23 pass, 4 fail, 9 late withdrawals).
+# the graded edge. Its stored outcome must be what the hub counts over it
+# (count_attempt_outcomes() against get_course_outcome_rates(), course by
+# course) and the canonical classifier's, row by row: a reader moving to the
+# table must see no number change. HIST 1110 in test_students is the course
+# pinned above (36 attempts: 23 pass, 4 fail, 9 late withdrawals).
 test_that("cedar_attempts reproduces the per-request outcome rates for every course", {
   edges <- data_objects$cedar_edges
   attempts <- attempts_for(test_students)
@@ -525,9 +560,9 @@ test_that("cedar_attempts reproduces the per-request outcome rates for every cou
   expect_equal(sum(hist$outcome %in% "dfw"), 13L)
   expect_equal(sum(hist$outcome_category == "w_late_withdrawal"), 9L)
 
-  # Every course and term, against the per-request path over the same rows.
+  # Every course and term, against the hub's path over the same table.
   per_request <- get_course_outcome_rates(
-    test_students, list(term = sort(unique(test_students$term)), data_edges = edges),
+    attempts, list(term = sort(unique(test_students$term)), data_edges = edges),
     group_cols = c("campus", "college", "term", "subject_course")) %>%
     select(campus, college, term, subject_course, n_attempts, n_pass, n_dfw, n_w) %>%
     filter(n_attempts > 0) %>%

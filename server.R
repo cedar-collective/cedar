@@ -2633,7 +2633,7 @@ output$enrl_classlist_download <- downloadHandler(
     if (!is.null(campus_filter)) opt$course_campus <- campus_filter$values
 
     get_course_outcome_rates(
-      data_objects[["cedar_registrations"]],
+      data_objects[["cedar_attempts"]],
       opt = opt,
       group_cols = c("campus", "college", "term", "subject_course"),
       min_n = 1L
@@ -2643,7 +2643,7 @@ output$enrl_classlist_download <- downloadHandler(
   cr_dfw_demographics_reactive <- reactive({
     data <- course_report_data()
     req(!is.null(data), !is.null(data$opt))
-    students <- data_objects[["cedar_registrations"]]
+    attempts <- data_objects[["cedar_attempts"]]
     opt <- data$opt
     opt$passing_grades <- dfw_passing_grades()
     # Grade-based outcomes stop at the graded edge; the branch requires it.
@@ -2655,12 +2655,12 @@ output$enrl_classlist_download <- downloadHandler(
 
     list(
       classification = get_course_dfw_demographics(
-        students, student_terms, opt,
+        attempts, student_terms, opt,
         group_col = "student_classification",
         min_n = 1L
       ),
       major = get_course_dfw_demographics(
-        students, student_terms, opt,
+        attempts, student_terms, opt,
         group_col = "major_code",
         min_n = 1L,
         max_groups = 25L,
@@ -2680,7 +2680,7 @@ output$enrl_classlist_download <- downloadHandler(
     if (!is.null(campus_filter)) opt$course_campus <- campus_filter$values
 
     get_course_dfw_context(
-      data_objects[["cedar_registrations"]],
+      data_objects[["cedar_attempts"]],
       opt = opt,
       min_cell = 5L
     )
@@ -4844,7 +4844,7 @@ output$enrl_classlist_download <- downloadHandler(
   # ===========================================================================
   # Open Seats tab (Shiny module)
   # ===========================================================================
-  seatfinderServer("seatfinder", cedar_registrations, cedar_sections, cedar_faculty,
+  seatfinderServer("seatfinder", data_objects[["cedar_attempts"]], cedar_sections, cedar_faculty,
                    edges = data_objects[["cedar_edges"]],
                    error_handler = handle_error)
 
@@ -4879,6 +4879,7 @@ output$enrl_classlist_download <- downloadHandler(
   # ===========================================================================
   genEdExploreServer("gen_ed",
     students = cedar_registrations,
+    attempts = data_objects[["cedar_attempts"]],
     sections = cedar_sections,
     programs = cedar_programs,
     degrees = cedar_degrees,

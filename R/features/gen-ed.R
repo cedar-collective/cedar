@@ -140,7 +140,18 @@ plot_gen_ed_course_modality_trends <- function(enrl_by_course_modality, top_n = 
 }
 
 
-get_gen_ed_profile <- function(students, sections, programs, degrees = NULL,
+#' The Gen Ed profile: enrollment, outcomes, majors and associations
+#'
+#' @param students The class list (`cedar_registrations`): registered seats and
+#'   the major associations.
+#' @param attempts The attempt measure table (`cedar_attempts`): every outcome
+#'   table (DFW by course, grade distribution, instructor DFW, department DFW).
+#' @param sections `cedar_sections`; `programs` `cedar_programs`; `degrees`
+#'   `cedar_degrees` or NULL; `student_terms` `cedar_student_terms`; `dims` the
+#'   dimension tables.
+#' @param opt The page's scope (`campus`, `terms`, `dept_code`, `gen_ed_area`,
+#'   `level`, ...), `min_n`, `include_associations`, `include_instructor_dfw`.
+get_gen_ed_profile <- function(students, attempts, sections, programs, degrees = NULL,
                                student_terms, dims, opt = list()) {
   min_n <- suppressWarnings(as.integer(opt$min_n %||% 5L))
   if (length(min_n) == 0 || is.na(min_n) || min_n < 1L) min_n <- 5L
@@ -233,7 +244,7 @@ get_gen_ed_profile <- function(students, sections, programs, degrees = NULL,
   # scope covers both, so a single blended DFW rate hides the gap a chair is
   # looking for. Every downstream join below is keyed on campus to match.
   outcome_rates <- get_course_outcome_rates(
-    students, outcome_opt,
+    attempts, outcome_opt,
     group_cols = c("campus", "department", "subject_course"),
     min_n = min_n
   )
@@ -302,7 +313,7 @@ get_gen_ed_profile <- function(students, sections, programs, degrees = NULL,
   # Grouped by campus for the same reason as dfw_by_course above, and so the two
   # tables sit on one page with rows that line up.
   grade_dist <- get_grade_distribution(
-    students, outcome_opt,
+    attempts, outcome_opt,
     group_cols = c("campus", "department", "subject_course"),
     min_n = min_n
   )
@@ -320,7 +331,7 @@ get_gen_ed_profile <- function(students, sections, programs, degrees = NULL,
   instructor_dfw <- NULL
   if (include_instructor_dfw) {
     instructor_rates <- get_course_outcome_rates(
-      students, outcome_opt,
+      attempts, outcome_opt,
       group_cols = c("campus", "department", "subject_course", "instructor_name"),
       min_n = min_n
     )
@@ -360,7 +371,7 @@ get_gen_ed_profile <- function(students, sections, programs, degrees = NULL,
       course_rates <- dfw_by_course %>%
         dplyr::select(campus, department, subject_course, course_dfw_rate = dfw_rate)
 
-      instructor_terms <- prepare_course_attempts(students, outcome_opt) %>%
+      instructor_terms <- prepare_course_attempts(attempts, outcome_opt) %>%
         dplyr::filter(!is.na(instructor_name), instructor_name != "") %>%
         dplyr::group_by(campus, department, subject_course, instructor_name) %>%
         dplyr::summarize(n_terms = dplyr::n_distinct(term), .groups = "drop")
@@ -463,7 +474,7 @@ get_gen_ed_profile <- function(students, sections, programs, degrees = NULL,
   # These totals aggregate thousands of students, where the guard protects
   # nothing.
   dept_outcome_rates <- get_course_outcome_rates(
-    students, outcome_opt,
+    attempts, outcome_opt,
     group_cols = c("department"),
     min_n = 1L
   )

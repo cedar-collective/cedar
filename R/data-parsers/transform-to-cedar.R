@@ -1665,6 +1665,14 @@ transform_to_cedar <- function(data_dir = NULL, use_qs = NULL, tables = NULL,
     for (name in names(saved_files)) {
       info      <- saved_files[[name]]
       dest_path <- file.path(local_data_dir, info$filename)
+      # A run over the local directory itself (--data-dir data/) saved the file
+      # where the copy would put it: file.copy() onto its own source truncates
+      # it to nothing (three empty measure tables, 2026-11-08), so leave it.
+      if (identical(normalizePath(info$filepath, mustWork = FALSE),
+                    normalizePath(dest_path, mustWork = FALSE))) {
+        message("  ", info$filename, " is already in local data/")
+        next
+      }
       message("  Copying: ", info$filename, " → local data/")
       if (file.copy(info$filepath, dest_path, overwrite = TRUE)) {
         message("    ✅ Copied")
