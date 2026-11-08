@@ -134,6 +134,23 @@ encrypt_if_needed <- function(id) {
   unname(enc[id_chr])
 }
 
+# Hash an instructor ID the way parse-data.R hashes the class list's and the
+# HR report's (md5 of the ID), unless it already is a hash. The DESR's report
+# spec hashes nothing, so its PRIM_INST_ID arrived as the employee ID: the HR
+# merge below never matched (job_cat was NA on every section) and the saved
+# sections joined neither the class list nor cedar_faculty (ISSUES I52).
+# Applied to all four sources, so files that never went through parse-data
+# (the synthetic institution's) come out the same way. NA stays NA.
+hash_instructor_id <- function(id) {
+  id_chr <- as.character(id)
+  todo <- !is.na(id_chr) & !grepl("^[0-9a-f]{32}$", id_chr)
+  if (!any(todo)) return(id_chr)
+  raw <- unique(id_chr[todo])
+  hashed <- vapply(raw, digest::digest, character(1), algo = "md5", USE.NAMES = FALSE)
+  id_chr[todo] <- hashed[match(id_chr[todo], raw)]
+  id_chr
+}
+
 # Convert a character vector of column names to snake_case
 to_snake <- function(x) {
   x <- gsub("[^a-zA-Z0-9]+", "_", x)  # non-alphanumeric → underscore
@@ -207,25 +224,13 @@ transform_sections <- function(desrs, data_dir, ext, maps) {
   # subject with no confirmed row is listed by the end-of-transform mapping
   # audit and on Admin > Mappings.
 
-  # ── HR merge (job_cat / title enrichment) ────────────────────────────────
-  hr_file <- file.path(data_dir, paste0("hr_data", ext))
-  if (file.exists(hr_file)) {
-    message("  Pre-processing: merging HR data for job_cat/title fields...")
-    hr_desrs <- load_file(hr_file, ext)
-    hr_desrs  <- hr_desrs %>% dplyr::select(-dplyr::any_of("as_of_date"))
-    desrs$PRIM_INST_ID <- as.character(desrs$PRIM_INST_ID)
-    desrs$TERM         <- as.character(desrs$TERM)
-    desrs <- desrs %>%
-      dplyr::left_join(hr_desrs,
-                       by     = c("TERM" = "term_code", "PRIM_INST_ID" = "UNM ID"),
-                       suffix = c("", ".hr")) %>%
-      dplyr::select(-dplyr::any_of("DEPT.hr"))
-    rm(hr_desrs); gc(verbose = FALSE)
-    message("  ✅ HR merge complete: ", nrow(desrs), " rows")
-  } else {
-    desrs$job_cat <- NA_character_
-    message("  ⚠️  hr_data not found: ", hr_file, " — job_cat will be NA")
-  }
+  # The instructor ID is hashed as the class list's and cedar_faculty's are,
+  # so a section joins both (I52). A section carries no faculty attribute: a
+  # reader that wants one joins cedar_faculty on term and instructor_id. (The
+  # HR merge that stood here joined the employee ID to hashed IDs, matched
+  # nothing, and left job_cat NA on every section; an instructor holding
+  # several appointments a term would also have duplicated the section.)
+  desrs$PRIM_INST_ID <- hash_instructor_id(desrs$PRIM_INST_ID)
 
   # ── Transmute to CEDAR model ─────────────────────────────────────────────
   message("  Transforming to CEDAR model...")
@@ -258,7 +263,6 @@ transform_sections <- function(desrs, data_dir, ext, maps) {
       source_college = COLLEGE,
       instructor_id   = as.character(PRIM_INST_ID),
       instructor_name = INST_NAME,
-      job_cat      = if ("job_cat" %in% names(.)) job_cat else NA_character_,
       enrolled     = as.integer(ENROLLED),
       total_enrl   = as.integer(total_enrl),
       capacity     = if ("SECT_CAP" %in% names(.)) as.integer(SECT_CAP) else as.integer(ROOM_CAP),
@@ -428,13 +432,78 @@ transform_sections <- function(desrs, data_dir, ext, maps) {
 }
 
 
+# ── 2a. dedup_class_list_rows: one row per student-course-campus-term ───────
+
+#' Keep one class-list row per student, course, campus and term
+#'
+#' Banner emits one row per CRN, so a student in a combined course (BIOL 302C:
+#' a lecture CRN and a lab CRN), a student who switched sections, or one in two
+#' sections of a topics course appears more than once. Campus is part of
+#' delivery identity: the same student can take one course at two campuses.
+#'
+#' The row kept is the one STATUS_PRECEDENCE (R/lists/status_codes.R) ranks
+#' first: registered (any registered code), then a late drop (the withdrawal
+#' is the outcome of record), then a waitlist row, then an early drop. Within
+#' a status, a row with a posted grade beats one without (a combined course's
+#' graded lecture over its ungraded lab; a credit attempt over an audit in a
+#' second section of a topics course), then the lowest CRN, so the choice
+#' never depends on row order. Before 2026-11-07 only "registered first" was
+#' applied, so a student who early-dropped one section and withdrew late from
+#' another could keep the early drop and lose the W: 703 student-course-terms
+#' on the 2026-10-08 pull (ISSUES I50).
+#'
+#' @param students Pre-dedup cedar_students rows.
+#' @return The rows, one per student_id, term, campus and subject_course.
+dedup_class_list_rows <- function(students) {
+  missing <- setdiff(c("student_id", "term", "campus", "subject_course", "crn",
+                       "registration_status_code", "final_grade"), names(students))
+  if (length(missing)) {
+    stop("[transform-to-cedar.R] dedup_class_list_rows(): students lacks ",
+         paste(missing, collapse = ", "))
+  }
+  status <- students$registration_status_code
+  # An audit is no outcome: a credit attempt in another section beats it.
+  grade <- trimws(students$final_grade)
+  graded <- !is.na(grade) & nzchar(grade) & !grade %in% GRADES_EXCLUDED_FROM_OUTCOMES
+  # Every registered code is one tier; an unlisted status ranks last.
+  tier <- match(status, STATUS_PRECEDENCE)
+  tier[status %in% STATUS_REGISTERED] <- 0L
+  tier[is.na(tier)] <- length(STATUS_PRECEDENCE) + 1L
+  keys <- c("student_id", "term", "campus", "subject_course")
+  ranked <- students %>%
+    dplyr::mutate(.tier = tier, .ungraded = !graded) %>%
+    dplyr::arrange(student_id, term, campus, subject_course, .tier, .ungraded, crn)
+  kept_first <- !duplicated(ranked[keys])
+  # What the ranking decided, for the transform log: a key whose rows hold more
+  # than one rank had its row chosen by the ranking, not by being alone.
+  in_dup <- duplicated(ranked[keys]) | duplicated(ranked[keys], fromLast = TRUE)
+  decided <- ranked[in_dup, , drop = FALSE] %>%
+    dplyr::group_by(dplyr::across(dplyr::all_of(keys))) %>%
+    dplyr::filter(dplyr::n_distinct(.tier) > 1L) %>%
+    dplyr::summarize(kept = dplyr::first(.tier), .groups = "drop")
+  out <- ranked[kept_first, , drop = FALSE] %>% dplyr::select(-.tier, -.ungraded)
+  n_removed <- nrow(students) - nrow(out)
+  if (n_removed > 0) {
+    kept <- ifelse(decided$kept == 0L, "registered",
+                   ifelse(decided$kept > length(STATUS_PRECEDENCE), "other",
+                          STATUS_PRECEDENCE[pmax(decided$kept, 1L)]))
+    kinds <- table(kept)
+    kinds <- kinds[kinds > 0]
+    message("  Removed ", n_removed, " duplicate section rows; ", nrow(decided),
+            " student-course-terms held rows of different statuses; kept: ",
+            paste0(names(kinds), " ", as.integer(kinds), collapse = ", "))
+  }
+  out
+}
+
+
 # ── 2. transform_students: class_lists → cedar_students ──────────────────────
 
 #' @param class_lists Raw class_lists data frame (output of parse-data.R)
 #' @param data_dir    Path to data directory
 #' @param ext         File extension
 #' @param maps        Named list of lookup vectors
-#' @return list(saved = list(students, grades))
+#' @return list(saved = list(students))
 transform_students <- function(class_lists, data_dir, ext, maps) {
   message("──────────────────────────────────────────────────────")
   message("2. Transforming class_lists → cedar_students")
@@ -525,7 +594,7 @@ transform_students <- function(class_lists, data_dir, ext, maps) {
       subject_code   = sub(" .*", "", SUBJ_CRSE),
       course_title   = if ("Short Course Title" %in% names(.)) `Short Course Title` else NA_character_,
       level = dplyr::coalesce(COURSE_LEVEL, "unknown"),
-      instructor_id         = if ("Primary Instructor ID"         %in% names(.)) `Primary Instructor ID`         else NA_character_,
+      instructor_id         = if ("Primary Instructor ID"         %in% names(.)) hash_instructor_id(`Primary Instructor ID`) else NA_character_,
       instructor_last_name  = if ("Primary Instructor Last Name"  %in% names(.)) `Primary Instructor Last Name`  else NA_character_,
       instructor_first_name = if ("Primary Instructor First Name" %in% names(.)) `Primary Instructor First Name` else NA_character_,
       instructor_name = case_when(
@@ -564,60 +633,10 @@ transform_students <- function(class_lists, data_dir, ext, maps) {
     # Keeping all three strings on ~1.7M rows adds substantial runtime memory.
     select(-instructor_last_name, -instructor_first_name)
 
-  # ── cedar_grades ─────────────────────────────────────────────────────────
-  # Built from pre-dedup cedar_students (CRN-level) so topics courses sharing
-  # a subject_course code are preserved as separate rows.
-  # Outcome classification is the canonical CEDAR pass/DFW policy from
-  # classify_enrollment_outcomes() (trunk/utils.R): A+ through C and CR pass;
-  # every other recorded non-audit outcome plus non-audit late drops is DFW. Early drops
-  # are NEVER DFW (see AGENTS.md, "CEDAR-wide DFW policy").
-  message("  Computing cedar_grades (pre-classified outcomes, CRN-level dedup)...")
-  # classify first (it restricts to registered + late-drop rows), THEN dedup —
-  # otherwise an excluded row (e.g. an early drop) could win the CRN dedup and
-  # shadow the student's real outcome row.
-  #
-  # Dedup key MUST include term: Banner recycles CRNs across terms, so a retake
-  # of a course under a recycled CRN is a distinct outcome, not a duplicate
-  # (~20k student-crn pairs span multiple terms in real data).
-  #
-  # Tie-break within (student, crn, term): a late-drop row wins over a
-  # coexisting registered row — the withdrawal is the outcome of record.
-  # arrange() makes the previously data-order-dependent choice deterministic.
-  cedar_grades_tbl <- cedar_students %>%
-    classify_enrollment_outcomes() %>%
-    arrange(student_id, term, crn,
-            desc(registration_status_code %in% STATUS_DROP_LATE)) %>%
-    distinct(student_id, crn, term, .keep_all = TRUE) %>%
-    select(student_id, term, subject_course, outcome, campus, level)
-  # Stamp only newly classified rows. Consumers reject unversioned/old artifacts
-  # because the saved table no longer carries the raw grade/status needed to fix it.
-  attr(cedar_grades_tbl, "cedar_outcome_policy_version") <- CEDAR_OUTCOME_POLICY_VERSION
-  grades_meta <- save_cedar_file(cedar_grades_tbl, "grades", data_dir, ext)
-  message("  ✅ cedar_grades: ", nrow(cedar_grades_tbl), " rows, ", ncol(cedar_grades_tbl), " columns")
-  rm(cedar_grades_tbl)
-
-  # Deduplicate: Banner emits one row per CRN, so students in combined courses
-  # (e.g. BIOL 302C = lecture CRN + lab CRN) appear twice. Keep one row per
-  # student-course-campus per term. Campus is part of delivery identity: the
-  # same student can legitimately take the same course at two campuses.
-  # cedar_grades is computed above (pre-dedup) to preserve topics enrollments.
-  #
-  # Tie-break within (student, term, campus, course): a registered row wins over
-  # a coexisting waitlist row — a student holding a seat is enrolled, not
-  # waiting. Same reasoning as the cedar_grades dedup above: arrange() makes a
-  # previously data-order-dependent choice deterministic. Without it the WL row
-  # could win and delete the evidence that the student ever registered, which is
-  # exactly what the class-list waitlist-demand rule needs in order to exclude
-  # them (R/branches/waitlist-demand.R). Rare but real: 7 student-course-campus
-  # terms in the current data hold both statuses.
-  n_before_dedup <- nrow(cedar_students)
-  cedar_students <- cedar_students %>%
-    arrange(student_id, term, campus, subject_course,
-            desc(registration_status_code %in% STATUS_REGISTERED)) %>%
-    distinct(student_id, term, campus, subject_course, .keep_all = TRUE)
-  n_removed <- n_before_dedup - nrow(cedar_students)
-  if (n_removed > 0)
-    message("  Removed ", n_removed, " duplicate section rows (combined lecture+lab courses)")
+  # One row per student, course, campus and term (dedup_class_list_rows()).
+  # Every outcome is classified from this table at load (cedar_attempts,
+  # R/branches/attempts.R); nothing classified is saved.
+  cedar_students <- dedup_class_list_rows(cedar_students)
 
   # Fill missing major_codes via name → code map
   if (length(major_name_to_major_code) > 0) {
@@ -637,6 +656,13 @@ transform_students <- function(class_lists, data_dir, ext, maps) {
   message("  Output columns: ", paste(names(cedar_students), collapse = ", "))
   rm(class_lists); gc(verbose = FALSE)
 
+  # The student's description is saved once per student-term and pull, and the
+  # class list without it (ADR-001 step 5): each description column repeated
+  # on every course row cost about 14 MB loaded, and every reader takes the
+  # student-term table's value. cedar_student_terms is built from the two.
+  descriptions_meta <- save_cedar_file(build_class_list_descriptions(cedar_students),
+                                       "class_list_descriptions", data_dir, ext)
+  cedar_students <- thin_class_list(cedar_students)
   students_meta <- save_cedar_file(cedar_students, "students", data_dir, ext)
 
   # The per-term and running credit totals that cedar_student_term_credits
@@ -648,7 +674,7 @@ transform_students <- function(class_lists, data_dir, ext, maps) {
   list(
     saved = list(
       students = students_meta,
-      grades = grades_meta
+      class_list_descriptions = descriptions_meta
     )
   )
 }
@@ -677,11 +703,17 @@ transform_student_terms <- function(data_dir, ext) {
     load_file(path, ext)
   }
   students <- load_saved("students")
+  descriptions_path <- file.path(data_dir, paste0("cedar_class_list_descriptions", ext))
+  descriptions <- resolve_class_list_descriptions(
+    if (file.exists(descriptions_path)) load_file(descriptions_path, ext) else NULL,
+    students, "transform_student_terms()")
+  students <- thin_class_list(students)
   programs <- load_saved("programs")
   degrees  <- load_saved("degrees")
   edges <- cedar_data_edges(students, degrees = degrees)
-  student_terms <- build_student_terms(students, programs, degrees, edges = edges)
-  rm(students, programs, degrees); gc(verbose = FALSE)
+  student_terms <- build_student_terms(students, programs, degrees, edges = edges,
+                                       class_list_descriptions = descriptions)
+  rm(students, descriptions, programs, degrees); gc(verbose = FALSE)
   meta <- save_cedar_file(student_terms, "student_terms", data_dir, ext)
   message("  ✅ cedar_student_terms: ", nrow(student_terms), " rows, ", ncol(student_terms), " columns")
   list(saved = list(student_terms = meta))
@@ -704,7 +736,8 @@ transform_student_terms <- function(data_dir, ext) {
 cedar_student_terms_staleness <- function(data_dir, ext = ".qs") {
   target <- file.path(data_dir, paste0("cedar_student_terms", ext))
   if (!file.exists(target)) return("cedar_student_terms has not been built")
-  sources <- file.path(data_dir, paste0("cedar_", c("students", "programs", "degrees"), ext))
+  sources <- file.path(data_dir, paste0("cedar_", c("students", "class_list_descriptions",
+                                                    "programs", "degrees"), ext))
   sources <- sources[file.exists(sources)]
   newer <- sources[file.mtime(sources) > file.mtime(target)]
   if (length(newer) > 0L) {
@@ -1056,7 +1089,7 @@ transform_faculty <- function(hr_data, data_dir, ext) {
 
   cedar_faculty <- hr_data %>%
     transmute(
-      instructor_id   = as.character(`UNM ID`),
+      instructor_id   = hash_instructor_id(`UNM ID`),
       term            = as.integer(term_code),
       instructor_name = Name,
       department      = DEPT,
@@ -1363,14 +1396,24 @@ transform_to_cedar <- function(data_dir = NULL, use_qs = NULL, tables = NULL,
       path <- file.path(data_dir, paste0(name, ext))
       if (file.exists(path)) load_file(path, ext) else NULL
     })
+  # The roster's majors are on the description table (or, in a class list
+  # saved before 2026-11-07, on the class list itself).
+  descriptions_path <- file.path(data_dir, paste0("cedar_class_list_descriptions", ext))
+  audit_majors <- if (!is.null(audit_tables$students)) {
+    summarize_class_list_majors(resolve_class_list_descriptions(
+      if (file.exists(descriptions_path)) load_file(descriptions_path, ext) else NULL,
+      audit_tables$students, "mapping audit"))
+  }
+  audit_tables$students <- if (!is.null(audit_tables$students)) thin_class_list(audit_tables$students)
   mapping_audit <- do.call(audit_mapping_coverage,
-                           c(list(files = read_institution_mappings()), audit_tables))
+                           c(list(files = read_institution_mappings()), audit_tables,
+                             list(class_list_majors = audit_majors)))
   message("  ", summarize_mapping_audit(mapping_audit))
   for (i in which(mapping_audit$status == "unmapped")) {
     message(sprintf("    %-14s %-10s %s rows, %s", mapping_audit$kind[i], mapping_audit$value[i],
                     format(mapping_audit$rows[i], big.mark = ","), mapping_audit$context[i]))
   }
-  rm(audit_tables, mapping_audit); gc(verbose = FALSE)
+  rm(audit_tables, audit_majors, mapping_audit); gc(verbose = FALSE)
 
   # Write cedar-status.json for fast CLI queries
   status_file <- file.path(data_dir, "cedar-status.json")

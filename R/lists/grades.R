@@ -32,9 +32,10 @@ GRADES_DFW <- c(
 # Blank/NA grades are handled separately: a late drop still supplies a withdrawal.
 GRADES_EXCLUDED_FROM_OUTCOMES <- c("AUD")
 
-# Saved cedar_grades must be rebuilt when classification changes. Version 1 is
-# the first stamped policy and excludes late-drop AUD (DFW definition 3.0.0).
-# This is an artifact compatibility check, not the explanatory record version.
+# Bump when classification changes: a saved cedar_attempts stamped with another
+# version is rebuilt at start (attempts_is_current()). Version 1 is the first
+# stamped policy and excludes late-drop AUD (DFW definition 3.0.0). This is an
+# artifact compatibility check, not the explanatory record version.
 CEDAR_OUTCOME_POLICY_VERSION <- 1L
 
 # assign point values to letter grades

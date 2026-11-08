@@ -69,8 +69,10 @@ filter_by_col <- function(data, col, val) {
          "Available columns: ", paste(colnames(data), collapse = ", "))
   }
 
-  # Don't split on comma for instructor names (they naturally contain commas)
-  split_on_comma <- !(col %in% c("instructor_name"))
+  # Don't split on comma for values that contain one: instructor names, and
+  # classifications ("Sophomore, 2nd Yr"), which a split turned into two values
+  # that match nothing (ISSUES.md I51).
+  split_on_comma <- !(col %in% c("instructor_name", "student_classification"))
   filter_values <- convert_param_to_list(val, split_on_comma = split_on_comma)
   cedar_debug("[filter.R]   Filter values after convert: ", paste(filter_values, collapse=", "))
 
@@ -252,7 +254,6 @@ opt_col_map_desr <- list(
   gen_ed        = "gen_ed_area",
   level         = "level",
   im            = "delivery_method",
-  job_cat       = "job_cat",
   enrl_min      = "enrolled",
   enrl_max      = "enrolled",
   uel           = "",
@@ -260,7 +261,12 @@ opt_col_map_desr <- list(
 )
 
 # CEDAR students filter options map
-# Maps user-facing filter option names to cedar_students column names
+# Maps user-facing filter option names to cedar_students column names.
+# The loaded class list describes the registration, not the student
+# (ADR-001 step 5): `classification` filters a column the caller attached from
+# cedar_student_terms (attach_student_descriptions()), and stops loudly on
+# rows without it. Major, home campus and student college have no key here;
+# a reader filters the student-term table's columns.
 opt_col_map_classlist <- list(
   crn               = "crn",
   course            = "subject_course",
@@ -271,12 +277,9 @@ opt_col_map_classlist <- list(
   inst              = "instructor_name",
   course_campus      = "campus",
   course_college     = "college",
-  student_campus     = "student_campus",
-  student_college    = "student_college",
   classification    = "student_classification",
   level             = "level",
   pt                = "part_term",
-  major             = "major_code",
   # gen_ed          = "gen_ed_area",  # REMOVED: gen_ed_area doesn't exist in cedar_students (only in cedar_sections)
   reg_status_code   = "registration_status_code",
   im                = "delivery_method",

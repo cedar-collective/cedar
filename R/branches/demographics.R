@@ -130,7 +130,9 @@ summarize_student_demographics <- function(filtered_students, student_terms, opt
 #' readers pivot and plot on them.
 DEMOGRAPHIC_STUDENT_TERM_COLS <- c(
   student_classification = "student_classification",
-  major_code             = "primary_major_code"
+  major_code             = "primary_major_code",
+  is_pre_major           = "is_pre_major",
+  student_campus         = "student_campus"
 )
 
 #' Replace class-list student descriptions with the student-term table's
@@ -154,15 +156,15 @@ attach_student_descriptions <- function(rows, student_terms, cols) {
   rows <- rows %>%
     select(-any_of(c(cols, unname(term_cols)))) %>%
     mutate(term = as.integer(term))
-  joined <- attach_student_term(
-    rows,
-    mutate(student_terms, term = as.integer(term)),
-    unname(term_cols)
-  )
+  # Only the key and the attached columns are copied out of the table.
+  source <- student_terms[c("student_id", "term", unname(term_cols))]
+  source$term <- as.integer(source$term)
+  source$.st_matched <- TRUE
+  joined <- attach_student_term(rows, source, c(unname(term_cols), ".st_matched"))
   # The table has a row for every student-term with a class-list row, so a
   # miss means the two tables were not built from the same class lists.
-  unmatched <- !(paste(joined$student_id, joined$term) %in%
-                   paste(student_terms$student_id, student_terms$term))
+  unmatched <- is.na(joined$.st_matched)
+  joined$.st_matched <- NULL
   if (any(unmatched)) {
     stop("[demographics.R] ", sum(unmatched), " enrollment rows have no row on ",
          "cedar_student_terms; the two tables were not built from the same class lists.")

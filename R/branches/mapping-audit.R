@@ -15,13 +15,17 @@
 #' @param files The list read_institution_mappings() returns.
 #' @param sections,students,programs,degrees CEDAR tables; any may be NULL, and
 #'   the kinds that need it are then not checked (and say so in `checked`).
+#' @param class_list_majors The roster's majors as `summarize_class_list_majors()`
+#'   returns them, for the loaded (thinned) class list; a saved class list,
+#'   which keeps its major columns, is summarised from `students` instead.
 #' @return Tibble: kind, value, context, rows, first_term, last_term, status
 #'   ("unmapped", "review", or "expected"), consequence, needs (what someone
 #'   must supply, in words), file (the mapping file that takes it, without
 #'   extension), line (the row to edit there, NA where the fix is a new row).
 #'   Attribute `checked`: the kinds checked.
 audit_mapping_coverage <- function(files, sections = NULL, students = NULL,
-                                   programs = NULL, degrees = NULL) {
+                                   programs = NULL, degrees = NULL,
+                                   class_list_majors = NULL) {
   out <- list()
   checked <- character(0)
   need <- function(df, cols, what) {
@@ -91,21 +95,31 @@ audit_mapping_coverage <- function(files, sections = NULL, students = NULL,
   # Dashboard's donuts -- is programs.csv's name for the code
   # (name_program_codes()). A code the file does not carry is shown as itself
   # until a row names it; the roster's own name is carried here as context.
-  if (!is.null(students)) {
+  # The loaded class list carries no major (thin_class_list(), ADR-001 step 5),
+  # so a loader summarises the roster's majors before thinning
+  # (summarize_class_list_majors()) and passes that; a saved class list, which
+  # keeps them, is summarised here.
+  if (is.null(class_list_majors) && !is.null(students) &&
+      any(c("major_code", "major_name") %in% names(students))) {
     need(students, c("major_code", "major_name", "term"), "cedar_students")
+    class_list_majors <- summarize_class_list_majors(students)
+  }
+  if (!is.null(class_list_majors)) {
+    need(class_list_majors, c("major_code", "major_name", "rows", "first_term", "last_term"),
+         "class_list_majors")
     checked <- c(checked, "class_list_program_code")
-    unmapped <- students %>%
-      dplyr::filter(!is.na(major_code), nzchar(major_code),
-                    !major_code %in% files$programs$program_code)
+    unmapped <- class_list_majors %>%
+      dplyr::filter(!major_code %in% files$programs$program_code)
     roster_names <- unmapped %>%
       dplyr::filter(!is.na(major_name), nzchar(major_name)) %>%
-      dplyr::count(major_code, major_name) %>%
       dplyr::group_by(major_code) %>%
-      dplyr::slice_max(n, n = 1, with_ties = FALSE) %>%
+      dplyr::slice_max(rows, n = 1, with_ties = FALSE) %>%
       dplyr::ungroup() %>%
       dplyr::select(major_code, roster_name = major_name)
     out$class_list_program_code <- unmapped %>%
-      span(major_code) %>%
+      dplyr::group_by(major_code) %>%
+      dplyr::summarize(first_term = edge(first_term, min), last_term = edge(last_term, max),
+                       rows = sum(rows), .groups = "drop") %>%
       dplyr::left_join(roster_names, by = "major_code") %>%
       dplyr::transmute(
         kind = "program_code", value = major_code,
@@ -261,4 +275,36 @@ summarize_mapping_audit <- function(audit) {
   sprintf("Mapping audit: %d unmapped value(s), %d mapped college(s) to review, %d expected difference(s). Checked: %s.",
           n("unmapped"), n("review"), n("expected"),
           paste(attr(audit, "checked"), collapse = ", "))
+}
+
+
+#' The roster's majors, summarised before the class list is thinned
+#'
+#' The class list prints each student's major code and name on every row; the
+#' loaded table drops both (thin_class_list(), ADR-001 step 5), so a loader
+#' keeps this summary for the mapping audit's class-list check, which names a
+#' code programs.csv lacks by the roster's own name.
+#'
+#' @param students A class list carrying `major_code`, `major_name` and
+#'   `term`, or the saved `cedar_class_list_descriptions`, whose `rows` say how
+#'   many class-list rows each description stood for.
+#' @return One row per code and roster name: `major_code`, `major_name`,
+#'   `rows` (class-list rows), `first_term`, `last_term`. Rows with no code
+#'   are left out.
+summarize_class_list_majors <- function(students) {
+  missing <- setdiff(c("major_code", "major_name", "term"), names(students))
+  if (length(missing)) {
+    stop("[mapping-audit.R] summarize_class_list_majors: cedar_students lacks ",
+         paste(missing, collapse = ", "), "; summarise the class list before thin_class_list(), ",
+         "or pass cedar_class_list_descriptions.")
+  }
+  keep <- !is.na(students$major_code) & nzchar(students$major_code)
+  rows <- students[keep, c("major_code", "major_name", "term")]
+  rows$.weight <- if ("rows" %in% names(students)) students$rows[keep] else 1L
+  # A major seen only on rows with no term has no first or last term, not Inf.
+  edge <- function(x, f) if (all(is.na(x))) NA_integer_ else as.integer(f(x, na.rm = TRUE))
+  rows %>%
+    dplyr::group_by(major_code, major_name) %>%
+    dplyr::summarize(rows = as.integer(sum(.weight)), first_term = edge(term, min),
+                     last_term = edge(term, max), .groups = "drop")
 }

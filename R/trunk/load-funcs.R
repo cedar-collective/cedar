@@ -93,6 +93,7 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
   source_file("branches/gpa-timeline.R")     # per-term cumulative GPA; shares credit_timeline_validity(), so must load after it
   source_file("branches/degrees.R")
   source_file("branches/course-attempts.R")
+  source_file("branches/attempts.R")             # cedar_attempts: one classified outcome per graded attempt (ADR-001 step 4)
   source_file("branches/course-flows.R")
   source_file("branches/enrollment-projections.R")
   source_file("branches/enrollment-projection-inputs.R")

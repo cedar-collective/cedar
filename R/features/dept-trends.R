@@ -492,7 +492,8 @@ compute_dept_enrl_tab <- function(base, data_objects, campus_filter = NULL) {
     scoped_data[["cedar_sections"]],
     base$dept_code,
     base$current_term,
-    dims = scoped_data[["cedar_dims"]]
+    dims = scoped_data[["cedar_dims"]],
+    student_terms = scoped_data[["cedar_student_terms"]]
   )
   enrl$tables$enrl_student_donuts <- dept_student_donut_cache_data(student_donuts)
   enrl$plots$student_donuts <- student_donuts

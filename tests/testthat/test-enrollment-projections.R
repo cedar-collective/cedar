@@ -82,6 +82,7 @@ projection_fixture_bundle <- function(target_term, as_of_term,
     cl_enrls = calc_cl_enrls(settled_students, by_part_term = TRUE),
     sections = test_sections,
     students = settled_students,
+    student_terms = test_student_terms,
     target_term = target_term,
     as_of_term = as_of_term,
     scope_courses = "MATH 1215Z",
@@ -440,12 +441,50 @@ test_that("course-market capacity pools campus and part-term components", {
   expect_equal(components$capacity_share, c(0.64, 0.20, 0.16))
 })
 
+test_that("projection student signals read each student-term's description off cedar_student_terms (0.29.0)", {
+  # The loaded class list carries no classification or major; the incoming
+  # first-semester counts and the market's majors are the student-term table's.
+  # Mark every student-term in 202080 a first-semester freshman with a designed
+  # major, and the signals follow the table.
+  st <- test_student_terms
+  fall <- st$term == 202080L
+  st$student_classification[fall] <- "Freshman, 1st Yr, 1st Sem"
+  st$primary_major_code[fall] <- "ZZDESIGNED"
+  inputs <- suppressMessages(prepare_projection_student_inputs(
+    test_students, st, target_courses = "MATH 1215Z", campuses = "ABQ",
+    through_term = 202110L
+  ))
+  uni <- inputs$university_term_signals
+  expect_equal(uni$university_incoming_first_sem[uni$term == 202080L],
+               uni$university_students[uni$term == 202080L])
+  market <- inputs$student_terms
+  expect_true(all(market$major_code[market$term == 202080L] == "ZZDESIGNED"))
+  expect_false("ZZDESIGNED" %in% market$major_code[market$term != 202080L])
+  expect_false(any(c("major_code", "student_classification") %in% names(test_students)))
+
+  # A class-list student-term the table lacks is refused, never left unknown.
+  expect_error(
+    suppressMessages(prepare_projection_student_inputs(
+      test_students, st[!fall, ], target_courses = "MATH 1215Z", campuses = "ABQ",
+      through_term = 202110L
+    )),
+    "no row on cedar_student_terms"
+  )
+})
+
 test_that("intersession is left out of every projection input (IS01)", {
+  # IS01's students carry no description that matters here (IS_D's two
+  # campuses in one pull would stop build_student_terms()); one row each.
+  intersession_student_terms <- test_students_intersession %>%
+    dplyr::distinct(student_id, term) %>%
+    dplyr::mutate(term = as.integer(term), student_classification = NA_character_,
+                  primary_major_code = NA_character_)
   prepare <- function(parts) {
     prepare_enrollment_projection_inputs(
       cl_enrls = calc_cl_enrls(test_students_intersession, by_part_term = TRUE),
       sections = test_sections_intersession,
       students = test_students_intersession,
+      student_terms = intersession_student_terms,
       target_courses = "BIOL 1140",
       target_campuses = c("ABQ", "EA"),
       target_market_id = "abq_ea_course_market",
@@ -2491,6 +2530,7 @@ test_that("standalone feature builder runs without Shiny or global data", {
     cl_enrls = cl,
     sections = test_sections,
     students = settled_students,
+    student_terms = test_student_terms,
     target_term = 202110L,
     as_of_term = 202080L,
     scope_courses = "MATH 1215Z",
@@ -2559,7 +2599,7 @@ test_that("projections follow a course across a former code (0.28.0, ADR-001 ste
   build <- function(students, sections, cl_students = students, scope = "MATH 1215Z") {
     suppressMessages(build_enrollment_projection_bundle(
       cl_enrls = calc_cl_enrls(cl_students, by_part_term = TRUE),
-      sections = sections, students = students,
+      sections = sections, students = students, student_terms = test_student_terms,
       target_term = 202110L, as_of_term = 202080L,
       scope_courses = scope, scope_campuses = "ABQ",
       scope_market_id = "abq_course_market", force_courses = scope,
@@ -2689,6 +2729,7 @@ test_that("feature builder rejects an unsettled source term", {
       cl_enrls = cl,
       sections = test_sections,
       students = unsettled_students,
+      student_terms = test_student_terms,
       target_term = 202110L,
       as_of_term = 202080L,
       scope_courses = "MATH 1215Z",

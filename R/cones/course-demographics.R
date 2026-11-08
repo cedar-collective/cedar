@@ -509,6 +509,11 @@ get_course_demographics <- function(students, student_terms, opt = list()) {
   message("[course-demographics.R] reg_status_code: ", paste(opt[["reg_status_code"]], collapse = ", "))
 
   opt$uel <- TRUE
+  # A classification filter selects on the student-term's classification: the
+  # loaded class list carries none (thin_class_list(), ADR-001 step 5).
+  if (!is.null(opt[["classification"]])) {
+    students <- attach_student_descriptions(students, student_terms, "student_classification")
+  }
   filtered_students <- filter_class_list(students, opt)
 
   # Exclude terms before Fall 2019 — data quality is inconsistent before this

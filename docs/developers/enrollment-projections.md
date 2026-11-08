@@ -917,6 +917,15 @@ recommendation pipeline.
 
 ## Saved Bundle
 
+Model 0.29.0 (schema 26, unchanged) reads each student-term's classification
+and major off `cedar_student_terms` (ADR-001 step 5): the classification
+academic studies recorded for that term, and the primary major
+(`primary_major_code`), where 0.28.0 took the most common value on the
+student-term's class-list rows. The class list stamps a late pull's
+classification a step ahead (ISSUES.md I47), which moved the incoming
+first-semester signals for terms pulled late. A class-list student-term the
+table lacks is refused.
+
 Model 0.28.0 (schema 26, unchanged) reads by course (ADR-001 step 4). A
 bundle's `subject_course` is the course id: the last code of a confirmed
 succession in `code_history.csv`, which for a course never renamed is its

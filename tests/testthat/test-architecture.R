@@ -373,9 +373,10 @@ test_that("transformed delivery keys retain campus", {
     collapse = "\n"
   )
 
+  # The class-list dedup's key (dedup_class_list_rows()) keeps campus.
   expect_match(
     transform,
-    "distinct\\(student_id, term, campus, subject_course, \\.keep_all = TRUE\\)"
+    'keys <- c\\("student_id", "term", "campus", "subject_course"\\)'
   )
   expect_false(grepl("group_by\\(term, crosslist_group\\)", transform))
   expect_false(grepl('by = c\\("term", "crosslist_group"\\)', transform))

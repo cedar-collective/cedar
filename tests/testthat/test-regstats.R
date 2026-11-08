@@ -141,7 +141,7 @@ test_that("Regstats definition v5 records the course key, lifecycle and waitlist
 
 test_that("cedar_course_terms and raw class lists give identical Regstats", {
   raw <- get_reg_stats(test_students_regstats, test_sections_regstats, regstats_history_opt())
-  course_terms <- build_course_terms(test_students_regstats)
+  course_terms <- course_terms_for(test_students_regstats)
   expect_true(course_terms_is_current(course_terms, test_students_regstats))
   expect_identical(attr(course_terms, "code_renames"), character(0))
   expect_identical(names(course_terms), COURSE_TERMS_COLUMNS)
@@ -169,7 +169,7 @@ test_that("Regstats refuses a course-term table not counted by this build over t
     "build_course_terms"
   )
   # Saved by an older build, or short a column: rebuilt, never read.
-  current <- build_course_terms(test_students_regstats)
+  current <- course_terms_for(test_students_regstats)
   older <- current
   attr(older, "course_terms_build_version") <- COURSE_TERMS_BUILD_VERSION - 1L
   expect_false(course_terms_is_current(older, test_students_regstats))
@@ -177,7 +177,7 @@ test_that("Regstats refuses a course-term table not counted by this build over t
   # Counted over one class list's renames, it is not current for another's.
   rn <- rn01_course_tables()
   expect_false(course_terms_is_current(current, rn$cedar_students))
-  rn_base <- build_course_terms(rn$cedar_students)
+  rn_base <- course_terms_for(rn$cedar_students)
   expect_true(course_terms_is_current(rn_base, rn$cedar_students))
   # The class list already names the renamed subject (I45), so its renames
   # are the two renumberings; the schedule's SOC codes are on the sections.
@@ -261,7 +261,7 @@ test_that("Regstats excludes a course the list names by a former code, on every 
   expect_null(raw$summary$upper$n_courses)
   expect_equal(raw$summary$lower$n_courses, 2L)
 
-  course_terms <- build_course_terms(rn$cedar_students)
+  course_terms <- course_terms_for(rn$cedar_students)
   expect_true("HIST 3201" %in% course_terms$subject_course)
   from_base <- get_reg_stats(rn$cedar_students, rn$cedar_sections, opt, course_terms = course_terms)
   expect_equal(from_base[names(from_base) != "cache_info"], raw[names(raw) != "cache_info"])
