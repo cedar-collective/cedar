@@ -96,7 +96,7 @@
 #' first such Y attempt occurred without a prior in-scope X pass (control).
 #' Surfaces whether completing X meaningfully prepares students for Y.
 #'
-#' @param students cedar_students data frame.
+#' @param students cedar_registrations data frame.
 #' @param programs cedar_programs data frame.
 #' @param applicants cedar_applicants data frame, or NULL.
 #' @param data_edges Optional output of [cedar_data_edges()]. Y outcomes stop at

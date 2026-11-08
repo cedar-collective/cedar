@@ -13,7 +13,7 @@
 # This is course-first analysis. For cohort-first stop-out analysis (which
 # courses are bleeding a specific student population?), see stopout.R.
 #
-# All functions take cedar_students as primary input.
+# All functions take cedar_registrations as primary input.
 #
 # DFW calculations delegate to get_course_outcome_rates() so cones use the
 # shared course-attempt/outcome contract.
@@ -37,7 +37,7 @@
 #' DFW trend and instructor comparison delegate to get_course_outcome_rates()
 #' so the DFW formula and component fields match the rest of the app.
 #'
-#' @param students cedar_students data frame.
+#' @param students cedar_registrations data frame.
 #' @param cedar_faculty cedar_faculty data frame, or NULL to skip DFW analyses.
 #' @param opt Options list:
 #'   \itemize{
@@ -145,14 +145,14 @@ get_course_outcomes <- function(students, cedar_faculty = NULL, opt = list()) {
 
 # ── Persistence analysis ──────────────────────────────────────────────────────
 
-#' Next-term persistence for one course, from cedar_students
+#' Next-term persistence for one course, from cedar_registrations
 #'
 #' Selects the course's registered, early-drop, and late-drop rows in the
 #' requested campus and term scope, keeps one row per student, course, and term,
 #' and passes them to next_term_persistence(). This is what Course Dynamics ->
 #' Retention shows beside the retention trend.
 #'
-#' @param students Full cedar_students table (also the UNM-wide return source).
+#' @param students Full cedar_registrations table (also the UNM-wide return source).
 #' @param degrees cedar_degrees; graduates count as returned.
 #' @param opt `course` (required), optional `campus` and `term`, plus the
 #'   next_term_persistence() options.
@@ -203,7 +203,7 @@ get_course_persistence <- function(students, degrees, opt = list(), context = NU
 #' @param filtered One row per student, course, and term (dedup_enrollment(level =
 #'   "course")) for the target course(s): registered, early-drop, and late-drop
 #'   rows.
-#' @param all_students Full cedar_students table: the UNM-wide return source.
+#' @param all_students Full cedar_registrations table: the UNM-wide return source.
 #' @param degrees cedar_degrees, for graduation.
 #' @param opt `min_n` (default 5), `passing_grades` (default GRADES_PASS; the
 #'   page's opt-in uses GRADES_PASS_SUB_C_OPT_IN), and `data_edges` or

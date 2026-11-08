@@ -50,8 +50,8 @@ test_that("fixture institution survives production transforms with usable proven
   expect_false(any(c("department", "college", "college_basis") %in% names(sections)))
   demo_dims <- build_cedar_dims(read_institution_mappings(cedar_institution_dir(root, "demo")))
   attached <- suppressMessages(attach_default_units(
-    list(cedar_students = students, cedar_sections = sections, cedar_programs = programs), demo_dims))
-  students <- attached$cedar_students
+    list(cedar_registrations = students, cedar_sections = sections, cedar_programs = programs), demo_dims))
+  students <- attached$cedar_registrations
   sections <- attached$cedar_sections
   programs <- attached$cedar_programs
   expect_equal(unique(programs$dept_code[programs$major_code %in% "PSYC-MIN"]), "PSYC")

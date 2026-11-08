@@ -38,7 +38,7 @@ ATTEMPTS_COLUMNS <- c(
 
 #' Build cedar_attempts from the loaded class list
 #'
-#' @param students The loaded cedar_students, keyed on the course
+#' @param students The loaded cedar_registrations, keyed on the course
 #'   (attach_course_ids()), one row per student, course, campus and term.
 #' @param edges The startup edges (cedar_report_edges()$edges);
 #'   `last_graded` bounds the table and fails closed when unknown.

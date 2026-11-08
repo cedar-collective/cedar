@@ -26,7 +26,7 @@
 #' P-values are unadjusted across courses; neither a gap nor the ranking score
 #' establishes that a course caused a student to leave.
 #'
-#' @param students Full `cedar_students` enrollment history, read only to
+#' @param students Full `cedar_registrations` enrollment history, read only to
 #'   classify outcomes when `attempts` is not supplied.
 #' @param population Output of [build_population()], with `student_id` and
 #'   `population_label`. Callers apply population membership windows to outcome
@@ -287,7 +287,7 @@ prepare_roadblock_results <- function(stopout_by_course) {
 #' next-term lookup. Callers must cap input at the grade edge; it does not
 #' require the complete follow-up window used by Roadblocks.
 #'
-#' @param students Data frame. The `cedar_students` table.
+#' @param students Data frame. The `cedar_registrations` table.
 #' @param population Data frame. Output of `build_population()`. Must have
 #'   `student_id`.
 #' @param opt List of options:
@@ -452,7 +452,7 @@ select_stopout_observations <- function(graded) {
 #' (`STATUS_DROP_EARLY`) are excluded entirely: a drop before the deadline
 #' posts no grade and is not an academic outcome.
 #'
-#' @param students Data frame. The `cedar_students` table.
+#' @param students Data frame. The `cedar_registrations` table.
 #'
 #' @return Data frame with columns: `student_id`, `term`, `campus`, `subject_course`,
 #'   `outcome` (`"pass"` or `"dfw"`).

@@ -24,7 +24,7 @@
 #' Only pairs where the A→B pattern occurred at least `opt$min_pair_n` times
 #' are returned.
 #'
-#' @param students Data frame. The `cedar_students` table.
+#' @param students Data frame. The `cedar_registrations` table.
 #' @param cohort Data frame. Output of `build_population()`. Defines the student
 #'   population to analyze — a program-based filter, not an entry-term cohort.
 #' @param opt List of options:
@@ -69,7 +69,7 @@
 #' population <- build_population(cedar_programs,
 #'                            opt = list(type = "health",
 #'                                       health_programs = "Radiologic Sciences"))
-#' pairs <- get_course_pairs(cedar_students, population, opt = list())
+#' pairs <- get_course_pairs(cedar_registrations, population, opt = list())
 #' # Top transitions out of BIOL 2310
 #' pairs %>% filter(course_a == "BIOL 2310")
 #' }

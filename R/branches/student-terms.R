@@ -72,7 +72,7 @@ STUDENT_TERMS_BUILD_VERSION <- 2L
 
 #' Build the student-term table
 #'
-#' @param students `cedar_students`: the registration facts. Its description
+#' @param students `cedar_registrations`: the registration facts. Its description
 #'   columns are read from `class_list_descriptions` when that is given, and
 #'   off `students` otherwise.
 #' @param programs `cedar_programs`, or NULL for class lists alone: then no

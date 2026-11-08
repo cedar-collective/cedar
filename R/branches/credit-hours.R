@@ -22,7 +22,7 @@
 #
 # TERMINOLOGY
 # -----------
-# In cedar_students, each row is one student enrolled in one course section:
+# In cedar_registrations, each row is one student enrolled in one course section:
 #   department      — the COURSE's home department (e.g., "HIST" for HIST 101)
 #   major           — the STUDENT's declared major code (e.g., "PSYC")
 #   student_college — the college the student is enrolled in (e.g., "AS")
@@ -84,7 +84,7 @@
 #' census credits are current registration -- one reason an in-progress term is
 #' labelled.
 #'
-#' @param students cedar_students rows. Requires term, crn,
+#' @param students cedar_registrations rows. Requires term, crn,
 #'   registration_status_code, final_grade, credits.
 #' @param sections cedar_sections rows for those terms. Requires term, crn,
 #'   credits_min, credits_max.
@@ -145,7 +145,7 @@ filter_sch_rows <- function(students, sections) {
 #' "total" row per group that sums across all levels — so downstream callers
 #' can choose either view without re-aggregating.
 #'
-#' @param students cedar_students data frame
+#' @param students cedar_registrations data frame
 #' @param sections cedar_sections data frame, for late drops' credit values.
 #' @param term_start,term_end Optional integer term-code bounds.
 #' @param departments,colleges,campuses Optional scope filters. When both
@@ -291,7 +291,7 @@ infer_credit_hours_dept_college <- function(students, sections, dept_code,
 #' under two different strings depending on the export vintage. We normalize
 #' to one display name so grouping works correctly.
 #'
-#' @param students cedar_students data frame
+#' @param students cedar_registrations data frame
 #' @param sections cedar_sections data frame, for late drops' credit values
 #' @param term_start Integer term code for the beginning of the analysis window
 #' @param term_end   Integer term code for the end of the analysis window
@@ -1189,7 +1189,7 @@ plot_chd_by_level <- function(by_period, subj_codes, palette) {
 #' full pipeline three times — once for lower division, once for upper division,
 #' and once for all undergrad combined — then assembles all plots and tables.
 #'
-#' @param students cedar_students data frame (pre-filtered to this department)
+#' @param students cedar_registrations data frame (pre-filtered to this department)
 #' @param sections cedar_sections data frame, for late drops' credit values
 #' @param dept_code Department code (e.g., "BIOL")
 #' @param major_codes Character vector of the department's home program codes
@@ -1429,7 +1429,7 @@ plot_chd_by_fac_stacked <- function(by_total, subj_codes, palette) {
 #' which is built from HR data and is not always available. Not displayed by
 #' Dept Trends today (see `compute_dept_credit_hours_tab()`).
 #'
-#' @param students cedar_students data frame
+#' @param students cedar_registrations data frame
 #' @param sections cedar_sections data frame, for late drops' credit values
 #' @param faculty cedar_faculty data frame (term, instructor_id, department,
 #'   job_category). An empty table returns the two "No faculty data available"
@@ -1445,7 +1445,7 @@ credit_hours_by_fac <- function(students, sections, faculty, dept_code, subj_cod
   message("[credit-hours.R] credit_hours_by_fac for dept: ", dept_code)
 
   if (is.null(students)) {
-    stop("[credit-hours.R] credit_hours_by_fac() requires the cedar_students table; got NULL")
+    stop("[credit-hours.R] credit_hours_by_fac() requires the cedar_registrations table; got NULL")
   }
   # cedar_faculty comes from HR data — it may genuinely not exist yet
   if (is.null(faculty)) {
@@ -1530,7 +1530,7 @@ credit_hours_by_fac <- function(students, sections, faculty, dept_code, subj_cod
 #' Produces the full set of department-level SCH plots: how the department
 #' compares to its college over time, broken down by subject code and level.
 #'
-#' @param class_lists cedar_students data frame (full — not pre-filtered to dept)
+#' @param class_lists cedar_registrations data frame (full — not pre-filtered to dept)
 #' @param sections cedar_sections data frame, for late drops' credit values
 #' @param dept_code Department code (e.g., "BIOL")
 #' @param subj_codes Subject codes used in plot titles (informational only)

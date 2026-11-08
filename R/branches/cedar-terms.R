@@ -38,7 +38,7 @@ CEDAR_TERMS_COLUMNS <- c(
 
 #' Build the term dimension
 #'
-#' @param students `cedar_students`. Required; supplies the terms with
+#' @param students `cedar_registrations`. Required; supplies the terms with
 #'   enrollment and, through `edges`, the right edges.
 #' @param sections `cedar_sections` or NULL. Supplies `section_rows`,
 #'   `start_date` and `census_date` (each the most common value among the

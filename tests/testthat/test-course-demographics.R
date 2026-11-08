@@ -309,41 +309,41 @@ test_that("calc_cl_enrls returns a row per course for HIST department", {
 .mix_opt <- list(course = "HIST 1110", term = 202010L, min_n = 1L, top_n = 50L)
 
 test_that("get_course_major_mix reads the student-term table's primary major, not the roster", {
-  plain <- get_course_major_mix(cedar_students_st, test_student_terms_st, test_dims, .mix_opt)
+  plain <- get_course_major_mix(cedar_registrations_st, test_student_terms_st, test_dims, .mix_opt)
   expect_true(all(c("History", "Spanish") %in% plain$major_label))
   expect_equal(plain$n_enrollments[plain$major_label == "Spanish"], 1L)
   # One seat per student-course: a student registered twice in the course that
   # term counts once.
   expect_equal(sum(plain$n_enrollments), dplyr::n_distinct(dplyr::filter(
-    cedar_students_st, subject_course == "HIST 1110", term == 202010L,
+    cedar_registrations_st, subject_course == "HIST 1110", term == 202010L,
     registration_status_code %in% STATUS_REGISTERED)$student_id))
 
   # The roster's major is not read: moving every roster major to SPAN changes
   # nothing, because the table still says HIST for the declared students.
-  roster <- cedar_students_st
+  roster <- cedar_registrations_st
   roster$major_code <- "SPAN"
   expect_equal(get_course_major_mix(roster, test_student_terms_st, test_dims, .mix_opt), plain)
 
   # The table is read: blanking ST_K's primary major there moves the seat.
   st <- test_student_terms_st
   st$primary_major_code[st$student_id == "ST_K"] <- NA_character_
-  blanked <- get_course_major_mix(cedar_students_st, st, test_dims, .mix_opt)
+  blanked <- get_course_major_mix(cedar_registrations_st, st, test_dims, .mix_opt)
   expect_false("Spanish" %in% blanked$major_label)
   expect_equal(blanked$n_enrollments[blanked$major_label == "No major code"], 1L)
 
   # The pre-major flag is the table's too.
   st <- test_student_terms_st
   st$is_pre_major[st$student_id == "ST_K"] <- TRUE
-  pre <- get_course_major_mix(cedar_students_st, st, test_dims, .mix_opt)
+  pre <- get_course_major_mix(cedar_registrations_st, st, test_dims, .mix_opt)
   expect_true("Spanish (pre-major)" %in% pre$major_label)
   expect_false("Spanish" %in% pre$major_label)
 })
 
 test_that("get_course_major_mix refuses enrollment rows the student-term table does not cover", {
   st <- dplyr::filter(test_student_terms_st, student_id != "ST_K")
-  expect_error(get_course_major_mix(cedar_students_st, st, test_dims, .mix_opt),
+  expect_error(get_course_major_mix(cedar_registrations_st, st, test_dims, .mix_opt),
                "no row on cedar_student_terms")
-  expect_error(get_course_major_mix(cedar_students_st, dplyr::select(test_student_terms_st, -is_pre_major),
+  expect_error(get_course_major_mix(cedar_registrations_st, dplyr::select(test_student_terms_st, -is_pre_major),
                                     test_dims, .mix_opt),
                "needs cedar_student_terms")
 })
@@ -354,7 +354,7 @@ test_that("get_course_major_mix names codes from programs.csv alone, never from 
   # names SPAN "Spanish", and the label is the file's for both.
   renamed <- test_dims
   renamed$programs$program_name[renamed$programs$program_code == "HIST"] <- "History of Everything"
-  named <- get_course_major_mix(cedar_students_st, test_student_terms_st,
+  named <- get_course_major_mix(cedar_registrations_st, test_student_terms_st,
                                 validate_cedar_dims(renamed), .mix_opt)
   expect_true("History of Everything" %in% named$major_label)
   expect_false("HIST" %in% named$major_label)
@@ -364,12 +364,12 @@ test_that("get_course_major_mix names codes from programs.csv alone, never from 
   without_span <- test_dims
   without_span$programs <- without_span$programs[without_span$programs$program_code != "SPAN", ]
   rlang::local_bindings(major_code_to_name = c(SPAN = "Should not appear"), .env = .GlobalEnv)
-  unnamed <- get_course_major_mix(cedar_students_st, test_student_terms_st,
+  unnamed <- get_course_major_mix(cedar_registrations_st, test_student_terms_st,
                                   validate_cedar_dims(without_span), .mix_opt)
   expect_true("SPAN" %in% unnamed$major_label)
   expect_false(any(c("Spanish", "Should not appear") %in% unnamed$major_label))
 
   # The dimension tables are required; the programs table is not a substitute.
-  expect_error(get_course_major_mix(cedar_students_st, test_student_terms_st, cedar_programs_st, .mix_opt),
+  expect_error(get_course_major_mix(cedar_registrations_st, test_student_terms_st, cedar_programs_st, .mix_opt),
                "build_cedar_dims")
 })

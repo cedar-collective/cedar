@@ -37,24 +37,24 @@
 #' library(qs2); library(dplyr); library(ggplot2)
 #'
 #' cedar_programs <- qs_read("data/cedar_programs.qs")
-#' cedar_students <- qs_read("data/cedar_students.qs")
+#' cedar_registrations <- qs_read("data/cedar_students.qs")
 #' source("R/trunk/load-funcs.R")
 #' load_funcs(".")   # loads population.R, pathway.R, and all dependencies
 #'
 #' # Build a student population and get course timing
 #' population <- build_population(cedar_programs,
 #'                                opt = list(type = "dept", dept_code = "NURS"))
-#' timing <- get_course_timing(cedar_students, population, opt = list(min_n = 5))
+#' timing <- get_course_timing(cedar_registrations, population, opt = list(min_n = 5))
 #'
 #' # Visualize as a curriculum map heatmap
 #' plot_curriculum_map(timing)
 #'
 #' # Ordered course pairs (A before B)
-#' pairs <- get_course_pairs(cedar_students, population, opt = list())
+#' pairs <- get_course_pairs(cedar_registrations, population, opt = list())
 #' head(pairs, 20)
 #'
 #' # Restrict to students who started as freshmen
-#' timing <- get_course_timing(cedar_students, population,
+#' timing <- get_course_timing(cedar_registrations, population,
 #'                             opt = list(start_classification = "Freshman"))
 #'
 #' # Focus on a subject area
@@ -91,7 +91,7 @@
 #' cohort. Students from all entry years are included and each student's
 #' relative term 1 is anchored to their own first enrolled semester.
 #'
-#' @param students Data frame. The `cedar_students` table.
+#' @param students Data frame. The `cedar_registrations` table.
 #' @param cohort Data frame. Output of `build_population()`. Must have columns
 #'   `student_id` and `population_label`. Defines the student population to analyze.
 #' @param opt List of options:
@@ -171,7 +171,7 @@
 #' population <- build_population(cedar_programs,
 #'                            opt = list(type = "health",
 #'                                       health_programs = "Radiologic Sciences"))
-#' timing <- get_course_timing(cedar_students, population, opt = list())
+#' timing <- get_course_timing(cedar_registrations, population, opt = list())
 #' plot_curriculum_map(timing)
 #' }
 #'
@@ -251,7 +251,7 @@ get_course_timing <- function(students, population, programs = NULL, opt = list(
   # Keep only the columns we need; deduplicate (a student registered in the
   # same course twice in one term gets one row).
   enrolled <- enrolled %>%
-    # No credit or description columns carried through from cedar_students:
+    # No credit or description columns carried through from cedar_registrations:
     # every credit axis resolves through build_credit_timeline(), and a
     # student's classification in a term is read off cedar_student_terms
     # (ADR-001 step 2), never off the course row.
@@ -732,7 +732,7 @@ get_course_timing <- function(students, population, programs = NULL, opt = list(
 #'
 #' @examples
 #' \dontrun{
-#' timing <- get_course_timing(cedar_students, cohort, opt = list())
+#' timing <- get_course_timing(cedar_registrations, cohort, opt = list())
 #' plot_curriculum_map(timing)
 #'
 #' # Save to file

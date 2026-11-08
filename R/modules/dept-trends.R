@@ -62,7 +62,7 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
     ns <- session$ns
 
     sections <- data_objects[["cedar_sections"]]
-    students <- data_objects[["cedar_students"]]
+    students <- data_objects[["cedar_registrations"]]
     programs <- data_objects[["cedar_programs"]]
     degrees  <- data_objects[["cedar_degrees"]]
     # Powers the credit-band x-axis on the graduate Gen Ed section; that section

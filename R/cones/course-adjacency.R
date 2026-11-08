@@ -20,7 +20,7 @@
 #' (converters for entry, leavers for exit) relative to the comparison group.
 #' This is a correlation, not evidence of causation.
 #'
-#' @param students   Data frame. The `cedar_students` table.
+#' @param students   Data frame. The `cedar_registrations` table.
 #' @param population Data frame. Output of `build_population()`. Must have
 #'   columns `student_id`, `outcome`, `first_unit_term`, `last_unit_term`.
 #'   `entry_status` is not required — groups are assigned by outcome alone,

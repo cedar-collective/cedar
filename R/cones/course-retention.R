@@ -33,7 +33,7 @@
 #'   through T+n_terms semesters later. Graduates are counted as retained.
 #'   Cells where the target term is beyond available data are NA.
 #'
-#' @param students  cedar_students data frame.
+#' @param students  cedar_registrations data frame.
 #' @param opt       Named list of options:
 #'   \describe{
 #'     \item{`term`}{Integer. Anchor term code (required).}
@@ -132,7 +132,7 @@ get_retention_comparison <- function(students, opt = list(), degrees = NULL,
 #'   Graduates are counted as retained. Cells where the target term is beyond
 #'   available data are NA rather than 0%.
 #'
-#' @param students  cedar_students data frame.
+#' @param students  cedar_registrations data frame.
 #' @param opt       Named list of options:
 #'   \describe{
 #'     \item{`course`}{Character. Single course code (required).}
@@ -260,7 +260,7 @@ get_retention_trend <- function(students, opt = list(), degrees = NULL,
 #'   enrolled in three courses in the same department counts once per term, not
 #'   three times.
 #'
-#' @param students  cedar_students data frame.
+#' @param students  cedar_registrations data frame.
 #' @param opt       Named list of options:
 #'   \describe{
 #'     \item{`dept`}{Character. Department code (e.g. "HIST"). Use dept OR college.}

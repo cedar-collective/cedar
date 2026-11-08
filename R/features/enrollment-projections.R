@@ -195,7 +195,7 @@ enrollment_projection_model_source <- function(bundle, path = NULL) {
 #' once the scope is resolved the spine, the floor, the feeders and the
 #' first-day seats are one course's across its codes.
 #'
-#' @param students,sections The loaded `cedar_students` and `cedar_sections`.
+#' @param students,sections The loaded `cedar_registrations` and `cedar_sections`.
 #' @param scope_courses,force_courses Course codes, current or former.
 #' @return A list of the resolved, sorted `scope_courses` and `force_courses`
 #'   (NULL when none).

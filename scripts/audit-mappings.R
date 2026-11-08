@@ -32,7 +32,7 @@ read_tbl <- function(n) {
   if (!file.exists(f)) return(NULL)
   suppressWarnings(qs2::qs_read(f))
 }
-D <- list(sections = read_tbl("cedar_sections"), students = read_tbl("cedar_students"),
+D <- list(sections = read_tbl("cedar_sections"), students = read_tbl(cedar_table_file("cedar_registrations")),
           programs = read_tbl("cedar_programs"), degrees  = read_tbl("cedar_degrees"),
           faculty  = read_tbl("cedar_faculty"))
 missing <- names(D)[vapply(D, is.null, logical(1))]
@@ -45,11 +45,11 @@ D$descriptions <- resolve_class_list_descriptions(read_tbl("cedar_class_list_des
 # are attached from the mapping files, as every loader attaches them
 # (ADR-001 step 3).
 attached <- attach_default_units(
-  list(cedar_sections = D$sections, cedar_students = D$students,
+  list(cedar_sections = D$sections, cedar_registrations = D$students,
        cedar_programs = D$programs, cedar_degrees = D$degrees),
   build_cedar_dims())
 D$sections <- attached$cedar_sections
-D$students <- attached$cedar_students
+D$students <- attached$cedar_registrations
 D$programs <- attached$cedar_programs
 D$degrees  <- attached$cedar_degrees
 rm(attached)

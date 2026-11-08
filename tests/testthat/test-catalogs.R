@@ -1076,7 +1076,7 @@ test_that("attach_default_units() replaces whatever a file stamped and keeps the
   expect_equal(objs$cedar_sections$crosslist_partners, test_sections$crosslist_partners)
   # A table that is not loaded is left alone, and said so.
   expect_equal(ncol(objs$cedar_degrees), 0L)
-  expect_message(attach_default_units(list(cedar_students = NULL), dims), "cedar_students is not loaded")
+  expect_message(attach_default_units(list(cedar_registrations = NULL), dims), "cedar_registrations is not loaded")
   expect_error(attach_default_units(list(cedar_sections = stamped), unclass(dims)), "build_cedar_dims")
 })
 

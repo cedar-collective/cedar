@@ -26,7 +26,7 @@ context("Course impact — observational machinery")
 
 # ── build_comparison ─────────────────────────────────────────────────────────
 
-# Covariates and ids come from MC02 (cedar_programs_mc / cedar_students_mc):
+# Covariates and ids come from MC02 (cedar_programs_mc / cedar_registrations_mc):
 # six students, two campuses, varying GPA/Pell/first-gen, and a second program
 # record for MC_A1 at 202110 so covariate-term selection has something to pick
 # between.

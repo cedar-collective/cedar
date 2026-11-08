@@ -7,7 +7,7 @@
 #' A standalone screen, not part of `get_reg_stats()`'s report: nothing on the
 #' page reads it.
 #'
-#' @param students Data frame of student enrollments from cedar_students table.
+#' @param students Data frame of student enrollments from cedar_registrations table.
 #'   Must include columns: campus, college, term, term_type,
 #'   subject_course, course_title, level
 #' @param student_terms The `cedar_student_terms` table: the classification
@@ -36,7 +36,7 @@
 #' \dontrun{
 #' # Find popular sophomore fall courses
 #' opt <- list()
-#' high_soph_courses <- get_high_fall_sophs(cedar_students, cedar_student_terms, opt)
+#' high_soph_courses <- get_high_fall_sophs(cedar_registrations, cedar_student_terms, opt)
 #'
 #' # These courses could be summer offerings
 #' print(high_soph_courses$subject_course)
@@ -480,7 +480,7 @@ regstats_course_key_info <- function(flagged) {
 #' waitlists. This is the primary tool for identifying enrollment concerns that need
 #' administrative attention.
 #'
-#' @param students Data frame of student enrollments from cedar_students table,
+#' @param students Data frame of student enrollments from cedar_registrations table,
 #'   with \code{course_id} attached (as every loader does).
 #'   Must include columns: campus, college, term, term_type, subject_course,
 #'   course_title, level, student_id, registration_status
@@ -584,7 +584,7 @@ regstats_course_key_info <- function(flagged) {
 #' \dontrun{
 #' # Analyze all Arts & Sciences courses for Fall 2025
 #' opt <- list(term = "202510", course_college = "AS")
-#' flagged <- get_reg_stats(cedar_students, cedar_sections, opt)
+#' flagged <- get_reg_stats(cedar_registrations, cedar_sections, opt)
 #'
 #' # View courses with enrollment bumps
 #' head(flagged$bumps)
@@ -608,7 +608,7 @@ regstats_course_key_info <- function(flagged) {
 #'     chronic_fill_rate = 0.85
 #'   )
 #' )
-#' custom_flagged <- get_reg_stats(cedar_students, cedar_sections, custom_opt)
+#' custom_flagged <- get_reg_stats(cedar_registrations, cedar_sections, custom_opt)
 #' }
 #'
 #' @seealso

@@ -542,7 +542,7 @@ test_that("overview plot builders return campus-separated Plotly charts", {
 test_that("Course Dynamics follows a course across its codes and names the former ones", {
   rn <- rn01_course_tables()
   opt <- create_test_opt(list(course = "HIST 3201"))
-  payload <- assemble_course_enrollment_payload(rn$cedar_students, rn$cedar_sections, opt)
+  payload <- assemble_course_enrollment_payload(rn$cedar_registrations, rn$cedar_sections, opt)
 
   # Every term of the course, keyed on the current code.
   lifecycle <- payload$overview$lifecycle
@@ -584,7 +584,7 @@ test_that("Course Dynamics follows a course across its codes and names the forme
   )
   # A course that has carried one code gets no note.
   one_code <- assemble_course_enrollment_payload(
-    rn$cedar_students, rn$cedar_sections, create_test_opt(list(course = "LING 2110"))
+    rn$cedar_registrations, rn$cedar_sections, create_test_opt(list(course = "LING 2110"))
   )
   expect_equal(one_code$overview$sections$listed_as, c("LING 2110", "LING 2110"))
   expect_null(course_former_codes_note(one_code$overview, "LING 2110"))
@@ -592,12 +592,12 @@ test_that("Course Dynamics follows a course across its codes and names the forme
   # A former code picked from the schedule is the same course, named by its
   # current code; a section table without the id is refused.
   from_former <- assemble_course_enrollment_payload(
-    rn$cedar_students, rn$cedar_sections, create_test_opt(list(course = "HIST 320"))
+    rn$cedar_registrations, rn$cedar_sections, create_test_opt(list(course = "HIST 320"))
   )
   expect_equal(from_former$overview$lifecycle, lifecycle)
   expect_equal(from_former$overview$sections, sections)
   expect_error(
-    assemble_course_enrollment_payload(rn$cedar_students, test_sections_rn, opt),
+    assemble_course_enrollment_payload(rn$cedar_registrations, test_sections_rn, opt),
     "needs columns course_id and listed_code"
   )
 })
@@ -605,9 +605,9 @@ test_that("Course Dynamics follows a course across its codes and names the forme
 test_that("the whole Course Dynamics payload is keyed on the course", {
   rn <- rn01_course_tables()
   rn_objects <- list(
-    cedar_students = rn$cedar_students, cedar_sections = rn$cedar_sections,
+    cedar_registrations = rn$cedar_registrations, cedar_sections = rn$cedar_sections,
     cedar_student_terms = attach_test_student_terms(suppressMessages(build_student_terms(
-      rn$cedar_students, programs = NULL, degrees = NULL,
+      rn$cedar_registrations, programs = NULL, degrees = NULL,
       edges = list(last_enrolled_complete = 202110L)
     )))
   )
@@ -626,7 +626,7 @@ test_that("the whole Course Dynamics payload is keyed on the course", {
 
   # The outcome cones read the same loaded class list, so DFW history begins
   # where the course did, not where its current code did.
-  keyed <- rn$cedar_students
+  keyed <- rn$cedar_registrations
   edges <- cedar_data_edges(test_students, degrees = test_degrees)
   outcomes <- suppressMessages(get_course_outcomes(
     keyed, test_faculty, list(course = "HIST 3201", min_n = 1L, data_edges = edges)

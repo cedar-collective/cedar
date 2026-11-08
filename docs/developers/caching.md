@@ -77,7 +77,7 @@ What a key must cover:
   `create_regstats_cache_filename()` is easy to under-specify — that's what bit
   us; if you keep that style, treat the key builder as correctness-critical.
 - **Data freshness** — so a stale entry can't outlive the data. Existing choices:
-  a data hash (`cedar_students_hash` / `cedar_sections_hash` in course-neighbors),
+  a data hash (`cedar_registrations_hash` / `cedar_sections_hash` in course-neighbors),
   the current term (`cedar_current_term` / `cedar_report_end_term`), or a short
   time window when the computation itself depends on the calendar. Pick the one whose
   granularity matches how the underlying data moves. **A time-based key alone is

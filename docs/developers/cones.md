@@ -26,7 +26,7 @@ CEDAR's response to this is the **cone**: a focused, documented, shareable analy
 
 A cone is an R function in `R/cones/` that answers **one** analytical question:
 
-1. **Accepts** the CEDAR tables it needs as parameters (`cedar_students`, `cedar_sections`, and so on), never reading them from global state;
+1. **Accepts** the CEDAR tables it needs as parameters (`cedar_registrations`, `cedar_sections`, and so on), never reading them from global state;
 2. **Takes its choices** in an options list, `opt = list()`, always the last argument (term, department, campus, thresholds);
 3. **Returns** a tibble or a named list with a documented output contract.
 

@@ -2,7 +2,7 @@
 # This is neither a prerequisite graph nor a degree audit.
 
 #' When does a population take each kind of coursework?
-#' @param students cedar_students; all history is needed to anchor the clock.
+#' @param students cedar_registrations; all history is needed to anchor the clock.
 #' @param population build_population() output, including relevant_until.
 #' @param groups Validated subject-to-descriptive-group table.
 #' @param opt data_edges (required), campus, max_terms, min_n, min_band_n.

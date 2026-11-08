@@ -79,7 +79,7 @@ never "is this data real?" It is:
 
 > **Does this data have a real-world counterpart it has to be faithful to?**
 
-**Yes: it enters the system.** `cedar_students`, `cedar_sections`,
+**Yes: it enters the system.** `cedar_registrations`, `cedar_sections`,
 `cedar_programs`, `cedar_degrees` are the shapes institutional data arrives in.
 Multi-campus delivery, waitlisted students, crosslists and repeat enrolments
 are facts about how the data looks, and every analytic touching them needs the
@@ -105,7 +105,7 @@ same rows, they are domain data.
 
 **The failure this guards against** is narrower than "invented data is bad":
 *a fixture that cannot express the bug produces a test that passes forever.* In
-July 2026 `cedar_students` was 100% ABQ, so every campus-grouping test asserted
+July 2026 `cedar_registrations` was 100% ABQ, so every campus-grouping test asserted
 nothing. Once the fixture gained a second campus (MC01–MC03), the same tests
 immediately caught a join that dropped campus and attached the wrong comparison
 rate. When a fixture cannot represent a case (it once had no waitlisted
@@ -445,7 +445,7 @@ cannot say whether a method is useful on the current population.
 Don't hand-roll the bootstrap; it has four gotchas. For a one-off question:
 
 ```bash
-Rscript --vanilla -e 'source("scripts/cedar-repl.R"); nrow(cedar_students)'
+Rscript --vanilla -e 'source("scripts/cedar-repl.R"); nrow(cedar_registrations)'
 ```
 
 `cedar-repl.R` sets `cedar_base_dir` and `cedar_data_dir` (required globals with
@@ -456,7 +456,7 @@ alive, source the helper once, and re-source only the changed file:
 
 ```r
 source("scripts/cedar-repl.R")
-prepared_inputs <- prepare_example_inputs(students = cedar_students, sections = cedar_sections)
+prepared_inputs <- prepare_example_inputs(students = cedar_registrations, sections = cedar_sections)
 result <- get_example_answer(prepared_inputs, opt = list(...))
 
 source("R/cones/example-question.R")      # after an edit; tables stay loaded

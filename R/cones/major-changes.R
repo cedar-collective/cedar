@@ -228,7 +228,7 @@ tag_major_changers <- function(programs, population = NULL, opt = list()) {
 
 #' Courses students were enrolled in during the term they changed majors
 #'
-#' Joins major change events to cedar_students by student_id + change_term.
+#' Joins major change events to cedar_registrations by student_id + change_term.
 #' Useful for identifying courses correlated with leaving or arriving in a major.
 #'
 #' To analyze departures from a major, filter changes to from_major == X before
@@ -236,7 +236,7 @@ tag_major_changers <- function(programs, population = NULL, opt = list()) {
 #'
 #' @param changes  Tibble from detect_major_changes(). Pre-filter to the
 #'   from_major or to_major of interest before passing in.
-#' @param students cedar_students data frame
+#' @param students cedar_registrations data frame
 #' @param opt      Options list:
 #'   \itemize{
 #'     \item \code{min_n} — integer; minimum students per course (default 5)
@@ -306,7 +306,7 @@ get_major_change_courses <- function(changes, students, opt = list()) {
 #'
 #' @param changes    Tibble from detect_major_changes(). Pre-filter to the
 #'   direction of interest (e.g. departures from a unit) before passing in.
-#' @param students   cedar_students data frame.
+#' @param students   cedar_registrations data frame.
 #' @param population Population tibble (needs `student_id`). Supplies the
 #'   comparison universe for the baseline column: every student here, whether or
 #'   not they switched, contributes their terms to `pct_other_terms`. Pass the

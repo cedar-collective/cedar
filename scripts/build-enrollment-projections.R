@@ -23,7 +23,7 @@ build_enrollment_projections <- function(args, refresh_config = NULL) {
     return(invisible(build_one_enrollment_projection(args, repo_root, refreshing = FALSE)))
   }
   source(file.path(repo_root, "scripts", "cedar-repl.R"))
-  scopes <- resolve_enrollment_projection_refresh(refresh_config, cedar_students)
+  scopes <- resolve_enrollment_projection_refresh(refresh_config, cedar_registrations)
   if (is.null(scopes)) {
     message("[projections] Automatic refresh disabled by configuration.")
     return(invisible(NULL))
@@ -144,11 +144,11 @@ build_one_enrollment_projection <- function(args, repo_root, refreshing) {
   # By course, not by code (0.28.0): the scope resolved to course ids, and
   # the demand history counted over the loaded class list, keyed on the course.
   course_scope <- enrollment_projection_course_scope(
-    cedar_students, cedar_sections, scope_courses, force_courses
+    cedar_registrations, cedar_sections, scope_courses, force_courses
   )
   scope_courses <- course_scope$scope_courses
   force_courses <- course_scope$force_courses
-  scoped_classlists <- cedar_students %>%
+  scoped_classlists <- cedar_registrations %>%
     dplyr::filter(
       campus %in% .env$scope_campuses,
       subject_course %in% .env$scope_courses
@@ -165,7 +165,7 @@ build_one_enrollment_projection <- function(args, repo_root, refreshing) {
   bundle <- build_enrollment_projection_bundle(
     cl_enrls = cl_enrls,
     sections = cedar_sections,
-    students = cedar_students,
+    students = cedar_registrations,
     student_terms = cedar_student_terms,
     target_term = target_term,
     as_of_term = as_of_term,

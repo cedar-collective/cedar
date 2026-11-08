@@ -89,7 +89,7 @@ if (is_docker()) {
 #
 # data_objects Structure (what cones expect):
 #   data_objects[["cedar_sections"]]  - Course sections
-#   data_objects[["cedar_students"]]  - Student enrollments
+#   data_objects[["cedar_registrations"]]  - Student enrollments
 #   data_objects[["cedar_student_terms"]] - One row per student-term (enrolled, returned)
 #   data_objects[["cedar_programs"]]  - Program enrollments
 #   data_objects[["cedar_degrees"]]   - Degrees awarded
@@ -103,7 +103,7 @@ if (is_docker()) {
 # CEDAR file list - these are the actual file names on disk
 cedar_files <- list(
   cedar_sections   = "cedar_sections",
-  cedar_students   = "cedar_students",
+  cedar_registrations = cedar_table_file("cedar_registrations"),
   cedar_programs   = "cedar_programs",
   cedar_degrees    = "cedar_degrees",
   cedar_faculty    = "cedar_faculty",
@@ -203,7 +203,7 @@ for (key in names(cedar_files)) {
 #
 # Trim first (cedar_min_term, set in shiny_config.R): rows that go are never
 # attached, so the attach's transient copy is of the rows the app keeps.
-for (.key in c("cedar_sections", "cedar_students", "cedar_student_terms", "cedar_faculty", "cedar_degrees", "cedar_programs")) {
+for (.key in c("cedar_sections", "cedar_registrations", "cedar_student_terms", "cedar_faculty", "cedar_degrees", "cedar_programs")) {
   if (!is.null(data_objects[[.key]]) && "term" %in% names(data_objects[[.key]])) {
     .n_before <- nrow(data_objects[[.key]])
     data_objects[[.key]] <- dplyr::filter(data_objects[[.key]], term >= cedar_min_term)
@@ -224,11 +224,11 @@ local({
   path <- file.path(data_dir, paste0("cedar_class_list_descriptions", get_data_extension()))
   descriptions <- resolve_class_list_descriptions(
     if (file.exists(path)) timed_read_data(path, basename(path)) else NULL,
-    data_objects[["cedar_students"]], "global.R")
+    data_objects[["cedar_registrations"]], "global.R")
   descriptions <- descriptions[descriptions$term >= cedar_min_term, , drop = FALSE]
   data_objects[["cedar_class_list_majors"]] <<- summarize_class_list_majors(descriptions)
 })
-data_objects[["cedar_students"]] <- thin_class_list(data_objects[["cedar_students"]])
+data_objects[["cedar_registrations"]] <- thin_class_list(data_objects[["cedar_registrations"]])
 gc(verbose = FALSE)
 
 cedar_dims <- build_cedar_dims()
@@ -240,7 +240,7 @@ data_objects[["cedar_dims"]] <- cedar_dims
 # sections, the class lists and the grades on it: subject_course is the course
 # from here on, and listed_code the code the registrar used that term. Never
 # saved: a confirmed row changes it at the next start, as a unit decision does.
-cedar_courses <- build_cedar_courses(data_objects[["cedar_sections"]], data_objects[["cedar_students"]], cedar_dims)
+cedar_courses <- build_cedar_courses(data_objects[["cedar_sections"]], data_objects[["cedar_registrations"]], cedar_dims)
 data_objects <- attach_course_ids(data_objects, cedar_courses)
 data_objects[["cedar_courses"]] <- cedar_courses$courses
 data_objects[["cedar_course_codes"]] <- cedar_courses$codes
@@ -260,7 +260,7 @@ message("[global.R] Data loading complete. Validating CEDAR data structure...")
 # These validations ensure data is in CEDAR format before the app starts
 validation_specs <- list(
   cedar_sections = c("section_id", "term", "department", "instructor_id", "subject_course", "part_term"),
-  cedar_students = c("student_id", "term", "department", "final_grade", "credits", "subject_code", "level", "instructor_id", "part_term"),
+  cedar_registrations = c("student_id", "term", "department", "final_grade", "credits", "subject_code", "level", "instructor_id", "part_term"),
   cedar_programs = c("term", "student_level", "program_type", "program_name", "dept_code", "student_college", "student_campus"),
   cedar_degrees = c("term", "degree", "major_code"),
   cedar_faculty = c("term", "instructor_id", "department", "job_category"),
@@ -309,7 +309,7 @@ message("[global.R] ✅ All CEDAR data validated successfully!")
 # same function, so the caches they write match what the app asks for. See the
 # right-edge policy in AGENTS.md.
 .report_edges <- cedar_report_edges(
-  data_objects[["cedar_students"]],
+  data_objects[["cedar_registrations"]],
   degrees = data_objects[["cedar_degrees"]]
 )
 cedar_edges <- .report_edges$edges
@@ -331,7 +331,7 @@ rm(.report_edges)
 # bound an analysis with filter(is_settled) instead of comparing against the
 # globals above; the flags are the same edges, passed in, never recomputed.
 cedar_terms <- build_cedar_terms(
-  data_objects[["cedar_students"]],
+  data_objects[["cedar_registrations"]],
   sections = data_objects[["cedar_sections"]],
   degrees  = data_objects[["cedar_degrees"]],
   edges    = cedar_edges
@@ -343,8 +343,8 @@ message(sprintf("[global.R] cedar_terms: %d terms, %s to %s", nrow(cedar_terms),
 # Pre-compute stable source hashes for cache keys. Each combines the loaded
 # dimensions with file size and modification time, so a same-shape replacement
 # still invalidates. Stored as globals so cache lookups do not touch large data.
-cedar_students_hash <- cedar_cache_object_hash(
-  data_objects[["cedar_students"]], cedar_source_fingerprints[["cedar_students"]]
+cedar_registrations_hash <- cedar_cache_object_hash(
+  data_objects[["cedar_registrations"]], cedar_source_fingerprints[["cedar_registrations"]]
 )
 cedar_sections_hash <- cedar_cache_object_hash(
   data_objects[["cedar_sections"]], cedar_source_fingerprints[["cedar_sections"]]
@@ -364,13 +364,13 @@ cedar_dept_source_hashes <- hash_dept_cache_sources(data_objects)
 message(sprintf(
   paste0("[global.R] Cache hashes: students=%s sections=%s programs=%s ",
          "degrees=%s faculty=%s"),
-  cedar_students_hash, cedar_sections_hash, cedar_programs_hash,
+  cedar_registrations_hash, cedar_sections_hash, cedar_programs_hash,
   cedar_degrees_hash, cedar_faculty_hash
 ))
 
 message("[global.R] Data objects ready:")
 message("  - cedar_sections: ", nrow(data_objects[["cedar_sections"]]), " rows")
-message("  - cedar_students: ", nrow(data_objects[["cedar_students"]]), " rows")
+message("  - cedar_registrations: ", nrow(data_objects[["cedar_registrations"]]), " rows")
 message("  - cedar_student_terms: ", nrow(data_objects[["cedar_student_terms"]]), " rows")
 message("  - cedar_programs: ", nrow(data_objects[["cedar_programs"]]), " rows")
 message("  - cedar_degrees: ", nrow(data_objects[["cedar_degrees"]]), " rows")
@@ -384,9 +384,9 @@ message("  - cedar_faculty: ", nrow(data_objects[["cedar_faculty"]]), " rows")
 # the copy saved beside the data is a cache, used only when it is newer than
 # the class list and attempts_is_current() finds this build, outcome policy,
 # graded edge and the class list's renames on it.
-if (!is.null(data_objects[["cedar_students"]]) && nrow(data_objects[["cedar_students"]]) > 0) {
+if (!is.null(data_objects[["cedar_registrations"]]) && nrow(data_objects[["cedar_registrations"]]) > 0) {
   attempts_path    <- file.path(data_dir, "cedar_attempts.qs")
-  students_qs_path <- file.path(data_dir, paste0("cedar_students", get_data_extension()))
+  students_qs_path <- file.path(data_dir, paste0(cedar_files[["cedar_registrations"]], get_data_extension()))
   saved_is_newer <- file.exists(attempts_path) && file.exists(students_qs_path) &&
                     file.info(attempts_path)$mtime > file.info(students_qs_path)$mtime
   saved_attempts <- NULL
@@ -396,7 +396,7 @@ if (!is.null(data_objects[["cedar_students"]]) && nrow(data_objects[["cedar_stud
       NULL
     })
   }
-  if (attempts_is_current(saved_attempts, data_objects[["cedar_students"]], cedar_edges)) {
+  if (attempts_is_current(saved_attempts, data_objects[["cedar_registrations"]], cedar_edges)) {
     data_objects[["cedar_attempts"]] <- saved_attempts
     message(sprintf("[global.R] cedar_attempts loaded: %d rows", nrow(saved_attempts)))
   } else {
@@ -408,7 +408,7 @@ if (!is.null(data_objects[["cedar_students"]]) && nrow(data_objects[["cedar_stud
     # container on the worst-case start (both caches stale).
     gc(verbose = FALSE)
     t_at <- system.time({
-      data_objects[["cedar_attempts"]] <- build_attempts(data_objects[["cedar_students"]], cedar_edges)
+      data_objects[["cedar_attempts"]] <- build_attempts(data_objects[["cedar_registrations"]], cedar_edges)
     })
     message(sprintf("[global.R] cedar_attempts built: %d rows (%.1fs)",
                     nrow(data_objects[["cedar_attempts"]]), t_at["elapsed"]))
@@ -433,9 +433,9 @@ if (!is.null(data_objects[["cedar_students"]]) && nrow(data_objects[["cedar_stud
 # it is used when it is newer than the class list and course_terms_is_current()
 # finds this build's version and columns and the class list's renames on it;
 # otherwise it is rebuilt.
-if (!is.null(data_objects[["cedar_students"]]) && nrow(data_objects[["cedar_students"]]) > 0) {
+if (!is.null(data_objects[["cedar_registrations"]]) && nrow(data_objects[["cedar_registrations"]]) > 0) {
   course_terms_path <- file.path(data_dir, "cedar_course_terms.qs")
-  students_qs_path  <- file.path(data_dir, paste0("cedar_students", get_data_extension()))
+  students_qs_path  <- file.path(data_dir, paste0(cedar_files[["cedar_registrations"]], get_data_extension()))
   saved_is_newer <- file.exists(course_terms_path) &&
                     file.exists(students_qs_path) &&
                     file.info(course_terms_path)$mtime > file.info(students_qs_path)$mtime
@@ -447,7 +447,7 @@ if (!is.null(data_objects[["cedar_students"]]) && nrow(data_objects[["cedar_stud
       NULL
     })
   }
-  if (course_terms_is_current(saved_course_terms, data_objects[["cedar_students"]],
+  if (course_terms_is_current(saved_course_terms, data_objects[["cedar_registrations"]],
                               graded_edge = cedar_edges$last_graded)) {
     data_objects[["cedar_course_terms"]] <- saved_course_terms
     message(sprintf("[global.R] cedar_course_terms loaded: %d rows",
@@ -458,7 +458,7 @@ if (!is.null(data_objects[["cedar_students"]]) && nrow(data_objects[["cedar_stud
     }
     gc(verbose = FALSE)
     t_ct <- system.time({
-      data_objects[["cedar_course_terms"]] <- build_course_terms(data_objects[["cedar_students"]],
+      data_objects[["cedar_course_terms"]] <- build_course_terms(data_objects[["cedar_registrations"]],
                                                                  data_objects[["cedar_attempts"]])
     })
     message(sprintf("[global.R] cedar_course_terms built: %d rows (%.1fs)",
@@ -485,9 +485,9 @@ if (!is.null(data_objects[["cedar_students"]]) && nrow(data_objects[["cedar_stud
 # cache: used when it is newer than the class list and course_flows_is_current()
 # finds this build, the edge and the class list's renames on it; otherwise
 # rebuilt.
-if (!is.null(data_objects[["cedar_students"]]) && nrow(data_objects[["cedar_students"]]) > 0) {
+if (!is.null(data_objects[["cedar_registrations"]]) && nrow(data_objects[["cedar_registrations"]]) > 0) {
   course_flows_path <- file.path(data_dir, "cedar_course_flows.qs")
-  students_qs_path  <- file.path(data_dir, paste0("cedar_students", get_data_extension()))
+  students_qs_path  <- file.path(data_dir, paste0(cedar_files[["cedar_registrations"]], get_data_extension()))
   saved_is_newer <- file.exists(course_flows_path) &&
                     file.exists(students_qs_path) &&
                     file.info(course_flows_path)$mtime > file.info(students_qs_path)$mtime
@@ -499,7 +499,7 @@ if (!is.null(data_objects[["cedar_students"]]) && nrow(data_objects[["cedar_stud
       NULL
     })
   }
-  if (course_flows_is_current(saved_course_flows, data_objects[["cedar_students"]], cedar_edges)) {
+  if (course_flows_is_current(saved_course_flows, data_objects[["cedar_registrations"]], cedar_edges)) {
     data_objects[["cedar_course_flows"]] <- saved_course_flows
     message(sprintf("[global.R] cedar_course_flows loaded: %d rows", nrow(saved_course_flows)))
   } else {
@@ -508,7 +508,7 @@ if (!is.null(data_objects[["cedar_students"]]) && nrow(data_objects[["cedar_stud
     }
     gc(verbose = FALSE)
     t_cf <- system.time({
-      data_objects[["cedar_course_flows"]] <- build_course_flows(data_objects[["cedar_students"]],
+      data_objects[["cedar_course_flows"]] <- build_course_flows(data_objects[["cedar_registrations"]],
                                                                  cedar_edges)
     })
     message(sprintf("[global.R] cedar_course_flows built: %d rows (%.1fs)",
@@ -582,10 +582,10 @@ if (!is.null(data_objects[["cedar_sections"]]) && nrow(data_objects[["cedar_sect
 }
 
 # Students
-if (!is.null(data_objects[["cedar_students"]]) && nrow(data_objects[["cedar_students"]]) > 0) {
-  cedar_data_summary$students_count      <- nrow(data_objects[["cedar_students"]])
-  cedar_data_summary$students_term_dates <- .term_dates(data_objects[["cedar_students"]])
-  cedar_data_summary$students_status_dates <- class_list_status_date_coverage(data_objects[["cedar_students"]])
+if (!is.null(data_objects[["cedar_registrations"]]) && nrow(data_objects[["cedar_registrations"]]) > 0) {
+  cedar_data_summary$students_count      <- nrow(data_objects[["cedar_registrations"]])
+  cedar_data_summary$students_term_dates <- .term_dates(data_objects[["cedar_registrations"]])
+  cedar_data_summary$students_status_dates <- class_list_status_date_coverage(data_objects[["cedar_registrations"]])
 } else {
   cedar_data_summary$students_count      <- 0L
   cedar_data_summary$students_term_dates <- list()
@@ -620,7 +620,7 @@ if (!is.null(data_objects[["cedar_faculty"]]) && nrow(data_objects[["cedar_facul
 
 # Determine display terms: next + current + prev 2 non-summer + relevant summers
 all_data_terms <- unique(unlist(lapply(
-  c("cedar_sections","cedar_students","cedar_programs","cedar_degrees","cedar_faculty"),
+  c("cedar_sections","cedar_registrations","cedar_programs","cedar_degrees","cedar_faculty"),
   function(k) if (!is.null(data_objects[[k]])) data_objects[[k]][["term"]] else integer(0)
 )))
 cedar_data_summary$display_terms <- .select_display_terms(all_data_terms, cedar_current_term)

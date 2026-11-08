@@ -558,7 +558,7 @@ test_that("demographic populations honor level and carry enrollment bookends", {
   expect_equal(pop$last_record_term, 202180L)
   expect_true(all(c("first_unit_term", "last_unit_term", "relevant_until") %in% names(pop)))
 
-  # cedar_students handed in the table's place would count every class-list
+  # cedar_registrations handed in the table's place would count every class-list
   # row as a term at UNM; it is refused by column.
   expect_error(
     build_population(programs, student_terms = student_terms %>% select(-enrolled),

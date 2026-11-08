@@ -205,7 +205,7 @@ asserts no output error before Run; it fails on the old renderers.
 (ADR-001 step 3, PR 2).
 **Severity:** medium. Until 2026-11-06 each mapped table carried a provenance
 stamp that hashed `R/data-parsers/transform-to-cedar.R` among the mapping
-files, so any transform edit rebuilt `cedar_sections`, `cedar_students`,
+files, so any transform edit rebuilt `cedar_sections`, `cedar_registrations`,
 `cedar_programs` and `cedar_degrees` at deploy (about 16 minutes, every
 time, whatever the edit). The stamps went with the stored unit columns, and
 nothing replaced the one case that mattered: a transform change that adds or
@@ -261,7 +261,7 @@ time are unaffected, which is why the 2026-11-04 agreement measurement
 (99% of student-terms) hid it.
 **Affects:** `R/trunk/filter.R` (`classification`), `R/features/regstats.R`
 (`get_high_fall_sophs()`), and any ad-hoc reader of
-`cedar_students$student_classification` for a term pulled late.
+`cedar_registrations$student_classification` for a term pulled late.
 
 ### What is wrong
 
@@ -275,7 +275,7 @@ it describes its students as they stood in March 2026.
 
 ```r
 source("scripts/cedar-repl.R")
-cl <- cedar_students %>%
+cl <- cedar_registrations %>%
   filter(subject_course == "ENGL 1120", term == 202580L,
          registration_status_code %in% STATUS_REGISTERED) %>%
   distinct(student_id, term) %>%
@@ -378,11 +378,11 @@ are on the schedule and the class list through Fall 2026 (CCS class-list
 rows from Summer 2021, 5,675 of them; 109 Fall 2026 sections as CCS, none as
 CCST), so a reader that joins a course-keyed table by the class list's code
 misses CCS courses in the current term, not only in old ones.
-**Found:** 2026-11-03, profiling which `cedar_students` columns could come from `cedar_sections`
+**Found:** 2026-11-03, profiling which `cedar_registrations` columns could come from `cedar_sections`
 **Severity:** medium. 1.3% of class-list rows; every page that reads the
 schedule loses those terms for the courses affected.
 **Affects:** any course-level view reading `cedar_sections` beside
-`cedar_students` for SOCI, PSYC and CCST courses in the terms below. Related
+`cedar_registrations` for SOCI, PSYC and CCST courses in the terms below. Related
 to [I37](#i37--renumbered-courses-lose-their-history), which is the same gap
 across terms; this one is inside a single term.
 
@@ -413,7 +413,7 @@ tables (campus, department, level, title: 100%).
 
 ```r
 source("scripts/cedar-repl.R")
-inner_join(cedar_students %>% distinct(term, crn, subject_course),
+inner_join(cedar_registrations %>% distinct(term, crn, subject_course),
            cedar_sections %>% select(term, crn, s_course = subject_course),
            by = c("term", "crn")) %>%
   filter(subject_course != s_course) %>% count(term)
@@ -470,8 +470,8 @@ Roadblocks kept its own lookup.
 
 ```r
 source("scripts/cedar-repl.R")
-a <- cedar_students %>% filter(term == 202580, registration_status_code %in% c(STATUS_REGISTERED, STATUS_DROP_LATE)) %>% distinct(student_id)
-nx <- cedar_students %>% filter(term == 202610) %>% group_by(student_id) %>%
+a <- cedar_registrations %>% filter(term == 202580, registration_status_code %in% c(STATUS_REGISTERED, STATUS_DROP_LATE)) %>% distinct(student_id)
+nx <- cedar_registrations %>% filter(term == 202610) %>% group_by(student_id) %>%
   summarise(reg = any(registration_status_code %in% STATUS_REGISTERED),
             late = any(registration_status_code %in% STATUS_DROP_LATE))
 a %>% left_join(nx, by = "student_id") %>% summarise(only_late = sum(!reg & late, na.rm = TRUE))  # 284
@@ -493,7 +493,7 @@ mrgather and per-report rebuilds remain (see Still to do)
 **Found:** 2026-11-03, reading the production refresh logs
 **Severity:** high. Nothing wrong was published, but production stopped
 refreshing. `cedar_sections` and `cedar_programs` were last written on Oct 27
-at the morning run, and `cedar_students` by a manual class-list run that
+at the morning run, and `cedar_registrations` by a manual class-list run that
 afternoon. The app has served those tables since.
 **Affects:** the default report list in `scripts/update-data.sh`, and mrgather
 (`/root/mrgather`, a separate repository; image built 2026-04-10).
@@ -784,9 +784,9 @@ of the 1,016 who never declared `FDMA`, 1 is.
 
 ### Reproduction
 
-`build_population(cedar_programs, cedar_degrees, cedar_students, opt =
+`build_population(cedar_programs, cedar_degrees, cedar_registrations, opt =
 list(program_names = "Film and Digital Arts", include_pre_majors = "lump",
-data_edges = cedar_report_edges(cedar_students, cedar_degrees)))`, then count
+data_edges = cedar_report_edges(cedar_registrations, cedar_degrees)))`, then count
 `FFDA` students who never declared `FDMA` among its `student_id`s.
 
 *Done when:* the program-name path adds pre-major codes through
@@ -1018,7 +1018,7 @@ still reported success:
 - `parse-data.R` logged `No .xlsx files found ... matching signature:
   Class_List_Guided_Adhoc` and the same for `S_Admissions_Applicants_Detail`,
   then reported ✅.
-- The transform rebuilt `cedar_students` from the previous class-list export,
+- The transform rebuilt `cedar_registrations` from the previous class-list export,
   and the run ended `CEDAR Update Complete`.
 
 The data was not harmed this time, because that morning's cron run had already
@@ -1242,10 +1242,10 @@ terms by shared IDs.
 The hashed `student_id` in `cedar_programs` and `cedar_degrees` belonged to one
 of the seven mutually incompatible spaces above, depending on which MyReports
 file supplied that term. Records outside cluster 6 could not join to
-`cedar_students` at all, and could not join to the *same student's* records in
+`cedar_registrations` at all, and could not join to the *same student's* records in
 another cluster within their own table.
 
-Per-term match against `cedar_students` was never partial — exactly 0% or
+Per-term match against `cedar_registrations` was never partial — exactly 0% or
 exactly 100%:
 
 | terms | match |
@@ -1261,7 +1261,7 @@ the same window. It also produced 12,504 ids holding exactly one program term �
 the five singleton clusters — none of which can generate a change event, since
 detecting one requires two consecutive records under the same id.
 
-The decisive check: 18,233 students appear in `cedar_students` at both 202410 and
+The decisive check: 18,233 students appear in `cedar_registrations` at both 202410 and
 202480 — same id string, same table, unambiguously the same people. Of those,
 15,681 have a program record at 202480 and **zero** have one at 202410. They were
 plainly enrolled and declared in 202410; those rows exist, under a different hash.
@@ -1316,7 +1316,7 @@ check_student_id_integrity(
     cedar_programs = load_cedar_data("data/cedar_programs.qs"),
     cedar_degrees  = load_cedar_data("data/cedar_degrees.qs")
   ),
-  opt = list(spine_name = "cedar_students")
+  opt = list(spine_name = "cedar_registrations")
 )$by_table
 ```
 
@@ -2428,7 +2428,7 @@ ARCH 472 is the pattern: students who waited one term and took it later vanish.
 
 ### Reproduce
 
-    st  <- cedar_students %>% filter(term >= 202480, campus %in% c("ABQ", "EA"))
+    st  <- cedar_registrations %>% filter(term >= 202480, campus %in% c("ABQ", "EA"))
     p   <- compute_waitlist_pressure(st, unique(st$student_id))
     c   <- summarize_waitlist_demand(get_true_waitlisted_rows(st, cedar_sections),
                                      c("campus", "term", "subject_course"))
@@ -2614,7 +2614,7 @@ Arts, Welding Technology, ...), and the report has none of them.
 
 ```r
 source("scripts/cedar-repl.R")
-cl <- dplyr::distinct(cedar_students, student_id, term, student_campus)
+cl <- dplyr::distinct(cedar_registrations, student_id, term, student_campus)
 pr <- dplyr::distinct(cedar_programs, student_id, term) |> dplyr::mutate(found = TRUE)
 dplyr::left_join(cl, pr, by = c("student_id", "term")) |>
   dplyr::group_by(student_campus) |>
@@ -2793,7 +2793,7 @@ own). A new salt changes every student ID, consistently across terms within a
 rebuilt table, since the transform rehashes every term from the stored MD5s.
 But tables built under different salts no longer join, so the change must be
 one complete rebuild of every table holding student IDs (`cedar_programs`,
-`cedar_degrees`, `cedar_students`, `cedar_student_terms`,
+`cedar_degrees`, `cedar_registrations`, `cedar_student_terms`,
 `cedar_applicants`; the course-flow and enrollment caches hold none; `cedar_student_term_credits`
 and `cedar_next_term` are retired), checked afterwards on Admin >
 Join Integrity. Salting the parse stage too means a one-time migration of the
@@ -3063,7 +3063,7 @@ not-yet-started 2H section, and its test fails on the current function.
 
 ### Reproduction
 
-From `cedar_students`, take term 202680, campuses ABQ and EA, and every
+From `cedar_registrations`, take term 202680, campuses ABQ and EA, and every
 non-waitlist row. Join each row's section start date (the minimum
 `start_date` per `term`, `crn` in `cedar_sections`). 9,271 rows have
 `as_of_date < start_date`. They fall in 257 courses, and those 257 are exactly
@@ -3358,7 +3358,7 @@ focused, tested patches.
 
 **M23 — Campus vocabularies differ by table.** The same field name can hold codes
 in one table and labels in another: `student_campus` is a name in
-`cedar_programs` ("Albuquerque/Main", "Taos") and a code in `cedar_students`
+`cedar_programs` ("Albuquerque/Main", "Taos") and a code in `cedar_registrations`
 ("ABQ", "TA"), and no file maps one to the other, so headcounts filter on names
 and course figures on codes. `institution/unm/campuses.csv` gives no expansion for EW, EF,
 ELA and TAQ, and the data uses codes it does not define (05, EG, ET, TAP
@@ -3457,9 +3457,9 @@ Degree Explorer map names its own (`degree_catalogs.csv`, `program_codes`).
 codes, and a page that pools them says so.
 
 **M38 — The designed class-list fixture carries student level as a name,
-production as a code.** `cedar_students$student_level` is `UG` / `GR` in
+production as a code.** `cedar_registrations$student_level` is `UG` / `GR` in
 production (Banner's `Student Level Code`), and `Undergraduate` / `Graduate`
-on academic studies; the fixture's `cedar_students` says `Undergraduate` on
+on academic studies; the fixture's `cedar_registrations` says `Undergraduate` on
 both tables, so a test written against it cannot see the vocabulary split
 ADR-001 §2 describes, and a filter that works on the fixture
 (`student_level == "Undergraduate"`) matches nothing in production — which is

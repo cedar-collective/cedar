@@ -16,7 +16,7 @@ COURSE_LEVEL_BY_LEADING_DIGIT <- stats::setNames(.cedar_course_levels$level,
 
 #' Course level from a course code
 #'
-#' The one rule for course level, used by cedar_sections, cedar_students and the
+#' The one rule for course level, used by cedar_sections, cedar_registrations and the
 #' Degree Explorer catalog validators: the leading digit of the course number,
 #' looked up in COURSE_LEVEL_BY_LEADING_DIGIT. Works for 3- and 4-digit numbers
 #' and lab suffixes alike ("HIST 301", "NMNC 3110", "PHYS 151L"). It lives here,

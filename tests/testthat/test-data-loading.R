@@ -86,7 +86,7 @@ test_that("load_global_data loads all required CEDAR model objects from configur
   # is which files load_global_data() reaches for. See AGENTS.md.
   with_temp_cedar_data_dir({
     cedar_files <- c(
-      "cedar_sections", "cedar_students", "cedar_student_terms",
+      "cedar_sections", "cedar_registrations", "cedar_student_terms",
       "cedar_programs", "cedar_degrees", "cedar_faculty", "cedar_applicants"
     )
 
@@ -95,7 +95,7 @@ test_that("load_global_data loads all required CEDAR model objects from configur
     # reads; an NA key resolves to no unit, which is all this test needs.
     attach_keys <- list(
       cedar_sections = c("subject", "source_college", "level", "campus", "crosslist_group", "subject_course"),
-      cedar_students = c("subject_code", "source_college", "level"),
+      cedar_registrations = c("subject_code", "source_college", "level"),
       cedar_programs = c("student_id", "program_type", "major_code", "source_college_code", "source_college"),
       cedar_degrees = c("major_code", "source_student_college", "source_college"),
       cedar_student_terms = c("primary_major_code", "primary_source_college_code", "primary_source_college")
@@ -105,12 +105,12 @@ test_that("load_global_data loads all required CEDAR model objects from configur
     for (name in cedar_files) {
       row <- tibble::tibble(term = 202510L, as_of_date = as.Date("2026-07-30"), dataset = name)
       for (key in attach_keys[[name]]) row[[key]] <- NA_character_
-      if (name %in% c("cedar_sections", "cedar_students")) {
+      if (name %in% c("cedar_sections", "cedar_registrations")) {
         row$subject_course <- "HIST 101"
         row$course_title <- "History"
         row$level <- "lower"
       }
-      saveRDS(row, file.path(cedar_data_dir, paste0(name, ".Rds")))
+      saveRDS(row, file.path(cedar_data_dir, paste0(cedar_table_file(name), ".Rds")))
     }
 
     suppressMessages(load_global_data(list(func = "course-report")))
@@ -119,11 +119,11 @@ test_that("load_global_data loads all required CEDAR model objects from configur
     expect_setequal(names(data_objects), c(cedar_files, "cedar_dims", "cedar_courses", "cedar_course_codes"))
     expect_true("department" %in% names(data_objects$cedar_sections))
     expect_equal(data_objects$cedar_sections$course_id, "HIST 101")
-    expect_equal(data_objects$cedar_students$course_id, "HIST 101")
+    expect_equal(data_objects$cedar_registrations$course_id, "HIST 101")
     expect_true("dept_code" %in% names(programs))
     expect_equal(data_objects$cedar_sections$dataset, "cedar_sections")
     expect_equal(sections$dataset, "cedar_sections")
-    expect_equal(students$dataset, "cedar_students")
+    expect_equal(students$dataset, "cedar_registrations")
     expect_equal(programs$dataset, "cedar_programs")
     expect_equal(degrees$dataset, "cedar_degrees")
     expect_equal(faculty$dataset, "cedar_faculty")

@@ -47,7 +47,7 @@ current_units <- function() {
   list(
     programs = cedar_programs %>%
       count(program_type, major_code, dept_code, name = "rows"),
-    courses = cedar_students %>%
+    courses = cedar_registrations %>%
       count(subject_code, college, department, name = "rows"),
     taken = Sys.time()
   )

@@ -43,7 +43,7 @@ campus   students vs degrees      0 / 15  (0%)   DISJOINT
 college  sections vs degrees      0 / 33  (0%)   DISJOINT
 ```
 
-The sharpest case: **`student_campus` is codes in `cedar_students` and labels in
+The sharpest case: **`student_campus` is codes in `cedar_registrations` and labels in
 `cedar_programs`.** Same name, same concept, incompatible values.
 `student_college` has the identical split.
 
@@ -58,7 +58,7 @@ Code-on-code, self-consistent. The two sides never meet.
 ### Why it is still a live trap
 
 `opt_col_map_classlist` in `R/trunk/filter.R` maps `opt$student_campus` and
-`opt$student_college` onto the **code** columns in `cedar_students`, while every
+`opt$student_college` onto the **code** columns in `cedar_registrations`, while every
 UI in the app produces **labels**. `R/features/regstats.R` already lists both in
 its `student_level_filters`. The first person to expose either filter passes
 `"Albuquerque/Main"` into a column of `ABQ` and gets an empty result with no
@@ -66,13 +66,13 @@ error. This already happened once in miniature: Pathways shipped with
 `selected = "ABQ"` against the label column, so its campus filter silently
 selected nothing and every population quietly included all five campuses.
 
-Also note `cedar_students$student_campus` and `student_college` (the code
+Also note `cedar_registrations$student_campus` and `student_college` (the code
 columns) **are read nowhere in the app**. They exist only to be mistaken for
 their `cedar_programs` namesakes.
 
 ### The mapping is derivable, not guesswork
 
-Joining `cedar_students` to `cedar_programs` on `student_id + term` yields a
+Joining `cedar_registrations` to `cedar_programs` on `student_id + term` yields a
 clean 1:1 with zero ambiguity. Confirmed independently on two snapshots — the
 local `data/` set (82,332 matched student-terms, shown below) and the deployed
 container's larger set (364,110) — with identical pairings:

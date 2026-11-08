@@ -24,7 +24,7 @@
 #
 # Every loader keys its tables on the course once, in attach_course_ids()
 # (decided 2026-11-07): `subject_course` on the loaded cedar_sections and
-# cedar_students carries each row's `course_id`, and the code
+# cedar_registrations carries each row's `course_id`, and the code
 # the registrar used that term moves to `listed_code`. A reader that filters,
 # groups or joins on `subject_course` therefore follows the course across its
 # codes with nothing to remember, and a reader that names the term's code (a
@@ -54,7 +54,7 @@ CEDAR_COURSE_CODES_COLUMNS <- c(
 # drops before attaching so a stamped file and an unstamped one load the same.
 CEDAR_ATTACHED_COURSE_COLUMNS <- list(
   cedar_sections = c("course_id", "listed_code"),
-  cedar_students = c("course_id", "listed_code")
+  cedar_registrations = c("course_id", "listed_code")
 )
 
 # A loaded table as the registrar wrote it: `subject_course` the term's code.
@@ -139,7 +139,7 @@ resolve_course_codes <- function(codes, code_history) {
 #'
 #' @param sections `cedar_sections` as loaded (keys only or attached; the unit
 #'   columns are not read).
-#' @param students `cedar_students` as loaded.
+#' @param students `cedar_registrations` as loaded.
 #' @param dims The object build_cedar_dims() returns; its `code_history` is
 #'   the crosswalk.
 #' @return An object of class `cedar_courses`: a list with `courses` (one row
@@ -252,7 +252,7 @@ validate_cedar_courses <- function(courses) {
 #'
 #' Writes each row's `course_id`, moves the code the registrar used that term
 #' to `listed_code`, and sets `subject_course` to the `course_id`, on
-#' cedar_sections and cedar_students. Every loader calls it once
+#' cedar_sections and cedar_registrations. Every loader calls it once
 #' (global.R, R/trunk/data.R, the cache-warming scripts, cedar-repl.R), so every
 #' reader groups, filters and joins by course on `subject_course`. A table
 #' already keyed is keyed again from its `listed_code`, so attaching twice, or

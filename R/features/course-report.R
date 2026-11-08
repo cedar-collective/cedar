@@ -14,7 +14,7 @@ get_course_data <- function(data_objects, opt, skip_neighbors = FALSE,
   # opt[["term"]] <- 202580
 
   # Extract CEDAR data objects (no legacy fallbacks)
-  students <- data_objects[["cedar_students"]]
+  students <- data_objects[["cedar_registrations"]]
   courses <- data_objects[["cedar_sections"]]
   # Rollcall reads each student's classification and major off the student-term table.
   student_terms <- data_objects[["cedar_student_terms"]]
@@ -25,7 +25,7 @@ get_course_data <- function(data_objects, opt, skip_neighbors = FALSE,
          "  Found data_objects keys: ", paste(names(data_objects), collapse = ", "))
   }
   if (is.null(students)) {
-    stop("[course_report.R] cedar_students dataset is NULL in data_objects\n",
+    stop("[course_report.R] cedar_registrations dataset is NULL in data_objects\n",
          "  Found data_objects keys: ", paste(names(data_objects), collapse = ", "))
   }
   if (is.null(student_terms)) {
@@ -284,7 +284,7 @@ assemble_course_overview <- function(sections, cl_enrls, opt,
 #' Each listing's own counts are retained only for labeled comparison in the
 #' Overview snapshot and the enrollment-history hover.
 #'
-#' @param students `cedar_students`.
+#' @param students `cedar_registrations`.
 #' @param sections `cedar_sections`.
 #' @param opt Course Dynamics options including `course`.
 #' @return A list containing `overview`, crosslist-family `classlist`, and
@@ -1089,7 +1089,7 @@ create_course_base_data <- function(data_objects, opt) {
   selected_code <- as.character(opt[["course"]])[[1]]
   opt[["course"]] <- course_id_of(sections, selected_code, "create_course_base_data")
   enrollment_payload <- assemble_course_enrollment_payload(
-    data_objects[["cedar_students"]], sections, opt
+    data_objects[["cedar_registrations"]], sections, opt
   )
   course_data <- get_course_data(
     data_objects, opt, skip_neighbors = TRUE,
@@ -1114,7 +1114,7 @@ compute_cr_flows_tab <- function(base, data_objects, min_contrib = 2,
   opt      <- base$opt
   # The loaded tables are keyed on the course: a feeder or destination
   # renumbered mid-history is one course.
-  students <- data_objects[["cedar_students"]]
+  students <- data_objects[["cedar_registrations"]]
   courses  <- data_objects[["cedar_sections"]]
   myopt    <- opt
   myopt[["term"]] <- NULL
@@ -1195,7 +1195,7 @@ compute_cr_flows_tab <- function(base, data_objects, min_contrib = 2,
 
 compute_cr_outcomes_tab <- function(base, data_objects) {
   outcome_opt <- modifyList(base$opt, list(data_edges = data_objects[["cedar_edges"]]))
-  get_course_outcomes(data_objects[["cedar_students"]], data_objects[["cedar_faculty"]], outcome_opt)
+  get_course_outcomes(data_objects[["cedar_registrations"]], data_objects[["cedar_faculty"]], outcome_opt)
 }
 
 #' Prepare the compact downstream-by-instructor display

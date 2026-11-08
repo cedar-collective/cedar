@@ -23,7 +23,7 @@
 #' entire program history, so switchers would be measured from their previous
 #' major rather than their entry into the focal one.
 #'
-#' @param students       cedar_students data frame. Must carry `campus`.
+#' @param students       cedar_registrations data frame. Must carry `campus`.
 #' @param programs       cedar_programs data frame
 #' @param population     Population tibble from build_population(); needs
 #'   `first_unit_term`

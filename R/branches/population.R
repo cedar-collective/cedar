@@ -519,7 +519,7 @@ classify_entry_status <- function(programs, focal_names, focal_codes = character
 #' @param student_terms Data frame or NULL. cedar_student_terms. Its `enrolled`
 #'   rows supply the UNM-wide enrollment bookends and the enrollment-based
 #'   continuation evidence; without it both bookends are NA and no candidate
-#'   is reclassified. Never cedar_students: a waitlist or an early drop is not
+#'   is reclassified. Never cedar_registrations: a waitlist or an early drop is not
 #'   an enrolled term.
 #' @param opt List of options:
 #'   type          — "preset", "dept", or "major". Default "preset".
@@ -998,7 +998,7 @@ build_demographic_population <- function(programs, opt = list(), student_terms =
 # student was enrolled at UNM, off cedar_student_terms (ADR-001 step 2). NULL
 # when no table was supplied, so callers without one get NA bookends and no
 # reclassification, never a guess. A table without `enrolled` is refused, so
-# cedar_students handed in its place cannot count a waitlist or an early drop
+# cedar_registrations handed in its place cannot count a waitlist or an early drop
 # as a term at UNM.
 .population_enrolled_terms <- function(student_terms) {
   if (is.null(student_terms)) return(NULL)
@@ -1007,7 +1007,7 @@ build_demographic_population <- function(programs, opt = list(), student_terms =
   if (length(missing_cols) > 0L) {
     stop("[population.R] student_terms is missing column(s): ",
          paste(missing_cols, collapse = ", "),
-         ". Pass cedar_student_terms, not cedar_students.")
+         ". Pass cedar_student_terms, not cedar_registrations.")
   }
   student_terms %>%
     filter(enrolled) %>%

@@ -10,7 +10,7 @@ server <- function(input, output, session) {
   #
   # DEPENDENCIES (loaded via global.R):
   #   - data_objects[["cedar_sections"]]  - Course sections (DESRs)
-  #   - data_objects[["cedar_students"]]  - Student enrollments (class lists)
+  #   - data_objects[["cedar_registrations"]]  - Student enrollments (class lists)
   #   - data_objects[["cedar_student_terms"]] - One row per student-term: enrolled, returned
   #   - data_objects[["cedar_programs"]]  - Student programs (academic studies)
   #   - data_objects[["cedar_degrees"]]   - Degree completions
@@ -24,7 +24,7 @@ server <- function(input, output, session) {
 
   # Convenience variables for server logic (all from data_objects loaded in global.R)
   cedar_sections  <- data_objects[["cedar_sections"]]
-  cedar_students  <- data_objects[["cedar_students"]]
+  cedar_registrations  <- data_objects[["cedar_registrations"]]
   cedar_programs  <- data_objects[["cedar_programs"]]
   cedar_degrees   <- data_objects[["cedar_degrees"]]
   cedar_faculty   <- data_objects[["cedar_faculty"]]
@@ -461,13 +461,13 @@ enrl_data <- eventReactive(enrl_run(), {
   # later and therefore cannot silently change the student-count table.
   filtered_students <- tryCatch(
     filter_enrollment_classlist_scope(
-      cedar_students,
+      cedar_registrations,
       desr_raw,
       dept_codes = opt[["dept_code"]]
     ),
     error = function(e) {
       cedar_debug("[server.R] Classlist scope matching failed: ", e$message)
-      cedar_students[integer(0), ]
+      cedar_registrations[integer(0), ]
     }
   )
   cedar_debug("[server.R] Filtered students to ", nrow(filtered_students), " rows for class list stats")
@@ -1693,7 +1693,7 @@ output$enrl_classlist_download <- downloadHandler(
   # step 4): the loaded tables are keyed on the course, and the picked code
   # resolves to its course once. create_course_base_data() does the same for
   # the main run, so the tabs agree on what the course is.
-  cr_students <- data_objects[["cedar_students"]]
+  cr_students <- data_objects[["cedar_registrations"]]
   cr_course_id <- reactive({
     course <- input$cr_course
     req(course, nzchar(course))
@@ -2614,7 +2614,7 @@ output$enrl_classlist_download <- downloadHandler(
   cr_dfw_status_exclusions_reactive <- reactive({
     data <- course_report_data()
     req(!is.null(data), !is.null(data$opt))
-    d <- summarize_outcome_status_exclusions(data_objects[["cedar_students"]], data$opt)
+    d <- summarize_outcome_status_exclusions(data_objects[["cedar_registrations"]], data$opt)
     campus_filter <- get_campus_filter()
     if (!is.null(campus_filter) && nrow(d) > 0) {
       d <- d %>% filter(campus %in% campus_filter$values)
@@ -2633,7 +2633,7 @@ output$enrl_classlist_download <- downloadHandler(
     if (!is.null(campus_filter)) opt$course_campus <- campus_filter$values
 
     get_course_outcome_rates(
-      data_objects[["cedar_students"]],
+      data_objects[["cedar_registrations"]],
       opt = opt,
       group_cols = c("campus", "college", "term", "subject_course"),
       min_n = 1L
@@ -2643,7 +2643,7 @@ output$enrl_classlist_download <- downloadHandler(
   cr_dfw_demographics_reactive <- reactive({
     data <- course_report_data()
     req(!is.null(data), !is.null(data$opt))
-    students <- data_objects[["cedar_students"]]
+    students <- data_objects[["cedar_registrations"]]
     opt <- data$opt
     opt$passing_grades <- dfw_passing_grades()
     # Grade-based outcomes stop at the graded edge; the branch requires it.
@@ -2680,7 +2680,7 @@ output$enrl_classlist_download <- downloadHandler(
     if (!is.null(campus_filter)) opt$course_campus <- campus_filter$values
 
     get_course_dfw_context(
-      data_objects[["cedar_students"]],
+      data_objects[["cedar_registrations"]],
       opt = opt,
       min_cell = 5L
     )
@@ -3183,7 +3183,7 @@ output$enrl_classlist_download <- downloadHandler(
     req(!is.null(course) && nzchar(course))
     campus_filter <- get_campus_filter()
     get_course_persistence(
-      data_objects[["cedar_students"]], data_objects[["cedar_degrees"]],
+      data_objects[["cedar_registrations"]], data_objects[["cedar_degrees"]],
       opt = list(
         course         = course,
         campus         = if (!is.null(campus_filter)) campus_filter$values,
@@ -3621,8 +3621,8 @@ output$enrl_classlist_download <- downloadHandler(
           # online. Results stay split by campus regardless of what is selected.
           column(3,
             selectInput("cr_ret_campus", "Campus", multiple = TRUE,
-              choices  = cedar_campus_choices(data_objects[["cedar_students"]]),
-              selected = cedar_campus_default(data_objects[["cedar_students"]]))
+              choices  = cedar_campus_choices(data_objects[["cedar_registrations"]]),
+              selected = cedar_campus_default(data_objects[["cedar_registrations"]]))
           ),
           column(2,
             numericInput("cr_ret_n_terms", "Semesters to track:", value = 4, min = 1, max = 8)
@@ -4844,7 +4844,7 @@ output$enrl_classlist_download <- downloadHandler(
   # ===========================================================================
   # Open Seats tab (Shiny module)
   # ===========================================================================
-  seatfinderServer("seatfinder", cedar_students, cedar_sections, cedar_faculty,
+  seatfinderServer("seatfinder", cedar_registrations, cedar_sections, cedar_faculty,
                    edges = data_objects[["cedar_edges"]],
                    error_handler = handle_error)
 
@@ -4856,7 +4856,7 @@ output$enrl_classlist_download <- downloadHandler(
   # ===========================================================================
   # Waitlists tab (Shiny module)
   # ===========================================================================
-  waitlistServer("waitlist", cedar_students, session,
+  waitlistServer("waitlist", cedar_registrations, session,
                  sections      = data_objects[["cedar_sections"]],
                  course_terms  = data_objects[["cedar_course_terms"]],
                  student_terms = cedar_student_terms)
@@ -4866,7 +4866,7 @@ output$enrl_classlist_download <- downloadHandler(
   # Regstats tab (Shiny module)
   # ===========================================================================
   regstatsServer("regstats",
-    students     = cedar_students,
+    students     = cedar_registrations,
     sections     = cedar_sections,
     course_flows = data_objects[["cedar_course_flows"]],
     data_summary = cedar_data_summary,
@@ -4878,7 +4878,7 @@ output$enrl_classlist_download <- downloadHandler(
   # Gen Ed tab (Shiny module)
   # ===========================================================================
   genEdExploreServer("gen_ed",
-    students = cedar_students,
+    students = cedar_registrations,
     sections = cedar_sections,
     programs = cedar_programs,
     degrees = cedar_degrees,
@@ -5727,7 +5727,7 @@ output$enrl_classlist_download <- downloadHandler(
   })
   .id_integrity <- reactive({
     req(integrity_tab_opened())
-    students <- data_objects[["cedar_students"]]
+    students <- data_objects[["cedar_registrations"]]
     if (is.null(students) || nrow(students) == 0) return(NULL)
 
     candidates <- c("cedar_programs", "cedar_degrees", "cedar_applicants",
@@ -5740,14 +5740,14 @@ output$enrl_classlist_download <- downloadHandler(
     if (length(tables) == 0) return(NULL)
 
     check_student_id_integrity(students, tables,
-                               opt = list(spine_name = "cedar_students"))
+                               opt = list(spine_name = "cedar_registrations"))
   })
 
   output$id_integrity_summary <- renderUI({
     res <- .id_integrity()
     if (is.null(res)) {
       return(div(class = "alert alert-info",
-                 "Join integrity cannot be checked: cedar_students is not loaded."))
+                 "Join integrity cannot be checked: cedar_registrations is not loaded."))
     }
 
     spine_note <- paste0(
@@ -5783,7 +5783,7 @@ output$enrl_classlist_download <- downloadHandler(
     res <- .id_integrity()
     if (is.null(res)) {
       return(.admin_reactable(
-        data.frame(Message = "cedar_students not loaded", stringsAsFactors = FALSE),
+        data.frame(Message = "cedar_registrations not loaded", stringsAsFactors = FALSE),
         pagination = FALSE, searchable = FALSE))
     }
     .admin_reactable(
@@ -5796,7 +5796,7 @@ output$enrl_classlist_download <- downloadHandler(
     res <- .id_integrity()
     if (is.null(res)) {
       return(.admin_reactable(
-        data.frame(Message = "cedar_students not loaded", stringsAsFactors = FALSE),
+        data.frame(Message = "cedar_registrations not loaded", stringsAsFactors = FALSE),
         pagination = FALSE, searchable = FALSE))
     }
     .admin_reactable(
@@ -5843,7 +5843,7 @@ output$enrl_classlist_download <- downloadHandler(
   .mapping_worklist <- reactive({
     audit <- audit_mapping_coverage(cedar_institution_files,
                                     sections = data_objects[["cedar_sections"]],
-                                    students = data_objects[["cedar_students"]],
+                                    students = data_objects[["cedar_registrations"]],
                                     programs = data_objects[["cedar_programs"]],
                                     degrees  = data_objects[["cedar_degrees"]],
                                     class_list_majors = data_objects[["cedar_class_list_majors"]])
@@ -6091,7 +6091,7 @@ output$enrl_classlist_download <- downloadHandler(
   # cedar_student_terms.
   output$campus_mapping_table <- reactable::renderReactable({
     campuses <- build_campus_reference(data_objects[["cedar_sections"]],
-                                       data_objects[["cedar_students"]],
+                                       data_objects[["cedar_registrations"]],
                                        data_objects[["cedar_student_terms"]])
     whole <- reactable::colFormat(separators = TRUE, digits = 0)
     .admin_reactable(campuses, page_size = 25L, columns = list(
@@ -6109,7 +6109,7 @@ output$enrl_classlist_download <- downloadHandler(
   # each touches in the loaded tables.
   output$counting_rules_table <- reactable::renderReactable({
     rules <- build_counting_rules(cedar_institution_files, data_objects[["cedar_programs"]],
-                                  data_objects[["cedar_sections"]], data_objects[["cedar_students"]],
+                                  data_objects[["cedar_sections"]], data_objects[["cedar_registrations"]],
                                   data_objects[["cedar_student_terms"]])
     .admin_reactable(rules, pagination = FALSE, searchable = FALSE, columns = list(
       rule     = reactable::colDef(name = "Rule", minWidth = 130),
@@ -6447,7 +6447,7 @@ output$enrl_classlist_download <- downloadHandler(
   # =============================================================================
   # Pathways tab — population-aware curriculum analytics (Shiny module)
   # =============================================================================
-  pathwaysServer("pathways", cedar_students, cedar_programs, degrees = cedar_degrees,
+  pathwaysServer("pathways", cedar_registrations, cedar_programs, degrees = cedar_degrees,
                  attempts = data_objects[["cedar_attempts"]],
                  cedar_student_terms = cedar_student_terms,
                  dims = data_objects[["cedar_dims"]],
@@ -6456,7 +6456,7 @@ output$enrl_classlist_download <- downloadHandler(
                  edges = data_objects[["cedar_edges"]], pathway_groups = CEDAR_PATHWAY_SUBJECT_GROUPS)
 
   degreeExplorerServer("degree_explorer", CEDAR_DEGREE_CATALOG, CEDAR_DEGREE_ROADMAPS,
-    sections = cedar_sections, students = cedar_students, edges = data_objects[["cedar_edges"]], shared = CEDAR_SHARED_REQUIREMENTS)
+    sections = cedar_sections, students = cedar_registrations, edges = data_objects[["cedar_edges"]], shared = CEDAR_SHARED_REQUIREMENTS)
 
   # =============================================================================
   # Retention tab — institution-level retention by course (Shiny module)
@@ -6464,6 +6464,6 @@ output$enrl_classlist_download <- downloadHandler(
   # Parked with its UI: retentionUI() is commented out in ui.R pending the
   # cross-course comparison work. The server was still running on every session,
   # registering outputs nothing rendered. Re-enable both together.
-  # retentionServer("retention", students = cedar_students, student_terms = cedar_student_terms)
+  # retentionServer("retention", students = cedar_registrations, student_terms = cedar_student_terms)
 
 } # end server

@@ -8,7 +8,7 @@
 #' Lives in branches/ because it is consumed by multiple cones
 #' (course-demographics.R and waitlist.R).
 #'
-#' @param filtered_students Data frame of student enrollments from cedar_students table,
+#' @param filtered_students Data frame of student enrollments from cedar_registrations table,
 #'   already filtered by desired criteria. Must include: student_id, term, campus,
 #'   college, subject_course, and any grouping column that describes the course
 #'   row rather than the student.

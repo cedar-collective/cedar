@@ -32,7 +32,7 @@ REGISTRATION_SNAPSHOT_COLUMNS <- c(
 
 #' Build one registration snapshot
 #'
-#' @param students `cedar_students` rows (all terms are accepted; only
+#' @param students `cedar_registrations` rows (all terms are accepted; only
 #'   `opt$terms` are read).
 #' @param sections `cedar_sections` rows.
 #' @param opt `terms` (required): the terms to snapshot, normally those still

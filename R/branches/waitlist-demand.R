@@ -162,7 +162,7 @@ summarize_waitlist_groups <- function(waitlisted_students, group_cols) {
 #' This is the shared entry point for app surfaces. It filters the full class
 #' list before removing registered overlap, which ensures the exclusion uses the
 #' same user-facing scope as the displayed count.
-#' @param students cedar_students enrollment rows.
+#' @param students cedar_registrations enrollment rows.
 #' @param opt Options accepted by [filter_class_list()].
 #' @param sections Optional sections table for title enrichment.
 #' @param group_cols Reporting grain. Defaults to the Waitlists course overview.

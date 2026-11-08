@@ -113,8 +113,8 @@ test_that("cache key changes when student data dimensions change", {
 })
 
 test_that("cache key changes when relevant content changes at the same dimensions", {
-  if (exists("cedar_students_hash", envir = .GlobalEnv))
-    rm("cedar_students_hash", envir = .GlobalEnv)
+  if (exists("cedar_registrations_hash", envir = .GlobalEnv))
+    rm("cedar_registrations_hash", envir = .GlobalEnv)
   if (exists("cedar_sections_hash", envir = .GlobalEnv))
     rm("cedar_sections_hash", envir = .GlobalEnv)
 
@@ -132,10 +132,10 @@ test_that("cache key changes when relevant content changes at the same dimension
 
 test_that("cache key uses pre-computed global hash when available", {
   # Set globals as global.R would at startup
-  assign("cedar_students_hash", "aabbccdd", envir = .GlobalEnv)
+  assign("cedar_registrations_hash", "aabbccdd", envir = .GlobalEnv)
   assign("cedar_sections_hash", "11223344", envir = .GlobalEnv)
   on.exit({
-    rm("cedar_students_hash", envir = .GlobalEnv)
+    rm("cedar_registrations_hash", envir = .GlobalEnv)
     rm("cedar_sections_hash", envir = .GlobalEnv)
   }, add = TRUE)
 
@@ -147,8 +147,8 @@ test_that("cache key uses pre-computed global hash when available", {
 
 test_that("cache key falls back to digest when globals are absent", {
   # Ensure globals do NOT exist
-  if (exists("cedar_students_hash", envir = .GlobalEnv))
-    rm("cedar_students_hash", envir = .GlobalEnv)
+  if (exists("cedar_registrations_hash", envir = .GlobalEnv))
+    rm("cedar_registrations_hash", envir = .GlobalEnv)
   if (exists("cedar_sections_hash", envir = .GlobalEnv))
     rm("cedar_sections_hash", envir = .GlobalEnv)
 
@@ -259,7 +259,7 @@ test_that("Dept Trends invalidates only tabs that consume the changed source", {
     # the major itself off the student-term table (ADR-001 step 2).
     cedar_programs = c("hc", "enrl", "ch", "demo"),
     cedar_degrees = "deg",
-    cedar_students = c("enrl", "ch"),
+    cedar_registrations = c("enrl", "ch"),
     # The Enrollment tab's student donuts read each seat's major and class
     # standing off the student-term table too (ADR-001 step 5).
     cedar_student_terms = c("enrl", "ch"),

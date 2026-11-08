@@ -307,7 +307,7 @@ audit_files <- function() {
 
 test_that("the mapping audit lists each kind of unmapped value, and college disagreements", {
   # The transform audits the saved class list, which keeps the roster's major.
-  audit <- audit_mapping_coverage(audit_files(), sections = test_sections, students = cedar_students,
+  audit <- audit_mapping_coverage(audit_files(), sections = test_sections, students = cedar_registrations,
                                   programs = test_programs, degrees = test_degrees)
   got <- audit %>% dplyr::arrange(kind, value, status) %>%
     dplyr::select(kind, value, status, rows) %>% as.data.frame()
@@ -349,7 +349,7 @@ test_that("a subject proposed in subjects.csv is still unmapped, and says where"
   files$subjects <- rbind(files$subjects, data.frame(
     subject_code = "BIOL", in_college = "STEM", in_level = "", unit_code = "MATH",
     college_code = "", status = "proposed", evidence = "", notes = ""))
-  biol <- audit_mapping_coverage(files, students = cedar_students) %>% dplyr::filter(value == "BIOL")
+  biol <- audit_mapping_coverage(files, students = cedar_registrations) %>% dplyr::filter(value == "BIOL")
   expect_equal(biol$status, "unmapped")
   expect_match(biol$context, "proposed in subjects.csv")
   expect_equal(biol$needs, "Confirm the suggested department, MATH, or replace it")
@@ -383,7 +383,7 @@ test_that("the mapping audit lists a class-list major code no programs.csv row n
   expect_false("SPAN" %in% audit_mapping_coverage(files, students = test_students_st)$value)
   # The class lists must carry the roster's name column to be checked.
   expect_error(audit_mapping_coverage(audit_files(), students = dplyr::select(test_students_st, -major_name)),
-               "cedar_students lacks major_name")
+               "cedar_registrations lacks major_name")
   # The loaded class list carries neither column (thin_class_list()): the
   # loader's summary of the roster's majors gives the same finding, and
   # without it the check is not run and the audit says so.

@@ -250,7 +250,7 @@ record keeps the decisions.
 | 2 | `cedar_student_terms`: one definition of an enrolled term and of return (closes I44) | done 2026-11-04 |
 | 3 | Dimensions from the mapping files, units attached at load | done 2026-11-06 |
 | 4 | `cedar_courses` and course ids at load (I37, I45); `cedar_course_terms`; `cedar_attempts` | courses and keying done 2026-11-07; `cedar_course_terms` done 2026-11-07; `cedar_attempts` done 2026-11-07 (`cedar_grades` retired); `cedar_course_flows` done 2026-11-07 |
-| 5 | Thin `cedar_students` and `cedar_programs` to keys and registration facts; rename to fact names | student-term columns off the loaded class list done 2026-11-07 (`thin_class_list()`), and off the saved file (`cedar_class_list_descriptions`); the section columns and `cedar_programs` stay (decisions below); the rename remains, after the open stack merges |
+| 5 | Thin `cedar_students` and `cedar_programs` to keys and registration facts; rename to fact names | student-term columns off the loaded class list done 2026-11-07 (`thin_class_list()`), and off the saved file (`cedar_class_list_descriptions`); the section columns and `cedar_programs` stay (decisions below); renamed `cedar_registrations` 2026-11-07, its file still `cedar_students.qs` (`CEDAR_TABLE_FILES`) |
 
 Step 2's precedence rule: when the two source snapshots disagree, the
 academic-studies row wins, the row is flagged and the count reported, never
@@ -283,8 +283,15 @@ a silent coalesce.
 - **The projections read the table too** (model 0.29.0): the classification
   and primary major of each student-term, instead of the most common value on
   its class-list rows (I47).
-- **Name:** `cedar_students` keeps its name until the rename PR, which answers
-  open question 1 with `cedar_registrations`.
+- **Name:** `cedar_registrations`, renamed last as one mechanical PR
+  (2026-11-07), which answers open question 1. The table, every
+  `data_objects` key, the fixture names and the docs carry the new name; the
+  saved file keeps the transform's name, `cedar_students.qs`, because
+  production cannot write a new file until its refresh runs again (I43).
+  `CEDAR_TABLE_FILES` (`R/trunk/data.R`) maps the table to its file and every
+  loader reads through `cedar_table_file()`, so renaming the file is one line
+  there and one in the transform's save. `cedar_programs` and `cedar_degrees`
+  keep their names: only the class list's was decided.
 - **The section columns stay on the row** (decided 2026-11-07, after
   measuring their readers). Of the thirteen, `subject_course`, `campus`,
   `college`, `department`, `level`, `part_term` and `term_type` are the keys

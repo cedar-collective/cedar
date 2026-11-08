@@ -45,7 +45,7 @@
 #' The balance table reveals whether instructor sections self-selected different
 #' kinds of students — the most common confounder in multi-section courses.
 #'
-#' @param students cedar_students data frame.
+#' @param students cedar_registrations data frame.
 #' @param programs cedar_programs data frame.
 #' @param applicants cedar_applicants data frame, or NULL.
 #' @param opt Named list:

@@ -25,7 +25,7 @@
 # - Mar 2026: Added is_pre_major to cedar_programs
 # - Mar 2026: Added is_topics to cedar_sections
 # - Jan 2026: Removed duplicate 'grade' column; use 'final_grade'
-# - Jan 2026: Added subject_code, level, instructor_id to cedar_students
+# - Jan 2026: Added subject_code, level, instructor_id to cedar_registrations
 # - Jan 2026: Added student_level, student_college, student_campus to cedar_programs
 #
 # To add a new table: write a transform_<name>() function below,
@@ -452,7 +452,7 @@ transform_sections <- function(desrs, data_dir, ext, maps) {
 #' another could keep the early drop and lose the W: 703 student-course-terms
 #' on the 2026-10-08 pull (ISSUES I50).
 #'
-#' @param students Pre-dedup cedar_students rows.
+#' @param students Pre-dedup cedar_registrations rows.
 #' @return The rows, one per student_id, term, campus and subject_course.
 dedup_class_list_rows <- function(students) {
   missing <- setdiff(c("student_id", "term", "campus", "subject_course", "crn",
@@ -497,7 +497,7 @@ dedup_class_list_rows <- function(students) {
 }
 
 
-# ── 2. transform_students: class_lists → cedar_students ──────────────────────
+# ── 2. transform_students: class_lists → cedar_registrations ──────────────────────
 
 #' @param class_lists Raw class_lists data frame (output of parse-data.R)
 #' @param data_dir    Path to data directory
@@ -506,7 +506,7 @@ dedup_class_list_rows <- function(students) {
 #' @return list(saved = list(students))
 transform_students <- function(class_lists, data_dir, ext, maps) {
   message("──────────────────────────────────────────────────────")
-  message("2. Transforming class_lists → cedar_students")
+  message("2. Transforming class_lists → cedar_registrations")
   message("──────────────────────────────────────────────────────")
   message("  Loaded ", nrow(class_lists), " rows, ", ncol(class_lists), " columns")
   message("  Input columns: ", paste(names(class_lists), collapse = ", "))
@@ -516,13 +516,13 @@ transform_students <- function(class_lists, data_dir, ext, maps) {
   # ── Pre-processing ────────────────────────────────────────────────────────
   message("  Pre-processing: deriving helper columns...")
 
-  # The roster's Major Code becomes cedar_students$major_code: the student-term
+  # The roster's Major Code becomes cedar_registrations$major_code: the student-term
   # table's primary major wherever the student has no declaration that term,
   # and what the mapping audit checks against programs.csv. Its name beside it
   # (major_name) is the audit's context for a code the file does not carry.
   if (!all(c("Major Code", "Major") %in% names(class_lists))) {
     stop("[transform_students] 'Major Code' and/or 'Major' columns absent from class lists export. ",
-         "cedar_students$major_code and major_name are read from them. Check the Banner class list export format.")
+         "cedar_registrations$major_code and major_name are read from them. Check the Banner class list export format.")
   }
 
   # Slim early: drop unused columns before mutations so all subsequent operations
@@ -585,7 +585,7 @@ transform_students <- function(class_lists, data_dir, ext, maps) {
 
   message("  Transforming to CEDAR model...")
 
-  cedar_students <- class_lists %>% transmute(
+  cedar_registrations <- class_lists %>% transmute(
       enrollment_id  = row_number(),
       crn            = as.character(`Course Reference Number`),
       student_id     = encrypt_if_needed(`Student ID`),
@@ -636,11 +636,11 @@ transform_students <- function(class_lists, data_dir, ext, maps) {
   # One row per student, course, campus and term (dedup_class_list_rows()).
   # Every outcome is classified from this table at load (cedar_attempts,
   # R/branches/attempts.R); nothing classified is saved.
-  cedar_students <- dedup_class_list_rows(cedar_students)
+  cedar_registrations <- dedup_class_list_rows(cedar_registrations)
 
   # Fill missing major_codes via name → code map
   if (length(major_name_to_major_code) > 0) {
-    cedar_students <- cedar_students %>%
+    cedar_registrations <- cedar_registrations %>%
       dplyr::mutate(
         major_code = dplyr::if_else(
           is.na(major_code) & !is.na(major_name) & nzchar(major_name),
@@ -652,24 +652,24 @@ transform_students <- function(class_lists, data_dir, ext, maps) {
       )
   }
 
-  message("  ✅ Created cedar_students: ", nrow(cedar_students), " rows, ", ncol(cedar_students), " columns")
-  message("  Output columns: ", paste(names(cedar_students), collapse = ", "))
+  message("  ✅ Created cedar_registrations: ", nrow(cedar_registrations), " rows, ", ncol(cedar_registrations), " columns")
+  message("  Output columns: ", paste(names(cedar_registrations), collapse = ", "))
   rm(class_lists); gc(verbose = FALSE)
 
   # The student's description is saved once per student-term and pull, and the
   # class list without it (ADR-001 step 5): each description column repeated
   # on every course row cost about 14 MB loaded, and every reader takes the
   # student-term table's value. cedar_student_terms is built from the two.
-  descriptions_meta <- save_cedar_file(build_class_list_descriptions(cedar_students),
+  descriptions_meta <- save_cedar_file(build_class_list_descriptions(cedar_registrations),
                                        "class_list_descriptions", data_dir, ext)
-  cedar_students <- thin_class_list(cedar_students)
-  students_meta <- save_cedar_file(cedar_students, "students", data_dir, ext)
+  cedar_registrations <- thin_class_list(cedar_registrations)
+  students_meta <- save_cedar_file(cedar_registrations, "students", data_dir, ext)
 
   # The per-term and running credit totals that cedar_student_term_credits
   # used to carry are columns of cedar_student_terms (build_student_terms(),
   # ADR-001 step 2), rebuilt whenever this table is.
 
-  rm(cedar_students); gc(verbose = FALSE)
+  rm(cedar_registrations); gc(verbose = FALSE)
 
   list(
     saved = list(
@@ -692,7 +692,7 @@ transform_students <- function(class_lists, data_dir, ext, maps) {
 #' @return list(saved = list(student_terms = <meta>))
 transform_student_terms <- function(data_dir, ext) {
   message("──────────────────────────────────────────────────────")
-  message("4b. Transforming cedar_students + cedar_programs + cedar_degrees → cedar_student_terms")
+  message("4b. Transforming cedar_registrations + cedar_programs + cedar_degrees → cedar_student_terms")
   message("──────────────────────────────────────────────────────")
   load_saved <- function(name) {
     path <- file.path(data_dir, paste0("cedar_", name, ext))
@@ -1282,7 +1282,7 @@ transform_to_cedar <- function(data_dir = NULL, use_qs = NULL, tables = NULL,
     message("  ⏭  Skipping cedar_sections (not in --tables)")
   }
 
-  # ── 2. cedar_students ─────────────────────────────────────────────────────
+  # ── 2. cedar_registrations ─────────────────────────────────────────────────────
   if ("students" %in% run_tables) {
     cl_file <- file.path(data_dir, paste0("class_lists", ext))
     if (file.exists(cl_file)) {
@@ -1292,10 +1292,10 @@ transform_to_cedar <- function(data_dir = NULL, use_qs = NULL, tables = NULL,
       saved_files <- c(saved_files, result$saved)
       rm(class_lists); gc(verbose = FALSE)
     } else {
-      message("  ⚠️  class_lists file not found: ", cl_file, " — skipping cedar_students")
+      message("  ⚠️  class_lists file not found: ", cl_file, " — skipping cedar_registrations")
     }
   } else {
-    message("  ⏭  Skipping cedar_students (not in --tables)")
+    message("  ⏭  Skipping cedar_registrations (not in --tables)")
   }
 
   # ── 3. cedar_programs ─────────────────────────────────────────────────────

@@ -571,7 +571,7 @@ get_gen_ed_profile <- function(students, sections, programs, degrees = NULL,
 #' runs, so a graduate who kept taking courses afterward does not contribute
 #' post-degree Gen Ed to the map.
 #'
-#' @param students Data frame. The `cedar_students` table.
+#' @param students Data frame. The `cedar_registrations` table.
 #' @param degrees Data frame. The `cedar_degrees` table.
 #' @param student_terms Data frame. The `cedar_student_terms` table.
 #' @param opt List of options:

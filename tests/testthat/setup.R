@@ -18,22 +18,22 @@ source("fixtures/designed_test_data.R")
 
 test_sections        <<- cedar_sections
 test_sections_sf     <<- cedar_sections_sf      # seatfinder-specific: 2024/2025 terms (test-seatfinder.R)
-test_students_mc     <<- cedar_students_mc       # MC02: sequence + co-req + repeat, 2 campuses
+test_students_mc     <<- cedar_registrations_mc       # MC02: sequence + co-req + repeat, 2 campuses
 test_programs_mc     <<- cedar_programs_mc       # MC02 covariates
-test_students_mcret  <<- cedar_students_mcret    # MC03: retention cohorts, incl. a campus move
-test_students_wlmkt  <<- cedar_students_wlmkt    # WL01: a waitlist in the pooled ABQ+EA market
+test_students_mcret  <<- cedar_registrations_mcret    # MC03: retention cohorts, incl. a campus move
+test_students_wlmkt  <<- cedar_registrations_wlmkt    # WL01: a waitlist in the pooled ABQ+EA market
 test_sections_intersession <<- cedar_sections_intersession # IS01: a December intersession, out of the forecast
-test_students_intersession <<- cedar_students_intersession # IS01
-test_students_rw     <<- cedar_students_rw      # RW01: last term's students, registered for the next
+test_students_intersession <<- cedar_registrations_intersession # IS01
+test_students_rw     <<- cedar_registrations_rw      # RW01: last term's students, registered for the next
 test_programs_rw     <<- cedar_programs_rw      # RW01
-test_students_st     <<- cedar_students_st      # ST01: the student-term table, one rule per student
+test_students_st     <<- cedar_registrations_st      # ST01: the student-term table, one rule per student
 test_programs_st     <<- cedar_programs_st      # ST01
 test_degrees_st      <<- cedar_degrees_st       # ST01
-test_students_rp     <<- cedar_students_rp       # RP01: next-term return, graduates and next-term drops
+test_students_rp     <<- cedar_registrations_rp       # RP01: next-term return, graduates and next-term drops
 test_degrees_rp      <<- cedar_degrees_rp        # RP01
 test_sections_topics <<- cedar_sections_topics  # rotating-topics history (test-low-enrollment.R)
 test_sections_schedule <<- cedar_sections_schedule  # SC01 schedule-check history (test-low-enrollment.R)
-test_students_pcc    <<- cedar_students_pcc      # PCC01: courses before a major switch, with a baseline
+test_students_pcc    <<- cedar_registrations_pcc      # PCC01: courses before a major switch, with a baseline
 test_programs_pcc    <<- cedar_programs_pcc      # PCC01: three switchers, three stayers
 test_population_pcc  <<- cedar_population_pcc    # PCC01: the six-student comparison universe
 test_ids_spine       <<- cedar_ids_spine         # IDS01: canonical ID space
@@ -41,26 +41,26 @@ test_ids_clean       <<- cedar_ids_clean         # IDS01: joins everywhere
 test_ids_split       <<- cedar_ids_split         # IDS01: two ID spaces, the real defect
 test_ids_partial     <<- cedar_ids_partial       # IDS01: wider population, never zero
 test_ids_orphan      <<- cedar_ids_orphan        # IDS01: no overlap in any term
-test_students    <<- cedar_students
-test_students_reused_crn <<- cedar_students_reused_crn # EC-08: repeat attempts and extract duplicates
-test_students_audits <<- cedar_students_audits # EC-09: audit/status precedence
+test_students    <<- cedar_registrations
+test_students_reused_crn <<- cedar_registrations_reused_crn # EC-08: repeat attempts and extract duplicates
+test_students_audits <<- cedar_registrations_audits # EC-09: audit/status precedence
 test_programs    <<- cedar_programs
 test_programs_concurrent <<- cedar_programs_concurrent # EC-10: same-term program intersections
 test_programs_hp <<- cedar_programs_hp            # HP01: named population groups -> Banner codes
-test_students_regstats <<- cedar_students_regstats # EC-11: prior-only anomaly baselines
+test_students_regstats <<- cedar_registrations_regstats # EC-11: prior-only anomaly baselines
 test_sections_regstats <<- cedar_sections_regstats
 test_sections_course_history <<- cedar_sections_course_history
-test_students_course_history <<- cedar_students_course_history
+test_students_course_history <<- cedar_registrations_course_history
 test_sections_pending_session <<- cedar_sections_pending_session # EC-11c: a session not yet begun (I28)
-test_students_pending_session <<- cedar_students_pending_session
-test_students_roadblocks <<- cedar_students_roadblocks # EC-12: first eligible outcomes
+test_students_pending_session <<- cedar_registrations_pending_session
+test_students_roadblocks <<- cedar_registrations_roadblocks # EC-12: first eligible outcomes
 test_programs_many_programs <<- cedar_programs_many_programs # EC-13: dept over the rollup threshold
 test_degrees_roadblocks <<- cedar_degrees_roadblocks
 test_sections_xl_switch <<- cedar_sections_xl_switch # EC-15: listing switch in a crosslist
-test_students_xl_switch <<- cedar_students_xl_switch
+test_students_xl_switch <<- cedar_registrations_xl_switch
 test_sections_rn     <<- cedar_sections_rn       # RN01: codes that succeed one another (course dimension)
-test_students_rn     <<- cedar_students_rn
-test_students_rn02   <<- cedar_students_rn02     # RN02: waitlisted under two live codes
+test_students_rn     <<- cedar_registrations_rn
+test_students_rn02   <<- cedar_registrations_rn02     # RN02: waitlisted under two live codes
 test_degrees     <<- cedar_degrees
 
 # Student-term tables (cedar_student_terms), built by the production builder
@@ -77,16 +77,16 @@ test_degrees     <<- cedar_degrees
     edges = list(last_enrolled_complete = as.integer(settled))
   ))
 }
-test_student_terms            <<- .fixture_student_terms(cedar_students, cedar_degrees)
-test_student_terms_audits     <<- .fixture_student_terms(cedar_students_audits, settled = 202110L)
-test_student_terms_roadblocks <<- .fixture_student_terms(cedar_students_roadblocks, cedar_degrees_roadblocks)
-test_student_terms_mcret      <<- .fixture_student_terms(cedar_students_mcret)
-test_student_terms_rp         <<- .fixture_student_terms(cedar_students_rp, cedar_degrees_rp)
-test_student_terms_mc         <<- .fixture_student_terms(cedar_students_mc)
+test_student_terms            <<- .fixture_student_terms(cedar_registrations, cedar_degrees)
+test_student_terms_audits     <<- .fixture_student_terms(cedar_registrations_audits, settled = 202110L)
+test_student_terms_roadblocks <<- .fixture_student_terms(cedar_registrations_roadblocks, cedar_degrees_roadblocks)
+test_student_terms_mcret      <<- .fixture_student_terms(cedar_registrations_mcret)
+test_student_terms_rp         <<- .fixture_student_terms(cedar_registrations_rp, cedar_degrees_rp)
+test_student_terms_mc         <<- .fixture_student_terms(cedar_registrations_mc)
 # RW01 carries programs rows (unit, standing); Spring 2021 is in registration,
 # so Fall 2020 is the settled edge.
 test_student_terms_rw         <<- suppressMessages(build_student_terms(
-  cedar_students_rw, cedar_programs_rw, edges = list(last_enrolled_complete = 202080L)))
+  cedar_registrations_rw, cedar_programs_rw, edges = list(last_enrolled_complete = 202080L)))
 # The Gen Ed association rows carry programs rows (GE_S1..GE_S4 declare HIST),
 # so the major mix reads a programs primary major beside class-list ones.
 test_student_terms_gen_ed_assoc <<- suppressMessages(build_student_terms(
@@ -94,7 +94,7 @@ test_student_terms_gen_ed_assoc <<- suppressMessages(build_student_terms(
   edges = list(last_enrolled_complete = as.integer(max(gen_ed_assoc_students$term)))))
 # ST01 carries its own programs and a settled edge of its own (Fall 2020).
 test_student_terms_st         <<- suppressMessages(build_student_terms(
-  cedar_students_st, cedar_programs_st, cedar_degrees_st))
+  cedar_registrations_st, cedar_programs_st, cedar_degrees_st))
 # As global.R attaches at start (ADR-001 step 3): the built table stores its
 # primary major's keys, and the unit and college (primary_dept_code,
 # primary_college_code, primary_college_basis) are attached from the
@@ -119,7 +119,7 @@ attach_test_course_ids <<- function(tbl, role = c("sections", "students")) {
   empty <- tbl[0, intersect(c("term", "subject_course", "course_title", "level"), names(tbl))]
   courses <- suppressMessages(if (role == "sections") build_cedar_courses(tbl, empty, test_dims)
                               else build_cedar_courses(empty, tbl, test_dims))
-  name <- if (role == "sections") "cedar_sections" else "cedar_students"
+  name <- if (role == "sections") "cedar_sections" else "cedar_registrations"
   suppressMessages(attach_course_ids(stats::setNames(list(tbl), name), courses))[[name]]
 }
 for (.sec in c("test_sections", "test_sections_sf", "test_sections_topics", "test_sections_schedule",
@@ -142,7 +142,7 @@ rn01_course_tables <<- function(students = test_students_rn) {
   dims <- build_cedar_dims(read_institution_mappings(cedar_institution_dir(cedar_base_dir, "demo")))
   courses <- suppressMessages(build_cedar_courses(test_sections_rn, students, dims))
   suppressMessages(attach_course_ids(
-    list(cedar_sections = test_sections_rn, cedar_students = students), courses
+    list(cedar_sections = test_sections_rn, cedar_registrations = students), courses
   ))
 }
 # RN02 rides on RN01: its class-list rows added to RN01's.
@@ -159,7 +159,7 @@ test_faculty     <<- cedar_faculty
 data_objects <<- list(
   cedar_programs = test_programs,
   cedar_degrees  = test_degrees,
-  cedar_students = test_students,
+  cedar_registrations = test_students,
   cedar_student_terms = test_student_terms,
   cedar_faculty  = test_faculty,
   cedar_sections = test_sections,

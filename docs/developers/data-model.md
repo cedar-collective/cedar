@@ -49,7 +49,7 @@ stores, so a mapping edit changes the next start and rebuilds nothing.
 |---|---|---|---|
 | `cedar_programs` | `college_code`, `student_college` (name) | `source_college_code` (Actual College), `source_college` (Translated College) | The student's college that term: their primary major's `program_college`, on every row they have |
 | `cedar_programs` | `program_college` | — | Each row's own program: program → unit → college; a concentration takes its primary major's |
-| `cedar_sections`, `cedar_students` | `college` | `source_college` | The subject row's `college_code`, else the unit's home college |
+| `cedar_sections`, `cedar_registrations` | `college` | `source_college` | The subject row's `college_code`, else the unit's home college |
 | `cedar_degrees` | `college_code`, `college`, `student_college` | `source_college` (Translated), `source_student_college` (Actual) | The degree program's college |
 
 `college_basis` on each says where the reported value came from: `mapped` (the
@@ -106,7 +106,7 @@ The flags are the startup edges from `cedar_data_edges()` passed in, never recom
 | `campus` | string | Campus code | "Main", "ABQ", "Online" | Filter (34 uses) |
 | `college` | string | College code | "AS" (Arts & Sciences) | Filter (30 uses) |
 | `department` | string | Department code | "MATH" | Filter (58 uses) |
-| `instructor_id` | string | Primary instructor ID, md5-hashed as on `cedar_students` and `cedar_faculty` (`hash_instructor_id()`, ISSUES I52; a file transformed before 2026-11-07 carries the employee ID). A section carries no faculty attribute: join `cedar_faculty` on `term` and `instructor_id` | "07c10c7c…" | FK to faculty |
+| `instructor_id` | string | Primary instructor ID, md5-hashed as on `cedar_registrations` and `cedar_faculty` (`hash_instructor_id()`, ISSUES I52; a file transformed before 2026-11-07 carries the employee ID). A section carries no faculty attribute: join `cedar_faculty` on `term` and `instructor_id` | "07c10c7c…" | FK to faculty |
 | `instructor_name` | string | Instructor full name | "Smith, John" | Instructor filter |
 | `enrolled` | integer | Current enrollment | 28 | Analytics (11 uses) |
 | `capacity` | integer | Maximum enrollment | 30 | Seat analysis |
@@ -155,9 +155,14 @@ The flags are the startup edges from `cedar_data_edges()` passed in, never recom
 
 ---
 
-## 2. `cedar_students` (Student Registrations)
+## 2. `cedar_registrations` (Student Registrations)
 
 **Purpose:** One row per student per course section (class lists)
+
+**Name and file.** The table was `cedar_students` until 2026-11-07 (ADR-001
+step 5). Its file keeps that name, `cedar_students.qs`, until the transform
+writes the new one; loaders ask for the table and read the file
+`CEDAR_TABLE_FILES` names (`cedar_table_file()`, `R/trunk/data.R`).
 
 ### Required Columns
 **These columns are used throughout Cedar code - features will break without them**
@@ -182,11 +187,11 @@ The flags are the startup edges from `cedar_data_edges()` passed in, never recom
 
 **Important Notes:**
 - `student_id` **must be encrypted/hashed** - never store plaintext student IDs!
-- `term` is most-used column (113 references) - absolutely critical. In `cedar_students`,
+- `term` is most-used column (113 references) - absolutely critical. In `cedar_registrations`,
   it is derived from the Class Lists `Academic Period Code` field.
 - `campus` (72 uses) and `college` (45 uses) are heavily filtered
 - Some columns like `subject_course`, `campus`, `college`, `term_type` are denormalized from sections for query performance
-- Analyses sometimes use `min(cedar_students$term)` as a student's **first observed
+- Analyses sometimes use `min(cedar_registrations$term)` as a student's **first observed
   class-list enrollment**. This is not a formal Banner matriculation/start-term field;
   it is only the first term CEDAR sees that student in a class-list enrollment row.
 
@@ -287,7 +292,7 @@ Major Changes is intentionally explicit about CEDAR-to-Banner derivations:
 | `inst_credits_attempted` | Academic Studies `Institution Credits Attempted` | Cumulative attempted UNM-only hours as recorded on the program row; not used for movement-card UNM medians. |
 | `overall_credits_attempted` | Academic Studies `Overall Credits Attempted` | Cumulative attempted hours including transfer; used as transfer-inclusive context. |
 
-When Pathways needs an enrollment anchor, it uses `min(cedar_students$term)`, derived
+When Pathways needs an enrollment anchor, it uses `min(cedar_registrations$term)`, derived
 from Class Lists `Academic Period Code`. Treat that as first observed class-list
 enrollment, not as a Banner start date. To avoid overstating entry timing, the
 Major Changes headline entry cards exclude records already present at the data-start
@@ -346,7 +351,7 @@ Class Lists, not the frozen Academic Studies `inst_credits_attempted` field.
 
 | Column | Type | Description | Example | Usage Count |
 |--------|------|-------------|---------|-------------|
-| `instructor_id` | string | **Encrypted** UNM ID (matches cedar_students) | "abc123..." | Join key |
+| `instructor_id` | string | **Encrypted** UNM ID (matches cedar_registrations) | "abc123..." | Join key |
 | `instructor_name` | string | Full name | "Smith, John D." | Display |
 | `term` | integer | Academic term | 202580 | Join key (34 uses) |
 | `department` | string | Home department code | "MATH" | Filter (28 uses) |
@@ -358,7 +363,7 @@ Class Lists, not the frozen Academic Studies `inst_credits_attempted` field.
 - `department` uses **department codes** from HR data (e.g., "MATH", "ANTH")
 - `job_category` uses **Title Case** values from parse-HRreport.R (see values below)
 - `appointment_pct` is stored as **decimal 0.0-1.0**, not percentage (e.g., 0.5 = 50%)
-- `instructor_id` is the same md5 hash as on `cedar_sections` and `cedar_students` (I52). An instructor can hold several appointments a term, so a join from a section or a class-list row on `term` and `instructor_id` can return several rows: pick the appointment deliberately
+- `instructor_id` is the same md5 hash as on `cedar_sections` and `cedar_registrations` (I52). An instructor can hold several appointments a term, so a join from a section or a class-list row on `term` and `instructor_id` can return several rows: pick the appointment deliberately
 
 ### Job Categories
 
@@ -431,7 +436,7 @@ course_attempts %>%
 
 ```
 cedar_sections
-    ├─► cedar_students (via term + crn)
+    ├─► cedar_registrations (via term + crn)
     │       └─► cedar_programs (via student_id)
     │       └─► cedar_degrees (via student_id)
     └─► cedar_faculty (via instructor_id)
@@ -439,10 +444,10 @@ cedar_sections
 
 ### Key Foreign Key Relationships
 
-1. **sections → enrollments:** `cedar_sections.term + crn` = `cedar_students.term + crn`
+1. **sections → enrollments:** `cedar_sections.term + crn` = `cedar_registrations.term + crn`
 2. **sections → faculty:** `cedar_sections.instructor_id` = `cedar_faculty.instructor_id`
-3. **enrollments → programs:** `cedar_students.student_id` = `cedar_programs.student_id`
-4. **enrollments → degrees:** `cedar_students.student_id` = `cedar_degrees.student_id`
+3. **enrollments → programs:** `cedar_registrations.student_id` = `cedar_programs.student_id`
+4. **enrollments → degrees:** `cedar_registrations.student_id` = `cedar_degrees.student_id`
 
 ---
 
@@ -453,7 +458,7 @@ Typical data volumes for a mid-sized university (~25,000 students):
 | Table | Rows per Term | Total (5 years) | Memory (approx) |
 |-------|--------------|-----------------|-----------------|
 | `cedar_sections` | 5,000 - 8,000 | 40,000 - 60,000 | 5-10 MB |
-| `cedar_students` | 100,000 - 150,000 | 750,000 - 1M | 60-100 MB |
+| `cedar_registrations` | 100,000 - 150,000 | 750,000 - 1M | 60-100 MB |
 | `cedar_programs` | 30,000 - 40,000 | 200,000 - 300,000 | 15-25 MB |
 | `cedar_degrees` | 5,000 - 8,000 | 40,000 - 60,000 | 3-5 MB |
 | `cedar_faculty` | 1,500 - 2,500 | 10,000 - 15,000 | 1-2 MB |
@@ -475,7 +480,7 @@ cedar_sections %>%
 
 ### Get student's course history
 ```r
-cedar_students %>%
+cedar_registrations %>%
   filter(student_id == "hashed_id") %>%
   select(term, subject_course, course_title, final_grade)
 ```
@@ -563,7 +568,7 @@ encrypt_student_id <- function(id) {
 }
 
 # In transformation
-cedar_students <- class_lists %>%
+cedar_registrations <- class_lists %>%
   mutate(student_id = encrypt_student_id(`Student ID`))
 ```
 
@@ -600,21 +605,21 @@ How each loaded table is built, and how every row gets its unit and its course a
 | Table | Rows | What it is / most-used columns |
 |-------|------|-------------------------------|
 | `cedar_sections` | ~50k | One row per DESR section row. `term`, `crn`, `subject_course`, `campus`, `department`, `enrolled`, `total_enrl`, `is_combined`, `is_topics` |
-| `cedar_students` | ~1.9M | One row per student-course-term. `student_id`, `term`, `subject_course`, `campus`, `level`, `final_grade`, `registration_status_code`. Saved and loaded without the student-description columns (`thin_class_list()`) |
+| `cedar_registrations` | ~1.9M | One row per student-course-term. `student_id`, `term`, `subject_course`, `campus`, `level`, `final_grade`, `registration_status_code`. Saved and loaded without the student-description columns (`thin_class_list()`) |
 | `cedar_class_list_descriptions` | ~470k | Saved by the transform; the app reads it at start only to summarise the roster's majors, then lets it go. One row per `student_id`, `term`, `as_of_date` and distinct roster description (`student_level`, `student_classification`, `major_code`, `major_name`, `student_college`, `student_campus`, `residency`, `dual_credit`), with `rows`, the class-list rows that carried it (`build_class_list_descriptions()`). `build_student_terms()` reads it; the summary (`summarize_class_list_majors()`, `data_objects$cedar_class_list_majors`) lets Admin > Mappings name an unmapped roster major. About 7 MB saved against 8 MB of columns on the class list file, and 56 MB in memory against 122 MB |
 | `cedar_programs` | ~200k | One row per student-term program declaration. `program_name`, `program_code`, `dept_code`, `college_code`, `student_campus`, `pell_eligible`, `first_gen`, `ipeds_race`, `gender`, `time_status`. Its `*_credits_*` columns are pull-stamped — see the field reliability contract |
 | `cedar_degrees` | ~20k | Awarded degrees. `degree`, `program_name`, `dept_code`, `cumulative_gpa`, `cumulative_credits` |
 | `cedar_faculty` | ~5k × terms | `instructor_id`, `instructor_name`, `department`, `job_category`, `appointment_pct` (0–100; divide by 100 for FTE), `college` |
 | `cedar_student_terms` | ~520k | One row per student-term with any class-list row or declaration. Built by `build_student_terms()` in the transform from students, programs and degrees (ADR-001 step 2; contract [student-terms.md](student-terms.md)). `enrolled` (registered or late-dropped: **CEDAR's one definition of an enrolled student-term**), `returned_next_regular_term` / `return_observable`, description columns in code vocabulary with the source and any conflict flagged, per-term and running (`cumulative_*`) attempted and completed UNM credits with `unm_credits_entering` and `timeline_valid`, `dfw_grades`, `degree_awarded`. Loaded by the app, which stops without it. Roadblocks reads its return, Course Dynamics retention its `enrolled` (I44 closed), every credit position its running totals through `build_credit_timeline()` (`cedar_student_term_credits` is retired) and the Gen Ed major mix its `primary_major_code`, Pathways' classification axis and the Gen Ed graduate cohort its `student_classification`, Dept Trends' SCH by major its `primary_major_code` (named through `name_program_codes()`), Course Dynamics' rollcall and the Waitlists splits its `student_classification` and `primary_major_code` (`attach_student_descriptions()`), and since 2026-11-07 every other reader of a student's description: the Course Report's DFW by classification and major, the Dept Dashboard's donuts and composition shifts, Admin's home-campus counts, Regstats' sophomore screen and the enrollment projections (0.29.0). The loaded class list carries none |
-| `cedar_courses` / `cedar_course_codes` | ~7.5k / ~7.6k | **The course dimension** (ADR-001 step 4), built at startup by `build_cedar_courses()` (`R/branches/courses.R`) from the sections, the class lists and `code_history.csv`; never saved. `cedar_courses` is one row per `course_id`: the last code of a confirmed succession chain (`SOC 371` → `SOCI 371`; `SOC 250` → `SOCI 250` → `SOCI 2315`) or the code itself, with the current `subject` and `course_number`, `level`, latest `course_title`, `first_term` / `last_term` over every code, `n_codes` and `former_codes`. `cedar_course_codes` is one row per code in the data with its `course_id`, where it appears (`in_sections`, `in_class_lists`) and `steps`. **Every loader keys the tables on the course** (decided 2026-11-07): `attach_course_ids()` sets `subject_course` on the loaded `cedar_sections` and `cedar_students` to the `course_id`, keeps the code the registrar used that term as `listed_code`, and writes `course_id` beside them (one shared vector). **So `subject_course` on a loaded table is the course**: a reader that filters, groups or joins on it follows a renamed or renumbered course across its codes with nothing to remember, and a reader that names the term's code (a section listing; "also listed as SOC 371") reads `listed_code`. The saved files keep the registrar's code. A picked code, current or former, resolves through `course_id_of()` / `course_ids_of()` or the shared `course` filter (`filter_DESRs()`, `filter_class_list()`), and the pickers whose readers resolve offer both (`course_picker_choices()`). Readers name a course's former codes from `course_former_code_spans()` (Regstats, Waitlists, the Dashboard), `course_former_codes_note()` (Course Dynamics) and Low Enrollment's history text (`"2 (Sp20); also as SOC 250"`). A cache over the loaded tables records `course_code_renames()` in its key or on its payload (Regstats v6, `cedar_course_terms`, the course flows, the neighbors cache). The enrollment projections read by course from model 0.28.0. The code-level functions alone read the registrar's code (`build_cedar_courses()`, `detect_course_renamings()`). `cedar_attempts` and `cedar_course_terms` are the measure tables (rows below) (ISSUES I37, I45) |
+| `cedar_courses` / `cedar_course_codes` | ~7.5k / ~7.6k | **The course dimension** (ADR-001 step 4), built at startup by `build_cedar_courses()` (`R/branches/courses.R`) from the sections, the class lists and `code_history.csv`; never saved. `cedar_courses` is one row per `course_id`: the last code of a confirmed succession chain (`SOC 371` → `SOCI 371`; `SOC 250` → `SOCI 250` → `SOCI 2315`) or the code itself, with the current `subject` and `course_number`, `level`, latest `course_title`, `first_term` / `last_term` over every code, `n_codes` and `former_codes`. `cedar_course_codes` is one row per code in the data with its `course_id`, where it appears (`in_sections`, `in_class_lists`) and `steps`. **Every loader keys the tables on the course** (decided 2026-11-07): `attach_course_ids()` sets `subject_course` on the loaded `cedar_sections` and `cedar_registrations` to the `course_id`, keeps the code the registrar used that term as `listed_code`, and writes `course_id` beside them (one shared vector). **So `subject_course` on a loaded table is the course**: a reader that filters, groups or joins on it follows a renamed or renumbered course across its codes with nothing to remember, and a reader that names the term's code (a section listing; "also listed as SOC 371") reads `listed_code`. The saved files keep the registrar's code. A picked code, current or former, resolves through `course_id_of()` / `course_ids_of()` or the shared `course` filter (`filter_DESRs()`, `filter_class_list()`), and the pickers whose readers resolve offer both (`course_picker_choices()`). Readers name a course's former codes from `course_former_code_spans()` (Regstats, Waitlists, the Dashboard), `course_former_codes_note()` (Course Dynamics) and Low Enrollment's history text (`"2 (Sp20); also as SOC 250"`). A cache over the loaded tables records `course_code_renames()` in its key or on its payload (Regstats v6, `cedar_course_terms`, the course flows, the neighbors cache). The enrollment projections read by course from model 0.28.0. The code-level functions alone read the registrar's code (`build_cedar_courses()`, `detect_course_renamings()`). `cedar_attempts` and `cedar_course_terms` are the measure tables (rows below) (ISSUES I37, I45) |
 | `cedar_course_terms` | ~61k | **The course-term measure table** (ADR-001 step 4), counted at startup by `build_course_terms()` (`R/branches/course-terms.R`) from the keyed class list and held at `data_objects[["cedar_course_terms"]]`; the copy saved beside the data is a cache, rebuilt unless `course_terms_is_current()` finds its build version (`COURSE_TERMS_BUILD_VERSION`), its columns and the class list's renames. One row per `campus`, `college`, `term`, `subject_course` (the course) and `part_term`, with `level`, `department` and the class-list counts: `registered` (final), `dr_early`, `dr_late`, `dr_all`, `wl_all` (waitlist rows, not true demand), `cl_total` (ever registered) and `census_enrl`. A student is in one part of term of a course-term-campus, so the part-of-term rows sum exactly to course × term × campus. It holds no mean or baseline across terms: that is the reader's question. A reader takes it as a parameter and refuses one not current for its class list (`require_current_course_terms()`): Regstats, the Department Dashboard's Regstats flags and Waitlists' census history read it. Build 2 adds the outcome counts from `cedar_attempts`: `attempts` (the DFW denominator, `passed + dfw`), `passed`, `dfw` and `withdrawn` (late withdrawals, part of `dfw`), zero for a graded course-term with no attempt and **NA after `last_graded`**, where nothing has posted; it is stamped with the `graded_edge` it was counted to, and the loader rebuilds a copy counted to another. First-day enrollment, fill and waitlist demand join it as their readers move |
 | `cedar_course_flows` | ~1.6M (111 MB) | **Every next-term course pair**, counted at startup by `build_course_flows()` (`R/branches/course-flows.R`) from the keyed class list and held at `data_objects[["cedar_course_flows"]]`; the saved copy is a cache, rebuilt unless `course_flows_is_current()` finds its build version, columns, enrollment edge and the class list's renames. One row per `campus`, `source_course`, `term`, `dest_course` and `next_term` (regular terms, registered students on the same campus both terms) with `n_students`, and the source and destination college and term type. Pairs stop at `cedar_longitudinal_edge()`: a destination term past `last_enrolled_complete` is still registering and is not a follow-up. Regstats' downstream signals read it |
 | `cedar_attempts` | ~1.4M | **The attempt measure table** (ADR-001 step 4), built at startup by `build_attempts()` (`R/branches/attempts.R`) from the keyed class list and the graded edge, held at `data_objects[["cedar_attempts"]]`; the saved copy is a cache, rebuilt unless `attempts_is_current()` finds its build version (`ATTEMPTS_BUILD_VERSION`), `cedar_outcome_policy_version`, columns, `graded_edge` and the class list's renames. One row per `student_id`, `term`, `campus` and `subject_course` (the course; `listed_code` the term's code), with `college`, `part_term`, `level`, `department`, `crn`, `registration_status_code`, `final_grade` as the classifier read it (an early drop is `Drop`, a late drop with no grade `W`), `outcome_category` (pass, c_minus, d, f, other_nonpassing, w_late_withdrawal, early_drop, missing) and `outcome` under the default policy: `pass`, `dfw`, or NA for an early drop or a registered row with no grade. The rows are `prepare_course_attempts()`'s: registered, early-drop and late-drop rows, audits excluded, terms up to `last_graded`; a duplicate student-course-campus-term stops the build. Its per-course-term counts equal `get_course_outcome_rates()` on the same class list. It replaced saved `cedar_grades` (classified before the dedup, by CRN; retired 2026-11-07): Roadblocks reads it |
 | `cedar_dims` | — | The mapping files as dimension tables (`colleges`, `units`, `subjects`, `programs`, `settings`), built once at startup by `build_cedar_dims()` (`R/branches/dims.R`) and held at `data_objects[["cedar_dims"]]`. Never saved. A cone that needs a dimension by name takes it as `dims`; `attach_unit()` reads it (ADR-001 step 3). Every lookup the retired `cedar_lookups.qs` used to carry is read off it: `unit_names(dims)`, `college_code_names(dims)`, `subject_units(dims)`, and `name_program_codes(codes, dims)` for a program code's display name (programs.csv's, which names every code the data carries, the class-list-only ones as proposed rows; a code with no row is shown as itself and listed by the mapping audit). A department's program names are counted from the programs table by `headcount_program_names()` |
 
-**Every unit is attached at load, by one function (ADR-001 step 3, 2026-11-06).** No saved table stores a unit or a college. `cedar_sections` and `cedar_students` carry the subject and Banner's section college (`source_college`); `cedar_programs` and `cedar_degrees` carry the program code and Banner's two college values (`source_college` and `source_college_code` / `source_student_college`); `cedar_student_terms` carries its primary major's code and the source's college for it (`primary_source_college_code`, `primary_source_college`). The in-memory `department` / `college` / `college_basis` on sections and class-list rows, `dept_code` / `program_college` / `college_code` / `college_basis` / `student_college` on programs and degrees, `primary_dept_code` / `primary_college_code` / `primary_college_basis` on student-terms, and the `crosslist_external` / `crosslist_partners` that follow a department, are written by `attach_default_units()` in `R/branches/dims.R` at every start (`global.R`, the cache-warming scripts, `cedar-repl.R`) through `attach_unit(rows, dims, hierarchy)`: the only code that resolves a unit, wrapping the two rules in `R/lists/institution_files.R`. `tests/testthat/test-architecture.R` ratchets every other resolution site, the transform included. A file stamped by an older transform loads the same way: the loader drops its copy first. The default columns always mean the subject's unit (sections, class lists) or the program's unit (declarations, degrees, student-terms); a reader that wants another hierarchy calls `attach_unit()` with its own `cols`, never into those names. Measured on the 2026-10-08 pull: every value the transform used to stamp is reproduced on all five tables.
+**Every unit is attached at load, by one function (ADR-001 step 3, 2026-11-06).** No saved table stores a unit or a college. `cedar_sections` and `cedar_registrations` carry the subject and Banner's section college (`source_college`); `cedar_programs` and `cedar_degrees` carry the program code and Banner's two college values (`source_college` and `source_college_code` / `source_student_college`); `cedar_student_terms` carries its primary major's code and the source's college for it (`primary_source_college_code`, `primary_source_college`). The in-memory `department` / `college` / `college_basis` on sections and class-list rows, `dept_code` / `program_college` / `college_code` / `college_basis` / `student_college` on programs and degrees, `primary_dept_code` / `primary_college_code` / `primary_college_basis` on student-terms, and the `crosslist_external` / `crosslist_partners` that follow a department, are written by `attach_default_units()` in `R/branches/dims.R` at every start (`global.R`, the cache-warming scripts, `cedar-repl.R`) through `attach_unit(rows, dims, hierarchy)`: the only code that resolves a unit, wrapping the two rules in `R/lists/institution_files.R`. `tests/testthat/test-architecture.R` ratchets every other resolution site, the transform included. A file stamped by an older transform loads the same way: the loader drops its copy first. The default columns always mean the subject's unit (sections, class lists) or the program's unit (declarations, degrees, student-terms); a reader that wants another hierarchy calls `attach_unit()` with its own `cols`, never into those names. Measured on the 2026-10-08 pull: every value the transform used to stamp is reproduced on all five tables.
 
-**Every course code gets its id at load the same way (ADR-001 step 4, 2026-11-06).** `build_cedar_courses(sections, students, dims)` in `R/branches/courses.R` gives every `subject_course` in either table one `course_id`, following the confirmed rows of `institution/<id>/code_history.csv` step by step (a subject row renames every number under it; a course row renumbers one course; a chain may mix the two), and `attach_course_ids()` keys `cedar_sections` and `cedar_students` on it at every loader beside the units. A proposed row assigns nothing: it is `detect_course_renamings()`'s candidate, written by `scripts/propose-code-history.R --write` with its evidence, and the dimension keeps the two codes as two courses until someone confirms it, exactly as a proposed unit mapping assigns no unit. The saved files are never rewritten (annotate, never mutate): in memory `subject_course` is the course and `listed_code` the term's code. Measured on the 2026-10-08 pull: 7,450 courses from 7,641 codes, the two confirmed subject renames (PSY, SOC) and the 61 CCST → CCS course rows (CCST is the lower-division prefix, CCS still the upper-division one) joining 216 codes; SOCI 371's history now begins Fall 2018 instead of Fall 2021. Build 8 s, attach under a second. A course that splits into two codes has no row by design: the validator refuses a confirmed code with two successors, because one code cannot have two ids.
+**Every course code gets its id at load the same way (ADR-001 step 4, 2026-11-06).** `build_cedar_courses(sections, students, dims)` in `R/branches/courses.R` gives every `subject_course` in either table one `course_id`, following the confirmed rows of `institution/<id>/code_history.csv` step by step (a subject row renames every number under it; a course row renumbers one course; a chain may mix the two), and `attach_course_ids()` keys `cedar_sections` and `cedar_registrations` on it at every loader beside the units. A proposed row assigns nothing: it is `detect_course_renamings()`'s candidate, written by `scripts/propose-code-history.R --write` with its evidence, and the dimension keeps the two codes as two courses until someone confirms it, exactly as a proposed unit mapping assigns no unit. The saved files are never rewritten (annotate, never mutate): in memory `subject_course` is the course and `listed_code` the term's code. Measured on the 2026-10-08 pull: 7,450 courses from 7,641 codes, the two confirmed subject renames (PSY, SOC) and the 61 CCST → CCS course rows (CCST is the lower-division prefix, CCS still the upper-division one) joining 216 codes; SOCI 371's history now begins Fall 2018 instead of Fall 2021. Build 8 s, attach under a second. A course that splits into two codes has no row by design: the validator refuses a confirmed code with two successors, because one code cannot have two ids.
 
 **The mapping files decide every unit (ADR-002 Stage 3).** A program's unit is the one its row in `institution/<id>/programs.csv` names: the confirmed row for (code, college), else the code's every-college row. Concentrations take the unit of the student's primary major that term. A course's unit comes the same way from `subjects.csv`, keyed on subject, section college (translated through `colleges.csv`, so a renamed college still matches) and level. **A code with no confirmed row has no unit (`NA`)** and is listed on Admin > Data & Usage > Mappings and in the end-of-transform mapping audit: the designed state for a code awaiting a decision, never a department named after itself. Programs no department owns (Non-Degree, Undecided) are `basis = no_unit`. A decision is an edit to the file, through a pull request; it takes effect at the next start, and the deploy restarts the app. Nothing is rebuilt for it. The deploy gate (`scripts/rebuild-programs-if-mappings-changed.R`, also run by every refresh; the name is historical) now builds only `cedar_student_terms`: when it is missing, older than the students, programs or degrees file it reads (by file time), short a column the builder now writes, or stamped with an older rule version than `STUDENT_TERMS_BUILD_VERSION` (bump it when the builder's rules change the values it writes), it is built in its own R process (`--tables student_terms`), so the app never starts without it. The transform keeps every stage's heap until it exits, and one process carrying four tables into the student-term stage was killed for memory on an 8.6 GB host.
 

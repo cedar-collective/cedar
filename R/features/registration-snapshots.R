@@ -13,7 +13,7 @@
 
 #' Terms still in registration, or scheduled and not yet open
 #'
-#' @param students,sections `cedar_students`, `cedar_sections`.
+#' @param students,sections `cedar_registrations`, `cedar_sections`.
 #' @return Every class-list or schedule term after the settled edge
 #'   (`last_enrolled_complete`, see `cedar_data_edges()`), oldest first;
 #'   `integer(0)` when there is none. Stops when the settled edge cannot be
@@ -25,7 +25,7 @@ registration_snapshot_terms <- function(students, sections) {
 
 #' Fall and Spring terms whose registration has opened
 #'
-#' @param students `cedar_students`.
+#' @param students `cedar_registrations`.
 #' @return Every Fall or Spring class-list term after the settled edge, oldest
 #'   first; `integer(0)` when there is none. Summer is never a term to return
 #'   for, and a term with a draft schedule and no class list has had no
@@ -65,7 +65,7 @@ registration_snapshot_path <- function(output_dir, term, classlist_as_of, sectio
 
 #' Record today's snapshot of every term in registration
 #'
-#' @param students,sections `cedar_students`, `cedar_sections`.
+#' @param students,sections `cedar_registrations`, `cedar_sections`.
 #' @param output_dir Directory to write into; created if absent.
 #' @param terms Terms to record; default, those still in registration or
 #'   scheduled and not yet open.
@@ -131,7 +131,7 @@ return_snapshot_path <- function(output_dir, term, classlist_as_of,
 
 #' Record today's return snapshot of every Fall or Spring term in registration
 #'
-#' @param students `cedar_students`, read only to find the terms in registration.
+#' @param students `cedar_registrations`, read only to find the terms in registration.
 #' @param student_terms `cedar_student_terms`, which the snapshot is built from.
 #' @param output_dir Directory to write into; created if absent.
 #' @param terms Target terms; default, the Fall and Spring terms whose

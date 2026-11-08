@@ -2,7 +2,7 @@
 # Tests functions in R/trunk/filter.R (CEDAR model)
 #
 # Uses designed_test_data.R fixtures (hand-crafted, transparent).
-# All expected values match counts from cedar_sections / cedar_students in that file.
+# All expected values match counts from cedar_sections / cedar_registrations in that file.
 # When fixture data changes, update the counts below accordingly.
 #
 # === SECTIONS (status=A) — 85 total rows (71 base + 14 XL merged in) ===

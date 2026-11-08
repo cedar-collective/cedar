@@ -652,7 +652,7 @@ test_that("get_course_pairs without censor_term preserves uncensored behavior", 
 
 # ── Campus policy ────────────────────────────────────────────────────────────
 #
-# Course-delivery campus (`campus` on cedar_students) is not the same field as
+# Course-delivery campus (`campus` on cedar_registrations) is not the same field as
 # the population's home campus (`student_campus` on cedar_programs); they differ
 # on roughly 28% of enrollment rows. Filtering only on home campus therefore
 # leaves branch-delivered course rows inside a main-campus view. These tests pin
