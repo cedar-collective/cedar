@@ -73,15 +73,19 @@ save_cedar_file <- function(data, table_name, data_dir, ext) {
   } else {
     message("  ✅ Saved (", round(file_size_mb, 1), " MB)")
   }
-  as_of <- if ("as_of_date" %in% names(data)) {
-    tryCatch(format(max(data$as_of_date, na.rm = TRUE)), error = function(e) NA_character_)
-  } else NA_character_
-  min_term <- if ("term" %in% names(data)) {
-    tryCatch(as.character(min(data$term, na.rm = TRUE)), error = function(e) NA_character_)
-  } else NA_character_
-  max_term <- if ("term" %in% names(data)) {
-    tryCatch(as.character(max(data$term, na.rm = TRUE)), error = function(e) NA_character_)
-  } else NA_character_
+  # The range of a column with no non-missing value is NA, not Inf with a
+  # warning: a table can be legitimately empty (a measure over a window with
+  # nothing to count).
+  known <- function(column) {
+    if (!is.data.frame(data) || !column %in% names(data)) return(NULL)
+    values <- data[[column]]
+    values[!is.na(values)]
+  }
+  as_of_values <- known("as_of_date")
+  as_of <- if (length(as_of_values)) format(max(as_of_values)) else NA_character_
+  term_values <- known("term")
+  min_term <- if (length(term_values)) as.character(min(term_values)) else NA_character_
+  max_term <- if (length(term_values)) as.character(max(term_values)) else NA_character_
   list(
     filename = filename, filepath = filepath,
     rows = if (is.data.frame(data)) nrow(data) else NA_integer_,
@@ -767,6 +771,172 @@ cedar_student_terms_staleness <- function(data_dir, ext = ".qs") {
 }
 
 
+# ── 2c. transform_measures: the keyed class list → the measure tables ────────
+
+#' The three measure tables, built as the app would have built them (ADR-001
+#' step 6)
+#'
+#' cedar_attempts (build_attempts()), cedar_course_terms (build_course_terms())
+#' and cedar_course_flows (build_course_flows()) are counted over the class
+#' list exactly as global.R loads it: trimmed to the app's first term, keyed
+#' on the course and carrying the default units from the same mapping files.
+#' Each is stamped with the fingerprint of those files and the first term, so
+#' the loader can refuse one built from other files or over another window
+#' (cedar_load_measure_table()); the builders' own stamps (build version,
+#' outcome policy, edge, course-code renames) are on it too. The app never
+#' builds one: a restart is a load.
+#'
+#' Built one at a time, each saved and dropped before the next: the refresh
+#' runs this beside the live app on the production host.
+#'
+#' @param data_dir Path to data directory
+#' @param ext      File extension
+#' @param min_term The first term the app loads (cedar_min_term in
+#'   config/shiny_config.R); required, because the renames stamped on each
+#'   table are those the trimmed class list shows.
+#' @param dims     The dimensions (build_cedar_dims()); a parameter so a test
+#'   can pass its own.
+#' @param edges    The data edges to count to; by default cedar_report_edges()
+#'   over the trimmed class list and the saved degrees, which stops when the
+#'   settled or graded edge cannot be determined. A parameter so a test can
+#'   state its edge, as the course-flow tests do.
+#' @return list(saved = list(attempts = <meta>, course_terms = <meta>,
+#'   course_flows = <meta>))
+transform_measures <- function(data_dir, ext, min_term, dims = build_cedar_dims(), edges = NULL) {
+  message("──────────────────────────────────────────────────────")
+  message("4c. Transforming the keyed class list → cedar_attempts, cedar_course_terms, cedar_course_flows")
+  message("──────────────────────────────────────────────────────")
+  if (!is.numeric(min_term) || length(min_term) != 1L || is.na(min_term)) {
+    stop("[transform-to-cedar.R] transform_measures() needs min_term, the first term the app ",
+         "loads (cedar_min_term in config/shiny_config.R): the course-code renames stamped on ",
+         "each measure table are those the trimmed class list shows.")
+  }
+  min_term <- as.integer(min_term)
+  load_saved <- function(name) {
+    path <- file.path(data_dir, paste0(cedar_table_file(paste0("cedar_", name)), ext))
+    if (!file.exists(path)) {
+      stop("[transform-to-cedar.R] the measure tables need ", path, ", which has not been built.")
+    }
+    message("  Loading: ", path)
+    load_file(path, ext)
+  }
+  # As global.R loads them: trimmed first, then the default units and the
+  # course ids attached from the files the app reads.
+  students <- thin_class_list(load_saved("registrations"))
+  students <- students[students$term >= min_term, , drop = FALSE]
+  sections <- load_saved("sections")
+  sections <- sections[sections$term >= min_term, , drop = FALSE]
+  message(sprintf("  Class list trimmed to term >= %d: %s rows", min_term,
+                  format(nrow(students), big.mark = ",")))
+  students <- attach_default_units(list(cedar_registrations = students), dims)$cedar_registrations
+  courses  <- build_cedar_courses(sections, students, dims)
+  students <- attach_course_ids(list(cedar_registrations = students), courses)$cedar_registrations
+  rm(sections, courses); gc(verbose = FALSE)
+  if (is.null(edges)) {
+    degrees <- load_saved("degrees")
+    degrees <- degrees[degrees$term >= min_term, , drop = FALSE]
+    edges <- cedar_report_edges(students, degrees = degrees)$edges
+    rm(degrees)
+  }
+  message(sprintf("  Edges: graded through %s, settled through %s",
+                  edges$last_graded, edges$last_enrolled_complete))
+
+  fingerprint <- cedar_dims_fingerprint(dims)
+  stamp <- function(tbl) {
+    attr(tbl, "cedar_dims_fingerprint") <- fingerprint
+    attr(tbl, "cedar_min_term") <- min_term
+    tbl
+  }
+  saved <- list()
+  attempts <- stamp(build_attempts(students, edges))
+  saved$attempts <- save_cedar_file(attempts, "attempts", data_dir, ext)
+  course_terms <- stamp(build_course_terms(students, attempts))
+  saved$course_terms <- save_cedar_file(course_terms, "course_terms", data_dir, ext)
+  rm(attempts, course_terms); gc(verbose = FALSE)
+  flows <- stamp(build_course_flows(students, edges))
+  saved$course_flows <- save_cedar_file(flows, "course_flows", data_dir, ext)
+  rm(flows, students); gc(verbose = FALSE)
+  message("  ✅ The measure tables are built; the app loads them and never builds them.")
+  list(saved = saved)
+}
+
+#' Why the measure tables need rebuilding, or NULL when they do not
+#'
+#' The deploy gate's question (scripts/rebuild-programs-if-mappings-changed.R),
+#' answered without loading the class list: each table must exist, be newer
+#' than the saved class list, carry its builder's current build version (and,
+#' for cedar_attempts, the outcome policy) and columns, and be stamped with
+#' the fingerprint of the mapping files now deployed and the first term the
+#' app loads. A mapping PR therefore rebuilds the measures at deploy, in the
+#' gate's own process, before the app starts: their unit columns are the
+#' files'. The loader's full check (the edge and the course-code renames
+#' against the loaded class list) stays in cedar_load_measure_table().
+#'
+#' @param data_dir Path to data directory
+#' @param ext      File extension
+#' @param dims     The dimensions now deployed (build_cedar_dims()).
+#' @param min_term The first term the app loads (cedar_min_term).
+#' @return A one-line reason, or NULL.
+cedar_measures_staleness <- function(data_dir, ext = ".qs", dims = build_cedar_dims(), min_term) {
+  if (missing(min_term) || !is.numeric(min_term) || length(min_term) != 1L || is.na(min_term)) {
+    stop("[transform-to-cedar.R] cedar_measures_staleness() needs min_term (cedar_min_term)")
+  }
+  class_list_name <- cedar_table_file("cedar_registrations")
+  class_list <- file.path(data_dir, paste0(class_list_name, ext))
+  if (!file.exists(class_list)) return(paste0(class_list_name, " has not been built"))
+  fingerprint <- cedar_dims_fingerprint(dims)
+  contracts <- list(
+    cedar_attempts = list(version_attr = "attempts_build_version",
+                          version = ATTEMPTS_BUILD_VERSION, columns = ATTEMPTS_COLUMNS),
+    cedar_course_terms = list(version_attr = "course_terms_build_version",
+                              version = COURSE_TERMS_BUILD_VERSION, columns = COURSE_TERMS_COLUMNS),
+    cedar_course_flows = list(version_attr = "course_flows_build_version",
+                              version = COURSE_FLOWS_BUILD_VERSION,
+                              columns = names(empty_next_course_pairs()))
+  )
+  for (name in CEDAR_MEASURE_TABLES) {
+    contract <- contracts[[name]]
+    path <- file.path(data_dir, paste0(name, ext))
+    if (!file.exists(path)) return(paste0(name, " has not been built"))
+    if (file.mtime(path) < file.mtime(class_list)) {
+      return(paste0(class_list_name, " newer than ", name))
+    }
+    saved <- load_file(path, ext)
+    built_under <- attr(saved, contract$version_attr, exact = TRUE)
+    if (!identical(built_under, contract$version)) {
+      return(paste0("saved ", name, " was built under build version ",
+                    if (is.null(built_under)) "unknown (unstamped)" else built_under,
+                    "; the builder is at ", contract$version))
+    }
+    if (name == "cedar_attempts") {
+      policy <- attr(saved, "cedar_outcome_policy_version", exact = TRUE)
+      if (!identical(policy, CEDAR_OUTCOME_POLICY_VERSION)) {
+        return(paste0("saved cedar_attempts was classified under outcome policy ",
+                      if (is.null(policy)) "unknown (unstamped)" else policy,
+                      "; the policy is at ", CEDAR_OUTCOME_POLICY_VERSION))
+      }
+    }
+    if (!identical(names(saved), contract$columns)) {
+      missing <- setdiff(contract$columns, names(saved))
+      return(paste0("saved ", name, if (length(missing)) " lacks column(s) the builder now writes: "
+                    else " carries other columns than the builder now writes: ",
+                    paste(if (length(missing)) missing else names(saved), collapse = ", ")))
+    }
+    if (!identical(attr(saved, "cedar_dims_fingerprint", exact = TRUE), fingerprint)) {
+      return(paste0("saved ", name, " was built from other mapping files"))
+    }
+    built_from <- attr(saved, "cedar_min_term", exact = TRUE)
+    if (!identical(as.integer(built_from), as.integer(min_term))) {
+      return(paste0("saved ", name, " starts at term ",
+                    if (is.null(built_from)) "unknown (unstamped)" else built_from,
+                    "; the app starts at ", min_term))
+    }
+    rm(saved)
+  }
+  NULL
+}
+
+
 # ── 3. transform_programs: academic_studies → cedar_programs ─────────────────
 
 #' @param academic_studies Raw academic_studies data frame
@@ -1186,7 +1356,7 @@ transform_applicants <- function(applicants, data_dir, ext) {
 #'                          "faculty", "applicants"
 #' @return Invisibly: named list of save metadata for each table written
 transform_to_cedar <- function(data_dir = NULL, use_qs = NULL, tables = NULL,
-                               include_student_terms = TRUE) {
+                               include_student_terms = TRUE, min_term = NULL) {
 
   message("\n═══════════════════════════════════════════════════════")
   message("  CEDAR Data Model Transformation")
@@ -1210,8 +1380,8 @@ transform_to_cedar <- function(data_dir = NULL, use_qs = NULL, tables = NULL,
   ext <- if (use_qs && requireNamespace("qs2", quietly = TRUE)) ".qs" else ".Rds"
 
   # Resolve which tables to run
-  all_tables <- c("sections", "students", "programs", "degrees", "student_terms", "faculty",
-                  "applicants")
+  all_tables <- c("sections", "students", "programs", "degrees", "student_terms", "measures",
+                  "faculty", "applicants")
   if (is.null(tables)) {
     run_tables <- all_tables
   } else {
@@ -1219,14 +1389,28 @@ transform_to_cedar <- function(data_dir = NULL, use_qs = NULL, tables = NULL,
     if (length(unknown) > 0)
       message("  ⚠️  Unknown table(s) ignored: ", paste(unknown, collapse = ", "))
     run_tables <- intersect(all_tables, tables)
-    # The student-term table reads the saved students, programs and degrees,
-    # so it is rebuilt whenever any of them is. A caller that will build it in
-    # a later run of its own (the deploy gate, one table per process so no
-    # process carries four tables' heap into this stage) says so.
+    # The derived tables read the saved tables, so each is rebuilt whenever a
+    # table it reads is: the student-term table on students, programs or
+    # degrees; the measure tables on students (ADR-001 step 6). A caller that
+    # will build them in later runs of its own (the deploy gate, one stage per
+    # process so no process carries four tables' heap into these) says so.
     if (isTRUE(include_student_terms) &&
         any(c("students", "programs", "degrees") %in% run_tables) && !"student_terms" %in% run_tables) {
       run_tables <- c(run_tables, "student_terms")
       message("  Note: Adding student_terms (auto-included when students/programs/degrees are transformed)")
+    }
+    if (isTRUE(include_student_terms) && "students" %in% run_tables && !"measures" %in% run_tables) {
+      run_tables <- c(run_tables, "measures")
+      message("  Note: Adding measures (auto-included when students are transformed)")
+    }
+  }
+  # The measure tables are counted over the class list as the app loads it,
+  # from its first term; that term is a setting the stage must be given.
+  if ("measures" %in% run_tables) {
+    min_term <- min_term %||% (if (exists("cedar_min_term")) cedar_min_term else NULL)
+    if (is.null(min_term)) {
+      stop("[transform-to-cedar.R] The measure tables need min_term, the first term the app loads: ",
+           "pass min_term, or define cedar_min_term (config/shiny_config.R) before calling.")
     }
   }
 
@@ -1339,6 +1523,16 @@ transform_to_cedar <- function(data_dir = NULL, use_qs = NULL, tables = NULL,
     saved_files <- c(saved_files, result$saved)
   } else {
     message("  ⏭  Skipping cedar_student_terms (not in --tables)")
+  }
+
+  # ── 4c. the measure tables ────────────────────────────────────────────────
+  # Reads the SAVED class list, sections and degrees, so a --tables students
+  # run produces measures that match the stored class list (ADR-001 step 6).
+  if ("measures" %in% run_tables) {
+    result <- transform_measures(data_dir, ext, min_term = min_term)
+    saved_files <- c(saved_files, result$saved)
+  } else {
+    message("  ⏭  Skipping the measure tables (not in --tables)")
   }
 
   # ── 5. cedar_faculty ──────────────────────────────────────────────────────
@@ -1517,6 +1711,16 @@ if (!interactive() && !exists("SOURCED_FROM_PARSE_DATA")) {
   # audit have nothing to call (ISSUES.md I13).
   source(file.path("R", "trunk", "load-funcs.R"))
   load_funcs(getwd(), modules = FALSE)
+  # The measure tables start at the app's first term, a setting in the app's
+  # config. Read that one value without the file's other side effects.
+  if (file.exists("config/shiny_config.R")) {
+    shiny_settings <- new.env()
+    sys.source("config/shiny_config.R", envir = shiny_settings)
+    if (exists("cedar_min_term", envir = shiny_settings, inherits = FALSE)) {
+      cedar_min_term <- get("cedar_min_term", envir = shiny_settings)
+    }
+    rm(shiny_settings)
+  }
 
   args         <- commandArgs(trailingOnly = TRUE)
   data_dir_arg <- NULL

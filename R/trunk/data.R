@@ -95,6 +95,66 @@ cedar_table_file <- function(name) {
   if (name %in% names(CEDAR_TABLE_FILES)) CEDAR_TABLE_FILES[[name]] else name
 }
 
+# The measure tables (ADR-001 step 6). The transform builds them over the
+# class list as the app loads it and saves them beside the fact tables; the
+# app loads them and never builds one: a restart is a load. The hint is the
+# command that builds them by hand; the deploy gate and the refresh run it.
+CEDAR_MEASURE_TABLES <- c("cedar_attempts", "cedar_course_terms", "cedar_course_flows")
+CEDAR_MEASURES_REBUILD_HINT <-
+  "Rscript --vanilla R/data-parsers/transform-to-cedar.R --tables measures"
+
+#' Load one saved measure table, or stop
+#'
+#' Fails closed on every way the saved table can disagree with what the app
+#' loaded: missing; older than the class list it was counted over; built from
+#' other mapping files (its units would be another file's); over another first
+#' term (its course-code renames would be another window's); or, by the
+#' table's own check, from another build, outcome policy, edge or set of
+#' course codes. Nothing is rebuilt here.
+#'
+#' @param name One of CEDAR_MEASURE_TABLES.
+#' @param data_dir The directory holding the saved tables.
+#' @param class_list_path The saved class list's path, for the file-time check.
+#' @param is_current The table's own currency check over the loaded tables
+#'   (attempts_is_current(), course_terms_is_current(),
+#'   course_flows_is_current()), as a function of the saved table.
+#' @param dims_fingerprint cedar_dims_fingerprint() of the dimensions loaded.
+#' @param min_term The first term the app loads (cedar_min_term).
+#' @param ext The saved files' extension.
+#' @return The saved table, attributes kept.
+cedar_load_measure_table <- function(name, data_dir, class_list_path, is_current,
+                                     dims_fingerprint, min_term, ext = get_data_extension()) {
+  if (!name %in% CEDAR_MEASURE_TABLES) {
+    stop("[data.R] cedar_load_measure_table(): ", name, " is not a measure table")
+  }
+  path <- file.path(data_dir, paste0(name, ext))
+  refuse <- function(why) {
+    stop("[data.R] ", name, " ", why, ". The app loads the measure tables and never ",
+         "builds one (ADR-001 step 6): run `", CEDAR_MEASURES_REBUILD_HINT,
+         "` (the deploy gate and the data refresh do) and start again.", call. = FALSE)
+  }
+  if (!file.exists(path)) refuse(paste0("has not been built (no ", path, ")"))
+  if (!file.exists(class_list_path)) {
+    stop("[data.R] cedar_load_measure_table(): no class list at ", class_list_path, call. = FALSE)
+  }
+  if (file.mtime(path) < file.mtime(class_list_path)) {
+    refuse("is older than the class list it was counted over")
+  }
+  tbl <- if (ext == ".qs") qs2::qs_read(path) else readRDS(path)
+  if (!identical(attr(tbl, "cedar_dims_fingerprint", exact = TRUE), dims_fingerprint)) {
+    refuse("was built from other mapping files")
+  }
+  built_from <- attr(tbl, "cedar_min_term", exact = TRUE)
+  if (!identical(as.integer(built_from), as.integer(min_term))) {
+    refuse(sprintf("was built over terms from %s; this app starts at %s",
+                   if (is.null(built_from)) "an unstamped first term" else built_from, min_term))
+  }
+  if (!isTRUE(is_current(tbl))) {
+    refuse("is from another build, outcome policy, edge or set of course codes")
+  }
+  tbl
+}
+
 # Load CEDAR data model files (only supported model - no legacy fallbacks)
 load_global_data <- function(opt) {
   message("[data.R] Loading CEDAR data model...")

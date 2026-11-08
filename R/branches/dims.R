@@ -309,6 +309,21 @@ CEDAR_ATTACHED_UNIT_COLUMNS <- list(
   cedar_student_terms = unname(CEDAR_STUDENT_TERM_UNIT_COLS)
 )
 
+#' One short fingerprint of the mapping files as loaded
+#'
+#' The dimension tables are the mapping files, so this names the files that
+#' decided every unit on the attached tables. The loader folds it into each
+#' attached table's cache fingerprint (caching cardinal rule 1), and the
+#' transform stamps it on each measure table so the loader can refuse one
+#' built from other files (ADR-001 step 6).
+#'
+#' @param dims The object build_cedar_dims() returns.
+#' @return A 12-character hash.
+cedar_dims_fingerprint <- function(dims) {
+  validate_cedar_dims(dims)
+  substr(digest::digest(dims), 1, 12)
+}
+
 #' Attach the default unit columns to every fact table a loader holds
 #'
 #' @param tables A named list of loaded tables; a table that is not
