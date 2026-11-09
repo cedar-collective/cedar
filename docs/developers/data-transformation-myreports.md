@@ -42,7 +42,7 @@ Aggregate Files (DESRs.qs, etc.)
 transform-to-cedar.R (daily)
         ↓
 cedar_sections.qs (21 columns - streamlined for performance)
-cedar_students.qs (18 columns - streamlined)
+cedar_registrations.qs (the class list; cedar_students.qs before 2026-11-09)
 cedar_programs.qs (10 columns)
 cedar_degrees.qs (14 columns)
 cedar_faculty.qs (8 columns)
@@ -204,7 +204,7 @@ CEDAR_STUDENT_SALT=your-random-secret-salt-here
 The transformation script will:
 - Check if IDs are already encrypted (64-char hex strings)
 - If not encrypted, apply SHA-256 hash with your salt
-- Store only hashed IDs in cedar_students.qs
+- Store only hashed IDs in cedar_registrations.qs
 
 **Never commit your salt to version control!**
 

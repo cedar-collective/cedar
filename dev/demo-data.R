@@ -236,7 +236,7 @@ write_demo_provenance <- function(raw, target) {
   provenance <- attr(raw, "provenance")
   people <- provenance$students %>% mutate(student_id = encrypt_if_needed(student_id))
   if (anyDuplicated(people$student_id)) stop("Fixture identities overlap between scenarios")
-  for (name in c("students", "programs", "degrees", "student_terms")) {
+  for (name in c("registrations", "programs", "degrees", "student_terms")) {
     path <- file.path(target, paste0("cedar_", name, ".qs"))
     data <- left_join(qs2::qs_read(path), people, by = "student_id")
     qs2::qs_save(data, path)

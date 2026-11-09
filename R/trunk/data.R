@@ -85,14 +85,47 @@ get_data_extension <- function(use_qs = NULL) {
 
 
 
-# The file each table is saved in, where its name differs. The class list is
-# cedar_registrations (ADR-001 step 5); the transform still saves it as
-# cedar_students, the name production's files carry, so a loader asks for the
-# table and reads the file named here.
-CEDAR_TABLE_FILES <- c(cedar_registrations = "cedar_students")
+# The file each table is saved in, where its name differs from the table's.
+# Empty since 2026-11-09: the class list's file took the table's name
+# (cedar_registrations.qs; ADR-001 step 5), and a loader still asks through
+# cedar_table_file() so the next rename is one line here.
+CEDAR_TABLE_FILES <- c()
 
 cedar_table_file <- function(name) {
   if (name %in% names(CEDAR_TABLE_FILES)) CEDAR_TABLE_FILES[[name]] else name
+}
+
+#' Rename the class list's file from the table's old name, once
+#'
+#' Production's data directory was written by a transform that saved the
+#' class list as cedar_students.qs (its name until ADR-001 step 5). The deploy
+#' gate runs this before anything reads the file: the old file is renamed to
+#' the table's name when no new one exists, and left alone, unread and
+#' reported, when both exist. A data directory with neither is not this
+#' function's concern (the staleness checks report it).
+#'
+#' @param data_dir The directory holding the saved tables.
+#' @param ext The saved files' extension.
+#' @return The files renamed (new paths), invisibly; character(0) when none.
+migrate_class_list_file <- function(data_dir, ext = ".qs") {
+  renamed <- character(0)
+  for (suffix in c("", "_small")) {
+    old <- file.path(data_dir, paste0("cedar_students", suffix, ext))
+    new <- file.path(data_dir, paste0("cedar_registrations", suffix, ext))
+    if (!file.exists(old)) next
+    if (file.exists(new)) {
+      message("[data.R] ", basename(old), " is not read: ", basename(new),
+              " is the class list's file (ADR-001 step 5). Remove the old file.")
+      next
+    }
+    if (!file.rename(old, new)) {
+      stop("[data.R] could not rename ", old, " to ", new, call. = FALSE)
+    }
+    message("[data.R] Renamed ", basename(old), " to ", basename(new),
+            ": the class list's file takes the table's name (ADR-001 step 5).")
+    renamed <- c(renamed, new)
+  }
+  invisible(renamed)
 }
 
 # The measure tables (ADR-001 step 6). The transform builds them over the

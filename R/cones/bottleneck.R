@@ -25,7 +25,7 @@
 #' library(qs2); library(dplyr)
 #'
 #' cedar_programs <- qs_read("data/cedar_programs.qs")
-#' cedar_registrations <- qs_read("data/cedar_students.qs")
+#' cedar_registrations <- qs_read("data/cedar_registrations.qs")
 #'
 #' # Build a health track cohort, then find enrollment bottlenecks
 #' cohort <- build_population(cedar_programs, opt = list(type = "health"))
@@ -81,7 +81,7 @@
 #' @examples
 #' \dontrun{
 #' cedar_programs <- qs_read("data/cedar_programs.qs")
-#' cedar_registrations <- qs_read("data/cedar_students.qs")
+#' cedar_registrations <- qs_read("data/cedar_registrations.qs")
 #'
 #' cohort <- build_population(cedar_programs, opt = list(type = "health"))
 #' result <- get_bottlenecks(cohort, cedar_registrations, opt = list())

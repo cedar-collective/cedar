@@ -37,7 +37,7 @@
 #' library(qs2); library(dplyr); library(ggplot2)
 #'
 #' cedar_programs <- qs_read("data/cedar_programs.qs")
-#' cedar_registrations <- qs_read("data/cedar_students.qs")
+#' cedar_registrations <- qs_read("data/cedar_registrations.qs")
 #' source("R/trunk/load-funcs.R")
 #' load_funcs(".")   # loads population.R, pathway.R, and all dependencies
 #'

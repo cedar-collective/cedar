@@ -27,6 +27,10 @@
 #   (cedar_measures_staleness()). So a mapping PR rebuilds them here, in
 #   minutes, and the app that then starts only loads.
 #
+# Before either check, a class-list file still under the table's old name
+# (cedar_students.qs, before 2026-11-09) is renamed to cedar_registrations.qs
+# once (migrate_class_list_file(), R/trunk/data.R).
+#
 # Checked by file times and the saved files' names and stamps, never by
 # loading the class list, so a deploy that changed nothing costs seconds.
 # Data-driven staleness stays with the morning refresh, whose transform
@@ -59,6 +63,10 @@ rebuild_programs_if_mappings_changed <- function(
       "data/"
     }
   }
+  # A data directory written before 2026-11-09 holds the class list under the
+  # table's old name; rename it once, before anything here or in the app
+  # reads it (ADR-001 step 5).
+  migrate_class_list_file(data_dir)
   # Each stage is built in its own R process. The transform keeps every
   # stage's heap until it exits, so one process running the four fact tables
   # and then the student-term stage was killed for memory on an 8.6 GB

@@ -39,7 +39,7 @@ The JSON records actual row counts, terms, campuses, and scenario families.
 ## Select the original records
 
 ```r
-students <- qs2::qs_read("output/synthetic-institution/cedar_students.qs")
+students <- qs2::qs_read("output/synthetic-institution/cedar_registrations.qs")
 original <- dplyr::filter(students,
   synthetic_cohort == 1L, fixture_source == "base")
 

@@ -160,9 +160,11 @@ The flags are the startup edges from `cedar_data_edges()` passed in, never recom
 **Purpose:** One row per student per course section (class lists)
 
 **Name and file.** The table was `cedar_students` until 2026-11-07 (ADR-001
-step 5). Its file keeps that name, `cedar_students.qs`, until the transform
-writes the new one; loaders ask for the table and read the file
-`CEDAR_TABLE_FILES` names (`cedar_table_file()`, `R/trunk/data.R`).
+step 5), and its file kept that name until 2026-11-09, when the transform
+began saving `cedar_registrations.qs` and the deploy gate renamed a data
+directory's old file once (`migrate_class_list_file()`, `R/trunk/data.R`).
+Loaders ask for the table and read the file `CEDAR_TABLE_FILES` names
+(`cedar_table_file()`), a registry now empty.
 
 ### Required Columns
 **These columns are used throughout Cedar code - features will break without them**

@@ -4,7 +4,7 @@
 # Runs after parse-data.R (PII removal already done) and writes cedar_* files.
 #
 # IMPORTANT: This does NOT modify any existing source files.
-# Output files are named cedar_sections.qs, cedar_students.qs, etc.
+# Output files are named cedar_sections.qs, cedar_registrations.qs, etc.
 #
 # ⚠️  SCHEMA SYNC REQUIREMENT:
 # When adding columns to cedar_* tables, you MUST also update:
@@ -667,7 +667,10 @@ transform_students <- function(class_lists, data_dir, ext, maps) {
   descriptions_meta <- save_cedar_file(build_class_list_descriptions(cedar_registrations),
                                        "class_list_descriptions", data_dir, ext)
   cedar_registrations <- thin_class_list(cedar_registrations)
-  students_meta <- save_cedar_file(cedar_registrations, "students", data_dir, ext)
+  # The file carries the table's name since 2026-11-09 (it was
+  # cedar_students.qs); the deploy gate renames a directory's old file once
+  # (migrate_class_list_file()).
+  students_meta <- save_cedar_file(cedar_registrations, "registrations", data_dir, ext)
 
   # The per-term and running credit totals that cedar_student_term_credits
   # used to carry are columns of cedar_student_terms (build_student_terms(),
@@ -706,7 +709,7 @@ transform_student_terms <- function(data_dir, ext) {
     message("  Loading: ", path)
     load_file(path, ext)
   }
-  students <- load_saved("students")
+  students <- load_saved("registrations")
   descriptions_path <- file.path(data_dir, paste0("cedar_class_list_descriptions", ext))
   descriptions <- resolve_class_list_descriptions(
     if (file.exists(descriptions_path)) load_file(descriptions_path, ext) else NULL,
@@ -740,7 +743,7 @@ transform_student_terms <- function(data_dir, ext) {
 cedar_student_terms_staleness <- function(data_dir, ext = ".qs") {
   target <- file.path(data_dir, paste0("cedar_student_terms", ext))
   if (!file.exists(target)) return("cedar_student_terms has not been built")
-  sources <- file.path(data_dir, paste0("cedar_", c("students", "class_list_descriptions",
+  sources <- file.path(data_dir, paste0("cedar_", c("registrations", "class_list_descriptions",
                                                     "programs", "degrees"), ext))
   sources <- sources[file.exists(sources)]
   newer <- sources[file.mtime(sources) > file.mtime(target)]
@@ -1586,7 +1589,7 @@ transform_to_cedar <- function(data_dir = NULL, use_qs = NULL, tables = NULL,
   # person, and Admin > Mappings shows the same audit live.
   message("\n──────────────────────────────────────────────────────")
   audit_tables <- lapply(
-    c(sections = "cedar_sections", students = "cedar_students",
+    c(sections = "cedar_sections", students = "cedar_registrations",
       programs = "cedar_programs", degrees = "cedar_degrees"),
     function(name) {
       path <- file.path(data_dir, paste0(name, ext))
@@ -1697,7 +1700,9 @@ transform_to_cedar <- function(data_dir = NULL, use_qs = NULL, tables = NULL,
   message("CEDAR files created:")
   for (name in names(saved_files)) {
     info <- saved_files[[name]]
-    message("  ✅ cedar_", name, ext, " (",
+    # The file's own name: the class list is saved under the table's name,
+    # cedar_registrations, while its stage is still called "students".
+    message("  ✅ ", info$filename %||% paste0("cedar_", name, ext), " (",
             format(info$rows, big.mark = ","), " rows, ",
             round(info$size_mb, 1), " MB)")
   }
