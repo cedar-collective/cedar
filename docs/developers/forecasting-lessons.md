@@ -40,6 +40,8 @@ between the two population models.
 
 | Model | Bundle schema | Calculation contract | Evidence |
 |---|---:|---|---|
+| `0.30.0` | 27 | A pooled feeder earns its place by lift: its preceding-term students take the course next at 3 or more times the market's rate, from 20 or more transitions, and the four carrying the most such students are kept (was the eight with the most, no floor); each feeder's lift and the market rate are saved. Rescored on the same data, the adjusted candidate's Spring error is 13.33% against 13.22% and the published rule's 14.44% against 14.48%; Fall 14.12% against 14.06% and 14.03% against 14.02%. Stricter rules lost: ranked by lift 14.31%, a floor of 5 13.77%. The large first-year courses carry the signal | [Feeders ranked by lift](#feeders-ranked-by-lift-model-0300-2026-11-09) below |
+| `0.29.0` | 26 | Each student-term's classification and major are read off `cedar_student_terms` (ADR-001 step 5): the classification recorded for that term, where the class list stamped a late pull's classification a step ahead (ISSUES.md I47), and the primary major in place of the most common class-list value. No rule changes; the incoming first-semester signals move for terms pulled late. Production bundles of 2026-11-07 (Spring and Fall 2027) are built on it | [ADR-001 step 5](architecture-decisions.md#step-5-decisions-2026-11-07) |
 | `0.28.0` | 26 | Reads by course (ADR-001 step 4): the course group, the forced courses, the listed sequences, the class list and the sections are keyed on `course_id`, so a renamed or renumbered course's earlier offerings are its own spine, deltas and aftcasts, and a feeder carried under two codes is one feeder. No rule changes. Rebuilt on the 2026-10-08 pull against 0.27.0 on the same data: all 58 Spring 2027 and 66 Fall 2027 published rows identical; PSY 332 and PSYC 332 as one course enter the top eight feeders of ANTH 2190C and SOCI 2315, moving four unpublished adjusted-candidate aftcasts | [ADR-001, reader PR 6](architecture-decisions.md#step-4-the-course-dimension-and-what-follows-it) |
 | `0.27.0` | 25 | The plan's feeder adjustment applies to Spring targets only (`plan_feeder_seasons`). Rescored past forecasts: following feeders took Spring error from 14.71% to 13.60% and raised Fall error from 12.78% to 13.01%, and a Spring feeder's change pointed the way the Fall course moved in 97 of 194 folds. The adjusted candidate keeps its deltas in both seasons. Rebuilt on the same data as 0.26.0, no forecast, bump, plan or section changes in either season; Fall plans' notes now state the rule | [Feeder adjustment for Spring plans only](#feeder-adjustment-for-spring-plans-only-model-0270-2026-10-25) below |
 | `0.26.0` | 25 | A course's listed predecessor (`projection_sequences.csv`: ENGL 1110 before 1120, MATH 1512 before 1522, MATH 1250 before 1512) carries its enrollment change in at its own rate and leaves the pooled feeders. The plan follows the term just finished where the spine is published: the predecessor's change always, the pooled feeders' only at 5% or more either way. The pressure bump is 5%, and feeders no longer cancel it. On the same data, Spring 2027 forecasts change for three courses (ENGL 1120 and MATH 1512 now publish the adjusted candidate); bumps fall from 1,134 to 567 registrations and planned sections from 616 to 596; no plan gets a feeder adjustment, because every spine-published course's feeders moved under 5% in Fall 2026. Fall 2027 forecasts are unchanged; bumps fall from 2,151 to 1,323 and sections from 752 to 732 | [Sequences, the feeder adjustment and a 5% bump](#sequences-the-feeder-adjustment-and-a-5-bump-model-0260-2026-10-24) below |
@@ -429,6 +431,76 @@ plan seats so that past forecasts would have covered, say, 8 terms in 10. On
 this record that is the first-day plan plus 21%. Registrations are the simpler
 rule and do as well as a flat 10%.
 
+## Feeders ranked by lift (model 0.30.0, 2026-11-09)
+
+Through 0.29.0 the pooled feeders were the eight courses whose preceding-term
+students most often took the target next, with no floor on how much more
+often than anyone else. For MATH 1220 that list was ENGL 1110, PSYC 1110,
+MATH 1215, MATH 1350, ENGL 1120, CHEM 1215, ECON 2110 and CHEM 1215L: the
+large first-year courses, not a prerequisite list, and the page could not say
+why any of them was there. 0.30.0 keeps a feeder only at a lift of 3 or more
+(its students' rate of taking the target next over a typical market student's,
+anyone in another market course that term counted once), from 20 or more
+transitions over at least two pairs, and keeps the four carrying the most such
+students; each feeder's lift and the market rate are saved and shown. MATH
+1220's feeders are now ENGL 1110 3.7x, MATH 1215 13.7x, CHEM 1215 3.6x and
+ECON 2110 3.9x over a market rate of 2.6%.
+
+Rescored on the 2026-11-07 data with both models, same folds (Spring 2027
+bundle: 215 adjusted-candidate folds, 2023–2026; Fall 2027: 242):
+
+| Feeder rule | Spring adjusted WAPE | 2024–26 only (161) | Bias | Spring published WAPE | Adjusted selected | Fall adjusted WAPE | Fall published WAPE |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| 0.29.0: eight by count, no floor | 13.22% | 13.02% | -3.5% | 14.48% | 14 | 14.06% | 14.02% |
+| **0.30.0: lift ≥ 3, four by transitions** | **13.33%** | 13.17% | -4.0% | **14.44%** | 13 | 14.12% | 14.03% |
+| lift ≥ 3, four by lift | 14.31% | 14.43% | -5.5% | 14.50% | 9 | | |
+| lift ≥ 5, four by transitions | 13.77% | 13.72% | -5.2% | 14.52% | 6 | | |
+| lift ≥ 5, four by lift | 14.17% | 14.24% | -5.7% | 14.51% | 7 | | |
+| lift ≥ 3, market rate including the course's own students | 13.34% | 13.17% | -4.0% | 14.44% | 13 | | |
+
+The spine alone is 14.75% in Spring and 14.02% in Fall. The 2026-10-18
+experiment above measured 12.9% for lift-ranked feeders against 13.2% for the
+engine's; the engine's figure reproduces and the gain does not. That
+experiment added only the repeat and feeder deltas on 152 folds; the engine
+also applies the floor and the listed sequences, whose students leave the
+pool, and reads by course. A tenth of a point either way is inside what 215
+folds resolve.
+
+Three readings:
+
+1. **Selectivity costs accuracy, monotonically.** Every stricter rule lost,
+   and ranking by lift lost most. Ranked by lift MATH 1220's feeders are the
+   credible MATH 1215 13.7x, MATH 1215Z 11.9x, CHEM 1106 6.2x and BIOL 2101
+   5.3x at a pooled rate of 25%, but MATH 1350's are HMHV 2993, NURS 329, BIOL
+   1140L and MATH 1215Y, and ENGL 1120's include NURS 329 and ARSC 198: small
+   courses whose year-to-year change is noise, with a rate high enough to
+   amplify it. The feeder delta works as the change in the incoming class's
+   size times a small carry-through rate, and the largest first-year courses
+   are the best measure of that class. The explanation got more honest; the
+   predictor did not get better.
+2. **The floor of 3 changes little because it removes little.** Against a
+   market that includes every student in a 139-course market, any first-year
+   course clears 3x for any other first-year course (ENGL 1110 is 3.0–5.1x for
+   MATH 1350, BIOL 1140 and CHEM 1215). Dropping from eight feeders to four
+   moved the delta in 125 of the 215 Spring folds, 79 closer and 73 farther,
+   and the delta pointed the way the course moved in 70 of 129 folds against
+   77 of 152. Including the target's own students in the market rate changes
+   nothing: the base rate barely moves.
+3. **Published rows move within noise.** Spring 2027: 7 of 58 courses change
+   method (AFST 1110, ARTH 1120 and ENGL 2210 to the adjusted candidate; ARTS
+   1510, ARTS 1810, ENGL 2120 and MATH 1220 to the spine), 8 projections and 8
+   section counts change, planned sections 509 to 511, and plans gain feeder
+   adjustments totalling 7 registrations where none had one. Fall 2027:
+   ARTS 1510 (127 to 105) and ENGL 2650 (26) return to the spine; sections and
+   plans are unchanged. 47 of 58 Spring courses have feeders (52 before), 167
+   feeders in all at a median lift of 4.9 (3.0 to 241), 37 courses with the
+   full four.
+
+Kept because the page can now say why each feeder is one and the forecast is
+unchanged within noise. Do not tighten the rule for credibility's sake: the
+next step for the feeder delta, if any, is a measure of the incoming class
+itself (the structural Fall model), not a better prerequisite list.
+
 ## Feeder adjustment for Spring plans only (model 0.27.0, 2026-10-25)
 
 Should the plan follow feeders at all, and only past a 5% move? Each past
@@ -807,10 +879,12 @@ or progression eligibility. Those require leakage-safe course-specific tests.
    term was full; past expansions filled this share". On Spring the schedule of
    registration's first 30 days took the spine from 17.3% to 11.7% (2026-10-20
    re-audit above); Fall cannot be tested until schedules are archived.
-2. **Rank feeders by lift, not count**, keeping one pooled rate. The accuracy
-   gain is small (0.2–0.3 points); the reason is that "ENGL 1110, PSYC 1110" is
-   not a credible feeder list for MATH 1220. Do not split the rate by major,
-   and do not build the eligible pool as a separate method.
+2. ~~**Rank feeders by lift, not count**, keeping one pooled rate.~~ Done in
+   0.30.0 as a lift floor with the feeders still ranked by transitions
+   ([above](#feeders-ranked-by-lift-model-0300-2026-11-09)); the 0.2–0.3
+   point gain did not reproduce, and ranking by lift itself lost a full point.
+   Still standing: do not split the rate by major, and do not build the
+   eligible pool as a separate method.
 3. **Record known policy changes as data** (placement cutoffs, redesigned
    sequences, new requirements) with their reason, shown as a labelled
    adjustment and checked against the actuals afterwards. MATH 1220 and FYEX

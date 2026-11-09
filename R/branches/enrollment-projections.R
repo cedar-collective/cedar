@@ -91,8 +91,16 @@ enrollment_projection_defaults <- function() {
     saturation_fill_threshold = CEDAR_NEAR_FULL_FILL,
     delta_pairs_window = 4L,
     delta_min_pairs = 2L,
-    feeder_max_courses = 8L,
-    feeder_min_students = 3L,
+    # A pooled feeder earns its place (0.30.0): its students must take this
+    # course next at feeder_min_lift times the market's rate, from at least
+    # feeder_min_students transitions over delta_min_pairs pairs, and the
+    # feeder_max_courses carrying the most such students are kept, each with
+    # its lift. Stricter selection (ranking by lift, a floor of 5) forecasts
+    # worse: the large first-year courses carry the signal
+    # (forecasting-lessons.md, 0.30.0).
+    feeder_max_courses = 4L,
+    feeder_min_students = 20L,
+    feeder_min_lift = 3,
     # Context, not a multiplier: among same-season pairs whose prior term was
     # saturated and whose capacity grew by at least expansion_capacity_change,
     # what share of the added seats filled. Needs expansion_min_pairs.
@@ -264,6 +272,14 @@ enrollment_projection_model_config <- function(opt = list()) {
     }
     config[[field]] <- value
   }
+  # A lift under 1 would admit courses whose students take this one less often
+  # than the market does: not a feeder in any sense.
+  min_lift <- suppressWarnings(as.numeric(config$feeder_min_lift))
+  if (length(min_lift) != 1L || !is.finite(min_lift) || min_lift < 1) {
+    stop("[enrollment-projections.R] feeder_min_lift must be a number of at least 1.",
+         call. = FALSE)
+  }
+  config$feeder_min_lift <- min_lift
   bump_window <- suppressWarnings(as.integer(config$pressure_bump_window))
   bump_min <- suppressWarnings(as.integer(config$pressure_bump_min_terms))
   if (length(bump_window) != 1L || length(bump_min) != 1L ||
@@ -531,6 +547,7 @@ empty_enrollment_projections <- function() {
       adjusted_delta_feeder = numeric(), adjusted_feeder_rate = numeric(),
       adjusted_feeder_courses = character(), adjusted_feeder_change = numeric(),
       adjusted_feeder_change_rate = numeric(),
+      adjusted_feeder_lifts = character(), adjusted_feeder_base_rate = numeric(),
       adjusted_delta_basis = character(),
       pressure_judged_terms = integer(), pressure_full_terms = integer(),
       pressure_bump_applied = logical(), pressure_bump = numeric(),

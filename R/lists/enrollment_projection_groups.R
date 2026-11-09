@@ -10,6 +10,14 @@
 # Groups are monitoring scopes. Projection rows use the named market and course;
 # campus and part-term allocation remains in saved delivery components.
 
+# 0.30.0 (schema 27): a pooled feeder must earn its place by lift. A course is
+# a feeder only when its students take the course next at feeder_min_lift (3)
+# times the market's rate, from at least 20 transitions, and the four carrying
+# the most such students are kept (feeder_max_courses, was eight with no
+# floor). The pooled rate is unchanged in kind. Candidates and published rows
+# carry each feeder's lift and the market rate it is measured against, so a
+# reader sees why each feeder is one. Stricter rules forecast worse
+# (forecasting-lessons.md).
 # 0.29.0 (schema 26): each student-term's classification and major are read
 # off cedar_student_terms (ADR-001 step 5): the classification Banner recorded
 # for that term, and the primary major, where the class list stamped a late
@@ -67,11 +75,12 @@
 # saturation floor and two Fall-enrollment deltas and must beat the spine on
 # rolling aftcasts. (0.19.0 introduced rolling selection and the
 # occupancy-based capacity signal.)
-CEDAR_ENROLLMENT_PROJECTION_MODEL_VERSION <- "0.29.0"
+CEDAR_ENROLLMENT_PROJECTION_MODEL_VERSION <- "0.30.0"
 
-# Schema 26: candidates and projections carry the students left waiting in
-# the term just finished (waitlisted_preceding), shown as context only.
-CEDAR_ENROLLMENT_PROJECTION_SCHEMA_VERSION <- 26L
+# Schema 27: candidates and projections carry each pooled feeder's lift and
+# the market rate behind it (feeder_lifts, feeder_base_rate). Schema 26 added
+# the students left waiting in the term just finished (waitlisted_preceding).
+CEDAR_ENROLLMENT_PROJECTION_SCHEMA_VERSION <- 27L
 # Capacity is reached at CEDAR_FULL_FILL first-day fill and a prior term is
 # saturated at CEDAR_NEAR_FULL_FILL; both levels live in R/lists/seat_fill.R.
 # The first term the model reads history from (settings.csv

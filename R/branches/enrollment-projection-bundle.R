@@ -301,7 +301,8 @@ validate_enrollment_projection_bundle <- function(bundle) {
       "preceding_term_enrollment", "preceding_term_change", "regime_alarm",
       "delta_repeat", "repeat_rate", "delta_sequence", "sequence_courses",
       "sequence_change", "delta_feeder", "feeder_rate",
-      "feeder_courses", "feeder_change", "delta_basis", "projection_formula"),
+      "feeder_courses", "feeder_change", "feeder_lifts", "feeder_base_rate",
+      "delta_basis", "projection_formula"),
     "validate_enrollment_projection_bundle() candidates"
   )
   projection_require_columns(
