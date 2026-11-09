@@ -683,6 +683,11 @@ cedar_percent_coldef <- function(name, ...) {
 #                  cache so the label stays a single "(est. Ns)".
 #   loading_label  action-specific text shown beside the spinner.
 #   loading_detail optional explanation of what the blocking load prepares.
+#   show_at_start  TRUE renders the overlay visible, for a tab whose content
+#                  loads as soon as it is opened with no run button: the page
+#                  otherwise looks finished while its outputs are still seconds
+#                  away. The server must then always send a completion (or an
+#                  error) for the first load, or the overlay never leaves.
 #
 # Labels use the recent median-to-90th-percentile end-to-end range. With both a
 # fresh and cached estimate the label names both paths; with neither, it stays
@@ -705,7 +710,8 @@ cedar_loading_overlay <- function(id, run_button = NULL, ..., emoji = "\U0001f33
                                   report_type = NULL, fresh_default = NULL,
                                   cached_default = NULL,
                                   loading_label = "Loading…",
-                                  loading_detail = NULL) {
+                                  loading_detail = NULL,
+                                  show_at_start = FALSE) {
   if (is.null(run_button) && is.null(trigger_input)) {
     stop("cedar_loading_overlay(): supply run_button (click trigger) or trigger_input (input-change trigger).")
   }
@@ -756,7 +762,8 @@ cedar_loading_overlay <- function(id, run_button = NULL, ..., emoji = "\U0001f33
       role = "dialog",
       `aria-modal` = "true",
       `aria-labelledby` = paste0(id, "-loading-label"),
-      style = "display: none;",
+      # The script adopts an already-visible overlay on DOMContentLoaded.
+      style = if (isTRUE(show_at_start)) "display: flex;" else "display: none;",
       div(class = "dash-loader-backdrop"),
       div(class = "dash-loader-box",
         div(class = "dash-loader-icon",

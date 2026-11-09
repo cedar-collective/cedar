@@ -87,17 +87,27 @@ Unrated last. The search box matches flag and rating text, including the
 own-history and evidence ratings the table does not show, so typing
 "Hard to predict" or "Volatile" finds those courses.
 
-Three blue boxes above the table each answer one question; the title says which:
+Two blue boxes above the table each answer one question; the title says which:
 
 | Box | Answers |
 |---|---|
 | **Reading the table: what each column means** | Every column, and when a miss is the schedule's rather than the forecast's |
 | **How a course's plan is built, step by step** | From last year's registrations to sections, and why each step is there; then what the pressure bump and the feeder adjustment add across the courses shown, and how many students the term just finished left waiting |
-| **Where forecast error comes from** | Past misses by cause, measured on the loaded projection's past forecasts |
 
-Below the table, **Projection methods: the two forecasts, and how one is
-chosen** describes the two forecasting methods. The Draft schedule tab has its
-own box, **How the draft comparison works**.
+Three more sit below the table:
+
+| Box | Answers |
+|---|---|
+| **Projection methods: the two forecasts, and how one is chosen** | The two forecasting methods and the rule that picks one |
+| **Where forecast error comes from** | Past misses by cause, measured on the loaded projection's past forecasts |
+| **What has been tried, and what it changed** | Every idea tested on past terms, what it did, and whether it is in the model, dropped, or next |
+
+The Draft schedule tab has its own box, **How the draft comparison works**.
+
+The page opens under a loading screen. Its text appears at once, but the
+table and the numbers in the brief are built from the saved projection after
+the page connects, which takes a few seconds; the screen lifts when they have
+rendered, and returns when you change the target term.
 
 {% include definition-summary.html id="enrollment-projection" %}
 
