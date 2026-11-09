@@ -621,6 +621,89 @@ projection_detail_ui <- function(data, ns) {
 }
 
 
+# The scope stripe over a bundle's view: target term, data window, market,
+# course count, when it was built, the draft schedule it was set beside, and
+# the model with its provenance behind an info icon. Shared by the Projections
+# page and Course Dynamics > Projections, which show the same saved bundles;
+# the course page is about one course, so it leaves the count out.
+projection_scope_bar <- function(meta, course_count = TRUE) {
+  provenance <- meta$model_provenance
+  commit <- provenance$git_commit
+  commit_label <- if (length(commit) == 1L && !is.na(commit)) {
+    substr(commit, 1L, 8L)
+  } else {
+    "unavailable"
+  }
+  worktree_label <- if (isTRUE(provenance$relevant_worktree_dirty)) {
+    "model files had uncommitted changes at build time"
+  } else if (identical(provenance$relevant_worktree_dirty, FALSE)) {
+    "model files matched the recorded Git commit"
+  } else {
+    "Git worktree status was unavailable"
+  }
+  model_note <- paste0(
+    "Model ", meta$model_version, "; Git ", commit_label, "; ",
+    worktree_label, ". Exact normalized model source is embedded in the saved bundle."
+  )
+  tags$div(
+    class = "scope-bar",
+    tags$strong(meta$target_term_label),
+    " projections | Data window: ", meta$history_start_term_label,
+    " through ", meta$as_of_term_label,
+    " | ABQ + EA",
+    if (isTRUE(course_count)) {
+      paste0(" | ", meta$n_rows, " course", if (meta$n_rows == 1L) "" else "s")
+    },
+    # When the numbers were made and what schedule they were set beside.
+    " | built ", projection_date_label(meta$built_at),
+    " | draft schedule ", if (is.na(meta$target_schedule_as_of)) {
+      "not yet in the data"
+    } else {
+      paste("as of", projection_date_label(meta$target_schedule_as_of))
+    },
+    " | model ", meta$model_version,
+    tags$span(
+      class = "enrollment-projection-model-info",
+      title = model_note,
+      `aria-label` = model_note,
+      icon("circle-info")
+    )
+  )
+}
+
+# The course detail's four rendered outputs (projection_detail_ui() names them
+# through `ns`), bound to a reactive that returns the detail or NULL. `ns`
+# maps the bare id to the one `output` expects: identity inside a module
+# server, whose `output` is already namespaced, and NS(...) from server.R. The
+# Projections page binds them once for its modal; Course Dynamics binds a set
+# per saved bundle it shows.
+bind_projection_detail_outputs <- function(output, ns, detail) {
+  output[[ns("method_history_plot")]] <- plotly::renderPlotly({
+    data <- detail()
+    req(!is.null(data), nrow(data$method_history) > 0L)
+    build_enrollment_projection_method_history_plot(
+      data$method_history,
+      selected_method_id = data$current$method_id[[1]]
+    )
+  })
+  output[[ns("movement_table")]] <- reactable::renderReactable({
+    data <- detail()
+    req(!is.null(data), nrow(data$movement$data) > 0L)
+    projection_movement_reactable(data)
+  })
+  output[[ns("history_table")]] <- reactable::renderReactable({
+    data <- detail()
+    req(!is.null(data), nrow(data$history) > 0L)
+    projection_history_reactable(data)
+  })
+  output[[ns("candidate_table")]] <- reactable::renderReactable({
+    data <- detail()
+    req(!is.null(data), nrow(data$candidates) > 0L)
+    projection_candidate_reactable(data)
+  })
+  invisible(NULL)
+}
+
 # The projections table: one row per course, opening on what each plan adds.
 projection_table_reactable <- function(projection_view, select_input) {
   data <- projection_view$table
@@ -1442,49 +1525,7 @@ enrollmentProjectionsServer <- function(id, bundles, load_bundle, programs) {
     })
 
     output$scope <- renderUI({
-      data <- view()
-      provenance <- data$meta$model_provenance
-      commit <- provenance$git_commit
-      commit_label <- if (length(commit) == 1L && !is.na(commit)) {
-        substr(commit, 1L, 8L)
-      } else {
-        "unavailable"
-      }
-      worktree_label <- if (isTRUE(provenance$relevant_worktree_dirty)) {
-        "model files had uncommitted changes at build time"
-      } else if (identical(provenance$relevant_worktree_dirty, FALSE)) {
-        "model files matched the recorded Git commit"
-      } else {
-        "Git worktree status was unavailable"
-      }
-      model_note <- paste0(
-        "Model ", data$meta$model_version, "; Git ", commit_label, "; ",
-        worktree_label, ". Exact normalized model source is embedded in the saved bundle."
-      )
-      tagList(
-        tags$div(
-          class = "scope-bar",
-          tags$strong(data$meta$target_term_label),
-          " projections | Data window: ", data$meta$history_start_term_label,
-          " through ", data$meta$as_of_term_label,
-          " | ABQ + EA | ", data$meta$n_rows,
-          paste0(" course", if (data$meta$n_rows == 1L) "" else "s"),
-          # When the numbers were made and what schedule they were set beside.
-          " | built ", projection_date_label(data$meta$built_at),
-          " | draft schedule ", if (is.na(data$meta$target_schedule_as_of)) {
-            "not yet in the data"
-          } else {
-            paste("as of", projection_date_label(data$meta$target_schedule_as_of))
-          },
-          " | model ", data$meta$model_version,
-          tags$span(
-            class = "enrollment-projection-model-info",
-            title = model_note,
-            `aria-label` = model_note,
-            icon("circle-info")
-          )
-        )
-      )
+      projection_scope_bar(view()$meta)
     })
 
     output$projection_table <- reactable::renderReactable({
@@ -1537,32 +1578,9 @@ enrollmentProjectionsServer <- function(id, bundles, load_bundle, programs) {
       ))
     })
 
-    output$method_history_plot <- plotly::renderPlotly({
-      data <- detail()
-      req(!is.null(data), nrow(data$method_history) > 0L)
-      build_enrollment_projection_method_history_plot(
-        data$method_history,
-        selected_method_id = data$current$method_id[[1]]
-      )
-    })
-
-    output$movement_table <- reactable::renderReactable({
-      data <- detail()
-      req(!is.null(data), nrow(data$movement$data) > 0L)
-      projection_movement_reactable(data)
-    })
-
-    output$history_table <- reactable::renderReactable({
-      data <- detail()
-      req(!is.null(data), nrow(data$history) > 0L)
-      projection_history_reactable(data)
-    })
-
-    output$candidate_table <- reactable::renderReactable({
-      data <- detail()
-      req(!is.null(data), nrow(data$candidates) > 0L)
-      projection_candidate_reactable(data)
-    })
+    # The module's `output` is already namespaced, so the ids are bare here;
+    # projection_detail_ui() above received session$ns for the same ids.
+    bind_projection_detail_outputs(output, identity, detail)
 
     # ---- Scenario sub-tab ---------------------------------------------------
     # Inputs in, feature call, render out. The arithmetic, the guards, and the

@@ -1907,6 +1907,66 @@ enrollment_projection_course_detail <- function(view, subject_course) {
 }
 
 
+# One course's published outlook in one saved bundle, for Course Dynamics'
+# Projections tab. It reads the bundle through the same view the Projections
+# page uses and never fits, screens or selects anything. A course the bundle
+# did not project says which of three things it was: screened out by the
+# saved pressure screen (with the saved reason), in the bundle's scope with no
+# published row, or outside the monitored course groups altogether.
+#
+# Returns a list: `status` (projected, screened_out, unpublished,
+# out_of_scope), `sentence` (NULL when projected; otherwise the one sentence
+# to show), `meta` (the view's), and `detail` (the course detail, or NULL).
+enrollment_projection_course_outlook <- function(bundle, subject_course) {
+  validate_enrollment_projection_bundle(bundle)
+  course <- as.character(subject_course %||% character(0))
+  if (length(course) != 1L || is.na(course) || !nzchar(course)) {
+    stop(
+      "[enrollment-projection-view.R] enrollment_projection_course_outlook() ",
+      "needs one subject_course.", call. = FALSE
+    )
+  }
+  view <- build_enrollment_projection_view(
+    bundle, list(group_id = "all_saved", courses = course)
+  )
+  detail <- enrollment_projection_course_detail(view, course)
+  screen <- bundle$pressure_screen %>%
+    dplyr::filter(subject_course == .env$course)
+  target_label <- view$meta$target_term_label
+  status <- if (!is.null(detail)) {
+    "projected"
+  } else if (nrow(screen) > 0L && !any(screen$included %in% TRUE)) {
+    "screened_out"
+  } else if (course %in% bundle$scope_courses) {
+    "unpublished"
+  } else {
+    "out_of_scope"
+  }
+  # The saved reason is a sentence of its own ("Not selected: 1 of 2 recent
+  # spring terms ..."), so it follows the course's sentence rather than
+  # running into it after a colon.
+  reason <- paste(unique(screen$inclusion_reason), collapse = " ")
+  if (nzchar(reason) && !grepl("[.!?]$", reason)) reason <- paste0(reason, ".")
+  sentence <- switch(
+    status,
+    projected = NULL,
+    screened_out = paste0(
+      course, " is monitored but was not projected for ", target_label,
+      ". ", reason
+    ),
+    unpublished = paste0(
+      course, " is in the ", target_label, " projection scope, but the saved ",
+      "projection holds no row for it."
+    ),
+    out_of_scope = paste0(
+      course, " is not in the monitored course groups the ", target_label,
+      " projections cover. Projections are made only for monitored courses."
+    )
+  )
+  list(status = status, sentence = sentence, meta = view$meta, detail = detail)
+}
+
+
 build_enrollment_projection_movement_detail <- function(history) {
   required <- c(
     "history_term", "history_term_label", "actual_classlist_total",

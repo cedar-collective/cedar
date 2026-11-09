@@ -1962,6 +1962,28 @@ output$enrl_classlist_download <- downloadHandler(
 
     }
 
+    if (tab == "Projections") {
+      base <- course_report_data() %||% base
+      if (is.null(base$projections)) {
+        base$projections <- with_cr_tab_loading(
+          "Reading the saved projections...",
+          lapply(
+            load_cr_projection_bundles(),
+            enrollment_projection_course_outlook,
+            subject_course = base$course_code
+          )
+        )
+        course_report_data(base)
+        for (target_term in names(base$projections)) local({
+          key <- target_term
+          bind_projection_detail_outputs(
+            output, NS(paste0("cr_projection_", key)),
+            function() course_report_data()$projections[[key]]$detail
+          )
+        })
+      }
+    }
+
     # Outcomes (dfw_trend, instructor_dfw, persistence) are needed by both the
     # DFW and Retention tabs.
     if (tab %in% c("DFW", "Retention")) {
@@ -1981,6 +2003,69 @@ output$enrl_classlist_download <- downloadHandler(
   observeEvent(input$cr_tabs, {
     cr_load_tab(input$cr_tabs)
   }, ignoreInit = TRUE)
+
+  # Course Dynamics > Projections reads the saved bundles Registration >
+  # Projections reads, one per published target term, through the same loader
+  # and view (enrollment-projections.md: Shiny never fits a model). Each file is
+  # read once per session; a bundle this build cannot read is reported and left
+  # out, as on the Projections page.
+  cr_projection_bundle_cache <- new.env(parent = emptyenv())
+  load_cr_projection_bundles <- function() {
+    saved <- find_enrollment_projection_bundles(projection_bundle_dir)
+    saved <- saved[order(saved$target_term), , drop = FALSE]
+    bundles <- list()
+    for (i in seq_len(nrow(saved))) {
+      key <- paste0(saved$path[[i]], "@", format(saved$modified[[i]], "%Y%m%d%H%M%S"))
+      bundle <- cr_projection_bundle_cache[[key]]
+      if (is.null(bundle)) {
+        bundle <- tryCatch(
+          {
+            value <- load_enrollment_projection_bundle(
+              projection_bundle_dir, saved$target_term[[i]]
+            )
+            if (!is.null(value)) validate_enrollment_projection_bundle(value)
+            value
+          },
+          error = function(e) {
+            showNotification(
+              paste0(
+                "The saved projection for ", fmt_term(saved$target_term[[i]]),
+                " cannot be read by this version of CEDAR: ", conditionMessage(e)
+              ),
+              type = "warning", duration = 12
+            )
+            NULL
+          }
+        )
+        if (is.null(bundle)) next
+        assign(key, bundle, envir = cr_projection_bundle_cache)
+      }
+      bundles[[as.character(saved$target_term[[i]])]] <- bundle
+    }
+    bundles
+  }
+
+  output$cr_projections_ui <- renderUI({
+    data <- course_report_data()
+    req(!is.null(data))
+    outlooks <- data$projections
+    if (is.null(outlooks)) return(NULL)
+    if (length(outlooks) == 0L) {
+      return(empty_state("No validated enrollment projection bundle is available."))
+    }
+    tagList(lapply(outlooks, function(outlook) {
+      ns <- NS(paste0("cr_projection_", outlook$meta$target_term))
+      dashboard_subsection(
+        paste(outlook$meta$target_term_label, "plan"),
+        projection_scope_bar(outlook$meta, course_count = FALSE),
+        if (identical(outlook$status, "projected")) {
+          projection_detail_ui(outlook$detail, ns)
+        } else {
+          tags$p(class = "enrollment-projection-lead", outlook$sentence)
+        }
+      )
+    }))
+  })
 
   # "Update Flow Diagrams" button — recompute Sankey with current min/max settings.
   observeEvent(input$cr_update_flows, {

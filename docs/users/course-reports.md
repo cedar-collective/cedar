@@ -40,6 +40,28 @@ The report tabs appear once **Analyze Course** has finished; changing the course
 
 ---
 
+## Projections
+
+The published plan for this course in each term CEDAR has projected, read from
+the same saved projection as **Registration → Projections**. One block per
+projected term (a Fall and a Spring are both current) shows the sections to
+schedule, the registrations they are sized for, each step that built the number
+from last year's class list, the recent same-season evidence, and how close
+past forecasts for the course came.
+
+- Projections are made for **ABQ and EA together as one market**, so the campus
+  filter at the top of the page does not apply to this tab, and branch campuses
+  are never projected.
+- Only monitored courses are projected. A course outside the monitored groups
+  says so; a monitored course the pressure screen left out of a term shows the
+  saved reason (for example, how many recent same-season terms reached 90% of
+  scheduled capacity).
+- Nothing is computed when the tab opens: every number is the saved
+  projection's, built by the morning refresh. See
+  [Enrollment Projections](enrollment-projections) for how to read the plan.
+
+---
+
 ## Course Flows
 
 What do students take alongside this course, where do they come from before it,
