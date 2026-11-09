@@ -609,7 +609,10 @@ test_that("the whole Course Dynamics payload is keyed on the course", {
     cedar_student_terms = attach_test_student_terms(suppressMessages(build_student_terms(
       rn$cedar_registrations, programs = NULL, degrees = NULL,
       edges = list(last_enrolled_complete = 202110L)
-    )))
+    ))),
+    # The demographics denominator reads the course-term table built over the
+    # same keyed class list.
+    cedar_course_terms = course_terms_for(rn$cedar_registrations, rn$cedar_sections)
   )
   base <- suppressMessages(
     create_course_base_data(rn_objects, list(course = "HIST 320", skip_cache = TRUE))

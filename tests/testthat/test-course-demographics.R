@@ -23,7 +23,7 @@ test_that("summarize_student_demographics groups by student_classification", {
 
   opt    <- list(group_cols = c("campus", "college", "term", "term_type",
                                 "student_classification", "subject_course"))
-  result <- summarize_student_demographics(filtered, test_student_terms, opt)
+  result <- summarize_student_demographics(filtered, test_student_terms, test_course_terms, opt)
 
   expect_true("student_classification" %in% names(result))
   # 27 registered HIST 1110 students across all terms
@@ -37,7 +37,7 @@ test_that("summarize_student_demographics pct sums to 100 per term", {
 
   opt    <- list(group_cols = c("campus", "college", "term", "term_type",
                                 "student_classification", "subject_course"))
-  result <- summarize_student_demographics(filtered, test_student_terms, opt)
+  result <- summarize_student_demographics(filtered, test_student_terms, test_course_terms, opt)
 
   pct_sums <- result %>%
     group_by(term) %>%
@@ -47,34 +47,48 @@ test_that("summarize_student_demographics pct sums to 100 per term", {
 })
 
 test_that("term-type averages include zero-presence offered terms", {
-  students <- tibble::tibble(
-    student_id = c("A1", "B1", "A2"),
-    campus = "ABQ",
-    college = "AS",
-    term = c(202080L, 202080L, 202180L),
-    term_type = "fall",
-    subject_course = "HIST 1110",
-    registration_status_code = "RE"
-  )
-  # The major is the student-term table's, never the course row's.
-  student_terms <- tibble::tibble(
-    student_id = c("A1", "B1", "A2"),
-    term = c(202080L, 202080L, 202180L),
-    primary_major_code = c("A", "B", "A")
-  )
+  # HIST 1110 on ABQ ran in Spring 2020 (21 registered) and Spring 2021 (2).
+  # Give one Spring 2020 student major B and everyone else major A: B is
+  # present in one of the two springs, so its typical-spring count averages
+  # over both (0.5), against the course's typical spring enrollment (11.5).
+  roster <- test_students %>%
+    filter(subject_course == "HIST 1110", registration_status_code %in% STATUS_REGISTERED,
+           term %in% c(202010L, 202110L))
+  one <- roster %>% filter(term == 202010L) %>% slice(1)
+  student_terms <- test_student_terms %>%
+    mutate(primary_major_code = if_else(student_id == one$student_id & term == 202010L, "B", "A"))
   result <- summarize_student_demographics(
-    students,
-    student_terms,
-    list(group_cols = c(
-      "campus", "college", "term", "term_type", "major_code", "subject_course"
-    ))
+    roster, student_terms, test_course_terms,
+    list(group_cols = c("campus", "college", "term", "term_type", "major_code", "subject_course"))
   )
-
+  springs <- test_course_terms %>%
+    filter(subject_course == "HIST 1110", campus == "ABQ", term %in% c(202010L, 202110L),
+           !is.na(registered))
+  expect_equal(sort(springs$registered), c(2L, 21L))
   major_b <- result %>% dplyr::filter(major_code == "B")
   expect_equal(nrow(major_b), 2L)
   expect_setequal(major_b$count, c(0L, 1L))
   expect_true(all(major_b$mean == 0.5))
-  expect_true(all(major_b$term_type_pct == 33.3))
+  expect_equal(unique(major_b$registered_mean), mean(springs$registered))
+  expect_true(all(major_b$term_type_pct == round(0.5 / mean(springs$registered) * 100, 1)))
+  # The denominator is the table's, not a recount of the rows handed in: a
+  # roster cut to one student still reports the course's enrollment.
+  cut <- summarize_student_demographics(
+    one, student_terms, test_course_terms,
+    list(group_cols = c("campus", "college", "term", "term_type", "major_code", "subject_course"))
+  )
+  expect_equal(cut$registered, 21L)
+  expect_equal(cut$term_pct, round(1 / 21 * 100, 1))
+  # Rows the table has no count for are refused, never given a denominator.
+  expect_error(
+    summarize_student_demographics(
+      roster %>% mutate(subject_course = "HIST 9999"), student_terms, test_course_terms,
+      list(group_cols = c("campus", "college", "term", "term_type", "major_code", "subject_course"))),
+    "no registered count in cedar_course_terms")
+  expect_error(
+    summarize_student_demographics(roster, student_terms, calc_cl_enrls(roster, by_part_term = TRUE),
+      list(group_cols = c("campus", "college", "term", "term_type", "major_code", "subject_course"))),
+    "build_course_terms")
 })
 
 test_that("plot_time_series uses actual term percentages, not term-type averages", {
@@ -146,7 +160,7 @@ test_that("classification is read off the student-term table, not the course row
   # Roster says Senior everywhere; the table still says Sophomore.
   relabelled_roster <- .hist_1110_registered() %>%
     mutate(student_classification = "Senior")
-  result <- summarize_student_demographics(relabelled_roster, test_student_terms, .class_opt)
+  result <- summarize_student_demographics(relabelled_roster, test_student_terms, test_course_terms, .class_opt)
   expect_setequal(unique(result$student_classification), "Sophomore")
   expect_equal(sum(result$count), 27)
 
@@ -155,7 +169,7 @@ test_that("classification is read off the student-term table, not the course row
   relabelled_table <- test_student_terms %>%
     mutate(student_classification = if_else(
       student_id == one$student_id & term == one$term, "Junior", student_classification))
-  result <- summarize_student_demographics(.hist_1110_registered(), relabelled_table, .class_opt)
+  result <- summarize_student_demographics(.hist_1110_registered(), relabelled_table, test_course_terms, .class_opt)
   junior <- result %>% filter(student_classification == "Junior", count > 0)
   expect_equal(nrow(junior), 1L)
   expect_equal(junior$term, one$term)
@@ -168,7 +182,7 @@ test_that("major_code is the student-term table's primary_major_code", {
   stamped_table <- test_student_terms %>%
     mutate(primary_major_code = if_else(
       student_id %in% stamped_roster$student_id, "HIST-BA", primary_major_code))
-  result <- summarize_student_demographics(stamped_roster, stamped_table, .major_opt)
+  result <- summarize_student_demographics(stamped_roster, stamped_table, test_course_terms, .major_opt)
   expect_setequal(unique(result$major_code), "HIST-BA")
   expect_equal(sum(result$count), 27)
   expect_false("primary_major_code" %in% names(result))
@@ -176,26 +190,27 @@ test_that("major_code is the student-term table's primary_major_code", {
 
 test_that("a grouping that describes the student needs the table and every row on it", {
   expect_error(
-    summarize_student_demographics(.hist_1110_registered(), NULL, .class_opt),
+    summarize_student_demographics(.hist_1110_registered(), NULL, test_course_terms, .class_opt),
     "reads cedar_student_terms"
   )
   expect_error(
     summarize_student_demographics(.hist_1110_registered(),
-                                   select(test_student_terms, -student_classification), .class_opt),
+                                   select(test_student_terms, -student_classification),
+                                   test_course_terms, .class_opt),
     "missing required column"
   )
   one <- .hist_1110_registered() %>% distinct(student_id, term) %>% slice(1)
   short_table <- test_student_terms %>%
     filter(!(student_id == one$student_id & term == one$term))
   expect_error(
-    summarize_student_demographics(.hist_1110_registered(), short_table, .class_opt),
+    summarize_student_demographics(.hist_1110_registered(), short_table, test_course_terms, .class_opt),
     "1 enrollment rows have no row on cedar_student_terms"
   )
 })
 
 test_that("a grouping with no student description reads no table", {
   opt <- list(group_cols = c("campus", "college", "term", "term_type", "subject_course"))
-  result <- summarize_student_demographics(.hist_1110_registered(), NULL, opt)
+  result <- summarize_student_demographics(.hist_1110_registered(), NULL, test_course_terms, opt)
   expect_equal(sum(result$count), 27)
 })
 
@@ -206,34 +221,34 @@ test_that("a grouping with no student description reads no table", {
 
 
 test_that("get_course_demographics default output includes classification and major columns", {
-  result <- get_course_demographics(test_students, test_student_terms, list(course = "HIST 1110"))
+  result <- get_course_demographics(test_students, test_student_terms, test_course_terms, list(course = "HIST 1110"))
 
   expect_true("student_classification" %in% names(result))
   expect_true("major_code"             %in% names(result))
 })
 
 test_that("get_course_demographics filters to requested course only", {
-  result <- get_course_demographics(test_students, test_student_terms, list(course = "HIST 1110"))
+  result <- get_course_demographics(test_students, test_student_terms, test_course_terms, list(course = "HIST 1110"))
 
   expect_true(all(result$subject_course == "HIST 1110"))
 })
 
 test_that("get_course_demographics total count matches registered students for HIST 1110", {
-  result <- get_course_demographics(test_students, test_student_terms, list(course = "HIST 1110"))
+  result <- get_course_demographics(test_students, test_student_terms, test_course_terms, list(course = "HIST 1110"))
 
   # 27 registered (RE/RS/RR) HIST 1110 students in the fixture
   expect_equal(sum(result$count), 27)
 })
 
 test_that("get_course_demographics filters by term correctly", {
-  result <- get_course_demographics(test_students, test_student_terms, list(term = 202010))
+  result <- get_course_demographics(test_students, test_student_terms, test_course_terms, list(term = 202010))
 
   expect_true(all(result$term == 202010))
   expect_gt(nrow(result), 0)
 })
 
 test_that("get_course_demographics filters by department correctly", {
-  result <- get_course_demographics(test_students, test_student_terms, list(dept_code = "HIST"))
+  result <- get_course_demographics(test_students, test_student_terms, test_course_terms, list(dept_code = "HIST"))
 
   expect_true(all(grepl("^HIST", result$subject_course)))
   expect_setequal(unique(result$term), c(202010, 202060, 202080, 202110))
@@ -247,12 +262,12 @@ test_that("get_course_demographics excludes early drops from count", {
            registration_status_code %in% STATUS_REGISTERED) %>%
     nrow()
 
-  result <- get_course_demographics(test_students, test_student_terms, list(course = "HIST 1120"))
+  result <- get_course_demographics(test_students, test_student_terms, test_course_terms, list(course = "HIST 1120"))
   expect_equal(sum(result$count), hist_1120_reg)
 })
 
 test_that("get_course_demographics returns empty data frame for nonexistent course", {
-  result <- get_course_demographics(test_students, test_student_terms, list(course = "NONEXISTENT 9999"))
+  result <- get_course_demographics(test_students, test_student_terms, test_course_terms, list(course = "NONEXISTENT 9999"))
 
   expect_equal(nrow(result), 0)
   expect_s3_class(result, "data.frame")
@@ -264,14 +279,14 @@ test_that("get_course_demographics respects custom group_cols", {
     group_cols = c("campus", "college", "term", "term_type",
                    "student_classification", "subject_course")
   )
-  result <- get_course_demographics(test_students, test_student_terms, opt)
+  result <- get_course_demographics(test_students, test_student_terms, test_course_terms, opt)
 
   expect_true("student_classification" %in% names(result))
   expect_false("major_code" %in% names(result))
 })
 
 test_that("get_course_demographics combined dept + term filter works", {
-  result <- get_course_demographics(test_students, test_student_terms, list(dept_code = "HIST", term = 202010))
+  result <- get_course_demographics(test_students, test_student_terms, test_course_terms, list(dept_code = "HIST", term = 202010))
 
   expect_true(all(grepl("^HIST", result$subject_course)))
   expect_true(all(result$term == 202010))

@@ -302,11 +302,18 @@ calc_first_day_enrl <- function(students, sections, by_part_term = FALSE,
          paste(missing, collapse = ", "))
   }
 
-  first_class_day <- sections %>%
+  dated_sections <- sections %>%
     ungroup() %>%
-    filter(!is.na(start_date)) %>%
-    group_by(term, crn) %>%
-    summarize(start_date = min(start_date), .groups = "drop")
+    filter(!is.na(start_date))
+  # An empty schedule (a term with no section rows) has no first class days;
+  # summarize() over no groups would still evaluate min() once and warn.
+  first_class_day <- if (nrow(dated_sections) == 0) {
+    dated_sections %>% select(term, crn, start_date)
+  } else {
+    dated_sections %>%
+      group_by(term, crn) %>%
+      summarize(start_date = min(start_date), .groups = "drop")
+  }
 
   students %>%
     ungroup() %>%
@@ -2158,6 +2165,11 @@ get_course_crosslist_classlist_enrl <- function(students, sections, opt) {
     ))
   }
 
+  # Counted from the class list, not read off cedar_course_terms (ADR-001 step
+  # 7): the family total counts each student once across the listings they
+  # registered under, which the table's per-course rows cannot give, and the
+  # listings beside it must come from the same count. The table carries a
+  # crosslisted section's seats once, under the home listing.
   listings <- calc_cl_enrls(family_students) %>%
     add_first_day_enrl(family_students, family_sections)
   overlap <- summarize_listing_overlap(family_students)

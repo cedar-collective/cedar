@@ -86,6 +86,34 @@ test_that("a side with no row is NA: unknown, never zero (EC-11b)", {
   expect_false(any(result$dips$subject_course == "SOCI 104"))
 })
 
+test_that("a crosslisted section is one offering, counted under its home listing (XL04)", {
+  # Spring 2020: HIST 490 has a section of its own (S10003, 20 seats) and is
+  # the partner listing of XL04, whose home is ANTH 490 (XL0401, 20 seats).
+  # Counted under every listing, HIST 490 would offer two sections and XL04's
+  # seats would be counted twice. The schedule's side is the home listing's.
+  xl <- test_course_terms %>%
+    filter(subject_course %in% c("HIST 490", "ANTH 490"), term == 202010L, campus == "ABQ",
+           !is.na(sections))
+  hist <- xl %>% filter(subject_course == "HIST 490")
+  anth <- xl %>% filter(subject_course == "ANTH 490")
+  expect_equal(sum(hist$sections), 1L)
+  expect_equal(sum(hist$seats), 20)
+  expect_equal(sum(anth$sections), 1L)
+  expect_equal(sum(anth$seats), 20)
+  # The section its own listing: the plain count of active sections is two.
+  plain <- test_sections %>%
+    filter(subject_course == "HIST 490", term == 202010L, campus == "ABQ", status == "A")
+  expect_equal(nrow(plain), 2L)
+  # The partner's students stay under the partner's code: a row with students
+  # and no section (the fixture's class-list rows carry no part of term, so
+  # the sides do not join here; the regstats fixture joins them).
+  expect_equal(sum(test_course_terms$registered[test_course_terms$subject_course == "HIST 490" &
+                                                  test_course_terms$term == 202010L], na.rm = TRUE), 2L)
+  expect_error(build_course_terms(test_students_regstats, attempts_for(test_students_regstats),
+                                  select(test_sections_regstats, -crosslist_role)),
+               "crosslist_role")
+})
+
 test_that("the builder refuses a class list or schedule missing what it counts", {
   expect_error(build_course_terms(select(test_students_regstats, -as_of_date),
                                   attempts_for(test_students_regstats), test_sections_regstats),

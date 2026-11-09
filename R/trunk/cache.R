@@ -18,7 +18,9 @@ cedar_course_neighbors_cache_version <- 5L
 # v7 reads the lifecycle history and the saturation seats off cedar_course_terms
 #    (ADR-001 step 7, group 3): unknown seats are NA capacity, never the
 #    headcount, and a zero-seat, zero-student section is not an offering.
-cedar_regstats_cache_version <- 7L
+# v8 the table counts a crosslisted section once, under its home listing
+#    (cedar_course_terms build 4): a partner listing has students and no seats.
+cedar_regstats_cache_version <- 8L
 
 course_neighbors_content_hash <- function(df, relevant_cols) {
   cols <- intersect(relevant_cols, names(df))
@@ -447,7 +449,9 @@ load_dept_demographics_cache <- function(dept_code, data_objects, opt = list()) 
 #     former_codes. The key already hashes the dims, code_history included.
 # v14 major donuts and composition shifts read each seat's major and class
 #     standing off cedar_student_terms (ADR-001 step 5).
-cedar_dept_dashboard_cache_version <- 14L
+# v15 the Regstats flags read cedar_course_terms (ADR-001 step 7), which the
+#     key now hashes: a rebuilt table under the same class list is a miss.
+cedar_dept_dashboard_cache_version <- 15L
 
 cache_value_or <- function(x, default) {
   if (is.null(x) || length(x) == 0) default else x
@@ -497,7 +501,10 @@ get_dept_dashboard_cache_key <- function(opt, data_objects, cache_date = Sys.Dat
       cedar_content_hash(data_objects[["cedar_student_terms"]]),
     # The mapping files name every major on the dashboard, so a renamed program
     # or a decided unit is a miss (ADR-001 step 3); the tables are small.
-    dims_hash = digest::digest(data_objects[["cedar_dims"]], algo = "xxhash64")
+    dims_hash = digest::digest(data_objects[["cedar_dims"]], algo = "xxhash64"),
+    # The Regstats flags read the course-term measure table (ADR-001 step 7):
+    # a table rebuilt under another build or rule is a miss. It is small.
+    course_terms_hash = cedar_content_hash(data_objects[["cedar_course_terms"]])
   )
 
   paste0(

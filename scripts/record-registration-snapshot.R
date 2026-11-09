@@ -7,7 +7,9 @@
 # recorded alone:
 #   - registration-*: one file per term in registration or scheduled ahead of
 #     it, per pair of class-list and schedule pulls. Counts per course, campus
-#     and part of term (R/branches/registration-snapshots.R).
+#     and part of term (R/branches/registration-snapshots.R), read off
+#     cedar_course_terms, which the gate that runs before this script has
+#     rebuilt from the same pull.
 #   - return-*: one file per Fall or Spring term in registration, per set of
 #     pulls. Which of last term's students have registered for it, by group,
 #     read off cedar_student_terms (R/branches/return-snapshots.R), which the
@@ -36,7 +38,8 @@ record_registration_snapshot_cli <- function(args) {
   }
 
   source(file.path(repo_root, "scripts", "cedar-repl.R"))
-  recorded <- record_registration_snapshot(cedar_registrations, cedar_sections, output_dir)
+  recorded <- record_registration_snapshot(cedar_registrations, cedar_sections, cedar_course_terms,
+                                           output_dir)
   for (i in seq_len(nrow(recorded))) {
     message(sprintf("[registration-snapshots] %s, class list %s, schedule %s: %s (%d rows) %s",
                     fmt_term(recorded$term[[i]]), format(recorded$classlist_as_of[[i]]),

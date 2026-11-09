@@ -389,7 +389,7 @@ test_that("a classification filter selects on the student-term's value, not the 
   hit <- st$student_id == key$student_id & st$term == as.integer(key$term)
   st$student_classification[hit] <- "Designed, Only Here"
   out <- suppressMessages(get_course_demographics(
-    test_students, st,
+    test_students, st, test_course_terms,
     list(classification = "Designed, Only Here",
          group_cols = c("campus", "college", "term", "term_type", "subject_course",
                         "course_title", "level"))
@@ -397,7 +397,7 @@ test_that("a classification filter selects on the student-term's value, not the 
   expect_gt(nrow(out), 0L)
   expect_true(key$subject_course %in% out$subject_course)
   none <- suppressMessages(get_course_demographics(
-    test_students, test_student_terms,
+    test_students, test_student_terms, test_course_terms,
     list(classification = "Designed, Only Here",
          group_cols = c("campus", "college", "term", "term_type", "subject_course",
                         "course_title", "level"))

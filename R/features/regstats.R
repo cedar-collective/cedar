@@ -13,6 +13,8 @@
 #' @param student_terms The `cedar_student_terms` table: the classification
 #'   that selects sophomores is the student-term's, never the class list's,
 #'   which a late pull stamps a step ahead (ISSUES.md I47).
+#' @param course_terms `cedar_course_terms`, the course enrollment the shares
+#'   are taken against.
 #' @param opt Options list (currently unused - function uses hardcoded filters)
 #'
 #' @return Data frame with single column:
@@ -36,14 +38,15 @@
 #' \dontrun{
 #' # Find popular sophomore fall courses
 #' opt <- list()
-#' high_soph_courses <- get_high_fall_sophs(cedar_registrations, cedar_student_terms, opt)
+#' high_soph_courses <- get_high_fall_sophs(cedar_registrations, cedar_student_terms,
+#'                                          cedar_course_terms, opt)
 #'
 #' # These courses could be summer offerings
 #' print(high_soph_courses$subject_course)
 #' }
 #'
 #' @seealso \code{\link{get_course_demographics}} for enrollment counting logic
-get_high_fall_sophs <- function(students, student_terms, opt = list()) {
+get_high_fall_sophs <- function(students, student_terms, course_terms, opt = list()) {
 
   cedar_debug("[regstats.R] Getting fall courses with 100+ sophomores for potential summer offerings...")
   myopt <- list()
@@ -53,7 +56,7 @@ get_high_fall_sophs <- function(students, student_terms, opt = list()) {
   myopt[["group_cols"]] <- c("campus", "college","term", "term_type", "subject_course","course_title","level")
   myopt[["classification"]] <- "Sophomore, 2nd Yr"
   myopt[["term"]] <- "fall"
-  demo_out <- get_course_demographics(students, student_terms, myopt)
+  demo_out <- get_course_demographics(students, student_terms, course_terms, myopt)
 
   # 100 is a bit arbitrary; not sure how to calc would what be a better threshold
   demo_out <- demo_out %>% filter(mean > 100)

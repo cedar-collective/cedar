@@ -12,14 +12,17 @@
 # schedule and no class list yet is kept too, its class-list counts unknown.
 #
 # One row per term, delivery campus, college, course and part of term, the
-# grain of calc_cl_enrls(by_part_term = TRUE) and the canonical waitlist rule.
-# Part of term is kept so a reader can leave out intersession, as projections
-# do. Counts are distinct students within a row; a student in two parts of
-# term is in both rows, so rows are not summed into a course total without
-# deduplication. A crosslisted section and its seats are counted once, under
-# its home listing; students who registered under a partner listing stay on the
-# partner's row, which can therefore hold students and no section. No student
-# ID leaves this function.
+# grain of cedar_course_terms (R/branches/course-terms.R) and the canonical
+# waitlist rule. The registrations, drops, sections and seats are that table's
+# (ADR-001 step 7: the refresh rebuilds it from the same pull before this runs,
+# and a table not current for the class list is refused); the waitlist count
+# is class-list true demand, which the table does not carry. Part of term is
+# kept so a reader can leave out intersession, as projections do. The class
+# list holds one row per student, course, campus and term, so the part-of-term
+# rows sum to the course. A crosslisted section and its seats are counted once,
+# under its home listing; students who registered under a partner listing stay
+# on the partner's row, which can therefore hold students and no section. No
+# student ID leaves this function.
 
 REGISTRATION_SNAPSHOT_SCHEMA_VERSION <- 1L
 
@@ -33,8 +36,11 @@ REGISTRATION_SNAPSHOT_COLUMNS <- c(
 #' Build one registration snapshot
 #'
 #' @param students `cedar_registrations` rows (all terms are accepted; only
-#'   `opt$terms` are read).
-#' @param sections `cedar_sections` rows.
+#'   `opt$terms` are read): the waitlist count and the class list's pull date.
+#' @param sections `cedar_sections` rows: the schedule's pull date and the
+#'   waitlist rule's section scope.
+#' @param course_terms `cedar_course_terms`, current for `students`: the
+#'   registrations, drops, sections and seats.
 #' @param opt `terms` (required): the terms to snapshot, normally those still
 #'   in registration (see `registration_snapshot_terms()`).
 #' @return A tibble with `REGISTRATION_SNAPSHOT_COLUMNS`. `classlist_as_of` and
@@ -42,7 +48,7 @@ REGISTRATION_SNAPSHOT_COLUMNS <- c(
 #'   no rows for the term. Within a source that has the term, a course it does
 #'   not list is a measured zero (nobody registered yet, no active section);
 #'   for a source without the term, that source's counts are `NA`, unknown.
-build_registration_snapshot <- function(students, sections, opt = list()) {
+build_registration_snapshot <- function(students, sections, course_terms, opt = list()) {
   terms <- opt$terms
   if (is.null(terms) || length(terms) == 0L) {
     stop("[registration-snapshots.R] opt$terms is required: the terms to snapshot.")
@@ -52,8 +58,7 @@ build_registration_snapshot <- function(students, sections, opt = list()) {
                          "part_term", "student_id", "registration_status_code",
                          "course_title", "as_of_date")
   required_sections <- c("term", "campus", "college", "subject_course", "part_term",
-                         "status", "enrolled", "available", "total_enrl",
-                         "as_of_date")
+                         "status", "as_of_date")
   missing_students <- setdiff(required_students, names(students))
   missing_sections <- setdiff(required_sections, names(sections))
   if (length(missing_students) > 0L || length(missing_sections) > 0L) {
@@ -61,6 +66,8 @@ build_registration_snapshot <- function(students, sections, opt = list()) {
          paste(missing_students, collapse = ", "), "], sections [",
          paste(missing_sections, collapse = ", "), "]")
   }
+
+  require_current_course_terms(course_terms, students, "build_registration_snapshot")
 
   keys <- c("term", "campus", "college", "subject_course", "part_term")
   term_students <- students %>%
@@ -99,40 +106,28 @@ build_registration_snapshot <- function(students, sections, opt = list()) {
     left_join(newest_pull(term_students, "classlist_as_of"), by = "term") %>%
     left_join(newest_pull(term_sections, "sections_as_of"), by = "term")
 
-  empty_keys <- tibble(term = integer(0), campus = character(0),
-                       college = character(0), subject_course = character(0),
-                       part_term = character(0))
-  classlist <- if (nrow(term_students) == 0L) {
-    mutate(empty_keys, registered = integer(0), dr_early = integer(0),
-           dr_late = integer(0))
-  } else {
-    calc_cl_enrls(term_students, by_part_term = TRUE) %>%
-      ungroup() %>%
-      mutate(term = as.integer(term)) %>%
-      select(all_of(keys), registered, dr_early, dr_late)
-  }
+  # The two sides of the course-term table for these terms: the class list's
+  # registrations and drops, and the schedule's active sections and seats
+  # (every active section, crosslists counted once under the home listing,
+  # nothing left out by the exclusion list: the snapshot is a record, and its
+  # readers choose a scope). A side the table has no row for is NA there and
+  # is decided below by whether the source has a pull for the term.
+  term_rows <- course_terms %>%
+    filter(term %in% terms) %>%
+    mutate(term = as.integer(term))
+  classlist <- term_rows %>%
+    filter(!is.na(registered)) %>%
+    select(all_of(keys), registered, dr_early, dr_late)
+  scheduled <- term_rows %>%
+    filter(!is.na(sections)) %>%
+    transmute(across(all_of(keys)), sections = as.integer(sections), seats = pmax(0, seats))
 
   waitlisted <- if (nrow(term_students) == 0L) {
-    mutate(empty_keys, waitlisted = integer(0))
+    tibble(term = integer(0), campus = character(0), college = character(0),
+           subject_course = character(0), part_term = character(0), waitlisted = integer(0))
   } else {
     get_true_waitlisted_rows(term_students, sections = term_sections) %>%
       summarize_waitlist_demand(group_cols = keys, count_name = "waitlisted")
-  }
-
-  # Every active section, crosslists counted once, nothing left out by the
-  # exclusion list: the snapshot is a record, and its readers choose a scope.
-  scheduled <- if (nrow(term_sections) == 0L) {
-    mutate(empty_keys, sections = integer(0), seats = numeric(0))
-  } else {
-    get_enrl(term_sections, list(
-      status = "A", uel = FALSE, crosslist = "home", group_cols = keys
-    )) %>%
-      ungroup() %>%
-      transmute(
-        term = as.integer(term), campus, college, subject_course, part_term,
-        sections = as.integer(sections),
-        seats = pmax(0, as.numeric(enrolled) + as.numeric(avail))
-      )
   }
 
   snapshot <- classlist %>%
@@ -152,6 +147,10 @@ build_registration_snapshot <- function(students, sections, opt = list()) {
     mutate(schema_version = REGISTRATION_SNAPSHOT_SCHEMA_VERSION) %>%
     select(all_of(REGISTRATION_SNAPSHOT_COLUMNS)) %>%
     arrange(term, campus, subject_course, part_term, college)
+  # A record of its own, not the measure table: its stamps do not travel.
+  for (stamp in c("code_renames", "graded_edge", "course_terms_build_version")) {
+    attr(snapshot, stamp) <- NULL
+  }
 
   if (exists("cedar_log_level")) {
     cedar_debug("[registration-snapshots.R] ", nrow(snapshot), " rows for term(s) ",
