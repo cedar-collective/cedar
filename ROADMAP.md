@@ -43,14 +43,14 @@ Changelog (Admin). Cross-course Retention is built but hidden.
 
 The order work is taken in.
 
-1. **Finish the domain data model (ADR-001 step 7).** The measure tables are
-   now built by the transform and only loaded by the app (step 6, 2026-11-08).
-   Next: re-point the cones onto the measure tables one group at a time, deleting
-   each re-derivation, and rename the class-list file last. Design and the
-   progress metrics: [ADR-001 steps 6 and 7](docs/developers/architecture-decisions.md#steps-6-and-7-where-compute-lives-and-the-cone-migration-planned-2026-11-08).
-2. **Projection adjustments.** The open items under [Section-needs
+1. **Projection adjustments.** The open items under [Section-needs
    projections](#section-needs-projections).
-3. **Degree maps.** The open items under [Degree Explorer](#degree-explorer-and-curriculum-informed-demand).
+2. **Degree maps.** The open items under [Degree Explorer](#degree-explorer-and-curriculum-informed-demand).
+
+The domain data model ([ADR-001](docs/developers/architecture-decisions.md#adr-001-move-cedars-tables-from-report-shaped-to-domain-shaped))
+closed its migration on 2026-11-09: the transform builds every table, the app
+loads, and the cones read the measure tables. What remains of it is under
+[Platform](#platform).
 
 **Decisions waiting on a person:** the 37 renumberings still proposed in
 `institution/unm/code_history.csv` ([I37](ISSUES.md)); decide the largest
@@ -167,6 +167,10 @@ contracts: [degree-requirements.md](docs/developers/degree-requirements.md),
 - [ ] **Operational monitoring.** Shiny errors, usage logs, scheduled-refresh
   outcomes and cold-cache latency after release.
 - [ ] **Standard CSV export** across user-facing tables through a shared helper.
+- [ ] **ADR-001's open questions:** size the pulls layer (full extracts or a
+  changes-only log), and decide which `cedar_student_terms` measures need a
+  home-campus variant
+  ([open questions](docs/developers/architecture-decisions.md#open-questions)).
 
 ## Later
 
