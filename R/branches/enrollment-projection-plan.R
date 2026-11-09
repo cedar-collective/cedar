@@ -185,7 +185,7 @@ projection_pressure_bump <- function(enrollment_history, section_history, rows,
       }
       paste0(
         "Pressure bump +", format(bump, big.mark = ","), ": ", full_text,
-        ", so its registrations were capped by its seats; ", sized_by,
+        ", so its registrations stopped at its seats; ", sized_by,
         if (already > 0) {
           paste0("; the published projection already adds ", round(already),
                  " of them")
@@ -504,16 +504,17 @@ add_projection_recommendations <- function(selected, candidates, pressure_screen
           as.numeric(projection_option(opt, "disagreement_threshold")),
         FALSE
       ),
+      # Reader-facing: whether last year was near full and what that adds.
       floor_note = dplyr::case_when(
         is.na(adjusted_saturated_prior) ~ dplyr::coalesce(
-          adjusted_floor_basis, "Saturation of the prior term cannot be judged"
+          adjusted_floor_basis, "Whether last year was near full cannot be judged"
         ),
         adjusted_saturated_prior & adjusted_floor_uplift > 0 ~ paste0(
-          "Floor: ", adjusted_floor_basis, ". ", expansion_note
+          adjusted_floor_basis, ". ", expansion_note
         ),
         adjusted_saturated_prior ~ paste0(
-          "Floor: ", adjusted_floor_basis,
-          "; its count was capped by its seats, so it understates demand. ",
+          adjusted_floor_basis,
+          "; its count stopped at its seats, so it understates demand. ",
           expansion_note
         ),
         TRUE ~ adjusted_floor_basis
@@ -523,7 +524,7 @@ add_projection_recommendations <- function(selected, candidates, pressure_screen
           adjusted_delta_basis, "Preceding term not observed"
         ),
         adjusted_regime_alarm ~ paste0(
-          "Regime check: enrollment in ", fmt_term(adjusted_preceding_term),
+          "Sharp change: enrollment in ", fmt_term(adjusted_preceding_term),
           " moved ", projection_signed_percent(adjusted_preceding_term_change),
           " from the year before; review this course before scheduling to the projection"
         ),
@@ -554,7 +555,7 @@ add_projection_recommendations <- function(selected, candidates, pressure_screen
         !target_schedule_available & !is.na(recommended_sections) &
           adjusted_saturated_prior %in% TRUE ~
           paste0("Plan at least ", projection_count_noun(recommended_sections, "section"),
-                 "; prior term was saturated"),
+                 "; last year was near full"),
         !target_schedule_available & !is.na(recommended_sections) ~
           paste("Plan", projection_count_noun(recommended_sections, "section")),
         is.finite(projection_high) &

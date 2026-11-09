@@ -586,7 +586,7 @@ projection_expansion_response <- function(enrollment_history, section_history,
     return(list(
       n_pairs = nrow(pairs), fill_rate = NA_real_,
       note = paste0(
-        "Only ", nrow(pairs), " saturated-then-expanded pairs before ",
+        "Only ", nrow(pairs), " near-full courses given more seats before ",
         fmt_term(target_term), "; needs ", min_pairs
       )
     ))
@@ -595,7 +595,7 @@ projection_expansion_response <- function(enrollment_history, section_history,
   list(
     n_pairs = nrow(pairs), fill_rate = rate,
     note = paste0(
-      "When saturated courses in this market were given at least ",
+      "When near-full courses in this market were given at least ",
       scales::percent(min_change, accuracy = 1), " more seats (", nrow(pairs),
       " cases before ", fmt_term(target_term), "), class-list demand grew by ",
       scales::percent(rate, accuracy = 1), " of the added seats"

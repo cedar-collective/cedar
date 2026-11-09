@@ -3395,8 +3395,16 @@ Status Date, so `calc_first_day_enrl()` returns `NA` for every course and the
 projection cannot judge saturation, capacity reached, or the floor for the
 aftcast that reads them: one of the four history terms in each season. Admin >
 Data & Usage and `class_list_status_date_coverage()` list which; prose does not
-name them, because re-pulling a term's class list fills its dates in. *Done
-when:* both are re-pulled, the coverage report shows dates for every term from
+name them, because re-pulling a term's class list fills its dates in (the
+projections scope bar names them from the loaded bundle for the same reason).
+2026-11-09: the coverage report shows the undated terms are Fall 2024, Spring
+2025 and Summer 2025, whose class lists were pulled on 2025-04-11, 2025-06-05
+and 2025-08-04, before the Class List report carried the Registration Status
+Date column; every term from Fall 2025 on is complete. They hold 40 of the 215
+Spring 2027 and 60 of the 242 Fall 2027 past forecasts, 19% and 28% of the
+error, as "seats or first-day data missing". *Done when:* the three terms are
+re-pulled from MyReports with the current report definition, parsed and
+transformed, the coverage report shows dates for every term from
 `projection_history_start_term` on, and the projection bundles are rebuilt.
 
 **M35 — The projection range covers two outcomes in three, and one in three

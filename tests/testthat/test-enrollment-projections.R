@@ -265,7 +265,7 @@ test_that("Gen Ed and FYEX monitoring group has an explicit campus scope", {
                            collapse = ", and ")
   ))
   expect_false(grepl("0 ", guide$summary, fixed = TRUE) || grepl("0 ", guide$overview, fixed = TRUE))
-  expect_match(guide$selection_process, "Prior same-season is the default")
+  expect_match(guide$selection_process, "Last year's registrations is the default")
   expect_error(
     enrollment_projection_model_config(list(saturation_fill_threshold = 2)),
     "saturation_fill_threshold"
@@ -522,7 +522,8 @@ test_that("intersession is left out of every projection input (IS01)", {
 test_that("recent history pairs actuals and sections with current-method aftcasts", {
   projections <- projection_test_row() %>%
     dplyr::mutate(
-      method_id = "seasonal_last", method_label = "Prior same-season",
+      method_id = "seasonal_last",
+      method_label = unname(CEDAR_ENROLLMENT_PROJECTION_METHODS[["seasonal_last"]]),
       applicability_reason = "Unique class-list registrants in prior fall term"
     )
   history <- projection_test_history(
@@ -541,7 +542,8 @@ test_that("recent history pairs actuals and sections with current-method aftcast
   backtests <- tibble::tibble(
     market_id = "abq_ea_course_market", subject_course = "TEST 101",
     term_type = "fall", method_id = "seasonal_last",
-    method_label = "Prior same-season", policy_selected = TRUE,
+    method_label = unname(CEDAR_ENROLLMENT_PROJECTION_METHODS[["seasonal_last"]]),
+    policy_selected = TRUE,
     target_term = c(202180L, 202280L, 202380L), applicable = TRUE,
     applicability_reason = "Prior fall",
     projected_classlist_total = c(100, 110, 120),
@@ -561,7 +563,8 @@ test_that("recent history pairs actuals and sections with current-method aftcast
   expect_equal(recent$actual_final_enrollment, c(130, 120, 110))
   expect_equal(recent$scheduled_sections, c(4L, 4L, 3L))
   expect_equal(recent$aftcast_classlist_total, c(120, 110, 100))
-  expect_equal(recent$aftcast_method_label, rep("Prior same-season", 3))
+  expect_equal(recent$aftcast_method_label,
+               rep(unname(CEDAR_ENROLLMENT_PROJECTION_METHODS[["seasonal_last"]]), 3))
   expect_equal(recent$first_day_fill, c(130 / 135, 120 / 125, 110 / 115))
   expect_equal(round(recent$aftcast_pct_error, 3), c(-0.077, -0.083, -0.091))
   expect_equal(
@@ -759,7 +762,7 @@ test_that("the axis summary stays compact and names the main caveat", {
   )
   expect_match(
     projection_axis_brief("Stable", "Deep", "High", regime_alarm = TRUE),
-    "regime check$"
+    "sharp change$"
   )
 })
 
@@ -798,7 +801,7 @@ test_that("historical-method plot compares one term type with lifecycle actuals"
   expect_true("First day (seats judged here)" %in% trace_names)
   expect_true("Census" %in% trace_names)
   expect_true("Final / last day" %in% trace_names)
-  expect_true("Prior same-season + floor + latest-term changes (selected)" %in% trace_names)
+  expect_true("Last year's registrations, adjusted (selected)" %in% trace_names)
   expect_equal(length(trace_names), 6L)
   first_day_trace <- built$x$data[[which(trace_names == "First day (seats judged here)")]]
   expect_true(is.na(first_day_trace$y[[2]]))
@@ -1072,7 +1075,7 @@ test_that("an always-full course gets a pressure bump on its plan, never on its 
   expect_match(full$pressure_bump_note, paste0(
     "^Pressure bump \\+10: near full on the first day in every recent Fall ",
     "with a first-day count \\(Fall 2021, Fall 2022, Fall 2023\\), so its ",
-    "registrations were capped by its seats; the bump is 5% of last Fall's ",
+    "registrations stopped at its seats; the bump is 5% of last Fall's ",
     "200 registrations$"
   ))
 
@@ -1373,32 +1376,61 @@ test_that("past error is summed by whose miss each term was", {
 #   2025  -5%      5              9               5 (default)
 #   2026  unknown 29             20              20 (adjusted)
 # Published 50 / 400 = 12.5%; prior same-season alone 64 / 400 = 16.0%; with
-# seats held (2023, 2025) 15 / 200 = 7.5%. An unknown seat change is not held.
+# seats held (2023, 2025) 15 / 200 = 7.5%, with seats moved (2024) 15 / 100 =
+# 15.0%. An unknown seat change is neither held nor moved. The published
+# errors are -10, -15, +5, -20: 40 low on 400, so the record says the
+# forecasts ran 10% low and why.
 test_that("the forecast's record is stated beside last year's number alone", {
   backtests <- tibble::tribble(
-    ~target_term, ~method_id,       ~policy_selected, ~abs_error, ~fold_seat_change,
-    202310L,      "seasonal_last",  TRUE,             10,          0.02,
-    202310L,      "spine_adjusted", FALSE,            12,          0.02,
-    202410L,      "seasonal_last",  FALSE,            20,          0.30,
-    202410L,      "spine_adjusted", TRUE,             15,          0.30,
-    202510L,      "seasonal_last",  TRUE,              5,         -0.05,
-    202510L,      "spine_adjusted", FALSE,             9,         -0.05,
-    202610L,      "seasonal_last",  FALSE,            29,          NA,
-    202610L,      "spine_adjusted", TRUE,             20,          NA
+    ~target_term, ~method_id,       ~policy_selected, ~error, ~fold_seat_change,
+    202310L,      "seasonal_last",  TRUE,             -10,     0.02,
+    202310L,      "spine_adjusted", FALSE,            -12,     0.02,
+    202410L,      "seasonal_last",  FALSE,            -20,     0.30,
+    202410L,      "spine_adjusted", TRUE,             -15,     0.30,
+    202510L,      "seasonal_last",  TRUE,               5,    -0.05,
+    202510L,      "spine_adjusted", FALSE,              9,    -0.05,
+    202610L,      "seasonal_last",  FALSE,            -29,     NA,
+    202610L,      "spine_adjusted", TRUE,             -20,     NA
   ) %>%
     dplyr::mutate(market_id = "m", subject_course = "TEST 101",
-                  term_type = "spring", actual_classlist_total = 100)
+                  term_type = "spring", actual_classlist_total = 100,
+                  abs_error = abs(error))
   record <- projection_track_record_summary(backtests, list())
   expect_equal(record$n_folds, 4L)
   expect_equal(record$wape, 50 / 400)
   expect_equal(record$default_wape, 64 / 400)
   expect_equal(record$held_folds, 2L)
   expect_equal(record$held_wape, 15 / 200)
+  expect_equal(record$moved_folds, 1L)
+  expect_equal(record$moved_wape, 15 / 100)
+  expect_equal(record$bias, -40 / 400)
   expect_equal(record$sentence, paste0(
     "When the seats stayed within 10% of the year before, past forecasts ",
-    "were 7.5% off on average (2 of 4 past Spring forecasts). Over all 4, ",
-    "the published forecast was 12.5% off, and last year's number alone 16.0%."
+    "were 7.5% off on average (2 of 4 past Spring forecasts); when the seats ",
+    "moved more than that, 15.0% off (1). Over all 4, ",
+    "the published forecast was 12.5% off, and last year's number alone 16.0%.",
+    " They ran 10.0% low on average: a course that filled registers only as ",
+    "many students as it had seats, so when seats were added the next year, ",
+    "more registered than last year's count said."
   ))
+  expect_equal(record$headline, paste0(
+    "Past Spring forecasts were within 7.5% where the seats held (2 of 4) and ",
+    "15.0% off where they moved 10% or more (1): most of the error follows ",
+    "the schedule, not the forecast."
+  ))
+  # A record that ran high says so without the full-course explanation, and
+  # one within a point of even says nothing about direction.
+  high <- projection_track_record_summary(
+    dplyr::mutate(backtests, error = -error), list()
+  )
+  expect_match(high$sentence, "They ran 10\\.0% high on average\\.$")
+  even <- projection_track_record_summary(
+    dplyr::mutate(backtests, error = dplyr::if_else(target_term == 202610L, 20, error)),
+    list()
+  )
+  expect_equal(even$bias, 0)
+  expect_false(grepl("on average: a course", even$sentence, fixed = TRUE))
+  expect_match(even$sentence, "alone 16\\.0%\\.$")
   # Comparing the rule with doing nothing needs doing nothing on every term.
   expect_error(
     projection_track_record_summary(
@@ -1468,19 +1500,53 @@ test_that("the draft comparison separates short of day one from short of the pla
     additional_sections = c(2L, 1L, 0L, 0L, NA),
     target_registration_observed = FALSE, target_registered_now = NA_real_,
     accuracy = "High", accuracy_value = "5.0% off",
-    seat_consistency = "High", seat_consistency_value = "seats moved in 0 of 4"
+    # SPARE 1's Low rating was set by its seats, so it displays grey.
+    reliability_tone = c("High", "High", "High", "neutral", "High"),
+    reliability_label = c(rep("5.0% off", 3), "5.0% off · set by seats", "5.0% off"),
+    seat_consistency = "High", seat_consistency_value = "seats moved in 0 of 4",
+    # Last year's registrations, and whether last year was near full: DAY 1
+    # and SPARE 1 were, so the draft's seats have their own answer there.
+    observed_baseline = c(96, 100, 100, 100, 100),
+    adjusted_saturated_prior = c(TRUE, FALSE, NA, TRUE, TRUE)
   )
   components <- tibble::tibble(
     market_id = "abq_ea_course_market", subject_course = "DAY 1",
     campus = c("ABQ", "EA"), part_term = "1", scheduled_sections = c(1L, 1L)
   )
+  # Last year's seats: DAY 1 had 80 (1.2 registrations per seat), SPARE 1 had
+  # 100; the rest are not needed, and MISSING 1 has no history row at all.
+  history <- tibble::tibble(
+    market_id = "abq_ea_course_market",
+    subject_course = c("DAY 1", "DAY 1", "PLAN 1", "COVER 1", "SPARE 1"),
+    recency_rank = c(1L, 2L, 1L, 1L, 1L),
+    scheduled_capacity = c(80, 70, 90, 110, 100)
+  )
   view <- list(
     projections = projections, delivery_components = components,
+    history = history,
     meta = list(target_schedule_as_of = as.Date("2026-10-08"),
                 target_term_label = "Spring 2027")
   )
   draft <- build_enrollment_projection_draft_comparison(view)
   table <- draft$table
+
+  # If the draft's seats fill as last year's did: DAY 1's 60 seats at 1.2 per
+  # seat hold 72; SPARE 1's 200 at 1.0 hold 200. A course that had seats to
+  # spare (PLAN 1), one whose fill is unknown (COVER 1) and one not in the
+  # draft (MISSING 1) get no such number: their registrations did not follow
+  # their seats, or there are no seats to follow.
+  expect_equal(table$if_seats_fill[table$course == "DAY 1"], 72)
+  expect_equal(table$if_seats_fill[table$course == "SPARE 1"], 200)
+  expect_true(all(is.na(table$if_seats_fill[table$course %in% c("PLAN 1", "COVER 1", "MISSING 1")])))
+  expect_match(draft$sentence, paste0(
+    " For the 2 courses near full last year, the draft's seats would hold ",
+    "about 272 registrations if they fill as last year's did, against 220 ",
+    "planned\\.$"
+  ))
+  # modifyList() would merge a tibble's columns into the old one; replace it.
+  no_seats <- view
+  no_seats$history <- dplyr::select(history, -scheduled_capacity)
+  expect_error(build_enrollment_projection_draft_comparison(no_seats), "scheduled_capacity")
 
   expect_true(draft$available)
   expect_equal(table$course, c("DAY 1", "PLAN 1", "MISSING 1", "COVER 1", "SPARE 1"))
@@ -1498,24 +1564,101 @@ test_that("the draft comparison separates short of day one from short of the pla
   expect_equal(table$campus_sections[[1]], "ABQ 1 \u00b7 EA 1")
   expect_match(draft$sentence, "^The draft schedule \\(pulled October 8, 2026\\) has 475 seats in 4 of the 5 courses shown")
   expect_match(draft$sentence, "1 course is short of the students expected on day one \\(by 30 seats\\)")
-  expect_match(draft$sentence, "1 monitored course is not in the draft\\.$")
+  expect_match(draft$sentence, "1 monitored course is not in the draft\\.")
   # One course takes a singular verb.
   expect_match(draft$sentence, paste0(
     "; 1 covers day one but not the plan; 1 covers the plan; 1 has more than ",
     "a section to spare\\."
   ))
-  # The ratings travel with the numbers behind them.
+  # The ratings travel with the numbers behind them, and with the table's
+  # display of them.
   expect_equal(unique(table$reliability_value), "5.0% off")
   expect_equal(unique(table$seat_consistency_value), "seats moved in 0 of 4")
+  expect_equal(table$reliability_tone[table$course == "SPARE 1"], "neutral")
+  expect_equal(table$reliability_label[table$course == "SPARE 1"], "5.0% off · set by seats")
+  expect_equal(table$reliability_label[table$course == "DAY 1"], "5.0% off")
 
   # No schedule for the target term: says so instead of an empty table.
   none <- build_enrollment_projection_draft_comparison(list(
     projections = dplyr::mutate(projections, target_schedule_available = FALSE),
-    delivery_components = components[0, ],
+    delivery_components = components[0, ], history = history,
     meta = list(target_schedule_as_of = as.Date(NA), target_term_label = "Spring 2027")
   ))
   expect_false(none$available)
   expect_match(none$sentence, "^No schedule for Spring 2027 is in the data yet")
+  expect_true(all(is.na(none$table$if_seats_fill)))
+})
+
+test_that("reliability reads grey 'set by seats' when the schedule set the past numbers", {
+  shown <- projection_reliability_display(
+    accuracy = c("Low", "Moderate", "Low", "High", "Unrated", "Moderate"),
+    accuracy_value = c("32.8% off", "15.0% off", "25.0% off", "4.0% off", "Unrated", "12.0% off"),
+    miss_cause = c("seats", "seats", "forecast", "seats", NA, "unknown")
+  )
+  # Low or Moderate with the schedule's miss: neutral, labelled. A close
+  # forecast stays High whatever the seats did; the forecast's own miss and
+  # an unknown cause keep their rating colour.
+  expect_equal(shown$reliability_tone,
+               c("neutral", "neutral", "Low", "High", "Unrated", "Moderate"))
+  expect_equal(shown$reliability_label,
+               c("32.8% off · set by seats", "15.0% off · set by seats",
+                 "25.0% off", "4.0% off", "Unrated", "12.0% off"))
+
+  bundle <- projection_fixture_bundle(202110L, 202080L, 202080L)
+  view <- build_enrollment_projection_view(bundle, list(group_id = "all_saved"))
+  expect_true(all(c("reliability_tone", "reliability_label") %in% names(view$table)))
+  expect_equal(view$meta$n_bundle_rows, nrow(bundle$projections))
+  expect_gte(view$meta$n_bundle_rows, view$meta$n_rows)
+  # The designed class lists are dated, so no recent term is undated.
+  expect_equal(view$meta$undated_terms, character(0))
+  expect_match(view$meta$track_record$headline, "^(Past .*forecasts were|No past forecasts)")
+})
+
+test_that("a recent term with no first-day count for any course is named, not shown as dashes", {
+  history <- tibble::tibble(
+    history_term = c(202310L, 202310L, 202410L, 202410L, 202510L, 202510L),
+    history_term_label = rep(c("Spring 2023", "Spring 2024", "Spring 2025"), each = 2L),
+    subject_course = rep(c("A 1", "B 1"), 3L),
+    actual_first_day = c(90, 80, NA, NA, NA, 75),
+    actual_classlist_total = c(100, 90, 110, 95, 0, 80)
+  )
+  # Spring 2024: both courses offered, neither first day known. Spring 2025:
+  # A 1 was not offered (no students), B 1's first day is known, so the term
+  # is not undated. Spring 2023 is complete.
+  expect_equal(projection_undated_history_terms(history), "Spring 2024")
+  expect_equal(projection_undated_history_terms(history[0, ]), character(0))
+  expect_error(projection_undated_history_terms(dplyr::select(history, -actual_first_day)),
+               "actual_first_day")
+})
+
+test_that("the ledger of ideas tried is complete and in the page's words", {
+  ledger <- enrollment_projection_attempts_ledger()
+  expect_equal(names(ledger), c("idea", "result", "status"))
+  expect_gte(nrow(ledger), 10L)
+  expect_false(any(is.na(ledger) | ledger == ""))
+  # The one idea the rules forbid and the one that is next are both listed,
+  # so a reader finds them before asking.
+  expect_true(any(grepl("schedule's seats as the forecast", ledger$idea)))
+  expect_true(any(ledger$status == "Next"))
+})
+
+# Reader-facing text says last year's registrations, the students still
+# waiting, a change, a sharp change, and a count that stopped at its seats;
+# the model's internal names are for the code. Checked on the sentence-like
+# string literals (those with a space) of the page's files, comments aside.
+test_that("the projections page carries no model jargon in its text", {
+  jargon <- "\\b(spine|floor|delta|deltas|regime|aftcast|aftcasts|saturated|saturation|capped)\\b"
+  files <- c(
+    "R/modules/enrollment-projections.R",
+    "R/lists/enrollment_projection_groups.R"
+  )
+  for (file in files) {
+    lines <- readLines(file.path(cedar_base_dir, file), warn = FALSE)
+    lines <- lines[!grepl("^\\s*#", lines)]
+    strings <- unlist(regmatches(lines, gregexpr('"[^"]*\\s[^"]*"', lines)))
+    hits <- strings[grepl(jargon, strings, ignore.case = TRUE)]
+    expect_equal(hits, character(0), info = file)
+  }
 })
 
 test_that("the bundle validator rejects a plan that is not its projection plus its adjustments", {
@@ -1985,7 +2128,7 @@ test_that("a listed sequence carries its own change and leaves the pooled feeder
   expect_equal(result$delta_feeder, 5)
   # 24 + repeat 1 - sequence 2 + feeder 5.
   expect_equal(result$projected_classlist_total, 28)
-  expect_match(result$delta_basis, "sequence SEQ 1: \\(4 - 8\\) x 0\\.5 = -2\\.0")
+  expect_match(result$delta_basis, "taken just before, SEQ 1: \\(4 - 8\\) x 0\\.5 = -2\\.0")
   expect_true(validate_spine_rows(
     result %>% dplyr::mutate(target_term = 202410L), "fixture"
   ))
@@ -2122,7 +2265,7 @@ test_that("a prior term full on the first day adds its unserved waitlist to the 
   expect_equal(result$waitlisted_prior, 3L)
   expect_equal(result$floor_uplift, 3)
   expect_match(result$floor_basis, "first-day fill 90.9%")
-  expect_match(result$floor_basis, "spine 24 \\+ 3 still waiting = 27")
+  expect_match(result$floor_basis, "last year's 24 \\+ 3 still waiting = 27")
   expect_equal(result$projected_classlist_total, 24 + 3 + 1 + 5)
   expect_true(validate_spine_rows(
     result %>% dplyr::mutate(target_term = 202410L), "fixture"
@@ -2338,7 +2481,7 @@ test_that("selection is rolling: a challenger wins only on earlier shared aftcas
   expect_equal(selected$method_id, "spine_adjusted")
   expect_equal(selected$selection_common_n, 4L)
   expect_match(selected$selection_reason,
-               "floor \\+ latest-term changes beat Prior same-season on 4 earlier terms both were made for")
+               "adjusted beat Last year's registrations on 4 earlier terms both were made for")
   # Saved reasons are read on the page, so they speak plainly.
   expect_false(any(grepl("WAPE|aftcast", c(
     selected$selection_reason, selected$depth_reason, selected$accuracy_reason
@@ -2387,7 +2530,7 @@ test_that("a challenger inside the margin leaves the default in place", {
 
   expect_equal(selected$method_id, "seasonal_last")
   expect_true(is.na(selected$selection_common_n))
-  expect_match(selected$selection_reason, "Prior same-season is the default")
+  expect_match(selected$selection_reason, "Last year's registrations is the default")
   expect_equal(selected$n_backtests, 4L)
   expect_equal(selected$wape, 0.10)
   expect_equal(selected$projection_low, 110)
@@ -2975,7 +3118,7 @@ test_that("the administrator summary says the decision in one sentence and flags
   )
   denied_sentence <- projection_summary_sentence(denied)
   expect_match(denied_sentence, "^Plan at least 99 sections for 2,179 registrations \\(about 2,080 in seats on the first day\\)\\.")
-  expect_match(denied_sentence, "capped by its seats and understates demand\\. No pressure bump: Spring 2026 filled 85\\.0% of its seats\\.")
+  expect_match(denied_sentence, "stopped at its seats and understates demand\\. No pressure bump: Spring 2026 filled 85\\.0% of its seats\\.")
   # The change is the forecast's, named as such: after "Plan ... for 2,397
   # registrations", "That is last year's level" read as though the plan were.
   expect_match(sentence, "The forecast matches last Spring's 2,179\\.")
@@ -2985,7 +3128,7 @@ test_that("the administrator summary says the decision in one sentence and flags
   # (ISSUES.md I42).
   expect_match(sentence, paste0(
     "filled 98\\.8% of its seats on the first day with 15 students waiting, ",
-    "so its count was capped by its seats and understates demand; the ",
+    "so its count stopped at its seats and understates demand; the ",
     "pressure bump allows for that\\."
   ))
   expect_false(grepl("floor", sentence))
@@ -3000,7 +3143,7 @@ test_that("the administrator summary says the decision in one sentence and flags
   ))
   expect_match(lower, paste0(
     "The forecast is 0.7% below last Spring's 2,179: the changes in Fall 2026 ",
-    "point lower\\. Last Spring filled 98\\.8% .* capped by its seats and ",
+    "point lower\\. Last Spring filled 98\\.8% .* stopped at its seats and ",
     "understates demand; the pressure bump allows for that\\."
   ))
   # The course's own error, as its plan step states it: a Moderate course at

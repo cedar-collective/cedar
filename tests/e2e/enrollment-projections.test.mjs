@@ -97,13 +97,38 @@ async function closeEvidence(page) {
     methodGuide.summary || '(missing)');
   // Retired candidate families once read "0 diagnostic upstream indicators".
   check('method guide counts the two forecasts and no retired ones',
-    ['2 forecasts', 'Prior same-season is the default']
+    ['2 forecasts', "Last year's registrations is the default"]
       .every((phrase) => methodGuide.text.includes(phrase)) &&
       !/\b0 (diagnostic|selectable|signals)/.test(methodGuide.text),
     methodGuide.text.slice(0, 700));
   check('method guide describes both registered methods',
-    ['Prior same-season', 'Prior same-season + floor + latest-term changes']
+    ["Last year's registrations", "Last year's registrations, adjusted"]
       .every((label) => methodGuide.text.includes(label)));
+  // The page's words, not the model's: no spine, floor, delta or regime
+  // anywhere a reader looks.
+  const pageText = await page.evaluate(() => document.body.innerText);
+  check('the page carries no model jargon',
+    !/\b(spine|floor uplift|delta|regime|aftcast|saturated)\b/i.test(pageText),
+    (pageText.match(/\b(spine|floor uplift|delta|regime|aftcast|saturated)\b/i) || [''])[0]);
+  // The method in five lines sits above the panels, with the record from
+  // the loaded bundle, and the ledger of ideas tried is one panel below.
+  const brief = await page.evaluate(() => {
+    const block = document.querySelector('.enrollment-projection-brief');
+    return block ? block.innerText : '';
+  });
+  check('the five-line brief states the record before any panel opens',
+    ['Start.', 'Adjust only with evidence.', 'Plan.', 'Check.', 'Limit.']
+      .every((label) => brief.includes(label)) &&
+      /Past (Spring |Fall )?forecasts were/.test(brief),
+    brief.slice(0, 400));
+  // The panel opens closed, so read its text content, not its visible text.
+  const attempts = await page.evaluate(() => {
+    const panel = document.querySelector('.enrollment-projection-attempts-guide');
+    return panel ? panel.textContent : '';
+  });
+  check('the ledger of ideas tried is on the page',
+    attempts.includes('What has been tried') && attempts.includes('Dropped'),
+    attempts.slice(0, 200));
 
   const initialContext = await page.evaluate(() => {
     const group = document.getElementById('enrollment_projections-group');
@@ -242,10 +267,11 @@ async function closeEvidence(page) {
       fillHeader: fillHeader ? fillHeader.innerText.replace(/\s+/g, ' ').trim() : '',
     };
   });
+  // "· set by seats" follows the number when the schedule set the misses.
   check('reliability cells show how far off with the seat moves beneath, or Unrated',
     ratingCells.reliability.length > 0 &&
       ratingCells.reliability.every((v) =>
-        /^\d+\.\d% off\nseats moved in \d+ of \d+$/.test(v) || /^\d+\.\d% off$/.test(v) ||
+        /^\d+\.\d% off( · set by seats)?(\nseats moved in \d+ of \d+)?$/.test(v) ||
         v === 'Unrated'),
     ratingCells.reliability.join(', '));
   check('sections cells name the registrations they are planned for',
@@ -307,7 +333,7 @@ async function closeEvidence(page) {
   check(
     'the summary keeps method detail and secondary values out of their own columns',
     !['Basis', 'Why', 'Dept', 'vs last', 'Likely range', 'Trend',
-      'Saturation floor', 'Regime check', 'Recommendation']
+      'Last year near full?', 'Sharp change check', 'Recommendation']
       .some((header) => colIndex(table.headers, header) >= 0),
     table.headers.join(' | ')
   );
@@ -448,18 +474,20 @@ async function closeEvidence(page) {
       .find((cell) => /^reliability$/i.test(cell.innerText.trim()));
     return header && header.getAttribute('aria-sort') === 'descending';
   }, { timeout: 10000 });
-  // A cell shows the number; its rating is the badge's tone.
+  // A cell shows the number; the column sorts on the rating behind it, which
+  // the badge's hover names first ("Low: ..."). A grey "set by seats" badge
+  // keeps its rating in the hover, so the order is read there, not from the tone.
   const reliabilityOrder = reliabilitySorted && await page.evaluate(() => {
     const root = document.getElementById('enrollment_projections-projection_table');
     const index = [...root.querySelectorAll('.rt-thead .rt-th')]
       .findIndex((cell) => /^reliability$/i.test(cell.innerText.trim()));
     return [...root.querySelectorAll('.rt-tbody .rt-tr')].map((row) => {
       const badge = row.querySelectorAll('.rt-td')[index].querySelector('.projection-axis');
-      const tone = badge ? [...badge.classList].find((c) => c.startsWith('projection-axis--')) : null;
-      return tone ? tone.replace('projection-axis--', '') : 'missing';
+      const title = badge ? (badge.getAttribute('title') || '') : '';
+      return title.split(':')[0].trim() || 'missing';
     });
   });
-  const reliabilityRank = { poor: 3, mid: 2, good: 1, none: 0 };
+  const reliabilityRank = { Low: 3, Moderate: 2, High: 1, Unrated: 0, None: 0 };
   check(
     'Reliability sorts weakest first, unrated last',
     Array.isArray(reliabilityOrder) && reliabilityOrder.length > 1 &&
@@ -541,8 +569,8 @@ async function closeEvidence(page) {
   });
   check('course detail retains planning, bias, and population-fit evidence',
     ['Status', 'Sections', 'Planned registrations', 'How this plan was built',
-      'Forecast registrations', 'Selected method', 'Saturation floor',
-      'Changes in the term just finished', 'Regime check']
+      'Forecast registrations', 'Selected method', 'Last year near full?',
+      'Changes in the term just finished', 'Sharp change check']
       // innerText applies CSS text-transform: the headline labels read in capitals.
       .every((label) => detailSummaryText.toLowerCase().includes(label.toLowerCase())),
     detailSummaryText.slice(0, 500));
@@ -630,7 +658,7 @@ async function closeEvidence(page) {
   // 0.20.0 retired every candidate but the spine and its adjusted form.
   check('both candidates are inspectable',
     candidates.rows.length === 2 &&
-      candidateText.includes('Prior same-season + floor + latest-term changes'),
+      candidateText.includes("Last year's registrations, adjusted"),
     `${candidates.rows.length} rows: ${candidateText.slice(0, 200)}`);
 
   // Closing the modal returns the reader to the table exactly where they were.
