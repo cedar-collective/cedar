@@ -152,6 +152,9 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
   source_file("cones/enrollment-projections.R")
   source_file("cones/grouped-student-paths.R")
   source_file("cones/course-planning-history.R")
+  source_file("cones/population-course-uptake.R")  # when a population takes a course, relative to unit entry
+  source_file("cones/course-retake-timing.R")      # after a DFW, when the student sits in the course again
+  source_file("cones/course-offering-pattern.R")   # seasons, parts of term, seats and day-1 fill
 
   # 5. Features (app-facing orchestration — call multiple branches/cones)
   message("[load-funcs.R] Loading features...")
@@ -168,6 +171,7 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
   source_file("features/registration-snapshots.R")
   source_file("features/enrollment-projection-scenario.R")
   source_file("features/degree-explorer.R")
+  source_file("features/population-course-pressure.R")  # text-first preview: a population through its shared courses
   source_file("features/shared-requirements.R")
   source_file("features/catalog-capture.R")
   source_file("features/catalog-analysis.R")

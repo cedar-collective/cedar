@@ -47,6 +47,9 @@ test_students_audits <<- cedar_registrations_audits # EC-09: audit/status preced
 test_programs    <<- cedar_programs
 test_programs_concurrent <<- cedar_programs_concurrent # EC-10: same-term program intersections
 test_programs_hp <<- cedar_programs_hp            # HP01: named population groups -> Banner codes
+test_programs_hp2 <<- cedar_programs_hp2          # HP02: a pre-nursing population through its courses
+test_students_hp2 <<- cedar_registrations_hp2
+test_sections_hp2 <<- cedar_sections_hp2
 test_students_regstats <<- cedar_registrations_regstats # EC-11: prior-only anomaly baselines
 test_sections_regstats <<- cedar_sections_regstats
 test_sections_course_history <<- cedar_sections_course_history
@@ -124,14 +127,14 @@ attach_test_course_ids <<- function(tbl, role = c("sections", "students")) {
 }
 for (.sec in c("test_sections", "test_sections_sf", "test_sections_topics", "test_sections_schedule",
                "test_sections_regstats", "test_sections_course_history", "test_sections_xl_switch",
-               "test_sections_intersession", "test_sections_pending_session")) {
+               "test_sections_intersession", "test_sections_pending_session", "test_sections_hp2")) {
   assign(.sec, attach_test_course_ids(get(.sec), "sections"), envir = globalenv())
 }
 # Loaded as global.R loads them: without the student-description columns
 # (thin_class_list(), ADR-001 step 5); a reader attaches them from the
 # student-term table built above from the full fixtures.
 for (.stu in c("test_students", "test_students_xl_switch", "test_students_regstats",
-               "test_students_course_history", "test_students_pending_session")) {
+               "test_students_course_history", "test_students_pending_session", "test_students_hp2")) {
   assign(.stu, attach_test_course_ids(thin_class_list(get(.stu)), "students"), envir = globalenv())
 }
 rm(.stu)

@@ -59,6 +59,32 @@
 #          Biology: BIOL declared (3) — a non-health control that must never
 #            resolve into a health group.
 #
+#   HP02 — cedar_programs_hp2 (24 rows) + cedar_registrations_hp2 (27 rows) +
+#          cedar_sections_hp2 (8 rows). A pre-nursing population of 12
+#          (HP2-P01..P12, all with a Nursing record in the newest term, so all
+#          ongoing with no ceiling) and six outsiders (HP2-N01..N06, no program
+#          rows) in BIOL 1140, CHEM 1215 and NUTR 2110 on ABQ, 202010–202110.
+#          Pulled 2021-03-01; grades posted through 202080; 202110 settled, so
+#          edges: last_graded 202080, last_enrolled_complete 202110.
+#          Entry: P01–P08 at 202010, P09–P12 at 202080.
+#          Uptake BIOL 1140/ABQ: 11 of 12 take it (P10 is an early drop, never
+#            a taker); P09 took it before entry; the other 10 in their entry
+#            term (median and 75th pct 0). CHEM 1215: 4 takers, 1, 1, 2, 2 terms
+#            after entry (median 1.5, p75 2). NUTR 2110: 1 taker (suppressed at
+#            min_n 2).
+#          DFW BIOL 1140/ABQ: population 5 of 13 attempts (38.46%); all
+#            students 6 of 18 (33.33%). CHEM 1215: 0 of 2 vs 0 of 3.
+#          Retakes after a 202010 DFW in BIOL 1140: P05 in the summer (202060),
+#            P06 the next regular term (202080, the 2H section), P07 later in
+#            the year (202110), P08 never; P11's 202080 DFW is too recent to
+#            judge (its year ends 202180). Outsider N02 never retakes.
+#          Offerings BIOL 1140/ABQ (3-year window, edge 202110, covered:
+#            2 springs, 1 summer, 1 fall): Spring full term 2 of 2 (12 seats;
+#            day-1 fill 12/12 then 2/12), Summer 1 of 1 (20 seats, 2/20), Fall
+#            full term 1 of 1 (30 seats, 3/30), Fall 2H 1 of 1 (10 seats, 2/10).
+#            CHEM 1215: Fall 1 of 1 (24 seats, 3/24), Spring 1 of 2 (24, 2/24).
+#          Used by test-population-course-pressure.R.
+#
 #   RP01 — cedar_registrations_rp (13 rows) + cedar_degrees_rp (1 row). HIST 499:
 #          "returned next term" = registered next fall/spring OR graduated.
 #          pass 6 anchors, 4 returned; fail 1/1; early drop 1/1. Matches
@@ -4144,6 +4170,103 @@ cedar_programs_hp <- dplyr::bind_rows(
   # Control: never resolves into a health group.
   .hp_row(c("HP_BIOL_1", "HP_BIOL_2", "HP_BIOL_3"), "Biology", "BIOL", FALSE, "BIOL")
 )
+
+
+# =============================================================================
+# HP02 — a pre-nursing population through its shared courses
+# =============================================================================
+# See the HP02 block in the header for the design and every pinned number.
+# Programs: every student has a Nursing record in the newest term (202110), so
+# the whole population is ongoing with no enrollment ceiling; P01 declares
+# NURS there, the rest stay pre-majors (FNRS leads to NURS).
+.hp2_ids <- function(nums) sprintf("HP2-P%02d", nums)
+cedar_programs_hp2 <- dplyr::bind_rows(
+  .hp_row(.hp2_ids(1:8), "Nursing", "FNRS", TRUE, "NURS") %>% dplyr::mutate(term = 202010L),
+  .hp_row(.hp2_ids(2:8), "Nursing", "FNRS", TRUE, "NURS"),
+  .hp_row(.hp2_ids(1), "Nursing", "NURS", FALSE, "NURS"),
+  .hp_row(.hp2_ids(9:12), "Nursing", "FNRS", TRUE, "NURS") %>% dplyr::mutate(term = 202080L),
+  .hp_row(.hp2_ids(9:12), "Nursing", "FNRS", TRUE, "NURS")
+)
+
+# Registrations: one section per course, term and part of term; status dates
+# before the first class day except the drops, so the first-day count is the
+# roster (a drop dated after the first day was present on it).
+.hp2_reg <- function(sids, term, course, crn, grades = NA_character_, status = "RE",
+                     status_date = as.Date("2019-12-01"), part_term = "1",
+                     as_of = as.Date("2021-03-01")) {
+  .mc_row(sids, term, course, "ABQ", sub(" .*", "", course), grades) %>%
+    dplyr::mutate(
+      registration_status_code = status,
+      registration_status = dplyr::case_when(status == "RE" ~ "Registered", TRUE ~ "Drop"),
+      registration_date = status_date,
+      part_term = .env$part_term,
+      as_of_date = as_of,
+      crn = .env$crn, section_id = .env$crn,
+      enrollment_id = paste0(.env$crn, "-", student_id)
+    )
+}
+.hp2_n <- function(nums) sprintf("HP2-N%02d", nums)
+cedar_registrations_hp2 <- dplyr::bind_rows(
+  # Spring 2020, full term, 12 seats: twelve on the first day, two drops later.
+  .hp2_reg(.hp2_ids(1:6), 202010L, "BIOL 1140", "HP2-B1140-SP20", c("A", "B", "B", "C", "F", "D")),
+  .hp2_reg(.hp2_ids(7), 202010L, "BIOL 1140", "HP2-B1140-SP20", status = "DW",
+           status_date = as.Date("2020-03-01")),
+  .hp2_reg(.hp2_ids(8:9), 202010L, "BIOL 1140", "HP2-B1140-SP20", c("F", "B")),
+  .hp2_reg(.hp2_ids(10), 202010L, "BIOL 1140", "HP2-B1140-SP20", status = "DR",
+           status_date = as.Date("2020-01-20")),
+  .hp2_reg(.hp2_n(1:2), 202010L, "BIOL 1140", "HP2-B1140-SP20", c("A", "F")),
+  # Summer 2020, 20 seats: P05 retakes and passes.
+  .hp2_reg(c(.hp2_ids(5), .hp2_n(3)), 202060L, "BIOL 1140", "HP2-B1140-SU20", c("B", "A"),
+           status_date = as.Date("2020-05-01")),
+  # Fall 2020, full term (30 seats) and a second-half section (10 seats).
+  .hp2_reg(c(.hp2_ids(12), .hp2_n(4:5)), 202080L, "BIOL 1140", "HP2-B1140-FA20", c("B", "B", "C"),
+           status_date = as.Date("2020-08-01")),
+  .hp2_reg(c(.hp2_ids(6), .hp2_ids(11)), 202080L, "BIOL 1140", "HP2-B1140-FA20H", c("C", "F"),
+           status_date = as.Date("2020-08-01"), part_term = "2H"),
+  # Spring 2021, 12 seats, in progress at the pull: P07 retakes, no grades yet.
+  .hp2_reg(c(.hp2_ids(7), .hp2_n(6)), 202110L, "BIOL 1140", "HP2-B1140-SP21",
+           status_date = as.Date("2020-12-01")),
+  # CHEM 1215: Fall 2020 and Spring 2021, 24 seats each.
+  .hp2_reg(c(.hp2_ids(1:2), .hp2_n(4)), 202080L, "CHEM 1215", "HP2-C1215-FA20", c("A", "B", "B"),
+           status_date = as.Date("2020-08-01")),
+  .hp2_reg(.hp2_ids(3:4), 202110L, "CHEM 1215", "HP2-C1215-SP21",
+           status_date = as.Date("2020-12-01")),
+  # NUTR 2110: one taker.
+  .hp2_reg(.hp2_ids(1), 202080L, "NUTR 2110", "HP2-N2110-FA20", "B",
+           status_date = as.Date("2020-08-01"))
+)
+
+# Sections, from the ordinary section template: one active section per
+# course-term-part, with the roster's registered count at the pull and the
+# seats the header pins.
+.hp2_sections <- tibble::tribble(
+  ~crn,               ~term,   ~course,     ~part_term, ~capacity, ~enrolled, ~start_date,
+  "HP2-B1140-SP20",   202010L, "BIOL 1140", "1",        12L,       10L,       "2020-01-13",
+  "HP2-B1140-SU20",   202060L, "BIOL 1140", "1",        20L,        2L,       "2020-06-01",
+  "HP2-B1140-FA20",   202080L, "BIOL 1140", "1",        30L,        3L,       "2020-08-17",
+  "HP2-B1140-FA20H",  202080L, "BIOL 1140", "2H",       10L,        2L,       "2020-10-12",
+  "HP2-B1140-SP21",   202110L, "BIOL 1140", "1",        12L,        2L,       "2021-01-19",
+  "HP2-C1215-FA20",   202080L, "CHEM 1215", "1",        24L,        3L,       "2020-08-17",
+  "HP2-C1215-SP21",   202110L, "CHEM 1215", "1",        24L,        2L,       "2021-01-19",
+  "HP2-N2110-FA20",   202080L, "NUTR 2110", "1",        30L,        1L,       "2020-08-17"
+)
+cedar_sections_hp2 <- dplyr::bind_rows(lapply(seq_len(nrow(.hp2_sections)), function(i) {
+  row <- .hp2_sections[i, ]
+  cedar_sections %>% dplyr::filter(section_id == "S10001") %>%
+    dplyr::mutate(section_id = row$crn, crn = row$crn,
+      term = row$term,
+      term_type = dplyr::case_when(row$term %% 100L == 10L ~ "spring",
+                                   row$term %% 100L == 60L ~ "summer", TRUE ~ "fall"),
+      subject = sub(" .*", "", row$course), course_number = sub(".* ", "", row$course),
+      subject_course = row$course, course_title = row$course,
+      department = sub(" .*", "", row$course),
+      campus = "ABQ", part_term = row$part_term,
+      enrolled = row$enrolled, total_enrl = row$enrolled,
+      capacity = row$capacity, available = row$capacity - row$enrolled,
+      start_date = as.Date(row$start_date),
+      end_date = as.Date(row$start_date) + 100L,
+      as_of_date = as.Date("2021-03-01"))
+}))
 
 
 # ── EC-13 — a department that owns more programs than the rollup threshold ───

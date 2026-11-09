@@ -132,12 +132,20 @@ Built: an illustrative semester board for about two dozen programs from the
 2026–27 catalog, with math/English starting points, prerequisite links,
 15/16-credit budgeting, annual shared University/Gen Ed/college rules, course
 popups with seats and first-day pressure, Pathways > Course paths, the offline
-catalog scanner, Admin Catalog Review, and reviewed AI-assisted draft
-interpretations. Rules: [degree-explorer-rules.md](docs/developers/degree-explorer-rules.md);
+catalog scanner, Admin Catalog Review, reviewed AI-assisted draft
+interpretations, and the population course pressure text preview
+(`scripts/population-course-pressure.R`: for a named population group and its
+plans, each shared course's uptake and timing, DFW against everyone, retake
+timing after a DFW, and seasons, parts of term, seats and day-1 fill).
+Rules: [degree-explorer-rules.md](docs/developers/degree-explorer-rules.md);
 contracts: [degree-requirements.md](docs/developers/degree-requirements.md),
 [catalog-scanning.md](docs/developers/catalog-scanning.md),
 [catalog-normalization.md](docs/developers/catalog-normalization.md).
 
+- [ ] **Course pressure on the board.** Surface the population course pressure
+  preview for a population and its plans: the shared courses' day-1 fill,
+  DFW gap and retake timing on the tiles they share, and a compact card mode
+  so the board keeps its visual power as cards gain facts.
 - [ ] **Minors.** Pilot list (English, Spanish, History, …), placed in the top
   band, with authored overlap rules.
 - [ ] **Elective guidance.** Reviewed, major-specific suggestions kept apart

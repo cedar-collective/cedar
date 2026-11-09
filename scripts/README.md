@@ -476,6 +476,34 @@ cannot be rebuilt afterwards, and the grain: `R/branches/registration-snapshots.
 
 ---
 
+## population-course-pressure.R
+
+The text-first preview of a population's path through the courses its degree
+plans share: for a named population group (`population_groups.csv`) and a list
+of roadmap plans (`degree_roadmap_plans.csv`), each course at least two plans
+require, with how many of the population took it and when relative to entering
+the unit, DFW for the population beside every student, when a DFW was retaken
+(next regular term, a summer, later in the year, not within a year), and in
+which seasons and parts of term it is offered with seats and first-day fill.
+It is `format_population_course_pressure()` over
+`build_population_course_pressure()` (`R/features/population-course-pressure.R`).
+
+```bash
+Rscript --vanilla scripts/population-course-pressure.R \
+  --group "Health Professions (Clinical)" \
+  --plans "nursing-bsn-2026,medical-laboratory-bs-2026,population-health-bs-2026" \
+  --campus ABQ --min-plans 2 --min-n 10 --years 3 [--output PATH]
+```
+
+`--courses "BIOL 2210,CHEM 1215"` names the courses instead of deriving them
+from the plans; `--level Undergraduate` scopes the population. It loads the
+class list, programs, student terms and both measure tables, so run it with the
+app stopped when they share a machine (in production, through the
+`cedar-projections` service as the snapshot script above). The preview is
+computational evidence, not UI evidence; a Shiny surface reads the payload.
+
+---
+
 ## pull-production-data.sh
 
 Copies production's prepared tables (`cedar_*.qs`, `cedar-status.json`) into
