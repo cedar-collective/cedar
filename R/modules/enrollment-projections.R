@@ -71,6 +71,9 @@ projection_axis_badge <- function(value, label = value, title = NULL) {
     Moderate = "mid",
     Thin = "thin",
     Volatile = , Low = "poor",
+    # A rated axis whose number the schedule set, not the forecast: grey
+    # with the rating kept in the hover, as against None, which has no rating.
+    neutral = "neutral",
     "none"
   )
   htmltools::span(
@@ -130,13 +133,20 @@ projection_day_one_coldef <- function(title) {
 # Reliability as its number, coloured by the rating, with how often the
 # course's seats moved in the same terms beneath, uncoloured: the context a
 # miss is read in, not a second grade.
-projection_reliability_coldef <- function(ratings, values, reasons, seat_ratings,
-                                          seat_notes, ...) {
+projection_reliability_coldef <- function(tones, labels, ratings, reasons,
+                                          seat_ratings, seat_notes, ...) {
   reactable::colDef(
     ..., searchable = FALSE, defaultSortOrder = "desc", sortNALast = TRUE,
     cell = function(value, index) {
+      # The tone may be "neutral" (grey, set by seats); the hover still names
+      # the rating behind the number, which is also what the column sorts on.
+      rating <- ratings[[index]]
+      reason <- reasons[[index]]
+      title <- if (is.null(reason) || is.na(reason)) rating else paste0(rating, ": ", reason)
       htmltools::tagList(
-        projection_axis_value_badge(ratings[[index]], values[[index]], reasons[[index]]),
+        projection_axis_badge(tones[[index]],
+                              label = dplyr::coalesce(labels[[index]], rating),
+                              title = title),
         if (!seat_ratings[[index]] %in% c("Unrated", NA)) {
           htmltools::div(class = "text-note", seat_notes[[index]])
         }
@@ -322,7 +332,7 @@ projection_build_explainer <- function(shown = NULL, track_record = NULL) {
               " large first-year courses, which is where the change comes from. A course",
               " listed as the one taken just before (Composition I before II, say)",
               " carries its change at its own rate. The change can take a near-full course",
-              " below last year's count: a count capped by its seats says demand",
+              " below last year's count: a count that stopped at its seats says demand",
               " was higher last year, not that it cannot fall. Two terms ahead,",
               " that term has not happened yet, so the change is left out and the",
               " course's detail says so."),
@@ -430,6 +440,69 @@ projection_error_explainer <- function(error_sources, range_coverage) {
   )
 }
 
+# The method in five lines, always open, above the panels that spell each
+# one out. `record` is the loaded bundle's one-line record (rendered in the
+# server), so the page states how close past forecasts came before a reader
+# has opened anything.
+projection_in_brief_ui <- function(record) {
+  defaults <- enrollment_projection_defaults()
+  line <- function(name, ...) tags$li(tags$strong(name), " ", ...)
+  tags$div(
+    class = "enrollment-projection-brief",
+    tags$ul(
+      class = "enrollment-projection-brief-list",
+      line("Start.", "The course's registrations in the same season last year,",
+           " everyone who signed up, including students who later dropped."),
+      line("Adjust only with evidence.", "The students still waiting when last",
+           " year was near full, and the enrollment changes in the term just",
+           " finished, are added only where that forecast beat last year's",
+           " number on earlier terms."),
+      line("Plan.", paste0(
+        "A course near full every recent year is planned for ",
+        projection_percent(defaults$pressure_bump_share),
+        " more; registrations are divided by the section size and rounded up."
+      )),
+      line("Check.", "Every past term is re-forecast with only what was known",
+           " then. ", record),
+      line("Limit.", "The forecast cannot see next year's schedule. A full",
+           " course registers as many students as it has seats, so where",
+           " seats change, registrations follow the seats.")
+    )
+  )
+}
+
+# What has been tried and what it changed, as a collapsed table: the answer
+# to "did you consider X" before it is asked. The rows are
+# enrollment_projection_attempts_ledger(); the evidence behind each is on the
+# developer lessons page.
+projection_attempts_explainer <- function() {
+  ledger <- enrollment_projection_attempts_ledger()
+  info_panel(
+    "What has been tried, and what it changed",
+    tags$table(
+      class = "table table-sm enrollment-projection-attempts",
+      tags$thead(tags$tr(tags$th("Idea"), tags$th("Result"), tags$th("Status"))),
+      tags$tbody(lapply(seq_len(nrow(ledger)), function(i) {
+        tags$tr(
+          tags$td(ledger$idea[[i]]),
+          tags$td(ledger$result[[i]]),
+          tags$td(class = "text-nowrap", ledger$status[[i]])
+        )
+      }))
+    ),
+    tags$p(
+      "Each idea was judged the same way: forecast every past term with only",
+      " the evidence available then, and compare with last year's number on",
+      " the same terms. The measurements are in the developer notes."
+    ),
+    description = paste0(
+      nrow(ledger), " ideas, each judged on past terms: what is in the model, ",
+      "what was dropped, and what is next."
+    ),
+    class = "enrollment-projection-attempts-guide"
+  )
+}
+
 projection_draft_explainer <- function() {
   info_panel(
     "How the draft comparison works",
@@ -441,6 +514,12 @@ projection_draft_explainer <- function() {
       tags$li(tags$strong("Planned registrations"),
               " are the projection plus any pressure bump. They run above the",
               " students expected in a seat on day one, on purpose."),
+      tags$li(tags$strong("If seats fill as last year"),
+              " is shown for a course that was near full last year: the",
+              " draft's seats times last year's registrations per seat. A",
+              " near-full course's registrations follow its seats, so this is",
+              " what the draft itself would produce; it never replaces the",
+              " forecast or counts toward its reliability."),
       tags$li(tags$strong("Short of day-one seats:"),
               " the draft has fewer seats than the students expected in the room",
               " when classes begin. This is the one to fix first."),
@@ -533,8 +612,10 @@ projection_detail_ui <- function(data, ns) {
       # Named as in the table's column headers, each with the number behind
       # its rating: four bare badges reading "Moderate Deep Moderate Low" say
       # nothing about which is which, or what any of them measured.
+      # Grey "set by seats" when the schedule set the past numbers.
       projection_axis_named_badge("Reliability", current$accuracy,
-                                  current$accuracy_value, current$accuracy_reason),
+                                  current$reliability_label, current$accuracy_reason,
+                                  neutral = identical(current$reliability_tone, "neutral")),
       projection_axis_named_badge("Seats", current$seat_consistency,
                                   current$seat_consistency_value,
                                   current$seat_consistency_reason, neutral = TRUE),
@@ -553,7 +634,7 @@ projection_detail_ui <- function(data, ns) {
         class = "enrollment-projection-summary",
         tags$dt("Selected method"), tags$dd(current$method_label),
         tags$dt("Why selected"), tags$dd(current$selection_reason),
-        tags$dt("Adjusted candidate"), tags$dd(adjusted_candidate_text),
+        tags$dt("Adjusted forecast"), tags$dd(adjusted_candidate_text),
         tags$dt("Seats in past forecast terms"),
         tags$dd(current$seat_consistency_reason),
         tags$dt("Left waiting in the term just finished"),
@@ -562,16 +643,17 @@ projection_detail_ui <- function(data, ns) {
         tags$dt("Why it is listed"), tags$dd(current$inclusion_reason),
         tags$dt("Feeder adjustment"), tags$dd(current$plan_feeder_note),
         tags$dt("Pressure bump"), tags$dd(current$pressure_bump_note),
-        tags$dt("Saturation floor"), tags$dd(current$floor_note),
+        tags$dt("Last year near full?"), tags$dd(current$floor_note),
         tags$dt("Changes in the term just finished"),
         tags$dd(dplyr::coalesce(current$adjusted_delta_basis, "Not available")),
-        tags$dt("Regime check"), tags$dd(current$regime_note),
+        tags$dt("Sharp change check"), tags$dd(current$regime_note),
         tags$dt("Capacity check"), tags$dd(current$capacity_limit_note)
       ),
       description = paste(
         "Why this method and this course were selected, the feeder and",
-        "pressure-bump arithmetic, and the floor, term-just-finished, regime,",
-        "and capacity checks behind the number above."
+        "pressure-bump arithmetic, whether last year was near full, the",
+        "changes in the term just finished, and the sharp-change and",
+        "capacity checks behind the number above."
       ),
       class = "enrollment-projection-evidence"
     ),
@@ -654,8 +736,22 @@ projection_scope_bar <- function(meta, course_count = TRUE) {
     " projections | Data window: ", meta$history_start_term_label,
     " through ", meta$as_of_term_label,
     " | ABQ + EA",
+    # "11 of 58 courses": the course group is a filter over the bundle, and a
+    # reader should see there is more than the default group.
     if (isTRUE(course_count)) {
-      paste0(" | ", meta$n_rows, " course", if (meta$n_rows == 1L) "" else "s")
+      paste0(
+        " | ", meta$n_rows,
+        if (isTRUE(meta$n_bundle_rows > meta$n_rows)) paste0(" of ", meta$n_bundle_rows),
+        " course", if (max(meta$n_rows, meta$n_bundle_rows %||% 0L) == 1L) "" else "s"
+      )
+    },
+    # A recent term with no first-day count for any course shown: the table
+    # would otherwise show a column of dashes with no reason (ISSUES.md M32).
+    if (length(meta$undated_terms) > 0L) {
+      paste0(
+        " | ", paste(meta$undated_terms, collapse = " and "),
+        " first days unknown (class lists pulled without status dates)"
+      )
     },
     # When the numbers were made and what schedule they were set beside.
     " | built ", projection_date_label(meta$built_at),
@@ -934,23 +1030,26 @@ projection_table_reactable <- function(projection_view, select_input) {
       depth_value = reactable::colDef(show = FALSE),
       depth_reason = reactable::colDef(show = FALSE),
       accuracy_order = projection_reliability_coldef(
-        data$accuracy, data$accuracy_value, data$accuracy_reason,
-        data$seat_consistency, data$seat_consistency_value,
-        name = "Reliability", minWidth = 120,
+        data$reliability_tone, data$reliability_label, data$accuracy,
+        data$accuracy_reason, data$seat_consistency, data$seat_consistency_value,
+        name = "Reliability", minWidth = 165,
         header = htmltools::span(
           "Reliability",
           title = paste(
             "How far past forecasts for this course landed from what",
             "happened, on average; beneath, in how many of those terms its",
-            "seats moved. A near-full course's miss as its seats moved the way",
-            "of the miss, or held, is the schedule's; a miss with seats to spare",
-            "is the forecast's, and is flagged"
+            "seats moved. Grey \"set by seats\" when most of the miss came",
+            "while the course was near full and its seats moved the way of the",
+            "miss, or held: the schedule set those numbers. A miss with seats",
+            "to spare is the forecast's, coloured, and flagged"
           )
         )
       ),
       accuracy = reactable::colDef(show = FALSE, searchable = TRUE),
       accuracy_value = reactable::colDef(show = FALSE),
       accuracy_reason = reactable::colDef(show = FALSE),
+      reliability_tone = reactable::colDef(show = FALSE),
+      reliability_label = reactable::colDef(show = FALSE, searchable = TRUE),
       seat_consistency = reactable::colDef(show = FALSE, searchable = TRUE),
       seat_consistency_value = reactable::colDef(show = FALSE),
       seat_consistency_reason = reactable::colDef(show = FALSE),
@@ -995,6 +1094,21 @@ projection_draft_reactable <- function(data, select_input) {
       ),
       draft_seats = reactable::colDef(
         name = "Draft seats", align = "right", minWidth = 85,
+        cell = function(value) count_text(value)
+      ),
+      # Seats, not students: the draft's own answer for a near-full course,
+      # beside the plan's, never in place of it.
+      if_seats_fill = reactable::colDef(
+        name = "If seats fill as last year", align = "right", minWidth = 110,
+        header = htmltools::span(
+          "If seats fill", htmltools::div("as last year"),
+          title = paste(
+            "For a course near full last year: the draft's seats times last",
+            "year's registrations per seat. What to expect if the new seats",
+            "fill the way last year's did. A dash means the course had seats",
+            "to spare last year, so its registrations did not follow its seats"
+          )
+        ),
         cell = function(value) count_text(value)
       ),
       expected_first_day = projection_day_one_coldef(
@@ -1045,10 +1159,12 @@ projection_draft_reactable <- function(data, select_input) {
         cell = function(value) count_text(value)
       ),
       reliability = projection_reliability_coldef(
-        table$reliability, table$reliability_value,
+        table$reliability_tone, table$reliability_label, table$reliability,
         rep(NA_character_, nrow(table)), table$seat_consistency,
-        table$seat_consistency_value, name = "Reliability", minWidth = 120
+        table$seat_consistency_value, name = "Reliability", minWidth = 165
       ),
+      reliability_tone = reactable::colDef(show = FALSE),
+      reliability_label = reactable::colDef(show = FALSE),
       reliability_value = reactable::colDef(show = FALSE),
       seat_consistency = reactable::colDef(show = FALSE),
       seat_consistency_value = reactable::colDef(show = FALSE),
@@ -1193,7 +1309,7 @@ projection_candidate_reactable <- function(data) {
       selected = reactable::colDef(name = "Selected", maxWidth = 80),
       applicable = reactable::colDef(name = "Usable", maxWidth = 70),
       components = reactable::colDef(
-        name = "Floor and delta components", minWidth = 280
+        name = "Waiting students and changes", minWidth = 280
       ),
       evidence = reactable::colDef(name = "Evidence", minWidth = 260)
     )
@@ -1251,6 +1367,9 @@ enrollmentProjectionsUI <- function(id) {
         "see each step that changed it and how close past forecasts came."
       )
     ),
+    # The whole method in five lines, with the record from the loaded
+    # bundle, before any panel has to be opened.
+    projection_in_brief_ui(uiOutput(ns("accuracy_headline"), inline = TRUE)),
     # Each explainer answers one question a reader brings to the page, and
     # its title says which. The methods guide sits below the table.
     projection_columns_explainer(),
@@ -1259,6 +1378,7 @@ enrollmentProjectionsUI <- function(id) {
       track_record = uiOutput(ns("track_record"), inline = TRUE)
     ),
     uiOutput(ns("error_sources")),
+    projection_attempts_explainer(),
     navset_tab(
       id = ns("projection_tabs"),
       selected = "Projections",
@@ -1518,6 +1638,8 @@ enrollmentProjectionsServer <- function(id, bundles, load_bundle, programs) {
     })
 
     output$track_record <- renderUI(view()$meta$track_record$sentence)
+
+    output$accuracy_headline <- renderUI(view()$meta$track_record$headline)
 
     output$pressure_summary <- renderUI({
       tags$p(

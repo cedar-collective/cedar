@@ -154,11 +154,13 @@ CEDAR_ENROLLMENT_PROJECTION_GROUPS <- local({
 # of the spine (correlation 0.999 to 1.000) or lost to it rolling, and the
 # bias-correction path never fired on five Springs of history. The audit
 # figures are in docs/developers/forecasting-lessons.md.
+# Reader-facing names, in the page's words: no "spine", "floor" or "delta".
+# The adjusted forecast is named for what it adds, whatever the season of the
+# term just finished (a Spring for a Fall target read one step ahead,
+# ISSUES.md I41).
 CEDAR_ENROLLMENT_PROJECTION_METHODS <- c(
-  seasonal_last = "Prior same-season",
-  # Named for the term just finished, whatever its season: a Spring for a
-  # Fall target read one step ahead (ISSUES.md I41).
-  spine_adjusted = "Prior same-season + floor + latest-term changes"
+  seasonal_last = "Last year's registrations",
+  spine_adjusted = "Last year's registrations, adjusted"
 )
 
 CEDAR_ENROLLMENT_PROJECTION_DEFAULT_METHOD <- "seasonal_last"
@@ -175,13 +177,13 @@ CEDAR_ENROLLMENT_PROJECTION_METHOD_FAMILIES <- data.frame(
   family_id = "observed_enrollment",
   family_label = "Observed enrollment",
   description = paste(
-    "Both candidates start from the course's own prior same-season",
-    "enrollment. The adjusted one raises it to a floor when that term was",
-    "saturated and moves it by what changed in the term just finished."
+    "Both forecasts start from the course's registrations in the same season",
+    "last year. The adjusted one adds the students still waiting when that",
+    "term was near full, and the enrollment changes in the term just finished."
   ),
   selection_note = paste(
-    "Prior same-season is the default; the adjusted candidate replaces it only",
-    "after beating it on earlier aftcasts."
+    "Last year's registrations is the default; the adjusted forecast replaces",
+    "it only after beating it on earlier past forecasts."
   ),
   stringsAsFactors = FALSE
 )
@@ -191,18 +193,18 @@ CEDAR_ENROLLMENT_PROJECTION_METHOD_GUIDE <- data.frame(
   family_id = unname(CEDAR_ENROLLMENT_PROJECTION_METHOD_ROLES),
   concept_id = c("latest_level", "adjusted_level"),
   basis = c(
-    "Repeats enrollment from the most recent prior term of the same type.",
+    "Repeats the course's registrations from the same season last year.",
     paste(
       "Starts from the same number, adds the students still waiting when that",
-      "term was saturated, and adds the change in the course's own",
+      "term was near full, and adds the change in the course's own",
       "enrollment, in the course taken just before it, and in its other",
       "feeder courses during the term just finished, each scaled by the share",
       "that historically carried into this course."
     )
   ),
   distinction = c(
-    "The default. Closest when the schedule holds still; a year old by the time the target is scheduled, and blind to a saturated ceiling.",
-    "Sees a saturated prior term and a term just finished that moved. Uses that term's enrollments only, because grades are not posted when the schedule is built; the same terms can be re-read once they are."
+    "The default. Closest when the schedule holds still; a year old by the time the target is scheduled, and it cannot see that a full course would have drawn more students.",
+    "Sees a near-full prior term and a term just finished that moved. Uses that term's enrollments only, because grades are not posted when the schedule is built; the same terms can be re-read once they are."
   ),
   stringsAsFactors = FALSE
 )

@@ -12,26 +12,63 @@ nav_order: 4.5
 
 ---
 
-Open **Registration > Projections** to inspect the latest validated demand
-artifacts for the pooled ABQ and EA course market. The page
-includes courses in the Gen Ed monitoring scope that passed the pressure screen
-plus the always-monitored FYEX and gateway list. Branch campuses are not
-included.
+Open **Registration > Projections** for the saved course-demand projections
+for the pooled Albuquerque and online course market: the Gen Ed courses that
+passed the pressure screen plus the always-monitored first-year and gateway
+list. Branch campuses are not included.
 
-CEDAR publishes **one projection per season** — a Spring target and a Fall
-target — and neither replaces the other. Use **Target term** to choose which one
+## The method in five lines
+
+1. **Start.** The course's registrations in the same season last year:
+   everyone who signed up, including students who later dropped.
+2. **Adjust only with evidence.** The students still waiting when last year
+   was near full, and the enrollment changes in the term just finished, are
+   added only where that forecast beat last year's number on earlier terms.
+3. **Plan.** A course near full every recent year is planned for 5% more.
+   Registrations are divided by the section size and rounded up.
+4. **Check.** Every past term is re-forecast with only what was known then.
+   The page states the result at the top: on the current projections, past
+   forecasts were within about 4% where the seats held and about 25% off
+   where the seats moved 10% or more.
+5. **Limit.** The forecast cannot see next year's schedule. A full course
+   registers as many students as it has seats, so where seats change,
+   registrations follow the seats, and the forecast misses by the change.
+
+That fifth line is most of the error, and it is why the page shows the
+schedule beside the plan (the **Draft schedule** tab) rather than trying to
+forecast through it. The forecast also runs a few percent low on average:
+last year's count stopped at last year's seats, and where seats were added
+the next year, more students registered than the count said. The pressure
+bump corrects the plan for this; the forecast and its reliability carry it
+and say so.
+
+**What has been tried, and what it changed**, a collapsed panel on the page,
+lists each idea tested (averaging years, blending forecasts, population
+models, bias corrections, DFW multipliers, following feeders) with its result
+and whether it is in the model. Every idea was judged the same way, on past
+terms with only the evidence available then. The measurements are in the
+[developer lessons](../developers/forecasting-lessons.html).
+
+## Reading the page
+
+CEDAR publishes **one projection per season**, a Spring target and a Fall
+target, and neither replaces the other. Use **Target term** to choose which one
 you are reading; the page opens on the nearest one, and the scope stripe always
 names the term actually loaded. The two are not directly comparable as forecasts
 of the same thing: the nearer target can read the term that has already
-happened for its changes, while the further one carries the spine and the
-saturation floor alone. A further-out target therefore shows thinner evidence
-depth and no deltas — which means that evidence was unavailable, not that
-nothing changed.
+happened for its changes, while the further one carries last year's number
+and the students still waiting alone. A further-out target therefore shows
+thinner evidence and no changes, which means that evidence was unavailable,
+not that nothing changed.
 
 The page opens to **Always monitored**. Use **Target term**, **Course group**,
-**Department**, and **Course** to narrow the saved rows. The table expands to
-show every matching row and scrolls with the page. These controls do not fit or
-rerun a model.
+**Department**, and **Course** to narrow the saved rows; the scope stripe
+counts them against the whole projection ("11 of 58 courses"), so the
+other groups are a dropdown away. The stripe also names any recent term whose
+class lists were pulled without registration status dates, so that its
+column of dashes in the table has a reason. The table expands to show every
+matching row and scrolls with the page. These controls do not fit or rerun a
+model.
 
 Two sentences sit above the table. The first, once the target term's draft
 schedule is in the data, says how many of the courses shown are short of the
@@ -146,6 +183,15 @@ Each course gets one verdict:
   to fill: when such courses were given more seats, the new seats filled.
 - **Not in the draft schedule**: a monitored course with a projection and no
   sections yet.
+
+For a course that was near full last year, the table also gives the draft's
+own answer: **If seats fill as last year**, the draft's seats times last
+year's registrations per seat. A near-full course's registrations follow its
+seats, so this is what the draft would produce if its seats fill the way last
+year's did. It sits beside the plan and never replaces the forecast or counts
+toward its reliability; the sentence above the table totals it against the
+plan for those courses. A course that had seats to spare shows a dash, because
+its registrations did not follow its seats.
 
 The table also shows the draft's sections (with each campus's share), its
 seats, the expected day-one seats, the planned registrations (including the
@@ -273,27 +319,29 @@ seats, it is still judged near full, and the note says "at least".
 Below the table, expand **Projection methods** for the method map. There are
 two candidates:
 
-- **Prior same-season**, the spine and the default: last comparable season's
+- **Last year's registrations**, the default: last comparable season's
   class-list demand. Step 1 of **How a course's plan is built** says, from
-  the loaded projection, how far off past forecasts were when the seats held,
-  and how the published forecast compares with last year's number alone over
-  every past forecast. On the October 2026 projections the two were 15.2% and
+  the loaded projection, how far off past forecasts were when the seats held
+  and when they moved, how the published forecast compares with last year's
+  number alone over every past forecast, and which way the forecasts ran on
+  average. On the October 2026 projections the two were 15.2% and
   15.5% off for Spring, and both 14.2% for Fall: the plan's additions and the
   flags, not a cleverer forecast, are what the page adds to last year's count.
-- **Prior same-season + floor + latest-term changes**: the same number, plus the
+- **Last year's registrations, adjusted**: the same number, plus the
   students still waiting for a seat at the end of that term when it was
-  saturated (90% or more of the seats filled on the first day), plus the change
+  near full (90% or more of the seats filled on the first day), plus the change
   in the course's own enrollment, in the course taken just before it, and in
   its other feeder courses during the term just finished, each scaled by the
-  share that historically carried into this course. It uses that term's enrollments, not grades, because grades are not posted
-  when the schedule is built.
+  share that historically carried into this course. It uses that term's
+  enrollments, not grades, because grades are not posted when the schedule
+  is built.
 
-**Prior same-season is the default for every course.** The adjusted candidate
-replaces it only after beating it by a margin on earlier terms both were
-forecast for. The rule is replayed at every past term with only the evidence available
-then, so the accuracy you see is what that rule would actually have delivered,
-not the fit of the winner on the terms that chose it. A course's detail gives
-the evidence behind its current method.
+**Last year's registrations is the default for every course.** The adjusted
+forecast replaces it only after beating it by a margin on earlier terms both
+were forecast for. The rule is replayed at every past term with only the
+evidence available then, so the accuracy you see is what that rule would
+actually have delivered, not the fit of the winner on the terms that chose it.
+A course's detail gives the evidence behind its current method.
 
 The table is sized to fit a laptop window:
 
@@ -307,7 +355,7 @@ The table is sized to fit a laptop window:
 | **First day / sections** | The last four same-season terms: students enrolled on the first day over the sections scheduled. A dash means the course was not offered, or the first day cannot be reconstructed; hover for which. |
 | **Day-1 fill** | The share of seats filled on the first day of classes in the term the forecast starts from, the same season last year; the header names that term. **Full** at 98% or more, **Near full** at 90%, with the students still waiting beneath. "Unknown" says why: the class lists carry no status dates, a later session had not begun when the data was pulled, or there was no seat count. |
 | **Flags** | What no column already says: one campus full while another had room (online seats can fill while Albuquerque's do not, and the pooled plan hides it), students left waiting in the term just finished (enough to fill half a section or more; context, never added to the plan), a big enrollment change in that term (named by the term, such as "Fall 2026 enrollment +25%"), a volatile history with no track record yet ("Hard to predict"), past forecasts more than 20% off while the course had seats to spare, or the two candidates disagreeing. |
-| **Reliability** | How far past forecasts for this course were off, each made with only the evidence available then, coloured High (within 10%), Moderate (10 to 20%) or Low (more than 20%), with how many of those same past terms moved the course's seats 10% or more beneath. Unrated when there are too few. |
+| **Reliability** | How far past forecasts for this course were off, each made with only the evidence available then, coloured High (within 10%), Moderate (10 to 20%) or Low (more than 20%), with how many of those same past terms moved the course's seats 10% or more beneath. Grey **set by seats** when most of the miss came while the course was near full and its seats moved the way of the miss or held: the schedule set those numbers, so a red Low would blame the forecast for the schedule. Unrated when there are too few. |
 
 The course's **Own history** (whether it is predictable from its own history
 at all, measured with no model: Stable, Moderate, Volatile or Unrated) and
@@ -317,11 +365,11 @@ Moderate, Thin or None) are in its detail.
 Clicking a row opens the course's evidence in a window over the table; close it
 to return to the same place in the list. It opens with one sentence that says
 what to plan and why. It names how the forecast compares with last year's
-count. For a course near full last year, it says that count was capped by its
-seats and so understates demand. That is evidence about last year, not a floor
-under this one: falling feeder courses can still take the forecast below it,
-and the sentence then says the changes in the term just finished point lower.
-The pressure bump, where it applies, allows for the cap. Then come three
+count. For a course near full last year, it says that count stopped at its
+seats and so understates demand. That is evidence about last year, not a
+minimum for this one: falling feeder courses can still take the forecast below
+it, and the sentence then says the changes in the term just finished point
+lower. The pressure bump, where it applies, allows for it. Then come three
 things large and up front: its **Status**
 (the planning recommendation), the **Sections**, and the planned registrations
 they are sized for.
@@ -344,17 +392,17 @@ Each total is the sum of the lines above it, so a reader can check the plan
 line by line.
 
 Beneath that are four badges, each with its number: Reliability with its
-rating ("10.4% off (Low)"), Seats (how often they moved in those past terms,
-in grey because seat moves are not good or bad in themselves), Own history
-and Evidence, then the one sentence saying whose the past misses were, and
-then the last four same-season
-terms. The reasoning behind each step is in **Why this method, why this
-course: the full evidence trail**, collapsed by default: the selected method
-and why, why the course is listed, the students left waiting in the term just
-finished, the feeder and pressure-bump notes, and the floor,
-term-just-finished, regime and capacity checks. The method plot, movement
-diagnostic and candidate table sit under **Analyst detail**, collapsed as
-well.
+rating ("10.4% off (Low)", or grey "32.8% off · set by seats" when the
+schedule set the past numbers), Seats (how often they moved in those past
+terms, in grey because seat moves are not good or bad in themselves), Own
+history and Evidence, then the one sentence saying whose the past misses were,
+and then the last four same-season terms. The reasoning behind each step is in
+**Why this method, why this course: the full evidence trail**, collapsed by
+default: the selected method and why, why the course is listed, the students
+left waiting in the term just finished, the feeder and pressure-bump notes,
+whether last year was near full, the changes in the term just finished, and
+the sharp-change and capacity checks. The method plot, movement diagnostic and
+candidate table sit under **Analyst detail**, collapsed as well.
 
 The plot compares every forecasting method against historical ever-registered,
 first-day, census, and final/last-day enrollment. It is restricted to the
@@ -368,13 +416,14 @@ The detail also shows the last four same-season terms' registrations,
 first-day enrollment, census, sections, capacity, first-day fill, the method
 the selection rule would have published that term and what it forecast, signed
 error, capacity-bounded status, and potential explanation. Three rows describe
-the adjustment whichever candidate was published: **Saturation floor**
-(whether the prior term was full on the first day, the waitlist left on it,
-and what happened the last times saturated courses in this market were given
-more seats), **Changes in the term just finished** (the enrollment changes and carry-through rates
-behind the repeat, sequence and feeder terms), and **Regime check**, which flags a
-course whose own enrollment in the term just finished moved 25% or more from
-the year before. The check changes nothing; it says look. Its full **What this
+the adjustment whichever candidate was published: **Last year near full?**
+(whether the prior term was near full on the first day, the waitlist left on
+it, and what happened the last times near-full courses in this market were
+given more seats), **Changes in the term just finished** (the enrollment
+changes and carry-through rates behind the retake, taken-just-before and
+feeder terms), and **Sharp change check**, which flags a course whose own
+enrollment in the term just finished moved 25% or more from the year before.
+The check changes nothing; it says look. Its full **What this
 means** text separates historical fit from structural caveats: a method can
 fit observed enrollment consistently while a seat ceiling still prevents that
 fit from proving unconstrained demand.

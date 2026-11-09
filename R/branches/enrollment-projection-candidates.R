@@ -276,14 +276,14 @@ projection_spine_floor <- function(spine_row, section_history, waitlist_history,
         if (is.finite(started_fill)) paste0(
           "; the sessions that had begun fill ",
           scales::percent(started_fill, accuracy = 0.1), " of its seats, short of the ",
-          scales::percent(threshold, accuracy = 1), " that would settle saturation"
+          scales::percent(threshold, accuracy = 1), " that would count as full"
         ) else ""
       )
     } else {
       paste0(
         fmt_term(spine_term), "'s class lists carry no registration status ",
-        "dates, so its first day cannot be counted and saturation cannot be ",
-        "judged; re-pulling that term's class list restores it"
+        "dates, so its first day cannot be counted and whether it was near full ",
+        "cannot be judged; re-pulling that term's class list restores it"
       )
     }
     return(list(
@@ -295,8 +295,8 @@ projection_spine_floor <- function(spine_row, section_history, waitlist_history,
     return(list(
       saturated = NA, fill = saturation$fill_rate[[1]], waitlisted = waitlisted,
       uplift = 0,
-      basis = paste("No usable capacity for", fmt_term(spine_term),
-                    "so saturation cannot be judged"),
+      basis = paste("No usable seat count for", fmt_term(spine_term),
+                    "so whether it was near full cannot be judged"),
       first_day_basis = "no_capacity"
     ))
   }
@@ -305,7 +305,7 @@ projection_spine_floor <- function(spine_row, section_history, waitlist_history,
       saturated = FALSE, fill = saturation$fill_rate[[1]],
       waitlisted = waitlisted, uplift = 0,
       basis = paste0(
-        fmt_term(spine_term), " was not saturated (",
+        fmt_term(spine_term), " was not near full (",
         fill_text(saturation$fill_rate[[1]]), ")"
       ),
       first_day_basis = read_as
@@ -320,15 +320,16 @@ projection_spine_floor <- function(spine_row, section_history, waitlist_history,
     saturated = TRUE, fill = saturation$fill_rate[[1]], waitlisted = waitlisted,
     uplift = as.numeric(waitlisted), first_day_basis = read_as,
     basis = paste0(
-      fmt_term(spine_term), " was saturated (",
+      fmt_term(spine_term), " was near full (",
       fill_text(saturation$fill_rate[[1]]), "); ",
       if (waitlisted > 0) {
-        paste0("spine ", round(spine), " + ", waitlisted,
+        paste0("last year's ", round(spine), " + ", waitlisted,
                " still waiting = ", round(floor_demand))
       } else {
-        # Capped, so the count understates demand; nothing measured lifts it,
-        # and it is no lower bound on this year (ISSUES.md I42).
-        "no waitlist rows retained for that term, so nothing is added to the spine"
+        # The count stopped at the seats, so it understates demand; nothing
+        # measured lifts it, and it is no lower bound on this year (ISSUES.md
+        # I42).
+        "no waitlist rows retained for that term, so nothing is added to last year's count"
       }
     )
   )
@@ -571,12 +572,12 @@ project_spine_adjusted <- function(history, preceding_term_history,
     if (is.finite(repeat_rate)) {
       delta_repeat <- (preceding_enrollment - then_enrollment) * repeat_rate
       parts <- c(parts, paste0(
-        "repeat: (", preceding_enrollment, " - ", then_enrollment, ") x ",
+        "retakes: (", preceding_enrollment, " - ", then_enrollment, ") x ",
         round(repeat_rate, 3), " = ", sprintf("%+.1f", delta_repeat)
       ))
     } else {
       parts <- c(parts, paste0(
-        "repeat: no carry-through rate from ", rates$n_pairs, " prior pairs"
+        "retakes: no carry-through rate from ", rates$n_pairs, " prior pairs"
       ))
     }
     # A listed predecessor carries its own change at its own rate.
@@ -597,7 +598,7 @@ project_spine_adjusted <- function(history, preceding_term_history,
       sequence_change <- sum(changes)
       delta_sequence <- sum(changes * sequence$rate)
       parts <- c(parts, paste0(
-        "sequence ", sequence$course, ": (", counts["now", ], " - ",
+        "taken just before, ", sequence$course, ": (", counts["now", ], " - ",
         counts["then", ], ") x ", round(sequence$rate, 3), " = ",
         sprintf("%+.1f", changes * sequence$rate)
       ))
@@ -652,13 +653,15 @@ project_spine_adjusted <- function(history, preceding_term_history,
     "spine_adjusted",
     estimate = estimate,
     applicable = TRUE,
+    # The page's words: last year's count, the students still waiting, and
+    # each change from the term just finished.
     reason = paste0(
-      "Prior same-season ", spine, " + floor ", round(floor$uplift),
-      " + repeat delta ", sprintf("%+.1f", delta_repeat),
+      "Last year ", spine, " + waiting ", round(floor$uplift),
+      " + retakes ", sprintf("%+.1f", delta_repeat),
       if (length(sequence_courses) > 0L) {
-        paste0(" + sequence delta ", sprintf("%+.1f", delta_sequence))
+        paste0(" + taken just before ", sprintf("%+.1f", delta_sequence))
       } else "",
-      " + feeder delta ", sprintf("%+.1f", delta_feeder)
+      " + feeders ", sprintf("%+.1f", delta_feeder)
     ),
     n_history_terms = 1L,
     evidence_n = spine,
@@ -694,7 +697,7 @@ project_spine_adjusted <- function(history, preceding_term_history,
     feeder_lifts = projection_feeder_lift_text(feeders, feeder_lifts),
     feeder_base_rate = feeder_base_rate,
     delta_basis = delta_basis,
-    projection_formula = "spine + floor uplift + repeat delta + sequence delta + feeder delta"
+    projection_formula = "last year's registrations + students still waiting + retake change + predecessor change + feeder change"
   )
 }
 

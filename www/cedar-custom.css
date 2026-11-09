@@ -249,6 +249,9 @@ details.enrollment-projection-method-guide {
 .projection-axis--mid  { background: #edf0e2; color: #4f5c2f; }
 .projection-axis--thin { background: #f4e9d2; color: #7a5010; }
 .projection-axis--poor { background: #f2e3de; color: #7a2a1c; }
+/* Rated, but the schedule set the number ("set by seats"): grey like Unrated,
+   with the rating kept in the hover. */
+.projection-axis--neutral { background: #ececec; color: #4a4a4a; }
 
 /* Recent same-season terms in one projections-table cell: first-day
    enrollment over sections, one column per term, aligned under the term
@@ -281,6 +284,31 @@ details.enrollment-projection-method-guide {
   font-size: 1.02rem;
   margin: 0 0 12px;
   max-width: 980px;
+}
+
+/* The method in five lines, always open above the explainer panels. */
+.enrollment-projection-brief {
+  max-width: 980px;
+  margin: 0 0 14px;
+  padding: 10px 14px;
+  border-left: 3px solid rgba(71, 105, 117, 0.35);
+  background: rgba(71, 105, 117, 0.05);
+}
+
+.enrollment-projection-brief-list {
+  margin: 0;
+  padding-left: 1.1rem;
+}
+
+.enrollment-projection-brief-list li {
+  margin: 2px 0;
+}
+
+/* The ledger of ideas tried: idea, result, status. */
+.enrollment-projection-attempts td,
+.enrollment-projection-attempts th {
+  font-size: 0.9rem;
+  vertical-align: top;
 }
 
 /* Course detail modal: the three things to act on, large and up front. */

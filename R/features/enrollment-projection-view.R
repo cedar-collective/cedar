@@ -207,7 +207,7 @@ projection_axis_brief <- function(stability, depth, accuracy,
 
   vapply(seq_len(size), function(i) {
     qualifier <- dplyr::case_when(
-      isTRUE(regime_alarm[[i]]) ~ "regime check",
+      isTRUE(regime_alarm[[i]]) ~ "sharp change",
       isTRUE(capacity_constrained[[i]]) ~ "capacity-limited",
       isTRUE(methods_disagree[[i]]) ~ "methods differ",
       TRUE ~ NA_character_
@@ -753,7 +753,7 @@ projection_summary_sentence <- function(projections) {
         )
       }
     } else ""
-    # A near-full course's count was capped by its seats, so it understates
+    # A near-full course's count stopped at its seats, so it understates
     # demand; that is evidence about last year, not a floor under this one,
     # which falling feeders can take lower (ISSUES.md I42).
     full <- if (isTRUE(row$adjusted_saturated_prior)) {
@@ -764,7 +764,7 @@ projection_summary_sentence <- function(projections) {
         if (isTRUE(row$adjusted_waitlisted_prior > 0)) {
           paste0(" with ", row$adjusted_waitlisted_prior, " students waiting")
         } else "",
-        ", so its count was capped by its seats and understates demand",
+        ", so its count stopped at its seats and understates demand",
         if (isTRUE(row$pressure_bump_applied)) "; the pressure bump allows for that." else "."
       )
     } else ""
@@ -968,7 +968,7 @@ projection_pressure_bump_summary <- function(projections, share) {
       " section", if (sections == 1L) "" else "s", " across ", n_courses,
       " of the ", nrow(projections), " courses shown. They were near full on ",
       "the first day in every recent same-season term with a first-day count, ",
-      "so their registrations were capped by their seats. The bump is ",
+      "so their registrations stopped at their seats. The bump is ",
       scales::percent(share, accuracy = 1), ", or the students left waiting if ",
       "that is more, and it will be measured from waitlists as they accumulate."
     )
@@ -1098,16 +1098,18 @@ projection_error_sources_summary <- function(backtests, model_config) {
 # bundle checked and which the adjusted forecast's live rows contradicted.
 projection_track_record_summary <- function(backtests, model_config) {
   change <- as.numeric(projection_option(model_config, "seat_consistency_change"))
+  none <- "No past forecasts are saved for this target, so the forecast's record cannot be shown."
   empty <- list(
-    n_folds = 0L, wape = NA_real_, default_wape = NA_real_,
+    n_folds = 0L, wape = NA_real_, default_wape = NA_real_, bias = NA_real_,
     held_folds = 0L, held_wape = NA_real_,
-    sentence = "No past forecasts are saved for this target, so the forecast's record cannot be shown."
+    moved_folds = 0L, moved_wape = NA_real_,
+    sentence = none, headline = none
   )
   if (nrow(backtests) == 0L) return(empty)
   keys <- c("market_id", "subject_course", "term_type", "target_term")
   projection_require_columns(
     backtests,
-    c(keys, "method_id", "policy_selected", "abs_error",
+    c(keys, "method_id", "policy_selected", "error", "abs_error",
       "actual_classlist_total", "fold_seat_change"),
     "projection_track_record_summary()"
   )
@@ -1130,27 +1132,155 @@ projection_track_record_summary <- function(backtests, model_config) {
   }
   wape <- function(rows) sum(rows$abs_error) / sum(rows$actual_classlist_total)
   held <- dplyr::filter(policy, is.finite(fold_seat_change), abs(fold_seat_change) < change)
+  moved <- dplyr::filter(policy, is.finite(fold_seat_change), abs(fold_seat_change) >= change)
+  # Signed: forecast minus actual over actual, so below zero is a forecast
+  # that ran low. Last year's count stops at last year's seats, so where seats
+  # were added the next year it runs low, and the record says so rather than
+  # leaving a reader to find the direction in the course details.
+  bias <- sum(policy$error) / sum(policy$actual_classlist_total)
   seasons <- unique(as.character(policy$term_type))
   season <- if (length(seasons) == 1L) {
     switch(seasons, spring = "Spring ", fall = "Fall ", "")
   } else ""
   n <- nrow(policy)
   pct <- function(x) scales::percent(x, accuracy = 0.1)
+  count <- function(x) format(x, big.mark = ",")
+  direction <- if (abs(bias) >= 0.01) paste0(
+    " They ran ", pct(abs(bias)), if (bias < 0) " low" else " high",
+    " on average",
+    if (bias < 0) paste0(
+      ": a course that filled registers only as many students as it had",
+      " seats, so when seats were added the next year, more registered than",
+      " last year's count said."
+    ) else "."
+  ) else ""
   sentence <- paste0(
     if (nrow(held) > 0L) paste0(
       "When the seats stayed within ", scales::percent(change, accuracy = 1),
       " of the year before, past forecasts were ", pct(wape(held)),
-      " off on average (", format(nrow(held), big.mark = ","), " of ",
-      format(n, big.mark = ","), " past ", season, "forecasts). "
+      " off on average (", count(nrow(held)), " of ",
+      count(n), " past ", season, "forecasts)",
+      if (nrow(moved) > 0L) paste0(
+        "; when the seats moved more than that, ", pct(wape(moved)),
+        " off (", count(nrow(moved)), ")"
+      ) else "",
+      ". "
     ) else "",
-    "Over all ", format(n, big.mark = ","), ", the published forecast was ",
+    "Over all ", count(n), ", the published forecast was ",
     pct(wape(policy)), " off, and last year's number alone ", pct(wape(default)),
-    "."
+    ".", direction
   )
+  # The one-line record for the top of the page.
+  headline <- if (nrow(held) > 0L && nrow(moved) > 0L) {
+    paste0(
+      "Past ", season, "forecasts were within ", pct(wape(held)),
+      " where the seats held (", count(nrow(held)), " of ", count(n),
+      ") and ", pct(wape(moved)), " off where they moved ",
+      scales::percent(change, accuracy = 1), " or more (", count(nrow(moved)),
+      "): most of the error follows the schedule, not the forecast."
+    )
+  } else {
+    paste0(
+      "Past ", season, "forecasts were ", pct(wape(policy)), " off on average (",
+      count(n), ")."
+    )
+  }
   list(
     n_folds = as.integer(n), wape = wape(policy), default_wape = wape(default),
+    bias = bias,
     held_folds = nrow(held), held_wape = if (nrow(held) > 0L) wape(held) else NA_real_,
-    sentence = sentence
+    moved_folds = nrow(moved), moved_wape = if (nrow(moved) > 0L) wape(moved) else NA_real_,
+    sentence = sentence, headline = headline
+  )
+}
+
+
+# Terms in the view's recent history whose first day is unknown for every
+# course shown: a class list pulled without registration status dates has
+# no first-day count anywhere (ISSUES.md M32), and the table would otherwise
+# show a column of dashes with no reason. Computed, never written in prose, so
+# it clears the day the term is re-pulled. Returns the term labels, oldest
+# first, or character(0).
+projection_undated_history_terms <- function(history) {
+  if (nrow(history) == 0L) return(character(0))
+  projection_require_columns(
+    history, c("history_term", "history_term_label", "actual_first_day",
+               "actual_classlist_total"),
+    "projection_undated_history_terms()"
+  )
+  history %>%
+    # A term the course was not offered in says nothing about dates.
+    dplyr::filter(is.finite(actual_classlist_total), actual_classlist_total > 0) %>%
+    dplyr::group_by(history_term, history_term_label) %>%
+    dplyr::summarize(known = sum(is.finite(actual_first_day)), n = dplyr::n(),
+                     .groups = "drop") %>%
+    dplyr::filter(known == 0L, n > 0L) %>%
+    dplyr::arrange(history_term) %>%
+    dplyr::pull(history_term_label)
+}
+
+
+# How reliability is shown. A course whose past misses mostly came when it
+# was near full and its seats moved the way of the miss or held was set by
+# the schedule, not missed by the forecast; its number is shown grey with
+# "set by seats" rather than in the red of a Low rating, which read as the
+# forecast's failure beside a sentence saying it was the schedule's. High
+# stays coloured: a close forecast is a close forecast whatever the seats did.
+projection_reliability_display <- function(accuracy, accuracy_value, miss_cause) {
+  accuracy <- as.character(accuracy)
+  seats <- dplyr::coalesce(as.character(miss_cause), "") == "seats" &
+    accuracy %in% c("Low", "Moderate")
+  tibble::tibble(
+    reliability_tone = dplyr::if_else(seats, "neutral", accuracy),
+    reliability_label = dplyr::if_else(
+      seats, paste0(accuracy_value, " · set by seats"), accuracy_value
+    )
+  )
+}
+
+
+# What has been tried on the projections and what it changed: the short
+# ledger a reader needs before asking "did you consider X". One row per idea,
+# its result in one sentence, and whether it is in the model. The evidence
+# behind each row is in docs/developers/forecasting-lessons.md; this is the
+# page's summary of it, kept here so a test can check it is complete and the
+# module only renders it.
+enrollment_projection_attempts_ledger <- function() {
+  tibble::tribble(
+    ~idea, ~result, ~status,
+    "Repeat last year's registrations, same season",
+    "The hardest baseline to beat: within 4% where seats held. Every other idea is judged against it, on earlier terms only.",
+    "In the model",
+    "Add the students still waiting when last year was near full",
+    "Adds a measured number, not a guess; the waitlists that measure it exist from Summer 2026.",
+    "In the model",
+    "Follow enrollment changes in the term just finished (retakes, the course taken just before, feeder courses)",
+    "Made past Spring forecasts about a point closer; no closer for Fall, where a Spring feeder's change pointed the right way no more often than chance. Spring plans follow feeders; Fall plans do not.",
+    "In the model for Spring",
+    "A 5% planning allowance for a course near full every recent year",
+    "Changes the plan, never the forecast. 5% is the typical waiting backlog; it stays flat until waitlists can measure it per course.",
+    "In the plan",
+    "Average two or more past years, or a damped trend",
+    "No closer than last year alone on the same terms; a trend chased the schedule.",
+    "Dropped",
+    "Blend the two forecasts, or pick one for the whole course set",
+    "No closer than choosing per course; a blend split the difference and gained nothing.",
+    "Dropped",
+    "Forecast from student populations (majors, classifications, feeder transitions)",
+    "Within a third of a point of last year's number, or worse, and one version ran 35% high.",
+    "Dropped",
+    "Correct a forecast's bias after the fact",
+    "Needs six comparable terms to test safely; five Springs cannot supply them. Off until they can.",
+    "Waiting on data",
+    "A DFW or repeat multiplier for every course",
+    "No relation between a course's DFW rate and its next miss (correlation near zero).",
+    "Dropped",
+    "Use the schedule's seats as the forecast",
+    "Answers the scheduling question with the schedule. Seats are compared with the plan on the Draft schedule tab, never used to forecast.",
+    "By rule, not done",
+    "Read next year's schedule where a draft exists",
+    "Most error follows the seats, so this is the largest gain left. Needs daily schedule snapshots to test honestly; not yet built.",
+    "Next"
   )
 }
 
@@ -1276,10 +1406,27 @@ build_enrollment_projection_draft_comparison <- function(view) {
       "recommended_sections", "additional_sections", "reference_section_size",
       "scheduled_sections", "scheduled_capacity", "target_schedule_available",
       "target_registration_observed", "target_registered_now", "accuracy",
-      "accuracy_value", "seat_consistency", "seat_consistency_value"),
+      "accuracy_value", "reliability_tone", "reliability_label",
+      "seat_consistency", "seat_consistency_value",
+      "observed_baseline", "adjusted_saturated_prior"),
     "build_enrollment_projection_draft_comparison()"
   )
+  projection_require_columns(
+    view$history,
+    c("market_id", "subject_course", "recency_rank", "scheduled_capacity"),
+    "build_enrollment_projection_draft_comparison() history"
+  )
   as_of <- view$meta$target_schedule_as_of
+  # Last year's seats, for the one course-level number the draft can give
+  # that the forecast cannot: a near-full course registers about as many
+  # students per seat as it did last year, so the draft's seats times last
+  # year's registrations per seat is what to expect if they fill the same
+  # way. A planning comparison beside the forecast, never the forecast: it
+  # is NA for a course that had seats to spare, whose registrations did not
+  # follow its seats.
+  last_seats <- view$history %>%
+    dplyr::filter(recency_rank == 1L) %>%
+    dplyr::transmute(market_id, subject_course, last_capacity = as.numeric(scheduled_capacity))
   count <- function(x) format(round(x), big.mark = ",", trim = TRUE)
   sections_note <- function(n) dplyr::if_else(
     dplyr::coalesce(n, 0L) > 0L,
@@ -1301,6 +1448,8 @@ build_enrollment_projection_draft_comparison <- function(view) {
   table <- projections %>%
     dplyr::filter(is.finite(projected_classlist_total)) %>%
     dplyr::left_join(campus_sections, by = c("market_id", "subject_course")) %>%
+    dplyr::left_join(last_seats, by = c("market_id", "subject_course"),
+                     relationship = "many-to-one") %>%
     dplyr::transmute(
       course = subject_course,
       department,
@@ -1308,6 +1457,13 @@ build_enrollment_projection_draft_comparison <- function(view) {
       draft_sections = dplyr::if_else(in_draft, as.integer(scheduled_sections), NA_integer_),
       draft_seats = dplyr::if_else(in_draft, as.numeric(scheduled_capacity), NA_real_),
       campus_sections,
+      # Registrations if the draft's seats fill as last year's did, for a
+      # course that was near full last year; NA otherwise.
+      if_seats_fill = dplyr::if_else(
+        in_draft & adjusted_saturated_prior %in% TRUE & is.finite(last_capacity) &
+          last_capacity > 0 & is.finite(observed_baseline) & is.finite(draft_seats),
+        draft_seats * observed_baseline / last_capacity, NA_real_
+      ),
       expected_first_day = projected_first_day_equivalent,
       planned_registrations,
       pressure_bump,
@@ -1326,8 +1482,12 @@ build_enrollment_projection_draft_comparison <- function(view) {
       registered_now = dplyr::if_else(
         target_registration_observed %in% TRUE, as.numeric(target_registered_now), NA_real_
       ),
+      # The same display as the projections table: grey "set by seats" when
+      # the schedule set the past numbers.
       reliability = accuracy,
       reliability_value = accuracy_value,
+      reliability_tone,
+      reliability_label,
       seat_consistency,
       seat_consistency_value,
       status = dplyr::case_when(
@@ -1362,10 +1522,10 @@ build_enrollment_projection_draft_comparison <- function(view) {
       )
     ) %>%
     dplyr::select(
-      course, department, verdict, draft_sections, draft_seats,
+      course, department, verdict, draft_sections, draft_seats, if_seats_fill,
       expected_first_day, planned_registrations, plan_sections, draft_vs_plan,
-      registered_now, reliability, reliability_value, seat_consistency,
-      seat_consistency_value,
+      registered_now, reliability, reliability_value, reliability_tone,
+      reliability_label, seat_consistency, seat_consistency_value,
       in_draft, campus_sections, pressure_bump, plan_feeder_adjustment,
       sections_to_add, status
     ) %>%
@@ -1405,7 +1565,17 @@ build_enrollment_projection_draft_comparison <- function(view) {
         ". ", n("not_in_draft"), " monitored course",
         if (n("not_in_draft") == 1L) " is" else "s are", " not in the draft"
       ) else "",
-      "."
+      ".",
+      # The seats' own answer for the near-full courses, beside the plan's.
+      if (any(is.finite(table$if_seats_fill))) paste0(
+        " For the ", sum(is.finite(table$if_seats_fill)),
+        " course", if (sum(is.finite(table$if_seats_fill)) == 1L) "" else "s",
+        " near full last year, the draft's seats would hold about ",
+        count(sum(table$if_seats_fill, na.rm = TRUE)),
+        " registrations if they fill as last year's did, against ",
+        count(sum(table$planned_registrations[is.finite(table$if_seats_fill)])),
+        " planned."
+      ) else ""
     )
   }
   list(
@@ -1540,11 +1710,11 @@ build_enrollment_projection_method_guide <- function(
       "computed for every course and every past term."
     ),
     selection_process = paste(
-      "Prior same-season is the default for every course. Another forecast",
-      "replaces it only after beating it by a margin on earlier past forecasts",
-      "the two share, and the rule is replayed at every past term with only",
-      "the evidence available then, so the reliability shown is what that rule",
-      "would actually have delivered."
+      "Last year's registrations is the default for every course. Another",
+      "forecast replaces it only after beating it by a margin on earlier past",
+      "forecasts the two share, and the rule is replayed at every past term",
+      "with only the evidence available then, so the reliability shown is what",
+      "that rule would actually have delivered."
     ),
     families = families
   )
@@ -1618,7 +1788,7 @@ build_enrollment_projection_view <- function(bundle, opt = list()) {
       selection_evidence = dplyr::case_when(
         method_id == "none" ~ "No applicable method",
         is.finite(selection_common_n) ~ paste0(
-          "Beat prior same-season on ", selection_common_n,
+          "Beat last year's number on ", selection_common_n,
           " earlier terms both were made for (",
           projection_preview_percent(selection_challenger_wape), " vs ",
           projection_preview_percent(selection_default_wape), " off on average)"
@@ -1680,6 +1850,12 @@ build_enrollment_projection_view <- function(bundle, opt = list()) {
     projections,
     projection_prior_fill(projections, fill_header_term),
     projection_axis_values(projections)
+  )
+  projections <- dplyr::bind_cols(
+    projections,
+    projection_reliability_display(
+      projections$accuracy, projections$accuracy_value, projections$miss_cause
+    )
   )
   selected_keys <- projections %>%
     dplyr::select(market_id, subject_course, term_type, target_term)
@@ -1755,6 +1931,8 @@ build_enrollment_projection_view <- function(bundle, opt = list()) {
       accuracy,
       accuracy_value,
       accuracy_reason,
+      reliability_tone,
+      reliability_label,
       seat_consistency,
       seat_consistency_value,
       seat_consistency_reason,
@@ -1782,8 +1960,10 @@ build_enrollment_projection_view <- function(bundle, opt = list()) {
       stability, stability_value, stability_reason,
       depth, depth_value, depth_reason,
       # Reliability (accuracy) carries seat consistency beneath it, so the two
-      # read together; the flags say when a miss was the forecast's own.
+      # read together; the flags say when a miss was the forecast's own, and
+      # the tone and label say when the schedule set the number.
       accuracy, accuracy_value, accuracy_reason,
+      reliability_tone, reliability_label,
       seat_consistency, seat_consistency_value, seat_consistency_reason,
       reliability_reading,
       method, selection_evidence,
@@ -1810,7 +1990,11 @@ build_enrollment_projection_view <- function(bundle, opt = list()) {
       campuses = bundle$scope_campuses,
       group_id = group_id,
       n_rows = nrow(projections),
+      # Every course the bundle holds, so the scope bar can say "11 of 58".
+      n_bundle_rows = nrow(bundle$projections),
       n_attention = sum(projections$attention),
+      # Recent terms with no first-day count for any course shown.
+      undated_terms = projection_undated_history_terms(history),
       pressure_bump = projection_pressure_bump_summary(
         projections, bundle$model_config$pressure_bump_share
       ),
@@ -2238,7 +2422,7 @@ build_enrollment_projection_method_history_plot <- function(
       text = paste0(
         label, if (selected) " (selected)" else "", "<br>",
         unname(term_labels[as.character(values$target_term)]),
-        "<br>Raw aftcast: ", round(values$raw_projected_classlist_total)
+        "<br>Forecast made for this term: ", round(values$raw_projected_classlist_total)
       ),
       hovertemplate = "%{text}<extra></extra>"
     )
@@ -2385,28 +2569,28 @@ format_enrollment_projection_preview <- function(bundle, courses = NULL) {
         accuracy %in% c("Unrated", "Low") | stability == "Volatile",
         why_uncertain, "--"
       ),
-      Spine = projection_preview_integer(observed_baseline),
+      `Last year` = projection_preview_integer(observed_baseline),
       Adjusted = projection_preview_integer(adjusted_projection),
-      Floor = dplyr::case_when(
+      `Last year near full` = dplyr::case_when(
         adjusted_saturated_prior %in% TRUE & adjusted_floor_uplift > 0 ~
-          paste0("Saturated; +", round(adjusted_floor_uplift)),
-        adjusted_saturated_prior %in% TRUE ~ "Saturated; spine was capped",
-        adjusted_saturated_prior %in% FALSE ~ "Not saturated",
+          paste0("Yes; +", round(adjusted_floor_uplift), " waiting"),
+        adjusted_saturated_prior %in% TRUE ~ "Yes; count stopped at its seats",
+        adjusted_saturated_prior %in% FALSE ~ "No",
         TRUE ~ "Unknown"
       ),
       `Term-just-finished changes` = dplyr::if_else(
         adjusted_applicable %in% TRUE,
         paste0(
-          "repeat ", projection_signed_whole(adjusted_delta_repeat),
+          "retakes ", projection_signed_whole(adjusted_delta_repeat),
           dplyr::if_else(
             is.na(adjusted_sequence_courses), "",
-            paste0(", sequence ", projection_signed_whole(adjusted_delta_sequence))
+            paste0(", taken just before ", projection_signed_whole(adjusted_delta_sequence))
           ),
-          ", feeder ", projection_signed_whole(adjusted_delta_feeder)
+          ", feeders ", projection_signed_whole(adjusted_delta_feeder)
         ),
         "--"
       ),
-      `Regime check` = dplyr::if_else(
+      `Sharp change` = dplyr::if_else(
         adjusted_regime_alarm %in% TRUE, "Review", "--"
       ),
       `Feeder adjustment basis` = plan_feeder_note,
@@ -2465,7 +2649,7 @@ format_enrollment_projection_preview <- function(bundle, courses = NULL) {
     right_align = c(
       "Class-list demand", "Pressure bump", "Planned", "Planned sections",
       "First-day seats", "Aftcasts", "Raw WAPE",
-      "Uncensored WAPE", "Bias", "Spine", "Adjusted"
+      "Uncensored WAPE", "Bias", "Last year", "Adjusted"
     )
   )
   history_lines <- projection_preview_markdown_table(
@@ -2508,9 +2692,10 @@ format_enrollment_projection_preview <- function(bundle, courses = NULL) {
     error_lines,
     "",
     paste(
-      "Historical predictions are leakage-safe aftcasts of the method the",
-      "rolling selection rule would have published that term; they are not",
-      "claims about a forecast published at that time."
+      "Historical predictions are forecasts re-made for each past term from",
+      "only the data available before it, by the method the selection rule",
+      "would have published then; they are not claims about a forecast",
+      "published at that time."
     ),
     paste(
       "Capacity-bounded means overprojection cannot be measured because",
