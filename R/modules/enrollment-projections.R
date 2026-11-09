@@ -1357,6 +1357,18 @@ enrollmentProjectionsUI <- function(id) {
       filter_scope_stripe(uiOutput(ns("scope"))),
       class = "enrollment-projection-filters"
     ),
+    # The page's text is static and appears at once; the table, the brief's
+    # record and the scope stripe are built from the saved bundle after the
+    # session connects, seconds later. The overlay says so, from the first
+    # paint until those outputs have rendered, and again on a target change.
+    cedar_loading_overlay(
+      id, run_button = NULL, trigger_input = ns("target_term"),
+      show_at_start = TRUE, emoji = "\U0001f4c8",
+      loading_label = "Loading the saved projections…",
+      loading_detail = paste(
+        "Reading the saved forecast for the target term and building the",
+        "table and its record."
+      ),
     uiOutput(ns("bundle_status")),
     tags$p(
       class = "enrollment-projection-lead",
@@ -1371,14 +1383,14 @@ enrollmentProjectionsUI <- function(id) {
     # bundle, before any panel has to be opened.
     projection_in_brief_ui(uiOutput(ns("accuracy_headline"), inline = TRUE)),
     # Each explainer answers one question a reader brings to the page, and
-    # its title says which. The methods guide sits below the table.
+    # its title says which. The two a reader needs before the table are here;
+    # the methods guide, the error sources and the ledger of ideas tried sit
+    # below it.
     projection_columns_explainer(),
     projection_build_explainer(
       uiOutput(ns("pressure_summary")),
       track_record = uiOutput(ns("track_record"), inline = TRUE)
     ),
-    uiOutput(ns("error_sources")),
-    projection_attempts_explainer(),
     navset_tab(
       id = ns("projection_tabs"),
       selected = "Projections",
@@ -1399,7 +1411,9 @@ enrollmentProjectionsUI <- function(id) {
           class = "enrollment-projection-table-flow cedar-clickable-rows",
           reactable::reactableOutput(ns("projection_table"), height = NULL)
         ),
-        uiOutput(ns("method_guide"))
+        uiOutput(ns("method_guide")),
+        uiOutput(ns("error_sources")),
+        projection_attempts_explainer()
       ),
 
       nav_panel(
@@ -1483,6 +1497,7 @@ enrollmentProjectionsUI <- function(id) {
         ),
         uiOutput(ns("scenario_excluded"))
       )
+    )
     )
   )
 }
@@ -1592,7 +1607,8 @@ enrollmentProjectionsServer <- function(id, bundles, load_bundle, programs) {
     view <- reactive({
       value <- bundle_value()
       req(!is.null(value))
-      build_enrollment_projection_view(
+      started <- Sys.time()
+      result <- build_enrollment_projection_view(
         value,
         list(
           group_id = input$group %||% "always_monitored",
@@ -1600,6 +1616,13 @@ enrollmentProjectionsServer <- function(id, bundles, load_bundle, programs) {
           courses = input$course
         )
       )
+      # Dismisses the loading overlay, which the page opens with: the browser
+      # waits for the outputs built from this view to render before it fades.
+      signal_load_complete(
+        session, id,
+        duration_sec = as.numeric(Sys.time() - started, units = "secs")
+      )
+      result
     })
 
     # The draft schedule's verdict, when the target term has one, and how many
@@ -1634,6 +1657,8 @@ enrollmentProjectionsServer <- function(id, bundles, load_bundle, programs) {
       if (!is.null(saved) && nrow(saved) > 0L && !is.null(bundle_value())) {
         return(NULL)
       }
+      # No view will be built, so nothing else would dismiss the overlay.
+      signal_load_complete(session, id, error = TRUE)
       empty_state("No validated enrollment projection bundle is available.")
     })
 

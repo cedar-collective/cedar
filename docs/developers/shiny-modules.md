@@ -82,6 +82,11 @@ Named atomic vectors can trigger jsonlite warnings such as `Input to asJSON(keep
   its custom-message channel matches the full ID passed to the UI overlay.
   Custom messages do not inherit Shiny's input/output namespaces. Verify that
   the overlay actually closes after success and validation failure (I31).
+- A tab with no run button whose outputs load as soon as it opens (Projections)
+  passes `show_at_start = TRUE` to `cedar_loading_overlay()`: its static text
+  paints at once and the outputs land seconds later, so the page otherwise
+  looks finished while empty. The server then owes a `signal_load_complete()`
+  for the first load on every path, including the empty state.
 - Always show a clear blue info callout when a run succeeds but returns no rows for the selected criteria. If a secondary tab intentionally ignores one filter (e.g., Trends ignoring exact term codes), do not hide useful secondary results just because the primary table is empty.
 
 **User-facing polish review.**

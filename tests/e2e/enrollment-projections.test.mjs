@@ -281,6 +281,29 @@ async function closeEvidence(page) {
   check('the Day-1 fill header names the term the plans start from',
     /^Day-1 fill \((Spring|Fall) \d{4}\)$/i.test(ratingCells.fillHeader),
     ratingCells.fillHeader);
+  // The page opens under a loading overlay, since its outputs land seconds
+  // after the static text; with the table rendered, the overlay has gone.
+  const overlayGone = await waitFor(page, () => {
+    const box = document.getElementById('enrollment_projections-loading-overlay');
+    return box ? getComputedStyle(box).display === 'none' : null;
+  }, { timeout: 10000 });
+  check('the loading overlay is present and dismissed once the table has rendered',
+    overlayGone === true, String(overlayGone));
+  // The methods guide, the error sources and the ledger follow the table.
+  const belowTable = await page.evaluate(() => {
+    const table = document.getElementById('enrollment_projections-projection_table');
+    return [
+      'details.enrollment-projection-method-guide',
+      '#enrollment_projections-error_sources',
+      '.enrollment-projection-attempts-guide',
+    ].map((selector) => {
+      const el = document.querySelector(selector);
+      if (!el || !table) return null;
+      return Boolean(table.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING);
+    });
+  });
+  check('the methods guide, error sources and ledger sit below the table',
+    belowTable.every((v) => v === true), JSON.stringify(belowTable));
   // The spine term's waiting students are the Day-1 fill column; the term
   // just finished's are a flag, and name their term.
   check('no flag repeats a column',
