@@ -198,8 +198,17 @@ gen_ed_assoc_attempts <<- keyed_attempts(gen_ed_assoc_students)
 # list and schedule pairs the readers of cedar_course_terms are tested on.
 test_course_terms          <<- course_terms_for(test_students, test_sections)
 test_course_terms_regstats <<- course_terms_for(test_students_regstats, test_sections_regstats)
+# The course-flow measure table (every next-term pair) over a keyed class
+# list. The designed fixtures settle no term on their own (their edges carry
+# no last_enrolled_complete), so the edge is given: the newest term, as the
+# other follow-up tests give theirs.
+flows_for <<- function(students, edge = max(students$term)) {
+  build_course_flows(students, list(last_enrolled_complete = as.integer(edge)))
+}
+test_course_flows <<- flows_for(test_students)
 data_objects$cedar_attempts     <<- test_attempts
 data_objects$cedar_course_terms <<- test_course_terms
+data_objects$cedar_course_flows <<- test_course_flows
 
 Sys.setenv(shiny = "FALSE")
 

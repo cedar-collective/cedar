@@ -23,16 +23,16 @@ test_that("next-course pairs are campus-scoped and campus-filterable", {
 })
 
 test_that("destination and feeder summaries retain campus grouping", {
-  pairs <- get_next_course_pairs(test_students, opt = list(summer = FALSE))
+  pairs <- test_course_flows
   source_course <- pairs$source_course[[1]]
   target_course <- pairs$dest_course[[1]]
 
   destinations <- get_course_destinations(
-    test_students,
+    test_course_flows,
     opt = list(course = source_course, summer = FALSE)
   )
   feeders <- get_course_feeders(
-    test_students,
+    test_course_flows,
     opt = list(course = target_course, summer = FALSE)
   )
 
@@ -40,6 +40,52 @@ test_that("destination and feeder summaries retain campus grouping", {
   expect_true("campus" %in% names(feeders))
   expect_false(any(is.na(destinations$campus)))
   expect_false(any(is.na(feeders$campus)))
+})
+
+test_that("destinations and feeders are the flows table read from either side (ADR-001 step 7)", {
+  flows <- test_course_flows
+  # The pair with the most students: X's destinations name Y with that count,
+  # and Y's feeders name X with the same count; the sums agree with the table.
+  top <- flows %>% dplyr::arrange(dplyr::desc(n_students)) %>% dplyr::slice(1)
+  dest <- get_course_destinations(flows, opt = list(course = top$source_course))
+  feed <- get_course_feeders(flows, opt = list(course = top$dest_course))
+  expect_equal(
+    sum(dest$total_students),
+    sum(flows$n_students[flows$source_course == top$source_course])
+  )
+  expect_equal(
+    sum(feed$total_students),
+    sum(flows$n_students[flows$dest_course == top$dest_course])
+  )
+  d <- dest %>% dplyr::filter(campus == top$campus, subject_course == top$dest_course,
+                              source_term_type == top$source_term_type)
+  f <- feed %>% dplyr::filter(campus == top$campus, subject_course == top$source_course,
+                              target_term_type == top$dest_term_type)
+  expect_equal(d$total_students, f$total_students)
+  expect_equal(d$from_crse, top$source_course)
+  expect_equal(f$to_crse, top$dest_course)
+  # The output contracts the Sankey reads.
+  expect_named(dest, c("campus", "college", "subject_course", "source_term_type", "dest_term_type",
+                       "from_crse", "total_students", "num_terms", "min_contrib", "max_contrib",
+                       "avg_contrib"))
+  expect_named(feed, c("campus", "college", "subject_course", "source_term_type", "target_term_type",
+                       "to_crse", "total_students", "num_terms", "min_contrib", "max_contrib",
+                       "avg_contrib"))
+
+  # A campus scope keeps that campus's pairs; a campus with none is empty, not an error.
+  scoped <- get_course_destinations(flows, opt = list(course = top$source_course,
+                                                      course_campus = top$campus))
+  expect_setequal(unique(scoped$campus), top$campus)
+  expect_equal(nrow(get_course_feeders(flows, opt = list(course = top$dest_course,
+                                                         campus = "NOWHERE"))), 0L)
+
+  # The table is required, and answers next regular terms only.
+  expect_error(get_course_destinations(test_students, opt = list(course = top$source_course)),
+               "build_course_flows")
+  expect_error(get_course_feeders(NULL, opt = list(course = top$dest_course)), "build_course_flows")
+  expect_error(get_course_destinations(flows, opt = list(course = top$source_course, summer = TRUE)),
+               "summer")
+  expect_error(get_course_feeders(flows, opt = list()), "opt\\$course is required")
 })
 
 test_that("concurrent course summaries keep student classification", {
@@ -104,10 +150,13 @@ test_that("old course-neighbor function names are intentionally unavailable", {
   expect_false(exists("where_from", mode = "function"))
   expect_false(exists("where_at", mode = "function"))
   expect_false(exists("get_course_neighbors", mode = "function"))
+  # The class-list readers the flows table replaced (ADR-001 step 7 group 4).
+  expect_false(exists("get_previous_course_pairs", mode = "function"))
+  expect_false(exists("get_course_flow_neighbors", mode = "function"))
 })
 
 test_that("course report flow tab returns sankey plots from branch outputs", {
-  pairs <- get_next_course_pairs(test_students, opt = list(summer = FALSE))
+  pairs <- test_course_flows
   source_course <- pairs$source_course[[1]]
   campus_scope <- pairs$campus[[1]]
   old_base <- cedar_base_dir
@@ -126,6 +175,7 @@ test_that("course report flow tab returns sankey plots from branch outputs", {
     data_objects = list(
       cedar_registrations = test_students,
       cedar_sections = test_sections,
+      cedar_course_flows = test_course_flows,
       cedar_edges = list(
         last_enrolled = max(test_students$term),
         last_enrolled_complete = max(test_students$term),
@@ -140,6 +190,18 @@ test_that("course report flow tab returns sankey plots from branch outputs", {
   sankey_names <- names(payload$plots)[grepl("^sankey_.*_plot$", names(payload$plots))]
   expect_true(length(sankey_names) > 0)
   expect_true("concurrent_courses" %in% names(payload$tables))
+
+  # The flows table is required, and must be bounded at the edges' settled term.
+  flows_tab <- function(objects) compute_cr_flows_tab(
+    base = list(opt = list(course = source_course, course_campus = campus_scope, skip_cache = TRUE)),
+    data_objects = objects, min_contrib = 1, max_courses = 6
+  )
+  without <- list(cedar_registrations = test_students, cedar_sections = test_sections,
+                  cedar_edges = list(last_enrolled_complete = max(test_students$term)))
+  expect_error(suppressMessages(flows_tab(without)), "cedar_course_flows")
+  terms <- sort(unique(test_students$term))
+  earlier <- c(without, list(cedar_course_flows = flows_for(test_students, edge = terms[length(terms) - 1L])))
+  expect_error(suppressMessages(flows_tab(earlier)), "bounded at")
 })
 
 test_that("the start-up course flows stop at the longitudinal edge (ADR-001 step 4)", {

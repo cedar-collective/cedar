@@ -219,9 +219,8 @@ get_course_sequence_effect <- function(students, attempts, programs, applicants 
     pool_ids        = pool_ids,
     programs        = programs,
     applicants      = applicants,
-    students        = students,
     covariate_terms = covariate_terms,
-    student_terms    = student_terms
+    student_terms   = student_terms
   )
   groups <- comparison$groups
   n_dropped_by_programs <- length(treatment_ids) - comparison$n_treatment

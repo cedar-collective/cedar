@@ -38,6 +38,16 @@ GRADES_EXCLUDED_FROM_OUTCOMES <- c("AUD")
 # artifact compatibility check, not the explanatory record version.
 CEDAR_OUTCOME_POLICY_VERSION <- 1L
 
-# assign point values to letter grades
-grades_to_points <- data.frame(grade=c("A+","A","A-","B+","B","B-","C+","C","C-","D+","D","D-","CR","F","NC","NR","W","Drop","I"),
-                               points=c(4.3,4,3.7,3.3,3,2.7,2.3,2,1.7,1.3,1,.7,0,0,0,0,0,0,0))
+# Grade points for the letter grades that carry them: what cedar_student_terms'
+# quality_points and graded_hours are summed with (build_student_terms()) and
+# build_gpa_timeline() divides. Anything not named here carries no points and
+# no graded hours — the two must be dropped together or the denominator
+# silently inflates and every affected student reads low. CR/NC, W, I, PR,
+# AUD and the R-prefixed retake variants are excluded, as Banner excludes them.
+CEDAR_GRADE_POINTS <- c(
+  "A+" = 4.0, "A" = 4.0, "A-" = 3.7,
+  "B+" = 3.3, "B" = 3.0, "B-" = 2.7,
+  "C+" = 2.3, "C" = 2.0, "C-" = 1.7,
+  "D+" = 1.3, "D" = 1.0, "D-" = 0.7,
+  "F"  = 0.0
+)

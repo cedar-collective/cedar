@@ -362,8 +362,7 @@ get_instructor_effect <- function(students, attempts, programs, applicants = NUL
     pool_ids      = pool_ids,
     programs      = programs,
     applicants    = applicants,
-    students      = students,
-    student_terms  = student_terms
+    student_terms = student_terms
   )
 
   message("[course-instructor-effect.R]   Instructor effect computed. Done.")

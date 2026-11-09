@@ -276,7 +276,8 @@ test_that("Dept Trends invalidates only tabs that consume the changed source", {
     # No Dept Trends tab reads a measure table (the Dashboard's Regstats
     # flags do, under its own cache version).
     cedar_attempts = character(0),
-    cedar_course_terms = character(0)
+    cedar_course_terms = character(0),
+    cedar_course_flows = character(0)
   ))
 
   corrected <- data_objects
