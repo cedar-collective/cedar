@@ -215,6 +215,26 @@ test_that("credit position is a running total over the student's terms", {
   expect_true(row(st, "ST_I", 202110L)$timeline_valid)
 })
 
+test_that("grade points and graded hours run beside the credits (ADR-001 step 7 group 4)", {
+  st <- st01()
+  # ST_K: an A (4.0 x 3) then a B (3.0 x 3); the running sums are what
+  # build_gpa_timeline() divides (3.5 after Fall 2020, 4.0 entering it).
+  k10 <- row(st, "ST_K", 202010L); k80 <- row(st, "ST_K", 202080L)
+  expect_equal(c(k10$quality_points, k10$graded_hours), c(12, 3))
+  expect_equal(c(k80$quality_points, k80$graded_hours), c(9, 3))
+  expect_equal(c(k80$cumulative_quality_points, k80$cumulative_graded_hours), c(21, 6))
+  tl <- build_gpa_timeline(st, opt = list(student_ids = "ST_K"))
+  expect_equal(tl$gpa_after, c(4, 3.5))
+  expect_equal(tl$gpa_entering, c(NA_real_, 4))
+  # ST_H: an A and a C- carry points (4.0 x 3 + 1.7 x 3 over 6 hours); the
+  # late drop has no grade and adds to neither sum.
+  h <- row(st, "ST_H", 202010L)
+  expect_equal(c(h$quality_points, h$graded_hours), c(17.1, 6))
+  # ST_I registered with no posted grade: attempted credits, no graded hours.
+  i <- row(st, "ST_I", 202110L)
+  expect_equal(c(i$attempted_unm_credits, i$graded_hours, i$quality_points), c(3, 0, 0))
+})
+
 test_that("the credit window opens with the class lists, not with the programs", {
   # UNM's academic studies reaches back a year before its class lists. Judged
   # against the table's own first row, a student first registered in the first

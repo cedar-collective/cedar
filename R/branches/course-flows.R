@@ -1,13 +1,17 @@
 # Shared course-flow computations.
 #
 # Public API for course sequencing / neighboring-course analyses:
-# - get_next_course_pairs(): campus-scoped source -> next-term destination pairs
-# - get_course_destinations(): summarized courses taken after a target course
-# - get_course_feeders(): summarized courses taken before a target course
-# - get_concurrent_courses(): summarized courses taken in the same term
-# - get_course_flow_neighbors(): named list combining destinations/feeders/concurrent
+# - get_next_course_pairs(): campus-scoped source -> next-term destination
+#   pairs, counted from the class list; what build_course_flows() runs
 # - build_course_flows(): every next-term pair, bounded at the longitudinal
-#   edge and stamped, counted once at start (Regstats' downstream signals)
+#   edge and stamped: cedar_course_flows, built by the transform (ADR-001
+#   step 6), what every next-term reader reads
+# - get_course_destinations(): the courses taken the term after a course,
+#   read off cedar_course_flows (ADR-001 step 7 group 4)
+# - get_course_feeders(): the courses taken the term before a course, the
+#   same pairs read from the destination's side
+# - get_concurrent_courses(): courses taken in the same term, counted from the
+#   class list: a same-term pair is not a flow and no measure table holds it
 #
 # Course sequencing always joins and groups by campus. This prevents students at
 # different campuses from being treated as part of the same source/destination
@@ -171,74 +175,60 @@ course_flows_is_current <- function(flows, students, edges) {
   !is.null(renames) && identical(as.character(renames), course_code_renames(students))
 }
 
-get_previous_course_pairs <- function(students, opt = list(), target_courses = NULL) {
-  incl_summer <- opt[["summer"]] %||% FALSE
-  target_courses <- target_courses %||% opt[["course"]] %||% opt[["courses"]] %||% NULL
-
-  if (is.null(target_courses) || length(target_courses) == 0) {
-    stop("[course-flows.R] target course is required for previous-course pairs.",
-         call. = FALSE)
+#' Is this cedar_course_flows as build_course_flows() counts it?
+#'
+#' The table is required, never recomputed: an absent one is a start-up
+#' failure to report, not a reason to count the class list again.
+#'
+#' @param course_flows The table to check.
+#' @param caller The function name for the message.
+#' @return `course_flows`, invisibly; an error otherwise.
+require_course_flows <- function(course_flows, caller) {
+  needed <- names(empty_next_course_pairs())
+  if (!is.data.frame(course_flows) || length(setdiff(needed, names(course_flows))) > 0L ||
+      is.null(attr(course_flows, "enrolled_edge", exact = TRUE))) {
+    stop("[course-flows.R] ", caller, "(): course_flows must be cedar_course_flows as ",
+         "build_course_flows() counts it and the loader holds it.", call. = FALSE)
   }
-
-  enrollments <- prepare_course_flow_enrollments(students, opt)
-
-  target <- enrollments %>%
-    dplyr::filter(subject_course %in% .env$target_courses) %>%
-    dplyr::transmute(
-      campus,
-      student_id,
-      target_term = term,
-      target_course = subject_course,
-      target_college = college,
-      target_term_type = term_type
-    )
-
-  if (nrow(target) == 0L) {
-    return(tibble::tibble(
-      campus = character(), source_course = character(),
-      source_college = character(), source_term = integer(),
-      source_term_type = character(), target_course = character(),
-      target_college = character(), target_term = integer(),
-      target_term_type = character(), n_students = integer()
-    ))
-  }
-
-  target <- add_prev_term_col(target, "target_term", summer = incl_summer)
-
-  src <- enrollments %>%
-    dplyr::transmute(
-      campus,
-      student_id,
-      source_term = term,
-      source_course = subject_course,
-      source_college = college,
-      source_term_type = term_type
-    )
-
-  target %>%
-    dplyr::filter(!is.na(prev_term)) %>%
-    dplyr::inner_join(
-      src,
-      by = c("campus", "student_id", "prev_term" = "source_term"),
-      relationship = "many-to-many"
-    ) %>%
-    dplyr::mutate(source_term = prev_term) %>%
-    dplyr::count(
-      campus, source_course, source_college, source_term,
-      source_term_type, target_course, target_college, target_term,
-      target_term_type,
-      name = "n_students"
-    ) %>%
-    dplyr::arrange(campus, target_course, target_term, dplyr::desc(n_students))
+  invisible(course_flows)
 }
 
-get_course_destinations <- function(students, opt = list()) {
+# The pairs of some courses, scoped the way the class-list readers scoped
+# their enrollments: a campus in opt$course_campus (or opt$campus) keeps the
+# pairs on that campus (every pair is one campus, the student's on both
+# terms). The table is counted without summer as a step (Spring → Fall), so a
+# request for summer pairs is refused rather than answered with other pairs.
+.scope_course_flows <- function(course_flows, opt, caller) {
+  require_course_flows(course_flows, caller)
+  if (isTRUE(opt[["summer"]])) {
+    stop("[course-flows.R] ", caller, "(): cedar_course_flows counts next regular terms ",
+         "(summer = FALSE); opt$summer = TRUE is not an option it answers.", call. = FALSE)
+  }
+  campus_scope <- opt[["course_campus"]] %||% opt[["campus"]] %||% NULL
+  if (!is.null(campus_scope) && length(campus_scope) > 0) {
+    course_flows <- dplyr::filter(course_flows, campus %in% .env$campus_scope)
+  }
+  course_flows
+}
+
+#' Courses taken the term after a course
+#'
+#' @param course_flows `cedar_course_flows` (build_course_flows()).
+#' @param opt `course` (or `courses`): the source course(s), required;
+#'   `course_campus` / `campus`: keep pairs on these campuses.
+#' @return One row per campus, destination course and the pair's term types:
+#'   `campus`, `college` (the destination's), `subject_course` (the
+#'   destination), `source_term_type`, `dest_term_type`, `from_crse`,
+#'   `total_students`, `num_terms`, `min_contrib`, `max_contrib`,
+#'   `avg_contrib` (students per destination term).
+get_course_destinations <- function(course_flows, opt = list()) {
   courses <- opt[["course"]] %||% opt[["courses"]]
   if (is.null(courses) || length(courses) == 0) {
     stop("[course-flows.R] opt$course is required.", call. = FALSE)
   }
 
-  pairs <- get_next_course_pairs(students, opt, source_courses = courses)
+  pairs <- .scope_course_flows(course_flows, opt, "get_course_destinations") %>%
+    dplyr::filter(source_course %in% .env$courses)
   if (nrow(pairs) == 0L) {
     return(tibble::tibble(
       campus = character(), college = character(), subject_course = character(),
@@ -264,13 +254,29 @@ get_course_destinations <- function(students, opt = list()) {
     dplyr::arrange(dplyr::desc(avg_contrib))
 }
 
-get_course_feeders <- function(students, opt = list()) {
+#' Courses taken the term before a course
+#'
+#' The same next-term pairs as get_course_destinations(), read from the
+#' destination's side: a feeder of Y in term T is a course taken in the
+#' regular term before T by a student registered in Y at T. Pairs stop at the
+#' table's edge, so a term still registering has no feeders yet.
+#'
+#' @param course_flows `cedar_course_flows` (build_course_flows()).
+#' @param opt `course` (or `courses`): the target course(s), required;
+#'   `course_campus` / `campus`: keep pairs on these campuses.
+#' @return One row per campus, feeder course and the pair's term types:
+#'   `campus`, `college` (the feeder's), `subject_course` (the feeder),
+#'   `source_term_type`, `target_term_type`, `to_crse`, `total_students`,
+#'   `num_terms`, `min_contrib`, `max_contrib`, `avg_contrib` (students per
+#'   target term).
+get_course_feeders <- function(course_flows, opt = list()) {
   courses <- opt[["course"]] %||% opt[["courses"]]
   if (is.null(courses) || length(courses) == 0) {
     stop("[course-flows.R] opt$course is required.", call. = FALSE)
   }
 
-  pairs <- get_previous_course_pairs(students, opt, target_courses = courses)
+  pairs <- .scope_course_flows(course_flows, opt, "get_course_feeders") %>%
+    dplyr::filter(dest_course %in% .env$courses)
   if (nrow(pairs) == 0L) {
     return(tibble::tibble(
       campus = character(), college = character(), subject_course = character(),
@@ -283,11 +289,11 @@ get_course_feeders <- function(students, opt = list()) {
   pairs %>%
     dplyr::group_by(
       campus, college = source_college, subject_course = source_course,
-      source_term_type, target_term_type, to_crse = target_course
+      source_term_type, target_term_type = dest_term_type, to_crse = dest_course
     ) %>%
     dplyr::summarise(
       total_students = sum(n_students),
-      num_terms = dplyr::n_distinct(target_term),
+      num_terms = dplyr::n_distinct(next_term),
       min_contrib = min(n_students),
       max_contrib = max(n_students),
       .groups = "drop"
@@ -296,6 +302,9 @@ get_course_feeders <- function(students, opt = list()) {
     dplyr::arrange(dplyr::desc(avg_contrib))
 }
 
+# Same-term co-enrollment is counted from the class list per request: it is
+# not a flow, and no measure table holds the same-term pairs (every pair of a
+# student-term's courses is several times the class list).
 get_concurrent_courses <- function(students, opt = list()) {
   courses <- opt[["course"]] %||% opt[["courses"]]
   if (is.null(courses) || length(courses) == 0) {
@@ -436,33 +445,6 @@ summarize_concurrent_courses <- function(concurrent, top_n = NULL) {
 
   out
 }
-
-get_course_flow_neighbors <- function(students, opt = list()) {
-  courses <- convert_param_to_list(opt[["course"]])
-  if (is.null(courses) || length(courses) == 0) {
-    stop("Required params: -c (course)\nFor example: -c 'ENGL 1120'",
-         call. = FALSE)
-  }
-
-  destinations <- list()
-  feeders <- list()
-  concurrent <- list()
-
-  for (course in courses) {
-    course_opt <- opt
-    course_opt[["course"]] <- course
-    destinations[[course]] <- get_course_destinations(students, course_opt)
-    feeders[[course]] <- get_course_feeders(students, course_opt)
-    concurrent[[course]] <- get_concurrent_courses(students, course_opt)
-  }
-
-  list(
-    destinations = dplyr::bind_rows(destinations),
-    feeders = dplyr::bind_rows(feeders),
-    concurrent = dplyr::bind_rows(concurrent)
-  )
-}
-
 
 # ── Downstream course options for a single course ────────────────────────────
 #

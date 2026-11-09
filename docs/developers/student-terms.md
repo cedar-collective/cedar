@@ -103,6 +103,8 @@ programs row. **No column is ever coalesced silently.**
 | `completed_unm_credits` | num | the same over rows whose `final_grade` is in `passing_grades` |
 | `dfw_grades` | int | registered rows (not late drops) whose `classify_enrollment_outcomes()` outcome is `dfw`; late drops are counted in `late_withdrawals`, never here |
 | `graded_rows` | int | registered rows with a posted grade; `dfw_grades` is unknown, not zero, when this is 0 and `enrolled` is TRUE |
+| `quality_points` | num | grade points × credits over the same de-duplicated registered rows as the credits, for the letter grades that carry points (`CEDAR_GRADE_POINTS`, `R/lists/grades.R`) with a positive credit value. CR/NC, W, I, PR, AUD and the retake variants add nothing (ADR-001 step 7 group 4) |
+| `graded_hours` | num | the credits of those rows: the GPA denominator. A grade with no points adds to neither sum, or the student reads low. 0 with `graded_rows` 0 is unknown, as `dfw_grades` is |
 | `sem_gpa` | num | programs `sem_gpa` (a per-term field; passes both reliability tests). The one description academic studies repeats with two values in one pull — a program row duplicated with a 0.00 beside the real figure, 381 student-terms (0.09%) on the 2026-10-27 pull — so it is kept only where the rows agree, `NA` and counted where they do not |
 
 ### Position: where they were in their degree
@@ -116,12 +118,14 @@ table (since 2026-11-04) instead of deriving them from
 | `cumulative_attempted_unm_credits` | num | running sum of `attempted_unm_credits` over the student's terms in the data (a declared-only term adds 0 and carries the total) |
 | `cumulative_completed_unm_credits` | num | the same running sum of `completed_unm_credits`: the basis of Pathways' `unm_credit_band` axis and the Major Changes credit medians |
 | `unm_credits_entering` | num | the running attempted sum before this term |
-| `timeline_valid` | lgl | the student's first term in the data (any row, enrolled or declared) is after the data's first term, so the running sum started at zero for a reason. **Set here, over the whole data, so a slice of the table keeps the right answer; readers read it, never re-derive it.** Readers placing students on a credit axis filter on it and say how many they dropped. |
+| `cumulative_quality_points`, `cumulative_graded_hours` | num | the running sums of `quality_points` and `graded_hours`: `build_gpa_timeline()` divides them (`gpa_after`), and less the term's own (`gpa_entering`), the covariate `build_comparison()` matches on. Posted grades only: a reader claiming a GPA *at* a term bounds its terms at `last_graded` |
+| `timeline_valid` | lgl | the student's first term in the data (any row, enrolled or declared) is after the data's first term, so the running sum started at zero for a reason. **Set here, over the whole data, so a slice of the table keeps the right answer; readers read it, never re-derive it.** Readers placing students on a credit axis or a GPA filter on it and say how many they dropped. |
 
 Transfer credits stay in `build_credit_timeline()`'s per-student block, since
 they are recovered from two banned fields and are per-student, not per-term.
-`build_gpa_timeline()` still builds its own series from class-list rows and
-derives the flag through `credit_timeline_validity()`; it moves later.
+`build_gpa_timeline()` reads the grade-point columns and the flag off this
+table since 2026-11-08 (ADR-001 step 7 group 4); the class-list series and
+its own `credit_timeline_validity()` call are gone.
 
 ### Return: did they come back
 

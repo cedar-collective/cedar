@@ -93,6 +93,15 @@ get_course_data <- function(data_objects, opt, skip_neighbors = FALSE,
   if (!skip_neighbors) {
     use_cache <- is.null(opt[["skip_cache"]]) || !opt[["skip_cache"]]
     campus_scope <- opt[["course_campus"]] %||% opt[["campus"]] %||% NULL
+    # The term-before and term-after courses are read off cedar_course_flows
+    # (every next-term pair, counted by the transform to the longitudinal
+    # edge); only the same-term courses are counted from the class list.
+    course_flows <- data_objects[["cedar_course_flows"]]
+    if (is.null(course_flows)) {
+      stop("[course_report.R] cedar_course_flows dataset is NULL in data_objects\n",
+           "  Found data_objects keys: ", paste(names(data_objects), collapse = ", "))
+    }
+    require_course_flows(course_flows, "get_course_data")
     neighbor_students <- students
     neighbor_courses <- courses
 
@@ -101,10 +110,12 @@ get_course_data <- function(data_objects, opt, skip_neighbors = FALSE,
       neighbor_courses <- neighbor_courses %>% dplyr::filter(campus %in% .env$campus_scope)
     }
     # The renames in the frame are an input to a result read by course, so
-    # they are in the key: a newly confirmed code_history row is a miss.
+    # they are in the key: a newly confirmed code_history row is a miss. So is
+    # the flows' edge: a newly settled term adds pairs.
     cache_scope <- list(
       course_campus = campus_scope,
-      code_renames = course_code_renames(neighbor_students)
+      code_renames = course_code_renames(neighbor_students),
+      enrolled_edge = attr(course_flows, "enrolled_edge", exact = TRUE)
     )
 
     if (use_cache) {
@@ -118,8 +129,8 @@ get_course_data <- function(data_objects, opt, skip_neighbors = FALSE,
         course_data[["where_at"]] <- course_neighbors_cache$where_at
       } else {
         message("[course_report.R] Cache miss: computing course-neighbors for ", opt[["course"]])
-        course_data[["where_from"]] <- get_course_feeders(neighbor_students, myopt)
-        course_data[["where_to"]] <- get_course_destinations(neighbor_students, myopt)
+        course_data[["where_from"]] <- get_course_feeders(course_flows, myopt)
+        course_data[["where_to"]] <- get_course_destinations(course_flows, myopt)
         course_data[["where_at"]] <- get_concurrent_courses(neighbor_students, myopt)
 
         course_neighbors_data <- list(
@@ -132,8 +143,8 @@ get_course_data <- function(data_objects, opt, skip_neighbors = FALSE,
       }
     } else {
       cedar_debug("[course_report.R] Cache disabled — computing fresh course-neighbors.")
-      course_data[["where_from"]] <- get_course_feeders(neighbor_students, myopt)
-      course_data[["where_to"]] <- get_course_destinations(neighbor_students, myopt)
+      course_data[["where_from"]] <- get_course_feeders(course_flows, myopt)
+      course_data[["where_to"]] <- get_course_destinations(course_flows, myopt)
       course_data[["where_at"]] <- get_concurrent_courses(neighbor_students, myopt)
     }
   } else {
@@ -1130,6 +1141,21 @@ compute_cr_flows_tab <- function(base, data_objects, min_contrib = 2,
   if (is.null(observation_end)) {
     stop("[course_report.R] Course flows need a complete longitudinal observation term.")
   }
+  # The term-before and term-after courses are read off cedar_course_flows,
+  # counted by the transform to the same edge; the same-term courses are
+  # counted from the class list bounded at it.
+  course_flows <- data_objects[["cedar_course_flows"]]
+  if (is.null(course_flows)) {
+    stop("[course_report.R] cedar_course_flows dataset is NULL in data_objects\n",
+         "  Found data_objects keys: ", paste(names(data_objects), collapse = ", "))
+  }
+  require_course_flows(course_flows, "compute_cr_flows_tab")
+  flows_edge <- attr(course_flows, "enrolled_edge", exact = TRUE)
+  if (!identical(as.integer(flows_edge), as.integer(observation_end))) {
+    stop("[course_report.R] cedar_course_flows is bounded at ", flows_edge,
+         " but the data edges settle at ", observation_end,
+         "; the table and the edges must come from one class list.")
+  }
   students <- students %>% dplyr::filter(term <= .env$observation_end)
   courses  <- courses %>% dplyr::filter(term <= .env$observation_end)
   campus_scope <- opt[["course_campus"]] %||% opt[["campus"]] %||% NULL
@@ -1153,8 +1179,8 @@ compute_cr_flows_tab <- function(base, data_objects, min_contrib = 2,
       where_at_data   <- cached$where_at
     } else {
       message("[course_report.R] Cache miss: computing course-neighbors (flows tab) for ", opt[["course"]])
-      where_from_data <- get_course_feeders(students, myopt)
-      where_to_data   <- get_course_destinations(students, myopt)
+      where_from_data <- get_course_feeders(course_flows, myopt)
+      where_to_data   <- get_course_destinations(course_flows, myopt)
       where_at_data   <- get_concurrent_courses(students, myopt)
       message("[course_report.R] Course-neighbors rows (flows tab): destinations=",
               nrow(where_to_data), ", feeders=", nrow(where_from_data),
@@ -1164,8 +1190,8 @@ compute_cr_flows_tab <- function(base, data_objects, min_contrib = 2,
         students, courses, cache_scope)
     }
   } else {
-    where_from_data <- get_course_feeders(students, myopt)
-    where_to_data   <- get_course_destinations(students, myopt)
+    where_from_data <- get_course_feeders(course_flows, myopt)
+    where_to_data   <- get_course_destinations(course_flows, myopt)
     where_at_data   <- get_concurrent_courses(students, myopt)
     message("[course_report.R] Course-neighbors rows (flows tab, no cache): destinations=",
             nrow(where_to_data), ", feeders=", nrow(where_from_data),

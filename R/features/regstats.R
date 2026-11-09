@@ -1344,8 +1344,8 @@ flagged[["bumps"]] <- bumps %>% arrange(across(all_of(std_arrange_cols)))
 
 #' The next-term destinations of some source courses
 #'
-#' A filter on cedar_course_flows (build_course_flows()), which global.R counts
-#' once over the keyed class list, to the longitudinal edge.
+#' A filter on cedar_course_flows (build_course_flows()), which the transform
+#' counts once over the keyed class list, to the longitudinal edge.
 #'
 #' @param source_courses Character vector of subject_course values (courses).
 #' @param course_flows cedar_course_flows.
@@ -1360,18 +1360,6 @@ get_downstream_course_flows <- function(source_courses, course_flows, campus = N
     flows <- flows %>% filter(campus %in% .env$campus)
   }
   flows
-}
-
-# A course-flow table is required, never recomputed here: an absent one is a
-# start-up failure to report, not a reason to count the class list again.
-require_course_flows <- function(course_flows, caller) {
-  needed <- c("campus", "source_course", "dest_course", "term", "next_term", "n_students")
-  if (!is.data.frame(course_flows) || length(setdiff(needed, names(course_flows))) > 0L ||
-      is.null(attr(course_flows, "enrolled_edge", exact = TRUE))) {
-    stop("[regstats.R] ", caller, "(): course_flows must be cedar_course_flows as ",
-         "build_course_flows() counts it (global.R holds it in data_objects).", call. = FALSE)
-  }
-  invisible(course_flows)
 }
 
 

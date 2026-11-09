@@ -47,10 +47,11 @@ STUDENT_TERMS_COLUMNS <- c(
   # enrollment
   "class_list_rows", "enrolled", "registered_courses", "late_withdrawals",
   "early_drops", "waitlisted_only", "attempted_unm_credits", "completed_unm_credits",
-  "dfw_grades", "graded_rows", "sem_gpa",
+  "dfw_grades", "graded_rows", "sem_gpa", "quality_points", "graded_hours",
   # position
   "cumulative_attempted_unm_credits", "cumulative_completed_unm_credits",
-  "unm_credits_entering", "timeline_valid",
+  "unm_credits_entering", "cumulative_quality_points", "cumulative_graded_hours",
+  "timeline_valid",
   # return
   "next_regular_term", "returned_next_regular_term", "return_observable",
   "degree_awarded"
@@ -67,7 +68,10 @@ STUDENT_TERMS_ATTACHED_COLUMNS <- unname(CEDAR_STUDENT_TERM_UNIT_COLS)
 # column list records.
 #   2 (2026-11-04): a primary major, unit, college and pre-major flag from the
 #     class list where academic studies has no row.
-STUDENT_TERMS_BUILD_VERSION <- 2L
+#   3 (2026-11-08): grade points and graded hours, per term and running
+#     (quality_points, graded_hours, cumulative_*), what build_gpa_timeline()
+#     reads (ADR-001 step 7 group 4).
+STUDENT_TERMS_BUILD_VERSION <- 3L
 
 
 #' Build the student-term table
@@ -162,6 +166,8 @@ build_student_terms <- function(students, programs = NULL, degrees = NULL,
       completed_unm_credits = dplyr::coalesce(completed_unm_credits, 0),
       dfw_grades = dplyr::coalesce(dfw_grades, 0L),
       graded_rows = dplyr::coalesce(graded_rows, 0L),
+      quality_points = dplyr::coalesce(quality_points, 0),
+      graded_hours = dplyr::coalesce(graded_hours, 0),
       n_declarations = dplyr::coalesce(n_declarations, 0L),
       declared = n_declarations > 0L
     )
@@ -213,6 +219,9 @@ build_student_terms <- function(students, programs = NULL, degrees = NULL,
       cumulative_attempted_unm_credits = cumsum(attempted_unm_credits),
       cumulative_completed_unm_credits = cumsum(completed_unm_credits),
       unm_credits_entering = cumulative_attempted_unm_credits - attempted_unm_credits,
+      # The GPA series' running sums: build_gpa_timeline() divides them.
+      cumulative_quality_points = cumsum(quality_points),
+      cumulative_graded_hours = cumsum(graded_hours),
       timeline_valid = min(term) > min_data_term
     ) %>%
     dplyr::ungroup()
@@ -318,14 +327,24 @@ build_student_terms <- function(students, programs = NULL, degrees = NULL,
     dplyr::filter(registration_status_code %in% STATUS_REGISTERED)
   # CAMPUS_ROLLUP: one curriculum credit load per student-term, not a delivery
   # metric; a repeated course counts once even if its campus changed.
+  # The grade-point sums beside them (build_gpa_timeline() reads them): over
+  # the same de-duplicated rows, the letter grades that carry points
+  # (CEDAR_GRADE_POINTS) with a positive credit value. A grade with no points
+  # adds to neither sum, or the denominator inflates and the student reads low.
   credits <- registered %>%
     dplyr::filter(!is.na(credits)) %>%
     dplyr::distinct(student_id, term, subject_course, course_title, credits,
                     final_grade, registration_status_code) %>%
+    dplyr::mutate(
+      .pointed = final_grade %in% names(CEDAR_GRADE_POINTS) & credits > 0,
+      .points = dplyr::if_else(.pointed, unname(CEDAR_GRADE_POINTS[final_grade]) * credits, 0)
+    ) %>%
     dplyr::group_by(student_id, term) %>%
     dplyr::summarize(
       attempted_unm_credits = sum(credits),
       completed_unm_credits = sum(dplyr::if_else(final_grade %in% passing_grades, credits, 0)),
+      quality_points = sum(.points),
+      graded_hours = sum(dplyr::if_else(.pointed, credits, 0)),
       .groups = "drop")
   # Posted grades only; a blank grade is unknown. Late drops are not here:
   # they have their own column, and classify_enrollment_outcomes() would

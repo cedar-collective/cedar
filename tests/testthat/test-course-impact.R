@@ -37,7 +37,7 @@ bc_ids <- c("MC_A1", "MC_A2", "MC_A3", "MC_A4")
 
 test_that("groups are labelled from the id vectors, not from the data", {
   r <- suppressMessages(build_comparison(
-    c("MC_A1", "MC_A2"), c("MC_A3", "MC_A4"), test_programs_mc, students = test_students_mc))
+    c("MC_A1", "MC_A2"), c("MC_A3", "MC_A4"), test_programs_mc, student_terms = test_student_terms_mc))
   expect_equal(r$n_treatment, 2)
   expect_equal(r$n_control, 2)
   expect_setequal(r$groups$student_id[r$groups$group == "treatment"], c("MC_A1", "MC_A2"))
@@ -51,7 +51,7 @@ test_that("a student with no program record is dropped from the comparison", {
   # actually compared, which can be fewer than the ids passed in — any caller
   # displaying its own sample size alongside this can disagree with it.
   r <- suppressMessages(build_comparison(
-    c("MC_A1", "ghost"), c("MC_A3", "MC_A4"), test_programs_mc, students = test_students_mc))
+    c("MC_A1", "ghost"), c("MC_A3", "MC_A4"), test_programs_mc, student_terms = test_student_terms_mc))
   expect_equal(r$n_treatment, 1)
   expect_false("ghost" %in% r$groups$student_id)
 })
@@ -60,7 +60,7 @@ test_that("a student in both groups is counted once, as treatment", {
   # pool_ids is documented as needing to exclude treatment_ids; nothing enforces
   # it, so pin the fallback rather than leave it undefined.
   r <- suppressMessages(build_comparison(
-    c("MC_A1"), c("MC_A1", "MC_A3"), test_programs_mc, students = test_students_mc))
+    c("MC_A1"), c("MC_A1", "MC_A3"), test_programs_mc, student_terms = test_student_terms_mc))
   expect_equal(nrow(r$groups), 2)
   expect_equal(r$n_treatment, 1)
   expect_equal(r$n_control, 1)
@@ -69,22 +69,22 @@ test_that("a student in both groups is counted once, as treatment", {
 
 test_that("empty treatment or control is an explicit error, not a silent empty result", {
   expect_error(suppressMessages(build_comparison(
-    character(0), c("MC_A3"), test_programs_mc, students = test_students_mc)))
+    character(0), c("MC_A3"), test_programs_mc, student_terms = test_student_terms_mc)))
   expect_error(suppressMessages(build_comparison(
-    c("MC_A1"), character(0), test_programs_mc, students = test_students_mc)))
+    c("MC_A1"), character(0), test_programs_mc, student_terms = test_student_terms_mc)))
 })
 
 test_that("covariates are taken at or before the covariate term, most recent first", {
   # MC_A1 has two program records in MC02: 202010 (standing "Good") and 202110
   # ("Probation"). Neither branch may simply take the latest row.
   r <- suppressMessages(build_comparison(
-    c("MC_A1"), c("MC_A3"), test_programs_mc, students = test_students_mc))
+    c("MC_A1"), c("MC_A3"), test_programs_mc, student_terms = test_student_terms_mc))
   # Default is the entry term (202010), so the later Probation row must not win.
   expect_equal(r$groups$academic_standing[r$groups$student_id == "MC_A1"], "Good")
 
   # Asking for a term at or after the later record does pick it up.
   r2 <- suppressMessages(build_comparison(
-    c("MC_A1"), c("MC_A3"), test_programs_mc, students = test_students_mc,
+    c("MC_A1"), c("MC_A3"), test_programs_mc, student_terms = test_student_terms_mc,
     covariate_terms = tibble::tibble(student_id = "MC_A1", covariate_term = 202110L)))
   expect_equal(r2$groups$academic_standing[r2$groups$student_id == "MC_A1"], "Probation")
 })
@@ -95,7 +95,7 @@ test_that("the frozen cumulative fields never reach the comparison groups", {
   # final totals on every historical row, so matching on them means matching on
   # the outcome. They are present in the fixture and must be dropped anyway.
   r <- suppressMessages(build_comparison(
-    c("MC_A1"), c("MC_A3"), test_programs_mc, students = test_students_mc))
+    c("MC_A1"), c("MC_A3"), test_programs_mc, student_terms = test_student_terms_mc))
 
   banned <- c("inst_gpa", "inst_credits_attempted", "inst_credits_earned",
               "overall_credits_attempted", "overall_credits_earned")
@@ -110,7 +110,7 @@ test_that("current_unm_gpa is carried for description but never balanced on", {
   # strength (populated for ~4x as many students as the reconstruction), so it
   # rides along in `groups` for the profile table and is excluded from the SMDs.
   r <- suppressMessages(build_comparison(
-    c("MC_A1"), c("MC_A3"), test_programs_mc, students = test_students_mc))
+    c("MC_A1"), c("MC_A3"), test_programs_mc, student_terms = test_student_terms_mc))
 
   expect_true("current_unm_gpa" %in% names(r$groups))
   expect_false("current_unm_gpa" %in% r$balance$smd_table$covariate)

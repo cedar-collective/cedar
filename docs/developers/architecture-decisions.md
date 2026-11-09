@@ -413,6 +413,46 @@ Report's lifecycle counts a crosslist family's students once across its
 listings; `get_high_fall_sophs()`, which nothing calls, takes the table and
 waits for a caller.
 
+Group 4, the flow and sequence readers, followed the same day. The class
+list is itself the registration measure (one row per student, course, campus
+and term), so a cohort defined by registration — retention's anchor, the
+sequence and instructor effects' X cohort — reads it directly and has nothing
+to move; what moved is what was derived from it per request. The Course
+Report's term-after and term-before courses read `cedar_course_flows`:
+`get_course_destinations(course_flows, opt)` filters the pairs by source and
+`get_course_feeders(course_flows, opt)` the same pairs by destination, so a
+feeder of Y in term T is a course whose next regular term is T. Destinations
+are identical to the class-list reader's on every course checked; feeders
+change where summer sat, because the class-list reader stepped back from a
+Fall to its Spring while the table steps a Summer forward to its Fall (summer
+is not a step, so a Spring's next regular term is Fall and nothing's is
+Summer): a Fall's feeders now include its Summer's courses and a Summer
+target has none (MATH 1215 ABQ 810 → 638 feeder rows, 189 Spring → Summer
+rows out and 17 Summer → Fall rows in; ENGL 1110 ABQ 709 → 744, 35 in,
+none out). Sixteen requests take 3.5 s instead of 19.3 s, and the Course
+Report's non-tab path, which read every term, is now bounded at the edge like
+the flows tab, which also checks that the table's edge is the data's.
+`get_previous_course_pairs()` and `get_course_flow_neighbors()` are deleted;
+the same-term courses stay on the class list (a same-term pair is not a flow
+and no measure holds it). The GPA covariate moved onto `cedar_student_terms`:
+build 3 sums `quality_points` and `graded_hours` per student-term over the
+same de-duplicated registered rows as the credits, with running totals, and
+`build_gpa_timeline(student_terms, opt)` divides them and reads the table's
+`timeline_valid` instead of deriving its own. Over 20,000 real students the
+series has 86,428 rows against 86,432 (four graded rows with a
+non-registered status no longer count), eight `gpa_after` values differ (one
+course on two campuses in one term now counts once, as the credits do, and
+the four rows' running sums), and `timeline_valid` differs on 1,791 rows
+because the table opens the window at a student's first row of any kind,
+declarations included, the rule the credit position already used; 20,000
+students take 0.05 s instead of 1.9 s. `build_comparison()` no longer takes
+the class list: its default covariate term is the student's first enrolled
+term on the table. Grade points are `CEDAR_GRADE_POINTS` in
+`R/lists/grades.R`; the unused `grades_to_points` frame is gone. Still
+reading the class list for a student-term fact, for a later group: the first
+term and terms-enrolled counts in `population.R`, `gen-ed-conversion.R` and
+`grouped-student-paths.R`.
+
 #### Step 5: decisions (2026-11-07)
 
 - **Order:** the student-term columns leave the loaded class list first

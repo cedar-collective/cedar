@@ -7,7 +7,9 @@
 # v4 reads by course (course_id; ADR-001 step 4) and keys the renames in scope.
 # v5 drops the concurrent courses' classification split, which no reader used
 # and the loaded class list no longer carries (ADR-001 step 5).
-cedar_course_neighbors_cache_version <- 5L
+# v6: where_to and where_from are read off cedar_course_flows (ADR-001 step 7
+# group 4), bounded at the table's enrolled_edge, which the scope carries.
+cedar_course_neighbors_cache_version <- 6L
 
 # Regstats v2 uses a separate prior-only baseline for every reported term;
 # v3 preserves one reporting row when source sections carry different titles;
