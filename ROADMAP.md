@@ -65,12 +65,12 @@ Built: a monitored course registry, the prior same-season spine and an
 adjusted challenger, rolling out-of-sample selection, three evidence axes,
 first-day capacity judgement, section plans from projected registrations with
 a pressure bump and feeder adjustment, a draft-schedule comparison, growth
-scenarios, and saved bundles per season with model provenance. Contract:
+scenarios, saved bundles per season with model provenance, and each course's
+saved plan on Course Dynamics. Contract:
 [enrollment-projections.md](docs/developers/enrollment-projections.md);
 what was tried and rejected: [forecasting-lessons.md](docs/developers/forecasting-lessons.md).
 Waitlists are not an input until two years of retained waitlists exist.
 
-- [ ] **Projections on Course Dynamics.** Reuse the saved payload on the course page.
 - [ ] **Pilot with chairs and associate deans.** The table and its explanations.
 - [ ] **Structural Fall model.** Split continuing students from the incoming
   cohort; blocked on retained admissions/acceptance/NSO snapshots CEDAR does

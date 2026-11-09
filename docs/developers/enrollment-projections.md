@@ -911,9 +911,9 @@ multiplier.
 | Module | `R/modules/enrollment-projections.R` | Read-only Registration page over the saved feature payload |
 | Script | `scripts/build-enrollment-projections.R` | Clean-process artifact publication |
 
-Future modules and Course Dynamics must call the feature/cone or read the saved
-bundle. They must not reproduce a model, backtest, pressure calculation, or
-recommendation pipeline.
+Future modules, like Course Dynamics' Projections tab, must call the feature/cone
+or read the saved bundle. They must not reproduce a model, backtest, pressure
+calculation, or recommendation pipeline.
 
 ## Saved Bundle
 
@@ -1116,8 +1116,15 @@ Registration > Projections lists saved bundles with
 with `load_enrollment_projection_bundle()`, and filters it through
 `build_enrollment_projection_view()`. It never runs a candidate method, aftcast,
 calibration, or pressure screen. `server.R` owns the path and the file read; the
-module receives a discovery reactive and a loader function. Course Dynamics must
-reuse that same loader/view boundary when projections are added there.
+module receives a discovery reactive and a loader function. Course Dynamics >
+Projections (2026-11-09) reads the same files through the same boundary: `server.R`
+loads every saved bundle once per session, and
+`enrollment_projection_course_outlook(bundle, subject_course)` (the feature)
+builds the course's view and detail, or says why the bundle has none for it
+(screened out, with the saved `inclusion_reason`; in scope with no row; or
+outside the monitored groups). The tab renders `projection_detail_ui()` and
+binds its outputs with `bind_projection_detail_outputs()`, the module's own
+pieces, so the course page and the Projections page cannot disagree.
 
 Discovery is season-aware because CEDAR publishes **one bundle per season**. A
 Fall 2027 and a Spring 2027 projection are both current and neither supersedes

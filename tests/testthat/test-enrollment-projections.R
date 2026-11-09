@@ -2666,6 +2666,74 @@ test_that("a Fall target publishes through the same pipeline as Spring", {
                     names(bundle$projections)))
 })
 
+# Course Dynamics > Projections shows one course's saved outlook per bundle,
+# through the Projections page's own view, and says why a course has none
+# rather than showing an empty panel.
+test_that("Course Dynamics reads one course's outlook off the saved bundle and says why a course has none", {
+  bundle <- projection_fixture_bundle(202080L, 202060L, 201980L)
+
+  projected <- enrollment_projection_course_outlook(bundle, "MATH 1215Z")
+  expect_equal(projected$status, "projected")
+  expect_null(projected$sentence)
+  expect_equal(projected$meta$target_term, 202080L)
+  expect_equal(projected$detail$current$subject_course, "MATH 1215Z")
+  # The same detail the Projections page opens for the course.
+  page_detail <- enrollment_projection_course_detail(
+    build_enrollment_projection_view(bundle, list(group_id = "all_saved")),
+    "MATH 1215Z"
+  )
+  expect_equal(projected$detail$current, page_detail$current)
+  expect_equal(projected$detail$plan_steps, page_detail$plan_steps)
+
+  # Outside every monitored group: no detail, and the sentence says so.
+  outside <- enrollment_projection_course_outlook(bundle, "ENGL 1110")
+  expect_equal(outside$status, "out_of_scope")
+  expect_null(outside$detail)
+  expect_match(
+    outside$sentence,
+    "ENGL 1110 is not in the monitored course groups the Fall 2020 projections cover"
+  )
+
+  # Monitored, but left out by the saved pressure screen: its saved reason.
+  screened <- bundle
+  screened$scope_courses <- c(screened$scope_courses, "TEST 999")
+  screened$pressure_screen <- dplyr::bind_rows(
+    screened$pressure_screen,
+    projection_test_row("TEST 999") %>%
+      dplyr::mutate(
+        market_id = bundle$scope_market_id, target_term = 202080L,
+        # No delivery components for it, so no scheduled seats to reconcile.
+        scheduled_sections = 0L, scheduled_capacity = 0,
+        is_forced = FALSE, included = FALSE,
+        inclusion_reason = "0 of 3 recent fall terms at or above 90% of scheduled capacity"
+      )
+  )
+  expect_true(validate_enrollment_projection_bundle(screened))
+  left_out <- enrollment_projection_course_outlook(screened, "TEST 999")
+  expect_equal(left_out$status, "screened_out")
+  expect_null(left_out$detail)
+  expect_equal(
+    left_out$sentence,
+    paste(
+      "TEST 999 is monitored but was not projected for Fall 2020.",
+      "0 of 3 recent fall terms at or above 90% of scheduled capacity."
+    )
+  )
+
+  # In scope with no saved row at all: said, never shown as an empty detail.
+  unpublished <- bundle
+  unpublished$scope_courses <- c(unpublished$scope_courses, "TEST 998")
+  no_row <- enrollment_projection_course_outlook(unpublished, "TEST 998")
+  expect_equal(no_row$status, "unpublished")
+  expect_match(no_row$sentence, "holds no row for it")
+
+  expect_error(enrollment_projection_course_outlook(bundle, NULL), "one subject_course")
+  expect_error(
+    enrollment_projection_course_outlook(bundle, c("MATH 1215Z", "ENGL 1110")),
+    "one subject_course"
+  )
+})
+
 test_that("bundle discovery is per season, not the highest target term", {
   # Fall 202080 is the EARLIER target here. A discovery that returns the highest
   # saved term hands back Spring 202110 for a Fall request -- the failure that

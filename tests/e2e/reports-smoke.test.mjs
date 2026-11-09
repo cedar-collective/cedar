@@ -659,6 +659,33 @@ export async function runReportChecks({ scope = 'smoke', synthetic = false } = {
         { type: 'plotly', id: 'cr_enrollment_pressure_plot' },
         { type: 'reactable', id: 'cr_enrollment_table' },
       ], { all: true });
+
+      // Projections reads the saved bundles. With bundles mounted, every
+      // published term gets a "<term> plan" block whether the course was
+      // projected, screened out or outside the monitored groups; without
+      // bundles the tab says so instead of staying blank.
+      await clickSubTabIn(page, 'cr_tabs', 'Projections');
+      await waitForOutput(page, 'Course Dynamics projections', [
+        { type: 'text', id: 'cr_projections_ui' },
+      ]);
+      const projectionsText = await page.$eval('#cr_projections_ui', (el) => el.innerText);
+      assert.match(
+        projectionsText,
+        // Case-insensitive: the block title is upper-cased by CSS and
+        // innerText reports it that way.
+        /\b(Fall|Spring) \d{4} plan\b|No validated enrollment projection bundle/i,
+        `Course Dynamics projections rendered neither a term plan nor the empty state: ${projectionsText.slice(0, 200)}`,
+      );
+      // A projected term shows its recent same-season evidence as a table
+      // with rows, bound per term; a heading over an empty table is a bug.
+      if (/How this plan was built/.test(projectionsText)) {
+        await page.waitForFunction(
+          () => document.querySelectorAll('#cr_projections_ui .rt-tbody .rt-tr').length > 0,
+          { timeout: 60000, polling: 500 },
+        ).catch(() => {
+          throw new Error('Course Dynamics projections: a projected term rendered no evidence rows');
+        });
+      }
     });
 
     await withStep(page, ['retention'], 'Course Dynamics Retention runs with benchmarks', async () => {

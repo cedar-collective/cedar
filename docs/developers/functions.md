@@ -8,7 +8,7 @@ parent: Developer Guide
 
 This reference is auto-generated from roxygen2 comments in the source code.
 
-*Generated: 2026-11-07 22:01:49.012213*
+*Generated: 2026-11-09 08:17:26.004504*
 
 ---
 
@@ -56,6 +56,23 @@ Refuse an attempts table this build did not make  For a reader handed `attempts`
 **Refuse an attempts table this code did not build, or built over other codes**
 
 Refuse an attempts table this code did not build, or built over other codes  For readers handed `attempts` with the class list but not the edges: checks the build, policy, columns and renames, and returns the graded edge it was built to.
+
+---
+
+### `attempt_outcome_flags()`
+
+*Source: attempts.R*
+
+**The outcome flags of attempts, read off their stored classification**
+
+The outcome flags of attempts, read off their stored classification  What the per-request readers count (summarize_attempt_outcomes() and the rest of R/branches/course-attempts.R). Every flag is read off `outcome_category`, which build_attempts() wrote once with classify_attempt_outcomes(), so a reader never decides again whether an attempt passed, failed or withdrew. The one grade read is a page's visible C-/D opt-in: `is_pass` is a graded category whose `final_grade` is in `passing_values`, which under the default GRADES_PASS is exactly the `pass` category (tests/testthat/test-course-attempts.R pins that).
+
+**Parameters:**
+
+- `attempts` - Rows of cedar_attempts, scoped or not; needs `outcome_category` and `final_grade`.
+- `passing_values` - The grades that pass; GRADES_PASS, or GRADES_PASS_SUB_C_OPT_IN from a page's visible control.
+
+**Returns:** `attempts` with the `is_*` flags classify_attempt_outcomes() writes.
 
 ---
 
@@ -368,6 +385,48 @@ Get Courses Adjacent to Student Entry or Exit Events  Finds courses taken in the
 
 ## course-attempts
 
+### `prepare_course_attempts()`
+
+*Source: course-attempts.R*
+
+**The attempt rows in scope**
+
+**Parameters:**
+
+- `attempts` - The attempt measure table (`cedar_attempts`), or rows of it that keep its stamps (a dplyr filter does).
+- `opt` - The standard filter options (filter_attempts(): `course`, `crn`, `term`, `course_campus`, `course_college`, `dept_code`, `subj`, `inst`, `level`, `pt`, `uel`), plus `population_ids` (or `cohort_ids`) to keep those students' attempts, `min_term` for a left edge, and optionally `data_edges`, which must agree with the edge the table was built to.
+
+**Returns:** The rows in scope, with the table's columns; zero rows when nothing matches.
+
+---
+
+### `summarize_outcome_status_exclusions()`
+
+*Source: course-attempts.R*
+
+**The class-list rows cedar_attempts leaves out, by status**
+
+The class-list rows cedar_attempts leaves out, by status  A data-quality report, so it reads the class list, not the measure: rows in scope whose status is neither registered nor a drop (waitlist, a code Banner added), with how many carry a grade anyway. `opt$data_edges` is required.
+
+---
+
+### `get_course_outcome_rates()`
+
+*Source: course-attempts.R*
+
+**Outcome rates by group**
+
+**Parameters:**
+
+- `attempts` - The attempt measure table (`cedar_attempts`).
+- `opt` - prepare_course_attempts()' options, plus `passing_grades` (default GRADES_PASS; a page's visible opt-in passes GRADES_PASS_SUB_C_OPT_IN).
+- `group_cols` - Columns of the table to group by; campus beside the course.
+- `min_n` - Smallest DFW denominator a group needs to be shown.
+
+**Returns:** summarize_attempt_outcomes()' columns per group.
+
+---
+
 ### `get_course_dfw_demographics()`
 
 *Source: course-attempts.R*
@@ -376,15 +435,46 @@ Get Courses Adjacent to Student Entry or Exit Events  Finds courses taken in the
 
 **Parameters:**
 
-- `students` - Class-list rows (the loaded `cedar_registrations`).
+- `attempts` - The attempt measure table (`cedar_attempts`).
 - `student_terms` - The `cedar_student_terms` table; the group is read off it.
-- `opt` - Course-attempt options (`course`, `data_edges`, `passing_grades`, ...).
+- `opt` - Course-attempt options (`course`, `passing_grades`, ...).
 - `group_col` - One of `DFW_DEMOGRAPHIC_GROUPS`.
 - `min_n` - Smallest attempt count a group needs to be shown.
 - `max_groups` - Optional cap on the groups returned, largest DFW count first.
 - `dims` - The dimension tables (`build_cedar_dims()`); required for `group_col = "major_code"`, whose groups are programs.csv's names.
 
 **Returns:** One row per group: counts, `dfw_pct`, `late_withdrawal_pct`, `early_drop_pct`, `share_of_dfw`, `share_of_attempts`.
+
+---
+
+### `get_course_dfw_context()`
+
+*Source: course-attempts.R*
+
+**The same-term workload of a course's DFW students**
+
+**Parameters:**
+
+- `attempts` - The attempt measure table (`cedar_attempts`): the focal course's attempts are read in the caller's scope, then every attempt of its DFW students in the same terms, campus-blind.
+- `opt` - Course-attempt options; `course` is required.
+- `min_cell` - Smallest bucket shown; thinner ones merge into a neighbour.
+
+---
+
+### `get_grade_distribution()`
+
+*Source: course-attempts.R*
+
+**Letter-grade distribution by group**
+
+**Parameters:**
+
+- `attempts` - The attempt measure table (`cedar_attempts`).
+- `opt` - prepare_course_attempts()' options.
+- `group_cols` - Columns of the table to group by; campus beside the course.
+- `min_n` - Smallest denominator a group needs to be shown.
+
+**Returns:** Per group: counts and percentages of A, B, C, D, F, W and Other over the DFW denominator (early drops and ungraded rows excluded).
 
 ---
 
@@ -486,6 +576,7 @@ Get Course Demographics  Analyzes the demographic composition (majors, classific
 - `students` - Data frame of student enrollments from cedar_registrations table.
 - `student_terms` - The `cedar_student_terms` table. A grouping by `student_classification` or `major_code` reads the student's description off it, never off the class-list row (ADR-001 step 2). May be `NULL` only when no grouping column describes the student.
 - `opt` - Options list for filtering and grouping: \itemize{ \item \code{group_cols} - Character vector of columns to group by. If NULL, uses defaults: campus, college, term, term_type, student_classification, major_code, subject_course, course_title, level \item \code{reg_status_code} - Registration status codes to include (default: STATUS_REGISTERED) \item \code{course} - Course identifier(s) to filter by \item \code{term} - Term code(s) to filter by \item Other filtering options supported by \code{filter_class_list()} }
+- `course_terms` - `cedar_course_terms`: the course enrollment the shares are taken against (ADR-001 step 7), never recounted from the rows.
 
 **Returns:** Data frame with student demographic breakdown including counts, means, and percentages. See \code{\link{summarize_student_demographics}} for column details.
 
@@ -497,14 +588,16 @@ opt <- list(
   course     = "BIOL 2305",
   group_cols = c("campus", "term", "term_type", "major_code", "subject_course")
 )
-major_breakdown <- get_course_demographics(cedar_registrations, cedar_student_terms, opt)
+major_breakdown <- get_course_demographics(cedar_registrations, cedar_student_terms,
+                                           cedar_course_terms, opt)
 
 # Classification breakdown across all MATH courses
 opt <- list(
   subject    = "MATH",
   group_cols = c("campus", "term", "student_classification", "subject_course")
 )
-class_breakdown <- get_course_demographics(cedar_registrations, cedar_student_terms, opt)
+class_breakdown <- get_course_demographics(cedar_registrations, cedar_student_terms,
+                                           cedar_course_terms, opt)
 }
 
 ```
@@ -589,6 +682,55 @@ Count every course's next-term destinations, to the longitudinal edge  get_next_
 
 ---
 
+### `require_course_flows()`
+
+*Source: course-flows.R*
+
+**Is this cedar_course_flows as build_course_flows() counts it?**
+
+Is this cedar_course_flows as build_course_flows() counts it?  The table is required, never recomputed: an absent one is a start-up failure to report, not a reason to count the class list again.
+
+**Parameters:**
+
+- `course_flows` - The table to check.
+- `caller` - The function name for the message.
+
+**Returns:** `course_flows`, invisibly; an error otherwise.
+
+---
+
+### `get_course_destinations()`
+
+*Source: course-flows.R*
+
+**Courses taken the term after a course**
+
+**Parameters:**
+
+- `course_flows` - `cedar_course_flows` (build_course_flows()).
+- `opt` - `course` (or `courses`): the source course(s), required; `course_campus` / `campus`: keep pairs on these campuses.
+
+**Returns:** One row per campus, destination course and the pair's term types: `campus`, `college` (the destination's), `subject_course` (the destination), `source_term_type`, `dest_term_type`, `from_crse`, `total_students`, `num_terms`, `min_contrib`, `max_contrib`, `avg_contrib` (students per destination term).
+
+---
+
+### `get_course_feeders()`
+
+*Source: course-flows.R*
+
+**Courses taken the term before a course**
+
+Courses taken the term before a course  The same next-term pairs as get_course_destinations(), read from the destination's side: a feeder of Y in term T is a course taken in the regular term before T by a student registered in Y at T. Pairs stop at the table's edge, so a term still registering has no feeders yet.
+
+**Parameters:**
+
+- `course_flows` - `cedar_course_flows` (build_course_flows()).
+- `opt` - `course` (or `courses`): the target course(s), required; `course_campus` / `campus`: keep pairs on these campuses.
+
+**Returns:** One row per campus, feeder course and the pair's term types: `campus`, `college` (the feeder's), `subject_course` (the feeder), `source_term_type`, `target_term_type`, `to_crse`, `total_students`, `num_terms`, `min_contrib`, `max_contrib`, `avg_contrib` (students per target term).
+
+---
+
 ### `summarize_concurrent_courses()`
 
 *Source: course-flows.R*
@@ -653,7 +795,8 @@ Downstream Success by Instructor  Among students who took course X and later too
 
 **Parameters:**
 
-- `students` - cedar_registrations data frame.
+- `students` - cedar_registrations data frame: the X cohort and the comparison's covariates.
+- `attempts` - The attempt measure table (`cedar_attempts`): the Y outcomes.
 - `programs` - cedar_programs data frame.
 - `applicants` - cedar_applicants data frame, or NULL.
 - `opt` - Named list: \describe{ \item{course_x}{Character. The upstream course. Required.} \item{course_y}{Character. The downstream outcome course. May name several courses, in which case the analysis becomes a rollup across all of them and each student is counted once, at their earliest enrolment in the set. Required.} \item{campus}{Character vector. Optional campus filter.} \item{min_n}{Integer. Minimum students per instructor who later took Y (default 15). Instructors below this threshold are excluded.} }
@@ -692,8 +835,8 @@ Analyze outcomes for one or more courses  Runs the DFW trend and instructor comp
 
 **Parameters:**
 
-- `students` - cedar_registrations data frame.
-- `cedar_faculty` - cedar_faculty data frame, or NULL to skip DFW analyses.
+- `attempts` - The attempt measure table (`cedar_attempts`).
+- `cedar_faculty` - cedar_faculty data frame; kept for the callers, unread here.
 - `opt` - Options list: \itemize{ \item \code{course}  — character vector of subject_course values (required) \item \code{term}    — integer vector; restrict to these terms (optional) \item \code{campus}  — character vector; restrict by campus (optional) \item \code{min_n}   — integer; minimum graded students per group (default 5) \item \code{data_edges} — output of [cedar_data_edges()]; longitudinal grade outputs stop at the earlier of the complete-enrollment and graded edges, while persistence eligibility uses the complete-enrollment edge }
 
 **Returns:** Named list: \describe{ \item{dfw_trend}{Tibble: campus, college, subject_course, term, dfw_pct} \item{instructor_dfw}{Tibble: campus, college, subject_course, instructor_id, instructor_name, dfw_pct, course_avg_dfw, dfw_diff} \item{courses}{Character vector of courses analyzed} }
@@ -782,7 +925,7 @@ pairs %>% filter(course_a == "BIOL 2310")
 
 **Historical availability and first-class-day pressure for exact course codes**
 
-Historical availability and first-class-day pressure for exact course codes  The last nine possible terms end at settled enrollment. Keep course, delivery campus, college and session together. First day is reconstructed only from dated class-list statuses, never substituted with census or ever-registered.
+Historical availability and first-class-day pressure for exact course codes  The last nine possible terms end at settled enrollment. Keep course, delivery campus, college and session together. Seats, the first-day count and the class-list match are read off `cedar_course_terms` (ADR-001 step 7): first day is reconstructed there from dated class-list statuses, never substituted with census or ever-registered. The schedule still says which terms each campus's source covers and which offerings exist.
 
 ---
 
@@ -808,7 +951,8 @@ Course Sequence Effect  Compares grades in course Y between students who passed 
 
 **Parameters:**
 
-- `students` - cedar_registrations data frame.
+- `students` - cedar_registrations data frame: the comparison's covariates.
+- `attempts` - The attempt measure table (`cedar_attempts`): both courses' outcomes, classified once (ADR-001 step 7).
 - `programs` - cedar_programs data frame.
 - `applicants` - cedar_applicants data frame, or NULL.
 - `data_edges` - Optional output of [cedar_data_edges()]. Y outcomes stop at the longitudinal grade edge: the earlier of `last_enrolled_complete` and `last_graded`.
@@ -826,12 +970,13 @@ Course Sequence Effect  Compares grades in course Y between students who passed 
 
 **Count the course-term measure table**
 
-Count the course-term measure table  The class-list counts of calc_cl_enrls() by part of term, with census enrollment (add_census_enrl()) and each course's level and department. `registered` is still registered at the pull (final, for a past term); `cl_total` is every non-waitlist registration (ever registered: `registered + dr_all`); `census_enrl` is `registered + dr_late`; `wl_all` counts waitlist rows, not true demand (`R/branches/waitlist-demand.R`). The outcome counts are count_attempt_outcomes() over `attempts`.
+Count the course-term measure table  The class-list counts of calc_cl_enrls() by part of term, with census enrollment (add_census_enrl()) and the first-day count (calc_first_day_enrl()), the schedule's active offerings and seats (get_enrl()), and each course's subject, level and department. `registered` is still registered at the pull (final, for a past term); `cl_total` is every non-waitlist registration (ever registered: `registered + dr_all`); `census_enrl` is `registered + dr_late`; `wl_all` counts waitlist rows, not true demand (`R/branches/waitlist-demand.R`). `first_day_enrl` is counted over the class-list rows in an active section, NA with `first_day_basis` saying why when a status or start date is missing or a session had not begun at the pull. `sections` counts the active offerings (a crosslisted section once, under its home listing), `sections_matched` those with a class-list row, `seats` their scheduled seats (`enrolled + available`), `seats_known` whether every one has a finite capacity, and `desr_enrl` the schedule's headcount at the pull. NA on either side means that source has no row for the course-term. The outcome counts are count_attempt_outcomes() over `attempts`.
 
 **Parameters:**
 
-- `students` - `cedar_registrations` keyed on the course (attach_course_ids()).
+- `students` - `cedar_registrations` keyed on the course (attach_course_ids()), with `registration_date` and `as_of_date`.
 - `attempts` - cedar_attempts built from the same class list (build_attempts()); its graded edge decides which terms carry outcomes.
+- `sections` - `cedar_sections` keyed on the course, with `status`, `enrolled`, `available`, `total_enrl`, `crosslist_code`, `crosslist_group`, `crosslist_role` and `start_date`.
 
 **Returns:** One row per campus, college, term, course and part of term, with exactly COURSE_TERMS_COLUMNS, ungrouped, stamped with `code_renames`, `graded_edge` and `course_terms_build_version`.
 
@@ -843,13 +988,21 @@ Count the course-term measure table  The class-list counts of calc_cl_enrls() by
 
 **Was this course-term table counted by this build over this class list?**
 
-Was this course-term table counted by this build over this class list?  TRUE when it carries the current build version, exactly its columns, and the renames of the class list now loaded. FALSE for anything else, including a table saved by an older build, a table counted by code, or NULL: the loader rebuilds it, and a reader refuses it (require_current_course_terms()).
+Was this course-term table counted by this build over this class list?  TRUE when it carries the current build version, exactly its columns, and the renames of the class list now loaded. FALSE for anything else, including a table saved by an older build, a table counted by code, or NULL: the loader refuses it, and so does a reader (require_current_course_terms()).
 
 **Parameters:**
 
 - `course_terms` - A saved cedar_course_terms, or anything else.
 - `students` - `cedar_registrations` keyed on the course.
 - `graded_edge` - The loader's graded edge, to refuse a table whose outcome columns stop at another; NULL for a reader that does not read them.
+
+---
+
+### `course_terms_is_build()`
+
+*Source: course-terms.R*
+
+**Does this table carry the current build's version and columns?**
 
 ---
 
@@ -863,6 +1016,21 @@ Was this course-term table counted by this build over this class list?  TRUE whe
 
 - `course_terms` - cedar_course_terms as passed to a reader.
 - `students` - The class list the reader also holds.
+- `caller` - The reader's name, for the error.
+
+---
+
+### `require_course_terms_build()`
+
+*Source: course-terms.R*
+
+**Stop unless a course-term table is this build's**
+
+Stop unless a course-term table is this build's  For a reader that holds the table and not the class list (the planning history): the build version and columns are checked, the renames are the loader's job (cedar_load_measure_table()).
+
+**Parameters:**
+
+- `course_terms` - cedar_course_terms as passed to a reader.
 - `caller` - The reader's name, for the error.
 
 ---
@@ -2031,6 +2199,7 @@ Summarize Student Demographics  Flexible demographic summary function that group
 
 - `filtered_students` - Data frame of student enrollments from cedar_registrations table, already filtered by desired criteria. Must include: student_id, term, campus, college, subject_course, and any grouping column that describes the course row rather than the student.
 - `student_terms` - The `cedar_student_terms` table. A grouping by `student_classification` or `major_code` reads the student's description off it (`student_classification`, `primary_major_code`), never off the class-list row (ADR-001 step 2); the class-list copies are dropped first. May be `NULL` only when no grouping column describes the student.
+- `course_terms` - `cedar_course_terms`: the course enrollment each group's share is taken against (`registered`, summed over part of term for the course-terms the rows come from, and its mean across terms of one type), never recounted from the rows (ADR-001 step 7).
 - `opt` - Options list containing: \itemize{ \item \code{group_cols} - Character vector of column names to group by. If NULL, uses default: campus, college, term, term_type, major, student_classification, subject_course, course_title, level }
 
 **Returns:** Data frame with student demographic breakdown including: \describe{ \item{count}{Number of distinct students in this group for THIS SPECIFIC TERM} \item{mean}{Average count across all terms OF THE SAME TERM_TYPE (e.g., avg across all falls). This is the key value used for plotting "average students per term type".} \item{registered}{Total course enrollment for this specific term} \item{registered_mean}{Average course enrollment across terms of same term_type} \item{term_pct}{Percentage of course enrollment this group represents IN THIS TERM (count / registered * 100)} \item{term_type_pct}{AVERAGE percentage across all terms of this term_type (mean / registered_mean * 100). This is what the pie charts display.} } Plus all columns specified in group_cols.  The \code{mean} and \code{term_type_pct} columns answer: "On average, what percentage of students in HIST 1105 are freshmen in fall semesters?" This averages across Fall 2022, Fall 2023, Fall 2024, etc. to give a stable "typical" value.
@@ -2132,6 +2301,22 @@ Attach the unit and college to sections (cedar_sections)  The subject rule, keye
 **Attach the primary major's unit and college to student-terms**
 
 Attach the primary major's unit and college to student-terms  The program rule on the keys the student-term table stores: the primary major's code and the source's college for it (academic studies' Actual and Translated College where a programs row described the term, the roster's Student College Code in both key columns where the class list did), written as the three CEDAR_STUDENT_TERM_UNIT_COLS.
+
+---
+
+### `cedar_dims_fingerprint()`
+
+*Source: dims.R*
+
+**One short fingerprint of the mapping files as loaded**
+
+One short fingerprint of the mapping files as loaded  The dimension tables are the mapping files, so this names the files that decided every unit on the attached tables. The loader folds it into each attached table's cache fingerprint (caching cardinal rule 1), and the transform stamps it on each measure table so the loader can refuse one built from other files (ADR-001 step 6).
+
+**Parameters:**
+
+- `dims` - The object build_cedar_dims() returns.
+
+**Returns:** A 12-character hash.
 
 ---
 
@@ -2335,7 +2520,7 @@ Historical census-enrollment baselines per course and term type  Summarizes each
 
 **Parameters:**
 
-- `df` - Course-term enrollment rows (e.g. \code{cedar_cl_enrls_base} or a \code{\link{calc_cl_enrls}} result). Needs \code{registered}, \code{dr_late}, \code{term}, and the grouping keys.
+- `df` - Course-term enrollment rows: \code{cedar_course_terms}, which carries \code{census_enrl}, or a \code{\link{calc_cl_enrls}} result, whose \code{registered} and \code{dr_late} it is counted from. Needs \code{term} and the grouping keys.
 - `target_terms` - With \code{prior_only = TRUE}, select the terms to report (NULL reports every term). Otherwise, exclude these terms from the all-history reference mean/count; this legacy mode can include terms later than the target.
 - `keys` - Grouping columns; \code{part_term} is appended when present.
 - `prior_only` - When TRUE, give each term its own strictly earlier comparison mean, population SD, and count. The full series remains available for context.
@@ -2973,12 +3158,12 @@ Gen Ed Uptake Among a Graduate Cohort  For a cohort from [get_gen_ed_grad_cohort
 
 **Build a Per-Term Cumulative GPA for Students**
 
-Build a Per-Term Cumulative GPA for Students  One row per (student, term in which they earned graded hours) giving the credit-weighted cumulative GPA entering and after that term.
+Build a Per-Term Cumulative GPA for Students  One row per (student, term in which they earned graded hours) giving the credit-weighted cumulative GPA entering and after that term, read off `cedar_student_terms`' grade-point columns.
 
 **Parameters:**
 
-- `students` - Data frame. `cedar_registrations`. Needs `student_id`, `term`, `final_grade` and `credits`.
-- `opt` - List of options: \describe{ \item{`student_ids`}{Character vector. Restrict to these students. Strongly recommended — the full class list is large.} \item{`min_data_term`}{Integer. First term present in the data, used to set `timeline_valid`. Defaults to the earliest term in `students`.} \item{`student_first_terms`}{Data frame of `student_id` / `first_unm_term`. **Required if you pre-filtered `students` by term** — see [credit_timeline_validity()], which this shares.} }
+- `student_terms` - `cedar_student_terms` (build_student_terms()). Needs `student_id`, `term`, `quality_points`, `graded_hours`, `cumulative_quality_points`, `cumulative_graded_hours` and `timeline_valid`.
+- `opt` - List of options: \describe{ \item{`student_ids`}{Character vector. Restrict to these students.} } The window options the class-list series took (`min_data_term`, `student_first_terms`) are refused: the table sets `timeline_valid` over the whole data, and a slice of it keeps the right answer.
 
 **Returns:** Tibble with `student_id`, `term`, `term_gpa`, `graded_hours`, `gpa_entering`, `gpa_after`, `graded_hours_entering` and `timeline_valid`. `gpa_entering` is NA in a student's first graded term — there is no prior record to average, and 0.0 would be a failing student rather than an unknown one.
 
@@ -4051,8 +4236,9 @@ Semantic annotations that apply to a population  Looks up CEDAR_DATA_SEMANTICS (
 
 **Parameters:**
 
-- `students` - `cedar_registrations` rows (all terms are accepted; only `opt$terms` are read).
-- `sections` - `cedar_sections` rows.
+- `students` - `cedar_registrations` rows (all terms are accepted; only `opt$terms` are read): the waitlist count and the class list's pull date.
+- `sections` - `cedar_sections` rows: the schedule's pull date and the waitlist rule's section scope.
+- `course_terms` - `cedar_course_terms`, current for `students`: the registrations, drops, sections and seats.
 - `opt` - `terms` (required): the terms to snapshot, normally those still in registration (see `registration_snapshot_terms()`).
 
 **Returns:** A tibble with `REGISTRATION_SNAPSHOT_COLUMNS`. `classlist_as_of` and `sections_as_of` are each term's newest pull date, `NA` for a source with no rows for the term. Within a source that has the term, a course it does not list is a measured zero (nobody registered yet, no active section); for a source without the term, that source's counts are `NA`, unknown.
@@ -4218,7 +4404,7 @@ Analyze Course Seat Availability Across Terms  Main seatfinder function that per
 
 **Parameters:**
 
-- `students` - Data frame from cedar_registrations table (used for DFW rate calculation)
+- `attempts` - The attempt measure table (`cedar_attempts`), for each course's DFW rate
 - `courses` - Data frame from cedar_sections table with enrollment and capacity data
 - `cedar_faculty` - Data frame from cedar_faculty table (used for instructor job category in grades)
 - `opt` - Options list with required and optional parameters: \itemize{ \item \code{term} - (Required) Term code or range (e.g., "202510" or "202410,202510") If single term, compares to same term previous year (term - 100) \item \code{part_term} - (Optional) Part of term filter (e.g., "1H", "2H", "FT") \item \code{department} - (Optional) Department filter \item \code{subject} - (Optional) Subject filter \item \code{group_cols} - (Optional) Custom grouping columns Defaults to: campus, college, term, subject_course, part_term, level, gen_ed_area }
@@ -4234,14 +4420,14 @@ Seatfinder workflow: \enumerate{ \item Parse term parameter (single term vs comp
 \dontrun{
 # Compare Fall 2025 to Fall 2024 (default one-year comparison)
 opt <- list(term = "202580", part_term = "FT", department = "MATH")
-results <- seatfinder(cedar_registrations, cedar_sections, cedar_faculty, opt)
+results <- seatfinder(cedar_attempts, cedar_sections, cedar_faculty, opt)
 
 # View courses with largest availability decreases
 head(results$type_summary %>% arrange(avail_diff))
 
 # Compare specific terms
 opt <- list(term = "202410,202510")  # Spring 2024 vs Spring 2025
-results <- seatfinder(cedar_registrations, cedar_sections, cedar_faculty, opt)
+results <- seatfinder(cedar_attempts, cedar_sections, cedar_faculty, opt)
 
 # Check gen ed availability
 head(results$gen_ed_summary)
@@ -4647,6 +4833,45 @@ Why cedar_student_terms needs rebuilding, or NULL when it does not  The table is
 
 ---
 
+### `transform_measures()`
+
+*Source: transform-to-cedar.R*
+
+**The three measure tables, built as the app would have built them (ADR-001**
+
+The three measure tables, built as the app would have built them (ADR-001 step 6)  cedar_attempts (build_attempts()), cedar_course_terms (build_course_terms()) and cedar_course_flows (build_course_flows()) are counted over the class list exactly as global.R loads it: trimmed to the app's first term, keyed on the course and carrying the default units from the same mapping files. Each is stamped with the fingerprint of those files and the first term, so the loader can refuse one built from other files or over another window (cedar_load_measure_table()); the builders' own stamps (build version, outcome policy, edge, course-code renames) are on it too. The app never builds one: a restart is a load.  Built one at a time, each saved and dropped before the next: the refresh runs this beside the live app on the production host.
+
+**Parameters:**
+
+- `data_dir` - Path to data directory
+- `ext` - File extension
+- `min_term` - The first term the app loads (cedar_min_term in config/shiny_config.R); required, because the renames stamped on each table are those the trimmed class list shows.
+- `dims` - The dimensions (build_cedar_dims()); a parameter so a test can pass its own.
+- `edges` - The data edges to count to; by default cedar_report_edges() over the trimmed class list and the saved degrees, which stops when the settled or graded edge cannot be determined. A parameter so a test can state its edge, as the course-flow tests do.
+
+**Returns:** list(saved = list(attempts = <meta>, course_terms = <meta>, course_flows = <meta>))
+
+---
+
+### `cedar_measures_staleness()`
+
+*Source: transform-to-cedar.R*
+
+**Why the measure tables need rebuilding, or NULL when they do not**
+
+Why the measure tables need rebuilding, or NULL when they do not  The deploy gate's question (scripts/rebuild-programs-if-mappings-changed.R), answered without loading the class list: each table must exist, be newer than the saved class list, carry its builder's current build version (and, for cedar_attempts, the outcome policy) and columns, and be stamped with the fingerprint of the mapping files now deployed and the first term the app loads. A mapping PR therefore rebuilds the measures at deploy, in the gate's own process, before the app starts: their unit columns are the files'. The loader's full check (the edge and the course-code renames against the loaded class list) stays in cedar_load_measure_table().
+
+**Parameters:**
+
+- `data_dir` - Path to data directory
+- `ext` - File extension
+- `dims` - The dimensions now deployed (build_cedar_dims()).
+- `min_term` - The first term the app loads (cedar_min_term).
+
+**Returns:** A one-line reason, or NULL.
+
+---
+
 ### `transform_applicants()`
 
 *Source: transform-to-cedar.R*
@@ -4825,13 +5050,13 @@ waitlist_counts <- get_unique_waitlisted(filtered, opt)
 
 *Source: waitlist.R*
 
-**Scope the course-term counts to waitlist course keys**
+**Scope the course-term measure table to waitlist course keys**
 
-Scope the course-term counts to waitlist course keys  Keeps every historical term for the course keys present in a waitlist result, while dropping unrelated courses before census-history aggregation begins.
+Scope the course-term measure table to waitlist course keys  Keeps every historical term for the course keys present in a waitlist result, while dropping unrelated courses before census-history aggregation begins. Rows the class list has no registration for (NA `census_enrl`: the schedule offered the course-term and nobody registered under it) carry no census and are left out of the history.
 
 **Parameters:**
 
-- `enrl_base` - Course-term enrollment rows (cedar_course_terms or a scoped recount).
+- `enrl_base` - `cedar_course_terms` rows.
 - `count_df` - Waitlist course-overview rows.
 
 **Returns:** A list containing scoped `data` and the shared `match_keys`.
@@ -4844,15 +5069,15 @@ Scope the course-term counts to waitlist course keys  Keeps every historical ter
 
 **Attach per-course census-enrollment context to the waitlist course overview**
 
-Attach per-course census-enrollment context to the waitlist course overview  Enriches the waitlist count table with each course's current-term census enrollment, its historical average census enrollment (same term type, viewed term excluded), the count of reference terms behind that average, and the same-term-type census series used to draw a sparkline in the UI. This reference can include later terms when reviewing an older target; Regstats instead uses a strictly prior baseline. The count uses registered plus late drops (see \code{\link{add_census_enrl}}), the same class-list lifecycle numerator Regstats matches to DESR scheduled capacity for saturation. It is not a frozen census roster.  Enrollment history comes from \code{course_terms}, the course-term measure table (\code{cedar_course_terms}, \code{\link{build_course_terms}}, built at start and handed down by the caller). Without one (tests, standalone scripts) it is recomputed via \code{\link{calc_cl_enrls}}, scoped to just the courses in the overview so the recompute stays cheap. The cone never looks the table up by name.
+Attach per-course census-enrollment context to the waitlist course overview  Enriches the waitlist count table with each course's current-term census enrollment, its historical average census enrollment (same term type, viewed term excluded), the count of reference terms behind that average, and the same-term-type census series used to draw a sparkline in the UI. This reference can include later terms when reviewing an older target; Regstats instead uses a strictly prior baseline. The count uses registered plus late drops (see \code{\link{add_census_enrl}}), the same class-list lifecycle numerator Regstats matches to DESR scheduled capacity for saturation. It is not a frozen census roster.  Enrollment history comes from \code{course_terms}, the course-term measure table (\code{cedar_course_terms}, \code{\link{build_course_terms}}, built by the transform and handed down by the caller; ADR-001 step 7). The cone never recounts the class list and never looks the table up by name.
 
 **Parameters:**
 
 - `count_df` - Waitlist course-overview table (one row per campus/college/ term/part_term/subject_course) from \code{\link{get_unique_waitlisted}}.
-- `students` - Student enrollment rows, used to recompute enrollment history when no course-term table is passed.
-- `course_terms` - Optional \code{cedar_course_terms} (\code{\link{build_course_terms}}). NULL recounts the overview's courses from \code{students}.
+- `students` - The keyed class list, read only to resolve each row's code to its course (\code{course_code_lookup()}).
+- `course_terms` - \code{cedar_course_terms} (\code{\link{build_course_terms}}).
 
-**Returns:** \code{count_df} with added columns \code{census_enrl} (current-term census enrollment), \code{census_enrl_mean} (historical average, viewed term excluded), \code{n_hist_terms} (reference terms behind the average), and the \code{trend_hist} / \code{trend_terms} list-columns the module renders as a sparkline. Returned unchanged when no enrollment source is available.
+**Returns:** \code{count_df} with added columns \code{census_enrl} (current-term census enrollment), \code{census_enrl_mean} (historical average, viewed term excluded), \code{n_hist_terms} (reference terms behind the average), and the \code{trend_hist} / \code{trend_terms} list-columns the module renders as a sparkline.
 
 ---
 
@@ -4868,7 +5093,7 @@ Inspect Waitlist by Major and Classification  Comprehensive waitlist analysis th
 
 - `students` - Data frame of student enrollments from cedar_registrations table, with \code{course_id} attached (as every loader does); read keyed on it, so every \code{subject_course} in the result is a course id and each table carries \code{former_codes} (the other codes the course has carried, with their terms; NA when one). Must include columns: campus, college, term, term_type, major, student_classification, subject_course, course_title, level, and registration_status_code (or the backward-compatible registration_status).
 - `opt` - Options list for filtering: \itemize{ \item \code{course} - Course identifier(s) (e.g., "MATH 1430"), current or former: each resolves to its course \item \code{term} - Term code(s) (e.g., 202510) \item \code{subject} - Subject code(s) (e.g., "MATH") \item Other filtering options supported by \code{filter_class_list()} }
-- `course_terms` - Optional \code{cedar_course_terms} (\code{\link{build_course_terms}}), checked against \code{students}' course codes and passed on to \code{\link{attach_enrollment_history}}, which recomputes a scoped base from \code{students} when this is NULL.
+- `course_terms` - \code{cedar_course_terms} (\code{\link{build_course_terms}}), required: checked against \code{students}' course codes and passed on to \code{\link{attach_enrollment_history}} for each course's census history.
 - `sections` - Optional cedar_sections table; only needed if students lacks a course_title column (titles are joined by term/subject_course)
 - `student_terms` - The `cedar_student_terms` table. The majors and classifications splits read each waiting student's description off it (`primary_major_code`, `student_classification`), never off the class-list row (ADR-001 step 2). Required.
 

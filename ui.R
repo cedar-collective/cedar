@@ -1112,6 +1112,25 @@ nav_panel(
       ),
 
       nav_panel(
+        "Projections",
+        icon = icon("calendar-check"),
+        subtab_header(
+          "Projections",
+          "The published plan for this course in each projected term, read from the same saved projection as Registration > Projections: ",
+          "the sections to schedule, the registrations they are sized for, each step that built the number, and how close past forecasts came. ",
+          "A course outside the monitored groups, or screened out of a term, says so."
+        ),
+        # The model pools ABQ and EA as one market (enrollment-projections.md,
+        # Grain and Scope), so the page's campus filter cannot apply here.
+        div(
+          class = "alert alert-info alert-compact",
+          tags$strong("Campus rollup: "),
+          "Projections are made for ABQ and EA together as one market, so the campus filter above does not apply to this tab. Branch campuses are never projected."
+        ),
+        uiOutput("cr_projections_ui")
+      ),
+
+      nav_panel(
         "Course Flows",
         icon = icon("arrow-right-arrow-left"),
         subtab_header(
