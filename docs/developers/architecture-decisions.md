@@ -250,9 +250,9 @@ record keeps the decisions.
 | 2 | `cedar_student_terms`: one definition of an enrolled term and of return (closes I44) | done 2026-11-04 |
 | 3 | Dimensions from the mapping files, units attached at load | done 2026-11-06 |
 | 4 | `cedar_courses` and course ids at load (I37, I45); `cedar_course_terms`; `cedar_attempts` | courses and keying done 2026-11-07; `cedar_course_terms` done 2026-11-07; `cedar_attempts` done 2026-11-07 (`cedar_grades` retired); `cedar_course_flows` done 2026-11-07 |
-| 5 | Thin `cedar_students` and `cedar_programs` to keys and registration facts; rename to fact names | student-term columns off the loaded class list done 2026-11-07 (`thin_class_list()`), and off the saved file (`cedar_class_list_descriptions`); the section columns and `cedar_programs` stay (decisions below); renamed `cedar_registrations` 2026-11-07, its file still `cedar_students.qs` (`CEDAR_TABLE_FILES`) |
+| 5 | Thin `cedar_students` and `cedar_programs` to keys and registration facts; rename to fact names | student-term columns off the loaded class list done 2026-11-07 (`thin_class_list()`), and off the saved file (`cedar_class_list_descriptions`); the section columns and `cedar_programs` stay (decisions below); renamed `cedar_registrations` 2026-11-07, its file `cedar_registrations.qs` 2026-11-09 (done) |
 | 6 | The measure tables become transform outputs: the app loads and verifies, never builds (decisions below) | done 2026-11-08 (`transform_measures()`, `cedar_load_measure_table()`, the gate's `build_measures_if_stale()`) |
-| 7 | Re-point the cones onto the measure tables, deleting each re-derivation; then rename the class-list file | planned 2026-11-08; progress is the count of cones that take `cedar_registrations` (18 of 26 on 2026-11-08) and the cone line count (8,908) |
+| 7 | Re-point the cones onto the measure tables, deleting each re-derivation; then rename the class-list file | done 2026-11-09 in five groups (below); 17 of 26 cones take `cedar_registrations` (from 18), six of them with no measure table because they read registration events themselves, and the cones hold 8,844 lines (from 8,908) |
 
 Step 2's precedence rule: when the two source snapshots disagree, the
 academic-studies row wins, the row is flagged and the count reported, never
