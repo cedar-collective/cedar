@@ -86,9 +86,10 @@ Waitlists are not an input until two years of retained waitlists exist.
 - [ ] **Project against the submitted draft.** "With these seats, expect
   this": most aftcast error moves with the seats. Needs the submission date
   marked in the snapshots.
-- [ ] **Rank feeders by lift,** not raw count, so a chair's feeder list names
-  prerequisites, not the largest freshman courses; review
-  `projection_sequences.csv` yearly.
+- [ ] **Review `projection_sequences.csv` yearly** against the lift-ranked
+  feeders each bundle now saves (`adjusted_feeder_lifts`): a listed
+  predecessor should be the top feeder of its successor, and a feeder at a
+  high lift with a stable carry-through is a candidate to list.
 - [ ] **Record policy changes** (placement cutoffs, redesigned sequences) under
   `institution/<id>/` as labelled adjustments, scored afterwards.
 - [ ] **Carry a waitlist forward and measure the pressure bump** once two

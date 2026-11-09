@@ -120,6 +120,8 @@ projection_candidate <- function(method_id, estimate = NA_real_, applicable = FA
                                  feeder_courses = NA_character_,
                                  feeder_change = NA_real_,
                                  feeder_change_rate = NA_real_,
+                                 feeder_lifts = NA_character_,
+                                 feeder_base_rate = NA_real_,
                                  delta_basis = NA_character_,
                                  projection_formula = NA_character_) {
   tibble::tibble(
@@ -162,6 +164,8 @@ projection_candidate <- function(method_id, estimate = NA_real_, applicable = FA
     feeder_courses = as.character(feeder_courses),
     feeder_change = as.numeric(feeder_change),
     feeder_change_rate = as.numeric(feeder_change_rate),
+    feeder_lifts = as.character(feeder_lifts),
+    feeder_base_rate = as.numeric(feeder_base_rate),
     delta_basis = as.character(delta_basis),
     projection_formula = as.character(projection_formula)
   )
@@ -340,6 +344,7 @@ projection_delta_rates <- function(student_inputs, row, target_term,
   min_pairs <- as.integer(projection_option(opt, "delta_min_pairs"))
   max_feeders <- as.integer(projection_option(opt, "feeder_max_courses"))
   min_students <- as.integer(projection_option(opt, "feeder_min_students"))
+  min_lift <- as.numeric(projection_option(opt, "feeder_min_lift"))
   course <- row$subject_course
   enrollments <- student_inputs$course_enrollments
   targets <- student_inputs$target_students %>%
@@ -350,7 +355,8 @@ projection_delta_rates <- function(student_inputs, row, target_term,
   )
   empty <- list(
     n_pairs = 0L, repeat_rate = NA_real_, feeder_rate = NA_real_,
-    feeders = character(0), pairs = integer(0),
+    feeders = character(0), feeder_lifts = numeric(0),
+    feeder_base_rate = NA_real_, pairs = integer(0),
     sequence = tibble::tibble(course = predecessors, rate = NA_real_)
   )
   if (is.null(enrollments) || nrow(enrollments) == 0L || nrow(targets) == 0L) {
@@ -403,25 +409,44 @@ projection_delta_rates <- function(student_inputs, row, target_term,
     preceding_rows, in_sequence, by = c("student_id", "following")
   )
 
-  # Feeders: the courses whose p students most often took this course in s,
-  # excluding the course itself. Then one pooled rate across the feeder set so
-  # a student in two feeders counts once.
+  # Feeders (0.30.0): a feeder's p students take this course in s at `lift`
+  # times the rate of a typical market student in p (anyone in another market
+  # course that term, counted once); only a course at min_lift or more, with
+  # enough transitions, is a feeder, and the max_feeders carrying the most such
+  # students are kept. Ranked by transitions, not by lift: the large
+  # first-year courses carry the signal, and ranking by lift picks small
+  # courses and forecasts worse (forecasting-lessons.md). Then one pooled rate
+  # across the feeder set so a student in two feeders counts once.
+  market_pool <- pooled_rows %>%
+    dplyr::filter(subject_course != course) %>%
+    dplyr::distinct(student_id, following) %>%
+    dplyr::left_join(following_rows, by = c("student_id", "following"))
+  base_rate <- if (nrow(market_pool) == 0L) NA_real_ else
+    mean(dplyr::coalesce(market_pool$took_next, FALSE))
   # CAMPUS_ROLLUP: course_enrollments is already deduplicated across the named
   # planning market, so a feeder is counted once per student whichever campus
   # delivered it; a campus split here would double-count cross-campus students.
   transitions <- pooled_rows %>%
     dplyr::filter(subject_course != course) %>%
     dplyr::distinct(student_id, following, subject_course) %>%
-    dplyr::inner_join(following_rows, by = c("student_id", "following")) %>%
+    dplyr::left_join(following_rows, by = c("student_id", "following")) %>%
+    dplyr::mutate(took_next = dplyr::coalesce(took_next, FALSE)) %>%
     dplyr::group_by(subject_course) %>%
     dplyr::summarise(
-      n_transition = dplyr::n(), n_pairs = dplyr::n_distinct(following),
+      n_students = dplyr::n(),
+      n_transition = sum(took_next),
+      n_pairs = dplyr::n_distinct(following[took_next]),
       .groups = "drop"
     ) %>%
-    dplyr::filter(n_transition >= min_students, n_pairs >= min_pairs) %>%
+    dplyr::mutate(lift = (n_transition / n_students) / base_rate) %>%
+    dplyr::filter(
+      n_transition >= min_students, n_pairs >= min_pairs,
+      is.finite(lift), lift >= min_lift
+    ) %>%
     dplyr::arrange(dplyr::desc(n_transition), subject_course) %>%
     dplyr::slice_head(n = max_feeders)
   feeders <- transitions$subject_course
+  feeder_lifts <- stats::setNames(transitions$lift, feeders)
   feeder_rate <- if (length(feeders) == 0L) NA_real_ else {
     pool <- pooled_rows %>%
       dplyr::filter(subject_course %in% feeders) %>%
@@ -432,9 +457,17 @@ projection_delta_rates <- function(student_inputs, row, target_term,
 
   list(
     n_pairs = nrow(pairs), repeat_rate = repeat_rate, feeder_rate = feeder_rate,
-    feeders = feeders, pairs = pairs$following,
+    feeders = feeders, feeder_lifts = feeder_lifts, feeder_base_rate = base_rate,
+    pairs = pairs$following,
     sequence = tibble::tibble(course = predecessors, rate = unname(sequence_rates))
   )
+}
+
+
+# "FEED 1 7.9x, SEQ 1 5.4x": each feeder's lift over the market's rate.
+projection_feeder_lift_text <- function(feeders, lifts) {
+  if (length(feeders) == 0L) return(NA_character_)
+  paste0(feeders, " ", sprintf("%.1f", lifts[feeders]), "x", collapse = ", ")
 }
 
 
@@ -511,6 +544,8 @@ project_spine_adjusted <- function(history, preceding_term_history,
   repeat_rate <- NA_real_
   feeder_rate <- NA_real_
   feeders <- character(0)
+  feeder_lifts <- numeric(0)
+  feeder_base_rate <- NA_real_
   sequence_courses <- character(0)
   sequence_change <- NA_real_
   feeder_change <- NA_real_
@@ -530,6 +565,8 @@ project_spine_adjusted <- function(history, preceding_term_history,
     repeat_rate <- rates$repeat_rate
     feeder_rate <- rates$feeder_rate
     feeders <- rates$feeders
+    feeder_lifts <- rates$feeder_lifts
+    feeder_base_rate <- rates$feeder_base_rate
     parts <- character(0)
     if (is.finite(repeat_rate)) {
       delta_repeat <- (preceding_enrollment - then_enrollment) * repeat_rate
@@ -578,8 +615,10 @@ project_spine_adjusted <- function(history, preceding_term_history,
       feeder_change <- feeder_now - feeder_then
       feeder_change_rate <- if (feeder_then > 0) feeder_change / feeder_then else NA_real_
       delta_feeder <- feeder_change * feeder_rate
+      # Each feeder with its lift over the market's rate: why it is one.
       parts <- c(parts, paste0(
-        "feeders (", paste(feeders, collapse = ", "), "): (", feeder_now,
+        "feeders (", projection_feeder_lift_text(feeders, feeder_lifts),
+        " the market's ", round(feeder_base_rate, 3), "): (", feeder_now,
         " - ", feeder_then, ") x ", round(feeder_rate, 3), " = ",
         sprintf("%+.1f", delta_feeder)
       ))
@@ -652,6 +691,8 @@ project_spine_adjusted <- function(history, preceding_term_history,
       paste(feeders, collapse = ", "),
     feeder_change = feeder_change,
     feeder_change_rate = feeder_change_rate,
+    feeder_lifts = projection_feeder_lift_text(feeders, feeder_lifts),
+    feeder_base_rate = feeder_base_rate,
     delta_basis = delta_basis,
     projection_formula = "spine + floor uplift + repeat delta + sequence delta + feeder delta"
   )

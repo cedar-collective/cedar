@@ -586,11 +586,18 @@ feeder delta  (distinct enrollment across the feeder set in the preceding term,
 The rates are learned only from pairs (preceding term, following same-season
 term) that precede the target, over the last four such pairs and at least
 two. The repeat rate is the share of students in the course in the preceding
-term who were in it again the following same-season term. The feeder set is
-the up-to-eight courses whose preceding-term students most often took this
-course next (at least three transitions over at least two pairs), and the
-feeder rate is one pooled share across that set so a student in two feeders
-counts once. A listed predecessor's rate is the share of its preceding-term
+term who were in it again the following same-season term. A course is a
+feeder (0.30.0) when its preceding-term students took this course next at
+`feeder_min_lift` (3) times the rate of a typical market student in that term
+(anyone in another market course, counted once), from at least
+`feeder_min_students` (20) transitions over at least two pairs, and the
+`feeder_max_courses` (4) carrying the most such students are kept, ranked by
+transitions, not by lift. Most are still the large first-year courses, now
+each with the multiple that earns it the place; ranking by lift instead picks
+small courses and forecasts worse ([forecasting-lessons.md](forecasting-lessons.md#feeders-ranked-by-lift-model-0300-2026-11-09)).
+The feeder rate is one pooled share across the set so a student in two
+feeders counts once; each feeder's lift and the market rate are saved beside
+it (`feeder_lifts`, `feeder_base_rate`). A listed predecessor's rate is the share of its preceding-term
 students who took this course next; its students leave the pool before the
 feeder set is chosen, so the predecessor is never also a pooled feeder and a
 student in both counts once, under the predecessor (0.26.0). **Both deltas read enrollments, not grades**, because grades are
@@ -916,6 +923,17 @@ or read the saved bundle. They must not reproduce a model, backtest, pressure
 calculation, or recommendation pipeline.
 
 ## Saved Bundle
+
+Schema 27 (model 0.30.0) makes the pooled feeders earn their place by lift
+(the adjusted candidate, above): candidates gain `feeder_lifts` ("MATH 1215
+13.7x, ...", each feeder's rate of taking the course next over the market's)
+and `feeder_base_rate` (that market rate), published as
+`adjusted_feeder_lifts` and `adjusted_feeder_base_rate`; the model config
+gains `feeder_min_lift`, and `feeder_max_courses` and `feeder_min_students`
+move from 8 and 3 to 4 and 20. On the same data the adjusted candidate's
+Spring aftcast error is 13.3% against 13.2%, and the published rule's 14.4%
+against 14.5%; the evidence and the stricter rules that lost are in
+[forecasting-lessons.md](forecasting-lessons.md#feeders-ranked-by-lift-model-0300-2026-11-09).
 
 Model 0.29.0 (schema 26, unchanged) reads each student-term's classification
 and major off `cedar_student_terms` (ADR-001 step 5): the classification

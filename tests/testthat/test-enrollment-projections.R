@@ -1762,12 +1762,20 @@ projection_spine_scenario <- function(spring_capacity = 30, waitlisted = 0L,
   roster <- function(term, course, students) {
     tibble::tibble(student_id = students, term = term, subject_course = course)
   }
+  # BIG 1 is the market's large course: 100 students each Fall, of whom two
+  # take TEST 201 next Spring. By count it out-feeds FEED 1 over the two pairs
+  # (4 transitions against FEED 1's 10 would both have passed the old
+  # threshold of 3); by lift it is nothing like a prerequisite (0.02 against
+  # the market's 0.064, lift 0.3), where FEED 1's half is lift 7.9.
   enrollments <- dplyr::bind_rows(
     roster(202180L, "FEED 1", ids("f", 10)), roster(202180L, "TEST 201", ids("r", 4)),
-    roster(202210L, "TEST 201", c(ids("f", 5), "r1", ids("x", 14))),
+    roster(202180L, "BIG 1", ids("b", 100)),
+    roster(202210L, "TEST 201", c(ids("f", 5), "r1", ids("x", 12), "b1", "b2")),
     roster(202280L, "FEED 1", ids("g", 10)), roster(202280L, "TEST 201", ids("s", 4)),
-    roster(202310L, "TEST 201", c(ids("g", 5), "s1", ids("y", 18))),
+    roster(202280L, "BIG 1", ids("c", 100)),
+    roster(202310L, "TEST 201", c(ids("g", 5), "s1", ids("y", 16), "c1", "c2")),
     roster(202380L, "FEED 1", ids("h", 20)), roster(202380L, "TEST 201", ids("t", 12)),
+    roster(202380L, "BIG 1", ids("d", 100)),
     if (sequence) dplyr::bind_rows(
       roster(202180L, "SEQ 1", ids("q", 8)), roster(202210L, "TEST 201", ids("q", 4)),
       roster(202280L, "SEQ 1", ids("p", 8)), roster(202310L, "TEST 201", ids("p", 4)),
@@ -1804,11 +1812,16 @@ projection_spine_scenario <- function(spring_capacity = 30, waitlisted = 0L,
   )
 }
 
+# The scenario's feeders carry 5 students a pair, so these tests lower the
+# transition floor from the default 20; the lift rule is the default.
+projection_scenario_opt <- function(...) list(feeder_min_students = 3L, ...)
+
 test_that("Fall deltas scale enrollment changes by the historical carry-through", {
   s <- projection_spine_scenario()
   result <- project_spine_adjusted(
     s$enrollment_history, s$preceding_term_history, s$section_history,
-    s$waitlist_history, s$students, s$row, 202410L
+    s$waitlist_history, s$students, s$row, 202410L,
+    opt = projection_scenario_opt()
   )
 
   expect_true(result$applicable)
@@ -1829,7 +1842,7 @@ test_that("Fall deltas scale enrollment changes by the historical carry-through"
   # +50% in the course's own Fall enrollment trips the regime check.
   expect_equal(result$preceding_term_change, 0.5)
   expect_true(result$regime_alarm)
-  expect_match(result$component_summary, "feeders \\(FEED 1\\)")
+  expect_match(result$component_summary, "feeders \\(FEED 1 7\\.9x the market's 0\\.064\\)")
   expect_true(validate_spine_rows(
     result %>% dplyr::mutate(target_term = 202410L), "fixture"
   ))
@@ -1838,13 +1851,75 @@ test_that("Fall deltas scale enrollment changes by the historical carry-through"
   # the row says why, rather than guessing a delta.
   far <- project_spine_adjusted(
     s$enrollment_history, s$preceding_term_history, s$section_history,
-    s$waitlist_history, s$students, s$row, 202510L
+    s$waitlist_history, s$students, s$row, 202510L,
+    opt = projection_scenario_opt()
   )
   expect_true(far$applicable)
   expect_equal(far$delta_repeat, 0)
   expect_equal(far$delta_feeder, 0)
   expect_match(far$delta_basis, "Fall 2024 is not observed yet")
   expect_true(is.na(far$regime_alarm))
+})
+
+# Model 0.30.0: a pooled feeder earns its place by lift (its students take
+# the course next at feeder_min_lift times the market's rate), so a large
+# course whose students mostly go elsewhere is not a feeder however many it
+# sends; the feeders kept are still ranked by transitions. The evidence is in
+# forecasting-lessons.md ("Feeders ranked by lift").
+test_that("a feeder earns its place by lift, not by size", {
+  s <- projection_spine_scenario()
+  run <- function(...) project_spine_adjusted(
+    s$enrollment_history, s$preceding_term_history, s$section_history,
+    s$waitlist_history, s$students, s$row, 202410L,
+    opt = projection_scenario_opt(...)
+  )
+
+  # The defaults: lift 3 over the market, 20 transitions, four feeders.
+  defaults <- enrollment_projection_defaults()
+  expect_equal(defaults$feeder_min_lift, 3)
+  expect_equal(defaults$feeder_min_students, 20L)
+  expect_equal(defaults$feeder_max_courses, 4L)
+
+  # BIG 1 has 4 transitions to FEED 1's 10 and would have been a feeder by
+  # count; at lift 0.3 it is not one. The market rate is 14 of the 220
+  # non-TEST 201 student-pairs.
+  result <- run()
+  expect_equal(result$feeder_courses, "FEED 1")
+  expect_equal(result$feeder_base_rate, 14 / 220)
+  expect_equal(result$feeder_lifts, "FEED 1 7.9x")
+  expect_equal(result$feeder_rate, 0.5)
+  expect_equal(result$delta_feeder, 5)
+
+  # At the lowest lift the configuration allows, 1, BIG 1 is still out: its
+  # students take the course less often than the market does.
+  at_one <- run(feeder_min_lift = 1)
+  expect_equal(at_one$feeder_courses, "FEED 1")
+  # Raised past FEED 1's 7.9, the rule keeps nothing.
+
+  # A lift nothing reaches leaves the course with no feeders, said plainly.
+  none <- run(feeder_min_lift = 10)
+  expect_true(is.na(none$feeder_courses))
+  expect_true(is.na(none$feeder_lifts))
+  expect_equal(none$delta_feeder, 0)
+  expect_equal(none$feeder_check, "no_feeders")
+  expect_match(none$delta_basis, "feeders: none met the evidence threshold")
+
+  # The lift and the market rate travel to the published row.
+  pairing <- projection_method_pairing(
+    dplyr::bind_rows(
+      result %>% dplyr::mutate(
+        market_id = "abq_ea_course_market", subject_course = "TEST 201",
+        term_type = "spring", target_term = 202410L, wape = NA_real_,
+        n_backtests = 0L
+      )
+    )
+  )
+  expect_equal(pairing$adjusted_feeder_lifts, "FEED 1 7.9x")
+  expect_equal(pairing$adjusted_feeder_base_rate, 14 / 220)
+
+  # A lift under 1 is refused as configuration.
+  expect_error(enrollment_projection_model_config(list(feeder_min_lift = 0.5)),
+               "feeder_min_lift must be a number of at least 1")
 })
 
 # A change that rounds to nothing read "-0%" in the regime note and "repeat -0"
@@ -1861,7 +1936,7 @@ test_that("the students left waiting in the term just finished are context, neve
   s <- projection_spine_scenario()
   run <- function(waitlists, target = 202410L) project_spine_adjusted(
     s$enrollment_history, s$preceding_term_history, s$section_history,
-    waitlists, s$students, s$row, target
+    waitlists, s$students, s$row, target, opt = projection_scenario_opt()
   )
   base <- run(s$waitlist_history)
   expect_true(is.na(base$waitlisted_preceding))
@@ -1893,7 +1968,7 @@ test_that("a listed sequence carries its own change and leaves the pooled feeder
   result <- project_spine_adjusted(
     s$enrollment_history, s$preceding_term_history, s$section_history,
     s$waitlist_history, s$students, s$row, 202410L,
-    opt = list(sequences = sequences)
+    opt = projection_scenario_opt(sequences = sequences)
   )
 
   # SEQ 1: half of each earlier Fall's students took TEST 201 next Spring,
@@ -1919,7 +1994,7 @@ test_that("a listed sequence carries its own change and leaves the pooled feeder
   pooled <- project_spine_adjusted(
     s$enrollment_history, s$preceding_term_history, s$section_history,
     s$waitlist_history, s$students, s$row, 202410L,
-    opt = list(sequences = sequences[0, ])
+    opt = projection_scenario_opt(sequences = sequences[0, ])
   )
   expect_true(is.na(pooled$sequence_courses))
   expect_equal(pooled$delta_sequence, 0)
@@ -2037,7 +2112,8 @@ test_that("a prior term full on the first day adds its unserved waitlist to the 
   )
   result <- project_spine_adjusted(
     s$enrollment_history, s$preceding_term_history, s$section_history,
-    s$waitlist_history, s$students, s$row, 202410L
+    s$waitlist_history, s$students, s$row, 202410L,
+    opt = projection_scenario_opt()
   )
 
   expect_equal(result$spine, 24)

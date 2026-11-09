@@ -515,6 +515,8 @@ projection_method_pairing <- function(candidates, opt = list()) {
       adjusted_feeder_courses = feeder_courses,
       adjusted_feeder_change = feeder_change,
       adjusted_feeder_change_rate = feeder_change_rate,
+      adjusted_feeder_lifts = feeder_lifts,
+      adjusted_feeder_base_rate = feeder_base_rate,
       adjusted_delta_basis = delta_basis
     )
   candidates %>%
