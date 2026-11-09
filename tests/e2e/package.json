@@ -16,6 +16,6 @@
     "course-impact-covariates": "node course-impact-covariates.test.mjs"
   },
   "dependencies": {
-    "puppeteer-core": "^25.1.0"
+    "puppeteer-core": "^25.16.0"
   }
 }
