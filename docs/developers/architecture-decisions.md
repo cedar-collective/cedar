@@ -448,10 +448,17 @@ declarations included, the rule the credit position already used; 20,000
 students take 0.05 s instead of 1.9 s. `build_comparison()` no longer takes
 the class list: its default covariate term is the student's first enrolled
 term on the table. Grade points are `CEDAR_GRADE_POINTS` in
-`R/lists/grades.R`; the unused `grades_to_points` frame is gone. Still
-reading the class list for a student-term fact, for a later group: the first
-term and terms-enrolled counts in `population.R`, `gen-ed-conversion.R` and
-`grouped-student-paths.R`.
+`R/lists/grades.R`; the unused `grades_to_points` frame is gone. The
+remaining first-term derivations in the path cones were checked and left:
+`population.R` already reads a student's first and last enrolled term off
+the table (`.population_enrolled_terms()`), and its other first terms are
+scoped to the focal programs; the Gen Ed conversion's exposure term is the
+first term in one subject and the grouped paths' clock is the first course
+participation in the population's window, course facts that no student-term
+column holds. With the readers moved, the class-list file took the table's
+name on 2026-11-09 (`cedar_registrations.qs`; the step 5 note above), which
+closes step 7's migration: every cone reads a measure table or the
+registration table itself.
 
 #### Step 5: decisions (2026-11-07)
 
@@ -483,11 +490,14 @@ term and terms-enrolled counts in `population.R`, `gen-ed-conversion.R` and
 - **Name:** `cedar_registrations`, renamed last as one mechanical PR
   (2026-11-07), which answers open question 1. The table, every
   `data_objects` key, the fixture names and the docs carry the new name; the
-  saved file keeps the transform's name, `cedar_students.qs`, because
-  production cannot write a new file until its refresh runs again (I43).
+  saved file kept the transform's name, `cedar_students.qs`, because
+  production could not write a new file until its refresh ran again (I43).
   `CEDAR_TABLE_FILES` (`R/trunk/data.R`) maps the table to its file and every
-  loader reads through `cedar_table_file()`, so renaming the file is one line
-  there and one in the transform's save. `cedar_programs` and `cedar_degrees`
+  loader reads through `cedar_table_file()`, so renaming the file was one line
+  there and one in the transform's save: done 2026-11-09, closing step 5,
+  with the deploy gate renaming a data directory's old file once
+  (`migrate_class_list_file()`) so the app that starts after the deploy finds
+  it, and the registry left empty for the next rename. `cedar_programs` and `cedar_degrees`
   keep their names: only the class list's was decided.
 - **The section columns stay on the row** (decided 2026-11-07, after
   measuring their readers). Of the thirteen, `subject_course`, `campus`,

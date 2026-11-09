@@ -37,7 +37,7 @@ test_that("fixture institution survives production transforms with usable proven
     c("--vanilla", "dev/generate-demo.R", shQuote(target)), stdout = log, stderr = log))
   expect_equal(rc, 0, info = paste(tail(readLines(log), 30), collapse = "\n"))
   if (rc != 0) return(invisible(NULL))
-  students <- qs2::qs_read(file.path(target, "cedar_students.qs"))
+  students <- qs2::qs_read(file.path(target, "cedar_registrations.qs"))
   sections <- qs2::qs_read(file.path(target, "cedar_sections.qs"))
   programs <- qs2::qs_read(file.path(target, "cedar_programs.qs"))
   # Outcomes are classified at load (cedar_attempts), never saved.

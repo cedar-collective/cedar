@@ -95,7 +95,7 @@ Get Enrollment Demand Bottlenecks for a Cohort  For each course, counts cohort s
 ```r
 \dontrun{
 cedar_programs <- qs_read("data/cedar_programs.qs")
-cedar_registrations <- qs_read("data/cedar_students.qs")
+cedar_registrations <- qs_read("data/cedar_registrations.qs")
 
 cohort <- build_population(cedar_programs, opt = list(type = "health"))
 result <- get_bottlenecks(cohort, cedar_registrations, opt = list())

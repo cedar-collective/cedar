@@ -480,7 +480,7 @@ scratchpad. To combine fixtures with real data from a script:
 setwd("tests/testthat")
 for (f in list.files(".", "^helper")) source(f)   # cone/branch functions
 source("setup.R")                                  # test_students, test_sections, ...
-students <- qs2::qs_read("../../data/cedar_students.qs")   # qs2; qs::qread fails
+students <- qs2::qs_read("../../data/cedar_registrations.qs")   # qs2; qs::qread fails
 ```
 
 Two things the helpers don't do, both of which look like broken code:

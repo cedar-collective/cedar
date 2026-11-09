@@ -16,7 +16,7 @@ context("The measure tables are built by the transform (ADR-001 step 6)")
 # college stands in for it.
 write_saved_fixtures <- function(dir) {
   qs2::qs_save(dplyr::mutate(test_sections, source_college = college), file.path(dir, "cedar_sections.qs"))
-  qs2::qs_save(dplyr::mutate(test_students, source_college = college), file.path(dir, "cedar_students.qs"))
+  qs2::qs_save(dplyr::mutate(test_students, source_college = college), file.path(dir, "cedar_registrations.qs"))
   qs2::qs_save(test_degrees, file.path(dir, "cedar_degrees.qs"))
   invisible(dir)
 }
@@ -162,16 +162,16 @@ test_that("the measure tables are stale when missing, older than the class list,
   }
   stale <- function() env$cedar_measures_staleness(dir, dims = test_dims, min_term = min_term)
 
-  expect_match(stale(), "^cedar_students has not been built$")
-  write_at("cedar_students", t0)
+  expect_match(stale(), "^cedar_registrations has not been built$")
+  write_at("cedar_registrations", t0)
   expect_match(stale(), "^cedar_attempts has not been built$")
   write_all()
   expect_null(stale())
 
   # The class list rebuilt since: every measure is stale.
-  write_at("cedar_students", t0 + 120)
-  expect_match(stale(), "^cedar_students newer than cedar_attempts$")
-  write_at("cedar_students", t0)
+  write_at("cedar_registrations", t0 + 120)
+  expect_match(stale(), "^cedar_registrations newer than cedar_attempts$")
+  write_at("cedar_registrations", t0)
 
   # Another build of one table.
   older <- course_terms; attr(older, "course_terms_build_version") <- COURSE_TERMS_BUILD_VERSION - 1L
@@ -221,7 +221,7 @@ test_that("the app refuses a measure table that is missing, older than the class
   attempts <- attempts_for(test_students, edges)
   attr(attempts, "cedar_dims_fingerprint") <- cedar_dims_fingerprint(test_dims)
   attr(attempts, "cedar_min_term") <- 201980L
-  class_list <- file.path(dir, "cedar_students.qs")
+  class_list <- file.path(dir, "cedar_registrations.qs")
   qs2::qs_save(test_students, class_list)
   Sys.setFileTime(class_list, Sys.time() - 3600)
   path <- file.path(dir, "cedar_attempts.qs")

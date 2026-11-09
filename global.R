@@ -81,7 +81,7 @@ if (is_docker()) {
 #
 # CEDAR Data Files:
 #   - cedar_sections.qs    - Course sections
-#   - cedar_students.qs    - Student enrollments
+#   - cedar_registrations.qs - Student registrations (the class list; cedar_students.qs before 2026-11-09)
 #   - cedar_student_terms.qs - One row per student-term: enrolled, returned (ADR-001)
 #   - cedar_programs.qs    - Program enrollments
 #   - cedar_degrees.qs     - Degrees awarded

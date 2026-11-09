@@ -68,7 +68,7 @@ test_that("the gate builds the measure tables only when they are stale or forced
   expect_equal(built, "measures")
   expect_false(gate())
   expect_equal(built, "measures")
-  state$reason <- "cedar_students newer than cedar_attempts"
+  state$reason <- "cedar_registrations newer than cedar_attempts"
   expect_true(gate())
   expect_equal(built, c("measures", "measures"))
   expect_true(gate(force = TRUE))
@@ -91,7 +91,7 @@ test_that("the gate builds cedar_student_terms only when it is stale or forced",
     qs2::qs_save(data, path)
     Sys.setFileTime(path, when)
   }
-  for (name in c("cedar_students", "cedar_programs", "cedar_degrees")) write_at(name, t0)
+  for (name in c("cedar_registrations", "cedar_programs", "cedar_degrees")) write_at(name, t0)
 
   env <- new.env(parent = globalenv())
   sys.source("../../scripts/rebuild-programs-if-mappings-changed.R", envir = env)
@@ -99,7 +99,7 @@ test_that("the gate builds cedar_student_terms only when it is stale or forced",
   built <- character(0)
   # A build writes the table after its sources: the stub dates it a second
   # past the newest source, wherever the test has moved them.
-  sources <- file.path(dir, paste0("cedar_", c("students", "programs", "degrees"), ".qs"))
+  sources <- file.path(dir, paste0("cedar_", c("registrations", "programs", "degrees"), ".qs"))
   rebuild <- function(tables) {
     built <<- c(built, tables)
     write_at("cedar_student_terms", max(file.mtime(sources)) + 1, full_row)
@@ -125,4 +125,29 @@ test_that("the gate builds cedar_student_terms only when it is stale or forced",
   stale <- function(tables) write_at("cedar_student_terms", t0 - 60, full_row)
   write_at("cedar_programs", Sys.time() + 120)
   expect_error(gate(rebuild_with = stale), "still stale")
+})
+
+# A data directory written before 2026-11-09 holds the class list as
+# cedar_students.qs; the gate renames it to the table's name once, and never
+# over a file already there (ADR-001 step 5).
+test_that("the gate renames the class list's file to the table's name once", {
+  dir <- withr::local_tempdir()
+  old <- file.path(dir, "cedar_students.qs")
+  new <- file.path(dir, "cedar_registrations.qs")
+  qs2::qs_save(tibble::tibble(x = 1), old)
+  expect_message(renamed <- migrate_class_list_file(dir), "Renamed cedar_students.qs")
+  expect_equal(renamed, new)
+  expect_false(file.exists(old))
+  expect_equal(qs2::qs_read(new)$x, 1)
+  # Nothing left to rename: quiet.
+  expect_silent(migrate_class_list_file(dir))
+  # An old file beside the new one is left alone, unread, and reported.
+  qs2::qs_save(tibble::tibble(x = 2), old)
+  expect_message(migrate_class_list_file(dir), "is not read")
+  expect_true(file.exists(old))
+  expect_equal(qs2::qs_read(new)$x, 1)
+  # The small variant travels the same way.
+  qs2::qs_save(tibble::tibble(x = 3), file.path(dir, "cedar_students_small.qs"))
+  expect_message(migrate_class_list_file(dir), "cedar_students_small.qs")
+  expect_true(file.exists(file.path(dir, "cedar_registrations_small.qs")))
 })

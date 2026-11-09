@@ -43,7 +43,7 @@ test_that("student transform saves one class-list row per course-term and no cla
   # The saved rows carry Banner's course college as a key and no unit (ADR-001
   # step 3); attached through the same files, the course reports its unit's
   # college, with Banner's beside it.
-  students <- qs2::qs_read(file.path(output_dir, "cedar_students.qs"))
+  students <- qs2::qs_read(file.path(output_dir, "cedar_registrations.qs"))
   expect_false(any(c("department", "college", "college_basis") %in% names(students)))
   expect_equal(unique(students$source_college), "ARTS")
   attached <- attach_unit(students, scaffold_dims(), "subject")
@@ -119,7 +119,7 @@ test_that("cedar-status writer emits valid JSON with null metadata", {
 
   saved_files <- list(
     students = list(
-      filename = "cedar_students.qs", rows = 10L, size_mb = 1.2,
+      filename = "cedar_registrations.qs", rows = 10L, size_mb = 1.2,
       as_of_date = "2026-02-04", min_term = "201980", max_term = "202610"
     ),
     applicants = list(
@@ -282,7 +282,7 @@ test_that("cedar_student_terms is stale when missing, older than a source, short
     path
   }
   t0 <- Sys.time() - 3600
-  for (name in c("cedar_students", "cedar_programs", "cedar_degrees")) write_at(name, t0)
+  for (name in c("cedar_registrations", "cedar_programs", "cedar_degrees")) write_at(name, t0)
   expect_match(env$cedar_student_terms_staleness(dir), "not been built")
   write_at("cedar_student_terms", t0 + 60, full_row)
   expect_null(env$cedar_student_terms_staleness(dir))
@@ -305,6 +305,6 @@ test_that("cedar_student_terms is stale when missing, older than a source, short
   write_at("cedar_student_terms", t0 + 60, full_row)
   write_at("cedar_programs", t0 + 120)
   expect_match(env$cedar_student_terms_staleness(dir), "^cedar_programs newer than cedar_student_terms$")
-  write_at("cedar_students", t0 + 180)
-  expect_match(env$cedar_student_terms_staleness(dir), "^cedar_students, cedar_programs newer")
+  write_at("cedar_registrations", t0 + 180)
+  expect_match(env$cedar_student_terms_staleness(dir), "^cedar_registrations, cedar_programs newer")
 })

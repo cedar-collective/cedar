@@ -212,7 +212,7 @@ check_sync() {
 }
 
 check_sync "cedar_sections.qs"  "DESRs.qs"
-check_sync "cedar_students.qs"  "class_lists.qs"
+check_sync "cedar_registrations.qs"  "class_lists.qs"
 check_sync "cedar_programs.qs"  "academic_studies.qs"
 check_sync "cedar_degrees.qs"   "degrees.qs"
 
