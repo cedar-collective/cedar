@@ -155,6 +155,7 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
   source_file("cones/population-course-uptake.R")  # when a population takes a course, relative to unit entry
   source_file("cones/course-retake-timing.R")      # after a DFW, when the student sits in the course again
   source_file("cones/course-offering-pattern.R")   # seasons, parts of term, seats and day-1 fill
+  source_file("cones/major-course-units.R")        # which units teach the courses a major's students take
 
   # 5. Features (app-facing orchestration — call multiple branches/cones)
   message("[load-funcs.R] Loading features...")

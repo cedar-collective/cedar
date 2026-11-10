@@ -82,6 +82,7 @@ Lowercase snake_case columns; legacy uppercase names are deprecated. How each ta
 | `cedar_courses` / `cedar_course_codes` | course / code | the course dimension: one `course_id` per chain of confirmed renames in `code_history.csv` |
 | `cedar_attempts` | student × course × campus × term | the attempt measure table: every graded attempt classified once (`outcome_category`; `outcome` pass / dfw / NA), to `last_graded`, with the section's instructor; **what every grade-reading analysis reads** ([attempts.R](R/branches/attempts.R)) |
 | `cedar_course_terms` | course × term × campus × part of term | the course-term measure table, the class list's side and the schedule's side full-joined: class-list counts (`registered`, `dr_*`, `wl_all`, `cl_total`, `census_enrl`, `first_day_enrl` with `first_day_basis`), outcome counts (`attempts`, `passed`, `dfw`, `withdrawn`; NA past `last_graded`) and the active offerings (`sections`, `sections_matched`, `seats`, `seats_known`, `desr_enrl`; a crosslisted section once, under its home listing, so a partner listing has students and no seats); **NA on a side means that source has no row**, never zero, and a reader says which side is missing instead of filling one from the other; no cross-term means; **what every count and fill analysis reads**, scoped by `filter_course_terms()`. The two deliberate class-list counts left are section-scoped (Open Seats' class-list tab) or a crosslist family deduplicated across its listings (the Course Report), each marked where it counts ([course-terms.R](R/branches/course-terms.R)) |
+| `cedar_course_flows` | campus × source course × term × destination course × next term | the flow measure table: every next-regular-term course pair with `n_students`, registered students on the same campus both terms, to `cedar_longitudinal_edge()`; summer is not a step (a Spring's next regular term is Fall, a Summer's is Fall, nothing's is Summer); **what every term-after and term-before analysis reads** (`get_course_destinations()`, `get_course_feeders()`); a same-term pair is not a flow and is counted from the class list ([course-flows.R](R/branches/course-flows.R)) |
 
 The dimensions and `cedar_courses` are built at startup and held in `data_objects`; neither is saved. **The measure tables (`cedar_attempts`, `cedar_course_terms`, `cedar_course_flows`) are built by the transform** (`transform_measures()`, ADR-001 step 6) over the class list as the app loads it, stamped with the mapping files and `cedar_min_term`, and **the app only loads them**: a stale or missing one stops startup with the rebuild command (`cedar_load_measure_table()`); the deploy gate rebuilds them in its own process. No loader builds a measure table (`test-architecture.R`).
 
@@ -191,7 +192,10 @@ Reasoning and the inventory: [campus-policy.md](docs/developers/campus-policy.md
 
 Each cone is one file in `R/cones/` answering one question. It takes CEDAR tables plus `opt = list()` and returns a tibble or named list: no Shiny, no side effects, no other cones. **Before writing anything, check [layer-inventory.md](docs/developers/layer-inventory.md) and `grep` the source**: an existing function may already answer it.
 
+- **A new cone is a filter and a join over the measure tables** (`cedar_attempts`, `cedar_course_terms`, `cedar_course_flows`, `cedar_student_terms`). It reads `cedar_registrations` only for a fact no measure holds (a same-term pair, a cohort defined by registration), and it never recounts what a table holds. `R/cones/major-course-units.R` is the worked example: two tables in, one join, one count.
 - Validate required columns up front and stop loudly.
+- The edges reach a cone as `opt$data_edges` (`cedar_data_edges()` output, `data_objects$cedar_edges` in the app); bound with `cedar_longitudinal_edge()` and record the edge on the result.
+- Source the file from the cone list in `R/trunk/load-funcs.R` (files are listed, not globbed; the test suite loads the same list) and add its row to the inventory.
 - Reuse `filter_DESRs()` / `filter_class_list()`, and `ungroup()` immediately after `filter_DESRs()`.
 - Define an explicit output contract; no trailing `everything()` unless documented.
 - `cedar_debug()` for key counts (guard with `exists("cedar_log_level")` if sourced standalone); `%||%` for `opt` defaults.
@@ -211,6 +215,7 @@ Each cone is one file in `R/cones/` answering one question. It takes CEDAR table
 - A summary with a different filter scope is its own named output, documented on the page.
 - Set the status option explicitly for each filter pass.
 - `compute_windowed_trend()` with `group_modify` over course pairs hangs; use vectorized `group_by + summarize`.
+- `$` partial-matches on a list: `edges$last_enrolled` silently returns `last_enrolled_complete` when `last_enrolled` is absent. Read an edge or an option that is a prefix of another with `[[`.
 
 **Opt lists:** `opt = list()` is the last argument, resolved with `%||%`. Common keys: `term`, `campus`, `dept_code`, `college`, `level`, `min_n`, `subject_code`, `include_summer`. Option objects use `dept_code`; the table column is `department`; `department_code` is not used.
 

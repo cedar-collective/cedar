@@ -26,7 +26,7 @@ CEDAR's response to this is the **cone**: a focused, documented, shareable analy
 
 A cone is an R function in `R/cones/` that answers **one** analytical question:
 
-1. **Accepts** the CEDAR tables it needs as parameters (`cedar_registrations`, `cedar_sections`, and so on), never reading them from global state;
+1. **Accepts** the CEDAR tables it needs as parameters, never reading them from global state. Most questions are a filter and a join over the measure tables (`cedar_attempts`, `cedar_course_terms`, `cedar_course_flows`, `cedar_student_terms`), which already hold every classified attempt, every course-term count, every next-term pair and every student-term; the class list (`cedar_registrations`) and the schedule (`cedar_sections`) are for the facts no measure holds;
 2. **Takes its choices** in an options list, `opt = list()`, always the last argument (term, department, campus, thresholds);
 3. **Returns** a tibble or a named list with a documented output contract.
 
@@ -55,10 +55,13 @@ The fastest path is often an AI assistant given the repository: it reads `AGENTS
 
 Then verify the draft as you would anyone's:
 
-- Column names match the CEDAR schema ([data-model.md](data-model)).
-- Course results are grouped by campus, and grade outcomes go through the shared DFW classifier.
-- A follow-up analysis stops at the right data edge ([right-edge-policy.md](right-edge-policy)).
+- Column names match the CEDAR schema ([data-model.md](data-model)), and counts come off the measure tables rather than being re-derived from the class list.
+- Course results are grouped by campus, and grade outcomes are read from `cedar_attempts`, never reclassified.
+- A follow-up analysis stops at the right data edge ([right-edge-policy.md](right-edge-policy)) and says which edge it used.
 - It has a test on the committed fixtures that fails when the logic is broken ([testing.md](testing)).
+- It is listed in `R/trunk/load-funcs.R` (cones are sourced from a list, not a glob) and in the [layer inventory](layer-inventory).
+
+`R/cones/major-course-units.R` (which units teach the courses a major's students take) is the smallest complete example: two tables in, one join, one count, a test on three fixtures.
 
 ---
 
