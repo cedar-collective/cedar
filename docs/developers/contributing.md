@@ -155,31 +155,57 @@ See the [Data Model](data-model.html) for the full schema.
 
 ## Adding a New Cone
 
-Cones are analysis modules. To add one:
+A cone is one file in `R/cones/` answering one question. The rules are in
+[`AGENTS.md`](https://github.com/cedar-collective/cedar/blob/main/AGENTS.md)
+under "Writing a cone"; the pattern is below. Before writing one, check the
+[layer inventory](layer-inventory.html): a branch or cone may already answer
+the question, and the measure tables already hold most counts.
 
-1. **Create the file** in `R/cones/your-cone.R`
+1. **Start from the measure tables**, not the class list. Every graded
+   attempt is classified once in `cedar_attempts`; every course-term count
+   (registered, census, first day, seats, sections, DFW) is in
+   `cedar_course_terms`; every next-term course pair is in
+   `cedar_course_flows`; every student-term's enrollment, return, major and
+   running credits are in `cedar_student_terms`. A new cone is a filter and a
+   join over them. It reads `cedar_registrations` only for a fact no measure
+   holds (a same-term pair, a cohort defined by registration). See the
+   [data model](data-model.html#loaded-tables-units-and-course-ids).
 2. **Follow the pattern**:
    ```r
-   #' Your Cone Analysis
-   #'
-   #' @description What this cone does
-   #' @param students CEDAR students data
-   #' @param sections CEDAR sections data
-   #' @param opt Options list with filters
-   #' @return Data frame or list of results
-   #' @export
-   get_your_cone <- function(students, sections, opt) {
-     message("[your-cone.R] Starting analysis...")
+   # Which units teach the courses a major's students take?
+   #
+   # One question, stated plainly at the top of the file, with what the
+   # rows mean, which edge bounds them and what is deliberately left out.
 
-     # Your analysis logic here
+   #' @param student_terms `cedar_student_terms`.
+   #' @param registrations `cedar_registrations`, keyed on the course.
+   #' @param opt `dept_code` (required), `term`, `campus`, `min_n`
+   #'   (default 10), `data_edges` (`cedar_data_edges()` output, required).
+   #' @return One row per unit, term and campus: `n_students`, `n_registrations`.
+   #'   Attribute `edge`: the term the rows stop at.
+   get_your_cone <- function(student_terms, registrations, opt = list()) {
+     if (is.null(opt$dept_code)) stop("[your-cone.R] opt$dept_code is required.", call. = FALSE)
+     min_n <- opt$min_n %||% 10L
+     edge  <- cedar_longitudinal_edge(opt$data_edges)
+     if (is.null(edge)) stop("[your-cone.R] no settled enrollment edge.", call. = FALSE)
 
-     message("[your-cone.R] Done. Returning X rows.")
-     return(result)
+     # filter, join, count: campus beside the course in every group_by()
+
+     cedar_debug("[your-cone.R] ", nrow(result), " rows to ", edge)
+     result
    }
    ```
-3. **Wire it in** — call the cone from the relevant Shiny module/server (or a report orchestrator); cones are never called directly from a dispatcher
-4. **Add tests** in `tests/testthat/`
-5. **Document** in the appropriate guide
+   Tables are parameters, never globals; `opt` is last and resolved with
+   `%||%`; a missing column or an impossible empty join stops with an
+   error, never a default. Round nothing: display adapters round.
+3. **Add a test** in `tests/testthat/` on the committed fixtures
+   (`tests/testthat/fixtures/designed_test_data.R`); `setup.R` exposes the
+   measure tables (`test_student_terms`, `test_course_flows`,
+   `attempts_for()`, `course_terms_for()`). Break the logic once and watch
+   the test fail before trusting it.
+4. **Wire it in** from a module or a feature; a cone never calls another
+   cone, and a page never computes.
+5. **Add its row** to the [layer inventory](layer-inventory.html).
 
 ## Pull Request Guidelines
 
