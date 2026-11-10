@@ -8,7 +8,7 @@ parent: Developer Guide
 
 This reference is auto-generated from roxygen2 comments in the source code.
 
-*Generated: 2026-11-10 07:07:28.448373*
+*Generated: 2026-11-10 07:45:49.410979*
 
 ---
 
@@ -475,6 +475,26 @@ The class-list rows cedar_attempts leaves out, by status  A data-quality report,
 - `min_n` - Smallest denominator a group needs to be shown.
 
 **Returns:** Per group: counts and percentages of A, B, C, D, F, W and Other over the DFW denominator (early drops and ungraded rows excluded).
+
+---
+
+## course-cohort-effect
+
+### `get_course_cohort_effect()`
+
+*Source: course-cohort-effect.R*
+
+**A course's takers against its non-takers, by return and next-term outcomes**
+
+**Parameters:**
+
+- `student_terms` - `cedar_student_terms`.
+- `attempts` - `cedar_attempts`.
+- `opt` - `course` (the course id; required), `classification` (one or more `student_classification` values; required), `term` (anchor terms to keep; default every term to the settled edge), `campus` (home campuses to keep; NULL keeps every campus, each its own row), `min_n` (smallest group a row needs; default 10), `data_edges` (`cedar_data_edges()` output, required).
+- `programs` - `cedar_programs`, for the balance table; NULL skips it.
+- `applicants` - `cedar_applicants`, or NULL.
+
+**Returns:** Named list. `rates`: one row per `term`, `student_campus` and `group` (`passed`, `dfw`, `none`) with `n_students`, `population` (the term and campus's members over every group, before suppression), `share_of_population`, `n_return_observable`, `n_returned`, `return_pct`, `next_term`, `next_outcomes_observable`, `n_with_next_attempts`, `next_attempts`, `next_dfw`, `next_dfw_pct`. `balance`: `compute_balance()` output for takers against never-takers, or NULL. `course`, `classification`, `edge` (settled), `graded_edge`, `n_population_student_terms`, `n_early_drops`, `n_unclassified_takers`, `suppressed` (the rows under `min_n`: `term`, `student_campus`, `group`, `n_students`).
 
 ---
 
