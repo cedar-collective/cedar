@@ -9,7 +9,6 @@ test_that("load_funcs loads optional Shiny modules", {
 })
 
 test_that("Course Dynamics share spec targets the standard analyze button", {
-  expect_true(exists("CEDAR_SHARE_SPECS"))
   spec <- CEDAR_SHARE_SPECS[["Course Dynamics"]]
   expect_equal(spec$slug, "course-dynamics")
   expect_equal(spec$prefix, "cr")

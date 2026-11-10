@@ -201,8 +201,6 @@ test_that("get_unique_waitlisted uses correct CEDAR column names", {
 test_that("inspect_waitlist structure is correct", {
   message("\n  Testing inspect_waitlist structure...")
 
-  expect_true(exists("inspect_waitlist"))
-
   # Function should take students, opt, an optional sections table (only needed
   # when students lack a course_title column), the optional course-term
   # measure table (M12: never looked up by name) and the student-term table

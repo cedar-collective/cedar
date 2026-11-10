@@ -11,6 +11,11 @@ suppressPackageStartupMessages({
   library(dplyr)
 })
 
+# CEDAR is not a package and is never on CRAN. Without this, testthat treats
+# a non-interactive run as a CRAN check and expect_snapshot() silently skips,
+# so every snapshot test would pass without comparing anything.
+Sys.setenv(NOT_CRAN = "true")
+
 # -----------------------------------------------------------------------------
 # DESIGNED FIXTURES - hand-crafted, transparent, and inspectable
 # -----------------------------------------------------------------------------

@@ -115,7 +115,6 @@ test_that("load_global_data loads all required CEDAR model objects from configur
 
     suppressMessages(load_global_data(list(func = "course-report")))
 
-    expect_true(exists("data_objects", envir = .GlobalEnv))
     expect_setequal(names(data_objects), c(cedar_files, "cedar_dims", "cedar_courses", "cedar_course_codes"))
     expect_true("department" %in% names(data_objects$cedar_sections))
     expect_equal(data_objects$cedar_sections$course_id, "HIST 101")

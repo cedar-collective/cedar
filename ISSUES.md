@@ -607,7 +607,7 @@ understates demand; the pressure bump allows for that." A change under 1%
 keeps a decimal, so CHEM 1215's 716 against 719 does not read as a match. The
 plan explainer's "Changes in the term just finished" step says the change can
 take a near-full course below last year's count, and the text preview's floor
-column reads "spine was capped". A test in `test-enrollment-projections.R`
+column reads "spine was capped". A test in `test-projection-page-text.R`
 pins the ENGL 1120 case. In the model source (#184), `floor_note`, shown
 under **Saturation floor** in the evidence trail, now says the prior term's
 count "was capped by its seats, so it understates demand" instead of "the
@@ -711,7 +711,7 @@ most of its absolute error. The reading, the flag ("Off 20%+ with seats to
 spare") and the sentence above the table follow it. Seat moves still show,
 as counts beneath Reliability, never as a rating of their own. The test "a
 past miss is the schedule's only when a full course's seats moved the way it
-missed" in `test-enrollment-projections.R` pins every case of the rule;
+missed" in `test-projection-model.R` pins every case of the rule;
 replacing the near-full condition with any seat move fails it.
 
 The **Where forecast error comes from** panel made the same mistake page-wide:
@@ -753,7 +753,7 @@ with Fall terms: 74 of 79 saturated rows start from 202680.
 The fill moved out of the flags into its own **Day-1 fill** column
 (`projection_prior_fill()`). Its header names the term, for example "Day-1 fill
 (Spring 2026)", and each of those older-Spring rows names its own term. The campus flag names its term too: "EA full in Spring 2026, ABQ had
-room". A test in `test-enrollment-projections.R` asserts the named term. The
+room". A test in `test-projection-page-text.R` asserts the named term. The
 user guide says the column describes the same season last year.
 
 ## I38 — A Pathways program population misses pre-majors whose name differs from their major
@@ -2857,7 +2857,7 @@ HIST 3010 in the table.
 now publishes prior same-season unless a challenger beat it by two WAPE points
 on at least three earlier shared aftcasts, replays that rule at every historical
 fold, and reports the realised error of what the rule would have picked.
-`test-enrollment-projections.R` holds a fixture whose in-sample winner fits 2%
+`test-projection-model.R` holds a fixture whose in-sample winner fits 2%
 and whose honest record is 8%; the old code reports 2%. Two shared folds were
 tried first: on the rebuilt bundle the 26 challengers they admitted on the 2026
 fold scored 11.4% against the default's 8.2% on the same courses.
@@ -2948,7 +2948,7 @@ when saturated and zero otherwise. Rebuilt Fall 2027: 35 saturated courses,
 waiting students removed as already on the class list. Spring 2027 has no
 waiting students to add. Two Spring 2024 aftcasts moved by two students each
 (stray Spring 2023 waitlist rows); the published rule's WAPE is unchanged in
-both seasons. `test-enrollment-projections.R` holds a saturated term whose
+both seasons. `test-projection-model.R` holds a saturated term whose
 waitlist is smaller than its early-drop churn (it failed on the old formula)
 and the WL01 market-waitlist scenario.
 **Found:** 2026-10-18, auditing the Spring and Fall 2027 bundles (model 0.21.0)
@@ -3101,7 +3101,7 @@ already reaches their level, and the floor note then says "at least".
 Otherwise the note names the session not yet begun. Course history reads
 "Session not yet begun". EC-11c in the designed fixture holds a full-term
 section and a 2H section not yet begun. Its tests in
-`test-course-planning-history.R` and `test-enrollment-projections.R` fail when
+`test-course-planning-history.R` and `test-projection-model.R` fail when
 the bound is ignored or trusted below the threshold.
 
 Measured on 2026-10-20, with the same change on an earlier branch, against
