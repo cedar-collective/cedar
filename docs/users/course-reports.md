@@ -196,8 +196,15 @@ Two tabs answer two halves of this, and neither answers the whole of it.
   seminar, not a measure of the seminar.
 
 What neither tab does is compare takers with students who did not take the
-course at all, holding classification constant. That comparison is on the
-roadmap.
+course at all, holding classification constant. That comparison exists for
+analysts (`get_course_cohort_effect()` in RStudio: for one classification, by
+home campus and term, return and next-term DFW share for students who passed
+the course, failed it, or never took it, with a balance table) and has no page
+yet. For main-campus first-semester freshmen in Fall 2023, 94% of those who
+passed FYEX 1010 returned the next spring, 78% of those who never took it, and
+46% of those who failed it; the groups differ substantially on ACT, high-school
+GPA, Pell eligibility and first-generation share, so these describe who is
+placed into the course as much as the course.
 
 ---
 

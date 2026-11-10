@@ -124,18 +124,17 @@ measure is pace against the same day a year earlier, always aggregate.
 - [ ] **Roadblocks on the Dept Dashboard,** ranked by Impact (`get_stopout()`).
 - [ ] **Unhide cross-course Retention** once it sets each course against its
   department and college.
-- [ ] **A course's takers against its non-takers** (`get_course_cohort_effect()`,
-  a cone over `cedar_attempts` and `cedar_student_terms`): for the students in
-  a classification, term and campus, return the next regular term and the DFW
-  share of their next-term attempts, split into passed the course, DFW'd it,
-  and never took it, with the balance table beside it. Verified 2026-11-10 that
-  no cone answers this: Course Sequence needs a named later course and its
-  groups differ on entering credits by construction for a first-year course;
-  Retention splits takers by outcome and never sees a non-taker. Preview on the
-  2026-11-04 pull, ABQ first-semester freshmen, Fall 2023: passed FYEX 1010
-  returned at 94%, never took it 77%, DFW'd it 50%; next-term DFW share 26%,
-  26% and 62%. Fall 2024 return: 91%, 78%, 51%. Takes M41's classification
-  scope with it.
+- [ ] **Surface a course's takers against its non-takers.** The cone exists
+  (`get_course_cohort_effect()`, 2026-11-10, over `cedar_attempts` and
+  `cedar_student_terms`): for the students of a classification, by home
+  campus and term, return the next regular term and the DFW share of their
+  next-term attempts, split into passed the course, DFW'd it and never took
+  it, with the balance table for takers against never-takers. On the
+  2026-11-04 pull, main-campus first-semester freshmen, Fall 2023: passed
+  FYEX 1010 returned at 94%, never took it 78%, DFW'd it 46%; next-term DFW
+  share 28%, 25%, 61%. The page needs a classification picker (M41) and goes
+  beside Course Dynamics > Retention, whose persistence split it extends with
+  the non-takers.
 - [ ] **Near-completers and stalled pre-majors** as outreach counts.
 
 ## Degree Explorer and curriculum-informed demand
