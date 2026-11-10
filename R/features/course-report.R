@@ -1285,3 +1285,98 @@ prepare_downstream_outcomes_display <- function(outcomes) {
   )
   display
 }
+
+
+# ── Course Sequence: the result in plain words ───────────────────────────────
+#
+# The sequence comparison's page renders its outcome and balance tables, but a
+# reader asking "did students who took X first do better in Y?" wants the two
+# rates first, in one sentence, with the arithmetic beside them and the
+# balance verdict right after: the groups are self-selected, and for a
+# first-year course they differ on entering credits by construction, so the
+# gap describes who took each path before it describes the course. The
+# sentences are built here, over the cone's payload, so a test can pin them.
+
+CEDAR_COVARIATE_LABELS <- c(
+  unm_credits_entering   = "UNM credits entering",
+  total_credits_entering = "total credits entering",
+  cum_gpa_entering       = "GPA entering",
+  high_school_cum_gpa    = "high-school GPA",
+  unm_act_combined_score = "ACT score",
+  transfer_gpa           = "transfer GPA",
+  current_age            = "age",
+  pell_eligible          = "Pell eligibility",
+  first_gen              = "first-generation share"
+)
+
+#' The Course Sequence result as two or three sentences
+#'
+#' @param result `get_course_sequence_effect()` output.
+#' @return Character vector of sentences: the two groups' DFW rates with their
+#'   counts, then the balance verdict (how many measured covariates differ
+#'   substantially, and the one that differs most), then, when a GPA band
+#'   was active, how many students had no HS GPA and were left out.
+course_sequence_headline <- function(result) {
+  required <- c("course_x", "course_y", "outcomes", "balance", "n_treatment", "n_control")
+  missing <- setdiff(required, names(result))
+  if (length(missing) > 0) {
+    stop("[course-report.R] course_sequence_headline: result lacks ", paste(missing, collapse = ", "),
+         call. = FALSE)
+  }
+  outcomes <- result$outcomes
+  rate <- function(group) {
+    rows <- outcomes[outcomes$group == group, , drop = FALSE]
+    total <- sum(rows$n)
+    dfw <- sum(rows$n[rows$outcome == "dfw"])
+    if (total == 0L) stop("[course-report.R] course_sequence_headline: no classified outcomes for ", group,
+                          call. = FALSE)
+    list(dfw = dfw, total = total, pct = 100 * dfw / total)
+  }
+  t <- rate("treatment")
+  c <- rate("control")
+  fmt_n <- function(n) format(n, big.mark = ",", trim = TRUE)
+  fmt_pct <- function(p) sprintf("%.1f%%", p)
+  gap <- t$pct - c$pct
+  direction <- if (abs(gap) < 0.05) "the same rate" else if (gap > 0) "a higher rate" else "a lower rate"
+
+  rates <- paste0(
+    "Students who passed ", result$course_x, " before ", result$course_y, " did not pass ",
+    result$course_y, " ", fmt_pct(t$pct), " of the time (", fmt_n(t$dfw), " of ", fmt_n(t$total),
+    "); students who took ", result$course_y, " without a prior pass in ", result$course_x, ", ",
+    fmt_pct(c$pct), " (", fmt_n(c$dfw), " of ", fmt_n(c$total), "): ", direction,
+    if (direction == "the same rate") "." else paste0(", by ", sprintf("%.1f", abs(gap)), " points.")
+  )
+
+  smd <- result$balance$smd_table
+  measured <- if (is.null(smd)) 0L else sum(!smd$balance_band %in% "unavailable")
+  if (measured == 0L) {
+    verdict <- "No measured covariate could be compared, so nothing says how alike the two groups were."
+  } else {
+    flagged <- smd[smd$balance_band %in% "substantial", , drop = FALSE]
+    if (nrow(flagged) == 0L) {
+      verdict <- paste0(
+        "On the ", measured, " measured covariates the groups did not differ substantially; ",
+        "the gap is still a description of two self-selected paths, not an effect of ", result$course_x, "."
+      )
+    } else {
+      top <- flagged[which.max(abs(flagged$smd)), , drop = FALSE]
+      label <- CEDAR_COVARIATE_LABELS[top$covariate]
+      if (is.na(label)) label <- gsub("_", " ", top$covariate)
+      value <- function(v) if (top$type == "binary") sprintf("%.1f%%", v) else sprintf("%.2f", v)
+      verdict <- paste0(
+        "The groups differ substantially on ", nrow(flagged), " of ", measured, " measured covariates, ",
+        "most on ", label, " (", value(top$value_treatment), " against ", value(top$value_control),
+        "), so the gap describes who took each path before it describes ", result$course_x, "."
+      )
+    }
+  }
+
+  sentences <- c(rates, verdict)
+  if (isTRUE(result$n_missing_hs_gpa_excluded > 0L)) {
+    sentences <- c(sentences, paste0(
+      fmt_n(result$n_missing_hs_gpa_excluded),
+      " students with no high-school GPA were left out because a GPA range was active."
+    ))
+  }
+  sentences
+}

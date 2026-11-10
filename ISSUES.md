@@ -3174,6 +3174,20 @@ when:* the cone returns the unrounded average, the table rounds for display
 only, the severity rule moves into a tested branch helper, and the cards fit one
 row.
 
+**M41 — Retention cohorts include concurrent-enrollment students without saying
+so.** `get_retention_comparison()`, `get_retention_trend()` and
+`get_course_persistence()` take every registered student in the course, so a
+branch-campus first-year course filled by dual-credit high-school students
+reports their return pattern as the course's: Gallup's Fall 2023 FYEX 1110
+cohort (35 students, all `Concurrent Enrollment`) returned at 37% the next
+spring and 97% the next fall, a shape no college cohort has. Found 2026-11-10
+verifying the FYEX questions. The pages and the `course-retention` definition
+now say the cohort is everyone registered (version 2.1.0), which is the
+disclosure, not the fix. *Done when:* each retention view takes a
+classification scope through `cedar_student_terms$student_classification`
+(the Explore page's cohort builder and Course Dynamics' campus control are the
+places), and a cohort's concurrent-enrollment share is shown beside its rate.
+
 ### Testing and pipeline safety
 
 **M7 — Untested analytical code.** No direct tests for

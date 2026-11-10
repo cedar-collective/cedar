@@ -37,7 +37,10 @@ retentionUI <- function(id) {
       "Institution-level retention (still enrolled at UNM, any major) measured from a
       course enrollment anchor. Use “Course Comparison” to compare retention rates
       across courses for a single term. Use “Course Trend” to track how one course’s
-      retention has changed over time."),
+      retention has changed over time. A cohort is everyone registered in the course,
+      concurrent-enrollment high-school students included; they return on the
+      high-school calendar, so a course they fill can show a low +1 rate and a high
+      +2 rate."),
 
     layout_sidebar(
       id = ns("retention-sidebar-layout"),

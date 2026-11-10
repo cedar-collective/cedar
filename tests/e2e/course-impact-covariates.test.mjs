@@ -61,6 +61,11 @@ try {
 
   ok(definition?.version === '2.0.0',
      'Course Sequence uses definition v2');
+  // The result opens with the two rates and their counts, then the balance verdict.
+  ok(/did not pass .* of the time \(\d[\d,]* of \d[\d,]*\)/.test(body),
+     'the result opens with both groups\' rates and their counts');
+  ok(/measured covariate/i.test(body),
+     'the opening sentence carries the balance verdict');
   ok(/small observed difference/i.test(body) && /0\.10/.test(body),
      'the page defines the small observed-difference band');
   ok(/0\.10[–-]0\.25/.test(body) && /review/i.test(body),

@@ -721,3 +721,40 @@ test_that("balance values preserve meaningful continuous precision", {
 
   expect_equal(values, c("3.23", "3.00", "57.0", "—"))
 })
+
+# ── course_sequence_headline ────────────────────────────────────────────────
+#
+# The page's first sentence over the cone's payload (R/features/course-report.R).
+# MC02, SPAN 101 -> SPAN 201 on ABQ: MC_A1, MC_A2 and MC_A4 passed SPAN 101 in
+# 202010 and took SPAN 201 in 202080 (MC_A1 F, the others pass); MC_G1 passed
+# SPAN 101 on GA, out of the ABQ scope, so their ABQ SPAN 201 (A) is control.
+# Treatment DFW 1 of 3; control 0 of 1.
+
+test_that("course_sequence_headline says the two rates, their counts and the balance verdict", {
+  testthat::local_edition(3)
+  result <- suppressMessages(get_course_sequence_effect(
+    test_students_mc, .impact_attempts, test_programs_mc, NULL,
+    opt = list(course_x = "SPAN 101", course_y = "SPAN 201", campus = "ABQ", min_n = 1L),
+    student_terms = test_student_terms_mc, data_edges = .impact_edges
+  ))
+  expect_equal(result$n_treatment, 3L)
+  expect_equal(result$n_control, 1L)
+  headline <- course_sequence_headline(result)
+  expect_length(headline, 2L)
+  expect_snapshot(cat(headline, sep = "\n"))
+
+  # The verdict names the most imbalanced covariate and counts the flagged ones.
+  smd <- result$balance$smd_table
+  n_flagged <- sum(smd$balance_band %in% "substantial")
+  if (n_flagged > 0) expect_match(headline[2], paste0("on ", n_flagged, " of "))
+  else expect_match(headline[2], "did not differ substantially")
+
+  # Rounding is the display's: the sentence is built from the counts.
+  expect_match(headline[1], "33.3% of the time (1 of 3)", fixed = TRUE)
+  expect_match(headline[1], "0.0% (0 of 1)", fixed = TRUE)
+  expect_match(headline[1], "a higher rate, by 33.3 points", fixed = TRUE)
+})
+
+test_that("course_sequence_headline stops on a payload without its tables", {
+  expect_error(course_sequence_headline(list(course_x = "A", course_y = "B")), "lacks")
+})
