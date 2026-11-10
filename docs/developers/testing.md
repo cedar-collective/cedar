@@ -352,6 +352,39 @@ branches with representative inputs, not once per configured record. Keep a
 regression in the layer that owns the behavior; integration tests prove wiring
 without repeating the component's checklist.
 
+### The page's words are snapshots
+
+A sentence a reader sees (a summary, a saved reason, a note, a plot's trace
+names) is held with `expect_snapshot()`, never with `expect_match()` or a
+pasted string. The test still asserts the numbers behind the sentence and any
+negative (a word that must not appear); the snapshot holds the wording. The
+file needs `testthat::local_edition(3)` at its top, and `setup.R` sets
+`NOT_CRAN` so the snapshot is compared rather than skipped.
+
+- The first run writes `tests/testthat/_snaps/<file>.md`; commit it. A run
+  with no snapshot file fails in CI, so a new snapshot test ships with its file.
+- A wording change fails with a diff. Read the diff, then
+  `Rscript --vanilla -e 'testthat::snapshot_accept("<file>")'` and commit the
+  updated `.md` alongside the change; the review is the diff of that file.
+- Group one test's variants in one `expect_snapshot({ ... })` block with a
+  label per `cat()`, so the snapshot reads as the page's cases.
+- Pin nothing volatile: a date computed at run time, a count read from
+  institutional data, a path.
+
+Before touching a projection sentence, `grep` its words in `_snaps/`: the four
+projection files (`test-projection-inputs.R`, `-model.R`, `-view.R`,
+`-page-text.R`) hold every sentence the Projections page and Course Dynamics
+show.
+
+### The measure of the suite
+
+The number of tests and expectations says nothing about the suite's cost. Watch
+the **test lines changed per PR**: when a wording or shape change edits more
+test lines than source lines, a fact is pinned in more than one layer, and the
+fix is to move it to the one that owns it (`AGENTS.md`, one layer per fact),
+not to update every copy. Run time matters only when a file stops being run
+while iterating.
+
 ---
 
 ## Pull-request checks without institutional data
@@ -540,6 +573,6 @@ A named group supplies the roster and campus scope; explicit `--courses` runs
 also need `--campuses` and `--market-id`, and those courses are forced through
 the screen for diagnosis. The builder and the lab call the same functions; Shiny
 only reads the published bundle. `test-architecture.R` keeps projection code
-free of Shiny and globals; `test-enrollment-projections.R` owns formula,
+free of Shiny and globals; the `test-projection-*.R` files (inputs, model, view, page text) own formula,
 cutoff, selection, empty-scope and artifact-contract behavior. A method change
 is incomplete until both the fixture tests and the real-data aftcast are rerun.

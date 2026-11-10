@@ -272,6 +272,7 @@ All test data is in `tests/testthat/fixtures/designed_test_data.R`, which **is**
 - Expected values are committed after running against fixtures; if one changes, investigate before updating it.
 - Domain rows belong in the shared fixture; one function's intermediate frames are built locally with documented expectations.
 - **A fixture too simple to express the bug gives a test that passes forever.** Reintroduce the bug and confirm the test fails before trusting it; mandatory for any guard on a join key, grouping grain or dedup.
+- **One layer per fact.** A calculation is tested at its branch or cone on the fixtures; a view builder for its own transformations only; the page's words with `expect_snapshot()` (the file under `tests/testthat/_snaps/` is committed, and a wording change is accepted with `testthat::snapshot_accept()` and reviewed as a diff); wiring and visibility in the browser. Never pin a sentence with `expect_match()` or a pasted string, and never assert a function exists when the next line calls it.
 - **Never write custom testing scripts** (scratch runners, probes, ad-hoc smoke tests). The entry points are the gates below, `testthat::test_file()` / `test_dir()` on committed files, and `tests/e2e/`. Exploratory diagnostics stay in the session scratchpad.
 
 | Change | Required checks |

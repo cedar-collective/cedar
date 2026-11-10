@@ -93,12 +93,6 @@ test_that("course-major association defaults separate delivery campuses", {
 })
 
 
-test_that("old instructor conversion function name is intentionally absent", {
-  expect_false(exists("get_instructor_conversion", mode = "function"))
-  expect_true(exists("get_course_major_associations", mode = "function"))
-})
-
-
 test_that("get_gen_ed_profile runs all-Gen-Ed default without department selection", {
   result <- get_gen_ed_profile(
     gen_ed_assoc_students,
