@@ -175,6 +175,30 @@ Flows require multiple terms of data and students who take other courses before 
 
 This depends on what your institution has loaded into CEDAR. Check with your CEDAR administrator for the data range.
 
+**Do students who take a first-year course (FYEX 1010, FYEX 1110) do better later, or come back more?**
+
+Two tabs answer two halves of this, and neither answers the whole of it.
+
+- **Downstream → Course Sequence** compares grades in one later course you
+  name (ENGL 1120, say) between students who passed the first-year course
+  first and students who took the later course without it. The first sentence
+  of the result gives both rates with their counts and says how alike the
+  groups were. For a first-year course they are never alike on what CEDAR can
+  see: students who passed it first are, by construction, in their first
+  semester, while the other group includes transfer students and everyone who
+  placed past it. On the 2026-11-04 pull, students who passed FYEX 1010 before
+  ENGL 1120 did not pass ENGL 1120 14.2% of the time against 12.9%, and
+  entered with 5 credits against 28. That gap describes who takes FYEX 1010.
+- **Retention** shows, of the students who took the course, how many came
+  back the next fall or spring, split by how they did in it. For FYEX 1010 on
+  main campus, 92% of those who passed returned against 49% of those who
+  failed. That is a strong signal about the students who fail a first-year
+  seminar, not a measure of the seminar.
+
+What neither tab does is compare takers with students who did not take the
+course at all, holding classification constant. That comparison is on the
+roadmap.
+
 ---
 
 ## Related analyses

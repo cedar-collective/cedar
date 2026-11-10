@@ -407,8 +407,32 @@ definitions:
             functions: [get_stopout, compute_stopout_for_group, build_next_term_lookup]
 
   - id: course-retention
-    current_version: "2.0.0"
+    current_version: "2.1.0"
     versions:
+      - version: "2.1.0"
+        title: Course retention and next-term persistence
+        summary: Among students who took a course, returning means being enrolled anywhere at UNM in the next fall or spring (registered, or registered and withdrawn after census), or a degree awarded in between. Enrolled is read from the student-term table, the one definition CEDAR uses everywhere, so this page and Pathways Roadblocks agree on who returned. The cohort is everyone registered in the course, concurrent-enrollment (dual-credit) high-school students included.
+        population: Students in the selected course and anchor term, whatever their classification. The retention trend takes registered students; the persistence table splits them by course outcome (pass, fail, late drop) and adds early drops as their own group.
+        unit: Student within an anchor course/term; a student who took the course in two terms counts once per term.
+        numerator: Students enrolled at UNM in the target term or graduating between the anchor and target terms. A next-term row that is only an early drop or a waitlist is not a return; a late withdrawal is, because that student was enrolled at census.
+        denominator: Eligible anchors with an observable follow-up term.
+        campus: Course delivery campus selects the cohort; follow-up spans all UNM campuses.
+        time_window: The next regular term (or year-later window) must be observable through the enrollment-complete edge; persistence anchors also stop at last_graded because they read a grade.
+        exclusions: Future follow-up is missing, not zero. Persistence outcomes come from the canonical classifier; anchors with no classifiable outcome (blank grade, audit) are excluded.
+        limitations:
+          - This is a course cohort, not the first-time degree-seeking cohort used for official institutional retention reporting.
+          - Differences between outcome groups do not establish that a course caused departure.
+          - Concurrent-enrollment students return on the high-school calendar, not the college's. Where they are most of a cohort, as in a branch-campus first-year course, a +1 rate can sit far below the +2 rate (Gallup's Fall 2023 FYEX 1110, 35 students, all concurrent enrollment, returned at 37% the next spring and 97% the next fall). Nothing in the rate itself says so; the course's classification mix does.
+        guide: users/course-reports
+        implementation:
+          - file: R/branches/retention-context.R
+            functions: [build_retention_context, .compute_retention]
+          - file: R/branches/student-terms.R
+            functions: [build_student_terms]
+          - file: R/cones/course-retention.R
+            functions: [get_retention_trend, get_retention_comparison]
+          - file: R/cones/course-outcomes.R
+            functions: [get_course_persistence, next_term_persistence]
       - version: "2.0.0"
         title: Course retention and next-term persistence
         summary: Among students who took a course, returning means being enrolled anywhere at UNM in the next fall or spring (registered, or registered and withdrawn after census), or a degree awarded in between. Enrolled is read from the student-term table, the one definition CEDAR uses everywhere, so this page and Pathways Roadblocks agree on who returned. Until 2026-11-04 a student whose only next-term row was a late withdrawal counted as lost; the change moves retention by about one point (284 of 28,282 Fall 2025 students).

@@ -3692,7 +3692,7 @@ output$enrl_classlist_download <- downloadHandler(
             )
           ),
           tags$ul(
-            tags$li("The starting cohort is every student officially registered in the selected course in each term."),
+            tags$li("The starting cohort is every student officially registered in the selected course in each term, whatever their classification: concurrent-enrollment (dual-credit) high-school students are in it, and where they are most of a cohort, as in a branch-campus first-year course, a +1 rate can sit far below the +2 rate because they return on the high-school calendar."),
             tags$li("Primary tables pool Fall, Spring, and Summer cohorts separately across the data window, weighted by cohort size."),
             tags$li("When instructor breakout is enabled, all terms taught by the same instructor ID are pooled before the minimum-student threshold is applied."),
             tags$li("The +1, +2, and later columns show the share of that cohort still enrolled anywhere at UNM the given number of fall/spring semesters later."),
@@ -4457,6 +4457,8 @@ output$enrl_classlist_download <- downloadHandler(
     }
 
     tagList(
+      # The number first, its arithmetic beside it, the balance verdict after.
+      p(class = "cedar-lead", paste(course_sequence_headline(result), collapse = " ")),
       # Methodology, not a warning — collapsible per the explain-box standard.
       info_panel(
         "Who is being counted",

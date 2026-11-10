@@ -105,6 +105,10 @@ Columns:
 Retention rates are most useful as prompts for better questions:
 
 - Did the course enroll many first-year, transfer, or near-graduation students?
+- Did it enroll concurrent-enrollment (dual-credit) high-school students? They
+  are in every cohort and return on the high-school calendar, so a course they
+  fill can show a low +1 rate and a high +2 rate. Gallup's Fall 2023 FYEX 1110
+  cohort was 35 such students: 37% at +1, 97% at +2.
 - Is the course a gateway, elective, prerequisite, or high-DFW course?
 - Did the term have unusual enrollment disruption?
 - Are small cohorts making the rate unstable?
