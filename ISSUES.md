@@ -3217,6 +3217,19 @@ from the mapping files, so a mapping edit rebuilds nothing, and the stamps,
 `R/branches/mapping-provenance.R` and the gate's mapping branch are gone. The
 gate builds `cedar_student_terms` alone.
 
+**M40 — The scenario program fixtures cannot build a student-term table with
+their programs.** `cedar_programs_mc` (MC02) and `cedar_programs_hp2` (HP02)
+lack `source_college_code`, `source_college` and `sem_gpa`, which
+`build_student_terms()` requires of a programs table, so `setup.R` builds
+`test_student_terms_mc` with `programs = NULL` (its majors come from the class
+list's `major_code`) and HP02 has no student-term table at all. A cone that
+joins `cedar_student_terms` to a class list by major (`get_major_course_units()`,
+2026-11-10) tests on ST01, RW01 and MC02 instead; HP02's pre-nursing
+population, the richer out-of-unit scenario, is unreachable. *Done when:* the
+two fixtures carry the builder's required columns and `setup.R` builds
+`test_student_terms_hp2` and `test_student_terms_mc` over them, with the
+fixture header's expected values checked.
+
 ### Architecture rules (`AGENTS.md`)
 
 **M11 — Silent fallbacks.** *Enforced since 2026-10-16* by

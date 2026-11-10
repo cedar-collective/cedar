@@ -8,7 +8,7 @@ parent: Developer Guide
 
 This reference is auto-generated from roxygen2 comments in the source code.
 
-*Generated: 2026-11-09 08:17:26.004504*
+*Generated: 2026-11-10 07:07:28.448373*
 
 ---
 
@@ -823,6 +823,23 @@ Downstream Success by Instructor  Among students who took course X and later too
 
 ---
 
+## course-offering-pattern
+
+### `get_course_offering_pattern()`
+
+*Source: course-offering-pattern.R*
+
+**Offering pattern by season and part of term**
+
+**Parameters:**
+
+- `course_terms` - The course-term measure table (`cedar_course_terms`).
+- `opt` - `course` (required), `campus` or `course_campus` (campuses to keep; each its own row), `data_edges` (`cedar_data_edges()` output, required: the window ends at `last_enrolled_complete`), `n_years` (academic years in the window; default 3).
+
+**Returns:** One row per course, campus, season (`term_type`) and `part_term`: `n_terms_offered`, `n_terms_in_window` (covered terms of that season), `last_offered`, `median_sections`, `median_seats`, `n_terms_fill_known`, `median_first_day_fill` (a proportion), `n_terms_full` (`CEDAR_FULL_FILL` or more), `n_terms_near_full` (`CEDAR_NEAR_FULL_FILL` or more). Attribute `window`: the first and last term covered.
+
+---
+
 ## course-outcomes
 
 ### `get_course_outcomes()`
@@ -936,6 +953,24 @@ Historical availability and first-class-day pressure for exact course codes  The
 **Recent options from an explicit course pool, retaining the first-day grain.**
 
 Recent options from an explicit course pool, retaining the first-day grain. History is supplied by the feature; this cone never calls another cone.
+
+---
+
+## course-retake-timing
+
+### `get_course_retake_timing()`
+
+*Source: course-retake-timing.R*
+
+**Retake timing after a DFW**
+
+**Parameters:**
+
+- `attempts` - The attempt measure table (`cedar_attempts`).
+- `registrations` - `cedar_registrations`, keyed on the course, for the later registrations (any status date; terms past the graded edge count, a retake needs no grade).
+- `opt` - `course` (required), `course_campus` (or `campus`), `population_ids` (optional), `data_edges` (`cedar_data_edges()` output, required: the opportunity edge is `last_enrolled_complete`, and the graded edge must agree with the table's), `min_n` (smallest DFW count a row needs; default 10).
+
+**Returns:** One row per course and campus of the DFW attempt: `n_dfw` (judged attempts), `n_next_regular`, `n_summer`, `n_within_year_other`, `n_none_within_year`, and `n_unobservable` (attempts too recent to judge). Attribute `suppressed`: course × campus rows under `min_n`.
 
 ---
 
@@ -3663,6 +3698,24 @@ Courses students were taking in the term before a major switch appeared  Answers
 
 ---
 
+## major-course-units
+
+### `get_major_course_units()`
+
+*Source: major-course-units.R*
+
+**Which units teach the courses a major's students take**
+
+**Parameters:**
+
+- `student_terms` - `cedar_student_terms`, with its units attached (`primary_dept_code`).
+- `registrations` - `cedar_registrations`, with its units attached (`department`, `college`).
+- `opt` - `dept_code` (the major's unit; required), `program_code` (one or more program codes to narrow the members to; default every program of the unit), `include_pre_majors` (default TRUE), `term` (terms to keep; default every term to the edge), `campus` (teaching campuses to keep; NULL keeps every campus, each its own row), `min_n` (the smallest distinct-student count a unit row needs; default 10), `include_in_progress` (default FALSE), `data_edges` (`cedar_data_edges()` output, required).
+
+**Returns:** One row per `term`, `campus`, `college` and `dept_code` (the teaching unit; NA for a subject with no mapping row), with `is_own_unit`, `in_progress`, `n_registrations` (distinct student × course), `n_students` (distinct students), `term_registrations` and `term_students` (the same over every unit in that term and campus) and `share_of_registrations` (`n_registrations / term_registrations`). Attributes: `edge` (the settled term the rows stop at), `latest_term` (the last term included), `n_member_student_terms`, `n_members` (distinct students), `n_unmapped` (member registrations whose subject has no unit), `suppressed` (the unit rows under `min_n`, as a tibble of `term`, `campus`, `dept_code`, `n_students`).
+
+---
+
 ## mapping-audit
 
 ### `audit_mapping_coverage()`
@@ -3947,6 +4000,24 @@ Summarise what the data window can and cannot see about a population  Pathways a
 Latest term whose grades are actually posted  Thin wrapper over [cedar_data_edges()]'s `last_graded`. The shared helper is the canonical one — see the right-edge policy in AGENTS.md — and this exists so Pathways callers read in their own vocabulary.
 
 **Returns:** Integer term code, or NULL when no term clears the threshold.
+
+---
+
+## population-course-uptake
+
+### `get_population_course_uptake()`
+
+*Source: population-course-uptake.R*
+
+**Course uptake and timing for a population**
+
+**Parameters:**
+
+- `registrations` - `cedar_registrations`, keyed on the course.
+- `population` - `build_population()` output, with `first_unit_term` and `relevant_until`.
+- `opt` - `course` (the courses, required), `campus` (course campuses to keep; NULL keeps every campus, each its own row), `data_edges` (`cedar_data_edges()` output, required), `min_n` (smallest taker count a row needs; default 10).
+
+**Returns:** One row per course and campus: `n_takers`, `n_population`, `share` (takers over the population), `n_before_entry`, `n_after_entry`, `median_terms_after_entry` and `p75_terms_after_entry` (regular terms after `first_unit_term`; 0 is the entry term; over the at-or-after rows). Attributes: `not_taken` (requested courses no one in the population sat in), `suppressed` (course × campus rows under `min_n`), `edge`, `n_without_entry` (population students with no `first_unit_term`, left out).
 
 ---
 

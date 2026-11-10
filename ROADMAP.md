@@ -220,4 +220,11 @@ Ideas not yet given a theme or an order. Add freely; triage moves an item into
 a theme above, into `ISSUES.md` if it is a fix to something that exists, or
 deletes it.
 
-- [ ] _(empty)_
+- [ ] **Surface `get_major_course_units()`** (which units teach the courses a
+  major's students take; `R/cones/major-course-units.R`, 2026-11-10) on a
+  Dept page beside Dept Trends' inverse view of whose majors fill a unit's seats.
+- [ ] **Verify and reword the first-year course questions.** Does taking
+  FYEX 1110 or FYEX 1010 go with better outcomes in later courses and with
+  returning? `get_course_sequence_effect()` answers it for one named later
+  course and `get_retention_comparison()` for return; check what each page says
+  a dean would hear, and decide whether "any later course" needs its own cone.
