@@ -182,7 +182,7 @@ Details and the failures behind each: [right-edge-policy.md](docs/developers/rig
 - Keep headline totals independent of the display grain; sibling tables on one page share a grain.
 - `campus` is the campus that taught the section; `student_campus` is the student's home campus. They disagree on 28% of rows. Course analytics scope on `campus`, through `cedar_filter_campus()` / `CEDAR_CAMPUS_DEFAULT`, never a bare `c("ABQ", "EA")`.
 - Scoping the cohort is not scoping the outcome: retention's outcome is UNM-wide.
-- A deliberate campus-neutral operation carries a `CAMPUS_ROLLUP:` comment with the reason; `test-architecture.R` enforces it. The existing ones: `get_course_pairs()`, `get_course_timing(opt$group_campus = FALSE)`, and the projections' `abq_ea_course_market`.
+- A deliberate campus-neutral operation carries a `CAMPUS_ROLLUP:` comment with the reason; `test-architecture.R` enforces it. The existing ones: `get_course_pairs()`, `get_course_timing(opt$group_campus = FALSE)`, the projections' `abq_ea_course_market`, and the home-campus grain of `get_course_cohort_effect()` / `build_course_cohort_context()`.
 
 Reasoning and the inventory: [campus-policy.md](docs/developers/campus-policy.md).
 

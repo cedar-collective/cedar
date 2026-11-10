@@ -174,6 +174,7 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
   source_file("features/enrollment-projection-scenario.R")
   source_file("features/degree-explorer.R")
   source_file("features/population-course-pressure.R")  # text-first preview: a population through its shared courses
+  source_file("features/course-cohort-context.R")       # text-first preview: a course's takers-vs-non-takers gap against its college's courses
   source_file("features/shared-requirements.R")
   source_file("features/catalog-capture.R")
   source_file("features/catalog-analysis.R")

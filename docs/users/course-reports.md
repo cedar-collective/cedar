@@ -206,6 +206,19 @@ passed FYEX 1010 returned the next spring, 78% of those who never took it, and
 GPA, Pell eligibility and first-generation share, so these describe who is
 placed into the course as much as the course.
 
+Is that gap unusual? A second analyst tool
+(`build_course_cohort_context()`, with `format_course_cohort_context()` for
+the words) runs the same comparison for every Arts & Sciences lower-division
+course those freshmen took and places the first-year course among them. For
+the same students, passing any such course went with returning at a median
+96%, a gap of 19 points over those who never took it; FYEX 1010's 16 points
+sat in the bottom quarter of courses and FYEX 1110's 18 at the median. On
+next-term grades, FYEX 1110 was again an average course, while FYEX 1010 was
+the one course whose passers failed more the next term than its never-takers
+did. Passing a course in the first semester goes with coming back; neither
+seminar shows a lift beyond that, and the students placed into FYEX 1010
+carry their risk into the next term.
+
 ---
 
 ## Related analyses
