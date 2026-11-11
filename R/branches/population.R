@@ -586,6 +586,12 @@ build_population <- function(programs, degrees = NULL, student_terms = NULL, opt
   }
   focal_names <- focal_programs$program_name
   focal_codes <- unique(na.omit(focal_programs$major_code))
+  # A pre-major is matched to its major by the mapping file's leads_to, not by
+  # sharing its name: FFDA is named "FDMA" and leads to Film and Digital Arts
+  # (ISSUES.md I38). Its rows are is_pre_major, so every step below already
+  # treats them as the focal program's pre-major records.
+  focal_codes <- union(focal_codes, pre_major_codes_leading_to(
+    focal_codes, opt$premajor_leads_to %||% premajor_leads_to))
   message("[population.R] Building ", type, " population: ",
           paste(focal_names, collapse = ", "),
           " | codes: ", if (length(focal_codes)) paste(focal_codes, collapse = ", ") else "(none)")
@@ -1106,6 +1112,17 @@ population_group_program_names <- function(group_id) {
 }
 
 
+#' The pre-major codes whose `leads_to` is one of the given program codes
+#'
+#' @param codes Declared program codes.
+#' @param leads_to Named character vector, pre-major code -> the code it leads
+#'   to (default `premajor_leads_to`, from programs.csv).
+#' @return Character vector of pre-major codes; empty when none lead there.
+pre_major_codes_leading_to <- function(codes, leads_to = premajor_leads_to) {
+  names(leads_to)[!is.na(leads_to) & leads_to %in% codes]
+}
+
+
 #' Resolve a named population group to Banner major codes
 #'
 #' @param group_id Name of an entry in CEDAR_POPULATION_GROUPS.
@@ -1133,8 +1150,7 @@ population_group_major_codes <- function(group_id, programs,
 
   # Pre-majors whose own name has drifted, recovered through their leads_to.
   declared <- matched$major_code[!matched$is_pre_major]
-  drifted <- names(premajor_leads_to)[premajor_leads_to %in% declared]
-  drifted <- setdiff(drifted, matched$major_code)
+  drifted <- setdiff(pre_major_codes_leading_to(declared), matched$major_code)
   if (length(drifted) > 0) {
     matched <- bind_rows(
       matched,

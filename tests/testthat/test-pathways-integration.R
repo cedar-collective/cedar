@@ -364,3 +364,33 @@ test_that("detect_major_changes: no changes for pure single-program populations"
   result <- detect_major_changes(test_programs, math_pop)
   expect_equal(nrow(result), 0L)
 })
+
+# ISSUES.md I38, fixture EC-38: the pre-major FFDA is named "FDMA", its major
+# FDMA "Film and Digital Arts"; only leads_to ties them. The map is passed so
+# the test reads the same pair under any institution's programs.csv.
+test_that("a pre-major is matched to its major by leads_to, not by sharing its name", {
+  film <- function(leads_to) suppressMessages(build_population(
+    test_programs, test_degrees,
+    opt = list(type = "preset", program_names = "Film and Digital Arts",
+               outcomes = c("graduated", "switched_out", "stopped_out", "ongoing",
+                            "chose_elsewhere", "left_undeclared"),
+               premajor_leads_to = leads_to)
+  ))
+  film_pop <- film(c(FFDA = "FDMA"))
+  expect_setequal(film_pop$student_id, c("STU-FDMA-PRE-001", "STU-FDMA-PRE-002"))
+  # 001 declared after its pre-major term; 002 never declared anything.
+  expect_equal(film_pop$entry_status[film_pop$student_id == "STU-FDMA-PRE-001"], "pre_major")
+  expect_equal(film_pop$outcome[film_pop$student_id == "STU-FDMA-PRE-002"], "left_undeclared")
+  # A pre-major that leads elsewhere is not this program's.
+  expect_equal(film(c(FFDA = "IFDM"))$student_id, "STU-FDMA-PRE-001")
+})
+
+# ISSUES.md I53, the same fixture: declaring the major a pre-major leads to is
+# not a change of major, though the two rows carry different names.
+test_that("declaring the major a pre-major leads to is not a major change", {
+  rows <- test_programs[test_programs$student_id == "STU-FDMA-PRE-001", ]
+  tied <- suppressMessages(detect_major_changes(rows, opt = list(premajor_leads_to = c(FFDA = "FDMA"))))
+  expect_equal(nrow(tied), 0L)
+  untied <- suppressMessages(detect_major_changes(rows, opt = list(premajor_leads_to = c(FFDA = "IFDM"))))
+  expect_equal(untied$to_major, "Film and Digital Arts")
+})

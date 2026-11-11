@@ -31,6 +31,8 @@
 #'     \item \code{campus}  — character; filter by student_campus
 #'     \item \code{college} — character; filter by student_college
 #'     \item \code{dept_code} — character; filter by dept_code
+#'     \item \code{premajor_leads_to} — named character, pre-major code to the
+#'       code it leads to (default \code{premajor_leads_to}, from programs.csv)
 #'     \item \code{observation_end_term} — integer; exclude program records
 #'       after the settled longitudinal enrollment edge
 #'   }
@@ -57,6 +59,12 @@ detect_major_changes <- function(programs, population = NULL, opt = list(),
                                  student_terms = NULL) {
 
   message("[major-change-detection.R] Welcome to detect_major_changes!")
+
+  if (!"major_code" %in% names(programs)) {
+    stop("[major-change-detection.R] programs lacks major_code, which ties a pre-major to its major.",
+         call. = FALSE)
+  }
+  leads_to <- opt$premajor_leads_to %||% premajor_leads_to
 
   majors <- programs %>%
     filter(program_type == "Major", !is.na(program_name), program_name != "")
@@ -87,9 +95,16 @@ detect_major_changes <- function(programs, population = NULL, opt = list(),
     group_by(student_id) %>%
     mutate(
       prev_major = lag(program_name),
+      prev_code  = lag(major_code),
       prev_term  = lag(term),
       prev_level = lag(student_level),
-      changed    = !is.na(prev_major) & program_name != prev_major
+      # A pre-major and the major it leads to are one program, whatever their
+      # names: FFDA is named "FDMA" and leads to Film and Digital Arts, and
+      # declaring it is not a change of major (ISSUES.md I53).
+      same_program = !is.na(prev_code) & !is.na(major_code) &
+        (coalesce(unname(leads_to[prev_code]) == major_code, FALSE) |
+           coalesce(unname(leads_to[major_code]) == prev_code, FALSE)),
+      changed    = !is.na(prev_major) & program_name != prev_major & !same_program
     ) %>%
     ungroup() %>%
     # Exclude level transitions: undergrad → grad school is not a major change.
