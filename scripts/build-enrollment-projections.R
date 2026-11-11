@@ -290,7 +290,10 @@ take_projection_lock <- function(
     "alive() { kill -0 %1$d 2>/dev/null || return 1;",
     "if [ -r /proc/%1$d/stat ]; then case \"$(cat /proc/%1$d/stat 2>/dev/null)\" in",
     "*') Z '*) return 1 ;; esac; fi; return 0; };",
-    "while alive && [ -f %2$s ]; do touch %3$s 2>/dev/null; sleep %4$d; done"),
+    # touch -c: never create the file. A release removes the lock's files and
+    # then the directory; a heartbeat written back in between left the
+    # directory, and so the lock, in place.
+    "while alive && [ -f %2$s ]; do touch -c %3$s 2>/dev/null; sleep %4$d; done"),
     Sys.getpid(), shQuote(owner_path), shQuote(beat_path), as.integer(heartbeat_every))
   system2("sh", c("-c", shQuote(loop)), wait = FALSE, stdout = FALSE, stderr = FALSE)
   attr(lock_path, "owner_path") <- owner_path
@@ -305,7 +308,13 @@ release_projection_lock <- function(lock_path) {
     stop("[projections] release_projection_lock() needs the value take_projection_lock() returned.",
          call. = FALSE)
   }
-  if (file.exists(owner_path)) unlink(lock_path, recursive = TRUE)
+  if (!file.exists(owner_path)) return(invisible(NULL))
+  # The owner file first: the heartbeat loop stops when it is gone.
+  unlink(owner_path)
+  unlink(lock_path, recursive = TRUE)
+  if (dir.exists(lock_path)) {
+    stop("[projections] Could not remove the rebuild lock: ", lock_path, call. = FALSE)
+  }
   invisible(NULL)
 }
 
