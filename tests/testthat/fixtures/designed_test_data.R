@@ -345,6 +345,11 @@
 #   stopped_out + direct    : STU-HD-SP1-005..039    (implicit: 202010 only, no degree, no other major)
 #   never_declared          : STU-HP-FA1-001..008, STU-HP-SU1-001
 #
+# EC-38 (ISSUES I38, I53): a pre-major named unlike its major. FFDA ("FDMA")
+#   leads to FDMA ("Film and Digital Arts"); 4 program rows, dept FDMA.
+#   STU-FDMA-PRE-001 declares the major (pre_major entry, not a major change);
+#   STU-FDMA-PRE-002 never does (left_undeclared).
+#
 # Major-changes cone (HIST focal):
 #   HIST → POLS: 2 students (STU-HIST-SWOUT-001/002) — testable pair at min_n=2
 #   HIST → BIOL: 1 student  (STU-HIST-SWOUT-003)
@@ -2690,6 +2695,32 @@ cedar_programs <- bind_rows(
     academic_standing      = "Good Standing",
     inst_gpa               = c(2.9, 3.1, 3.2, 3.0, 3.3),
     inst_credits_attempted = c(12L, 60L, 90L, 12L, 45L)
+  ),
+
+  # --- EC-38: a pre-major whose name differs from its major (ISSUES.md I38) ---
+  # The pre-major code FFDA is named "FDMA"; the major FDMA is named "Film
+  # and Digital Arts". Only leads_to (FFDA -> FDMA) ties them.
+  # STU-FDMA-PRE-001: 202010 pre-major (FFDA) → 202080 declared (FDMA)
+  # STU-FDMA-PRE-002: 202010 and 202080 pre-major (FFDA), never declared:
+  #   in the Film population only when the pre-major is matched by leads_to
+  tibble(
+    student_id             = c("STU-FDMA-PRE-001", "STU-FDMA-PRE-001",
+                               "STU-FDMA-PRE-002", "STU-FDMA-PRE-002"),
+    term                   = c(202010L, 202080L, 202010L, 202080L),
+    program_type           = "Major",
+    program_name           = c("FDMA", "Film and Digital Arts", "FDMA", "FDMA"),
+    major_code             = c("FFDA", "FDMA", "FFDA", "FFDA"),
+    student_college        = "ARTS",
+    student_campus         = "ABQ",
+    dept_code              = "FDMA",
+    is_pre_major           = c(TRUE, FALSE, TRUE, TRUE),
+    student_level          = "Undergraduate",
+    degree                 = "BA",
+    student_population     = "Continuing Student",
+    residency              = "Resident",
+    academic_standing      = "Good Standing",
+    inst_gpa               = c(3.0, 3.1, 2.8, 2.9),
+    inst_credits_attempted = c(12L, 30L, 12L, 24L)
   )
 )
 

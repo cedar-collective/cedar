@@ -314,12 +314,14 @@ test_that("the mapping audit lists each kind of unmapped value, and college disa
   attr(got, "checked") <- NULL
   expect_equal(got, data.frame(
     kind   = c("college_disagreement", "college_disagreement", "college_disagreement",
-               "program_code", "program_code", "section_college", "source_college",
-               "subject", "unit_college"),
-    value  = c("BUSA-BBA", "BUSA-BBA", "POLS-BA", "ENGL-BA", "FSEC-BS", "AS", "EDU", "BIOL", "PSYC"),
+               "program_code", "program_code", "program_code", "program_code",
+               "section_college", "source_college", "subject", "unit_college"),
+    # FDMA and FFDA are EC-38's major and pre-major, which these audit files do not map.
+    value  = c("BUSA-BBA", "BUSA-BBA", "POLS-BA", "ENGL-BA", "FDMA", "FFDA", "FSEC-BS", "AS", "EDU",
+               "BIOL", "PSYC"),
     status = c("expected", "review", "review", "unmapped", "unmapped", "unmapped", "unmapped",
-               "unmapped", "unmapped"),
-    rows   = c(1L, 3L, 4L, 2L, 1L, 17L, 1L, 2L, NA)))
+               "unmapped", "unmapped", "unmapped", "unmapped"),
+    rows   = c(1L, 3L, 4L, 2L, 1L, 3L, 1L, 17L, 1L, 2L, NA)))
   expect_setequal(attr(audit, "checked"),
                   c("subject", "class_list_program_code", "section_college", "program_code",
                     "source_college", "college_disagreement", "degree_program_code",
@@ -335,7 +337,7 @@ test_that("the mapping audit lists each kind of unmapped value, and college disa
                  "A decision: confirm, or set the program's college_code",
                  "A home college for the unit"))
   expect_equal(unique(audit$needs[audit$status == "expected"]), "Nothing: an expected difference")
-  expect_match(summarize_mapping_audit(audit), "^Mapping audit: 6 unmapped value\\(s\\), 2 mapped")
+  expect_match(summarize_mapping_audit(audit), "^Mapping audit: 8 unmapped value\\(s\\), 2 mapped")
   # Named columns reach the browser as JSON objects and break the table. Stored
   # cedar_programs built before the transform unnamed it carry a named
   # major_code; the audit must not pass the names on.

@@ -42,7 +42,7 @@ alongside other work (M14, M16).
 | [I46](#i46--a-deploy-that-must-rebuild-a-table-the-app-cannot-start-without-takes-the-site-down) | Defect | The deploy's table gate ran after the health check, so a deploy that added a column to `cedar_student_terms` failed its health check on the missing column and never reached the gate: production served the restart page from 17:07 UTC on 2026-11-04 (gate moved before the first request) |
 | [I45](#i45--the-class-list-and-the-schedule-name-the-same-section-with-different-course-codes) | Defect | The class list and the schedule name the same section with different course codes for renamed subjects (SOC to SOCI, PSY to PSYC): SOCI 371 had class-list history from Fall 2019 but no sections before Fall 2021 (fixed for every reader by keying the loaded tables on the course, 2026-11-07; open until the remaining successions are confirmed) |
 | [I43](#i43--every-scheduled-refresh-fails-because-the-default-asks-for-a-report-mrgather-never-fetches) | Defect | Every scheduled refresh has failed since 2026-10-24: the default asks for the applicants report, which production mrgather never fetches, so production tables have not been rebuilt since Oct 27 (default fixed; mrgather and per-report rebuilds remain) |
-| [I38](#i38--a-pathways-program-population-misses-pre-majors-whose-name-differs-from-their-major) | Defect | A Pathways program population misses pre-majors whose name differs from their major: "Film and Digital Arts" holds 1 of the 1,016 Film pre-majors who never declared the major, because `FFDA` is named "FDMA" |
+| [I38](#i38--a-pathways-program-population-misses-pre-majors-whose-name-differs-from-their-major) | Defect | A Pathways program population misses pre-majors whose name differs from their major: "Film and Digital Arts" holds 1 of the 1,016 Film pre-majors who never declared the major, because `FFDA` is named "FDMA" (fixed 2026-11-11 through `leads_to`; open for the eleven names in `programs.csv`) |
 | [I37](#i37--renumbered-courses-lose-their-history) | Defect | Renumbered courses lose their history: ACCT 3401 (was MGMT 340) and the other Fall 2026 ACCT, BUSA and POPH courses read as new (every reader follows a confirmed renumbering; 277 of the 320 title matches confirmed 2026-11-07, 6 deleted, 37 held for review with the reason on each row) |
 | [I33](#i33--a-crashed-myreports-download-is-recorded-as-a-successful-fetch) | Defect | A crashed MyReports download is recorded as a successful fetch: on Oct 23 class lists and applicants were never downloaded, and every step reported ✅ (partly fixed) |
 | [I32](#i32--a-scheduled-refresh-waits-forever-when-myreports-asks-for-a-2fa-code) | Defect | A scheduled refresh waits forever when MyReports asks for a 2FA code: the Oct 11 run sat 12 days at the prompt, unreported |
@@ -63,6 +63,7 @@ Kept until the next release, so a recurrence is recognisable; each entry below g
 
 | ID | Kind | Summary |
 |---|---|---|
+| [I53](#i53--declaring-the-major-a-pre-major-leads-to-was-counted-as-a-change-of-major) | Defect | Pathways > Major Changes counted a student moving from a pre-major to its own major as a change of major whenever the two names differ ("FDMA" to "Film and Digital Arts"): 1,414 of 23,388 change events (resolved 2026-11-11: a pre-major and the major it leads to are one program) |
 | [I51](#i51--a-classification-filter-matched-nobody-its-value-was-split-on-the-comma) | Defect | `filter_class_list()` split every filter value on commas, so a classification filter (`"Sophomore, 2nd Yr"`) became two values that match no row, and Regstats' sophomore screen never found a course (resolved 2026-11-07) |
 | [I47](#i47--the-class-lists-student_classification-is-stamped-at-pull-time-when-a-term-is-pulled-late) | Defect | A class list pulled months after its term carries each student's classification as of the pull (35% of ENGL 1120's Fall 2025 registered student-terms one step ahead); every reader now takes the student-term table's, and the loaded class list carries none (resolved 2026-11-07) |
 | [I49](#i49--ticking-break-out-by-instructor-errors-the-retention-tables-until-run) | Defect | Ticking "Break out by instructor" on Course Dynamics > Retention errored every retention table until Run, because the renderers read the checkbox rather than how the shown result was computed (resolved 2026-11-07) |
@@ -84,6 +85,28 @@ Kept until the next release, so a recurrence is recognisable; each entry below g
 ---
 
 # Defects
+
+## I53 — Declaring the major a pre-major leads to was counted as a change of major
+
+**Status:** resolved 2026-11-11.
+**Found:** 2026-11-11, adding I38's fixture: its pre-major student who then
+declared the major appeared in `detect_major_changes()`.
+**Severity:** moderate. Pathways > Major Changes counted a student moving
+from a pre-major to its own major as a major change whenever the two rows'
+names differ, the same eleven drifted names as I38: 1,414 of 23,388 change
+events on the 2026-11-04 tables, 980 of them "FDMA" to "Film and Digital
+Arts", then Liberal Arts & Integrative Studies (182) and Signed Language
+Interpreting (76). Each inflated its program's switched-in and switched-out
+flows and the courses-before-leaving tables.
+**Cause:** `detect_major_changes()` (`R/branches/major-change-detection.R`)
+compared consecutive `program_name` values only.
+**Reproduction:** `detect_major_changes(cedar_programs, opt =
+list(premajor_leads_to = c(x = "y")))` (a map that ties nothing) returns the
+old count; `count(from_major, to_major)` shows the pairs.
+**Fix:** two consecutive rows are one program when either's code leads to the
+other's in `premajor_leads_to` (programs.csv `leads_to`); `major_code` is
+required. "declaring the major a pre-major leads to is not a major change" in
+`test-pathways-integration.R` fails without it.
 
 ## I52 — Sections stored the instructor's employee ID, so they joined no other table
 
@@ -758,7 +781,16 @@ user guide says the column describes the same season last year.
 
 ## I38 — A Pathways program population misses pre-majors whose name differs from their major
 
-**Status:** open
+**Status:** fixed 2026-11-11 for every program population: `build_population()`
+adds the pre-major codes whose `leads_to` is a focal code
+(`pre_major_codes_leading_to()`, shared with `population_group_major_codes()`).
+Fixture EC-38 is a pre-major named unlike its major; the test in
+`test-pathways-integration.R` fails without the fix. On the 2026-11-04 tables
+the Film and Digital Arts population (every outcome) goes from 1,149 students
+to 2,164: all 2,000 students ever declared `FFDA` are in it (985 before), and
+all 1,013 who never declared `FDMA` (none before). Open only for the eleven
+names in `programs.csv`, which no longer change a count but still read
+oddly where a pre-major's name is shown; a mapping decision.
 **Found:** 2026-10-26, while adding Film and Digital Arts to Degree Explorer
 **Severity:** moderate — a program population undercounts its pre-majors, so
 their outcomes (`chose_elsewhere`, `left_undeclared`) read low or vanish.

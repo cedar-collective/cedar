@@ -63,7 +63,7 @@ test_that("SFR data is non-empty for departments with students and faculty", {
                             group_by = c("term", "dept_code", "student_level", "program_type", "program_name"))
   studfac_ratios <- hc_result$data
 
-  expect_equal(nrow(studfac_ratios), 37L)
+  expect_equal(nrow(studfac_ratios), 40L)  # 37 + EC-38: FDMA 202010, and FDMA + Film and Digital Arts 202080
 
   # Find matching department
   unique_depts <- unique(studfac_ratios$dept_code)
