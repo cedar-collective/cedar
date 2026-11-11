@@ -46,7 +46,6 @@ alongside other work (M14, M16).
 | [I37](#i37--renumbered-courses-lose-their-history) | Defect | Renumbered courses lose their history: ACCT 3401 (was MGMT 340) and the other Fall 2026 ACCT, BUSA and POPH courses read as new (every reader follows a confirmed renumbering; 277 of the 320 title matches confirmed 2026-11-07, 6 deleted, 37 held for review with the reason on each row) |
 | [I33](#i33--a-crashed-myreports-download-is-recorded-as-a-successful-fetch) | Defect | A crashed MyReports download is recorded as a successful fetch: on Oct 23 class lists and applicants were never downloaded, and every step reported ✅ (partly fixed) |
 | [I32](#i32--a-scheduled-refresh-waits-forever-when-myreports-asks-for-a-2fa-code) | Defect | A scheduled refresh waits forever when MyReports asks for a 2FA code: the Oct 11 run sat 12 days at the prompt, unreported |
-| [I28](#i28--one-late-starting-session-makes-a-whole-courses-first-day-unknown) | Defect | One late-starting session makes a whole course's first day unknown: 257 Fall 2026 courses on the Oct 8 pull, 17 on Oct 23. Intersession is out of the forecast (model 0.24.0), and a session not yet begun is judged on its lower bound (model 0.25.0). A section with no start date still reads as having no status dates |
 | [I24](#i24--cis-demo-browser-run-intermittently-loses-the-app-at-open-seats) | Defect | CI's demo browser run intermittently loses the app at Open Seats (probably fixed 2026-10-23: a test race) |
 | [I23](#i23--student-ids-are-hashed-with-the-built-in-default-salt) | Defect | Student IDs are hashed with the built-in default salt: the salt protects nothing |
 | [I20](#i20--cedar_programs-holds-almost-no-branch-campus-students) | Defect | `cedar_programs` holds 1–3% of branch-campus students; branch program counts read near zero |
@@ -63,6 +62,7 @@ Kept until the next release, so a recurrence is recognisable; each entry below g
 
 | ID | Kind | Summary |
 |---|---|---|
+| [I28](#i28--one-late-starting-session-makes-a-whole-courses-first-day-unknown) | Defect | One late-starting session made a whole course's first day unknown (257 Fall 2026 courses on the Oct 8 pull), under a reason that read as missing status dates. Intersession is out of the forecast (model 0.24.0), a session not yet begun is judged on its lower bound (0.25.0), and a section with no start date now has its own basis and reason (resolved 2026-11-11) |
 | [I51](#i51--a-classification-filter-matched-nobody-its-value-was-split-on-the-comma) | Defect | `filter_class_list()` split every filter value on commas, so a classification filter (`"Sophomore, 2nd Yr"`) became two values that match no row, and Regstats' sophomore screen never found a course (resolved 2026-11-07) |
 | [I47](#i47--the-class-lists-student_classification-is-stamped-at-pull-time-when-a-term-is-pulled-late) | Defect | A class list pulled months after its term carries each student's classification as of the pull (35% of ENGL 1120's Fall 2025 registered student-terms one step ahead); every reader now takes the student-term table's, and the loaded class list carries none (resolved 2026-11-07) |
 | [I49](#i49--ticking-break-out-by-instructor-errors-the-retention-tables-until-run) | Defect | Ticking "Break out by instructor" on Course Dynamics > Retention errored every retention table until Run, because the renderers read the checkbox rather than how the shown result was computed (resolved 2026-11-07) |
@@ -3001,11 +3001,12 @@ has `spine - actual_first_day >= waitlisted_prior`.
 
 ## I28 — One late-starting session makes a whole course's first day unknown
 
-**Status:** open, mostly fixed. Intersession is out of the forecast (model
+**Status:** resolved 2026-11-11. Intersession is out of the forecast (model
 0.24.0, 2026-10-23), so a December session no longer blanks the Fall first
 day. A session not yet begun is judged on its lower bound (model 0.25.0,
-2026-10-24; see *Fix* below). Still open: a section with no start date is
-filed with the terms that have no status dates, and its reason says so.
+2026-10-24; see *Fix* below). A section with no start date has its own basis
+and reason (2026-11-11, branch `enrl/first-day-no-start-date`; see the last
+section).
 **Found:** 2026-10-18, reading the Fall 2027 projection rows (model 0.22.0)
 for a transparency review
 **Severity:** moderate — a course that was full last term is shown as unknown,
@@ -3114,11 +3115,27 @@ Oct 23 pull, by which every second-half session had begun. No published row
 is pending, and no projection, plan, section count, bump or range differs
 from 0.24.0 in either season.
 
-Still open:
+### Fix for a missing start date (2026-11-11)
 
-- `undated` covers both a missing status date (M32) and a missing start date.
-  Its reason reads "no status dates" for both. A missing start date is the
-  case of the 10 courses above that are in no projection.
+`undated` covered both a missing status date (M32) and a missing start date,
+and its reason read "no status dates" for both. They have different remedies:
+a re-pull of the class list supplies status dates and never a start date.
+`calc_first_day_enrl()` now returns `first_day_basis = "no_start_date"` when
+every row has its status date and the schedule gives some row's section no
+start date, or has no row for it; `undated` means a status date is missing.
+The count stays `NA` either way, and there is no lower bound. Course history
+reads "Section start date missing" and the projections table "a section has
+no start date". No calculation reads the new value: the projection judges a
+first day only when it is complete or `sessions_pending`.
+`cedar_course_terms` is build 5, so the deploy's gate rebuilds the measure
+tables; `R/branches/enrl.R` is projection model source, so that deploy also
+rebuilds both bundles (the model version is unchanged).
+
+On the 2026-11-04 tables, ABQ and EA, by campus, college and course: Fall
+2025 has 9 groups with `no_start_date` that read `undated` before, and Fall
+2024, which has no status dates, keeps `undated` on all 2,760.
+`test-course-planning-history.R` removes EC-11c's second-half start date,
+then its schedule row; with the old `case_when` both read `undated`.
 - Course Dynamics (`add_first_day_enrl()`) shows a pending term as a dash and
   does not give the reason.
 

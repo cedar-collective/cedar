@@ -352,6 +352,7 @@ projection_prior_fill <- function(projections, header_term = NULL) {
   )
   unknown_cause <- dplyr::case_when(
     basis == "undated" ~ "no status dates",
+    basis == "no_start_date" ~ "a section has no start date",
     basis == "sessions_pending" ~ "a session had not begun",
     basis == "no_capacity" ~ "no seat count",
     TRUE ~ NA_character_

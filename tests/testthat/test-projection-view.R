@@ -369,11 +369,13 @@ test_that("the Day-1 fill column names last year's fill, who waited, and why a f
   expect_true(all(is.na(projection_prior_fill(rows)$prior_fill_term)))
   # Every recorded cause of an unknown fill is named (ISSUES.md I28).
   causes <- projection_prior_fill(dplyr::mutate(
-    rows[c(4, 4, 4), ],
-    adjusted_prior_first_day_basis = c("undated", "sessions_pending", "no_capacity")
+    rows[c(4, 4, 4, 4), ],
+    adjusted_prior_first_day_basis = c("undated", "sessions_pending", "no_capacity",
+                                       "no_start_date")
   ))
   expect_equal(causes$prior_fill_note,
-               c("no status dates", "a session had not begun", "no seat count"))
+               c("no status dates", "a session had not begun", "no seat count",
+                 "a section has no start date"))
   expect_error(projection_prior_fill(dplyr::select(rows, -spine_term)), "spine_term")
 })
 

@@ -58,7 +58,8 @@
 #' or changes meaning, so a saved copy from the older build is rebuilt.
 #' 3: first-day enrollment, the schedule's offerings and seats, subject_code.
 #' 4: a crosslisted section is counted once, under its home listing.
-COURSE_TERMS_BUILD_VERSION <- 4L
+#' 5: `first_day_basis` gains "no_start_date", split from "undated" (I28).
+COURSE_TERMS_BUILD_VERSION <- 5L
 
 #' The row key: a course offered on a campus in a part of one term.
 COURSE_TERMS_KEY <- c("campus", "college", "term", "subject_course", "part_term")

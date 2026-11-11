@@ -121,6 +121,39 @@ test_that("a session not yet begun leaves the first day pending, with the begun 
   expect_false(h$pressure$pressure_status[h$pressure$part_term == "1"] == "Session not yet begun")
 })
 
+# ISSUES.md I28: a section the schedule gives no start date was filed with the
+# rows that have no status dates, and its reason said so. EC-11c's rows all
+# carry status dates; here its 2H section loses its start date, then its
+# schedule row.
+test_that("a section with no start date is not reported as missing status dates", {
+  no_start <- test_sections_pending_session %>%
+    mutate(start_date = if_else(part_term == "2H", as.Date(NA), start_date))
+  expect_equal(sum(is.na(no_start$start_date)), 1L)
+  course <- calc_first_day_enrl(test_students_pending_session, no_start)
+  expect_true(is.na(course$first_day_enrl))
+  expect_equal(course$first_day_basis, "no_start_date")
+  # No lower bound either: a section with no start has no begun-or-not.
+  expect_true(is.na(course$first_day_started_enrl))
+  by_session <- calc_first_day_enrl(test_students_pending_session, no_start, by_part_term = TRUE)
+  expect_equal(by_session$first_day_basis[by_session$part_term == "1"], "complete")
+  expect_equal(by_session$first_day_enrl[by_session$part_term == "1"], 8L)
+  expect_equal(by_session$first_day_basis[by_session$part_term == "2H"], "no_start_date")
+  # A class-list section with no schedule row has no start date to read.
+  unscheduled <- calc_first_day_enrl(
+    test_students_pending_session, filter(test_sections_pending_session, part_term != "2H"))
+  expect_equal(unscheduled$first_day_basis, "no_start_date")
+  # A missing status date still decides it: that is the class list's gap.
+  one_undated <- test_students_pending_session
+  one_undated$registration_date[one_undated$registration_status_code %in% STATUS_REGISTERED][1] <- NA
+  expect_equal(calc_first_day_enrl(one_undated, no_start)$first_day_basis, "undated")
+  # Course history names the reason on the session it belongs to.
+  terms <- pending_session_terms %>%
+    mutate(first_day_basis = if_else(part_term == "2H", "no_start_date", first_day_basis))
+  h <- get_course_planning_history(no_start, terms, "SOCI 100",
+    list(last_enrolled_complete = 202180L))
+  expect_equal(h$pressure$pressure_status[h$pressure$part_term == "2H"], "Section start date missing")
+})
+
 test_that("frequency includes observed source terms when a course was absent", {
   h <- course_history("SOCI 104")
   fall <- h$frequency %>% filter(campus == "ABQ", term_type == "fall")

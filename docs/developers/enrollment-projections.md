@@ -219,8 +219,10 @@ against its section's first class day (`calc_first_day_enrl(..., pool_campuses
 = TRUE)`, each student-course once across the pooled market). It is the
 occupancy every seat judgment reads (0.21.0). It is `NA`, never a partial count,
 for a course-term whose class lists carry no status dates (`first_day_basis =
-"undated"`) or that has a session which had not begun when the class list was
-pulled (`"sessions_pending"`, such as a second-half session; ISSUES.md I28). A
+"undated"`), that has a section the schedule gives no start date
+(`"no_start_date"`), or that has a session which had not begun when the class
+list was pulled (`"sessions_pending"`, such as a second-half session;
+ISSUES.md I28). A
 pending term also carries `first_day_started_enrl`, the count over the sessions
 that had begun. Divided by all the scheduled seats it is a lower bound on fill,
 so `projection_judged_first_day()` uses it only where it already reaches the
@@ -994,7 +996,7 @@ the summary flag "EA full in Spring 2026, ABQ had room" compares the latest
 term's complete campus first days at the two seat-fill levels, read live, and
 names that term. Published
 rows gain `adjusted_prior_first_day_basis` (`complete`, `sessions_begun`,
-`sessions_pending`, `undated`, `no_capacity`), so a prior term full on the
+`sessions_pending`, `no_start_date`, `undated`, `no_capacity`), so a prior term full on the
 first day is flagged full rather than near full, and an unknown prior fill
 names its cause. Validation requires each campus row to belong to a
 recent-history term, once.

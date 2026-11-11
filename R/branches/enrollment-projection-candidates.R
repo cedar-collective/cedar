@@ -249,7 +249,7 @@ projection_spine_floor <- function(spine_row, section_history, waitlist_history,
   partial <- !is.finite(spine_row$first_day_enrl[[1]]) && is.finite(first_day)
   # How the prior first day was read, as a code for flags: "complete",
   # "sessions_begun" (judged on the lower bound), "sessions_pending",
-  # "undated", or "no_capacity".
+  # "no_start_date", "undated", or "no_capacity".
   read_as <- if (partial) "sessions_begun" else as.character(first_day_basis)
   fill_text <- function(fill) paste0(
     "first-day fill ", if (partial) "at least " else "",

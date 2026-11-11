@@ -54,6 +54,9 @@ get_course_planning_history <- function(sections, course_terms, subject_courses,
         # A session that had not begun when the class list was pulled has
         # dates; it has no first day yet (ISSUES.md I28).
         !first_day_known & first_day_basis %in% "sessions_pending" ~ "Session not yet begun",
+        # The status dates are there; the schedule has no start date to read
+        # them against, which no re-pull of the class list supplies.
+        !first_day_known & first_day_basis %in% "no_start_date" ~ "Section start date missing",
         !first_day_known ~ "First-day dates unavailable", !capacity_usable ~ "Unreliable capacity",
         near_full ~ "Near full", TRUE ~ paste("Below", scales::percent(CEDAR_NEAR_FULL_FILL))))
   terms <- pressure %>% group_by(campus, subject_course, term) %>%
