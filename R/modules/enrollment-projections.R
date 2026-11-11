@@ -803,13 +803,17 @@ bind_projection_detail_outputs <- function(output, ns, detail) {
   invisible(NULL)
 }
 
-# The projections table: one row per course, opening on what each plan adds.
+# The projections table: one row per course, read left to right in the order
+# the numbers come about: what happened in recent terms, what is projected,
+# what the plan makes of it, and how far to rely on it. Each of the four has
+# its heading over its columns. The rows open sorted by what each plan adds.
 projection_table_reactable <- function(projection_view, select_input) {
   data <- projection_view$table
   if (nrow(data) == 0L) return(NULL)
   season <- projection_view$meta$season_label
   history_terms <- projection_view$meta$summary_history_columns
   fill_term <- projection_view$meta$prior_fill_term_label
+  target <- projection_view$meta$target_term_label
   # Sort keys, so a header click orders by meaning rather than by the
   # alphabet. Each sits where its column shows and renders that column's
   # label, which stays searchable in its own hidden column.
@@ -828,7 +832,16 @@ projection_table_reactable <- function(projection_view, select_input) {
     ) %>%
     dplyr::relocate(plan_adds_size, .before = pressure_bump) %>%
     dplyr::relocate(flags_order, .before = flags) %>%
-    dplyr::relocate(accuracy_order, .before = accuracy)
+    dplyr::relocate(accuracy_order, .before = accuracy) %>%
+    # The display order. A column's hidden companions follow wherever they
+    # are: cells read them by name.
+    dplyr::relocate(
+      course, department,
+      recent_first_day, prior_fill,
+      projected_demand, expected_first_day,
+      plan_adds_size, planning_sections,
+      flags_order, accuracy_order
+    )
   # Sized to fit a laptop-width window without horizontal scrolling: the
   # department sits under the course, the planned registrations under the
   # sections, the range under the registrations, seat moves under
@@ -846,6 +859,24 @@ projection_table_reactable <- function(projection_view, select_input) {
     pagination = FALSE,
     # Ties (most courses add nothing) stay alphabetical.
     defaultSorted = list(plan_adds_size = "desc", course = "asc"),
+    columnGroups = list(
+      reactable::colGroup(
+        name = paste("Recent", season, "terms"),
+        columns = c("recent_first_day", "prior_fill")
+      ),
+      reactable::colGroup(
+        name = paste("Projected for", target),
+        columns = c("projected_demand", "expected_first_day")
+      ),
+      reactable::colGroup(
+        name = paste("Plan for", target),
+        columns = c("plan_adds_size", "planning_sections")
+      ),
+      reactable::colGroup(
+        name = "How far to rely on it",
+        columns = c("flags_order", "accuracy_order")
+      )
+    ),
     columns = list(
       course = projection_course_coldef(data$department, width = 96),
       department = reactable::colDef(show = FALSE, searchable = TRUE),

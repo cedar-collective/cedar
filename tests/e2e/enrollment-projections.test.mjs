@@ -238,13 +238,34 @@ async function closeEvidence(page) {
   ];
   // The Day-1 fill header carries its term, so it is matched by prefix.
   const hasFillHeader = table.headers.some((h) => /^day-1 fill\b/i.test(h));
+  // Left to right in the order the numbers come about: recent terms, the
+  // projection, the plan, then how far to rely on it.
+  const fillAt = table.headers.findIndex((h) => /^day-1 fill\b/i.test(h));
+  const order = [
+    colIndex(table.headers, 'Course'), fillAt,
+    colIndex(table.headers, 'Registrations'), colIndex(table.headers, 'Students (day 1)'),
+    colIndex(table.headers, 'Plan adds'), colIndex(table.headers, 'Sections'),
+    colIndex(table.headers, 'Flags'), colIndex(table.headers, 'Reliability'),
+  ];
   check(
-    'projection table leads with the decision and ends with reliability',
+    'projection table reads history, projection, plan, then reliability',
     hasFillHeader &&
       requiredHeaders.every((header) => colIndex(table.headers, header) >= 0) &&
-      colIndex(table.headers, 'Sections') < colIndex(table.headers, 'Reliability'),
+      order.every((at, i) => at >= 0 && (i === 0 || order[i - 1] < at)),
     table.headers.join(' | ')
   );
+  const groupHeadings = await page.evaluate(() => {
+    const root = document.getElementById('enrollment_projections-projection_table');
+    return [...root.querySelectorAll('.rt-thead .rt-th-group')]
+      .map((h) => h.innerText.replace(/\s+/g, ' ').trim());
+  });
+  check('each part of the table has its heading, the projection and plan naming the term',
+    groupHeadings.length === 4 &&
+      /^Recent (Spring|Fall) terms$/.test(groupHeadings[0]) &&
+      /^Projected for (Spring|Fall) \d{4}$/.test(groupHeadings[1]) &&
+      /^Plan for (Spring|Fall) \d{4}$/.test(groupHeadings[2]) &&
+      groupHeadings[3] === 'How far to rely on it',
+    groupHeadings.join(' | '));
   // Seat moves sit under reliability; own history and evidence are in the
   // course detail. "Seats" once headed a column of students.
   check('seat consistency, own history and evidence are not table columns',
@@ -255,11 +276,11 @@ async function closeEvidence(page) {
   // column, so no flag repeats it.
   const ratingCells = await page.evaluate(() => {
     const root = document.getElementById('enrollment_projections-projection_table');
-    const headers = [...root.querySelectorAll('.rt-thead .rt-th')].map((c) => c.innerText.trim());
+    const headers = [...root.querySelectorAll('.rt-thead .rt-th:not(.rt-th-group):not(.rt-th-group-none)')].map((c) => c.innerText.trim());
     const at = (name) => headers.findIndex((h) => h.toLowerCase().startsWith(name));
     const rows = [...root.querySelectorAll('.rt-tbody .rt-tr')];
     const cell = (row, i) => row.querySelectorAll('.rt-td')[i];
-    const fillHeader = root.querySelectorAll('.rt-thead .rt-th')[at('day-1 fill')];
+    const fillHeader = root.querySelectorAll('.rt-thead .rt-th:not(.rt-th-group):not(.rt-th-group-none)')[at('day-1 fill')];
     return {
       reliability: rows.map((r) => cell(r, at('reliability')).innerText.trim()),
       sections: rows.map((r) => cell(r, at('sections')).innerText.trim()),
@@ -365,7 +386,7 @@ async function closeEvidence(page) {
   const historyCells = await page.evaluate(() => {
     const root = document.getElementById('enrollment_projections-projection_table');
     if (!root) return null;
-    const header = [...root.querySelectorAll('.rt-thead .rt-th')]
+    const header = [...root.querySelectorAll('.rt-thead .rt-th:not(.rt-th-group):not(.rt-th-group-none)')]
       .find((cell) => /first day \/ sections/i.test(cell.innerText));
     const grids = [...root.querySelectorAll('.rt-tbody .projection-history-grid')];
     return {
@@ -478,7 +499,7 @@ async function closeEvidence(page) {
   // first, and a rating column sorts weakest first rather than alphabetically.
   const openingSort = await page.evaluate(() => {
     const root = document.getElementById('enrollment_projections-projection_table');
-    const header = root && [...root.querySelectorAll('.rt-thead .rt-th')]
+    const header = root && [...root.querySelectorAll('.rt-thead .rt-th:not(.rt-th-group):not(.rt-th-group-none)')]
       .find((cell) => /^plan adds$/i.test(cell.innerText.trim()));
     return header ? header.getAttribute('aria-sort') : null;
   });
@@ -486,14 +507,14 @@ async function closeEvidence(page) {
     openingSort === 'descending', String(openingSort));
   await page.evaluate(() => {
     const root = document.getElementById('enrollment_projections-projection_table');
-    const header = [...root.querySelectorAll('.rt-thead .rt-th')]
+    const header = [...root.querySelectorAll('.rt-thead .rt-th:not(.rt-th-group):not(.rt-th-group-none)')]
       .find((cell) => /^reliability$/i.test(cell.innerText.trim()));
     if (!header) throw new Error('no Reliability header');
     header.click();
   });
   const reliabilitySorted = await waitFor(page, () => {
     const root = document.getElementById('enrollment_projections-projection_table');
-    const header = [...root.querySelectorAll('.rt-thead .rt-th')]
+    const header = [...root.querySelectorAll('.rt-thead .rt-th:not(.rt-th-group):not(.rt-th-group-none)')]
       .find((cell) => /^reliability$/i.test(cell.innerText.trim()));
     return header && header.getAttribute('aria-sort') === 'descending';
   }, { timeout: 10000 });
@@ -502,7 +523,7 @@ async function closeEvidence(page) {
   // keeps its rating in the hover, so the order is read there, not from the tone.
   const reliabilityOrder = reliabilitySorted && await page.evaluate(() => {
     const root = document.getElementById('enrollment_projections-projection_table');
-    const index = [...root.querySelectorAll('.rt-thead .rt-th')]
+    const index = [...root.querySelectorAll('.rt-thead .rt-th:not(.rt-th-group):not(.rt-th-group-none)')]
       .findIndex((cell) => /^reliability$/i.test(cell.innerText.trim()));
     return [...root.querySelectorAll('.rt-tbody .rt-tr')].map((row) => {
       const badge = row.querySelectorAll('.rt-td')[index].querySelector('.projection-axis');
