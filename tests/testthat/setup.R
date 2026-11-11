@@ -27,6 +27,7 @@ test_students_mc     <<- cedar_registrations_mc       # MC02: sequence + co-req 
 test_programs_mc     <<- cedar_programs_mc       # MC02 covariates
 test_students_mcret  <<- cedar_registrations_mcret    # MC03: retention cohorts, incl. a campus move
 test_students_wlmkt  <<- cedar_registrations_wlmkt    # WL01: a waitlist in the pooled ABQ+EA market
+test_students_wlterm <<- cedar_registrations_wlterm   # WL02: waiting counted per term
 test_sections_intersession <<- cedar_sections_intersession # IS01: a December intersession, out of the forecast
 test_students_intersession <<- cedar_registrations_intersession # IS01
 test_students_rw     <<- cedar_registrations_rw      # RW01: last term's students, registered for the next

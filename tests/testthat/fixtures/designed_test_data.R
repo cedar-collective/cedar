@@ -95,6 +95,9 @@
 #          GA  cohort n=2 (MC_R3 returns AT ABQ, MC_R4 does not) -> ret_1 = 0.5
 #          A campus-blind grouping reports a single 0.75 and hides both facts.
 #
+#   WL02 — cedar_registrations_wlterm (7 rows). PSYC 1110 across Fall 2020 and
+#          Spring 2021: waiting is per term (ISSUES.md I16). Pinned: ABQ Fall
+#          2020 waiting 2, ABQ Spring 2021 waiting 1, EA Spring 2021 waiting 1.
 #   WL01 — cedar_registrations_wlmkt (13 rows). PSYC 1110, Fall 2020, a waitlist in
 #          the pooled ABQ+EA projection market. 7 students carry a waitlist row;
 #          2 are waiting in the market. The canonical per-campus rule alone
@@ -3258,6 +3261,38 @@ cedar_registrations_wlmkt <- dplyr::bind_rows(
   .wl_row("WL_F", "GA", "WL"),
   .wl_row("WL_G", "ABQ", "WL", course = "PSYC 2110"),
   .wl_row("WL_R1", "ABQ", "RE"), .wl_row("WL_R2", "EA", "RE")
+)
+
+# ── WL02: waiting is per term ────────────────────────────────────────────────
+# ISSUES.md I16: get_bottlenecks() matched waitlisted against registered rows
+# by student, campus and course with no term, so a seat in any later term
+# erased earlier waiting, and a student waiting in two terms counted once.
+# PSYC 1110:
+#
+#   student  Fall 2020        Spring 2021     waiting
+#   WT_A     WL at ABQ        RE at ABQ       Fall 2020 (got in a term later)
+#   WT_B     WL at ABQ        WL at ABQ       both terms
+#   WT_C     WL and RE, ABQ   none            never: registered that term
+#   WT_D     none             WL at EA        Spring 2021, at EA
+#
+# Pinned: ABQ Fall 2020 waiting 2 (WT_A, WT_B), ABQ Spring 2021 waiting 1
+# (WT_B), EA Spring 2021 waiting 1 (WT_D). Matching without the term gives
+# ABQ 1 (WT_B alone) and loses the terms.
+.wt_row <- function(sid, term_code, campus, status) {
+  .wl_row(sid, campus, status) %>%
+    dplyr::mutate(
+      term = as.integer(term_code),
+      enrollment_id = paste("WL02", sid, term_code, campus, status, sep = "-"),
+      section_id = paste0("MCSEC-PSYC1110-", term_code, "-", campus),
+      crn = paste0("MCPSYC11", term_code),
+      term_type = ifelse(term_code %% 100 == 10, "spring", "fall")
+    )
+}
+cedar_registrations_wlterm <- dplyr::bind_rows(
+  .wt_row("WT_A", 202080L, "ABQ", "WL"), .wt_row("WT_A", 202110L, "ABQ", "RE"),
+  .wt_row("WT_B", 202080L, "ABQ", "WL"), .wt_row("WT_B", 202110L, "ABQ", "WL"),
+  .wt_row("WT_C", 202080L, "ABQ", "WL"), .wt_row("WT_C", 202080L, "ABQ", "RE"),
+  .wt_row("WT_D", 202110L, "EA", "WL")
 )
 
 

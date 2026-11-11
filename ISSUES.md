@@ -51,7 +51,6 @@ alongside other work (M14, M16).
 | [I23](#i23--student-ids-are-hashed-with-the-built-in-default-salt) | Defect | Student IDs are hashed with the built-in default salt: the salt protects nothing |
 | [I20](#i20--cedar_programs-holds-almost-no-branch-campus-students) | Defect | `cedar_programs` holds 1–3% of branch-campus students; branch program counts read near zero |
 | [I18](#i18--cedar_degrees-holds-no-associate-degrees-so-branch-campus-completions-read-zero) | Defect | `cedar_degrees` holds no associate degrees: branch-campus completions read zero |
-| [I16](#i16--bottleneck-waitlist-pressure-ignores-term-so-later-registration-erases-earlier-waiting) | Defect | `get_bottlenecks()` waitlist pressure ignores term: ~6% under true demand (RStudio only; no page shows it) |
 | [I8](#i8--a-timing-log-row-is-silently-dropped-when-the-write-lock-times-out) | Defect | A timing-log row is dropped when the write lock times out |
 | [I6](#i6--a-killed-projection-rebuild-strands-its-lock-and-blocks-every-later-refresh) | Defect | A killed projection rebuild strands its lock |
 | [I4](#i4--pre-change-course-ratios-are-confounded-by-career-stage) | Defect | Pre-change course ratios confounded by career stage (deferred) |
@@ -63,6 +62,7 @@ Kept until the next release, so a recurrence is recognisable; each entry below g
 
 | ID | Kind | Summary |
 |---|---|---|
+| [I16](#i16--bottleneck-waitlist-pressure-ignores-term-so-later-registration-erases-earlier-waiting) | Defect | `get_bottlenecks()` matched waitlisted against registered rows with no term, so a seat in any later term erased earlier waiting: about 6% under true demand (RStudio only). It now returns the canonical class-list waitlist demand per campus, term and course (resolved 2026-11-11) |
 | [I51](#i51--a-classification-filter-matched-nobody-its-value-was-split-on-the-comma) | Defect | `filter_class_list()` split every filter value on commas, so a classification filter (`"Sophomore, 2nd Yr"`) became two values that match no row, and Regstats' sophomore screen never found a course (resolved 2026-11-07) |
 | [I47](#i47--the-class-lists-student_classification-is-stamped-at-pull-time-when-a-term-is-pulled-late) | Defect | A class list pulled months after its term carries each student's classification as of the pull (35% of ENGL 1120's Fall 2025 registered student-terms one step ahead); every reader now takes the student-term table's, and the loaded class list carries none (resolved 2026-11-07) |
 | [I49](#i49--ticking-break-out-by-instructor-errors-the-retention-tables-until-run) | Defect | Ticking "Break out by instructor" on Course Dynamics > Retention errored every retention table until Run, because the renderers read the checkbox rather than how the shown result was computed (resolved 2026-11-07) |
@@ -2400,7 +2400,8 @@ their own rows and nothing still depends on the name match.
 
 ## I16 — Bottleneck waitlist pressure ignores term, so later registration erases earlier waiting
 
-**Status:** open — confirmed 2026-10-07
+**Status:** resolved 2026-11-11 (branch `cones/bottleneck-waitlist-per-term`;
+see Fix)
 **Found:** 2026-10-07, auditing where CEDAR counts the same thing twice
 **Severity:** low — totals about 6% under the canonical count; a few courses
 read far lower. No app page shows it.
@@ -2441,6 +2442,25 @@ Roadblocks question, but then it needs its own label and definition; otherwise
 use `get_true_waitlisted_rows()` / `summarize_waitlist_demand()` per term. Either
 way, a fixture student waitlisted in 202080 and registered in 202110 for the
 same course pins the behaviour.
+
+### Fix
+
+The rule in AGENTS.md decides it: waitlist demand is the class list's true
+demand, through `R/branches/waitlist-demand.R`. `compute_waitlist_pressure()`
+is now that count restricted to the population
+(`get_true_waitlisted_rows()` then `summarize_waitlist_demand()`), and
+`get_bottlenecks()` returns one row per campus, **term** and course in
+`$waitlist` and `$by_label`. Terms are never pooled. "Waited and never got in
+during the window" is not offered; it would be a new measure with its own
+name. `get_bottlenecks()` takes an optional `sections` before `opt`, for
+course titles a class list lacks; options passed in that position are refused.
+
+Fixture WL02 (`cedar_registrations_wlterm`) holds a student waitlisted in
+Fall 2020 and registered in Spring 2021, and one waitlisted in both terms.
+The old function returns ABQ 1 on it; `test-bottleneck.R` pins ABQ Fall 2020
+2, ABQ Spring 2021 1, EA Spring 2021 1. On the reproduction above (the
+2026-11-04 tables) the result is identical to the canonical summary, row for
+row: 618 campus-term-courses, 3,954 waiting.
 
 ---
 
