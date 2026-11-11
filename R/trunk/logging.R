@@ -37,7 +37,11 @@ init_logging <- function() {
   tryCatch(
     with_timing_log_lock(
       report_timing_log_file,
-      function() ensure_report_timing_schema(report_timing_log_file)
+      function() {
+        ensure_report_timing_schema(report_timing_log_file)
+        merge_pending_timing_rows(report_timing_log_file, read_report_timings,
+                                  normalize_report_timings)
+      }
     ),
     error = function(e) message("[logging.R] Could not migrate report timing log: ",
                                e$message)
@@ -45,7 +49,11 @@ init_logging <- function() {
   tryCatch(
     with_timing_log_lock(
       client_render_timing_log_file,
-      function() ensure_client_timing_schema(client_render_timing_log_file)
+      function() {
+        ensure_client_timing_schema(client_render_timing_log_file)
+        merge_pending_timing_rows(client_render_timing_log_file, read_client_timings,
+                                  normalize_client_timings)
+      }
     ),
     error = function(e) message("[logging.R] Could not migrate client timing log: ",
                                e$message)
@@ -323,13 +331,74 @@ with_timing_log_lock <- function(path, action, timeout_sec = 2) {
       next
     }
     if (Sys.time() >= deadline) {
-      stop("Timed out waiting for timing-log lock: ", lock_dir, call. = FALSE)
+      stop(structure(
+        class = c("timing_log_lock_timeout", "error", "condition"),
+        list(message = paste0("Timed out waiting for timing-log lock: ", lock_dir),
+             call = NULL)
+      ))
     }
     Sys.sleep(0.01)
   }
 
   on.exit(unlink(lock_dir, recursive = TRUE), add = TRUE)
   action()
+}
+
+# Append one timing row, and never lose it to a busy lock. A report must not
+# hold a user's session for a telemetry write, so the wait for the lock stays
+# short; a row that cannot take it in time used to be dropped with a console
+# message, eight workers writing seven rows (ISSUES.md I8). It is now kept as
+# its own file in `<log>.pending/`, written whole under a temporary name and
+# renamed, so a file seen there is complete. Whoever next holds the lock (the
+# next row from any worker, or the next start) appends the pending rows and
+# removes their files. Any other failure is the caller's to handle, as before.
+#
+# @param read_rows,normalize_rows The log's reader and its column aligner.
+# @return "written", or "pending" when the row waits for the next write.
+append_timing_row <- function(path, timing_row, ensure_schema, read_rows,
+                              normalize_rows, timeout_sec = 2) {
+  tryCatch(
+    with_timing_log_lock(path, function() {
+      dir.create(dirname(path), recursive = TRUE, showWarnings = FALSE)
+      ensure_schema(path)
+      merge_pending_timing_rows(path, read_rows, normalize_rows)
+      append_timing_rows(path, normalize_rows(timing_row))
+      "written"
+    }, timeout_sec = timeout_sec),
+    timing_log_lock_timeout = function(e) {
+      pending_dir <- timing_pending_dir(path)
+      dir.create(pending_dir, recursive = TRUE, showWarnings = FALSE)
+      tmp <- tempfile(paste0("row-", Sys.getpid(), "-"), tmpdir = pending_dir,
+                      fileext = ".tmp")
+      write.table(normalize_rows(timing_row), tmp, sep = ",", row.names = FALSE,
+                  col.names = TRUE, qmethod = "double", na = "NA")
+      if (!isTRUE(file.rename(tmp, sub("\\.tmp$", ".csv", tmp)))) {
+        stop("[logging.R] Could not keep a timing row for the next write: ", tmp,
+             call. = FALSE)
+      }
+      message("[logging.R] Timing log busy; the row waits in ", pending_dir,
+              " for the next write.")
+      "pending"
+    }
+  )
+}
+
+timing_pending_dir <- function(path) paste0(path, ".pending")
+
+append_timing_rows <- function(path, rows) {
+  write.table(rows, path, sep = ",", row.names = FALSE,
+              col.names = !file.exists(path), append = file.exists(path),
+              qmethod = "double", na = "NA")
+}
+
+# Call with the log's lock held: one merger at a time, so no row lands twice.
+merge_pending_timing_rows <- function(path, read_rows, normalize_rows) {
+  pending <- list.files(timing_pending_dir(path), pattern = "\\.csv$", full.names = TRUE)
+  for (file in pending) {
+    append_timing_rows(path, normalize_rows(read_rows(file)))
+    unlink(file)
+  }
+  invisible(length(pending))
 }
 
 empty_report_timings <- function() {
@@ -521,6 +590,8 @@ reset_report_timings <- function(path = report_timing_log_file) {
   if (!file.exists(path)) return(0L)
 
   n_observations <- with_timing_log_lock(path, function() {
+    # Rows waiting for the lock belong to the history being reset.
+    unlink(timing_pending_dir(path), recursive = TRUE)
     if (!file.exists(path)) return(0L)
     n <- max(length(readLines(path, warn = FALSE)) - 1L, 0L)
     if (!isTRUE(file.remove(path))) {
@@ -633,15 +704,8 @@ log_client_render_timing <- function(timing, session_id = NULL,
     stringsAsFactors = FALSE
   )
 
-  with_timing_log_lock(path, function() {
-    dir.create(dirname(path), recursive = TRUE, showWarnings = FALSE)
-    ensure_client_timing_schema(path)
-    write.table(
-      normalize_client_timings(timing_row), path, sep = ",", row.names = FALSE,
-      col.names = !file.exists(path), append = file.exists(path),
-      qmethod = "double", na = "NA"
-    )
-  })
+  append_timing_row(path, timing_row, ensure_client_timing_schema,
+                    read_client_timings, normalize_client_timings)
   invisible(TRUE)
 }
 
@@ -653,6 +717,8 @@ reset_client_render_timings <- function(path = client_render_timing_log_file) {
   if (!file.exists(path)) return(0L)
 
   n_observations <- with_timing_log_lock(path, function() {
+    # Rows waiting for the lock belong to the history being reset.
+    unlink(timing_pending_dir(path), recursive = TRUE)
     if (!file.exists(path)) return(0L)
     n <- max(length(readLines(path, warn = FALSE)) - 1L, 0L)
     if (!isTRUE(file.remove(path))) {
@@ -866,17 +932,9 @@ end_report_timer <- function(timing_context, cached = FALSE, result,
   # Upgrade legacy/mixed logs before appending. qmethod = "double" keeps the
   # JSON parameter field valid CSV for read.csv() and other standard readers.
   tryCatch({
-    with_timing_log_lock(report_timing_log_file, function() {
-      dir.create(dirname(report_timing_log_file), recursive = TRUE,
-                 showWarnings = FALSE)
-      ensure_report_timing_schema(report_timing_log_file)
-      write.table(
-        normalize_report_timings(timing_row), report_timing_log_file,
-        sep = ",", row.names = FALSE,
-        col.names = !file.exists(report_timing_log_file),
-        append = file.exists(report_timing_log_file), qmethod = "double", na = "NA"
-      )
-    })
+    append_timing_row(report_timing_log_file, timing_row,
+                      ensure_report_timing_schema, read_report_timings,
+                      normalize_report_timings)
   }, error = function(e) {
     message("[logging.R] Could not write report timing: ", e$message)
   })
