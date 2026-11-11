@@ -260,11 +260,14 @@ class_list_status_date_coverage <- function(students) {
 #'
 #' `first_day_basis` says which: `"complete"`, `"sessions_pending"` (every row
 #' is dated but some section had not begun when the class list was pulled --
-#' a second-half session during the term, ISSUES.md I28) or `"undated"` (a
-#' status or start date is missing, ISSUES.md M32). `first_day_started_enrl`
-#' counts the same way over the sections that had begun: equal to
-#' `first_day_enrl` when complete, a lower bound on it while sessions are
-#' pending, NA when undated.
+#' a second-half session during the term, ISSUES.md I28), `"no_start_date"`
+#' (every row has its status date, but the schedule gives a row's section no
+#' start date, or has no row for it, ISSUES.md I28) or `"undated"` (a status
+#' date is missing, ISSUES.md M32). The two unknowns have different remedies:
+#' a re-pull of the class list supplies status dates, and never a start date.
+#' `first_day_started_enrl` counts the same way over the sections that had
+#' begun: equal to `first_day_enrl` when complete, a lower bound on it while
+#' sessions are pending, NA when a date is missing.
 #'
 #' @param students Class-list rows with `student_id`, `crn`,
 #'   `registration_status_code`, `registration_date`, `as_of_date`, and the
@@ -322,8 +325,9 @@ calc_first_day_enrl <- function(students, sections, by_part_term = FALSE,
       # A waitlist row never counts, so its dates cannot change the answer;
       # waitlists retained from a pre-term pull must not withhold the count.
       .waitlist = registration_status_code %in% STATUS_WAITLIST,
-      .dated = .waitlist |
-        (!is.na(registration_date) & !is.na(start_date) & !is.na(as_of_date)),
+      .status_dated = .waitlist |
+        (!is.na(registration_date) & !is.na(as_of_date)),
+      .dated = .waitlist | (.status_dated & !is.na(start_date)),
       .started = .dated & !.waitlist & as_of_date >= start_date,
       .known = .waitlist | .started,
       .present = (registration_status_code %in% STATUS_REGISTERED &
@@ -341,6 +345,7 @@ calc_first_day_enrl <- function(students, sections, by_part_term = FALSE,
       first_day_basis = dplyr::case_when(
         all(.known) ~ "complete",
         all(.dated) ~ "sessions_pending",
+        all(.status_dated) ~ "no_start_date",
         TRUE ~ "undated"
       ),
       first_day_started_enrl = if (all(.dated)) {
