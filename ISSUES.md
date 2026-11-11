@@ -52,6 +52,7 @@ alongside other work (M14, M16).
 | [I20](#i20--cedar_programs-holds-almost-no-branch-campus-students) | Defect | `cedar_programs` holds 1–3% of branch-campus students; branch program counts read near zero |
 | [I18](#i18--cedar_degrees-holds-no-associate-degrees-so-branch-campus-completions-read-zero) | Defect | `cedar_degrees` holds no associate degrees: branch-campus completions read zero |
 | [I16](#i16--bottleneck-waitlist-pressure-ignores-term-so-later-registration-erases-earlier-waiting) | Defect | `get_bottlenecks()` waitlist pressure ignores term: ~6% under true demand (RStudio only; no page shows it) |
+| [I6](#i6--a-killed-projection-rebuild-strands-its-lock-and-blocks-every-later-refresh) | Defect | A killed projection rebuild strands its lock |
 | [I8](#i8--a-timing-log-row-is-silently-dropped-when-the-write-lock-times-out) | Defect | A timing-log row is dropped when the write lock times out |
 | [I4](#i4--pre-change-course-ratios-are-confounded-by-career-stage) | Defect | Pre-change course ratios confounded by career stage (deferred) |
 | M1–M39 | Improvement | See [Improvements](#improvements) |
@@ -62,6 +63,7 @@ Kept until the next release, so a recurrence is recognisable; each entry below g
 
 | ID | Kind | Summary |
 |---|---|---|
+| [I8](#i8--a-timing-log-row-is-silently-dropped-when-the-write-lock-times-out) | Defect | A report-timing row that could not take the log's write lock within 2 seconds was dropped with a console message (8 concurrent workers, 7 rows); it is now kept as a pending file and appended by the next write (resolved 2026-11-11) |
 | [I6](#i6--a-killed-projection-rebuild-strands-its-lock-and-blocks-every-later-refresh) | Defect | A projection rebuild that was killed (a deploy timeout, an out-of-memory kill) left its lock for ever and every later refresh failed closed until someone removed it; a held lock now carries a heartbeat, and a lock whose heartbeat has stopped is taken over by the next run (resolved 2026-11-11) |
 | [I53](#i53--declaring-the-major-a-pre-major-leads-to-was-counted-as-a-change-of-major) | Defect | Pathways > Major Changes counted a student moving from a pre-major to its own major as a change of major whenever the two names differ ("FDMA" to "Film and Digital Arts"): 1,414 of 23,388 change events (resolved 2026-11-11: a pre-major and the major it leads to are one program) |
 | [I51](#i51--a-classification-filter-matched-nobody-its-value-was-split-on-the-comma) | Defect | `filter_class_list()` split every filter value on commas, so a classification filter (`"Sophomore, 2nd Yr"`) became two values that match no row, and Regstats' sophomore screen never found a course (resolved 2026-11-07) |
@@ -2046,7 +2048,8 @@ mapping issues". It is now `build_admin_mapping_issues()` in
 
 ## I8 — A timing-log row is silently dropped when the write lock times out
 
-**Status:** open
+**Status:** resolved 2026-11-11 (branch `logging/timing-row-not-dropped`; see
+Fix)
 **Found:** 2026-09-09 (test-logging.R failed once during a run that was competing
 with a Docker image build; it passes 3/3 in isolation)
 **Severity:** low — telemetry only. No analytical table is affected. But the loss
@@ -2088,6 +2091,22 @@ enough that the count is known to be incomplete. What it must not do is what it
 does now: raise an error into a context that discards it. Note that the 2-second
 timeout is itself reasonable — a report-timing write should not block a user
 session — so the fix is about the swallowed error, not the deadline.
+
+### Fix
+
+The wait stays at 2 seconds. A row that cannot take the lock in that time is
+written whole to its own file in `<log>.pending/` (a temporary name, then a
+rename, so a file seen there is complete) instead of being dropped.
+Whoever next holds the lock, the next row from any worker or the next start
+(`init_logging()`), appends the pending rows and removes their files; one
+merger at a time, so no row lands twice. Both timing logs (report and
+browser-render) write through the one function, `append_timing_row()`. A reset
+clears pending rows with the history. Until that next write, Admin > Data &
+Usage is short by the rows still pending.
+
+`test-logging.R` holds the lock while a report finishes: the row waits, lands
+first with the next report's row, keeps its JSON parameters intact, and is
+not written again by the write after that.
 
 ---
 

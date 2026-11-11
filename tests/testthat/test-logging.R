@@ -389,6 +389,46 @@ test_that("concurrent workers append complete timing rows", {
   expect_setequal(written$report_type, paste0("worker_", seq_len(8)))
 })
 
+# ISSUES.md I8: a row that timed out waiting for the lock was dropped with a
+# console message (8 workers, 7 rows on a saturated machine).
+test_that("a timing row that cannot take the lock waits and lands with the next write", {
+  log_file <- tempfile(fileext = ".csv")
+  lock <- paste0(log_file, ".lock")
+  pending <- paste0(log_file, ".pending")
+  old_path <- report_timing_log_file
+  assign("report_timing_log_file", log_file, envir = .GlobalEnv)
+  on.exit({
+    assign("report_timing_log_file", old_path, envir = .GlobalEnv)
+    unlink(c(log_file, lock, pending), recursive = TRUE)
+  }, add = TRUE)
+
+  # Another worker holds the lock for longer than this one will wait.
+  dir.create(lock)
+  end_report_timer(start_report_timer("held_out", list(dept = "HIST, \"x\"")), result = 1)
+  expect_false(file.exists(log_file))
+  expect_length(list.files(pending, pattern = "\\.csv$"), 1L)
+  expect_length(list.files(pending, pattern = "\\.tmp$"), 0L)
+
+  # The lock is free again: the next row brings the waiting one with it, once.
+  unlink(lock, recursive = TRUE)
+  end_report_timer(start_report_timer("next_run"), result = 2)
+  written <- read_report_timings(log_file)
+  expect_equal(written$report_type, c("held_out", "next_run"))
+  expect_equal(written$report_params[1], '{"dept":"HIST, \\"x\\""}')
+  expect_identical(names(read.csv(log_file, check.names = FALSE)), REPORT_TIMING_COLUMNS)
+  expect_length(list.files(pending), 0L)
+  end_report_timer(start_report_timer("third_run"), result = 3)
+  expect_equal(nrow(read_report_timings(log_file)), 3L)
+
+  # A reset clears a waiting row with the history it belongs to.
+  dir.create(lock)
+  end_report_timer(start_report_timer("held_out_again"), result = 4)
+  unlink(lock, recursive = TRUE)
+  expect_equal(reset_report_timings(log_file), 3L)
+  end_report_timer(start_report_timer("after_reset"), result = 5)
+  expect_equal(read_report_timings(log_file)$report_type, "after_reset")
+})
+
 test_that("legacy and mixed timing rows migrate to canonical CSV", {
   log_file <- tempfile(fileext = ".csv")
   old_path <- report_timing_log_file
