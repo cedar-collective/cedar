@@ -789,7 +789,11 @@ compute_dept_course_units_tab <- function(base, data_objects, campus_filter = NU
     summarize(n_registrations = sum(n_registrations), share = sum(share_of_registrations), .groups = "drop") %>%
     arrange(term, campus, desc(share))
 
-  latest <- attr(result, "latest_term")
+  # The cone's latest_term is the end of the data window. The table and the
+  # lead read the latest term in which a member actually holds a registration,
+  # which is earlier for a department whose majors have stopped enrolling.
+  window_end <- attr(result, "latest_term")
+  latest <- if (nrow(rows) > 0L) max(rows$term) else window_end
   latest_rows <- rows %>% filter(term == latest)
   shown <- latest_rows %>% filter(n_students >= min_n | is_own_unit)
   pooled <- latest_rows %>%
@@ -819,6 +823,7 @@ compute_dept_course_units_tab <- function(base, data_objects, campus_filter = NU
       dept_code = base$dept_code,
       dept_name = base$dept_name %||% base$dept_code,
       edge = attr(result, "edge"),
+      window_end = window_end,
       latest_term = latest,
       latest_in_progress = latest > attr(result, "edge"),
       n_members = attr(result, "n_members"),
@@ -837,12 +842,16 @@ dept_course_units_headline <- function(payload) {
   meta <- payload$meta
   own <- payload$tables$own_share %>% filter(term == meta$latest_term) %>% arrange(campus)
   if (nrow(own) == 0L) {
-    return(paste0("No enrolled ", meta$dept_name, " major holds a registration to ", fmt_term(meta$edge), "."))
+    return(paste0("No enrolled ", meta$dept_name, " major holds a registration to ", fmt_term(meta$window_end), "."))
   }
   n <- function(x) format(as.integer(x), big.mark = ",", trim = TRUE)
   plural <- function(k, noun) paste0(n(k), " ", noun, if (k == 1) "" else "s")
   pct <- function(x) sprintf("%.1f%%", 100 * x)
-  vapply(seq_len(nrow(own)), function(i) {
+  stale <- if (meta$latest_term < meta$window_end) {
+    paste0("No enrolled ", meta$dept_name, " major holds a registration after ", fmt_term(meta$latest_term),
+           "; the data runs to ", fmt_term(meta$window_end), ", so that is the latest term read here.")
+  }
+  c(stale, vapply(seq_len(nrow(own)), function(i) {
     o <- own[i, ]
     others <- payload$tables$latest_units %>%
       filter(campus == o$campus, !is_own_unit, !is.na(dept_code)) %>%
@@ -858,5 +867,5 @@ dept_course_units_headline <- function(payload) {
                " taught the most outside it.")
       } else "."
     )
-  }, character(1))
+  }, character(1)))
 }

@@ -503,6 +503,17 @@ test_that("compute_dept_course_units_tab reads the majors' teaching units and po
   testthat::local_edition(3)
   expect_snapshot(cat(dept_course_units_headline(result), sep = "\n"))
 
+  # A data window that runs past the majors' last registration: the latest
+  # term read is the last one with a registration, not the window's end, and
+  # the lead says so before it reads that term.
+  data_objects$cedar_edges <- list(last_enrolled = 202180L, last_enrolled_complete = 202180L,
+                                   last_graded = 202180L)
+  later <- compute_dept_course_units_tab(base, data_objects, min_n = 1L)
+  expect_equal(later$meta$window_end, 202180L)
+  expect_equal(later$meta$latest_term, 202110L)
+  expect_equal(later$tables$latest_units, result$tables$latest_units, ignore_attr = TRUE)
+  expect_snapshot(cat(dept_course_units_headline(later), sep = "\n"))
+
   expect_error(compute_dept_course_units_tab(list(), data_objects), "dept_code")
   expect_error(compute_dept_course_units_tab(base, data_objects[setdiff(names(data_objects), "cedar_student_terms")]),
                "cedar_student_terms")

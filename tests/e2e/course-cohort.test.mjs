@@ -52,7 +52,9 @@ try {
   await waitForSelector(page, '#cr_cohort-groups_table .rt-table', { timeout: 60000 });
   await waitForIdle(page);
 
-  const body = await page.evaluate(() => document.getElementById('cr_cohort-results').innerText);
+  // textContent, not innerText: the "Who is being counted" panel is a collapsed
+  // <details>, and innerText leaves collapsed content out.
+  const body = await page.evaluate(() => document.getElementById('cr_cohort-results').textContent);
   ok(/returned the next regular term|no gap to read|nothing to compare/.test(body),
      'the result opens with the lead paragraph');
   ok(/Passed it/.test(body) && /Never took it/.test(body),
