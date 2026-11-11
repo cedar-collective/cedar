@@ -48,9 +48,54 @@ load_file <- function(path, ext) {
   if (ext == ".qs") qs2::qs_read(path) else readRDS(path)
 }
 
+# The stored schema of each fact table, as a version the deploy gate can read
+# off the saved file (ISSUES.md I48). Bump a table's number, by hand, in the
+# same change that adds, renames or removes a column it stores, or changes
+# what a stored value means: the next deploy then rebuilds that table before
+# the app starts, and the derived tables after it. A transform edit that
+# leaves the stored tables alone bumps nothing and costs a deploy nothing. A
+# saved file with no stamp predates stamping (2026-11-11) and is rebuilt once.
+CEDAR_FACT_SCHEMA_VERSIONS <- c(sections = 1L, registrations = 1L, programs = 1L, degrees = 1L)
+
+# The transform stage (`--tables`) that builds each fact table.
+CEDAR_FACT_TABLE_STAGES <- c(sections = "sections", registrations = "students",
+                             programs = "programs", degrees = "degrees")
+
+#' Which fact tables were saved under another stored schema than the code's
+#'
+#' Read from the stamp save_cedar_file() writes, so a file copied in from
+#' another host carries its own answer. A missing file is not stale here: the
+#' transform builds a fact table from a report, and a host without the report
+#' has nothing to rebuild it from (the derived-table checks name a missing
+#' source themselves).
+#'
+#' @param data_dir Path to data directory
+#' @param ext      File extension
+#' @return A character vector of reasons named by transform stage, in the
+#'   order the stages run; empty when every saved fact table is current.
+cedar_fact_tables_staleness <- function(data_dir, ext = ".qs") {
+  reasons <- character(0)
+  for (table in names(CEDAR_FACT_SCHEMA_VERSIONS)) {
+    path <- file.path(data_dir, paste0("cedar_", table, ext))
+    if (!file.exists(path)) next
+    saved_under <- attr(load_file(path, ext), "cedar_transform_schema_version", exact = TRUE)
+    current <- CEDAR_FACT_SCHEMA_VERSIONS[[table]]
+    if (!identical(as.integer(saved_under), current)) {
+      reasons[[CEDAR_FACT_TABLE_STAGES[[table]]]] <- paste0(
+        "saved cedar_", table, " stores schema version ",
+        if (is.null(saved_under)) "unknown (unstamped)" else saved_under,
+        "; the transform writes ", current)
+    }
+  }
+  reasons
+}
+
 save_cedar_file <- function(data, table_name, data_dir, ext) {
   filename <- paste0("cedar_", table_name, ext)
   filepath <- file.path(data_dir, filename)
+  if (table_name %in% names(CEDAR_FACT_SCHEMA_VERSIONS)) {
+    attr(data, "cedar_transform_schema_version") <- CEDAR_FACT_SCHEMA_VERSIONS[[table_name]]
+  }
   message("Saving: ", filepath)
   if (ext == ".qs") {
     qs2::qs_save(data, filepath)
@@ -889,6 +934,7 @@ cedar_measures_staleness <- function(data_dir, ext = ".qs", dims = build_cedar_d
   class_list_name <- cedar_table_file("cedar_registrations")
   class_list <- file.path(data_dir, paste0(class_list_name, ext))
   if (!file.exists(class_list)) return(paste0(class_list_name, " has not been built"))
+  sections <- file.path(data_dir, paste0("cedar_sections", ext))
   fingerprint <- cedar_dims_fingerprint(dims)
   contracts <- list(
     cedar_attempts = list(version_attr = "attempts_build_version",
@@ -905,6 +951,11 @@ cedar_measures_staleness <- function(data_dir, ext = ".qs", dims = build_cedar_d
     if (!file.exists(path)) return(paste0(name, " has not been built"))
     if (file.mtime(path) < file.mtime(class_list)) {
       return(paste0(class_list_name, " newer than ", name))
+    }
+    # cedar_course_terms counts the schedule's side from the saved sections.
+    if (name == "cedar_course_terms" && file.exists(sections) &&
+        file.mtime(path) < file.mtime(sections)) {
+      return(paste0("cedar_sections newer than ", name))
     }
     saved <- load_file(path, ext)
     built_under <- attr(saved, contract$version_attr, exact = TRUE)

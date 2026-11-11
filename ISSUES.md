@@ -38,7 +38,7 @@ alongside other work (M14, M16).
 |---|---|---|
 | [I52](#i52--sections-stored-the-instructors-employee-id-so-they-joined-no-other-table) | Defect | The DESR's instructor ID was saved as the employee ID while the class list and HR hash theirs: the transform's HR merge matched nothing (`job_cat` NA on all 242,413 sections) and sections joined neither table. Fixed in the transform (every source hashed alike, the merge and `job_cat` removed); takes effect when the DESRs are next transformed |
 | [I50](#i50--the-class-list-dedup-can-keep-an-early-drop-over-a-late-withdrawal) | Defect | The transform keeps one class-list row per student-course-campus-term but ranked only "registered first": a student who early-dropped one section and withdrew late from another could keep the early drop, so the W left the loaded class list (703 student-course-terms on the 2026-10-08 pull; 651 on the 2026-02-04 one). Every outcome reader now classifies that table (`cedar_attempts`); fixed in the transform, takes effect when the class lists are next transformed |
-| [I48](#i48--a-transform-change-to-a-fact-tables-stored-columns-is-not-rebuilt-at-deploy) | Defect | Since the mapping stamps retired (ADR-001 step 3, 2026-11-06) the deploy gate rebuilds only `cedar_student_terms`: a transform change that adds or renames a stored column on sections, students, programs or degrees starts the app on files without it until the morning refresh, the I46 shape with no gate |
+| [I48](#i48--a-transform-change-to-a-fact-tables-stored-columns-is-not-rebuilt-at-deploy) | Defect | Since the mapping stamps retired (ADR-001 step 3, 2026-11-06) the deploy gate rebuilt only `cedar_student_terms`: a transform change that adds or renames a stored column on sections, students, programs or degrees started the app on files without it until the morning refresh, the I46 shape with no gate (fixed 2026-11-11: each fact table carries a schema stamp the gate checks; open until production's unstamped tables are rebuilt by the deploy that carries it) |
 | [I46](#i46--a-deploy-that-must-rebuild-a-table-the-app-cannot-start-without-takes-the-site-down) | Defect | The deploy's table gate ran after the health check, so a deploy that added a column to `cedar_student_terms` failed its health check on the missing column and never reached the gate: production served the restart page from 17:07 UTC on 2026-11-04 (gate moved before the first request) |
 | [I45](#i45--the-class-list-and-the-schedule-name-the-same-section-with-different-course-codes) | Defect | The class list and the schedule name the same section with different course codes for renamed subjects (SOC to SOCI, PSY to PSYC): SOCI 371 had class-list history from Fall 2019 but no sections before Fall 2021 (fixed for every reader by keying the loaded tables on the course, 2026-11-07; open until the remaining successions are confirmed) |
 | [I43](#i43--every-scheduled-refresh-fails-because-the-default-asks-for-a-report-mrgather-never-fetches) | Defect | Every scheduled refresh has failed since 2026-10-24: the default asks for the applicants report, which production mrgather never fetches, so production tables have not been rebuilt since Oct 27 (default fixed; mrgather and per-report rebuilds remain) |
@@ -88,7 +88,8 @@ Kept until the next release, so a recurrence is recognisable; each entry below g
 ## I52 — Sections stored the instructor's employee ID, so they joined no other table
 
 **Status:** fixed in the transform 2026-11-07; open until production's DESRs
-are next transformed (I43, I48).
+are next transformed: by the deploy that carries I48's fix, which rebuilds
+every unstamped fact table once, or by a refresh (I43).
 **Found:** 2026-11-07, checking whether the class list's section columns could
 be read from `cedar_sections` instead (ADR-001 step 5).
 **Severity:** medium. `parse-data.R` md5-hashes `Primary Instructor ID` on the
@@ -150,7 +151,8 @@ with the split.
 ## I50 — The class-list dedup can keep an early drop over a late withdrawal
 
 **Status:** fixed in the transform 2026-11-07; open until production's class
-lists are transformed again (a transform edit is not rebuilt at deploy, I48).
+lists are transformed again: by the deploy that carries I48's fix, which
+rebuilds every unstamped fact table once, or by a refresh (I43).
 **Found:** 2026-11-07, comparing saved `cedar_grades` (classified before the
 dedup, one row per CRN) with `cedar_attempts` (classified from the loaded,
 deduplicated class list) before moving Roadblocks onto the second.
@@ -200,7 +202,9 @@ asserts no output error before Run; it fails on the old renderers.
 
 ## I48 — A transform change to a fact table's stored columns is not rebuilt at deploy
 
-**Status:** open.
+**Status:** fixed 2026-11-11; open until the deploy that carries it has
+rebuilt production's unstamped fact tables (once, about 10 minutes), which is
+also when I50 and I52 take effect.
 **Found:** 2026-11-06, in review of the PR that retired the mapping stamps
 (ADR-001 step 3, PR 2).
 **Severity:** medium. Until 2026-11-06 each mapped table carried a provenance
@@ -220,16 +224,29 @@ I46 shape, with no gate in front of it.
 of it to `attach_section_units()`; deploy without a refresh. The gate reports
 `cedar_student_terms is current`, the app starts, and `attach_unit()` stops on
 the missing key.
-**Fix (not yet made):** the pattern `cedar_student_terms` already uses. The
-transform stamps each fact table with a `cedar_transform_schema_version`
-attribute from a constant beside `STUDENT_TERMS_BUILD_VERSION`, bumped by hand
-when a stored column is added, renamed or changes meaning; the gate compares
-the saved stamp with the constant and rebuilds the stale tables in their own R
-process (`--tables sections students ...`, one table per process on the 8.6 GB
-host, see the memory-kill note under I46), then `cedar_student_terms`, which
-their file times make stale. An unstamped file predates stamping and is
-rebuilt once. A transform edit that changes no stored column then costs the
-deploy nothing, which the retired stamp could not tell.
+**Fix:** the pattern `cedar_student_terms` already uses. `save_cedar_file()`
+stamps each fact table with a `cedar_transform_schema_version` attribute from
+`CEDAR_FACT_SCHEMA_VERSIONS` (in the transform, one number per table), bumped
+by hand when a stored column is added, renamed or changes meaning. The gate
+asks `cedar_fact_tables_staleness()` and rebuilds each stale table's stage in
+its own R process (`build_fact_tables_if_stale()`; one stage per process on
+the 8.6 GB host, see the memory-kill note under I46), then
+`cedar_student_terms` and the measure tables, which the new file times make
+stale (`cedar_course_terms` now also against `cedar_sections`). An unstamped
+file predates stamping and is rebuilt once. A transform edit that changes no
+stored column costs the deploy nothing, which the retired stamp could not
+tell. A fact table that cannot be rebuilt (its report is not on the host)
+does not keep the derived-table checks from running; its error is raised
+after them. `test-rebuild-gate.R` holds the decision and the deploy's restart.
+Rehearsed 2026-11-11 on a copy of the development data directory (reports of
+2026-10-08, every table unstamped): four stages, each building the derived
+tables that follow from it, in 585 s with a 2.6 GB peak; a second run rebuilt
+nothing.
+**Only where the reports are current:** the gate rebuilds a fact table from
+the parsed report beside it. On a development host whose `cedar_*` files were
+pulled from production over older reports, running the gate by hand replaces
+the newer tables with the older reports' rows; pull the reports too, or do
+not run it there. Deploys and the refresh run it only in production.
 **Worked around once (2026-11-07):** the thin saved class list (ADR-001 step
 5) drops columns and adds `cedar_class_list_descriptions`. Every loader and
 the transform's student-term stage accept the older full file, deriving its

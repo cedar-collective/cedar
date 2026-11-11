@@ -152,6 +152,8 @@ Use the constants in `R/lists/grades.R` (`GRADES_DFW`, `GRADES_PASS`, `GRADES_PA
 
 The classifier is **`classify_enrollment_outcomes()`** (`R/trunk/utils.R`); `classify_grades()` for grade-only frames. Course-level rates go through `get_course_outcome_rates()` over `cedar_attempts`; a reader that wants every attempt's outcome reads `cedar_attempts`, classified once by the transform, and never reclassifies the class list. Bump `CEDAR_OUTCOME_POLICY_VERSION` when classification changes: a saved `cedar_attempts` under another version is refused by the app and rebuilt by the transform (at deploy, by the gate). The transform keeps one class-list row per student, course, campus and term, the row `STATUS_PRECEDENCE` ranks first (`dedup_class_list_rows()`). Docker mounts `CEDAR_DATA_DIR` from `.env`, which need not be the repository's `data/`.
 
+**A change to what a fact table stores bumps its entry in `CEDAR_FACT_SCHEMA_VERSIONS`** (`transform-to-cedar.R`) in the same change: a column added, renamed or removed on sections, the class list, programs or degrees, or a stored value that changes meaning. The deploy gate rebuilds a table saved under another number before the app starts (about 10 minutes for all four, with the derived tables); without the bump the app starts on yesterday's files (ISSUES I48).
+
 ## Right edges
 
 **Never bound an analysis with `max(term)`, a hardcoded term, or arithmetic on `cedar_current_term`.** Use the edges `cedar_report_edges()` computes once at startup (`R/branches/data-edges.R`), also on `cedar_terms` as flags:
