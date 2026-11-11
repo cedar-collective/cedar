@@ -404,9 +404,10 @@ Ordinary container starts and user sessions never build projections.
 Failures preserve the previous artifact, return a nonzero scheduler status, and
 retry on the next successful data refresh. A one-shot request remains queued
 when it fails. Automatic and manual checks share `rebuild-request.yml.lock`
-to prevent overlap. A hard-killed process can leave this lock; only after
-confirming no builder is running, remove the empty directory with
-`rmdir output/projections/rebuild-request.yml.lock`. Removing a one-shot
+to prevent overlap. A hard-killed process leaves this lock behind; its
+heartbeat stops with the process, and the next run takes the lock over once
+the heartbeat is 10 minutes old (ISSUES.md I6), so nothing needs removing by
+hand. Removing a one-shot
 request cancels that force-build, not the automatic policy. "Cannot create the
 rebuild lock" is a different failure: there is no lock to remove, and
 `output/` is not writable from wherever the build ran (ISSUES.md I19).
