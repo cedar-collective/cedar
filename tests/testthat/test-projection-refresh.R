@@ -293,10 +293,93 @@ test_that("an active build lock rejects a second request", {
   on.exit(unlink(c(path, lock), recursive = TRUE), add = TRUE)
   expect_error(
     projection_request_runner()(path, function(args) stop("must not build")),
-    "already running or stale lock"
+    "Rebuild already running"
   )
   expect_true(dir.exists(lock))
   expect_true(file.exists(path))
+})
+
+# I6: a build that is killed never runs its on.exit(), and its lock blocked
+# every later refresh until removed by hand.
+test_that("the lock of a killed build is taken over; a live build keeps its lock", {
+  env <- new.env(parent = globalenv())
+  script <- normalizePath("../../scripts/build-enrollment-projections.R")
+  sys.source(script, envir = env)
+  root <- tempfile("projection-lock-")
+  dir.create(root)
+  on.exit(unlink(root, recursive = TRUE), add = TRUE)
+  lock <- file.path(root, "rebuild-request.yml.lock")
+
+  # Another R process takes the lock and holds it, as a build does.
+  holder <- sprintf(
+    'env <- new.env(); sys.source(%s, envir = env); env$take_projection_lock(%s, heartbeat_every = 1); Sys.sleep(120)',
+    deparse(script), deparse(lock))
+  system2(file.path(R.home("bin"), "Rscript"), c("--vanilla", "-e", shQuote(holder)),
+          wait = FALSE, stdout = FALSE, stderr = FALSE)
+  owner <- character(0)
+  for (i in seq_len(100)) {
+    owner <- list.files(lock, pattern = "^owner-", full.names = TRUE)
+    if (length(owner) == 1L && length(readLines(owner, warn = FALSE)) == 3L) break
+    Sys.sleep(0.2)
+  }
+  expect_length(owner, 1L)
+  holder_pid <- as.integer(sub("^pid: ", "", readLines(owner, warn = FALSE)[1]))
+  on.exit(tools::pskill(holder_pid, tools::SIGKILL), add = TRUE)
+
+  # Alive past the stale limit: its heartbeat keeps the lock, however long.
+  Sys.sleep(4)
+  expect_error(env$take_projection_lock(lock, stale_after = 3, heartbeat_every = 1),
+               "Rebuild already running")
+
+  # Killed, so nothing releases the lock. Before the stale limit it still
+  # holds; after it, the next run takes the lock over and can release it.
+  tools::pskill(holder_pid, tools::SIGKILL)
+  expect_true(dir.exists(lock))
+  Sys.sleep(5)
+  taken <- NULL
+  expect_message(
+    taken <- env$take_projection_lock(lock, stale_after = 3, heartbeat_every = 1),
+    "Taking over the rebuild lock")
+  expect_equal(list.files(lock, pattern = "^owner-", full.names = TRUE),
+               attr(taken, "owner_path"))
+  env$release_projection_lock(taken)
+  expect_false(dir.exists(lock))
+})
+
+test_that("only one run takes over a dead lock, and a lock taken over is not released by its old holder", {
+  env <- new.env(parent = globalenv())
+  sys.source("../../scripts/build-enrollment-projections.R", envir = env)
+  root <- tempfile("projection-lock-")
+  dir.create(root)
+  on.exit(unlink(root, recursive = TRUE), add = TRUE)
+  lock <- file.path(root, "rebuild-request.yml.lock")
+  long_ago <- Sys.time() - 3600
+
+  # A dead lock another run is already taking over (it holds the marker).
+  dir.create(lock)
+  beat <- file.path(lock, "heartbeat")
+  file.create(beat)
+  Sys.setFileTime(beat, long_ago)
+  dir.create(file.path(lock, paste0("takeover-", as.integer(file.mtime(beat)))))
+  expect_error(env$take_projection_lock(lock), "Rebuild already running")
+  unlink(lock, recursive = TRUE)
+
+  # A lock from a build that wrote no heartbeat: stale only by its long limit.
+  dir.create(lock)
+  Sys.setFileTime(lock, long_ago)
+  expect_error(env$take_projection_lock(lock), "Rebuild already running")
+  first <- env$take_projection_lock(lock, legacy_stale_after = 60, heartbeat_every = 1)
+
+  # That holder's heartbeat stops (as if suspended) and a second run takes the
+  # lock over; the first, releasing late, must leave the second's lock alone.
+  unlink(attr(first, "owner_path"))
+  Sys.sleep(2.5)
+  Sys.setFileTime(beat, long_ago + 60)
+  second <- env$take_projection_lock(lock, heartbeat_every = 1)
+  env$release_projection_lock(first)
+  expect_true(dir.exists(lock))
+  env$release_projection_lock(second)
+  expect_false(dir.exists(lock))
 })
 
 # I19: an unwritable projections directory read as a stale lock every morning,

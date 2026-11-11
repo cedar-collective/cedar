@@ -53,7 +53,6 @@ alongside other work (M14, M16).
 | [I18](#i18--cedar_degrees-holds-no-associate-degrees-so-branch-campus-completions-read-zero) | Defect | `cedar_degrees` holds no associate degrees: branch-campus completions read zero |
 | [I16](#i16--bottleneck-waitlist-pressure-ignores-term-so-later-registration-erases-earlier-waiting) | Defect | `get_bottlenecks()` waitlist pressure ignores term: ~6% under true demand (RStudio only; no page shows it) |
 | [I8](#i8--a-timing-log-row-is-silently-dropped-when-the-write-lock-times-out) | Defect | A timing-log row is dropped when the write lock times out |
-| [I6](#i6--a-killed-projection-rebuild-strands-its-lock-and-blocks-every-later-refresh) | Defect | A killed projection rebuild strands its lock |
 | [I4](#i4--pre-change-course-ratios-are-confounded-by-career-stage) | Defect | Pre-change course ratios confounded by career stage (deferred) |
 | M1–M39 | Improvement | See [Improvements](#improvements) |
 
@@ -63,6 +62,7 @@ Kept until the next release, so a recurrence is recognisable; each entry below g
 
 | ID | Kind | Summary |
 |---|---|---|
+| [I6](#i6--a-killed-projection-rebuild-strands-its-lock-and-blocks-every-later-refresh) | Defect | A projection rebuild that was killed (a deploy timeout, an out-of-memory kill) left its lock for ever and every later refresh failed closed until someone removed it; a held lock now carries a heartbeat, and a lock whose heartbeat has stopped is taken over by the next run (resolved 2026-11-11) |
 | [I53](#i53--declaring-the-major-a-pre-major-leads-to-was-counted-as-a-change-of-major) | Defect | Pathways > Major Changes counted a student moving from a pre-major to its own major as a change of major whenever the two names differ ("FDMA" to "Film and Digital Arts"): 1,414 of 23,388 change events (resolved 2026-11-11: a pre-major and the major it leads to are one program) |
 | [I51](#i51--a-classification-filter-matched-nobody-its-value-was-split-on-the-comma) | Defect | `filter_class_list()` split every filter value on commas, so a classification filter (`"Sophomore, 2nd Yr"`) became two values that match no row, and Regstats' sophomore screen never found a course (resolved 2026-11-07) |
 | [I47](#i47--the-class-lists-student_classification-is-stamped-at-pull-time-when-a-term-is-pulled-late) | Defect | A class list pulled months after its term carries each student's classification as of the pull (35% of ENGL 1120's Fall 2025 registered student-terms one step ahead); every reader now takes the student-term table's, and the loaded class list carries none (resolved 2026-11-07) |
@@ -1725,7 +1725,8 @@ at the call site with a pointer here.
 
 ## I6 — A killed projection rebuild strands its lock and blocks every later refresh
 
-**Status:** open
+**Status:** resolved 2026-11-11 (branch `projections/stale-lock-recovery`; see
+Fix)
 **Found:** 2026-09-08 (while adding Fall targets, which roughly doubles the work
 one rebuild does and turns this from theoretical into likely)
 **Severity:** moderate — silent stoppage. Projections quietly stop updating; the
@@ -1779,7 +1780,34 @@ happens; it does not fix the stranding.
 
 Since 2026-10-11 (I19) the error tells a held lock from an unwritable
 directory and says when the lock was created, so a stranded lock is easier to
-recognise; it still has to be removed by hand.
+recognise.
+
+### Fix
+
+The owner's PID cannot decide it: the morning refresh and the deploy each
+build in their own `cedar-projections` container, and one container cannot see
+another's processes. What they share is the lock's directory. So
+`take_projection_lock()` starts a shell loop beside the build that touches
+`heartbeat` in the lock every 30 seconds for as long as the owning R process
+exists and still holds the lock. A kill of the process, or of its container,
+stops the heartbeat. A killed process that nothing has collected is a zombie,
+on which `kill -0` still succeeds, so on Linux the loop reads the state from
+`/proc` and counts a zombie as gone (the first version did not, and CI's
+container, which has no init, kept a dead build's heartbeat going). A run that finds a lock whose heartbeat is
+more than 600 seconds old takes it over and says so; a live build keeps its
+lock however long it runs. Two runs that find the same dead lock race for one
+`takeover-<heartbeat time>` directory, which exactly one can create. A lock
+with no heartbeat file is from a build before this change and is stale only
+after six hours. `release_projection_lock()` removes only a lock its caller
+still owns.
+
+`test-projection-refresh.R` runs the reproduction above: a second R process
+takes the lock and is killed with SIGKILL. While it lives, a lock older than
+the stale limit is refused; after the kill and the limit, the next run takes
+it over. Without the heartbeat the takeover assertion fails.
+
+`scripts/build-enrollment-projections.R` is projection model source, so the
+deploy that carries this rebuilds both bundles once.
 
 ---
 

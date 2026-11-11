@@ -208,11 +208,33 @@ build_one_enrollment_projection <- function(args, repo_root, refreshing) {
 }
 
 # The lock is a directory, released by the caller's on.exit(). A failed create
-# has two causes that need different hands: a lock already there (a build
-# running, or one killed before it could release -- ISSUES.md I6), or a
+# has two causes that need different hands: a lock already there, or a
 # projections directory this process cannot write, which once passed for a
 # stale lock every morning (I19). Say which.
-take_projection_lock <- function(lock_path) {
+#
+# on.exit() never runs in a process that is killed (a deploy's SSH timeout, an
+# out-of-memory kill, an interrupted `docker compose run`), and a lock left
+# that way blocked every later refresh until someone removed it by hand
+# (ISSUES.md I6). So a held lock carries a sign of life: a small shell loop
+# beside the build touches `heartbeat` in the lock every few seconds for as
+# long as the owning R process exists. A lock whose heartbeat has stopped for
+# `stale_after` seconds belongs to a process that is gone, and the next run
+# takes it over. A heartbeat rather than the owner's PID, because builds run
+# in separate containers that share only this directory: one container cannot
+# see another's processes. And not the lock's age, because a build has no
+# maximum length safe to guess: a live build keeps its lock however long it
+# runs.
+PROJECTION_LOCK_HEARTBEAT_SECONDS <- 30
+PROJECTION_LOCK_STALE_SECONDS <- 600
+# A lock with no heartbeat file was taken by a build from before 2026-11-11,
+# which had none; it is stale only once older than any such build could be.
+PROJECTION_LOCK_LEGACY_STALE_SECONDS <- 6 * 3600
+
+take_projection_lock <- function(
+    lock_path,
+    stale_after = PROJECTION_LOCK_STALE_SECONDS,
+    heartbeat_every = PROJECTION_LOCK_HEARTBEAT_SECONDS,
+    legacy_stale_after = PROJECTION_LOCK_LEGACY_STALE_SECONDS) {
   reason <- NULL
   created <- withCallingHandlers(
     dir.create(lock_path),
@@ -221,17 +243,70 @@ take_projection_lock <- function(lock_path) {
       invokeRestart("muffleWarning")
     }
   )
-  if (created) return(invisible(lock_path))
-  if (dir.exists(lock_path)) {
-    stop("[projections] Rebuild already running or stale lock: ", lock_path,
-         " (created ", format(file.mtime(lock_path), "%Y-%m-%d %H:%M"), "). ",
-         "If no projection build is running, remove it and retry (ISSUES.md I6).",
+  if (!created && !dir.exists(lock_path)) {
+    stop("[projections] Cannot create the rebuild lock -- ",
+         if (is.null(reason)) lock_path else reason, ". The projections ",
+         "directory must be writable; in production, build through the ",
+         "cedar-projections service (ISSUES.md I19).", call. = FALSE)
+  }
+  if (!created) {
+    beat_path <- file.path(lock_path, "heartbeat")
+    has_beat <- file.exists(beat_path)
+    last_alive <- file.mtime(if (has_beat) beat_path else lock_path)
+    silent_for <- as.numeric(difftime(Sys.time(), last_alive, units = "secs"))
+    limit <- if (has_beat) stale_after else legacy_stale_after
+    # Two runs that find the same dead lock race for one marker, named after
+    # the heartbeat they both read; dir.create() lets exactly one of them win.
+    takeover <- file.path(lock_path, paste0("takeover-", as.integer(last_alive)))
+    if (is.na(silent_for) || silent_for <= limit ||
+        !suppressWarnings(dir.create(takeover))) {
+      stop("[projections] Rebuild already running: ", lock_path,
+           " (taken ", format(file.mtime(lock_path), "%Y-%m-%d %H:%M"),
+           ", last sign of life ", format(last_alive, "%Y-%m-%d %H:%M:%S"),
+           "). A lock whose build was killed is taken over by the next run ",
+           "once it has shown none for ", limit, " seconds (ISSUES.md I6).",
+           call. = FALSE)
+    }
+    message("[projections] Taking over the rebuild lock of a build that is gone: ",
+            "no sign of life since ", format(last_alive, "%Y-%m-%d %H:%M:%S"), ".")
+    unlink(list.files(lock_path, pattern = "^owner-", full.names = TRUE))
+  }
+
+  # The owner file names this holder; its heartbeat stops when the file goes
+  # (the lock was released or taken over) or this process does.
+  token <- paste0(Sys.getpid(), "-", format(Sys.time(), "%Y%m%d%H%M%OS3"))
+  owner_path <- file.path(lock_path, paste0("owner-", token))
+  beat_path <- file.path(lock_path, "heartbeat")
+  writeLines(c(paste("pid:", Sys.getpid()),
+               paste("host:", Sys.info()[["nodename"]]),
+               paste("started:", format(Sys.time(), "%Y-%m-%d %H:%M:%S"))),
+             owner_path)
+  writeLines(format(Sys.time(), "%Y-%m-%d %H:%M:%S"), beat_path)
+  # A killed process whose parent has not collected it stays in the process
+  # table as a zombie, and `kill -0` still succeeds on it: in a container
+  # with no init, that kept a dead build's heartbeat going. On Linux, read
+  # the state from /proc and count a zombie as gone.
+  loop <- sprintf(paste(
+    "alive() { kill -0 %1$d 2>/dev/null || return 1;",
+    "if [ -r /proc/%1$d/stat ]; then case \"$(cat /proc/%1$d/stat 2>/dev/null)\" in",
+    "*') Z '*) return 1 ;; esac; fi; return 0; };",
+    "while alive && [ -f %2$s ]; do touch %3$s 2>/dev/null; sleep %4$d; done"),
+    Sys.getpid(), shQuote(owner_path), shQuote(beat_path), as.integer(heartbeat_every))
+  system2("sh", c("-c", shQuote(loop)), wait = FALSE, stdout = FALSE, stderr = FALSE)
+  attr(lock_path, "owner_path") <- owner_path
+  invisible(lock_path)
+}
+
+# Release only a lock this process still holds: one taken over while its
+# holder was suspended belongs to the run that took it.
+release_projection_lock <- function(lock_path) {
+  owner_path <- attr(lock_path, "owner_path")
+  if (is.null(owner_path)) {
+    stop("[projections] release_projection_lock() needs the value take_projection_lock() returned.",
          call. = FALSE)
   }
-  stop("[projections] Cannot create the rebuild lock -- ",
-       if (is.null(reason)) lock_path else reason, ". The projections ",
-       "directory must be writable; in production, build through the ",
-       "cedar-projections service (ISSUES.md I19).", call. = FALSE)
+  if (file.exists(owner_path)) unlink(lock_path, recursive = TRUE)
+  invisible(NULL)
 }
 
 # A request file is a one-shot flag, checked before loading the data or model.
@@ -245,7 +320,7 @@ run_projection_rebuild_request <- function(
   # The standalone builder changes to the repository root before loading data.
   request_path <- normalizePath(request_path, mustWork = TRUE)
   lock_path <- take_projection_lock(paste0(request_path, ".lock"))
-  on.exit(unlink(lock_path, recursive = TRUE), add = TRUE)
+  on.exit(release_projection_lock(lock_path), add = TRUE)
 
   request_text <- readLines(request_path, warn = FALSE)
   request <- yaml::yaml.load(paste(request_text, collapse = "\n"), eval.expr = FALSE)
@@ -302,7 +377,7 @@ run_projection_auto_refresh <- function(
   lock_path <- take_projection_lock(
     file.path(normalizePath(dirname(request_path), mustWork = TRUE),
               paste0(basename(request_path), ".lock")))
-  on.exit(unlink(lock_path, recursive = TRUE), add = TRUE)
+  on.exit(release_projection_lock(lock_path), add = TRUE)
   build(character(0), refresh_config = config)
 }
 
