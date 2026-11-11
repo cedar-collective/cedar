@@ -156,3 +156,43 @@ get_major_course_units <- function(student_terms, registrations, opt = list()) {
               " under min_n ", min_n, ")")
   result
 }
+
+
+# ── Plots ───────────────────────────────────────────────────────────────────
+# Prepared rows in, plotly out; no table is re-read here.
+
+#' Share of a major's registrations by teaching college, stacked by term
+#'
+#' @param by_college One row per `term`, `campus`, `college_label` with
+#'   `share` (of the term and campus's member registrations) and
+#'   `n_registrations`, as `compute_dept_course_units_tab()` prepares them.
+#' @return A named list, one plotly per campus (`names` are the campuses).
+plot_major_course_units_by_college <- function(by_college) {
+  needed <- c("term", "campus", "college_label", "share", "n_registrations")
+  missing <- setdiff(needed, names(by_college))
+  if (length(missing) > 0) {
+    stop("[major-course-units.R] by_college lacks ", paste(missing, collapse = ", "), call. = FALSE)
+  }
+  if (nrow(by_college) == 0L) return(list())
+  colors <- cedar_plotly_palette(by_college$college_label)
+  campuses <- sort(unique(by_college$campus))
+  stats::setNames(lapply(campuses, function(cmp) {
+    rows <- by_college %>%
+      filter(campus == cmp) %>%
+      mutate(term_label = term_axis_factor(term)) %>%
+      arrange(term, desc(share))
+    plotly::plot_ly(
+      rows,
+      x = ~term_label, y = ~share, color = ~college_label, colors = colors,
+      type = "bar",
+      customdata = ~n_registrations,
+      hovertemplate = "%{x}<br>%{fullData.name}: %{y:.1%} (%{customdata} registrations)<extra></extra>"
+    ) %>%
+      plotly::layout(
+        barmode = "stack",
+        xaxis = list(title = "", tickangle = -45),
+        yaxis = list(title = "Share of registrations", tickformat = ".0%", range = c(0, 1)),
+        legend = list(orientation = "h", x = 0, y = -0.25)
+      )
+  }), campuses)
+}

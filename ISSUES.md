@@ -3183,10 +3183,13 @@ cohort (35 students, all `Concurrent Enrollment`) returned at 37% the next
 spring and 97% the next fall, a shape no college cohort has. Found 2026-11-10
 verifying the FYEX questions. The pages and the `course-retention` definition
 now say the cohort is everyone registered (version 2.1.0), which is the
-disclosure, not the fix. *Done when:* each retention view takes a
-classification scope through `cedar_student_terms$student_classification`
-(the Explore page's cohort builder and Course Dynamics' campus control are the
-places), and a cohort's concurrent-enrollment share is shown beside its rate.
+disclosure, not the fix. Course Dynamics > Takers vs Non-Takers (2026-11-10)
+takes that scope through its classification control; the Retention tab and
+the hidden Explore retention module still do not. *Done when:* each retention
+view takes a classification scope through
+`cedar_student_terms$student_classification` (the Explore page's cohort
+builder and Course Dynamics' campus control are the places), and a cohort's
+concurrent-enrollment share is shown beside its rate.
 
 ### Testing and pipeline safety
 

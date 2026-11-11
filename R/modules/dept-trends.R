@@ -81,6 +81,7 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
     deg_data  <- reactiveVal(NULL)
     ch_data   <- reactiveVal(NULL)
     demo_data <- reactiveVal(NULL)
+    mcu_data  <- reactiveVal(NULL)   # Courses Taken; computed on open, never cached
     last_request <- reactiveVal(NULL)
 
     # The department and campus this page actually ran with, committed by
@@ -246,6 +247,7 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
       deg_data(NULL)
       ch_data(NULL)
       demo_data(NULL)
+      mcu_data(NULL)
 
       signal_load_start(session, ns("dept_report"))
       timer <- start_report_timer("dept_report", list(department = dept))
@@ -350,6 +352,122 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
         }
       )
     }, ignoreInit = TRUE)
+
+    # Courses Taken computes when its tab is opened, once per committed scope
+    # (0.4 s over the full class list), so it is not preloaded or cached.
+    observeEvent(input$tabs, {
+      req(identical(input$tabs, "Courses Taken"), is.null(mcu_data()))
+      base <- dept_data()
+      req(base)
+      tryCatch({
+        payload <- compute_dept_course_units_tab(base, data_objects, active_scope()$campus)
+        for (cmp in names(payload$plots)) local({
+          campus_key <- cmp
+          output[[paste0("mcu_college_share_", campus_key)]] <- renderPlotly({
+            data <- mcu_data()
+            req(data)
+            mark_plotly_terms(data$plots[[campus_key]], in_progress_labels)
+          })
+        })
+        mcu_data(payload)
+      }, error = function(e) {
+        if (!is.null(error_handler)) {
+          error_handler(e, "dept_trends_courses_taken")
+        } else {
+          showNotification(paste("Courses Taken could not load:", conditionMessage(e)),
+                           type = "error", duration = 8)
+        }
+      })
+    }, ignoreInit = TRUE)
+
+    output$mcu_body <- renderUI({
+      data <- mcu_data()
+      if (is.null(data)) return(empty_state("Loading where this department's majors take their courses\u2026"))
+      meta <- data$meta
+      n <- function(x) format(as.integer(x), big.mark = ",", trim = TRUE)
+      tagList(
+        lapply(dept_course_units_headline(data), function(s) tags$p(class = "cedar-lead", s)),
+        info_panel(
+          "Who is being counted",
+          description = "Members, registrations, teaching units and the guard.",
+          div(class = "alert alert-info", tags$strong("Data window: "),
+              cedar_longitudinal_edge_note(data_objects[["cedar_edges"]], grade_dependent = FALSE)),
+          tags$ul(class = "mb-0",
+            tags$li("A member is an enrolled student-term whose primary major belongs to ", meta$dept_name,
+                    " (pre-majors included): ", n(meta$n_members), " students over ",
+                    n(meta$n_member_student_terms), " student-terms."),
+            tags$li("A registration is a member's class-list row registered at the pull or withdrawn late; early drops and waitlist rows are not course-taking. Each student and course counts once per term and teaching campus."),
+            tags$li("The teaching unit is the subject's unit in the mapping files; ", n(meta$n_unmapped),
+                    " registrations are in subjects no mapping row has decided and are shown as their own row, never given a unit."),
+            tags$li("Shares are within the term and teaching campus over every member registration there. In the latest-term table, units under ",
+                    meta$min_n, " students are pooled into one row."),
+            if (isTRUE(meta$latest_in_progress)) tags$li("The latest term is in progress: its registrations are current, not settled.")
+          )
+        ),
+        dashboard_subsection(
+          "Teaching Colleges Over Time",
+          "Each bar is one term's member registrations split by the college of the unit that taught the course, one chart per teaching campus. A shaded term is in progress.",
+          lapply(names(data$plots), function(cmp) tagList(
+            section_heading(cmp, level = "h6"),
+            plotlyOutput(ns(paste0("mcu_college_share_", cmp)), height = "340px")
+          ))
+        ),
+        dashboard_subsection(
+          paste0("Teaching Units, ", fmt_term(meta$latest_term)),
+          "Every unit that taught this department's majors in the latest term, by teaching campus, with its share of their registrations; the department's own row first.",
+          reactable::reactableOutput(ns("mcu_units_table"))
+        ),
+        dashboard_subsection(
+          "Own-Unit Share by Term",
+          "The members' students and registrations each term and teaching campus, and the share of those registrations in the department's own courses.",
+          reactable::reactableOutput(ns("mcu_own_share_table"))
+        )
+      )
+    })
+
+    mcu_term_coldef <- reactable::colDef(name = "Term", cell = function(v) fmt_term(v), minWidth = 100)
+    mcu_flag_coldef <- reactable::colDef(name = "In progress", cell = function(v) if (isTRUE(v)) "yes" else "", maxWidth = 100)
+
+    output$mcu_units_table <- reactable::renderReactable({
+      data <- mcu_data()
+      req(data)
+      display <- data$tables$latest_units %>%
+        dplyr::transmute(campus, college_label, unit_label, dept_code, n_students, n_registrations, share_of_registrations)
+      reactable::reactable(
+        display, theme = cedar_tbl_theme, compact = TRUE, striped = TRUE, highlight = TRUE,
+        searchable = TRUE, defaultPageSize = 15, showPageSizeOptions = TRUE, pageSizeOptions = c(15, 30, 100),
+        columns = list(
+          campus = reactable::colDef(name = "Campus", maxWidth = 90),
+          college_label = reactable::colDef(name = "College", minWidth = 160),
+          unit_label = reactable::colDef(name = "Teaching unit", minWidth = 200),
+          dept_code = reactable::colDef(name = "Code", maxWidth = 90, na = "\u2014"),
+          n_students = cedar_count_coldef("Students"),
+          n_registrations = cedar_count_coldef("Registrations"),
+          share_of_registrations = cedar_percent_coldef("Share")
+        )
+      )
+    })
+
+    output$mcu_own_share_table <- reactable::renderReactable({
+      data <- mcu_data()
+      req(data)
+      display <- data$tables$own_share %>%
+        dplyr::transmute(term, campus, in_progress, students, registrations, own_registrations, own_share, n_units)
+      reactable::reactable(
+        display, theme = cedar_tbl_theme, compact = TRUE, striped = TRUE, pagination = FALSE,
+        defaultSorted = list(term = "desc"),
+        columns = list(
+          term = mcu_term_coldef,
+          campus = reactable::colDef(name = "Campus", maxWidth = 90),
+          in_progress = mcu_flag_coldef,
+          students = cedar_count_coldef("Students"),
+          registrations = cedar_count_coldef("Registrations"),
+          own_registrations = cedar_count_coldef("In own courses"),
+          own_share = cedar_percent_coldef("Own-unit share"),
+          n_units = cedar_count_coldef("Teaching units")
+        )
+      )
+    })
 
     output$actions <- renderUI({
       if (is.null(dept_data())) return(NULL)
@@ -638,6 +756,9 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
         ),
         tabPanel("Credit Hours",
           deptTrendsCreditHoursUI(ns, home_major_code_label)
+        ),
+        tabPanel("Courses Taken",
+          deptTrendsCourseUnitsUI(ns)
         ),
         tabPanel("Gen Ed",
           deptProfileGenEdUI(ns("gen_ed"),
@@ -1252,5 +1373,18 @@ deptTrendsCreditHoursUI <- function(ns, home_major_code_label) {
       )
     )
   )
+  )
+}
+
+
+# Courses Taken: the body renders once the tab's payload is computed on open.
+deptTrendsCourseUnitsUI <- function(ns) {
+  tagList(
+    subtab_header(
+      "Courses Taken",
+      "Which units teach the courses this department's majors take: for each term and teaching campus, every enrolled major's registrations split by the unit that taught the course, with the share in the department's own courses. ",
+      "The inverse of Students Served on the Credit Hours tab, which asks whose majors fill this department's seats."
+    ),
+    uiOutput(ns("mcu_body"))
   )
 }

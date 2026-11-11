@@ -130,6 +130,38 @@ You can configure how many semesters to track, set a minimum cohort size per row
 
 ---
 
+## Takers vs Non-Takers
+
+{% include definition-summary.html id="course-cohort-effect" %}
+
+Retention above follows the students who took the course. This tab adds the
+students who did not: for every enrolled student of a classification in a
+term (first-semester freshmen, say), by home campus, it splits the population
+into those who passed the course, those who DFW'd it, and those who never took
+it that term, and shows each group's return the next regular term and the DFW
+share of its next-term attempts. The gap columns are the passed group's rate
+minus the never-took group's, in points.
+
+The page opens on the classification most of the course's recent takers held,
+the course's own college and level, and the last three years of fall and
+spring terms. Change any of them and click **Compare Groups**.
+
+Read the gap against the benchmark, not on its own. Passing any course goes
+with returning, so the tab runs the same comparison for every other course of
+the chosen college (and level) the same students took, and reports the median
+and quartiles of their gaps with the share of courses whose gap is below this
+course's. A course whose gap sits at the college's median is an average
+course; one far below it is where the question starts. A benchmark course
+needs the minimum in both its passed and its never-took groups, and the
+"Every Course in the Benchmark" table lists them.
+
+The balance table at the bottom compares takers with never-takers on the
+measured covariates (ACT, high-school GPA, Pell eligibility, first-generation
+share and the rest) at each student's first selected term. A substantial
+difference says the gap describes who is placed into the course.
+
+---
+
 ## Downstream
 
 The Downstream tab combines two related views that use the same observed follow-on-course list but answer different questions. Choose **Course Sequence** when the question is about taking this course before another course. Choose **Instructor Patterns** when the question is about later continuation and outcomes among this course's students, grouped by their first instructor here.
@@ -196,28 +228,25 @@ Two tabs answer two halves of this, and neither answers the whole of it.
   seminar, not a measure of the seminar.
 
 What neither tab does is compare takers with students who did not take the
-course at all, holding classification constant. That comparison exists for
-analysts (`get_course_cohort_effect()` in RStudio: for one classification, by
-home campus and term, return and next-term DFW share for students who passed
-the course, failed it, or never took it, with a balance table) and has no page
-yet. For main-campus first-semester freshmen in Fall 2023, 94% of those who
-passed FYEX 1010 returned the next spring, 78% of those who never took it, and
-46% of those who failed it; the groups differ substantially on ACT, high-school
-GPA, Pell eligibility and first-generation share, so these describe who is
-placed into the course as much as the course.
+course at all, holding classification constant. **Takers vs Non-Takers** does:
+for one classification, by home campus and term, return and next-term DFW
+share for students who passed the course, failed it, or never took it, with a
+balance table. For main-campus first-semester freshmen in Fall 2023, 94% of
+those who passed FYEX 1010 returned the next spring, 78% of those who never
+took it, and 46% of those who failed it; the groups differ substantially on
+ACT, high-school GPA, Pell eligibility and first-generation share, so these
+describe who is placed into the course as much as the course.
 
-Is that gap unusual? A second analyst tool
-(`build_course_cohort_context()`, with `format_course_cohort_context()` for
-the words) runs the same comparison for every Arts & Sciences lower-division
-course those freshmen took and places the first-year course among them. For
-the same students, passing any such course went with returning at a median
-96%, a gap of 19 points over those who never took it; FYEX 1010's 16 points
-sat in the bottom quarter of courses and FYEX 1110's 18 at the median. On
-next-term grades, FYEX 1110 was again an average course, while FYEX 1010 was
-the one course whose passers failed more the next term than its never-takers
-did. Passing a course in the first semester goes with coming back; neither
-seminar shows a lift beyond that, and the students placed into FYEX 1010
-carry their risk into the next term.
+Is that gap unusual? The same tab runs the comparison for every Arts &
+Sciences lower-division course those freshmen took and places the first-year
+course among them. For the same students, passing any such course went with
+returning at a median 96%, a gap of 19 points over those who never took it;
+FYEX 1010's 16 points sat in the bottom quarter of courses and FYEX 1110's 18
+at the median. On next-term grades, FYEX 1110 was again an average course,
+while FYEX 1010 was the one course whose passers failed more the next term
+than its never-takers did. Passing a course in the first semester goes with
+coming back; neither seminar shows a lift beyond that, and the students
+placed into FYEX 1010 carry their risk into the next term.
 
 ---
 

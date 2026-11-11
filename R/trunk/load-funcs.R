@@ -199,6 +199,7 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
     source_file("modules/observed-course-paths.R")
     source_file("modules/pathways.R")
     source_file("modules/retention.R")
+    source_file("modules/course-cohort.R")   # Course Dynamics > Takers vs Non-Takers
     source_file("modules/degree-explorer.R")
   } else {
     message("[load-funcs.R] Skipping Shiny modules (modules = FALSE).")

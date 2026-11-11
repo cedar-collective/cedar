@@ -165,20 +165,26 @@ get_course_cohort_effect <- function(student_terms, attempts, opt = list(),
     rename(population = n_students)
 
   # ── The takers of each course, in four categories ─────────────────────────
-  # CAMPUS_ROLLUP: a student took the course wherever it was taught; the
-  # grain the result keeps is the student's home campus (student_campus).
+  # Only the members' own attempts are classified: without the semi_join the
+  # group-wise summarize ran over every student who ever took the courses
+  # (80 s for six terms of a college's lower division; 2026-11-10).
   x <- attempts %>%
     filter(subject_course %in% courses) %>%
+    semi_join(members, by = c("student_id", "term")) %>%
+    mutate(.dfw = outcome %in% "dfw", .pass = outcome %in% "pass",
+           .early = outcome_category %in% "early_drop") %>%
+    # CAMPUS_ROLLUP: a student took the course wherever it was taught; the
+    # grain the result keeps is the student's home campus (student_campus).
     group_by(student_id, term, course = subject_course) %>%
-    summarize(
-      group = case_when(
-        any(outcome %in% "dfw") ~ "dfw",
-        any(outcome %in% "pass") ~ "passed",
-        all(outcome_category %in% "early_drop") ~ "early_drop",
-        TRUE ~ "unclassified"
-      ),
-      .groups = "drop"
-    )
+    summarize(n_rows = n(), n_dfw = sum(.dfw), n_pass = sum(.pass), n_early = sum(.early),
+              .groups = "drop") %>%
+    mutate(group = case_when(
+      n_dfw > 0L ~ "dfw",
+      n_pass > 0L ~ "passed",
+      n_early == n_rows ~ "early_drop",
+      TRUE ~ "unclassified"
+    )) %>%
+    select(student_id, term, course, group)
   takers <- members %>% inner_join(x, by = c("student_id", "term"))
 
   by_category <- takers %>%

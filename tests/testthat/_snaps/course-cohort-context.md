@@ -45,3 +45,17 @@
         SPAN 101: passed 0 (0% of the population), returned —; never took it 1, returned —: —. DFW'd it 0, returned —.
         Benchmark: no ARTS course clears 1 in both groups.
 
+# the headline reads the latest term, one paragraph per home campus
+
+    Code
+      cat(course_cohort_context_headline(p), sep = "\n")
+    Output
+      In Fall 2020, 2 of 6 ABQ students (Sophomore) passed HIST 1110 and 50.0% of them returned the next regular term; 1 never took it and 0.0% returned, a gap of +50.0 points. Passing one of the 1 other Arts lower-division courses went with a median gap of +50.0 points, and HIST 1110's gap is above 0% of them.
+
+---
+
+    Code
+      cat(course_cohort_context_headline(mc02_context()), sep = "\n")
+    Output
+      In Spring 2021, of 1 ABQ students (Freshman), SPAN 101 has no passed and never-took groups of 1 with an observable return, so there is no gap to read.
+

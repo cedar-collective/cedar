@@ -720,3 +720,143 @@ rebuild_dept_credit_hours_tab <- function(cached, base) {
 
   list(plots = plots, tables = tables)
 }
+
+
+# ── Courses Taken: where this unit's majors take their courses ───────────────
+# The inverse of Students Served on the Credit Hours tab: that asks whose
+# majors fill this unit's seats; this asks which units teach the courses this
+# unit's majors sit in. Computed on activation (0.4 s on the full class list,
+# 2026-11-10), never cached, so it is not in DEPT_CACHE_TABLES.
+
+#' Compute the Courses Taken tab
+#'
+#' @param base The Dept Trends base payload (`dept_code`, `dept_name`).
+#' @param data_objects The loaded tables: `cedar_student_terms`,
+#'   `cedar_registrations`, `cedar_dims`, `cedar_edges`.
+#' @param campus_filter Teaching campuses to keep (the page's scope); NULL
+#'   keeps every campus, each its own row.
+#' @param min_n The smallest distinct-student count a unit row shows on its
+#'   own in the latest-term table; smaller rows are pooled as one.
+#' @return `tables` (`own_share`: per term and campus, the members' students
+#'   and registrations and the share in the unit's own courses; `by_college`:
+#'   per term, campus and teaching college, the share; `latest_units`: the
+#'   latest term's teaching units per campus, small ones pooled), `plots`
+#'   (`plot_major_course_units_by_college()`, one per campus) and `meta`.
+compute_dept_course_units_tab <- function(base, data_objects, campus_filter = NULL, min_n = 10L) {
+  for (key in c("cedar_student_terms", "cedar_registrations", "cedar_dims", "cedar_edges")) {
+    if (is.null(data_objects[[key]])) stop("[dept-trends.R] compute_dept_course_units_tab: data_objects lacks ", key)
+  }
+  if (is.null(base$dept_code) || !nzchar(base$dept_code)) stop("[dept-trends.R] base$dept_code is required")
+  min_n <- as.integer(min_n)
+
+  # Every unit row, so the shares below are over every member registration;
+  # the display guard is applied once, to the latest-term table.
+  result <- get_major_course_units(
+    data_objects[["cedar_student_terms"]], data_objects[["cedar_registrations"]],
+    list(dept_code = base$dept_code, campus = campus_filter, min_n = 1L,
+         include_in_progress = TRUE, data_edges = data_objects[["cedar_edges"]])
+  )
+  dims <- data_objects[["cedar_dims"]]
+  unit_labels <- unit_names(dims)
+  college_labels <- college_code_names(dims)
+  no_unit <- "No unit decided"
+
+  rows <- result %>%
+    left_join(unit_labels, by = "dept_code") %>%
+    mutate(
+      unit_label = case_when(is.na(dept_code) ~ no_unit, is.na(dept_name) ~ dept_code, TRUE ~ dept_name),
+      college_label = case_when(
+        is.na(dept_code) ~ no_unit,
+        is.na(college) ~ "No college",
+        TRUE ~ coalesce(unname(college_labels[college]), college)
+      )
+    )
+
+  own_share <- rows %>%
+    group_by(term, campus, in_progress) %>%
+    summarize(
+      students = first(term_students),
+      registrations = first(term_registrations),
+      own_registrations = sum(n_registrations[is_own_unit]),
+      n_units = n_distinct(dept_code),
+      .groups = "drop"
+    ) %>%
+    mutate(own_share = own_registrations / registrations) %>%
+    arrange(term, campus)
+
+  by_college <- rows %>%
+    group_by(term, campus, in_progress, college_label) %>%
+    summarize(n_registrations = sum(n_registrations), share = sum(share_of_registrations), .groups = "drop") %>%
+    arrange(term, campus, desc(share))
+
+  latest <- attr(result, "latest_term")
+  latest_rows <- rows %>% filter(term == latest)
+  shown <- latest_rows %>% filter(n_students >= min_n | is_own_unit)
+  pooled <- latest_rows %>%
+    filter(n_students < min_n, !is_own_unit) %>%
+    group_by(term, campus, in_progress) %>%
+    summarize(
+      n_pooled = n(),
+      n_registrations = sum(n_registrations),
+      share_of_registrations = sum(share_of_registrations),
+      .groups = "drop"
+    ) %>%
+    mutate(
+      college = NA_character_, dept_code = NA_character_, is_own_unit = FALSE,
+      n_students = NA_integer_,
+      unit_label = paste0("Other units (", n_pooled, " under ", min_n, " students)"),
+      college_label = "Pooled"
+    )
+  latest_units <- bind_rows(shown, pooled) %>%
+    select(term, campus, in_progress, college_label, unit_label, dept_code, is_own_unit,
+           n_students, n_registrations, share_of_registrations) %>%
+    arrange(campus, desc(is_own_unit), desc(n_registrations))
+
+  list(
+    tables = list(own_share = own_share, by_college = by_college, latest_units = latest_units),
+    plots = plot_major_course_units_by_college(by_college),
+    meta = list(
+      dept_code = base$dept_code,
+      dept_name = base$dept_name %||% base$dept_code,
+      edge = attr(result, "edge"),
+      latest_term = latest,
+      latest_in_progress = latest > attr(result, "edge"),
+      n_members = attr(result, "n_members"),
+      n_member_student_terms = attr(result, "n_member_student_terms"),
+      n_unmapped = attr(result, "n_unmapped"),
+      min_n = min_n
+    )
+  )
+}
+
+#' The Courses Taken lead, one sentence group per campus of the latest term
+#'
+#' @param payload `compute_dept_course_units_tab()` output.
+#' @return Character vector, one paragraph per campus.
+dept_course_units_headline <- function(payload) {
+  meta <- payload$meta
+  own <- payload$tables$own_share %>% filter(term == meta$latest_term) %>% arrange(campus)
+  if (nrow(own) == 0L) {
+    return(paste0("No enrolled ", meta$dept_name, " major holds a registration to ", fmt_term(meta$edge), "."))
+  }
+  n <- function(x) format(as.integer(x), big.mark = ",", trim = TRUE)
+  plural <- function(k, noun) paste0(n(k), " ", noun, if (k == 1) "" else "s")
+  pct <- function(x) sprintf("%.1f%%", 100 * x)
+  vapply(seq_len(nrow(own)), function(i) {
+    o <- own[i, ]
+    others <- payload$tables$latest_units %>%
+      filter(campus == o$campus, !is_own_unit, !is.na(dept_code)) %>%
+      arrange(desc(n_registrations)) %>%
+      head(3)
+    paste0(
+      "In ", fmt_term(o$term), if (isTRUE(o$in_progress)) " (in progress)" else "", ", ",
+      plural(o$students, paste(meta$dept_name, "major")), " held ", plural(o$registrations, "registration"),
+      " in courses taught on ", o$campus, "; ", pct(o$own_share),
+      " were in the unit's own courses",
+      if (nrow(others) > 0L) {
+        paste0(", and ", paste0(others$unit_label, " (", pct(others$share_of_registrations), ")", collapse = ", "),
+               " taught the most outside it.")
+      } else "."
+    )
+  }, character(1))
+}

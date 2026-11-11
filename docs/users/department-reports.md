@@ -83,6 +83,38 @@ The methodology note at the top of the tab explains exactly what is and isn't co
 
 ---
 
+## Courses Taken
+
+The inverse of the Credit Hours tab's Students Served charts. Those ask whose
+majors fill this department's seats; this tab asks which units teach the
+courses this department's majors sit in.
+
+A member is an enrolled student-term whose primary major belongs to the
+department, pre-majors included. Each member's class-list registrations that
+term (registered at the pull, or withdrawn late, which held a seat past
+census) are split by the unit that taught the course, as the mapping files
+decide it. Shares are within the term and teaching campus, over every member
+registration there. A subject no mapping row has decided appears as its own
+"No unit decided" row rather than being given a unit.
+
+The tab opens with one sentence per teaching campus for the latest term: how
+many majors, how many registrations, the share in the department's own
+courses, and the three outside units that taught the most. Below it:
+
+- **Teaching colleges over time** — one stacked bar per term, split by the
+  college of the teaching unit, one chart per teaching campus. A shaded term
+  is in progress.
+- **Teaching units, latest term** — every unit that taught the department's
+  majors, with students, registrations and share; units under ten students
+  are pooled into one row.
+- **Own-unit share by term** — the members' students and registrations each
+  term, and the share in the department's own courses.
+
+The tab computes when you open it and is not cached; it follows the page's
+campus scope.
+
+---
+
 ## DFW
 
 Nonpassing course outcomes under CEDAR's shared DFW definition, with instructor-level comparison. This section is **password protected** — contact your CEDAR administrator for access.

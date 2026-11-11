@@ -654,6 +654,79 @@ cedar_percent_coldef <- function(name, ...) {
                     format = reactable::colFormat(percent = TRUE, digits = 1), ...)
 }
 
+# A difference between two rates, in percentage points, signed at one decimal.
+cedar_points_coldef <- function(name, ...) {
+  reactable::colDef(name = name, align = "right", na = "\u2014",
+                    cell = function(v) if (is.na(v)) "\u2014" else sprintf("%+.1f", v), ...)
+}
+
+# \u2500\u2500 Balance tables (build_comparison() / compute_balance()) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+# The SMD rows as a display tibble, one row per measured covariate, with the
+# band marked beside the number; and the one-line verdict above them. Shared
+# by Course Dynamics' Downstream tabs (server.R) and the Takers vs Non-Takers
+# module, so the two pages read a balance table the same way. Neither infers
+# comparability from the absence of a substantial difference.
+cedar_balance_smd_rows <- function(smd, group_labels = c("Treatment", "Control")) {
+  group_a <- group_labels[[1]]
+  group_b <- group_labels[[2]]
+  display <- smd %>%
+    dplyr::mutate(
+      value_treatment = cedar_format_balance_value(value_treatment, type),
+      value_control = cedar_format_balance_value(value_control, type),
+      smd_value = dplyr::if_else(is.na(smd), "\u2014", sprintf("%.3f", smd)),
+      smd_fmt = dplyr::case_when(
+        balance_band == "substantial" ~ paste0(smd_value, " \u26a0"),
+        balance_band == "review" ~ paste0(smd_value, " \u25b3"),
+        TRUE ~ smd_value
+      ),
+      interpretation = dplyr::recode(
+        balance_band,
+        small = "Small difference",
+        review = "Review",
+        substantial = "Substantial difference",
+        unavailable = "Unavailable"
+      )
+    ) %>%
+    dplyr::select(covariate, type, n_treatment, n_control,
+                  value_treatment, value_control, unit, smd = smd_fmt,
+                  interpretation)
+  names(display) <- c(
+    "Covariate", "Type", paste0(group_a, " N"), paste0(group_b, " N"),
+    paste0(group_a, " Value"), paste0(group_b, " Value"), "Unit", "SMD",
+    "Interpretation"
+  )
+  display
+}
+
+cedar_balance_summary <- function(balance) {
+  switch(
+    balance$overall_balance %||% "none",
+    substantial =
+      div(class = "alert alert-warning",
+          style = "font-size: 0.85em;",
+          icon("triangle-exclamation"), " ",
+          "One or more measured covariates have substantial observed differences (|SMD| > 0.25). ",
+          "Outcome gaps may partly reflect who entered each group."),
+    review =
+      div(class = "alert alert-warning",
+          style = "font-size: 0.85em;",
+          icon("circle-info"), " ",
+          "Review the measured covariate differences: at least one |SMD| is 0.10\u20130.25, ",
+          "even though none exceeds 0.25. Do not describe these groups as well-balanced."),
+    small =
+      div(class = "alert alert-success", style = "font-size: 0.85em;",
+          icon("circle-check"), " All estimated continuous and binary covariates have small ",
+          "observed differences (|SMD| < 0.10). This does not establish comparability on ",
+          "unmeasured factors."),
+    unavailable =
+      div(class = "alert alert-secondary", style = "font-size: 0.85em;",
+          icon("circle-info"), " No continuous or binary SMD could be estimated. ",
+          "Observed balance is unavailable; review the group descriptions and categorical distributions."),
+    div(class = "alert alert-secondary", style = "font-size: 0.85em;",
+        "Observed balance status is unavailable.")
+  )
+}
+
 # ── Shared loading overlay ───────────────────────────────────────────────────
 # Data-heavy tabs show the standard dash-loader spinner box while a report runs.
 # cedar_loading_overlay() renders that box plus the JS that shows it the instant

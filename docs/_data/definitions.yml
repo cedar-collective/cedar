@@ -496,6 +496,31 @@ definitions:
           - file: R/cones/course-outcomes.R
             functions: [get_course_persistence, next_term_persistence]
 
+  - id: course-cohort-effect
+    current_version: "1.0.0"
+    versions:
+      - version: "1.0.0"
+        title: Takers against non-takers
+        summary: For the enrolled students of a classification in a term, by home campus, compares those who passed a course, those who DFW'd it, and those who never took it that term on two later outcomes, return the next regular term and the DFW share of their next-term attempts, and reads the passed-minus-never-took gap against every course of a college the same students took.
+        population: Enrolled student-terms of the selected classification(s) in the selected anchor terms, by home campus, from the student-term table.
+        unit: Student-term, grouped by the student's outcome in the course that term.
+        numerator: Group members enrolled the next regular term (return); DFW outcomes among the group's classified attempts in that next term (next-term DFW share).
+        denominator: Group members whose return is observable; the group's classified next-term attempts.
+        campus: The student's home campus, not the campus that taught the course. A student who took the course on any campus is a taker.
+        time_window: Anchor terms run to the settled enrollment edge; the next-term DFW share is shown only where the next regular term is graded. Summer is not a step.
+        exclusions: Early drops and registrations with no posted grade are in the population and in no group. A group under the minimum keeps its count and shows no rate. A benchmark course needs the minimum in both its passed and its never-took groups, and the focal course is never its own benchmark.
+        limitations:
+          - Passing any course goes with returning, so the gap over never-takers is mostly who takes and passes courses. The benchmark gives the college's typical gap; the course's distance from it is the number to read, and it is still descriptive.
+          - The balance table compares takers with never-takers on measured covariates at each student's first anchor term. A substantial difference says the gap describes placement, and a small one does not establish comparability on unmeasured factors.
+          - A benchmark is a median over courses, not over students, so small courses count as much as large ones; raise the minimum to read only well-attended courses.
+          - A classification scope is a classification as the student-term table records it, which for a branch-campus course can be mostly concurrent-enrollment students.
+        guide: users/course-reports#takers-vs-non-takers
+        implementation:
+          - file: R/cones/course-cohort-effect.R
+            functions: [get_course_cohort_effect]
+          - file: R/features/course-cohort-context.R
+            functions: [build_course_cohort_context, course_cohort_context_defaults, course_cohort_context_headline]
+
   - id: course-sequence
     current_version: "2.0.0"
     versions:
