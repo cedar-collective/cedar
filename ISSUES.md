@@ -41,11 +41,11 @@ alongside other work (M14, M16).
 | [I48](#i48--a-transform-change-to-a-fact-tables-stored-columns-is-not-rebuilt-at-deploy) | Defect | Since the mapping stamps retired (ADR-001 step 3, 2026-11-06) the deploy gate rebuilds only `cedar_student_terms`: a transform change that adds or renames a stored column on sections, students, programs or degrees starts the app on files without it until the morning refresh, the I46 shape with no gate |
 | [I46](#i46--a-deploy-that-must-rebuild-a-table-the-app-cannot-start-without-takes-the-site-down) | Defect | The deploy's table gate ran after the health check, so a deploy that added a column to `cedar_student_terms` failed its health check on the missing column and never reached the gate: production served the restart page from 17:07 UTC on 2026-11-04 (gate moved before the first request) |
 | [I45](#i45--the-class-list-and-the-schedule-name-the-same-section-with-different-course-codes) | Defect | The class list and the schedule name the same section with different course codes for renamed subjects (SOC to SOCI, PSY to PSYC): SOCI 371 had class-list history from Fall 2019 but no sections before Fall 2021 (fixed for every reader by keying the loaded tables on the course, 2026-11-07; open until the remaining successions are confirmed) |
-| [I43](#i43--every-scheduled-refresh-fails-because-the-default-asks-for-a-report-mrgather-never-fetches) | Defect | Every scheduled refresh has failed since 2026-10-24: the default asks for the applicants report, which production mrgather never fetches, so production tables have not been rebuilt since Oct 27 (default fixed; mrgather and per-report rebuilds remain) |
+| [I43](#i43--every-scheduled-refresh-fails-because-the-default-asks-for-a-report-mrgather-never-fetches) | Defect | Every scheduled refresh failed from 2026-10-24 to 2026-11-03: the default asked for the applicants report, which production mrgather never fetches, and one missing report skipped every table (default fixed 2026-11-03, per-report rebuilds 2026-11-11; open for mrgather, which still accepts a report it cannot fetch) |
 | [I38](#i38--a-pathways-program-population-misses-pre-majors-whose-name-differs-from-their-major) | Defect | A Pathways program population misses pre-majors whose name differs from their major: "Film and Digital Arts" holds 1 of the 1,016 Film pre-majors who never declared the major, because `FFDA` is named "FDMA" |
 | [I37](#i37--renumbered-courses-lose-their-history) | Defect | Renumbered courses lose their history: ACCT 3401 (was MGMT 340) and the other Fall 2026 ACCT, BUSA and POPH courses read as new (every reader follows a confirmed renumbering; 277 of the 320 title matches confirmed 2026-11-07, 6 deleted, 37 held for review with the reason on each row) |
-| [I33](#i33--a-crashed-myreports-download-is-recorded-as-a-successful-fetch) | Defect | A crashed MyReports download is recorded as a successful fetch: on Oct 23 class lists and applicants were never downloaded, and every step reported ✅ (partly fixed) |
-| [I32](#i32--a-scheduled-refresh-waits-forever-when-myreports-asks-for-a-2fa-code) | Defect | A scheduled refresh waits forever when MyReports asks for a 2FA code: the Oct 11 run sat 12 days at the prompt, unreported |
+| [I33](#i33--a-crashed-myreports-download-is-recorded-as-a-successful-fetch) | Defect | A crashed MyReports download is recorded as a successful fetch: on Oct 23 class lists and applicants were never downloaded, and every step reported ✅ (fixed in CEDAR 2026-11-11: the fetch is judged per report by its files and parse stops on a named report with no file; open for mrgather's exit status) |
+| [I32](#i32--a-scheduled-refresh-waits-forever-when-myreports-asks-for-a-2fa-code) | Defect | A scheduled refresh waits forever when MyReports asks for a 2FA code: the Oct 11 run sat 12 days at the prompt, unreported (fixed in CEDAR 2026-11-11: the fetch is stopped at the prompt when no one can answer, and after a time limit) |
 | [I28](#i28--one-late-starting-session-makes-a-whole-courses-first-day-unknown) | Defect | One late-starting session makes a whole course's first day unknown: 257 Fall 2026 courses on the Oct 8 pull, 17 on Oct 23. Intersession is out of the forecast (model 0.24.0), and a session not yet begun is judged on its lower bound (model 0.25.0). A section with no start date still reads as having no status dates |
 | [I24](#i24--cis-demo-browser-run-intermittently-loses-the-app-at-open-seats) | Defect | CI's demo browser run intermittently loses the app at Open Seats (probably fixed 2026-10-23: a test race) |
 | [I23](#i23--student-ids-are-hashed-with-the-built-in-default-salt) | Defect | Student IDs are hashed with the built-in default salt: the salt protects nothing |
@@ -488,8 +488,9 @@ CEDAR's basis for enrollment elsewhere. Whichever is chosen goes into
 
 ## I43 — Every scheduled refresh fails because the default asks for a report mrgather never fetches
 
-**Status:** default fixed 2026-11-03 (#186);
-mrgather and per-report rebuilds remain (see Still to do)
+**Status:** fixed in CEDAR: the default 2026-11-03 (#186), per-report
+rebuilds and the run summary 2026-11-11. Open only for mrgather, which still
+accepts a report it cannot fetch (see Still to do)
 **Found:** 2026-11-03, reading the production refresh logs
 **Severity:** high. Nothing wrong was published, but production stopped
 refreshing. `cedar_sections` and `cedar_programs` were last written on Oct 27
@@ -541,11 +542,16 @@ fails.
 
 - mrgather: fetch the applicants report, or refuse a report it cannot fetch
   instead of accepting it and counting the rest as complete.
-- `update-data.sh`: one missing report skips every table, including those
-  built from the reports that arrived. I33's *Done when* asks only that the
-  tables built from a missing report are not rebuilt.
-- The run summary marks skipped steps ✅ ("transform-to-cedar.R ✅ 0s prior
-  step failed; transform not run"), so the failure shows only on its own line.
+
+Done 2026-11-11 (branch `refresh/partial-rebuild-and-fetch-limit`):
+
+- One missing report no longer skips every table. The fetch is judged per
+  report: the ones with a file from today go on to parse and transform, the
+  others keep their tables, the step reads `mrgather fetch ❌ no file from
+  today for: aa; continuing with: desr deg as cl`, and the run still ends
+  with an error (exit status 2, on which `restart-cedar.sh --update` reloads
+  the app; 1 when nothing arrived or a later step failed).
+- A step that did not run shows ➖ in the run summary, never ✅.
 
 ## I42 — A saturated course whose Fall changes lower its forecast is still called a floor
 
@@ -983,9 +989,9 @@ without it, and its fixed-value assertion fails on any platform.
 
 ## I33 — A crashed MyReports download is recorded as a successful fetch
 
-**Status:** partly fixed 2026-10-24: a fetch that leaves a requested report
-with no file from today now fails and names it, so the transform is skipped
-(see Fix). `parse-data.R` and mrgather are unchanged.
+**Status:** fixed in CEDAR (2026-10-24 and 2026-11-11, see Fix and Still
+open); open for mrgather, which still exits 0 after a fatal error, and for
+the two limits of the file check listed under Still open.
 **Found:** 2026-10-23, reading the log of a manual production refresh
 (`restart-cedar.sh --mode production --update -s 202680 -e 202710`,
 `/var/log/cedar-update-20261023_192042.log`)
@@ -1069,33 +1075,40 @@ Still open:
   passed, rightly: the data was today's.
 - One Academic Study file satisfies the check. A run that gets the first file
   and loses the second, as on Oct 23, still passes.
-- `parse-data.R` still passes a requested report that has no file.
 - mrgather still exits 0 after a fatal error. On Oct 27 a manual class-list
   re-pull (`/var/log/cedar-update-20261027_110446.log`) stopped on the
   VPN's sign-in handoff (`unmvpn.unm.edu/SAML20/SP/ACS`), never reached
   `#SignonUserName`, and exited 0 with `Fatal error during report gathering`.
   The fetch check caught it (`no file from today for: cl`) and nothing was
   republished; the same command run again at 13:36 UTC logged in normally.
-- One missing report blocks every table. The check fails the whole fetch
-  step, so a run that downloads everything but the applicants file publishes
-  nothing, class lists included. The morning cron failed three days running
-  for this reason: on Oct 25 and Oct 26 the Academic Study download timed out
-  and mrgather stopped before class lists and applicants (`no file from today
-  for: cl aa`); on Oct 27 every report downloaded except applicants, which
-  mrgather never attempted (the log has no Applicants URL after the class
-  list), and the run ended `Skipping transform because an earlier step
-  failed`. Production served the tables of the last successful run. *Done
-  when* gains: a report that did download still has its tables rebuilt, and
-  only the tables built from the missing report are kept.
 
-  To check a morning: `grep -E "Fetch exited|Skipping transform|Update
-  Finished|Update Complete" /var/log/cedar-update-$(date -u +%Y%m%d)_100501.log`.
+Fixed 2026-11-11 (branch `refresh/partial-rebuild-and-fetch-limit`):
+
+- A report that arrived is refreshed when another did not. The fetch step
+  lists the reports with a file from today and passes only those to
+  `parse-data.R -r` and to the transform's `--tables`; a missing report's
+  tables are kept. The step is `PARTIAL` (❌ in the summary, exit status 2)
+  and its note names both lists; the success note is now `files from today:`
+  and the reports found, not the ones requested. Before this, one missing
+  report failed the whole step: on Oct 25 and 26 the Academic Study download
+  timed out and mrgather stopped before class lists and applicants, on Oct 27
+  everything arrived but applicants, and each run published nothing (I43).
+- `parse-data.R` stops, before parsing anything, when a report named with
+  `-r` has no file. A run that names none still parses whatever it finds.
+- `test-data-update-pipeline.R` runs the fetch step against a stand-in
+  `docker` for each case.
+
+To check a morning: `grep -E "Fetch incomplete|Fetch failed|Skipping
+transform|Update Finished|Update Complete" /var/log/cedar-update-$(date -u
++%Y%m%d)_100501.log`.
 
 ---
 
 ## I32 — A scheduled refresh waits forever when MyReports asks for a 2FA code
 
-**Status:** open
+**Status:** fixed in CEDAR 2026-11-11 (see Fix); takes effect in production
+at the deploy that carries it. mrgather still waits at the prompt when run
+without CEDAR's script.
 **Found:** 2026-10-23, while starting a manual production refresh
 **Severity:** moderate. No number is wrong. Later runs fetch normally, but a
 run that hits the prompt never ends and never reports failure. It keeps its
@@ -1153,6 +1166,27 @@ setsid /root/cedar/scripts/update-data.sh -s 202680 -e 202680 </dev/null >/tmp/f
 To check for runs already stuck:
 `pgrep -fa update-data.sh` and `docker ps --filter name=mrgather-mrgather-run`.
 Anything older than a day is one.
+
+### Fix
+
+`update-data.sh` starts the fetch container under a name
+(`cedar-mrgather-fetch-<pid>`) and watches it. When the run has no terminal on
+standard input and mrgather's output reaches `Please enter the 2FA code`, or
+when the fetch has run for `CEDAR_FETCH_TIME_LIMIT` seconds (default 7200),
+the watcher removes the container with `docker rm -f`, which also ends the
+compose client. The step is then `mrgather fetch ❌` with `2FA required and
+nobody at a terminal to enter the code` or `stopped after the 7200s time
+limit` in its note. A run from a terminal is left at the prompt, so a person
+can still type the code, and is bound only by the time limit. Production and
+local runs share the one command. `test-data-update-pipeline.R` runs the step
+against a stand-in `docker` that prints the prompt and waits, and one that
+only waits: each is stopped, and the container removed is the one named on
+the fetch command.
+
+The prompt text is mrgather's (`mrgather.js`); if it changes, the 2FA case is
+caught by the time limit instead. Not verified against MyReports, which
+decides when to ask.
+
 
 ---
 
