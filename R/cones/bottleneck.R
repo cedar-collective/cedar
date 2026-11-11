@@ -3,8 +3,9 @@
 #' @description
 #' Identifies enrollment demand bottlenecks — courses where students in a
 #' defined cohort are being shut out. A bottleneck here means a course where
-#' students want seats they can't get, measured by students who are waitlisted
-#' but hold no registered seat in the course.
+#' students want seats they can't get, measured by CEDAR's class-list true
+#' waitlist demand (`R/branches/waitlist-demand.R`): students waitlisted for a
+#' course in a term who hold no registered seat in it that term.
 #'
 #' This cone focuses on access, not grade outcomes. For DFW analysis of a
 #' cohort, use `get_course_outcome_rates()` with `opt$cohort_ids`. For stop-out
@@ -48,9 +49,11 @@
 
 #' Get Enrollment Demand Bottlenecks for a Cohort
 #'
-#' For each course, counts cohort students who are waitlisted but hold no
-#' registered seat — the clearest signal of unmet demand. Results are
-#' returned per campus and course, sorted by waitlist count.
+#' For each course and term, counts cohort students who are waitlisted but hold
+#' no registered seat that term — the clearest signal of unmet demand. Results
+#' are returned per campus, term and course, sorted by waitlist count. Terms
+#' are never pooled: a seat won a term later does not erase the term spent
+#' waiting, and a student waiting in two terms is waiting in each.
 #'
 #' If the cohort contains multiple labels (from `build_population()` with
 #' `include_pre_majors = "split"`), a `$by_label` table is also returned
@@ -59,6 +62,8 @@
 #' @param cohort Data frame. Output of `build_population()`. Must have columns
 #'   `student_id` and `population_label`.
 #' @param students Data frame. The `cedar_registrations` table.
+#' @param sections Optional `cedar_sections`, used only when the class list
+#'   has rows without a course title (the title is part of the waitlist grain).
 #' @param opt List of options:
 #'   \describe{
 #'     \item{`term`}{Integer or character vector of term codes to restrict to.
@@ -69,8 +74,8 @@
 #' @return Named list:
 #'   \describe{
 #'     \item{`waitlist`}{Data frame of enrollment bottlenecks, sorted
-#'       descending by `n_waitlisted`. Columns: `campus`, `subject_course`,
-#'       `n_waitlisted`.}
+#'       descending by `n_waitlisted`. Columns: `campus`, `term`,
+#'       `subject_course`, `n_waitlisted`.}
 #'     \item{`population_size`}{Named integer vector: number of unique student
 #'       IDs per cohort label.}
 #'     \item{`by_label`}{Data frame breaking down waitlist counts by
@@ -92,11 +97,16 @@
 #' @seealso [build_population()] to construct the cohort input,
 #'   [compute_waitlist_pressure()] for the underlying calculation
 #' @export
-get_bottlenecks <- function(population, students, opt = list()) {
+get_bottlenecks <- function(population, students, sections = NULL, opt = list()) {
 
   message("[bottleneck.R] Starting enrollment demand analysis...")
 
   validate_population(population, "get_bottlenecks")
+  if (!is.null(sections) && !is.data.frame(sections)) {
+    stop("[get_bottlenecks] `sections` must be cedar_sections or NULL; ",
+         "pass options by name: get_bottlenecks(population, students, opt = list(...))",
+         call. = FALSE)
+  }
 
   # Apply term / campus filters to students
   filtered_students <- students
@@ -121,7 +131,7 @@ get_bottlenecks <- function(population, students, opt = list()) {
 
   # Overall waitlist pressure across all cohort members
   message("[bottleneck.R] Computing waitlist pressure...")
-  result$waitlist <- compute_waitlist_pressure(filtered_students, all_ids)
+  result$waitlist <- compute_waitlist_pressure(filtered_students, all_ids, sections)
 
   # If multiple labels, also break out by label
   labels <- unique(population$population_label)
@@ -129,11 +139,11 @@ get_bottlenecks <- function(population, students, opt = list()) {
     message("[bottleneck.R] Multiple cohort labels found — computing by-label breakdown...")
     by_label <- purrr::map_dfr(labels, function(lbl) {
       ids <- population$student_id[population$population_label == lbl]
-      compute_waitlist_pressure(filtered_students, ids) %>%
+      compute_waitlist_pressure(filtered_students, ids, sections) %>%
         mutate(population_label = lbl)
     })
     result$by_label <- by_label %>%
-      select(population_label, campus, subject_course, n_waitlisted) %>%
+      select(population_label, campus, term, subject_course, n_waitlisted) %>%
       arrange(population_label, desc(n_waitlisted))
   }
 
@@ -148,41 +158,36 @@ get_bottlenecks <- function(population, students, opt = list()) {
 
 #' Compute Waitlist Pressure for a Student Cohort
 #'
-#' Counts cohort students who are waitlisted for a course and hold no
-#' registered seat in that course — i.e., students who couldn't get in.
-#' Students who are both waitlisted and registered (hedging across sections)
-#' are excluded from the count.
+#' CEDAR's class-list true waitlist demand, restricted to a cohort: students
+#' waitlisted for a course in a term who hold no registered seat for the same
+#' course title, term, delivery campus, college and part of term
+#' (`get_true_waitlisted_rows()`), counted once per campus, term and course.
+#' A student who is both waitlisted and registered that term (hedging across
+#' sections) is not waiting.
 #'
 #' @param students Data frame. The `cedar_registrations` table, optionally
 #'   pre-filtered by term/campus.
-#' @param cohort_ids Character vector of student IDs to include.
+#' @param population_ids Character vector of student IDs to include.
+#' @param sections Optional `cedar_sections`, for course titles the class list
+#'   lacks.
 #'
 #' @return Data frame sorted descending by `n_waitlisted`:
 #'   \describe{
 #'     \item{`campus`}{Course-delivery campus code.}
+#'     \item{`term`}{Term code the students were waiting in.}
 #'     \item{`subject_course`}{Course identifier, e.g., `"BIOL 2310"`.}
 #'     \item{`n_waitlisted`}{Unique cohort students waitlisted and not
-#'       registered for this course.}
+#'       registered for this course that term.}
 #'   }
 #'
 #' @keywords internal
-compute_waitlist_pressure <- function(students, population_ids) {
+compute_waitlist_pressure <- function(students, population_ids, sections = NULL) {
   cedar_require_campus(students, "compute_waitlist_pressure")
 
-  population_students <- students %>% filter(student_id %in% population_ids)
-
-  waitlisted <- population_students %>%
-    filter(registration_status_code %in% STATUS_WAITLIST) %>%
-    select(student_id, campus, subject_course) %>%
-    distinct()
-
-  registered <- population_students %>%
-    filter(registration_status_code %in% STATUS_REGISTERED) %>%
-    select(student_id, campus, subject_course) %>%
-    distinct()
-
-  setdiff(waitlisted, registered) %>%
-    group_by(campus, subject_course) %>%
-    summarize(n_waitlisted = n_distinct(student_id), .groups = "drop") %>%
-    arrange(desc(n_waitlisted))
+  students %>%
+    filter(student_id %in% population_ids) %>%
+    get_true_waitlisted_rows(sections) %>%
+    summarize_waitlist_demand(c("campus", "term", "subject_course"),
+                              count_name = "n_waitlisted") %>%
+    arrange(desc(n_waitlisted), campus, term, subject_course)
 }

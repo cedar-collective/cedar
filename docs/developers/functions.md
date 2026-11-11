@@ -8,7 +8,7 @@ parent: Developer Guide
 
 This reference is auto-generated from roxygen2 comments in the source code.
 
-*Generated: 2026-11-10 20:57:29.09365*
+*Generated: 2026-11-11 15:55:57.809666*
 
 ---
 
@@ -98,15 +98,16 @@ The outcome flags of attempts, read off their stored classification  What the pe
 
 **Get Enrollment Demand Bottlenecks for a Cohort**
 
-Get Enrollment Demand Bottlenecks for a Cohort  For each course, counts cohort students who are waitlisted but hold no registered seat — the clearest signal of unmet demand. Results are returned per campus and course, sorted by waitlist count.  If the cohort contains multiple labels (from `build_population()` with `include_pre_majors = "split"`), a `$by_label` table is also returned showing results broken out by cohort label.
+Get Enrollment Demand Bottlenecks for a Cohort  For each course and term, counts cohort students who are waitlisted but hold no registered seat that term — the clearest signal of unmet demand. Results are returned per campus, term and course, sorted by waitlist count. Terms are never pooled: a seat won a term later does not erase the term spent waiting, and a student waiting in two terms is waiting in each.  If the cohort contains multiple labels (from `build_population()` with `include_pre_majors = "split"`), a `$by_label` table is also returned showing results broken out by cohort label.
 
 **Parameters:**
 
 - `cohort` - Data frame. Output of `build_population()`. Must have columns `student_id` and `population_label`.
 - `students` - Data frame. The `cedar_registrations` table.
+- `sections` - Optional `cedar_sections`, used only when the class list has rows without a course title (the title is part of the waitlist grain).
 - `opt` - List of options: \describe{ \item{`term`}{Integer or character vector of term codes to restrict to. Optional; defaults to all terms.} \item{`campus`}{Character vector of campus codes. Optional.} }
 
-**Returns:** Named list: \describe{ \item{`waitlist`}{Data frame of enrollment bottlenecks, sorted descending by `n_waitlisted`. Columns: `campus`, `subject_course`, `n_waitlisted`.} \item{`population_size`}{Named integer vector: number of unique student IDs per cohort label.} \item{`by_label`}{Data frame breaking down waitlist counts by `population_label`. Only present when the cohort has more than one distinct label.} }
+**Returns:** Named list: \describe{ \item{`waitlist`}{Data frame of enrollment bottlenecks, sorted descending by `n_waitlisted`. Columns: `campus`, `term`, `subject_course`, `n_waitlisted`.} \item{`population_size`}{Named integer vector: number of unique student IDs per cohort label.} \item{`by_label`}{Data frame breaking down waitlist counts by `population_label`. Only present when the cohort has more than one distinct label.} }
 
 **Example:**
 ```r
@@ -130,14 +131,15 @@ result$population_size
 
 **Compute Waitlist Pressure for a Student Cohort**
 
-Compute Waitlist Pressure for a Student Cohort  Counts cohort students who are waitlisted for a course and hold no registered seat in that course — i.e., students who couldn't get in. Students who are both waitlisted and registered (hedging across sections) are excluded from the count.
+Compute Waitlist Pressure for a Student Cohort  CEDAR's class-list true waitlist demand, restricted to a cohort: students waitlisted for a course in a term who hold no registered seat for the same course title, term, delivery campus, college and part of term (`get_true_waitlisted_rows()`), counted once per campus, term and course. A student who is both waitlisted and registered that term (hedging across sections) is not waiting.
 
 **Parameters:**
 
 - `students` - Data frame. The `cedar_registrations` table, optionally pre-filtered by term/campus.
-- `cohort_ids` - Character vector of student IDs to include.
+- `population_ids` - Character vector of student IDs to include.
+- `sections` - Optional `cedar_sections`, for course titles the class list lacks.
 
-**Returns:** Data frame sorted descending by `n_waitlisted`: \describe{ \item{`campus`}{Course-delivery campus code.} \item{`subject_course`}{Course identifier, e.g., `"BIOL 2310"`.} \item{`n_waitlisted`}{Unique cohort students waitlisted and not registered for this course.} }
+**Returns:** Data frame sorted descending by `n_waitlisted`: \describe{ \item{`campus`}{Course-delivery campus code.} \item{`term`}{Term code the students were waiting in.} \item{`subject_course`}{Course identifier, e.g., `"BIOL 2310"`.} \item{`n_waitlisted`}{Unique cohort students waitlisted and not registered for this course that term.} }
 
 ---
 
