@@ -8,8 +8,7 @@ parent: Developer Guide
 
 This reference is auto-generated from roxygen2 comments in the source code.
 
-*Generated: 2026-11-11 16:01:31.698436*
-*Generated: 2026-11-11 15:55:57.809666*
+*Generated: 2026-11-11 16:24:18.612222*
 
 ---
 
@@ -3582,7 +3581,7 @@ Detect major changes for each student across their academic timeline  Compares e
 - `programs` - cedar_programs data frame.
 - `cohort` - Optional tibble(student_id, cohort_label). If provided, only students in the cohort are analyzed.
 - `student_terms` - Optional. `cedar_student_terms`. Supplies the credit position at each change via [build_credit_timeline()]. When NULL the credit columns are returned as NA rather than being read off the frozen cumulative columns on `programs` — see the note below.
-- `opt` - Options list: \itemize{ \item \code{campus}  — character; filter by student_campus \item \code{college} — character; filter by student_college \item \code{dept_code} — character; filter by dept_code \item \code{observation_end_term} — integer; exclude program records after the settled longitudinal enrollment edge }
+- `opt` - Options list: \itemize{ \item \code{campus}  — character; filter by student_campus \item \code{college} — character; filter by student_college \item \code{dept_code} — character; filter by dept_code \item \code{premajor_leads_to} — named character, pre-major code to the code it leads to (default \code{premajor_leads_to}, from programs.csv) \item \code{observation_end_term} — integer; exclude program records after the settled longitudinal enrollment edge }
 
 **Returns:** Tibble with one row per major change event: student_id, change_term, prev_term, from_major, to_major, unm_credits_before_change, total_credits_before_change (credits entering the term before the change posted, UNM-only and UNM + transfer), credits_position_valid, student_college, student_campus, dept_code, student_level, degree   This function used to read `inst_credits_attempted` / `overall_credits_attempted` at the change term and lag them by one term, on the stated reasoning that "because these columns are running totals, lag() subtracts exactly that student's lagged-term load". They are not running totals. Academic Studies stamps the student's total as of the pull onto every historical row, so within one full re-pull the value moves across a student's own terms only 16% of the time. `lag()` on a frozen column subtracts zero, and the reported "credits before the change" was approximately the student's FINAL credit total — overstating the position at a student's first term by a median of 84 credits. See the field reliability contract in AGENTS.md.
 
@@ -4288,6 +4287,21 @@ Build a Demographic Population  Identifies students based on demographic indicat
 
 ---
 
+### `pre_major_codes_leading_to()`
+
+*Source: population.R*
+
+**The pre-major codes whose `leads_to` is one of the given program codes**
+
+**Parameters:**
+
+- `codes` - Declared program codes.
+- `leads_to` - Named character vector, pre-major code -> the code it leads to (default `premajor_leads_to`, from programs.csv).
+
+**Returns:** Character vector of pre-major codes; empty when none lead there.
+
+---
+
 ### `population_group_major_codes()`
 
 *Source: population.R*
@@ -4890,6 +4904,23 @@ Drop the student-description columns from a class list  The transform saves the 
 ---
 
 ## transform-to-cedar
+
+### `cedar_fact_tables_staleness()`
+
+*Source: transform-to-cedar.R*
+
+**Which fact tables were saved under another stored schema than the code's**
+
+Which fact tables were saved under another stored schema than the code's  Read from the stamp save_cedar_file() writes, so a file copied in from another host carries its own answer. A missing file is not stale here: the transform builds a fact table from a report, and a host without the report has nothing to rebuild it from (the derived-table checks name a missing source themselves).
+
+**Parameters:**
+
+- `data_dir` - Path to data directory
+- `ext` - File extension
+
+**Returns:** A character vector of reasons named by transform stage, in the order the stages run; empty when every saved fact table is current.
+
+---
 
 ### `dedup_class_list_rows()`
 
