@@ -15,7 +15,7 @@ context("The deploy's table gate")
 test_that("the deploy's table gate runs before the first request and restarts on a rebuild", {
   # The script's lines as written; bash ignores their YAML indentation.
   deploy <- readLines("../../.github/workflows/deploy.yml", warn = FALSE)
-  first <- grep("Checking whether the student-term table or the measure tables need rebuilding", deploy, fixed = TRUE)
+  first <- grep("Checking whether the fact tables, the student-term table or the measure tables need rebuilding", deploy, fixed = TRUE)
   last <- grep('rm -f "$MAPPING_LOG"', deploy, fixed = TRUE)
   expect_length(first, 1L)
   expect_length(last, 1L)
@@ -42,12 +42,15 @@ test_that("the deploy's table gate runs before the first request and restarts on
   measures <- run_gate(paste0("[student-terms] cedar_student_terms is current; no rebuild.\n",
                               "[measures] Rebuilt: cedar_attempts, cedar_course_terms, cedar_course_flows."))
   expect_true("DOCKER:compose restart cedar-shiny" %in% measures)
+  # A rebuilt fact table restarts it too (I48).
+  facts <- run_gate("[fact-tables] Rebuilt: sections.")
+  expect_true("DOCKER:compose restart cedar-shiny" %in% facts)
   unchanged <- run_gate(paste0("[student-terms] cedar_student_terms is current; no rebuild.\n",
                                "[measures] The measure tables are current; no rebuild."))
   expect_false(any(grepl("restart", unchanged)))
   failed <- run_gate("Error: cedar_student_terms needs cedar_programs.qs, which has not been built.", rc = 1L)
   expect_false(any(grepl("DOCKER:compose restart", failed)))
-  expect_true(any(grepl("WARNING: student-term or measure-table check", failed, fixed = TRUE)))
+  expect_true(any(grepl("WARNING: fact-table, student-term or measure-table check", failed, fixed = TRUE)))
 })
 
 # The gate's decision for the measure tables, with the child process stubbed,
@@ -75,6 +78,47 @@ test_that("the gate builds the measure tables only when they are stale or forced
   expect_equal(built, rep("measures", 3L))
   state$reason <- "saved cedar_attempts was built from other mapping files"
   expect_error(gate(rebuild_with = function(tables) NULL), "still stale")
+})
+
+# ISSUES.md I48: a fact table saved under another stored schema than the
+# transform writes is rebuilt at deploy, its own stage alone; an unstamped
+# file predates stamping and is rebuilt once; a current one costs nothing.
+# The stamp is the one save_cedar_file() writes, read back from the file.
+test_that("the gate rebuilds only the fact tables whose stored schema is stale", {
+  dir <- withr::local_tempdir()
+  env <- new.env(parent = globalenv())
+  sys.source("../../scripts/rebuild-programs-if-mappings-changed.R", envir = env)
+  transform <- load_transform_helpers()
+  save_stamped <- function(table) suppressMessages(
+    transform$save_cedar_file(tibble::tibble(x = 1), table, dir, ".qs"))
+  for (table in c("sections", "programs", "degrees")) save_stamped(table)
+  # The class list predates stamping.
+  qs2::qs_save(tibble::tibble(x = 1), file.path(dir, "cedar_registrations.qs"))
+
+  built <- character(0)
+  stage_tables <- c(sections = "sections", students = "registrations",
+                    programs = "programs", degrees = "degrees")
+  rebuild <- function(tables) { built <<- c(built, tables); save_stamped(stage_tables[[tables]]) }
+  gate <- function(rebuild_with = rebuild) suppressMessages(
+    env$build_fact_tables_if_stale(dir, rebuild_with, staleness = transform$cedar_fact_tables_staleness))
+
+  expect_equal(names(transform$cedar_fact_tables_staleness(dir)), "students")
+  expect_true(gate())
+  expect_equal(built, "students")
+  expect_false(gate())
+  expect_equal(built, "students")
+  # A file stamped under an older version: that stage and no other.
+  older <- tibble::tibble(x = 1)
+  attr(older, "cedar_transform_schema_version") <- transform$CEDAR_FACT_SCHEMA_VERSIONS[["degrees"]] - 1L
+  qs2::qs_save(older, file.path(dir, "cedar_degrees.qs"))
+  expect_true(gate())
+  expect_equal(built, c("students", "degrees"))
+  # A rebuild that leaves the file stale is an error, not a success.
+  qs2::qs_save(older, file.path(dir, "cedar_degrees.qs"))
+  expect_error(gate(rebuild_with = function(tables) NULL), "still stale")
+  # A table with no file is not this check's to build.
+  unlink(file.path(dir, "cedar_degrees.qs"))
+  expect_length(transform$cedar_fact_tables_staleness(dir), 0L)
 })
 
 # The gate's own decision, with the child process stubbed: current means no

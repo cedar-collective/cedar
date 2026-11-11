@@ -196,13 +196,16 @@ jobs:
             # (The stale stored dept_code that hid 194 of 229 Radiologic
             # Sciences students for nine months, ISSUES.md I7, can no longer
             # exist.) The measure tables do carry units, so a mapping edit
-            # rebuilds them here, in their own process, in minutes. The four
-            # fact tables are rebuilt by the morning refresh, not here: a
-            # transform change to their stored columns waits for it (I48).
+            # rebuilds them here, in their own process, in minutes. A fact
+            # table is rebuilt here only when its saved file stores another
+            # schema than the transform now writes (a bumped
+            # CEDAR_FACT_SCHEMA_VERSIONS entry, or a file with no stamp):
+            # one stage per R process, each with the derived tables built
+            # from it, about 10 minutes for all four (ISSUES.md I48).
             #
-            # Cheap by design: file times, column lists and stamps, never
-            # loading the class list, so a deploy that changed nothing costs
-            # seconds. Data-driven staleness stays with the morning refresh.
+            # File times, column lists and stamps only, so a deploy that
+            # changed nothing rebuilds nothing. Data-driven staleness stays
+            # with the morning refresh.
             #
             # Here, and not after the health check: the container is replaced,
             # but shiny-server starts the app's R process on the first request,
@@ -217,7 +220,7 @@ jobs:
             # runs. A rebuild restarts the container all the same, so nothing
             # that may have started meanwhile outlives the tables it loaded
             # (app_idle_timeout 0); it has loaded nothing, so that is cheap.
-            echo "Checking whether the student-term table or the measure tables need rebuilding in this deploy..."
+            echo "Checking whether the fact tables, the student-term table or the measure tables need rebuilding in this deploy..."
             MAPPING_LOG="$(mktemp)"
             if docker compose exec -T cedar-shiny \
                  Rscript --vanilla \
@@ -225,13 +228,13 @@ jobs:
                  < /dev/null > "$MAPPING_LOG" 2>&1; then
               cat "$MAPPING_LOG"
               echo "Derived-table check complete."
-              if grep -Eq '^\[(student-terms|measures)\] Rebuilt:' "$MAPPING_LOG"; then
+              if grep -Eq '^\[(fact-tables|student-terms|measures)\] Rebuilt:' "$MAPPING_LOG"; then
                 echo "A table was rebuilt; restarting the container so the app starts from it."
                 docker compose restart cedar-shiny
               fi
             else
               cat "$MAPPING_LOG"
-              echo "WARNING: student-term or measure-table check or rebuild failed."
+              echo "WARNING: fact-table, student-term or measure-table check or rebuild failed."
               echo "The previous tables are retained; the next data refresh retries."
             fi
             rm -f "$MAPPING_LOG"

@@ -11,9 +11,14 @@
 # (R/branches/dims.R), so a mapping edit changes the next start and rebuilds
 # none of them, and that branch is gone.
 #
-# What remains are the derived tables, each built in its own R process here,
-# before the first request, because the app requires them and never builds
-# one (ADR-001 step 6: a restart is a load):
+# First, a fact table (sections, class list, programs, degrees) whose saved
+# file stores another schema than the transform now writes is rebuilt from
+# its report, one stage per R process (cedar_fact_tables_staleness(),
+# CEDAR_FACT_SCHEMA_VERSIONS; ISSUES.md I48).
+#
+# Then the derived tables, each built in its own R process here, before the
+# first request, because the app requires them and never builds one (ADR-001
+# step 6: a restart is a load):
 #
 # - cedar_student_terms (step 2), built from the saved students, programs and
 #   degrees: stale whenever one of them is newer, short a column the builder
@@ -31,8 +36,9 @@
 # (cedar_students.qs, before 2026-11-09) is renamed to cedar_registrations.qs
 # once (migrate_class_list_file(), R/trunk/data.R).
 #
-# Checked by file times and the saved files' names and stamps, never by
-# loading the class list, so a deploy that changed nothing costs seconds.
+# Checked by file times and the saved files' names and stamps. Reading a
+# stamp loads the file, the class list among them, in this process, beside
+# no app (deploy.yml runs the gate before the first request).
 # Data-driven staleness stays with the morning refresh, whose transform
 # builds every derived table after the fact tables. `force` rebuilds them
 # regardless.
@@ -86,11 +92,49 @@ rebuild_programs_if_mappings_changed <- function(
     }
   }
 
+  # The fact tables first: the derived tables are built from them, and their
+  # file times then make every derived table stale. A fact table that could
+  # not be rebuilt (its report is not on this host) must not keep the derived
+  # checks from running, since the app cannot start without those tables
+  # (ISSUES.md I46); its error is raised once they are done.
+  fact_error <- NULL
+  built_facts <- tryCatch(build_fact_tables_if_stale(data_dir, rebuild),
+                          error = function(e) { fact_error <<- e; FALSE })
   built_student_terms <- build_student_terms_if_stale(data_dir, rebuild, force = force)
   built_measures <- build_measures_if_stale(
     data_dir, rebuild, force = force,
     staleness = function(dir) cedar_measures_staleness(dir, min_term = min_term))
-  invisible(built_student_terms || built_measures)
+  if (!is.null(fact_error)) stop(fact_error)
+  invisible(built_facts || built_student_terms || built_measures)
+}
+
+#' The gate's decision for the fact tables: rebuild each one whose saved file
+#' stores another schema than the transform now writes (ISSUES.md I48)
+#'
+#' @param data_dir The directory holding the saved tables.
+#' @param rebuild A function taking the stages to build, run once per stale
+#'   stage: one stage per R process.
+#' @param staleness The check (cedar_fact_tables_staleness(), from the
+#'   transform): reasons named by stage, empty when current.
+#' @return TRUE when a table was rebuilt, FALSE when all were current; an
+#'   error when a rebuild left one stale.
+build_fact_tables_if_stale <- function(data_dir, rebuild, staleness = cedar_fact_tables_staleness) {
+  reasons <- staleness(data_dir)
+  if (length(reasons) == 0L) {
+    message("[fact-tables] Every saved fact table stores the transform's schema; no rebuild.")
+    return(invisible(FALSE))
+  }
+  for (stage in names(reasons)) {
+    message("[fact-tables] Rebuilding the ", stage, " stage: ", reasons[[stage]])
+    rebuild(stage)
+  }
+  still <- staleness(data_dir)
+  if (length(still) > 0L) {
+    stop("[fact-tables] Rebuilt, but still stale: ", paste(still, collapse = "; "), call. = FALSE)
+  }
+  # deploy.yml restarts the app on this exact line, so it serves what was built.
+  message("[fact-tables] Rebuilt: ", paste(names(reasons), collapse = ", "), ".")
+  invisible(TRUE)
 }
 
 #' The gate's decision for the measure tables: build them when stale or forced

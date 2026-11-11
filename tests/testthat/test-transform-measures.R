@@ -173,6 +173,12 @@ test_that("the measure tables are stale when missing, older than the class list,
   expect_match(stale(), "^cedar_registrations newer than cedar_attempts$")
   write_at("cedar_registrations", t0)
 
+  # The sections rebuilt since: the course-term table counts its schedule side
+  # from them (the gate rebuilds sections alone on a schema bump, I48).
+  write_at("cedar_sections", t0 + 120)
+  expect_match(stale(), "^cedar_sections newer than cedar_course_terms$")
+  write_at("cedar_sections", t0)
+
   # Another build of one table.
   older <- course_terms; attr(older, "course_terms_build_version") <- COURSE_TERMS_BUILD_VERSION - 1L
   write_at("cedar_course_terms", t0 + 60, older)
