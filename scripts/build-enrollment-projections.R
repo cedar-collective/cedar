@@ -282,8 +282,15 @@ take_projection_lock <- function(
                paste("started:", format(Sys.time(), "%Y-%m-%d %H:%M:%S"))),
              owner_path)
   writeLines(format(Sys.time(), "%Y-%m-%d %H:%M:%S"), beat_path)
-  loop <- sprintf(
-    "while kill -0 %d 2>/dev/null && [ -f %s ]; do touch %s 2>/dev/null; sleep %d; done",
+  # A killed process whose parent has not collected it stays in the process
+  # table as a zombie, and `kill -0` still succeeds on it: in a container
+  # with no init, that kept a dead build's heartbeat going. On Linux, read
+  # the state from /proc and count a zombie as gone.
+  loop <- sprintf(paste(
+    "alive() { kill -0 %1$d 2>/dev/null || return 1;",
+    "if [ -r /proc/%1$d/stat ]; then case \"$(cat /proc/%1$d/stat 2>/dev/null)\" in",
+    "*') Z '*) return 1 ;; esac; fi; return 0; };",
+    "while alive && [ -f %2$s ]; do touch %3$s 2>/dev/null; sleep %4$d; done"),
     Sys.getpid(), shQuote(owner_path), shQuote(beat_path), as.integer(heartbeat_every))
   system2("sh", c("-c", shQuote(loop)), wait = FALSE, stdout = FALSE, stderr = FALSE)
   attr(lock_path, "owner_path") <- owner_path

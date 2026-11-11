@@ -1706,8 +1706,11 @@ build in their own `cedar-projections` container, and one container cannot see
 another's processes. What they share is the lock's directory. So
 `take_projection_lock()` starts a shell loop beside the build that touches
 `heartbeat` in the lock every 30 seconds for as long as the owning R process
-exists (`kill -0`) and still holds the lock. A kill of the process, or of its
-container, stops the heartbeat. A run that finds a lock whose heartbeat is
+exists and still holds the lock. A kill of the process, or of its container,
+stops the heartbeat. A killed process that nothing has collected is a zombie,
+on which `kill -0` still succeeds, so on Linux the loop reads the state from
+`/proc` and counts a zombie as gone (the first version did not, and CI's
+container, which has no init, kept a dead build's heartbeat going). A run that finds a lock whose heartbeat is
 more than 600 seconds old takes it over and says so; a live build keeps its
 lock however long it runs. Two runs that find the same dead lock race for one
 `takeover-<heartbeat time>` directory, which exactly one can create. A lock
