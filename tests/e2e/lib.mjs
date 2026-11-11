@@ -378,13 +378,19 @@ export function readReactable(page, outputId, { limit = 30 } = {}) {
   return page.evaluate((id, lim) => {
     const root = document.getElementById(id);
     if (!root) return { error: `no #${id}` };
-    const headers = [...root.querySelectorAll('.rt-th')]
+    // Column headers only: a heading over a group of columns is not a column,
+    // and counting it would shift every index (see COLUMN_HEADER below).
+    const headers = [...root.querySelectorAll('.rt-th:not(.rt-th-group):not(.rt-th-group-none)')]
       .map((h) => h.innerText.replace(/\s+/g, ' ').trim()).filter(Boolean);
     const rows = [...root.querySelectorAll('.rt-tbody .rt-tr')].slice(0, lim)
       .map((tr) => [...tr.querySelectorAll('.rt-td')].map((td) => td.innerText.trim()));
     return { headers, rows };
   }, outputId, limit);
 }
+
+// A reactable's column header cells, leaving out the headings over groups of
+// columns, so a header's position is its cells' position in a row.
+export const COLUMN_HEADER = '.rt-thead .rt-th:not(.rt-th-group):not(.rt-th-group-none)';
 
 // Case-insensitive column lookup for the headers returned by readReactable().
 export function colIndex(headers, name) {
