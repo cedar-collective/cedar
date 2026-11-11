@@ -15,6 +15,7 @@
 #   restart-cedar.sh --update -s 202610 -e 202680 # All reports, two terms, restart
 
 PIPELINE_SUCCESS=true
+UPDATE_PARTIAL=false
 PIPELINE_START=$SECONDS
 
 # ── Step tracking ──────────────────────────────────────────────────────────────
@@ -193,9 +194,18 @@ if [[ "$RUN_UPDATE" == true ]]; then
     [[ "$DRY_RUN" == true ]]   && UPDATE_ARGS+=(--dry-run)
     [[ ${#REPORTS[@]} -gt 0 ]] && UPDATE_ARGS+=("${REPORTS[@]}")
 
-    if run_cmd "$SCRIPT_DIR/update-data.sh" "${UPDATE_ARGS[@]}"; then
+    run_cmd "$SCRIPT_DIR/update-data.sh" "${UPDATE_ARGS[@]}"
+    UPDATE_RC=$?
+    if [[ $UPDATE_RC -eq 0 ]]; then
         log_success "Data update complete"
         record_step "update-data.sh" "OK" "$((SECONDS - STEP_START))s"
+    elif [[ $UPDATE_RC -eq 2 ]]; then
+        # Some requested reports did not arrive; the tables built from the ones
+        # that did were rebuilt and every later step ran. Reload the app on
+        # them, and still finish with an error so the missing reports are seen.
+        log_error "Data update incomplete: some reports did not arrive; restarting on the tables that were rebuilt"
+        record_step "update-data.sh" "PARTIAL" "$((SECONDS - STEP_START))s" "some reports missing; see its log"
+        UPDATE_PARTIAL=true
     else
         log_error "Data update failed — aborting restart to avoid reloading with stale data"
         record_step "update-data.sh" "FAILED" "$((SECONDS - STEP_START))s" "restart aborted"
@@ -291,7 +301,7 @@ fi
 # ── Summary ────────────────────────────────────────────────────────────────────
 TOTAL_DURATION=$((SECONDS - PIPELINE_START))
 echo "════════════════════════════════════════════════════"
-if [[ "$PIPELINE_SUCCESS" == true ]]; then
+if [[ "$PIPELINE_SUCCESS" == true && "$UPDATE_PARTIAL" != true ]]; then
     echo -e " ${GREEN}${BOLD}CEDAR restart complete${NC}  $(date '+%Y-%m-%d %H:%M:%S')"
 else
     echo -e " ${RED}${BOLD}CEDAR restart finished with errors${NC}  $(date '+%Y-%m-%d %H:%M:%S')"
@@ -308,7 +318,7 @@ for i in "${!STEP_NAMES[@]}"; do
     case "$status" in
         OK|SKIPPED) color="$GREEN" ;;
         WARN)       color="$YELLOW" ;;
-        FAILED)     color="$RED" ;;
+        FAILED|PARTIAL) color="$RED" ;;
         *)          color="$NC" ;;
     esac
     printf "  %-28s ${color}%-8s${NC} %-8s %s\n" \
@@ -325,4 +335,4 @@ if [[ "$LOG_TAIL" -gt 0 && "$DRY_RUN" == false ]]; then
 fi
 
 # Let cron detect failed data/projection refreshes and aborted restarts.
-[[ "$PIPELINE_SUCCESS" == true ]]
+[[ "$PIPELINE_SUCCESS" == true && "$UPDATE_PARTIAL" != true ]]

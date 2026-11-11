@@ -46,7 +46,13 @@
 
 # No set -e: exit codes are tracked explicitly so we always print the final summary
 
+# PIPELINE_SUCCESS decides the exit status and the headline. REFRESH_CAN_CONTINUE
+# decides whether the next step runs. They differ in one case: a fetch that
+# brought some of the requested reports and not others (PARTIAL) is an error to
+# report, and the tables built from the reports that did arrive are still
+# rebuilt (ISSUES.md I33, I43).
 PIPELINE_SUCCESS=true
+REFRESH_CAN_CONTINUE=true
 PIPELINE_START=$SECONDS
 
 # ── Step tracking ─────────────────────────────────────────────────────────────
@@ -60,7 +66,10 @@ record_step() {
     STEP_STATUSES+=("$2")
     STEP_DURATIONS+=("$3")
     STEP_NOTES+=("${4:-}")
-    [[ "$2" == "FAILED" ]] && PIPELINE_SUCCESS=false
+    case "$2" in
+        FAILED)  PIPELINE_SUCCESS=false; REFRESH_CAN_CONTINUE=false ;;
+        PARTIAL) PIPELINE_SUCCESS=false ;;
+    esac
 }
 
 # ── Colors ────────────────────────────────────────────────────────────────────
@@ -149,6 +158,10 @@ Optional:
     CEDAR_TRENDS_WARM_CAMPUSES comma list (default: ABQ,EA)
     CEDAR_TRENDS_WARM_COLLEGES comma list (default: AS,ARTS)
     CEDAR_TRENDS_WARM_DEPTS   comma list (overrides college-derived depts)
+    CEDAR_FETCH_TIME_LIMIT    seconds the MyReports fetch may run (default: 7200)
+
+Exit status: 0 complete; 2 when some requested reports did not arrive and the
+tables built from the ones that did were rebuilt; 1 for any other failure.
 
   -h               Show this help message
   REPORTS          Space-separated list of reports to fetch
@@ -294,27 +307,6 @@ else
     RSCRIPT_LOCAL=(Rscript --vanilla)
 fi
 
-REPORTS_CSV=$(IFS=,; echo "${REPORTS[*]}")
-
-# Map requested reports to cedar table names for transform-to-cedar.R
-# Only pass --tables when a subset of reports is requested (not all 5)
-TABLES_ARGS=()
-if [[ ${#REPORTS[@]} -lt 5 ]]; then
-  TABLES=()
-  for report in "${REPORTS[@]}"; do
-    case "$report" in
-      desr) TABLES+=("sections") ;;
-      cl)   TABLES+=("students") ;;
-      as)   TABLES+=("programs") ;;
-      deg)  TABLES+=("degrees") ;;
-      aa)   TABLES+=("applicants") ;;
-    esac
-  done
-  TABLES_CSV=$(IFS=,; echo "${TABLES[*]}")
-  TABLES_ARGS+=(--tables "$TABLES_CSV")
-  log_step "Transform tables: ${TABLES[*]}"
-fi
-
 log_step "CEDAR dir:    $CEDAR_HOST_DIR"
 log_step "mrgather dir: $MRGATHER_DIR"
 [[ "$MODE" == "production" ]] && log_step "Container:    $CONTAINER_NAME"
@@ -326,10 +318,20 @@ STEP_START=$SECONDS
 FETCH_RC=0
 FETCH_STATUS="OK"
 FETCH_NOTE=""
+FETCH_STOP_REASON=""
 
 enter_dir "$MRGATHER_DIR"
 
 TODAY=$(date +%Y%m%d)
+
+# The fetch is stopped, and its container removed, when it runs past this many
+# seconds, or at once when MyReports asks for a 2FA code and nobody is at a
+# terminal to type one: mrgather waits at that prompt for ever, and the
+# 2026-10-11 cron run sat there for 12 days (ISSUES.md I32). The prompt text is
+# mrgather's own (mrgather.js); if it changes, the time limit still ends the run.
+FETCH_TIME_LIMIT="${CEDAR_FETCH_TIME_LIMIT:-7200}"
+FETCH_POLL_SECONDS=5
+MRGATHER_2FA_PROMPT="Please enter the 2FA code"
 
 # Resolve where mrgather drops files
 if [[ "$MODE" == "production" ]]; then
@@ -391,43 +393,120 @@ if [[ "$SKIP_FETCH" == true ]]; then
 else
     log_step "Fetching from MyReports..."
     if [[ "$MODE" == "production" ]]; then
-        run_cmd /usr/bin/docker compose -f "$PROD_MRGATHER_COMPOSE_FILE" run --rm mrgather \
-            node mrgather.js "${REPORTS[@]}" -s "$START_TERM" -e "$END_TERM"
-        FETCH_RC=$?
+        FETCH_DOCKER=/usr/bin/docker
+        FETCH_COMPOSE_FILE="$PROD_MRGATHER_COMPOSE_FILE"
     else
-        run_cmd docker compose -f "$MRGATHER_DIR/docker-compose.yml" run --rm mrgather \
-            node mrgather.js "${REPORTS[@]}" -s "$START_TERM" -e "$END_TERM"
-        FETCH_RC=$?
+        FETCH_DOCKER=docker
+        FETCH_COMPOSE_FILE="$MRGATHER_DIR/docker-compose.yml"
     fi
-    # mrgather can exit 0 having downloaded nothing, or only some reports: a
-    # MyReports login timeout, or a crash after a download timed out, is
-    # reported and the run still "completes". Parse then finds no new file and
-    # the transform would republish tables from older raw exports as today's
-    # (ISSUES.md I33). A requested report with no file from today fails the
-    # fetch, and the transform is skipped.
-    NOT_FETCHED=()
-    if [[ $FETCH_RC -eq 0 && "$DRY_RUN" != true ]]; then
-        for report in "${REPORTS[@]}"; do
-            file_glob=$(report_file_glob "$report") || continue
-            has_todays_file "$file_glob" || NOT_FETCHED+=("$report")
-        done
+    # Named, so the watchdog can remove it: ending the compose client alone
+    # need not remove a --rm container.
+    FETCH_CONTAINER="cedar-mrgather-fetch-$$"
+    FETCH_OUT=$(mktemp)
+    FETCH_STOPPED=$(mktemp)
+    FETCH_INTERACTIVE=false
+    [[ -t 0 ]] && FETCH_INTERACTIVE=true
+    FETCH_WATCHDOG=""
+    if [[ "$DRY_RUN" != true ]]; then
+        (
+            deadline=$((SECONDS + FETCH_TIME_LIMIT))
+            reason=""
+            while [[ -z "$reason" ]]; do
+                sleep "$FETCH_POLL_SECONDS"
+                if (( SECONDS >= deadline )); then
+                    reason="stopped after the ${FETCH_TIME_LIMIT}s time limit"
+                elif [[ "$FETCH_INTERACTIVE" != true ]] \
+                        && grep -q "$MRGATHER_2FA_PROMPT" "$FETCH_OUT" 2>/dev/null; then
+                    reason="2FA required and nobody at a terminal to enter the code"
+                fi
+            done
+            echo "$reason" > "$FETCH_STOPPED"
+            "$FETCH_DOCKER" rm -f "$FETCH_CONTAINER"
+        ) > /dev/null 2>&1 &
+        FETCH_WATCHDOG=$!
     fi
-    if [[ $FETCH_RC -eq 0 && ${#NOT_FETCHED[@]} -gt 0 ]]; then
-        log_error "Fetch exited 0 but produced no file from today for: ${NOT_FETCHED[*]}"
-        FETCH_STATUS="FAILED"
-        FETCH_NOTE="no file from today for: ${NOT_FETCHED[*]}; see mrgather output"
-    elif [[ $FETCH_RC -eq 0 ]]; then
+    run_cmd "$FETCH_DOCKER" compose -f "$FETCH_COMPOSE_FILE" run --rm --name "$FETCH_CONTAINER" mrgather \
+        node mrgather.js "${REPORTS[@]}" -s "$START_TERM" -e "$END_TERM" 2>&1 | tee "$FETCH_OUT"
+    FETCH_RC=${PIPESTATUS[0]}
+    if [[ -n "$FETCH_WATCHDOG" ]]; then
+        kill "$FETCH_WATCHDOG" 2>/dev/null
+        wait "$FETCH_WATCHDOG" 2>/dev/null
+    fi
+    FETCH_STOP_REASON=$(cat "$FETCH_STOPPED" 2>/dev/null)
+    rm -f "$FETCH_OUT" "$FETCH_STOPPED"
+fi
+
+# mrgather can exit 0 having downloaded nothing, or only some reports: a
+# MyReports login timeout, or a crash after a download timed out, is reported
+# and the run still "completes" (ISSUES.md I33). So the fetch is judged by its
+# files: a requested report with no file from today did not arrive, whatever
+# the exit status. The reports that did arrive go on to parse and transform;
+# the others keep their tables.
+ARRIVED=()
+NOT_FETCHED=()
+for report in "${REPORTS[@]}"; do
+    if [[ "$DRY_RUN" == true || "$SKIP_FETCH" == true ]]; then
+        ARRIVED+=("$report")
+    elif file_glob=$(report_file_glob "$report") && ! has_todays_file "$file_glob"; then
+        NOT_FETCHED+=("$report")
+    else
+        ARRIVED+=("$report")
+    fi
+done
+
+if [[ "$SKIP_FETCH" != true ]]; then
+    FETCH_PROBLEM=""
+    if [[ -n "$FETCH_STOP_REASON" ]]; then
+        FETCH_PROBLEM="$FETCH_STOP_REASON"
+    elif [[ $FETCH_RC -ne 0 ]]; then
+        FETCH_PROBLEM="exit code $FETCH_RC"
+    fi
+    if [[ ${#NOT_FETCHED[@]} -gt 0 ]]; then
+        FETCH_PROBLEM="${FETCH_PROBLEM:+$FETCH_PROBLEM; }no file from today for: ${NOT_FETCHED[*]}"
+    fi
+    if [[ -z "$FETCH_PROBLEM" ]]; then
         log_success "Fetch complete"
         FETCH_STATUS="OK"
-        FETCH_NOTE="fetched: ${REPORTS[*]}"
-    else
-        log_error "Fetch failed (exit code: $FETCH_RC)"
+        FETCH_NOTE="files from today: ${ARRIVED[*]}"
+    elif [[ ${#ARRIVED[@]} -eq 0 ]]; then
+        log_error "Fetch failed: $FETCH_PROBLEM"
         FETCH_STATUS="FAILED"
-        FETCH_NOTE="exit code $FETCH_RC"
+        FETCH_NOTE="$FETCH_PROBLEM; see mrgather output"
+    else
+        log_error "Fetch incomplete: $FETCH_PROBLEM"
+        log_warning "Continuing with the reports that have a file from today: ${ARRIVED[*]}"
+        FETCH_STATUS="PARTIAL"
+        FETCH_NOTE="$FETCH_PROBLEM; continuing with: ${ARRIVED[*]}"
     fi
 fi
 
 record_step "mrgather fetch" "$FETCH_STATUS" "$((SECONDS - STEP_START))s" "$FETCH_NOTE"
+echo
+
+# ── Reports to refresh: the ones with a file from today ──────────────────────
+# Parse and transform work from the reports that arrived, not the ones that
+# were asked for: a report with no file from today keeps its tables as they
+# are, and no table is republished from an older export as today's.
+REPORTS_CSV=$(IFS=,; echo "${ARRIVED[*]}")
+
+# Map those reports to cedar table names for transform-to-cedar.R.
+# Only pass --tables when a subset of reports is refreshed (not all 5)
+TABLES_ARGS=()
+if [[ ${#ARRIVED[@]} -gt 0 && ${#ARRIVED[@]} -lt 5 ]]; then
+  TABLES=()
+  for report in "${ARRIVED[@]}"; do
+    case "$report" in
+      desr) TABLES+=("sections") ;;
+      cl)   TABLES+=("students") ;;
+      as)   TABLES+=("programs") ;;
+      deg)  TABLES+=("degrees") ;;
+      aa)   TABLES+=("applicants") ;;
+    esac
+  done
+  TABLES_CSV=$(IFS=,; echo "${TABLES[*]}")
+  TABLES_ARGS+=(--tables "$TABLES_CSV")
+  log_step "Transform tables: ${TABLES[*]}"
+fi
 echo
 
 # ── Step 2: Parse raw data ────────────────────────────────────────────────────
@@ -440,7 +519,11 @@ PARSE_OUT=$(mktemp)
 
 [[ "$MODE" == "local" ]] && enter_dir "$CEDAR_HOST_DIR"
 
-if [[ "$MODE" == "production" ]]; then
+if [[ "$REFRESH_CAN_CONTINUE" != true ]]; then
+    log_warning "Skipping parse: no requested report has a file from today."
+    PARSE_STATUS="SKIPPED"
+    PARSE_NOTE="fetch failed; nothing to parse"
+elif [[ "$MODE" == "production" ]]; then
     log_step "Ensuring container is running..."
     run_cmd /usr/bin/docker compose -f "$DOCKER_COMPOSE_FILE" up -d "$CONTAINER_NAME"
     run_cmd sleep 2
@@ -467,7 +550,9 @@ else
     fi
 fi
 
-if [[ $PARSE_RC -eq 0 ]]; then
+if [[ "$PARSE_STATUS" == "SKIPPED" ]]; then
+    :
+elif [[ $PARSE_RC -eq 0 ]]; then
     log_success "Parsing complete"
     PARSE_STATUS="OK"
     # Extract brief summary from R output (last few informative lines)
@@ -493,7 +578,7 @@ TRANSFORM_STATUS="OK"
 TRANSFORM_NOTE=""
 TRANSFORM_OUT=""
 
-if [[ "$PIPELINE_SUCCESS" != true ]]; then
+if [[ "$REFRESH_CAN_CONTINUE" != true ]]; then
     log_warning "Skipping transform because an earlier step failed; existing CEDAR tables were not republished."
     TRANSFORM_STATUS="SKIPPED"
     TRANSFORM_NOTE="prior step failed; transform not run"
@@ -555,7 +640,7 @@ echo
 # source, short a column or built under an older rule. (Units are attached at
 # every start from the mapping files since ADR-001 step 3, so a mapping edit
 # rebuilds nothing here.) After the transform, before projections.
-if [[ "$PIPELINE_SUCCESS" != true ]]; then
+if [[ "$REFRESH_CAN_CONTINUE" != true ]]; then
     record_step "student-term check" "SKIPPED" "0s" "data refresh failed; cedar_student_terms not checked"
 else
     log_step "Build cedar_student_terms only if it is stale"
@@ -586,7 +671,7 @@ fi
 echo
 
 # ── Automatic projection refresh, after fresh data and before cache warming ──
-if [[ "$PIPELINE_SUCCESS" != true ]]; then
+if [[ "$REFRESH_CAN_CONTINUE" != true ]]; then
     record_step "refresh projections" "SKIPPED" "0s" "data refresh failed; saved bundle retained"
 else
     log_step "Check enrollment projections and rebuild only when stale"
@@ -622,7 +707,7 @@ fi
 # registered for the Fall or Spring term in registration
 # (R/branches/return-snapshots.R). A failure is recorded and the refresh goes
 # on: the app does not read these yet.
-if [[ "$PIPELINE_SUCCESS" != true ]]; then
+if [[ "$REFRESH_CAN_CONTINUE" != true ]]; then
     record_step "registration snapshot" "SKIPPED" "0s" "data refresh failed"
 else
     log_step "Keep today's registration counts for terms in registration"
@@ -649,7 +734,7 @@ echo
 # ── Step 4: Warm Dept Dashboard cache ────────────────────────────────────────
 WARM_DASHBOARD_CACHE="${CEDAR_WARM_DASHBOARD_CACHE:-auto}"
 SHOULD_WARM=false
-if [[ "$PIPELINE_SUCCESS" == true ]]; then
+if [[ "$REFRESH_CAN_CONTINUE" == true ]]; then
     case "$WARM_DASHBOARD_CACHE" in
         true|TRUE|1|yes|YES) SHOULD_WARM=true ;;
         false|FALSE|0|no|NO) SHOULD_WARM=false ;;
@@ -712,7 +797,7 @@ echo
 # ── Step 5: Warm Dept Trends tab caches ──────────────────────────────────────
 WARM_TRENDS_CACHE="${CEDAR_WARM_TRENDS_CACHE:-auto}"
 SHOULD_WARM_TRENDS=false
-if [[ "$PIPELINE_SUCCESS" == true ]]; then
+if [[ "$REFRESH_CAN_CONTINUE" == true ]]; then
     case "$WARM_TRENDS_CACHE" in
         true|TRUE|1|yes|YES) SHOULD_WARM_TRENDS=true ;;
         false|FALSE|0|no|NO) SHOULD_WARM_TRENDS=false ;;
@@ -799,9 +884,10 @@ echo "  ────────────────────────
 for i in "${!STEP_NAMES[@]}"; do
     status="${STEP_STATUSES[$i]}"
     case "$status" in
-        OK|SKIPPED) symbol="✅" ;;
-        WARN)       symbol="⚠️" ;;
-        FAILED)     symbol="❌" ;;
+        OK)             symbol="✅" ;;
+        SKIPPED)        symbol="➖" ;;   # not run: never shown as a success
+        WARN)           symbol="⚠️" ;;
+        FAILED|PARTIAL) symbol="❌" ;;
         *)          symbol="" ;;
     esac
     printf "  %-28s %-8s %-8s %s\n" \
@@ -818,5 +904,13 @@ if [[ "$MODE" == "production" && "$LOG_TAIL" -gt 0 ]]; then
     echo
 fi
 
-# Propagate failures to cron and restart-cedar.sh --update.
-[[ "$PIPELINE_SUCCESS" == true ]]
+# Propagate failures to cron and restart-cedar.sh --update. Status 2 says the
+# only failure was a fetch that brought some reports and not others, and every
+# later step ran on the ones that arrived: the tables on disk are newer than
+# the app's and consistent, so restart-cedar.sh still reloads it.
+if [[ "$PIPELINE_SUCCESS" == true ]]; then
+    exit 0
+elif [[ "$REFRESH_CAN_CONTINUE" == true ]]; then
+    exit 2
+fi
+exit 1

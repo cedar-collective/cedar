@@ -264,7 +264,8 @@ check_memory <- function(context = "") {
 process_reports <- function(
   report = NULL,
   guide = FALSE,
-  keep_file = FALSE
+  keep_file = FALSE,
+  require_files = FALSE
 ){
 
 message("Welcome to process_reports!")
@@ -364,6 +365,23 @@ if (length(file_list) == 0) {
   } else {
     message("Found ", length(file_list), " total .xlsx files.")
   }
+
+# A report named on the command line is one the caller says has a file. With
+# none, stop before parsing anything: reporting success here let the transform
+# republish a table from an older export as today's (ISSUES.md I33). A run
+# that names no report looks for all of them and parses what it finds.
+if (isTRUE(require_files)) {
+  known <- intersect(unlist(report_list), names(report_specs))
+  no_file <- known[!vapply(known, function(r) {
+    any(grepl(report_specs[[r]]$filename_sig, basename(file_list), ignore.case = TRUE))
+  }, logical(1))]
+  if (length(no_file) > 0) {
+    msg <- paste0("ERROR: No .xlsx file for requested report(s): ",
+                  paste(no_file, collapse = ", "), " in ", myreports_dir)
+    add_error(msg)
+    stop("[parse-data.R] ", msg, call. = FALSE)
+  }
+}
 
 # loop through reports as specified in command line
 message("processing reports: ", paste(report_list, collapse = ", "))
@@ -769,7 +787,8 @@ opt = parse_args(opt_parser)
 message("Parsed options: ", str(opt))
 
 # check if report is specified
-if (is.null(opt$report) || opt$report == "") {
+reports_named <- !(is.null(opt$report) || opt$report == "")
+if (!reports_named) {
   message("No report specified. Using all (desr, cl, as, deg) by default.")
   opt$report <- names(report_specs) 
 } else {
@@ -789,7 +808,8 @@ tryCatch({
   process_reports(
     report = opt$report,
     guide = opt$guide,
-    keep_file = opt$keep
+    keep_file = opt$keep,
+    require_files = reports_named
   )
   summary_env$run_status <- "success"
 }, error = function(e) {

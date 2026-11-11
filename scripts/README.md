@@ -55,7 +55,7 @@ Unified pipeline for updating CEDAR data from MyReports. Works in both productio
 
 Runs the complete data update workflow:
 1. **Check** — Verifies if today's MyReports files already exist (skips fetch if found)
-2. **Fetch** — Downloads data from MyReports via mrgather (only if needed). It fails, and the transform is skipped, if any requested report has no file from today afterward, even when mrgather exits 0
+2. **Fetch** — Downloads data from MyReports via mrgather (only if needed). A requested report with no file from today afterward did not arrive, even when mrgather exits 0: the step is marked ❌, the later steps run for the reports that did arrive, the missing report's tables are kept, and the script exits 2 (1 when nothing arrived or a later step failed). The fetch is stopped and its container removed after `CEDAR_FETCH_TIME_LIMIT` seconds (default 7200), or at once when MyReports asks for a 2FA code and the run has no terminal
 3. **Parse** — Processes raw .xlsx files into R-readable format (parse-data.R)
 4. **Transform** — Converts to CEDAR data model (transform-to-cedar.R)
 5. **Projections** — Rebuilds the enrollment projection bundles only when stale
