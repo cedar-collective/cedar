@@ -8,7 +8,7 @@ parent: Developer Guide
 
 This reference is auto-generated from roxygen2 comments in the source code.
 
-*Generated: 2026-11-10 08:35:48.706969*
+*Generated: 2026-11-10 20:57:29.09365*
 
 ---
 
@@ -3733,6 +3733,20 @@ Courses students were taking in the term before a major switch appeared  Answers
 - `opt` - `dept_code` (the major's unit; required), `program_code` (one or more program codes to narrow the members to; default every program of the unit), `include_pre_majors` (default TRUE), `term` (terms to keep; default every term to the edge), `campus` (teaching campuses to keep; NULL keeps every campus, each its own row), `min_n` (the smallest distinct-student count a unit row needs; default 10), `include_in_progress` (default FALSE), `data_edges` (`cedar_data_edges()` output, required).
 
 **Returns:** One row per `term`, `campus`, `college` and `dept_code` (the teaching unit; NA for a subject with no mapping row), with `is_own_unit`, `in_progress`, `n_registrations` (distinct student × course), `n_students` (distinct students), `term_registrations` and `term_students` (the same over every unit in that term and campus) and `share_of_registrations` (`n_registrations / term_registrations`). Attributes: `edge` (the settled term the rows stop at), `latest_term` (the last term included), `n_member_student_terms`, `n_members` (distinct students), `n_unmapped` (member registrations whose subject has no unit), `suppressed` (the unit rows under `min_n`, as a tibble of `term`, `campus`, `dept_code`, `n_students`).
+
+---
+
+### `plot_major_course_units_by_college()`
+
+*Source: major-course-units.R*
+
+**Share of a major's registrations by teaching college, stacked by term**
+
+**Parameters:**
+
+- `by_college` - One row per `term`, `campus`, `college_label` with `share` (of the term and campus's member registrations) and `n_registrations`, as `compute_dept_course_units_tab()` prepares them.
+
+**Returns:** A named list, one plotly per campus (`names` are the campuses).
 
 ---
 

@@ -3518,32 +3518,7 @@ output$enrl_classlist_download <- downloadHandler(
     group_a <- group_labels[[1]]
     group_b <- group_labels[[2]]
 
-    smd_display <- smd %>%
-      dplyr::mutate(
-        value_treatment = cedar_format_balance_value(value_treatment, type),
-        value_control = cedar_format_balance_value(value_control, type),
-        smd_value = dplyr::if_else(is.na(smd), "—", sprintf("%.3f", smd)),
-        smd_fmt = dplyr::case_when(
-          balance_band == "substantial" ~ paste0(smd_value, " ⚠"),
-          balance_band == "review" ~ paste0(smd_value, " △"),
-          TRUE ~ smd_value
-        ),
-        interpretation = dplyr::recode(
-          balance_band,
-          small = "Small difference",
-          review = "Review",
-          substantial = "Substantial difference",
-          unavailable = "Unavailable"
-        )
-      ) %>%
-      dplyr::select(covariate, type, n_treatment, n_control,
-                    value_treatment, value_control, unit, smd = smd_fmt,
-                    interpretation)
-    names(smd_display) <- c(
-      "Covariate", "Type", paste0(group_a, " N"), paste0(group_b, " N"),
-      paste0(group_a, " Value"), paste0(group_b, " Value"), "Unit", "SMD",
-      "Interpretation"
-    )
+    smd_display <- cedar_balance_smd_rows(smd, c(group_a, group_b))
 
     # Categorical distributions — one mini-table per variable, side by side
     cat_panels <- NULL
@@ -3586,32 +3561,7 @@ output$enrl_classlist_download <- downloadHandler(
       )
     }
 
-    balance_summary <- switch(
-      balance$overall_balance,
-      substantial =
-        div(class = "alert alert-warning",
-            style = "font-size: 0.85em;",
-            icon("triangle-exclamation"), " ",
-            "One or more measured covariates have substantial observed differences (|SMD| > 0.25). ",
-            "Outcome gaps may partly reflect who entered each group."),
-      review =
-        div(class = "alert alert-warning",
-            style = "font-size: 0.85em;",
-            icon("circle-info"), " ",
-            "Review the measured covariate differences: at least one |SMD| is 0.10–0.25, ",
-            "even though none exceeds 0.25. Do not describe these groups as well-balanced."),
-      small =
-        div(class = "alert alert-success", style = "font-size: 0.85em;",
-            icon("circle-check"), " All estimated continuous and binary covariates have small ",
-            "observed differences (|SMD| < 0.10). This does not establish comparability on ",
-            "unmeasured factors."),
-      unavailable =
-        div(class = "alert alert-secondary", style = "font-size: 0.85em;",
-            icon("circle-info"), " No continuous or binary SMD could be estimated. ",
-            "Observed balance is unavailable; review the group descriptions and categorical distributions."),
-      div(class = "alert alert-secondary", style = "font-size: 0.85em;",
-          "Observed balance status is unavailable.")
-    )
+    balance_summary <- cedar_balance_summary(balance)
 
     tagList(
       balance_summary,
@@ -6560,5 +6510,22 @@ output$enrl_classlist_download <- downloadHandler(
   # cross-course comparison work. The server was still running on every session,
   # registering outputs nothing rendered. Re-enable both together.
   # retentionServer("retention", students = cedar_registrations, student_terms = cedar_student_terms)
+
+  # Course Dynamics > Takers vs Non-Takers: the analysed course against the
+  # students of its classification who never took it, read against the
+  # college's other courses (R/modules/course-cohort.R).
+  courseCohortServer(
+    "cr_cohort",
+    student_terms = data_objects[["cedar_student_terms"]],
+    attempts      = data_objects[["cedar_attempts"]],
+    programs      = data_objects[["cedar_programs"]],
+    dims          = data_objects[["cedar_dims"]],
+    edges         = data_objects[["cedar_edges"]],
+    course        = reactive({
+      data <- course_report_data()
+      if (is.null(data)) NULL else data$course_code
+    }),
+    campus        = reactive(input$cr_campus)
+  )
 
 } # end server

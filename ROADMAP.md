@@ -113,10 +113,23 @@ unusually; provost: cross-college patterns and risks).
 ## Retention signals while there is time to act
 
 Built: next-term registration of last term's students kept at every refresh
-(`return-*` snapshots). Measured: of Fall 2025's undergraduates, the 6,751 who
-withdrew late, failed a course or were on probation returned at 78% against
-93% and were 63% of the loss; a third had not registered on Dec 1. The
-measure is pace against the same day a year earlier, always aggregate.
+(`return-*` snapshots); Course Dynamics > Takers vs Non-Takers (2026-11-10:
+a course's passed, DFW'd and never-took groups for a classification by home
+campus, with return and next-term DFW share, read against every course of a
+college the same students took, with the balance table). Measured: of Fall
+2025's undergraduates, the 6,751 who withdrew late, failed a course or were on
+probation returned at 78% against 93% and were 63% of the loss; a third had
+not registered on Dec 1. The measure is pace against the same day a year
+earlier, always aggregate. And for main-campus first-semester freshmen, Fall
+2023–2025: passing any Arts & Sciences lower-division course went with
+returning at a median 96 / 94 / 96%, a gap of +19 / +17 / +8 points over
+never-takers; FYEX 1110 was the median course on return and on next-term
+grades, FYEX 1010 average on return (gap +16 / +11 / +8) and the one course
+whose passers DFW'd more the next term than its never-takers (+3 / +2 / +4
+against a median of −11 / −8 / −6), which is who is placed into it (ACT,
+high-school GPA, Pell, first-generation all differ). The retention signal is
+the selection every course shows, not a lift the seminars add; the question
+worth a page is who does not pass a course, which is the return watch.
 
 - [ ] **Return watch** on the Dept Dashboard and UNM-wide: continuing students
   not yet registered against the same day a year earlier, by classification,
@@ -124,39 +137,8 @@ measure is pace against the same day a year earlier, always aggregate.
 - [ ] **Roadblocks on the Dept Dashboard,** ranked by Impact (`get_stopout()`).
 - [ ] **Unhide cross-course Retention** once it sets each course against its
   department and college.
-- [ ] **Surface a course's takers against its non-takers.** The cone exists
-  (`get_course_cohort_effect()`, 2026-11-10, over `cedar_attempts` and
-  `cedar_student_terms`): for the students of a classification, by home
-  campus and term, return the next regular term and the DFW share of their
-  next-term attempts, split into passed the course, DFW'd it and never took
-  it, with the balance table for takers against never-takers. On the
-  2026-11-04 pull, main-campus first-semester freshmen, Fall 2023: passed
-  FYEX 1010 returned at 94%, never took it 78%, DFW'd it 46%; next-term DFW
-  share 28%, 25%, 61%. The page needs a classification picker (M41) and goes
-  beside Course Dynamics > Retention, whose persistence split it extends with
-  the non-takers.
-- [ ] **Read a course's gap against its college's courses.** The text-first
-  preview exists (`build_course_cohort_context()`, 2026-11-10): the same
-  cone over every Arts & Sciences lower-division course the population took,
-  and the focal course placed among them. What it says about the first-year
-  seminars, same pull and population, Fall 2023 / 2024 / 2025: passing any
-  A&S lower-division course goes with returning at a median 96 / 94 / 96%,
-  a gap over never-takers of +19 / +17 / +8 points. FYEX 1010's passers
-  returned at 94 / 90 / 95% (gap +16 / +11 / +8, in the bottom quartile of
-  courses two years of three), and were the only passers in the college
-  whose next-term DFW share was *above* the never-takers' (+3 / +2 / +4
-  points against a median of -11 / -8 / -6; worse than 92–98% of courses).
-  FYEX 1110's passers returned at 95 / 94 / 97% (gap +18 / +17 / +9, the
-  median course) with a next-term DFW gap of -1 / -7 / -6 (the median course
-  from 2024). The same reading at a guard of 100 students a group. So the
-  retention signal is the selection every course shows, not a lift the
-  seminars add: FYEX 1110 is an average A&S course on both measures, FYEX
-  1010 an average one on return and the worst on next-term grades, which
-  is who is placed into it (its takers' ACT, high-school GPA, Pell and
-  first-generation shares all differ). The honest claim for a retention
-  page: a first-semester freshman who passes a course returns; the question
-  worth a page is who does not pass one, and that is the return watch
-  above. The preview's page needs the same classification picker.
+- [ ] **Give Retention the classification scope** Takers vs Non-Takers has
+  (M41), so its cohorts can leave concurrent-enrollment students out.
 - [ ] **Near-completers and stalled pre-majors** as outreach counts.
 
 ## Degree Explorer and curriculum-informed demand
@@ -253,6 +235,3 @@ Ideas not yet given a theme or an order. Add freely; triage moves an item into
 a theme above, into `ISSUES.md` if it is a fix to something that exists, or
 deletes it.
 
-- [ ] **Surface `get_major_course_units()`** (which units teach the courses a
-  major's students take; `R/cones/major-course-units.R`, 2026-11-10) on a
-  Dept page beside Dept Trends' inverse view of whose majors fill a unit's seats.

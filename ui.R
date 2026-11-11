@@ -1298,6 +1298,12 @@ nav_panel(
       ),
 
       nav_panel(
+        "Takers vs Non-Takers",
+        icon = icon("people-arrows"),
+        courseCohortUI("cr_cohort")
+      ),
+
+      nav_panel(
         "Downstream",
         icon = icon("arrow-right-long"),
         uiOutput("cr_impact_downstream_ui")

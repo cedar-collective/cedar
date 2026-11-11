@@ -464,3 +464,57 @@ test_that("get_degrees_for_dept_report produces NULL plots when prog_codes has n
   expect_null(result$plots$degree_summary_filtered_program_stacked_plot)
   expect_equal(nrow(result$tables$degree_summary_filtered), 0L)
 })
+
+# =============================================================================
+# Courses Taken: where this department's majors take their courses
+# =============================================================================
+
+test_that("compute_dept_course_units_tab reads the majors' teaching units and pools small rows", {
+  # ST01's HIST majors, as test-major-course-units.R reads them: their own
+  # student-term table and class list, to a settled edge of 202110.
+  data_objects <- make_data_objects()
+  data_objects$cedar_student_terms <- test_student_terms_st
+  data_objects$cedar_registrations <- test_students_st
+  data_objects$cedar_edges <- list(last_enrolled = 202110L, last_enrolled_complete = 202110L,
+                                   last_graded = 202110L)
+  base <- list(dept_code = "HIST", dept_name = "History")
+
+  result <- compute_dept_course_units_tab(base, data_objects, min_n = 1L)
+  expect_equal(names(result$tables), c("own_share", "by_college", "latest_units"))
+  own <- result$tables$own_share
+  expect_true(nrow(own) > 0)
+  expect_true(all(own$own_share >= 0 & own$own_share <= 1))
+  expect_true(any(result$tables$latest_units$is_own_unit))
+  # One plot per teaching campus, and the college shares sum to one within a
+  # term and campus: every member registration is in exactly one row.
+  expect_equal(names(result$plots), sort(unique(result$tables$by_college$campus)))
+  sums <- result$tables$by_college %>%
+    dplyr::group_by(term, campus) %>%
+    dplyr::summarize(s = sum(share), .groups = "drop")
+  expect_equal(sums$s, rep(1, nrow(sums)))
+  expect_equal(result$meta$dept_code, "HIST")
+
+  # A guard above every row pools everything but the department's own unit.
+  pooled <- compute_dept_course_units_tab(base, data_objects, min_n = 1000L)
+  lu <- pooled$tables$latest_units
+  expect_true(all(lu$is_own_unit | grepl("^Other units", lu$unit_label)))
+  expect_equal(pooled$tables$own_share, result$tables$own_share)
+
+  testthat::local_edition(3)
+  expect_snapshot(cat(dept_course_units_headline(result), sep = "\n"))
+
+  # A data window that runs past the majors' last registration: the latest
+  # term read is the last one with a registration, not the window's end, and
+  # the lead says so before it reads that term.
+  data_objects$cedar_edges <- list(last_enrolled = 202180L, last_enrolled_complete = 202180L,
+                                   last_graded = 202180L)
+  later <- compute_dept_course_units_tab(base, data_objects, min_n = 1L)
+  expect_equal(later$meta$window_end, 202180L)
+  expect_equal(later$meta$latest_term, 202110L)
+  expect_equal(later$tables$latest_units, result$tables$latest_units, ignore_attr = TRUE)
+  expect_snapshot(cat(dept_course_units_headline(later), sep = "\n"))
+
+  expect_error(compute_dept_course_units_tab(list(), data_objects), "dept_code")
+  expect_error(compute_dept_course_units_tab(base, data_objects[setdiff(names(data_objects), "cedar_student_terms")]),
+               "cedar_student_terms")
+})

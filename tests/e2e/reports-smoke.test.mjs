@@ -309,6 +309,18 @@ export async function runReportChecks({ scope = 'smoke', synthetic = false } = {
         'dept_trends-download_ch_outside',
       ]);
 
+      // Courses Taken computes on open (R/features/dept-trends.R,
+      // compute_dept_course_units_tab()); the latest-term table is its anchor.
+      await clickSubTabIn(page, 'dept_trends-tabs', 'Courses Taken');
+      await waitForOutput(page, 'Dept Trends Courses Taken tab', [
+        { type: 'reactable', id: 'dept_trends-mcu_units_table' },
+        { type: 'reactable', id: 'dept_trends-mcu_own_share_table' },
+      ], { all: true });
+      const coursesTaken = await page.$eval('#dept_trends-mcu_body', (el) => el.innerText);
+      if (!/were in the unit's own courses|holds a registration/.test(coursesTaken)) {
+        throw new Error(`Courses Taken lead missing: ${coursesTaken.slice(0, 200)}`);
+      }
+
       await clickSubTabIn(page, 'dept_trends-tabs', 'Demographics');
       await waitForOutput(page, 'Dept Trends Demographics tab', [
         { type: 'plot', id: 'dept_trends-pt_plot' },
