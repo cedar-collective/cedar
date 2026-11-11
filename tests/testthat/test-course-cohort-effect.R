@@ -37,7 +37,7 @@ test_that("RP01: passed, DFW and never-took groups with their returns and next-t
     list(course = "HIST 499", classification = "Freshman", min_n = 1L, data_edges = rp01_edges)
   )
   r <- res$rates
-  expect_equal(names(r), c("term", "student_campus", "group", "n_students", "population",
+  expect_equal(names(r), c("course", "term", "student_campus", "group", "n_students", "population",
                            "share_of_population", "n_return_observable", "n_returned", "return_pct",
                            "next_term", "next_outcomes_observable", "n_with_next_attempts",
                            "next_attempts", "next_dfw", "next_dfw_pct"))
@@ -54,8 +54,16 @@ test_that("RP01: passed, DFW and never-took groups with their returns and next-t
   expect_equal(r$next_dfw_pct, c(0, 0, 0, NA, NA))
   expect_equal(r$next_outcomes_observable, c(TRUE, TRUE, TRUE, TRUE, FALSE))
   expect_equal(res$n_population_student_terms, 11L)
-  expect_equal(res$n_early_drops, 0L)
+  expect_equal(nrow(res$left_out), 0L)
   expect_null(res$balance)
+  expect_equal(unique(r$course), "HIST 499")
+  # The population's own rates, every member in.
+  p <- res$population
+  expect_equal(p$term, c(202010L, 202080L, 202110L))
+  expect_equal(p$population, c(6L, 4L, 1L))
+  expect_equal(p$n_returned, c(3L, 1L, 0L))
+  expect_equal(p$return_pct, c(50, 25, NA))
+  expect_equal(p$next_attempts, c(3L, 1L, NA))
 })
 
 test_that("MC02: home campus beside the group; a next-term DFW is counted; campus scopes", {
@@ -120,7 +128,8 @@ test_that("RW01: nothing observable gives counts and NA rates; a late drop is DF
   expect_equal(r$n_return_observable, c(0L, 0L, 0L))
   expect_false(any(r$next_outcomes_observable))
   expect_true(all(is.na(r$next_attempts)))
-  expect_equal(res$n_unclassified_takers, 1L)
+  expect_equal(res$left_out$n_unclassified, 1L)
+  expect_equal(res$left_out$n_early_drops, 0L)
   expect_equal(res$n_population_student_terms, 6L)
 
   two <- get_course_cohort_effect(
@@ -148,4 +157,37 @@ test_that("get_course_cohort_effect() stops without a course, a classification, 
   expect_error(get_course_cohort_effect(test_student_terms_rp %>% select(-return_observable), att,
                                         list(course = "HIST 499", classification = "Freshman",
                                              data_edges = rp01_edges)), "return_observable")
+})
+
+test_that("several courses at once: each course against the same population, no balance", {
+  res <- get_course_cohort_effect(
+    test_student_terms_mc, keyed_attempts(test_students_mc, mc02_edges),
+    list(course = c("SPAN 101L", "PHIL 105"), classification = "Freshman", min_n = 1L, data_edges = mc02_edges)
+  )
+  r <- res$rates
+  expect_equal(res$courses, c("SPAN 101L", "PHIL 105"))
+  lab <- r %>% filter(course == "SPAN 101L", term == 202010L)
+  # A1 and A2 passed the lab (both returned; A1 failed SPAN 201 next); A3, A4
+  # on ABQ and G1, G2 on GA never took it.
+  expect_equal(lab$student_campus, c("ABQ", "ABQ", "GA"))
+  expect_equal(lab$group, c("passed", "none", "none"))
+  expect_equal(lab$n_students, c(2L, 2L, 2L))
+  expect_equal(lab$return_pct, c(100, 100, 50))
+  expect_equal(lab$next_dfw_pct, c(50, 0, 0))
+  expect_equal(lab$population, c(4L, 4L, 2L))
+  phil <- r %>% filter(course == "PHIL 105", term == 202080L)
+  # A3 passed PHIL 105 and did not return; A1, A2, A4, G1 never took it, A1 returned.
+  expect_equal(phil$group, c("passed", "none"))
+  expect_equal(phil$n_students, c(1L, 4L))
+  expect_equal(phil$return_pct, c(0, 25))
+  # The never-took rows are the population less the takers, so they sum back.
+  tot <- r %>% group_by(course, term, student_campus) %>%
+    summarize(n = sum(n_students), pop = first(population), .groups = "drop")
+  expect_equal(tot$n, tot$pop)
+
+  expect_error(get_course_cohort_effect(
+    test_student_terms_mc, keyed_attempts(test_students_mc, mc02_edges),
+    list(course = c("SPAN 101L", "PHIL 105"), classification = "Freshman", min_n = 1L, data_edges = mc02_edges),
+    programs = test_programs_mc
+  ), "one course")
 })

@@ -63,6 +63,8 @@ Scoping the cohort is not the same as scoping the outcome, and conflating them c
 
 `get_course_timing()` takes the same exception under `opt$group_campus = FALSE`, and only under it. The default keeps campus in the key. Pass `FALSE` when the row is a statement about one student's path through the curriculum — a student who took ENGL 1120 online and PSYC 1110 in Albuquerque has one trajectory, and splitting them by delivery campus both answers a different question and halves every count on a small population. It also puts two tiles at the same heatmap coordinate, which `plot_curriculum_map()` draws one over the other. A delivery-mix or course-audience view must keep the default.
 
+`get_course_cohort_effect()` in `R/cones/course-cohort-effect.R` keys its result on the student's home campus (`student_campus`), not the campus that taught the course: a student-term either took the course somewhere or did not, and splitting the takers by delivery campus would put one freshman cohort's members in several rows. `build_course_cohort_context()` (`R/features/course-cohort-context.R`) pre-filters benchmark candidates by how many students took the course anywhere and hands the cone the same home-campus grain.
+
 Enrollment projections have one further named exception:
 `market_id = "abq_ea_course_market"`. For the monitored Gen Ed/FYEX/gateway
 scope, ABQ and EA are substitutable deliveries of one planning market: online
