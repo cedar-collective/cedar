@@ -203,10 +203,13 @@ CEDAR_CONFIG_FILE_SPECS <- list(
   population_groups = c("group", "description", "default_for", "program_name"),
   # Enrollment-projection monitoring scopes. campuses: |-separated codes from
   # campuses.csv, the market the group projects (branch campuses never enter
-  # it). include_gen_ed: TRUE adds every gen_ed_courses.csv course to the group.
-  # market_id names the planning market saved on every row (the campus policy's
-  # documented exception).
-  projection_groups = c("group_id", "label", "description", "market_id", "campuses", "include_gen_ed"),
+  # it). include_gen_ed: TRUE adds every gen_ed_courses.csv course to the group,
+  # except the courses of the areas in exclude_gen_ed_areas (|-separated area
+  # numbers, blank = none); a course of an excluded area the group still wants
+  # is named in projection_courses.csv. market_id names the planning market
+  # saved on every row (the campus policy's documented exception).
+  projection_groups = c("group_id", "label", "description", "market_id", "campuses",
+                        "include_gen_ed", "exclude_gen_ed_areas"),
   # Courses named explicitly in a group, beyond include_gen_ed. always_monitored
   # TRUE skips the pressure screen. history_start_term and retention_min_terms
   # are per-course overrides of the model window and the first-day-retention
@@ -462,6 +465,7 @@ validate_population_groups <- function(df) {
 #' @param groups,courses The two tables as read.
 #' @param known_campuses Campus codes from campuses.csv.
 #' @return list(groups, courses) with `campuses` split into character vectors,
+#'   `exclude_gen_ed_areas` into integer vectors (none where blank),
 #'   `include_gen_ed` and `always_monitored` logical, and the two overrides
 #'   integer (NA where blank), if valid. Stops listing every problem otherwise.
 validate_projection_groups <- function(groups, courses, known_campuses) {
@@ -480,6 +484,12 @@ validate_projection_groups <- function(groups, courses, known_campuses) {
   if (length(bad)) problems <- c(problems, paste("projection_groups.csv: campuses not in campuses.csv:", paste(bad, collapse = ", ")))
   gen_ed_flag <- .csv_flag(groups$include_gen_ed)
   if (anyNA(gen_ed_flag)) problems <- c(problems, "projection_groups.csv: include_gen_ed must be TRUE or FALSE")
+  excluded_areas <- strsplit(groups$exclude_gen_ed_areas, "|", fixed = TRUE)
+  bad <- unique(unlist(excluded_areas)[!grepl("^[0-9]+$", unlist(excluded_areas))])
+  if (length(bad)) problems <- c(problems, paste("projection_groups.csv: exclude_gen_ed_areas must be whole area numbers separated by |; found", paste(bad, collapse = ", ")))
+  if (any(lengths(excluded_areas) > 0 & !(gen_ed_flag %in% TRUE))) {
+    problems <- c(problems, "projection_groups.csv: exclude_gen_ed_areas is set on a group whose include_gen_ed is not TRUE")
+  }
 
   if (any(blank(courses$group_id))) problems <- c(problems, "projection_courses.csv: blank group_id")
   if (any(blank(courses$subject_course))) problems <- c(problems, "projection_courses.csv: blank subject_course")
@@ -506,6 +516,7 @@ validate_projection_groups <- function(groups, courses, known_campuses) {
   }
   groups$campuses <- campuses
   groups$include_gen_ed <- gen_ed_flag
+  groups$exclude_gen_ed_areas <- lapply(excluded_areas, as.integer)
   courses$always_monitored <- monitored
   courses$history_start_term <- suppressWarnings(as.integer(ifelse(blank(starts), NA, starts)))
   courses$retention_min_terms <- suppressWarnings(as.integer(ifelse(blank(mins), NA, mins)))

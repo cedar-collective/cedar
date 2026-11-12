@@ -782,7 +782,10 @@ test_that("the projection groups and overrides are the institution's files", {
     expect_equal(g$campuses, pj$groups$campuses[[i]])
     expect_setequal(g$always_monitored_courses, rows$subject_course[rows$always_monitored])
     expect_true(all(rows$subject_course %in% g$courses))
-    if (pj$groups$include_gen_ed[[i]]) expect_true(all(unlist(gen_ed_all) %in% g$courses))
+    if (pj$groups$include_gen_ed[[i]]) {
+      kept <- CEDAR_GEN_ED_COURSES$subject_course[!CEDAR_GEN_ED_COURSES$area %in% pj$groups$exclude_gen_ed_areas[[i]]]
+      expect_true(all(kept %in% g$courses))
+    }
   }
   overrides <- pj$courses[!is.na(pj$courses$history_start_term), ]
   expect_equal(unname(CEDAR_ENROLLMENT_PROJECTION_COURSE_HISTORY_START_TERMS[overrides$subject_course]),
@@ -811,7 +814,8 @@ test_that("the projection validator reports every problem at once", {
   utils::write.csv(data.frame(group_id = c("critical_courses", "critical_courses", "Bad-Id"),
                               label = c("A", "A", ""), description = "d",
                               market_id = "m", campuses = c("ABQ|XX", "ABQ", "EA"),
-                              include_gen_ed = c("TRUE", "maybe", "FALSE")),
+                              include_gen_ed = c("TRUE", "maybe", "FALSE"),
+                              exclude_gen_ed_areas = c("6|six", "", "6")),
                    file.path(dir, "projection_groups.csv"), row.names = FALSE)
   utils::write.csv(data.frame(group_id = c("critical_courses", "critical_courses", "ghost", "Bad-Id"),
                               subject_course = c("MATH 1215", "MATH 1215", "ENGL 1110", "MATH 1215"),
@@ -828,6 +832,8 @@ test_that("the projection validator reports every problem at once", {
   expect_match(err, "group_id must be lowercase")
   expect_match(err, "campuses not in campuses.csv: XX")
   expect_match(err, "include_gen_ed must be TRUE or FALSE")
+  expect_match(err, "exclude_gen_ed_areas must be whole area numbers separated by |; found six", fixed = TRUE)
+  expect_match(err, "exclude_gen_ed_areas is set on a group whose include_gen_ed is not TRUE")
   expect_match(err, "group_id not in projection_groups.csv: ghost")
   expect_match(err, "duplicate course in a group: critical_courses / MATH 1215")
   expect_match(err, "always_monitored must be TRUE or FALSE")

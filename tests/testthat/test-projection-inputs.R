@@ -57,16 +57,26 @@ test_that("Gen Ed and FYEX monitoring group has an explicit campus scope", {
     "MATH 1215", "MATH 1220", "MATH 1350", "BIOL 1140",
     "CHEM 1215", "CHEM 1215L", "ENGL 1110", "ENGL 1120"
   )
+  # Second-language courses (area 6) are limited by instructors, not demand,
+  # and are left out; the two the file names stay in.
+  second_language <- CEDAR_GEN_ED_COURSES$subject_course[CEDAR_GEN_ED_COURSES$area == 6L]
+  named_second_language <- c("SPAN 1110", "SPAN 1210")
   expected_courses <- sort(unique(c(
-    unlist(gen_ed_all, use.names = FALSE),
-    expected_always_monitored
+    setdiff(unlist(gen_ed_all, use.names = FALSE), second_language),
+    expected_always_monitored,
+    named_second_language
   )))
+  expect_length(second_language, 55L)
+  expect_setequal(
+    intersect(projection_course_group_courses("critical_courses"), second_language),
+    named_second_language
+  )
 
   expect_setequal(
     projection_course_group_courses("critical_courses"),
     expected_courses
   )
-  expect_length(projection_course_group_courses("critical_courses"), 139L)
+  expect_length(projection_course_group_courses("critical_courses"), 141L)
   expect_setequal(
     projection_course_group_campuses("critical_courses"),
     c("ABQ", "EA")

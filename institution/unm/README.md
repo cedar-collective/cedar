@@ -259,10 +259,10 @@ not on the number's value (ISSUES.md I5).
 
 One row per (area, course): the state Gen Ed area number, its name (the same
 on every row of the area; shown as "1: Communication"), and the course. Areas
-1, 2, 3, 4, 5 and 7 are listed; area 6 (second language) is not yet defined.
-A course listed under two areas counts under the first listed. Last reviewed
-against the catalog 2024-08-27. Many area 3 courses have associated labs that
-are not listed. The transform stamps `cedar_sections$gen_ed_area` from this
+1 to 7 are listed. A course listed under two areas counts under the first
+listed. Areas 1 to 5 and 7 were last reviewed against the catalog 2024-08-27;
+area 6 (second language) was added from the catalog 2026-11-12 (ISSUES.md
+I54). Many area 3 courses have associated labs that are not listed. The transform stamps `cedar_sections$gen_ed_area` from this
 file, so a change here takes effect at the next rebuild; Explore > Gen Ed and
 Dept Trends > Gen Ed read it live.
 
@@ -300,8 +300,12 @@ A projection group is a monitoring scope for `scripts/build-enrollment-projectio
 (`--group critical_courses`). `projection_groups.csv` names each group, the
 planning market it projects (`market_id`, saved on every row; the campus
 policy's documented exception), the campuses in that market (`|`-separated,
-from `campuses.csv`; branch campuses never enter it) and whether every
-`gen_ed_courses.csv` course belongs (`include_gen_ed`). `projection_courses.csv`
+from `campuses.csv`; branch campuses never enter it), whether every
+`gen_ed_courses.csv` course belongs (`include_gen_ed`) and which Gen Ed areas
+are left out all the same (`exclude_gen_ed_areas`, `|`-separated area numbers,
+blank for none). UNM leaves out area 6: second-language courses are limited by
+instructors, so only the two named in `projection_courses.csv` (SPAN 1110 and
+SPAN 1210) are projected. `projection_courses.csv`
 names the courses a group monitors beyond Gen Ed; `always_monitored` TRUE
 skips the pressure screen and is aftcast on every build. `history_start_term`
 and `retention_min_terms` are per-course overrides of the model window and the

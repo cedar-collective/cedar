@@ -36,6 +36,7 @@ alongside other work (M14, M16).
 
 | ID | Kind | Summary |
 |---|---|---|
+| [I54](#i54--the-gen-ed-list-had-no-second-language-area) | Defect | The Gen Ed list had no area 6 (second language): no language course counted as Gen Ed anywhere, 36 courses and 2,228 enrolled seats in Fall 2025 on ABQ and online (reported in #269; the 55 catalog courses added 2026-11-12, in effect once the sections are rebuilt) |
 | [I46](#i46--a-deploy-that-must-rebuild-a-table-the-app-cannot-start-without-takes-the-site-down) | Defect | The deploy's table gate ran after the health check, so a deploy that added a column to `cedar_student_terms` failed its health check on the missing column and never reached the gate: production served the restart page from 17:07 UTC on 2026-11-04 (gate moved before the first request) |
 | [I45](#i45--the-class-list-and-the-schedule-name-the-same-section-with-different-course-codes) | Defect | The class list and the schedule name the same section with different course codes for renamed subjects (SOC to SOCI, PSY to PSYC): SOCI 371 had class-list history from Fall 2019 but no sections before Fall 2021 (fixed for every reader by keying the loaded tables on the course, 2026-11-07; open until the remaining successions are confirmed) |
 | [I43](#i43--every-scheduled-refresh-fails-because-the-default-asks-for-a-report-mrgather-never-fetches) | Defect | Every scheduled refresh failed from 2026-10-24 to 2026-11-03: the default asked for the applicants report, which production mrgather never fetches, and one missing report skipped every table (default fixed 2026-11-03, per-report rebuilds 2026-11-11; open for mrgather, which still accepts a report it cannot fetch) |
@@ -85,6 +86,32 @@ Kept until the next release, so a recurrence is recognisable; each entry below g
 ---
 
 # Defects
+
+## I54 — The Gen Ed list had no second-language area
+
+**Status:** fixed in the file 2026-11-12; in effect on production once
+`cedar_sections` is rebuilt.
+**Found:** 2026-11-12, reported in #269 ("Is CEDAR capturing SPAN's gen ed
+enrollment?").
+**Severity:** moderate. `institution/unm/gen_ed_courses.csv` listed areas 1,
+2, 3, 4, 5 and 7 and never area 6, so every second-language course had
+`gen_ed_area` NA: absent from Explore > Gen Ed, Dept Trends > Gen Ed, the Gen
+Ed tables of Open Seats and Regstats. The
+only Spanish course counted was SPAN 2130, under Communication. On the local
+tables, Fall 2025 on ABQ and online had 36 of the 55 courses on the schedule
+with 2,228 enrolled seats, none counted as Gen Ed. Each course's own
+enrollment was right everywhere; only the Gen Ed views missed it.
+**Reproduction:** `dplyr::count(CEDAR_GEN_ED_COURSES, area)` shows no area 6;
+`cedar_sections %>% filter(subject_course == "SPAN 1110") %>%
+count(gen_ed_area)` is all NA.
+**Fix:** the 55 courses the catalog lists for the second-language area, added
+as area 6, "Second Language". All 55 codes appear in `cedar_sections`. The
+transform stamps the area on sections, so the stored area changes when they
+are rebuilt. The projections leave the
+area out on purpose (`projection_groups.csv` `exclude_gen_ed_areas`: language
+courses are limited by instructors) and name SPAN 1110 and SPAN 1210 in
+`projection_courses.csv`, so the monitored group goes from 139 courses to
+141.
 
 ## I53 — Declaring the major a pre-major leads to was counted as a change of major
 
