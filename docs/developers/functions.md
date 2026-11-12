@@ -8,7 +8,7 @@ parent: Developer Guide
 
 This reference is auto-generated from roxygen2 comments in the source code.
 
-*Generated: 2026-11-11 18:31:33.640007*
+*Generated: 2026-11-11 18:31:38.002014*
 
 ---
 
@@ -358,6 +358,36 @@ Compute covariate balance between treatment and control groups  For binary and c
 - `groups` - Tibble from build_comparison() with a "group" column.
 
 **Returns:** Named list: \describe{ \item{smd_table}{Tibble sorted by |SMD| descending: covariate, type, n_treatment, n_control, value_treatment, value_control, unit, smd, balance_band, flagged. SMD retains full precision; display layers round it.} \item{categorical}{Named list of frequency tibbles for categorical covariates.} \item{overall_balance}{The most serious observed SMD band, or unavailable when no SMD can be estimated.} }
+
+---
+
+### `hs_gpa_band()`
+
+*Source: comparison.R*
+
+**The high-school GPA band of each value**
+
+**Parameters:**
+
+- `gpa` - Numeric high-school GPAs; NA is "not on file".
+
+**Returns:** A factor over `CEDAR_HS_GPA_BANDS`.
+
+---
+
+### `applicant_hs_gpa()`
+
+*Source: comparison.R*
+
+**One high-school GPA per student, off the applicants table**
+
+One high-school GPA per student, off the applicants table  The first row per student, as build_comparison() reads it, with the same cleaning: a value above 5.5 or at or below zero is an unscaled or empty record and is not a GPA.
+
+**Parameters:**
+
+- `applicants` - `cedar_applicants`.
+
+**Returns:** A tibble of `student_id` and `high_school_cum_gpa`, one row each.
 
 ---
 
@@ -1015,7 +1045,26 @@ Course Sequence Effect  Compares grades in course Y between students who passed 
 - `data_edges` - Optional output of [cedar_data_edges()]. Y outcomes stop at the longitudinal grade edge: the earlier of `last_enrolled_complete` and `last_graded`.
 - `opt` - Named list: \describe{ \item{course_x}{Character. The preparatory course. Required.} \item{course_y}{Character. The outcome course, or several codes read as one course (a course and its modular or stretch forms): a student's outcome is their earliest attempt of any of them. Required.} \item{campus}{Character vector. Optional campus filter.} \item{min_n}{Integer. Minimum students per group (default 15).} \item{filters}{Named list of covariate equality filters. Optional.} \item{hs_gpa_min, hs_gpa_max, act_min, act_max}{Optional windows on high-school GPA and ACT composite; a student with no value is left out while a window on it is active, and counted.} \item{min_band_n}{Smallest control group a high-school GPA band needs to supply a rate to the standardized comparison (default 10).} }
 
-**Returns:** Named list: \describe{ \item{course_x, course_y}{Course identifiers.} \item{outcomes}{Tibble: group, outcome (pass/dfw), n, pct.} \item{group_profile}{Compact covariate summary per group.} \item{balance}{From compute_balance().} \item{n_treatment, n_control}{Group sizes.} \item{control_split}{The control group by what they did in X before Y: `prior_x` (`attempted_not_passed`: a classified X attempt strictly before Y, none passed; `no_prior_attempt`), `n`, `n_dfw`, `dfw_pct`.} \item{by_hs_gpa_band}{Per high-school GPA band and group: `n`, `n_dfw`, `dfw_pct`; NULL without an applicants table.} \item{standardized}{The treatment group's actual DFW rate against the rate expected at the control group's rate in each band (`actual_dfw_pct`, `expected_dfw_pct`, `n_treatment_covered`, `n_treatment_left_out`, `bands_used`, `min_band_n`); NULL without an applicants table.} \item{n_missing_hs_gpa_excluded, n_missing_act_excluded}{Students left out by an active window for having no value.} }
+**Returns:** Named list: \describe{ \item{course_x, course_y}{Course identifiers.} \item{outcomes}{Tibble: group, outcome (pass/dfw), n, pct.} \item{group_profile}{Compact covariate summary per group.} \item{balance}{From compute_balance().} \item{n_treatment, n_control}{Group sizes.} \item{control_split}{The control group by what they did in X before Y: `prior_x` (`attempted_not_passed`: a classified X attempt strictly before Y, none passed; `no_prior_attempt`), `n`, `n_dfw`, `dfw_pct`.} \item{by_year}{Per calendar year of the Y attempt and group: `n`, `n_dfw`, `dfw_pct` (NA under `min_n`).} \item{by_hs_gpa_band}{Per high-school GPA band and group: `n`, `n_dfw`, `dfw_pct`; NULL without an applicants table.} \item{standardized}{The treatment group's actual DFW rate against the rate expected at the control group's rate in each band (`actual_dfw_pct`, `expected_dfw_pct`, `n_treatment_covered`, `n_treatment_left_out`, `bands_used`, `min_band_n`); NULL without an applicants table.} \item{n_missing_hs_gpa_excluded, n_missing_act_excluded}{Students left out by an active window for having no value.} }
+
+---
+
+## course-similar-students
+
+### `get_course_similar_students()`
+
+*Source: course-similar-students.R*
+
+**A course's takers against non-takers of the same term, campus, HS GPA band and time status**
+
+**Parameters:**
+
+- `student_terms` - `cedar_student_terms`.
+- `attempts` - `cedar_attempts`.
+- `applicants` - `cedar_applicants` (the high-school GPA band).
+- `opt` - `classification` (one or more `student_classification` values; required), `course` (course ids; NULL reads every course with `min_n` takers), `term` (anchor terms; default every term to the settled edge), `campus` (home campuses; NULL keeps every campus, each its own cell), `grain` (`"course"`, the default, or `"instructor"`: a course's takers by the instructor of their attempt, against the course's non-takers), `by_term` (TRUE gives one row per anchor term as well, with `term` after the course: the same comparison term by term, for change over time; default FALSE pools the terms), `min_n` (smallest covered taker count a row needs; default 30), `min_cell_n` (smallest non-taker count a cell needs; default 5), `data_edges` (`cedar_data_edges()` output, required).
+
+**Returns:** A tibble, one row per `course` (and `instructor_id`, `instructor_name` at the instructor grain): `n_takers`, `n_covered`, `n_terms`; `return_n`, `return_pct`, `return_expected_pct`, `return_gap`, `return_gap_se`; `other_attempts`, `other_dfw_pct`, `other_dfw_expected_pct`, `other_dfw_gap`; `next_gpa_n`, `next_gpa`, `next_gpa_expected`, `next_gpa_gap`. Gaps are actual minus expected (a positive DFW gap is worse); an outcome with nothing observable is NA. Attributes: `edge`, `graded_edge`, `n_population_student_terms`, `cells` (the cell columns), `suppressed` (rows under `min_n`).
 
 ---
 

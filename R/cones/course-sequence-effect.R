@@ -23,7 +23,7 @@
 #   a same-named function in cones/course-retention.R. Course Dynamics > Retention
 #   is served by get_retention_trend() in that file.)
 #
-# Depends on: build_comparison(), compute_balance() (branches/comparison.R)
+# Depends on: build_comparison(), compute_balance(), hs_gpa_band() (branches/comparison.R)
 #             prepare_course_attempts() (branches/course-attempts.R): both
 #               courses' outcomes come off cedar_attempts (ADR-001 step 7)
 #             cedar_longitudinal_edge() (branches/data-edges.R)
@@ -87,15 +87,6 @@
 
 
 
-# High-school GPA bands for the within-band comparison. A missing GPA is its
-# own band, never dropped: who has no GPA on file is not random.
-SEQUENCE_HS_GPA_BREAKS <- c(2.75, 3.25, 3.75)
-SEQUENCE_HS_GPA_BANDS  <- c("2.75 or lower", "2.76 to 3.25", "3.26 to 3.75", "above 3.75", "not on file")
-.hs_gpa_band <- function(gpa) {
-  band <- SEQUENCE_HS_GPA_BANDS[findInterval(gpa, SEQUENCE_HS_GPA_BREAKS, left.open = TRUE) + 1L]
-  factor(if_else(is.na(gpa), "not on file", band), levels = SEQUENCE_HS_GPA_BANDS)
-}
-
 # The two groups' Y outcomes inside each high-school GPA band, and the DFW
 # rate the treatment group would have had at the control group's band rates
 # (direct standardization to the treatment group's mix). A band whose control
@@ -103,7 +94,7 @@ SEQUENCE_HS_GPA_BANDS  <- c("2.75 or lower", "2.76 to 3.25", "3.26 to 3.75", "ab
 # left out of both sides of the standardized comparison and counted.
 .sequence_band_comparison <- function(groups, y_outcomes, min_band_n) {
   rows <- groups %>%
-    transmute(student_id, group, band = .hs_gpa_band(high_school_cum_gpa)) %>%
+    transmute(student_id, group, band = hs_gpa_band(high_school_cum_gpa)) %>%
     inner_join(y_outcomes, by = "student_id")
   by_band <- rows %>%
     group_by(band, group) %>%
@@ -174,6 +165,8 @@ SEQUENCE_HS_GPA_BANDS  <- c("2.75 or lower", "2.76 to 3.25", "3.26 to 3.75", "ab
 #'     \item{control_split}{The control group by what they did in X before Y:
 #'       `prior_x` (`attempted_not_passed`: a classified X attempt strictly
 #'       before Y, none passed; `no_prior_attempt`), `n`, `n_dfw`, `dfw_pct`.}
+#'     \item{by_year}{Per calendar year of the Y attempt and group: `n`,
+#'       `n_dfw`, `dfw_pct` (NA under `min_n`).}
 #'     \item{by_hs_gpa_band}{Per high-school GPA band and group: `n`, `n_dfw`,
 #'       `dfw_pct`; NULL without an applicants table.}
 #'     \item{standardized}{The treatment group's actual DFW rate against the
@@ -383,6 +376,15 @@ get_course_sequence_effect <- function(students, attempts, programs, applicants 
     .sequence_band_comparison(groups, final %>% select(student_id, y_outcome), min_band_n)
   } else list(by_band = NULL, standardized = NULL)
 
+  # The same two rates by the calendar year of the Y attempt, for change over
+  # time. A group under min_n in a year keeps its count and has no rate.
+  by_year <- final %>%
+    mutate(year = as.integer(term_y %/% 100L)) %>%
+    group_by(year, group) %>%
+    summarize(n = n(), n_dfw = sum(y_outcome == "dfw"), .groups = "drop") %>%
+    mutate(dfw_pct = if_else(n >= min_n, 100 * n_dfw / n, NA_real_)) %>%
+    arrange(year, desc(group))
+
   message("[course-sequence-effect.R]   Sequence effect computed. Done.")
 
   list(
@@ -399,6 +401,8 @@ get_course_sequence_effect <- function(students, attempts, programs, applicants 
     n_missing_hs_gpa_excluded = n_missing_hs_gpa_excluded,
     n_missing_act_excluded  = n_missing_act_excluded,
     control_split           = control_split,
+    by_year                 = by_year,
+    n_min_year              = min_n,
     by_hs_gpa_band          = bands$by_band,
     standardized            = bands$standardized,
     y_attempt_rule          = "earliest classifiable in-scope Y attempt per student",

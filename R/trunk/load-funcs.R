@@ -157,6 +157,7 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
   source_file("cones/course-offering-pattern.R")   # seasons, parts of term, seats and day-1 fill
   source_file("cones/major-course-units.R")        # which units teach the courses a major's students take
   source_file("cones/course-cohort-effect.R")      # a course's takers against its non-takers: return and next-term outcomes
+  source_file("cones/course-similar-students.R")   # a course's takers against non-takers of the same term, campus, HS GPA band and time status
 
   # 5. Features (app-facing orchestration — call multiple branches/cones)
   message("[load-funcs.R] Loading features...")
@@ -175,6 +176,7 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
   source_file("features/degree-explorer.R")
   source_file("features/population-course-pressure.R")  # text-first preview: a population through its shared courses
   source_file("features/course-cohort-context.R")       # text-first preview: a course's takers-vs-non-takers gap against its college's courses
+  source_file("features/course-similar-students.R")     # text-first preview: a course against similar non-takers, beside every course and by instructor
   source_file("features/shared-requirements.R")
   source_file("features/catalog-capture.R")
   source_file("features/catalog-analysis.R")

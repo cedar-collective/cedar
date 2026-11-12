@@ -456,6 +456,11 @@ test_that("the control group splits into attempted-not-passed and never-sat X", 
   result <- .run_sequence_bands(.sequence_band_fixture(), course_y = "SEQ 201")
   expect_equal(result$n_treatment, 2L)
   expect_equal(result$n_control, 4L)
+  # Every Y attempt is in 2020: one year, both groups, the rates over min_n = 1.
+  expect_equal(result$by_year$year, c(2020L, 2020L))
+  expect_equal(result$by_year$group, c("treatment", "control"))
+  expect_equal(result$by_year$n, c(2L, 4L))
+  expect_equal(result$by_year$dfw_pct, c(100, 25))
   split <- result$control_split
   expect_equal(split$prior_x, c("attempted_not_passed", "no_prior_attempt"))
   expect_equal(split$n, c(1L, 3L))

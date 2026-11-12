@@ -426,3 +426,39 @@ compute_balance <- function(groups) {
 if (!exists("%||%")) {
   `%||%` <- function(a, b) if (!is.null(a)) a else b
 }
+
+# ── High-school GPA bands ─────────────────────────────────────────────────────
+# The one banding every like-with-like comparison uses (Course Sequence, the
+# similar-students course effect). A missing GPA is its own band, never
+# dropped: who has no GPA on file is not random.
+CEDAR_HS_GPA_BREAKS <- c(2.75, 3.25, 3.75)
+CEDAR_HS_GPA_BANDS  <- c("2.75 or lower", "2.76 to 3.25", "3.26 to 3.75", "above 3.75", "not on file")
+
+#' The high-school GPA band of each value
+#'
+#' @param gpa Numeric high-school GPAs; NA is "not on file".
+#' @return A factor over `CEDAR_HS_GPA_BANDS`.
+hs_gpa_band <- function(gpa) {
+  band <- CEDAR_HS_GPA_BANDS[findInterval(gpa, CEDAR_HS_GPA_BREAKS, left.open = TRUE) + 1L]
+  factor(if_else(is.na(gpa), "not on file", band), levels = CEDAR_HS_GPA_BANDS)
+}
+
+#' One high-school GPA per student, off the applicants table
+#'
+#' The first row per student, as build_comparison() reads it, with the same
+#' cleaning: a value above 5.5 or at or below zero is an unscaled or empty
+#' record and is not a GPA.
+#'
+#' @param applicants `cedar_applicants`.
+#' @return A tibble of `student_id` and `high_school_cum_gpa`, one row each.
+applicant_hs_gpa <- function(applicants) {
+  missing <- setdiff(c("student_id", "high_school_cum_gpa"), names(applicants))
+  if (length(missing) > 0) {
+    stop("[comparison.R] applicant_hs_gpa: applicants lacks ", paste(missing, collapse = ", "), call. = FALSE)
+  }
+  applicants %>%
+    distinct(student_id, .keep_all = TRUE) %>%
+    transmute(student_id,
+              high_school_cum_gpa = if_else(high_school_cum_gpa > 5.5 | high_school_cum_gpa <= 0,
+                                            NA_real_, as.numeric(high_school_cum_gpa)))
+}

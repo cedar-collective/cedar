@@ -4517,6 +4517,21 @@ output$enrl_classlist_download <- downloadHandler(
             no_prior_attempt = paste0("Never sat ", result$course_x, " before"))), "Comparison students"),
           default_page_size = 5L, searchable = FALSE)
       ),
+      dashboard_subsection(
+        "Over Time",
+        paste0("The two groups' rates by the calendar year of each student's ", y_label,
+               " attempt, and the gap between them in points. A group under ", result$n_min_year,
+               " students in a year keeps its count and shows no rate."),
+        cr_basic_reactable(
+          result$by_year %>%
+            tidyr::pivot_wider(names_from = group, values_from = c(n, n_dfw, dfw_pct)) %>%
+            dplyr::transmute(
+              Year = as.character(year),
+              `Passed first: students` = n_treatment, `Passed first: DFW %` = round(dfw_pct_treatment, 1),
+              `No prior pass: students` = n_control, `No prior pass: DFW %` = round(dfw_pct_control, 1),
+              `Gap, points` = round(dfw_pct_treatment - dfw_pct_control, 1)),
+          default_page_size = 12L, searchable = FALSE)
+      ),
       if (!is.null(result$by_hs_gpa_band)) dashboard_subsection(
         "Within High-School GPA Bands",
         paste0("The same outcome inside each high-school GPA band, so students are read against others who arrived with similar preparation; a student with no GPA on file is their own band. The lead's like-with-like rate weights the comparison group's band rates by the first group's mix, using bands with at least ",
@@ -6563,6 +6578,7 @@ output$enrl_classlist_download <- downloadHandler(
     programs      = data_objects[["cedar_programs"]],
     dims          = data_objects[["cedar_dims"]],
     edges         = data_objects[["cedar_edges"]],
+    applicants    = data_objects[["cedar_applicants"]],
     course        = reactive({
       data <- course_report_data()
       if (is.null(data)) NULL else data$course_code

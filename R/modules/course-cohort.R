@@ -9,7 +9,12 @@
 # Exported functions:
 #   courseCohortUI(id)
 #   courseCohortServer(id, student_terms, attempts, programs, dims, edges,
-#                      course, campus)
+#                      course, campus, applicants)
+#
+# With the applicants table, the same run also reads the course against
+# similar non-takers (build_course_similar_students()): the like-with-like
+# gap, its change over time, every course the population takes, and the
+# course's instructors.
 
 courseCohortUI <- function(id) {
   ns <- NS(id)
@@ -19,11 +24,14 @@ courseCohortUI <- function(id) {
 #' @param course Reactive: the analysed course's id (NULL before Analyze Course).
 #' @param campus Reactive: the page's campus selection, offered as the home
 #'   campuses where it names one.
+#' @param applicants `cedar_applicants`, or NULL: without it the page has no
+#'   similar-students sections and says so.
 courseCohortServer <- function(id, student_terms, attempts, programs, dims, edges,
-                               course, campus) {
+                               course, campus, applicants = NULL) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
     result <- reactiveVal(NULL)
+    similar <- reactiveVal(NULL)
     college_names <- college_code_names(dims)
 
     defaults <- reactive({
@@ -33,7 +41,7 @@ courseCohortServer <- function(id, student_terms, attempts, programs, dims, edge
     })
 
     # A new course is a new question: the old answer leaves with it.
-    observeEvent(course(), result(NULL), ignoreNULL = FALSE)
+    observeEvent(course(), { result(NULL); similar(NULL) }, ignoreNULL = FALSE)
 
     output$body <- renderUI({
       crs <- course()
@@ -90,6 +98,7 @@ courseCohortServer <- function(id, student_terms, attempts, programs, dims, edge
       crs <- course()
       req(crs, nzchar(crs), input$classification, input$college)
       result(NULL)
+      similar(NULL)
       opt <- list(
         course = crs,
         classification = input$classification,
@@ -123,6 +132,19 @@ courseCohortServer <- function(id, student_terms, attempts, programs, dims, edge
             }
           )
         }
+        if (!is.null(payload) && !is.null(applicants)) {
+          setProgress(0.9, detail = "similar students")
+          similar(tryCatch(
+            build_course_similar_students(
+              student_terms, attempts, applicants,
+              list(course = crs, classification = opt$classification, campus = opt$campus, term = opt$term,
+                   data_edges = edges)),
+            error = function(e) {
+              showNotification(paste("Similar-students comparison:", conditionMessage(e)), type = "error", duration = 10)
+              NULL
+            }
+          ))
+        }
         result(payload)
         setProgress(1)
       })
@@ -155,6 +177,7 @@ courseCohortServer <- function(id, student_terms, attempts, programs, dims, edge
             tags$li("Both gaps are passed minus never took, in points, and describe who takes the course before they describe the course.")
           )
         ),
+        uiOutput(ns("similar_ui")),
         dashboard_subsection(
           "The Population",
           "Every enrolled student of the classification in each term and home campus, with its own return and next-term DFW share: the floor every group is read against.",
@@ -182,6 +205,109 @@ courseCohortServer <- function(id, student_terms, attempts, programs, dims, edge
           uiOutput(ns("balance_ui"))
         )
       )
+    })
+
+    # ── Against similar non-takers ──────────────────────────────────────────
+    output$similar_ui <- renderUI({
+      s <- similar()
+      if (is.null(s)) return(NULL)
+      m <- s$meta
+      tagList(
+        dashboard_subsection(
+          "Against Similar Students",
+          paste0("The students who took ", m$course, " against students of the same term, home campus, high-school GPA band and time status who did not, pooled over the selected terms. Expected is what the takers would have done at their non-taking peers' rates; a cell with fewer than ",
+                 m$min_cell_n, " non-takers supplies no rate and its takers are left out. The cells remove those four things and nothing else: placement, advising and major are not in them."),
+          lapply(course_similar_students_headline(s), function(x) tags$p(class = "cedar-lead", x)),
+          if (!is.null(s$focal)) reactable::reactableOutput(ns("similar_focal_table"))
+        ),
+        if (nrow(s$by_term) > 0L) dashboard_subsection(
+          "Over Time",
+          paste0("The same comparison one term at a time: the takers' return rate beside the rate expected from similar non-takers, and the three gaps. A term needs ",
+                 m$min_term_n, " covered takers. The trend in the lead is the slope of the return gap across regular terms against its own standard error."),
+          plotly::plotlyOutput(ns("similar_trend_plot"), height = "320px"),
+          reactable::reactableOutput(ns("similar_term_table"))
+        ),
+        dashboard_subsection(
+          "Every Course These Students Take",
+          paste0("The same gaps for every course with ", m$min_n, " or more covered takers in this population, largest return gap first. Taking almost any course goes with returning, so a course is read against the other courses here, never against zero; a course students are placed into shows its placement."),
+          reactable::reactableOutput(ns("similar_courses_table"))
+        ),
+        if (nrow(s$instructors) > 0L) dashboard_subsection(
+          paste0(m$course, " by Instructor"),
+          paste0("The course's takers by the instructor of their attempt, each against the course's similar non-takers; instructors with ",
+                 m$min_n, " or more covered takers. Not a measure of teaching and not a basis for evaluating anyone: a section tied to a program, a learning community or a time of day shows who enrolled in it."),
+          reactable::reactableOutput(ns("similar_instructors_table"))
+        )
+      )
+    })
+
+    similar_columns <- function(first) {
+      c(first, list(
+        n_covered = cedar_count_coldef("Takers"),
+        return_pct = cedar_percent_coldef("Actual"),
+        return_expected_pct = cedar_percent_coldef("Expected"),
+        return_gap = cedar_points_coldef("Gap"),
+        return_chance = reactable::colDef(name = "Chance, ±", align = "right", na = "—",
+                                          format = reactable::colFormat(digits = 1)),
+        other_dfw_pct = cedar_percent_coldef("Actual"),
+        other_dfw_expected_pct = cedar_percent_coldef("Expected"),
+        other_dfw_gap = cedar_points_coldef("Gap"),
+        next_gpa = reactable::colDef(name = "Actual", align = "right", na = "—",
+                                     format = reactable::colFormat(digits = 2)),
+        next_gpa_expected = reactable::colDef(name = "Expected", align = "right", na = "—",
+                                              format = reactable::colFormat(digits = 2)),
+        next_gpa_gap = reactable::colDef(name = "Gap", align = "right", na = "—",
+                                         format = reactable::colFormat(digits = 2))
+      ))
+    }
+    similar_groups <- list(
+      reactable::colGroup(name = "Returned next term", columns = c("return_pct", "return_expected_pct", "return_gap", "return_chance")),
+      reactable::colGroup(name = "DFW in other courses that term (lower is better)",
+                          columns = c("other_dfw_pct", "other_dfw_expected_pct", "other_dfw_gap")),
+      reactable::colGroup(name = "Next-term GPA, returners", columns = c("next_gpa", "next_gpa_expected", "next_gpa_gap"))
+    )
+    similar_display <- function(rows, first_cols) {
+      rows %>% transmute(
+        across(all_of(first_cols)), n_covered,
+        return_pct = return_pct / 100, return_expected_pct = return_expected_pct / 100, return_gap,
+        return_chance = 2 * return_gap_se,
+        other_dfw_pct = other_dfw_pct / 100, other_dfw_expected_pct = other_dfw_expected_pct / 100, other_dfw_gap,
+        next_gpa, next_gpa_expected, next_gpa_gap)
+    }
+    similar_table <- function(rows, first_cols, first_defs, ...) {
+      reactable::reactable(
+        similar_display(rows, first_cols), theme = cedar_tbl_theme, compact = TRUE, striped = TRUE,
+        columns = similar_columns(first_defs), columnGroups = similar_groups, ...)
+    }
+    course_def <- list(course = reactable::colDef(name = "Course", minWidth = 110))
+
+    output$similar_focal_table <- reactable::renderReactable({
+      s <- similar(); req(s, !is.null(s$focal))
+      similar_table(s$focal, "course", course_def, pagination = FALSE)
+    })
+    output$similar_term_table <- reactable::renderReactable({
+      s <- similar(); req(s, nrow(s$by_term) > 0L)
+      similar_table(s$by_term, "term",
+                    list(term = reactable::colDef(name = "Term", cell = function(v) fmt_term(v), minWidth = 100)),
+                    pagination = FALSE, defaultSorted = list(term = "desc"))
+    })
+    output$similar_trend_plot <- plotly::renderPlotly({
+      s <- similar(); req(s)
+      plot_course_similar_students_trend(s)
+    })
+    output$similar_courses_table <- reactable::renderReactable({
+      s <- similar(); req(s)
+      similar_table(s$courses, "course", course_def, highlight = TRUE, searchable = TRUE,
+                    defaultPageSize = 15, showPageSizeOptions = TRUE, pageSizeOptions = c(15, 30, 100),
+                    rowClass = reactable::JS(sprintf(
+                      "function(rowInfo) { return rowInfo && rowInfo.values.course === %s ? 'fw-semibold' : null }",
+                      jsonlite::toJSON(s$meta$course, auto_unbox = TRUE))))
+    })
+    output$similar_instructors_table <- reactable::renderReactable({
+      s <- similar(); req(s, nrow(s$instructors) > 0L)
+      similar_table(s$instructors, "instructor_name",
+                    list(instructor_name = reactable::colDef(name = "Instructor", minWidth = 160)),
+                    pagination = FALSE)
     })
 
     term_coldef <- reactable::colDef(name = "Term", cell = function(v) fmt_term(v), minWidth = 100)
