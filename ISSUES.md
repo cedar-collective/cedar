@@ -36,7 +36,6 @@ alongside other work (M14, M16).
 
 | ID | Kind | Summary |
 |---|---|---|
-| [I54](#i54--the-gen-ed-list-had-no-second-language-area) | Defect | The Gen Ed list had no area 6 (second language): no language course counted as Gen Ed anywhere, 36 courses and 2,228 enrolled seats in Fall 2025 on ABQ and online (reported in #269; the 55 catalog courses added 2026-11-12, in effect once the sections are rebuilt) |
 | [I46](#i46--a-deploy-that-must-rebuild-a-table-the-app-cannot-start-without-takes-the-site-down) | Defect | The deploy's table gate ran after the health check, so a deploy that added a column to `cedar_student_terms` failed its health check on the missing column and never reached the gate: production served the restart page from 17:07 UTC on 2026-11-04 (gate moved before the first request) |
 | [I45](#i45--the-class-list-and-the-schedule-name-the-same-section-with-different-course-codes) | Defect | The class list and the schedule name the same section with different course codes for renamed subjects (SOC to SOCI, PSY to PSYC): SOCI 371 had class-list history from Fall 2019 but no sections before Fall 2021 (fixed for every reader by keying the loaded tables on the course, 2026-11-07; open until the remaining successions are confirmed) |
 | [I43](#i43--every-scheduled-refresh-fails-because-the-default-asks-for-a-report-mrgather-never-fetches) | Defect | Every scheduled refresh failed from 2026-10-24 to 2026-11-03: the default asked for the applicants report, which production mrgather never fetches, and one missing report skipped every table (default fixed 2026-11-03, per-report rebuilds 2026-11-11; open for mrgather, which still accepts a report it cannot fetch) |
@@ -57,6 +56,7 @@ Kept until the next release, so a recurrence is recognisable; each entry below g
 
 | ID | Kind | Summary |
 |---|---|---|
+| [I54](#i54--the-gen-ed-list-had-no-second-language-area) | Defect | The Gen Ed list had no area 6 (second language): no language course counted as Gen Ed anywhere, 36 courses and 2,228 enrolled seats in Fall 2025 on ABQ and online (reported in #269; the 55 catalog courses added and production's sections rebuilt 2026-11-12) |
 | [I52](#i52--sections-stored-the-instructors-employee-id-so-they-joined-no-other-table) | Defect | The DESR's instructor ID was saved as the employee ID while the class list and HR hash theirs: the transform's HR merge matched nothing (`job_cat` NA on all 242,413 sections) and sections joined neither table. Fixed in the transform (every source hashed alike, the merge and `job_cat` removed; resolved 2026-11-12, when the deploy rebuilt production's sections) |
 | [I50](#i50--the-class-list-dedup-can-keep-an-early-drop-over-a-late-withdrawal) | Defect | The transform keeps one class-list row per student-course-campus-term but ranked only "registered first": a student who early-dropped one section and withdrew late from another could keep the early drop, so the W left the loaded class list (703 student-course-terms on the 2026-10-08 pull; 651 on the 2026-02-04 one). Every outcome reader now classifies that table (`cedar_attempts`); fixed in the transform (resolved 2026-11-12, when the deploy rebuilt production's class list) |
 | [I48](#i48--a-transform-change-to-a-fact-tables-stored-columns-is-not-rebuilt-at-deploy) | Defect | Since the mapping stamps retired (ADR-001 step 3, 2026-11-06) the deploy gate rebuilt only `cedar_student_terms`: a transform change that adds or renames a stored column on sections, students, programs or degrees started the app on files without it until the morning refresh, the I46 shape with no gate (resolved 2026-11-12: each fact table carries a schema stamp the gate checks, and the deploy that carried it rebuilt all four of production's unstamped tables) |
@@ -89,9 +89,11 @@ Kept until the next release, so a recurrence is recognisable; each entry below g
 
 ## I54 — The Gen Ed list had no second-language area
 
-**Status:** fixed in the file 2026-11-12; in effect on production once a
-deploy rebuilds `cedar_sections` (the sections schema version is bumped for
-it).
+**Status:** resolved 2026-11-12 (#270, #271). The deploy of #271 (run
+43312320789) rebuilt production's sections before the app restarted: its gate
+log reads "[fact-tables] Rebuilt: sections." and "[measures] Rebuilt:
+cedar_attempts, cedar_course_terms, cedar_course_flows." Confirmed from the
+gate's log, not by reading production's rows.
 **Found:** 2026-11-12, reported in #269 ("Is CEDAR capturing SPAN's gen ed
 enrollment?").
 **Severity:** moderate. `institution/unm/gen_ed_courses.csv` listed areas 1,
