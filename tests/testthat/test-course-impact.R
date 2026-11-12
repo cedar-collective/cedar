@@ -415,6 +415,109 @@ test_that("an active HS GPA band excludes and reports missing GPAs", {
   expect_equal(sum(result$outcomes$n), 3L)
 })
 
+# The audit fixture plus SEQ_F1, who failed SEQ 101 on ABQ in 202010 and then
+# failed SEQ 201 in 202080 (control: attempted X earlier, did not pass), and
+# SEQ_M1, who passed SEQ 101 and then passed the modular SEQ 201X (in no group
+# until SEQ 201X is read as part of the later course).
+#   Treatment: SEQ_T1 (Y dfw, HS 3.0, ACT 20), SEQ_T2 (Y dfw, no HS, no ACT)
+#   Control:   SEQ_C1 (pass, 3.2, 22), SEQ_C2 (pass, 2.8, 16),
+#              SEQ_XC (pass, none, none), SEQ_F1 (dfw, 3.0, 19)
+.sequence_band_fixture <- function() {
+  fixture <- .sequence_audit_fixture()
+  fixture$students <- dplyr::bind_rows(
+    fixture$students,
+    .mc_row("SEQ_F1", 202010, "SEQ 101", "ABQ", "SEQ", "F", "SEQ_I1"),
+    .mc_row("SEQ_F1", 202080, "SEQ 201", "ABQ", "SEQ", "F", "SEQ_I1"),
+    .mc_row("SEQ_M1", 202010, "SEQ 101", "ABQ", "SEQ", "A", "SEQ_I1"),
+    .mc_row("SEQ_M1", 202080, "SEQ 201X", "ABQ", "SEQ", "A", "SEQ_I1")
+  )
+  extra <- c("SEQ_F1", "SEQ_M1")
+  fixture$programs <- dplyr::bind_rows(fixture$programs, lapply(seq_along(extra), function(i) {
+    fixture$programs %>% dplyr::slice(1L) %>%
+      dplyr::mutate(student_id = extra[[i]], program_id = paste0("SEQ-PROG-X", i))
+  }))
+  fixture$applicants <- tibble::tibble(
+    student_id = c(fixture$ids, extra),
+    high_school_cum_gpa    = c(3.0, NA, 3.2, 2.8, NA, 3.0, NA),
+    unm_act_combined_score = c(20, NA, 22, 16, NA, 19, NA)
+  )
+  fixture
+}
+.run_sequence_bands <- function(fixture, ...) {
+  suppressMessages(get_course_sequence_effect(
+    fixture$students, keyed_attempts(fixture$students, .impact_edges), fixture$programs,
+    applicants = fixture$applicants,
+    opt = c(list(course_x = "SEQ 101", campus = "ABQ", min_n = 1L), list(...)),
+    data_edges = .impact_edges
+  ))
+}
+
+test_that("the control group splits into attempted-not-passed and never-sat X", {
+  result <- .run_sequence_bands(.sequence_band_fixture(), course_y = "SEQ 201")
+  expect_equal(result$n_treatment, 2L)
+  expect_equal(result$n_control, 4L)
+  split <- result$control_split
+  expect_equal(split$prior_x, c("attempted_not_passed", "no_prior_attempt"))
+  expect_equal(split$n, c(1L, 3L))
+  expect_equal(split$n_dfw, c(1L, 0L))
+  expect_equal(split$dfw_pct, c(100, 0))
+})
+
+test_that("outcomes are compared inside HS GPA bands and standardized to the treatment mix", {
+  fixture <- .sequence_band_fixture()
+  result <- .run_sequence_bands(fixture, course_y = "SEQ 201", min_band_n = 1L)
+  bands <- result$by_hs_gpa_band
+  expect_equal(as.character(bands$band), c("2.76 to 3.25", "2.76 to 3.25", "not on file", "not on file"))
+  expect_equal(bands$group, c("treatment", "control", "treatment", "control"))
+  expect_equal(bands$n, c(1L, 3L, 1L, 1L))
+  expect_equal(bands$n_dfw, c(1L, 1L, 1L, 0L))
+  std <- result$standardized
+  expect_equal(std$n_treatment_covered, 2L)
+  expect_equal(std$n_treatment_left_out, 0L)
+  expect_equal(std$actual_dfw_pct, 100)
+  # (1 x 1/3 + 1 x 0/1) / 2
+  expect_equal(std$expected_dfw_pct, 100 / 6)
+
+  # A band whose control group is under the guard supplies no rate, and its
+  # treatment students leave both sides.
+  guarded <- .run_sequence_bands(fixture, course_y = "SEQ 201", min_band_n = 2L)$standardized
+  expect_equal(guarded$bands_used, "2.76 to 3.25")
+  expect_equal(guarded$n_treatment_covered, 1L)
+  expect_equal(guarded$n_treatment_left_out, 1L)
+  expect_equal(guarded$expected_dfw_pct, 100 / 3)
+
+  # No applicants table: no bands, and no sentence about them.
+  no_app <- fixture; no_app["applicants"] <- list(NULL)
+  bare <- .run_sequence_bands(no_app, course_y = "SEQ 201")
+  expect_null(bare$by_hs_gpa_band)
+  expect_null(bare$standardized)
+
+  testthat::local_edition(3)
+  expect_snapshot(cat(course_sequence_headline(result), sep = "\n"))
+})
+
+test_that("an ACT window keeps both groups inside it and reports the students with no score", {
+  result <- .run_sequence_bands(.sequence_band_fixture(), course_y = "SEQ 201", act_min = 18)
+  expect_equal(result$n_missing_act_excluded, 2L)
+  expect_equal(result$n_treatment, 1L)
+  expect_equal(result$n_control, 2L)
+  no_app <- .sequence_band_fixture(); no_app["applicants"] <- list(NULL)
+  expect_error(.run_sequence_bands(no_app, course_y = "SEQ 201", act_min = 18), "ACT window")
+})
+
+test_that("several later-course codes are one course: each student once, at the earliest attempt", {
+  fixture <- .sequence_band_fixture()
+  family <- .run_sequence_bands(fixture, course_y = c("SEQ 201", "SEQ 201X"))
+  expect_equal(family$course_y, c("SEQ 201", "SEQ 201X"))
+  expect_equal(family$n_treatment, 3L)
+  expect_equal(family$n_control, 4L)
+  treated <- family$outcomes %>% dplyr::filter(group == "treatment")
+  expect_equal(treated$outcome, c("dfw", "pass"))
+  expect_equal(treated$n, c(2L, 1L))
+  testthat::local_edition(3)
+  expect_snapshot(cat(course_sequence_headline(family)[1], sep = "\n"))
+})
+
 test_that("cross-department follow-ons are not treated as invalid sequences", {
   src <- paste(readLines("../../server.R", warn = FALSE), collapse = "\n")
 

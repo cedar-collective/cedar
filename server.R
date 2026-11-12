@@ -4319,8 +4319,9 @@ output$enrl_classlist_download <- downloadHandler(
                          choices  = cr_downstream_choices(
                            cr_downstream_options(), include_rollup = FALSE,
                            dept = cr_course_dept()),
+                         multiple = TRUE,
                          options = list(placeholder = "Choose a later course...")),
-          helpText("The list includes courses students actually took later across departments. Department ownership and continuation share do not establish — or rule out — an intended sequence; use curricular context.")
+          helpText("Choose several codes to read them as one course (a course and its modular or stretch forms): each student counts once, at their earliest attempt of any of them. The list includes courses students actually took later across departments. Department ownership and continuation share do not establish — or rule out — an intended sequence; use curricular context.")
         ),
         column(2,
           numericInput("cr_impact_seq_min_n", "Min students:", value = 15, min = 5, max = 100)
@@ -4333,11 +4334,11 @@ output$enrl_classlist_download <- downloadHandler(
         column(2,
           numericInput("cr_impact_seq_gpa_max", "HS GPA max:", value = NA, min = 0, max = 5, step = 0.1)
         ),
-        column(4,
-          br(),
-          p(style = "font-size: 0.8em; color: #888;",
-            "Restrict both groups to a HS GPA window to reduce self-selection bias.
-             Leave blank to include all students regardless of GPA.")
+        column(2,
+          numericInput("cr_impact_seq_act_min", "ACT min:", value = NA, min = 1, max = 36, step = 1)
+        ),
+        column(2,
+          numericInput("cr_impact_seq_act_max", "ACT max:", value = NA, min = 1, max = 36, step = 1)
         ),
         column(2,
           br(),
@@ -4345,6 +4346,7 @@ output$enrl_classlist_download <- downloadHandler(
                        icon = icon("play"), class = "btn-primary")
         )
       ),
+      helpText("Leave the windows blank to include every student. A window keeps both groups inside one high-school GPA or ACT range and leaves out anyone with no value on file; ACT is on file for a minority of students, so an ACT window usually removes most of both groups. The results compare the groups inside high-school GPA bands either way."),
       uiOutput("cr_impact_sequence_results")
     )
   })
@@ -4357,16 +4359,20 @@ output$enrl_classlist_download <- downloadHandler(
 
   observeEvent(input$cr_impact_seq_run, {
     req(input$cr_course, nzchar(input$cr_course),
-        input$cr_impact_seq_course_y, nzchar(input$cr_impact_seq_course_y))
+        length(input$cr_impact_seq_course_y) > 0, all(nzchar(input$cr_impact_seq_course_y)))
     cr_impact_sequence_data(NULL)
+    window_value <- function(v) if (is.numeric(v) && !is.na(v)) v else NULL
 
     gpa_min <- input$cr_impact_seq_gpa_min
     gpa_max <- input$cr_impact_seq_gpa_max
     # Both courses by id: the Y picker lists schedule codes, former ones included.
     opt <- list(
       course_x    = cr_course_id(),
-      course_y    = course_id_of(data_objects[["cedar_sections"]], input$cr_impact_seq_course_y,
-                                 "server.R Course Sequence"),
+      course_y    = unique(vapply(input$cr_impact_seq_course_y, course_id_of, character(1),
+                                  tbl = data_objects[["cedar_sections"]],
+                                  caller = "server.R Course Sequence", USE.NAMES = FALSE)),
+      act_min     = window_value(input$cr_impact_seq_act_min),
+      act_max     = window_value(input$cr_impact_seq_act_max),
       min_n       = as.integer(input$cr_impact_seq_min_n %||% 15L),
       hs_gpa_min  = if (!is.na(gpa_min) && is.numeric(gpa_min)) gpa_min else NULL,
       hs_gpa_max  = if (!is.na(gpa_max) && is.numeric(gpa_max)) gpa_max else NULL,
@@ -4406,6 +4412,12 @@ output$enrl_classlist_download <- downloadHandler(
       paste(season, yr)
     }
 
+    y_label <- paste(result$course_y, collapse = " or ")
+    pct_counts <- function(tbl, labels) {
+      tbl %>% dplyr::transmute(
+        !!labels[1] := as.character(.data[[names(tbl)[1]]]),
+        Students = n, `Did not pass` = n_dfw, `DFW %` = round(dfw_pct, 1))
+    }
     tagList(
       # The number first, its arithmetic beside it, the balance verdict after.
       p(class = "cedar-lead", paste(course_sequence_headline(result), collapse = " ")),
@@ -4421,7 +4433,7 @@ output$enrl_classlist_download <- downloadHandler(
           tags$li(
             strong("Treatment"), paste0(" (“passed ", result$course_x, " first”): "),
             "Students who (1) registered for and ", strong("passed"), paste0(" ", result$course_x),
-            " at any point, and (2) later took ", result$course_y, " in a subsequent term. ",
+            " at any point, and (2) later took ", y_label, " in a subsequent term. ",
             "Any gap between the two courses qualifies — consecutive or not. ",
             paste0(result$n_took_x_before_y, " students met this definition across "),
             fmt_term(result$term_range_x[1]), "–", fmt_term(result$term_range_x[2]), ". ",
@@ -4433,9 +4445,9 @@ output$enrl_classlist_download <- downloadHandler(
               paste0("All ", result$n_treatment, " appear in the final comparison.")
           ),
           tags$li(
-            strong("Control"), paste0(" (“took ", result$course_y, " without prior ",
+            strong("Control"), paste0(" (“took ", y_label, " without prior ",
                                       result$course_x, "”): "),
-            paste0("Students who took ", result$course_y, " but had no prior passing record in ",
+            paste0("Students who took ", y_label, " but had no prior passing record in ",
                    result$course_x, ". "),
             paste0(result$n_took_y_without_x, " students across "),
             fmt_term(result$term_range_y[1]), "–", fmt_term(result$term_range_y[2]),
@@ -4446,6 +4458,10 @@ output$enrl_classlist_download <- downloadHandler(
             paste0("Each student contributes once, using their ", result$y_attempt_rule,
                    ". A later retake cannot move a student between groups or overwrite that outcome.")
           ),
+          if (result$n_missing_act_excluded > 0L) tags$li(
+            result$n_missing_act_excluded,
+            " students with no ACT score were excluded because an ACT window was active."
+          ),
           if (result$n_missing_hs_gpa_excluded > 0L) tags$li(
             result$n_missing_hs_gpa_excluded,
             " students with no HS GPA were excluded because a GPA window was active."
@@ -4454,7 +4470,7 @@ output$enrl_classlist_download <- downloadHandler(
       ),
       fluidRow(
         column(6,
-          h5(paste0("Grade Outcomes in ", result$course_y)),
+          h5(paste0("Grade Outcomes in ", y_label)),
           cr_basic_reactable(
             cr_humanize_columns(result$outcomes),
             default_page_size = 10L,
@@ -4486,6 +4502,32 @@ output$enrl_classlist_download <- downloadHandler(
             searchable = FALSE
           )
         )
+      ),
+      dashboard_subsection(
+        "The Comparison Group, by What They Did Before",
+        paste0("The students who took ", y_label, " without a prior pass in ", result$course_x,
+               " are two different groups: those who attempted ", result$course_x,
+               " in an earlier term and did not pass it, and those who never sat it before ", y_label,
+               " (placed past it, brought it in as transfer credit, or skipped it). Each student's one ",
+               y_label, " outcome; an attempt in the same term is not before."),
+        cr_basic_reactable(
+          pct_counts(result$control_split %>% dplyr::mutate(prior_x = dplyr::recode(
+            prior_x,
+            attempted_not_passed = paste0("Attempted ", result$course_x, " earlier, did not pass"),
+            no_prior_attempt = paste0("Never sat ", result$course_x, " before"))), "Comparison students"),
+          default_page_size = 5L, searchable = FALSE)
+      ),
+      if (!is.null(result$by_hs_gpa_band)) dashboard_subsection(
+        "Within High-School GPA Bands",
+        paste0("The same outcome inside each high-school GPA band, so students are read against others who arrived with similar preparation; a student with no GPA on file is their own band. The lead's like-with-like rate weights the comparison group's band rates by the first group's mix, using bands with at least ",
+               result$standardized$min_band_n, " comparison students."),
+        cr_basic_reactable(
+          result$by_hs_gpa_band %>% dplyr::transmute(
+            `HS GPA band` = as.character(band),
+            Group = dplyr::if_else(group == "treatment", paste0("Passed ", result$course_x, " first"),
+                                   "No prior pass"),
+            Students = n, `Did not pass` = n_dfw, `DFW %` = round(dfw_pct, 1)),
+          default_page_size = 10L, searchable = FALSE)
       ),
       hr(),
       h5("Covariate Balance"),
