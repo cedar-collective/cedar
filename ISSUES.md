@@ -89,8 +89,9 @@ Kept until the next release, so a recurrence is recognisable; each entry below g
 
 ## I54 — The Gen Ed list had no second-language area
 
-**Status:** fixed in the file 2026-11-12; in effect on production once
-`cedar_sections` is rebuilt.
+**Status:** fixed in the file 2026-11-12; in effect on production once a
+deploy rebuilds `cedar_sections` (the sections schema version is bumped for
+it).
 **Found:** 2026-11-12, reported in #269 ("Is CEDAR capturing SPAN's gen ed
 enrollment?").
 **Severity:** moderate. `institution/unm/gen_ed_courses.csv` listed areas 1,
@@ -106,8 +107,8 @@ enrollment was right everywhere; only the Gen Ed views missed it.
 count(gen_ed_area)` is all NA.
 **Fix:** the 55 courses the catalog lists for the second-language area, added
 as area 6, "Second Language". All 55 codes appear in `cedar_sections`. The
-transform stamps the area on sections, so the stored area changes when they
-are rebuilt. The projections leave the
+transform stamps the area on sections, so `CEDAR_FACT_SCHEMA_VERSIONS` moves
+sections to 2 and the next deploy rebuilds them. The projections leave the
 area out on purpose (`projection_groups.csv` `exclude_gen_ed_areas`: language
 courses are limited by instructors) and name SPAN 1110 and SPAN 1210 in
 `projection_courses.csv`, so the monitored group goes from 139 courses to

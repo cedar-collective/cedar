@@ -55,7 +55,7 @@ load_file <- function(path, ext) {
 # the app starts, and the derived tables after it. A transform edit that
 # leaves the stored tables alone bumps nothing and costs a deploy nothing. A
 # saved file with no stamp predates stamping (2026-11-11) and is rebuilt once.
-CEDAR_FACT_SCHEMA_VERSIONS <- c(sections = 1L, registrations = 1L, programs = 1L, degrees = 1L)
+CEDAR_FACT_SCHEMA_VERSIONS <- c(sections = 2L, registrations = 1L, programs = 1L, degrees = 1L)
 
 # The transform stage (`--tables`) that builds each fact table.
 CEDAR_FACT_TABLE_STAGES <- c(sections = "sections", registrations = "students",
