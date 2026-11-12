@@ -736,13 +736,21 @@ rebuild_dept_credit_hours_tab <- function(cached, base) {
 #' @param campus_filter Teaching campuses to keep (the page's scope); NULL
 #'   keeps every campus, each its own row.
 #' @param min_n The smallest distinct-student count a unit row shows on its
-#'   own in the latest-term table; smaller rows are pooled as one.
+#'   own in the latest-term table; smaller rows are pooled as one. An outside
+#'   course under it is left out.
+#' @param program_code One or more of the unit's program codes to narrow the
+#'   members to (`meta$programs` lists them); NULL reads every program.
+#' @param n_outside How many outside courses to list per teaching campus.
 #' @return `tables` (`own_share`: per term and campus, the members' students
 #'   and registrations and the share in the unit's own courses; `by_college`:
 #'   per term, campus and teaching college, the share; `latest_units`: the
-#'   latest term's teaching units per campus, small ones pooled), `plots`
+#'   latest term's teaching units per campus, small ones pooled;
+#'   `outside_courses`: the latest term's courses outside the unit that most
+#'   members sit in, per campus, with the share of that term's members and
+#'   the count in the same term a year earlier), `plots`
 #'   (`plot_major_course_units_by_college()`, one per campus) and `meta`.
-compute_dept_course_units_tab <- function(base, data_objects, campus_filter = NULL, min_n = 10L) {
+compute_dept_course_units_tab <- function(base, data_objects, campus_filter = NULL, min_n = 10L,
+                                          program_code = NULL, n_outside = 15L) {
   for (key in c("cedar_student_terms", "cedar_registrations", "cedar_dims", "cedar_edges")) {
     if (is.null(data_objects[[key]])) stop("[dept-trends.R] compute_dept_course_units_tab: data_objects lacks ", key)
   }
@@ -753,10 +761,26 @@ compute_dept_course_units_tab <- function(base, data_objects, campus_filter = NU
   # the display guard is applied once, to the latest-term table.
   result <- get_major_course_units(
     data_objects[["cedar_student_terms"]], data_objects[["cedar_registrations"]],
-    list(dept_code = base$dept_code, campus = campus_filter, min_n = 1L,
+    list(dept_code = base$dept_code, campus = campus_filter, min_n = 1L, program_code = program_code,
          include_in_progress = TRUE, data_edges = data_objects[["cedar_edges"]])
   )
   dims <- data_objects[["cedar_dims"]]
+  # The unit's programs, counted over every member whatever program is chosen.
+  programs <- attr(result, "member_programs")
+  program_names <- name_program_codes(programs$primary_major_code, dims, programs$is_pre_major)
+  programs <- programs %>%
+    group_by(program_code = primary_major_code) %>%
+    summarize(n_students = sum(n_students), .groups = "drop") %>%
+    mutate(program_label = unname(program_names[program_code])) %>%
+    arrange(desc(n_students), program_code)
+  if (!is.null(program_code) && !all(program_code %in% programs$program_code)) {
+    stop("[dept-trends.R] compute_dept_course_units_tab: ", base$dept_code, " has no member in program ",
+         paste(setdiff(program_code, programs$program_code), collapse = ", "))
+  }
+  dept_name <- base$dept_name %||% base$dept_code
+  member_name <- if (is.null(program_code)) dept_name else {
+    paste(programs$program_label[match(program_code, programs$program_code)], collapse = ", ")
+  }
   unit_labels <- unit_names(dims)
   college_labels <- college_code_names(dims)
   no_unit <- "No unit decided"
@@ -816,12 +840,42 @@ compute_dept_course_units_tab <- function(base, data_objects, campus_filter = NU
            n_students, n_registrations, share_of_registrations) %>%
     arrange(campus, desc(is_own_unit), desc(n_registrations))
 
+  # The courses themselves, for the latest term and the same term a year
+  # earlier: the seats another unit's schedule supplies to these majors, and
+  # where two curricula overlap. Same members, same registrations, one grain
+  # down; a course under min_n students is not listed, and a year-earlier
+  # count under it is not shown.
+  courses <- get_major_course_units(
+    data_objects[["cedar_student_terms"]], data_objects[["cedar_registrations"]],
+    list(dept_code = base$dept_code, campus = campus_filter, min_n = 1L, program_code = program_code,
+         grain = "course", term = c(latest, latest - 100L), include_in_progress = TRUE,
+         data_edges = data_objects[["cedar_edges"]])
+  ) %>% filter(!is_own_unit)
+  year_earlier <- courses %>%
+    filter(term == latest - 100L, n_students >= min_n) %>%
+    select(campus, dept_code, subject_course, students_year_earlier = n_students)
+  outside_courses <- courses %>%
+    filter(term == latest, n_students >= min_n) %>%
+    left_join(year_earlier, by = c("campus", "dept_code", "subject_course")) %>%
+    left_join(unit_labels, by = "dept_code") %>%
+    mutate(unit_label = case_when(is.na(dept_code) ~ no_unit, is.na(dept_name) ~ dept_code, TRUE ~ dept_name)) %>%
+    group_by(campus) %>%
+    slice_max(n_students, n = as.integer(n_outside), with_ties = FALSE) %>%
+    ungroup() %>%
+    select(term, campus, in_progress, subject_course, unit_label, dept_code,
+           n_students, share_of_students, students_year_earlier) %>%
+    arrange(campus, desc(n_students), subject_course)
+
   list(
-    tables = list(own_share = own_share, by_college = by_college, latest_units = latest_units),
+    tables = list(own_share = own_share, by_college = by_college, latest_units = latest_units,
+                  outside_courses = outside_courses),
     plots = plot_major_course_units_by_college(by_college),
     meta = list(
       dept_code = base$dept_code,
-      dept_name = base$dept_name %||% base$dept_code,
+      dept_name = dept_name,
+      member_name = member_name,
+      program_code = program_code,
+      programs = programs,
       edge = attr(result, "edge"),
       window_end = window_end,
       latest_term = latest,
@@ -829,7 +883,8 @@ compute_dept_course_units_tab <- function(base, data_objects, campus_filter = NU
       n_members = attr(result, "n_members"),
       n_member_student_terms = attr(result, "n_member_student_terms"),
       n_unmapped = attr(result, "n_unmapped"),
-      min_n = min_n
+      min_n = min_n,
+      n_outside = as.integer(n_outside)
     )
   )
 }
@@ -842,13 +897,13 @@ dept_course_units_headline <- function(payload) {
   meta <- payload$meta
   own <- payload$tables$own_share %>% filter(term == meta$latest_term) %>% arrange(campus)
   if (nrow(own) == 0L) {
-    return(paste0("No enrolled ", meta$dept_name, " major holds a registration to ", fmt_term(meta$window_end), "."))
+    return(paste0("No enrolled ", meta$member_name, " major holds a registration to ", fmt_term(meta$window_end), "."))
   }
   n <- function(x) format(as.integer(x), big.mark = ",", trim = TRUE)
   plural <- function(k, noun) paste0(n(k), " ", noun, if (k == 1) "" else "s")
   pct <- function(x) sprintf("%.1f%%", 100 * x)
   stale <- if (meta$latest_term < meta$window_end) {
-    paste0("No enrolled ", meta$dept_name, " major holds a registration after ", fmt_term(meta$latest_term),
+    paste0("No enrolled ", meta$member_name, " major holds a registration after ", fmt_term(meta$latest_term),
            "; the data runs to ", fmt_term(meta$window_end), ", so that is the latest term read here.")
   }
   c(stale, vapply(seq_len(nrow(own)), function(i) {
@@ -859,7 +914,7 @@ dept_course_units_headline <- function(payload) {
       head(3)
     paste0(
       "In ", fmt_term(o$term), if (isTRUE(o$in_progress)) " (in progress)" else "", ", ",
-      plural(o$students, paste(meta$dept_name, "major")), " held ", plural(o$registrations, "registration"),
+      plural(o$students, paste(meta$member_name, "major")), " held ", plural(o$registrations, "registration"),
       " in courses taught on ", o$campus, "; ", pct(o$own_share),
       " were in the unit's own courses",
       if (nrow(others) > 0L) {

@@ -52,6 +52,54 @@ test_that("ST01: HIST majors' registrations by teaching unit, late drops in, dup
   expect_equal(nrow(attr(res, "suppressed")), 0L)
 })
 
+test_that("ST01: the course grain is the same registrations one level down, with the share of members", {
+  res <- get_major_course_units(test_student_terms_st, test_students_st,
+                                list(dept_code = "HIST", min_n = 1L, grain = "course", data_edges = st01_edges))
+  expect_equal(names(res), c("term", "campus", "college", "dept_code", "subject_course", "is_own_unit",
+                             "in_progress", "n_registrations", "n_students", "term_registrations",
+                             "term_students", "share_of_registrations", "share_of_students"))
+  expect_equal(res$term, c(202010L, 202010L, 202010L, 202110L))
+  expect_equal(res$subject_course, c("HIST 1110", "ENGL 1110", "MATH 1215", "HIST 1110"))
+  expect_equal(res$dept_code, c("HIST", "ENGL", "MATH", "HIST"))
+  expect_equal(res$n_students, c(8L, 1L, 1L, 1L))
+  # The totals are the term and campus's, as at the unit grain.
+  expect_equal(res$term_students, c(8L, 8L, 8L, 1L))
+  expect_equal(res$share_of_students, c(1, 0.125, 0.125, 1))
+
+  sup <- attr(get_major_course_units(test_student_terms_st, test_students_st,
+                                     list(dept_code = "HIST", min_n = 2L, grain = "course",
+                                          data_edges = st01_edges)), "suppressed")
+  expect_equal(sup$subject_course, c("ENGL 1110", "MATH 1215", "HIST 1110"))
+
+  expect_error(get_major_course_units(test_student_terms_st, test_students_st,
+                                      list(dept_code = "HIST", grain = "section", data_edges = st01_edges)),
+               "grain")
+})
+
+test_that("MC02: two courses of one unit are two rows at the course grain, each with its own students", {
+  res <- get_major_course_units(test_student_terms_mc, test_students_mc,
+                                list(dept_code = "SPAN", min_n = 1L, grain = "course", data_edges = mc02_edges))
+  first <- res %>% filter(term == 202010L)
+  expect_equal(first$campus, c("ABQ", "ABQ", "GA"))
+  expect_equal(first$subject_course, c("SPAN 101", "SPAN 101L", "SPAN 101"))
+  expect_equal(first$n_students, c(4L, 2L, 2L))
+  expect_equal(first$share_of_students, c(1, 0.5, 1))
+})
+
+test_that("member_programs lists the unit's programs before program_code narrows the members", {
+  all_programs <- get_major_course_units(test_student_terms_st, test_students_st,
+                                         list(dept_code = "HIST", min_n = 1L, data_edges = st01_edges))
+  expect_equal(attr(all_programs, "member_programs"),
+               tibble::tibble(primary_major_code = "HIST", is_pre_major = FALSE, n_students = 9L))
+  # A program the unit does not hold leaves no member, and the list is unchanged.
+  none <- get_major_course_units(test_student_terms_st, test_students_st,
+                                 list(dept_code = "HIST", min_n = 1L, program_code = "SPAN",
+                                      data_edges = st01_edges))
+  expect_equal(nrow(none), 0L)
+  expect_equal(attr(none, "n_members"), 0L)
+  expect_equal(attr(none, "member_programs"), attr(all_programs, "member_programs"))
+})
+
 test_that("ST01: min_n suppresses unit rows and leaves the term totals alone", {
   res <- get_major_course_units(test_student_terms_st, test_students_st,
                                 list(dept_code = "HIST", min_n = 2L, data_edges = st01_edges))

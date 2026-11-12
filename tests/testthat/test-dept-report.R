@@ -480,7 +480,12 @@ test_that("compute_dept_course_units_tab reads the majors' teaching units and po
   base <- list(dept_code = "HIST", dept_name = "History")
 
   result <- compute_dept_course_units_tab(base, data_objects, min_n = 1L)
-  expect_equal(names(result$tables), c("own_share", "by_college", "latest_units"))
+  expect_equal(names(result$tables), c("own_share", "by_college", "latest_units", "outside_courses"))
+  # The latest term (202110) holds one member, in HIST 1110: no outside course.
+  expect_equal(nrow(result$tables$outside_courses), 0L)
+  expect_equal(result$meta$programs$program_code, "HIST")
+  expect_equal(result$meta$programs$n_students, 9L)
+  expect_equal(result$meta$member_name, "History")
   own <- result$tables$own_share
   expect_true(nrow(own) > 0)
   expect_true(all(own$own_share >= 0 & own$own_share <= 1))
@@ -513,6 +518,38 @@ test_that("compute_dept_course_units_tab reads the majors' teaching units and po
   expect_equal(later$meta$latest_term, 202110L)
   expect_equal(later$tables$latest_units, result$tables$latest_units, ignore_attr = TRUE)
   expect_snapshot(cat(dept_course_units_headline(later), sep = "\n"))
+
+  # Top outside courses. Give ST_I, the one member in 202110, the ENGL 1110
+  # seat ST_H held a year earlier: the latest term then has one outside
+  # course, one of one members in it, against one a year earlier. MATH 1215
+  # (202010 only) is not in the latest term and is not listed.
+  data_objects$cedar_edges <- list(last_enrolled = 202110L, last_enrolled_complete = 202110L,
+                                   last_graded = 202110L)
+  engl <- test_students_st %>% dplyr::filter(student_id == "ST_H", subject_course == "ENGL 1110")
+  expect_equal(nrow(engl), 1L)
+  data_objects$cedar_registrations <- dplyr::bind_rows(
+    test_students_st, engl %>% dplyr::mutate(student_id = "ST_I", term = 202110L))
+  outside <- compute_dept_course_units_tab(base, data_objects, min_n = 1L)$tables$outside_courses
+  expect_equal(names(outside), c("term", "campus", "in_progress", "subject_course", "unit_label", "dept_code",
+                                 "n_students", "share_of_students", "students_year_earlier"))
+  expect_equal(outside$term, 202110L)
+  expect_equal(outside$subject_course, "ENGL 1110")
+  expect_equal(outside$dept_code, "ENGL")
+  expect_equal(outside$n_students, 1L)
+  expect_equal(outside$share_of_students, 1)
+  expect_equal(outside$students_year_earlier, 1L)
+  # The guard drops a course under it, and n_outside caps the list per campus.
+  expect_equal(nrow(compute_dept_course_units_tab(base, data_objects, min_n = 2L)$tables$outside_courses), 0L)
+  expect_equal(nrow(compute_dept_course_units_tab(base, data_objects, min_n = 1L,
+                                                  n_outside = 0L)$tables$outside_courses), 0L)
+
+  # One program of the unit: the same payload under that program's name, and
+  # a program the unit does not hold is an error, never an empty page.
+  one <- compute_dept_course_units_tab(base, data_objects, min_n = 1L, program_code = "HIST")
+  expect_equal(one$meta$program_code, "HIST")
+  expect_equal(one$tables$outside_courses, outside)
+  expect_snapshot(cat(dept_course_units_headline(one), sep = "\n"))
+  expect_error(compute_dept_course_units_tab(base, data_objects, program_code = "SPAN"), "no member in program")
 
   expect_error(compute_dept_course_units_tab(list(), data_objects), "dept_code")
   expect_error(compute_dept_course_units_tab(base, data_objects[setdiff(names(data_objects), "cedar_student_terms")]),

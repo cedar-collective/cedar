@@ -8,7 +8,7 @@ parent: Developer Guide
 
 This reference is auto-generated from roxygen2 comments in the source code.
 
-*Generated: 2026-11-11 16:24:18.612222*
+*Generated: 2026-11-11 17:28:35.685899*
 
 ---
 
@@ -3732,9 +3732,9 @@ Courses students were taking in the term before a major switch appeared  Answers
 
 - `student_terms` - `cedar_student_terms`, with its units attached (`primary_dept_code`).
 - `registrations` - `cedar_registrations`, with its units attached (`department`, `college`).
-- `opt` - `dept_code` (the major's unit; required), `program_code` (one or more program codes to narrow the members to; default every program of the unit), `include_pre_majors` (default TRUE), `term` (terms to keep; default every term to the edge), `campus` (teaching campuses to keep; NULL keeps every campus, each its own row), `min_n` (the smallest distinct-student count a unit row needs; default 10), `include_in_progress` (default FALSE), `data_edges` (`cedar_data_edges()` output, required).
+- `opt` - `dept_code` (the major's unit; required), `program_code` (one or more program codes to narrow the members to; default every program of the unit), `include_pre_majors` (default TRUE), `term` (terms to keep; default every term to the edge), `campus` (teaching campuses to keep; NULL keeps every campus, each its own row), `min_n` (the smallest distinct-student count a unit row needs; default 10), `include_in_progress` (default FALSE), `grain` (`"unit"`, the default, or `"course"`: one row per course under its teaching unit, with `subject_course` and `share_of_students`, `n_students / term_students`), `data_edges` (`cedar_data_edges()` output, required).
 
-**Returns:** One row per `term`, `campus`, `college` and `dept_code` (the teaching unit; NA for a subject with no mapping row), with `is_own_unit`, `in_progress`, `n_registrations` (distinct student × course), `n_students` (distinct students), `term_registrations` and `term_students` (the same over every unit in that term and campus) and `share_of_registrations` (`n_registrations / term_registrations`). Attributes: `edge` (the settled term the rows stop at), `latest_term` (the last term included), `n_member_student_terms`, `n_members` (distinct students), `n_unmapped` (member registrations whose subject has no unit), `suppressed` (the unit rows under `min_n`, as a tibble of `term`, `campus`, `dept_code`, `n_students`).
+**Returns:** One row per `term`, `campus`, `college` and `dept_code` (the teaching unit; NA for a subject with no mapping row), with `is_own_unit`, `in_progress`, `n_registrations` (distinct student × course), `n_students` (distinct students), `term_registrations` and `term_students` (the same over every unit in that term and campus) and `share_of_registrations` (`n_registrations / term_registrations`). Attributes: `edge` (the settled term the rows stop at), `latest_term` (the last term included), `n_member_student_terms`, `n_members` (distinct students), `member_programs` (the unit's members before `program_code` narrows them: `primary_major_code`, `is_pre_major`, `n_students`), `n_unmapped` (member registrations whose subject has no unit), `suppressed` (the unit rows under `min_n`, as a tibble of `term`, `campus`, `dept_code`, `n_students`).
 
 ---
 
