@@ -1315,7 +1315,9 @@ CEDAR_COVARIATE_LABELS <- c(
 #' @return Character vector of sentences: the two groups' DFW rates with their
 #'   counts, then the balance verdict (how many measured covariates differ
 #'   substantially, and the one that differs most), then, when a GPA band
-#'   was active, how many students had no HS GPA and were left out.
+#'   was active, how many students had no HS GPA and were left out. With an
+#'   applicants table, a sentence between them gives the gap inside the same
+#'   high-school GPA bands (`result$standardized`).
 course_sequence_headline <- function(result) {
   required <- c("course_x", "course_y", "outcomes", "balance", "n_treatment", "n_control")
   missing <- setdiff(required, names(result))
@@ -1324,6 +1326,7 @@ course_sequence_headline <- function(result) {
          call. = FALSE)
   }
   outcomes <- result$outcomes
+  course_y <- paste(result$course_y, collapse = " or ")
   rate <- function(group) {
     rows <- outcomes[outcomes$group == group, , drop = FALSE]
     total <- sum(rows$n)
@@ -1340,9 +1343,9 @@ course_sequence_headline <- function(result) {
   direction <- if (abs(gap) < 0.05) "the same rate" else if (gap > 0) "a higher rate" else "a lower rate"
 
   rates <- paste0(
-    "Students who passed ", result$course_x, " before ", result$course_y, " did not pass ",
-    result$course_y, " ", fmt_pct(t$pct), " of the time (", fmt_n(t$dfw), " of ", fmt_n(t$total),
-    "); students who took ", result$course_y, " without a prior pass in ", result$course_x, ", ",
+    "Students who passed ", result$course_x, " before ", course_y, " did not pass ",
+    course_y, " ", fmt_pct(t$pct), " of the time (", fmt_n(t$dfw), " of ", fmt_n(t$total),
+    "); students who took ", course_y, " without a prior pass in ", result$course_x, ", ",
     fmt_pct(c$pct), " (", fmt_n(c$dfw), " of ", fmt_n(c$total), "): ", direction,
     if (direction == "the same rate") "." else paste0(", by ", sprintf("%.1f", abs(gap)), " points.")
   )
@@ -1372,6 +1375,28 @@ course_sequence_headline <- function(result) {
   }
 
   sentences <- c(rates, verdict)
+  # The like-with-like reading: the first group against students of the same
+  # high-school GPA band who took the other path.
+  std <- result$standardized
+  if (!is.null(std) && std$n_treatment_covered > 0L) {
+    adj <- std$actual_dfw_pct - std$expected_dfw_pct
+    sentences <- c(sentences, paste0(
+      "Within the same high-school GPA bands, students without the prior pass did not pass ",
+      fmt_pct(std$expected_dfw_pct), " of the time against ", fmt_pct(std$actual_dfw_pct),
+      " for the ", fmt_n(std$n_treatment_covered), " who passed ", result$course_x, " first: ",
+      if (abs(adj) < 0.05) "no gap" else paste0("a gap of ", sprintf("%.1f", abs(adj)), " points"),
+      " once the two groups have the same GPA mix",
+      if (std$n_treatment_left_out > 0L) paste0(" (", fmt_n(std$n_treatment_left_out),
+        " in a band with fewer than ", std$min_band_n, " comparison students are left out)") else "",
+      "."
+    ))
+  }
+  if (isTRUE(result$n_missing_act_excluded > 0L)) {
+    sentences <- c(sentences, paste0(
+      fmt_n(result$n_missing_act_excluded),
+      " students with no ACT score were left out because an ACT range was active."
+    ))
+  }
   if (isTRUE(result$n_missing_hs_gpa_excluded > 0L)) {
     sentences <- c(sentences, paste0(
       fmt_n(result$n_missing_hs_gpa_excluded),

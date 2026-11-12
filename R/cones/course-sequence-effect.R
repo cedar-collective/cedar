@@ -87,6 +87,50 @@
 
 
 
+# High-school GPA bands for the within-band comparison. A missing GPA is its
+# own band, never dropped: who has no GPA on file is not random.
+SEQUENCE_HS_GPA_BREAKS <- c(2.75, 3.25, 3.75)
+SEQUENCE_HS_GPA_BANDS  <- c("2.75 or lower", "2.76 to 3.25", "3.26 to 3.75", "above 3.75", "not on file")
+.hs_gpa_band <- function(gpa) {
+  band <- SEQUENCE_HS_GPA_BANDS[findInterval(gpa, SEQUENCE_HS_GPA_BREAKS, left.open = TRUE) + 1L]
+  factor(if_else(is.na(gpa), "not on file", band), levels = SEQUENCE_HS_GPA_BANDS)
+}
+
+# The two groups' Y outcomes inside each high-school GPA band, and the DFW
+# rate the treatment group would have had at the control group's band rates
+# (direct standardization to the treatment group's mix). A band whose control
+# group is under `min_band_n` supplies no rate: its treatment students are
+# left out of both sides of the standardized comparison and counted.
+.sequence_band_comparison <- function(groups, y_outcomes, min_band_n) {
+  rows <- groups %>%
+    transmute(student_id, group, band = .hs_gpa_band(high_school_cum_gpa)) %>%
+    inner_join(y_outcomes, by = "student_id")
+  by_band <- rows %>%
+    group_by(band, group) %>%
+    summarize(n = n(), n_dfw = sum(y_outcome == "dfw"), .groups = "drop") %>%
+    mutate(dfw_pct = 100 * n_dfw / n) %>%
+    arrange(band, desc(group))
+  wide <- by_band %>%
+    select(band, group, n, n_dfw) %>%
+    tidyr::pivot_wider(names_from = group, values_from = c(n, n_dfw), values_fill = 0L)
+  for (col in c("n_treatment", "n_control", "n_dfw_treatment", "n_dfw_control")) {
+    if (!col %in% names(wide)) wide[[col]] <- 0L
+  }
+  usable <- wide %>% filter(n_treatment > 0L, n_control >= min_band_n)
+  n_covered <- sum(usable$n_treatment)
+  standardized <- list(
+    n_treatment_covered  = n_covered,
+    n_treatment_left_out = sum(wide$n_treatment) - n_covered,
+    bands_used           = as.character(usable$band),
+    min_band_n           = min_band_n,
+    actual_dfw_pct       = if (n_covered > 0L) 100 * sum(usable$n_dfw_treatment) / n_covered else NA_real_,
+    expected_dfw_pct     = if (n_covered > 0L) {
+      100 * sum(usable$n_treatment * usable$n_dfw_control / usable$n_control) / n_covered
+    } else NA_real_
+  )
+  list(by_band = by_band, standardized = standardized)
+}
+
 # ── Course Sequence Effect ────────────────────────────────────────────────────
 
 #' Course Sequence Effect
@@ -107,10 +151,17 @@
 #' @param opt Named list:
 #'   \describe{
 #'     \item{course_x}{Character. The preparatory course. Required.}
-#'     \item{course_y}{Character. The outcome course. Required.}
+#'     \item{course_y}{Character. The outcome course, or several codes read as
+#'       one course (a course and its modular or stretch forms): a student's
+#'       outcome is their earliest attempt of any of them. Required.}
 #'     \item{campus}{Character vector. Optional campus filter.}
 #'     \item{min_n}{Integer. Minimum students per group (default 15).}
 #'     \item{filters}{Named list of covariate equality filters. Optional.}
+#'     \item{hs_gpa_min, hs_gpa_max, act_min, act_max}{Optional windows on
+#'       high-school GPA and ACT composite; a student with no value is left
+#'       out while a window on it is active, and counted.}
+#'     \item{min_band_n}{Smallest control group a high-school GPA band needs
+#'       to supply a rate to the standardized comparison (default 10).}
 #'   }
 #'
 #' @return Named list:
@@ -120,6 +171,18 @@
 #'     \item{group_profile}{Compact covariate summary per group.}
 #'     \item{balance}{From compute_balance().}
 #'     \item{n_treatment, n_control}{Group sizes.}
+#'     \item{control_split}{The control group by what they did in X before Y:
+#'       `prior_x` (`attempted_not_passed`: a classified X attempt strictly
+#'       before Y, none passed; `no_prior_attempt`), `n`, `n_dfw`, `dfw_pct`.}
+#'     \item{by_hs_gpa_band}{Per high-school GPA band and group: `n`, `n_dfw`,
+#'       `dfw_pct`; NULL without an applicants table.}
+#'     \item{standardized}{The treatment group's actual DFW rate against the
+#'       rate expected at the control group's rate in each band
+#'       (`actual_dfw_pct`, `expected_dfw_pct`, `n_treatment_covered`,
+#'       `n_treatment_left_out`, `bands_used`, `min_band_n`); NULL without an
+#'       applicants table.}
+#'     \item{n_missing_hs_gpa_excluded, n_missing_act_excluded}{Students left
+#'       out by an active window for having no value.}
 #'   }
 get_course_sequence_effect <- function(students, attempts, programs, applicants = NULL,
                                        opt = list(), student_terms = NULL,
@@ -137,7 +200,9 @@ get_course_sequence_effect <- function(students, attempts, programs, applicants 
     stop("[course-sequence-effect.R] No complete term with sufficiently complete grades is available.")
   }
 
-  message("[course-sequence-effect.R] get_course_sequence_effect: ", course_x, " → ", course_y)
+  y_label <- paste(course_y, collapse = " or ")
+  min_band_n <- as.integer(opt$min_band_n %||% 10L)
+  message("[course-sequence-effect.R] get_course_sequence_effect: ", course_x, " → ", y_label)
 
   # Apply the delivery-campus scope once, before deriving either side of the
   # sequence. Otherwise an excluded-campus X pass can relabel an in-scope Y
@@ -165,7 +230,7 @@ get_course_sequence_effect <- function(students, attempts, programs, applicants 
     rename(term_y = term)
 
   if (nrow(took_y) == 0)
-    stop("[course-sequence-effect.R] No students found for course_y: ", course_y)
+    stop("[course-sequence-effect.R] No students found for course_y: ", y_label)
 
   # When did each student first pass X inside the same campus and grade edge?
   passed_x <- scoped %>%
@@ -193,11 +258,11 @@ get_course_sequence_effect <- function(students, attempts, programs, applicants 
   )
   term_range_y <- range(took_y$term_y)
 
-  message("[course-sequence-effect.R]   Took ", course_x, " before ", course_y, ": ",
+  message("[course-sequence-effect.R]   Took ", course_x, " before ", y_label, ": ",
           length(treatment_ids), " students")
   message("[course-sequence-effect.R]   ", course_x, " offered: ", term_range_x[1], "–", term_range_x[2])
-  message("[course-sequence-effect.R]   ", course_y, " offered: ", term_range_y[1], "–", term_range_y[2])
-  message("[course-sequence-effect.R]   Took ", course_y, " without prior ", course_x, ": ",
+  message("[course-sequence-effect.R]   ", y_label, " offered: ", term_range_y[1], "–", term_range_y[2])
+  message("[course-sequence-effect.R]   Took ", y_label, " without prior ", course_x, ": ",
           length(pool_ids), " students")
   message("[course-sequence-effect.R]   Note: treatment requires passing (not just taking) ", course_x)
 
@@ -251,6 +316,24 @@ get_course_sequence_effect <- function(students, attempts, programs, applicants 
     }
   }
 
+  # ── ACT band filter ──────────────────────────────────────────────────────────
+  # The placement measure, beside the GPA window. ACT is on file for a
+  # minority of students at a test-optional institution, so the count left
+  # out for having none is reported and is often most of the pool.
+  act_min <- opt$act_min
+  act_max <- opt$act_max
+  n_missing_act_excluded <- 0L
+  if (!is.null(act_min) || !is.null(act_max)) {
+    if (!"unm_act_combined_score" %in% names(groups)) {
+      stop("[course-sequence-effect.R] An ACT window needs the applicants table's ",
+           "unm_act_combined_score, which the comparison does not carry.")
+    }
+    n_missing_act_excluded <- sum(is.na(groups$unm_act_combined_score))
+    groups <- filter(groups, !is.na(unm_act_combined_score))
+    if (!is.null(act_min)) groups <- filter(groups, unm_act_combined_score >= act_min)
+    if (!is.null(act_max)) groups <- filter(groups, unm_act_combined_score <= act_max)
+  }
+
   filters <- opt$filters %||% list()
   if (length(filters) > 0)
     groups <- .apply_covariate_filters(groups, filters)
@@ -261,7 +344,8 @@ get_course_sequence_effect <- function(students, attempts, programs, applicants 
     stop("[course-sequence-effect.R] Groups too small after filtering (treatment=", n_t,
          ", control=", n_c, ", min_n=", min_n, ").")
 
-  if (!is.null(hs_gpa_min) || !is.null(hs_gpa_max) || length(filters) > 0) {
+  if (!is.null(hs_gpa_min) || !is.null(hs_gpa_max) || !is.null(act_min) || !is.null(act_max) ||
+      length(filters) > 0) {
     comparison$balance     <- compute_balance(groups)
     comparison$n_treatment <- n_t
     comparison$n_control   <- n_c
@@ -278,6 +362,27 @@ get_course_sequence_effect <- function(students, attempts, programs, applicants 
     mutate(pct = round(100 * n / sum(n), 1)) %>%
     ungroup()
 
+  # The control group is two different kinds of student: those who tried X
+  # before Y and did not pass it, and those who never sat X before Y (placed
+  # past it, transferred it in, or skipped it). Strictly earlier only: an X
+  # attempt in Y's own term is not "before".
+  tried_x <- scoped %>%
+    filter(subject_course %in% course_x) %>%
+    inner_join(took_y %>% select(student_id, term_y), by = "student_id") %>%
+    filter(term < term_y) %>%
+    distinct(student_id)
+  final <- sequence_data %>% filter(student_id %in% groups$student_id)
+  control_split <- final %>%
+    filter(group == "control") %>%
+    mutate(prior_x = if_else(student_id %in% tried_x$student_id, "attempted_not_passed", "no_prior_attempt")) %>%
+    group_by(prior_x) %>%
+    summarize(n = n(), n_dfw = sum(y_outcome == "dfw"), .groups = "drop") %>%
+    mutate(dfw_pct = 100 * n_dfw / n)
+
+  bands <- if ("high_school_cum_gpa" %in% names(groups)) {
+    .sequence_band_comparison(groups, final %>% select(student_id, y_outcome), min_band_n)
+  } else list(by_band = NULL, standardized = NULL)
+
   message("[course-sequence-effect.R]   Sequence effect computed. Done.")
 
   list(
@@ -292,6 +397,10 @@ get_course_sequence_effect <- function(students, attempts, programs, applicants 
     n_took_y_without_x      = length(pool_ids),
     n_dropped_by_programs   = n_dropped_by_programs,
     n_missing_hs_gpa_excluded = n_missing_hs_gpa_excluded,
+    n_missing_act_excluded  = n_missing_act_excluded,
+    control_split           = control_split,
+    by_hs_gpa_band          = bands$by_band,
+    standardized            = bands$standardized,
     y_attempt_rule          = "earliest classifiable in-scope Y attempt per student",
     term_range_x            = term_range_x,
     term_range_y            = term_range_y,
