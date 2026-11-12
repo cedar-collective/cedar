@@ -82,6 +82,7 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
     ch_data   <- reactiveVal(NULL)
     demo_data <- reactiveVal(NULL)
     mcu_data  <- reactiveVal(NULL)   # Courses Taken; computed on open, never cached
+    mcu_programs <- reactiveVal(NULL) # the unit's programs, for the tab's picker
     last_request <- reactiveVal(NULL)
 
     # The department and campus this page actually ran with, committed by
@@ -248,6 +249,7 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
       ch_data(NULL)
       demo_data(NULL)
       mcu_data(NULL)
+      mcu_programs(NULL)
 
       signal_load_start(session, ns("dept_report"))
       timer <- start_report_timer("dept_report", list(department = dept))
@@ -354,13 +356,14 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
     }, ignoreInit = TRUE)
 
     # Courses Taken computes when its tab is opened, once per committed scope
-    # (0.4 s over the full class list), so it is not preloaded or cached.
-    observeEvent(input$tabs, {
-      req(identical(input$tabs, "Courses Taken"), is.null(mcu_data()))
+    # (under a second over the full class list), so it is not preloaded or
+    # cached; choosing one of the unit's programs computes it again.
+    load_mcu <- function(program_code = NULL) {
       base <- dept_data()
       req(base)
       tryCatch({
-        payload <- compute_dept_course_units_tab(base, data_objects, active_scope()$campus)
+        payload <- compute_dept_course_units_tab(base, data_objects, active_scope()$campus,
+                                                 program_code = program_code)
         for (cmp in names(payload$plots)) local({
           campus_key <- cmp
           output[[paste0("mcu_college_share_", campus_key)]] <- renderPlotly({
@@ -378,7 +381,29 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
                            type = "error", duration = 8)
         }
       })
+    }
+    observeEvent(input$tabs, {
+      req(identical(input$tabs, "Courses Taken"), is.null(mcu_data()))
+      load_mcu()
+      data <- mcu_data()
+      if (!is.null(data)) mcu_programs(data$meta$programs)
     }, ignoreInit = TRUE)
+    observeEvent(input$mcu_program, {
+      req(!is.null(mcu_data()))
+      chosen <- if (nzchar(input$mcu_program)) input$mcu_program else NULL
+      if (!identical(chosen, mcu_data()$meta$program_code)) load_mcu(chosen)
+    }, ignoreInit = TRUE)
+
+    # The picker is drawn once per scope, from the programs of the first
+    # load, so recomputing for a program does not redraw and reset it.
+    output$mcu_controls <- renderUI({
+      programs <- mcu_programs()
+      if (is.null(programs) || nrow(programs) < 2L) return(NULL)
+      choices <- c(stats::setNames("", "All programs"),
+                   stats::setNames(programs$program_code,
+                                   paste0(programs$program_label, " (", programs$program_code, ")")))
+      selectInput(ns("mcu_program"), "Program", choices = choices, selected = "")
+    })
 
     output$mcu_body <- renderUI({
       data <- mcu_data()
@@ -393,8 +418,10 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
           div(class = "alert alert-info", tags$strong("Data window: "),
               cedar_longitudinal_edge_note(data_objects[["cedar_edges"]], grade_dependent = FALSE)),
           tags$ul(class = "mb-0",
-            tags$li("A member is an enrolled student-term whose primary major belongs to ", meta$dept_name,
-                    " (pre-majors included): ", n(meta$n_members), " students over ",
+            tags$li("A member is an enrolled student-term whose primary major ",
+                    if (is.null(meta$program_code)) paste0("belongs to ", meta$dept_name, " (pre-majors included)")
+                    else paste0("is ", meta$member_name, ", a program of ", meta$dept_name),
+                    ": ", n(meta$n_members), " students over ",
                     n(meta$n_member_student_terms), " student-terms."),
             tags$li("A registration is a member's class-list row registered at the pull or withdrawn late; early drops and waitlist rows are not course-taking. Each student and course counts once per term and teaching campus."),
             tags$li("The teaching unit is the subject's unit in the mapping files; ", n(meta$n_unmapped),
@@ -416,6 +443,16 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
           paste0("Teaching Units, ", fmt_term(meta$latest_term)),
           "Every unit that taught this department's majors in the latest term, by teaching campus, with its share of their registrations; the department's own row first.",
           reactable::reactableOutput(ns("mcu_units_table"))
+        ),
+        dashboard_subsection(
+          paste0("Top Outside Courses, ", fmt_term(meta$latest_term)),
+          paste0("The courses outside the department's own unit that the most of these majors sit in during the latest term, by teaching campus, with the share of that term's majors and the count in the same term a year earlier: the seats another unit's schedule supplies, and where two curricula overlap. Up to ",
+                 meta$n_outside, " per campus; a course or a year-earlier count under ", meta$min_n, " students is not shown."),
+          if (nrow(data$tables$outside_courses) == 0L) {
+            empty_state(paste0("No outside course has ", meta$min_n, " or more of these majors in ", fmt_term(meta$latest_term), "."))
+          } else {
+            reactable::reactableOutput(ns("mcu_outside_table"))
+          }
         ),
         dashboard_subsection(
           "Own-Unit Share by Term",
@@ -444,6 +481,25 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
           n_students = cedar_count_coldef("Students"),
           n_registrations = cedar_count_coldef("Registrations"),
           share_of_registrations = cedar_percent_coldef("Share")
+        )
+      )
+    })
+
+    output$mcu_outside_table <- reactable::renderReactable({
+      data <- mcu_data()
+      req(data, nrow(data$tables$outside_courses) > 0L)
+      display <- data$tables$outside_courses %>%
+        dplyr::transmute(campus, subject_course, unit_label, n_students, share_of_students, students_year_earlier)
+      reactable::reactable(
+        display, theme = cedar_tbl_theme, compact = TRUE, striped = TRUE, highlight = TRUE,
+        searchable = TRUE, defaultPageSize = 15, showPageSizeOptions = TRUE, pageSizeOptions = c(15, 30, 100),
+        columns = list(
+          campus = reactable::colDef(name = "Campus", maxWidth = 90),
+          subject_course = reactable::colDef(name = "Course", minWidth = 110),
+          unit_label = reactable::colDef(name = "Teaching unit", minWidth = 200),
+          n_students = cedar_count_coldef("Majors in it"),
+          share_of_students = cedar_percent_coldef("Share of majors"),
+          students_year_earlier = cedar_count_coldef("A year earlier")
         )
       )
     })
@@ -1385,6 +1441,7 @@ deptTrendsCourseUnitsUI <- function(ns) {
       "Which units teach the courses this department's majors take: for each term and teaching campus, every enrolled major's registrations split by the unit that taught the course, with the share in the department's own courses. ",
       "The inverse of Students Served on the Credit Hours tab, which asks whose majors fill this department's seats."
     ),
+    uiOutput(ns("mcu_controls")),
     uiOutput(ns("mcu_body"))
   )
 }

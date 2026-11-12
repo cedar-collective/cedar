@@ -29,6 +29,11 @@
 # opt$include_in_progress, terms up to last_enrolled are added and marked
 # `in_progress`, the right-edge policy's labelled current registration.
 #
+# opt$grain = "course" answers the same question one level down: the rows
+# are the courses themselves, each under its teaching unit, with the share of
+# the term and campus's members who sat in it. The members, the
+# registrations and every total are the same; only the grouping is finer.
+#
 # This is a filter and a join over two tables (ADR-001): the cone counts
 # nothing a table already holds.
 #
@@ -48,8 +53,10 @@
 #'   keep; default every term to the edge), `campus` (teaching campuses to
 #'   keep; NULL keeps every campus, each its own row), `min_n` (the smallest
 #'   distinct-student count a unit row needs; default 10),
-#'   `include_in_progress` (default FALSE), `data_edges`
-#'   (`cedar_data_edges()` output, required).
+#'   `include_in_progress` (default FALSE), `grain` (`"unit"`, the default,
+#'   or `"course"`: one row per course under its teaching unit, with
+#'   `subject_course` and `share_of_students`, `n_students / term_students`),
+#'   `data_edges` (`cedar_data_edges()` output, required).
 #' @return One row per `term`, `campus`, `college` and `dept_code` (the
 #'   teaching unit; NA for a subject with no mapping row), with
 #'   `is_own_unit`, `in_progress`, `n_registrations` (distinct student ×
@@ -58,7 +65,9 @@
 #'   `share_of_registrations` (`n_registrations / term_registrations`).
 #'   Attributes: `edge` (the settled term the rows stop at), `latest_term`
 #'   (the last term included), `n_member_student_terms`, `n_members`
-#'   (distinct students), `n_unmapped` (member registrations whose subject
+#'   (distinct students), `member_programs` (the unit's members before
+#'   `program_code` narrows them: `primary_major_code`, `is_pre_major`,
+#'   `n_students`), `n_unmapped` (member registrations whose subject
 #'   has no unit), `suppressed` (the unit rows under `min_n`, as a tibble of
 #'   `term`, `campus`, `dept_code`, `n_students`).
 get_major_course_units <- function(student_terms, registrations, opt = list()) {
@@ -83,6 +92,10 @@ get_major_course_units <- function(student_terms, registrations, opt = list()) {
   include_pre_majors  <- isTRUE(opt$include_pre_majors %||% TRUE)
   include_in_progress <- isTRUE(opt$include_in_progress %||% FALSE)
   min_n <- as.integer(opt$min_n %||% 10L)
+  grain <- opt$grain %||% "unit"
+  if (!grain %in% c("unit", "course")) {
+    stop("[major-course-units.R] opt$grain must be \"unit\" or \"course\", not ", grain, call. = FALSE)
+  }
 
   edge <- cedar_longitudinal_edge(opt$data_edges)
   if (is.null(edge)) {
@@ -103,8 +116,13 @@ get_major_course_units <- function(student_terms, registrations, opt = list()) {
   members <- student_terms %>%
     filter(enrolled, !is.na(primary_dept_code), primary_dept_code == dept_code, term <= latest)
   if (!include_pre_majors) members <- members %>% filter(!is_pre_major %in% TRUE)
-  if (!is.null(opt$program_code)) members <- members %>% filter(primary_major_code %in% opt$program_code)
   if (!is.null(opt$term)) members <- members %>% filter(term %in% as.integer(opt$term))
+  # The programs a caller may narrow to, counted before it does.
+  member_programs <- members %>%
+    group_by(primary_major_code, is_pre_major = is_pre_major %in% TRUE) %>%
+    summarize(n_students = n_distinct(student_id), .groups = "drop") %>%
+    arrange(desc(n_students), primary_major_code)
+  if (!is.null(opt$program_code)) members <- members %>% filter(primary_major_code %in% opt$program_code)
   members <- members %>% distinct(student_id, term)
   cedar_debug("[major-course-units.R] ", nrow(members), " member student-terms of ", dept_code,
               " to ", latest)
@@ -124,7 +142,9 @@ get_major_course_units <- function(student_terms, registrations, opt = list()) {
     )
 
   by_unit <- taken %>%
-    group_by(term, campus, college, dept_code = department) %>%
+    group_by(across(all_of(c("term", "campus", "college", "department",
+                             if (grain == "course") "subject_course")))) %>%
+    rename(dept_code = department) %>%
     summarize(
       n_registrations = n_distinct(student_id, subject_course),
       n_students      = n_distinct(student_id),
@@ -134,22 +154,28 @@ get_major_course_units <- function(student_terms, registrations, opt = list()) {
     mutate(
       is_own_unit = !is.na(dept_code) & dept_code == .env$dept_code,
       in_progress = term > edge,
-      share_of_registrations = n_registrations / term_registrations
+      share_of_registrations = n_registrations / term_registrations,
+      share_of_students = n_students / term_students
     ) %>%
-    select(term, campus, college, dept_code, is_own_unit, in_progress,
-           n_registrations, n_students, term_registrations, term_students,
-           share_of_registrations) %>%
-    arrange(term, campus, desc(n_registrations), dept_code)
+    select(all_of(c("term", "campus", "college", "dept_code",
+                    if (grain == "course") "subject_course",
+                    "is_own_unit", "in_progress", "n_registrations", "n_students",
+                    "term_registrations", "term_students", "share_of_registrations",
+                    if (grain == "course") "share_of_students"))) %>%
+    arrange(across(all_of(c("term", "campus"))), desc(n_registrations),
+            across(all_of(c("dept_code", if (grain == "course") "subject_course"))))
 
   suppressed <- by_unit %>%
     filter(n_students < min_n) %>%
-    select(term, campus, dept_code, n_students)
+    select(all_of(c("term", "campus", "dept_code",
+                    if (grain == "course") "subject_course", "n_students")))
   result <- by_unit %>% filter(n_students >= min_n)
 
   attr(result, "edge")        <- edge
   attr(result, "latest_term") <- latest
   attr(result, "n_member_student_terms") <- nrow(members)
   attr(result, "n_members")   <- n_distinct(members$student_id)
+  attr(result, "member_programs") <- member_programs
   attr(result, "n_unmapped")  <- sum(is.na(taken$department))
   attr(result, "suppressed")  <- suppressed
   cedar_debug("[major-course-units.R] ", nrow(result), " unit rows (", nrow(suppressed),
