@@ -36,9 +36,6 @@ alongside other work (M14, M16).
 
 | ID | Kind | Summary |
 |---|---|---|
-| [I52](#i52--sections-stored-the-instructors-employee-id-so-they-joined-no-other-table) | Defect | The DESR's instructor ID was saved as the employee ID while the class list and HR hash theirs: the transform's HR merge matched nothing (`job_cat` NA on all 242,413 sections) and sections joined neither table. Fixed in the transform (every source hashed alike, the merge and `job_cat` removed); takes effect when the DESRs are next transformed |
-| [I50](#i50--the-class-list-dedup-can-keep-an-early-drop-over-a-late-withdrawal) | Defect | The transform keeps one class-list row per student-course-campus-term but ranked only "registered first": a student who early-dropped one section and withdrew late from another could keep the early drop, so the W left the loaded class list (703 student-course-terms on the 2026-10-08 pull; 651 on the 2026-02-04 one). Every outcome reader now classifies that table (`cedar_attempts`); fixed in the transform, takes effect when the class lists are next transformed |
-| [I48](#i48--a-transform-change-to-a-fact-tables-stored-columns-is-not-rebuilt-at-deploy) | Defect | Since the mapping stamps retired (ADR-001 step 3, 2026-11-06) the deploy gate rebuilt only `cedar_student_terms`: a transform change that adds or renames a stored column on sections, students, programs or degrees started the app on files without it until the morning refresh, the I46 shape with no gate (fixed 2026-11-11: each fact table carries a schema stamp the gate checks; open until production's unstamped tables are rebuilt by the deploy that carries it) |
 | [I46](#i46--a-deploy-that-must-rebuild-a-table-the-app-cannot-start-without-takes-the-site-down) | Defect | The deploy's table gate ran after the health check, so a deploy that added a column to `cedar_student_terms` failed its health check on the missing column and never reached the gate: production served the restart page from 17:07 UTC on 2026-11-04 (gate moved before the first request) |
 | [I45](#i45--the-class-list-and-the-schedule-name-the-same-section-with-different-course-codes) | Defect | The class list and the schedule name the same section with different course codes for renamed subjects (SOC to SOCI, PSY to PSYC): SOCI 371 had class-list history from Fall 2019 but no sections before Fall 2021 (fixed for every reader by keying the loaded tables on the course, 2026-11-07; open until the remaining successions are confirmed) |
 | [I43](#i43--every-scheduled-refresh-fails-because-the-default-asks-for-a-report-mrgather-never-fetches) | Defect | Every scheduled refresh failed from 2026-10-24 to 2026-11-03: the default asked for the applicants report, which production mrgather never fetches, and one missing report skipped every table (default fixed 2026-11-03, per-report rebuilds 2026-11-11; open for mrgather, which still accepts a report it cannot fetch) |
@@ -59,6 +56,9 @@ Kept until the next release, so a recurrence is recognisable; each entry below g
 
 | ID | Kind | Summary |
 |---|---|---|
+| [I52](#i52--sections-stored-the-instructors-employee-id-so-they-joined-no-other-table) | Defect | The DESR's instructor ID was saved as the employee ID while the class list and HR hash theirs: the transform's HR merge matched nothing (`job_cat` NA on all 242,413 sections) and sections joined neither table. Fixed in the transform (every source hashed alike, the merge and `job_cat` removed; resolved 2026-11-12, when the deploy rebuilt production's sections) |
+| [I50](#i50--the-class-list-dedup-can-keep-an-early-drop-over-a-late-withdrawal) | Defect | The transform keeps one class-list row per student-course-campus-term but ranked only "registered first": a student who early-dropped one section and withdrew late from another could keep the early drop, so the W left the loaded class list (703 student-course-terms on the 2026-10-08 pull; 651 on the 2026-02-04 one). Every outcome reader now classifies that table (`cedar_attempts`); fixed in the transform (resolved 2026-11-12, when the deploy rebuilt production's class list) |
+| [I48](#i48--a-transform-change-to-a-fact-tables-stored-columns-is-not-rebuilt-at-deploy) | Defect | Since the mapping stamps retired (ADR-001 step 3, 2026-11-06) the deploy gate rebuilt only `cedar_student_terms`: a transform change that adds or renames a stored column on sections, students, programs or degrees started the app on files without it until the morning refresh, the I46 shape with no gate (resolved 2026-11-12: each fact table carries a schema stamp the gate checks, and the deploy that carried it rebuilt all four of production's unstamped tables) |
 | [I28](#i28--one-late-starting-session-makes-a-whole-courses-first-day-unknown) | Defect | One late-starting session made a whole course's first day unknown (257 Fall 2026 courses on the Oct 8 pull), under a reason that read as missing status dates. Intersession is out of the forecast (model 0.24.0), a session not yet begun is judged on its lower bound (0.25.0), and a section with no start date now has its own basis and reason (resolved 2026-11-11) |
 | [I16](#i16--bottleneck-waitlist-pressure-ignores-term-so-later-registration-erases-earlier-waiting) | Defect | `get_bottlenecks()` matched waitlisted against registered rows with no term, so a seat in any later term erased earlier waiting: about 6% under true demand (RStudio only). It now returns the canonical class-list waitlist demand per campus, term and course (resolved 2026-11-11) |
 | [I8](#i8--a-timing-log-row-is-silently-dropped-when-the-write-lock-times-out) | Defect | A report-timing row that could not take the log's write lock within 2 seconds was dropped with a console message (8 concurrent workers, 7 rows); it is now kept as a pending file and appended by the next write (resolved 2026-11-11) |
@@ -110,9 +110,9 @@ required. "declaring the major a pre-major leads to is not a major change" in
 
 ## I52 — Sections stored the instructor's employee ID, so they joined no other table
 
-**Status:** fixed in the transform 2026-11-07; open until production's DESRs
-are next transformed: by the deploy that carries I48's fix, which rebuilds
-every unstamped fact table once, or by a refresh (I43).
+**Status:** resolved 2026-11-12. Fixed in the transform 2026-11-07; production's
+DESRs were transformed again in the deploy of 2026-11-12 (run 43135526579), whose gate log reads "[fact-tables] Rebuilt: sections, students, programs, degrees." before the app restarted and passed its health check.
+Confirmed from the gate's log, not by reading production's rows.
 **Found:** 2026-11-07, checking whether the class list's section columns could
 be read from `cedar_sections` instead (ADR-001 step 5).
 **Severity:** medium. `parse-data.R` md5-hashes `Primary Instructor ID` on the
@@ -173,9 +173,9 @@ with the split.
 
 ## I50 — The class-list dedup can keep an early drop over a late withdrawal
 
-**Status:** fixed in the transform 2026-11-07; open until production's class
-lists are transformed again: by the deploy that carries I48's fix, which
-rebuilds every unstamped fact table once, or by a refresh (I43).
+**Status:** resolved 2026-11-12. Fixed in the transform 2026-11-07; production's
+class list was transformed again in the deploy of 2026-11-12 (run 43135526579), whose gate log reads "[fact-tables] Rebuilt: sections, students, programs, degrees." before the app restarted and passed its health check.
+Confirmed from the gate's log, not by reading production's rows.
 **Found:** 2026-11-07, comparing saved `cedar_grades` (classified before the
 dedup, one row per CRN) with `cedar_attempts` (classified from the loaded,
 deduplicated class list) before moving Roadblocks onto the second.
@@ -225,9 +225,11 @@ asserts no output error before Run; it fails on the old renderers.
 
 ## I48 — A transform change to a fact table's stored columns is not rebuilt at deploy
 
-**Status:** fixed 2026-11-11; open until the deploy that carries it has
-rebuilt production's unstamped fact tables (once, about 10 minutes), which is
-also when I50 and I52 take effect.
+**Status:** resolved 2026-11-12. Fixed 2026-11-11; the deploy that carried it
+rebuilt production's four unstamped fact tables in the deploy of 2026-11-12 (run 43135526579), whose gate log reads "[fact-tables] Rebuilt: sections, students, programs, degrees." before the app restarted and passed its health check.
+The rebuild took about 33 minutes there, not the 10 estimated, and with two
+projection bundles due the deploy step then ran into its 60-minute command
+limit before the second bundle was saved.
 **Found:** 2026-11-06, in review of the PR that retired the mapping stamps
 (ADR-001 step 3, PR 2).
 **Severity:** medium. Until 2026-11-06 each mapped table carried a provenance
