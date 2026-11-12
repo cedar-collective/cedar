@@ -67,6 +67,12 @@ try {
     ok(rendered, `${id} rendered`);
   }
 
+  // The similar-students sections come from the same run.
+  ok(/Against Similar Students/.test(body) && /Every Course These Students Take/.test(body),
+     'the similar-students sections are on the page');
+  ok(await page.evaluate(() => !!document.querySelector('#cr_cohort-similar_courses_table .rt-table')),
+     'cr_cohort-similar_courses_table rendered');
+
   const shot = '/tmp/cedar-course-cohort.png';
   await page.screenshot({ path: shot, fullPage: true });
   console.log(`screenshot: ${shot}`);
