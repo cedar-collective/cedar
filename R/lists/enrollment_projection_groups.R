@@ -126,10 +126,19 @@ CEDAR_ENROLLMENT_PROJECTION_ALWAYS_MONITORED_COURSES <- unique(
   .cedar_projection$courses$subject_course[.cedar_projection$courses$always_monitored]
 )
 
+# A group's Gen Ed courses: every listed course whose area the group does not
+# exclude. A course counts under its first listed area, as everywhere else.
 CEDAR_ENROLLMENT_PROJECTION_GROUPS <- local({
   g <- .cedar_projection$groups
+  gen_ed <- CEDAR_GEN_ED_COURSES[!duplicated(CEDAR_GEN_ED_COURSES$subject_course), ]
+  unknown <- setdiff(unlist(g$exclude_gen_ed_areas), gen_ed$area)
+  if (length(unknown)) {
+    stop("[enrollment_projection_groups.R] projection_groups.csv excludes Gen Ed area(s) ",
+         paste(unknown, collapse = ", "), ", which gen_ed_courses.csv does not list")
+  }
   stats::setNames(lapply(seq_len(nrow(g)), function(i) {
     rows <- .cedar_projection$courses[.cedar_projection$courses$group_id == g$group_id[[i]], ]
+    group_gen_ed <- gen_ed$subject_course[!gen_ed$area %in% g$exclude_gen_ed_areas[[i]]]
     list(
       label = g$label[[i]],
       description = g$description[[i]],
@@ -137,7 +146,7 @@ CEDAR_ENROLLMENT_PROJECTION_GROUPS <- local({
       campuses = g$campuses[[i]],
       always_monitored_courses = rows$subject_course[rows$always_monitored],
       courses = sort(unique(c(
-        if (g$include_gen_ed[[i]]) unlist(gen_ed_all, use.names = FALSE) else character(0),
+        if (g$include_gen_ed[[i]]) group_gen_ed else character(0),
         rows$subject_course
       )))
     )

@@ -142,8 +142,11 @@ independent campus-demand forecasts. Branch campuses never enter this market.
 
 A named course group is a monitoring scope, declared in the institution's
 `projection_groups.csv` and `projection_courses.csv`. UNM's `critical_courses`
-group contains the canonical Gen Ed list (`include_gen_ed`) plus the explicitly
-monitored FYEX and gateway courses. Its always-monitored core is FYEX 1010,
+group contains the canonical Gen Ed list (`include_gen_ed`) without its
+second-language area (`exclude_gen_ed_areas`: those courses are limited by
+instructors, so their registrations say little about demand), plus the
+explicitly monitored FYEX and gateway courses and the two second-language
+courses the file names, SPAN 1110 and SPAN 1210. Its always-monitored core is FYEX 1010,
 1030, and 1110; MATH 1215, 1220, and 1350; BIOL 1140; CHEM 1215 and 1215L; and
 ENGL 1110 and 1120. CHEM 1220 is not in the monitoring scope. The group is
 restricted to ABQ and EA. Course membership uses exact `subject_course` values;
