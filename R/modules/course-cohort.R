@@ -26,13 +26,19 @@ courseCohortUI <- function(id) {
 #'   campuses where it names one.
 #' @param applicants `cedar_applicants`, or NULL: without it the page has no
 #'   similar-students sections and says so.
+#' @param instructor_access The session's shared instructor-gate flag
+#'   (`reactiveVal`); the by-instructor table renders only when it is TRUE.
+#' @param instructor_password The gate's password ("" when none is configured).
 courseCohortServer <- function(id, student_terms, attempts, programs, dims, edges,
-                               course, campus, applicants = NULL) {
+                               course, campus, applicants = NULL,
+                               instructor_access = reactiveVal(FALSE), instructor_password = "") {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
     result <- reactiveVal(NULL)
     similar <- reactiveVal(NULL)
     college_names <- college_code_names(dims)
+    instructorGateServer("instructor_gate", instructor_access, instructor_password,
+                         what = "Results by instructor")
 
     defaults <- reactive({
       crs <- course()
@@ -236,7 +242,8 @@ courseCohortServer <- function(id, student_terms, attempts, programs, dims, edge
           paste0(m$course, " by Instructor"),
           paste0("The course's takers by the instructor of their attempt, each against the course's similar non-takers; instructors with ",
                  m$min_n, " or more covered takers. Not a measure of teaching and not a basis for evaluating anyone: a section tied to a program, a learning community or a time of day shows who enrolled in it."),
-          reactable::reactableOutput(ns("similar_instructors_table"))
+          if (isTRUE(instructor_access())) reactable::reactableOutput(ns("similar_instructors_table"))
+          else instructorGateUI(ns("instructor_gate"))
         )
       )
     })
@@ -304,7 +311,7 @@ courseCohortServer <- function(id, student_terms, attempts, programs, dims, edge
                       jsonlite::toJSON(s$meta$course, auto_unbox = TRUE))))
     })
     output$similar_instructors_table <- reactable::renderReactable({
-      s <- similar(); req(s, nrow(s$instructors) > 0L)
+      s <- similar(); req(s, nrow(s$instructors) > 0L, isTRUE(instructor_access()))
       similar_table(s$instructors, "instructor_name",
                     list(instructor_name = reactable::colDef(name = "Instructor", minWidth = 160)),
                     pagination = FALSE)

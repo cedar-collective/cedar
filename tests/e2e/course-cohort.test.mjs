@@ -73,6 +73,11 @@ try {
   ok(await page.evaluate(() => !!document.querySelector('#cr_cohort-similar_courses_table .rt-table')),
      'cr_cohort-similar_courses_table rendered');
 
+  // Instructor names sit behind the gate: a session that has not unlocked it
+  // sees the prompt, never the by-instructor table.
+  ok(await page.evaluate(() => !document.querySelector('#cr_cohort-similar_instructors_table')),
+     'the by-instructor table is not rendered without the instructor password');
+
   const shot = '/tmp/cedar-course-cohort.png';
   await page.screenshot({ path: shot, fullPage: true });
   console.log(`screenshot: ${shot}`);

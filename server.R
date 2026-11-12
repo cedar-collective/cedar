@@ -1720,6 +1720,12 @@ output$enrl_classlist_download <- downloadHandler(
   dfw_authenticated <- reactiveVal(FALSE)
   dfw_password <- trimws(Sys.getenv("CEDAR_DFW_PASSWORD", unset = ""))
   dfw_password_configured <- nzchar(dfw_password)
+  # The same flag gates every table that names an instructor beside student
+  # outcomes (R/modules/instructor-gate.R): unlocking one unlocks all.
+  instructorGateServer("cr_ret_instructor_gate", dfw_authenticated, dfw_password,
+                       what = "Retention rows by instructor")
+  instructorGateServer("cr_impact_instructor_gate", dfw_authenticated, dfw_password,
+                       what = "Downstream outcomes by instructor")
 
   create_password_gate_ui <- function(password_input_id, submit_button_id,
                                       message_text = "This section contains sensitive academic performance data and requires authentication. Enter the password below to continue.") {
@@ -3670,9 +3676,10 @@ output$enrl_classlist_download <- downloadHandler(
             numericInput("cr_ret_min_n", "Min students per summary:", value = 10, min = 1)
           ),
           column(3,
-            div(style = "margin-top: 24px;",
-              checkboxInput("cr_ret_by_instructor", "Break out by instructor", value = FALSE)
-            )
+            if (isTRUE(dfw_authenticated())) {
+              div(class = "mt-4",
+                checkboxInput("cr_ret_by_instructor", "Break out by instructor", value = FALSE))
+            } else instructorGateUI("cr_ret_instructor_gate")
           ),
           column(2,
             div(class = "mt-4",
@@ -3737,7 +3744,8 @@ output$enrl_classlist_download <- downloadHandler(
       n_terms       = n_terms,
       min_n         = min_n,
       campus        = campus_sel,
-      by_instructor = isTRUE(input$cr_ret_by_instructor),
+      # Named instructors only behind the gate, whatever the input says.
+      by_instructor = isTRUE(input$cr_ret_by_instructor) && isTRUE(dfw_authenticated()),
       data_edges    = data_objects[["cedar_edges"]]
     )
 
@@ -4560,6 +4568,17 @@ output$enrl_classlist_download <- downloadHandler(
     course <- input$cr_course
     if (is.null(course) || !nzchar(course))
       return(empty_state("Select a course, then click Analyze Course to view this tab."))
+    # Every result on this tab names an instructor: the whole tab is gated.
+    if (!isTRUE(dfw_authenticated())) {
+      return(tagList(
+        subtab_header(
+          "Instructor Patterns",
+          paste0("How students do later on, grouped by who taught them ", course,
+                 ". Every row names an instructor, so the tab opens with the instructor-data password.")
+        ),
+        instructorGateUI("cr_impact_instructor_gate")
+      ))
+    }
     tagList(
       subtab_header(
         "Instructor Patterns",
@@ -4620,7 +4639,7 @@ output$enrl_classlist_download <- downloadHandler(
   })
 
   observeEvent(input$cr_impact_inst_run, {
-    req(input$cr_course, nzchar(input$cr_course),
+    req(isTRUE(dfw_authenticated()), input$cr_course, nzchar(input$cr_course),
         length(input$cr_impact_inst_course_y) > 0,
         all(nzchar(input$cr_impact_inst_course_y)))
     cr_impact_instructor_data(NULL)
@@ -4674,7 +4693,7 @@ output$enrl_classlist_download <- downloadHandler(
 
   output$cr_impact_instructor_results <- renderUI({
     result <- cr_impact_instructor_data()
-    if (is.null(result)) return(NULL)
+    if (is.null(result) || !isTRUE(dfw_authenticated())) return(NULL)
 
     fmt_term <- function(t) {
       yr <- t %/% 100; ss <- t %% 100
@@ -6554,7 +6573,8 @@ output$enrl_classlist_download <- downloadHandler(
                  dims = data_objects[["cedar_dims"]],
                  program_choices = cedar_pathways_choices$program_choices,
                  dept_choices = cedar_pathways_choices$dept_choices,
-                 edges = data_objects[["cedar_edges"]], pathway_groups = CEDAR_PATHWAY_SUBJECT_GROUPS)
+                 edges = data_objects[["cedar_edges"]], pathway_groups = CEDAR_PATHWAY_SUBJECT_GROUPS,
+                 instructor_access = dfw_authenticated, instructor_password = dfw_password)
 
   degreeExplorerServer("degree_explorer", CEDAR_DEGREE_CATALOG, CEDAR_DEGREE_ROADMAPS,
     sections = cedar_sections, course_terms = data_objects[["cedar_course_terms"]],
@@ -6579,6 +6599,7 @@ output$enrl_classlist_download <- downloadHandler(
     dims          = data_objects[["cedar_dims"]],
     edges         = data_objects[["cedar_edges"]],
     applicants    = data_objects[["cedar_applicants"]],
+    instructor_access = dfw_authenticated, instructor_password = dfw_password,
     course        = reactive({
       data <- course_report_data()
       if (is.null(data)) NULL else data$course_code

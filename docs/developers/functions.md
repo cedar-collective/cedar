@@ -8,7 +8,7 @@ parent: Developer Guide
 
 This reference is auto-generated from roxygen2 comments in the source code.
 
-*Generated: 2026-11-11 18:31:38.002014*
+*Generated: 2026-11-11 18:31:39.992736*
 
 ---
 
