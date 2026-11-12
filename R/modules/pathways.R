@@ -690,6 +690,7 @@ pathwaysUI <- function(id, campus_choices, program_choices = character(),
             tags$strong("Table: Course + Instructor Signals"),
             " — all enrolled students in focal-subject courses, grouped by campus, course title, and instructor."
           ),
+          instructorGateUI(ns("instructor_gate")),
           reactable::reactableOutput(ns("ge_instructor_table")),
 
           # ── Entry Heatmaps (collapsed) ───────────────────────────────────────
@@ -966,9 +967,14 @@ pathways_start_panel <- function() {
 pathwaysServer <- function(id, students, programs, degrees = NULL,
                            attempts, cedar_student_terms = NULL,
                            dims, program_choices = character(),
-                           dept_choices = character(), edges, pathway_groups) {
+                           dept_choices = character(), edges, pathway_groups,
+                           instructor_access = reactiveVal(FALSE), instructor_password = "") {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
+    # The course + instructor table names instructors beside student
+    # outcomes: it renders only behind the session's instructor gate.
+    instructorGateServer("instructor_gate", instructor_access, instructor_password,
+                         what = "Course + instructor rows")
 
     make_pathways_table <- function(df, page_size = 25, columns = list(),
                                     selection = NULL, on_click = NULL,
@@ -3997,6 +4003,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
     })
 
     output$ge_instructor_table <- reactable::renderReactable({
+      req(isTRUE(instructor_access()))
       d <- ge_instructor_data()
       req(!is.null(d), nrow(d) > 0)
       make_pathways_table(

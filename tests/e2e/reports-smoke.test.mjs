@@ -711,7 +711,6 @@ export async function runReportChecks({ scope = 'smoke', synthetic = false } = {
       ], { all: true });
       await setInput(page, 'cr_ret_campus', CAMPUSES);
       await setInput(page, 'cr_ret_min_n', 1);
-      await setInput(page, 'cr_ret_by_instructor', false);
       await click(page, 'cr_ret_run');
       await waitForIdle(page, { timeout: 180000 }).catch(() => {});
       await waitForOutput(page, 'Course Dynamics Retention benchmarks', [
@@ -722,7 +721,30 @@ export async function runReportChecks({ scope = 'smoke', synthetic = false } = {
       ], { all: true });
     });
 
-    await withStep(page, ['retention'], 'Course Dynamics Retention instructor breakout runs', async () => {
+    await withStep(page, ['retention'], 'Course Dynamics Retention instructor breakout waits for the gate', async () => {
+      // Instructor names sit behind the instructor-data password. A locked
+      // session has the prompt, no checkbox, and a forged input changes nothing.
+      const locked = await page.evaluate(() => ({
+        gate: !!document.querySelector('#cr_ret_instructor_gate-gate .alert'),
+        box: !!document.getElementById('cr_ret_by_instructor'),
+      }));
+      if (!locked.gate || locked.box) {
+        throw new Error(`instructor breakout is not gated: ${JSON.stringify(locked)}`);
+      }
+      await setInput(page, 'cr_ret_by_instructor', true);
+      await click(page, 'cr_ret_run');
+      await waitForIdle(page, { timeout: 180000 }).catch(() => {});
+      const leaked = await page.evaluate(() =>
+        !!document.querySelector('#cr_retention_instructor_top_table .rt-table'));
+      if (leaked) throw new Error('a locked session rendered the instructor retention tables');
+    });
+
+    // Opt-in: CEDAR_E2E_INSTRUCTOR_PASSWORD unlocks the gate so the breakout itself is exercised.
+    if (process.env.CEDAR_E2E_INSTRUCTOR_PASSWORD) await withStep(page, ['retention'], 'Course Dynamics Retention instructor breakout runs', async () => {
+      await setInput(page, 'cr_ret_instructor_gate-password', process.env.CEDAR_E2E_INSTRUCTOR_PASSWORD);
+      await click(page, 'cr_ret_instructor_gate-submit');
+      await waitForIdle(page, { timeout: 60000 }).catch(() => {});
+      await page.waitForSelector('#cr_ret_by_instructor', { timeout: 30000 });
       await setInput(page, 'cr_ret_by_instructor', true);
       await setInput(page, 'cr_ret_min_n', 1);
       // Ticking the box must not re-render the course-only result as an

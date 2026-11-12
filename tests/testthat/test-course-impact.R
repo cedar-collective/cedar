@@ -523,6 +523,24 @@ test_that("several later-course codes are one course: each student once, at the 
   expect_snapshot(cat(course_sequence_headline(family)[1], sep = "\n"))
 })
 
+test_that("every table that names an instructor beside outcomes waits for the instructor gate", {
+  server <- paste(readLines("../../server.R", warn = FALSE), collapse = "\n")
+  # Instructor Patterns: the tab, its run and its results.
+  start <- regexpr("output\\$cr_impact_instructor_ui <- renderUI", server)
+  tab <- substr(server, start, start + 900)
+  expect_true(grepl("if (!isTRUE(dfw_authenticated()))", tab, fixed = TRUE))
+  expect_true(grepl("req(isTRUE(dfw_authenticated()), input$cr_course", server, fixed = TRUE))
+  # Retention: the breakout is honoured only behind the gate.
+  expect_true(grepl("isTRUE(input$cr_ret_by_instructor) && isTRUE(dfw_authenticated())", server, fixed = TRUE))
+  # The modules that name instructors are handed the shared flag.
+  expect_equal(lengths(regmatches(server, gregexpr("instructor_access = dfw_authenticated", server, fixed = TRUE))), 2L)
+  cohort <- paste(readLines("../../R/modules/course-cohort.R", warn = FALSE), collapse = "\n")
+  expect_true(grepl("req(s, nrow(s$instructors) > 0L, isTRUE(instructor_access()))", cohort, fixed = TRUE))
+  pathways <- paste(readLines("../../R/modules/pathways.R", warn = FALSE), collapse = "\n")
+  expect_true(grepl("output$ge_instructor_table <- reactable::renderReactable({\n      req(isTRUE(instructor_access()))",
+                    pathways, fixed = TRUE))
+})
+
 test_that("cross-department follow-ons are not treated as invalid sequences", {
   src <- paste(readLines("../../server.R", warn = FALSE), collapse = "\n")
 
