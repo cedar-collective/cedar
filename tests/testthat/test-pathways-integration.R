@@ -1,7 +1,7 @@
 # Integration tests for the pathways analysis pipeline
 #
 # Tests the full data flow:
-#   build_population() → filter_students_by_pop() → cone function → output
+#   build_population() → apply_pathways_population_window() → cone function → output
 #
 # This mirrors the reactive pipeline in modules/pathways.R without Shiny
 # infrastructure. If a cone produces wrong results or crashes on a real
@@ -12,41 +12,7 @@
 #   Mathematics (preset) — 8 students; stopped_out / ongoing; simpler case
 #   Anthropology (dept)  — 12 students; dept-mode path through get_focal_programs()
 
-library(tibble)
-library(dplyr)
-
 context("Pathways Integration: Population + Cone Pipeline")
-
-
-# ---------------------------------------------------------------------------
-# Helper: applies the same Pathways population window used by the Shiny module.
-# ---------------------------------------------------------------------------
-filter_students_by_pop <- function(students, population) {
-  apply_pathways_population_window(students, population)
-}
-
-
-# ---------------------------------------------------------------------------
-# Build populations once, reuse across tests
-# ---------------------------------------------------------------------------
-hist_pop <- build_population(
-  test_programs, test_degrees,
-  opt = list(type = "preset", program_names = "History")
-)
-
-math_pop <- build_population(
-  test_programs,
-  opt = list(type = "preset", program_names = "Mathematics")
-)
-
-anth_pop <- build_population(
-  test_programs,
-  opt = list(type = "dept", dept_code = "ANTH")
-)
-
-hist_students <- filter_students_by_pop(test_students, hist_pop)
-math_students <- filter_students_by_pop(test_students, math_pop)
-anth_students <- filter_students_by_pop(test_students, anth_pop)
 
 
 # =============================================================================
@@ -150,7 +116,7 @@ test_that("filter_students_by_pop: removes post-relevant_until enrollment rows",
     registration_status_code = "RE"
   )
 
-  result <- filter_students_by_pop(students, pop)
+  result <- apply_pathways_population_window(students, pop)
 
   # A's post-202010 enrollment removed
   expect_false(any(result$student_id == "A" & result$term == 202110L))

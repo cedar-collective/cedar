@@ -8,25 +8,6 @@
 
 context("Data Integrity")
 
-ids_tables <- function() {
-  list(
-    ids_clean   = test_ids_clean,
-    ids_split   = test_ids_split,
-    ids_partial = test_ids_partial,
-    ids_orphan  = test_ids_orphan
-  )
-}
-
-ids_result <- function() {
-  check_student_id_integrity(test_ids_spine, ids_tables(),
-                             opt = list(spine_name = "ids_spine"))
-}
-
-verdict_for <- function(res, tbl) {
-  res$by_table$verdict[res$by_table$table == tbl]
-}
-
-
 test_that("check_student_id_integrity reports the spine it compared against", {
   res <- ids_result()
 
@@ -91,7 +72,7 @@ test_that("check_student_id_integrity counts term statuses per table", {
 })
 
 test_that("check_student_id_integrity stops on a table missing a required column", {
-  bad <- ids_tables()
+  bad <- ids_tables
   bad$ids_clean <- bad$ids_clean %>% select(-term)
 
   expect_error(
@@ -110,7 +91,7 @@ test_that("check_student_id_integrity stops on unnamed or empty table lists", {
 
 test_that("check_student_id_integrity stops when the spine lacks the id column", {
   expect_error(
-    check_student_id_integrity(test_ids_spine %>% select(-student_id), ids_tables()),
+    check_student_id_integrity(test_ids_spine %>% select(-student_id), ids_tables),
     "student_id"
   )
 })

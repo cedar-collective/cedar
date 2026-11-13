@@ -15,8 +15,9 @@
 # rebuilding the groups from scratch.
 #
 # Split from the former cones/course-impact.R on 2026-09-07. The instructor
-# question that shared that file now lives in cones/course-instructor-effect.R;
-# the two shared no code, only a filename.
+# question that shared that file is now Later Course's gated breakdown
+# (cones/downstream-outcomes.R, cones/downstream-instructor-balance.R); the
+# two shared no code, only a filename.
 #
 #   (A RETENTION analysis, get_course_retention(), was removed 2026-08-01: it had
 #   no callers, and its private .compute_retention() was shadowed at load time by

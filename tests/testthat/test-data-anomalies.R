@@ -114,41 +114,6 @@ test_that("the Admin mapping panel fails loudly instead of hiding a broken scree
   expect_equal(nrow(build_admin_mapping_issues(NULL, NULL, NULL)), 0L)
 })
 
-# DA01 (local): three programs over 2024-2026, each with 50 majors a term.
-#   SEL   50 undergrad majors,  5 grads/yr  -> ratio 10.0, flagged
-#   NORM  50 undergrad majors, 25 grads/yr  -> ratio  2.0, not flagged
-#   GRAD  45 GRADUATE + 5 undergrad majors, 5 baccalaureate grads/yr
-#         -> ratio 1.0 when levels are paired; 10.0 if they are not.
-anomaly_ratio_programs <- function() {
-  terms <- c(202480L, 202580L, 202680L)
-  build <- function(code, n, level) {
-    tidyr::expand_grid(term = terms, i = seq_len(n)) %>%
-      dplyr::transmute(
-        student_id = paste0(code, "-", level, "-", i), term, major_code = code,
-        program_name = code, is_pre_major = FALSE, program_type = "Major",
-        student_level = level
-      )
-  }
-  dplyr::bind_rows(
-    build("SEL", 50L, "Undergraduate"),
-    build("NORM", 50L, "Undergraduate"),
-    build("GRAD", 45L, "Graduate"),
-    build("GRAD", 5L, "Undergraduate")
-  )
-}
-
-anomaly_ratio_degrees <- function() {
-  terms <- c(202410L, 202510L, 202610L)
-  build <- function(code, n) {
-    tidyr::expand_grid(term = terms, i = seq_len(n)) %>%
-      dplyr::transmute(
-        student_id = paste0(code, "-grad-", term, "-", i), term, major_code = code,
-        award_category = "Baccalaureate Degree"
-      )
-  }
-  dplyr::bind_rows(build("SEL", 5L), build("NORM", 25L), build("GRAD", 5L))
-}
-
 test_that("identity-fallback departments are flagged, real ones are not", {
   programs <- test_programs_hp
   # RADS and MEDL are real departments; BIOL is too. FRAD/FMDL/XRAD are
@@ -184,7 +149,7 @@ test_that("identity-fallback departments are flagged, real ones are not", {
 
 test_that("a program whose majors far exceed its graduates is flagged", {
   found <- detect_selective_admission_signal(
-    anomaly_ratio_programs(), anomaly_ratio_degrees(),
+    anomaly_ratio_programs, anomaly_ratio_degrees,
     opt = list(from_term = 202410L)
   )
 
@@ -201,7 +166,7 @@ test_that("graduate majors are not counted against baccalaureate degrees", {
   # the award category leaves 5 undergraduate majors against 5 graduates.
   # Special Education scored 13.4 and Physics 9.9 this way on real data.
   found <- detect_selective_admission_signal(
-    anomaly_ratio_programs(), anomaly_ratio_degrees(),
+    anomaly_ratio_programs, anomaly_ratio_degrees,
     opt = list(from_term = 202410L, min_majors = 1)
   )
 
@@ -211,16 +176,16 @@ test_that("graduate majors are not counted against baccalaureate degrees", {
 
 test_that("the combined report runs both screens and fails loudly on bad input", {
   report <- build_data_anomaly_report(
-    anomaly_ratio_programs() %>%
+    anomaly_ratio_programs %>%
       dplyr::mutate(dept_code = major_code, is_pre_major = TRUE),
-    anomaly_ratio_degrees(),
+    anomaly_ratio_degrees,
     opt = list(from_term = 202410L)
   )
   expect_true("pre_major_self_mapped_department" %in% report$issue_type)
   expect_error(
     detect_selective_admission_signal(
-      anomaly_ratio_programs(),
-      dplyr::select(anomaly_ratio_degrees(), -award_category)
+      anomaly_ratio_programs,
+      dplyr::select(anomaly_ratio_degrees, -award_category)
     ),
     "degrees is missing: award_category"
   )
@@ -271,43 +236,10 @@ test_that("an annotation stops applying once its term bound passes", {
 })
 
 # ── Mapping audit (ADR-002): every value the mapping files do not cover ───────
-# Scaffolding: mapping files for the designed fixture's synthetic institution,
-# with one deliberate gap of each kind. BIOL has no subject row; section college
-# AS and Translated College EDU name no college; ENGL-BA and FSEC-BS have no
-# program row; PSYC has no home college. POLS-BA and BUSA-BBA are mapped to a
-# college Banner's Translated College disagrees with -- BUSA-BBA's pre-major
-# rows are the expected kind of difference, its others need review.
-audit_files <- function() {
-  prog <- function(code, unit, pre = "FALSE") data.frame(
-    program_code = code, in_college = "", program_name = code, unit_code = unit,
-    college_code = "", is_pre_major = pre, leads_to = "", basis = "decided",
-    status = "confirmed", evidence = "", notes = "")
-  list(
-    colleges = data.frame(college_code = c("ARTS", "SOSC", "STEM", "NURS", "BUS"),
-                          college_name = c("Arts", "Social Science", "STEM", "Nursing", "Business"),
-                          source_names = ""),
-    units = data.frame(unit_code = c("ANTH", "HIST", "MATH", "NURS", "BUSN", "PSYC"),
-                       unit_name = "", college_code = c("SOSC", "ARTS", "STEM", "NURS", "BUS", ""),
-                       kind = "department", notes = ""),
-    subjects = data.frame(subject_code = c("ANTH", "HIST", "MATH", "NURS"),
-                          in_college = c("SOSC", "ARTS", "STEM", "NURS"), in_level = "",
-                          college_code = "",
-                          unit_code = c("ANTH", "HIST", "MATH", "NURS"),
-                          status = "confirmed", evidence = "", notes = ""),
-    programs = rbind(
-      prog(c("ANTH-BA", "ANTH"), "ANTH"), prog(c("HIST-BA", "HIST-MA", "HIST"), "HIST"),
-      prog(c("MATH-BS", "BIOL-BS", "MATH"), "MATH"), prog("NURS-BS", "NURS"),
-      prog(c("POLS-BA", "PSYC-MIN"), "HIST"),
-      prog("BUSA-BBA", "MATH"), prog(c("ACCT-BBA", "BUAN-BBA", "BUMG-BBA", "FINC-BBA"), "BUSN")),
-    settings = data.frame(setting = c("mapping_files_url", "source_files_url"),
-                          value = c("https://github.com/org/repo/blob/main/institution/x",
-                                    "https://github.com/org/repo/blob/main"))
-  )
-}
 
 test_that("the mapping audit lists each kind of unmapped value, and college disagreements", {
   # The transform audits the saved class list, which keeps the roster's major.
-  audit <- audit_mapping_coverage(audit_files(), sections = test_sections, students = cedar_registrations,
+  audit <- audit_mapping_coverage(audit_files, sections = test_sections, students = cedar_registrations,
                                   programs = test_programs, degrees = test_degrees)
   got <- audit %>% dplyr::arrange(kind, value, status) %>%
     dplyr::select(kind, value, status, rows) %>% as.data.frame()
@@ -342,12 +274,12 @@ test_that("the mapping audit lists each kind of unmapped value, and college disa
   # cedar_programs built before the transform unnamed it carry a named
   # major_code; the audit must not pass the names on.
   named <- test_programs; named$major_code <- stats::setNames(named$major_code, named$major_code)
-  from_named <- audit_mapping_coverage(audit_files(), programs = named)
+  from_named <- audit_mapping_coverage(audit_files, programs = named)
   expect_false(any(vapply(from_named, function(x) !is.null(names(x)), logical(1))))
 })
 
 test_that("a subject proposed in subjects.csv is still unmapped, and says where", {
-  files <- audit_files()
+  files <- audit_files
   files$subjects <- rbind(files$subjects, data.frame(
     subject_code = "BIOL", in_college = "STEM", in_level = "", unit_code = "MATH",
     college_code = "", status = "proposed", evidence = "", notes = ""))
@@ -361,7 +293,7 @@ test_that("a subject proposed in subjects.csv is still unmapped, and says where"
 test_that("the mapping audit lists a class-list major code no programs.csv row names, with the roster's name", {
   # ST01: every class-list row carries SPAN as the roster's major (named
   # "Spanish" there), and the audit's fixture files have no SPAN row.
-  audit <- audit_mapping_coverage(audit_files(), students = test_students_st)
+  audit <- audit_mapping_coverage(audit_files, students = test_students_st)
   span <- audit %>% dplyr::filter(kind == "program_code", value == "SPAN")
   expect_equal(nrow(span), 1L)
   expect_equal(span$context, 'class-list major "Spanish"')
@@ -373,41 +305,41 @@ test_that("the mapping audit lists a class-list major code no programs.csv row n
   expect_true("class_list_program_code" %in% attr(audit, "checked"))
   # A roster with no name for the code says so instead of inventing one.
   unnamed <- test_students_st; unnamed$major_name <- NA_character_
-  expect_equal(audit_mapping_coverage(audit_files(), students = unnamed) %>%
+  expect_equal(audit_mapping_coverage(audit_files, students = unnamed) %>%
                  dplyr::filter(value == "SPAN") %>% dplyr::pull(context),
                "class-list major, unnamed on the roster")
   # A row in the file, proposed or confirmed, takes the code off the list.
-  files <- audit_files()
+  files <- audit_files
   files$programs <- rbind(files$programs, data.frame(
     program_code = "SPAN", in_college = "", program_name = "Spanish", unit_code = "",
     college_code = "", is_pre_major = "FALSE", leads_to = "", basis = "unresolved",
     status = "proposed", evidence = "", notes = ""))
   expect_false("SPAN" %in% audit_mapping_coverage(files, students = test_students_st)$value)
   # The class lists must carry the roster's name column to be checked.
-  expect_error(audit_mapping_coverage(audit_files(), students = dplyr::select(test_students_st, -major_name)),
+  expect_error(audit_mapping_coverage(audit_files, students = dplyr::select(test_students_st, -major_name)),
                "cedar_registrations lacks major_name")
   # The loaded class list carries neither column (thin_class_list()): the
   # loader's summary of the roster's majors gives the same finding, and
   # without it the check is not run and the audit says so.
   majors <- summarize_class_list_majors(test_students_st)
-  from_summary <- audit_mapping_coverage(audit_files(), students = thin_class_list(test_students_st),
+  from_summary <- audit_mapping_coverage(audit_files, students = thin_class_list(test_students_st),
                                          class_list_majors = majors)
   expect_equal(from_summary %>% dplyr::filter(value == "SPAN") %>%
                  dplyr::select(context, rows, first_term, last_term),
                span %>% dplyr::select(context, rows, first_term, last_term))
-  skipped <- audit_mapping_coverage(audit_files(), students = thin_class_list(test_students_st))
+  skipped <- audit_mapping_coverage(audit_files, students = thin_class_list(test_students_st))
   expect_false("class_list_program_code" %in% attr(skipped, "checked"))
   expect_error(summarize_class_list_majors(thin_class_list(test_students_st)),
                "before thin_class_list")
 })
 
 test_that("the mapping audit checks only the tables it is given, and says so", {
-  audit <- audit_mapping_coverage(audit_files(), sections = test_sections)
+  audit <- audit_mapping_coverage(audit_files, sections = test_sections)
   expect_setequal(attr(audit, "checked"), c("subject", "section_college", "unit_college"))
   # With no course table, the other kinds still say what they need.
-  only_programs <- audit_mapping_coverage(audit_files(), programs = test_programs)
+  only_programs <- audit_mapping_coverage(audit_files, programs = test_programs)
   expect_false(anyNA(only_programs$needs))
-  expect_error(audit_mapping_coverage(audit_files(),
+  expect_error(audit_mapping_coverage(audit_files,
                                       programs = dplyr::select(test_programs, -source_college, -student_college)),
                "cedar_programs lacks source_college and student_college")
 })

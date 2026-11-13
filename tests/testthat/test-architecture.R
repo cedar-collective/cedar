@@ -1,43 +1,14 @@
 context("Architecture Guardrails")
 
-project_root <- normalizePath(file.path(getwd(), "../.."))
-
-r_files_under <- function(...) {
-  path <- file.path(project_root, ...)
-  list.files(path, pattern = "\\.R$", recursive = TRUE, full.names = TRUE)
-}
-
-read_code <- function(file) {
-  lines <- readLines(file, warn = FALSE)
-  lines <- lines[!grepl("^\\s*#", lines)]
-  paste(lines, collapse = "\n")
-}
-
-relative_path <- function(path) {
-  sub(paste0("^", normalizePath(project_root), "/"), "", normalizePath(path))
-}
-
-extract_function_names <- function(file) {
-  code <- read_code(file)
-  hits <- regmatches(
-    code,
-    gregexpr("\\b[A-Za-z.][A-Za-z0-9_.]*\\s*<-\\s*function\\s*\\(", code, perl = TRUE)
-  )[[1]]
-  if (identical(hits, character(0)) || hits[1] == -1) {
-    return(character())
-  }
-  sub("\\s*<-.*$", "", hits)
-}
-
 test_that("archived forecasting code is not part of main", {
   forecast_files <- r_files_under("R", "cones", "forecast")
   expect_length(forecast_files, 0)
 
   active_files <- c(
     r_files_under("R"),
-    file.path(project_root, "global.R"),
-    file.path(project_root, "server.R"),
-    file.path(project_root, "ui.R")
+    file.path(cedar_base_dir, "global.R"),
+    file.path(cedar_base_dir, "server.R"),
+    file.path(cedar_base_dir, "ui.R")
   )
   active_text <- paste(vapply(active_files, read_code, character(1)), collapse = "\n")
 
@@ -50,9 +21,9 @@ test_that("archived forecasting code is not part of main", {
 test_that("active code does not call retired gradebook APIs", {
   active_files <- c(
     r_files_under("R"),
-    file.path(project_root, "global.R"),
-    file.path(project_root, "server.R"),
-    file.path(project_root, "ui.R")
+    file.path(cedar_base_dir, "global.R"),
+    file.path(cedar_base_dir, "server.R"),
+    file.path(cedar_base_dir, "ui.R")
   )
   active_text <- paste(vapply(active_files, read_code, character(1)), collapse = "\n")
 
@@ -92,9 +63,9 @@ test_that("registration status literals stay at the parsing/constants boundary",
 test_that("runtime code does not access legacy uppercase data columns", {
   files <- c(
     r_files_under("R"),
-    file.path(project_root, "global.R"),
-    file.path(project_root, "server.R"),
-    file.path(project_root, "ui.R")
+    file.path(cedar_base_dir, "global.R"),
+    file.path(cedar_base_dir, "server.R"),
+    file.path(cedar_base_dir, "ui.R")
   )
   files <- files[!grepl("/R/data-parsers/", normalizePath(files), fixed = TRUE)]
 
@@ -149,7 +120,7 @@ test_that("projection computation stays independent of Shiny and global data", {
   # Every projection file below the modules, so a stage split into its own
   # file is covered without anyone remembering to list it here.
   files <- unlist(lapply(c("R/branches", "R/cones", "R/features"), function(dir) {
-    list.files(file.path(project_root, dir),
+    list.files(file.path(cedar_base_dir, dir),
                pattern = "^enrollment-projection.*\\.R$", full.names = TRUE)
   }))
   expect_gte(length(files), 13L)
@@ -171,9 +142,9 @@ test_that("projection computation stays independent of Shiny and global data", {
 test_that("runtime code uses centralized ColorBrewer access", {
   files <- c(
     r_files_under("R"),
-    file.path(project_root, "global.R"),
-    file.path(project_root, "server.R"),
-    file.path(project_root, "ui.R")
+    file.path(cedar_base_dir, "global.R"),
+    file.path(cedar_base_dir, "server.R"),
+    file.path(cedar_base_dir, "ui.R")
   )
   allowed <- "R/trunk/utils.R"
 
@@ -195,7 +166,7 @@ test_that("runtime code uses centralized ColorBrewer access", {
 test_that("department filter options use dept_code", {
   files <- c(
     r_files_under("R"),
-    file.path(project_root, "server.R")
+    file.path(cedar_base_dir, "server.R")
   )
 
   patterns <- c(
@@ -368,7 +339,7 @@ test_that("literal course group_cols vectors include campus or declare a rollup"
 
 test_that("transformed delivery keys retain campus", {
   transform <- paste(
-    readLines(file.path(project_root, "R", "data-parsers", "transform-to-cedar.R"),
+    readLines(file.path(cedar_base_dir, "R", "data-parsers", "transform-to-cedar.R"),
               warn = FALSE),
     collapse = "\n"
   )
@@ -383,7 +354,7 @@ test_that("transformed delivery keys retain campus", {
 })
 
 test_that("the standard gate owns every committed browser suite", {
-  runner <- paste(readLines(file.path(project_root, "run-tests.sh"), warn = FALSE), collapse = "\n")
+  runner <- paste(readLines(file.path(cedar_base_dir, "run-tests.sh"), warn = FALSE), collapse = "\n")
   suite_line <- regmatches(runner, regexpr("suites=\\([^)]*\\)", runner, perl = TRUE))
   expect_length(suite_line, 1)
 
@@ -392,7 +363,7 @@ test_that("the standard gate owns every committed browser suite", {
   declared <- strsplit(trimws(declared), "\\s+")[[1]]
   committed <- sub(
     "\\.test\\.mjs$", "",
-    basename(list.files(file.path(project_root, "tests", "e2e"),
+    basename(list.files(file.path(cedar_base_dir, "tests", "e2e"),
                         pattern = "\\.test\\.mjs$", full.names = TRUE))
   )
 
@@ -400,7 +371,7 @@ test_that("the standard gate owns every committed browser suite", {
 })
 
 test_that("Docker data directory is configured before data paths are resolved", {
-  global <- readLines(file.path(project_root, "global.R"), warn = FALSE)
+  global <- readLines(file.path(cedar_base_dir, "global.R"), warn = FALSE)
   assignment <- grep("^\\s*data_dir\\s*<-", global)[1]
   first_use <- grep("get_cedar_data_path\\(cedar_file_name, data_dir", global)[1]
 
@@ -415,11 +386,11 @@ test_that("no loader builds a measure table", {
   builders <- "\\bbuild_(attempts|course_terms|course_flows)\\("
   for (loader in c("global.R", "scripts/cedar-repl.R",
                    "scripts/warm-dept-dashboard-cache.R", "scripts/warm-dept-trends-cache.R")) {
-    lines <- readLines(file.path(project_root, loader), warn = FALSE)
+    lines <- readLines(file.path(cedar_base_dir, loader), warn = FALSE)
     code <- sub("#.*$", "", lines)
     expect_false(any(grepl(builders, code)), info = loader)
   }
-  transform <- readLines(file.path(project_root, "R/data-parsers/transform-to-cedar.R"), warn = FALSE)
+  transform <- readLines(file.path(cedar_base_dir, "R/data-parsers/transform-to-cedar.R"), warn = FALSE)
   expect_true(any(grepl("build_attempts\\(", transform)))
 })
 
@@ -435,12 +406,12 @@ test_that("legacy custom test runners stay retired", {
     "tests/test-dept-dashboard-standalone.R"
   )
 
-  expect_false(any(file.exists(file.path(project_root, retired))))
+  expect_false(any(file.exists(file.path(cedar_base_dir, retired))))
 })
 
 test_that("deploy CI invokes the canonical non-browser gate", {
   workflow <- paste(
-    readLines(file.path(project_root, ".github", "workflows", "deploy.yml"), warn = FALSE),
+    readLines(file.path(cedar_base_dir, ".github", "workflows", "deploy.yml"), warn = FALSE),
     collapse = "\n"
   )
 
@@ -453,7 +424,7 @@ test_that("deploy CI invokes the canonical non-browser gate", {
 # rule, and they disagreed -- the DESR rule sent every 4-digit number to
 # "lower". Both must call the one classifier.
 test_that("both transforms derive course level through course_level_from_number", {
-  code <- read_code(file.path(project_root, "R/data-parsers/transform-to-cedar.R"))
+  code <- read_code(file.path(cedar_base_dir, "R/data-parsers/transform-to-cedar.R"))
   calls <- gregexpr("course_level_from_number\\(", code)[[1]]
   expect_equal(sum(calls > 0), 2L,
                info = "transform_sections and transform_students must both use it")
@@ -472,103 +443,13 @@ test_that("both transforms derive course level through course_level_from_number"
 # the real backlog and never a stale ceiling. Delete a file's entry when it
 # reaches zero.
 
-# Every `error = function(e)` handler in a file, with its body text. A brace
-# handler is read to its matching brace; a one-line handler to the end of the
-# line, which is enough to see what it returns.
-architecture_error_handlers <- function(file) {
-  text <- paste(readLines(file, warn = FALSE), collapse = "\n")
-  starts <- gregexpr("error\\s*=\\s*function\\s*\\(\\s*[A-Za-z_.]*\\s*\\)", text)[[1]]
-  if (length(starts) == 1L && starts[[1]] == -1L) return(character(0))
-  # Each result keeps its `error = function(<arg>)` prefix so the classifier
-  # can tell a handler that returns the condition itself from one returning
-  # a literal.
-  vapply(starts, function(start) {
-    rest <- substr(text, start, nchar(text))
-    prefix <- regmatches(rest, regexpr("^error\\s*=\\s*function\\s*\\([^)]*\\)\\s*", rest))
-    after <- substr(rest, nchar(prefix) + 1L, nchar(rest))
-    body <- if (startsWith(after, "{")) {
-      depth <- 0L
-      chars <- strsplit(after, "")[[1]]
-      end <- length(chars)
-      for (i in seq_along(chars)) {
-        if (chars[[i]] == "{") depth <- depth + 1L
-        if (chars[[i]] == "}") {
-          depth <- depth - 1L
-          if (depth == 0L) { end <- i; break }
-        }
-      }
-      paste(chars[seq_len(end)], collapse = "")
-    } else {
-      sub("\n.*$", "", after)
-    }
-    paste0(trimws(prefix), " ", body)
-  }, character(1))
-}
-
-# A handler is a silent fallback when it hands the caller a value without
-# telling anyone. Showing the error (showNotification, the module helper
-# handle_error), re-raising it (stop), warning, writing it to the log
-# (message, cedar_log_*), or handing the condition itself to the caller
-# (returning the error object or its conditionMessage, so the caller decides
-# and can say why) are not silent: someone can find out. A degenerate
-# statistic returning NA is the one sanctioned default.
-architecture_silent_fallback <- function(handler) {
-  prefix <- "^error\\s*=\\s*function\\s*\\(\\s*([A-Za-z_.]*)\\s*\\)\\s*"
-  argument <- sub(paste0(prefix, ".*$"), "\\1", handler)
-  body <- gsub("#[^\n]*", "", sub(prefix, "", handler))
-  reported <- paste0(
-    "showNotification\\(|handle_error\\(|\\bstop\\(|\\bwarning\\(|",
-    "rlang::abort\\(|cli::cli_abort\\(|\\bmessage\\(|cedar_log[a-z_]*\\(|",
-    "conditionMessage\\("
-  )
-  if (grepl(reported, body)) {
-    return(FALSE)
-  }
-  compact_body <- gsub("^\\{|\\}$|\\s+", "", body)
-  if (nzchar(argument) && identical(sub("\\)$", "", compact_body), argument)) {
-    return(FALSE)
-  }
-  compact <- gsub("^\\{|\\}$|\\s+", "", body)
-  if (grepl("^NA(_real_|_integer_|_character_|_logical_)?\\)?$", compact)) return(FALSE)
-  TRUE
-}
-
-architecture_count_by_file <- function(files, counter) {
-  counts <- vapply(files, counter, integer(1))
-  names(counts) <- vapply(files, relative_path, character(1))
-  counts[counts > 0L]
-}
-
-# Compare measured counts with the allowances and explain every mismatch.
-architecture_expect_ratchet <- function(measured, allowance, what) {
-  files <- union(names(measured), names(allowance))
-  problems <- character(0)
-  for (file in files) {
-    have <- if (file %in% names(measured)) measured[[file]] else 0L
-    allow <- if (file %in% names(allowance)) allowance[[file]] else 0L
-    if (have > allow) {
-      problems <- c(problems, sprintf(
-        "%s has %d %s (allowance %d): fix the new one, do not raise the allowance",
-        file, have, what, allow
-      ))
-    } else if (have < allow) {
-      problems <- c(problems, sprintf(
-        "%s has %d %s but an allowance of %d: lower the allowance to %d%s",
-        file, have, what, allow, have,
-        if (have == 0L) " by deleting its entry" else ""
-      ))
-    }
-  }
-  expect(length(problems) == 0L, paste(problems, collapse = "\n"))
-}
-
 test_that("silent error fallbacks do not grow, and the backlog shrinks on record (M11)", {
   # AGENTS.md: tryCatch(..., error = function(e) NULL) around a data pipeline
   # is always a bug. Two uses are allowed anywhere: an error shown to the user
   # with showNotification(), and a degenerate statistic returning NA.
   files <- c(
     r_files_under("R"),
-    file.path(project_root, c("global.R", "server.R", "ui.R"))
+    file.path(cedar_base_dir, c("global.R", "server.R", "ui.R"))
   )
   files <- files[!grepl("/R/lists/", files)]
   measured <- architecture_count_by_file(files, function(file) {
@@ -624,7 +505,7 @@ test_that("units are resolved only by attach_unit() and the lists layer (ADR-001
     r_files_under("R", "trunk"), r_files_under("R", "branches"), r_files_under("R", "cones"),
     r_files_under("R", "features"), r_files_under("R", "modules"),
     r_files_under("R", "data-parsers"),
-    file.path(project_root, c("global.R", "server.R"))
+    file.path(cedar_base_dir, c("global.R", "server.R"))
   )
   files <- files[!grepl("/R/branches/dims\\.R$", files)]
   pattern <- paste0(
@@ -650,4 +531,75 @@ test_that("units are resolved only by attach_unit() and the lists layer (ADR-001
     "server.R" = 8L
   )
   architecture_expect_ratchet(measured, allowance, "unit resolution(s) outside attach_unit()")
+})
+
+test_that("a test file holds tests, a table is a fixed object, a helper is a tool", {
+  # docs/developers/testing.md (Where test code lives). A test file's top level
+  # is test_that() blocks. Every table a test reads is a fixed object, built
+  # once before any test runs: the designed fixtures, the tables setup.R
+  # derives from them, and fixtures/scenario_tables.R. A helper file
+  # (tests/testthat/helper-*.R) holds what a test does, never what it reads:
+  # functions and constants, and no function there types a table. Attaching a
+  # package or sourcing a file is helper-load-functions.R's alone. A definition
+  # in a test file reaches that file only, and a library() or source() there
+  # stays in effect for every file after it. Not a ratchet: each count is zero.
+  dir <- file.path(cedar_base_dir, "tests", "testthat")
+  test_files <- list.files(dir, "^test-.*\\.R$", full.names = TRUE)
+  helper_files <- setdiff(list.files(dir, "^helper-.*\\.R$", full.names = TRUE),
+                          file.path(dir, "helper-load-functions.R"))
+  expect_gt(length(test_files), 80L)
+  expect_gt(length(helper_files), 30L)
+  top_level <- function(files) do.call(rbind, lapply(files, architecture_top_level))
+  describe <- function(rows) paste(sprintf("%s:%d %s", rows$file, rows$line, rows$what), collapse = "\n")
+
+  in_tests <- top_level(test_files)
+  stray <- in_tests[in_tests$kind != "test", ]
+  expect(nrow(stray) == 0L, paste0(
+    "outside a test_that() block; a table goes in fixtures/scenario_tables.R, ",
+    "a tool in tests/testthat/helper-<topic>.R:\n", describe(stray)))
+
+  in_helpers <- top_level(helper_files)
+  stray <- in_helpers[in_helpers$kind != "definition", ]
+  expect(nrow(stray) == 0L, paste0(
+    "a helper file runs something at load; define a function, or load it in ",
+    "helper-load-functions.R:\n", describe(stray)))
+
+  # A function with no argument returns the same thing every call: fixed data
+  # written as a function. The exceptions do something and are listed by name.
+  no_args <- in_helpers[in_helpers$n_args %in% 0L, ]
+  stray <- no_args[!no_args$what %in% names(helper_actions_without_arguments), ]
+  expect(nrow(stray) == 0L, paste0(
+    "a helper function with no argument is a fixed table; make it an object in ",
+    "fixtures/scenario_tables.R:\n", describe(stray)))
+  gone <- setdiff(names(helper_actions_without_arguments), no_args$what)
+  expect(length(gone) == 0L, paste0(
+    "listed in helper_actions_without_arguments but no longer a helper function ",
+    "with no argument; remove from the list: ", paste(gone, collapse = ", ")))
+
+  # A table typed inside a helper function is data chosen at call time, and a
+  # table held by a helper object is a fixture in the wrong file.
+  typed <- in_helpers[!is.na(in_helpers$types_table) & nzchar(in_helpers$types_table), ]
+  stray <- typed[!typed$what %in% names(helper_functions_typing_a_table), ]
+  expect(nrow(stray) == 0L, paste0(
+    "a helper function types a table (", paste(architecture_table_constructors, collapse = ", "),
+    "); make the table an object in fixtures/scenario_tables.R and state the ",
+    "change in the test:\n", describe(stray)))
+  gone <- setdiff(names(helper_functions_typing_a_table), typed$what)
+  expect(length(gone) == 0L, paste0(
+    "listed in helper_functions_typing_a_table but no longer a helper function ",
+    "that types one; remove from the list: ", paste(gone, collapse = ", ")))
+  objects <- in_helpers[in_helpers$kind == "definition" & is.na(in_helpers$n_args), ]
+  held <- vapply(objects$what, function(name) {
+    architecture_holds_table(get0(name, inherits = TRUE))
+  }, logical(1))
+  stray <- objects[held, ]
+  expect(nrow(stray) == 0L, paste0(
+    "a helper file holds a table; move it to fixtures/scenario_tables.R:\n", describe(stray)))
+
+  scenario <- architecture_top_level(file.path(dir, "fixtures", "scenario_tables.R"))
+  expect_gt(nrow(scenario), 50L)
+  stray <- scenario[scenario$kind != "definition" | !is.na(scenario$n_args), ]
+  expect(nrow(stray) == 0L, paste0(
+    "fixtures/scenario_tables.R holds fixed objects only; a function is a helper:\n",
+    describe(stray)))
 })

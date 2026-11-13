@@ -8,7 +8,7 @@ parent: Developer Guide
 
 This reference is auto-generated from roxygen2 comments in the source code.
 
-*Generated: 2026-11-12 21:18:51.967379*
+*Generated: 2026-11-13 07:26:43.295281*
 
 ---
 
@@ -73,6 +73,22 @@ The outcome flags of attempts, read off their stored classification  What the pe
 - `passing_values` - The grades that pass; GRADES_PASS, or GRADES_PASS_SUB_C_OPT_IN from a page's visible control.
 
 **Returns:** `attempts` with the `is_*` flags classify_attempt_outcomes() writes.
+
+---
+
+### `add_attempt_grade_band()`
+
+*Source: attempts.R*
+
+**The grade band of each attempt**
+
+The grade band of each attempt  Reads the band off the stored `outcome_category`, so a band sits on one side of the pass line by construction: a passing attempt is "A", "B" or "C" by its letter (GRADE_LETTER_BANDS) or "Other passing" (CR); a C-, D or F is "C- to F"; a late drop or W is "Withdrew"; any other recorded nonpassing grade is "Other nonpassing"; an early drop or an attempt with no grade is "Not graded".
+
+**Parameters:**
+
+- `attempts` - Rows of cedar_attempts; needs `outcome_category` and `final_grade`.
+
+**Returns:** `attempts` with `grade_band` (one of GRADE_BAND_LEVELS).
 
 ---
 
@@ -319,6 +335,24 @@ Program scope includes its concentrations and the transitive course references T
 - `terms` - A tibble as built by [build_cedar_terms()].
 
 **Returns:** `terms`, unchanged, or an error naming what is wrong: a missing column, a repeated term, a term code that is not YYYYSS, or no row for a Fall or Spring between the first and last enrolled term.
+
+---
+
+### `advance_term()`
+
+*Source: cedar-terms.R*
+
+**Move term codes forward a number of terms**
+
+Move term codes forward a number of terms  The last term of a follow-up window: retention's term T+n, the later-course window's end. Each code is advanced independently, `n_steps` times through add_next_term_col() (trunk/utils.R), so it needs no term table and reaches past the loaded data.
+
+**Parameters:**
+
+- `term_codes` - Term codes (`YYYYSS`).
+- `n_steps` - How many terms forward.
+- `summer` - Whether Summer is a step. Default FALSE: regular terms only, a Summer code moving to its Fall first.
+
+**Returns:** Integer term codes, one per input; an unrecognized code is NA.
 
 ---
 
@@ -797,64 +831,6 @@ Summarize courses taken alongside a selected course  Collapses the term-type det
 - `top_n` - Optional maximum number of campus-course rows to retain.
 
 **Returns:** A campus-grained tibble ordered by share of selected-course student-term enrollments.
-
----
-
-### `get_downstream_pair_audit()`
-
-*Source: course-flows.R*
-
-**Course-level eligibility and order audit for a downstream pair**
-
-Course-level eligibility and order audit for a downstream pair  Counts every student once, independent of instructor attribution. The year table keys a student to the calendar year of their first X attempt and shows whether they had already passed Y strictly earlier or in that same term.
-
-**Parameters:**
-
-- `students` - cedar_registrations.
-- `course_x` - Character. Upstream course.
-- `course_y` - Character vector. Selected downstream course(s).
-- `opt` - Named list with `campus` and `data_edges`.
-
-**Returns:** List with one-row `summary` and `order_by_year` tibbles.
-
----
-
-### `get_downstream_course_options()`
-
-*Source: course-flows.R*
-
-**Courses students took after a given course**
-
-**Parameters:**
-
-- `students` - cedar_registrations.
-- `course_x` - Character. The upstream course.
-- `opt` - Named list: \describe{ \item{campus}{Character vector of course-delivery campus codes. Pass the same value the analysis will use so the counts agree.} \item{min_n}{Integer. Drop follow-on courses below this many students. Default 15, matching the impact analyses' default.} \item{data_edges}{Optional output of [cedar_data_edges()]. Follow-on enrollment is capped at the longitudinal grade edge (the earlier of `last_enrolled_complete` and `last_graded`), and recent X cohorts without a subsequent regular term by that edge are excluded from the picker denominator. Derived from `students` when omitted.} }
-
-**Returns:** Tibble ordered by same-department first, then share of X's students: subject_course, course_title, department, n_students, pct_of_x, same_dept.  No term-gap column: term codes are YYYYSS, so differencing them does not yield a number of semesters, and a plausible-looking wrong gap is worse than no gap at all. Add it via term_diff() if it is ever needed.
-
----
-
-## course-instructor-effect
-
-### `get_instructor_effect()`
-
-*Source: course-instructor-effect.R*
-
-**Downstream Success by Instructor**
-
-Downstream Success by Instructor  Among students who took course X and later took course Y, compares grade outcomes in Y between students taught by different instructors in X. Surfaces descriptive differences in downstream outcomes by upstream instructor.  The balance table reveals whether instructor sections self-selected different kinds of students — the most common confounder in multi-section courses.
-
-**Parameters:**
-
-- `students` - cedar_registrations data frame: the X cohort and the comparison's covariates.
-- `attempts` - The attempt measure table (`cedar_attempts`): the Y outcomes.
-- `programs` - cedar_programs data frame.
-- `applicants` - cedar_applicants data frame, or NULL.
-- `opt` - Named list: \describe{ \item{course_x}{Character. The upstream course. Required.} \item{course_y}{Character. The downstream outcome course. May name several courses, in which case the analysis becomes a rollup across all of them and each student is counted once, at their earliest enrolment in the set. Required.} \item{campus}{Character vector. Optional campus filter.} \item{min_n}{Integer. Minimum students per instructor who later took Y (default 15). Instructors below this threshold are excluded.} }
-- `data_edges` - Optional output of [cedar_data_edges()]. When omitted it is derived from `students`. X cohorts stop at `last_enrolled_complete`; grade outcomes stop at the earlier of that edge and `last_graded`. Cohorts without one subsequent regular term before the complete-enrollment edge are excluded from the continuation denominator.
-
-**Returns:** Named list: \describe{ \item{course_x, course_y}{Course identifiers.} \item{outcomes}{Eligibility, continuation, and observed Y outcomes by each student's first instructor in X.} \item{order_audit_by_year}{Course-level yearly counts of students who passed Y strictly before or in the same term as their first X attempt.} \item{course_summary}{Course-level continuation denominator and rate, independent of instructor attribution and display thresholds.} \item{instructor_counts}{Tibble: instructor_name, n (students who took Y).} \item{balance}{Balance between the two most-common instructors' student pools.} \item{n_treatment, n_control}{Sizes for the reference instructor comparison.} }
 
 ---
 
@@ -2468,6 +2444,100 @@ One short fingerprint of the mapping files as loaded  The dimension tables are t
 Which subjects each unit teaches  One row per confirmed (subject, unit, college) in subjects.csv. A subject taught under two units (or credited to two colleges) has a row for each; filter on `dept_code` and pull `subject_code` for a unit's subjects, which is what the retired data-derived subject_lookup served.
 
 **Returns:** A tibble with `subject_code`, `dept_code` and `college`.
+
+---
+
+## downstream-cohort
+
+### `downstream_course_y_label()`
+
+*Source: downstream-cohort.R*
+
+**How a page names the later course**
+
+**Parameters:**
+
+- `course_y` - The later course, or a set of them.
+
+**Returns:** The course, or for a set "any of N later courses": a student counts at their first term with any member.
+
+---
+
+### `build_downstream_cohort()`
+
+*Source: downstream-cohort.R*
+
+**Students who took course X, and what each did in course Y**
+
+Students who took course X, and what each did in course Y  The single later-course cohort definition (see the file header).
+
+**Parameters:**
+
+- `students` - cedar_registrations: who took X and Y, when and where.
+- `attempts` - cedar_attempts: what each attempt earned.
+- `course_x` - Character. The earlier course.
+- `course_y` - Character vector. The later course, or a set of them; with more than one, each student counts at their first term with any member.
+- `opt` - Named list: `data_edges` ([cedar_data_edges()] output; required), `campus` (campuses that delivered X; NULL for all) and `window_terms` (regular terms after X in which Y counts; default 3).
+
+**Returns:** A list: `cohort`, `window_terms`, `observation_end` (the settled edge enrollment is followed to) and `grade_end` (the edge grades are read to). `cohort` has one row per student and DOWNSTREAM_COHORT_COLUMNS: the campus, term and instructor of their first X attempt, `x_outcome` ("pass" / "dfw" / NA) and `x_band` (GRADE_BAND_LEVELS), `window_end`, `right_censored`, `passed_y_before_x`, `passed_y_same_term`, `prior_pass_excluded`, `eligible`, `took_y`, `term_y`, `y_courses`, `gap_terms` (1..window_terms), `y_outcome` ("pass", "dfw", "not_graded", "no_outcome", or NA when Y was not taken) and `y_withdrew`.
+
+---
+
+### `get_downstream_course_options()`
+
+*Source: downstream-cohort.R*
+
+**Courses students took after a given course**
+
+Courses students took after a given course  The later-course picker. Counts follow build_downstream_cohort(): students whose first X attempt has a complete window, each later course counted once per student inside that window and on every campus, its denominator net of students who had already passed that course before X. The picker and the analysis therefore show the same continuation share for a single course.  Campus: the picker is one list across the campus scope, not a rate table per campus ("CHEM 1225 at ABQ" and "CHEM 1225 at EA" as separate entries would be unusable). The analysis that follows splits by campus.
+
+**Parameters:**
+
+- `students` - cedar_registrations.
+- `attempts` - cedar_attempts.
+- `course_x` - Character. The earlier course.
+- `opt` - Named list: `data_edges`, `campus` and `window_terms` as build_downstream_cohort(), and `min_n` (drop later courses reached by fewer students; default 15).
+
+**Returns:** Tibble with DOWNSTREAM_OPTION_COLUMNS, same-department courses first, then by students: `n_students` who took the course in the window, `n_eligible` who could have, `pct_of_x` (0-100, unrounded). Zero rows when no later course reaches `min_n`.
+
+---
+
+## downstream-instructor-balance
+
+### `get_downstream_instructor_balance()`
+
+*Source: downstream-instructor-balance.R*
+
+**Balance between the students of two X instructors who went on to Y**
+
+**Parameters:**
+
+- `students` - cedar_registrations.
+- `attempts` - cedar_attempts.
+- `programs` - cedar_programs.
+- `applicants` - cedar_applicants, or NULL.
+- `opt` - Named list: \describe{ \item{course_x}{Character. The earlier course. Required.} \item{course_y}{Character vector. The later course or set. Required.} \item{data_edges}{Output of [cedar_data_edges()]. Required.} \item{campus}{Campuses that delivered X.} \item{window_terms}{Regular terms after X in which Y counts. Default 3.} \item{min_n}{Smallest instructor group compared. Default 15.} \item{reference_instructor}{Optional instructor name to compare first.} }
+- `student_terms` - cedar_student_terms, for the rebuilt credit and GPA covariates.
+
+**Returns:** Named list: `balance` (from build_comparison(), or NULL), `n_comparable` and `n_groups` (instructor groups with `min_n` continuers, and with any), `instructor_counts` (campus, instructor_name, n continuers), `reference_instructor`, `reference_campus`, `comparison_instructor`, `comparison_campus`, `n_treatment`, `n_control`, `min_n`, `course_x`, `course_y`, `course_y_label`, `window_terms`. `balance` is NULL when fewer than two groups reach `min_n`.
+
+---
+
+## downstream-outcomes
+
+### `get_downstream_outcomes()`
+
+*Source: downstream-outcomes.R*
+
+**Outcomes in a later course for the students of an earlier one**
+
+**Parameters:**
+
+- `students` - cedar_registrations.
+- `attempts` - cedar_attempts.
+- `opt` - Named list: \describe{ \item{course_x}{Character. The earlier course. Required.} \item{course_y}{Character vector. The later course, or a set of them (each student counts at their first term with any). Required.} \item{data_edges}{Output of [cedar_data_edges()]. Required.} \item{campus}{Campuses that delivered X. NULL includes every campus.} \item{window_terms}{Regular terms after X in which Y counts. Default 3.} \item{by_instructor}{TRUE adds the breakdown by the instructor of each student's first X attempt. Default FALSE.} \item{min_n}{Smallest denominator a rate is shown for. Default 10.} }
+
+**Returns:** Named list. Tables, each with the counts and rates of `.downstream_rates()`: `summary` (one row per campus), `by_grade` (campus x grade band in X), `by_term` (campus x term of X, with `term_type`, oldest first), `instructors` and `instructors_by_grade` (campus x instructor, and x grade band; NULL unless `by_instructor`). Also `timing` (campus x regular terms after X), `order_by_year` (campus x academic year: Y passed before or alongside X), `main_term_type` (the term type of X holding the most eligible students), and the scope: `course_x`, `course_y`, `course_y_label`, `rollup`, `by_instructor`, `min_n`, `window_terms`, `observation_end`, `grade_end`.
 
 ---
 

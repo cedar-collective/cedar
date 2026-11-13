@@ -9,12 +9,6 @@
 
 context("Registration Statistics (regstats)")
 
-regstats_history_opt <- function(term = 202080L) {
-  list(term = term, bypass_cache = TRUE,
-       thresholds = list(min_impacted = 1, pct_sd = 1, chronic_fill_rate = .60,
-                         min_sat_terms = 1, min_wait = 1, section_proximity = .3))
-}
-
 test_that("Regstats uses earlier matching terms for every mean and population SD", {
   result <- get_reg_stats(test_students_regstats, test_sections_regstats, regstats_history_opt(),
                          course_terms = test_course_terms_regstats)
@@ -193,7 +187,7 @@ test_that("Regstats refuses a course-term table not counted by this build over t
   expect_false(course_terms_is_current(older, test_students_regstats))
   expect_false(course_terms_is_current(dplyr::select(current, -census_enrl), test_students_regstats))
   # Counted over one class list's renames, it is not current for another's.
-  rn <- rn01_course_tables()
+  rn <- rn01_course_tables
   expect_false(course_terms_is_current(current, rn$cedar_registrations))
   rn_base <- course_terms_for(rn$cedar_registrations, rn$cedar_sections)
   expect_true(course_terms_is_current(rn_base, rn$cedar_registrations))
@@ -215,7 +209,7 @@ test_that("Regstats stops on a table no loader attached", {
 })
 
 test_that("Regstats follows a course across its codes (ADR-001 step 4)", {
-  rn <- rn01_course_tables()
+  rn <- rn01_course_tables
   # RN01 sections seat 20 and one student registers, so a 5% ceiling marks
   # every offering at cap; one prior term at cap is Chronically full here.
   rn_terms <- course_terms_for(rn$cedar_registrations, rn$cedar_sections)
@@ -269,7 +263,7 @@ test_that("Regstats excludes a course the list names by a former code, on every 
   # Keyed on course_id, a list naming HIST 320 must drop the course HIST 3201
   # in every term, from the course-term table and the waits pass's class list
   # alike; matched by code, the table's HIST 3201 rows would survive and flag.
-  rn <- rn01_course_tables()
+  rn <- rn01_course_tables
   rn_terms <- course_terms_for(rn$cedar_registrations, rn$cedar_sections)
   expect_true("HIST 3201" %in% rn_terms$subject_course)
   opt <- regstats_history_opt(term = 202110L)
@@ -285,7 +279,7 @@ test_that("Regstats excludes a course the list names by a former code, on every 
 })
 
 test_that("the schedule's old code joins the class list's new one in Regstats saturation (I45)", {
-  rn <- rn01_course_tables()
+  rn <- rn01_course_tables
   # Spring 2020: SOC 371 and SOC 250 are on the schedule, SOCI 371 and
   # SOCI 250 on the class list. By course every section finds its census.
   result <- get_reg_stats(rn$cedar_registrations, rn$cedar_sections, regstats_history_opt(term = 202010L),

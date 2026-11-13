@@ -11,31 +11,6 @@
 
 context("Gen Ed campus split")
 
-ge_profile <- function(min_n = 1L, instructor = TRUE) {
-  suppressMessages(get_gen_ed_profile(
-    test_students, test_attempts, test_sections, test_programs, NULL, test_student_terms, test_dims,
-    list(min_n = min_n,
-         include_instructor_dfw = instructor,
-         include_associations = FALSE,
-         data_edges = data_objects$cedar_edges)
-  ))
-}
-
-# MC01 in designed_test_data.R mirrors the ABQ gen_ed_assoc rows onto EA: same
-# course, same instructors, different students, opposite outcomes. Everything
-# below reads from that fixture rather than building tibbles here.
-ge_two_campus_profile <- function(min_n = 1L) {
-  suppressMessages(get_gen_ed_profile(
-    gen_ed_assoc_students,
-    gen_ed_assoc_attempts,
-    gen_ed_assoc_sections,
-    gen_ed_assoc_programs,
-    student_terms = test_student_terms_gen_ed_assoc,
-    dims = test_dims,
-    opt = list(data_edges = data_objects$cedar_edges, dept_code = "HIST", min_n = min_n, include_instructor_dfw = TRUE)
-  ))
-}
-
 test_that("dfw_by_course is one row per campus per course", {
   d <- ge_profile()$dfw_by_course
   skip_if(nrow(d) == 0, "fixture produced no DFW rows")

@@ -2,41 +2,13 @@ context("Transform status metadata")
 
 # load_transform_helpers() is in helper-transform.R, shared with the gate's test.
 
-# Scaffolding: the ADR-002 mapping files a transform reads, as small frames.
-# Only HIST courses have a subject row; programs are passed per test.
-scaffold_mapping_files <- function(programs = NULL) {
-  if (is.null(programs)) {
-    programs <- as.data.frame(stats::setNames(
-      rep(list(character()), length(CEDAR_MAPPING_FILE_SPECS$programs)),
-      CEDAR_MAPPING_FILE_SPECS$programs))
-  }
-  list(
-    colleges = data.frame(college_code = c("AS", "FA", "PH"),
-                          college_name = c("Arts and Sciences", "Fine Arts", "Pharmacy"),
-                          source_names = c("College of Arts & Sciences", "College of Fine Arts", "")),
-    units    = data.frame(unit_code = c("HIST", "ANTH", "PHRM", "ARTS"),
-                          unit_name = c("History", "Anthropology", "Pharmacy", "Art Studio"),
-                          college_code = c("AS", "AS", "PH", "FA"), kind = "department", notes = ""),
-    subjects = data.frame(subject_code = "HIST", in_college = "", in_level = "", unit_code = "HIST",
-                          college_code = "", status = "confirmed", evidence = "", notes = ""),
-    programs = programs,
-    code_history = as.data.frame(stats::setNames(
-      rep(list(character()), length(CEDAR_MAPPING_FILE_SPECS$code_history)),
-      CEDAR_MAPPING_FILE_SPECS$code_history)),
-    settings = data.frame(setting = character(), value = character())
-  )
-}
-# The same files as the loader reads them: the transform stores keys, and
-# attach_unit() (R/branches/dims.R) resolves them at every start.
-scaffold_dims <- function(programs = NULL) build_cedar_dims(scaffold_mapping_files(programs))
-
 test_that("student transform saves one class-list row per course-term and no classified outcomes", {
   env <- load_transform_helpers()
   output_dir <- tempfile("audit-transform-")
   dir.create(output_dir)
   on.exit(unlink(output_dir, recursive = TRUE), add = TRUE)
   env$transform_students(class_lists_audits, output_dir, ".qs",
-                        maps = list(mapping_files = scaffold_mapping_files(),
+                        maps = list(mapping_files = scaffold_mapping_files,
                                     major_name_to_major_code = c(History = "HIST")))
   # Outcomes are classified at load (cedar_attempts), never saved.
   expect_false(file.exists(file.path(output_dir, "cedar_grades.qs")))
@@ -46,7 +18,7 @@ test_that("student transform saves one class-list row per course-term and no cla
   students <- qs2::qs_read(file.path(output_dir, "cedar_registrations.qs"))
   expect_false(any(c("department", "college", "college_basis") %in% names(students)))
   expect_equal(unique(students$source_college), "ARTS")
-  attached <- attach_unit(students, scaffold_dims(), "subject")
+  attached <- attach_unit(students, scaffold_dims, "subject")
   expect_equal(unique(attached$department), "HIST")
   expect_equal(unique(attached$college), "AS")
   expect_equal(unique(attached$college_basis), "mapped")
@@ -197,9 +169,12 @@ test_that("a program's unit comes from programs.csv; anything unconfirmed has no
     status = c("confirmed", "confirmed", "confirmed", "proposed"), evidence = "", notes = "")
   # History names a major, so the name-to-code fill could reach EC14-C's
   # History concentration if it applied to concentrations (I21).
+  mapping_files <- scaffold_mapping_files
+  mapping_files$programs <- programs_csv
+  dims <- build_cedar_dims(mapping_files)
   maps <- list(
-    mapping_files = scaffold_mapping_files(programs_csv),
-    dims = scaffold_dims(programs_csv),
+    mapping_files = mapping_files,
+    dims = dims,
     major_name_to_major_code = c(History = "HIST")
   )
   env$transform_programs(academic_studies_program_units, output_dir, ".qs", maps = maps)
@@ -207,7 +182,7 @@ test_that("a program's unit comes from programs.csv; anything unconfirmed has no
   expect_false(any(c("dept_code", "program_college", "college_code", "college_basis",
                      "student_college") %in% names(stored)))
   expect_true(all(c("source_college", "source_college_code") %in% names(stored)))
-  programs <- suppressMessages(attach_program_units(stored, scaffold_dims(programs_csv)))
+  programs <- suppressMessages(attach_program_units(stored, dims))
   declared <- programs[!grepl("Concentration", programs$program_type), ]
   dept <- stats::setNames(declared$dept_code, declared$major_code)
 

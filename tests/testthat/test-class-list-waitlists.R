@@ -1,8 +1,5 @@
 context("Class-list waitlist preservation")
 
-source("../../R/data-parsers/class-list-waitlists.R")
-
-
 test_that("preserve_class_list_waitlists keeps old WL rows missing from a refreshed term", {
   old_data <- tibble::tibble(
     `Academic Period` = c("Fall 2025", "Fall 2025", "Spring 2026"),

@@ -25,6 +25,8 @@ test_sections        <<- cedar_sections
 test_sections_sf     <<- cedar_sections_sf      # seatfinder-specific: 2024/2025 terms (test-seatfinder.R)
 test_students_mc     <<- cedar_registrations_mc       # MC02: sequence + co-req + repeat, 2 campuses
 test_programs_mc     <<- cedar_programs_mc       # MC02 covariates
+test_students_ds     <<- cedar_registrations_ds       # DS01: a course and its sequel (Later Course)
+test_programs_ds     <<- cedar_programs_ds       # DS01 covariates
 test_students_mcret  <<- cedar_registrations_mcret    # MC03: retention cohorts, incl. a campus move
 test_students_wlmkt  <<- cedar_registrations_wlmkt    # WL01: a waitlist in the pooled ABQ+EA market
 test_students_wlterm <<- cedar_registrations_wlterm   # WL02: waiting counted per term
@@ -92,6 +94,7 @@ test_student_terms_roadblocks <<- .fixture_student_terms(cedar_registrations_roa
 test_student_terms_mcret      <<- .fixture_student_terms(cedar_registrations_mcret)
 test_student_terms_rp         <<- .fixture_student_terms(cedar_registrations_rp, cedar_degrees_rp)
 test_student_terms_mc         <<- .fixture_student_terms(cedar_registrations_mc)
+test_student_terms_ds         <<- .fixture_student_terms(cedar_registrations_ds)
 # RW01 carries programs rows (unit, standing); Spring 2021 is in registration,
 # so Fall 2020 is the settled edge.
 test_student_terms_rw         <<- suppressMessages(build_student_terms(
@@ -114,6 +117,7 @@ attach_test_student_terms <<- function(st) {
 }
 for (.st in c("test_student_terms", "test_student_terms_audits", "test_student_terms_roadblocks",
               "test_student_terms_mcret", "test_student_terms_rp", "test_student_terms_mc",
+              "test_student_terms_ds",
               "test_student_terms_rw", "test_student_terms_gen_ed_assoc", "test_student_terms_st")) {
   assign(.st, attach_test_student_terms(get(.st)), envir = globalenv())
 }
@@ -147,17 +151,17 @@ rm(.stu)
 rm(.sec)
 # RN01 read with the demo institution's code_history.csv, as its tests read it:
 # both tables attached from one dimension built over both, as global.R does.
-rn01_course_tables <<- function(students = test_students_rn) {
+.rn_course_tables <- function(students) {
   dims <- build_cedar_dims(read_institution_mappings(cedar_institution_dir(cedar_base_dir, "demo")))
   courses <- suppressMessages(build_cedar_courses(test_sections_rn, students, dims))
   suppressMessages(attach_course_ids(
     list(cedar_sections = test_sections_rn, cedar_registrations = students), courses
   ))
 }
+rn01_course_tables <<- .rn_course_tables(test_students_rn)
 # RN02 rides on RN01: its class-list rows added to RN01's.
-rn02_course_tables <<- function() {
-  rn01_course_tables(dplyr::bind_rows(test_students_rn, test_students_rn02))
-}
+rn02_course_tables <<- .rn_course_tables(dplyr::bind_rows(test_students_rn, test_students_rn02))
+rm(.rn_course_tables)
 # Degree Explorer: the demo institution's designed catalog (institution/demo/),
 # two synthetic programs whose schedules are worked by hand in
 # test-degree-explorer.R. Independent of any real institution's annual catalog.
@@ -244,6 +248,14 @@ message(sprintf("  test_sections: %d rows (%d XL) | test_students: %d rows | tes
                 nrow(test_students), nrow(test_programs)))
 message(sprintf("  test_faculty:  %d rows | test_degrees:  %d rows",
                 nrow(test_faculty), nrow(test_degrees)))
+
+# -----------------------------------------------------------------------------
+# SCENARIO TABLES - the fixed tables one test file reads, each built once here
+# -----------------------------------------------------------------------------
+# Typed by hand or derived from the fixtures above; never a function. Sourced
+# into this environment, after the fixtures and measure tables it reads, so a
+# helper function can read a table and a table can use a helper's row builder.
+suppressMessages(source("fixtures/scenario_tables.R", local = TRUE))
 
 # Helper function to create standard opt list
 create_test_opt <- function(overrides = list()) {

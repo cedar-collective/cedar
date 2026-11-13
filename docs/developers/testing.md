@@ -86,9 +86,11 @@ are facts about how the data looks, and every analytic touching them needs the
 same shape. These belong in `designed_test_data.R`; tests filter from the
 `test_*` variables.
 
-**No: it exists only inside the pipeline.** Build it locally at the top of the
-test file, with its expected values documented directly above and a comment
-saying why it is local. The legitimate cases:
+**No: it exists only inside the pipeline.** Write it once, as a fixed object in
+`fixtures/scenario_tables.R` ([where test code lives](#where-test-code-lives)),
+under the heading of the test file that reads it, with its expected values
+documented directly above and a comment saying why it is not in the shared
+fixture. The legitimate cases:
 
 - **Intermediate frames.** `compute_stopout_for_group()` takes a frame with
   `outcome` and `stopped_out` already derived; that shape is one function's
@@ -128,13 +130,101 @@ then committed. If one changes, the function or fixture changed: investigate
 before updating. To learn the value for a new assertion, assert something
 obviously wrong and read the real value from the failure diff.
 
-Filter tests use `make_opt(uel = FALSE)`: the `uel = TRUE` default applies the
-excluded-courses list and changes `subject_course`.
+Filter tests use `filtering_opt()`, which sets `uel = FALSE`: the `uel = TRUE`
+default applies the excluded-courses list and changes `subject_course`.
 
 `tests/testthat/create-test-fixtures.R` once sampled real data into binary
 `cedar_*_test.qs` files. Nothing loads them; the script is kept, under a legacy
 banner, only as the recipe for a stratified real-data sample. Never add rows to
 it.
+
+### Where test code lives
+
+**A test reads fixed data, and a helper is something a test does.** Four
+rules, each enforced by `test-architecture.R`:
+
+1. **A test file holds `test_that()` blocks and nothing else** (a `context()`
+   line and `testthat::local_edition()` aside): no function, object,
+   `library()` or `source()` at its top level.
+2. **Every table a test reads is a fixed object,** built once before any test
+   runs and the same object for every test. It is never a function.
+3. **A helper function takes an argument or does something.** A function with
+   no argument returns the same thing every call, so a table written as one is
+   fixed data and belongs with the tables. The twelve helpers that take no
+   argument each run something (the function under test, a script, a skip);
+   they are listed by name in `helper_actions_without_arguments`
+   (`helper-architecture.R`), and the list may only get shorter.
+4. **No helper types a table.** A function that types a table from its
+   arguments (`tibble()`, `tribble()`, `data.frame()`) is data chosen at call
+   time, and a table held by a helper object is a fixture in the wrong file.
+   Both go with the tables. The two functions that still call a constructor
+   are not data a test reads, and are listed in
+   `helper_functions_typing_a_table`.
+
+Everything loads before every test file, whichever file is run:
+
+| What | Where |
+|---|---|
+| Rows that enter the system | `fixtures/designed_test_data.R`, exposed by `setup.R` as `test_*` and `data_objects` |
+| The tables the transform builds from them (student terms, attempts, course terms, flows) | Built once in `setup.R`, by the production builders |
+| A table one test file reads: a frame typed by hand as the input of one function, or a population, an attempts table or a mapping-file list derived from the fixtures | `fixtures/scenario_tables.R`, one section per test file, sourced once at the end of `setup.R` |
+| The right edges a designed scenario is read through | `helper-scenario-edges.R`, one list per scenario |
+| What a test does: run the function under test with its options, stamp a stated series on a fixed row, write to a temporary directory, read a plot. Also ids and option lists | `helper-<topic>.R`, named for the test file it serves |
+| Packages, and the source files `load_funcs()` leaves out | `helper-load-functions.R` |
+
+What follows from a table being fixed:
+
+- **A test that needs a variant says so in its own body:**
+  `pathway_students %>% filter(term < 202510L)`, or
+  `mutate(scenario_test_composition, n_students = c(3L, 30L))`. The fixed
+  table is the base and the test states the one thing it changes. R copies on
+  modify, so a test cannot change a table for the test after it.
+- **Several designed variants of one table are one named list,** typed once:
+  `mapping_programs$invalid`, `spine_scenarios$sequence`,
+  `dfw_demo_rows$threshold`. Each row's reason is a comment beside the row,
+  as in the designed fixtures.
+- **A test that states a series, not a table, stamps it on a fixed row:**
+  `projection_test_history(c(20, 24), terms = c(202210L, 202310L))` repeats
+  `projection_history_row` once per term and writes the series into its count
+  columns. The row is typed in the scenario tables; the helper only repeats
+  and overwrites, so the shape of a prepared history row has one home.
+- **A scenario table that cannot be built stops every test file,** as a broken
+  fixture does. Derive one through the builders, readers and filters that
+  produce the input of the function under test (`build_population()`,
+  `build_attempts()`, `build_cedar_dims()`, `cedar_data_edges()`), never
+  through the function under test itself: its output stays an action in a
+  helper (`ch_result()`, `gpa_timeline()`), so breaking it fails its own tests
+  and no others.
+- **Names are global to the suite.** Prefix a name with its scenario or topic
+  (`hp2_population`, `ss_attempts`, `roadmap_plan()`), and `grep` the scenario
+  tables and the helpers before adding one: it may exist.
+- **A helper selects and shapes; it never reimplements a calculation.** The
+  expected values stay in the test, beside the assertion.
+
+The scenario tables add under a second to setup. A scratch session loads the
+same homes the same way, from `tests/testthat`, into an environment of its own
+(`setup.R` assigns with `<<-`, which fails when it is sourced straight into the
+global environment):
+
+```r
+e <- new.env(parent = globalenv())
+invisible(testthat::source_test_helpers(".", env = e))
+invisible(testthat::source_test_setup(".", env = e))
+local(print(hp2_population), envir = e)
+```
+
+Until 2026-11 these definitions sat at the top of 57 of the 86 test files (141
+functions, 60 objects). A scratch session could not reach them; two files held
+different values under one name (`mc02_edges`); the same builder was written
+out in two files; and a file run alone attached different packages from the
+same file run in the suite, because `library()` and `source()` calls in one
+test file stayed in effect for every file after it. A first pass moved them
+into helper files as functions. 78 of those took no argument and returned the
+same table every call, so the data a test read was still spread over 34 files
+and rebuilt on every call; they became the fixed objects above. Eighteen more
+took arguments and typed a table from them (`program_rows("FHIS", leads_to =
+"NOPE")`); their tables became fixed objects too, each checked equal to what
+its function had returned.
 
 ---
 
@@ -279,10 +369,12 @@ for each browser retry.
 ### The suite does not load Shiny modules
 
 `helper-load-functions.R` calls `load_funcs(cedar_base_dir, modules = FALSE)`,
-so `subtab_header()`, `deptProfileGenEdUI()` and every other module function is
-absent; a test calling one fails with "could not find function". To exercise a
-UI function, rerun the loader with modules on, rather than hand-sourcing
-`R/modules/*.R` (which pulls a dependency chain):
+so `deptProfileGenEdUI()` and nearly every other module function is absent; a
+test calling one fails with "could not find function". The helper then sources
+three module files for the pure helpers the suite tests (`ui-helpers.R`,
+`admin.R`, `dept-trends.R`); a test file never sources one itself. To exercise
+any other UI function, rerun the loader with modules on, rather than
+hand-sourcing `R/modules/*.R` (which pulls a dependency chain):
 
 ```r
 setwd("tests/testthat")
@@ -511,9 +603,11 @@ scratchpad. To combine fixtures with real data from a script:
 
 ```r
 setwd("tests/testthat")
-for (f in list.files(".", "^helper")) source(f)   # cone/branch functions
-source("setup.R")                                  # test_students, test_sections, ...
+e <- new.env(parent = globalenv())                  # see "Where test code lives"
+invisible(testthat::source_test_helpers(".", env = e))   # functions, test builders
+invisible(testthat::source_test_setup(".", env = e))     # test_students, test_sections, ...
 students <- qs2::qs_read("../../data/cedar_registrations.qs")   # qs2; qs::qread fails
+local(nrow(dplyr::semi_join(students, test_students, by = "subject_course")), envir = e)
 ```
 
 Two things the helpers don't do, both of which look like broken code:

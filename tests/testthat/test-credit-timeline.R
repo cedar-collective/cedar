@@ -5,8 +5,6 @@
 # field reliability contract in AGENTS.md, then the CT01 block in
 # fixtures/designed_test_data.R — every number below is stated there.
 
-source(file.path(dirname(getwd()), "testthat", "fixtures", "designed_test_data.R"))
-
 context("Per-Term Credit Position")
 
 
@@ -172,26 +170,9 @@ test_that("an event in a term the student has no row for keeps the row with NA",
 # ever falls back to them the position stops moving across a student's terms,
 # which is precisely what these assert against.
 
-ct_population <- function() {
-  tibble::tibble(student_id = c("CT_A", "CT_C"), population_label = "ct")
-}
-
-ct_students <- function() {
-  # CT_A takes one course per term across their four terms.
-  tibble::tibble(
-    student_id = rep("CT_A", 4),
-    term = c(202080L, 202110L, 202180L, 202210L),
-    subject_course = "CTMP 101",
-    course_title = "Test Course",
-    student_classification = "Freshman",
-    registration_status_code = "RE",
-    campus = "ABQ"
-  )
-}
-
 test_that("inst_credit_band places a course by UNM credits entering the term", {
   timing <- suppressMessages(get_course_timing(
-    ct_students(), ct_population(),
+    ct_students, ct_population,
     opt = list(x_axis = "inst_credit_band", min_n = 1L, campus = "ABQ",
                group_campus = FALSE),
     student_terms = cedar_student_terms_ct
@@ -202,7 +183,7 @@ test_that("inst_credit_band places a course by UNM credits entering the term", {
 
 test_that("overall_credit_band adds the transfer block and shifts the bands", {
   timing <- suppressMessages(get_course_timing(
-    ct_students(), ct_population(), programs = cedar_programs_ct,
+    ct_students, ct_population, programs = cedar_programs_ct,
     opt = list(x_axis = "overall_credit_band", min_n = 1L, campus = "ABQ",
                group_campus = FALSE),
     student_terms = cedar_student_terms_ct
@@ -216,7 +197,7 @@ test_that("overall_credit_band adds the transfer block and shifts the bands", {
 test_that("credit axes refuse to run without student_terms", {
   expect_error(
     suppressMessages(get_course_timing(
-      ct_students(), ct_population(), programs = cedar_programs_ct,
+      ct_students, ct_population, programs = cedar_programs_ct,
       opt = list(x_axis = "inst_credit_band", min_n = 1L, campus = "ABQ"))),
     "require cedar_student_terms"
   )
@@ -228,7 +209,7 @@ test_that("overall_credit_band refuses to run without programs", {
   # under the right label.
   expect_error(
     suppressMessages(get_course_timing(
-      ct_students(), ct_population(),
+      ct_students, ct_population,
       opt = list(x_axis = "overall_credit_band", min_n = 1L, campus = "ABQ"),
       student_terms = cedar_student_terms_ct)),
     "recover the transfer block"
@@ -239,7 +220,7 @@ test_that("the credit position moves across a student's terms on both axes", {
   # The single property the frozen columns failed.
   for (ax in c("inst_credit_band", "overall_credit_band")) {
     timing <- suppressMessages(get_course_timing(
-      ct_students(), ct_population(), programs = cedar_programs_ct,
+      ct_students, ct_population, programs = cedar_programs_ct,
       opt = list(x_axis = ax, min_n = 1L, campus = "ABQ", group_campus = FALSE),
       student_terms = cedar_student_terms_ct))
     expect_gt(dplyr::n_distinct(timing$relative_term), 1)

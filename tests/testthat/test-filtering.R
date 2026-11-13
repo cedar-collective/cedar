@@ -27,18 +27,12 @@
 
 context("Data Filtering - CEDAR Model")
 
-# Use uel=FALSE throughout filtering tests so the exclude list (loaded by
-# load_funcs) doesn't mask section/student records. The uel behavior is
-# tested separately. All expected counts below are from discover-expected-values.R
-# run against the current fixtures.
-make_opt <- function(...) create_test_opt(c(list(uel = FALSE), list(...)))
-
 # =============================================================================
 # Department Filtering
 # =============================================================================
 
 test_that("filter_DESRs filters by HIST department correctly", {
-  opt <- make_opt(dept_code = "HIST")
+  opt <- filtering_opt(dept_code = "HIST")
   filtered <- filter_DESRs(test_sections, opt)
 
   expect_equal(nrow(filtered), 21)
@@ -46,7 +40,7 @@ test_that("filter_DESRs filters by HIST department correctly", {
 })
 
 test_that("filter_DESRs filters by MATH department correctly", {
-  opt <- make_opt(dept_code = "MATH")
+  opt <- filtering_opt(dept_code = "MATH")
   filtered <- filter_DESRs(test_sections, opt)
 
   expect_equal(nrow(filtered), 10)
@@ -54,7 +48,7 @@ test_that("filter_DESRs filters by MATH department correctly", {
 })
 
 test_that("filter_DESRs filters by ANTH department correctly", {
-  opt <- make_opt(dept_code = "ANTH")
+  opt <- filtering_opt(dept_code = "ANTH")
   filtered <- filter_DESRs(test_sections, opt)
 
   # 12 pre-XL06-S + 6 ANTH 2190C spring rows + 1 XL06-EA row = 19
@@ -63,7 +57,7 @@ test_that("filter_DESRs filters by ANTH department correctly", {
 })
 
 test_that("filter_DESRs filters by NURS department correctly", {
-  opt <- make_opt(dept_code = "NURS")
+  opt <- filtering_opt(dept_code = "NURS")
   filtered <- filter_DESRs(test_sections, opt)
 
   expect_equal(nrow(filtered), 8)
@@ -75,7 +69,7 @@ test_that("filter_DESRs filters by NURS department correctly", {
 # =============================================================================
 
 test_that("filter_DESRs filters by term 202010 correctly", {
-  opt <- make_opt(term = 202010)
+  opt <- filtering_opt(term = 202010)
   filtered <- filter_DESRs(test_sections, opt)
 
   expect_equal(nrow(filtered), 30)
@@ -83,7 +77,7 @@ test_that("filter_DESRs filters by term 202010 correctly", {
 })
 
 test_that("filter_DESRs filters by term 202060 (summer) correctly", {
-  opt <- make_opt(term = 202060)
+  opt <- filtering_opt(term = 202060)
   filtered <- filter_DESRs(test_sections, opt)
 
   expect_equal(nrow(filtered), 12)
@@ -91,7 +85,7 @@ test_that("filter_DESRs filters by term 202060 (summer) correctly", {
 })
 
 test_that("filter_DESRs filters by term 202080 correctly", {
-  opt <- make_opt(term = 202080)
+  opt <- filtering_opt(term = 202080)
   filtered <- filter_DESRs(test_sections, opt)
 
   # 18 base + 14 C-suffix rows (EC-04:4, EC-05:4, EC-06:6) + 3 EC-07 = 35
@@ -100,7 +94,7 @@ test_that("filter_DESRs filters by term 202080 correctly", {
 })
 
 test_that("filter_DESRs filters by term 202110 correctly", {
-  opt <- make_opt(term = 202110)
+  opt <- filtering_opt(term = 202110)
   filtered <- filter_DESRs(test_sections, opt)
 
   expect_equal(nrow(filtered), 19)
@@ -112,7 +106,7 @@ test_that("filter_DESRs filters by term 202110 correctly", {
 # =============================================================================
 
 test_that("filter_DESRs filters by ABQ campus correctly", {
-  opt <- make_opt(course_campus = "ABQ")
+  opt <- filtering_opt(course_campus = "ABQ")
   filtered <- filter_DESRs(test_sections, opt)
 
   # 67 base + 14 C-suffix + 3 EC-07 + 6 XL06-S rows (all ABQ campus) = 90
@@ -121,7 +115,7 @@ test_that("filter_DESRs filters by ABQ campus correctly", {
 })
 
 test_that("filter_DESRs filters by EA campus correctly", {
-  opt <- make_opt(course_campus = "EA")
+  opt <- filtering_opt(course_campus = "EA")
   filtered <- filter_DESRs(test_sections, opt)
 
   # 7 base + 1 XL06-EA row (ANTH 2190C at EA)
@@ -134,7 +128,7 @@ test_that("filter_DESRs filters by EA campus correctly", {
 # =============================================================================
 
 test_that("filter_DESRs returns only active sections by default", {
-  opt <- make_opt(dept_code = "HIST")
+  opt <- filtering_opt(dept_code = "HIST")
   filtered <- filter_DESRs(test_sections, opt)
 
   # create_test_opt sets status="A" by default — no cancelled sections should appear
@@ -142,7 +136,7 @@ test_that("filter_DESRs returns only active sections by default", {
 })
 
 test_that("filter_DESRs filters by active status explicitly", {
-  opt <- make_opt(status = "A")
+  opt <- filtering_opt(status = "A")
   filtered <- filter_DESRs(test_sections, opt)
 
   # 75 base + 14 C-suffix + 3 EC-07 + 6 XL06-S + 1 XL06-EA (all status="A") = 99
@@ -151,7 +145,7 @@ test_that("filter_DESRs filters by active status explicitly", {
 })
 
 test_that("filter_DESRs filters by cancelled status correctly", {
-  opt <- make_opt(status = "C")
+  opt <- filtering_opt(status = "C")
   filtered <- filter_DESRs(test_sections, opt)
 
   expect_equal(nrow(filtered), 8)
@@ -163,7 +157,7 @@ test_that("filter_DESRs filters by cancelled status correctly", {
 # =============================================================================
 
 test_that("filter_DESRs filters by ONL delivery correctly", {
-  opt <- make_opt(im = "ONL")
+  opt <- filtering_opt(im = "ONL")
   filtered <- filter_DESRs(test_sections, opt)
 
   expect_equal(nrow(filtered), 22)
@@ -171,7 +165,7 @@ test_that("filter_DESRs filters by ONL delivery correctly", {
 })
 
 test_that("filter_DESRs filters by ENH delivery correctly", {
-  opt <- make_opt(im = "ENH")
+  opt <- filtering_opt(im = "ENH")
   filtered <- filter_DESRs(test_sections, opt)
 
   # 46 base + 14 C-suffix + 3 EC-07 + 6 XL06-S + 1 XL06-EA (all delivery="ENH") = 70
@@ -180,7 +174,7 @@ test_that("filter_DESRs filters by ENH delivery correctly", {
 })
 
 test_that("filter_DESRs filters by MOPS delivery correctly", {
-  opt <- make_opt(im = "MOPS")
+  opt <- filtering_opt(im = "MOPS")
   filtered <- filter_DESRs(test_sections, opt)
 
   expect_equal(nrow(filtered), 6)
@@ -192,7 +186,7 @@ test_that("filter_DESRs filters by MOPS delivery correctly", {
 # =============================================================================
 
 test_that("filter_DESRs filters by full term (1) correctly", {
-  opt <- make_opt(pt = "1")
+  opt <- filtering_opt(pt = "1")
   filtered <- filter_DESRs(test_sections, opt)
 
   # 59 base + 14 C-suffix + 3 EC-07 + 6 XL06-S + 1 XL06-EA (all part_term="1") = 83
@@ -201,7 +195,7 @@ test_that("filter_DESRs filters by full term (1) correctly", {
 })
 
 test_that("filter_DESRs filters by first half (1H) correctly", {
-  opt <- make_opt(pt = "1H")
+  opt <- filtering_opt(pt = "1H")
   filtered <- filter_DESRs(test_sections, opt)
 
   expect_equal(nrow(filtered), 4)
@@ -209,7 +203,7 @@ test_that("filter_DESRs filters by first half (1H) correctly", {
 })
 
 test_that("filter_DESRs filters by second half (2H) correctly", {
-  opt <- make_opt(pt = "2H")
+  opt <- filtering_opt(pt = "2H")
   filtered <- filter_DESRs(test_sections, opt)
 
   expect_equal(nrow(filtered), 3)
@@ -217,7 +211,7 @@ test_that("filter_DESRs filters by second half (2H) correctly", {
 })
 
 test_that("filter_DESRs filters by NF part_term (NURS-only) correctly", {
-  opt <- make_opt(pt = "NF")
+  opt <- filtering_opt(pt = "NF")
   filtered <- filter_DESRs(test_sections, opt)
 
   expect_equal(nrow(filtered), 8)
@@ -229,7 +223,7 @@ test_that("filter_DESRs filters by NF part_term (NURS-only) correctly", {
 # =============================================================================
 
 test_that("filter_DESRs filters by lower level correctly", {
-  opt <- make_opt(level = "lower")
+  opt <- filtering_opt(level = "lower")
   filtered <- filter_DESRs(test_sections, opt)
 
   # 49 base + 14 C-suffix + 3 EC-07 + 6 XL06-S + 1 XL06-EA (all level="lower") = 73
@@ -238,7 +232,7 @@ test_that("filter_DESRs filters by lower level correctly", {
 })
 
 test_that("filter_DESRs filters by upper level correctly", {
-  opt <- make_opt(level = "upper")
+  opt <- filtering_opt(level = "upper")
   filtered <- filter_DESRs(test_sections, opt)
 
   expect_equal(nrow(filtered), 20)
@@ -246,7 +240,7 @@ test_that("filter_DESRs filters by upper level correctly", {
 })
 
 test_that("filter_DESRs filters by grad level correctly", {
-  opt <- make_opt(level = "grad")
+  opt <- filtering_opt(level = "grad")
   filtered <- filter_DESRs(test_sections, opt)
 
   expect_equal(nrow(filtered), 6)
@@ -258,7 +252,7 @@ test_that("filter_DESRs filters by grad level correctly", {
 # =============================================================================
 
 test_that("filter_DESRs filters by HIST + term 202010 correctly", {
-  opt <- make_opt(dept_code = "HIST", term = 202010)
+  opt <- filtering_opt(dept_code = "HIST", term = 202010)
   filtered <- filter_DESRs(test_sections, opt)
 
   expect_equal(nrow(filtered), 10)
@@ -267,7 +261,7 @@ test_that("filter_DESRs filters by HIST + term 202010 correctly", {
 })
 
 test_that("filter_DESRs filters by ANTH + term 202060 correctly", {
-  opt <- make_opt(dept_code = "ANTH", term = 202060)
+  opt <- filtering_opt(dept_code = "ANTH", term = 202060)
   filtered <- filter_DESRs(test_sections, opt)
 
   expect_equal(nrow(filtered), 1)
@@ -276,7 +270,7 @@ test_that("filter_DESRs filters by ANTH + term 202060 correctly", {
 })
 
 test_that("filter_DESRs filters by MATH + term 202010 correctly", {
-  opt <- make_opt(dept_code = "MATH", term = 202010)
+  opt <- filtering_opt(dept_code = "MATH", term = 202010)
   filtered <- filter_DESRs(test_sections, opt)
 
   expect_equal(nrow(filtered), 3)
@@ -285,7 +279,7 @@ test_that("filter_DESRs filters by MATH + term 202010 correctly", {
 })
 
 test_that("filter_DESRs filters by NURS + term 202060 correctly", {
-  opt <- make_opt(dept_code = "NURS", term = 202060)
+  opt <- filtering_opt(dept_code = "NURS", term = 202060)
   filtered <- filter_DESRs(test_sections, opt)
 
   expect_equal(nrow(filtered), 2)
@@ -298,7 +292,7 @@ test_that("filter_DESRs filters by NURS + term 202060 correctly", {
 # =============================================================================
 
 test_that("filter_DESRs handles nonexistent department gracefully", {
-  opt <- make_opt(dept_code = "NONEXISTENT")
+  opt <- filtering_opt(dept_code = "NONEXISTENT")
   filtered <- filter_DESRs(test_sections, opt)
 
   expect_equal(nrow(filtered), 0)
@@ -307,7 +301,7 @@ test_that("filter_DESRs handles nonexistent department gracefully", {
 
 test_that("filter_DESRs handles impossible filter combination gracefully", {
   # HIST has no NF part_term sections (NF is NURS-only)
-  opt <- make_opt(dept_code = "HIST", pt = "NF")
+  opt <- filtering_opt(dept_code = "HIST", pt = "NF")
   filtered <- filter_DESRs(test_sections, opt)
 
   expect_equal(nrow(filtered), 0)
@@ -386,7 +380,7 @@ test_that("filter_by_term handles 'fall' keyword", {
 # =============================================================================
 
 test_that("filter_class_list filters by HIST department correctly", {
-  opt <- make_opt(dept_code = "HIST")
+  opt <- filtering_opt(dept_code = "HIST")
   filtered <- filter_class_list(test_students, opt)
 
   expect_equal(nrow(filtered), 84)
@@ -394,7 +388,7 @@ test_that("filter_class_list filters by HIST department correctly", {
 })
 
 test_that("filter_class_list filters by MATH department correctly", {
-  opt <- make_opt(dept_code = "MATH")
+  opt <- filtering_opt(dept_code = "MATH")
   filtered <- filter_class_list(test_students, opt)
 
   expect_equal(nrow(filtered), 10)
@@ -402,7 +396,7 @@ test_that("filter_class_list filters by MATH department correctly", {
 })
 
 test_that("filter_class_list filters by ANTH department correctly", {
-  opt <- make_opt(dept_code = "ANTH")
+  opt <- filtering_opt(dept_code = "ANTH")
   filtered <- filter_class_list(test_students, opt)
 
   expect_equal(nrow(filtered), 87)
@@ -410,7 +404,7 @@ test_that("filter_class_list filters by ANTH department correctly", {
 })
 
 test_that("filter_class_list filters by term 202010 correctly", {
-  opt <- make_opt(term = 202010)
+  opt <- filtering_opt(term = 202010)
   filtered <- filter_class_list(test_students, opt)
 
   expect_equal(nrow(filtered), 133)
@@ -418,7 +412,7 @@ test_that("filter_class_list filters by term 202010 correctly", {
 })
 
 test_that("filter_class_list filters by term 202060 correctly", {
-  opt <- make_opt(term = 202060)
+  opt <- filtering_opt(term = 202060)
   filtered <- filter_class_list(test_students, opt)
 
   expect_equal(nrow(filtered), 4)
@@ -426,7 +420,7 @@ test_that("filter_class_list filters by term 202060 correctly", {
 })
 
 test_that("filter_class_list filters by course correctly", {
-  opt <- make_opt(course = "MATH 1430")
+  opt <- filtering_opt(course = "MATH 1430")
   filtered <- filter_class_list(test_students, opt)
 
   expect_equal(nrow(filtered), 2)
@@ -528,7 +522,7 @@ test_that("the excluded-course list removes a course by any code it carries on a
   # one course (SOCI 371). A list naming the old code removes the whole course
   # from a loaded table, keyed on the course, and only the old code's row from
   # the table as saved.
-  rn <- rn01_course_tables()
+  rn <- rn01_course_tables
   keyed <- rn$cedar_sections
   sections <- test_sections_rn
   expect_equal(excluded_course_ids(keyed, excl = "soc  371"), c("SOC 371", "SOCI 371"))

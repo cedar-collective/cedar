@@ -14,14 +14,6 @@
 
 context("Student terms")
 
-st01 <- function() build_student_terms(test_students_st, test_programs_st, test_degrees_st)
-row <- function(st, sid, term) {
-  r <- st[st$student_id == sid & st$term == term, ]
-  if (nrow(r) != 1L) stop("expected one row for ", sid, " ", term, ", got ", nrow(r))
-  r
-}
-
-
 test_that("one row per student-term with any class-list row or declaration, pinned", {
   st <- st01()
   expect_equal(nrow(st), 17L)
@@ -35,12 +27,12 @@ test_that("one row per student-term with any class-list row or declaration, pinn
 
 test_that("ST_A: a late withdrawal next term is enrolled, so the student returned (I44)", {
   st <- st01()
-  a80 <- row(st, "ST_A", 202080L)
+  a80 <- student_term_row(st, "ST_A", 202080L)
   expect_true(a80$enrolled)
   expect_equal(a80$class_list_rows, 1L)
   expect_equal(a80$registered_courses, 0L)
   expect_equal(a80$late_withdrawals, 1L)
-  a10 <- row(st, "ST_A", 202010L)
+  a10 <- student_term_row(st, "ST_A", 202010L)
   expect_equal(a10$next_regular_term, 202080L)
   expect_true(a10$return_observable)
   expect_true(a10$returned_next_regular_term)
@@ -48,24 +40,24 @@ test_that("ST_A: a late withdrawal next term is enrolled, so the student returne
 
 test_that("ST_B and ST_C: an early drop or a waitlist next term is a row, not enrollment", {
   st <- st01()
-  b80 <- row(st, "ST_B", 202080L)
+  b80 <- student_term_row(st, "ST_B", 202080L)
   expect_false(b80$enrolled)
   expect_equal(b80$class_list_rows, 1L)
   expect_equal(b80$early_drops, 1L)
-  expect_false(row(st, "ST_B", 202010L)$returned_next_regular_term)
-  c80 <- row(st, "ST_C", 202080L)
+  expect_false(student_term_row(st, "ST_B", 202010L)$returned_next_regular_term)
+  c80 <- student_term_row(st, "ST_C", 202080L)
   expect_false(c80$enrolled)
   expect_true(c80$waitlisted_only)
-  expect_false(row(st, "ST_C", 202010L)$returned_next_regular_term)
-  expect_false(row(st, "ST_A", 202080L)$waitlisted_only)
+  expect_false(student_term_row(st, "ST_C", 202010L)$returned_next_regular_term)
+  expect_false(student_term_row(st, "ST_A", 202080L)$waitlisted_only)
 })
 
 test_that("ST_D: Summer is not a return term", {
   st <- st01()
-  d10 <- row(st, "ST_D", 202010L)
+  d10 <- student_term_row(st, "ST_D", 202010L)
   expect_equal(d10$next_regular_term, 202080L)
   expect_false(d10$returned_next_regular_term)
-  d60 <- row(st, "ST_D", 202060L)
+  d60 <- student_term_row(st, "ST_D", 202060L)
   expect_true(d60$enrolled)
   expect_equal(d60$next_regular_term, 202080L)
   expect_false(d60$returned_next_regular_term)
@@ -73,32 +65,32 @@ test_that("ST_D: Summer is not a return term", {
 
 test_that("ST_E: a declaration with no class list is a row with enrolled FALSE", {
   st <- st01()
-  e80 <- row(st, "ST_E", 202080L)
+  e80 <- student_term_row(st, "ST_E", 202080L)
   expect_true(e80$declared)
   expect_false(e80$enrolled)
   expect_equal(e80$class_list_rows, 0L)
   expect_equal(e80$description_source, "programs")
   expect_true(is.na(e80$classlist_as_of))
   expect_equal(e80$primary_major_code, "HIST")
-  expect_false(row(st, "ST_E", 202010L)$returned_next_regular_term)
+  expect_false(student_term_row(st, "ST_E", 202010L)$returned_next_regular_term)
 })
 
 test_that("ST_F: the newest class-list pull is read, programs wins, and the conflict is flagged", {
   st <- st01()
-  f <- row(st, "ST_F", 202010L)
+  f <- student_term_row(st, "ST_F", 202010L)
   expect_equal(f$student_classification, "Sophomore, 2nd Yr")
   expect_equal(f$description_source, "programs")
   expect_true(f$description_conflict)
   expect_equal(f$classlist_as_of, as.Date("2021-02-15"))
   # a student whose two sources agree is both_agree, not a conflict
-  a <- row(st, "ST_A", 202010L)
+  a <- student_term_row(st, "ST_A", 202010L)
   expect_equal(a$description_source, "both_agree")
   expect_false(a$description_conflict)
 })
 
 test_that("ST_G: the primary major is the first Major row by code, and every declaration is counted", {
   st <- st01()
-  g <- row(st, "ST_G", 202010L)
+  g <- student_term_row(st, "ST_G", 202010L)
   expect_equal(g$primary_major_code, "AA")
   # The table stores the primary major's keys, never its unit (ADR-001 step 3).
   expect_equal(g$primary_source_college_code, "AS")
@@ -111,7 +103,7 @@ test_that("ST_G: the primary major is the first Major row by code, and every dec
 
 test_that("ST_H: late drops are withdrawals, never DFW grades; credits follow the registered rows", {
   st <- st01()
-  h <- row(st, "ST_H", 202010L)
+  h <- student_term_row(st, "ST_H", 202010L)
   expect_equal(h$class_list_rows, 3L)
   expect_equal(h$registered_courses, 2L)
   expect_equal(h$late_withdrawals, 1L)
@@ -123,7 +115,7 @@ test_that("ST_H: late drops are withdrawals, never DFW grades; credits follow th
 
 test_that("ST_I: a return past the settled edge is NA, never FALSE", {
   st <- st01()
-  i <- row(st, "ST_I", 202110L)
+  i <- student_term_row(st, "ST_I", 202110L)
   expect_equal(i$next_regular_term, 202180L)
   expect_false(i$return_observable)
   expect_true(is.na(i$returned_next_regular_term))
@@ -138,20 +130,20 @@ test_that("a Fall or Spring with no class list makes the return into it unobserv
     st <- build_student_terms(dplyr::filter(test_students_st, term != 202080L),
                               test_programs_st, test_degrees_st),
     "no class list for Fall 2020")
-  a <- row(st, "ST_A", 202010L)
+  a <- student_term_row(st, "ST_A", 202010L)
   expect_equal(a$next_regular_term, 202080L)
   expect_false(a$return_observable)
   expect_true(is.na(a$returned_next_regular_term))
   # Summer 2020's next regular term is the same gap.
-  expect_false(row(st, "ST_D", 202060L)$return_observable)
+  expect_false(student_term_row(st, "ST_D", 202060L)$return_observable)
   expect_false(any(st$return_observable[st$next_regular_term == 202080L]))
   # The complete fixture judges Spring 2020 returns, as ST_A shows.
-  expect_true(row(st01(), "ST_A", 202010L)$return_observable)
+  expect_true(student_term_row(st01(), "ST_A", 202010L)$return_observable)
 })
 
 test_that("ST_J: a degree awarded sits beside the return flag; the table does not combine them", {
   st <- st01()
-  j <- row(st, "ST_J", 202010L)
+  j <- student_term_row(st, "ST_J", 202010L)
   expect_true(j$degree_awarded)
   expect_false(j$returned_next_regular_term)
   expect_equal(sum(st$degree_awarded), 1L)
@@ -159,7 +151,7 @@ test_that("ST_J: a degree awarded sits beside the return flag; the table does no
 
 test_that("ST_K: with no programs row the class list describes the student, in code vocabulary", {
   st <- st01()
-  k <- row(st, "ST_K", 202010L)
+  k <- student_term_row(st, "ST_K", 202010L)
   expect_equal(k$description_source, "class_list")
   expect_false(k$declared)
   expect_equal(k$n_declarations, 0L)
@@ -179,28 +171,28 @@ test_that("ST_K: with no programs row the class list describes the student, in c
   expect_equal(k$primary_source_college, roster_college)
   attached <- suppressMessages(attach_default_units(
     list(cedar_student_terms = st), build_cedar_dims(files)))$cedar_student_terms
-  k_att <- row(attached, "ST_K", 202010L)
+  k_att <- student_term_row(attached, "ST_K", 202010L)
   key <- dplyr::coalesce(translate_source_college(roster_college, files), "")
   expect_equal(k_att$primary_dept_code, resolve_program_units("SPAN", key, files$programs))
   expect_false(is.na(k_att$primary_dept_code))
   expect_equal(k_att$primary_college_code, resolve_program_colleges("SPAN", key, files))
   expect_equal(names(attached), c(STUDENT_TERMS_COLUMNS, STUDENT_TERMS_ATTACHED_COLUMNS))
   expect_equal(k$is_pre_major, program_pre_major_flags("SPAN", files$programs))
-  expect_equal(row(st, "ST_A", 202010L)$primary_major_code, "HIST")
+  expect_equal(student_term_row(st, "ST_A", 202010L)$primary_major_code, "HIST")
   expect_equal(attr(st, "cedar_student_terms_build_version"), STUDENT_TERMS_BUILD_VERSION)
   # the programs names resolve to the same codes through the institution's files
-  a <- row(st, "ST_A", 202010L)
+  a <- student_term_row(st, "ST_A", 202010L)
   expect_equal(a$student_level, "UG")
   expect_equal(a$student_campus, "ABQ")
   expect_equal(a$academic_standing, "Good Standing")
   expect_equal(a$sem_gpa, 3.5)
-  expect_true(row(st, "ST_K", 202080L)$returned_next_regular_term == FALSE |
-                is.na(row(st, "ST_K", 202080L)$returned_next_regular_term))
+  expect_true(student_term_row(st, "ST_K", 202080L)$returned_next_regular_term == FALSE |
+                is.na(student_term_row(st, "ST_K", 202080L)$returned_next_regular_term))
 })
 
 test_that("credit position is a running total over the student's terms", {
   st <- st01()
-  k10 <- row(st, "ST_K", 202010L); k80 <- row(st, "ST_K", 202080L)
+  k10 <- student_term_row(st, "ST_K", 202010L); k80 <- student_term_row(st, "ST_K", 202080L)
   expect_equal(k10$unm_credits_entering, 0)
   expect_equal(k10$cumulative_attempted_unm_credits, 3)
   expect_equal(k80$unm_credits_entering, 3)
@@ -209,17 +201,17 @@ test_that("credit position is a running total over the student's terms", {
   # ST_H's C- and DW earn nothing, so theirs stops at the A's credits.
   expect_equal(k10$cumulative_completed_unm_credits, 3)
   expect_equal(k80$cumulative_completed_unm_credits, 6)
-  expect_equal(row(st, "ST_H", 202010L)$cumulative_completed_unm_credits, 3)
+  expect_equal(student_term_row(st, "ST_H", 202010L)$cumulative_completed_unm_credits, 3)
   # every ST01 student first appears in the data's first term, so none is valid
   expect_false(any(st$timeline_valid[st$student_id != "ST_I"]))
-  expect_true(row(st, "ST_I", 202110L)$timeline_valid)
+  expect_true(student_term_row(st, "ST_I", 202110L)$timeline_valid)
 })
 
 test_that("grade points and graded hours run beside the credits (ADR-001 step 7 group 4)", {
   st <- st01()
   # ST_K: an A (4.0 x 3) then a B (3.0 x 3); the running sums are what
   # build_gpa_timeline() divides (3.5 after Fall 2020, 4.0 entering it).
-  k10 <- row(st, "ST_K", 202010L); k80 <- row(st, "ST_K", 202080L)
+  k10 <- student_term_row(st, "ST_K", 202010L); k80 <- student_term_row(st, "ST_K", 202080L)
   expect_equal(c(k10$quality_points, k10$graded_hours), c(12, 3))
   expect_equal(c(k80$quality_points, k80$graded_hours), c(9, 3))
   expect_equal(c(k80$cumulative_quality_points, k80$cumulative_graded_hours), c(21, 6))
@@ -228,10 +220,10 @@ test_that("grade points and graded hours run beside the credits (ADR-001 step 7 
   expect_equal(tl$gpa_entering, c(NA_real_, 4))
   # ST_H: an A and a C- carry points (4.0 x 3 + 1.7 x 3 over 6 hours); the
   # late drop has no grade and adds to neither sum.
-  h <- row(st, "ST_H", 202010L)
+  h <- student_term_row(st, "ST_H", 202010L)
   expect_equal(c(h$quality_points, h$graded_hours), c(17.1, 6))
   # ST_I registered with no posted grade: attempted credits, no graded hours.
-  i <- row(st, "ST_I", 202110L)
+  i <- student_term_row(st, "ST_I", 202110L)
   expect_equal(c(i$attempted_unm_credits, i$graded_hours, i$quality_points), c(3, 0, 0))
 })
 

@@ -262,42 +262,11 @@ test_that("get_course_outcome_rates exposes nuanced DFW components", {
 })
 
 
-# The groups are the student-term table's, never the class list's (ADR-001
-# step 5): the loaded class list carries no description, so each designed seat
-# gets its classification and primary major from a student-term row built here.
-dfw_demo_rows <- function(ids, statuses, grades) {
-  base_row <- test_students %>%
-    dplyr::filter(subject_course == "HIST 1110") %>%
-    dplyr::slice(1)
-  dplyr::bind_rows(lapply(seq_along(ids), function(i) {
-    base_row %>% dplyr::mutate(
-      student_id = ids[[i]], crn = as.character(93000 + i),
-      registration_status_code = statuses[[i]], final_grade = grades[[i]]
-    )
-  }))
-}
-dfw_demo_terms <- function(rows, classification, major, pre_major = FALSE) {
-  tibble::tibble(
-    student_id = rows$student_id, term = as.integer(rows$term),
-    student_classification = classification,
-    primary_major_code = major, is_pre_major = pre_major
-  )
-}
-
 test_that("get_course_dfw_demographics summarizes rate and composition", {
-  designed <- dfw_demo_rows(
-    paste0("demo-0", 1:6),
-    c("RE", "RE", "DW", "DR", "RE", "RE"),
-    c("A", "F", NA, NA, "C-", "A")
-  )
-  # Two codes programs.csv does not carry, so each is named as itself; the
-  # second is a pre-major, so it reads with the suffix every major table uses.
-  st <- dfw_demo_terms(
-    designed,
-    classification = c(rep("Freshman", 4), "Sophomore", "Sophomore"),
-    major = c(rep("ZZHIST", 4), "ZZBIOL", "ZZBIOL"),
-    pre_major = c(rep(FALSE, 4), TRUE, TRUE)
-  )
+  # Six designed seats: A, F, a late drop, an early drop, C- and A. The first
+  # four are Freshman ZZHIST, the last two Sophomore pre-major ZZBIOL.
+  designed <- dfw_demo_rows$demo
+  st <- dfw_demo_student_terms$demo
 
   attempts <- keyed_attempts(designed)
   result <- get_course_dfw_demographics(
@@ -346,8 +315,9 @@ test_that("get_course_dfw_demographics summarizes rate and composition", {
 
 
 test_that("get_course_dfw_demographics honors caller-supplied passing grades", {
-  designed <- dfw_demo_rows(c("threshold-01", "threshold-02"), c("RE", "RE"), c("C-", "A"))
-  st <- dfw_demo_terms(designed, classification = "Sophomore", major = "ZZBIOL")
+  # Two designed seats, C- and A, both Sophomore ZZBIOL.
+  designed <- dfw_demo_rows$threshold
+  st <- dfw_demo_student_terms$threshold
 
   result <- get_course_dfw_demographics(
     keyed_attempts(designed), st,
@@ -625,7 +595,7 @@ test_that("cedar_attempts is refused when built to another edge, build or set of
   older <- attempts; attr(older, "attempts_build_version") <- ATTEMPTS_BUILD_VERSION - 1L
   expect_false(attempts_is_current(older, test_students, edges))
   expect_false(attempts_is_current(NULL, test_students, edges))
-  rn <- rn01_course_tables()
+  rn <- rn01_course_tables
   expect_false(attempts_is_current(attempts, rn$cedar_registrations, edges))
   expect_error(require_current_attempts(attempts, rn$cedar_registrations, "a reader"), "build_attempts")
   expect_error(build_attempts(test_students, modifyList(edges, list(last_graded = NULL))),

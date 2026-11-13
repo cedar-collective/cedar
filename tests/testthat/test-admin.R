@@ -2,14 +2,6 @@
 
 context("Admin modules")
 
-suppressPackageStartupMessages({
-  library(shiny)
-  library(bslib)
-})
-
-source(file.path(cedar_base_dir, "R", "modules", "ui-helpers.R"))
-source(file.path(cedar_base_dir, "R", "modules", "admin.R"))
-
 test_that("data freshness is complete static HTML with honest missing states", {
   summary <- list(
     display_terms = c(202080L, 202110L),
@@ -117,39 +109,9 @@ test_that("loading overlays embed learned ranges before a report can block", {
 })
 
 # ── Admin > Mappings: programs.csv rows awaiting a decision ──────────────────
-# Scaffolding: a mapping-file list with three program rows. FRAD carries
-# students in the HP01 fixture; ZZZZ appears only in the file (a degree-only
-# code) and must still be listed, with no students; NURS is confirmed and must
-# not be.
-review_files <- function() {
-  list(
-    programs = data.frame(
-      program_code = c("NURS", "FRAD", "ZZZZ"), in_college = "",
-      program_name = c("Nursing", "Radiologic Sciences", "Ghost"),
-      unit_code = c("NURS", "RADS", ""), college_code = "", is_pre_major = c("FALSE", "TRUE", "FALSE"),
-      leads_to = "", basis = c("decided", "inherited", "unresolved"),
-      status = c("confirmed", "proposed", "proposed"), evidence = "", notes = ""),
-    settings = data.frame(setting = c("mapping_files_url", "source_files_url"),
-                          value = c("https://github.com/org/repo/blob/main/institution/x",
-                                    "https://github.com/org/repo/blob/main"))
-  )
-}
-
-# Scaffolding: what build_admin_mapping_issues() would say about three codes.
-# FRAD is proposed in the file (merged into its row), NOFILE has no row at all
-# (listed, unlinked), and NURS is already confirmed (not listed, but counted).
-review_issues <- function() {
-  tibble::tibble(
-    issue_type = c("pre_major_self_mapped_department", "declared_majors_far_exceed_graduates",
-                   "identity_fallback_department"),
-    severity = "warning", review_status = "needs_review",
-    program_code = c(NA, "BA-NOFILE-AS", NA), major_code = c("FRAD", "NOFILE", "NURS"),
-    college_code = NA, dept_code = NA, degree_level = NA, program_type = NA,
-    details = c("pre-major maps to itself", "no department owner", "falls back to itself"))
-}
 
 test_that("the program queue merges proposed rows with today's issues, most students first", {
-  res <- build_program_mapping_queue(review_files(), test_programs_hp, review_issues(),
+  res <- build_program_mapping_queue(review_files, test_programs_hp, review_issues,
                                      known_units = c("NURS", "RADS", "MEDL", "BIOL"))
   q <- res$queue
   expect_equal(q$program_code, c("FRAD", "NOFILE", "ZZZZ"))
@@ -158,8 +120,8 @@ test_that("the program queue merges proposed rows with today's issues, most stud
   expect_equal(q$today, c("FRAD (phantom)", "none", "none"))
   expect_equal(q$problem, c("pre-major mapped to itself", "far more majors than graduates", NA))
   expect_equal(q$problem_detail[1], "pre-major maps to itself")
-  bad <- review_issues(); bad$issue_type[1] <- "new_screen"
-  expect_error(build_program_mapping_queue(review_files(), test_programs_hp, bad, "NURS"),
+  bad <- review_issues; bad$issue_type[1] <- "new_screen"
+  expect_error(build_program_mapping_queue(review_files, test_programs_hp, bad, "NURS"),
                "No Problem label for issue type\\(s\\): new_screen")
   expect_equal(q$basis, c("inherited", "no row in programs.csv", "unresolved"))
   expect_equal(q$program_name[2], "Banner program BA-NOFILE-AS")
@@ -168,8 +130,8 @@ test_that("the program queue merges proposed rows with today's issues, most stud
                c("https://github.com/org/repo/blob/main/institution/x/programs.csv?plain=1#L3",
                  NA, "https://github.com/org/repo/blob/main/institution/x/programs.csv?plain=1#L4"))
   expect_equal(res$n_decided_issues, 1L)
-  expect_error(build_program_mapping_queue(review_files(), dplyr::select(test_programs_hp, -term),
-                                           review_issues(), "NURS"),
+  expect_error(build_program_mapping_queue(review_files, dplyr::select(test_programs_hp, -term),
+                                           review_issues, "NURS"),
                "cedar_programs lacks term")
 })
 
@@ -201,7 +163,7 @@ test_that("the mapping work list separates decisions from problems no mapping fi
     file = c("subjects", "programs", "programs", "programs", "programs", "programs", "units"),
     line = c(NA, 2L, 5L, NA, NA, NA, 4L))
   sd <- data.frame(source_name = "Catch-all", unit_code = "", kind = "bucket", notes = "")
-  w <- build_mapping_worklist(c(review_files(), list(
+  w <- build_mapping_worklist(c(review_files, list(
     units = data.frame(unit_code = c("NURS", "RADS", "MEDL", "BIOL"),
                        unit_name = c("Nursing", "Radiologic Sciences", "Medical Lab", "Biology"),
                        college_code = "", kind = "department", notes = ""),
@@ -210,7 +172,7 @@ test_that("the mapping work list separates decisions from problems no mapping fi
     subjects = data.frame(
     subject_code = character(), in_college = character(), in_level = character(),
     unit_code = character(), college_code = character(), status = character(),
-    evidence = character(), notes = character()))), test_programs_hp, review_issues(), audit, sd)
+    evidence = character(), notes = character()))), test_programs_hp, review_issues, audit, sd)
   # FRAD is a pre-major in the file; ZZZZ has no program rows to say more.
   expect_setequal(paste(w$decisions$kind, w$decisions$code),
                   c("Program (pre-major) FRAD", "Program ZZZZ", "Course subject BIOL",
@@ -251,7 +213,7 @@ test_that("the mapping work list separates decisions from problems no mapping fi
 # proposed) plus a no_unit program and a branch-only row, and subjects with an
 # every-college row and a college- and level-specific one.
 test_that("the mapping reference tables carry every confirmed row, with names", {
-  files <- review_files()
+  files <- review_files
   files$programs <- rbind(files$programs, data.frame(
     program_code = c("NOND", "BADM"), in_college = c("", "AD"),
     program_name = c("Non-Degree", "Business Administration"),
@@ -291,7 +253,7 @@ test_that("the mapping reference tables carry every confirmed row, with names", 
 # reference-table files above, with HLED's every-college and AD-only rows, a
 # proposed subject that must not appear, and a pre-major leading to NURS.
 test_that("a unit's scope names every confirmed subject and program row behind it", {
-  files <- review_files()
+  files <- review_files
   files$programs <- rbind(files$programs, data.frame(
     program_code = c("FNRS", "BADM"), in_college = c("", "AD"),
     program_name = c("Pre-Nursing", "Business Administration"),
@@ -324,57 +286,9 @@ test_that("a unit's scope names every confirmed subject and program row behind i
   expect_error(unit_mapping_rows("NOPE", files), "not in units.csv: NOPE")
 })
 
-# Scaffolding for build_counting_rules(): the transform's output columns the
-# rules read, as small frames. Programs: two concentration rows (one under an
-# undecided major, so no department, and flagged a pre-major by its name, as
-# tables built before I21's fix show "Pre-Law"), one coded pre-major by name (FZZZ),
-# one PHRD undergraduate, rows reporting Banner's college. Sections: a cross-list
-# group spanning HIST and ENGL (home and partner) and one within HIST, an
-# excluded course, levels 3 lower / 1 upper / 1 grad. Students: S1-S3 in
-# 202080; S3 at TA has no program record. Student terms: their home campus and
-# whether they declared, as cedar_student_terms records it, plus S4, declared
-# with no class-list row, whom the no-program-record rule never counts.
-counting_rule_tables <- function() {
-  programs <- tibble::tibble(
-    student_id = c("S1", "S1", "S2", "S2", "S1", "S2"), term = 202080L,
-    program_type = c("Major", "First Concentration", "Major", "First Concentration",
-                     "Second Major", "First Minor"),
-    program_name = c("History", "Public Policy", "Zed", "Law", "Pharmacy", "Undecided"),
-    major_code = c("HIST", NA, "FZZZ", NA, "PHRD", "UNDC"),
-    dept_code = c("HIST", "HIST", NA, NA, "PHRM", NA),
-    is_pre_major = c(FALSE, FALSE, TRUE, TRUE, TRUE, FALSE),
-    pre_major_basis = c("programs_csv", "name_prefix", "name_prefix", "name_prefix",
-                        "phrd_undergraduate", "programs_csv"),
-    college_basis = c("mapped", "mapped", "banner", "banner", "mapped", "banner"),
-    student_campus = c("Albuquerque/Main", "Albuquerque/Main", "Albuquerque/Main",
-                       "Albuquerque/Main", "Albuquerque/Main", "Albuquerque/Main"))
-  sections <- tibble::tibble(
-    term = 202080L, campus = c("ABQ", "ABQ", "ABQ", "ABQ", "EA"),
-    subject = c("HIST", "ENGL", "HIST", "HIST", "ZZZZ"),
-    subject_course = c("HIST 300", "ENGL 300", "HIST 101", "HIST 501", excluded_courses[1]),
-    level = c("upper", "lower", "lower", "grad", "lower"),
-    department = c("HIST", "ENGL", "HIST", "HIST", NA),
-    college_basis = c("mapped", "mapped", "mapped", "mapped", "banner"),
-    crosslist_group = c("G1", "G1", "G2", "G2", NA),
-    crosslist_role = c("home", "partner", "internal", "internal", NA))
-  # As the loader keys them (attach_course_ids()); no code is renamed here.
-  sections$course_id <- sections$subject_course
-  sections$listed_code <- sections$subject_course
-  students <- tibble::tibble(
-    student_id = c("S1", "S2", "S3", "S3"), term = 202080L,
-    campus = c("ABQ", "EA", "TA", "ZZ"),
-    college_basis = c("mapped", "mapped", "banner", "mapped"))
-  student_terms <- tibble::tibble(
-    student_id = c("S1", "S2", "S3", "S4"), term = 202080L,
-    student_campus = c("ABQ", "ABQ", "TA", "ABQ"),
-    declared = c(TRUE, TRUE, FALSE, TRUE), class_list_rows = c(1L, 1L, 2L, 0L))
-  list(programs = programs, sections = sections, students = students,
-       student_terms = student_terms)
-}
-
 test_that("counting rules report what each touches in the loaded tables", {
-  t <- counting_rule_tables()
-  files <- review_files()
+  t <- counting_rule_tables
+  files <- review_files
   files$subjects <- data.frame(subject_code = c("HIST", "HIST"), in_level = c("", "grad"))
   rules <- build_counting_rules(files, t$programs, t$sections, t$students, t$student_terms)
   affects <- stats::setNames(rules$affects, rules$rule)
@@ -401,7 +315,7 @@ test_that("counting rules report what each touches in the loaded tables", {
 })
 
 test_that("the campus table lists every defined code and any the data adds", {
-  t <- counting_rule_tables()
+  t <- counting_rule_tables
   campuses <- build_campus_reference(t$sections, t$students, t$student_terms)
   expect_equal(head(campuses$campus, 3), c("ABQ", "EA", "GA"))
   zz <- campuses[campuses$campus == "ZZ", ]
@@ -449,7 +363,7 @@ test_that("a suggestion's confidence follows the evidence the assistant recorded
 #   SOCI 250 -> SOCI 2315: the schedule never lists SOCI 250 (it says SOC 250).
 test_that("the code history lists every succession with when each code was offered", {
   files <- read_institution_mappings(cedar_institution_dir(cedar_base_dir, "demo"))
-  sections <- rn01_course_tables()$cedar_sections
+  sections <- rn01_course_tables$cedar_sections
   got <- build_code_history_table(files, sections)
 
   expect_equal(got$from_code, c("PHIL 150", "SOC", "HIST 320", "SOCI 250"))

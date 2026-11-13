@@ -145,31 +145,20 @@ test_that("multi-campus trend denominators include campuses where a category is 
 # the table and the roster separately to show which one the summary reads.
 # -----------------------------------------------------------------------------
 
-.hist_1110_registered <- function() {
-  test_students %>%
-    filter(subject_course == "HIST 1110",
-           registration_status_code %in% STATUS_REGISTERED)
-}
-
-.class_opt <- list(group_cols = c("campus", "college", "term", "term_type",
-                                  "student_classification", "subject_course"))
-.major_opt <- list(group_cols = c("campus", "college", "term", "term_type",
-                                  "major_code", "subject_course"))
-
 test_that("classification is read off the student-term table, not the course row", {
   # Roster says Senior everywhere; the table still says Sophomore.
-  relabelled_roster <- .hist_1110_registered() %>%
+  relabelled_roster <- .hist_1110_registered %>%
     mutate(student_classification = "Senior")
   result <- summarize_student_demographics(relabelled_roster, test_student_terms, test_course_terms, .class_opt)
   expect_setequal(unique(result$student_classification), "Sophomore")
   expect_equal(sum(result$count), 27)
 
   # Move one student-term to Junior on the table: the summary follows the table.
-  one <- .hist_1110_registered() %>% distinct(student_id, term) %>% slice(1)
+  one <- .hist_1110_registered %>% distinct(student_id, term) %>% slice(1)
   relabelled_table <- test_student_terms %>%
     mutate(student_classification = if_else(
       student_id == one$student_id & term == one$term, "Junior", student_classification))
-  result <- summarize_student_demographics(.hist_1110_registered(), relabelled_table, test_course_terms, .class_opt)
+  result <- summarize_student_demographics(.hist_1110_registered, relabelled_table, test_course_terms, .class_opt)
   junior <- result %>% filter(student_classification == "Junior", count > 0)
   expect_equal(nrow(junior), 1L)
   expect_equal(junior$term, one$term)
@@ -178,7 +167,7 @@ test_that("classification is read off the student-term table, not the course row
 })
 
 test_that("major_code is the student-term table's primary_major_code", {
-  stamped_roster <- .hist_1110_registered() %>% mutate(major_code = "ROSTER")
+  stamped_roster <- .hist_1110_registered %>% mutate(major_code = "ROSTER")
   stamped_table <- test_student_terms %>%
     mutate(primary_major_code = if_else(
       student_id %in% stamped_roster$student_id, "HIST-BA", primary_major_code))
@@ -190,27 +179,27 @@ test_that("major_code is the student-term table's primary_major_code", {
 
 test_that("a grouping that describes the student needs the table and every row on it", {
   expect_error(
-    summarize_student_demographics(.hist_1110_registered(), NULL, test_course_terms, .class_opt),
+    summarize_student_demographics(.hist_1110_registered, NULL, test_course_terms, .class_opt),
     "reads cedar_student_terms"
   )
   expect_error(
-    summarize_student_demographics(.hist_1110_registered(),
+    summarize_student_demographics(.hist_1110_registered,
                                    select(test_student_terms, -student_classification),
                                    test_course_terms, .class_opt),
     "missing required column"
   )
-  one <- .hist_1110_registered() %>% distinct(student_id, term) %>% slice(1)
+  one <- .hist_1110_registered %>% distinct(student_id, term) %>% slice(1)
   short_table <- test_student_terms %>%
     filter(!(student_id == one$student_id & term == one$term))
   expect_error(
-    summarize_student_demographics(.hist_1110_registered(), short_table, test_course_terms, .class_opt),
+    summarize_student_demographics(.hist_1110_registered, short_table, test_course_terms, .class_opt),
     "1 enrollment rows have no row on cedar_student_terms"
   )
 })
 
 test_that("a grouping with no student description reads no table", {
   opt <- list(group_cols = c("campus", "college", "term", "term_type", "subject_course"))
-  result <- summarize_student_demographics(.hist_1110_registered(), NULL, test_course_terms, opt)
+  result <- summarize_student_demographics(.hist_1110_registered, NULL, test_course_terms, opt)
   expect_equal(sum(result$count), 27)
 })
 
@@ -321,7 +310,6 @@ test_that("calc_cl_enrls returns a row per course for HIST department", {
 # no programs row and a roster major of SPAN, which the table carries as the
 # class-list primary major. Both took HIST 1110 that term. The demo
 # institution's programs.csv (test_dims) names HIST "History" and SPAN "Spanish".
-.mix_opt <- list(course = "HIST 1110", term = 202010L, min_n = 1L, top_n = 50L)
 
 test_that("get_course_major_mix reads the student-term table's primary major, not the roster", {
   plain <- get_course_major_mix(cedar_registrations_st, test_student_terms_st, test_dims, .mix_opt)

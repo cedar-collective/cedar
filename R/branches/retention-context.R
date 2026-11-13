@@ -26,23 +26,12 @@
 # consume what this file produces, so it belongs below them rather than beside
 # them.
 #
-# Depends on: add_next_term_col() (trunk/utils.R), cedar_student_terms
+# Depends on: advance_term() (branches/cedar-terms.R), cedar_student_terms
 #             (branches/student-terms.R, built in the transform)
 
 # =============================================================================
 # Internal helpers
 # =============================================================================
-
-# Advance a vector of term codes by exactly n_steps semesters (skipping summer
-# by default). Each element is advanced independently.
-.advance_term_n <- function(term_codes, n_steps, summer = FALSE) {
-  result <- as.integer(term_codes)
-  for (i in seq_len(n_steps)) {
-    tmp    <- data.frame(term = result)
-    result <- add_next_term_col(tmp, "term", summer = summer)$next_term
-  }
-  result
-}
 
 # Every entry point in this file groups by campus, so a students frame without
 # a campus column cannot produce a correct result. Failing here is deliberate:
@@ -190,7 +179,7 @@ build_retention_context <- function(students, degrees = NULL, opt = list(),
     # Map each anchor term to its T+N target
     term_map <- data.frame(
       anchor_term = unique_anchors,
-      target_term = .advance_term_n(unique_anchors, n_steps = n)
+      target_term = advance_term(unique_anchors, n_steps = n)
     )
 
     # Anchor terms whose target is beyond available data — return NA, not 0%

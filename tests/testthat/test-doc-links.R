@@ -1,8 +1,5 @@
 context("Documentation links")
 
-source("../../R/modules/ui-helpers.R")
-
-
 test_that("cedar_docs_link builds standard external docs links", {
   link <- cedar_docs_link("users/regstats#saturation")
   html <- as.character(link)

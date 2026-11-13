@@ -41,6 +41,7 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
   source_file("lists/excluded_courses.R")
   source_file("lists/gen_ed_courses.R")
   source_file("lists/grades.R")
+  source_file("lists/grade_bands.R")        # letter bands of an earlier grade (Later Course)
   source_file("lists/subj_dept_map.R")      # college → dept → subject hierarchy
   source_file("lists/catalog_lookups.R")   # runtime lookup vectors from the mapping files
   source_file("lists/mappings.R")          # text/name maps not derivable from catalogs
@@ -95,6 +96,7 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
   source_file("branches/course-attempts.R")
   source_file("branches/attempts.R")             # cedar_attempts: one classified outcome per graded attempt (ADR-001 step 4)
   source_file("branches/course-flows.R")
+  source_file("branches/downstream-cohort.R")    # students who took course X, and what each did in course Y
   source_file("branches/enrollment-projections.R")
   source_file("branches/enrollment-projection-inputs.R")
   source_file("branches/enrollment-projection-candidates.R")
@@ -143,7 +145,8 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
   source_file("cones/sfr.R")
   source_file("cones/waitlist.R")
   source_file("cones/course-sequence-effect.R")   # did passing X improve grades in Y?
-  source_file("cones/course-instructor-effect.R") # downstream Y outcomes by upstream X instructor
+  source_file("cones/downstream-outcomes.R")            # of X's students, who took Y, when, and how they did
+  source_file("cones/downstream-instructor-balance.R")  # were two X instructors' later-Y students alike?
   source_file("cones/course-retention.R")      # institution-level retention by course and over time
   source_file("cones/retention-summaries.R")   # pooling, benchmarks, and instructor rows over a retention result
   source_file("cones/gen-ed-conversion.R")     # gen ed flow tables + course-major associations
@@ -177,6 +180,7 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
   source_file("features/population-course-pressure.R")  # text-first preview: a population through its shared courses
   source_file("features/course-cohort-context.R")       # text-first preview: a course's takers-vs-non-takers gap against its college's courses
   source_file("features/course-similar-students.R")     # text-first preview: a course against similar non-takers, beside every course and by instructor
+  source_file("features/later-course.R")                # text-first preview: a course's students in a later course, by term, grade and instructor
   source_file("features/shared-requirements.R")
   source_file("features/catalog-capture.R")
   source_file("features/catalog-analysis.R")
@@ -203,6 +207,7 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
     source_file("modules/retention.R")
     source_file("modules/instructor-gate.R") # the one password gate in front of every table that names an instructor
     source_file("modules/course-cohort.R")   # Course Dynamics > Takers vs Non-Takers
+    source_file("modules/later-course.R")    # Course Dynamics > Downstream > Later Course
     source_file("modules/degree-explorer.R")
   } else {
     message("[load-funcs.R] Skipping Shiny modules (modules = FALSE).")

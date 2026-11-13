@@ -12,28 +12,8 @@
 
 context("Course demographics donuts")
 
-# Same category at two campuses, and a percentage column deliberately
-# inconsistent with the headcounts — both true of the real source.
-make_multi_campus_demo <- function() {
-  majors <- c("HIST", "ANTH", "ENGL", "PSYC", "BIOL", "MATH", "CHEM", "ECON", "SOCI")
-  demo <- expand.grid(major_code = majors, campus = c("ABQ", "EA"),
-                      stringsAsFactors = FALSE)
-  demo$college        <- "AS"
-  demo$subject_course <- "HIST 1105"
-  demo$term_type      <- "fall"
-  demo$mean           <- c(40, 30, 20, 15, 10, 5, 4, 3, 2,
-                           20, 15, 10,  8,  5, 3, 2, 1, 1)
-  demo$term_type_pct  <- round(100 * demo$mean / sum(demo$mean[demo$campus == "ABQ"]), 1)
-  demo
-}
-
-donut_trace <- function(demo, palette) {
-  plots <- plot_demographics_summary(demo, "major_code", color_palette = palette)
-  plotly::plotly_build(plots$fall)$x$data[[1]]
-}
-
 test_that("donut collapses duplicate category rows instead of ranking them separately", {
-  demo <- make_multi_campus_demo()
+  demo <- multi_campus_demo
   tr <- donut_trace(demo, build_color_map(c("HIST", "ANTH", "ENGL")))
   labs <- unlist(tr$labels)
 
@@ -43,7 +23,7 @@ test_that("donut collapses duplicate category rows instead of ranking them separ
 })
 
 test_that("donut slices account for every student and label to 100%", {
-  demo <- make_multi_campus_demo()
+  demo <- multi_campus_demo
   tr <- donut_trace(demo, build_color_map(c("HIST", "ANTH", "ENGL")))
   vals <- unlist(tr$values)
 
@@ -54,7 +34,7 @@ test_that("donut slices account for every student and label to 100%", {
 })
 
 test_that("grey is reserved for Other and every other slice is distinct", {
-  demo <- make_multi_campus_demo()
+  demo <- multi_campus_demo
   # Palette knows only 3 of the 5 categories that will be plotted.
   tr <- donut_trace(demo, build_color_map(c("HIST", "ANTH", "ENGL")))
   labs <- unlist(tr$labels)
@@ -67,7 +47,7 @@ test_that("grey is reserved for Other and every other slice is distinct", {
 })
 
 test_that("a category set with no remainder produces no Other slice", {
-  demo <- make_multi_campus_demo()
+  demo <- multi_campus_demo
   demo <- demo[demo$major_code %in% c("HIST", "ANTH", "ENGL"), ]
   tr <- donut_trace(demo, build_color_map(c("HIST", "ANTH", "ENGL")))
   labs <- unlist(tr$labels)

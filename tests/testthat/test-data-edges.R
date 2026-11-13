@@ -10,31 +10,11 @@
 context("Data Edges")
 
 
-edge_students <- function() {
-  mk <- function(term, n, graded) tibble::tibble(
-    term = rep(as.integer(term), n),
-    final_grade = c(rep("A", graded), rep(NA_character_, n - graded))
-  )
-  dplyr::bind_rows(
-    mk(202480, 100, 91),   # finished, graded
-    mk(202580, 100, 91),   # finished, graded
-    mk(202610, 100, 7),    # finished, grades still landing
-    mk(202660, 100, 0),    # registration only
-    mk(202680, 100, 0)     # registration only, partial
-  )
-}
-
-edge_degrees <- function() tibble::tibble(
-  term = c(202480L, 202580L, 202610L),
-  graduation_status = c("Awarded", "Awarded", "Pending")
-)
-
-
 test_that("the enrollment and graded edges are different terms", {
   # The whole reason this file exists. If these ever collapse to one number the
   # distinction has been lost and grade rates will silently reach into an
   # ungraded term again.
-  e <- cedar_data_edges(edge_students())
+  e <- cedar_data_edges(edge_students)
 
   expect_equal(e$last_enrolled, 202680L)
   expect_equal(e$last_graded,   202580L)
@@ -44,13 +24,13 @@ test_that("the enrollment and graded edges are different terms", {
 test_that("a term with a trickle of early grades is not gradeable", {
   # 7% posted is enough to look non-empty and nowhere near enough to measure a
   # rate against.
-  e <- cedar_data_edges(edge_students())
+  e <- cedar_data_edges(edge_students)
   expect_true(e$last_graded < 202610L)
 })
 
 test_that("the graded edge advances on its own once grades land", {
   later <- dplyr::bind_rows(
-    dplyr::filter(edge_students(), term != 202610L),
+    dplyr::filter(edge_students, term != 202610L),
     tibble::tibble(term = rep(202610L, 100),
                    final_grade = c(rep("A", 88), rep(NA_character_, 12)))
   )
@@ -62,30 +42,30 @@ test_that("the threshold is not finely balanced", {
   # picks the same edge. A test that only passed at one exact value would mean
   # the separation was fragile.
   for (thr in c(0.2, 0.4, 0.5, 0.6, 0.8)) {
-    expect_equal(cedar_data_edges(edge_students(), min_graded_share = thr)$last_graded,
+    expect_equal(cedar_data_edges(edge_students, min_graded_share = thr)$last_graded,
                  202580L, info = paste("threshold", thr))
   }
 })
 
 test_that("first_enrolled comes from the data, not a hardcoded floor", {
-  e <- cedar_data_edges(edge_students())
+  e <- cedar_data_edges(edge_students)
   expect_equal(e$first_enrolled, 202480L)
 })
 
 test_that("max_term caps every edge without changing the grade rule", {
-  e <- cedar_data_edges(edge_students(), max_term = 202510L)
+  e <- cedar_data_edges(edge_students, max_term = 202510L)
   expect_equal(e$last_enrolled, 202480L)
   expect_equal(e$last_graded,   202480L)
 })
 
 test_that("the degree edge counts awarded degrees only", {
-  e <- cedar_data_edges(edge_students(), degrees = edge_degrees())
+  e <- cedar_data_edges(edge_students, degrees = edge_degrees)
   # 202610 is Pending, so the edge is the last AWARDED term.
   expect_equal(e$last_degree, 202580L)
 })
 
 test_that("no degrees supplied yields NULL, not a guess", {
-  expect_null(cedar_data_edges(edge_students())$last_degree)
+  expect_null(cedar_data_edges(edge_students)$last_degree)
 })
 
 test_that("an entirely ungraded snapshot reports NULL rather than nominating a term", {
@@ -98,7 +78,7 @@ test_that("an entirely ungraded snapshot reports NULL rather than nominating a t
 })
 
 test_that("graded_by_term shows the work behind the edge", {
-  e <- cedar_data_edges(edge_students())
+  e <- cedar_data_edges(edge_students)
   expect_true(all(c("term", "rows", "graded_share") %in% names(e$graded_by_term)))
   expect_equal(nrow(e$graded_by_term), 5)
   expect_true(all(e$graded_by_term$graded_share >= 0 & e$graded_by_term$graded_share <= 1))
@@ -106,7 +86,7 @@ test_that("graded_by_term shows the work behind the edge", {
 
 test_that("missing columns and empty input fail loudly", {
   expect_error(cedar_data_edges(tibble::tibble(term = 202480L)), "missing required column")
-  expect_error(cedar_data_edges(edge_students()[0, ]), "non-empty students table")
+  expect_error(cedar_data_edges(edge_students[0, ]), "non-empty students table")
 })
 
 
@@ -115,7 +95,7 @@ test_that("missing columns and empty input fail loudly", {
 # =============================================================================
 
 test_that("the graded note names the term and says why the next one is absent", {
-  note <- cedar_edge_note(cedar_data_edges(edge_students()), "graded")
+  note <- cedar_edge_note(cedar_data_edges(edge_students), "graded")
   expect_match(note, "Fall 2025")
   expect_match(note, "grades posted")
   expect_match(note, "Spring 2026")     # enrolled but not graded
@@ -132,7 +112,7 @@ test_that("a graded edge that cannot be advanced is an error, not a dropped sent
 })
 
 test_that("the enrolled note names the enrollment edge", {
-  note <- cedar_edge_note(cedar_data_edges(edge_students()), "enrolled")
+  note <- cedar_edge_note(cedar_data_edges(edge_students), "enrolled")
   expect_match(note, "Fall 2026")
   expect_false(grepl("grades posted", note))
 })
@@ -152,22 +132,8 @@ test_that("an unavailable edge yields NULL rather than a misleading sentence", {
 # advance registration: charting it beside settled terms shows a collapse that
 # is an artifact of the pull date.
 
-settled_students <- function() {
-  mk <- function(term, n, graded, pull) tibble::tibble(
-    term = rep(as.integer(term), n),
-    final_grade = c(rep("A", graded), rep(NA_character_, n - graded)),
-    as_of_date = as.Date(pull)
-  )
-  dplyr::bind_rows(
-    mk(202580, 100, 91, "2026-03-07"),   # Fall 2025, pulled long after it began
-    mk(202610, 100,  7, "2026-04-20"),   # Spring 2026, began Jan, pulled April
-    mk(202660, 100,  0, "2026-04-27"),   # Summer 2026, pulled BEFORE it begins
-    mk(202680,  70,  0, "2026-06-18")    # Fall 2026, pulled BEFORE it begins
-  )
-}
-
 test_that("a term captured before it began is not a settled term", {
-  e <- cedar_data_edges(settled_students())
+  e <- cedar_data_edges(edge_settled_students)
 
   expect_equal(e$last_enrolled, 202680L)            # raw extent
   expect_equal(e$last_enrolled_complete, 202610L)   # last settled
@@ -177,7 +143,7 @@ test_that("a term captured before it began is not a settled term", {
 test_that("the three edges are genuinely three different terms", {
   # graded < settled < raw. If any two collapse, a caller will pick the wrong
   # one without noticing.
-  e <- cedar_data_edges(settled_students())
+  e <- cedar_data_edges(edge_settled_students)
   expect_equal(e$last_graded, 202580L)
   expect_true(e$last_graded < e$last_enrolled_complete)
   expect_true(e$last_enrolled_complete < e$last_enrolled)
@@ -188,7 +154,7 @@ test_that("a genuine enrollment decline is NOT treated as an unfinished term", {
   # (pulled well after it began) but only a third the usual size — a real drop.
   # It must survive as the edge, so the decline is visible rather than truncated.
   declining <- dplyr::bind_rows(
-    dplyr::filter(settled_students(), term %in% c(202580L, 202610L)),
+    dplyr::filter(edge_settled_students, term %in% c(202580L, 202610L)),
     tibble::tibble(term = rep(202680L, 30), final_grade = NA_character_,
                    as_of_date = as.Date("2026-10-01"))
   )
@@ -206,8 +172,8 @@ test_that("min_days_after_start clears add/drop rather than the first day", {
 })
 
 test_that("the app's report edges are the data edges under their app names", {
-  r <- cedar_report_edges(settled_students())
-  expect_equal(r$edges, cedar_data_edges(settled_students()))
+  r <- cedar_report_edges(edge_settled_students)
+  expect_equal(r$edges, cedar_data_edges(edge_settled_students))
   expect_equal(r$graded_through, 202580L)
   expect_equal(r$report_end_term, 202610L)
   expect_equal(r$report_latest_term, 202680L)
@@ -218,7 +184,7 @@ test_that("the app's report edges are not capped below the newest registrations"
   # descriptive charts the day it lands; the settled rule alone keeps it out of
   # trend comparisons.
   ahead <- dplyr::bind_rows(
-    settled_students(),
+    edge_settled_students,
     tibble::tibble(term = rep(202710L, 40), final_grade = NA_character_,
                    as_of_date = as.Date("2026-10-28"))
   )
@@ -229,16 +195,16 @@ test_that("the app's report edges are not capped below the newest registrations"
 })
 
 test_that("an undeterminable report edge stops startup instead of being guessed", {
-  no_dates <- dplyr::select(settled_students(), -as_of_date)
+  no_dates <- dplyr::select(edge_settled_students, -as_of_date)
   expect_error(cedar_report_edges(no_dates), "settled edge")
-  ungraded <- dplyr::mutate(settled_students(), final_grade = NA_character_)
+  ungraded <- dplyr::mutate(edge_settled_students, final_grade = NA_character_)
   expect_error(cedar_report_edges(ungraded), "graded edge")
 })
 
 test_that("without as_of_date the settled edge is NULL, not the raw maximum", {
   # Failing closed: silently returning the raw edge would reintroduce the
   # in-flight term into enrollment reports.
-  no_dates <- dplyr::select(settled_students(), -as_of_date)
+  no_dates <- dplyr::select(edge_settled_students, -as_of_date)
   expect_null(cedar_data_edges(no_dates)$last_enrolled_complete)
   expect_equal(cedar_data_edges(no_dates)$last_enrolled, 202680L)
 })
@@ -265,7 +231,7 @@ test_that("longitudinal edge fails closed without a complete enrollment term", {
 })
 
 test_that("the enrolled note explains why the newest term is held back", {
-  note <- cedar_edge_note(cedar_data_edges(settled_students()), "enrolled")
+  note <- cedar_edge_note(cedar_data_edges(edge_settled_students), "enrolled")
   expect_match(note, "Spring 2026")
   expect_match(note, "Fall 2026")
   expect_match(note, "artifact of the pull date")
@@ -281,7 +247,7 @@ test_that("the enrolled note explains why the newest term is held back", {
 # vanish from Dept Trends for its first weeks.
 
 test_that("every enrolled term after the graded edge is in progress", {
-  ip <- cedar_in_progress_terms(cedar_data_edges(settled_students()))
+  ip <- cedar_in_progress_terms(cedar_data_edges(edge_settled_students))
   # Graded through Fall 2025, so Spring, Summer and Fall 2026 are all unfinished.
   expect_equal(ip$term, c(202610L, 202660L, 202680L))
   # Spring 2026 was pulled after it began; Summer and Fall were not.
@@ -290,14 +256,14 @@ test_that("every enrolled term after the graded edge is in progress", {
 })
 
 test_that("a fully graded snapshot has no in-progress terms and no note", {
-  graded <- settled_students() %>% dplyr::mutate(final_grade = "A")
+  graded <- edge_settled_students %>% dplyr::mutate(final_grade = "A")
   ip <- cedar_in_progress_terms(cedar_data_edges(graded))
   expect_equal(nrow(ip), 0)
   expect_null(cedar_in_progress_note(ip))
 })
 
 test_that("the in-progress note names the term, its pull date, and filling state", {
-  ip <- cedar_in_progress_terms(cedar_data_edges(settled_students()))
+  ip <- cedar_in_progress_terms(cedar_data_edges(edge_settled_students))
   note <- cedar_in_progress_note(ip[ip$term == 202680L, ])
   expect_match(note, "Fall 2026 as of Jun 18, 2026, registration still filling")
   expect_match(note, "last graded term")
@@ -380,7 +346,7 @@ test_that("an edge the data cannot determine is NA on every row, never FALSE", {
 })
 
 test_that("the flags are the edges: settled, graded and in progress disagree where the edges do", {
-  s <- settled_students()
+  s <- edge_settled_students
   e <- cedar_data_edges(s)
   d <- build_cedar_terms(s, edges = e)
   r <- function(col) setNames(d[[col]], d$term)

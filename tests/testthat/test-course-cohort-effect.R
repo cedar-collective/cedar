@@ -25,12 +25,6 @@
 #   RW_B registered with no grade: a taker whose outcome is unknown, left out;
 #   RW_F early-dropped and is not enrolled; RW_E is a Junior.
 
-library(dplyr)
-
-rp01_edges <- list(last_enrolled = 202110L, last_enrolled_complete = 202110L, last_graded = 202110L)
-mc02_edges <- list(last_enrolled = 202180L, last_enrolled_complete = 202110L, last_graded = 202110L)
-rw01_edges <- list(last_enrolled = 202110L, last_enrolled_complete = 202080L, last_graded = 202080L)
-
 test_that("RP01: passed, DFW and never-took groups with their returns and next-term outcomes", {
   res <- get_course_cohort_effect(
     test_student_terms_rp, keyed_attempts(test_students_rp, rp01_edges),

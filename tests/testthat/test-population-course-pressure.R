@@ -2,14 +2,6 @@
 # HP02: a pre-nursing population of twelve through BIOL 1140, CHEM 1215 and
 # NUTR 2110. Every expected number is pinned in the fixture header.
 
-hp2_edges <- cedar_data_edges(test_students_hp2)
-hp2_attempts <- attempts_for(test_students_hp2, hp2_edges)
-hp2_course_terms <- course_terms_for(test_students_hp2, test_sections_hp2, hp2_edges)
-hp2_population <- suppressMessages(build_population(
-  test_programs_hp2, opt = list(type = "preset", program_names = "Nursing")
-))
-hp2_courses <- c("BIOL 1140", "CHEM 1215", "NUTR 2110")
-
 test_that("HP02 settles as the header says", {
   expect_equal(hp2_edges$last_graded, 202080L)
   expect_equal(hp2_edges$last_enrolled_complete, 202110L)
@@ -227,15 +219,6 @@ test_that("offering pattern requires a built table, a course and the edge", {
 
 
 # ── build_population_course_pressure() and its text ─────────────────────────
-
-hp2_plans <- tibble::tribble(
-  ~catalog_id,        ~subject_course,
-  "nursing-bsn-2026", "BIOL 1140",
-  "nursing-bsn-2026", "CHEM 1215",
-  "medlab-bs-2026",   "BIOL 1140",
-  "medlab-bs-2026",   "NUTR 2110",
-  "pophealth-bs-2026", "BIOL 1140"
-)
 
 test_that("the payload joins the four measures on course and campus", {
   payload <- build_population_course_pressure(

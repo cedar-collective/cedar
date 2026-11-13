@@ -47,111 +47,13 @@
 context("Pathway Analysis")
 
 
-make_pathway_students <- function() {
-  tibble(
-    student_id = c(
-      "S001", "S001", "S001",
-      "S002", "S002", "S002",
-      "S003", "S003",
-      "S004", "S004", "S004",
-      "S005", "S005"
-    ),
-    term = c(
-      202410L, 202480L, 202510L,
-      202410L, 202480L, 202510L,
-      202410L, 202480L,
-      202410L, 202480L, 202510L,
-      202480L, 202510L
-    ),
-    subject_course = c(
-      "CHEM 1215", "BIOL 2310", "ENGL 1110",
-      "CHEM 1215", "BIOL 2310", "ENGL 1110",
-      "CHEM 1215", "BIOL 2310",
-      "CHEM 1215", "BIOL 2310", "ENGL 1110",
-      "BIOL 2310",  "ENGL 1110"
-    ),
-    course_title = c(
-      "General Chemistry", "General Biology", "Composition",
-      "General Chemistry", "General Biology", "Composition",
-      "General Chemistry", "General Biology",
-      "General Chemistry", "General Biology", "Composition",
-      "General Biology",   "Composition"
-    ),
-    student_classification = c(
-      "Freshman",  "Sophomore", "Junior",
-      "Freshman",  "Sophomore", "Junior",
-      "Freshman",  "Sophomore",
-      "Freshman",  "Sophomore", "Junior",
-      "Sophomore", "Junior"
-    ),
-    registration_status_code = rep("RE", 13),
-    # All ABQ: the timing/pairs expectations above are stated per course, so a
-    # single campus keeps them one row each. The two-campus behaviour is pinned
-    # separately at the end of this file.
-    campus = rep("ABQ", 13)
-  )
-}
-
-make_pathway_population <- function() {
-  tibble(
-    student_id       = c("S001", "S002", "S003", "S004", "S005"),
-    population_label = "bio_majors"
-  )
-}
-
-# The position columns of cedar_student_terms for the S00x students, as
-# build_student_terms() would write them: running totals per student, and
-# timeline_valid set against the first term in the whole table. `extra` rows
-# are bound in before either is derived, so a row on an earlier term opens the
-# window for everyone.
-make_pathway_student_terms <- function(extra = NULL) {
-  dplyr::bind_rows(
-    tibble(
-      student_id = c("S001", "S001", "S001",
-                     "S002", "S002", "S002",
-                     "S003", "S003",
-                     "S004", "S004", "S004",
-                     "S005", "S005"),
-      term = c(202410L, 202480L, 202510L,
-               202410L, 202480L, 202510L,
-               202410L, 202480L,
-               202410L, 202480L, 202510L,
-               202480L, 202510L),
-      attempted_unm_credits = rep(15, 13),
-      completed_unm_credits = rep(15, 13),
-      # The classification each student carried that term, as the class-list
-      # fixture above records it; the classification axis and the start filter
-      # read it from here, never from the course row.
-      student_classification = c("Freshman", "Sophomore", "Junior",
-                                 "Freshman", "Sophomore", "Junior",
-                                 "Freshman", "Sophomore",
-                                 "Freshman", "Sophomore", "Junior",
-                                 "Sophomore", "Junior"),
-      enrolled = TRUE
-    ),
-    extra
-  ) %>%
-    dplyr::mutate(.min_data_term = min(term)) %>%
-    dplyr::group_by(student_id) %>%
-    dplyr::arrange(term, .by_group = TRUE) %>%
-    dplyr::mutate(
-      cumulative_attempted_unm_credits = cumsum(attempted_unm_credits),
-      cumulative_completed_unm_credits = cumsum(completed_unm_credits),
-      unm_credits_entering = cumulative_attempted_unm_credits - attempted_unm_credits,
-      timeline_valid = min(term) > .min_data_term
-    ) %>%
-    dplyr::ungroup() %>%
-    dplyr::select(-.min_data_term)
-}
-
-
 # =============================================================================
 # get_course_timing() tests
 # =============================================================================
 
 test_that("get_course_timing counts each course position against its eligible population", {
   result <- get_course_timing(
-    make_pathway_students(), make_pathway_population(), opt = list(min_n = 1)
+    pathway_students, pathway_population, opt = list(min_n = 1)
   ) %>% arrange(subject_course, relative_term)
 
   expect_s3_class(result, "data.frame")
@@ -175,8 +77,8 @@ test_that("get_course_timing min_n drops courses below total-student threshold",
   # CHEM 1215 total = 4; ENGL 1110 total = 4; BIOL 2310 total = 5
   # min_n=5 → CHEM and ENGL drop; BIOL survives
   result <- get_course_timing(
-    make_pathway_students(),
-    make_pathway_population(),
+    pathway_students,
+    pathway_population,
     opt = list(min_n = 5, min_band_n = 1L, min_cell_n = 1L)
   )
 
@@ -277,9 +179,9 @@ test_that("timing suppresses thin bands and thin course cells separately", {
 
 test_that("get_course_timing start_classification excludes S005 from counts and eligibility", {
   result <- get_course_timing(
-    make_pathway_students(), make_pathway_population(),
+    pathway_students, pathway_population,
     opt = list(min_n = 1, start_classification = "Freshman"),
-    student_terms = make_pathway_student_terms()
+    student_terms = pathway_student_terms
   ) %>%
     filter(subject_course %in% c("BIOL 2310", "CHEM 1215")) %>%
     arrange(subject_course, relative_term)
@@ -299,8 +201,8 @@ test_that("get_course_timing start_classification excludes S005 from counts and 
 
 test_that("get_course_timing subject_code filter restricts to BIOL courses only", {
   result <- get_course_timing(
-    make_pathway_students(),
-    make_pathway_population(),
+    pathway_students,
+    pathway_population,
     opt = list(min_n = 1, subject_code = "BIOL")
   )
 
@@ -312,14 +214,14 @@ test_that("get_course_timing subject_code filter restricts to BIOL courses only"
 test_that("get_course_timing stops when population missing population_label column", {
   bad_pop <- tibble(student_id = c("S001", "S002"))
   expect_error(
-    get_course_timing(make_pathway_students(), bad_pop, opt = list(min_n = 1)),
+    get_course_timing(pathway_students, bad_pop, opt = list(min_n = 1)),
     "population_label"
   )
 })
 
 test_that("get_course_timing returns empty data frame for empty population", {
-  empty_pop <- make_pathway_population()[0, ]
-  result <- get_course_timing(make_pathway_students(), empty_pop, opt = list(min_n = 1))
+  empty_pop <- pathway_population[0, ]
+  result <- get_course_timing(pathway_students, empty_pop, opt = list(min_n = 1))
   expect_equal(nrow(result), 0)
 })
 
@@ -354,7 +256,7 @@ test_that("get_course_timing returns empty data frame for empty population", {
 
 test_that("get_course_pairs preserves progression counts, rates, gaps, and frequency order", {
   result <- get_course_pairs(
-    make_pathway_students(), make_pathway_population(),
+    pathway_students, pathway_population,
     opt = list(min_n = 1, min_pair_n = 1)
   )
 
@@ -375,8 +277,8 @@ test_that("get_course_pairs preserves progression counts, rates, gaps, and frequ
 
 test_that("get_course_pairs max_term_gap=1 excludes CHEM→ENGL (gap=2) but keeps CHEM→BIOL (gap=1)", {
   result <- get_course_pairs(
-    make_pathway_students(),
-    make_pathway_population(),
+    pathway_students,
+    pathway_population,
     opt = list(min_n = 1, min_pair_n = 1, max_term_gap = 1)
   )
 
@@ -389,8 +291,8 @@ test_that("get_course_pairs max_term_gap=1 excludes CHEM→ENGL (gap=2) but keep
 
 test_that("get_course_pairs min_pair_n=4 drops CHEM→ENGL (n=3) but keeps CHEM→BIOL (n=4)", {
   result <- get_course_pairs(
-    make_pathway_students(),
-    make_pathway_population(),
+    pathway_students,
+    pathway_population,
     opt = list(min_n = 1, min_pair_n = 4)
   )
 
@@ -404,8 +306,8 @@ test_that("get_course_pairs min_pair_n=4 drops CHEM→ENGL (n=3) but keeps CHEM�
 
 test_that("get_course_pairs returns empty tibble when no pairs meet thresholds", {
   result <- get_course_pairs(
-    make_pathway_students(),
-    make_pathway_population(),
+    pathway_students,
+    pathway_population,
     opt = list(min_n = 1, min_pair_n = 999)
   )
   expect_equal(nrow(result), 0)
@@ -454,71 +356,9 @@ test_that("get_course_pairs returns empty tibble when no pairs meet thresholds",
 #   PHYS 100 must NOT appear (only taker is S006, excluded for no prior term).
 #   BIOL 2310 (202480 = event term) must NOT appear when include_event_term=FALSE.
 
-make_ep_population <- function() {
-  tibble(
-    student_id       = c("S001", "S002", "S003", "S004", "S005", "S006", "S007"),
-    population_label = "bio_majors",
-    outcome          = c("ongoing", "ongoing", "ongoing",
-                         "chose_elsewhere", "chose_elsewhere",
-                         "ongoing",    # S006: entered, but first_unit_term=202410 (no prior)
-                         "ongoing"),   # S007: switched_in, still "entered" by outcome
-    entry_status     = c("pre_major", "pre_major", "pre_major",
-                         "pre_major", "pre_major",
-                         "pre_major",
-                         "switched_in"),
-    first_unit_term  = c(202480L, 202480L, 202480L,
-                         202480L, 202480L,
-                         202410L,   # earliest data term — no prior term exists
-                         202480L),
-    last_unit_term   = c(202510L, 202510L, 202510L,
-                         202480L, 202480L,
-                         202510L,
-                         202510L)
-  )
-}
-
-make_ep_students <- function() {
-  tibble(
-    student_id = c(
-      # 202410: prior term window for first_unit_term=202480 students
-      "S001", "S002", "S003", "S004", "S007",  # CHEM 1215 (S007 switched_in, now included)
-      "S002", "S003", "S004", "S005",          # HIST 101
-      "S006",                                  # PHYS 100 (S006 excluded: no prior term)
-      # 202480: event term itself — should NOT appear in results
-      "S001", "S002", "S003", "S004", "S005",
-      # 202510: post-event — should NOT appear in results
-      "S001", "S002"
-    ),
-    term = c(
-      202410L, 202410L, 202410L, 202410L, 202410L,
-      202410L, 202410L, 202410L, 202410L,
-      202410L,
-      202480L, 202480L, 202480L, 202480L, 202480L,
-      202510L, 202510L
-    ),
-    subject_course = c(
-      "CHEM 1215", "CHEM 1215", "CHEM 1215", "CHEM 1215", "CHEM 1215",
-      "HIST 101",  "HIST 101",  "HIST 101",  "HIST 101",
-      "PHYS 100",
-      "BIOL 2310", "BIOL 2310", "BIOL 2310", "BIOL 2310", "BIOL 2310",
-      "BIOL 3100", "BIOL 3100"
-    ),
-    course_title = c(
-      rep("General Chemistry", 5),
-      rep("World History",     4),
-      rep("Physics",           1),
-      rep("General Biology",   5),
-      rep("Cell Biology",      2)
-    ),
-    registration_status_code = rep("RE", 17),
-    campus = rep("ABQ", 17)
-  )
-}
-
-
 test_that("get_event_adjacent_courses compares prior courses with audited entry groups", {
   result <- get_event_adjacent_courses(
-    make_ep_students(), make_ep_population(), event = "entry", min_n = 1
+    ep_students, ep_population, event = "entry", min_n = 1
   )
   meta <- attr(result, "ep_meta")
 
@@ -546,7 +386,7 @@ test_that("get_event_adjacent_courses compares prior courses with audited entry 
 
 test_that("get_event_adjacent_courses include_event_term=TRUE adds event-term courses", {
   result <- get_event_adjacent_courses(
-    make_ep_students(), make_ep_population(),
+    ep_students, ep_population,
     event = "entry", window = 1L, include_event_term = TRUE, min_n = 1
   )
 
@@ -557,7 +397,7 @@ test_that("get_event_adjacent_courses min_n threshold filters correctly", {
   # With min_n=3: CHEM entered n=4 survives; HIST entered n=2 dropped,
   # HIST did_not_enter n=2 dropped — only CHEM appears.
   result <- get_event_adjacent_courses(
-    make_ep_students(), make_ep_population(),
+    ep_students, ep_population,
     event = "entry", min_n = 3
   )
 
@@ -569,7 +409,7 @@ test_that("get_event_adjacent_courses min_n threshold filters correctly", {
 test_that("get_event_adjacent_courses errors when population missing required columns", {
   bad_pop <- tibble(student_id = c("S001", "S002"), population_label = "x")
   expect_error(
-    get_event_adjacent_courses(make_ep_students(), bad_pop),
+    get_event_adjacent_courses(ep_students, bad_pop),
     "missing columns"
   )
 })
@@ -577,26 +417,26 @@ test_that("get_event_adjacent_courses errors when population missing required co
 test_that("get_event_adjacent_courses returns empty when all outcomes unclassifiable", {
   # Population with only stopped_out outcomes that don't match entry groups
   # (stopped_out IS in "entered" now) — test with outcome = NA instead
-  no_group_pop <- make_ep_population() %>%
+  no_group_pop <- ep_population %>%
     mutate(outcome = NA_character_)
   result <- get_event_adjacent_courses(
-    make_ep_students(), no_group_pop, event = "entry", min_n = 1
+    ep_students, no_group_pop, event = "entry", min_n = 1
   )
   expect_equal(nrow(result), 0)
 })
 
 test_that("get_event_adjacent_courses returns empty when all students entered in first data term", {
-  early_pop <- make_ep_population() %>%
+  early_pop <- ep_population %>%
     mutate(first_unit_term = 202410L)
   result <- get_event_adjacent_courses(
-    make_ep_students(), early_pop, event = "entry", min_n = 1
+    ep_students, early_pop, event = "entry", min_n = 1
   )
   expect_equal(nrow(result), 0)
 })
 
 test_that("get_event_adjacent_courses errors on invalid event argument", {
   expect_error(
-    get_event_adjacent_courses(make_ep_students(), make_ep_population(),
+    get_event_adjacent_courses(ep_students, ep_population,
                                event = "middle"),
     "entry.*exit"
   )
@@ -613,7 +453,7 @@ test_that("get_event_adjacent_courses errors on invalid event argument", {
 
 test_that("get_course_pairs censor_term drops A-side rows without a full follow-up window", {
   result <- get_course_pairs(
-    make_pathway_students(), make_pathway_population(),
+    pathway_students, pathway_population,
     opt = list(min_n = 1, min_pair_n = 1, max_term_gap = 2, censor_term = 202510L)
   )
 
@@ -632,7 +472,7 @@ test_that("get_course_pairs censor_term drops A-side rows without a full follow-
 test_that("get_course_pairs censor_term with a 1-term gap keeps BIOL as course A", {
   # gap = 1 → boundary = 202480; BIOL 2310 rows (202480) now have full follow-up.
   result <- get_course_pairs(
-    make_pathway_students(), make_pathway_population(),
+    pathway_students, pathway_population,
     opt = list(min_n = 1, min_pair_n = 1, max_term_gap = 1, censor_term = 202510L)
   )
   biol_engl <- result %>% filter(course_a == "BIOL 2310", course_b == "ENGL 1110")
@@ -642,7 +482,7 @@ test_that("get_course_pairs censor_term with a 1-term gap keeps BIOL as course A
 
 test_that("get_course_pairs without censor_term preserves uncensored behavior", {
   result <- get_course_pairs(
-    make_pathway_students(), make_pathway_population(),
+    pathway_students, pathway_population,
     opt = list(min_n = 1, min_pair_n = 1, max_term_gap = 2)
   )
   expect_true("BIOL 2310" %in% result$course_a)
@@ -658,15 +498,9 @@ test_that("get_course_pairs without censor_term preserves uncensored behavior", 
 # leaves branch-delivered course rows inside a main-campus view. These tests pin
 # the delivery-campus scope and grouping.
 
-# MC02 in designed_test_data.R supplies the two-campus rows; the population
-# wrapper is shape, not data.
-mc_population <- function(ids) {
-  tibble(student_id = ids, population_label = "MC test population")
-}
-
 test_that("course timing splits one course across its delivery campuses", {
   r <- suppressMessages(get_course_timing(
-    test_students_mc, mc_population(unique(test_students_mc$student_id)),
+    test_students_mc, mc_population,
     opt = list(min_n = 1L, x_axis = "relative_term")
   ))
   expect_true("campus" %in% names(r))
@@ -678,7 +512,7 @@ test_that("course timing splits one course across its delivery campuses", {
 
 test_that("curriculum map labels multi-campus course rows distinctly", {
   timing <- suppressMessages(get_course_timing(
-    test_students_mc, mc_population(unique(test_students_mc$student_id)),
+    test_students_mc, mc_population,
     opt = list(min_n = 1L, x_axis = "relative_term")
   ))
   plot <- suppressMessages(plot_curriculum_map(
@@ -691,7 +525,7 @@ test_that("curriculum map labels multi-campus course rows distinctly", {
 
 test_that("opt$campus scopes course timing to the delivery campus", {
   r <- suppressMessages(get_course_timing(
-    test_students_mc, mc_population(unique(test_students_mc$student_id)),
+    test_students_mc, mc_population,
     opt = list(min_n = 1L, campus = "ABQ", x_axis = "relative_term")
   ))
   expect_equal(unique(r$campus), "ABQ")
@@ -705,7 +539,7 @@ test_that("course timing without a campus column fails loudly", {
   no_campus <- dplyr::select(test_students_mc, -campus)
   expect_error(
     suppressMessages(get_course_timing(
-      no_campus, mc_population(unique(test_students_mc$student_id)),
+      no_campus, mc_population,
       opt = list(min_n = 1L, x_axis = "relative_term"))),
     "campus"
   )
@@ -716,7 +550,7 @@ test_that("course pairs scope by delivery campus but keep cross-campus pairs", {
   # legitimately sit on different campuses. MC_G1 in MC02 is exactly that: they
   # took SPAN 101 at GA and the follow-on SPAN 201 at ABQ. Campus scopes which
   # rows enter the self-join; it is deliberately not part of the pair key.
-  pop <- mc_population(unique(test_students_mc$student_id))
+  pop <- mc_population
 
   both <- suppressMessages(get_course_pairs(
     test_students_mc, pop,
@@ -755,10 +589,10 @@ test_that("course pairs scope by delivery campus but keep cross-campus pairs", {
 
 test_that("inst_credit_band drops left-truncated students and reports the count", {
   result <- get_course_timing(
-    make_pathway_students(),
-    make_pathway_population(),
+    pathway_students,
+    pathway_population,
     opt = list(min_n = 1, x_axis = "inst_credit_band"),
-    student_terms = make_pathway_student_terms()
+    student_terms = pathway_student_terms
   )
 
   meta <- attr(result, "timing_meta")
@@ -779,10 +613,10 @@ test_that("inst_credit_band drops left-truncated students and reports the count"
 
 test_that("unm_credit_band carries the same guard as the other credit axes", {
   result <- get_course_timing(
-    make_pathway_students(),
-    make_pathway_population(),
+    pathway_students,
+    pathway_population,
     opt = list(min_n = 1, x_axis = "unm_credit_band"),
-    student_terms = make_pathway_student_terms()
+    student_terms = pathway_student_terms
   )
 
   expect_equal(attr(result, "timing_meta")$n_truncated, 4)
@@ -792,28 +626,28 @@ test_that("unm_credit_band carries the same guard as the other credit axes", {
 test_that("classification axis reads the student-term table, not the course row", {
   # Every course row says Senior; the table keeps the fixture's progression,
   # and the axis follows the table.
-  rows <- dplyr::mutate(make_pathway_students(), student_classification = "Senior")
+  rows <- dplyr::mutate(pathway_students, student_classification = "Senior")
   result <- suppressMessages(get_course_timing(
-    rows, make_pathway_population(),
+    rows, pathway_population,
     opt = list(min_n = 1, x_axis = "classification"),
-    student_terms = make_pathway_student_terms()
+    student_terms = pathway_student_terms
   ))
   expect_setequal(result$relative_term[result$subject_course == "CHEM 1215"], 1L)
   expect_setequal(result$relative_term[result$subject_course == "ENGL 1110"], 3L)
 
   # Without the table neither the axis nor the start filter can be read.
-  expect_error(get_course_timing(make_pathway_students(), make_pathway_population(),
+  expect_error(get_course_timing(pathway_students, pathway_population,
                                  opt = list(min_n = 1, x_axis = "classification")),
                "need cedar_student_terms")
-  expect_error(get_course_timing(make_pathway_students(), make_pathway_population(),
+  expect_error(get_course_timing(pathway_students, pathway_population,
                                  opt = list(min_n = 1, start_classification = "Freshman")),
                "need cedar_student_terms")
   # The start filter reads the first enrolled term on the table: S005 enters as
   # a Sophomore there, and a table calling that term Freshman keeps S005.
-  st <- make_pathway_student_terms()
+  st <- pathway_student_terms
   st$student_classification[st$student_id == "S005" & st$term == 202480L] <- "Freshman"
   kept <- suppressMessages(get_course_timing(
-    make_pathway_students(), make_pathway_population(),
+    pathway_students, pathway_population,
     opt = list(min_n = 1, start_classification = "Freshman"),
     student_terms = st
   ))
@@ -822,10 +656,10 @@ test_that("classification axis reads the student-term table, not the course row"
 
 test_that("classification axis excludes nobody for truncation", {
   result <- get_course_timing(
-    make_pathway_students(),
-    make_pathway_population(),
+    pathway_students,
+    pathway_population,
     opt = list(min_n = 1, x_axis = "classification"),
-    student_terms = make_pathway_student_terms()
+    student_terms = pathway_student_terms
   )
 
   expect_equal(attr(result, "timing_meta")$n_truncated, 0L)
@@ -838,12 +672,10 @@ test_that("a fully-visible population loses no students to the guard", {
   # window opens before every S00x student's first term and none of them are
   # truncated.
   result <- get_course_timing(
-    make_pathway_students(),
-    make_pathway_population(),
+    pathway_students,
+    pathway_population,
     opt = list(min_n = 1, x_axis = "inst_credit_band"),
-    student_terms = make_pathway_student_terms(
-      extra = tibble(student_id = "S000", term = 202380L,
-                     attempted_unm_credits = 12, completed_unm_credits = 12))
+    student_terms = pathway_student_terms_earlier_window
   )
 
   expect_equal(attr(result, "timing_meta")$n_truncated, 0)

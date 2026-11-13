@@ -22,9 +22,6 @@
 
 context("Crosslist and Split-Level Detection")
 
-# Derived view used throughout — mirrors how production code sees XL sections
-xl_sections <- test_sections %>% filter(!is.na(crosslist_group))
-
 # =============================================================================
 # crosslist_group
 # =============================================================================

@@ -7,45 +7,8 @@ context("Enrollment projection scenarios")
 # fixtures cannot express -- test_students$major_code is entirely NA -- and is
 # covered by the real-data audit documented in developers/enrollment-projections.md.
 
-scenario_test_bundle <- function(composition = NULL) {
-  settled_students <- test_students %>%
-    dplyr::mutate(as_of_date = .cedar_term_start(term) + 30L)
-  bundle <- build_enrollment_projection_bundle(
-    cl_enrls = calc_cl_enrls(settled_students, by_part_term = TRUE),
-    sections = test_sections,
-    students = settled_students,
-    student_terms = test_student_terms,
-    target_term = 202110L,
-    as_of_term = 202080L,
-    scope_courses = "MATH 1215Z",
-    scope_campuses = "ABQ",
-    scope_market_id = "abq_course_market",
-    force_courses = "MATH 1215Z",
-    # 202010 is the one prior Spring in the fixture, so the course gets a
-    # real published projection (5 students) to anchor the scenario on.
-    opt = list(history_start_term = 202010L),
-    built_at = as.POSIXct("2026-08-15 12:00:00", tz = "UTC")
-  )
-  if (!is.null(composition)) bundle$cohort_composition <- composition
-  bundle
-}
-
-# 40 students in the baseline roster, 10 of them Nursing: a 25% share. Every
-# expected value below is derived from these two numbers and the published
-# projection, so a changed expectation means the arithmetic moved.
-scenario_test_composition <- function(cohort = 10L, others = 30L) {
-  tibble::tibble(
-    market_id = "abq_course_market",
-    subject_course = "MATH 1215Z",
-    baseline_term = 202010L,
-    major_code = c("NURS", "BIOL"),
-    student_classification = "Sophomore",
-    n_students = c(cohort, others)
-  )
-}
-
 test_that("year one is the published projection at any growth rate", {
-  bundle <- scenario_test_bundle(scenario_test_composition())
+  bundle <- scenario_test_bundle(scenario_test_composition)
   published <- build_enrollment_projection_view(
     bundle, list(group_id = "all_saved")
   )$projections$projected_classlist_total[[1]]
@@ -63,7 +26,7 @@ test_that("year one is the published projection at any growth rate", {
 })
 
 test_that("zero growth is flat and only the population's share moves demand", {
-  bundle <- scenario_test_bundle(scenario_test_composition())
+  bundle <- scenario_test_bundle(scenario_test_composition)
   published <- build_enrollment_projection_view(
     bundle, list(group_id = "all_saved")
   )$projections$projected_classlist_total[[1]]
@@ -91,7 +54,7 @@ test_that("zero growth is flat and only the population's share moves demand", {
 })
 
 test_that("the horizon advances one year per step in the target's own season", {
-  bundle <- scenario_test_bundle(scenario_test_composition())
+  bundle <- scenario_test_bundle(scenario_test_composition)
   scenario <- build_enrollment_projection_scenario(
     bundle, opt = list(group_id = "all_saved", major_codes = "NURS",
                        growth_rate = 0.10, horizon_years = 3L,
@@ -104,7 +67,7 @@ test_that("the horizon advances one year per step in the target's own season", {
 })
 
 test_that("sections round up from unrounded demand and never go negative", {
-  bundle <- scenario_test_bundle(scenario_test_composition())
+  bundle <- scenario_test_bundle(scenario_test_composition)
   scenario <- build_enrollment_projection_scenario(
     bundle, opt = list(group_id = "all_saved", major_codes = "NURS",
                        growth_rate = 0.50, horizon_years = 5L,
@@ -124,7 +87,7 @@ test_that("sections round up from unrounded demand and never go negative", {
 })
 
 test_that("a cohort below the guard is reported, not silently dropped", {
-  bundle <- scenario_test_bundle(scenario_test_composition(cohort = 3L))
+  bundle <- scenario_test_bundle(dplyr::mutate(scenario_test_composition, n_students = c(3L, 30L)))
   scenario <- build_enrollment_projection_scenario(
     bundle, opt = list(group_id = "all_saved", major_codes = "NURS",
                        growth_rate = 0.10, min_population_cohort = 10L)
@@ -137,7 +100,7 @@ test_that("a cohort below the guard is reported, not silently dropped", {
 })
 
 test_that("a course with none of the population is excluded with a reason", {
-  bundle <- scenario_test_bundle(scenario_test_composition(cohort = 0L))
+  bundle <- scenario_test_bundle(dplyr::mutate(scenario_test_composition, n_students = c(0L, 30L)))
   scenario <- build_enrollment_projection_scenario(
     bundle, opt = list(group_id = "all_saved", major_codes = "PHRD",
                        growth_rate = 0.10, min_population_cohort = 1L)
@@ -149,7 +112,7 @@ test_that("a course with none of the population is excluded with a reason", {
 })
 
 test_that("the scenario fails loudly rather than guessing", {
-  bundle <- scenario_test_bundle(scenario_test_composition())
+  bundle <- scenario_test_bundle(scenario_test_composition)
 
   expect_error(
     build_enrollment_projection_scenario(bundle, opt = list(growth_rate = 0.1)),
@@ -180,7 +143,7 @@ test_that("the scenario fails loudly rather than guessing", {
 })
 
 test_that("meta states the assumption and names the population", {
-  bundle <- scenario_test_bundle(scenario_test_composition())
+  bundle <- scenario_test_bundle(scenario_test_composition)
   scenario <- build_enrollment_projection_scenario(
     bundle, programs = test_programs_hp,
     opt = list(group_id = "all_saved",

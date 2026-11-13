@@ -17,39 +17,8 @@
 context("GPA Timeline")
 
 
-# GP_S1 — three terms, all graded, whole record inside the window.
-# GP_S2 — starts in the first term of the data, so left-truncated.
-# GP_S9 — one term with an A beside W, CR and I: points for the A only.
-# GP_S8 — a W only: no graded hours, no timeline row.
-# Rows through the ST01 constructor (3 credits each, registered, ABQ).
-make_gpa_students <- function() {
-  dplyr::bind_rows(
-    .st_row("GP_S1", 202080L, "AAA 101", "RE", "A"),
-    .st_row("GP_S1", 202080L, "BBB 101", "RE", "B"),
-    .st_row("GP_S1", 202110L, "CCC 101", "RE", "C"),
-    .st_row("GP_S1", 202180L, "DDD 101", "RE", "A"),
-    .st_row("GP_S2", 202010L, "EEE 101", "RE", "B"),
-    .st_row("GP_S2", 202110L, "FFF 101", "RE", "A"),
-    .st_row("GP_S9", 202080L, "GGG 101", "RE", "A"),
-    .st_row("GP_S9", 202080L, "HHH 101", "RE", "W"),
-    .st_row("GP_S9", 202080L, "III 101", "RE", "CR"),
-    .st_row("GP_S9", 202080L, "JJJ 101", "RE", "I"),
-    .st_row("GP_S8", 202080L, "KKK 101", "RE", "W")
-  )
-}
-
-gpa_student_terms <- function(students = make_gpa_students()) {
-  suppressMessages(build_student_terms(
-    students, programs = NULL, degrees = NULL,
-    edges = list(last_enrolled_complete = 202180L)
-  ))
-}
-
-gpa_timeline <- function() build_gpa_timeline(gpa_student_terms())
-
-
 test_that("the student-term table carries the grade points the series divides", {
-  st <- gpa_student_terms()
+  st <- gpa_student_terms
   s1 <- dplyr::filter(st, student_id == "GP_S1") %>% dplyr::arrange(term)
   # 202080: A (4.0) and B (3.0), 3 credits each -> 21 points over 6 hours
   expect_equal(s1$quality_points, c(21, 6, 12))
@@ -127,7 +96,7 @@ test_that("left-truncated students are marked invalid, by the table's flag", {
   expect_false(unique(dplyr::filter(tl, student_id == "GP_S2")$timeline_valid))
   expect_true(all(dplyr::filter(tl, student_id == "GP_S1")$timeline_valid))
   # The flag is the table's, over the whole data: a slice of the table keeps it.
-  sliced <- build_gpa_timeline(dplyr::filter(gpa_student_terms(), student_id == "GP_S2"))
+  sliced <- build_gpa_timeline(dplyr::filter(gpa_student_terms, student_id == "GP_S2"))
   expect_false(unique(sliced$timeline_valid))
 })
 
@@ -135,7 +104,7 @@ test_that("left-truncated students are marked invalid, by the table's flag", {
 test_that("a student with no gradeable rows yields no timeline rows", {
   tl <- gpa_timeline()
   expect_false("GP_S8" %in% tl$student_id)
-  expect_equal(nrow(build_gpa_timeline(gpa_student_terms(), opt = list(student_ids = "GP_S8"))), 0)
+  expect_equal(nrow(build_gpa_timeline(gpa_student_terms, opt = list(student_ids = "GP_S8"))), 0)
 })
 
 
@@ -145,9 +114,9 @@ test_that("missing columns and the class list's window options are explicit erro
     "missing required column"
   )
   # The class list itself is not the table.
-  expect_error(build_gpa_timeline(make_gpa_students()), "missing required column")
+  expect_error(build_gpa_timeline(gpa_students), "missing required column")
   expect_error(
-    build_gpa_timeline(gpa_student_terms(), opt = list(min_data_term = 202010L)),
+    build_gpa_timeline(gpa_student_terms, opt = list(min_data_term = 202010L)),
     "not an option it answers"
   )
 })
@@ -202,7 +171,7 @@ test_that("an empty timeline yields NA columns rather than an error", {
   events <- tibble::tibble(student_id = "GP_S1", covariate_term = 202080L)
   out <- attach_gpa_position(
     events,
-    build_gpa_timeline(gpa_student_terms(), opt = list(student_ids = "GP_S8")),
+    build_gpa_timeline(gpa_student_terms, opt = list(student_ids = "GP_S8")),
     term_col = "covariate_term"
   )
   expect_true(is.na(out$gpa_entering))

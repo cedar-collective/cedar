@@ -2,21 +2,10 @@
 # below are explicit analytical parameters, not institutional fixture tables.
 # The history reads the course-term measure table (ADR-001 step 7), counted
 # here over each fixture's class list and schedule as the transform counts it.
-history_edges <- list(last_enrolled_complete = 202080L, last_enrolled = 202180L)
-course_history <- function(courses = "SOCI 100", sections = test_sections_regstats,
-                           course_terms = test_course_terms_regstats) {
-  get_course_planning_history(sections, course_terms, courses, history_edges)
-}
-course_history_terms <- course_terms_for(test_students_course_history, test_sections_course_history)
-pending_session_terms <- course_terms_for(test_students_pending_session, test_sections_pending_session)
-
-# Catalog membership is analytical scaffolding over EC-11's recorded histories.
-planning_gen_ed <- function() data.frame(subject_course = c("SOCI 100", "SOCI 101", "SOCI 104"),
-  area_label = c("4: Social sciences", "4: Social sciences", "5: Humanities"))
 
 test_that("Gen Ed suggestions retain season, campus and session and suppress small first-day cells", {
   h <- course_history(c("SOCI 100", "SOCI 101", "SOCI 104"))
-  x <- get_gen_ed_planning_options(test_sections_regstats, h, planning_gen_ed(), "fall", 3)
+  x <- get_gen_ed_planning_options(test_sections_regstats, h, planning_gen_ed, "fall", 3)
   social <- x[x$subject_course == "SOCI 100", ]
   expect_equal(nrow(social), 3L)
   expect_equal(social$first_day_enrl[social$campus == "ABQ" & social$part_term == "1"], 107)
@@ -26,17 +15,17 @@ test_that("Gen Ed suggestions retain season, campus and session and suppress sma
   expect_true(all(x$term <= history_edges$last_enrolled_complete))
   expect_true(all(x$term %% 100 == 80))
   expect_false(anyDuplicated(x[c("campus", "subject_course", "college", "part_term")]) > 0L)
-  spring <- get_gen_ed_planning_options(test_sections_regstats, h, planning_gen_ed(), "spring", 3)
+  spring <- get_gen_ed_planning_options(test_sections_regstats, h, planning_gen_ed, "spring", 3)
   expect_setequal(spring$term, 202010L)
   expect_true(all(spring$season_frequency == "1 of 1"))
   # An earlier source edge makes EA's small 2018 offering the latest one.
   early <- get_course_planning_history(test_sections_regstats, test_course_terms_regstats, "SOCI 100",
     list(last_enrolled_complete = 201880L))
-  small <- get_gen_ed_planning_options(test_sections_regstats, early, planning_gen_ed(), "fall", 3)
+  small <- get_gen_ed_planning_options(test_sections_regstats, early, planning_gen_ed, "fall", 3)
   expect_true(is.na(small$first_day_enrl[small$campus == "EA"]))
   expect_equal(small$pressure_status[small$campus == "EA"], "Suppressed (<10)")
   expect_error(get_gen_ed_planning_options(select(test_sections_regstats, -credits_min), h,
-    planning_gen_ed(), "fall", 3), "missing: credits_min")
+    planning_gen_ed, "fall", 3), "missing: credits_min")
 })
 
 test_that("course pressure retains campus, college and session and uses first-day capacity", {
