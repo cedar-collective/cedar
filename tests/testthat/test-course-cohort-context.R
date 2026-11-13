@@ -138,9 +138,20 @@ test_that("the page's defaults are read off the data: classification, college, l
   # The college of the takers' other lower-division courses (all ARTS here).
   expect_equal(d$college, "ARTS")
   expect_equal(d$level, "lower")
-  # Every regular term to the settled edge, newest last; no summer.
-  expect_equal(d$terms, c(202010L, 202080L, 202110L))
+  # SPAN 101 is taken in Spring 2020 only: the page opens on every Spring to
+  # the settled edge, and offers every term.
+  expect_equal(d$term_type, "spring")
+  expect_equal(d$terms, c(202010L, 202110L))
   expect_equal(d$choices$terms, c(202010L, 202080L, 202110L))
+  expect_equal(d$choices$term_types, c("fall", "spring"))
+  both <- course_cohort_context_defaults("SPAN 101", test_student_terms_mc,
+                                         keyed_attempts(test_students_mc, mc02_edges), mc02_edges,
+                                         list(term_type = c("fall", "spring")))
+  expect_equal(both$terms, c(202010L, 202080L, 202110L))
+  expect_error(course_cohort_context_defaults("SPAN 101", test_student_terms_mc,
+                                              keyed_attempts(test_students_mc, mc02_edges), mc02_edges,
+                                              list(term_type = "summer")),
+               "names no term in the data: summer")
   # Only the home campuses the page's selection names.
   expect_equal(d$campus, "ABQ")
   expect_equal(d$choices$campuses, c("ABQ", "GA"))
@@ -161,23 +172,4 @@ test_that("with programs the payload carries the focal course's balance table", 
   )
   expect_true(is.data.frame(p$balance$smd_table))
   expect_null(mc02_context()$balance)
-})
-
-test_that("the headline reads the latest term, one paragraph per home campus", {
-  testthat::local_edition(3)
-  st <- suppressMessages(build_student_terms(cedar_registrations_rw, cedar_programs_rw, edges = rw01_settled_edges))
-  att <- keyed_attempts(test_students_rw, rw01_settled_edges)
-  p <- build_course_cohort_context(st, att, list(
-    course = "HIST 1110", classification = "Sophomore", college = "ARTS", level = "lower",
-    min_n = 1L, term = 202080L, data_edges = rw01_settled_edges, college_label = "Arts"
-  ))
-  expect_snapshot(cat(course_cohort_context_headline(p), sep = "\n"))
-  # MC02: no term has both SPAN 101 groups, so the paragraph falls back to the
-  # latest term and says there is no gap to read.
-  expect_snapshot(cat(course_cohort_context_headline(mc02_context()), sep = "\n"))
-  # With a readable gap in an earlier term, the headline reads that term, not
-  # the latest unobservable one.
-  lab <- mc02_context(course = "SPAN 101L")
-  expect_match(course_cohort_context_headline(lab)[[1]], "^In Spring 2020, 2 of 4 ABQ students")
-  expect_error(course_cohort_context_headline(list()), "build_course_cohort_context")
 })

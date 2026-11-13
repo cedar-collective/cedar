@@ -519,7 +519,7 @@ definitions:
           - file: R/cones/course-cohort-effect.R
             functions: [get_course_cohort_effect]
           - file: R/features/course-cohort-context.R
-            functions: [build_course_cohort_context, course_cohort_context_defaults, course_cohort_context_headline]
+            functions: [build_course_cohort_context, course_cohort_context_defaults]
 
   - id: course-sequence
     current_version: "2.0.0"

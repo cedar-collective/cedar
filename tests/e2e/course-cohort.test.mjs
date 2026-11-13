@@ -28,7 +28,7 @@ try {
 
   await openSubTab(page, 'Takers vs Non-Takers', { timeout: 300000 });
   await requireIds(page, ['cr_cohort-classification', 'cr_cohort-college', 'cr_cohort-terms',
-                          'cr_cohort-min_n', 'cr_cohort-run']);
+                          'cr_cohort-term_type', 'cr_cohort-min_n', 'cr_cohort-run']);
 
   // The controls open filled from the data, never empty.
   const defaults = await page.evaluate(() => ({
@@ -38,7 +38,10 @@ try {
   }));
   ok(defaults.classification.length > 0, `classification defaults to the takers' (${defaults.classification})`);
   ok(defaults.college.length > 0, `benchmark college defaults to the course's (${defaults.college})`);
-  ok(defaults.terms.length > 0, `terms default to the recent regular terms (${defaults.terms.length})`);
+  ok(defaults.terms.length > 0, `terms default to every term of the course's main term type (${defaults.terms.length})`);
+  // Term codes end in the term type's two digits: the default is one type.
+  ok(new Set(defaults.terms.map((t) => t.slice(4))).size === 1,
+     `the default terms are of one term type (${defaults.terms.join(', ')})`);
 
   const definition = await page.evaluate(() => {
     const note = document.querySelector('[data-definition-id="course-cohort-effect"]');
@@ -55,8 +58,6 @@ try {
   // textContent, not innerText: the "Who is being counted" panel is a collapsed
   // <details>, and innerText leaves collapsed content out.
   const body = await page.evaluate(() => document.getElementById('cr_cohort-results').textContent);
-  ok(/returned the next regular term|no gap to read|nothing to compare/.test(body),
-     'the result opens with the lead paragraph');
   ok(/Passed it/.test(body) && /Never took it/.test(body),
      'the groups table names the three groups');
   ok(/describe who takes the course before they describe the course/.test(body),
