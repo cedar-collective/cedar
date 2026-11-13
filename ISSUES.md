@@ -36,6 +36,7 @@ alongside other work (M14, M16).
 
 | ID | Kind | Summary |
 |---|---|---|
+| [I58](#i58--courses-taken-calls-a-term-in-progress-in-its-charts-and-settled-in-its-tables) | Defect | Courses Taken calls a term in progress in its charts and settled in its tables: on the Oct 8 pull Fall 2026 is shaded "In progress" on every over-time chart, while the own-share table's In progress column, the Teaching Units heading and the "Who is being counted" note call it settled |
 | [I55](#i55--the-instructor-gate-password-stopped-reaching-the-app) | Defect | The instructor-gate password stopped reaching the app: since 2026-09-05 `.Renviron` is kept out of the image and nothing else passed `CEDAR_DFW_PASSWORD`, so every instructor gate on production reads "not configured" (fixed in code 2026-11-12; production needs the password in its `.env`) |
 | [I46](#i46--a-deploy-that-must-rebuild-a-table-the-app-cannot-start-without-takes-the-site-down) | Defect | The deploy's table gate ran after the health check, so a deploy that added a column to `cedar_student_terms` failed its health check on the missing column and never reached the gate: production served the restart page from 17:07 UTC on 2026-11-04 (gate moved before the first request) |
 | [I45](#i45--the-class-list-and-the-schedule-name-the-same-section-with-different-course-codes) | Defect | The class list and the schedule name the same section with different course codes for renamed subjects (SOC to SOCI, PSY to PSYC): SOCI 371 had class-list history from Fall 2019 but no sections before Fall 2021 (fixed for every reader by keying the loaded tables on the course, 2026-11-07; open until the remaining successions are confirmed) |
@@ -89,6 +90,59 @@ Kept until the next release, so a recurrence is recognisable; each entry below g
 ---
 
 # Defects
+
+## I58 — Courses Taken calls a term in progress in its charts and settled in its tables
+
+**Status:** open.
+**Found:** 2026-11-13, looking at Dept Trends > Courses Taken for History
+(ABQ, EA) on the local institutional app, after #282.
+**Severity:** low. No count is wrong; one page labels the same term two ways,
+and the reader cannot tell whether Fall 2026's registrations are final.
+**Affects:** `get_major_course_units()` (`R/cones/major-course-units.R`),
+`compute_dept_course_units_tab()` (`R/features/dept-trends.R`) and the
+Courses Taken page (`R/modules/dept-trends.R`).
+
+### What is wrong
+
+The page reads two definitions of "in progress":
+
+- **The charts** shade every term after `last_graded`, to `last_enrolled`
+  (`cedar_in_progress_terms()`, `R/modules/dept-trends.R:75`, drawn by
+  `mark_plotly_terms()`), as the right-edge policy says a descriptive
+  current-registration chart must. The outside-course table's column headings
+  read the same terms (`R/modules/dept-trends.R:595`).
+- **The tables and the words** read the cone's `in_progress`, which is
+  `term > last_enrolled_complete` (`R/cones/major-course-units.R:177`), and
+  the payload's `meta$latest_in_progress` built the same way
+  (`R/features/dept-trends.R:939`). The own-share table's In progress column,
+  the "Teaching Units, <term>" heading (`R/modules/dept-trends.R:483`) and the
+  in-progress line of "Who is being counted" (`:509`) follow it.
+
+Whenever a term is settled but not graded (each regular term, from the day it
+settles until its grades post), the two disagree. On the Oct 8 pull the edges
+are `last_enrolled` 202680, `last_enrolled_complete` 202680 and `last_graded`
+202660: every over-time chart shades Fall 2026 "In progress", while its row in
+the own-share table is blank in In progress, the heading reads "Teaching
+Units, Fall 2026" with no "(in progress)", and the note leaves out the
+in-progress line.
+
+### Reproduction
+
+On `shared-data` (`scripts/cedar-repl.R` with `cedar_data_dir` set to it;
+edges from `cedar_report_edges()`):
+`cedar_in_progress_terms(edges)$term` is `202680`, while
+`compute_dept_course_units_tab(list(dept_code = "HIST", dept_name = "History"), data_objects)`
+gives `meta$latest_in_progress` FALSE and no `own_share` row with
+`in_progress` TRUE. In the app: Dept Trends, History, Courses Taken.
+
+### Done when
+
+Every in-progress label on the page reads one definition, the terms after
+`last_graded` that the charts shade, and a test on the fixtures sets edges
+with the settled edge later than the graded edge and finds the latest term
+labelled in progress in the table, the heading and the note. The cone's own
+`in_progress` (past the settled edge) either goes or is renamed for what it
+is, so no reader takes it for the page's label.
 
 ## I57 — The Instructor Patterns column guide states a pass rule CEDAR does not use
 
