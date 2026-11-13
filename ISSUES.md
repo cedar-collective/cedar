@@ -57,6 +57,7 @@ Kept until the next release, so a recurrence is recognisable; each entry below g
 
 | ID | Kind | Summary |
 |---|---|---|
+| [I59](#i59--the-dfw-tabs-dfw-by-term-table-stopped-with-an-error-for-every-course) | Defect | The DFW tab's DFW by Term table stopped with an error for every course from 2026-10-16 (#143) to 2026-11-13: its status-exclusion summary read the class list without the graded edge (resolved) |
 | [I58](#i58--courses-taken-calls-a-term-in-progress-in-its-charts-and-settled-in-its-tables) | Defect | Courses Taken shaded Fall 2026 "In progress" in its charts and called it settled in its tables, heading and note; every label now reads `cedar_term_in_progress()` (resolved) |
 | [I57](#i57--the-instructor-patterns-column-guide-states-a-pass-rule-cedar-does-not-use) | Defect | The Instructor Patterns column guide said "Passing is C− or better, CR, P, or S" beside a table that followed CEDAR's rule (A+ through C and CR). The tab is gone: the breakdown by instructor is a section of Downstream > Later Course, which states no pass rule of its own (resolved 2026-11-13, #280) |
 | [I56](#i56--downstream-continuation-misses-every-later-enrollment-after-the-grade-edge) | Defect | Downstream continuation read the later course only to the graded edge while counting eligibility to the settled edge, so the newest students who continued counted as not continuing: 183 of 557 for CHEM 1215 to 1225, confirmed on the 2026-11-13 tables. One cohort (`build_downstream_cohort()`) now reads enrollment to the settled edge and grades to the graded edge, inside a fixed window, by the campus that taught the first course (resolved 2026-11-13, #280) |
@@ -90,6 +91,37 @@ Kept until the next release, so a recurrence is recognisable; each entry below g
 ---
 
 # Defects
+
+## I59 — The DFW tab's DFW by Term table stopped with an error for every course
+
+**Status:** resolved 2026-11-13 (#285). The DFW tab's sections read one
+options builder, `cr_dfw_opt()` in `server.R`, which carries the course's
+scope, the grade rule, the graded edge and the campus filter, so no section
+can leave the edge out. `tests/e2e/course-dynamics-deeplink.test.mjs` opens
+the DFW tab and fails on any section that shows an error; against the app
+before the fix it failed with this one.
+**Found:** 2026-11-13, reported on production: "an error has occured for the
+dfw by term section".
+**Severity:** moderate. For every course since 2026-10-16, the DFW by Term
+section showed Shiny's "An error has occurred" in place of the term table
+and the note on excluded registration statuses. The chart above it and the
+other sections were right; no number was wrong, one table was missing.
+**Affects:** `cr_dfw_status_exclusions_reactive` in `server.R`.
+**Cause:** #143 (2026-10-16, M12) made the graded edge a parameter of the
+course-attempts branch: `course_attempt_term_window()` stops without
+`opt$data_edges`, so no path reads a grade past `last_graded`. Three of the
+DFW tab's reactives were given the edge; the status-exclusion summary
+(`summarize_outcome_status_exclusions()`, called by the DFW by Term section)
+was passed the course's `opt` without it. Module code is not loaded by the R
+suite, and no browser test opened the DFW tab.
+
+### Reproduction
+
+Before the fix, Course Dynamics, any course (CHEM 1215L, ABQ and EA), DFW
+tab: the DFW by Term section reads "An error has occurred". The worker's log:
+`Error in : [course-attempts.R] opt$data_edges (cedar_data_edges() output) is
+required to bound grade-based outcomes at the graded edge`, from
+`summarize_outcome_status_exclusions` in `cr_dfw_status_exclusions_reactive`.
 
 ## I58 — Courses Taken calls a term in progress in its charts and settled in its tables
 

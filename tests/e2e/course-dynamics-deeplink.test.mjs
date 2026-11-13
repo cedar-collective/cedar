@@ -66,6 +66,54 @@ const SEARCH = [
     if (jsErrors.length > 0) throw new Error(`uncaught page errors: ${jsErrors.join(' | ')}`);
 
     console.log(`PASS  Course Dynamics deep link autoruns: ${COURSE}`);
+
+    // The DFW tab: every section renders, none stops with an error. The DFW
+    // by Term table read the class list without the graded edge and showed
+    // Shiny's error from 2026-10-16 to 2026-11-13 (ISSUES I59).
+    const dfwTab = await page.evaluate(() => {
+      const link = [...document.querySelectorAll('a.nav-link, a[data-toggle="tab"], a[data-bs-toggle="tab"]')]
+        .find((a) => a.textContent.trim() === 'DFW');
+      if (link) link.click();
+      return !!link;
+    });
+    if (!dfwTab) throw new Error('Course Dynamics has no DFW tab');
+    // The table's rows, or a section's error, whichever comes first.
+    await waitFor(page, () => !!document.querySelector('#cr_outcomes_dfw_trend .rt-tbody .rt-tr') ||
+      !!document.querySelector('#cr_dfw_tab_content .shiny-output-error'), { timeout: 120000, interval: 250 });
+    const dfwErrors = await page.$$eval('#cr_dfw_tab_content .shiny-output-error',
+      (els) => els.map((el) => `${el.id || '(no id)'}: ${el.innerText.trim().slice(0, 160)}`));
+    if (dfwErrors.length > 0) throw new Error(`DFW tab sections failed: ${dfwErrors.join(' | ')}`);
+    await waitForSelector(page, '#cr_outcomes_dfw_trend .rt-tbody .rt-tr', { timeout: 120000 });
+    await waitForSelector(page,
+      '#dfw_by_term_plot.js-plotly-plot, #dfw_by_term_plot .js-plotly-plot', { timeout: 120000 });
+    console.log(`PASS  Course Dynamics DFW tab renders every section: ${COURSE}`);
+
+    // Term types under the term chart: Fall and Spring to begin with, so the
+    // chart has no summer term; ticking Summer adds them. The DFW by Term
+    // table reads the same terms.
+    const ticked = await page.$$eval('#cr_dfw_term_type input:checked', (els) => els.map((el) => el.value));
+    if (ticked.join(',') !== 'fall,spring') {
+      throw new Error(`DFW term types open as "${ticked.join(',')}", not fall,spring`);
+    }
+    const termLabels = () => page.evaluate(() => {
+      const gd = document.querySelector('#dfw_by_term_plot.js-plotly-plot, #dfw_by_term_plot .js-plotly-plot');
+      return (gd?.data || []).flatMap((trace) => (trace.x || []).map(String));
+    });
+    const tableTerms = () => page.$$eval('#cr_outcomes_dfw_trend .rt-tbody .rt-tr',
+      (rows) => rows.map((row) => row.innerText).join(' ').match(/\b20\d\d(10|60|80)\b/g) || []);
+    if ((await termLabels()).some((x) => x.startsWith('Su'))) {
+      throw new Error('DFW term chart draws a summer term with Summer unticked');
+    }
+    if ((await tableTerms()).some((t) => t.endsWith('60'))) {
+      throw new Error('DFW by Term table lists a summer term with Summer unticked');
+    }
+    await page.click('#cr_dfw_term_type input[value="summer"]');
+    const summerDrawn = await waitFor(page, () => {
+      const gd = document.querySelector('#dfw_by_term_plot.js-plotly-plot, #dfw_by_term_plot .js-plotly-plot');
+      return (gd?.data || []).some((trace) => (trace.x || []).some((x) => String(x).startsWith('Su')));
+    }, { timeout: 60000, interval: 250 });
+    if (!summerDrawn) throw new Error('ticking Summer drew no summer term on the DFW term chart');
+    console.log(`PASS  Course Dynamics DFW term types choose the chart's terms: ${COURSE}`);
   } catch (error) {
     await page.screenshot({ path: '/tmp/cedar-course-dynamics-deeplink-failure.png' })
       .catch(() => {});
