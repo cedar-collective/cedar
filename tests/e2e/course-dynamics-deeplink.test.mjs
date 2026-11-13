@@ -66,6 +66,27 @@ const SEARCH = [
     if (jsErrors.length > 0) throw new Error(`uncaught page errors: ${jsErrors.join(' | ')}`);
 
     console.log(`PASS  Course Dynamics deep link autoruns: ${COURSE}`);
+
+    // The DFW tab: every section renders, none stops with an error. The DFW
+    // by Term table read the class list without the graded edge and showed
+    // Shiny's error from 2026-10-16 to 2026-11-13 (ISSUES I59).
+    const dfwTab = await page.evaluate(() => {
+      const link = [...document.querySelectorAll('a.nav-link, a[data-toggle="tab"], a[data-bs-toggle="tab"]')]
+        .find((a) => a.textContent.trim() === 'DFW');
+      if (link) link.click();
+      return !!link;
+    });
+    if (!dfwTab) throw new Error('Course Dynamics has no DFW tab');
+    // The table's rows, or a section's error, whichever comes first.
+    await waitFor(page, () => !!document.querySelector('#cr_outcomes_dfw_trend .rt-tbody .rt-tr') ||
+      !!document.querySelector('#cr_dfw_tab_content .shiny-output-error'), { timeout: 120000, interval: 250 });
+    const dfwErrors = await page.$$eval('#cr_dfw_tab_content .shiny-output-error',
+      (els) => els.map((el) => `${el.id || '(no id)'}: ${el.innerText.trim().slice(0, 160)}`));
+    if (dfwErrors.length > 0) throw new Error(`DFW tab sections failed: ${dfwErrors.join(' | ')}`);
+    await waitForSelector(page, '#cr_outcomes_dfw_trend .rt-tbody .rt-tr', { timeout: 120000 });
+    await waitForSelector(page,
+      '#dfw_by_term_plot.js-plotly-plot, #dfw_by_term_plot .js-plotly-plot', { timeout: 120000 });
+    console.log(`PASS  Course Dynamics DFW tab renders every section: ${COURSE}`);
   } catch (error) {
     await page.screenshot({ path: '/tmp/cedar-course-dynamics-deeplink-failure.png' })
       .catch(() => {});

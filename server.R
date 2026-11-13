@@ -2681,10 +2681,24 @@ output$enrl_classlist_download <- downloadHandler(
     }
   })
 
-  cr_dfw_status_exclusions_reactive <- reactive({
+  # The options every DFW section reads: the course's scope, the grade rule
+  # chosen on the tab, the graded edge (grade-based outcomes stop there, and
+  # the branches refuse to read grades without it) and the campus filter. One
+  # builder, so no section can leave the edge out: the DFW by Term table did,
+  # and stopped with an error from 2026-10-16 (#143) to 2026-11-13 (I59).
+  cr_dfw_opt <- reactive({
     data <- course_report_data()
     req(!is.null(data), !is.null(data$opt))
-    d <- summarize_outcome_status_exclusions(data_objects[["cedar_registrations"]], data$opt)
+    opt <- data$opt
+    opt$passing_grades <- dfw_passing_grades()
+    opt$data_edges <- data_objects[["cedar_edges"]]
+    campus_filter <- get_campus_filter()
+    if (!is.null(campus_filter)) opt$course_campus <- campus_filter$values
+    opt
+  })
+
+  cr_dfw_status_exclusions_reactive <- reactive({
+    d <- summarize_outcome_status_exclusions(data_objects[["cedar_registrations"]], cr_dfw_opt())
     campus_filter <- get_campus_filter()
     if (!is.null(campus_filter) && nrow(d) > 0) {
       d <- d %>% filter(campus %in% campus_filter$values)
@@ -2693,34 +2707,17 @@ output$enrl_classlist_download <- downloadHandler(
   })
 
   cr_dfw_by_term_reactive <- reactive({
-    data <- course_report_data()
-    req(!is.null(data), !is.null(data$opt))
-    opt <- data$opt
-    opt$passing_grades <- dfw_passing_grades()
-    # Grade-based outcomes stop at the graded edge; the branch requires it.
-    opt$data_edges <- data_objects[["cedar_edges"]]
-    campus_filter <- get_campus_filter()
-    if (!is.null(campus_filter)) opt$course_campus <- campus_filter$values
-
     get_course_outcome_rates(
       data_objects[["cedar_attempts"]],
-      opt = opt,
+      opt = cr_dfw_opt(),
       group_cols = c("campus", "college", "term", "subject_course"),
       min_n = 1L
     )
   })
 
   cr_dfw_demographics_reactive <- reactive({
-    data <- course_report_data()
-    req(!is.null(data), !is.null(data$opt))
     attempts <- data_objects[["cedar_attempts"]]
-    opt <- data$opt
-    opt$passing_grades <- dfw_passing_grades()
-    # Grade-based outcomes stop at the graded edge; the branch requires it.
-    opt$data_edges <- data_objects[["cedar_edges"]]
-    campus_filter <- get_campus_filter()
-    if (!is.null(campus_filter)) opt$course_campus <- campus_filter$values
-
+    opt <- cr_dfw_opt()
     student_terms <- data_objects[["cedar_student_terms"]]
 
     list(
@@ -2740,18 +2737,9 @@ output$enrl_classlist_download <- downloadHandler(
   })
 
   cr_dfw_context_reactive <- reactive({
-    data <- course_report_data()
-    req(!is.null(data), !is.null(data$opt))
-    opt <- data$opt
-    opt$passing_grades <- dfw_passing_grades()
-    # Grade-based outcomes stop at the graded edge; the branch requires it.
-    opt$data_edges <- data_objects[["cedar_edges"]]
-    campus_filter <- get_campus_filter()
-    if (!is.null(campus_filter)) opt$course_campus <- campus_filter$values
-
     get_course_dfw_context(
       data_objects[["cedar_attempts"]],
-      opt = opt,
+      opt = cr_dfw_opt(),
       min_cell = 5L
     )
   })
