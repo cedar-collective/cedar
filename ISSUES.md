@@ -94,7 +94,7 @@ Kept until the next release, so a recurrence is recognisable; each entry below g
 
 ## I59 — The DFW tab's DFW by Term table stopped with an error for every course
 
-**Status:** resolved 2026-11-13 (#PRNUM). The DFW tab's sections read one
+**Status:** resolved 2026-11-13 (#285). The DFW tab's sections read one
 options builder, `cr_dfw_opt()` in `server.R`, which carries the course's
 scope, the grade rule, the graded edge and the campus filter, so no section
 can leave the edge out. `tests/e2e/course-dynamics-deeplink.test.mjs` opens
