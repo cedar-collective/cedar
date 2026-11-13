@@ -6,6 +6,26 @@ set -e
 # since shiny-server does not always pass it through.
 export LANG=C.UTF-8 LC_ALL=C.UTF-8
 
+# shiny-server starts its R worker with a clean environment (HOME, PATH, LANG
+# and R's own variables), so a variable Compose passes to the container never
+# reaches the app. Hand the ones the app reads to the worker through its user
+# .Renviron, written fresh at every start so a removed value is removed, and
+# readable by this user only. A single-quoted .Renviron value is literal; a
+# value holding a single quote or a line break cannot be written that way, and
+# the container stops rather than start with the gate silently closed.
+worker_renviron="$HOME/.Renviron"
+( umask 077; : > "$worker_renviron" )
+if [ -n "${CEDAR_DFW_PASSWORD:-}" ]; then
+  case "$CEDAR_DFW_PASSWORD" in
+    *"'"*|*$'\n'*)
+      echo "[entrypoint.sh] CEDAR_DFW_PASSWORD holds a single quote or a line break, which .Renviron cannot carry. Choose another password." >&2
+      exit 1 ;;
+  esac
+  printf "CEDAR_DFW_PASSWORD='%s'\n" "$CEDAR_DFW_PASSWORD" >> "$worker_renviron"
+else
+  echo "[entrypoint.sh] CEDAR_DFW_PASSWORD is not set: instructor-level results stay closed."
+fi
+
 # Forward shiny-server R process logs to Docker stdout as they appear.
 # Shiny Server writes each session's R stderr to a new timestamped file in
 # /var/log/shiny-server/. This loop tails any new .log files so they appear
