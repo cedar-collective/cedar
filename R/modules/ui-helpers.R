@@ -660,6 +660,33 @@ cedar_points_coldef <- function(name, ...) {
                     cell = function(v) if (is.na(v)) "\u2014" else sprintf("%+.1f", v), ...)
 }
 
+# A rate (0-100, unrounded) shown with the count beside it: "76.0% (45)", or
+# with `of = TRUE` its denominator, "76.0% of 45". `counts` is that count's
+# column of the same table, in the table's row order; reactable passes the
+# row's index to the cell, so the pairing survives sorting. A rate withheld by
+# a small-cell guard shows an em dash, with the count in its hover text.
+cedar_pct_count_coldef <- function(name, counts, of = FALSE, ...) {
+  force(counts)
+  reactable::colDef(
+    name = name,
+    align = "right",
+    minWidth = 110,
+    cell = function(value, index) {
+      count <- counts[[index]]
+      n <- if (is.na(count)) "\u2014" else
+        format(as.integer(count), big.mark = ",", scientific = FALSE, trim = TRUE)
+      if (is.na(value)) {
+        return(htmltools::tags$span(
+          title = if (!is.na(count)) paste0(n, " students; too few for a rate"), "\u2014"))
+      }
+      rate <- paste0(formatC(value, format = "f", digits = 1), "%")
+      htmltools::tags$span(class = "text-nowrap",
+                           if (of) paste0(rate, " of ", n) else paste0(rate, " (", n, ")"))
+    },
+    ...
+  )
+}
+
 # \u2500\u2500 Balance tables (build_comparison() / compute_balance()) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 # The SMD rows as a display tibble, one row per measured covariate, with the
 # band marked beside the number; and the one-line verdict above them. Shared

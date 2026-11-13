@@ -167,7 +167,50 @@ difference says the gap describes who is placed into the course.
 
 ## Downstream
 
-The Downstream tab combines two related views that use the same observed follow-on-course list but answer different questions. Choose **Course Sequence** when the question is about taking this course before another course. Choose **Instructor Patterns** when the question is about later continuation and outcomes among this course's students, grouped by their first instructor here.
+The Downstream tab holds two views of what happens after the course. **Later Course** follows the course's own students forward: how many took a later course within a set number of terms, and how they did in it. **Course Sequence** starts from the later course and compares students who reached it after passing this one with students who reached it without. Both offer the later courses this course's students actually took.
+
+### Later Course
+
+{% include definition-summary.html id="downstream-outcomes" %}
+
+Choose one later course, or several to read as a set, the window (three
+regular terms unless you change it) and the smallest group a rate is shown
+for, then click **Show Outcomes**. The list shows, beside each course, how
+many of this course's students took it within the window.
+
+The page gives, for each campus that taught the course:
+
+- **The two rates, with the counts behind them.** The share who took the later
+  course and the share of those who passed it, each over all terms. Directly
+  underneath is the arithmetic: everyone who took the course, minus the
+  students too recent to have had the whole window, minus those who had
+  already passed the later course, equals the students who could have taken
+  it; then how many did, and what became of them (passed, DFW, withdrew, not
+  yet graded).
+- **Over Time.** The same two rates by the term students took the course, as a
+  chart and a table. Read one term type at a time with **Term types**: a Fall
+  cohort and a Spring one are different students. Under the chart, one
+  sentence per line says whether it is rising, falling or steady. The verdict
+  is the fitted line's across every term, set beside the movement that chance
+  and the terms' own scatter would give with no trend, so the first and last
+  terms can point one way and the verdict another.
+- **By grade in the course.** The grade a student earned separates their later
+  results more than anything else on the page. Read every other comparison
+  with that in mind.
+- **When they took it**, in regular terms after the course.
+- **By instructor in the course**, behind the instructor-data password. Each
+  instructor's row gives their students' grades in this course first, then the
+  later results, then the later pass rate among students with the same letter
+  grade. An instructor who passes fewer students sends a stronger group on, so
+  a higher later pass rate does not show better preparation. The table is not
+  a measure of teaching and not a basis for evaluating anyone. A balance check
+  under it says whether the two largest instructor groups started alike; it
+  changes no number above it.
+- **Course Order.** How many students had already passed the later course
+  before this one, or in the same term, by academic year.
+
+A student who took the later course in a term whose grades are not posted yet
+counts as having taken it, and is listed as not yet graded, never as failing.
 
 ### Course Sequence
 
@@ -185,14 +228,6 @@ factors. Categorical distributions must be reviewed directly, and an
 unavailable SMD is not evidence of a small difference.
 
 Useful for checking whether a prerequisite or recommended sequence is associated with the outcome difference that motivates it. The comparison is descriptive and should be read with the balance table and local curriculum context.
-
----
-
-### Instructor Patterns
-
-Among students who took this course and later took a downstream course, do downstream grades differ by the instructor students had here? This tab compares downstream grades for students grouped by which instructor they had in this course.
-
-A balance table is included to show whether different instructors' sections enrolled different types of students. Self-selection is a major confounder here, since students often choose sections based on schedule, availability, or reputation. Check the balance table before treating differences as instructor effects.
 
 ---
 

@@ -38,6 +38,16 @@
 #          cedar_programs_mc: one row per student at 202010, plus a second row
 #            for MC_A1 at 202110 (inst_gpa 3.0 -> 3.9) for covariate-term tests.
 #
+#   DS01 — cedar_registrations_ds (31 rows) + cedar_programs_ds (16 rows).
+#          STAT 145 and its sequel STAT 245, for Course Dynamics > Later
+#          Course. Test edges (ds01_edges): settled 202280, graded 202260.
+#          ABQ, three-term window: 15 in STAT 145; 2 right-censored (DS_R1,
+#            DS_Q1), 2 passed STAT 245 first (DS_P1, DS_Q1; 1 removed net of
+#            the censored), 1 alongside (DS_S1); 12 eligible, 9 took STAT 245
+#            (75%); 4 passed, 4 DFW (1 late drop), 1 not graded (DS_E1, in
+#            202280). Timing 5 / 3 / 1 by regular term after X.
+#          GA: 1 in STAT 145 (DS_G1), who took STAT 245 at ABQ.
+#
 #   HP01 — cedar_programs_hp (20 rows). Named population groups resolving to
 #          Banner codes, covering all three ways a pre-major is reached (or
 #          missed). Used by test-population-groups.R.
@@ -3087,10 +3097,9 @@ gen_ed_assoc_students <- dplyr::bind_rows(
 
 
 # ── MC02 — course sequence across campuses, with a co-requisite ──────────────
-# Purpose-built for the impact analyses (course-sequence-effect.R,
-# course-instructor-effect.R) and the downstream
-# course picker (course-flows.R). Deliberately contains the two shapes that
-# broke real code:
+# Purpose-built for the impact analyses (course-sequence-effect.R and the
+# later-course cohort and picker in downstream-cohort.R). Deliberately
+# contains the two shapes that broke real code:
 #
 #   1. SPAN 101L is a CO-REQUISITE — taken in the SAME term as SPAN 101, not
 #      after it. Any "earliest follow-on course" logic that runs before the
@@ -3215,6 +3224,121 @@ cedar_programs_mc <- dplyr::bind_rows(
                   academic_standing = "Probation",
                   overall_credits_earned = 45)
 )
+
+
+# ── DS01 — a course and its sequel: window, edges, grade bands ───────────────
+# For build_downstream_cohort(), get_downstream_outcomes(), the later-course
+# picker and get_downstream_instructor_balance(). Built so that each rule that
+# once miscounted has a row that breaks if the rule does:
+#
+#   - DS_E1 takes STAT 245 in 202280, settled but past the graded edge (202260
+#     in ds01_edges). Continued, not graded yet. Counting continuation only to
+#     the grade edge made them a non-continuer (ISSUES I56).
+#   - DS_C2 takes STAT 245 four regular terms after STAT 145: outside the
+#     default three-term window, so not a continuer.
+#   - DS_R1 takes STAT 145 in 202210: the window runs past the settled edge,
+#     so they are right-censored, not a non-continuer.
+#   - DS_C1 takes STAT 245 in a summer (202160): it falls in the window's
+#     second regular term.
+#   - DS_B2 takes STAT 245 at GA after STAT 145 at ABQ: a continuer, since
+#     what a student did next is read on every campus.
+#   - DS_G1 takes STAT 145 at GA: outside an ABQ scope, and a campus of their
+#     own when every campus is in scope.
+#   - DS_F1 fails STAT 145, retakes and passes it: counted once, at the first
+#     attempt, in the band of the F.
+#   - DS_S1 passes STAT 245 in the same term as STAT 145: concurrent.
+#   - DS_P1 passed STAT 245 before STAT 145: never able to continue into it.
+#   - DS_Q1 passed STAT 245 at GA, then took STAT 145 too recently to count:
+#     both too recent and a prior passer, so the page's arithmetic (everyone,
+#     minus the too recent, minus prior passers, equals the denominator) must
+#     not remove them twice.
+#   - DS_N1's STAT 145 section has no recorded instructor, and their STAT 245
+#     is a late drop: DFW, and a withdrawal.
+#
+#   student  campus  STAT 145 (X)            STAT 245 (Y)          X instructor
+#   DS_A1    ABQ     202080 A                202110 A              DS_I1
+#   DS_A2    ABQ     202080 A                202180 B              DS_I1
+#   DS_B1    ABQ     202080 B                202110 F              DS_I1
+#   DS_B2    ABQ     202080 B                202110 B @GA          DS_I2
+#   DS_C1    ABQ     202080 C                202160 D (summer)     DS_I2
+#   DS_C2    ABQ     202080 C                202280 — (outside)    DS_I2
+#   DS_F1    ABQ     202080 F, 202110 B      202180 A              DS_I2
+#   DS_W1    ABQ     202080 DW (late drop)   —                     DS_I1
+#   DS_P1    ABQ     202080 B                202010 A (before X)   DS_I1
+#   DS_S1    ABQ     202080 B                202080 A (same term)  DS_I1
+#   DS_N1    ABQ     202080 A                202110 DG             (none)
+#   DS_T1    ABQ     202080 F                202110 D              DS_I2
+#   DS_E1    ABQ     202110 B                202280 — (ungraded)   DS_I1
+#   DS_R1    ABQ     202210 A                —                     DS_I1
+#   DS_Q1    ABQ     202210 B                202080 A @GA (before) DS_I1
+#   DS_G1    GA      202080 A                202110 A @ABQ         DS_I3
+#
+# Pinned, ABQ scope, three-term window: 15 students in STAT 145, 2
+# right-censored (R1, Q1), 2 passed STAT 245 first (P1, Q1; Q1 is also too
+# recent, so 1 is removed for it), 1 alongside (S1); 12 eligible, 9 took
+# STAT 245 in the window (75%); 4 passed, 4 DFW (1 a late drop), 1 not graded
+# yet (E1). Bands, eligible / took / passed: A 3/3/2; B 4/3/1; C 2/1/0;
+# C- to F 2/2/1; Withdrew 1/0/0. Timing: 5 in the first regular term, 3 in the
+# second, 1 in the third. By term of X: Fall 2020 has 11 eligible, 8 took, 4
+# passed and 4 DFW; Spring 2021 has 1 eligible who took it (not graded);
+# Spring 2022 has 2 students, both too recent.
+# By instructor, eligible / took / passed / DFW: DS_I1 6/4/2/1 (5 passed X,
+# 5 with an A or B); DS_I2 5/4/2/2 (3 passed X, 1 with an A or B); no
+# instructor recorded 1/1/0/1.
+
+.ds_row <- function(sid, term, course, campus, grade = NA_character_,
+                    instructor = NA_character_, status = "RE") {
+  .mc_row(sid, term, course, campus, "STAT", grade, instructor) %>%
+    dplyr::mutate(registration_status_code = status)
+}
+
+cedar_registrations_ds <- dplyr::bind_rows(
+  # STAT 145 (X)
+  .ds_row("DS_A1", 202080, "STAT 145", "ABQ", "A", "DS_I1"),
+  .ds_row("DS_A2", 202080, "STAT 145", "ABQ", "A", "DS_I1"),
+  .ds_row("DS_B1", 202080, "STAT 145", "ABQ", "B", "DS_I1"),
+  .ds_row("DS_B2", 202080, "STAT 145", "ABQ", "B", "DS_I2"),
+  .ds_row("DS_C1", 202080, "STAT 145", "ABQ", "C", "DS_I2"),
+  .ds_row("DS_C2", 202080, "STAT 145", "ABQ", "C", "DS_I2"),
+  .ds_row("DS_F1", 202080, "STAT 145", "ABQ", "F", "DS_I2"),
+  .ds_row("DS_F1", 202110, "STAT 145", "ABQ", "B", "DS_I2"),
+  .ds_row("DS_W1", 202080, "STAT 145", "ABQ", NA, "DS_I1", status = "DW"),
+  .ds_row("DS_P1", 202080, "STAT 145", "ABQ", "B", "DS_I1"),
+  .ds_row("DS_S1", 202080, "STAT 145", "ABQ", "B", "DS_I1"),
+  .ds_row("DS_N1", 202080, "STAT 145", "ABQ", "A"),
+  .ds_row("DS_T1", 202080, "STAT 145", "ABQ", "F", "DS_I2"),
+  .ds_row("DS_E1", 202110, "STAT 145", "ABQ", "B", "DS_I1"),
+  .ds_row("DS_R1", 202210, "STAT 145", "ABQ", "A", "DS_I1"),
+  .ds_row("DS_Q1", 202210, "STAT 145", "ABQ", "B", "DS_I1"),
+  .ds_row("DS_G1", 202080, "STAT 145", "GA",  "A", "DS_I3"),
+  # STAT 245 (Y)
+  .ds_row("DS_A1", 202110, "STAT 245", "ABQ", "A",  "DS_Y1"),
+  .ds_row("DS_A2", 202180, "STAT 245", "ABQ", "B",  "DS_Y1"),
+  .ds_row("DS_B1", 202110, "STAT 245", "ABQ", "F",  "DS_Y1"),
+  .ds_row("DS_B2", 202110, "STAT 245", "GA",  "B",  "DS_Y2"),
+  .ds_row("DS_C1", 202160, "STAT 245", "ABQ", "D",  "DS_Y1"),
+  .ds_row("DS_C2", 202280, "STAT 245", "ABQ", NA,   "DS_Y1"),
+  .ds_row("DS_F1", 202180, "STAT 245", "ABQ", "A",  "DS_Y1"),
+  .ds_row("DS_P1", 202010, "STAT 245", "ABQ", "A",  "DS_Y1"),
+  .ds_row("DS_Q1", 202080, "STAT 245", "GA",  "A",  "DS_Y2"),
+  .ds_row("DS_S1", 202080, "STAT 245", "ABQ", "A",  "DS_Y1"),
+  .ds_row("DS_N1", 202110, "STAT 245", "ABQ", NA,   "DS_Y1", status = "DG"),
+  .ds_row("DS_T1", 202110, "STAT 245", "ABQ", "D",  "DS_Y1"),
+  .ds_row("DS_E1", 202280, "STAT 245", "ABQ", NA,   "DS_Y1"),
+  .ds_row("DS_G1", 202110, "STAT 245", "ABQ", "A",  "DS_Y1")
+)
+
+# One program record per DS01 student, before any of their courses, so the
+# comparison builders keep every student.
+cedar_programs_ds <- local({
+  ids <- sort(unique(cedar_registrations_ds$student_id))
+  template <- cedar_programs_mc %>%
+    dplyr::filter(student_id == "MC_A2", term == 202010L)
+  dplyr::bind_rows(lapply(seq_along(ids), function(i) {
+    dplyr::mutate(template, student_id = ids[[i]],
+                  program_id = paste0("DS-PROG-", i), student_campus = "ABQ")
+  }))
+})
 
 
 # ── MC03 — retention cohorts on two campuses ─────────────────────────────────

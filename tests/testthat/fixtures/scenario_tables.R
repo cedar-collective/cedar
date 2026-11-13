@@ -928,6 +928,78 @@ headcount_fixture_dims <- local({
   validate_cedar_dims(dims)
 })
 
+# ── test-later-course.R ─────────────────────────────────────────────────────────
+
+# DS01's attempt table, built to its edges (graded through Summer 2022).
+ds_attempts <- keyed_attempts(test_students_ds, ds01_edges)
+
+# One attempt per grade a class list can hold, classified once by
+# build_attempts(), for add_attempt_grade_band(): twelve students in one
+# section, GB_01 to GB_12, the last a late drop with no grade. The bands
+# expected, in student order: A, A, B, C, C- to F, C- to F, C- to F,
+# Other passing, Other nonpassing, Other nonpassing, Withdrew, Withdrew.
+grade_band_attempts <- local({
+  grades <- c("A-", "RA", "B+", "C", "C-", "D", "RF", "CR", "P", "NR", "W", NA)
+  rows <- dplyr::bind_rows(lapply(seq_along(grades), function(i) {
+    .mc_row(sprintf("GB_%02d", i), 202010, "SPAN 101", "ABQ", "SPAN", grade = grades[[i]])
+  }))
+  rows$registration_status_code[is.na(rows$final_grade)] <- "DW"
+  keyed_attempts(rows, mc02_edges) %>% dplyr::arrange(student_id)
+})
+
+# A Later Course payload's per-term series, typed by hand for the trend
+# reading (later_course_trend() and what is drawn and said from it). Only the
+# fields those functions read are present. A rate needs 10 students.
+#
+#   ABQ, Fall 2018 to Fall 2022: 100 could have taken STAT 245 each term and
+#     40, 45, 50, 55, 60 did. The share rises 5 points a year; at the pooled
+#     50% chance alone gives a slope of 2 x 1.58 = 3.16, so it is rising. All
+#     of them are graded and 30, 33, 38, 41, 45 passed (75.0, 73.3, 76.0,
+#     74.5, 75.0%): +0.12 points a year against 2 x 1.98, steady.
+#   ABQ, Fall 2023: 4 could have; no rate, so it is not a term of the trend.
+#   ABQ, Fall 2024: 120 took STAT 145, all too recent.
+#   ABQ, Spring 2019 and Spring 2020: two terms with a rate, too few to read.
+#   GA, Fall 2018 to Fall 2022: the share falls 5 points a year, 60 to 40.
+#   EA, Fall 2018 to Fall 2022: a large course that dips and recovers. 10,000
+#     could have each term and 50, 40, 42, 52, 56% did: +2.4 points a year.
+#     Binomial chance at the pooled 48% gives 2 x 0.16, which alone would call
+#     it rising; the terms' scatter around the line gives 2 x 2.05, so it is
+#     steady. Exactly 75% pass every term: a flat line.
+later_course_trend_payload <- structure(
+  list(
+    course_x = "STAT 145", course_y = "STAT 245", course_y_label = "STAT 245",
+    rollup = FALSE, window_terms = 3L, min_n = 10L,
+    by_term = tibble::tribble(
+      ~campus, ~term_x, ~n_in_x, ~n_eligible, ~n_took_y, ~n_graded, ~n_pass, ~n_not_graded,
+      "ABQ",   201880L, 104L,    100L,        40L,       40L,       30L,     0L,
+      "ABQ",   201910L,  52L,     50L,        20L,       20L,       15L,     0L,
+      "ABQ",   201980L, 103L,    100L,        45L,       45L,       33L,     0L,
+      "ABQ",   202010L,  51L,     50L,        22L,       22L,       16L,     0L,
+      "ABQ",   202080L, 101L,    100L,        50L,       50L,       38L,     0L,
+      "ABQ",   202180L, 102L,    100L,        55L,       55L,       41L,     0L,
+      "ABQ",   202280L, 100L,    100L,        60L,       60L,       45L,     0L,
+      "ABQ",   202380L,   4L,      4L,         2L,        1L,        1L,     1L,
+      "ABQ",   202480L, 120L,      0L,         0L,        0L,        0L,     0L,
+      "GA",    201880L, 100L,    100L,        60L,       60L,       45L,     0L,
+      "GA",    201980L, 100L,    100L,        55L,       55L,       41L,     0L,
+      "GA",    202080L, 100L,    100L,        50L,       50L,       38L,     0L,
+      "GA",    202180L, 100L,    100L,        45L,       45L,       33L,     0L,
+      "GA",    202280L, 100L,    100L,        40L,       40L,       30L,     0L,
+      "EA",    201880L, 10000L,  10000L,      5000L,     5000L,     3750L,   0L,
+      "EA",    201980L, 10000L,  10000L,      4000L,     4000L,     3000L,   0L,
+      "EA",    202080L, 10000L,  10000L,      4200L,     4200L,     3150L,   0L,
+      "EA",    202180L, 10000L,  10000L,      5200L,     5200L,     3900L,   0L,
+      "EA",    202280L, 10000L,  10000L,      5600L,     5600L,     4200L,   0L
+    ) %>%
+      dplyr::mutate(
+        term_type = get_term_type(term_x),
+        pct_took_y = dplyr::if_else(n_eligible >= 10L, 100 * n_took_y / n_eligible, NA_real_),
+        pct_pass = dplyr::if_else(n_graded >= 10L, 100 * n_pass / n_graded, NA_real_)
+      )
+  ),
+  class = c("later_course", "list")
+)
+
 # ── test-pathway.R ──────────────────────────────────────────────────────────────
 
 pathway_students <- tibble(
