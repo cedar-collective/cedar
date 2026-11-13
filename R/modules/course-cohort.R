@@ -1,4 +1,4 @@
-# Shiny Module: Course Dynamics > Takers vs Non-Takers
+# Shiny Module: Course Dynamics > Retention > Takers vs Non-Takers
 #
 # A course's takers against its non-takers, read against the college's other
 # courses. The module owns the controls and the rendering; every number comes
