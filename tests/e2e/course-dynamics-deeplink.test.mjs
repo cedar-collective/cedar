@@ -87,6 +87,33 @@ const SEARCH = [
     await waitForSelector(page,
       '#dfw_by_term_plot.js-plotly-plot, #dfw_by_term_plot .js-plotly-plot', { timeout: 120000 });
     console.log(`PASS  Course Dynamics DFW tab renders every section: ${COURSE}`);
+
+    // Term types under the term chart: Fall and Spring to begin with, so the
+    // chart has no summer term; ticking Summer adds them. The DFW by Term
+    // table reads the same terms.
+    const ticked = await page.$$eval('#cr_dfw_term_type input:checked', (els) => els.map((el) => el.value));
+    if (ticked.join(',') !== 'fall,spring') {
+      throw new Error(`DFW term types open as "${ticked.join(',')}", not fall,spring`);
+    }
+    const termLabels = () => page.evaluate(() => {
+      const gd = document.querySelector('#dfw_by_term_plot.js-plotly-plot, #dfw_by_term_plot .js-plotly-plot');
+      return (gd?.data || []).flatMap((trace) => (trace.x || []).map(String));
+    });
+    const tableTerms = () => page.$$eval('#cr_outcomes_dfw_trend .rt-tbody .rt-tr',
+      (rows) => rows.map((row) => row.innerText).join(' ').match(/\b20\d\d(10|60|80)\b/g) || []);
+    if ((await termLabels()).some((x) => x.startsWith('Su'))) {
+      throw new Error('DFW term chart draws a summer term with Summer unticked');
+    }
+    if ((await tableTerms()).some((t) => t.endsWith('60'))) {
+      throw new Error('DFW by Term table lists a summer term with Summer unticked');
+    }
+    await page.click('#cr_dfw_term_type input[value="summer"]');
+    const summerDrawn = await waitFor(page, () => {
+      const gd = document.querySelector('#dfw_by_term_plot.js-plotly-plot, #dfw_by_term_plot .js-plotly-plot');
+      return (gd?.data || []).some((trace) => (trace.x || []).some((x) => String(x).startsWith('Su')));
+    }, { timeout: 60000, interval: 250 });
+    if (!summerDrawn) throw new Error('ticking Summer drew no summer term on the DFW term chart');
+    console.log(`PASS  Course Dynamics DFW term types choose the chart's terms: ${COURSE}`);
   } catch (error) {
     await page.screenshot({ path: '/tmp/cedar-course-dynamics-deeplink-failure.png' })
       .catch(() => {});

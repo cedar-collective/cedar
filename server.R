@@ -2744,10 +2744,24 @@ output$enrl_classlist_download <- downloadHandler(
     )
   })
 
+  # The term types ticked under the term chart. Summer starts unticked: its
+  # students and its compressed courses differ, so a summer point reads as a
+  # change in the course that is not one. The chart and the DFW by Term table
+  # read the same terms.
+  cr_dfw_term_types <- reactive({
+    shiny::validate(shiny::need(length(input$cr_dfw_term_type) > 0, "Tick at least one term type."))
+    input$cr_dfw_term_type
+  })
+  cr_dfw_by_term_shown <- reactive({
+    d <- cr_dfw_by_term_reactive()
+    req(!is.null(d))
+    d %>% dplyr::filter(get_term_type(term) %in% cr_dfw_term_types())
+  })
+
   # DFW by term plot
   output$dfw_by_term_plot <- renderPlotly({
-    d <- cr_dfw_by_term_reactive()
-    req(!is.null(d), nrow(d) > 0)
+    d <- cr_dfw_by_term_shown()
+    shiny::validate(shiny::need(nrow(d) > 0, "No term of the ticked types has DFW data for this course."))
 
     td <- d %>%
       dplyr::arrange(term, campus, subject_course) %>%
@@ -2927,7 +2941,12 @@ output$enrl_classlist_download <- downloadHandler(
         cedar_definition_panel("dfw", "How grades and registration statuses are counted"),
         dashboard_subsection(
           "DFW and Drop Rates by Term",
-          "Tracks DFW, late-withdrawal, and early-drop rates as separate term lines. Late withdrawals count in DFW; early drops are shown separately because they are registration churn, not final course outcomes.",
+          "Tracks DFW, late-withdrawal, and early-drop rates as separate term lines, for the term types ticked below. Late withdrawals count in DFW; early drops are shown separately because they are registration churn, not final course outcomes. Summer starts unticked: its students and its compressed courses differ, so a summer point is not a change in the course.",
+          # Kept across a redraw of the tab (the grade rule above redraws it).
+          checkboxGroupInput("cr_dfw_term_type", "Term types",
+                             choices = c("Fall" = "fall", "Spring" = "spring", "Summer" = "summer"),
+                             selected = isolate(input$cr_dfw_term_type) %||% c("fall", "spring"),
+                             inline = TRUE),
           plotlyOutput("dfw_by_term_plot", height = "400px")
         ),
         uiOutput("cr_dfw_context_ui"),
@@ -2935,7 +2954,7 @@ output$enrl_classlist_download <- downloadHandler(
         hr(),
         dashboard_subsection(
           "DFW by Term",
-          "Reference table for the term chart. Attempts exclude early drops, and DFW % uses the selected non-passing grade rule above.",
+          "Reference table for the term chart, for the same term types. Attempts exclude early drops, and DFW % uses the selected non-passing grade rule above.",
           uiOutput("cr_dfw_trend_ui")
         ),
         hr(),
@@ -3291,8 +3310,8 @@ output$enrl_classlist_download <- downloadHandler(
   })
 
   output$cr_outcomes_dfw_trend <- reactable::renderReactable({
-    d <- cr_dfw_by_term_reactive()
-    req(nrow(d) > 0)
+    d <- cr_dfw_by_term_shown()
+    shiny::validate(shiny::need(nrow(d) > 0, "No term of the ticked types has DFW data for this course."))
     d <- d %>%
       dplyr::arrange(term, campus, subject_course) %>%
       dplyr::transmute(
