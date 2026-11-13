@@ -2105,6 +2105,129 @@ h4.cedar-section-heading {
 .stat-compare--worse  { color: var(--amber-dark); font-weight: 600; }
 .stat-compare--better { color: var(--cedar-green); font-weight: 600; }
 
+/* ── Finding figures ──────────────────────────────────────────────────────── */
+/* A finding drawn rather than written (cedar_finding_card()): the one count to
+   act on, a thin bar splitting the whole into its parts, and the parts listed
+   beneath with a swatch each. Cards sit side by side where there is room. */
+.finding-card-row {
+  display: grid;
+  gap: var(--space-3);
+  grid-template-columns: repeat(auto-fit, minmax(340px, 660px));
+  margin: 0 0 var(--space-3);
+}
+.finding-card { margin-bottom: 0; }
+.finding-card--warn { border-top-color: var(--danger-red); }
+.finding-card-title {
+  align-items: baseline;
+  color: var(--charcoal-soil);
+  display: flex;
+  flex-wrap: wrap;
+  font-size: 0.82rem;
+  font-weight: 700;
+  gap: var(--space-2);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.finding-card-title .text-note {
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.finding-card-headline {
+  align-items: baseline;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 2px 0 var(--space-2);
+}
+.finding-card-headline .stat-lbl {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+.finding-card-link { font-size: 0.87rem; margin: var(--space-2) 0 0; }
+
+/* The part colours, shared by a bar's segments, its legend swatches and any
+   table row marked with the same part. Each is told from its neighbours by
+   lightness as well as hue, and is never shown without its label. */
+.segment--critical { background-color: var(--danger-red);    fill: var(--danger-red); }
+.segment--warning  { background-color: var(--lichen-gold);   fill: var(--lichen-gold); }
+.segment--success  { background-color: var(--action-green);  fill: var(--action-green); }
+.segment--info     { background-color: var(--juniper-blue);  fill: var(--juniper-blue); }
+.segment--neutral  { background-color: #a9afab;              fill: #a9afab; }
+.segment--muted    { background-color: #d8dcd9;              fill: #d8dcd9; }
+
+.segment-bar {
+  border-radius: 4px;
+  display: block;
+  height: 8px;
+  overflow: hidden;
+  width: 100%;
+}
+.segment-bar-gap { fill: var(--surface-card); }
+.segment-swatch {
+  border-radius: 2px;
+  display: inline-block;
+  flex: none;
+  height: 10px;
+  width: 10px;
+}
+/* A swatch ahead of text in a table cell. */
+.rt-td .segment-swatch { margin-right: 6px; }
+.segment-legend {
+  list-style: none;
+  margin: var(--space-2) 0 0;
+  padding: 0;
+}
+.segment-legend li {
+  align-items: baseline;
+  column-gap: var(--space-2);
+  display: grid;
+  font-size: 0.87rem;
+  grid-template-columns: 10px minmax(1.4em, max-content) minmax(0, 1fr);
+  margin: 2px 0;
+}
+.segment-legend-count {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  text-align: right;
+}
+.segment-legend-label { font-weight: 600; margin-right: 6px; }
+
+/* Amounts against what each is for (cedar_meter_list()): a name, a bar and
+   the figures per row, the bars aligned. */
+.meter-list {
+  align-items: center;
+  border-top: 1px solid var(--surface-card-border);
+  column-gap: var(--space-3);
+  display: grid;
+  font-size: 0.87rem;
+  grid-template-columns: max-content minmax(0, 1fr);
+  margin: var(--space-3) 0 0;
+  padding-top: var(--space-2);
+  row-gap: var(--space-2);
+}
+.meter-list dt { font-weight: 600; }
+.meter-list dd { margin: 0; }
+.meter-bar {
+  border-radius: 4px;
+  display: block;
+  height: 8px;
+  overflow: hidden;
+  width: 100%;
+}
+.meter-bar-track { fill: #d5deeb; }
+.meter-bar-fill  { fill: var(--juniper-blue); }
+.meter-bar-mark  { fill: var(--charcoal-soil); }
+.meter-list-figure { display: block; margin-top: 2px; }
+
+/* Column-group banding for a reactable with column groups: put
+   `cedar-col-band` on every other group's heading and columns (colGroup
+   headerClass, colDef class and headerClass). The tint is translucent, so row
+   striping and hover show through it. */
+.Reactable .rt-td.cedar-col-band { background-color: rgba(112, 104, 88, 0.1); }
+.Reactable .rt-thead .rt-th.cedar-col-band { background-color: #5f5849; }
+.Reactable .rt-thead .rt-th-group.cedar-col-band { background-color: rgba(112, 104, 88, 0.16); }
+
 /* Label above a comparison row of stat cards. */
 .stat-row {
   margin-bottom: var(--space-2);

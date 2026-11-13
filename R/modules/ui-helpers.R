@@ -99,6 +99,121 @@ cedar_stat_card <- function(value, label, note = NULL, class = NULL) {
   )
 }
 
+# ── Finding figures ──────────────────────────────────────────────────────────
+# A finding a page used to state as a sentence of counts, drawn instead: a
+# card with the one count to act on, a thin bar splitting the whole into its
+# parts, and the parts listed beneath with a swatch each. Pure (htmltools
+# only). Every number arrives computed from a feature; these only lay it out.
+
+# The card: a title with its scope beside it, the headline count with its
+# caption, then the figures. `warn` marks a finding that asks for action.
+cedar_finding_card <- function(title, ..., scope = NULL, headline = NULL,
+                               caption = NULL, warn = FALSE, class = NULL) {
+  div(
+    class = paste(c("stat-card", "stat-card--left", "finding-card",
+                    if (isTRUE(warn)) "finding-card--warn", class), collapse = " "),
+    div(
+      class = "finding-card-title",
+      span(title),
+      if (!is.null(scope) && !is.na(scope)) span(class = "text-note", scope)
+    ),
+    if (!is.null(headline)) {
+      p(class = "finding-card-headline",
+        span(class = "stat-num", headline), " ", span(class = "stat-lbl", caption))
+    },
+    ...
+  )
+}
+
+# One whole split into parts: a thin segmented bar, and the parts listed under
+# it. `parts` has `n` (the part's size), `tone` (critical, warning, success,
+# info, neutral or muted: the swatch and segment fill), `label` and `detail`
+# (NA for none). A part of zero is listed and draws nothing. `description` is
+# the bar's accessible text, the sentence the figure replaces.
+cedar_segment_figure <- function(parts, description = NULL) {
+  required <- c("n", "tone", "label", "detail")
+  if (!all(required %in% names(parts))) {
+    stop("cedar_segment_figure(): parts needs ", paste(required, collapse = ", "), ".",
+         call. = FALSE)
+  }
+  total <- sum(parts$n)
+  drawn <- parts[parts$n > 0, , drop = FALSE]
+  share <- 100 * drawn$n / total
+  start <- cumsum(c(0, share))[seq_along(share)]
+  pct <- function(x) paste0(round(x, 3), "%")
+  tagList(
+    if (total > 0) {
+      tags$svg(
+        class = "segment-bar", role = "img", `aria-label` = description,
+        lapply(seq_len(nrow(drawn)), function(i) {
+          tags$rect(
+            class = paste0("segment-bar-part segment--", drawn$tone[[i]]),
+            x = pct(start[[i]]), width = pct(share[[i]]), height = "100%",
+            tags$title(paste(drawn$n[[i]], drawn$label[[i]]))
+          )
+        }),
+        # The gap between touching parts, in the card's own colour.
+        lapply(start[-1], function(at) {
+          tags$rect(class = "segment-bar-gap", x = pct(at), width = 2, height = "100%",
+                    transform = "translate(-1 0)")
+        })
+      )
+    },
+    tags$ul(
+      class = "segment-legend",
+      lapply(seq_len(nrow(parts)), function(i) {
+        tags$li(
+          span(class = paste0("segment-swatch segment--", parts$tone[[i]])),
+          span(class = "segment-legend-count", format(parts$n[[i]], big.mark = ",")),
+          span(
+            span(class = "segment-legend-label", parts$label[[i]]),
+            if (!is.na(parts$detail[[i]])) span(class = "text-note", parts$detail[[i]])
+          )
+        )
+      })
+    )
+  )
+}
+
+# Amounts set against the amount each is for, one per row with the bars
+# aligned: `meters` has `label`, `share` (the amount over what it is for) and
+# `text` (both amounts in words). A bar past its mark runs to the end, and the
+# mark, the amount it is for, moves in from it.
+cedar_meter_list <- function(meters) {
+  required <- c("label", "share", "text")
+  if (!all(required %in% names(meters))) {
+    stop("cedar_meter_list(): meters needs ", paste(required, collapse = ", "), ".",
+         call. = FALSE)
+  }
+  pct <- function(x) paste0(round(100 * x, 3), "%")
+  tags$dl(
+    class = "meter-list",
+    lapply(seq_len(nrow(meters)), function(i) {
+      share <- meters$share[[i]]
+      scale <- max(1, share)
+      tagList(
+        tags$dt(meters$label[[i]]),
+        tags$dd(
+          tags$svg(
+            class = "meter-bar", role = "img",
+            `aria-label` = paste0(meters$label[[i]], ": ", meters$text[[i]]),
+            tags$rect(class = "meter-bar-track", width = "100%", height = "100%"),
+            tags$rect(class = "meter-bar-fill", width = pct(share / scale), height = "100%"),
+            if (share > 1) {
+              tags$rect(class = "meter-bar-mark", x = pct(1 / scale), width = 2, height = "100%")
+            }
+          ),
+          span(
+            class = "meter-list-figure",
+            tags$strong(scales::percent(share, accuracy = 0.1)), " ",
+            span(class = "text-note", meters$text[[i]])
+          )
+        )
+      )
+    })
+  )
+}
+
 # Compact current-term snapshot: grouped measure rows, the current term as the
 # anchor column, and earlier comparison terms beside it. The current column may
 # split into sub-columns (e.g. All plus each crosslisted code); a row whose

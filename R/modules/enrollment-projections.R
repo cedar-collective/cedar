@@ -416,10 +416,11 @@ projection_error_explainer <- function(error_sources, range_coverage) {
     tags$ul(rows),
     tags$p(tags$strong("The range"), class = "mb-1"),
     tags$p(range_coverage$sentence),
-    tags$p(tags$strong("What the projection cannot see"), class = "mb-1"),
+    tags$p(tags$strong("What the projection does not account for"), class = "mb-1"),
     tags$ul(
-      tags$li("Next year's schedule. Compare the plan with the draft on the",
-              " Draft schedule tab."),
+      tags$li("The target term's draft schedule. The forecast assumes seats",
+              " like last year's; the Draft schedule tab sets the draft",
+              " beside the plan."),
       tags$li("Policy changes, such as new placement cutoffs or requirements."),
       tags$li("How many students a full course turned away. The pressure bump",
               " stands in for it until waitlists can measure it."),
@@ -464,9 +465,14 @@ projection_in_brief_ui <- function(record) {
       )),
       line("Check.", "Every past term is re-forecast with only what was known",
            " then. ", record),
-      line("Limit.", "The forecast cannot see next year's schedule. A full",
-           " course registers as many students as it has seats, so where",
-           " seats change, registrations follow the seats.")
+      # The draft schedule is in the data once it is posted, and the page
+      # sets it beside the plan; what the forecast lacks is not the sight of
+      # it but any use of it, since seats are never a predictor.
+      line("Limit.", "The forecast assumes seats like last year's and is not",
+           " changed by the draft schedule. A full course registers as many",
+           " students as it has seats, so where the draft moves a full",
+           " course's seats, registrations follow the seats; the Draft",
+           " schedule tab shows where.")
     )
   )
 }
@@ -502,6 +508,66 @@ projection_attempts_explainer <- function() {
     class = "enrollment-projection-attempts-guide"
   )
 }
+
+# ---- Findings as figures ---------------------------------------------------------
+#
+# The two findings the Projections tab leads with, drawn from the counts the
+# view computed. Each part takes the colour its rows carry in the table it
+# summarises: a draft verdict's swatch in the Draft schedule table, a
+# reliability badge's tone in the projections table.
+
+projection_part_tone <- function(id, tones, what) {
+  tone <- unname(tones[id])
+  if (anyNA(tone)) {
+    stop("[enrollment-projections.R] No tone for ", what, " '",
+         paste(unique(id[is.na(tone)]), collapse = "', '"), "'.", call. = FALSE)
+  }
+  tone
+}
+
+projection_draft_tone <- function(status) {
+  projection_part_tone(status, c(
+    short_day_one = "critical", short_plan = "warning", covers = "success",
+    spare = "info", not_in_draft = "neutral"
+  ), "draft status")
+}
+
+# Grey for a miss the schedule set, as its "set by seats" badge is; red for
+# the forecast's own, as its Low badge is.
+projection_miss_tone <- function(part) {
+  projection_part_tone(part, c(
+    seats = "neutral", forecast = "critical", unknown = "warning",
+    within = "success", unrated = "muted"
+  ), "miss group")
+}
+
+# `link` is the Projections tab's way to the course-by-course comparison; the
+# Draft schedule tab, which is that comparison, passes none.
+projection_draft_finding <- function(comparison, link = NULL) {
+  parts <- dplyr::mutate(comparison$parts, tone = projection_draft_tone(status))
+  cedar_finding_card(
+    "Draft schedule against the plan",
+    scope = comparison$scope,
+    headline = comparison$headline, caption = comparison$caption,
+    # A draft short of the students expected on day one is the thing to fix
+    # first, so the card is marked.
+    warn = any(parts$n[parts$status == "short_day_one"] > 0L),
+    cedar_segment_figure(parts, description = comparison$sentence),
+    if (nrow(comparison$meters) > 0L) cedar_meter_list(comparison$meters),
+    if (!is.null(link)) tags$p(class = "finding-card-link", link)
+  )
+}
+
+projection_miss_finding <- function(miss) {
+  if (miss$n == 0L) return(NULL)
+  parts <- dplyr::mutate(miss$parts, tone = projection_miss_tone(part))
+  cedar_finding_card(
+    "Reliability of past forecasts",
+    headline = miss$headline, caption = miss$caption,
+    cedar_segment_figure(parts, description = miss$sentence)
+  )
+}
+
 
 projection_draft_explainer <- function() {
   info_panel(
@@ -814,6 +880,7 @@ projection_table_reactable <- function(projection_view, select_input) {
   history_terms <- projection_view$meta$summary_history_columns
   fill_term <- projection_view$meta$prior_fill_term_label
   target <- projection_view$meta$target_term_label
+  band <- "cedar-col-band"
   # Sort keys, so a header click orders by meaning rather than by the
   # alphabet. Each sits where its column shows and renders that column's
   # label, which stays searchable in its own hidden column.
@@ -859,10 +926,12 @@ projection_table_reactable <- function(projection_view, select_input) {
     pagination = FALSE,
     # Ties (most courses add nothing) stay alphabetical.
     defaultSorted = list(plan_adds_size = "desc", course = "asc"),
+    # Every other group is banded (`band` on its heading and its columns), so
+    # the four read as four blocks down the whole table.
     columnGroups = list(
       reactable::colGroup(
         name = paste("Recent", season, "terms"),
-        columns = c("recent_first_day", "prior_fill")
+        columns = c("recent_first_day", "prior_fill"), headerClass = band
       ),
       reactable::colGroup(
         name = paste("Projected for", target),
@@ -870,7 +939,7 @@ projection_table_reactable <- function(projection_view, select_input) {
       ),
       reactable::colGroup(
         name = paste("Plan for", target),
-        columns = c("plan_adds_size", "planning_sections")
+        columns = c("plan_adds_size", "planning_sections"), headerClass = band
       ),
       reactable::colGroup(
         name = "How far to rely on it",
@@ -882,6 +951,7 @@ projection_table_reactable <- function(projection_view, select_input) {
       department = reactable::colDef(show = FALSE, searchable = TRUE),
       planning_sections = reactable::colDef(
         name = "Sections", align = "right", width = 78,
+        class = band, headerClass = band,
         headerStyle = list(whiteSpace = "nowrap"),
         header = htmltools::span(
           "Sections",
@@ -906,6 +976,7 @@ projection_table_reactable <- function(projection_view, select_input) {
       planned_registrations = reactable::colDef(show = FALSE),
       plan_adds_size = reactable::colDef(
         name = "Plan adds", align = "right", minWidth = 90,
+        class = band, headerClass = band,
         searchable = FALSE, defaultSortOrder = "desc", sortNALast = TRUE,
         header = htmltools::span(
           "Plan adds",
@@ -979,6 +1050,7 @@ projection_table_reactable <- function(projection_view, select_input) {
       )),
       prior_fill = reactable::colDef(
         name = "Day-1 fill", align = "right", minWidth = 92,
+        class = band, headerClass = band,
         searchable = FALSE, defaultSortOrder = "desc", sortNALast = TRUE,
         header = htmltools::span(
           "Day-1 fill",
@@ -1014,6 +1086,7 @@ projection_table_reactable <- function(projection_view, select_input) {
       prior_fill_term = reactable::colDef(show = FALSE),
       recent_first_day = reactable::colDef(
         name = paste("Last", season, "terms"), minWidth = 220,
+        class = band, headerClass = band,
         sortable = FALSE, searchable = FALSE,
         header = htmltools::tagList(
           htmltools::div("First day / sections"),
@@ -1111,7 +1184,18 @@ projection_draft_reactable <- function(data, select_input) {
     columns = list(
       course = projection_course_coldef(table$department, minWidth = 105),
       department = reactable::colDef(show = FALSE, searchable = TRUE),
-      verdict = reactable::colDef(name = "Draft against the plan", minWidth = 220),
+      # Each verdict carries the swatch its part has in the figure above.
+      verdict = reactable::colDef(
+        name = "Draft against the plan", minWidth = 220,
+        cell = function(value, index) {
+          htmltools::tagList(
+            htmltools::span(class = paste0(
+              "segment-swatch segment--", projection_draft_tone(table$status[[index]])
+            )),
+            value
+          )
+        }
+      ),
       draft_sections = reactable::colDef(
         name = "Draft sections", align = "right", minWidth = 95,
         cell = function(value, index) {
@@ -1414,10 +1498,9 @@ enrollmentProjectionsUI <- function(id) {
     # bundle, before any panel has to be opened.
     projection_in_brief_ui(uiOutput(ns("accuracy_headline"), inline = TRUE)),
     # Each explainer answers one question a reader brings to the page, and
-    # its title says which. The two a reader needs before the table are here;
-    # the methods guide, the error sources and the ledger of ideas tried sit
-    # below it.
-    projection_columns_explainer(),
+    # its title says which. How a plan is built is here, before the tabs;
+    # the column guide sits directly over the table it describes; the methods
+    # guide, the error sources and the ledger of ideas tried sit below it.
     projection_build_explainer(
       uiOutput(ns("pressure_summary")),
       track_record = uiOutput(ns("track_record"), inline = TRUE)
@@ -1435,9 +1518,10 @@ enrollmentProjectionsUI <- function(id) {
             "plans add most to last year; click a header to sort by it instead."
           )
         ),
-        # What the draft schedule lacks and where the misses came from, said
+        # What the draft schedule lacks and where the misses came from, drawn
         # before the table rather than one tab or one panel away.
         uiOutput(ns("projection_findings")),
+        projection_columns_explainer(),
         tags$div(
           class = "enrollment-projection-table-flow cedar-clickable-rows",
           reactable::reactableOutput(ns("projection_table"), height = NULL)
@@ -1661,19 +1745,15 @@ enrollmentProjectionsServer <- function(id, bundles, load_bundle, programs) {
     # expected on day one is the thing to fix first, so it is a warning.
     output$projection_findings <- renderUI({
       comparison <- draft()
-      short <- comparison$counts$n[comparison$counts$status == "short_day_one"]
-      tagList(
+      tags$div(
+        class = "finding-card-row",
         if (isTRUE(comparison$available)) {
-          tags$div(
-            class = paste("alert-box",
-                          if (length(short) && short > 0L) "alert-box--warning" else "alert-box--neutral"),
-            comparison$sentence, " ",
+          projection_draft_finding(
+            comparison,
             actionLink(session$ns("open_draft"), "Compare course by course")
           )
         },
-        if (!is.na(view()$meta$miss_sentence)) {
-          tags$p(view()$meta$miss_sentence)
-        }
+        projection_miss_finding(view()$meta$miss)
       )
     })
 
@@ -1726,8 +1806,14 @@ enrollmentProjectionsServer <- function(id, bundles, load_bundle, programs) {
     # ---- Draft schedule sub-tab ---------------------------------------------
     draft <- reactive(build_enrollment_projection_draft_comparison(view()))
 
+    # The same figure the Projections tab leads with; with no schedule in the
+    # data there is nothing to draw, and the sentence says so.
     output$draft_summary <- renderUI({
-      tags$p(class = "enrollment-projection-lead", draft()$sentence)
+      comparison <- draft()
+      if (!isTRUE(comparison$available)) {
+        return(tags$p(class = "enrollment-projection-lead", comparison$sentence))
+      }
+      tags$div(class = "finding-card-row", projection_draft_finding(comparison))
     })
 
     output$draft_table <- reactable::renderReactable({

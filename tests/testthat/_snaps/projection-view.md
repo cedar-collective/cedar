@@ -39,6 +39,30 @@
       The draft schedule (pulled October 8, 2026) has 475 seats in 4 of the 5 courses shown, against 440 planned registrations. 1 course is short of the students expected on day one (by 30 seats); 1 covers day one but not the plan; 1 covers the plan; 1 has more than a section to spare. 1 monitored course is not in the draft. For the 2 courses near full last year, the draft's seats would hold about 272 registrations if they fill as last year's did, against 220 planned.
       
     Code
+      cat(draft$headline, draft$caption, "|", draft$scope, "\n")
+    Output
+      1 of 5 courses shown is short of the students expected on day one | pulled October 8, 2026 
+    Code
+      cat(paste(draft$parts$n, draft$parts$label, draft$parts$detail, sep = " | "),
+      sep = "\n")
+    Output
+      1 | Short of day-one seats | by 30 seats
+      1 | Covers day one, short of the plan | NA
+      1 | Covers the plan | NA
+      1 | Seats beyond the plan | more than a section to spare
+      1 | Not in the draft | monitored, with a projection and no sections yet
+    Code
+      cat(paste0(draft$meters$label, ": ", draft$meters$text), sep = "\n")
+    Output
+      Draft seats: 475 seats for 440 planned registrations, in 4 of the 5 courses shown
+      If seats fill as last year: about 272 registrations for 220 planned, in the 2 courses near full last year
+    Code
+      cat("\n", all_in$headline, " ", all_in$caption, "\n\n", sep = "")
+    Output
+      
+      0 of 3 courses shown are short of the students expected on day one
+      
+    Code
       cat(none$sentence, "\n")
     Output
       No schedule for Spring 2027 is in the data yet. It appears here after a refresh pulls the target term's DESR from MyReports, and the bundle rebuilds with it. 
