@@ -172,12 +172,47 @@ test_that("the draft comparison separates short of day one from short of the pla
   ))
   expect_false(none$available)
   expect_true(all(is.na(none$table$if_seats_fill)))
+
+  # The figure's counts: one course per verdict, most urgent first, with the
+  # course not in the draft listed last because there is one.
+  expect_equal(draft$parts$status,
+               c("short_day_one", "short_plan", "covers", "spare", "not_in_draft"))
+  expect_equal(draft$parts$n, rep(1L, 5))
+  expect_equal(sum(draft$parts$n), nrow(table))
+  # The draft's 475 seats against the 440 registrations planned in the four
+  # courses it holds; and for DAY 1 and SPARE 1, near full last year, the 272
+  # their seats would hold against the 220 planned for the two.
+  expect_equal(draft$meters$id, c("seats", "if_seats_fill"))
+  expect_equal(draft$meters$value, c(475, 272))
+  expect_equal(draft$meters$planned, c(440, 220))
+  expect_equal(draft$meters$share, c(475 / 440, 272 / 220))
+  # A draft every course is in lists the four verdicts and no fifth; a verdict
+  # no course has stays listed at zero, with no gap to state.
+  all_in_view <- view
+  all_in_view$projections <- projections[2:4, ]
+  all_in <- build_enrollment_projection_draft_comparison(all_in_view)
+  expect_equal(all_in$parts$status, c("short_day_one", "short_plan", "covers", "spare"))
+  expect_equal(all_in$parts$n, c(0L, 1L, 1L, 1L))
+  expect_true(is.na(all_in$parts$detail[[1]]))
+  # No course near full last year: only the seats are set against the plan.
+  spare_view <- view
+  spare_view$projections <- projections[2:3, ]
+  expect_equal(build_enrollment_projection_draft_comparison(spare_view)$meters$id, "seats")
+  # No schedule: nothing to draw.
+  expect_equal(nrow(none$meters), 0L)
+  expect_equal(none$parts$n[none$parts$status == "not_in_draft"], nrow(none$table))
+
   # Each course's verdict (day-one and plan shortfalls in seats and sections;
   # one course takes a singular verb), the sentence over the five with the
-  # near-full courses' seats at last year's fill, and no schedule at all.
+  # near-full courses' seats at last year's fill, the figure's words, and no
+  # schedule at all.
   expect_snapshot({
     cat(paste0(table$course, ": ", table$verdict), sep = "\n")
     cat("\n", draft$sentence, "\n\n", sep = "")
+    cat(draft$headline, draft$caption, "|", draft$scope, "\n")
+    cat(paste(draft$parts$n, draft$parts$label, draft$parts$detail, sep = " | "), sep = "\n")
+    cat(paste0(draft$meters$label, ": ", draft$meters$text), sep = "\n")
+    cat("\n", all_in$headline, " ", all_in$caption, "\n\n", sep = "")
     cat(none$sentence, "\n")
   })
 })

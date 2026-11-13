@@ -338,6 +338,46 @@ test_that("the page says which of the worst misses the schedule set and names th
   })
   expect_error(projection_miss_sentence(rows, list()), "accuracy_fair_max_wape")
   expect_error(projection_miss_sentence(dplyr::select(rows, -miss_cause), config), "miss_cause")
+
+  # The same finding as the figure's parts: every course shown in one group.
+  # Of the five, two Low the schedule set, one Low the forecast's own, and
+  # two within the threshold (High and Moderate, whatever their cause).
+  summary <- projection_miss_summary(rows, config)
+  expect_equal(summary$parts$part, c("seats", "forecast", "within"))
+  expect_equal(summary$parts$n, c(2L, 1L, 2L))
+  expect_equal(sum(summary$parts$n), nrow(rows))
+  expect_equal(summary$n_low, 3L)
+  expect_equal(summary$sentence, projection_miss_sentence(rows, config))
+  # None the forecast's own is the finding, so its part stays at zero; with no
+  # Low course there is no such part to show.
+  schedule_only <- projection_miss_summary(rows[1:2, ], config)
+  expect_equal(schedule_only$parts$part, c("seats", "forecast"))
+  expect_equal(schedule_only$parts$n, c(2L, 0L))
+  expect_equal(projection_miss_summary(rows[4:5, ], config)$parts$part, "within")
+  # A Low course whose cause the data cannot tell, and a course with too few
+  # past forecasts to rate, are their own parts, not folded into another.
+  mixed <- projection_miss_summary(
+    dplyr::mutate(rows, accuracy = c("Low", "Low", "Low", "High", "Unrated"),
+                  miss_cause = c("seats", NA, "forecast", "forecast", NA)),
+    config
+  )
+  expect_equal(mixed$parts$part, c("seats", "forecast", "unknown", "within", "unrated"))
+  expect_equal(mixed$parts$n, rep(1L, 5))
+  expect_error(
+    projection_miss_summary(dplyr::mutate(rows, accuracy = NA_character_), config),
+    "accuracy is missing for 5"
+  )
+  # The figure's words: the headline, each part with its note (the forecast's
+  # own named, or counted when more than five), and the threshold read live.
+  many_parts <- projection_miss_summary(many, config)$parts
+  one <- projection_miss_summary(rows[4, ], list(accuracy_fair_max_wape = 0.25))
+  expect_snapshot({
+    cat(summary$headline, summary$caption, "\n")
+    cat(paste(mixed$parts$n, mixed$parts$label, mixed$parts$detail, sep = " | "), sep = "\n")
+    cat(paste(many_parts$n, many_parts$label, many_parts$detail, sep = " | "), sep = "\n")
+    cat(one$headline, one$caption, "\n")
+    cat(paste(one$parts$n, one$parts$label, one$parts$detail, sep = " | "), sep = "\n")
+  })
 })
 
 test_that("a plan's steps add up from last year's class list to its sections", {

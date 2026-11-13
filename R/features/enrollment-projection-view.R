@@ -473,6 +473,43 @@ projection_miss_attribution <- function(projections, backtests, model_config) {
 }
 
 
+# Each course shown, by how its past forecasts landed: a Low course (more than
+# accuracy_fair_max_wape off) by whose miss most of its error was
+# (projection_miss_attribution(): "seats", "forecast", or "unknown" when the
+# data cannot tell), a High or Moderate one "within", and one with too few
+# past forecasts "unrated". The one count behind the page's sentence and its
+# figure.
+projection_miss_groups <- function(projections) {
+  projection_require_columns(
+    projections, c("accuracy", "miss_cause", "subject_course"),
+    "projection_miss_groups()"
+  )
+  if (anyNA(projections$accuracy)) {
+    stop("[enrollment-projection-view.R] projection_miss_groups(): accuracy is ",
+         "missing for ", sum(is.na(projections$accuracy)), " course(s).",
+         call. = FALSE)
+  }
+  low <- projections$accuracy == "Low"
+  cause <- dplyr::coalesce(projections$miss_cause, "unknown")
+  dplyr::case_when(
+    low & cause == "seats" ~ "seats",
+    low & cause == "forecast" ~ "forecast",
+    low ~ "unknown",
+    projections$accuracy %in% c("High", "Moderate") ~ "within",
+    TRUE ~ "unrated"
+  )
+}
+
+projection_miss_threshold <- function(model_config) {
+  fair_max <- model_config$accuracy_fair_max_wape
+  if (!is.numeric(fair_max) || length(fair_max) != 1L || !is.finite(fair_max)) {
+    stop("[enrollment-projection-view.R] model_config$accuracy_fair_max_wape is required.",
+         call. = FALSE)
+  }
+  paste0(round(100 * fair_max), "%")
+}
+
+
 # Sentences for the page on the courses whose past forecasts missed most: how
 # many missed mostly while near full with seats moving the way of the miss or
 # holding (the schedule's), and which missed with seats to spare or seats
@@ -480,20 +517,14 @@ projection_miss_attribution <- function(projections, backtests, model_config) {
 # to look at). Said even when the answer is none, because "none was the
 # forecast's own" is the finding.
 projection_miss_sentence <- function(projections, model_config) {
-  projection_require_columns(
-    projections, c("accuracy", "miss_cause", "subject_course"),
-    "projection_miss_sentence()"
-  )
-  fair_max <- model_config$accuracy_fair_max_wape
-  if (!is.numeric(fair_max) || length(fair_max) != 1L || !is.finite(fair_max)) {
-    stop("[enrollment-projection-view.R] model_config$accuracy_fair_max_wape is required.",
-         call. = FALSE)
-  }
+  threshold <- projection_miss_threshold(model_config)
+  group <- projection_miss_groups(projections)
   n <- nrow(projections)
   if (n == 0L) return(NA_character_)
-  threshold <- paste0(round(100 * fair_max), "%")
-  low <- projections$accuracy == "Low"
-  n_low <- sum(low)
+  seats <- sum(group == "seats")
+  own <- sort(projections$subject_course[group == "forecast"])
+  unknown <- sum(group == "unknown")
+  n_low <- seats + length(own) + unknown
   course_word <- function(k) paste0("course", if (k == 1L) "" else "s")
   if (n_low == 0L) {
     return(paste0(
@@ -501,10 +532,6 @@ projection_miss_sentence <- function(projections, model_config) {
       " had past forecasts more than ", threshold, " off."
     ))
   }
-  cause <- dplyr::coalesce(projections$miss_cause[low], "unknown")
-  seats <- sum(cause == "seats")
-  own <- sort(projections$subject_course[low][cause == "forecast"])
-  unknown <- sum(cause == "unknown")
   for_how_many <- function(k) {
     if (k == n_low && n_low > 1L) paste("all", k) else as.character(k)
   }
@@ -528,6 +555,53 @@ projection_miss_sentence <- function(projections, model_config) {
       " For ", for_how_many(unknown), ", the seats or first day of those terms",
       " are not known."
     )
+  )
+}
+
+
+# The same finding as a figure: every course shown in one of
+# projection_miss_groups()'s groups, in the order the page draws them, with
+# the page's words for each. A Low course the schedule explains is labelled as
+# the Reliability column labels it ("set by seats"), so a part of the bar can
+# be matched to the rows of the table beneath it. A group with no course is
+# left out, except the forecast's own when any course is Low: none is the
+# finding. `sentence` is projection_miss_sentence(), the figure's text.
+projection_miss_summary <- function(projections, model_config) {
+  threshold <- projection_miss_threshold(model_config)
+  group <- projection_miss_groups(projections)
+  n_courses <- nrow(projections)
+  own <- sort(projections$subject_course[group == "forecast"])
+  n_low <- sum(group %in% c("seats", "forecast", "unknown"))
+  parts <- tibble::tibble(
+    part = c("seats", "forecast", "unknown", "within", "unrated"),
+    label = c(
+      "Set by seats", "The forecast's own", "Cause not known",
+      paste("Within", threshold), "Unrated"
+    ),
+    n = vapply(part, function(id) sum(group == id), integer(1), USE.NAMES = FALSE),
+    detail = c(
+      "near full, and the seats moved the way of the miss or held",
+      paste0(
+        # More than five are counted, not listed, as in the sentence.
+        if (length(own) > 0L && length(own) <= 5L) paste0(paste(own, collapse = ", "), ": "),
+        "seats to spare, or seats that moved against the miss"
+      ),
+      "the seats or first day of those terms are not known",
+      NA_character_,
+      "too few past forecasts to rate"
+    )
+  ) %>%
+    dplyr::filter(n > 0L | (part == "forecast" & n_low > 0L))
+  list(
+    n = n_courses,
+    n_low = n_low,
+    headline = paste(n_low, "of", n_courses),
+    caption = paste0(
+      if (n_courses == 1L) "course" else "courses",
+      " shown had past forecasts more than ", threshold, " off"
+    ),
+    parts = parts,
+    sentence = projection_miss_sentence(projections, model_config)
   )
 }
 
@@ -1579,11 +1653,71 @@ build_enrollment_projection_draft_comparison <- function(view) {
       ) else ""
     )
   }
+  # The same comparison as a figure, which the page draws with the sentence as
+  # its text: the courses shown split by verdict, most urgent first, under the
+  # one count to act on, and the draft's seats set against the registrations
+  # planned for them. The four verdicts are always listed, since none short of
+  # day one is the finding; a course not in the draft only when there is one.
+  statuses <- c("short_day_one", "short_plan", "covers", "spare", "not_in_draft")
+  day_one_gap <- if (n("short_day_one") > 0L) paste0(
+    "by ", count(gap_sum("short_day_one", table$expected_first_day - table$draft_seats)),
+    " seats"
+  ) else NA_character_
+  parts <- tibble::tibble(
+    status = statuses,
+    label = c(
+      "Short of day-one seats", "Covers day one, short of the plan",
+      "Covers the plan", "Seats beyond the plan", "Not in the draft"
+    ),
+    courses = vapply(statuses, n, integer(1), USE.NAMES = FALSE),
+    detail = c(
+      day_one_gap, NA_character_, NA_character_,
+      "more than a section to spare",
+      "monitored, with a projection and no sections yet"
+    )
+  ) %>%
+    dplyr::filter(status != "not_in_draft" | courses > 0L) %>%
+    dplyr::rename(n = courses)
+  near_full <- is.finite(table$if_seats_fill)
+  meters <- tibble::tibble(
+    id = c("seats", "if_seats_fill"),
+    label = c("Draft seats", "If seats fill as last year"),
+    value = c(sum(table$draft_seats, na.rm = TRUE), sum(table$if_seats_fill, na.rm = TRUE)),
+    planned = c(
+      sum(table$planned_registrations[in_draft]),
+      sum(table$planned_registrations[near_full])
+    ),
+    text = c(
+      paste0(
+        count(value[[1]]), " seats for ", count(planned[[1]]),
+        " planned registrations, in ", sum(in_draft), " of the ", nrow(table),
+        " courses shown"
+      ),
+      paste0(
+        "about ", count(value[[2]]), " registrations for ", count(planned[[2]]),
+        " planned, in the ", sum(near_full), " course",
+        if (sum(near_full) == 1L) "" else "s", " near full last year"
+      )
+    )
+  ) %>%
+    # No seats to set against a plan, or no course whose registrations follow
+    # its seats: no bar.
+    dplyr::filter(c(available, any(near_full)), planned > 0) %>%
+    dplyr::mutate(share = value / planned)
   list(
     available = available,
     as_of = as_of,
     table = table,
     counts = table %>% dplyr::count(status),
+    headline = paste(n("short_day_one"), "of", nrow(table)),
+    caption = paste0(
+      if (nrow(table) == 1L) "course" else "courses", " shown ",
+      if (n("short_day_one") == 1L) "is" else "are",
+      " short of the students expected on day one"
+    ),
+    scope = if (is.na(as_of)) NA_character_ else paste("pulled", projection_date_label(as_of)),
+    parts = parts,
+    meters = meters,
     sentence = sentence
   )
 }
@@ -2021,7 +2155,7 @@ build_enrollment_projection_view <- function(bundle, opt = list()) {
       } else {
         fmt_term(fill_header_term)
       },
-      miss_sentence = projection_miss_sentence(projections, bundle$model_config),
+      miss = projection_miss_summary(projections, bundle$model_config),
       summary_history_columns = history_summary$columns,
       bundle_path = attr(bundle, "bundle_path") %||% NA_character_
     ),

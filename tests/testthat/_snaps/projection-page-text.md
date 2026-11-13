@@ -169,6 +169,34 @@
     Output
       3 of the 5 courses shown had past forecasts more than 25% off. For 2, most of the miss came when the course was near full and its seats moved the way of the miss or held, so the schedule set the number. For 1 (FYEX 1110), the course had seats to spare or its seats moved against the miss, so the miss was the forecast's own. 
 
+---
+
+    Code
+      cat(summary$headline, summary$caption, "\n")
+    Output
+      3 of 5 courses shown had past forecasts more than 20% off 
+    Code
+      cat(paste(mixed$parts$n, mixed$parts$label, mixed$parts$detail, sep = " | "),
+      sep = "\n")
+    Output
+      1 | Set by seats | near full, and the seats moved the way of the miss or held
+      1 | The forecast's own | FYEX 1110: seats to spare, or seats that moved against the miss
+      1 | Cause not known | the seats or first day of those terms are not known
+      1 | Within 20% | NA
+      1 | Unrated | too few past forecasts to rate
+    Code
+      cat(paste(many_parts$n, many_parts$label, many_parts$detail, sep = " | "), sep = "\n")
+    Output
+      6 | The forecast's own | seats to spare, or seats that moved against the miss
+    Code
+      cat(one$headline, one$caption, "\n")
+    Output
+      0 of 1 course shown had past forecasts more than 25% off 
+    Code
+      cat(paste(one$parts$n, one$parts$label, one$parts$detail, sep = " | "), sep = "\n")
+    Output
+      1 | Within 25% | NA
+
 # a plan's steps add up from last year's class list to its sections
 
     Code

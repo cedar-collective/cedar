@@ -80,6 +80,22 @@ async function closeEvidence(page) {
   check('the column guide is a collapsed, purpose-labelled info panel',
     pageChrome.guideTitle.includes('Reading the table: what each column means') &&
       pageChrome.guideOpen === false, pageChrome.guideTitle || '(missing)');
+  // The guide describes the table, so it sits directly over it: after the
+  // findings, with nothing between it and the table.
+  const guidePlacement = await page.evaluate(() => {
+    const guide = document.querySelector('details.enrollment-projection-guide');
+    const findings = document.getElementById('enrollment_projections-projection_findings');
+    const table = document.getElementById('enrollment_projections-projection_table');
+    if (!guide || !findings || !table) return null;
+    const next = guide.nextElementSibling;
+    return {
+      afterFindings: Boolean(findings.compareDocumentPosition(guide) & Node.DOCUMENT_POSITION_FOLLOWING),
+      tableNext: Boolean(next && next.contains(table)),
+    };
+  });
+  check('the column guide sits directly above the projections table',
+    guidePlacement && guidePlacement.afterFindings && guidePlacement.tableNext,
+    JSON.stringify(guidePlacement));
 
   const methodGuide = await page.evaluate(() => {
     const guide = document.querySelector('details.enrollment-projection-method-guide');
@@ -266,6 +282,33 @@ async function closeEvidence(page) {
       /^Plan for (Spring|Fall) \d{4}$/.test(groupHeadings[2]) &&
       groupHeadings[3] === 'How far to rely on it',
     groupHeadings.join(' | '));
+  // Every other part is banded, heading to last row, and the band is a
+  // colour a reader can see: a class with no rule behind it would pass a
+  // class check and show nothing.
+  const banding = await page.evaluate(() => {
+    const root = document.getElementById('enrollment_projections-projection_table');
+    const groups = [...root.querySelectorAll('.rt-thead .rt-th-group')];
+    const headers = [...root.querySelectorAll('.rt-thead .rt-th:not(.rt-th-group):not(.rt-th-group-none)')];
+    const row = root.querySelector('.rt-tbody .rt-tr');
+    const cells = row ? [...row.querySelectorAll('.rt-td')] : [];
+    const banded = (el) => el.classList.contains('cedar-col-band');
+    const tint = (el) => getComputedStyle(el).backgroundColor;
+    const plain = cells.find((c) => !banded(c));
+    const band = cells.find(banded);
+    return {
+      groups: groups.map(banded),
+      headers: headers.filter(banded).map((h) => h.innerText.replace(/\s+/g, ' ').trim().split(' (')[0]),
+      cells: cells.filter(banded).length,
+      cellTint: band ? tint(band) : null,
+      plainTint: plain ? tint(plain) : null,
+      headerTints: [...new Set(headers.map(tint))].length,
+    };
+  });
+  check('the recent-terms and plan parts are banded from heading to rows',
+    banding.groups.join() === 'true,false,true,false' &&
+      banding.headers.length === 4 && banding.cells === 4 &&
+      banding.cellTint !== banding.plainTint && banding.headerTints === 2,
+    JSON.stringify(banding));
   // Seat moves sit under reliability; own history and evidence are in the
   // course detail. "Seats" once headed a column of students.
   check('seat consistency, own history and evidence are not table columns',
@@ -346,12 +389,32 @@ async function closeEvidence(page) {
   const findings = await page.evaluate(() => {
     const box = document.getElementById('enrollment_projections-projection_findings');
     const scope = document.getElementById('enrollment_projections-scope');
+    const table = document.getElementById('enrollment_projections-projection_table');
+    const cards = box ? [...box.querySelectorAll('.finding-card')] : [];
     return {
       text: box ? box.innerText : '',
       link: Boolean(box && box.querySelector('#enrollment_projections-open_draft')),
       scope: scope ? scope.innerText : '',
+      rows: table ? table.querySelectorAll('.rt-tbody .rt-tr').length : 0,
+      // Each card: its drawn parts, and the counts its legend lists.
+      cards: cards.map((card) => ({
+        title: card.querySelector('.finding-card-title')?.innerText.trim() ?? '',
+        segments: [...card.querySelectorAll('.segment-bar .segment-bar-part')]
+          .map((part) => part.getBoundingClientRect().width),
+        counts: [...card.querySelectorAll('.segment-legend-count')]
+          .map((count) => Number(count.innerText.replace(/,/g, ''))),
+        meters: card.querySelectorAll('.meter-bar').length,
+      })),
     };
   });
+  // The findings are figures, not sentences: each card's bar is drawn, and
+  // its parts account for every course in the table beneath.
+  check('each finding is a drawn bar whose parts add up to the courses shown',
+    findings.cards.length >= 1 && findings.rows > 0 &&
+      findings.cards.every((card) =>
+        card.segments.length >= 1 && card.segments.every((w) => w > 0) &&
+        card.counts.reduce((a, b) => a + b, 0) === findings.rows),
+    JSON.stringify(findings.cards));
   check('the page says how many of the worst misses followed the seats',
     /had past forecasts more than \d+% off|has had past forecasts more than \d+% off|has not had past forecasts/.test(findings.text),
     findings.text);
@@ -360,8 +423,11 @@ async function closeEvidence(page) {
       /draft schedule (as of [A-Z][a-z]+ \d{1,2}, \d{4}|not yet in the data)/.test(findings.scope),
     findings.scope);
   if (findings.link) {
+    // innerText applies CSS text-transform: the card titles read in capitals.
     check('the draft verdict leads the Projections tab',
-      findings.text.startsWith('The draft schedule'), findings.text);
+      /^draft schedule against the plan/i.test(findings.text.trim()) &&
+        /short of the students expected on day one/.test(findings.text) &&
+        findings.cards[0].meters >= 1, findings.text);
     await page.evaluate(() => document.getElementById('enrollment_projections-open_draft').click());
     const draftShown = await waitFor(page, () => {
       const pane = document.getElementById('enrollment_projections-draft_table');

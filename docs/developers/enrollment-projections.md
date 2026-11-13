@@ -426,6 +426,12 @@ In the view (`R/features/enrollment-projection-view.R`):
   fewer), reading `accuracy_fair_max_wape` live. Both use the rule's own
   words: near full with seats moving the way of the miss or holding, against
   seats to spare or seats moving against the miss.
+- `projection_miss_summary()` is that count as the figure the page draws
+  above the table (`meta$miss`): every course shown in one of
+  `projection_miss_groups()`'s groups, the Low ones by whose miss it was and
+  labelled as the Reliability column labels them, with
+  `projection_miss_sentence()` as the figure's text. The sentence and the
+  figure read one count.
 - `projection_track_record_summary(backtests, model_config)` states the
   published rule's record for step 1 of **How a course's plan is built**:
   its error over the past forecasts whose seats held, and over all of them
@@ -477,6 +483,15 @@ the plan, never one count beside the other's gap. It is
 arithmetic over saved rows: the bundle's refresh signature includes the
 target-term sections, so a changed draft rebuilds the bundle at the next
 refresh, and Shiny never refits to compare.
+
+The page draws the comparison rather than writing it out. Beside `sentence`
+the builder returns `parts` (the courses shown by verdict, most urgent first;
+the four verdicts always, a course not in the draft only when there is one),
+`headline` and `caption` (how many are short of day one), and `meters` (the
+draft's seats over the registrations planned for them, and for the courses
+near full last year `if_seats_fill` over their plan, each with `share`). The
+Projections tab leads with the figure and the Draft schedule tab repeats it
+over its table, whose verdicts carry the same swatches.
 
 Expected first-day seats are still shown beside the plan, as context. For each
 aftcast or current projection, CEDAR estimates a leakage-safe same-season
