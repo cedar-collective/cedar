@@ -1291,16 +1291,33 @@ nav_panel(
         uiOutput("cr_dfw_tab_content")
       ),
 
+      # Two views of one question, whether students stay after the course:
+      # its own students by how they did in it, and its students against the
+      # students who never took it. Built here rather than in a renderUI, so
+      # choosing another course before Analyze Course redraws neither view.
       nav_panel(
         "Retention",
         icon = icon("person-walking-arrow-right"),
-        uiOutput("cr_impact_retention_ui")
-      ),
-
-      nav_panel(
-        "Takers vs Non-Takers",
-        icon = icon("people-arrows"),
-        courseCohortUI("cr_cohort")
+        subtab_header(
+          "Retention",
+          "Two views of whether students stay after this course. By Grade follows the course's own students and splits ",
+          "their return by how they did in it. Takers vs Non-Takers sets them beside students of the same classification ",
+          "who never took it, against the college's other courses and against similar students. The grade rule chosen ",
+          "under By Grade applies there only; Takers vs Non-Takers counts pass and DFW by the standard rule."
+        ),
+        navset_tab(
+          id = "cr_retention_view",
+          nav_panel(
+            "By Grade",
+            icon = icon("chart-simple"),
+            uiOutput("cr_impact_retention_ui")
+          ),
+          nav_panel(
+            "Takers vs Non-Takers",
+            icon = icon("people-arrows"),
+            courseCohortUI("cr_cohort")
+          )
+        )
       ),
 
       nav_panel(

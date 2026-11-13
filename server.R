@@ -3592,7 +3592,7 @@ output$enrl_classlist_download <- downloadHandler(
       return(empty_state("Select a course and click Analyze Course first, then open this tab."))
     tagList(
       subtab_header(
-        "Retention",
+        "By Grade",
         "Of the students who took this course, how many enrolled again the next ",
         "fall or spring, or graduated first — split by how they did here. The ",
         "trend below uses the same definition. Read the bars against each ",
@@ -6240,7 +6240,7 @@ output$enrl_classlist_download <- downloadHandler(
     instructor_access = dfw_authenticated, instructor_password = dfw_password
   )
 
-  # Course Dynamics > Takers vs Non-Takers: the analysed course against the
+  # Course Dynamics > Retention > Takers vs Non-Takers: the analysed course against the
   # students of its classification who never took it, read against the
   # college's other courses (R/modules/course-cohort.R).
   courseCohortServer(

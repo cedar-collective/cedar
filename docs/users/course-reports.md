@@ -122,19 +122,21 @@ The DFW tab is intended to support conversations about course design and student
 
 ## Retention
 
+The Retention tab holds two views of whether students stay after the course. **By Grade** follows the course's own students and splits their return by how they did in it. **Takers vs Non-Takers** sets them beside students of the same classification who never took the course, against the college's other courses and against similar students. The **What counts as failing?** choice under By Grade applies there only; Takers vs Non-Takers counts pass and DFW by the standard rule.
+
+### By Grade
+
 {% include definition-summary.html id="course-retention" %}
 
 Summer terms are skipped when counting forward.
 
 You can configure how many semesters to track, set a minimum cohort size per row, and optionally break out results by instructor.
 
----
-
-## Takers vs Non-Takers
+### Takers vs Non-Takers
 
 {% include definition-summary.html id="course-cohort-effect" %}
 
-Retention above follows the students who took the course. This tab adds the
+By Grade follows the students who took the course. This view adds the
 students who did not: for every enrolled student of a classification in a
 term (first-semester freshmen, say), by home campus, it splits the population
 into those who passed the course, those who DFW'd it, and those who never took
@@ -150,7 +152,7 @@ types** selects every term of the types you tick, and **Terms** narrows them.
 Change any of them and click **Compare Groups**.
 
 Read the gap against the benchmark, not on its own. Passing any course goes
-with returning, so the tab runs the same comparison for every other course of
+with returning, so the view runs the same comparison for every other course of
 the chosen college (and level) the same students took, and reports the median
 and quartiles of their gaps with the share of courses whose gap is below this
 course's. A course whose gap sits at the college's median is an average
@@ -259,14 +261,14 @@ Two tabs answer two halves of this, and neither answers the whole of it.
   placed past it. On the 2026-11-04 pull, students who passed FYEX 1010 before
   ENGL 1120 did not pass ENGL 1120 14.2% of the time against 12.9%, and
   entered with 5 credits against 28. That gap describes who takes FYEX 1010.
-- **Retention** shows, of the students who took the course, how many came
+- **Retention → By Grade** shows, of the students who took the course, how many came
   back the next fall or spring, split by how they did in it. For FYEX 1010 on
   main campus, 92% of those who passed returned against 49% of those who
   failed. That is a strong signal about the students who fail a first-year
   seminar, not a measure of the seminar.
 
 What neither tab does is compare takers with students who did not take the
-course at all, holding classification constant. **Takers vs Non-Takers** does:
+course at all, holding classification constant. **Retention → Takers vs Non-Takers** does:
 for one classification, by home campus and term, return and next-term DFW
 share for students who passed the course, failed it, or never took it, with a
 balance table. For main-campus first-semester freshmen in Fall 2023, 94% of

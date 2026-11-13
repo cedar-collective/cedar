@@ -1,4 +1,4 @@
-// Course Dynamics > Takers vs Non-Takers: the analysed course's takers against
+// Course Dynamics > Retention > Takers vs Non-Takers: the analysed course's takers against
 // the students of its classification who never took it, read against the
 // college's other courses (R/modules/course-cohort.R over
 // build_course_cohort_context()).
@@ -26,6 +26,8 @@ try {
   await runAndWait(page, 'cr_generate_button');
   console.log(`course loaded: ${COURSE}`);
 
+  // Takers vs Non-Takers is the second view under Retention.
+  await openSubTab(page, 'Retention', { timeout: 300000 });
   await openSubTab(page, 'Takers vs Non-Takers', { timeout: 300000 });
   await requireIds(page, ['cr_cohort-classification', 'cr_cohort-college', 'cr_cohort-terms',
                           'cr_cohort-term_type', 'cr_cohort-min_n', 'cr_cohort-run']);
