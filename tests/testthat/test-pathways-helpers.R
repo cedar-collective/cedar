@@ -1,17 +1,5 @@
 context("Pathways branch helpers")
 
-# The population below is intermediate membership scaffolding, not authored raw
-# enrollment data. MC02 supplies all course rows, including concurrent labs,
-# repeat attempts and a student moving between delivery campuses.
-grouped_path_population <- function() {
-  test_students_mc %>% distinct(student_id) %>%
-    mutate(population_label = "All", relevant_until = NA_integer_)
-}
-grouped_path_opt <- function(...) {
-  modifyList(list(data_edges = list(first_enrolled = 202010L,
-    last_enrolled_complete = 202110L), min_n = 1L, min_band_n = 1L), list(...))
-}
-
 test_that("grouped paths count concurrent same-category courses once per student and campus", {
   p <- get_grouped_student_paths(test_students_mc, grouped_path_population(),
     CEDAR_PATHWAY_SUBJECT_GROUPS, grouped_path_opt())
@@ -155,16 +143,6 @@ test_that("pathways_observation_boundary returns NULL when the anchor is unknown
 # overstating coverage: a student whose record is bounded at either end must not
 # be counted as fully readable.
 
-cov_pop <- function() {
-  tibble::tibble(
-    student_id = paste0("S", 1:6),
-    # S1 starts at the data edge -> truncated. S2 ends at the edge -> censored.
-    # S3 is both. S4/S5/S6 sit inside the window -> complete.
-    first_unm_term   = c(202010L, 202080L, 202010L, 202080L, 202110L, 202080L),
-    last_record_term = c(202310L, 202480L, 202480L, 202310L, 202310L, 202380L)
-  )
-}
-
 test_that("coverage facts count truncation, censoring and complete records", {
   f <- pathways_coverage_facts(cov_pop(), min_data_term = 202010L, max_data_term = 202480L)
 
@@ -219,19 +197,6 @@ test_that("coverage percentages never exceed 100 or fall below 0", {
 # weeks after a term ends, and nothing moves the boundary until the config is
 # edited) and can overshoot (a config set ahead of the data nominates a term
 # with no grades, in which every student reads as stopped out).
-
-graded_students <- function() {
-  mk <- function(term, n, graded) tibble::tibble(
-    term = rep(as.integer(term), n),
-    final_grade = c(rep("A", graded), rep(NA_character_, n - graded))
-  )
-  dplyr::bind_rows(
-    mk(202480, 100, 91),   # complete
-    mk(202580, 100, 91),   # complete
-    mk(202610, 100, 7),    # grades not posted yet
-    mk(202680, 100, 0)     # in progress
-  )
-}
 
 test_that("the boundary is the last term whose grades are posted", {
   expect_equal(latest_graded_term(graded_students()), 202580L)

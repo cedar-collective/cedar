@@ -86,9 +86,10 @@ are facts about how the data looks, and every analytic touching them needs the
 same shape. These belong in `designed_test_data.R`; tests filter from the
 `test_*` variables.
 
-**No: it exists only inside the pipeline.** Build it locally at the top of the
-test file, with its expected values documented directly above and a comment
-saying why it is local. The legitimate cases:
+**No: it exists only inside the pipeline.** Build it in a function in the test
+file's helper (`helper-<topic>.R`, [where test code lives](#where-test-code-lives)),
+with its expected values documented directly above and a comment saying why it
+is local. The legitimate cases:
 
 - **Intermediate frames.** `compute_stopout_for_group()` takes a frame with
   `outcome` and `stopped_out` already derived; that shape is one function's
@@ -128,13 +129,60 @@ then committed. If one changes, the function or fixture changed: investigate
 before updating. To learn the value for a new assertion, assert something
 obviously wrong and read the real value from the failure diff.
 
-Filter tests use `make_opt(uel = FALSE)`: the `uel = TRUE` default applies the
-excluded-courses list and changes `subject_course`.
+Filter tests use `filtering_opt()`, which sets `uel = FALSE`: the `uel = TRUE`
+default applies the excluded-courses list and changes `subject_course`.
 
 `tests/testthat/create-test-fixtures.R` once sampled real data into binary
 `cedar_*_test.qs` files. Nothing loads them; the script is kept, under a legacy
 banner, only as the recipe for a stratified real-data sample. Never add rows to
 it.
+
+### Where test code lives
+
+**A test file holds `test_that()` blocks and nothing else** (a `context()` line
+and `testthat::local_edition()` aside). `test-architecture.R` fails on any
+other expression at a test file's top level: a function, an object, a
+`library()` or a `source()`. Whatever tests share has one of four homes, and
+testthat loads all four before every test file, whichever file is run:
+
+| What | Where |
+|---|---|
+| Rows that enter the system, and the tables the transform builds from them (student terms, attempts, course terms, flows) | `fixtures/designed_test_data.R`, exposed by `setup.R` as `test_*` and `data_objects` |
+| A builder, an option list or a constant that tests share: a pipeline-internal frame, a scenario's population, a scaffolded mapping file | `helper-<topic>.R`, named for the test file it serves |
+| The right edges a designed scenario is read through | `helper-scenario-edges.R`, one list per scenario |
+| Packages, and the source files `load_funcs()` leaves out | `helper-load-functions.R` |
+
+Three rules keep the helpers dependable:
+
+- **Anything built from the fixtures is a function, never an object.** Helper
+  files load before `setup.R`, in alphabetical order, so an object that read a
+  fixture or called a production function at load would stop every test file.
+  A function costs nothing until a test calls it, and a builder that breaks
+  fails the tests that use it and no others. A helper file's top level is
+  function definitions and literal values.
+- **Helper names are global to the suite.** Prefix a name with its scenario or
+  topic (`hp2_population()`, `ss_attempts()`, `roadmap_plan()`), and `grep` the
+  helper files before adding one: the builder may exist.
+- **A helper selects and shapes; it never reimplements a calculation.** The
+  expected values stay in the test, beside the assertion.
+
+A scratch session loads the same homes the same way, from `tests/testthat`,
+into an environment of its own (`setup.R` assigns with `<<-`, which fails when
+it is sourced straight into the global environment):
+
+```r
+e <- new.env(parent = globalenv())
+invisible(testthat::source_test_helpers(".", env = e))
+invisible(testthat::source_test_setup(".", env = e))
+local(print(hp2_population()), envir = e)
+```
+
+Until 2026-11 these definitions sat at the top of 57 of the 86 test files (141
+functions, 60 objects). A scratch session could not reach them; two files held
+different values under one name (`mc02_edges`); the same builder was written
+out in two files; and a file run alone attached different packages from the
+same file run in the suite, because `library()` and `source()` calls in one
+test file stayed in effect for every file after it.
 
 ---
 
@@ -279,10 +327,12 @@ for each browser retry.
 ### The suite does not load Shiny modules
 
 `helper-load-functions.R` calls `load_funcs(cedar_base_dir, modules = FALSE)`,
-so `subtab_header()`, `deptProfileGenEdUI()` and every other module function is
-absent; a test calling one fails with "could not find function". To exercise a
-UI function, rerun the loader with modules on, rather than hand-sourcing
-`R/modules/*.R` (which pulls a dependency chain):
+so `deptProfileGenEdUI()` and nearly every other module function is absent; a
+test calling one fails with "could not find function". The helper then sources
+three module files for the pure helpers the suite tests (`ui-helpers.R`,
+`admin.R`, `dept-trends.R`); a test file never sources one itself. To exercise
+any other UI function, rerun the loader with modules on, rather than
+hand-sourcing `R/modules/*.R` (which pulls a dependency chain):
 
 ```r
 setwd("tests/testthat")
@@ -511,9 +561,11 @@ scratchpad. To combine fixtures with real data from a script:
 
 ```r
 setwd("tests/testthat")
-for (f in list.files(".", "^helper")) source(f)   # cone/branch functions
-source("setup.R")                                  # test_students, test_sections, ...
+e <- new.env(parent = globalenv())                  # see "Where test code lives"
+invisible(testthat::source_test_helpers(".", env = e))   # functions, test builders
+invisible(testthat::source_test_setup(".", env = e))     # test_students, test_sections, ...
 students <- qs2::qs_read("../../data/cedar_registrations.qs")   # qs2; qs::qread fails
+local(nrow(dplyr::semi_join(students, test_students, by = "subject_course")), envir = e)
 ```
 
 Two things the helpers don't do, both of which look like broken code:

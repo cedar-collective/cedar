@@ -9,12 +9,6 @@
 
 context("Registration Statistics (regstats)")
 
-regstats_history_opt <- function(term = 202080L) {
-  list(term = term, bypass_cache = TRUE,
-       thresholds = list(min_impacted = 1, pct_sd = 1, chronic_fill_rate = .60,
-                         min_sat_terms = 1, min_wait = 1, section_proximity = .3))
-}
-
 test_that("Regstats uses earlier matching terms for every mean and population SD", {
   result <- get_reg_stats(test_students_regstats, test_sections_regstats, regstats_history_opt(),
                          course_terms = test_course_terms_regstats)

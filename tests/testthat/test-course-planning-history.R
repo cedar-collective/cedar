@@ -2,17 +2,6 @@
 # below are explicit analytical parameters, not institutional fixture tables.
 # The history reads the course-term measure table (ADR-001 step 7), counted
 # here over each fixture's class list and schedule as the transform counts it.
-history_edges <- list(last_enrolled_complete = 202080L, last_enrolled = 202180L)
-course_history <- function(courses = "SOCI 100", sections = test_sections_regstats,
-                           course_terms = test_course_terms_regstats) {
-  get_course_planning_history(sections, course_terms, courses, history_edges)
-}
-course_history_terms <- course_terms_for(test_students_course_history, test_sections_course_history)
-pending_session_terms <- course_terms_for(test_students_pending_session, test_sections_pending_session)
-
-# Catalog membership is analytical scaffolding over EC-11's recorded histories.
-planning_gen_ed <- function() data.frame(subject_course = c("SOCI 100", "SOCI 101", "SOCI 104"),
-  area_label = c("4: Social sciences", "4: Social sciences", "5: Humanities"))
 
 test_that("Gen Ed suggestions retain season, campus and session and suppress small first-day cells", {
   h <- course_history(c("SOCI 100", "SOCI 101", "SOCI 104"))
@@ -103,7 +92,7 @@ test_that("a session not yet begun leaves the first day pending, with the begun 
   expect_equal(later$first_day_basis, "sessions_pending")
   expect_equal(later$first_day_started_enrl, 0L)
   # The table carries the same verdicts per session.
-  tbl <- pending_session_terms %>% arrange(part_term)
+  tbl <- pending_session_terms() %>% arrange(part_term)
   expect_equal(tbl$part_term, c("1", "2H"))
   expect_equal(tbl$first_day_basis, c("complete", "sessions_pending"))
   expect_equal(tbl$first_day_enrl, c(8L, NA_integer_))
@@ -115,7 +104,7 @@ test_that("a session not yet begun leaves the first day pending, with the begun 
   expect_equal(undated$first_day_basis, "undated")
   expect_true(is.na(undated$first_day_started_enrl))
   # Course history names the reason per session.
-  h <- get_course_planning_history(test_sections_pending_session, pending_session_terms,
+  h <- get_course_planning_history(test_sections_pending_session, pending_session_terms(),
     "SOCI 100", list(last_enrolled_complete = 202180L))
   expect_equal(h$pressure$pressure_status[h$pressure$part_term == "2H"], "Session not yet begun")
   expect_false(h$pressure$pressure_status[h$pressure$part_term == "1"] == "Session not yet begun")
@@ -147,7 +136,7 @@ test_that("a section with no start date is not reported as missing status dates"
   one_undated$registration_date[one_undated$registration_status_code %in% STATUS_REGISTERED][1] <- NA
   expect_equal(calc_first_day_enrl(one_undated, no_start)$first_day_basis, "undated")
   # Course history names the reason on the session it belongs to.
-  terms <- pending_session_terms %>%
+  terms <- pending_session_terms() %>%
     mutate(first_day_basis = if_else(part_term == "2H", "no_start_date", first_day_basis))
   h <- get_course_planning_history(no_start, terms, "SOCI 100",
     list(last_enrolled_complete = 202180L))
@@ -176,7 +165,7 @@ test_that("frequency includes observed source terms when a course was absent", {
 
 test_that("unmatched, implausible, small and missing capacity histories fail closed", {
   h <- course_history(c("SOCI 100", "SOCI 101", "SOCI 102", "SOCI 103", "SOCI 104"),
-    test_sections_course_history, course_history_terms)
+    test_sections_course_history, course_history_terms())
   p <- h$pressure
   expect_false(any(p$subject_course == "SOCI 102" & p$term == 202080L))
   expect_true(is.na(p$capacity[p$subject_course == "SOCI 103" & p$term == 202080L]))

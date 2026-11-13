@@ -535,12 +535,6 @@ test_that("a schedule check finds each course's history or lists its other offer
 # HIST 320 -> HIST 3201 confirmed; PHIL 150 -> PHIL 1115 proposed).
 # =============================================================================
 
-rn01_sections <- function() {
-  dims <- build_cedar_dims(read_institution_mappings(cedar_institution_dir(cedar_base_dir, "demo")))
-  courses <- suppressMessages(build_cedar_courses(test_sections_rn, test_students_rn, dims))
-  suppressMessages(attach_course_ids(list(cedar_sections = test_sections_rn), courses))$cedar_sections
-}
-
 test_that("a schedule check finds a renumbered course's history under its former codes (RN01)", {
   concerns <- get_enrollment_concerns(rn01_sections(), list(term = "202110"), n_history_terms = 4) %>%
     arrange(subject_course)

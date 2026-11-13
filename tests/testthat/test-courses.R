@@ -1,13 +1,9 @@
 # The course dimension (ADR-001 step 4): one course_id per code, through the
 # confirmed successions in institution/<id>/code_history.csv. Fixtures: RN01
-# (designed_test_data.R) read with the demo institution's file (demo_dims).
-
-demo_files <- function() read_institution_mappings(cedar_institution_dir(cedar_base_dir, "demo"))
-# The demo institution's files, whichever institution load_funcs() read.
-demo_dims <- build_cedar_dims(demo_files())
+# (designed_test_data.R) read with the demo institution's file (demo_dims()).
 
 test_that("every code gets one course_id, following confirmed successions step by step", {
-  cc <- suppressMessages(build_cedar_courses(test_sections_rn, test_students_rn, demo_dims))
+  cc <- suppressMessages(build_cedar_courses(test_sections_rn, test_students_rn, demo_dims()))
   expect_s3_class(cc, "cedar_courses")
   codes <- cc$codes
   expect_equal(names(codes), CEDAR_COURSE_CODES_COLUMNS)
@@ -37,7 +33,7 @@ test_that("every code gets one course_id, following confirmed successions step b
 })
 
 test_that("a course's row spans every code it has carried", {
-  cc <- suppressMessages(build_cedar_courses(test_sections_rn, test_students_rn, demo_dims))
+  cc <- suppressMessages(build_cedar_courses(test_sections_rn, test_students_rn, demo_dims()))
   courses <- cc$courses
   expect_equal(names(courses), CEDAR_COURSES_COLUMNS)
   expect_equal(nrow(courses), 7L)
@@ -58,14 +54,14 @@ test_that("a course's row spans every code it has carried", {
 })
 
 test_that("the main fixtures build one course per code: the demo file touches none of them", {
-  cc <- suppressMessages(build_cedar_courses(test_sections, test_students, demo_dims))
+  cc <- suppressMessages(build_cedar_courses(test_sections, test_students, demo_dims()))
   expect_equal(nrow(cc$courses), nrow(cc$codes))
   expect_true(all(cc$codes$steps == 0L))
   expect_setequal(cc$codes$subject_course, union(test_sections$subject_course, test_students$subject_course))
 })
 
 test_that("attach_course_ids keys each table on the course, the registrar's code in listed_code", {
-  cc <- suppressMessages(build_cedar_courses(test_sections_rn, test_students_rn, demo_dims))
+  cc <- suppressMessages(build_cedar_courses(test_sections_rn, test_students_rn, demo_dims()))
   stale <- dplyr::mutate(test_sections_rn, course_id = "STALE")
   attr(stale, "cedar_provenance") <- "kept"
   out <- suppressMessages(attach_course_ids(
@@ -84,7 +80,7 @@ test_that("attach_course_ids keys each table on the course, the registrar's code
   again <- suppressMessages(attach_course_ids(out["cedar_sections"], cc))$cedar_sections
   expect_identical(again, secs)
   # The code-level functions read the registrar's code off a keyed table.
-  expect_equal(suppressMessages(build_cedar_courses(secs, out$cedar_registrations, demo_dims))$codes, cc$codes)
+  expect_equal(suppressMessages(build_cedar_courses(secs, out$cedar_registrations, demo_dims()))$codes, cc$codes)
   # A table with a code the dimension never saw is a stop, not an NA.
   expect_error(suppressMessages(attach_course_ids(list(cedar_sections = test_sections), cc)),
                "does not know")

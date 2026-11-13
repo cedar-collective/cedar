@@ -1,10 +1,8 @@
 # Dependency/setup contracts use no institutional data or network access.
-project_root <- normalizePath(file.path(getwd(), "../.."))
-env <- new.env(parent = globalenv())
-original_paths <- .libPaths()
-sys.source(file.path(project_root, "scripts", "r-environment.R"), envir = env)
 
 test_that("dependency helpers are inert when sourced", {
+  original_paths <- .libPaths()
+  env <- load_r_environment_script()
   expect_identical(.libPaths(), original_paths)
   expect_type(env$cedar_restore_dependencies, "closure")
   expect_output(env$cedar_r_environment_main("help"), "read-only")
@@ -13,8 +11,9 @@ test_that("dependency helpers are inert when sourced", {
 })
 
 test_that("the lock pins the tested runtime, bootstrap, and compiled qs2 chain", {
-  lock <- env$cedar_dependency_lock(project_root)
-  docker <- readLines(file.path(project_root, "Dockerfile.shiny"))
+  env <- load_r_environment_script()
+  lock <- env$cedar_dependency_lock(cedar_base_dir)
+  docker <- readLines(file.path(cedar_base_dir, "Dockerfile.shiny"))
   expect_match(docker[1], paste0("rocker/shiny:", lock$R$Version), fixed = TRUE)
   expect_identical(lock$Packages$renv$Version, "1.1.1")
   expect_identical(lock$Packages$shiny$Version, "1.10.0")
@@ -23,18 +22,19 @@ test_that("the lock pins the tested runtime, bootstrap, and compiled qs2 chain",
   expect_true(all(c("RcppParallel", "stringfish", "testthat", "reactable", "tidyverse") %in%
                     names(lock$Packages)))
   expect_false(grepl("latest", lock$R$Repositories[[1]]$URL))
-  activate <- paste(readLines(file.path(project_root, "renv", "activate.R")), collapse = "\n")
+  activate <- paste(readLines(file.path(cedar_base_dir, "renv", "activate.R")), collapse = "\n")
   expect_match(activate, paste0('version <- "', lock$Packages$renv$Version, '"'), fixed = TRUE)
   restore <- grep("restore-docker", docker)
   expect_length(restore, 1)
   expect_lt(restore, grep("COPY . .", docker, fixed = TRUE))
   expect_true(any(grepl("COPY renv.lock", docker, fixed = TRUE)))
   expect_false(any(grepl("install.packages", docker, fixed = TRUE)))
-  expect_false(jsonlite::fromJSON(file.path(project_root, "renv", "settings.json"))$use.cache)
+  expect_false(jsonlite::fromJSON(file.path(cedar_base_dir, "renv", "settings.json"))$use.cache)
 })
 
 test_that("drift checks report wrong R, wrong packages, missing packages, and precedence", {
-  lock <- env$cedar_dependency_lock(project_root)
+  env <- load_r_environment_script()
+  lock <- env$cedar_dependency_lock(cedar_base_dir)
   lock$Packages <- lock$Packages[c("dplyr", "qs2", "renv")]
   installed <- rbind(c("dplyr", "0.0.0"), c("dplyr", "1.1.4"), c("qs2", "0.2.2"))
   colnames(installed) <- c("Package", "Version")
@@ -46,6 +46,7 @@ test_that("drift checks report wrong R, wrong packages, missing packages, and pr
 })
 
 test_that("native selection is explicit and rejects absent or stale readiness markers", {
+  env <- load_r_environment_script()
   root <- withr::local_tempdir()
   before <- .libPaths()
   expect_false(env$cedar_use_native_library(root, required = FALSE))
@@ -55,7 +56,7 @@ test_that("native selection is explicit and rejects absent or stale readiness ma
   expect_true(startsWith(library, file.path(root, "renv", "library", "cedar")))
   expect_match(library, R.version$platform, fixed = TRUE)
   dir.create(library, recursive = TRUE)
-  file.copy(file.path(project_root, "renv.lock"), file.path(root, "renv.lock"))
+  file.copy(file.path(cedar_base_dir, "renv.lock"), file.path(root, "renv.lock"))
   writeLines("stale", file.path(library, ".cedar-ready"))
   expect_error(env$cedar_use_native_library(root), "different lockfile")
   expect_identical(.libPaths(), before)
@@ -70,7 +71,7 @@ test_that("native selection is explicit and rejects absent or stale readiness ma
 })
 
 test_that("startup cannot install packages or activate the old cache-linked library", {
-  profile <- paste(readLines(file.path(project_root, ".Rprofile")), collapse = "\n")
+  profile <- paste(readLines(file.path(cedar_base_dir, ".Rprofile")), collapse = "\n")
   expect_false(grepl("install.packages\\(|renv::|source\\(\"renv/activate|p_load\\(", profile))
   expect_match(profile, "cedar_use_native_library(required = FALSE)", fixed = TRUE)
   expect_match(profile, "load_global_data(opt = NULL)", fixed = TRUE)
@@ -80,13 +81,14 @@ test_that("startup cannot install packages or activate the old cache-linked libr
 })
 
 test_that("matching installed binaries are copied, not linked or silently substituted", {
+  env <- load_r_environment_script()
   root <- withr::local_tempdir()
   source <- file.path(root, "source")
   target <- file.path(root, "target")
   dir.create(file.path(source, "qs2"), recursive = TRUE)
   dir.create(target)
   writeLines("original", file.path(source, "qs2", "payload"))
-  lock <- env$cedar_dependency_lock(project_root)
+  lock <- env$cedar_dependency_lock(cedar_base_dir)
   lock$Packages <- lock$Packages["qs2"]
   installed <- matrix(c("qs2", "0.0.0", source), nrow = 1,
                       dimnames = list(NULL, c("Package", "Version", "LibPath")))
@@ -102,6 +104,8 @@ test_that("matching installed binaries are copied, not linked or silently substi
 })
 
 test_that("a newer installed renv does not block bootstrapping the pinned version", {
+  original_paths <- .libPaths()
+  env <- load_r_environment_script()
   # Test installation decisions without network access or changing libraries.
   sandbox <- new.env(parent = env)
   bootstrap <- env$cedar_bootstrap_renv
@@ -120,15 +124,15 @@ test_that("a newer installed renv does not block bootstrapping the pinned versio
   sandbox$.libPaths <- function(...) original_paths
   temporary <- withr::local_tempdir()
   sandbox$tempfile <- function(...) file.path(temporary, "bootstrap")
-  expect_identical(bootstrap(project_root), "1.1.1")
+  expect_identical(bootstrap(cedar_base_dir), "1.1.1")
   expect_true(installed)
   sandbox$loadedNamespaces <- function() "renv"
   sandbox$getNamespaceVersion <- function(...) package_version("1.2.4")
-  expect_error(bootstrap(project_root), "fresh Rscript --vanilla")
+  expect_error(bootstrap(cedar_base_dir), "fresh Rscript --vanilla")
 })
 
 test_that("the canonical gate keeps system R by default and offers pinned native R", {
-  runner <- file.path(project_root, "run-tests.sh")
+  runner <- file.path(cedar_base_dir, "run-tests.sh")
   text <- paste(readLines(runner), collapse = "\n")
   expect_match(text, "PROJECT_LIBRARY=0", fixed = TRUE)
   expect_match(text, "--project-library) PROJECT_LIBRARY=1", fixed = TRUE)

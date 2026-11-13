@@ -1,8 +1,5 @@
 # Tests for utility functions
 
-library(withr)
-library(lubridate)
-
 # NOTE: the former `update_codes()` utility was removed; legacy dept-code remapping
 # (CCS->CCST, PSY->PSYC, SOC->SOCI, ...) is now data-driven via R/lists/subj_dept_map.R,
 # applied during transform-to-cedar.R, and covered by the catalog/transform tests.

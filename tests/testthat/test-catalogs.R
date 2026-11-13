@@ -15,18 +15,6 @@ context("Catalog Architecture")
 # Prerequisites
 # =============================================================================
 
-skip_if_no_catalogs <- function() {
-  if (!exists("subj_dept_map") || !exists("cedar_institution_files")) {
-    skip("subj_dept_map / cedar_institution_files not loaded — run load_funcs() first")
-  }
-}
-
-skip_if_no_lookups <- function() {
-  if (!exists("major_to_dept") || !exists("subj_to_dept")) {
-    skip("catalog_lookups.R vectors not available")
-  }
-}
-
 # =============================================================================
 # 1. subj_dept_map structure
 # =============================================================================
@@ -87,55 +75,6 @@ test_that("subj_dept_map AD section includes required branch campus depts", {
 # ── Institution mapping files (ADR-002) ──────────────────────────────────────
 # subj_dept_map is built from institution/<id>/ CSVs. The validator is what
 # stops a malformed file from silently moving students between units.
-
-# Scaffolding: one programs.csv row per argument value, defaults filled in.
-program_rows <- function(program_code, unit_code = "HIST", in_college = "",
-                         college_code = "", is_pre_major = "FALSE", leads_to = "",
-                         basis = "decided", status = "confirmed") {
-  data.frame(program_code, in_college, program_name = program_code, unit_code,
-             college_code, is_pre_major, leads_to, basis, status, evidence = "", notes = "")
-}
-
-unm_settings <- data.frame(
-  setting = c("mapping_files_url", "source_files_url", "projection_history_start_term"),
-  value   = c("https://github.com/org/repo/blob/main/institution/x",
-              "https://github.com/org/repo/blob/main", "202210"))
-
-# Scaffolding: subjects.csv rows, defaults filled in.
-subject_rows <- function(subject_code, unit_code = "HIST", in_college = "AS", in_level = "",
-                         college_code = "", status = "confirmed") {
-  data.frame(subject_code, in_college, in_level, unit_code, college_code, status,
-             evidence = "", notes = "")
-}
-
-write_mapping_dir <- function(colleges, units, subjects, programs = program_rows("X")[0, ],
-                              settings = unm_settings, code_history = history_rows("X", "Y")[0, ]) {
-  dir <- tempfile("institution-")
-  dir.create(dir)
-  utils::write.csv(colleges, file.path(dir, "colleges.csv"), row.names = FALSE)
-  utils::write.csv(units, file.path(dir, "units.csv"), row.names = FALSE)
-  utils::write.csv(subjects, file.path(dir, "subjects.csv"), row.names = FALSE)
-  utils::write.csv(programs, file.path(dir, "programs.csv"), row.names = FALSE)
-  utils::write.csv(settings, file.path(dir, "settings.csv"), row.names = FALSE)
-  utils::write.csv(code_history, file.path(dir, "code_history.csv"), row.names = FALSE)
-  dir
-}
-
-# Scaffolding: code_history.csv rows, defaults filled in.
-history_rows <- function(from_code, to_code, kind = "course", effective_term = "202080",
-                         scope = "", basis = "catalog", status = "confirmed") {
-  data.frame(kind, from_code, to_code, effective_term, scope, basis, status,
-             evidence = "", notes = "")
-}
-
-one_unit <- list(
-  colleges = data.frame(college_code = c("AS", "AD"), college_name = c("Arts and Sciences", "Branch"),
-                        source_names = c("", "Branch Campuses|ED")),
-  units    = data.frame(unit_code = c("HIST", "SOCI", "CJUS"),
-                        unit_name = c("History", "Sociology", "Criminal Justice"),
-                        college_code = c("AS", "AS", "AD"), kind = "department", notes = ""),
-  subjects = subject_rows("HIST")
-)
 
 test_that("UNM mapping files load into the subject-unit-college table", {
   files <- read_institution_mappings(cedar_institution_dir(cedar_base_dir, "unm"))
@@ -400,13 +339,6 @@ test_that("source_departments: kinds must carry the right number of units", {
 # program_map.qs was retired at ADR-002 Stage 4. These read the files through
 # resolve_program_units(), the function the transform uses.
 
-unm_programs <- function() {
-  read_institution_mappings(cedar_institution_dir(cedar_base_dir, "unm"))$programs
-}
-unit_of <- function(code, college = rep("", length(code))) {
-  resolve_program_units(code, college, unm_programs())
-}
-
 test_that("decided program units hold in programs.csv", {
   expect_equal(unit_of("HLAD"), "PADM")                      # Health Administration
   # GitHub #100: East Asian Studies and its pre-major, and Comparative
@@ -550,21 +482,6 @@ test_that("set_payload prog_focus restricts to single program code", {
 
 
 # ---- Configuration files: campuses.csv and course_levels.csv ------------------
-
-write_config_dir <- function(campuses, course_levels, student_levels = NULL) {
-  dir <- tempfile("institution-config-")
-  dir.create(dir)
-  if (!"source_names" %in% names(campuses)) campuses$source_names <- ""
-  utils::write.csv(campuses, file.path(dir, "campuses.csv"), row.names = FALSE)
-  utils::write.csv(course_levels, file.path(dir, "course_levels.csv"), row.names = FALSE)
-  if (!is.null(student_levels)) {
-    utils::write.csv(student_levels, file.path(dir, "student_levels.csv"), row.names = FALSE)
-  }
-  dir
-}
-
-good_levels <- data.frame(leading_digit = as.character(0:9),
-                          level = c(rep("lower", 3), rep("upper", 2), rep("grad", 5)))
 
 test_that("the campus constants are the institution's campuses.csv", {
   files <- validate_campuses(read_institution_file("campuses", cedar_institution_dir(cedar_base_dir, "unm")))
@@ -940,10 +857,6 @@ test_that("the text-map validator reports every problem at once", {
 # The mapping files are read as dimension tables and the default unit is
 # attached at load, under the names every reader has always read. These tests
 # guard the one function that resolves a unit and the two rules it wraps.
-
-demo_dims <- function() {
-  build_cedar_dims(read_institution_mappings(cedar_institution_dir(cedar_base_dir, "demo")))
-}
 
 test_that("dims wraps the validated mapping files, and refuses anything else", {
   dims <- demo_dims()

@@ -5,8 +5,6 @@
 # field reliability contract in AGENTS.md, then the CT01 block in
 # fixtures/designed_test_data.R — every number below is stated there.
 
-source(file.path(dirname(getwd()), "testthat", "fixtures", "designed_test_data.R"))
-
 context("Per-Term Credit Position")
 
 
@@ -171,23 +169,6 @@ test_that("an event in a term the student has no row for keeps the row with NA",
 # used to read cedar_programs' frozen cumulative columns directly. If either
 # ever falls back to them the position stops moving across a student's terms,
 # which is precisely what these assert against.
-
-ct_population <- function() {
-  tibble::tibble(student_id = c("CT_A", "CT_C"), population_label = "ct")
-}
-
-ct_students <- function() {
-  # CT_A takes one course per term across their four terms.
-  tibble::tibble(
-    student_id = rep("CT_A", 4),
-    term = c(202080L, 202110L, 202180L, 202210L),
-    subject_course = "CTMP 101",
-    course_title = "Test Course",
-    student_classification = "Freshman",
-    registration_status_code = "RE",
-    campus = "ABQ"
-  )
-}
 
 test_that("inst_credit_band places a course by UNM credits entering the term", {
   timing <- suppressMessages(get_course_timing(

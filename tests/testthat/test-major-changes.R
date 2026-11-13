@@ -25,10 +25,6 @@
 # Non-changer (same program_name across all terms):
 #   NON_CHANGER: STU-NON-CHANGER — Business Administration in MGMT, 4 terms, no change
 
-CHANGER_A   <- "STU-CHANGER-A"
-CHANGER_B   <- "STU-CHANGER-B"
-NON_CHANGER <- "STU-NON-CHANGER"
-
 context("Major Changes")
 
 
@@ -378,18 +374,6 @@ test_that("get_major_change_courses returns empty tibble for empty changes", {
 # GEOG 100 is universal (ratio 1.0), GEOG 250 is genuinely concentrated before the
 # switch (ratio 12.0), GEOG 260 is a single-student cell, GEOG 300/350 occur only
 # in stayers' terms.
-
-pcc_changes <- function() {
-  suppressMessages(detect_major_changes(test_programs_pcc)) %>%
-    filter(from_major == "Pre Change Studies")
-}
-
-pcc_result <- function(min_n = 1L) {
-  suppressMessages(get_pre_change_courses(
-    pcc_changes(), test_students_pcc, test_population_pcc,
-    opt = list(min_n = min_n)
-  ))
-}
 
 test_that("get_pre_change_courses reports the switch and baseline denominators", {
   result <- pcc_result()

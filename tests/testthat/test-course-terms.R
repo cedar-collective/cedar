@@ -4,14 +4,12 @@
 # a designed class list and schedule with sessions, campuses, an unmatched
 # section, a cancelled offering and an unknown capacity.
 
-key <- c("campus", "college", "term", "subject_course", "part_term")
-
 test_that("the table carries the class list's counts and the schedule's offerings at one grain", {
   tbl <- test_course_terms_regstats
   expect_identical(names(tbl), COURSE_TERMS_COLUMNS)
   expect_identical(attr(tbl, "course_terms_build_version"), COURSE_TERMS_BUILD_VERSION)
   expect_false(dplyr::is_grouped_df(tbl))
-  expect_equal(anyDuplicated(tbl[key]), 0L)
+  expect_equal(anyDuplicated(tbl[course_term_key]), 0L)
   # EC-11: every offering has both a class list and a section, so every row is
   # matched on both sides.
   expect_false(anyNA(tbl$registered))
@@ -31,14 +29,14 @@ test_that("the table carries the class list's counts and the schedule's offering
   expect_equal(full$subject_code, "SOCI")
   # The schedule's seats are get_enrl()'s (enrolled + available) and the first
   # day is calc_first_day_enrl()'s, read off the same tables.
-  direct_seats <- get_enrl(test_sections_regstats, list(status = "A", uel = FALSE, group_cols = key)) %>%
-    ungroup() %>% transmute(across(all_of(key)), direct = enrolled + avail)
-  with_seats <- tbl %>% inner_join(direct_seats, by = key)
+  direct_seats <- get_enrl(test_sections_regstats, list(status = "A", uel = FALSE, group_cols = course_term_key)) %>%
+    ungroup() %>% transmute(across(all_of(course_term_key)), direct = enrolled + avail)
+  with_seats <- tbl %>% inner_join(direct_seats, by = course_term_key)
   expect_equal(nrow(with_seats), nrow(tbl))
   expect_equal(with_seats$seats, with_seats$direct)
   first_day <- calc_first_day_enrl(test_students_regstats, test_sections_regstats, by_part_term = TRUE)
-  joined <- tbl %>% select(all_of(key), first_day_enrl) %>%
-    inner_join(first_day, by = key, suffix = c("", ".direct"))
+  joined <- tbl %>% select(all_of(course_term_key), first_day_enrl) %>%
+    inner_join(first_day, by = course_term_key, suffix = c("", ".direct"))
   expect_equal(nrow(joined), nrow(tbl))
   expect_equal(joined$first_day_enrl, joined$first_day_enrl.direct)
 })

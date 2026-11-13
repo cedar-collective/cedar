@@ -13,27 +13,6 @@
 # data, so it is built locally here; the programs/students rows come from the
 # shared fixture.
 
-hist_ids <- unique(test_programs$student_id[test_programs$dept_code == "HIST"])
-
-hist_population <- tibble::tibble(
-  student_id       = hist_ids,
-  population_label = "HIST",
-  first_unm_term   = 202010L
-)
-
-decl_context <- function(population = hist_population, opt = list(min_n = 1L),
-                         student_terms = NULL, focal_subjects = "HIST") {
-  suppressMessages(get_declaration_context(
-    programs       = test_programs,
-    students       = test_students,
-    population     = population,
-    focal_subjects = focal_subjects,
-    opt            = opt,
-    student_terms  = student_terms
-  ))
-}
-
-
 test_that("pre-major rows never count as a declaration", {
   result <- decl_context()
 
@@ -42,7 +21,7 @@ test_that("pre-major rows never count as a declaration", {
       test_programs$program_type %in% c("Major", "Second Major") &
       !test_programs$is_pre_major
   ])
-  pre_only_ids <- setdiff(hist_ids, declared_ids)
+  pre_only_ids <- setdiff(decl_hist_ids(), declared_ids)
 
   # Every HIST student who is only ever a pre-major must be absent from the
   # declarer count; the fixture has such students, or this test proves nothing.
@@ -117,7 +96,7 @@ test_that("course share is expressed against the declarer count", {
 
 test_that("a population with no declared students returns NULL", {
   pre_only_ids <- setdiff(
-    hist_ids,
+    decl_hist_ids(),
     unique(test_programs$student_id[
       test_programs$dept_code == "HIST" &
         test_programs$program_type %in% c("Major", "Second Major") &

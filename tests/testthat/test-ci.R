@@ -1,7 +1,7 @@
 # These are workflow/runner input contracts, not institutional-data fixtures.
-project_root <- normalizePath(file.path(getwd(), "../.."))
+
 test_that("PR checks are read-only, secret-free, and independent of deployment", {
-  path <- file.path(project_root, ".github", "workflows", "pr-checks.yml")
+  path <- file.path(cedar_base_dir, ".github", "workflows", "pr-checks.yml")
   workflow <- yaml::read_yaml(path)
   text <- paste(readLines(path), collapse = "\n")
   expect_setequal(names(workflow$on), c("pull_request", "workflow_dispatch"))
@@ -27,7 +27,7 @@ test_that("PR checks are read-only, secret-free, and independent of deployment",
 })
 
 test_that("PR checks run the full standard gate against an isolated synthetic app", {
-  workflow <- yaml::read_yaml(file.path(project_root, ".github", "workflows", "pr-checks.yml"))
+  workflow <- yaml::read_yaml(file.path(cedar_base_dir, ".github", "workflows", "pr-checks.yml"))
   steps <- workflow$jobs[["synthetic-checks"]]$steps
   commands <- vapply(steps, function(step) step$run %||% "", character(1))
   start <- grep("up -d --no-build", commands, fixed = TRUE)
@@ -48,7 +48,7 @@ test_that("PR checks run the full standard gate against an isolated synthetic ap
 })
 
 test_that("the Docker R option preserves the standard runner and rejects malformed arguments", {
-  runner <- file.path(project_root, "run-tests.sh")
+  runner <- file.path(cedar_base_dir, "run-tests.sh")
   expect_equal(system2("bash", c("-n", shQuote(runner))), 0)
   text <- paste(readLines(runner), collapse = "\n")
   expect_equal(sum(gregexpr("testthat::test_dir", text, fixed = TRUE)[[1]] > 0), 1)
@@ -78,7 +78,7 @@ test_that("browser selection is narrow by default and failures are never retried
   }
   withr::local_envvar(c(PATH = paste(bin, Sys.getenv("PATH"), sep = .Platform$path.sep),
                       CEDAR_RUNNER_LOG = log, CEDAR_RUNNER_FAIL = ""))
-  runner <- file.path(project_root, "run-tests.sh")
+  runner <- file.path(cedar_base_dir, "run-tests.sh")
   run <- function(args, fail = "") {
     writeLines(character(), log)
     withr::local_envvar(c(CEDAR_RUNNER_FAIL = fail))
@@ -129,7 +129,7 @@ test_that("the runner refuses a suite aimed at the wrong data surface", {
     writeLines(stub, path)
     Sys.chmod(path, "0755")
   }
-  runner <- file.path(project_root, "run-tests.sh")
+  runner <- file.path(cedar_base_dir, "run-tests.sh")
   run <- function(args) {
     writeLines(character(), log)
     status <- system2("bash", c(shQuote(runner), args), stdout = FALSE, stderr = FALSE)
@@ -175,11 +175,11 @@ test_that("the instructor-gate password is handed from .env to the Shiny worker"
   # reaches the app only if Compose passes it to the container and the
   # entrypoint writes it where the worker's R reads it.
   # Read as text: yaml::read_yaml() warns on the build context's bare ".".
-  compose <- readLines(file.path(project_root, "docker-compose.yml"))
+  compose <- readLines(file.path(cedar_base_dir, "docker-compose.yml"))
   expect_length(grep("^      CEDAR_DFW_PASSWORD: \\$\\{CEDAR_DFW_PASSWORD:-\\}$", compose), 1L)
-  ignored <- readLines(file.path(project_root, ".dockerignore"))
+  ignored <- readLines(file.path(cedar_base_dir, ".dockerignore"))
   expect_true(all(c(".env", ".Renviron") %in% ignored))
-  entrypoint <- readLines(file.path(project_root, "entrypoint.sh"))
+  entrypoint <- readLines(file.path(cedar_base_dir, "entrypoint.sh"))
   writes <- grep("CEDAR_DFW_PASSWORD='%s'", entrypoint, fixed = TRUE)
   starts <- grep("^exec /usr/bin/shiny-server", entrypoint)
   expect_length(writes, 1L)

@@ -1,5 +1,4 @@
 # The app institution and unit regressions share the same authored scenarios.
-source("../../dev/demo-data.R")
 
 test_that("the institution preserves its original cohort and copies complete histories", {
   raw <- build_demo_sources(cohorts = 2L, fixture_path = "fixtures/designed_test_data.R")

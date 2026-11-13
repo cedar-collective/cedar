@@ -15,13 +15,6 @@
 #   ANTH 2190C ABQ fall — 202080 total 47 (must not enter the spring average).
 #   ANTH 2190C EA  spring — 201910 total 20 (must not enter the ABQ average).
 
-# The dashboard's exact course_history build (create_dept_dashboard_data).
-build_dashboard_course_history <- function(dept) {
-  ch_opt <- list(dept_code = dept, status = "A", crosslist = "home", uel = TRUE,
-                 group_cols = c("subject_course", "course_title", "campus", "term"))
-  get_enrl(test_sections, ch_opt) %>% dplyr::filter(enrolled > 0)
-}
-
 test_that("course_history reports combined courses at course-level totals, not per-lab counts", {
   ch <- build_dashboard_course_history("ANTH") %>%
     dplyr::filter(subject_course == "ANTH 2190C", campus == "ABQ") %>%

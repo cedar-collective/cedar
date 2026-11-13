@@ -9,11 +9,11 @@
 #     in 202080: BACK, FAIL, REP.
 #   202080 anchors: REP passed HIST 499 and returned; BACK, EDROP, FAIL passed
 #     HIST 300 and did not return; DROP is not enrolled.
-# Local frames, built here because RP01 has no second course in a term, no
-# semester GPA and one time status:
-#   `att2` adds HIST 101: 202010 BACK pass (RP_I1), FAIL pass (RP_I3);
+# Local frames, built in helper-course-similar-students.R because RP01 has no
+# second course in a term, no semester GPA and one time status:
+#   `ss_attempts2()` adds HIST 101: 202010 BACK pass (RP_I1), FAIL pass (RP_I3);
 #     202080 REP dfw, BACK pass, FAIL dfw.
-#   `st2` sets the 202080 semester GPAs BACK 3.0, FAIL 2.0, REP 4.0.
+#   `ss_student_terms2()` sets the 202080 semester GPAs BACK 3.0, FAIL 2.0, REP 4.0.
 #   Every student has a high-school GPA of 3.0 unless a test says otherwise.
 #
 # HIST 101 in 202010 (takers BACK, FAIL; non-takers DROP, GONE, GRAD, REP):
@@ -24,34 +24,8 @@
 #   REP's other attempt is HIST 101, a DFW: 1 of 1, against the non-takers'
 #   5 attempts (3 HIST 300, 2 HIST 101) with 1 DFW.
 
-library(dplyr)
-
-ss_edges <- list(last_enrolled = 202110L, last_enrolled_complete = 202110L, last_graded = 202110L)
-ss_attempts <- keyed_attempts(test_students_rp, ss_edges)
-.ss_row <- function(sid, term_code, outcome_value, instructor = "RP_I1") {
-  ss_attempts %>% slice(1L) %>%
-    mutate(student_id = sid, term = as.integer(term_code), subject_course = "HIST 101",
-           outcome = outcome_value, instructor_id = instructor, instructor_name = instructor)
-}
-att2 <- bind_rows(
-  ss_attempts,
-  .ss_row("RP_BACK", 202010, "pass"), .ss_row("RP_FAIL", 202010, "pass", "RP_I3"),
-  .ss_row("RP_REP", 202080, "dfw"), .ss_row("RP_BACK", 202080, "pass"), .ss_row("RP_FAIL", 202080, "dfw")
-)
-st2 <- test_student_terms_rp %>%
-  mutate(sem_gpa = case_when(
-    term == 202080L & student_id == "RP_BACK" ~ 3.0,
-    term == 202080L & student_id == "RP_FAIL" ~ 2.0,
-    term == 202080L & student_id == "RP_REP" ~ 4.0,
-    TRUE ~ sem_gpa
-  ))
-ss_ids <- unique(test_student_terms_rp$student_id)
-ss_app <- tibble::tibble(student_id = ss_ids, high_school_cum_gpa = 3.0)
-ss_opt <- function(...) c(list(classification = "Freshman", min_n = 1L, min_cell_n = 1L, data_edges = ss_edges),
-                          list(...))
-
 test_that("takers are read against the non-takers of their cell: return, other-course DFW, next-term GPA", {
-  res <- get_course_similar_students(st2, att2, ss_app, ss_opt(course = "HIST 101", term = 202010L))
+  res <- get_course_similar_students(ss_student_terms2(), ss_attempts2(), ss_app(), ss_opt(course = "HIST 101", term = 202010L))
   expect_equal(names(res), c("course", "n_takers", "n_covered", "n_terms",
                              "return_n", "return_pct", "return_expected_pct", "return_gap", "return_gap_se",
                              "other_attempts", "other_dfw_pct", "other_dfw_expected_pct", "other_dfw_gap",
@@ -76,7 +50,7 @@ test_that("takers are read against the non-takers of their cell: return, other-c
 })
 
 test_that("a taker's other-course DFW leaves the course itself out, and the non-takers' rate is theirs alone", {
-  res <- get_course_similar_students(st2, att2, ss_app, ss_opt(course = "HIST 499", term = 202080L))
+  res <- get_course_similar_students(ss_student_terms2(), ss_attempts2(), ss_app(), ss_opt(course = "HIST 499", term = 202080L))
   expect_equal(res$n_takers, 1L)
   expect_equal(res$other_attempts, 1L)
   expect_equal(res$other_dfw_pct, 100)
@@ -89,37 +63,37 @@ test_that("a taker's other-course DFW leaves the course itself out, and the non-
 
 test_that("the high-school GPA band and time status are cells: a taker with no peer in the cell is not covered", {
   # HIST 300 in 202080: takers BACK, EDROP, FAIL; the one non-taker is REP.
-  one_band <- get_course_similar_students(st2, ss_attempts, ss_app, ss_opt(course = "HIST 300", term = 202080L))
+  one_band <- get_course_similar_students(ss_student_terms2(), ss_attempts(), ss_app(), ss_opt(course = "HIST 300", term = 202080L))
   expect_equal(one_band$n_covered, 3L)
   # REP and BACK in one band, EDROP and FAIL in another with no non-taker.
-  banded <- ss_app %>% mutate(high_school_cum_gpa = if_else(student_id %in% c("RP_EDROP", "RP_FAIL"), 2.0, 3.0))
-  res <- get_course_similar_students(st2, ss_attempts, banded, ss_opt(course = "HIST 300", term = 202080L))
+  banded <- ss_app() %>% mutate(high_school_cum_gpa = if_else(student_id %in% c("RP_EDROP", "RP_FAIL"), 2.0, 3.0))
+  res <- get_course_similar_students(ss_student_terms2(), ss_attempts(), banded, ss_opt(course = "HIST 300", term = 202080L))
   expect_equal(res$n_takers, 3L)
   expect_equal(res$n_covered, 1L)
   expect_equal(res$return_n, 1L)
   expect_equal(res$return_expected_pct, 100)
   # A missing GPA is its own band, not a dropped student.
-  no_gpa <- ss_app %>% mutate(high_school_cum_gpa = if_else(student_id %in% c("RP_REP", "RP_BACK"), NA_real_, 3.0))
-  expect_equal(get_course_similar_students(st2, ss_attempts, no_gpa,
+  no_gpa <- ss_app() %>% mutate(high_school_cum_gpa = if_else(student_id %in% c("RP_REP", "RP_BACK"), NA_real_, 3.0))
+  expect_equal(get_course_similar_students(ss_student_terms2(), ss_attempts(), no_gpa,
                                            ss_opt(course = "HIST 300", term = 202080L))$n_covered, 1L)
   # Time status splits the same way.
-  part <- st2 %>% mutate(time_status = if_else(student_id == "RP_REP", "Full time", "Part time"))
-  split <- get_course_similar_students(part, ss_attempts, ss_app, ss_opt(course = "HIST 300", term = 202080L))
+  part <- ss_student_terms2() %>% mutate(time_status = if_else(student_id == "RP_REP", "Full time", "Part time"))
+  split <- get_course_similar_students(part, ss_attempts(), ss_app(), ss_opt(course = "HIST 300", term = 202080L))
   expect_equal(nrow(split), 0L)
   expect_equal(attr(split, "suppressed")$n_covered, 0L)
   # The cell guard: one non-taker is under min_cell_n = 2.
-  guarded <- get_course_similar_students(st2, ss_attempts, ss_app,
+  guarded <- get_course_similar_students(ss_student_terms2(), ss_attempts(), ss_app(),
                                          ss_opt(course = "HIST 300", term = 202080L, min_cell_n = 2L)[-3])
   expect_equal(nrow(guarded), 0L)
 })
 
 test_that("every course is a row when none is named, and the instructor grain splits a course's takers", {
-  all_courses <- get_course_similar_students(st2, att2, ss_app, ss_opt(term = 202010L))
+  all_courses <- get_course_similar_students(ss_student_terms2(), ss_attempts2(), ss_app(), ss_opt(term = 202010L))
   # HIST 499 has no non-taker in 202010 (every member has a row in it).
   expect_equal(all_courses$course, "HIST 101")
   expect_equal(attr(all_courses, "suppressed")$course, "HIST 499")
 
-  by_instructor <- get_course_similar_students(st2, att2, ss_app,
+  by_instructor <- get_course_similar_students(ss_student_terms2(), ss_attempts2(), ss_app(),
                                                ss_opt(course = "HIST 101", term = 202010L, grain = "instructor"))
   expect_equal(sort(by_instructor$instructor_id), c("RP_I1", "RP_I3"))
   expect_equal(by_instructor$n_takers, c(1L, 1L))
@@ -129,7 +103,7 @@ test_that("every course is a row when none is named, and the instructor grain sp
 })
 
 test_that("by_term gives the same comparison one anchor term at a time, and the trend reads it", {
-  by_term <- get_course_similar_students(st2, att2, ss_app, ss_opt(course = "HIST 101", by_term = TRUE))
+  by_term <- get_course_similar_students(ss_student_terms2(), ss_attempts2(), ss_app(), ss_opt(course = "HIST 101", by_term = TRUE))
   expect_equal(by_term$term, c(202010L, 202080L))
   expect_equal(by_term$n_takers, c(2L, 3L))
   # 202010 as the pooled single-term row; 202080: REP returned of three,
@@ -154,16 +128,16 @@ test_that("by_term gives the same comparison one anchor term at a time, and the 
 })
 
 test_that("get_course_similar_students() stops without its inputs", {
-  expect_error(get_course_similar_students(st2, att2, ss_app, list(data_edges = ss_edges)), "classification")
-  expect_error(get_course_similar_students(st2, att2, NULL, ss_opt()), "applicants")
-  expect_error(get_course_similar_students(st2, att2, ss_app, list(classification = "Freshman")),
+  expect_error(get_course_similar_students(ss_student_terms2(), ss_attempts2(), ss_app(), list(data_edges = rp01_edges)), "classification")
+  expect_error(get_course_similar_students(ss_student_terms2(), ss_attempts2(), NULL, ss_opt()), "applicants")
+  expect_error(get_course_similar_students(ss_student_terms2(), ss_attempts2(), ss_app(), list(classification = "Freshman")),
                "last_enrolled_complete")
-  expect_error(get_course_similar_students(st2 %>% select(-time_status), att2, ss_app, ss_opt()), "time_status")
-  expect_error(get_course_similar_students(st2, att2, ss_app, ss_opt(grain = "section")), "grain")
+  expect_error(get_course_similar_students(ss_student_terms2() %>% select(-time_status), ss_attempts2(), ss_app(), ss_opt()), "time_status")
+  expect_error(get_course_similar_students(ss_student_terms2(), ss_attempts2(), ss_app(), ss_opt(grain = "section")), "grain")
 })
 
 test_that("the payload carries the focal row, the benchmark and the instructors; the text preview reads it", {
-  payload <- build_course_similar_students(st2, att2, ss_app, ss_opt(course = "HIST 101"))
+  payload <- build_course_similar_students(ss_student_terms2(), ss_attempts2(), ss_app(), ss_opt(course = "HIST 101"))
   expect_s3_class(payload, "course_similar_students")
   expect_equal(payload$focal$course, "HIST 101")
   expect_true(all(c("HIST 101", "HIST 499", "HIST 300") %in% payload$courses$course))
@@ -176,9 +150,9 @@ test_that("the payload carries the focal row, the benchmark and the instructors;
   expect_snapshot(cat(format_course_similar_students(payload), sep = "\n"))
 
   # A focal course under the guard has no row and says so.
-  thin <- build_course_similar_students(st2, att2, ss_app, ss_opt(course = "HIST 101", min_n = 50L)[-2])
+  thin <- build_course_similar_students(ss_student_terms2(), ss_attempts2(), ss_app(), ss_opt(course = "HIST 101", min_n = 50L)[-2])
   expect_null(thin$focal)
   expect_snapshot(cat(course_similar_students_headline(thin), sep = "\n"))
-  expect_error(build_course_similar_students(st2, att2, ss_app, ss_opt()), "focal course")
+  expect_error(build_course_similar_students(ss_student_terms2(), ss_attempts2(), ss_app(), ss_opt()), "focal course")
   expect_error(course_similar_students_headline(list()), "build_course_similar_students")
 })

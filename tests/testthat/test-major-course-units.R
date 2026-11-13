@@ -20,12 +20,6 @@
 #   202110 ABQ  HIST 2110 RW_A, RW_F, RW_G (RW_B waitlisted: not enrolled)
 #   202110 EA   MATH 1240 RW_E
 
-library(dplyr)
-
-st01_edges <- list(last_enrolled = 202110L, last_enrolled_complete = 202110L)
-mc02_edges <- list(last_enrolled = 202110L, last_enrolled_complete = 202110L)
-rw01_edges <- list(last_enrolled = 202110L, last_enrolled_complete = 202080L)
-
 test_that("ST01: HIST majors' registrations by teaching unit, late drops in, duplicates and non-members out", {
   res <- get_major_course_units(test_student_terms_st, test_students_st,
                                 list(dept_code = "HIST", min_n = 1L, data_edges = st01_edges))

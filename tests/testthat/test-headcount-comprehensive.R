@@ -14,15 +14,7 @@
 #   PSYCH_MINOR_STUDENT: STU-PSYCH-MINOR — has Psychology First Minor
 #   ARCH_CONC_STUDENT:   STU-ARCH-CONC   — has Archaeology First Concentration
 
-PSYCH_MINOR_STUDENT <- "STU-PSYCH-MINOR"
-ARCH_CONC_STUDENT   <- "STU-ARCH-CONC"
-
 context("Headcount Comprehensive Filter Tests")
-
-headcount_plot_xaxes <- function(plot) {
-  plot$x$layout[grepl("^xaxis[0-9]*$", names(plot$x$layout))]
-}
-
 
 # =============================================================================
 # Schema / column presence
@@ -256,19 +248,6 @@ test_that("get_headcount grouped by program_type includes all six types", {
 # =============================================================================
 # get_headcount() — URL/input normalization and default scope
 # =============================================================================
-
-# test_dims with the fixtures' own college names: the fixtures' student_college
-# values (ARTS, STEM, ...) are not the institution's, so colleges.csv is
-# replaced by the codes the Headcount URL uses for them. Units are test_dims'.
-headcount_fixture_dims <- function() {
-  dims <- test_dims
-  dims$colleges <- tibble::tibble(
-    college_code = c("AS", "SC", "SO", "ED", "NR", "AD"),
-    college_name = c("ARTS", "STEM", "SOSC", "EDU", "NURS", "BUS"),
-    source_names = ""
-  )
-  validate_cedar_dims(dims)
-}
 
 test_that("normalize_headcount_opt accepts college code aliases", {
   opt <- normalize_headcount_opt(

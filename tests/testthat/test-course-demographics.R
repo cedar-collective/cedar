@@ -145,17 +145,6 @@ test_that("multi-campus trend denominators include campuses where a category is 
 # the table and the roster separately to show which one the summary reads.
 # -----------------------------------------------------------------------------
 
-.hist_1110_registered <- function() {
-  test_students %>%
-    filter(subject_course == "HIST 1110",
-           registration_status_code %in% STATUS_REGISTERED)
-}
-
-.class_opt <- list(group_cols = c("campus", "college", "term", "term_type",
-                                  "student_classification", "subject_course"))
-.major_opt <- list(group_cols = c("campus", "college", "term", "term_type",
-                                  "major_code", "subject_course"))
-
 test_that("classification is read off the student-term table, not the course row", {
   # Roster says Senior everywhere; the table still says Sophomore.
   relabelled_roster <- .hist_1110_registered() %>%
@@ -321,7 +310,6 @@ test_that("calc_cl_enrls returns a row per course for HIST department", {
 # no programs row and a roster major of SPAN, which the table carries as the
 # class-list primary major. Both took HIST 1110 that term. The demo
 # institution's programs.csv (test_dims) names HIST "History" and SPAN "Spanish".
-.mix_opt <- list(course = "HIST 1110", term = 202010L, min_n = 1L, top_n = 50L)
 
 test_that("get_course_major_mix reads the student-term table's primary major, not the roster", {
   plain <- get_course_major_mix(cedar_registrations_st, test_student_terms_st, test_dims, .mix_opt)

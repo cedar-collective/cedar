@@ -199,18 +199,6 @@ test_that("coalesce fallback fires for a course absent from counts", {
 
 context("filter_downstream_by_dept")
 
-# Build a minimal downstream signals data frame for testing
-make_downstream <- function() {
-  tibble::tribble(
-    ~source_course, ~dest_course,   ~recent_avg,
-    "MATH 1215",    "MATH 1430",    12.3,
-    "MATH 1215",    "PHYS 1310",     8.1,
-    "HIST 1110",    "HIST 327",      5.4,
-    "HIST 1110",    "ANTH 2175",     3.2,
-    "ANTH 1140",    "ANTH 2175",     9.0,
-  )
-}
-
 test_that("returns full data frame unchanged when dept is empty", {
   df <- make_downstream()
   result <- filter_downstream_by_dept(df, character(0), test_sections)

@@ -12,35 +12,6 @@ context("Credit hours outside-majors colours")
 # student-term table; test_students' rows carry none, and test_student_terms
 # (built from them without programs) names none either. Colour assignment keys
 # on major_code, so the stamped codes below are what is being tested.
-ch_fixture <- function() test_students
-
-# Home major codes the way Dept Trends resolves them (set_payload's prog_codes).
-hist_major_codes <- function() {
-  names(major_to_dept)[!is.na(major_to_dept) & major_to_dept == "HIST"]
-}
-
-# test_student_terms names no primary major (built without programs), so the
-# raw fixture cannot tell a home major from an outside one. Stamp one on the
-# student-term table: HIST students sorted by id, first half "HIST-BA" (home),
-# second half "BIOL-BS" (outside). Local scaffolding for this contract; the
-# shared tables stay unchanged.
-ch_student_terms_with_majors <- function() {
-  st  <- test_student_terms
-  ids <- sort(unique(test_students$student_id[test_students$department == "HIST"]))
-  home_ids <- ids[seq_len(ceiling(length(ids) / 2))]
-  st$primary_major_code <- dplyr::case_when(
-    st$student_id %in% home_ids ~ "HIST-BA",
-    st$student_id %in% ids      ~ "BIOL-BS",
-    TRUE                        ~ st$primary_major_code
-  )
-  st
-}
-
-ch_result <- function() {
-  credit_hours_by_major(ch_fixture(), test_sections, "HIST", hist_major_codes(),
-                        cedar_report_start_term, cedar_report_end_term,
-                        student_terms = ch_student_terms_with_majors())
-}
 
 test_that("every level slice is handed the same colour map object", {
   t <- ch_result()$tables
@@ -82,20 +53,20 @@ test_that("Other keeps the reserved neutral and is not a palette colour", {
 test_that("credit_hours_by_major takes its home major codes from the caller (M12)", {
   # No major_codes: an error, never a lookup of major_to_dept or dept_code as a major code.
   expect_error(
-    credit_hours_by_major(ch_fixture(), test_sections, "HIST",
+    credit_hours_by_major(test_students, test_sections, "HIST",
                           term_start = cedar_report_start_term, term_end = cedar_report_end_term,
                           student_terms = test_student_terms),
     "major_codes"
   )
   expect_error(
-    credit_hours_by_major(ch_fixture(), test_sections, "HIST", NULL,
+    credit_hours_by_major(test_students, test_sections, "HIST", NULL,
                           cedar_report_start_term, cedar_report_end_term,
                           student_terms = test_student_terms),
     "major_codes"
   )
 
   terms <- ch_student_terms_with_majors()
-  run  <- function(codes, st = terms, rows = ch_fixture()) {
+  run  <- function(codes, st = terms, rows = test_students) {
     credit_hours_by_major(rows, test_sections, "HIST", codes, cedar_report_start_term, cedar_report_end_term,
                           student_terms = st, include_all_ug = FALSE, include_wide_table = FALSE)
   }
@@ -114,7 +85,7 @@ test_that("credit_hours_by_major takes its home major codes from the caller (M12
 
 test_that("credit_hours_by_major reads each row's major off the student-term table, named by the caller", {
   terms <- ch_student_terms_with_majors()
-  run  <- function(codes, st = terms, rows = ch_fixture(), names = NULL) {
+  run  <- function(codes, st = terms, rows = test_students, names = NULL) {
     credit_hours_by_major(rows, test_sections, "HIST", codes, cedar_report_start_term, cedar_report_end_term,
                           student_terms = st, major_names = names,
                           include_all_ug = FALSE, include_wide_table = FALSE)
@@ -123,7 +94,7 @@ test_that("credit_hours_by_major reads each row's major off the student-term tab
 
   # The roster's major is not read: stamping every course row BIOL-BS changes
   # nothing, because the table still says HIST-BA for the home half.
-  rows <- ch_fixture()
+  rows <- test_students
   rows$major_code <- "BIOL-BS"
   rows$major_name <- "Biology"
   expect_equal(run("HIST-BA", rows = rows)$tables$sch_split_lower, home$tables$sch_split_lower)

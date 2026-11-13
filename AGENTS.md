@@ -280,6 +280,7 @@ All test data is in `tests/testthat/fixtures/designed_test_data.R`, which **is**
 - Domain rows belong in the shared fixture; one function's intermediate frames are built locally with documented expectations.
 - **A fixture too simple to express the bug gives a test that passes forever.** Reintroduce the bug and confirm the test fails before trusting it; mandatory for any guard on a join key, grouping grain or dedup.
 - **One layer per fact.** A calculation is tested at its branch or cone on the fixtures; a view builder for its own transformations only; the page's words with `expect_snapshot()` (the file under `tests/testthat/_snaps/` is committed, and a wording change is accepted with `testthat::snapshot_accept()` and reviewed as a diff); wiring and visibility in the browser. Never pin a sentence with `expect_match()` or a pasted string, and never assert a function exists when the next line calls it.
+- **A test file holds `test_that()` blocks only.** A builder, option list, constant or package that tests share lives in `tests/testthat/helper-*.R`, which every test file and scratch session loads: functions and literal values in `helper-<topic>.R` (anything built from the fixtures is a function, never an object), scenario edges in `helper-scenario-edges.R`, packages and sourced files in `helper-load-functions.R`. `test-architecture.R` fails on anything else at a test file's top level ([testing.md](docs/developers/testing.md#where-test-code-lives)).
 - **Never write custom testing scripts** (scratch runners, probes, ad-hoc smoke tests). The entry points are the gates below, `testthat::test_file()` / `test_dir()` on committed files, and `tests/e2e/`. Exploratory diagnostics stay in the session scratchpad.
 
 | Change | Required checks |
@@ -299,7 +300,7 @@ All test data is in `tests/testthat/fixtures/designed_test_data.R`, which **is**
 - Host path `/Users/fwgibbs/Dropbox/projects/cedar-project/cedar`; in the container, `/srv/shiny-server/cedar` (not `/srv/shiny-server`).
 - **The container bakes source with `COPY`**: a running container has old code until rebuilt. Check `docker ps`.
 - One CEDAR app, one port (3838): the synthetic and institutional stacks are alternatives.
-- **Module code is not loaded by the R suite** (`load_funcs(..., modules = FALSE)`): parse, render and look.
+- **Module code is not loaded by the R suite** (`load_funcs(..., modules = FALSE)`; `helper-load-functions.R` sources three module files for their pure helpers and no test file sources one): parse, render and look.
 - Dependencies go through `scripts/r-environment.R`, never a bare renv call; never `renv::deactivate()`.
 - Don't `source("setup.R")` from outside `tests/testthat`, `source("global.R")`, or hand-source modules. After a failing run, `rm -rf tests/testthat/_problems tests/testthat/testthat-problems.rds`.
 - Real-data checks: `Rscript --vanilla -e 'source("scripts/cedar-repl.R"); nrow(cedar_registrations)'`.

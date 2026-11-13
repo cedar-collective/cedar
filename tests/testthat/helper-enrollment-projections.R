@@ -287,3 +287,40 @@ projection_policy_candidates <- function(method_ids, projections,
       target_term = row$target_term, .before = 1
     )
 }
+
+scenario_test_bundle <- function(composition = NULL) {
+  settled_students <- test_students %>%
+    dplyr::mutate(as_of_date = .cedar_term_start(term) + 30L)
+  bundle <- build_enrollment_projection_bundle(
+    cl_enrls = calc_cl_enrls(settled_students, by_part_term = TRUE),
+    sections = test_sections,
+    students = settled_students,
+    student_terms = test_student_terms,
+    target_term = 202110L,
+    as_of_term = 202080L,
+    scope_courses = "MATH 1215Z",
+    scope_campuses = "ABQ",
+    scope_market_id = "abq_course_market",
+    force_courses = "MATH 1215Z",
+    # 202010 is the one prior Spring in the fixture, so the course gets a
+    # real published projection (5 students) to anchor the scenario on.
+    opt = list(history_start_term = 202010L),
+    built_at = as.POSIXct("2026-08-15 12:00:00", tz = "UTC")
+  )
+  if (!is.null(composition)) bundle$cohort_composition <- composition
+  bundle
+}
+
+# 40 students in the baseline roster, 10 of them Nursing: a 25% share. Every
+# expected value below is derived from these two numbers and the published
+# projection, so a changed expectation means the arithmetic moved.
+scenario_test_composition <- function(cohort = 10L, others = 30L) {
+  tibble::tibble(
+    market_id = "abq_course_market",
+    subject_course = "MATH 1215Z",
+    baseline_term = 202010L,
+    major_code = c("NURS", "BIOL"),
+    student_classification = "Sophomore",
+    n_students = c(cohort, others)
+  )
+}

@@ -19,19 +19,6 @@
 #   passers of whom one returned and never-takers of whom none did: +50 each,
 #   so the focal course's gap is above 0% of a one-course benchmark.
 
-library(dplyr)
-
-mc02_edges <- list(last_enrolled = 202180L, last_enrolled_complete = 202110L, last_graded = 202110L)
-rw01_settled_edges <- list(last_enrolled = 202110L, last_enrolled_complete = 202110L, last_graded = 202110L)
-
-mc02_context <- function(course = "SPAN 101", ...) {
-  build_course_cohort_context(
-    test_student_terms_mc, keyed_attempts(test_students_mc, mc02_edges),
-    modifyList(list(course = course, classification = "Freshman", college = "ARTS", level = "lower",
-                    min_n = 1L, data_edges = mc02_edges), list(...))
-  )
-}
-
 test_that("MC02: one wide row per course, term and campus; the benchmark is the courses with both groups", {
   p <- mc02_context()
   expect_s3_class(p, "course_cohort_context")

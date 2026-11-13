@@ -1,72 +1,5 @@
 context("Degree Explorer")
 
-# Public-source ingestion uses an authored catalog fixture, just like the demo
-# CSVs below. It models nested alternatives/bundles, a prose condition, an
-# unlabeled minor, an excluded graduate credential, and cyclic course links.
-scan_fixture <- function() read_source_json(file.path(cedar_institution_dir(cedar_base_dir, "demo"), "catalog-source-fixture.json"))
-scan_config <- function() {
-  dir <- cedar_institution_dir(cedar_base_dir, "demo")
-  list(source = as.list(read_institution_file("catalog_scan_sources", dir)[1, ]),
-    credentials = read_institution_file("catalog_scan_credentials", dir),
-    fields = read_institution_file("catalog_scan_fields", dir))
-}
-scan_fetcher <- function(fixture = scan_fixture(), observer = function(url) NULL) {
-  force(fixture)
-  function(url) {
-    observer(url)
-    base <- scan_config()$source$api_base
-    edition <- fixture$edition$`_id`
-    if (identical(url, scan_config()$source$landing_url)) {
-      bytes <- charToRaw(paste0("<script>window.catalogId='", edition, "'</script>"))
-    } else {
-      path <- substring(url, nchar(base) + 1L)
-      value <- if (path == "/public/catalogs") list(fixture$edition)
-        else if (path == paste0("/public/catalogs/", edition)) fixture$edition
-        else if (path == paste0("/programs/", edition)) fixture$index
-        else if (startsWith(path, paste0("/schema/", edition, "/"))) fixture$schemas[[sub(".*/", "", path)]]
-        else if (startsWith(path, paste0("/program/", edition, "/"))) fixture$programs[[sub(".*/", "", path)]]
-        else if (startsWith(path, paste0("/course/byId/", edition, "/"))) fixture$courses[[sub(".*/", "", path)]]
-        else stop("Unexpected fixture URL: ", url)
-      if (is.null(value)) stop("Unexpected fixture record: ", url)
-      bytes <- source_json_bytes(value)
-    }
-    list(body = bytes, final_url = url, status_code = 200L, content_type = "application/json",
-      etag = "fixture-etag", last_modified = "")
-  }
-}
-
-# Pipeline-shaped AI response scaffolding, deliberately unresolved throughout.
-# Source facts remain in the authored demo catalog; no model is called in tests.
-normalization_proposal <- function(request) {
-  nodes <- lapply(seq_along(request$source_blocks), function(i) {
-    block <- request$source_blocks[[i]]
-    list(id = paste0("rule-", i), parent_id = "", entity_id = block$entity_id,
-      phase = if (block$phase == "info") "information" else block$phase,
-      kind = "unresolved", label = block$text, minimum = NULL, maximum = NULL,
-      unit = "none", comparison = "none", value = "Designed unresolved passage", minimum_grade = "",
-      course_refs = list(), program_ref = "", timing = "not_applicable",
-      citations = list(list(block_id = block$id, quote = block$text)))
-  })
-  list(schema_version = "1.0.0", nodes = nodes,
-    coverage = lapply(seq_along(nodes), function(i) list(block_id = request$source_blocks[[i]]$id,
-      disposition = "unresolved", node_ids = list(nodes[[i]]$id), explanation = "Designed unresolved interpretation")),
-    questions = list())
-}
-
-normalization_fixture <- function(root) {
-  config <- scan_config(); capture <- file.path(root, "captures", "designed")
-  capture_degree_catalog(config$source, config$credentials, config$fields, capture, fetch = scan_fetcher(), pause = 0)
-  analyze_degree_catalog(capture)
-  payload <- load_catalog_review(dirname(capture), "designed/analysis")
-  store <- file.path(root, "reviews")
-  path <- prepare_catalog_normalization(payload, "biology", store,
-    paste(readLines(file.path(cedar_base_dir, "config/catalog-normalization-prompt.txt")), collapse = "\n"),
-    read_source_json(file.path(cedar_base_dir, "config/catalog-normalization.schema.json")))
-  program <- load_catalog_normalization_program(store, basename(path))
-  list(program = program, root = store, payload = payload, capture = capture,
-    unit = program$packet$units[[1]])
-}
-
 test_that("AI packets preserve complete source context and keep course units separate", {
   root <- tempfile("catalog-normalization-"); withr::defer(unlink(root, recursive = TRUE))
   f <- normalization_fixture(root); unit <- f$unit
@@ -657,28 +590,12 @@ test_that("catalog comparisons separate choice changes, formatting and missing s
 #   math1350 s1 (a suggested Gen Ed course), hist1 s1, hist2 s2,
 #   histmethods/histupper1/histupper2 s5, histupper3/histupper4/histchoice s6,
 #   historiography s7 (2 of the histupper pool, plus permission), histsenior s8.
-catalog <- function() test_degree_catalog
-roadmaps <- function() test_degree_roadmaps
-BIOLOGY <- "demo-biology-bs-2026"
-HISTORY <- "demo-history-ba-2026"
-plan <- function(id = BIOLOGY, math = "calculus", english = "composition", r = roadmaps()) {
-  build_degree_roadmap(catalog(), r, id, math, english)
-}
-view_of <- function(id = BIOLOGY, math = "calculus", english = "composition", season = "fall", r = roadmaps()) {
-  build_degree_roadmap_view(catalog(), r, id, math, english, season)
-}
-at <- function(view, id, field = "semester") view$nodes[[field]][match(id, view$nodes$node_id)]
-
-# EC-11 and EC-11b supply the raw section and class-list rows for popup history.
-history_edges <- list(last_enrolled_complete = 202080L, last_enrolled = 202180L)
-planning_gen_ed <- function() data.frame(subject_course = c("SOCI 100", "SOCI 101", "SOCI 104"),
-  area_label = c("4: Social sciences", "4: Social sciences", "5: Humanities"))
 
 # ── Catalog rule trees ───────────────────────────────────────────────────────
 
 test_that("catalog trees preserve alternatives, bundles, timing and unresolved source rules", {
-  expect_equal(validate_degree_catalog(catalog()), catalog())
-  rules <- degree_rule_outline(catalog(), catalog()$catalogs$catalog_id)
+  expect_equal(validate_degree_catalog(test_degree_catalog), test_degree_catalog)
+  rules <- degree_rule_outline(test_degree_catalog, test_degree_catalog$catalogs$catalog_id)
   intermediate <- rules[rules$rule_id == "bio-intermediate", ]
   bundle <- rules[rules$rule_id == "bio-microbiology", ]
   expect_equal(intermediate$operator, "choose_n")
@@ -693,13 +610,13 @@ test_that("catalog trees preserve alternatives, bundles, timing and unresolved s
   expect_match(rules$text[rules$rule_id == "bio-physiology-req"],
     "BIOL 304C — Evolution (4 credits) [for BIOL 3200]: Complete before or take concurrently", fixed = TRUE)
   expect_match(rules$text[rules$rule_id == "bio-total"], "[SOURCE CONFLICT]", fixed = TRUE)
-  bad <- catalog(); bad$rules$parent_id[1] <- bad$rules$rule_id[1]
+  bad <- test_degree_catalog; bad$rules$parent_id[1] <- bad$rules$rule_id[1]
   expect_error(validate_degree_catalog(bad), "Cycle")
-  bad <- catalog(); bad$rules$minimum[bad$rules$rule_id == "bio-intermediate"] <- "4"
+  bad <- test_degree_catalog; bad$rules$minimum[bad$rules$rule_id == "bio-intermediate"] <- "4"
   expect_error(validate_degree_catalog(bad), "Invalid choice group")
-  bad <- catalog(); bad$courses$rule_id[1] <- "missing"
+  bad <- test_degree_catalog; bad$courses$rule_id[1] <- "missing"
   expect_error(validate_degree_catalog(bad), "unknown rule")
-  bad <- catalog(); bad$evidence$catalog_year[1] <- "2025-2026"
+  bad <- test_degree_catalog; bad$evidence$catalog_year[1] <- "2025-2026"
   expect_error(validate_degree_catalog(bad), "evidence year")
 })
 
@@ -709,22 +626,22 @@ test_that("catalog trees preserve alternatives, bundles, timing and unresolved s
 # its own code as UNM's FFDA is, to show that leads_to is what connects it.
 test_that("each degree claims its own Banner program codes, keeping a B.A. apart from a B.S.", {
   programs <- read_institution_file("programs", cedar_institution_dir(cedar_base_dir, "demo"))
-  codes <- catalog()$program_codes
+  codes <- test_degree_catalog$program_codes
   expect_equal(codes$catalog_id, c(BIOLOGY, HISTORY))
   expect_equal(codes$program_code, c("BS-BIOL-AS", "BA-HIST-AS"))
   expect_equal(codes$major_code, c("BIOL", "HIST"))
   is_id <- function(cats, id) cats$catalog_id == id
-  bad <- catalog(); bad$catalogs$program_codes[is_id(bad$catalogs, BIOLOGY)] <- "BA-BIOL-AS"
+  bad <- test_degree_catalog; bad$catalogs$program_codes[is_id(bad$catalogs, BIOLOGY)] <- "BA-BIOL-AS"
   expect_error(validate_degree_catalog(bad), "belong to the catalog's degree: demo-biology-bs-2026")
-  bad <- catalog(); bad$catalogs$program_codes[is_id(bad$catalogs, BIOLOGY)] <- "BS-BIOL"
+  bad <- test_degree_catalog; bad$catalogs$program_codes[is_id(bad$catalogs, BIOLOGY)] <- "BS-BIOL"
   expect_error(validate_degree_catalog(bad), "belong to the catalog's degree")
-  bad <- catalog(); bad$catalogs$program_codes[is_id(bad$catalogs, BIOLOGY)] <- ""
+  bad <- test_degree_catalog; bad$catalogs$program_codes[is_id(bad$catalogs, BIOLOGY)] <- ""
   expect_error(validate_degree_catalog(bad), "belong to the catalog's degree")
-  bad <- catalog(); bad$catalogs$degree_code[is_id(bad$catalogs, HISTORY)] <- "BS"
+  bad <- test_degree_catalog; bad$catalogs$degree_code[is_id(bad$catalogs, HISTORY)] <- "BS"
   bad$catalogs$program_codes[is_id(bad$catalogs, HISTORY)] <- "BS-BIOL-AS"
   expect_error(validate_degree_catalog(bad), "belongs to one catalog")
 
-  cats <- catalog()$catalogs
+  cats <- test_degree_catalog$catalogs
   cats$program_codes[is_id(cats, HISTORY)] <- "BA-BIOL-AS"
   expect_error(degree_catalog_program_codes(cats, programs), "not the catalog's program: BA-BIOL-AS")
   cats$program_codes[is_id(cats, HISTORY)] <- "BA-HIST-AS|BA-FHIS-AS"
@@ -735,9 +652,9 @@ test_that("each degree claims its own Banner program codes, keeping a B.A. apart
   expect_equal(out$is_pre_major[out$catalog_id == HISTORY], c(FALSE, TRUE))
   expect_match(degree_program_codes_note(list(program_codes = out), HISTORY),
     "Banner program codes for this degree: BA-HIST-AS; pre-major BA-FHIS-AS.", fixed = TRUE)
-  expect_match(view_of(HISTORY)$program_codes_note, "for this degree: BA-HIST-AS. Another degree", fixed = TRUE)
-  rules <- build_degree_plan_rules(catalog(), roadmaps(), view_of(HISTORY))$rows
-  expect_equal(rules$rule[rules$kind == "Banner program codes"], view_of(HISTORY)$program_codes_note)
+  expect_match(roadmap_view(HISTORY)$program_codes_note, "for this degree: BA-HIST-AS. Another degree", fixed = TRUE)
+  rules <- build_degree_plan_rules(test_degree_catalog, test_degree_roadmaps, roadmap_view(HISTORY))$rows
+  expect_equal(rules$rule[rules$kind == "Banner program codes"], roadmap_view(HISTORY)$program_codes_note)
   pre$leads_to[pre$program_code == "FHIS"] <- "BIOL"
   expect_error(degree_catalog_program_codes(cats, pre), "not the catalog's program: BA-FHIS-AS")
 })
@@ -745,8 +662,8 @@ test_that("each degree claims its own Banner program codes, keeping a B.A. apart
 # ── Scheduling ───────────────────────────────────────────────────────────────
 
 test_that("readable plan rules expose the active graph and distinguish policy from scheduling", {
-  v <- view_of(HISTORY)
-  rules <- build_degree_plan_rules(catalog(), roadmaps(), v)
+  v <- roadmap_view(HISTORY)
+  rules <- build_degree_plan_rules(test_degree_catalog, test_degree_roadmaps, v)
   expect_match(rules$scenario, "Math: Calculus-ready: take statistics", fixed = TRUE)
   rows <- rules$rows
   expect_equal(sum(rows$kind == "Prerequisite arrow"), nrow(v$links))
@@ -761,7 +678,7 @@ test_that("readable plan rules expose the active graph and distinguish policy fr
   expect_true(all(preference$source_url == "" & preference$quote == ""))
   expect_true(any(rows$kind == "Suggested general coursework" & grepl("MATH 1350", rows$rule, fixed = TRUE)))
   expect_true(all(grepl("not evaluated", rows$effect[rows$kind == "Recorded catalog requirement"], fixed = TRUE)))
-  prepared <- build_degree_plan_rules(catalog(), roadmaps(), view_of(HISTORY, "intermediate"))$rows
+  prepared <- build_degree_plan_rules(test_degree_catalog, test_degree_roadmaps, roadmap_view(HISTORY, "intermediate"))$rows
   expect_true(any(prepared$kind == "Preparation" & grepl("MATH 1215", prepared$rule, fixed = TRUE)))
   expect_false(any(rows$kind == "Preparation" & grepl("MATH 1215", rows$rule, fixed = TRUE)))
   expect_setequal(setdiff(unique(unlist(strsplit(paste(rows$node_ids, collapse = "|"), "|", fixed = TRUE))), ""), c(v$nodes$node_id, v$allowances$node_id))
@@ -779,12 +696,12 @@ test_that("required blocks count actual component courses rather than assuming a
 })
 
 test_that("the calculus-ready biology plan matches its hand-worked schedule", {
-  v <- plan()
-  expect_equal(at(v, c("calc1", "engl1", "bio1", "chem1")), rep(1L, 4))
-  expect_equal(at(v, c("engl2", "bio2", "chem2", "phys1")), rep(2L, 4))
-  expect_equal(at(v, c("genetics", "biosci")), c(3L, 3L))
-  expect_equal(at(v, c("molecular", "evolution", "physiology")), rep(5L, 3))
-  expect_equal(at(v, c("bioelective", "biocap")), c(7L, 8L))
+  v <- roadmap_plan()
+  expect_equal(node_at(v, c("calc1", "engl1", "bio1", "chem1")), rep(1L, 4))
+  expect_equal(node_at(v, c("engl2", "bio2", "chem2", "phys1")), rep(2L, 4))
+  expect_equal(node_at(v, c("genetics", "biosci")), c(3L, 3L))
+  expect_equal(node_at(v, c("molecular", "evolution", "physiology")), rep(5L, 3))
+  expect_equal(node_at(v, c("bioelective", "biocap")), c(7L, 8L))
   expect_equal(v$terms$known_credits, c(15, 15, 7, 0, 11, 0, 3, 3))
   expect_equal(v$terms$other_credits, c(0, 0, 8, 15, 4, 15, 12, 12))
   expect_equal(v$terms$planned_credits, rep(15, 8))
@@ -792,21 +709,21 @@ test_that("the calculus-ready biology plan matches its hand-worked schedule", {
   expect_equal(v$preparation_credits, 0)
   expect_equal(v$n_moved, 0L)
   expect_equal(v$math_target$code, "MATH 1512")
-  expect_error(build_degree_roadmap(catalog(), roadmaps(), catalog()$catalogs$catalog_id, "calculus", "composition"),
+  expect_error(build_degree_roadmap(test_degree_catalog, test_degree_roadmaps, test_degree_catalog$catalogs$catalog_id, "calculus", "composition"),
     "one known degree")
-  expect_error(plan(math = "unknown"), "known math")
+  expect_error(roadmap_plan(math = "unknown"), "known math")
 })
 
 test_that("math preparation adds its sequence and moves only the courses that depend on it", {
-  ready <- plan()
-  prepared <- plan(math = "intermediate")
-  expect_equal(at(prepared, c("math1215", "math1220", "math1250", "calc1")), 1:4)
+  ready <- roadmap_plan()
+  prepared <- roadmap_plan(math = "intermediate")
+  expect_equal(node_at(prepared, c("math1215", "math1220", "math1250", "calc1")), 1:4)
   # Physics follows Calculus I out of semester 2; nothing else moves.
-  expect_equal(at(prepared, "phys1"), 5L)
-  expect_true(at(prepared, "phys1", "moved"))
+  expect_equal(node_at(prepared, "phys1"), 5L)
+  expect_true(node_at(prepared, "phys1", "moved"))
   expect_equal(prepared$n_moved, 1L)
   unrelated <- c("bio1", "chem1", "genetics", "molecular", "biocap")
-  expect_equal(at(prepared, unrelated), at(ready, unrelated))
+  expect_equal(node_at(prepared, unrelated), node_at(ready, unrelated))
   expect_equal(prepared$n_preparation, 3L)
   expect_equal(prepared$preparation_credits, 9)
   # 129 planned credits cannot fit eight semesters at 16; the plan grows a ninth.
@@ -816,70 +733,70 @@ test_that("math preparation adds its sequence and moves only the courses that de
 })
 
 test_that("English starting points replace the sequence and completed credit leaves the target", {
-  stretch <- plan(english = "stretch")
+  stretch <- roadmap_plan(english = "stretch")
   expect_equal(stretch$nodes$code[stretch$nodes$track == "english"], c("ENGL 1110X", "ENGL 1110Y", "ENGL 1120"))
-  expect_equal(at(stretch, c("englX", "englY", "engl2")), 1:3)
+  expect_equal(node_at(stretch, c("englX", "englY", "engl2")), 1:3)
   # Stretch I is preparation: 123 credits over eight semesters uses the 16-credit maximum.
   expect_equal(stretch$preparation_credits, 3)
   expect_equal(stretch$terms$planned_credits, c(16, 16, 16, 15, 15, 15, 15, 15))
-  advanced <- plan(english = "composition2")
+  advanced <- roadmap_plan(english = "composition2")
   expect_equal(advanced$nodes$code[advanced$nodes$track == "english"], "ENGL 1120")
-  expect_equal(at(advanced, "engl2"), 1L)
-  complete <- plan(english = "complete")
+  expect_equal(node_at(advanced, "engl2"), 1L)
+  complete <- roadmap_plan(english = "complete")
   expect_false(any(complete$nodes$track == "english"))
   expect_equal(complete$completed_credits, 6)
   expect_equal(sum(complete$terms$planned_credits), 114)
 })
 
 test_that("lecture/lab bundles stay together and count as two courses", {
-  v <- plan()
+  v <- roadmap_plan()
   expect_equal(sum(v$nodes$bundle), 2L)
-  expect_equal(at(v, c("chem1", "chem2"), "credits"), c(4, 4))
-  expect_equal(at(v, "chem2", "n_prerequisites"), 2L)
+  expect_equal(node_at(v, c("chem1", "chem2"), "credits"), c(4, 4))
+  expect_equal(node_at(v, "chem2", "n_prerequisites"), 2L)
   # Genetics' direct prerequisites: Biology II plus the chemistry bundle.
-  expect_equal(at(v, "genetics", "n_direct"), 3L)
+  expect_equal(node_at(v, "genetics", "n_direct"), 3L)
 })
 
 test_that("planning burden counts unique ancestors and keeps chain length separate", {
-  v <- plan()
-  expect_equal(at(v, "molecular", "n_prerequisites"), 7L)
-  expect_equal(at(v, "molecular", "prereq_depth"), 3L)
-  expect_setequal(strsplit(at(v, "molecular", "upstream_ids"), "|", fixed = TRUE)[[1]],
+  v <- roadmap_plan()
+  expect_equal(node_at(v, "molecular", "n_prerequisites"), 7L)
+  expect_equal(node_at(v, "molecular", "prereq_depth"), 3L)
+  expect_setequal(strsplit(node_at(v, "molecular", "upstream_ids"), "|", fixed = TRUE)[[1]],
     c("genetics", "chem2", "bio2", "chem1", "bio1"))
-  expect_equal(at(v, "biocap", "n_prerequisites"), 8L)
-  expect_equal(at(v, "physiology", "prereq_depth"), 2L)
-  expect_equal(at(v, "physiology", "n_prerequisites"), 3L)
-  expect_equal(at(v, "bio1", "n_downstream"), 6L)
-  expect_equal(at(v, "bio1", "chain_terms"), 5L)
-  expect_setequal(strsplit(at(v, "chem1", "downstream_ids"), "|", fixed = TRUE)[[1]],
+  expect_equal(node_at(v, "biocap", "n_prerequisites"), 8L)
+  expect_equal(node_at(v, "physiology", "prereq_depth"), 2L)
+  expect_equal(node_at(v, "physiology", "n_prerequisites"), 3L)
+  expect_equal(node_at(v, "bio1", "n_downstream"), 6L)
+  expect_equal(node_at(v, "bio1", "chain_terms"), 5L)
+  expect_setequal(strsplit(node_at(v, "chem1", "downstream_ids"), "|", fixed = TRUE)[[1]],
     c("chem2", "genetics", "molecular", "biocap"))
-  expect_equal(at(v, "chem1", "n_downstream"), 5L)
-  expect_equal(at(v, c("bio1", "bio2", "genetics", "evolution", "molecular", "biosci"), "planning_level"),
+  expect_equal(node_at(v, "chem1", "n_downstream"), 5L)
+  expect_equal(node_at(v, c("bio1", "bio2", "genetics", "evolution", "molecular", "biosci"), "planning_level"),
     c("green", "yellow", "red", "yellow", "red", "unresolved"))
   # Concurrent timing may share a semester; a "before" link may not.
   links <- v$links
-  expect_true(all(at(v, links$to) >= at(v, links$from) + as.integer(links$timing == "before")))
-  expect_equal(at(v, "physiology"), at(v, "evolution"))
+  expect_true(all(node_at(v, links$to) >= node_at(v, links$from) + as.integer(links$timing == "before")))
+  expect_equal(node_at(v, "physiology"), node_at(v, "evolution"))
 })
 
 # Authored timing perturbation: a delayed course pushes its dependants past semester 8.
 test_that("the semester board extends rather than dropping delayed courses", {
-  r <- roadmaps()
+  r <- test_degree_roadmaps
   r$nodes$semester[r$nodes$catalog_id == BIOLOGY & r$nodes$node_id == "molecular"] <- "8"
-  v <- plan(r = r)
-  expect_equal(at(v, c("molecular", "biocap")), c(8L, 9L))
+  v <- roadmap_plan(r = r)
+  expect_equal(node_at(v, c("molecular", "biocap")), c(8L, 9L))
   expect_equal(tail(v$terms$semester, 1), 9L)
   expect_equal(nrow(v$nodes), 15L)
-  expect_match(format_degree_explorer_preview(view_of(r = r)), "Semester 9", fixed = TRUE)
+  expect_match(format_degree_explorer_preview(roadmap_view(r = r)), "Semester 9", fixed = TRUE)
 })
 
 test_that("upper-level courses wait for the institution's later planning stage", {
-  v <- plan()
+  v <- roadmap_plan()
   expect_true(all(v$nodes$semester[v$nodes$course_level == "upper"] >= 5L))
-  r <- roadmaps()
+  r <- test_degree_roadmaps
   r$plans$upper_level_from_semester[r$plans$catalog_id == BIOLOGY] <- "7"
-  late <- view_of(r = r)
-  expect_equal(at(late, c("molecular", "evolution", "physiology", "bioelective", "biocap")), c(7L, 7L, 7L, 7L, 8L))
+  late <- roadmap_view(r = r)
+  expect_equal(node_at(late, c("molecular", "evolution", "physiology", "bioelective", "biocap")), c(7L, 7L, 7L, 7L, 8L))
   expect_true(all(late$terms$other_label[late$terms$semester < 7L] == "Gen Ed where identified; other elective / minor credits"))
   expect_true(all(late$terms$other_label[late$terms$semester >= 7L] == "Elective / minor · upper level may count"))
   expect_match(late$timing_note, "semester 7", fixed = TRUE)
@@ -889,29 +806,29 @@ test_that("upper-level courses wait for the institution's later planning stage",
 # ── Layout ───────────────────────────────────────────────────────────────────
 
 test_that("course families align after scheduling and parallel courses take separate rows", {
-  v <- plan()
-  expect_equal(at(v, c("calc1", "engl1", "engl2"), "row"), c(1L, 2L, 2L))
-  expect_equal(at(v, c("bio1", "bio2", "genetics", "molecular"), "row"), rep(8L, 4))
+  v <- roadmap_plan()
+  expect_equal(node_at(v, c("calc1", "engl1", "engl2"), "row"), c(1L, 2L, 2L))
+  expect_equal(node_at(v, c("bio1", "bio2", "genetics", "molecular"), "row"), rep(8L, 4))
   # Evolution and Physiology share Molecular Biology's semester and family.
-  expect_equal(at(v, c("evolution", "physiology"), "row"), c(9L, 10L))
+  expect_equal(node_at(v, c("evolution", "physiology"), "row"), c(9L, 10L))
   # Other families reuse a row outside each other's span.
-  expect_equal(at(v, c("biocap", "bioelective"), "row"), c(8L, 8L))
-  expect_equal(at(v, c("chem1", "chem2", "biosci", "phys1"), "row"), c(9L, 9L, 9L, 10L))
+  expect_equal(node_at(v, c("biocap", "bioelective"), "row"), c(8L, 8L))
+  expect_equal(node_at(v, c("chem1", "chem2", "biosci", "phys1"), "row"), c(9L, 9L, 9L, 10L))
   expect_false(anyDuplicated(paste(v$nodes$semester, v$nodes$row)) > 0L)
   # Layout metadata cannot change credit budgets, course timing or graph metrics.
-  r <- roadmaps()
+  r <- test_degree_roadmaps
   r$nodes$row_group <- "one_family"
-  alternate <- plan(r = r)
+  alternate <- roadmap_plan(r = r)
   fields <- c("node_id", "semester", "credits", "n_prerequisites", "n_downstream")
   expect_equal(v$nodes[fields], alternate$nodes[fields])
   expect_equal(v$terms, alternate$terms)
   r$nodes$row_group[1] <- ""
-  expect_error(validate_degree_roadmaps(r, catalog()), "row group")
+  expect_error(validate_degree_roadmaps(r, test_degree_catalog), "row group")
 })
 
 test_that("allowance cards fill every semester between math/writing and the program's courses", {
-  v <- view_of()
-  expect_identical(v$nodes$row, plan()$nodes$row)
+  v <- roadmap_view()
+  expect_identical(v$nodes$row, roadmap_plan()$nodes$row)
   expect_equal(v$allowances$semester, rep(3:8, c(3, 5, 1, 5, 4, 4)))
   expect_equal(v$allowances$credits, c(3, 3, 2, rep(3, 5), 4, rep(3, 13)))
   expect_equal(v$allowances$row, c(3:5, 3:7, 3L, 3:7, 3:6, 3:6))
@@ -927,15 +844,15 @@ test_that("allowance cards fill every semester between math/writing and the prog
   }
   expect_false(anyDuplicated(c(paste(v$nodes$semester, v$nodes$row),
     paste(v$allowances$semester, v$allowances$row))) > 0L)
-  spring <- view_of(season = "spring")
+  spring <- roadmap_view(season = "spring")
   expect_equal(v$terms$season[1:4], c("fall", "spring", "fall", "spring"))
   expect_equal(spring$terms$season[1:4], c("spring", "fall", "spring", "fall"))
   expect_identical(v$allowances[c("node_id", "semester", "credits", "row")],
     spring$allowances[c("node_id", "semester", "credits", "row")])
   expect_error(degree_semester_seasons(1:8, "summer"), "fall or spring")
-  r <- roadmaps()
+  r <- test_degree_roadmaps
   r$plans$degree_credit_target[r$plans$catalog_id == BIOLOGY] <- "54"
-  no_allowances <- view_of(r = r)
+  no_allowances <- roadmap_view(r = r)
   expect_equal(nrow(no_allowances$allowances), 0L)
   expect_equal(min(no_allowances$nodes$row), 1L)
 })
@@ -943,30 +860,30 @@ test_that("allowance cards fill every semester between math/writing and the prog
 # ── Programs: routes, conditions, choices and citations ──────────────────────
 
 test_that("a statistics major takes its own math route and never inherits calculus", {
-  h <- plan(HISTORY, "intermediate")
+  h <- roadmap_plan(HISTORY, "intermediate")
   expect_equal(h$nodes$code[h$nodes$track == "math"], c("MATH 1215", "MATH 1350"))
-  expect_equal(at(h, c("math1215", "math1350")), 1:2)
+  expect_equal(node_at(h, c("math1215", "math1350")), 1:2)
   expect_equal(h$preparation_credits, 3)
   expect_false(any(c("calc1", "math1220", "math1250") %in% h$nodes$node_id))
-  ready <- plan(HISTORY, "algebra")
+  ready <- roadmap_plan(HISTORY, "algebra")
   expect_equal(ready$math_target$code, "MATH 1350")
   expect_equal(ready$math_target$semester, 1L)
   expect_equal(ready$n_preparation, 0L)
-  expect_setequal(unname(degree_math_start_choices(roadmaps(), HISTORY)),
-    roadmaps()$starts$start_id[roadmaps()$starts$track == "math"])
-  bad <- roadmaps(); bad$math_routes <- bad$math_routes[-1, ]
-  expect_error(validate_degree_roadmaps(bad, catalog()), "math starting routes missing")
-  bad <- roadmaps(); bad$math_routes$node_ids[1] <- "missing"
-  expect_error(validate_degree_roadmaps(bad, catalog()), "math route course")
-  bad <- roadmaps(); bad$math_routes$node_ids[bad$math_routes$catalog_id == HISTORY] <- "calc1"
-  expect_error(validate_degree_roadmaps(bad, catalog()), "requirement evidence")
+  expect_setequal(unname(degree_math_start_choices(test_degree_roadmaps, HISTORY)),
+    test_degree_roadmaps$starts$start_id[test_degree_roadmaps$starts$track == "math"])
+  bad <- test_degree_roadmaps; bad$math_routes <- bad$math_routes[-1, ]
+  expect_error(validate_degree_roadmaps(bad, test_degree_catalog), "math starting routes missing")
+  bad <- test_degree_roadmaps; bad$math_routes$node_ids[1] <- "missing"
+  expect_error(validate_degree_roadmaps(bad, test_degree_catalog), "math route course")
+  bad <- test_degree_roadmaps; bad$math_routes$node_ids[bad$math_routes$catalog_id == HISTORY] <- "calc1"
+  expect_error(validate_degree_roadmaps(bad, test_degree_catalog), "requirement evidence")
 })
 
 test_that("a course-count condition stays separate from named prerequisites", {
-  h <- view_of(HISTORY, "algebra")
-  expect_equal(at(h, c("histmethods", "histupper1", "histupper2")), rep(5L, 3))
-  expect_equal(at(h, c("histupper3", "histupper4", "histchoice")), rep(6L, 3))
-  expect_equal(at(h, c("historiography", "histsenior")), c(7L, 8L))
+  h <- roadmap_view(HISTORY, "algebra")
+  expect_equal(node_at(h, c("histmethods", "histupper1", "histupper2")), rep(5L, 3))
+  expect_equal(node_at(h, c("histupper3", "histupper4", "histchoice")), rep(6L, 3))
+  expect_equal(node_at(h, c("historiography", "histsenior")), c(7L, 8L))
   expect_false(any(h$links$to == "historiography"))
   target <- h$nodes[h$nodes$node_id == "historiography", ]
   expect_equal(target$n_prerequisites, 0L)
@@ -978,28 +895,28 @@ test_that("a course-count condition stays separate from named prerequisites", {
   expect_match(target$planning_note, "0 named prerequisite courses", fixed = TRUE)
   expect_setequal(strsplit(target$qualifying_ids, "|", fixed = TRUE)[[1]], paste0("histupper", 1:4))
   expect_true(all(grepl("/courses/", h$conditions$source_url, fixed = TRUE)))
-  expect_equal(at(h, "histsenior", "planning_level"), "yellow")
+  expect_equal(node_at(h, "histsenior", "planning_level"), "yellow")
 })
 
 # Authored timing perturbation: the condition waits for the second qualifying
 # pool completion, not for every member and not for two particular electives.
 test_that("course-count conditions schedule against the earliest qualifying pool completions", {
-  r <- roadmaps()
+  r <- test_degree_roadmaps
   history <- r$nodes$catalog_id == HISTORY
   r$nodes$semester[history & r$nodes$node_id %in% paste0("histupper", 1:3)] <- "8"
   r$nodes$semester[history & r$nodes$node_id == "histupper4"] <- "5"
   r$nodes$semester[history & r$nodes$node_id == "historiography"] <- "1"
-  v <- plan(HISTORY, "algebra", r = r)
-  expect_equal(at(v, "historiography"), 9L)
-  bad <- roadmaps(); bad$conditions$minimum[1] <- "5"
-  expect_error(validate_degree_roadmaps(bad, catalog()), "course-count condition")
-  bad <- roadmaps(); bad$conditions$evidence_id[1] <- "total-hist"
-  expect_error(validate_degree_roadmaps(bad, catalog()), "Condition needs matching course evidence")
+  v <- roadmap_plan(HISTORY, "algebra", r = r)
+  expect_equal(node_at(v, "historiography"), 9L)
+  bad <- test_degree_roadmaps; bad$conditions$minimum[1] <- "5"
+  expect_error(validate_degree_roadmaps(bad, test_degree_catalog), "course-count condition")
+  bad <- test_degree_roadmaps; bad$conditions$evidence_id[1] <- "total-hist"
+  expect_error(validate_degree_roadmaps(bad, test_degree_catalog), "Condition needs matching course evidence")
 })
 
 test_that("Gen Ed suggestions are labelled while named requirements keep program styling", {
-  h <- view_of(HISTORY, "algebra")
-  b <- view_of()
+  h <- roadmap_view(HISTORY, "algebra")
+  b <- roadmap_view()
   suggestion <- h$nodes[h$nodes$node_id == "math1350", ]
   expect_true(suggestion$is_suggested)
   expect_equal(suggestion$basis, "general")
@@ -1010,7 +927,7 @@ test_that("Gen Ed suggestions are labelled while named requirements keep program
 })
 
 test_that("named course sets expose every alternative without one option's prerequisites", {
-  h <- view_of(HISTORY, "algebra")
+  h <- roadmap_view(HISTORY, "algebra")
   world <- h$nodes[h$nodes$node_id == "histchoice", ]
   expect_equal(world$option_label, "Choose 1 of 4 courses")
   expect_equal(world$option_codes, "HIST 1160, HIST 327, HIST 395, HIST 401")
@@ -1020,23 +937,23 @@ test_that("named course sets expose every alternative without one option's prere
   expect_equal(h$options$credit_label[h$options$subject_course == "HIST 401"], "3–4")
   expect_equal(h$options$prerequisite_note[h$options$subject_course == "HIST 401"], "HIST 300 - Historical Methods (3)")
   expect_equal(h$options$prerequisite_note[h$options$subject_course == "HIST 327"], "")
-  bad <- roadmaps(); bad$options <- rbind(bad$options, bad$options[1, ])
-  expect_error(validate_degree_roadmaps(bad, catalog()), "option course")
-  bad <- roadmaps(); bad$options$minimum[bad$options$node_id == "histchoice"] <- "5"
-  expect_error(validate_degree_roadmaps(bad, catalog()), "option set")
-  bad <- roadmaps(); bad$options$evidence_id[bad$options$node_id == "histchoice"][1] <- "total-hist"
-  expect_error(validate_degree_roadmaps(bad, catalog()), "program requirement evidence")
-  bad <- roadmaps(); bad$options$source_url[bad$options$subject_course == "HIST 401"] <- catalog()$catalogs$source_url[2]
-  expect_error(validate_degree_roadmaps(bad, catalog()), "matching course evidence")
+  bad <- test_degree_roadmaps; bad$options <- rbind(bad$options, bad$options[1, ])
+  expect_error(validate_degree_roadmaps(bad, test_degree_catalog), "option course")
+  bad <- test_degree_roadmaps; bad$options$minimum[bad$options$node_id == "histchoice"] <- "5"
+  expect_error(validate_degree_roadmaps(bad, test_degree_catalog), "option set")
+  bad <- test_degree_roadmaps; bad$options$evidence_id[bad$options$node_id == "histchoice"][1] <- "total-hist"
+  expect_error(validate_degree_roadmaps(bad, test_degree_catalog), "program requirement evidence")
+  bad <- test_degree_roadmaps; bad$options$source_url[bad$options$subject_course == "HIST 401"] <- test_degree_catalog$catalogs$source_url[2]
+  expect_error(validate_degree_roadmaps(bad, test_degree_catalog), "matching course evidence")
   # A named edge into a set would misstate every alternative.
-  bad <- roadmaps(); edge <- bad$links[bad$links$catalog_id == HISTORY, ][1, ]
+  bad <- test_degree_roadmaps; edge <- bad$links[bad$links$catalog_id == HISTORY, ][1, ]
   edge$from <- "histmethods"; edge$to <- "histchoice"
   bad$links <- rbind(bad$links, edge)
-  expect_error(validate_degree_roadmaps(bad, catalog()), "inherit a particular course")
+  expect_error(validate_degree_roadmaps(bad, test_degree_catalog), "inherit a particular course")
 })
 
 test_that("lecture/lab alternatives count complete options and keep the slot's credits", {
-  v <- view_of()
+  v <- roadmap_view()
   science <- v$nodes[v$nodes$node_id == "biosci", ]
   expect_equal(science$option_label, "Choose 1 of 3 options")
   expect_equal(science$option_codes, "PHYS 1230 + PHYS 1230L, GEOL 1110 + GEOL 1110L, ENVS 1110C")
@@ -1045,12 +962,12 @@ test_that("lecture/lab alternatives count complete options and keep the slot's c
   expect_true(all(groups$credits_min == 4 & groups$credits_max == 4))
   expect_false(any(v$links$from == "biosci" | v$links$to == "biosci"))
   # Counting rows as alternatives would let a one-credit lab fill the slot.
-  bad <- roadmaps(); bad$nodes$credits[bad$nodes$catalog_id == BIOLOGY & bad$nodes$node_id == "biosci"] <- "3"
-  expect_error(validate_degree_roadmaps(bad, catalog()), "option set or planning credits")
+  bad <- test_degree_roadmaps; bad$nodes$credits[bad$nodes$catalog_id == BIOLOGY & bad$nodes$node_id == "biosci"] <- "3"
+  expect_error(validate_degree_roadmaps(bad, test_degree_catalog), "option set or planning credits")
 })
 
 test_that("each tile cites its own requirement, and preparation cites the course it unlocks", {
-  v <- plan(math = "intermediate")
+  v <- roadmap_plan(math = "intermediate")
   molecular <- v$nodes[v$nodes$node_id == "molecular", ]
   expect_equal(molecular$evidence_section, "Requirements → Biology core")
   expect_match(molecular$evidence_quote, "BIOL300C", fixed = TRUE)
@@ -1060,28 +977,28 @@ test_that("each tile cites its own requirement, and preparation cites the course
   expect_match(preparation$evidence_source_url, "MATH-1220", fixed = TRUE)
   expect_false(preparation$source_url == preparation$evidence_source_url)
   expect_true(all(v$nodes$evidence_catalog_year == "2026-2027"))
-  bad <- roadmaps(); bad$basis$evidence_id[bad$basis$catalog_id == BIOLOGY & bad$basis$node_id == "molecular"] <- "req-bio1-bio2"
-  expect_error(validate_degree_roadmaps(bad, catalog()), "program page")
-  bad <- roadmaps(); bad$basis$node_id[1] <- "missing"
-  expect_error(validate_degree_roadmaps(bad, catalog()), "requirement evidence")
-  bad <- roadmaps(); bad$links$evidence_id[1] <- "missing"
-  expect_error(validate_degree_roadmaps(bad, catalog()), "Unknown roadmap evidence")
-  bad <- roadmaps(); bad$links$from[1] <- "missing"
-  expect_error(validate_degree_roadmaps(bad, catalog()), "endpoint")
-  bad <- roadmaps(); bad$links$to[1] <- bad$links$from[1]
-  expect_error(validate_degree_roadmaps(bad, catalog()), "Cycle")
+  bad <- test_degree_roadmaps; bad$basis$evidence_id[bad$basis$catalog_id == BIOLOGY & bad$basis$node_id == "molecular"] <- "req-bio1-bio2"
+  expect_error(validate_degree_roadmaps(bad, test_degree_catalog), "program page")
+  bad <- test_degree_roadmaps; bad$basis$node_id[1] <- "missing"
+  expect_error(validate_degree_roadmaps(bad, test_degree_catalog), "requirement evidence")
+  bad <- test_degree_roadmaps; bad$links$evidence_id[1] <- "missing"
+  expect_error(validate_degree_roadmaps(bad, test_degree_catalog), "Unknown roadmap evidence")
+  bad <- test_degree_roadmaps; bad$links$from[1] <- "missing"
+  expect_error(validate_degree_roadmaps(bad, test_degree_catalog), "endpoint")
+  bad <- test_degree_roadmaps; bad$links$to[1] <- bad$links$from[1]
+  expect_error(validate_degree_roadmaps(bad, test_degree_catalog), "Cycle")
 })
 
 test_that("authored course levels agree with institution numbering bands", {
-  r <- roadmaps()
+  r <- test_degree_roadmaps
   r$nodes$course_level[r$nodes$node_id == "molecular"] <- "lower"
-  expect_error(validate_degree_roadmaps(r, catalog()), "level disagrees")
-  r <- roadmaps(); r$nodes$course_level[r$nodes$kind == "choice"] <- ""
-  expect_error(validate_degree_roadmaps(r, catalog()), "Invalid roadmap course level")
-  r <- roadmaps(); r$plans$upper_level_from_semester <- "1"
-  expect_error(validate_degree_roadmaps(r, catalog()), "early-coursework stage")
-  r <- roadmaps(); r$courses$subject_course[r$courses$node_id == "phys1"] <- "PHYS 1320"
-  expect_error(validate_degree_roadmaps(r, catalog()), "components disagree")
+  expect_error(validate_degree_roadmaps(r, test_degree_catalog), "level disagrees")
+  r <- test_degree_roadmaps; r$nodes$course_level[r$nodes$kind == "choice"] <- ""
+  expect_error(validate_degree_roadmaps(r, test_degree_catalog), "Invalid roadmap course level")
+  r <- test_degree_roadmaps; r$plans$upper_level_from_semester <- "1"
+  expect_error(validate_degree_roadmaps(r, test_degree_catalog), "early-coursework stage")
+  r <- test_degree_roadmaps; r$courses$subject_course[r$courses$node_id == "phys1"] <- "PHYS 1320"
+  expect_error(validate_degree_roadmaps(r, test_degree_catalog), "components disagree")
 })
 
 # ── The loaded institution's own catalog ─────────────────────────────────────
@@ -1137,7 +1054,7 @@ test_that("the loaded institution's roadmaps keep every planning rule in every s
 # ── Popup history ────────────────────────────────────────────────────────────
 
 test_that("history components are explicit, and unenumerated groups and new codes stay unresolved", {
-  r <- roadmaps()
+  r <- test_degree_roadmaps
   expect_setequal(r$courses$subject_course[r$courses$node_id == "chem1"], c("CHEM 1215", "CHEM 1215L"))
   group <- build_degree_course_history(test_sections, test_course_terms, history_edges, r, BIOLOGY, "bioelective")
   expect_equal(group$state, "choice")
@@ -1160,7 +1077,7 @@ test_that("history components are explicit, and unenumerated groups and new code
 # Authored components redirect a tile to EC-11's raw rows; no institutional
 # records are invented here.
 test_that("a course popup keeps every campus, bundle component and alternative at its own grain", {
-  r <- roadmaps()
+  r <- test_degree_roadmaps
   r$courses$subject_course[r$courses$node_id == "calc1"] <- "SOCI 100"
   h <- build_degree_course_history(test_sections_regstats, test_course_terms_regstats, history_edges, r, BIOLOGY, "calc1")
   expect_setequal(h$table$campus, c("ABQ", "EA"))
@@ -1180,14 +1097,14 @@ test_that("a course popup keeps every campus, bundle component and alternative a
 })
 
 test_that("allowance popups disclose credit fit and exclude courses the plan already shows", {
-  v <- view_of()
+  v <- roadmap_view()
   remainder <- v$allowances$node_id[v$allowances$credits == 2]
   selection <- list(type = "allowance", catalog_id = BIOLOGY, math_start = "calculus",
     english_start = "composition", start_season = "fall", node_id = remainder)
   membership <- rbind(planning_gen_ed(), data.frame(subject_course = c("MATH 1512", "ENGL 1120"),
     area_label = c("2: Math", "1: Communication")))
   h <- build_degree_popup_history(test_sections_regstats, test_course_terms_regstats, history_edges,
-    catalog(), roadmaps(), membership, selection)
+    test_degree_catalog, test_degree_roadmaps, membership, selection)
   expect_equal(h$kind, "allowance")
   expect_equal(h$season, "fall")
   expect_equal(h$credits, 2)
@@ -1198,7 +1115,7 @@ test_that("allowance popups disclose credit fit and exclude courses the plan alr
   expect_false(any(c("student_id", "crn") %in% names(h$table)))
   selection$node_id <- "allowance-99-1"
   expect_error(build_degree_popup_history(test_sections_regstats, test_course_terms_regstats, history_edges,
-    catalog(), roadmaps(), membership, selection), "Unknown degree allowance")
+    test_degree_catalog, test_degree_roadmaps, membership, selection), "Unknown degree allowance")
 })
 
 # ── Rendering ────────────────────────────────────────────────────────────────
@@ -1207,10 +1124,10 @@ test_that("the board and popups render the payload; catalog evidence lives in th
   withr::local_package("shiny")
   withr::local_package("bslib")
   load_funcs(cedar_base_dir, modules = TRUE)
-  ui <- as.character(degreeExplorerUI("degree_explorer", catalog(), roadmaps()))
+  ui <- as.character(degreeExplorerUI("degree_explorer", test_degree_catalog, test_degree_roadmaps))
   expect_match(ui, "degree_explorer-dx_math_start", fixed = TRUE)
   expect_match(ui, "degree_explorer-dx_copy_url", fixed = TRUE)
-  v <- view_of(math = "intermediate", english = "stretch")
+  v <- roadmap_view(math = "intermediate", english = "stretch")
   board <- as.character(degree_semester_board(v, "board"))
   expect_match(board, "data-roadmap", fixed = TRUE)
   expect_match(board, "Semester 9", fixed = TRUE)
@@ -1233,7 +1150,7 @@ test_that("the board and popups render the payload; catalog evidence lives in th
   science <- as.character(degree_tile_modal(degree_roadmap_tile_detail(v, "biosci"), "history"))
   expect_equal(lengths(regmatches(science, gregexpr("<li data-option=", science, fixed = TRUE))), 3L)
   expect_match(science, "PHYS 1230 + PHYS 1230L · 4 credits together", fixed = TRUE)
-  h <- view_of(HISTORY, "algebra")
+  h <- roadmap_view(HISTORY, "algebra")
   condition <- as.character(degree_tile_modal(degree_roadmap_tile_detail(h, "historiography"), "history"))
   expect_match(condition, "◇ Department permission", fixed = TRUE)
   expect_error(degree_roadmap_tile_detail(h, "nope"), "Unknown degree roadmap tile")
@@ -1243,7 +1160,7 @@ test_that("the board and popups render the payload; catalog evidence lives in th
 
 test_that("popup history renders one standard table with first-day seats", {
   withr::local_package("shiny")
-  r <- roadmaps()
+  r <- test_degree_roadmaps
   r$courses$subject_course[r$courses$node_id == "calc1"] <- "SOCI 100"
   h <- build_degree_course_history(test_sections_regstats, test_course_terms_regstats, history_edges, r, BIOLOGY, "calc1")
   html <- as.character(degree_course_history_ui(h, "history_table"))
@@ -1253,11 +1170,11 @@ test_that("popup history renders one standard table with first-day seats", {
   expect_match(html, 'data-history-node="calc1"', fixed = TRUE)
   expect_match(html, "cedar-section-heading", fixed = TRUE)
   expect_s3_class(degree_history_table(h), "reactable")
-  v <- view_of()
+  v <- roadmap_view()
   selection <- list(type = "allowance", catalog_id = BIOLOGY, math_start = "calculus",
     english_start = "composition", start_season = "fall", node_id = v$allowances$node_id[1])
   suggestions <- build_degree_popup_history(test_sections_regstats, test_course_terms_regstats, history_edges,
-    catalog(), roadmaps(), planning_gen_ed(), selection)
+    test_degree_catalog, test_degree_roadmaps, planning_gen_ed(), selection)
   expect_s3_class(degree_allowance_table(suggestions), "reactable")
   html <- as.character(degree_allowance_history_ui(suggestions, "suggestion_table"))
   expect_match(html, "Fall course options", fixed = TRUE)

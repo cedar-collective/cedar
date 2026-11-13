@@ -17,14 +17,6 @@ context("Registration snapshots")
 # class-list count (STATUS_PRECEDENCE), and the canonical waitlist rule keeps a
 # student whose only other row is a drop. PSYC has no section in the IS01
 # schedule, so its sections and seats are measured zeros.
-snapshot_students <- function() {
-  attach_test_course_ids(dplyr::bind_rows(test_students_intersession, test_students_wlmkt), "students")
-}
-# The course-term table the snapshot reads, built over those rows and IS01's
-# schedule as the refresh builds it from one pull.
-snapshot_course_terms <- function(students = snapshot_students(), sections = test_sections_intersession) {
-  course_terms_for(students, sections)
-}
 
 test_that("a snapshot counts each campus and part of term on its own row", {
   snapshot <- build_registration_snapshot(
