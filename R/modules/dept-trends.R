@@ -506,7 +506,7 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
                     meta$min_n, " of these majors in a term is pooled with the others like it; a unit that taught fewer than ",
                     meta$min_n, " is pooled with the other small units of its college; and a campus with fewer than ",
                     meta$min_n, " of them is in the tables, not the charts."),
-            if (isTRUE(meta$latest_in_progress)) tags$li("The latest term is in progress: its registrations are current, not settled.")
+            if (isTRUE(meta$latest_in_progress)) tags$li("The latest term is in progress: its grades have not posted, and its registrations are current and will change until the term closes.")
           )
         ),
         dashboard_subsection(

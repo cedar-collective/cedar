@@ -197,6 +197,16 @@ test_that("RW01: rows stop at the settled edge; in-progress terms come in only w
   expect_equal(attr(current, "edge"), 202080L)
   expect_equal(attr(current, "latest_term"), 202110L)
 
+  # Spring 2021 settled and not yet graded: its rows are read without asking
+  # for in-progress terms, and they are labelled in progress all the same,
+  # as the page's charts shade them (I58).
+  ungraded <- get_major_course_units(test_student_terms_rw, test_students_rw,
+                                     list(dept_code = "SPAN", min_n = 1L,
+                                          data_edges = rw01_settled_ungraded_edges))
+  expect_equal(ungraded$term, c(202080L, 202110L, 202110L))
+  expect_equal(ungraded$in_progress, c(FALSE, TRUE, TRUE))
+  expect_equal(attr(ungraded, "edge"), 202110L)
+
   one_term <- get_major_course_units(test_student_terms_rw, test_students_rw,
                                      list(dept_code = "HIST", min_n = 1L, term = 202080L,
                                           data_edges = rw01_edges))
@@ -212,8 +222,13 @@ test_that("get_major_course_units() stops without a unit, an edge, or the attach
                                       list(dept_code = "HIST")), "last_enrolled_complete")
   expect_error(get_major_course_units(test_student_terms_st, test_students_st,
                                       list(dept_code = "HIST", include_in_progress = TRUE,
-                                           data_edges = list(last_enrolled_complete = 202110L))),
+                                           data_edges = st01_edges[c("last_enrolled_complete", "last_graded")])),
                "last_enrolled")
+  # The in-progress label reads the graded edge: edges that do not name it are refused.
+  expect_error(get_major_course_units(test_student_terms_st, test_students_st,
+                                      list(dept_code = "HIST",
+                                           data_edges = st01_edges[c("last_enrolled", "last_enrolled_complete")])),
+               "last_graded")
   expect_error(get_major_course_units(test_student_terms_st %>% select(-primary_dept_code),
                                       test_students_st, list(dept_code = "HIST", data_edges = st01_edges)),
                "primary_dept_code")

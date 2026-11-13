@@ -36,7 +36,6 @@ alongside other work (M14, M16).
 
 | ID | Kind | Summary |
 |---|---|---|
-| [I58](#i58--courses-taken-calls-a-term-in-progress-in-its-charts-and-settled-in-its-tables) | Defect | Courses Taken calls a term in progress in its charts and settled in its tables: on the Oct 8 pull Fall 2026 is shaded "In progress" on every over-time chart, while the own-share table's In progress column, the Teaching Units heading and the "Who is being counted" note call it settled |
 | [I55](#i55--the-instructor-gate-password-stopped-reaching-the-app) | Defect | The instructor-gate password stopped reaching the app: since 2026-09-05 `.Renviron` is kept out of the image and nothing else passed `CEDAR_DFW_PASSWORD`, so every instructor gate on production reads "not configured" (fixed in code 2026-11-12; production needs the password in its `.env`) |
 | [I46](#i46--a-deploy-that-must-rebuild-a-table-the-app-cannot-start-without-takes-the-site-down) | Defect | The deploy's table gate ran after the health check, so a deploy that added a column to `cedar_student_terms` failed its health check on the missing column and never reached the gate: production served the restart page from 17:07 UTC on 2026-11-04 (gate moved before the first request) |
 | [I45](#i45--the-class-list-and-the-schedule-name-the-same-section-with-different-course-codes) | Defect | The class list and the schedule name the same section with different course codes for renamed subjects (SOC to SOCI, PSY to PSYC): SOCI 371 had class-list history from Fall 2019 but no sections before Fall 2021 (fixed for every reader by keying the loaded tables on the course, 2026-11-07; open until the remaining successions are confirmed) |
@@ -58,6 +57,7 @@ Kept until the next release, so a recurrence is recognisable; each entry below g
 
 | ID | Kind | Summary |
 |---|---|---|
+| [I58](#i58--courses-taken-calls-a-term-in-progress-in-its-charts-and-settled-in-its-tables) | Defect | Courses Taken shaded Fall 2026 "In progress" in its charts and called it settled in its tables, heading and note; every label now reads `cedar_term_in_progress()` (resolved) |
 | [I57](#i57--the-instructor-patterns-column-guide-states-a-pass-rule-cedar-does-not-use) | Defect | The Instructor Patterns column guide said "Passing is C− or better, CR, P, or S" beside a table that followed CEDAR's rule (A+ through C and CR). The tab is gone: the breakdown by instructor is a section of Downstream > Later Course, which states no pass rule of its own (resolved 2026-11-13, #280) |
 | [I56](#i56--downstream-continuation-misses-every-later-enrollment-after-the-grade-edge) | Defect | Downstream continuation read the later course only to the graded edge while counting eligibility to the settled edge, so the newest students who continued counted as not continuing: 183 of 557 for CHEM 1215 to 1225, confirmed on the 2026-11-13 tables. One cohort (`build_downstream_cohort()`) now reads enrollment to the settled edge and grades to the graded edge, inside a fixed window, by the campus that taught the first course (resolved 2026-11-13, #280) |
 | [I54](#i54--the-gen-ed-list-had-no-second-language-area) | Defect | The Gen Ed list had no area 6 (second language): no language course counted as Gen Ed anywhere, 36 courses and 2,228 enrolled seats in Fall 2025 on ABQ and online (reported in #269; the 55 catalog courses added and production's sections rebuilt 2026-11-12) |
@@ -93,7 +93,15 @@ Kept until the next release, so a recurrence is recognisable; each entry below g
 
 ## I58 — Courses Taken calls a term in progress in its charts and settled in its tables
 
-**Status:** open.
+**Status:** resolved 2026-11-13 (#284). One definition, `cedar_term_in_progress()`
+(`R/branches/data-edges.R`): a term after `last_graded`, at or before
+`last_enrolled`, settled or not. `cedar_in_progress_terms()`, which the
+charts' shading reads, filters on it, and so do the cone's `in_progress`
+and the payload's `meta$latest_in_progress`; the cone refuses edges that do
+not name `last_graded`. The note's in-progress line now says the grades have
+not posted and the registrations can still change. `test-dept-report.R`
+(edges settled past the graded edge) and `test-major-course-units.R`
+(`rw01_settled_ungraded_edges`) fail with the old rule restored.
 **Found:** 2026-11-13, looking at Dept Trends > Courses Taken for History
 (ABQ, EA) on the local institutional app, after #282.
 **Severity:** low. No count is wrong; one page labels the same term two ways,

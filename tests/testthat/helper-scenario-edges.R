@@ -34,9 +34,12 @@ ds01_edges <- list(
 # edge. rw01_settled_edges reads the same rows once Spring 2021 has settled.
 rw01_edges <- list(last_enrolled = 202110L, last_enrolled_complete = 202080L, last_graded = 202080L)
 rw01_settled_edges <- list(last_enrolled = 202110L, last_enrolled_complete = 202110L, last_graded = 202110L)
+# RW01 between the two: Spring 2021 has settled and its grades have not posted.
+rw01_settled_ungraded_edges <- list(last_enrolled = 202110L, last_enrolled_complete = 202110L,
+                                    last_graded = 202080L)
 
-# ST01: Spring 2021 is settled; no test on it reads a grade.
-st01_edges <- list(last_enrolled = 202110L, last_enrolled_complete = 202110L)
+# ST01: Spring 2021 is settled and graded; no test on it reads a grade.
+st01_edges <- list(last_enrolled = 202110L, last_enrolled_complete = 202110L, last_graded = 202110L)
 
 # EC-11 and EC-11b (course planning history, and the Degree Explorer popup that
 # shows it): Fall 2020 is settled, Fall 2021 is the newest term named.
