@@ -458,7 +458,7 @@ test_that("the bundle validator rejects a plan that is not its projection plus i
 })
 
 test_that("Fall deltas scale enrollment changes by the historical carry-through", {
-  s <- projection_spine_scenario()
+  s <- spine_scenarios$base
   result <- project_spine_adjusted(
     s$enrollment_history, s$preceding_term_history, s$section_history,
     s$waitlist_history, s$students, s$row, 202410L,
@@ -508,7 +508,7 @@ test_that("Fall deltas scale enrollment changes by the historical carry-through"
 # sends; the feeders kept are still ranked by transitions. The evidence is in
 # forecasting-lessons.md ("Feeders ranked by lift").
 test_that("a feeder earns its place by lift, not by size", {
-  s <- projection_spine_scenario()
+  s <- spine_scenarios$base
   run <- function(...) project_spine_adjusted(
     s$enrollment_history, s$preceding_term_history, s$section_history,
     s$waitlist_history, s$students, s$row, 202410L,
@@ -574,7 +574,7 @@ test_that("the students left waiting in the term just finished are context, neve
   # The scenario's class lists cover Fall 2023, the term before the Spring
   # 2024 target, but keep no waitlist row in it: who was left waiting then is
   # unknown (NA), not zero, as in every term before waitlist rows were kept.
-  s <- projection_spine_scenario()
+  s <- spine_scenarios$base
   run <- function(waitlists, target = 202410L) project_spine_adjusted(
     s$enrollment_history, s$preceding_term_history, s$section_history,
     waitlists, s$students, s$row, target, opt = projection_scenario_opt()
@@ -604,7 +604,7 @@ test_that("the students left waiting in the term just finished are context, neve
 })
 
 test_that("a listed sequence carries its own change and leaves the pooled feeders", {
-  s <- projection_spine_scenario(sequence = TRUE)
+  s <- spine_scenarios$sequence
   sequences <- tibble::tibble(from_course = "SEQ 1", to_course = "TEST 201")
   result <- project_spine_adjusted(
     s$enrollment_history, s$preceding_term_history, s$section_history,
@@ -665,7 +665,7 @@ test_that("a prior term full on the first day adds its unserved waitlist to the 
   # never held a seat. Demand was at least 24 + 3 = 27. First day plus the
   # waitlist is 23, below the ever-registered spine, so a floor built that way
   # lets the early-drop churn absorb the waitlist (ISSUES.md I27).
-  s <- projection_spine_scenario(spring_capacity = 22, waitlisted = 3L)
+  s <- spine_scenarios$capacity_22_waitlist_3
   s$enrollment_history <- dplyr::mutate(
     s$enrollment_history,
     registered = dplyr::if_else(term == 202310L, 19, registered),
@@ -752,7 +752,7 @@ test_that("a prior term full on the first day adds its unserved waitlist to the 
 })
 
 test_that("the spine audit trail must reconcile", {
-  s <- projection_spine_scenario()
+  s <- spine_scenarios$base
   result <- project_spine_adjusted(
     s$enrollment_history, s$preceding_term_history, s$section_history,
     s$waitlist_history, s$students, s$row, 202410L
@@ -940,7 +940,7 @@ test_that("backtests separate raw from registration-cap-censored accuracy", {
 })
 
 test_that("signed aftcast diagnostics distinguish stable bias from WAPE", {
-  result <- summarize_projection_backtests(projection_summary_backtests())
+  result <- summarize_projection_backtests(projection_summary_backtests)
 
   expect_equal(result$wape, 0.10)
   expect_equal(result$weighted_bias, 0.10)
@@ -950,7 +950,7 @@ test_that("signed aftcast diagnostics distinguish stable bias from WAPE", {
 })
 
 test_that("rows with no applicable method remain explicit", {
-  row <- projection_test_row()
+  row <- projection_test_row
   candidates <- projection_candidate("spine_adjusted") %>%
     dplyr::mutate(
       market_id = row$market_id, college = row$college,
@@ -972,7 +972,7 @@ test_that("rows with no applicable method remain explicit", {
 })
 
 test_that("cone preserves candidate provenance when backtests are empty", {
-  row <- projection_test_row()
+  row <- projection_test_row
   inputs <- list(
     enrollment_history = projection_test_history(100, terms = 202380L),
     preceding_term_history = projection_test_history(100, terms = 202380L),

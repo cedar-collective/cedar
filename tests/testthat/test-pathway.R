@@ -181,7 +181,7 @@ test_that("get_course_timing start_classification excludes S005 from counts and 
   result <- get_course_timing(
     pathway_students, pathway_population,
     opt = list(min_n = 1, start_classification = "Freshman"),
-    student_terms = make_pathway_student_terms()
+    student_terms = pathway_student_terms
   ) %>%
     filter(subject_course %in% c("BIOL 2310", "CHEM 1215")) %>%
     arrange(subject_course, relative_term)
@@ -500,7 +500,7 @@ test_that("get_course_pairs without censor_term preserves uncensored behavior", 
 
 test_that("course timing splits one course across its delivery campuses", {
   r <- suppressMessages(get_course_timing(
-    test_students_mc, mc_population(unique(test_students_mc$student_id)),
+    test_students_mc, mc_population,
     opt = list(min_n = 1L, x_axis = "relative_term")
   ))
   expect_true("campus" %in% names(r))
@@ -512,7 +512,7 @@ test_that("course timing splits one course across its delivery campuses", {
 
 test_that("curriculum map labels multi-campus course rows distinctly", {
   timing <- suppressMessages(get_course_timing(
-    test_students_mc, mc_population(unique(test_students_mc$student_id)),
+    test_students_mc, mc_population,
     opt = list(min_n = 1L, x_axis = "relative_term")
   ))
   plot <- suppressMessages(plot_curriculum_map(
@@ -525,7 +525,7 @@ test_that("curriculum map labels multi-campus course rows distinctly", {
 
 test_that("opt$campus scopes course timing to the delivery campus", {
   r <- suppressMessages(get_course_timing(
-    test_students_mc, mc_population(unique(test_students_mc$student_id)),
+    test_students_mc, mc_population,
     opt = list(min_n = 1L, campus = "ABQ", x_axis = "relative_term")
   ))
   expect_equal(unique(r$campus), "ABQ")
@@ -539,7 +539,7 @@ test_that("course timing without a campus column fails loudly", {
   no_campus <- dplyr::select(test_students_mc, -campus)
   expect_error(
     suppressMessages(get_course_timing(
-      no_campus, mc_population(unique(test_students_mc$student_id)),
+      no_campus, mc_population,
       opt = list(min_n = 1L, x_axis = "relative_term"))),
     "campus"
   )
@@ -550,7 +550,7 @@ test_that("course pairs scope by delivery campus but keep cross-campus pairs", {
   # legitimately sit on different campuses. MC_G1 in MC02 is exactly that: they
   # took SPAN 101 at GA and the follow-on SPAN 201 at ABQ. Campus scopes which
   # rows enter the self-join; it is deliberately not part of the pair key.
-  pop <- mc_population(unique(test_students_mc$student_id))
+  pop <- mc_population
 
   both <- suppressMessages(get_course_pairs(
     test_students_mc, pop,
@@ -592,7 +592,7 @@ test_that("inst_credit_band drops left-truncated students and reports the count"
     pathway_students,
     pathway_population,
     opt = list(min_n = 1, x_axis = "inst_credit_band"),
-    student_terms = make_pathway_student_terms()
+    student_terms = pathway_student_terms
   )
 
   meta <- attr(result, "timing_meta")
@@ -616,7 +616,7 @@ test_that("unm_credit_band carries the same guard as the other credit axes", {
     pathway_students,
     pathway_population,
     opt = list(min_n = 1, x_axis = "unm_credit_band"),
-    student_terms = make_pathway_student_terms()
+    student_terms = pathway_student_terms
   )
 
   expect_equal(attr(result, "timing_meta")$n_truncated, 4)
@@ -630,7 +630,7 @@ test_that("classification axis reads the student-term table, not the course row"
   result <- suppressMessages(get_course_timing(
     rows, pathway_population,
     opt = list(min_n = 1, x_axis = "classification"),
-    student_terms = make_pathway_student_terms()
+    student_terms = pathway_student_terms
   ))
   expect_setequal(result$relative_term[result$subject_course == "CHEM 1215"], 1L)
   expect_setequal(result$relative_term[result$subject_course == "ENGL 1110"], 3L)
@@ -644,7 +644,7 @@ test_that("classification axis reads the student-term table, not the course row"
                "need cedar_student_terms")
   # The start filter reads the first enrolled term on the table: S005 enters as
   # a Sophomore there, and a table calling that term Freshman keeps S005.
-  st <- make_pathway_student_terms()
+  st <- pathway_student_terms
   st$student_classification[st$student_id == "S005" & st$term == 202480L] <- "Freshman"
   kept <- suppressMessages(get_course_timing(
     pathway_students, pathway_population,
@@ -659,7 +659,7 @@ test_that("classification axis excludes nobody for truncation", {
     pathway_students,
     pathway_population,
     opt = list(min_n = 1, x_axis = "classification"),
-    student_terms = make_pathway_student_terms()
+    student_terms = pathway_student_terms
   )
 
   expect_equal(attr(result, "timing_meta")$n_truncated, 0L)
@@ -675,9 +675,7 @@ test_that("a fully-visible population loses no students to the guard", {
     pathway_students,
     pathway_population,
     opt = list(min_n = 1, x_axis = "inst_credit_band"),
-    student_terms = make_pathway_student_terms(
-      extra = tibble(student_id = "S000", term = 202380L,
-                     attempted_unm_credits = 12, completed_unm_credits = 12))
+    student_terms = pathway_student_terms_earlier_window
   )
 
   expect_equal(attr(result, "timing_meta")$n_truncated, 0)

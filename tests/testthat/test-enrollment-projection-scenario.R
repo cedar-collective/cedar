@@ -8,7 +8,7 @@ context("Enrollment projection scenarios")
 # covered by the real-data audit documented in developers/enrollment-projections.md.
 
 test_that("year one is the published projection at any growth rate", {
-  bundle <- scenario_test_bundle(scenario_test_composition())
+  bundle <- scenario_test_bundle(scenario_test_composition)
   published <- build_enrollment_projection_view(
     bundle, list(group_id = "all_saved")
   )$projections$projected_classlist_total[[1]]
@@ -26,7 +26,7 @@ test_that("year one is the published projection at any growth rate", {
 })
 
 test_that("zero growth is flat and only the population's share moves demand", {
-  bundle <- scenario_test_bundle(scenario_test_composition())
+  bundle <- scenario_test_bundle(scenario_test_composition)
   published <- build_enrollment_projection_view(
     bundle, list(group_id = "all_saved")
   )$projections$projected_classlist_total[[1]]
@@ -54,7 +54,7 @@ test_that("zero growth is flat and only the population's share moves demand", {
 })
 
 test_that("the horizon advances one year per step in the target's own season", {
-  bundle <- scenario_test_bundle(scenario_test_composition())
+  bundle <- scenario_test_bundle(scenario_test_composition)
   scenario <- build_enrollment_projection_scenario(
     bundle, opt = list(group_id = "all_saved", major_codes = "NURS",
                        growth_rate = 0.10, horizon_years = 3L,
@@ -67,7 +67,7 @@ test_that("the horizon advances one year per step in the target's own season", {
 })
 
 test_that("sections round up from unrounded demand and never go negative", {
-  bundle <- scenario_test_bundle(scenario_test_composition())
+  bundle <- scenario_test_bundle(scenario_test_composition)
   scenario <- build_enrollment_projection_scenario(
     bundle, opt = list(group_id = "all_saved", major_codes = "NURS",
                        growth_rate = 0.50, horizon_years = 5L,
@@ -87,7 +87,7 @@ test_that("sections round up from unrounded demand and never go negative", {
 })
 
 test_that("a cohort below the guard is reported, not silently dropped", {
-  bundle <- scenario_test_bundle(scenario_test_composition(cohort = 3L))
+  bundle <- scenario_test_bundle(dplyr::mutate(scenario_test_composition, n_students = c(3L, 30L)))
   scenario <- build_enrollment_projection_scenario(
     bundle, opt = list(group_id = "all_saved", major_codes = "NURS",
                        growth_rate = 0.10, min_population_cohort = 10L)
@@ -100,7 +100,7 @@ test_that("a cohort below the guard is reported, not silently dropped", {
 })
 
 test_that("a course with none of the population is excluded with a reason", {
-  bundle <- scenario_test_bundle(scenario_test_composition(cohort = 0L))
+  bundle <- scenario_test_bundle(dplyr::mutate(scenario_test_composition, n_students = c(0L, 30L)))
   scenario <- build_enrollment_projection_scenario(
     bundle, opt = list(group_id = "all_saved", major_codes = "PHRD",
                        growth_rate = 0.10, min_population_cohort = 1L)
@@ -112,7 +112,7 @@ test_that("a course with none of the population is excluded with a reason", {
 })
 
 test_that("the scenario fails loudly rather than guessing", {
-  bundle <- scenario_test_bundle(scenario_test_composition())
+  bundle <- scenario_test_bundle(scenario_test_composition)
 
   expect_error(
     build_enrollment_projection_scenario(bundle, opt = list(growth_rate = 0.1)),
@@ -143,7 +143,7 @@ test_that("the scenario fails loudly rather than guessing", {
 })
 
 test_that("meta states the assumption and names the population", {
-  bundle <- scenario_test_bundle(scenario_test_composition())
+  bundle <- scenario_test_bundle(scenario_test_composition)
   scenario <- build_enrollment_projection_scenario(
     bundle, programs = test_programs_hp,
     opt = list(group_id = "all_saved",

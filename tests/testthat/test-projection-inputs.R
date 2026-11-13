@@ -257,7 +257,7 @@ test_that("first-day retention reads prior same-season first days and skips unkn
     )
 
   result <- projection_first_day_retention_for_row(
-    history, projection_test_row(), 202280L,
+    history, projection_test_row, 202280L,
     opt = list(first_day_retention_min_terms = 2L)
   )
 
@@ -380,7 +380,7 @@ test_that("intersession is left out of every projection input (IS01)", {
 })
 
 test_that("recent history pairs actuals and sections with current-method aftcasts", {
-  projections <- projection_test_row() %>%
+  projections <- projection_test_row %>%
     dplyr::mutate(
       method_id = "seasonal_last",
       method_label = unname(CEDAR_ENROLLMENT_PROJECTION_METHODS[["seasonal_last"]]),
@@ -580,7 +580,7 @@ test_that("seasonal methods exclude the target and all future terms", {
     projection_test_history(c(10, 20, 30, 40)),
     projection_test_history(999, terms = 202580L)
   )
-  row <- projection_test_row()
+  row <- projection_test_row
 
   last_result <- project_seasonal_last(history, row, 202480L)
 
@@ -591,7 +591,7 @@ test_that("seasonal methods exclude the target and all future terms", {
 })
 
 test_that("candidate methods can be limited for fast computational audits", {
-  row <- projection_test_row()
+  row <- projection_test_row
   inputs <- list(
     enrollment_history = projection_test_history(),
     students = list()
@@ -750,7 +750,7 @@ test_that("capacity context distinguishes saturation, growth, and added-seat res
   )
 
   context <- projection_capacity_context(
-    history, sections, projection_test_row()
+    history, sections, projection_test_row
   )
 
   expect_equal(context$capacity_data_quality, "Usable")
@@ -896,7 +896,7 @@ test_that("recent history is saved by delivery campus, each with its own first d
     test_students_regstats, test_sections_regstats, "SOCI 100", c("ABQ", "EA")
   )
   campus <- build_projection_recent_campus_history(
-    campus_history_scaffold(202080L), sections, first_day
+    campus_history_scaffold, sections, first_day
   )
   abq <- campus %>% dplyr::filter(campus == "ABQ")
   ea <- campus %>% dplyr::filter(campus == "EA")

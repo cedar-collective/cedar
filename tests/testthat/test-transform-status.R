@@ -8,7 +8,7 @@ test_that("student transform saves one class-list row per course-term and no cla
   dir.create(output_dir)
   on.exit(unlink(output_dir, recursive = TRUE), add = TRUE)
   env$transform_students(class_lists_audits, output_dir, ".qs",
-                        maps = list(mapping_files = scaffold_mapping_files(),
+                        maps = list(mapping_files = scaffold_mapping_files,
                                     major_name_to_major_code = c(History = "HIST")))
   # Outcomes are classified at load (cedar_attempts), never saved.
   expect_false(file.exists(file.path(output_dir, "cedar_grades.qs")))
@@ -18,7 +18,7 @@ test_that("student transform saves one class-list row per course-term and no cla
   students <- qs2::qs_read(file.path(output_dir, "cedar_registrations.qs"))
   expect_false(any(c("department", "college", "college_basis") %in% names(students)))
   expect_equal(unique(students$source_college), "ARTS")
-  attached <- attach_unit(students, scaffold_dims(), "subject")
+  attached <- attach_unit(students, scaffold_dims, "subject")
   expect_equal(unique(attached$department), "HIST")
   expect_equal(unique(attached$college), "AS")
   expect_equal(unique(attached$college_basis), "mapped")
@@ -169,9 +169,12 @@ test_that("a program's unit comes from programs.csv; anything unconfirmed has no
     status = c("confirmed", "confirmed", "confirmed", "proposed"), evidence = "", notes = "")
   # History names a major, so the name-to-code fill could reach EC14-C's
   # History concentration if it applied to concentrations (I21).
+  mapping_files <- scaffold_mapping_files
+  mapping_files$programs <- programs_csv
+  dims <- build_cedar_dims(mapping_files)
   maps <- list(
-    mapping_files = scaffold_mapping_files(programs_csv),
-    dims = scaffold_dims(programs_csv),
+    mapping_files = mapping_files,
+    dims = dims,
     major_name_to_major_code = c(History = "HIST")
   )
   env$transform_programs(academic_studies_program_units, output_dir, ".qs", maps = maps)
@@ -179,7 +182,7 @@ test_that("a program's unit comes from programs.csv; anything unconfirmed has no
   expect_false(any(c("dept_code", "program_college", "college_code", "college_basis",
                      "student_college") %in% names(stored)))
   expect_true(all(c("source_college", "source_college_code") %in% names(stored)))
-  programs <- suppressMessages(attach_program_units(stored, scaffold_dims(programs_csv)))
+  programs <- suppressMessages(attach_program_units(stored, dims))
   declared <- programs[!grepl("Concentration", programs$program_type), ]
   dept <- stats::setNames(declared$dept_code, declared$major_code)
 

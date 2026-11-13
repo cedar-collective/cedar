@@ -91,7 +91,192 @@ counting_rule_tables <- local({
 
 # ── test-catalogs.R ─────────────────────────────────────────────────────────────
 
+# One valid row of each mapping file: what a mapping directory holds when a
+# test needs the file and nothing in particular in it.
+mapping_program_row <- data.frame(
+  program_code = "HIST", in_college = "", program_name = "HIST", unit_code = "HIST",
+  college_code = "", is_pre_major = "FALSE", leads_to = "", basis = "decided",
+  status = "confirmed", evidence = "", notes = "")
+
+mapping_subject_row <- data.frame(
+  subject_code = "HIST", in_college = "AS", in_level = "", unit_code = "HIST",
+  college_code = "", status = "confirmed", evidence = "", notes = "")
+
+mapping_history_row <- data.frame(
+  kind = "course", from_code = "MATH 120", to_code = "MATH 1215",
+  effective_term = "202080", scope = "", basis = "catalog", status = "confirmed",
+  evidence = "", notes = "")
+
+# programs.csv as five tests design it, typed once; a test reads its rows by
+# name (mapping_programs$invalid). Every program's name is its code, and HIST
+# is the unit of every row that names no other.
+mapping_programs <- local({
+  rows <- tibble::tribble(
+    ~table,       ~program_code, ~in_college, ~unit_code, ~college_code, ~is_pre_major, ~leads_to, ~basis,          ~status,
+    # invalid: one row per fault the programs validator names.
+    "invalid",    "HIST",        "",          "HIST",     "",            "FALSE",       "",        "decided",       "confirmed",  # a duplicate...
+    "invalid",    "HIST",        "",          "HIST",     "",            "FALSE",       "",        "decided",       "confirmed",  # ...of this row
+    "invalid",    "FHIS",        "",          "HIST",     "",            "TRUE",        "NOPE",    "decided",       "confirmed",  # target not a program
+    "invalid",    "ANTH",        "",          "ANTH",     "",            "FALSE",       "",        "decided",       "confirmed",  # unit not in units.csv
+    "invalid",    "NOND",        "",          "",         "",            "FALSE",       "",        "decided",       "confirmed",  # confirmed, no unit, not no_unit
+    "invalid",    "GUES",        "",          "",         "",            "FALSE",       "",        "unresolved",    "confirmed",  # unresolved but confirmed
+    "invalid",    "ODD",         "",          "HIST",     "",            "FALSE",       "",        "vibes",         "maybe",      # no such basis, no such status
+    "invalid",    "LEAD",        "",          "HIST",     "",            "FALSE",       "HIST",    "decided",       "confirmed",  # target on a non-pre-major
+    "invalid",    "SOCI",        "",          "SOCI",     "",            "FALSE",       "",        "decided",       "confirmed",
+    "invalid",    "FSOC",        "",          "HIST",     "",            "TRUE",        "SOCI",    "decided",       "confirmed",  # target in another unit
+    "invalid",    "FSOX",        "",          "HIST",     "",            "TRUE",        "SOCI",    "course_taking", "proposed",   # ...which is a fault only once confirmed
+    # colleges: CRIM's unit, and so its college, depends on the in_college row.
+    # BCHM is owned by HIST (college AS) and sets its own college; its pre-major
+    # FBCH sets none. GUES is undecided. Nothing owns UNDC or NOND; UNDC names
+    # a college, NOND names none.
+    "colleges",   "CRIM",        "",          "SOCI",     "",            "FALSE",       "",        "decided",       "confirmed",
+    "colleges",   "CRIM",        "AD",        "CJUS",     "",            "FALSE",       "",        "override",      "confirmed",
+    "colleges",   "BCHM",        "",          "HIST",     "AD",          "FALSE",       "",        "decided",       "confirmed",
+    "colleges",   "FBCH",        "",          "HIST",     "",            "TRUE",        "BCHM",    "decided",       "confirmed",
+    "colleges",   "GUES",        "",          "",         "",            "FALSE",       "",        "unresolved",    "proposed",
+    "colleges",   "UNDC",        "",          "",         "AS",          "FALSE",       "",        "no_unit",       "confirmed",
+    "colleges",   "NOND",        "",          "",         "",            "FALSE",       "",        "no_unit",       "confirmed",
+    # line_order: CRIM's college-specific row is first, on purpose (file line 2);
+    # its every-college row is last (line 4).
+    "line_order", "CRIM",        "AD",        "CJUS",     "",            "FALSE",       "",        "override",      "confirmed",
+    "line_order", "HIST",        "",          "HIST",     "",            "FALSE",       "",        "decided",       "confirmed",
+    "line_order", "CRIM",        "",          "SOCI",     "",            "FALSE",       "",        "decided",       "confirmed",
+    # units: mirrors UNM's CRIM, Sociology on main campus and Criminal Justice at
+    # the branches (college AD); ART is a proposal; nothing owns NOND.
+    "units",      "CRIM",        "",          "SOCI",     "",            "FALSE",       "",        "decided",       "confirmed",
+    "units",      "CRIM",        "AD",        "CJUS",     "",            "FALSE",       "",        "override",      "confirmed",
+    "units",      "ART",         "",          "HIST",     "",            "FALSE",       "",        "course_taking", "proposed",
+    "units",      "NOND",        "",          "",         "",            "FALSE",       "",        "no_unit",       "confirmed",
+    # attach: HIST and CRIM (SOCI, but CJUS at the branch college AD), BCHM owned
+    # by HIST but credited to AD, its pre-major FBCH, and UNDC, which nothing
+    # owns but college AS reports.
+    "attach",     "HIST",        "",          "HIST",     "",            "FALSE",       "",        "decided",       "confirmed",
+    "attach",     "CRIM",        "",          "SOCI",     "",            "FALSE",       "",        "decided",       "confirmed",
+    "attach",     "CRIM",        "AD",        "CJUS",     "",            "FALSE",       "",        "override",      "confirmed",
+    "attach",     "BCHM",        "",          "HIST",     "AD",          "FALSE",       "",        "decided",       "confirmed",
+    "attach",     "FBCH",        "",          "HIST",     "",            "TRUE",        "BCHM",    "decided",       "confirmed",
+    "attach",     "UNDC",        "",          "",         "AS",          "FALSE",       "",        "no_unit",       "confirmed"
+  ) %>%
+    mutate(program_name = program_code, evidence = "", notes = "")
+  lapply(split(rows[names(mapping_program_row)], rows$table), as.data.frame)
+})
+
+# subjects.csv as four tests design it, typed once and read by name.
+mapping_subjects <- local({
+  rows <- tibble::tribble(
+    ~table,           ~subject_code, ~in_college, ~in_level, ~unit_code, ~college_code, ~status,
+    # invalid: ANTH names a unit units.csv does not have and a college
+    # colleges.csv does not have.
+    "invalid",        "HIST",        "AS",        "",        "HIST",     "",            "confirmed",
+    "invalid",        "ANTH",        "XX",        "",        "ANTH",     "",            "confirmed",
+    # with_proposals: HIST is confirmed; ANTH is a proposal with a suggested
+    # unit; GEX is a proposal nothing settled.
+    "with_proposals", "HIST",        "AS",        "",        "HIST",     "",            "confirmed",
+    "with_proposals", "ANTH",        "AS",        "",        "SOCI",     "",            "proposed",
+    "with_proposals", "GEX",         "AS",        "",        "",         "",            "proposed",
+    # specificity: mirrors UNM's GLNS, one unit (SOCI, home college AS) whose
+    # graduate courses keep the unit's college and whose other courses are
+    # credited to AD, with its lower-division courses in AD sections taught by
+    # CJUS. HIST has a row for section college AS and one for graduate courses
+    # in any college.
+    "specificity",    "HIST",        "AS",        "",        "HIST",     "",            "confirmed",
+    "specificity",    "HIST",        "",          "grad",    "SOCI",     "",            "confirmed",
+    "specificity",    "GLNS",        "",          "grad",    "SOCI",     "",            "confirmed",
+    "specificity",    "GLNS",        "",          "",        "SOCI",     "AD",          "confirmed",
+    "specificity",    "GLNS",        "AD",        "lower",   "CJUS",     "",            "confirmed",
+    # bad_level: senior is not a level.
+    "bad_level",      "HIST",        "AS",        "",        "HIST",     "",            "confirmed",
+    "bad_level",      "HIST",        "AS",        "senior",  "HIST",     "",            "confirmed"
+  ) %>%
+    mutate(evidence = "", notes = "")
+  lapply(split(rows[names(mapping_subject_row)], rows$table), as.data.frame)
+})
+
+# code_history.csv with one row or pair of rows per fault the code-history
+# validator names.
+mapping_code_history_invalid <- tibble::tribble(
+  ~kind,     ~from_code, ~to_code,    ~effective_term, ~scope,          ~basis,    ~status,
+  "course",  "SOCI 371", "SOCI 371",  "202080",        "",              "catalog", "confirmed",  # a code does not succeed itself
+  "course",  "MATH 120", "MATH 1215", "202080",        "",              "catalog", "confirmed",  # a duplicate...
+  "course",  "MATH 120", "MATH 1215", "202080",        "",              "catalog", "confirmed",  # ...of this row
+  "course",  "MATH 121", "MATH 1220", "202080",        "",              "catalog", "confirmed",  # a confirmed split...
+  "course",  "MATH 121", "MATH 1230", "202080",        "",              "catalog", "confirmed",  # ...into two codes
+  "course",  "MATH 122", "MATH 1240", "202080",        "",              "catalog", "proposed",   # a proposed split is fine
+  "course",  "MATH 122", "MATH 1250", "202080",        "",              "catalog", "proposed",
+  "subject", "PSY",      "PSYC",      "202080",        "undergraduate", "catalog", "confirmed",  # scope on a subject row
+  "subject", "ALB",      "ALBS",      "2020",          "",              "catalog", "confirmed",  # not a term code
+  "subject", "A",        "B",         "202080",        "",              "catalog", "confirmed",  # a cycle...
+  "subject", "B",        "A",         "202080",        "",              "catalog", "confirmed",  # ...of two
+  "course",  "soci 371", "SOCI 3710", "202080",        "",              "catalog", "confirmed",  # a lower-case code
+  "major",   "RADS",     "FRAD",      "202080",        "",              "vibes",   "maybe"       # no such kind, basis or status
+) %>%
+  mutate(evidence = "", notes = "") %>%
+  as.data.frame()
+
+unm_settings <- data.frame(
+  setting = c("mapping_files_url", "source_files_url", "projection_history_start_term"),
+  value   = c("https://github.com/org/repo/blob/main/institution/x",
+              "https://github.com/org/repo/blob/main", "202210"))
+
+one_unit <- list(
+  colleges = data.frame(college_code = c("AS", "AD"), college_name = c("Arts and Sciences", "Branch"),
+                        source_names = c("", "Branch Campuses|ED")),
+  units    = data.frame(unit_code = c("HIST", "SOCI", "CJUS"),
+                        unit_name = c("History", "Sociology", "Criminal Justice"),
+                        college_code = c("AS", "AS", "AD"), kind = "department", notes = ""),
+  subjects = mapping_subject_row
+)
+
+good_levels <- data.frame(leading_digit = as.character(0:9),
+                          level = c(rep("lower", 3), rep("upper", 2), rep("grad", 5)))
+
 unm_programs <- read_institution_mappings(cedar_institution_dir(cedar_base_dir, "unm"))$programs
+
+# ── test-course-attempts.R ──────────────────────────────────────────────────────
+
+# The designed seats of the DFW demographics tests: HIST 1110 rows copied from
+# the fixture's first, one per student, with the status and grade each test
+# reads.
+#   demo:      demo-01 A, demo-02 F, demo-03 late drop, demo-04 early drop,
+#              demo-05 C-, demo-06 A
+#   threshold: threshold-01 C-, threshold-02 A
+dfw_demo_rows <- local({
+  base_row <- test_students %>%
+    dplyr::filter(subject_course == "HIST 1110") %>%
+    dplyr::slice(1)
+  seats <- function(ids, statuses, grades) {
+    dplyr::bind_rows(lapply(seq_along(ids), function(i) {
+      base_row %>% dplyr::mutate(
+        student_id = ids[[i]], crn = as.character(93000 + i),
+        registration_status_code = statuses[[i]], final_grade = grades[[i]]
+      )
+    }))
+  }
+  list(
+    demo = seats(paste0("demo-0", 1:6), c("RE", "RE", "DW", "DR", "RE", "RE"),
+                 c("A", "F", NA, NA, "C-", "A")),
+    threshold = seats(c("threshold-01", "threshold-02"), c("RE", "RE"), c("C-", "A"))
+  )
+})
+
+# The groups are the student-term table's, never the class list's (ADR-001
+# step 5): the loaded class list carries no description, so each designed seat
+# gets its classification and primary major from a student-term row here. The
+# demo seats carry two codes programs.csv does not, so each is named as itself;
+# the second is a pre-major, so it reads with the suffix every major table uses.
+dfw_demo_student_terms <- list(
+  demo = tibble::tibble(
+    student_id = dfw_demo_rows$demo$student_id, term = as.integer(dfw_demo_rows$demo$term),
+    student_classification = c(rep("Freshman", 4), "Sophomore", "Sophomore"),
+    primary_major_code = c(rep("ZZHIST", 4), "ZZBIOL", "ZZBIOL"),
+    is_pre_major = c(rep(FALSE, 4), TRUE, TRUE)
+  ),
+  threshold = tibble::tibble(
+    student_id = dfw_demo_rows$threshold$student_id,
+    term = as.integer(dfw_demo_rows$threshold$term),
+    student_classification = "Sophomore", primary_major_code = "ZZBIOL", is_pre_major = FALSE
+  )
+)
 
 # ── test-course-demographics-donuts.R ───────────────────────────────────────────
 
@@ -237,11 +422,18 @@ planning_gen_ed <- data.frame(subject_course = c("SOCI 100", "SOCI 101", "SOCI 1
 
 ss_attempts <- keyed_attempts(test_students_rp, rp01_edges)
 
-ss_attempts2 <- bind_rows(
-  ss_attempts,
-  .ss_row("RP_BACK", 202010, "pass"), .ss_row("RP_FAIL", 202010, "pass", "RP_I3"),
-  .ss_row("RP_REP", 202080, "dfw"), .ss_row("RP_BACK", 202080, "pass"), .ss_row("RP_FAIL", 202080, "dfw")
-)
+ss_attempts2 <- local({
+  .ss_row <- function(sid, term_code, outcome_value, instructor = "RP_I1") {
+    ss_attempts %>% slice(1L) %>%
+      mutate(student_id = sid, term = as.integer(term_code), subject_course = "HIST 101",
+             outcome = outcome_value, instructor_id = instructor, instructor_name = instructor)
+  }
+  bind_rows(
+    ss_attempts,
+    .ss_row("RP_BACK", 202010, "pass"), .ss_row("RP_FAIL", 202010, "pass", "RP_I3"),
+    .ss_row("RP_REP", 202080, "dfw"), .ss_row("RP_BACK", 202080, "pass"), .ss_row("RP_FAIL", 202080, "dfw")
+  )
+})
 
 ss_student_terms2 <- test_student_terms_rp %>%
   mutate(sem_gpa = case_when(
@@ -443,7 +635,208 @@ scan_config <- local({
     fields = read_institution_file("catalog_scan_fields", dir))
 })
 
-# ── test-enrollment-projections.R ───────────────────────────────────────────────
+# ── test-enrollment-projection-scenario.R, test-projection-inputs.R, ─────────────
+# ── test-projection-model.R, test-projection-view.R ─────────────────────────────
+
+# One prepared history row, as prepare_enrollment_projection_inputs() shapes
+# it: a Fall of TEST 101 in the pooled market, complete on the first day, with
+# 100 in every count column. projection_test_history() stamps a test's own
+# series on it.
+projection_history_row <- tibble::tibble(
+  market_id = "abq_ea_course_market",
+  college = "AS",
+  subject_course = "TEST 101",
+  term = 202380L,
+  term_type = "fall",
+  registered = 100,
+  dr_early = 0,
+  dr_late = 0,
+  classlist_total = 100,
+  first_day_enrl = 100,
+  first_day_basis = "complete",
+  first_day_started_enrl = 100,
+  census_enrl = 100
+)
+
+# One prepared scope row: TEST 101, forced into scope, targeting Fall 2024.
+projection_test_row <- tibble::tibble(
+  market_id = "abq_ea_course_market",
+  college = "AS",
+  department = "TEST",
+  subject_course = "TEST 101",
+  term_type = "fall",
+  target_term = 202480L,
+  scheduled_sections = 4L,
+  scheduled_capacity = 140,
+  target_classlist_total_to_date = 135,
+  target_registered_now = 130,
+  target_early_drops_to_date = 5,
+  target_late_drops_to_date = 0,
+  target_other_status_to_date = 0,
+  target_registration_observed = TRUE,
+  target_available_seats = 10,
+  target_classlist_fill = 135 / 140,
+  target_active_fill = 130 / 140,
+  target_capacity_reached = FALSE,
+  n_delivery_components = 2L,
+  n_campuses = 2L,
+  target_schedule_available = TRUE,
+  recent_high_fill_terms = 2L,
+  recent_capacity_terms = 3L,
+  is_forced = TRUE,
+  pressure_capacity_shortfall = FALSE,
+  pressure_chronic_fill = TRUE,
+  pressure_growth = FALSE,
+  included = TRUE,
+  inclusion_reason = "Test scope"
+)
+
+# One aftcast row for one method, as backtest_course_projection_methods()
+# shapes it before capacity censoring: seasonal_last projecting 100 against an
+# actual 100 in twice the seats. projection_policy_backtests() stamps a test's
+# method and series on it.
+projection_backtest_row <- tibble::tibble(
+  market_id = "abq_ea_course_market", college = "AS",
+  subject_course = "TEST 101", term_type = "fall",
+  target_term = 202080L, target_term_label = "Fall 2020",
+  method_id = "seasonal_last",
+  method_label = unname(CEDAR_ENROLLMENT_PROJECTION_METHODS[["seasonal_last"]]),
+  method_role = unname(CEDAR_ENROLLMENT_PROJECTION_METHOD_ROLES[["seasonal_last"]]),
+  applicable = TRUE, applicability_reason = "test",
+  projected_classlist_total = 100,
+  first_day_retention_rate = 1, projected_first_day_equivalent = 100,
+  actual_classlist_total = 100, actual_first_day = 100,
+  actual_census = 100, actual_final_enrollment = 100,
+  scheduled_capacity = 200
+)
+
+# Six summarised aftcasts of seasonal_last for TEST 101, Falls 2018 to 2023:
+# 110 projected against 100 actual every year, never capacity constrained.
+projection_summary_backtests <- local({
+  projected <- rep(110, 6)
+  actual <- rep(100, 6)
+  error <- projected - actual
+  tibble::tibble(
+    market_id = "abq_ea_course_market", college = "AS", department = "TEST",
+    subject_course = "TEST 101", term_type = "fall",
+    target_term = seq(201880L, by = 100L, length.out = 6),
+    method_id = "seasonal_last",
+    method_label = unname(CEDAR_ENROLLMENT_PROJECTION_METHODS[["seasonal_last"]]),
+    method_role = "observed_enrollment", applicable = TRUE,
+    projected_classlist_total = projected, actual_classlist_total = actual,
+    first_day_retention_rate = 1,
+    projected_first_day_equivalent = projected, actual_first_day = actual,
+    actual_census = actual,
+    scheduled_capacity = 2 * actual, capacity_fill = 0.5,
+    capacity_usable = TRUE, capacity_reached = FALSE,
+    error = error, abs_error = abs(error),
+    capacity_censored_abs_error = abs(error),
+    pct_error = error / actual, abs_pct_error = abs(error / actual)
+  )
+})
+
+# EC-11's SOCI 100 at Fall 2020 is taught on two campuses: ABQ in a full-term
+# and a first-half session (107 + 28 on the first day, 200 seats) and EA
+# (58 of 100). Pooled, the market reads 193 of 300; each campus keeps its own.
+campus_history_scaffold <- tibble::tibble(
+  market_id = "abq_ea_course_market", subject_course = "SOCI 100",
+  projection_target_term = 202180L, history_term = 202080L,
+  recency_rank = 1L
+)
+
+# The spine / floor / delta model: one designed scenario, TEST 201, read by the
+# floor, delta and regime tests.
+#   Springs 2022 and 2023 enrolled 20 and 24 (the spine for Spring 2024 is 24).
+#   Falls 2021 to 2023 enrolled 8, 8, 12 in the course itself.
+#   FEED 1 enrolled 10, 10, 20 students in those Falls; half of each Fall's
+#   FEED 1 students took TEST 201 the following Spring, and a quarter of each
+#   Fall's TEST 201 students took it again.
+# Three readings of it:
+#   $base                    30 seats in Spring 2023, nobody waiting.
+#   $sequence                SEQ 1 added as the course taken just before: 8, 8
+#                            and 4 students in those Falls, half of each of the
+#                            first two taking TEST 201 the next Spring. Two of
+#                            Fall 2023's four also took FEED 1.
+#   $capacity_22_waitlist_3  22 seats in Spring 2023 and three students waiting.
+spine_scenarios <- local({
+  scenario <- function(spring_capacity = 30, waitlisted = 0L, sequence = FALSE) {
+    springs <- projection_test_history(
+      c(20, 24), terms = c(202210L, 202310L), course = "TEST 201"
+    ) %>% dplyr::mutate(term_type = "spring")
+    falls <- projection_test_history(
+      c(8, 8, 12), terms = c(202180L, 202280L, 202380L), course = "TEST 201"
+    )
+    ids <- function(prefix, n) paste0(prefix, seq_len(n))
+    roster <- function(term, course, students) {
+      tibble::tibble(student_id = students, term = term, subject_course = course)
+    }
+    # BIG 1 is the market's large course: 100 students each Fall, of whom two
+    # take TEST 201 next Spring. By count it out-feeds FEED 1 over the two pairs
+    # (4 transitions against FEED 1's 10 would both have passed the old
+    # threshold of 3); by lift it is nothing like a prerequisite (0.02 against
+    # the market's 0.064, lift 0.3), where FEED 1's half is lift 7.9.
+    enrollments <- dplyr::bind_rows(
+      roster(202180L, "FEED 1", ids("f", 10)), roster(202180L, "TEST 201", ids("r", 4)),
+      roster(202180L, "BIG 1", ids("b", 100)),
+      roster(202210L, "TEST 201", c(ids("f", 5), "r1", ids("x", 12), "b1", "b2")),
+      roster(202280L, "FEED 1", ids("g", 10)), roster(202280L, "TEST 201", ids("s", 4)),
+      roster(202280L, "BIG 1", ids("c", 100)),
+      roster(202310L, "TEST 201", c(ids("g", 5), "s1", ids("y", 16), "c1", "c2")),
+      roster(202380L, "FEED 1", ids("h", 20)), roster(202380L, "TEST 201", ids("t", 12)),
+      roster(202380L, "BIG 1", ids("d", 100)),
+      if (sequence) dplyr::bind_rows(
+        roster(202180L, "SEQ 1", ids("q", 8)), roster(202210L, "TEST 201", ids("q", 4)),
+        roster(202280L, "SEQ 1", ids("p", 8)), roster(202310L, "TEST 201", ids("p", 4)),
+        roster(202380L, "SEQ 1", ids("u", 4)), roster(202380L, "FEED 1", ids("u", 2))
+      )
+    )
+    sections <- tibble::tibble(
+      market_id = "abq_ea_course_market", college = "AS", department = "TEST",
+      course_title = "Test Course", subject_course = "TEST 201",
+      term = c(202210L, 202310L), term_type = "spring",
+      scheduled_sections = 1L, scheduled_enrl = c(20, 24),
+      scheduled_capacity = c(30, spring_capacity), n_delivery_components = 1L,
+      n_campuses = 1L, capacity_per_section = c(30, spring_capacity)
+    )
+    waitlists <- tibble::tibble(
+      market_id = "abq_ea_course_market", subject_course = "TEST 201",
+      term = 202310L, waitlisted = as.integer(waitlisted)
+    )
+    list(
+      enrollment_history = springs,
+      preceding_term_history = dplyr::bind_rows(springs, falls),
+      section_history = sections,
+      waitlist_history = waitlists,
+      students = list(
+        course_enrollments = enrollments,
+        target_students = enrollments %>% dplyr::filter(subject_course == "TEST 201"),
+        student_terms = tibble::tibble(
+          student_id = character(), term = integer(), major_code = character(),
+          student_classification = character()
+        )
+      ),
+      row = projection_test_row %>%
+        dplyr::mutate(subject_course = "TEST 201", term_type = "spring", target_term = 202410L)
+    )
+  }
+  list(
+    base = scenario(),
+    sequence = scenario(sequence = TRUE),
+    capacity_22_waitlist_3 = scenario(spring_capacity = 22, waitlisted = 3L)
+  )
+})
+
+# 40 students in the baseline roster, 10 of them Nursing: a 25% share. Every
+# expected value in the scenario tests is derived from these two numbers and
+# the published projection, so a changed expectation means the arithmetic moved.
+scenario_test_composition <- tibble::tibble(
+  market_id = "abq_course_market",
+  subject_course = "MATH 1215Z",
+  baseline_term = 202010L,
+  major_code = c("NURS", "BIOL"),
+  student_classification = "Sophomore",
+  n_students = c(10L, 30L)
+)
 
 empty_projection_test_waitlists <- tibble::tibble(
   market_id = character(), subject_course = character(), term = integer(),
@@ -513,6 +906,12 @@ gpa_students <- dplyr::bind_rows(
   .st_row("GP_S9", 202080L, "JJJ 101", "RE", "I"),
   .st_row("GP_S8", 202080L, "KKK 101", "RE", "W")
 )
+
+# GP_S1..GP_S9 as build_student_terms() reads them, settled through Fall 2021.
+gpa_student_terms <- suppressMessages(build_student_terms(
+  gpa_students, programs = NULL, degrees = NULL,
+  edges = list(last_enrolled_complete = 202180L)
+))
 
 # ── test-headcount-comprehensive.R ──────────────────────────────────────────────
 
@@ -636,6 +1035,48 @@ ep_students <- tibble(
   campus = rep("ABQ", 17)
 )
 
+# The S00x students' student-term rows as typed: 15 credits attempted and
+# completed each term, and the classification each student carried that term,
+# as pathway_students records it; the classification axis and the start filter
+# read it from here, never from the course row.
+pathway_term_rows <- tibble(
+  student_id = c("S001", "S001", "S001",
+                 "S002", "S002", "S002",
+                 "S003", "S003",
+                 "S004", "S004", "S004",
+                 "S005", "S005"),
+  term = c(202410L, 202480L, 202510L,
+           202410L, 202480L, 202510L,
+           202410L, 202480L,
+           202410L, 202480L, 202510L,
+           202480L, 202510L),
+  attempted_unm_credits = rep(15, 13),
+  completed_unm_credits = rep(15, 13),
+  student_classification = c("Freshman", "Sophomore", "Junior",
+                             "Freshman", "Sophomore", "Junior",
+                             "Freshman", "Sophomore",
+                             "Freshman", "Sophomore", "Junior",
+                             "Sophomore", "Junior"),
+  enrolled = TRUE
+)
+
+# Those rows with the position columns of cedar_student_terms. The table opens
+# at 202410, so every student who starts there is left-truncated.
+pathway_student_terms <- pathway_position_columns(pathway_term_rows)
+
+# The same rows beside S000, one Fall earlier (202380): the table now opens
+# before every S00x student's first term, and none of them is truncated.
+pathway_student_terms_earlier_window <- pathway_position_columns(dplyr::bind_rows(
+  pathway_term_rows,
+  tibble(student_id = "S000", term = 202380L,
+         attempted_unm_credits = 12, completed_unm_credits = 12)
+))
+
+# MC02 in designed_test_data.R supplies the two-campus rows; the population is
+# every one of its students under one label.
+mc_population <- tibble(student_id = unique(test_students_mc$student_id),
+                        population_label = "MC test population")
+
 # ── test-pathways-helpers.R ─────────────────────────────────────────────────────
 
 # The population below is intermediate membership scaffolding, not authored raw
@@ -731,6 +1172,16 @@ hp2_course_terms <- course_terms_for(test_students_hp2, test_sections_hp2, hp2_e
 hp2_population <- suppressMessages(build_population(
   test_programs_hp2, opt = list(type = "preset", program_names = "Nursing")
 ))
+
+# Which designed catalogs name each HP02 course.
+hp2_plans <- tibble::tribble(
+  ~catalog_id,        ~subject_course,
+  "nursing-bsn-2026", "BIOL 1140",
+  "nursing-bsn-2026", "CHEM 1215",
+  "medlab-bs-2026",   "BIOL 1140",
+  "medlab-bs-2026",   "NUTR 2110",
+  "pophealth-bs-2026", "BIOL 1140"
+)
 
 # ── test-population.R ───────────────────────────────────────────────────────────
 
@@ -860,6 +1311,21 @@ seatfinder_gen_ed_sections <- local({
 
   bind_rows(sections, likely_to_open)
 })
+
+# The five attempts every active section gets in the grade tests: A, B, D, F
+# and a late drop, so each course reads 60% DFW.
+seatfinder_grade_pattern <- tibble(
+  .attempt = 1:5,
+  registration_status_code = c("RE", "RE", "RE", "RE", "DW"),
+  final_grade = c("A", "B", "D", "F", "W")
+)
+
+# The class list over the seat-finder sections, and its attempts as seatfinder()
+# reads them (ADR-001 step 7): loaded and built as the transform builds them,
+# to the test edges' graded edge.
+seatfinder_grade_students <- seatfinder_students_for(test_sections_sf)
+
+seatfinder_grade_attempts <- keyed_attempts(seatfinder_grade_students, edges = seatfinder_test_edges)
 
 # ── test-shared-requirements.R ──────────────────────────────────────────────────
 
@@ -1001,3 +1467,30 @@ fixture_edges <- local({
   terms <- sort(unique(test_students$term))
   modifyList(data_objects$cedar_edges, list(last_enrolled_complete = terms[length(terms) - 1L]))
 })
+
+# ── test-transform-status.R ─────────────────────────────────────────────────────
+
+# Scaffolding: the ADR-002 mapping files a transform reads, as small frames.
+# Only HIST courses have a subject row, and there are no program rows; a test
+# that needs programs sets $programs in its own body.
+scaffold_mapping_files <- list(
+  colleges = data.frame(college_code = c("AS", "FA", "PH"),
+                        college_name = c("Arts and Sciences", "Fine Arts", "Pharmacy"),
+                        source_names = c("College of Arts & Sciences", "College of Fine Arts", "")),
+  units    = data.frame(unit_code = c("HIST", "ANTH", "PHRM", "ARTS"),
+                        unit_name = c("History", "Anthropology", "Pharmacy", "Art Studio"),
+                        college_code = c("AS", "AS", "PH", "FA"), kind = "department", notes = ""),
+  subjects = data.frame(subject_code = "HIST", in_college = "", in_level = "", unit_code = "HIST",
+                        college_code = "", status = "confirmed", evidence = "", notes = ""),
+  programs = as.data.frame(stats::setNames(
+    rep(list(character()), length(CEDAR_MAPPING_FILE_SPECS$programs)),
+    CEDAR_MAPPING_FILE_SPECS$programs)),
+  code_history = as.data.frame(stats::setNames(
+    rep(list(character()), length(CEDAR_MAPPING_FILE_SPECS$code_history)),
+    CEDAR_MAPPING_FILE_SPECS$code_history)),
+  settings = data.frame(setting = character(), value = character())
+)
+
+# The same files as the loader reads them: the transform stores keys, and
+# attach_unit() (R/branches/dims.R) resolves them at every start.
+scaffold_dims <- build_cedar_dims(scaffold_mapping_files)

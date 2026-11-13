@@ -335,7 +335,7 @@ test_that("seatfinder returns expected list structure", {
   with_seatfinder_test_terms({
     expect_no_error(
       result <- seatfinder(
-        seatfinder_grade_attempts(),
+        seatfinder_grade_attempts,
         test_sections_sf,
         test_faculty,
         list(data_edges = seatfinder_test_edges, term = "202510", course_campus = "ABQ", level = "lower")
@@ -356,7 +356,7 @@ test_that("seatfinder returns expected list structure", {
 test_that("seatfinder parses single term correctly", {
   with_seatfinder_test_terms({
     result <- seatfinder(
-      seatfinder_grade_attempts(),
+      seatfinder_grade_attempts,
       test_sections_sf,
       test_faculty,
       list(data_edges = seatfinder_test_edges, term = "202510", course_campus = "ABQ", level = "lower")
@@ -380,7 +380,7 @@ test_that("seatfinder keeps topic titles distinct without many-to-many repeats",
   with_seatfinder_test_terms({
     sections <- seatfinder_topic_sections
     result <- seatfinder(
-      seatfinder_grade_attempts(seatfinder_grade_students(sections)),
+      keyed_attempts(seatfinder_students_for(sections), edges = seatfinder_test_edges),
       sections,
       test_faculty,
       list(data_edges = seatfinder_test_edges, term = "202510", course_campus = "ABQ", dept_code = "HNRS", level = "lower")
@@ -409,7 +409,7 @@ test_that("seatfinder keeps topic titles distinct without many-to-many repeats",
 test_that("seatfinder parses comma-separated terms correctly", {
   with_seatfinder_test_terms({
     result <- seatfinder(
-      seatfinder_grade_attempts(),
+      seatfinder_grade_attempts,
       test_sections_sf,
       test_faculty,
       list(data_edges = seatfinder_test_edges, term = "202480,202580", course_campus = "ABQ")
@@ -430,7 +430,7 @@ test_that("seatfinder filters gen ed courses correctly", {
   with_seatfinder_test_terms({
     sections <- seatfinder_gen_ed_sections
     result <- seatfinder(
-      seatfinder_grade_attempts(seatfinder_grade_students(sections)),
+      keyed_attempts(seatfinder_students_for(sections), edges = seatfinder_test_edges),
       sections,
       test_faculty,
       list(data_edges = seatfinder_test_edges, term = "202510", course_campus = "ABQ", level = "lower")
@@ -453,7 +453,7 @@ test_that("seatfinder filters gen ed courses correctly", {
 test_that("seatfinder merges DFW rates correctly", {
   with_seatfinder_test_terms({
     result <- seatfinder(
-      seatfinder_grade_attempts(),
+      seatfinder_grade_attempts,
       test_sections_sf,
       test_faculty,
       list(data_edges = seatfinder_test_edges, term = "202510", course_campus = "ABQ", level = "lower")
@@ -469,7 +469,7 @@ test_that("seatfinder merges DFW rates correctly", {
 
 test_that("seatfinder delegates unfinished-term exclusion to the graded edge", {
   with_seatfinder_test_terms({
-    students <- seatfinder_grade_students()
+    students <- seatfinder_grade_students
     current_failure <- students %>%
       filter(subject_course == "HIST 1110", campus == "ABQ") %>%
       slice(1) %>%
@@ -482,7 +482,7 @@ test_that("seatfinder delegates unfinished-term exclusion to the graded edge", {
       )
 
     result <- seatfinder(
-      seatfinder_grade_attempts(bind_rows(students, current_failure)),
+      keyed_attempts(bind_rows(students, current_failure), edges = seatfinder_test_edges),
       test_sections_sf,
       test_faculty,
       list(data_edges = seatfinder_test_edges, term = "202510", course_campus = "ABQ", level = "lower")
@@ -495,7 +495,7 @@ test_that("seatfinder delegates unfinished-term exclusion to the graded edge", {
 test_that("seatfinder continues when no grade rows match", {
   with_seatfinder_test_terms({
     result <- seatfinder(
-      seatfinder_grade_attempts(seatfinder_grade_students()[0, ]),
+      keyed_attempts(seatfinder_grade_students[0, ], edges = seatfinder_test_edges),
       test_sections_sf,
       test_faculty,
       list(data_edges = seatfinder_test_edges, term = "202510", course_campus = "ABQ", level = "lower")
@@ -509,7 +509,7 @@ test_that("seatfinder continues when no grade rows match", {
 test_that("seatfinder returns empty result when filters match no enrollment rows", {
   with_seatfinder_test_terms({
     result <- seatfinder(
-      seatfinder_grade_attempts(),
+      seatfinder_grade_attempts,
       test_sections_sf,
       test_faculty,
       list(data_edges = seatfinder_test_edges, term = "202510", course_campus = "ABQ", dept_code = "SHS", level = "lower")
