@@ -72,7 +72,7 @@ courseCohortServer <- function(id, student_terms, attempts, programs, dims, edge
         subtab_header(
           "Takers vs Non-Takers",
           cedar_definition_summary("course-cohort-effect"),
-          " The page opens on every term of the term type most of this course's takers took it in, the classification most of them held, and its own college and level; change any of them and compare again. A Fall cohort and a Spring one are different students, so read one term type at a time."
+          " The page opens on this course's takers whose home campus is among the page's campuses (every home campus when none is): every term of the term type most of them took it in, the classification most of them held, and its own college and level; change any of them and compare again. A Fall cohort and a Spring one are different students, so read one term type at a time."
         ),
         cedar_definition_panel("course-cohort-effect"),
         fluidRow(

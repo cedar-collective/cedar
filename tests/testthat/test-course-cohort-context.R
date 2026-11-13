@@ -150,6 +150,40 @@ test_that("the page's defaults are read off the data: classification, college, l
                "no graded attempt")
 })
 
+test_that("the opening classification is read off the takers in the home campuses the page opens on (I60)", {
+  # SPAN 101's two GA takers (MC_G1, MC_G2) are stated here as
+  # concurrent-enrollment students; its four ABQ takers stay Freshman, the
+  # commonest classification of the course's takers on every campus.
+  st <- test_student_terms_mc %>%
+    mutate(student_classification = if_else(student_campus %in% "GA",
+                                            "Concurrent Enrollment", student_classification))
+  att <- keyed_attempts(test_students_mc, mc02_edges)
+
+  # A GA page opens on GA's takers: read off every taker it opened on
+  # Freshman, a GA population none of the takers is in.
+  ga <- course_cohort_context_defaults("SPAN 101", st, att, mc02_edges, list(campus = "GA"))
+  expect_equal(ga$campus, "GA")
+  expect_equal(ga$classification, "Concurrent Enrollment")
+  expect_equal(ga$term_type, "spring")
+  expect_equal(ga$level, "lower")
+
+  abq <- course_cohort_context_defaults("SPAN 101", st, att, mc02_edges, list(campus = c("ABQ", "EA")))
+  expect_equal(abq$campus, "ABQ")
+  expect_equal(abq$classification, "Freshman")
+
+  every <- course_cohort_context_defaults("SPAN 101", st, att, mc02_edges)
+  expect_null(every$campus)
+  expect_equal(every$classification, "Freshman")
+
+  # GA is a home campus but, without MC_G1 and MC_G2's attempts, no taker's:
+  # the page opens on every home campus and its takers.
+  no_ga_takers <- course_cohort_context_defaults(
+    "SPAN 101", st, att %>% filter(!student_id %in% c("MC_G1", "MC_G2")), mc02_edges,
+    list(campus = "GA"))
+  expect_null(no_ga_takers$campus)
+  expect_equal(no_ga_takers$classification, "Freshman")
+})
+
 test_that("with programs the payload carries the focal course's balance table", {
   p <- build_course_cohort_context(
     test_student_terms_mc, keyed_attempts(test_students_mc, mc02_edges),

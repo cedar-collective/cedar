@@ -36,7 +36,6 @@ alongside other work (M14, M16).
 
 | ID | Kind | Summary |
 |---|---|---|
-| [I60](#i60--takers-vs-non-takers-opens-on-a-classification-its-home-campus-scope-hardly-holds) | Defect | Takers vs Non-Takers picks its opening classification from the course's takers on every campus and then opens on the page's home campus: HIST 1110 opens on Concurrent Enrollment, nearly all of them dual-credit students at branch campuses, so on ABQ its passed and DFW'd groups are empty in almost every term |
 | [I55](#i55--the-instructor-gate-password-stopped-reaching-the-app) | Defect | The instructor-gate password stopped reaching the app: since 2026-09-05 `.Renviron` is kept out of the image and nothing else passed `CEDAR_DFW_PASSWORD`, so every instructor gate on production reads "not configured" (fixed in code 2026-11-12; production needs the password in its `.env`) |
 | [I46](#i46--a-deploy-that-must-rebuild-a-table-the-app-cannot-start-without-takes-the-site-down) | Defect | The deploy's table gate ran after the health check, so a deploy that added a column to `cedar_student_terms` failed its health check on the missing column and never reached the gate: production served the restart page from 17:07 UTC on 2026-11-04 (gate moved before the first request) |
 | [I45](#i45--the-class-list-and-the-schedule-name-the-same-section-with-different-course-codes) | Defect | The class list and the schedule name the same section with different course codes for renamed subjects (SOC to SOCI, PSY to PSYC): SOCI 371 had class-list history from Fall 2019 but no sections before Fall 2021 (fixed for every reader by keying the loaded tables on the course, 2026-11-07; open until the remaining successions are confirmed) |
@@ -58,6 +57,7 @@ Kept until the next release, so a recurrence is recognisable; each entry below g
 
 | ID | Kind | Summary |
 |---|---|---|
+| [I60](#i60--takers-vs-non-takers-opens-on-a-classification-its-home-campus-scope-hardly-holds) | Defect | Takers vs Non-Takers picked its opening classification from the course's takers on every campus and then opened on the page's home campus: HIST 1110 opened on Concurrent Enrollment, nearly all of them dual-credit students at branch campuses, so on ABQ its passed and DFW'd groups were empty in almost every term. The defaults are now read off the takers in the opening home-campus scope (resolved) |
 | [I59](#i59--the-dfw-tabs-dfw-by-term-table-stopped-with-an-error-for-every-course) | Defect | The DFW tab's DFW by Term table stopped with an error for every course from 2026-10-16 (#143) to 2026-11-13: its status-exclusion summary read the class list without the graded edge (resolved) |
 | [I58](#i58--courses-taken-calls-a-term-in-progress-in-its-charts-and-settled-in-its-tables) | Defect | Courses Taken shaded Fall 2026 "In progress" in its charts and called it settled in its tables, heading and note; every label now reads `cedar_term_in_progress()` (resolved) |
 | [I57](#i57--the-instructor-patterns-column-guide-states-a-pass-rule-cedar-does-not-use) | Defect | The Instructor Patterns column guide said "Passing is C− or better, CR, P, or S" beside a table that followed CEDAR's rule (A+ through C and CR). The tab is gone: the breakdown by instructor is a section of Downstream > Later Course, which states no pass rule of its own (resolved 2026-11-13, #280) |
@@ -95,7 +95,15 @@ Kept until the next release, so a recurrence is recognisable; each entry below g
 
 ## I60 — Takers vs Non-Takers opens on a classification its home-campus scope hardly holds
 
-**Status:** open.
+**Status:** resolved 2026-11-13 (#287). `course_cohort_context_defaults()`
+reads the opening term type, classification, level and college off the takers
+whose home campus is in the scope the page opens on; when no taker's home
+campus is in the page's selection the page opens on every home campus, which
+its Home campus control shows. HIST 1110 on an ABQ and online page now opens
+on first-semester freshmen, and on Concurrent Enrollment on a Valencia page.
+The test in `test-course-cohort-context.R` states SPAN 101's two GA takers as
+concurrent-enrollment students; on the old rule it failed twice (a GA page
+opened on Freshman, and a selection with no taker's home campus kept it).
 **Found:** 2026-11-13, in the browser test's screenshot of HIST 1110 (ABQ and
 EA) while moving the tab under Retention (#286); confirmed on the 2026-11-13
 tables.
@@ -105,7 +113,7 @@ wrong; the default question is the wrong one, and a reader has to know to
 change the classification.
 **Affects:** `course_cohort_context_defaults()` in
 `R/features/course-cohort-context.R`.
-**Cause:** the opening classification, level and benchmark college are the
+**Cause:** the opening classification, level and benchmark college were the
 modes of the course's takers on every home campus, while the opening home
 campus is the page's campus selection. For HIST 1110 the commonest
 classification of its Fall takers across UNM is Concurrent Enrollment, and
@@ -115,16 +123,10 @@ almost absent and first-semester freshmen and sophomores are the commonest.
 The page opens on ABQ Concurrent Enrollment students, few of whom took the
 course. A course whose branch-campus enrollment outweighs its main-campus one
 in one classification has the same shape.
-**Fix direction:** take the opening classification, level and college from
-the takers inside the opening home-campus scope (every taker when the page
-names no campus), so the default question is one its population can answer.
-A fixture row needs a course whose commonest taker classification differs
-between a branch home campus and ABQ; confirm the test fails on the current
-rule before trusting it.
 
 ### Reproduction
 
-Course Dynamics, HIST 1110, campus ABQ and EA, Analyze Course, then Retention >
+Before the fix, Course Dynamics, HIST 1110, campus ABQ and EA, Analyze Course, then Retention >
 Takers vs Non-Takers: Classification opens on "Concurrent Enrollment" and Home
 campus on ABQ, and the "Passed, DFW'd, Never Took It" table has no passed or
 DFW'd students in nearly every Fall. On the loaded tables:

@@ -219,8 +219,12 @@ course_cohort_context_balance <- function(payload, student_terms, attempts, prog
 #' takers took it in (a Fall cohort and a Spring one are different
 #' populations, and a gap is read across many terms of one type), the
 #' classification most of those terms' takers held, and the college and level
-#' their attempt rows carry. An institution's names never appear in platform
-#' code.
+#' their attempt rows carry. Each is read off the takers whose home campus is
+#' in the scope the page opens on, the population the comparison will be run
+#' over (ISSUES I60): read off every taker, a branch campus's dual-credit
+#' students chose a main-campus page's classification, and the page opened on
+#' a population that held almost none of the course's takers. An
+#' institution's names never appear in platform code.
 #'
 #' @param course The focal course id.
 #' @param student_terms `cedar_student_terms`.
@@ -229,12 +233,14 @@ course_cohort_context_balance <- function(payload, student_terms, attempts, prog
 #' @param opt `term_type` (one or more of `fall`, `spring`, `summer`; default
 #'   the type holding most of the course's taker student-terms, Fall before
 #'   Spring before Summer on a tie), `campus` (a page's campus selection, kept
-#'   where it is a home campus).
+#'   where it is a home campus of one of the course's takers).
 #' @return A list: `classification` (one value), `college` (the college that
 #'   taught most of the recent takers' other same-level courses, else the
 #'   course's own), `level`, `term_type`, `terms` (every anchor term of
-#'   `term_type` to the settled edge, oldest first), `campus` (NULL when none
-#'   of `opt$campus` is a home campus), and `choices` (`classifications`,
+#'   `term_type` to the settled edge, oldest first), `campus` (NULL, every
+#'   home campus, when none of `opt$campus` is the home campus of a taker to
+#'   the settled edge; the page's Home campus control then shows every home
+#'   campus), and `choices` (`classifications`,
 #'   `campuses`, `term_types`, `terms`: every value the controls may offer,
 #'   each with the enrolled student-terms behind it where that is a count).
 course_cohort_context_defaults <- function(course, student_terms, attempts, edges, opt = list()) {
@@ -259,6 +265,20 @@ course_cohort_context_defaults <- function(course, student_terms, attempts, edge
   takers <- attempts %>% filter(subject_course == .env$course, term <= edge)
   if (nrow(takers) == 0L) {
     stop("[course-cohort-context.R] ", course, " has no graded attempt to ", edge, ".", call. = FALSE)
+  }
+
+  # The scope the page opens on, and the takers inside it: every default
+  # below is read off the population the comparison will run over (I60).
+  campuses <- sort(unique(enrolled$student_campus[!is.na(enrolled$student_campus)]))
+  campus <- intersect(as.character(opt$campus %||% character(0)), campuses)
+  if (length(campus) > 0L) {
+    home_terms <- enrolled %>%
+      filter(student_campus %in% .env$campus) %>%
+      distinct(student_id, term)
+    in_scope <- takers %>% semi_join(home_terms, by = c("student_id", "term"))
+    # No taker's home campus is in the selection: the page opens on every
+    # home campus, which its Home campus control shows.
+    if (nrow(in_scope) > 0L) takers <- in_scope else campus <- character(0)
   }
   term_type <- opt$term_type
   if (is.null(term_type)) {
@@ -294,9 +314,6 @@ course_cohort_context_defaults <- function(course, student_terms, attempts, edge
     filter(subject_course != .env$course, level %in% .env$level)
   college <- modal(alongside$college)
   if (is.na(college)) college <- modal(recent$college)
-
-  campuses <- sort(unique(enrolled$student_campus[!is.na(enrolled$student_campus)]))
-  campus <- intersect(as.character(opt$campus %||% character(0)), campuses)
 
   list(
     classification = classification,
