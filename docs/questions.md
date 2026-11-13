@@ -243,8 +243,9 @@ the follow-up terms are left out rather than counted as gone.
 ### Does taking course A before course B help?
 
 **In CEDAR:** **Course Dynamics → Downstream → Course Sequence** compares later
-results for students who did and did not take one course first; **Instructor
-Patterns** compares later grades by the instructor students had.
+results for students who did and did not take one course first; **Later
+Course** follows a course's students into the next one, by term, by the grade
+they earned and, with the instructor-data password, by instructor.
 
 **Watch out for:** students choose their own sequences and sections. The balance
 table shows how alike the groups were; a difference is a lead to investigate,

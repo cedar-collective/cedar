@@ -117,6 +117,17 @@ architecture_expect_ratchet <- function(measured, allowance, what) {
   expect(length(problems) == 0L, paste(problems, collapse = "\n"))
 }
 
+# The calls that type a table: a function whose body holds one builds data at
+# call time.
+architecture_table_constructors <- c("tibble", "tribble", "data.frame", "data_frame",
+                                     "expand.grid", "expand_grid", "crossing")
+
+# TRUE for a table, and for a list holding one at any depth.
+architecture_holds_table <- function(x) {
+  is.data.frame(x) ||
+    (is.list(x) && !is.function(x) && any(vapply(x, architecture_holds_table, logical(1))))
+}
+
 # What sits at the top level of a test or helper file: one row per expression,
 # with its line and its kind ("test" for test_that(), context() and
 # testthat::local_edition(); "definition" for an assignment; "call" for
@@ -136,6 +147,11 @@ architecture_top_level <- function(file) {
     value <- exprs[[i]][[3]]
     if (is.call(value) && identical(value[[1]], as.name("function"))) length(value[[2]]) else NA_integer_
   }, integer(1))
+  # The table constructors a function's body calls: "" for none, NA for an object.
+  types_table <- vapply(seq_along(exprs), function(i) {
+    if (is.na(n_args[[i]])) return(NA_character_)
+    paste(intersect(architecture_table_constructors, all.names(exprs[[i]][[3]])), collapse = ", ")
+  }, character(1))
   data.frame(
     file = rep(basename(file), length(exprs)),
     line = vapply(attr(exprs, "srcref"), function(ref) ref[[1]], integer(1)),
@@ -143,6 +159,7 @@ architecture_top_level <- function(file) {
     kind = ifelse(heads %in% c("test_that", "context", "testthat::local_edition"), "test",
                   ifelse(heads %in% c("<-", "=", "<<-"), "definition", "call")),
     n_args = n_args,
+    types_table = types_table,
     stringsAsFactors = FALSE
   )
 }
@@ -164,4 +181,13 @@ helper_actions_without_arguments <- c(
   gpa_timeline              = "runs build_gpa_timeline(), the function under test",
   pcc_changes               = "runs detect_major_changes(), tested in the same file",
   gg_population             = "runs get_gen_ed_grad_cohort(), tested in the same file"
+)
+
+# The helper functions whose body types a table. A table typed in a helper is
+# data chosen at call time: it belongs in fixtures/scenario_tables.R as an
+# object, and a test that needs it different states the change. Neither of
+# these is a table a test reads. The list may only get shorter.
+helper_functions_typing_a_table <- c(
+  architecture_top_level    = "returns the listing of a file's top level that this guard reads",
+  make_shared_rule_artifact = "writes a one-row memberships file beside the rule files"
 )

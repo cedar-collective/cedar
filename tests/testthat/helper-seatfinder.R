@@ -46,7 +46,9 @@ with_seatfinder_test_terms <- function(expr) {
   eval.parent(substitute(expr))
 }
 
-seatfinder_grade_students <- function(sections = test_sections_sf) {
+# The class list seatfinder's grade tests read: five attempts in every active
+# section (seatfinder_grade_pattern), described from the section's own row.
+seatfinder_students_for <- function(sections) {
   active_sections <- sections %>%
     filter(status == "A") %>%
     mutate(.section_row = row_number())
@@ -56,14 +58,8 @@ seatfinder_grade_students <- function(sections = test_sections_sf) {
     mutate(.attempt = row_number()) %>%
     ungroup()
 
-  grade_pattern <- tibble(
-    .attempt = 1:5,
-    registration_status_code = c("RE", "RE", "RE", "RE", "DW"),
-    final_grade = c("A", "B", "D", "F", "W")
-  )
-
   students <- attempts %>%
-    left_join(grade_pattern, by = ".attempt") %>%
+    left_join(seatfinder_grade_pattern, by = ".attempt") %>%
     transmute(
       enrollment_id = paste0("SF-ENR-", section_id, "-", .attempt),
       section_id,
@@ -101,11 +97,4 @@ seatfinder_grade_students <- function(sections = test_sections_sf) {
     )
 
   bind_rows(test_students[0, ], students)
-}
-
-# seatfinder() reads the attempt measure table (ADR-001 step 7): the designed
-# class list above, loaded and built as the transform builds it, to the test
-# edges' graded edge.
-seatfinder_grade_attempts <- function(students = seatfinder_grade_students()) {
-  keyed_attempts(students, edges = seatfinder_test_edges)
 }

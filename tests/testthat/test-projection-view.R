@@ -310,7 +310,8 @@ test_that("Course Dynamics reads one course's outlook off the saved bundle and s
   screened$scope_courses <- c(screened$scope_courses, "TEST 999")
   screened$pressure_screen <- dplyr::bind_rows(
     screened$pressure_screen,
-    projection_test_row("TEST 999") %>%
+    projection_test_row %>%
+      dplyr::mutate(subject_course = "TEST 999") %>%
       dplyr::mutate(
         market_id = bundle$scope_market_id, target_term = 202080L,
         # No delivery components for it, so no scheduled seats to reconcile.

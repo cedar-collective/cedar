@@ -539,10 +539,10 @@ test_that("a test file holds tests, a table is a fixed object, a helper is a too
   # once before any test runs: the designed fixtures, the tables setup.R
   # derives from them, and fixtures/scenario_tables.R. A helper file
   # (tests/testthat/helper-*.R) holds what a test does, never what it reads:
-  # functions and constants. Attaching a package or sourcing a file is
-  # helper-load-functions.R's alone. A definition in a test file reaches that
-  # file only, and a library() or source() there stays in effect for every file
-  # after it. Not a ratchet: each count is zero.
+  # functions and constants, and no function there types a table. Attaching a
+  # package or sourcing a file is helper-load-functions.R's alone. A definition
+  # in a test file reaches that file only, and a library() or source() there
+  # stays in effect for every file after it. Not a ratchet: each count is zero.
   dir <- file.path(cedar_base_dir, "tests", "testthat")
   test_files <- list.files(dir, "^test-.*\\.R$", full.names = TRUE)
   helper_files <- setdiff(list.files(dir, "^helper-.*\\.R$", full.names = TRUE),
@@ -575,6 +575,26 @@ test_that("a test file holds tests, a table is a fixed object, a helper is a too
   expect(length(gone) == 0L, paste0(
     "listed in helper_actions_without_arguments but no longer a helper function ",
     "with no argument; remove from the list: ", paste(gone, collapse = ", ")))
+
+  # A table typed inside a helper function is data chosen at call time, and a
+  # table held by a helper object is a fixture in the wrong file.
+  typed <- in_helpers[!is.na(in_helpers$types_table) & nzchar(in_helpers$types_table), ]
+  stray <- typed[!typed$what %in% names(helper_functions_typing_a_table), ]
+  expect(nrow(stray) == 0L, paste0(
+    "a helper function types a table (", paste(architecture_table_constructors, collapse = ", "),
+    "); make the table an object in fixtures/scenario_tables.R and state the ",
+    "change in the test:\n", describe(stray)))
+  gone <- setdiff(names(helper_functions_typing_a_table), typed$what)
+  expect(length(gone) == 0L, paste0(
+    "listed in helper_functions_typing_a_table but no longer a helper function ",
+    "that types one; remove from the list: ", paste(gone, collapse = ", ")))
+  objects <- in_helpers[in_helpers$kind == "definition" & is.na(in_helpers$n_args), ]
+  held <- vapply(objects$what, function(name) {
+    architecture_holds_table(get0(name, inherits = TRUE))
+  }, logical(1))
+  stray <- objects[held, ]
+  expect(nrow(stray) == 0L, paste0(
+    "a helper file holds a table; move it to fixtures/scenario_tables.R:\n", describe(stray)))
 
   scenario <- architecture_top_level(file.path(dir, "fixtures", "scenario_tables.R"))
   expect_gt(nrow(scenario), 50L)

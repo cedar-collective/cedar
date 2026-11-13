@@ -346,7 +346,8 @@ Group 2, the two grade-reading cones, followed the same day:
 `get_course_sequence_effect()` reads both courses' outcomes off
 `cedar_attempts` (`outcome`: pass, dfw, or NA for an early drop or an
 ungraded registration, which is what "classifiable" meant), and
-`get_instructor_effect()` reads the Y outcomes off it (`outcome_category`:
+`get_instructor_effect()` (since replaced by `get_downstream_outcomes()`
+over `build_downstream_cohort()`) reads the Y outcomes off it (`outcome_category`:
 pass, a late withdrawal is dropped, any other graded category failed,
 missing unobserved). Each takes `attempts` beside `students`: the X cohort
 reads enrollment to the settled edge, which the attempt table (bounded at the

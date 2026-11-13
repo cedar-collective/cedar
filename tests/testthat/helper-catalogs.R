@@ -1,4 +1,5 @@
-# What the tests in test-catalogs.R share: builders, option lists, constants.
+# What the tests in test-catalogs.R do: skip without the catalogs, write a
+# mapping or config directory to a temporary folder, resolve a UNM program's unit.
 
 skip_if_no_catalogs <- function() {
   if (!exists("subj_dept_map") || !exists("cedar_institution_files")) {
@@ -12,28 +13,8 @@ skip_if_no_lookups <- function() {
   }
 }
 
-# Scaffolding: one programs.csv row per argument value, defaults filled in.
-program_rows <- function(program_code, unit_code = "HIST", in_college = "",
-                         college_code = "", is_pre_major = "FALSE", leads_to = "",
-                         basis = "decided", status = "confirmed") {
-  data.frame(program_code, in_college, program_name = program_code, unit_code,
-             college_code, is_pre_major, leads_to, basis, status, evidence = "", notes = "")
-}
-
-unm_settings <- data.frame(
-  setting = c("mapping_files_url", "source_files_url", "projection_history_start_term"),
-  value   = c("https://github.com/org/repo/blob/main/institution/x",
-              "https://github.com/org/repo/blob/main", "202210"))
-
-# Scaffolding: subjects.csv rows, defaults filled in.
-subject_rows <- function(subject_code, unit_code = "HIST", in_college = "AS", in_level = "",
-                         college_code = "", status = "confirmed") {
-  data.frame(subject_code, in_college, in_level, unit_code, college_code, status,
-             evidence = "", notes = "")
-}
-
-write_mapping_dir <- function(colleges, units, subjects, programs = program_rows("X")[0, ],
-                              settings = unm_settings, code_history = history_rows("X", "Y")[0, ]) {
+write_mapping_dir <- function(colleges, units, subjects, programs = mapping_program_row[0, ],
+                              settings = unm_settings, code_history = mapping_history_row[0, ]) {
   dir <- tempfile("institution-")
   dir.create(dir)
   utils::write.csv(colleges, file.path(dir, "colleges.csv"), row.names = FALSE)
@@ -44,22 +25,6 @@ write_mapping_dir <- function(colleges, units, subjects, programs = program_rows
   utils::write.csv(code_history, file.path(dir, "code_history.csv"), row.names = FALSE)
   dir
 }
-
-# Scaffolding: code_history.csv rows, defaults filled in.
-history_rows <- function(from_code, to_code, kind = "course", effective_term = "202080",
-                         scope = "", basis = "catalog", status = "confirmed") {
-  data.frame(kind, from_code, to_code, effective_term, scope, basis, status,
-             evidence = "", notes = "")
-}
-
-one_unit <- list(
-  colleges = data.frame(college_code = c("AS", "AD"), college_name = c("Arts and Sciences", "Branch"),
-                        source_names = c("", "Branch Campuses|ED")),
-  units    = data.frame(unit_code = c("HIST", "SOCI", "CJUS"),
-                        unit_name = c("History", "Sociology", "Criminal Justice"),
-                        college_code = c("AS", "AS", "AD"), kind = "department", notes = ""),
-  subjects = subject_rows("HIST")
-)
 
 unit_of <- function(code, college = rep("", length(code))) {
   resolve_program_units(code, college, unm_programs)
@@ -76,6 +41,3 @@ write_config_dir <- function(campuses, course_levels, student_levels = NULL) {
   }
   dir
 }
-
-good_levels <- data.frame(leading_digit = as.character(0:9),
-                          level = c(rep("lower", 3), rep("upper", 2), rep("grad", 5)))

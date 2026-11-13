@@ -263,19 +263,10 @@ test_that("get_course_outcome_rates exposes nuanced DFW components", {
 
 
 test_that("get_course_dfw_demographics summarizes rate and composition", {
-  designed <- dfw_demo_rows(
-    paste0("demo-0", 1:6),
-    c("RE", "RE", "DW", "DR", "RE", "RE"),
-    c("A", "F", NA, NA, "C-", "A")
-  )
-  # Two codes programs.csv does not carry, so each is named as itself; the
-  # second is a pre-major, so it reads with the suffix every major table uses.
-  st <- dfw_demo_terms(
-    designed,
-    classification = c(rep("Freshman", 4), "Sophomore", "Sophomore"),
-    major = c(rep("ZZHIST", 4), "ZZBIOL", "ZZBIOL"),
-    pre_major = c(rep(FALSE, 4), TRUE, TRUE)
-  )
+  # Six designed seats: A, F, a late drop, an early drop, C- and A. The first
+  # four are Freshman ZZHIST, the last two Sophomore pre-major ZZBIOL.
+  designed <- dfw_demo_rows$demo
+  st <- dfw_demo_student_terms$demo
 
   attempts <- keyed_attempts(designed)
   result <- get_course_dfw_demographics(
@@ -324,8 +315,9 @@ test_that("get_course_dfw_demographics summarizes rate and composition", {
 
 
 test_that("get_course_dfw_demographics honors caller-supplied passing grades", {
-  designed <- dfw_demo_rows(c("threshold-01", "threshold-02"), c("RE", "RE"), c("C-", "A"))
-  st <- dfw_demo_terms(designed, classification = "Sophomore", major = "ZZBIOL")
+  # Two designed seats, C- and A, both Sophomore ZZBIOL.
+  designed <- dfw_demo_rows$threshold
+  st <- dfw_demo_student_terms$threshold
 
   result <- get_course_dfw_demographics(
     keyed_attempts(designed), st,

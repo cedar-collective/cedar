@@ -77,9 +77,9 @@ for (const file of testFiles) {
   const ignored = ignoredFor(src);
   for (const re of PATTERNS) {
     for (const m of src.matchAll(re)) {
-      // requireIds takes an array literal; split it.
+      // requireIds takes an array literal, of one id or several; split it.
       const chunk = m[1];
-      const ids = chunk.includes(',') && chunk.includes("'")
+      const ids = chunk.includes("'")
         ? [...chunk.matchAll(/'([^']+)'/g)].map((x) => x[1])
         : [chunk];
       for (const id of ids) {

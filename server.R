@@ -1687,7 +1687,6 @@ output$enrl_classlist_download <- downloadHandler(
   cr_college_retention_data <- reactiveVal(NULL)
   cr_course_retention_data <- reactiveVal(NULL)
   cr_impact_sequence_data <- reactiveVal(NULL)
-  cr_impact_instructor_data <- reactiveVal(NULL)
 
   # Terms after the grade edge are still in progress: their "final" point is
   # current registration, so the enrollment history marks them.
@@ -1711,7 +1710,6 @@ output$enrl_classlist_download <- downloadHandler(
     cr_college_retention_data(NULL)
     cr_course_retention_data(NULL)
     cr_impact_sequence_data(NULL)
-    cr_impact_instructor_data(NULL)
     invisible(NULL)
   }
 
@@ -1724,8 +1722,6 @@ output$enrl_classlist_download <- downloadHandler(
   # outcomes (R/modules/instructor-gate.R): unlocking one unlocks all.
   instructorGateServer("cr_ret_instructor_gate", dfw_authenticated, dfw_password,
                        what = "Retention rows by instructor")
-  instructorGateServer("cr_impact_instructor_gate", dfw_authenticated, dfw_password,
-                       what = "Downstream outcomes by instructor")
 
   create_password_gate_ui <- function(password_input_id, submit_button_id,
                                       message_text = "This section contains sensitive academic performance data and requires authentication. Enter the password below to continue.") {
@@ -2508,27 +2504,6 @@ output$enrl_classlist_download <- downloadHandler(
       default_page_size = default_page_size,
       default_sorted = default_sorted,
       searchable = searchable
-    )
-  }
-
-  cr_pct_count_coldef <- function(counts) {
-    force(counts)
-    reactable::colDef(
-      align = "right",
-      minWidth = 125,
-      cell = function(value, index) {
-        count <- counts[[index]]
-        if (is.na(value) || is.na(count)) return("—")
-        tags$span(
-          class = "text-nowrap",
-          paste0(
-            formatC(value, format = "f", digits = 1), "% (",
-            format(as.integer(count), big.mark = ",", scientific = FALSE,
-                   trim = TRUE),
-            ")"
-          )
-        )
-      }
     )
   }
 
@@ -4199,49 +4174,26 @@ output$enrl_classlist_download <- downloadHandler(
     if (length(d) == 0) NA_character_ else d[[1]]
   })
 
-  # ── Downstream course choices, shared by Course Sequence and Instructor Patterns
+  # ── Later-course choices, shared by Later Course and Course Sequence ────────
   #
-  # These choices come from courses students actually took after X. Department
-  # ownership is retained only as a navigation aid and for the optional rollup;
-  # it is not evidence for or against a curricular sequence. Valid pathways
-  # routinely cross department boundaries.
+  # These choices come from courses students actually took after X, within the
+  # default follow-up window. Department ownership is retained only as a
+  # navigation aid and for the optional rollup; it is not evidence for or
+  # against a curricular sequence. Valid pathways routinely cross department
+  # boundaries. The grouped labels are downstream_course_choices()
+  # (R/modules/later-course.R).
   cr_downstream_options <- reactive({
     course <- input$cr_course
     req(course, nzchar(course))
     get_downstream_course_options(
       cr_students,
+      data_objects[["cedar_attempts"]],
       cr_course_id(),
       list(campus = if (length(input$cr_campus) > 0) input$cr_campus else NULL,
            min_n  = 15L,
            data_edges = data_objects[["cedar_edges"]])
     )
   })
-
-  # Grouped selectize choices, each labelled with how many of X's students
-  # continued into it. The group labels describe ownership, not relevance.
-  cr_downstream_choices <- function(opts, include_rollup = FALSE, dept = NULL) {
-    if (is.null(opts) || nrow(opts) == 0) return(list())
-    lab <- function(d) stats::setNames(
-      d$subject_course,
-      paste0(d$subject_course, " \u2014 ",
-             format(d$n_students, big.mark = ",", trim = TRUE),
-             " students (", d$pct_of_x, "%)")
-    )
-    same  <- opts[opts$same_dept %in% TRUE, , drop = FALSE]
-    other <- opts[!(opts$same_dept %in% TRUE), , drop = FALSE]
-    out <- list()
-    if (include_rollup && nrow(same) > 0) {
-      out[["Summary"]] <- stats::setNames(
-        CR_ROLLUP_SENTINEL,
-        paste0("All follow-on courses in this department (", nrow(same), ")")
-      )
-    }
-    if (nrow(same) > 0)
-      out[[paste0("Same department", if (!is.na(dept) && nzchar(dept))
-                  paste0(" (", dept, ")") else "")]] <- lab(same)
-    if (nrow(other) > 0) out[["Different department"]] <- lab(utils::head(other, 40))
-    out
-  }
 
   # ── Combined Downstream tab ─────────────────────────────────────────────────
   output$cr_impact_downstream_ui <- renderUI({
@@ -4253,23 +4205,23 @@ output$enrl_classlist_download <- downloadHandler(
       subtab_header(
         "Downstream",
         paste0(
-          "Two views of what happens after ", course, ". Course Sequence asks whether ",
-          "students who passed it before a later course differ from students who reached ",
-          "that course without it. Instructor Patterns starts with students in ", course,
-          " and groups their later continuation and outcomes by their first instructor here."
+          "Two views of what happens after ", course, ". Later Course follows its students ",
+          "forward: how many took a later course within a set number of terms, and how they ",
+          "did in it. Course Sequence compares students who reached a later course after ",
+          "passing ", course, " with students who reached it without."
         )
       ),
       navset_tab(
         id = "cr_downstream_view",
         nav_panel(
+          "Later Course",
+          icon = icon("arrow-right-long"),
+          laterCourseUI("cr_later")
+        ),
+        nav_panel(
           "Course Sequence",
           icon = icon("shuffle"),
           uiOutput("cr_impact_sequence_ui")
-        ),
-        nav_panel(
-          "Instructor Patterns",
-          icon = icon("chalkboard-teacher"),
-          uiOutput("cr_impact_instructor_ui")
         )
       )
     )
@@ -4324,7 +4276,7 @@ output$enrl_classlist_download <- downloadHandler(
       fluidRow(
         column(5,
           selectizeInput("cr_impact_seq_course_y", "Later course:",
-                         choices  = cr_downstream_choices(
+                         choices  = downstream_course_choices(
                            cr_downstream_options(), include_rollup = FALSE,
                            dept = cr_course_dept()),
                          multiple = TRUE,
@@ -4578,347 +4530,6 @@ output$enrl_classlist_download <- downloadHandler(
         "unobserved ways the groups may differ. ",
         "Use the HS GPA band inputs above to compare students within the same GPA range."),
       .render_balance_table(result$balance)
-    )
-  })
-
-  # ── Instructor Patterns view ────────────────────────────────────────────────
-  output$cr_impact_instructor_ui <- renderUI({
-    course <- input$cr_course
-    if (is.null(course) || !nzchar(course))
-      return(empty_state("Select a course, then click Analyze Course to view this tab."))
-    # Every result on this tab names an instructor: the whole tab is gated.
-    if (!isTRUE(dfw_authenticated())) {
-      return(tagList(
-        subtab_header(
-          "Instructor Patterns",
-          paste0("How students do later on, grouped by who taught them ", course,
-                 ". Every row names an instructor, so the tab opens with the instructor-data password.")
-        ),
-        instructorGateUI("cr_impact_instructor_gate")
-      ))
-    }
-    tagList(
-      subtab_header(
-        "Instructor Patterns",
-        paste0("How do students do later on, grouped by who taught them ", course,
-               "? Pick one or more later courses below, or use the optional department ",
-               "summary when the question is specifically about same-department ",
-               "follow-ons.")
-      ),
-      info_panel(
-        "What this can and cannot tell you",
-        description = "Worth reading once before acting on a result.",
-        tags$p(tags$strong("This is not a measure of teaching quality, and is ",
-                           "not a basis for evaluating instructors.")),
-        tags$ul(
-          tags$li(tags$strong("Start with the balance table."),
-                  " Students choose sections by schedule, reputation, and what ",
-                  "they have already taken, so two sections often begin with ",
-                  "different kinds of students. Where the balance table is ",
-                  "flagged, a later grade gap is partly telling you who enrolled."),
-          tags$li(tags$strong("Continuation rate is about the course, not the ",
-                              "instructor."), " A section full of majors ",
-                  "continues at a different rate than one full of students ",
-                  "filling a requirement, whoever teaches it."),
-          tags$li(tags$strong("Small groups move a lot."),
-                  " Raise the minimum student count if a rate looks extreme; ",
-                  "a handful of students can swing a percentage several points."),
-          tags$li(tags$strong("The grade window ends before advance registration."),
-                  " CEDAR may already contain students registered for the current ",
-                  "term even though none has a posted grade. Those rows are not ",
-                  "failures: outcomes stop at the most recent term with grades, ",
-                  "and students too recent to have a complete follow-up term are ",
-                  "excluded from the continuation denominator. The exact terms ",
-                  "and exclusion counts appear in the methodology after you run ",
-                  "the comparison.")
-        )
-      ),
-      fluidRow(
-        column(5,
-          selectizeInput("cr_impact_inst_course_y", "Later course(s):",
-                         choices  = cr_downstream_choices(
-                           cr_downstream_options(), include_rollup = TRUE,
-                           dept = cr_course_dept()),
-                         multiple = TRUE,
-                         options = list(placeholder = "Choose one or more later courses...")),
-          helpText("The list includes courses students actually took later across departments; department ownership and continuation share do not determine whether a sequence is intended. Dropdown percentages and the blue course-wide continuation rate use the same eligibility-adjusted denominator: students with a complete follow-up window, excluding those who had already passed a single selected later course. Select multiple courses to audit combined prior, concurrent, and later enrollment patterns.")
-        ),
-        column(2,
-          numericInput("cr_impact_inst_min_n", "Min students per instructor:", value = 15, min = 5, max = 100)
-        ),
-        column(3,
-          br(),
-          actionButton("cr_impact_inst_run", "Compare Outcomes",
-                       icon = icon("play"), class = "btn-primary")
-        )
-      ),
-      uiOutput("cr_impact_instructor_results")
-    )
-  })
-
-  observeEvent(input$cr_impact_inst_run, {
-    req(isTRUE(dfw_authenticated()), input$cr_course, nzchar(input$cr_course),
-        length(input$cr_impact_inst_course_y) > 0,
-        all(nzchar(input$cr_impact_inst_course_y)))
-    cr_impact_instructor_data(NULL)
-
-    # The picker's first entry is a sentinel meaning "every follow-on course in
-    # this department". Resolve it to the actual course list here so the cone
-    # only ever sees course codes.
-    y_sel <- input$cr_impact_inst_course_y
-    if (CR_ROLLUP_SENTINEL %in% y_sel) {
-      same_dept <- cr_downstream_options() %>% dplyr::filter(same_dept %in% TRUE)
-      if (nrow(same_dept) == 0) {
-        showNotification(
-          "No follow-on courses in this department cleared the minimum student count.",
-          type = "warning", duration = 8)
-        return(NULL)
-      }
-      y_sel <- same_dept$subject_course
-    }
-    # By id: the follow-on options already are; the picker lists schedule codes.
-    y_sel <- unique(vapply(y_sel, course_id_of, character(1),
-                           tbl = data_objects[["cedar_sections"]],
-                           caller = "server.R Instructor Patterns"))
-
-    opt <- list(
-      course_x = cr_course_id(),
-      course_y = y_sel,
-      min_n    = as.integer(input$cr_impact_inst_min_n %||% 15L),
-      campus   = if (length(input$cr_campus) > 0) input$cr_campus else NULL
-    )
-
-    withProgress(message = "Comparing downstream success...", value = 0.3, {
-      tryCatch({
-        result <- get_instructor_effect(
-          students     = cr_students,
-          attempts     = data_objects[["cedar_attempts"]],
-          programs     = data_objects[["cedar_programs"]],
-          applicants   = data_objects[["cedar_applicants"]],
-          opt          = opt,
-          student_terms = data_objects[["cedar_student_terms"]],
-          data_edges   = data_objects[["cedar_edges"]]
-        )
-        cr_impact_instructor_data(result)
-        setProgress(1)
-      }, error = function(e) {
-        showNotification(paste("Downstream success analysis failed:", conditionMessage(e)),
-                         type = "error", duration = 10)
-        message("[server.R] cr_impact_inst error: ", conditionMessage(e))
-      })
-    })
-  })
-
-  output$cr_impact_instructor_results <- renderUI({
-    result <- cr_impact_instructor_data()
-    if (is.null(result) || !isTRUE(dfw_authenticated())) return(NULL)
-
-    fmt_term <- function(t) {
-      yr <- t %/% 100; ss <- t %% 100
-      paste(dplyr::case_when(ss==10~"Spring", ss==60~"Summer", ss==80~"Fall",
-                             TRUE~as.character(ss)), yr)
-    }
-
-    x_period <- paste0(fmt_term(result$term_range_x[1]), "–", fmt_term(result$term_range_x[2]))
-    y_period <- paste0(fmt_term(result$term_range_y[1]), "–", fmt_term(result$term_range_y[2]))
-
-    # In rollup mode course_y is a vector, so every piece of prose below uses the
-    # label rather than the raw value.
-    y_label <- result$course_y_label %||% result$course_y
-    audit <- result$course_summary
-    continuation_avg <- audit$pct_took_y[[1]]
-    dfw_avg <- round(100 * (sum(result$outcomes$n_failed) +
-                             sum(result$outcomes$n_dropped)) /
-                       sum(result$outcomes$n_outcome_observed), 1)
-    outcomes_display <- prepare_downstream_outcomes_display(result$outcomes)
-    outcome_counts <- attr(outcomes_display, "pct_count_n")
-    outcome_columns <- c(
-      list(
-        Instructor = reactable::colDef(minWidth = 180),
-        `Students in X` = reactable::colDef(
-          align = "right",
-          format = reactable::colFormat(digits = 0, separators = TRUE)
-        ),
-        `Eligible for Y` = reactable::colDef(
-          align = "right",
-          format = reactable::colFormat(digits = 0, separators = TRUE)
-        )
-      ),
-      stats::setNames(
-        lapply(outcome_counts, cr_pct_count_coldef),
-        names(outcome_counts)
-      )
-    )
-
-    tagList(
-      if (isTRUE(result$rollup)) div(
-        class = "alert alert-info", style = "font-size: 0.88em;",
-        icon("layer-group"), " ",
-        tags$strong("Department summary."), " Each student is counted once, at ",
-        "the first of these courses they took after ", result$course_x, ". ",
-        "Courses included (", result$n_courses_y, "): ",
-        paste(result$course_y, collapse = ", "), "."
-      ),
-      # Methodology, not a warning — collapsible per the explain-box standard.
-      info_panel(
-        paste0("How to read this table — ", result$course_x, " \u2192 ", y_label),
-        description = "What the comparison does, and what each column means.",
-        div(class = "alert alert-info", style = "font-size: 0.9em;",
-          icon("calendar-check"), " ",
-          tags$strong("Data window: "), result$edge_note,
-          " Students taking ", result$course_x,
-          " too recently to have one complete subsequent regular term are excluded ",
-          "from the continuation denominator."
-        ),
-        tags$b("What the analysis does:"), " For each instructor who taught ",
-        strong(result$course_x), " (", x_period, "), this shows how their students ",
-        "performed later when those students took ", strong(y_label),
-        " (", y_period, "). Any gap between the two courses counts — it does not have ",
-        "to be the immediately following term. A student who repeated ", result$course_x,
-        " under more than one instructor is assigned once, to the first instructor, ",
-        "in the downstream outcomes table. Course-order totals are aggregated by year ",
-        "and never attributed to an instructor.", br(), br(),
-        tags$b("Column definitions:"), br(),
-        tags$ul(style = "margin-bottom: 4px;",
-          tags$li(strong("Students in X"), " — students attributed to this instructor at their ",
-                  "first ", result$course_x, " attempt through ",
-                  paste0(fmt_term(result$observation_end_term),
-                         ". Current or otherwise incomplete terms are not included.")),
-          tags$li(strong("Eligible for Y"), " — Students in X after removing students without ",
-                  "a complete follow-up opportunity",
-                  if (isTRUE(result$prior_pass_exclusion_applied)) {
-                    paste0(" and students who had already passed ", y_label, ".")
-                  } else {
-                    "."
-                  },
-                  " This is the continuation denominator."),
-          tags$li(strong("Continued to Y % (n)"), " — share of eligible students who later ",
-                  "enrolled in ", y_label, "; the count is in parentheses. Course-wide average: ",
-                  strong(paste0(continuation_avg, "%")),
-                  ". Wide variation usually reflects section composition (time-of-day, major vs. requirement-filler mix) ",
-                  "rather than instructor influence — treat outliers as a prompt to investigate, not a verdict."),
-          tags$li(strong("Classified outcomes % (n)"), " — share and count of later ",
-                  "enrollments with a classifiable final outcome. Blank, incomplete, audit, ",
-                  "and otherwise unknown outcomes stay in Continued to Y but are not failures."),
-          tags$li(strong("Passed / Failed / Late drops % (n)"), " — mutually exclusive shares ",
-                  "of classified outcomes, with counts in parentheses. Passing is C− or better, ",
-                  "CR, P, or S; Failed is a canonical D/F/W grade; Late drops are DG or DW statuses."),
-          tags$li(strong("DFW % (n)"), " — failed grades plus late drops divided by classified ",
-                  "outcomes, with their combined count in parentheses.")
-        ),
-        tags$b("How to read a combined cell:"), " ",
-        tags$span(class = "text-nowrap", "76.0% (45)"),
-        " means 76.0% and 45 students."
-      ),
-
-      dashboard_subsection(
-        "Who was actually eligible to continue?",
-        paste0("This audit reconciles persistence with course progression. Returning to UNM ",
-               "the next term does not imply taking ", y_label,
-               ", and passing a course before or concurrently with ", result$course_x,
-               " is not evidence of later progression from X to Y."),
-        div(class = "alert alert-info", style = "font-size: 0.9em; margin-bottom: 10px;",
-          tags$strong(format(audit$n_total_in_x, big.mark = ",")),
-          " students took ", result$course_x, " in the selected campus scope. ",
-          tags$strong(format(audit$n_right_censored, big.mark = ",")),
-          " were too close to the right edge for a complete follow-up window; ",
-          tags$strong(format(audit$n_passed_y_before_x, big.mark = ",")),
-          " had passed ", y_label, " in a strictly earlier term; and ",
-          tags$strong(format(audit$n_passed_y_same_term, big.mark = ",")),
-          " passed one or more selected courses concurrently. The continuation denominator is ",
-          tags$strong(format(audit$n_eligible_for_y, big.mark = ",")), ".",
-          tags$br(),
-          tags$strong("Instructor table scope: "),
-          "Students in X includes first-attributed students through ",
-          paste0(fmt_term(result$observation_end_term),
-                 ", not the current or an incomplete term. Eligible for Y removes students "),
-          "without a complete follow-up opportunity",
-          if (isTRUE(result$prior_pass_exclusion_applied)) {
-            paste0(" and those who had already passed ", y_label, ".")
-          } else {
-            "."
-          },
-          " Right-edge and course-order counts are summarized here rather than repeated ",
-          "for every instructor."
-        ),
-        h5("Students taking the courses out of order, by year"),
-        p(style = "font-size: 0.82em; color: #666;",
-          "Each student appears once, in the calendar year of their first ",
-          result$course_x, " attempt. A strictly earlier pass is genuinely out of order; ",
-          "a same-term pass is concurrent and is shown separately. Before-or-same is ",
-          "their student-level union, not their sum."),
-        cr_basic_reactable(
-          cr_humanize_columns(result$order_audit_by_year),
-          default_page_size = 25L,
-          searchable = FALSE
-        )
-      ),
-
-      dashboard_subsection(
-        paste0("Downstream Outcomes in ", y_label,
-               " by Instructor in ", result$course_x),
-        "Compares downstream outcomes for students grouped by their instructor in the selected course. Use the course-wide averages as context, and treat differences as prompts for review rather than causal effects.",
-        div(class = "alert alert-info", style = "font-size: 0.88em; margin-bottom: 10px;",
-          icon("lightbulb"), " ",
-          tags$strong("Course-wide averages for context:"), tags$br(),
-          tags$b("Continuation rate"), " (% of ", result$course_x, " students who took ",
-          y_label, "): ",
-          tags$span(style = "font-size: 1.1em;",
-            strong(paste0(continuation_avg, "%"))), tags$br(),
-          tags$b("DFW rate in ", y_label), " (across instructors shown): ",
-          tags$span(style = "font-size: 1.1em;",
-            strong(paste0(dfw_avg, "%"))),
-          tags$br(),
-          tags$span(style = "font-size: 0.85em;",
-            "Compare each instructor's Continued to Y and DFW cells against these baselines. ",
-            "Large departures are worth investigating but may reflect section composition, not instructor effect.")
-        )
-      ),
-      cr_cedar_reactable(
-        outcomes_display,
-        columns = outcome_columns,
-        default_page_size = 25L,
-        searchable = TRUE
-      ),
-
-      # This is optional context for interpreting differences between two
-      # instructor rows. It does not define or adjust the descriptive course-
-      # level continuation and downstream-outcome measures above.
-      dashboard_subsection(
-        "Optional context: were the two largest instructor groups similar?",
-        paste0("The continuation and downstream-outcome counts above use all eligible ",
-               "students and do not require instructor groups to be similar. This ",
-               "diagnostic matters only if you want to interpret a difference between ",
-               "two instructor rows as possibly instructor-related rather than a ",
-               "difference in who enrolled."),
-        div(class = "alert alert-info", style = "font-size: 0.88em; margin-bottom: 10px;",
-          icon("circle-info"), " ",
-          tags$strong("Why only two instructors?"), " Balance is a pairwise question, ",
-          "so the app automatically uses the two instructors with the most downstream ",
-          "students for the most stable, readable comparison.", tags$br(),
-          tags$strong("Instructor A: "),
-          result$reference_instructor %||% "\u2014", " (n = ", result$n_treatment, "); ",
-          tags$strong("Instructor B: "),
-          result$comparison_instructor %||% "\u2014", " (n = ", result$n_control, ").",
-          if (!is.null(result$instructor_counts) &&
-              nrow(result$instructor_counts) > 2) {
-            tagList(" The other ", tags$strong(nrow(result$instructor_counts) - 2L),
-                    " instructor groups remain in the outcomes table above; they are ",
-                    "not sampled away, but this diagnostic says nothing about their comparability.")
-          },
-          tags$br(),
-          tags$strong("What this changes: "),
-          "nothing in the rates above. It neither matches students nor adjusts outcomes. ",
-          "Use it only as a caution when comparing Instructor A with Instructor B. ",
-          "The Course Sequence view is where comparable groups are central to comparing ",
-          "students who did versus did not take a precursor course."
-        ),
-        .render_balance_table(
-          result$balance,
-          group_labels = c("Instructor A", "Instructor B")
-        )
-      ),
-
     )
   })
 
@@ -6605,6 +6216,22 @@ output$enrl_classlist_download <- downloadHandler(
   # cross-course comparison work. The server was still running on every session,
   # registering outputs nothing rendered. Re-enable both together.
   # retentionServer("retention", students = cedar_registrations, student_terms = cedar_student_terms)
+
+  # Course Dynamics > Downstream > Later Course: the analysed course's students
+  # in a later course, by term, grade and instructor (R/modules/later-course.R).
+  laterCourseServer(
+    "cr_later",
+    course        = cr_course_id,
+    campus        = reactive(if (length(input$cr_campus) > 0) input$cr_campus else NULL),
+    students      = cr_students,
+    attempts      = data_objects[["cedar_attempts"]],
+    programs      = data_objects[["cedar_programs"]],
+    applicants    = data_objects[["cedar_applicants"]],
+    student_terms = data_objects[["cedar_student_terms"]],
+    edges         = data_objects[["cedar_edges"]],
+    default_options = cr_downstream_options,
+    instructor_access = dfw_authenticated, instructor_password = dfw_password
+  )
 
   # Course Dynamics > Takers vs Non-Takers: the analysed course against the
   # students of its classification who never took it, read against the

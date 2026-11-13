@@ -140,7 +140,7 @@ it.
 
 ### Where test code lives
 
-**A test reads fixed data, and a helper is something a test does.** Three
+**A test reads fixed data, and a helper is something a test does.** Four
 rules, each enforced by `test-architecture.R`:
 
 1. **A test file holds `test_that()` blocks and nothing else** (a `context()`
@@ -154,6 +154,12 @@ rules, each enforced by `test-architecture.R`:
    argument each run something (the function under test, a script, a skip);
    they are listed by name in `helper_actions_without_arguments`
    (`helper-architecture.R`), and the list may only get shorter.
+4. **No helper types a table.** A function that types a table from its
+   arguments (`tibble()`, `tribble()`, `data.frame()`) is data chosen at call
+   time, and a table held by a helper object is a fixture in the wrong file.
+   Both go with the tables. The two functions that still call a constructor
+   are not data a test reads, and are listed in
+   `helper_functions_typing_a_table`.
 
 Everything loads before every test file, whichever file is run:
 
@@ -163,15 +169,25 @@ Everything loads before every test file, whichever file is run:
 | The tables the transform builds from them (student terms, attempts, course terms, flows) | Built once in `setup.R`, by the production builders |
 | A table one test file reads: a frame typed by hand as the input of one function, or a population, an attempts table or a mapping-file list derived from the fixtures | `fixtures/scenario_tables.R`, one section per test file, sourced once at the end of `setup.R` |
 | The right edges a designed scenario is read through | `helper-scenario-edges.R`, one list per scenario |
-| What a test does: run the function under test with its options, build a variant from arguments, write to a temporary directory, read a plot. Also ids and option lists | `helper-<topic>.R`, named for the test file it serves |
+| What a test does: run the function under test with its options, stamp a stated series on a fixed row, write to a temporary directory, read a plot. Also ids and option lists | `helper-<topic>.R`, named for the test file it serves |
 | Packages, and the source files `load_funcs()` leaves out | `helper-load-functions.R` |
 
 What follows from a table being fixed:
 
 - **A test that needs a variant says so in its own body:**
-  `pathway_students %>% filter(term < 202510L)`. The fixed table is the base
-  and the test states the one thing it changes. R copies on modify, so a test
-  cannot change a table for the test after it.
+  `pathway_students %>% filter(term < 202510L)`, or
+  `mutate(scenario_test_composition, n_students = c(3L, 30L))`. The fixed
+  table is the base and the test states the one thing it changes. R copies on
+  modify, so a test cannot change a table for the test after it.
+- **Several designed variants of one table are one named list,** typed once:
+  `mapping_programs$invalid`, `spine_scenarios$sequence`,
+  `dfw_demo_rows$threshold`. Each row's reason is a comment beside the row,
+  as in the designed fixtures.
+- **A test that states a series, not a table, stamps it on a fixed row:**
+  `projection_test_history(c(20, 24), terms = c(202210L, 202310L))` repeats
+  `projection_history_row` once per term and writes the series into its count
+  columns. The row is typed in the scenario tables; the helper only repeats
+  and overwrites, so the shape of a prepared history row has one home.
 - **A scenario table that cannot be built stops every test file,** as a broken
   fixture does. Derive one through the builders, readers and filters that
   produce the input of the function under test (`build_population()`,
@@ -205,7 +221,10 @@ same file run in the suite, because `library()` and `source()` calls in one
 test file stayed in effect for every file after it. A first pass moved them
 into helper files as functions. 78 of those took no argument and returned the
 same table every call, so the data a test read was still spread over 34 files
-and rebuilt on every call; they became the fixed objects above.
+and rebuilt on every call; they became the fixed objects above. Eighteen more
+took arguments and typed a table from them (`program_rows("FHIS", leads_to =
+"NOPE")`); their tables became fixed objects too, each checked equal to what
+its function had returned.
 
 ---
 

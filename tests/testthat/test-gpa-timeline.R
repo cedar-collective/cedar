@@ -18,7 +18,7 @@ context("GPA Timeline")
 
 
 test_that("the student-term table carries the grade points the series divides", {
-  st <- gpa_student_terms()
+  st <- gpa_student_terms
   s1 <- dplyr::filter(st, student_id == "GP_S1") %>% dplyr::arrange(term)
   # 202080: A (4.0) and B (3.0), 3 credits each -> 21 points over 6 hours
   expect_equal(s1$quality_points, c(21, 6, 12))
@@ -96,7 +96,7 @@ test_that("left-truncated students are marked invalid, by the table's flag", {
   expect_false(unique(dplyr::filter(tl, student_id == "GP_S2")$timeline_valid))
   expect_true(all(dplyr::filter(tl, student_id == "GP_S1")$timeline_valid))
   # The flag is the table's, over the whole data: a slice of the table keeps it.
-  sliced <- build_gpa_timeline(dplyr::filter(gpa_student_terms(), student_id == "GP_S2"))
+  sliced <- build_gpa_timeline(dplyr::filter(gpa_student_terms, student_id == "GP_S2"))
   expect_false(unique(sliced$timeline_valid))
 })
 
@@ -104,7 +104,7 @@ test_that("left-truncated students are marked invalid, by the table's flag", {
 test_that("a student with no gradeable rows yields no timeline rows", {
   tl <- gpa_timeline()
   expect_false("GP_S8" %in% tl$student_id)
-  expect_equal(nrow(build_gpa_timeline(gpa_student_terms(), opt = list(student_ids = "GP_S8"))), 0)
+  expect_equal(nrow(build_gpa_timeline(gpa_student_terms, opt = list(student_ids = "GP_S8"))), 0)
 })
 
 
@@ -116,7 +116,7 @@ test_that("missing columns and the class list's window options are explicit erro
   # The class list itself is not the table.
   expect_error(build_gpa_timeline(gpa_students), "missing required column")
   expect_error(
-    build_gpa_timeline(gpa_student_terms(), opt = list(min_data_term = 202010L)),
+    build_gpa_timeline(gpa_student_terms, opt = list(min_data_term = 202010L)),
     "not an option it answers"
   )
 })
@@ -171,7 +171,7 @@ test_that("an empty timeline yields NA columns rather than an error", {
   events <- tibble::tibble(student_id = "GP_S1", covariate_term = 202080L)
   out <- attach_gpa_position(
     events,
-    build_gpa_timeline(gpa_student_terms(), opt = list(student_ids = "GP_S8")),
+    build_gpa_timeline(gpa_student_terms, opt = list(student_ids = "GP_S8")),
     term_col = "covariate_term"
   )
   expect_true(is.na(out$gpa_entering))

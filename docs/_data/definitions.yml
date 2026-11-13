@@ -564,6 +564,36 @@ definitions:
           - file: R/cones/course-sequence-effect.R
             functions: [get_course_sequence_effect]
 
+  - id: downstream-outcomes
+    current_version: "1.0.0"
+    versions:
+      - version: "1.0.0"
+        title: Later-course continuation and outcomes
+        summary: Of the students who took a course, the share who took a chosen later course within a set number of regular terms, and the share of those who passed it, read by the term they took the first course, the grade they earned in it and, behind the instructor gate, their instructor in it.
+        population: Students with a registered or late-dropped attempt at the first course on a campus in scope, counted once, at their first attempt, through the most recent term whose registration has settled.
+        unit: Student, at their first attempt at the first course.
+        numerator: For continuation, students who enrolled in the later course inside the window. For the pass rate, those whose first later-course term in the window was passed.
+        denominator: For continuation, students whose whole window had passed by the settled edge and who had not already passed the later course. For the pass rate, those who took the later course and have a grade.
+        campus: Students are scoped and grouped by the campus that delivered the first course. The later course counts on any campus.
+        time_window: The later course counts within the chosen number of regular terms after the first course (three by default); a summer enrollment belongs to the regular term after it. Enrollment is followed to the settled edge and grades are read to the graded edge.
+        exclusions: Students too recent to have had the whole window are set aside, never counted as not continuing. For a single later course, students who passed it in a term before the first course are removed; a same-term pass is counted and not removed. For a set of later courses nobody is removed, each student counts at their first term with any of them, and that term passes only if everything taken from the set passed. A later course taken after the graded edge counts as taken and is not yet graded, never a failure.
+        limitations:
+          - Passing follows the default DFW policy (A+ through C, and CR); every other recorded grade and a late drop is DFW.
+          - A rate is shown only for a denominator at or above the chosen minimum; the counts stay.
+          - The grade earned in the first course separates later results more than anything else on the page. A term, an instructor or a campus whose students earned higher grades will show better later results for that reason alone.
+          - The per-term trend compares the slope across years with twice its standard error, the larger of binomial chance at the pooled rate and the terms' own scatter around the fitted line. It is read within one term type and needs three terms with a rate.
+          - The instructor breakdown is descriptive. Students choose sections by schedule, availability and reputation; it is not a measure of teaching and not a basis for evaluating anyone. The balance check compares only the two largest instructor groups and adjusts nothing.
+        guide: users/course-reports#later-course
+        implementation:
+          - file: R/branches/downstream-cohort.R
+            functions: [build_downstream_cohort, get_downstream_course_options]
+          - file: R/cones/downstream-outcomes.R
+            functions: [get_downstream_outcomes]
+          - file: R/cones/downstream-instructor-balance.R
+            functions: [get_downstream_instructor_balance]
+          - file: R/features/later-course.R
+            functions: [build_later_course, later_course_trend]
+
   - id: waitlist
     current_version: "3.0.0"
     versions:
