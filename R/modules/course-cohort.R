@@ -66,12 +66,13 @@ courseCohortServer <- function(id, student_terms, attempts, programs, dims, edge
         college_choices <- c(college_choices, stats::setNames(d$college, d$college))
       }
       level_choices <- sort(unique(attempts$level[!is.na(attempts$level)]))
+      term_type_choices <- stats::setNames(d$choices$term_types, tools::toTitleCase(d$choices$term_types))
 
       tagList(
         subtab_header(
           "Takers vs Non-Takers",
           cedar_definition_summary("course-cohort-effect"),
-          " The page opens on the classification most of this course's recent takers held, its own college and level, and the last three years of regular terms; change any of them and compare again."
+          " The page opens on every term of the term type most of this course's takers took it in, the classification most of them held, and its own college and level; change any of them and compare again. A Fall cohort and a Spring one are different students, so read one term type at a time."
         ),
         cedar_definition_panel("course-cohort-effect"),
         fluidRow(
@@ -89,8 +90,11 @@ courseCohortServer <- function(id, student_terms, attempts, programs, dims, edge
                                        selected = d$level))
         ),
         fluidRow(
+          column(2, checkboxGroupInput(ns("term_type"), "Term types", choices = term_type_choices,
+                                       selected = d$term_type, inline = TRUE)),
           column(2, numericInput(ns("min_n"), "Min students per group:", value = 10, min = 1, max = 1000)),
-          column(8, helpText(
+          column(6, helpText(
+            "Choosing term types selects every term of those types; narrow them in Terms. ",
             "Students are counted by home campus, and a student who took the course on any campus is a taker. ",
             "A benchmark course needs the minimum in both its passed and its never-took groups; this course is never its own benchmark."
           )),
@@ -99,6 +103,12 @@ courseCohortServer <- function(id, student_terms, attempts, programs, dims, edge
         uiOutput(ns("results"))
       )
     })
+
+    # A term type selects every term of that type; Terms then narrows them.
+    observeEvent(input$term_type, {
+      terms <- defaults()$choices$terms
+      updateSelectizeInput(session, "terms", selected = terms[get_term_type(terms) %in% input$term_type])
+    }, ignoreInit = TRUE)
 
     observeEvent(input$run, {
       crs <- course()
@@ -163,7 +173,6 @@ courseCohortServer <- function(id, student_terms, attempts, programs, dims, edge
       lo <- p$left_out
       n <- function(x) format(as.integer(x), big.mark = ",", trim = TRUE)
       tagList(
-        lapply(course_cohort_context_headline(p), function(s) tags$p(class = "cedar-lead", s)),
         info_panel(
           "Who is being counted",
           description = "The population, the groups, who is in no group, and the guard.",

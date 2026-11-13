@@ -142,9 +142,12 @@ it that term, and shows each group's return the next regular term and the DFW
 share of its next-term attempts. The gap columns are the passed group's rate
 minus the never-took group's, in points.
 
-The page opens on the classification most of the course's recent takers held,
-the course's own college and level, and the last three years of fall and
-spring terms. Change any of them and click **Compare Groups**.
+The page opens on every term of the term type most of the course's takers
+took it in (every Fall, for a course taken mostly in Fall), the classification
+most of them held, and the course's own college and level. A Fall cohort and a
+Spring one are different students, so read one term type at a time: **Term
+types** selects every term of the types you tick, and **Terms** narrows them.
+Change any of them and click **Compare Groups**.
 
 Read the gap against the benchmark, not on its own. Passing any course goes
 with returning, so the tab runs the same comparison for every other course of
