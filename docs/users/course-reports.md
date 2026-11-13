@@ -144,9 +144,13 @@ it that term, and shows each group's return the next regular term and the DFW
 share of its next-term attempts. The gap columns are the passed group's rate
 minus the never-took group's, in points.
 
-The page opens on every term of the term type most of the course's takers
-took it in (every Fall, for a course taken mostly in Fall), the classification
-most of them held, and the course's own college and level. A Fall cohort and a
+The page opens on the course's takers whose home campus is among the
+campuses chosen at the top of the page (every home campus when none of them
+is): every term of the term type most of them took it in (every Fall, for a
+course taken mostly in Fall), the classification most of them held, and the
+course's own college and level. So a main-campus page asks about
+main-campus students, even for a course most of whose takers are dual-credit
+students on a branch campus. A Fall cohort and a
 Spring one are different students, so read one term type at a time: **Term
 types** selects every term of the types you tick, and **Terms** narrows them.
 Change any of them and click **Compare Groups**.
