@@ -168,3 +168,21 @@ test_that("the runner refuses a suite aimed at the wrong data surface", {
   write_page("<html>starting</html>")
   expect_equal(browser_calls(run(c("--e2e", "nav"))), "node tests/e2e/nav.test.mjs")
 })
+
+test_that("the instructor-gate password is handed from .env to the Shiny worker", {
+  # ISSUES.md I55: .env and .Renviron are kept out of the image, and
+  # shiny-server starts its R worker with a clean environment. The password
+  # reaches the app only if Compose passes it to the container and the
+  # entrypoint writes it where the worker's R reads it.
+  # Read as text: yaml::read_yaml() warns on the build context's bare ".".
+  compose <- readLines(file.path(project_root, "docker-compose.yml"))
+  expect_length(grep("^      CEDAR_DFW_PASSWORD: \\$\\{CEDAR_DFW_PASSWORD:-\\}$", compose), 1L)
+  ignored <- readLines(file.path(project_root, ".dockerignore"))
+  expect_true(all(c(".env", ".Renviron") %in% ignored))
+  entrypoint <- readLines(file.path(project_root, "entrypoint.sh"))
+  writes <- grep("CEDAR_DFW_PASSWORD='%s'", entrypoint, fixed = TRUE)
+  starts <- grep("^exec /usr/bin/shiny-server", entrypoint)
+  expect_length(writes, 1L)
+  expect_true(any(grepl('worker_renviron="$HOME/.Renviron"', entrypoint, fixed = TRUE)))
+  expect_lt(writes, starts)
+})

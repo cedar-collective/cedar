@@ -14,6 +14,13 @@ services:
     restart: unless-stopped
     networks:
       - shiny-net
+    # .env and .Renviron are kept out of the image (.dockerignore), so a
+    # variable the app reads has to be passed here or it is unset in the
+    # container, and entrypoint.sh has to hand it on to the Shiny worker. The
+    # password that unlocks instructor-level results: unset or empty, those
+    # results stay closed and the page says so (ISSUES.md I55).
+    environment:
+      CEDAR_DFW_PASSWORD: ${CEDAR_DFW_PASSWORD:-}
     volumes:
       - ${CEDAR_DATA_DIR}:/srv/shiny-server/cedar/data
       # Public catalog archives stay separate from Banner data. The app reads

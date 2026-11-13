@@ -36,6 +36,7 @@ alongside other work (M14, M16).
 
 | ID | Kind | Summary |
 |---|---|---|
+| [I55](#i55--the-instructor-gate-password-stopped-reaching-the-app) | Defect | The instructor-gate password stopped reaching the app: since 2026-09-05 `.Renviron` is kept out of the image and nothing else passed `CEDAR_DFW_PASSWORD`, so every instructor gate on production reads "not configured" (fixed in code 2026-11-12; production needs the password in its `.env`) |
 | [I46](#i46--a-deploy-that-must-rebuild-a-table-the-app-cannot-start-without-takes-the-site-down) | Defect | The deploy's table gate ran after the health check, so a deploy that added a column to `cedar_student_terms` failed its health check on the missing column and never reached the gate: production served the restart page from 17:07 UTC on 2026-11-04 (gate moved before the first request) |
 | [I45](#i45--the-class-list-and-the-schedule-name-the-same-section-with-different-course-codes) | Defect | The class list and the schedule name the same section with different course codes for renamed subjects (SOC to SOCI, PSY to PSYC): SOCI 371 had class-list history from Fall 2019 but no sections before Fall 2021 (fixed for every reader by keying the loaded tables on the course, 2026-11-07; open until the remaining successions are confirmed) |
 | [I43](#i43--every-scheduled-refresh-fails-because-the-default-asks-for-a-report-mrgather-never-fetches) | Defect | Every scheduled refresh failed from 2026-10-24 to 2026-11-03: the default asked for the applicants report, which production mrgather never fetches, and one missing report skipped every table (default fixed 2026-11-03, per-report rebuilds 2026-11-11; open for mrgather, which still accepts a report it cannot fetch) |
@@ -86,6 +87,38 @@ Kept until the next release, so a recurrence is recognisable; each entry below g
 ---
 
 # Defects
+
+## I55 — The instructor-gate password stopped reaching the app
+
+**Status:** fixed in code 2026-11-12; in effect on production once
+`CEDAR_DFW_PASSWORD` is set in the host's `.env` and the app is deployed.
+**Found:** 2026-11-12, on production: every instructor gate read
+"CEDAR_DFW_PASSWORD is not configured", where the password had worked before.
+**Severity:** moderate. Nothing wrong was shown: the gate fails closed. But
+no one could open instructor-level results, and since #267 (2026-11-11) put
+instructor names behind the gate everywhere, that is every by-instructor
+table.
+**Cause:** the app reads the password with `Sys.getenv()` in the Shiny worker.
+The install guide said to set it in `.Renviron`, and it reached the app only
+because the image build copied the checkout's `.Renviron` into the app
+directory. Commit `0b8ccd1` (2026-09-05) added `.Renviron` and `.env` to
+`.dockerignore`, rightly, and dropped the variable from the install guide;
+`docker-compose.yml` passed no environment to the app, so from the next image
+the variable was unset. Passing it to the container is not enough either:
+shiny-server starts its R worker with a clean environment (`HOME`, `PATH`,
+`LANG` and R's own). That production set it in `.Renviron` is inferred from
+the guide and the history, not read off the host.
+**Reproduction:** `docker exec cedar-shiny sh -c 'tr "\0" "\n" <
+/proc/$(pgrep -f exec/R | head -1)/environ | cut -d= -f1'` lists the worker's
+variables: no `CEDAR_*` among them, whatever the container was given.
+**Fix:** `docker-compose.yml` passes `CEDAR_DFW_PASSWORD` from `.env` to the
+app container, and `entrypoint.sh` writes it to the worker's user `.Renviron`
+(mode 600, rewritten at every start, single-quoted so the value is literal; a
+password holding a single quote or a line break stops the container with the
+reason). Checked on the local institutional app with a password holding `$`,
+`#`, a space and double quotes: `./run-tests.sh --e2e retention` with
+`CEDAR_E2E_INSTRUCTOR_PASSWORD` set unlocked the instructor breakout.
+`test-ci.R` pins the hand-off.
 
 ## I54 — The Gen Ed list had no second-language area
 
