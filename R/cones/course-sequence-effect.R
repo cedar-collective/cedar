@@ -165,8 +165,10 @@
 #'     \item{control_split}{The control group by what they did in X before Y:
 #'       `prior_x` (`attempted_not_passed`: a classified X attempt strictly
 #'       before Y, none passed; `no_prior_attempt`), `n`, `n_dfw`, `dfw_pct`.}
-#'     \item{by_year}{Per calendar year of the Y attempt and group: `n`,
-#'       `n_dfw`, `dfw_pct` (NA under `min_n`).}
+#'     \item{by_term}{Per term of the Y attempt and group: `term`,
+#'       `term_type`, `n`, `n_dfw`, `dfw_pct` (NA under `min_n`), oldest
+#'       first. `main_term_type` is the term type holding the most students,
+#'       and `n_min_term` the guard.}
 #'     \item{by_hs_gpa_band}{Per high-school GPA band and group: `n`, `n_dfw`,
 #'       `dfw_pct`; NULL without an applicants table.}
 #'     \item{standardized}{The treatment group's actual DFW rate against the
@@ -376,14 +378,21 @@ get_course_sequence_effect <- function(students, attempts, programs, applicants 
     .sequence_band_comparison(groups, final %>% select(student_id, y_outcome), min_band_n)
   } else list(by_band = NULL, standardized = NULL)
 
-  # The same two rates by the calendar year of the Y attempt, for change over
-  # time. A group under min_n in a year keeps its count and has no rate.
-  by_year <- final %>%
-    mutate(year = as.integer(term_y %/% 100L)) %>%
-    group_by(year, group) %>%
+  # The same two rates by the term of the Y attempt, for change over time.
+  # One row per term, never per calendar year: a Fall holds new students
+  # placed straight into Y and a Spring the students who passed X the term
+  # before, so a year mixes two populations in proportions that change with
+  # which of its terms are graded. A group under min_n in a term keeps its
+  # count and has no rate.
+  by_term <- final %>%
+    mutate(term = as.integer(term_y), term_type = get_term_type(term)) %>%
+    group_by(term, term_type, group) %>%
     summarize(n = n(), n_dfw = sum(y_outcome == "dfw"), .groups = "drop") %>%
     mutate(dfw_pct = if_else(n >= min_n, 100 * n_dfw / n, NA_real_)) %>%
-    arrange(year, desc(group))
+    arrange(term, desc(group))
+  type_sizes <- by_term %>% group_by(term_type) %>% summarize(n = sum(n), .groups = "drop") %>%
+    arrange(desc(n), match(term_type, c("fall", "spring", "summer")))
+  main_term_type <- type_sizes$term_type[[1]]
 
   message("[course-sequence-effect.R]   Sequence effect computed. Done.")
 
@@ -401,8 +410,9 @@ get_course_sequence_effect <- function(students, attempts, programs, applicants 
     n_missing_hs_gpa_excluded = n_missing_hs_gpa_excluded,
     n_missing_act_excluded  = n_missing_act_excluded,
     control_split           = control_split,
-    by_year                 = by_year,
-    n_min_year              = min_n,
+    by_term                 = by_term,
+    main_term_type          = main_term_type,
+    n_min_term              = min_n,
     by_hs_gpa_band          = bands$by_band,
     standardized            = bands$standardized,
     y_attempt_rule          = "earliest classifiable in-scope Y attempt per student",
