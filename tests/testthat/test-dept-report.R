@@ -458,8 +458,17 @@ test_that("compute_dept_course_units_tab reads the majors' teaching units and po
   result <- compute_dept_course_units_tab(base, data_objects, min_n = 1L)
   expect_equal(names(result$tables), c("own_share", "by_college", "latest_units", "top_units",
                                        "outside_courses"))
-  # The latest term (202110) holds one member, in HIST 1110: no outside course.
-  expect_equal(nrow(result$tables$outside_courses), 0L)
+  # The outside courses are every term's: ST_H's ENGL 1110 and MATH 1215 in
+  # 202010, each 1 of that term's 8 members; 202110's one member is in HIST 1110.
+  expect_equal(names(result$tables$outside_courses),
+               c("term", "campus", "in_progress", "subject_course", "unit_label", "dept_code",
+                 "n_students", "term_students", "share_of_students"))
+  expect_equal(result$tables$outside_courses$term, c(202010L, 202010L))
+  expect_equal(result$tables$outside_courses$subject_course, c("ENGL 1110", "MATH 1215"))
+  expect_equal(result$tables$outside_courses$dept_code, c("ENGL", "MATH"))
+  expect_equal(result$tables$outside_courses$n_students, c(1L, 1L))
+  expect_equal(result$tables$outside_courses$term_students, c(8L, 8L))
+  expect_equal(result$tables$outside_courses$share_of_students, c(0.125, 0.125))
   expect_equal(result$meta$programs$program_code, "HIST")
   expect_equal(result$meta$programs$n_students, 9L)
   expect_equal(result$meta$member_name, "History")
@@ -485,10 +494,10 @@ test_that("compute_dept_course_units_tab reads the majors' teaching units and po
   expect_equal(sums$s, rep(1, nrow(sums)))
   expect_equal(result$meta$dept_code, "HIST")
 
-  # A guard above every row pools everything but the department's own unit.
+  # A guard above every row leaves the department's own unit, which always
+  # has its row, and changes no share.
   pooled <- compute_dept_course_units_tab(base, data_objects, min_n = 1000L)
-  lu <- pooled$tables$latest_units
-  expect_true(all(lu$is_own_unit | grepl("^Other units", lu$unit_label)))
+  expect_true(all(pooled$tables$latest_units$is_own_unit))
   expect_equal(pooled$tables$own_share, result$tables$own_share)
   # No campus has that many members, so there is nothing to chart; the college
   # rows are all pooled, and still sum to one.
@@ -526,6 +535,68 @@ test_that("compute_dept_course_units_tab reads the majors' teaching units and po
   nine <- compute_dept_course_units_tab(base, data_objects, min_n = 9L)$tables$by_college
   expect_true(all(nine$pooled))
 
+  # The latest term's units are pooled inside the college chart's segments, so
+  # the table's College column and the bars add up to that chart, whatever the
+  # guard hides. Read to Spring 2020: HIST 8 registrations, ENGL 1 (ST_H),
+  # MATH 1 (ST_H's late drop).
+  spring <- data_objects
+  spring$cedar_edges <- list(last_enrolled = 202010L, last_enrolled_complete = 202010L, last_graded = 202010L)
+  # a. As the fixture has it, one college: under a guard of 2, ENGL and MATH
+  #    are the college's other units, with no student count (ST_H is in both).
+  # b. ENGL and MATH taught by a second college, and the MATH seat ST_A's:
+  #    that college has 2 students and no unit with 2, so it stands in the
+  #    chart while none of its units has a row. Its units are one row under
+  #    its name, with the college's own 2 students.
+  # c. The same under a guard of 3: the second college is under the guard
+  #    too, so its units are under the chart's pooled label, with no count.
+  # d. A guard above everything: the department's own unit keeps its row,
+  #    under the pooled label its college is drawn under, and no campus has
+  #    members enough for bars.
+  second_college <- spring
+  second_college$cedar_registrations <- test_students_st %>%
+    dplyr::mutate(
+      college = dplyr::if_else(subject_course %in% c("ENGL 1110", "MATH 1215"), "ENGR", college),
+      student_id = dplyr::if_else(subject_course == "MATH 1215" & student_id == "ST_H", "ST_A", student_id))
+  pooled_units <- list(
+    a = compute_dept_course_units_tab(base, spring, min_n = 2L),
+    b = compute_dept_course_units_tab(base, second_college, min_n = 2L),
+    c = compute_dept_course_units_tab(base, second_college, min_n = 3L),
+    d = compute_dept_course_units_tab(base, spring, min_n = 1000L))
+  by_label <- function(rows) rows %>%
+    dplyr::group_by(college_label) %>%
+    dplyr::summarize(n_registrations = sum(n_registrations), .groups = "drop") %>%
+    dplyr::arrange(college_label)
+  for (case in names(pooled_units)) {
+    tables <- pooled_units[[case]]$tables
+    chart <- tables$by_college %>% dplyr::arrange(college_label)
+    expect_equal(by_label(tables$latest_units), chart[c("college_label", "n_registrations")], info = case)
+  }
+  for (case in c("a", "b", "c")) {
+    tables <- pooled_units[[case]]$tables
+    chart <- tables$by_college %>% dplyr::arrange(college_label)
+    expect_equal(by_label(tables$top_units), chart[c("college_label", "n_registrations")], info = case)
+  }
+  expect_equal(nrow(pooled_units$d$tables$top_units), 0L)
+  expect_equal(pooled_units$d$tables$latest_units$is_own_unit, c(TRUE, FALSE))
+  expect_equal(pooled_units$d$tables$latest_units$n_registrations, c(8L, 2L))
+  expect_equal(names(pooled_units$a$tables$latest_units),
+               c("term", "campus", "in_progress", "college_label", "unit_label", "dept_code", "is_own_unit",
+                 "n_pooled", "n_students", "n_registrations", "share_of_registrations"))
+  expect_equal(pooled_units$a$tables$latest_units$n_pooled, c(0L, 2L))
+  expect_equal(pooled_units$a$tables$latest_units$n_students, c(8L, NA))
+  expect_equal(pooled_units$a$tables$latest_units$n_registrations, c(8L, 2L))
+  expect_equal(pooled_units$b$tables$by_college$n_students, c(8L, 2L))
+  expect_equal(pooled_units$b$tables$latest_units$n_pooled, c(0L, 2L))
+  expect_equal(pooled_units$b$tables$latest_units$n_students, c(8L, 2L))
+  expect_equal(pooled_units$b$tables$latest_units$share_of_registrations, c(0.8, 0.2))
+  expect_equal(pooled_units$c$tables$by_college$pooled, c(FALSE, TRUE))
+  expect_equal(pooled_units$c$tables$latest_units$n_students, c(8L, NA))
+  testthat::local_edition(3)
+  expect_snapshot(for (case in names(pooled_units)) {
+    print(as.data.frame(pooled_units[[case]]$tables$latest_units[c("college_label", "unit_label")]))
+    print(as.data.frame(pooled_units[[case]]$tables$top_units[c("college_label", "unit_label")]))
+  })
+
   # The own-share line: 0.8 over 8 members in 202010, 1.0 over one in 202110.
   # Under a guard of 2 the second term has no point.
   line <- plotly::plotly_build(plot_major_course_units_own_share(result$tables$own_share, min_n = 1L))
@@ -554,7 +625,6 @@ test_that("compute_dept_course_units_tab reads the majors' teaching units and po
 
   # The charts carry the numbers; the note is only what a chart cannot say.
   expect_equal(dept_course_units_note(result), character(0))
-  testthat::local_edition(3)
 
   # A data window that runs past the majors' last registration: the latest
   # term read is the last one with a registration, not the window's end, and
@@ -567,10 +637,9 @@ test_that("compute_dept_course_units_tab reads the majors' teaching units and po
   expect_equal(later$tables$latest_units, result$tables$latest_units, ignore_attr = TRUE)
   expect_snapshot(cat(dept_course_units_note(later), sep = "\n"))
 
-  # Top outside courses. Give ST_I, the one member in 202110, the ENGL 1110
-  # seat ST_H held a year earlier: the latest term then has one outside
-  # course, one of one members in it, against one a year earlier. MATH 1215
-  # (202010 only) is not in the latest term and is not listed.
+  # Outside courses term by term. Give ST_I, the one member in 202110, the
+  # ENGL 1110 seat ST_H held a year earlier: ENGL 1110 then has a row in both
+  # terms (1 of 8 members, then 1 of 1), and MATH 1215 in 202010 only.
   data_objects$cedar_edges <- list(last_enrolled = 202110L, last_enrolled_complete = 202110L,
                                    last_graded = 202110L)
   engl <- test_students_st %>% dplyr::filter(student_id == "ST_H", subject_course == "ENGL 1110")
@@ -578,18 +647,19 @@ test_that("compute_dept_course_units_tab reads the majors' teaching units and po
   data_objects$cedar_registrations <- dplyr::bind_rows(
     test_students_st, engl %>% dplyr::mutate(student_id = "ST_I", term = 202110L))
   outside <- compute_dept_course_units_tab(base, data_objects, min_n = 1L)$tables$outside_courses
-  expect_equal(names(outside), c("term", "campus", "in_progress", "subject_course", "unit_label", "dept_code",
-                                 "n_students", "share_of_students", "students_year_earlier"))
-  expect_equal(outside$term, 202110L)
-  expect_equal(outside$subject_course, "ENGL 1110")
-  expect_equal(outside$dept_code, "ENGL")
-  expect_equal(outside$n_students, 1L)
-  expect_equal(outside$share_of_students, 1)
-  expect_equal(outside$students_year_earlier, 1L)
-  # The guard drops a course under it, and n_outside caps the list per campus.
+  expect_equal(outside$term, c(202010L, 202010L, 202110L))
+  expect_equal(outside$subject_course, c("ENGL 1110", "MATH 1215", "ENGL 1110"))
+  expect_equal(outside$n_students, c(1L, 1L, 1L))
+  expect_equal(outside$share_of_students, c(0.125, 0.125, 1))
+  # The page ranks them over the terms it draws: ENGL 1110 in two terms leads.
+  history <- prepare_major_course_units_course_history(
+    outside, terms = compute_dept_course_units_tab(base, data_objects, min_n = 1L)$tables$own_share$term, n_top = 1L)
+  expect_equal(history$courses$subject_course, c("ENGL 1110", "MATH 1215"))
+  expect_equal(history$courses$student_terms, c(2L, 1L))
+  expect_equal(history$table$t_202010, c(1L, 1L))
+  expect_equal(history$table$t_202110, c(1L, NA))
+  # The guard drops a course in a term it is under.
   expect_equal(nrow(compute_dept_course_units_tab(base, data_objects, min_n = 2L)$tables$outside_courses), 0L)
-  expect_equal(nrow(compute_dept_course_units_tab(base, data_objects, min_n = 1L,
-                                                  n_outside = 0L)$tables$outside_courses), 0L)
 
   # One program of the unit: the same payload under that program's name, and
   # a program the unit does not hold is an error, never an empty page.
@@ -601,7 +671,8 @@ test_that("compute_dept_course_units_tab reads the majors' teaching units and po
   expect_equal(one$tables$top_units$kind, c("own", "outside"))
   expect_equal(one$tables$top_units$share, c(0.5, 0.5))
   rest <- compute_dept_course_units_tab(base, data_objects, min_n = 1L, n_top = 0L)$tables$top_units
-  expect_equal(rest$unit_label, c("History (own courses)", "All other units (1)"))
+  expect_equal(rest$kind, c("own", "rest"))
+  expect_equal(rest$share, c(0.5, 0.5))
 
   # A unit with no member in the data: no chart, and a note that says so.
   nobody <- compute_dept_course_units_tab(list(dept_code = "PHIL", dept_name = "Philosophy"), data_objects,

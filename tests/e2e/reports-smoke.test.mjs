@@ -347,6 +347,37 @@ export async function runReportChecks({ scope = 'smoke', synthetic = false } = {
       if (/were in the unit's own courses/.test(coursesTaken.text)) {
         throw new Error('Courses Taken still opens with the latest-term paragraph');
       }
+      // The outside courses are read term by term, not for the latest term
+      // alone: the section carries its grids and table, or the reason it has
+      // neither (no outside course clears the small-cell guard in any term).
+      // Section headings are set in capitals by CSS, which innerText reflects.
+      const outside = await page.$eval('#dept_trends-mcu_body', (el) => ({
+        heading: /Top Outside Courses Over Time/i.test(el.innerText),
+        charts: !!el.querySelector('#dept_trends-mcu_outside_charts'),
+        table: !!el.querySelector('#dept_trends-mcu_outside_table'),
+        none: /No outside course has \d+ or more of these majors in any term/.test(el.innerText),
+      }));
+      if (!guarded && !(outside.heading && ((outside.charts && outside.table) || outside.none))) {
+        throw new Error(`Courses Taken has no outside courses over time: ${JSON.stringify(outside)}`);
+      }
+      if (outside.charts) {
+        // The grids are drawn per campus once the payload is in: a grid, or
+        // the sentence saying no course reached the guard in a ticked term.
+        await waitForOutput(page, 'Dept Trends Courses Taken outside courses', [
+          { type: 'reactable', id: 'dept_trends-mcu_outside_table' },
+          { type: 'text', id: 'dept_trends-mcu_outside_charts' },
+        ], { all: true });
+        const grids = await page.$$eval('#dept_trends-mcu_outside_charts [id^="dept_trends-mcu_outside_"]',
+          (els) => els.map((el) => el.id));
+        if (grids.length > 0) {
+          await waitForOutput(page, 'Dept Trends Courses Taken outside-course grid', [
+            { type: 'plotly', id: grids[0] },
+          ]);
+        } else if (!/No outside course has \d+ or more/.test(
+          await page.$eval('#dept_trends-mcu_outside_charts', (el) => el.innerText))) {
+          throw new Error('Courses Taken draws no outside-course grid and does not say why');
+        }
+      }
 
       await clickSubTabIn(page, 'dept_trends-tabs', 'Demographics');
       await waitForOutput(page, 'Dept Trends Demographics tab', [

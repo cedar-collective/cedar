@@ -8,7 +8,7 @@ parent: Developer Guide
 
 This reference is auto-generated from roxygen2 comments in the source code.
 
-*Generated: 2026-11-13 07:26:43.295281*
+*Generated: 2026-11-13 10:50:45.490995*
 
 ---
 
@@ -3861,16 +3861,34 @@ Courses students were taking in the term before a major switch appeared  Answers
 
 *Source: major-course-units.R*
 
-**One term's teaching units as bars: the own unit, the top outside units, the rest**
+**One term's teaching units as bars: the own unit, the top outside units, the rest by college**
 
 **Parameters:**
 
-- `unit_rows` - One term's `get_major_course_units()` unit rows (every row, before any small-cell guard) with a `unit_label` and a `college_label`.
+- `unit_rows` - One term's `get_major_course_units()` unit rows (every row, before any small-cell guard) with a `unit_label` and a `college_label`: the label the college chart draws the unit's college under in that term and campus, so the bars under one label add up to that chart's segment.
 - `own_label` - The label of the members' own unit, for a campus where it taught them nothing: its bar is still drawn, at zero.
 - `min_n` - The smallest distinct-student count a campus needs to be drawn at all, and an outside unit needs for a bar of its own.
 - `n_top` - How many outside units get a bar per campus.
+- `pooled_label` - The `college_label` holding every college under the guard, whose bar is drawn last; NULL when the rows carry no such label.
 
-**Returns:** One row per `campus` and bar, in drawing order: `unit_label`, `kind` (`"own"`, `"outside"`, `"undecided"` for subjects with no unit, `"rest"` for every unit without a bar), `n_units` (the units the bar holds), `n_registrations`, `share` (of the campus's member registrations that term), `term_students` and `term_registrations`. A campus's shares sum to 1.
+**Returns:** One row per `campus` and bar, in drawing order: `unit_label`, `college_label` (NA for an own-unit bar at zero), `kind` (`"own"`, `"outside"`, `"undecided"` for subjects with no unit, `"rest"` for one college's units without a bar of their own), `n_units` (the units the bar holds), `n_registrations`, `share` (of the campus's member registrations that term), `term_students` and `term_registrations`. A campus's shares sum to 1, and its bars under one `college_label` to that college's registrations: an own unit teaching under two colleges has a bar under each.
+
+---
+
+### `prepare_major_course_units_course_history()`
+
+*Source: major-course-units.R*
+
+**The outside courses a major's students sit in, term by term**
+
+**Parameters:**
+
+- `course_rows` - One row per `term`, `campus` and outside course that cleared the guard, with `subject_course`, `unit_label`, `n_students`, `term_students`, `share_of_students` and `in_progress`, as `compute_dept_course_units_tab()` prepares them (`outside_courses`).
+- `terms` - Every term to give a column, whether or not a course cleared the guard in it: the terms the members hold a registration in.
+- `term_types` - The term types to keep; NULL keeps every term.
+- `n_top` - How many courses per campus are marked `top`, for the chart.
+
+**Returns:** A list: `terms` (the terms kept, in order), `courses` (one row per `campus` and course: `rank` within the campus by `student_terms`, the majors counted in the course over the terms kept, with `n_terms`, the terms it cleared the guard in, and `top`), `cells` (the rows of `course_rows` in the terms kept) and `table` (`courses` with one `t_<term>` column per term kept, the majors in the course that term; NA where it did not clear the guard).
 
 ---
 
@@ -3902,7 +3920,21 @@ Courses students were taking in the term before a major switch appeared  Answers
 - `term_types` - The term types to draw; NULL draws every term.
 - `campuses` - The campuses to draw; NULL draws every campus.
 
-**Returns:** A named list, one plotly per campus drawn (`names` are the campuses). Colleges stack in the order of their registrations over every term and campus drawn, so a college keeps its colour and place from chart to chart; the pooled row is last and grey.
+**Returns:** A named list, one plotly per campus drawn (`names` are the campuses). Colleges stack in the order of `major_course_units_college_colors()` over every term of the campuses drawn, so a college keeps its colour and place from chart to chart and whatever term types are ticked; the pooled row is last and grey.
+
+---
+
+### `major_course_units_college_colors()`
+
+*Source: major-course-units.R*
+
+**The colour each teaching college keeps on the Courses Taken charts**
+
+**Parameters:**
+
+- `by_college` - Rows with `college_label`, `n_registrations` and `pooled`, as `compute_dept_course_units_tab()` prepares them.
+
+**Returns:** Colours named by college label, in the order of the colleges' registrations over every row given; the pooled label is last and grey. The latest term's unit bars and the colleges over time read the same colours, so a college is one colour in both.
 
 ---
 
@@ -3915,8 +3947,24 @@ Courses students were taking in the term before a major switch appeared  Answers
 **Parameters:**
 
 - `top_units` - `prepare_major_course_units_top_units()` output.
+- `colors` - Colours named by `college_label` (`major_course_units_college_colors()`), so a bar is its college's colour on the colleges-over-time chart.
 
-**Returns:** A named list, one plotly per campus (`names` are the campuses): the own unit's bar first and in its own colour, the outside units below it in order of registrations, the units without a bar pooled last in grey.
+**Returns:** A named list, one plotly per campus (`names` are the campuses): the own unit's bar first, the outside units below it in order of registrations, then each college's remaining units as one paler bar. A bar is coloured by its teaching college, and the legend names them.
+
+---
+
+### `plot_major_course_units_course_history()`
+
+*Source: major-course-units.R*
+
+**The outside courses a major's students sit in most, a term-by-course grid per campus**
+
+**Parameters:**
+
+- `history` - `prepare_major_course_units_course_history()` output.
+- `campuses` - The campuses to draw; NULL draws every campus with a course.
+
+**Returns:** A named list, one plotly per campus with a `top` course (`names` are the campuses): a row per course, the most-taken first, and a column per term; a cell holds the majors in the course that term and is shaded by their share of that term's majors on the campus, and is blank where the course did not clear the guard.
 
 ---
 
