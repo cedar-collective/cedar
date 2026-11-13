@@ -356,7 +356,7 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
     }, ignoreInit = TRUE)
 
     # Courses Taken computes when its tab is opened, once per committed scope
-    # (under a second over the full class list), so it is not preloaded or
+    # (under two seconds over the full class list), so it is not preloaded or
     # cached; choosing one of the unit's programs computes it again.
     load_mcu <- function(program_code = NULL) {
       base <- dept_data()
@@ -364,12 +364,20 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
       tryCatch({
         payload <- compute_dept_course_units_tab(base, data_objects, active_scope()$campus,
                                                  program_code = program_code)
-        for (cmp in names(payload$plots)) local({
+        for (cmp in payload$meta$chart_campuses) local({
           campus_key <- cmp
           output[[paste0("mcu_college_share_", campus_key)]] <- renderPlotly({
+            plot <- mcu_college_plots()[[campus_key]]
+            shiny::validate(shiny::need(!is.null(plot), paste0("No ", campus_key, " term of the ticked types to draw.")))
+            mark_plotly_terms(plot, in_progress_labels)
+          })
+        })
+        for (cmp in names(payload$plots$top_units)) local({
+          campus_key <- cmp
+          output[[paste0("mcu_top_units_", campus_key)]] <- renderPlotly({
             data <- mcu_data()
             req(data)
-            mark_plotly_terms(data$plots[[campus_key]], in_progress_labels)
+            data$plots$top_units[[campus_key]]
           })
         })
         mcu_data(payload)
@@ -405,13 +413,45 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
       selectInput(ns("mcu_program"), "Program", choices = choices, selected = "")
     })
 
+    # The over-time charts draw the term types ticked on the tab. Summer is
+    # unticked to begin with: few majors enrol then and they take a different
+    # mix, so a summer point or bar reads as a change that is not one.
+    mcu_term_types <- reactive({
+      shiny::validate(shiny::need(length(input$mcu_term_type) > 0, "Tick at least one term type."))
+      input$mcu_term_type
+    })
+    # One call for every campus, so a college keeps its colour from chart to chart.
+    mcu_college_plots <- reactive({
+      data <- mcu_data()
+      req(data)
+      plot_major_course_units_by_college(data$tables$by_college, term_types = mcu_term_types(),
+                                         campuses = data$meta$chart_campuses)
+    })
+    output$mcu_own_share_plot <- renderPlotly({
+      data <- mcu_data()
+      req(data)
+      plot <- plot_major_course_units_own_share(data$tables$own_share, min_n = data$meta$min_n,
+                                                term_types = mcu_term_types())
+      shiny::validate(shiny::need(!is.null(plot), paste0("No term of the ticked types has ", data$meta$min_n,
+                                                         " or more of these majors on a campus.")))
+      mark_plotly_terms(plot, in_progress_labels)
+    })
+
     output$mcu_body <- renderUI({
       data <- mcu_data()
       if (is.null(data)) return(empty_state("Loading where this department's majors take their courses\u2026"))
       meta <- data$meta
       n <- function(x) format(as.integer(x), big.mark = ",", trim = TRUE)
+      note <- dept_course_units_note(data)
+      if (nrow(data$tables$own_share) == 0L) return(empty_state(note))
+      latest_label <- paste0(fmt_term(meta$latest_term), if (isTRUE(meta$latest_in_progress)) " (in progress)" else "")
+      too_few <- paste0("No teaching campus has ", meta$min_n, " or more of these majors")
+      # One heading per campus chart: the campus, and the majors and
+      # registrations its bars are shares of.
+      top_campuses <- data$tables$top_units %>%
+        dplyr::distinct(campus, term_students, term_registrations)
       tagList(
-        lapply(dept_course_units_headline(data), function(s) tags$p(class = "cedar-lead", s)),
+        lapply(note, lead_text),
         info_panel(
           "Who is being counted",
           description = "Members, registrations, teaching units and the guard.",
@@ -426,26 +466,49 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
             tags$li("A registration is a member's class-list row registered at the pull or withdrawn late; early drops and waitlist rows are not course-taking. Each student and course counts once per term and teaching campus."),
             tags$li("The teaching unit is the subject's unit in the mapping files; ", n(meta$n_unmapped),
                     " registrations are in subjects no mapping row has decided and are shown as their own row, never given a unit."),
-            tags$li("Shares are within the term and teaching campus over every member registration there. In the latest-term table, units under ",
-                    meta$min_n, " students are pooled into one row."),
+            tags$li("Shares are within the term and teaching campus over every member registration there. A teaching unit or college with fewer than ",
+                    meta$min_n, " of these majors in a term is pooled with the others like it, and a campus with fewer than ",
+                    meta$min_n, " of them is in the tables, not the charts."),
             if (isTRUE(meta$latest_in_progress)) tags$li("The latest term is in progress: its registrations are current, not settled.")
           )
         ),
         dashboard_subsection(
+          "Own-Unit Share Over Time",
+          paste0("Of these majors' registrations each term, the share in the department's own courses, one line per teaching campus, for the term types ticked above; the table gives the counts behind each point. Summer starts unticked: few majors enrol then, and they take a different mix. A term with fewer than ",
+                 meta$min_n, " of these majors on a campus has no point. A shaded term is in progress."),
+          if (length(meta$chart_campuses) == 0L) {
+            empty_state(paste0(too_few, " in any term."))
+          } else {
+            plotlyOutput(ns("mcu_own_share_plot"), height = "340px")
+          },
+          reactable::reactableOutput(ns("mcu_own_share_table"))
+        ),
+        dashboard_subsection(
+          paste0("Teaching Units, ", latest_label),
+          paste0("Who taught these majors in the latest term, one chart per teaching campus: the department's own courses first, then the ",
+                 meta$n_top, " outside units with the most of their registrations, then every other unit together. The table lists every unit."),
+          if (nrow(top_campuses) == 0L) empty_state(paste0(too_few, " in ", fmt_term(meta$latest_term), ".")),
+          lapply(seq_len(nrow(top_campuses)), function(i) tagList(
+            section_heading(paste0(top_campuses$campus[[i]], ": ", n(top_campuses$term_students[[i]]), " majors, ",
+                                   n(top_campuses$term_registrations[[i]]), " registrations"), level = "h6"),
+            # A bar keeps its thickness whether the campus has two or ten.
+            plotlyOutput(ns(paste0("mcu_top_units_", top_campuses$campus[[i]])),
+                         height = paste0(90L + 30L * sum(data$tables$top_units$campus == top_campuses$campus[[i]]), "px"))
+          )),
+          reactable::reactableOutput(ns("mcu_units_table"))
+        ),
+        dashboard_subsection(
           "Teaching Colleges Over Time",
-          "Each bar is one term's member registrations split by the college of the unit that taught the course, one chart per teaching campus. A shaded term is in progress.",
-          lapply(names(data$plots), function(cmp) tagList(
+          paste0("Each bar is one term's member registrations split by the college of the unit that taught the course, one chart per teaching campus, for the term types ticked above. A college that taught fewer than ",
+                 meta$min_n, " of these majors in a term is in that term's grey segment. A shaded term is in progress."),
+          if (length(meta$chart_campuses) == 0L) empty_state(paste0(too_few, " in any term.")),
+          lapply(meta$chart_campuses, function(cmp) tagList(
             section_heading(cmp, level = "h6"),
             plotlyOutput(ns(paste0("mcu_college_share_", cmp)), height = "340px")
           ))
         ),
         dashboard_subsection(
-          paste0("Teaching Units, ", fmt_term(meta$latest_term)),
-          "Every unit that taught this department's majors in the latest term, by teaching campus, with its share of their registrations; the department's own row first.",
-          reactable::reactableOutput(ns("mcu_units_table"))
-        ),
-        dashboard_subsection(
-          paste0("Top Outside Courses, ", fmt_term(meta$latest_term)),
+          paste0("Top Outside Courses, ", latest_label),
           paste0("The courses outside the department's own unit that the most of these majors sit in during the latest term, by teaching campus, with the share of that term's majors and the count in the same term a year earlier: the seats another unit's schedule supplies, and where two curricula overlap. Up to ",
                  meta$n_outside, " per campus; a course or a year-earlier count under ", meta$min_n, " students is not shown."),
           if (nrow(data$tables$outside_courses) == 0L) {
@@ -453,11 +516,6 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
           } else {
             reactable::reactableOutput(ns("mcu_outside_table"))
           }
-        ),
-        dashboard_subsection(
-          "Own-Unit Share by Term",
-          "The members' students and registrations each term and teaching campus, and the share of those registrations in the department's own courses.",
-          reactable::reactableOutput(ns("mcu_own_share_table"))
         )
       )
     })
@@ -508,9 +566,11 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
       data <- mcu_data()
       req(data)
       display <- data$tables$own_share %>%
+        dplyr::filter(get_term_type(term) %in% mcu_term_types()) %>%
         dplyr::transmute(term, campus, in_progress, students, registrations, own_registrations, own_share, n_units)
       reactable::reactable(
-        display, theme = cedar_tbl_theme, compact = TRUE, striped = TRUE, pagination = FALSE,
+        display, theme = cedar_tbl_theme, compact = TRUE, striped = TRUE, highlight = TRUE,
+        defaultPageSize = 10, showPageSizeOptions = TRUE, pageSizeOptions = c(10, 30, 100),
         defaultSorted = list(term = "desc"),
         columns = list(
           term = mcu_term_coldef,
@@ -1442,6 +1502,9 @@ deptTrendsCourseUnitsUI <- function(ns) {
       "The inverse of Students Served on the Credit Hours tab, which asks whose majors fill this department's seats."
     ),
     uiOutput(ns("mcu_controls")),
+    checkboxGroupInput(ns("mcu_term_type"), "Term types in the charts over time",
+                       choices = c("Fall" = "fall", "Spring" = "spring", "Summer" = "summer"),
+                       selected = c("fall", "spring"), inline = TRUE),
     uiOutput(ns("mcu_body"))
   )
 }

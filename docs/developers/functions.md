@@ -8,7 +8,7 @@ parent: Developer Guide
 
 This reference is auto-generated from roxygen2 comments in the source code.
 
-*Generated: 2026-11-12 21:08:47.139108*
+*Generated: 2026-11-12 21:18:51.967379*
 
 ---
 
@@ -3781,9 +3781,42 @@ Courses students were taking in the term before a major switch appeared  Answers
 
 - `student_terms` - `cedar_student_terms`, with its units attached (`primary_dept_code`).
 - `registrations` - `cedar_registrations`, with its units attached (`department`, `college`).
-- `opt` - `dept_code` (the major's unit; required), `program_code` (one or more program codes to narrow the members to; default every program of the unit), `include_pre_majors` (default TRUE), `term` (terms to keep; default every term to the edge), `campus` (teaching campuses to keep; NULL keeps every campus, each its own row), `min_n` (the smallest distinct-student count a unit row needs; default 10), `include_in_progress` (default FALSE), `grain` (`"unit"`, the default, or `"course"`: one row per course under its teaching unit, with `subject_course` and `share_of_students`, `n_students / term_students`), `data_edges` (`cedar_data_edges()` output, required).
+- `opt` - `dept_code` (the major's unit; required), `program_code` (one or more program codes to narrow the members to; default every program of the unit), `include_pre_majors` (default TRUE), `term` (terms to keep; default every term to the edge), `campus` (teaching campuses to keep; NULL keeps every campus, each its own row), `min_n` (the smallest distinct-student count a unit row needs; default 10), `include_in_progress` (default FALSE), `grain` (`"unit"`, the default; `"course"`: one row per course under its teaching unit, with `subject_course` and `share_of_students`, `n_students / term_students`; or `"college"`: one row per teaching college, with `unit_decided` in place of `dept_code` and `is_own_unit`), `data_edges` (`cedar_data_edges()` output, required).
 
 **Returns:** One row per `term`, `campus`, `college` and `dept_code` (the teaching unit; NA for a subject with no mapping row), with `is_own_unit`, `in_progress`, `n_registrations` (distinct student × course), `n_students` (distinct students), `term_registrations` and `term_students` (the same over every unit in that term and campus) and `share_of_registrations` (`n_registrations / term_registrations`). Attributes: `edge` (the settled term the rows stop at), `latest_term` (the last term included), `n_member_student_terms`, `n_members` (distinct students), `member_programs` (the unit's members before `program_code` narrows them: `primary_major_code`, `is_pre_major`, `n_students`), `n_unmapped` (member registrations whose subject has no unit), `suppressed` (the unit rows under `min_n`, as a tibble of `term`, `campus`, `dept_code`, `n_students`).
+
+---
+
+### `prepare_major_course_units_top_units()`
+
+*Source: major-course-units.R*
+
+**One term's teaching units as bars: the own unit, the top outside units, the rest**
+
+**Parameters:**
+
+- `unit_rows` - One term's `get_major_course_units()` unit rows (every row, before any small-cell guard) with a `unit_label` and a `college_label`.
+- `own_label` - The label of the members' own unit, for a campus where it taught them nothing: its bar is still drawn, at zero.
+- `min_n` - The smallest distinct-student count a campus needs to be drawn at all, and an outside unit needs for a bar of its own.
+- `n_top` - How many outside units get a bar per campus.
+
+**Returns:** One row per `campus` and bar, in drawing order: `unit_label`, `kind` (`"own"`, `"outside"`, `"undecided"` for subjects with no unit, `"rest"` for every unit without a bar), `n_units` (the units the bar holds), `n_registrations`, `share` (of the campus's member registrations that term), `term_students` and `term_registrations`. A campus's shares sum to 1.
+
+---
+
+### `plot_major_course_units_own_share()`
+
+*Source: major-course-units.R*
+
+**Share of a major's registrations in its own unit's courses, a line per campus**
+
+**Parameters:**
+
+- `own_share` - One row per `term` and `campus` with `students`, `registrations`, `own_registrations` and `own_share`, as `compute_dept_course_units_tab()` prepares them.
+- `min_n` - A term and campus with fewer members than this has no point.
+- `term_types` - The term types to draw (`"fall"`, `"spring"`, `"summer"`); NULL draws every term. Summer course-taking is a different, smaller mix, so a line through every term rises or falls every third point for no reason of the department's.
+
+**Returns:** A plotly, or NULL when no term and campus drawn has `min_n` members.
 
 ---
 
@@ -3795,9 +3828,25 @@ Courses students were taking in the term before a major switch appeared  Answers
 
 **Parameters:**
 
-- `by_college` - One row per `term`, `campus`, `college_label` with `share` (of the term and campus's member registrations) and `n_registrations`, as `compute_dept_course_units_tab()` prepares them.
+- `by_college` - One row per `term`, `campus`, `college_label` with `share` (of the term and campus's member registrations), `n_registrations` and `pooled` (the row holding every college under the guard), as `compute_dept_course_units_tab()` prepares them.
+- `term_types` - The term types to draw; NULL draws every term.
+- `campuses` - The campuses to draw; NULL draws every campus.
 
-**Returns:** A named list, one plotly per campus (`names` are the campuses).
+**Returns:** A named list, one plotly per campus drawn (`names` are the campuses). Colleges stack in the order of their registrations over every term and campus drawn, so a college keeps its colour and place from chart to chart; the pooled row is last and grey.
+
+---
+
+### `plot_major_course_units_top_units()`
+
+*Source: major-course-units.R*
+
+**One term's teaching units, a horizontal bar per unit and a chart per campus**
+
+**Parameters:**
+
+- `top_units` - `prepare_major_course_units_top_units()` output.
+
+**Returns:** A named list, one plotly per campus (`names` are the campuses): the own unit's bar first and in its own colour, the outside units below it in order of registrations, the units without a bar pooled last in grey.
 
 ---
 

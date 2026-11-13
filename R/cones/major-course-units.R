@@ -33,6 +33,12 @@
 # are the courses themselves, each under its teaching unit, with the share of
 # the term and campus's members who sat in it. The members, the
 # registrations and every total are the same; only the grouping is finer.
+# opt$grain = "college" is the same one level up: one row per teaching
+# college, with the distinct members who sat in any of its units' courses,
+# which the unit rows cannot give (a student in two units of one college is
+# one student). A subject no mapping row has decided has no unit, so its
+# college is not asserted either: those registrations are one row of their
+# own (`unit_decided` FALSE, `college` NA).
 #
 # This is a filter and a join over two tables (ADR-001): the cone counts
 # nothing a table already holds.
@@ -53,9 +59,11 @@
 #'   keep; default every term to the edge), `campus` (teaching campuses to
 #'   keep; NULL keeps every campus, each its own row), `min_n` (the smallest
 #'   distinct-student count a unit row needs; default 10),
-#'   `include_in_progress` (default FALSE), `grain` (`"unit"`, the default,
-#'   or `"course"`: one row per course under its teaching unit, with
-#'   `subject_course` and `share_of_students`, `n_students / term_students`),
+#'   `include_in_progress` (default FALSE), `grain` (`"unit"`, the default;
+#'   `"course"`: one row per course under its teaching unit, with
+#'   `subject_course` and `share_of_students`, `n_students / term_students`;
+#'   or `"college"`: one row per teaching college, with `unit_decided` in
+#'   place of `dept_code` and `is_own_unit`),
 #'   `data_edges` (`cedar_data_edges()` output, required).
 #' @return One row per `term`, `campus`, `college` and `dept_code` (the
 #'   teaching unit; NA for a subject with no mapping row), with
@@ -93,8 +101,9 @@ get_major_course_units <- function(student_terms, registrations, opt = list()) {
   include_in_progress <- isTRUE(opt$include_in_progress %||% FALSE)
   min_n <- as.integer(opt$min_n %||% 10L)
   grain <- opt$grain %||% "unit"
-  if (!grain %in% c("unit", "course")) {
-    stop("[major-course-units.R] opt$grain must be \"unit\" or \"course\", not ", grain, call. = FALSE)
+  if (!grain %in% c("unit", "course", "college")) {
+    stop("[major-course-units.R] opt$grain must be \"unit\", \"course\" or \"college\", not ", grain,
+         call. = FALSE)
   }
 
   edge <- cedar_longitudinal_edge(opt$data_edges)
@@ -141,10 +150,23 @@ get_major_course_units <- function(student_terms, registrations, opt = list()) {
       .groups = "drop"
     )
 
+  n_unmapped <- sum(is.na(taken$department))
+  taken <- taken %>% rename(dept_code = department)
+  if (grain == "college") {
+    taken <- taken %>%
+      mutate(unit_decided = !is.na(dept_code),
+             college = if_else(unit_decided, college, NA_character_))
+  }
+  # What a row is, after its term and campus.
+  key_cols <- switch(grain,
+    unit    = c("college", "dept_code"),
+    course  = c("college", "dept_code", "subject_course"),
+    college = c("college", "unit_decided")
+  )
+  id_cols <- if (grain == "college") key_cols else setdiff(key_cols, "college")
+
   by_unit <- taken %>%
-    group_by(across(all_of(c("term", "campus", "college", "department",
-                             if (grain == "course") "subject_course")))) %>%
-    rename(dept_code = department) %>%
+    group_by(across(all_of(c("term", "campus", key_cols)))) %>%
     summarize(
       n_registrations = n_distinct(student_id, subject_course),
       n_students      = n_distinct(student_id),
@@ -152,23 +174,24 @@ get_major_course_units <- function(student_terms, registrations, opt = list()) {
     ) %>%
     inner_join(totals, by = c("term", "campus")) %>%
     mutate(
-      is_own_unit = !is.na(dept_code) & dept_code == .env$dept_code,
       in_progress = term > edge,
       share_of_registrations = n_registrations / term_registrations,
       share_of_students = n_students / term_students
-    ) %>%
-    select(all_of(c("term", "campus", "college", "dept_code",
-                    if (grain == "course") "subject_course",
-                    "is_own_unit", "in_progress", "n_registrations", "n_students",
+    )
+  if (grain != "college") {
+    by_unit <- by_unit %>% mutate(is_own_unit = !is.na(dept_code) & dept_code == .env$dept_code)
+  }
+  by_unit <- by_unit %>%
+    select(all_of(c("term", "campus", key_cols,
+                    if (grain != "college") "is_own_unit",
+                    "in_progress", "n_registrations", "n_students",
                     "term_registrations", "term_students", "share_of_registrations",
                     if (grain == "course") "share_of_students"))) %>%
-    arrange(across(all_of(c("term", "campus"))), desc(n_registrations),
-            across(all_of(c("dept_code", if (grain == "course") "subject_course"))))
+    arrange(across(all_of(c("term", "campus"))), desc(n_registrations), across(all_of(id_cols)))
 
   suppressed <- by_unit %>%
     filter(n_students < min_n) %>%
-    select(all_of(c("term", "campus", "dept_code",
-                    if (grain == "course") "subject_course", "n_students")))
+    select(all_of(c("term", "campus", id_cols, "n_students")))
   result <- by_unit %>% filter(n_students >= min_n)
 
   attr(result, "edge")        <- edge
@@ -176,7 +199,7 @@ get_major_course_units <- function(student_terms, registrations, opt = list()) {
   attr(result, "n_member_student_terms") <- nrow(members)
   attr(result, "n_members")   <- n_distinct(members$student_id)
   attr(result, "member_programs") <- member_programs
-  attr(result, "n_unmapped")  <- sum(is.na(taken$department))
+  attr(result, "n_unmapped")  <- n_unmapped
   attr(result, "suppressed")  <- suppressed
   cedar_debug("[major-course-units.R] ", nrow(result), " unit rows (", nrow(suppressed),
               " under min_n ", min_n, ")")
@@ -184,29 +207,160 @@ get_major_course_units <- function(student_terms, registrations, opt = list()) {
 }
 
 
+# ── Plot preparation ────────────────────────────────────────────────────────
+# Shapes rows the cone returned; nothing is recounted from a table.
+
+#' One term's teaching units as bars: the own unit, the top outside units, the rest
+#'
+#' @param unit_rows One term's `get_major_course_units()` unit rows (every row,
+#'   before any small-cell guard) with a `unit_label` and a `college_label`.
+#' @param own_label The label of the members' own unit, for a campus where it
+#'   taught them nothing: its bar is still drawn, at zero.
+#' @param min_n The smallest distinct-student count a campus needs to be drawn
+#'   at all, and an outside unit needs for a bar of its own.
+#' @param n_top How many outside units get a bar per campus.
+#' @return One row per `campus` and bar, in drawing order: `unit_label`, `kind`
+#'   (`"own"`, `"outside"`, `"undecided"` for subjects with no unit, `"rest"`
+#'   for every unit without a bar), `n_units` (the units the bar holds),
+#'   `n_registrations`, `share` (of the campus's member registrations that
+#'   term), `term_students` and `term_registrations`. A campus's shares sum to 1.
+prepare_major_course_units_top_units <- function(unit_rows, own_label, min_n = 10L, n_top = 8L) {
+  needed <- c("campus", "dept_code", "unit_label", "college_label", "is_own_unit", "n_students",
+              "n_registrations", "term_students", "term_registrations")
+  missing <- setdiff(needed, names(unit_rows))
+  if (length(missing) > 0) {
+    stop("[major-course-units.R] unit_rows lacks ", paste(missing, collapse = ", "), call. = FALSE)
+  }
+  if ("term" %in% names(unit_rows) && n_distinct(unit_rows$term) > 1L) {
+    stop("[major-course-units.R] prepare_major_course_units_top_units() reads one term's rows.", call. = FALSE)
+  }
+  min_n <- as.integer(min_n)
+  unit_rows <- unit_rows %>% filter(term_students >= min_n)
+
+  totals <- unit_rows %>%
+    group_by(campus) %>%
+    summarize(term_students = first(term_students), term_registrations = first(term_registrations),
+              own_registrations = sum(n_registrations[is_own_unit]), .groups = "drop")
+  own <- totals %>%
+    transmute(campus, unit_label = paste0(own_label, " (own courses)"), kind = "own", n_units = 1L,
+              n_registrations = own_registrations)
+  outside <- unit_rows %>%
+    filter(!is_own_unit, n_students >= min_n) %>%
+    group_by(campus) %>%
+    arrange(desc(n_registrations), unit_label, .by_group = TRUE) %>%
+    slice_head(n = as.integer(n_top)) %>%
+    # Two rows may carry one unit name (a unit teaching under two colleges):
+    # the college tells them apart, so neither bar is stacked on the other.
+    mutate(unit_label = if_else(duplicated(unit_label) | duplicated(unit_label, fromLast = TRUE),
+                                paste0(unit_label, " (", college_label, ")"), unit_label)) %>%
+    ungroup() %>%
+    transmute(campus, unit_label, kind = if_else(is.na(dept_code), "undecided", "outside"), n_units = 1L,
+              n_registrations)
+  n_outside_units <- unit_rows %>% filter(!is_own_unit) %>% count(campus, name = "n_outside")
+  rest <- totals %>%
+    left_join(outside %>% group_by(campus) %>%
+                summarize(shown_registrations = sum(n_registrations), n_shown = n(), .groups = "drop"),
+              by = "campus") %>%
+    left_join(n_outside_units, by = "campus") %>%
+    mutate(across(c(shown_registrations, n_shown, n_outside), ~ coalesce(.x, 0L))) %>%
+    transmute(campus, kind = "rest", n_units = n_outside - n_shown,
+              unit_label = paste0("All other units (", n_units, ")"),
+              n_registrations = term_registrations - own_registrations - shown_registrations) %>%
+    filter(n_units > 0L)
+
+  bind_rows(own, outside, rest) %>%
+    inner_join(totals %>% select(campus, term_students, term_registrations), by = "campus") %>%
+    mutate(share = n_registrations / term_registrations) %>%
+    arrange(campus, case_when(kind == "own" ~ 0L, kind == "rest" ~ 2L, TRUE ~ 1L),
+            desc(n_registrations), unit_label) %>%
+    select(campus, unit_label, kind, n_units, n_registrations, share, term_students, term_registrations)
+}
+
+
 # ── Plots ───────────────────────────────────────────────────────────────────
 # Prepared rows in, plotly out; no table is re-read here.
+
+#' Share of a major's registrations in its own unit's courses, a line per campus
+#'
+#' @param own_share One row per `term` and `campus` with `students`,
+#'   `registrations`, `own_registrations` and `own_share`, as
+#'   `compute_dept_course_units_tab()` prepares them.
+#' @param min_n A term and campus with fewer members than this has no point.
+#' @param term_types The term types to draw (`"fall"`, `"spring"`,
+#'   `"summer"`); NULL draws every term. Summer course-taking is a different,
+#'   smaller mix, so a line through every term rises or falls every third
+#'   point for no reason of the department's.
+#' @return A plotly, or NULL when no term and campus drawn has `min_n` members.
+plot_major_course_units_own_share <- function(own_share, min_n = 10L, term_types = NULL) {
+  needed <- c("term", "campus", "students", "registrations", "own_registrations", "own_share")
+  missing <- setdiff(needed, names(own_share))
+  if (length(missing) > 0) {
+    stop("[major-course-units.R] own_share lacks ", paste(missing, collapse = ", "), call. = FALSE)
+  }
+  if (!is.null(term_types)) own_share <- own_share %>% filter(get_term_type(term) %in% term_types)
+  shown <- own_share %>% filter(students >= as.integer(min_n))
+  if (nrow(shown) == 0L) return(NULL)
+  # A campus under the guard in some term keeps the term, with no point, so
+  # its line breaks there instead of bridging the gap.
+  rows <- own_share %>%
+    filter(campus %in% shown$campus) %>%
+    mutate(
+      own_share = if_else(students >= as.integer(min_n), own_share, NA_real_),
+      term_label = term_axis_factor(term),
+      detail = paste0(format(own_registrations, big.mark = ",", trim = TRUE), " of ",
+                      format(registrations, big.mark = ",", trim = TRUE), " registrations, ",
+                      format(students, big.mark = ",", trim = TRUE), " majors")
+    ) %>%
+    arrange(campus, term)
+  plotly::plot_ly(
+    rows,
+    x = ~term_label, y = ~own_share, color = ~campus, colors = cedar_plotly_palette(rows$campus),
+    type = "scatter", mode = "lines+markers", connectgaps = FALSE,
+    customdata = ~detail,
+    hovertemplate = "%{x}<br>%{fullData.name}: %{y:.1%} in own courses<br>%{customdata}<extra></extra>"
+  ) %>%
+    plotly::layout(
+      xaxis = list(title = "", tickangle = -45, categoryorder = "array",
+                   categoryarray = levels(rows$term_label)),
+      yaxis = list(title = "Share of registrations in own courses", tickformat = ".0%", rangemode = "tozero"),
+      legend = list(orientation = "h", x = 0, y = -0.25)
+    )
+}
 
 #' Share of a major's registrations by teaching college, stacked by term
 #'
 #' @param by_college One row per `term`, `campus`, `college_label` with
-#'   `share` (of the term and campus's member registrations) and
-#'   `n_registrations`, as `compute_dept_course_units_tab()` prepares them.
-#' @return A named list, one plotly per campus (`names` are the campuses).
-plot_major_course_units_by_college <- function(by_college) {
-  needed <- c("term", "campus", "college_label", "share", "n_registrations")
+#'   `share` (of the term and campus's member registrations),
+#'   `n_registrations` and `pooled` (the row holding every college under the
+#'   guard), as `compute_dept_course_units_tab()` prepares them.
+#' @param term_types The term types to draw; NULL draws every term.
+#' @param campuses The campuses to draw; NULL draws every campus.
+#' @return A named list, one plotly per campus drawn (`names` are the
+#'   campuses). Colleges stack in the order of their registrations over every
+#'   term and campus drawn, so a college keeps its colour and place from
+#'   chart to chart; the pooled row is last and grey.
+plot_major_course_units_by_college <- function(by_college, term_types = NULL, campuses = NULL) {
+  needed <- c("term", "campus", "college_label", "share", "n_registrations", "pooled")
   missing <- setdiff(needed, names(by_college))
   if (length(missing) > 0) {
     stop("[major-course-units.R] by_college lacks ", paste(missing, collapse = ", "), call. = FALSE)
   }
+  if (!is.null(term_types)) by_college <- by_college %>% filter(get_term_type(term) %in% term_types)
+  if (!is.null(campuses)) by_college <- by_college %>% filter(campus %in% campuses)
   if (nrow(by_college) == 0L) return(list())
-  colors <- cedar_plotly_palette(by_college$college_label)
-  campuses <- sort(unique(by_college$campus))
-  stats::setNames(lapply(campuses, function(cmp) {
+  label_order <- by_college %>%
+    group_by(college_label, pooled) %>%
+    summarize(n = sum(n_registrations), .groups = "drop") %>%
+    arrange(pooled, desc(n), college_label)
+  colors <- cedar_plotly_palette(label_order$college_label, label_order = label_order$college_label)
+  colors[label_order$college_label[label_order$pooled]] <- CEDAR_SEMANTIC_COLORS[["other"]]
+  drawn <- sort(unique(by_college$campus))
+  stats::setNames(lapply(drawn, function(cmp) {
     rows <- by_college %>%
       filter(campus == cmp) %>%
-      mutate(term_label = term_axis_factor(term)) %>%
-      arrange(term, desc(share))
+      mutate(term_label = term_axis_factor(term),
+             college_label = factor(college_label, levels = label_order$college_label)) %>%
+      arrange(term, college_label)
     plotly::plot_ly(
       rows,
       x = ~term_label, y = ~share, color = ~college_label, colors = colors,
@@ -216,9 +370,51 @@ plot_major_course_units_by_college <- function(by_college) {
     ) %>%
       plotly::layout(
         barmode = "stack",
-        xaxis = list(title = "", tickangle = -45),
+        xaxis = list(title = "", tickangle = -45, categoryorder = "array",
+                     categoryarray = levels(rows$term_label)),
         yaxis = list(title = "Share of registrations", tickformat = ".0%", range = c(0, 1)),
-        legend = list(orientation = "h", x = 0, y = -0.25)
+        legend = list(orientation = "h", x = 0, y = -0.25, traceorder = "normal")
+      )
+  }), drawn)
+}
+
+#' One term's teaching units, a horizontal bar per unit and a chart per campus
+#'
+#' @param top_units `prepare_major_course_units_top_units()` output.
+#' @return A named list, one plotly per campus (`names` are the campuses): the
+#'   own unit's bar first and in its own colour, the outside units below it in
+#'   order of registrations, the units without a bar pooled last in grey.
+plot_major_course_units_top_units <- function(top_units) {
+  needed <- c("campus", "unit_label", "kind", "n_registrations", "share")
+  missing <- setdiff(needed, names(top_units))
+  if (length(missing) > 0) {
+    stop("[major-course-units.R] top_units lacks ", paste(missing, collapse = ", "), call. = FALSE)
+  }
+  if (nrow(top_units) == 0L) return(list())
+  kind_colors <- c(
+    own = CEDAR_PALETTE[[1]], outside = CEDAR_PALETTE[[3]],
+    undecided = CEDAR_SEMANTIC_COLORS[["reference"]], rest = CEDAR_SEMANTIC_COLORS[["other"]]
+  )
+  campuses <- sort(unique(top_units$campus))
+  stats::setNames(lapply(campuses, function(cmp) {
+    rows <- top_units %>%
+      filter(campus == cmp) %>%
+      mutate(share_label = sprintf("%.1f%%", 100 * share),
+             detail = paste0(format(n_registrations, big.mark = ",", trim = TRUE), " registrations"))
+    plotly::plot_ly(
+      rows,
+      x = ~share, y = ~unit_label, type = "bar", orientation = "h",
+      marker = list(color = unname(kind_colors[rows$kind])),
+      text = ~share_label, textposition = "outside", cliponaxis = FALSE,
+      customdata = ~detail,
+      hovertemplate = "%{y}<br>%{text} of registrations (%{customdata})<extra></extra>"
+    ) %>%
+      plotly::layout(
+        xaxis = list(title = "Share of registrations", tickformat = ".0%",
+                     range = c(0, max(rows$share) * 1.15)),
+        yaxis = list(title = "", categoryorder = "array", categoryarray = rev(rows$unit_label),
+                     automargin = TRUE),
+        showlegend = FALSE
       )
   }), campuses)
 }
