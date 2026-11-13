@@ -273,6 +273,22 @@ test_that("in-progress terms fail loudly without edges", {
   expect_error(cedar_in_progress_terms(NULL), "last_enrolled")
 })
 
+test_that("a term is in progress after the graded edge, whether or not its registration has settled", {
+  # DS01: graded through Summer 2022, settled through Fall 2022, enrolled to
+  # Spring 2023. Fall 2022 is settled and not graded: in progress (I58).
+  terms <- c(202260L, 202280L, 202310L, 202380L)
+  expect_equal(cedar_term_in_progress(terms, ds01_edges), c(FALSE, TRUE, TRUE, FALSE))
+  # Graded as far as settled (MC02): only the newer term is in progress.
+  expect_equal(cedar_term_in_progress(c(202110L, 202180L), mc02_edges), c(FALSE, TRUE))
+  # Nothing graded: every enrolled term is in progress.
+  expect_equal(cedar_term_in_progress(terms, ds01_edges[setdiff(names(ds01_edges), "last_graded")]),
+               c(TRUE, TRUE, TRUE, FALSE))
+  expect_error(cedar_term_in_progress(202280L, NULL), "last_enrolled")
+  # `last_enrolled` is read by name, never partial-matched from last_enrolled_complete.
+  expect_error(cedar_term_in_progress(202280L, ds01_edges[setdiff(names(ds01_edges), "last_enrolled")]),
+               "last_enrolled")
+})
+
 test_that("a pull settles registration fourteen days after the nominal term start", {
   # Fall 2020's nominal start is Aug 15; add/drop clears by Aug 29.
   expect_equal(cedar_registration_settled(c(202080L, 202080L, NA, 202080L),

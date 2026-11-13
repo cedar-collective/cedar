@@ -227,6 +227,29 @@ cedar_report_edges <- function(students, degrees = NULL) {
 
 
 
+#' Whether each term is in progress: after the graded edge, at or before the newest enrolled term
+#'
+#' The one definition of an in-progress term, which every label reads: a term
+#' whose grades have not posted is labelled in progress whether or not its
+#' registration has settled (I58: Courses Taken shaded Fall 2026 in its charts
+#' and called it settled in its tables).
+#'
+#' @param term Term codes.
+#' @param edges A list with `last_enrolled` and `last_graded` (`cedar_data_edges()`
+#'   output). `last_graded` NULL means no term is graded, so every term to
+#'   `last_enrolled` is in progress.
+#' @return A logical vector the length of `term`.
+cedar_term_in_progress <- function(term, edges) {
+  # `[[`, not `$`: on a list, `$last_enrolled` partial-matches `last_enrolled_complete`.
+  if (is.null(edges) || is.null(edges[["last_enrolled"]])) {
+    stop("[data-edges.R] cedar_term_in_progress() needs edges with last_enrolled.", call. = FALSE)
+  }
+  graded <- if (is.null(edges[["last_graded"]])) -Inf else as.integer(edges[["last_graded"]])
+  term <- as.integer(term)
+  term > graded & term <= as.integer(edges[["last_enrolled"]])
+}
+
+
 #' Terms shown on descriptive charts that are not yet complete
 #'
 #' Descriptive enrollment surfaces (headcount, course enrollment, attempted SCH)
@@ -241,19 +264,18 @@ cedar_report_edges <- function(students, degrees = NULL) {
 #'   one row per in-progress term, oldest first. Zero rows when every enrolled
 #'   term is graded.
 cedar_in_progress_terms <- function(edges) {
-  if (is.null(edges) || is.null(edges$last_enrolled)) {
+  if (is.null(edges) || is.null(edges[["last_enrolled"]])) {
     stop("[data-edges.R] cedar_in_progress_terms() needs edges with last_enrolled.")
   }
   by_term <- edges$graded_by_term
   if (is.null(by_term) || !"term" %in% names(by_term)) {
     stop("[data-edges.R] edges$graded_by_term is missing; build edges with cedar_data_edges().")
   }
-  after <- if (is.null(edges$last_graded)) -Inf else as.integer(edges$last_graded)
   settled_edge <- if (is.null(edges$last_enrolled_complete)) -Inf else
     as.integer(edges$last_enrolled_complete)
 
   by_term %>%
-    dplyr::filter(term > after, term <= edges$last_enrolled) %>%
+    dplyr::filter(cedar_term_in_progress(term, edges)) %>%
     dplyr::transmute(
       term = as.integer(term),
       newest_pull = if ("newest_pull" %in% names(by_term)) as.Date(newest_pull) else as.Date(NA),

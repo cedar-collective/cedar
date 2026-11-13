@@ -936,7 +936,8 @@ compute_dept_course_units_tab <- function(base, data_objects, campus_filter = NU
       edge = attr(result, "edge"),
       window_end = window_end,
       latest_term = latest,
-      latest_in_progress = latest > attr(result, "edge"),
+      # The rows' own label: the latest term's grades have not posted (I58).
+      latest_in_progress = cedar_term_in_progress(latest, data_objects[["cedar_edges"]]),
       chart_campuses = chart_campuses,
       n_members = attr(result, "n_members"),
       n_member_student_terms = attr(result, "n_member_student_terms"),

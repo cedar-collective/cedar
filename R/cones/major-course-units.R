@@ -26,8 +26,10 @@
 # display grain.
 #
 # Terms stop at the settled enrollment edge (last_enrolled_complete). With
-# opt$include_in_progress, terms up to last_enrolled are added and marked
-# `in_progress`, the right-edge policy's labelled current registration.
+# opt$include_in_progress, terms up to last_enrolled are added. A row's
+# `in_progress` is cedar_term_in_progress(): its grades have not posted, the
+# right-edge policy's label for current registration, so a settled term not
+# yet graded is in progress too (I58).
 #
 # opt$grain = "course" answers the same question one level down: the rows
 # are the courses themselves, each under its teaching unit, with the share of
@@ -59,15 +61,18 @@
 #'   keep; default every term to the edge), `campus` (teaching campuses to
 #'   keep; NULL keeps every campus, each its own row), `min_n` (the smallest
 #'   distinct-student count a unit row needs; default 10),
-#'   `include_in_progress` (default FALSE), `grain` (`"unit"`, the default;
+#'   `include_in_progress` (default FALSE: rows stop at the settled edge),
+#'   `grain` (`"unit"`, the default;
 #'   `"course"`: one row per course under its teaching unit, with
 #'   `subject_course` and `share_of_students`, `n_students / term_students`;
 #'   or `"college"`: one row per teaching college, with `unit_decided` in
 #'   place of `dept_code` and `is_own_unit`),
-#'   `data_edges` (`cedar_data_edges()` output, required).
+#'   `data_edges` (`cedar_data_edges()` output, required; it must name
+#'   `last_graded`, NULL when no term is graded).
 #' @return One row per `term`, `campus`, `college` and `dept_code` (the
 #'   teaching unit; NA for a subject with no mapping row), with
-#'   `is_own_unit`, `in_progress`, `n_registrations` (distinct student ×
+#'   `is_own_unit`, `in_progress` (`cedar_term_in_progress()`: the term's
+#'   grades have not posted), `n_registrations` (distinct student ×
 #'   course), `n_students` (distinct students), `term_registrations` and
 #'   `term_students` (the same over every unit in that term and campus) and
 #'   `share_of_registrations` (`n_registrations / term_registrations`).
@@ -109,6 +114,12 @@ get_major_course_units <- function(student_terms, registrations, opt = list()) {
   edge <- cedar_longitudinal_edge(opt$data_edges)
   if (is.null(edge)) {
     stop("[major-course-units.R] opt$data_edges has no settled enrollment edge (last_enrolled_complete).",
+         call. = FALSE)
+  }
+  # A row's in-progress label reads the graded edge, so the edges must say
+  # where it is (NULL when nothing is graded).
+  if (!"last_graded" %in% names(opt$data_edges)) {
+    stop("[major-course-units.R] opt$data_edges names no last_graded edge, which labels a term in progress.",
          call. = FALSE)
   }
   latest <- edge
@@ -174,7 +185,7 @@ get_major_course_units <- function(student_terms, registrations, opt = list()) {
     ) %>%
     inner_join(totals, by = c("term", "campus")) %>%
     mutate(
-      in_progress = term > edge,
+      in_progress = cedar_term_in_progress(term, opt$data_edges),
       share_of_registrations = n_registrations / term_registrations,
       share_of_students = n_students / term_students
     )

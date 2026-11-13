@@ -458,6 +458,19 @@ test_that("compute_dept_course_units_tab reads the majors' teaching units and po
   result <- compute_dept_course_units_tab(base, data_objects, min_n = 1L)
   expect_equal(names(result$tables), c("own_share", "by_college", "latest_units", "top_units",
                                        "outside_courses"))
+  # Graded through the latest term: nothing is in progress.
+  expect_false(any(result$tables$own_share$in_progress))
+  expect_false(result$meta$latest_in_progress)
+  # Spring 2021 settled but not graded: the table rows and the latest-term
+  # label say in progress, as the charts shade it (I58).
+  ungraded <- data_objects
+  ungraded$cedar_edges <- list(last_enrolled = 202110L, last_enrolled_complete = 202110L,
+                               last_graded = 202010L)
+  ungraded_tab <- compute_dept_course_units_tab(base, ungraded, min_n = 1L)
+  expect_equal(ungraded_tab$tables$own_share$term, c(202010L, 202110L))
+  expect_equal(ungraded_tab$tables$own_share$in_progress, c(FALSE, TRUE))
+  expect_true(ungraded_tab$meta$latest_in_progress)
+  expect_true(all(ungraded_tab$tables$latest_units$in_progress))
   # The outside courses are every term's: ST_H's ENGL 1110 and MATH 1215 in
   # 202010, each 1 of that term's 8 members; 202110's one member is in HIST 1110.
   expect_equal(names(result$tables$outside_courses),
