@@ -215,23 +215,28 @@ course_cohort_context_balance <- function(payload, student_terms, attempts, prog
 #' Where a page starts: the focal course's own classification, college, level and terms
 #'
 #' The controls a page opens with, read off the data rather than written into
-#' it: the classification most of the course's recent takers held, the
-#' college and level its attempt rows carry, and the last regular terms to
-#' the settled edge. An institution's names never appear in platform code.
+#' it: every term to the settled edge of the term type most of the course's
+#' takers took it in (a Fall cohort and a Spring one are different
+#' populations, and a gap is read across many terms of one type), the
+#' classification most of those terms' takers held, and the college and level
+#' their attempt rows carry. An institution's names never appear in platform
+#' code.
 #'
 #' @param course The focal course id.
 #' @param student_terms `cedar_student_terms`.
 #' @param attempts `cedar_attempts`.
 #' @param edges `cedar_data_edges()` output.
-#' @param opt `n_years` (how many years of regular terms; default 3),
-#'   `campus` (a page's campus selection, kept where it is a home campus).
+#' @param opt `term_type` (one or more of `fall`, `spring`, `summer`; default
+#'   the type holding most of the course's taker student-terms, Fall before
+#'   Spring before Summer on a tie), `campus` (a page's campus selection, kept
+#'   where it is a home campus).
 #' @return A list: `classification` (one value), `college` (the college that
 #'   taught most of the recent takers' other same-level courses, else the
-#'   course's own), `level`, `terms`
-#'   (the anchor terms, oldest first), `campus` (NULL when none of
-#'   `opt$campus` is a home campus), and `choices` (`classifications`,
-#'   `campuses`, `terms`: every value the controls may offer, each with the
-#'   enrolled student-terms behind it where that is a count).
+#'   course's own), `level`, `term_type`, `terms` (every anchor term of
+#'   `term_type` to the settled edge, oldest first), `campus` (NULL when none
+#'   of `opt$campus` is a home campus), and `choices` (`classifications`,
+#'   `campuses`, `term_types`, `terms`: every value the controls may offer,
+#'   each with the enrolled student-terms behind it where that is a count).
 course_cohort_context_defaults <- function(course, student_terms, attempts, edges, opt = list()) {
   if (is.null(course) || length(course) != 1L || is.na(course) || !nzchar(course)) {
     stop("[course-cohort-context.R] course (one focal course id) is required.", call. = FALSE)
@@ -246,17 +251,28 @@ course_cohort_context_defaults <- function(course, student_terms, attempts, edge
   if (is.null(edge)) {
     stop("[course-cohort-context.R] edges has no settled enrollment edge.", call. = FALSE)
   }
-  n_years <- as.integer(opt$n_years %||% 3L)
 
   enrolled <- student_terms %>% filter(enrolled, term <= edge)
   all_terms <- sort(unique(enrolled$term))
-  regular <- all_terms[get_term_type(all_terms) %in% c("fall", "spring")]
-  terms <- tail(regular, 2L * n_years)
+  term_types <- intersect(c("fall", "spring", "summer"), get_term_type(all_terms))
 
   takers <- attempts %>% filter(subject_course == .env$course, term <= edge)
   if (nrow(takers) == 0L) {
     stop("[course-cohort-context.R] ", course, " has no graded attempt to ", edge, ".", call. = FALSE)
   }
+  term_type <- opt$term_type
+  if (is.null(term_type)) {
+    # which.max() takes the first of a tie, and term_types is in season order.
+    taker_terms <- takers %>% distinct(student_id, term)
+    per_type <- vapply(term_types, function(type) sum(get_term_type(taker_terms$term) == type), integer(1))
+    term_type <- term_types[[which.max(per_type)]]
+  }
+  unknown <- setdiff(term_type, term_types)
+  if (length(unknown) > 0L) {
+    stop("[course-cohort-context.R] opt$term_type names no term in the data: ",
+         paste(unknown, collapse = ", "), call. = FALSE)
+  }
+  terms <- all_terms[get_term_type(all_terms) %in% term_type]
   modal <- function(x) {
     x <- x[!is.na(x)]
     if (length(x) == 0L) return(NA_character_)
@@ -286,84 +302,17 @@ course_cohort_context_defaults <- function(course, student_terms, attempts, edge
     classification = classification,
     college = college,
     level = level,
+    term_type = term_type,
     terms = terms,
     campus = if (length(campus) > 0L) campus else NULL,
     choices = list(
       classifications = enrolled %>% count(student_classification, name = "n_student_terms") %>%
         filter(!is.na(student_classification)) %>% arrange(desc(n_student_terms)),
       campuses = campuses,
-      terms = regular
+      term_types = term_types,
+      terms = all_terms
     )
   )
-}
-
-
-#' The course cohort context's lead paragraph, one per home campus of the latest term
-#'
-#' @param payload `build_course_cohort_context()` output.
-#' @return Character vector: for each home campus of the latest anchor term
-#'   with an observable gap (else the latest anchor term), one paragraph
-#'   giving the focal course's passed and never-took groups with their counts
-#'   and return rates, the gap, the benchmark's median gap and where the
-#'   focal gap sits, then the same for next-term DFW when it is observable. A
-#'   campus whose groups are under the guard says so.
-course_cohort_context_headline <- function(payload) {
-  if (!inherits(payload, "course_cohort_context")) {
-    stop("[course-cohort-context.R] payload must come from build_course_cohort_context().", call. = FALSE)
-  }
-  meta <- payload$meta
-  if (nrow(payload$population) == 0L) {
-    return(paste0("No enrolled ", paste(meta$classification, collapse = ", "),
-                  " student-term is in scope, so there is nothing to compare."))
-  }
-  n <- function(x) format(as.integer(round(x)), big.mark = ",", trim = TRUE)
-  pct <- function(x) sprintf("%.1f%%", x)
-  pts <- function(x) sprintf("%+.1f points", x)
-  share <- function(x) paste0(round(100 * x), "%")
-  readable <- payload$focal$term[!is.na(payload$focal$lift_return)]
-  latest <- if (length(readable) > 0L) max(readable) else max(payload$population$term)
-  pop <- payload$population %>% filter(term == latest) %>% arrange(student_campus)
-  label <- paste0(meta$college_label,
-                  if (!is.null(meta$level)) paste0(" ", paste(meta$level, collapse = "/"), "-division") else "",
-                  " courses")
-
-  vapply(seq_len(nrow(pop)), function(i) {
-    p <- pop[i, ]
-    f <- payload$focal %>% filter(term == latest, student_campus == p$student_campus)
-    b <- payload$benchmark %>% filter(term == latest, student_campus == p$student_campus)
-    who <- paste0(n(p$population), " ", p$student_campus, " students (",
-                  paste(meta$classification, collapse = ", "), ")")
-    if (nrow(f) == 0L || is.na(f$passed_return_pct) || is.na(f$none_return_pct)) {
-      return(paste0("In ", fmt_term(latest), ", of ", who, ", ", meta$course,
-                    " has no passed and never-took groups of ", meta$min_n,
-                    " with an observable return, so there is no gap to read."))
-    }
-    first <- paste0(
-      "In ", fmt_term(latest), ", ", n(f$passed_n_students), " of ", who, " passed ", meta$course,
-      " and ", pct(f$passed_return_pct), " of them returned the next regular term; ",
-      n(f$none_n_students), " never took it and ", pct(f$none_return_pct), " returned, a gap of ",
-      pts(f$lift_return), "."
-    )
-    bench <- if (nrow(b) == 0L || is.na(b$lift_return_median)) {
-      paste0(" None of the other ", label, " has both groups at ", meta$min_n, ", so there is no benchmark.")
-    } else {
-      paste0(" Passing one of the ", n(b$n_courses), " other ", label, " went with a median gap of ",
-             pts(b$lift_return_median), ", and ", meta$course, "'s gap is above ",
-             share(b$share_below_return), " of them.")
-    }
-    dfw <- ""
-    if (!is.na(f$lift_next_dfw)) {
-      dfw <- paste0(
-        " On next-term grades, its passers' DFW share was ", pct(f$passed_next_dfw_pct), " against ",
-        pct(f$none_next_dfw_pct), " for never-takers (", pts(f$lift_next_dfw), ")",
-        if (nrow(b) > 0L && !is.na(b$lift_next_dfw_median))
-          paste0("; the median course's gap was ", pts(b$lift_next_dfw_median), " and ", meta$course,
-                 "'s is above ", share(b$share_below_next_dfw), " of them, where a larger gap is worse.")
-        else "."
-      )
-    }
-    paste0(first, bench, dfw)
-  }, character(1))
 }
 
 

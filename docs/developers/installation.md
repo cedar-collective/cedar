@@ -53,6 +53,13 @@ It also needs a machine-local `config/shiny_config.R`, created from
 `config/shiny_config_template.R`. For full institutional data, set
 `cedar_use_small_data <- FALSE` and review term/scope settings.
 
+Instructor-level results (instructor names beside outcomes) open with one
+password, `CEDAR_DFW_PASSWORD`. Set it in `.env` beside `CEDAR_DATA_DIR`;
+`docker-compose.yml` passes it to the app, and `docker compose up -d` applies
+a change. Unset or empty, those results stay closed and each gate says the
+password is not configured. A `.Renviron` in the checkout does not reach the
+app: it is excluded from the image.
+
 These local configuration files are not committed. `.env` and `.Renviron`
 are excluded from Docker build contexts. Never copy real data or secrets into
 a PR. Unlike the synthetic demo, production-style containers must be rebuilt

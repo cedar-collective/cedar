@@ -4408,6 +4408,25 @@ output$enrl_classlist_download <- downloadHandler(
     })
   })
 
+  output$cr_impact_sequence_over_time <- reactable::renderReactable({
+    result <- cr_impact_sequence_data()
+    req(result, length(input$cr_impact_seq_term_type) > 0)
+    cr_basic_reactable(
+      result$by_term %>%
+        dplyr::filter(term_type %in% input$cr_impact_seq_term_type) %>%
+        dplyr::mutate(group = factor(group, levels = c("treatment", "control"))) %>%
+        tidyr::pivot_wider(names_from = group, values_from = c(n, n_dfw, dfw_pct), names_expand = TRUE) %>%
+        dplyr::arrange(term) %>%
+        dplyr::transmute(
+          Term = fmt_term(term),
+          `Passed first: students` = dplyr::coalesce(n_treatment, 0L),
+          `Passed first: DFW %` = round(dfw_pct_treatment, 1),
+          `No prior pass: students` = dplyr::coalesce(n_control, 0L),
+          `No prior pass: DFW %` = round(dfw_pct_control, 1),
+          `Gap, points` = round(dfw_pct_treatment - dfw_pct_control, 1)),
+      default_page_size = 12L, searchable = FALSE)
+  })
+
   output$cr_impact_sequence_results <- renderUI({
     result <- cr_impact_sequence_data()
     if (is.null(result)) return(NULL)
@@ -4527,18 +4546,17 @@ output$enrl_classlist_download <- downloadHandler(
       ),
       dashboard_subsection(
         "Over Time",
-        paste0("The two groups' rates by the calendar year of each student's ", y_label,
-               " attempt, and the gap between them in points. A group under ", result$n_min_year,
-               " students in a year keeps its count and shows no rate."),
-        cr_basic_reactable(
-          result$by_year %>%
-            tidyr::pivot_wider(names_from = group, values_from = c(n, n_dfw, dfw_pct)) %>%
-            dplyr::transmute(
-              Year = as.character(year),
-              `Passed first: students` = n_treatment, `Passed first: DFW %` = round(dfw_pct_treatment, 1),
-              `No prior pass: students` = n_control, `No prior pass: DFW %` = round(dfw_pct_control, 1),
-              `Gap, points` = round(dfw_pct_treatment - dfw_pct_control, 1)),
-          default_page_size = 12L, searchable = FALSE)
+        paste0("The two groups' DFW rates by the term of each student's ", y_label,
+               " attempt, and the gap between them in points (passed first minus no prior pass). Read one term type at a time: a Fall holds mostly new students placed straight into ",
+               y_label, ", a Spring mostly students who passed ", result$course_x,
+               " the term before. A group under ", result$n_min_term,
+               " students in a term keeps its count and shows no rate."),
+        checkboxGroupInput(
+          "cr_impact_seq_term_type", "Term types",
+          choices = stats::setNames(unique(result$by_term$term_type),
+                                    tools::toTitleCase(unique(result$by_term$term_type))),
+          selected = result$main_term_type, inline = TRUE),
+        reactable::reactableOutput("cr_impact_sequence_over_time")
       ),
       if (!is.null(result$by_hs_gpa_band)) dashboard_subsection(
         "Within High-School GPA Bands",

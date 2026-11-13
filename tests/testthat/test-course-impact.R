@@ -456,16 +456,36 @@ test_that("the control group splits into attempted-not-passed and never-sat X", 
   result <- .run_sequence_bands(.sequence_band_fixture(), course_y = "SEQ 201")
   expect_equal(result$n_treatment, 2L)
   expect_equal(result$n_control, 4L)
-  # Every Y attempt is in 2020: one year, both groups, the rates over min_n = 1.
-  expect_equal(result$by_year$year, c(2020L, 2020L))
-  expect_equal(result$by_year$group, c("treatment", "control"))
-  expect_equal(result$by_year$n, c(2L, 4L))
-  expect_equal(result$by_year$dfw_pct, c(100, 25))
+  # Every Y attempt is in Fall 2020: one term, both groups, rates over min_n = 1.
+  expect_equal(result$by_term$term, c(202080L, 202080L))
+  expect_equal(result$by_term$group, c("treatment", "control"))
+  expect_equal(result$by_term$n, c(2L, 4L))
+  expect_equal(result$by_term$dfw_pct, c(100, 25))
   split <- result$control_split
   expect_equal(split$prior_x, c("attempted_not_passed", "no_prior_attempt"))
   expect_equal(split$n, c(1L, 3L))
   expect_equal(split$n_dfw, c(1L, 0L))
   expect_equal(split$dfw_pct, c(100, 0))
+})
+
+test_that("the sequence over time is one row per term, never per calendar year", {
+  # SEQ_C2's SEQ 201 attempt moves from Fall 2020 to Spring 2020: the same
+  # calendar year as everyone else's, another term type. By year the control
+  # group would be 4 students at 25%; by term it is 1 in Spring (passed) and
+  # 3 in Fall (SEQ_C1 and SEQ_XC passed, SEQ_F1 did not: 33.3%).
+  fixture <- .sequence_band_fixture()
+  moved <- fixture$students$student_id == "SEQ_C2" & fixture$students$subject_course == "SEQ 201"
+  expect_equal(sum(moved), 1L)
+  fixture$students$term[moved] <- 202010L
+  result <- .run_sequence_bands(fixture, course_y = "SEQ 201")
+  by_term <- result$by_term
+  expect_equal(by_term$term, c(202010L, 202080L, 202080L))
+  expect_equal(by_term$term_type, c("spring", "fall", "fall"))
+  expect_equal(by_term$group, c("control", "treatment", "control"))
+  expect_equal(by_term$n, c(1L, 2L, 3L))
+  expect_equal(round(by_term$dfw_pct, 1), c(0, 100, 33.3))
+  expect_equal(result$main_term_type, "fall")
+  expect_equal(result$n_min_term, 1L)
 })
 
 test_that("outcomes are compared inside HS GPA bands and standardized to the treatment mix", {

@@ -66,6 +66,17 @@ try {
      'the result opens with both groups\' rates and their counts');
   ok(/measured covariate/i.test(body),
      'the opening sentence carries the balance verdict');
+  // Over Time is one row per term, of the ticked term types: never a calendar
+  // year, which mixes a Fall's students with a Spring's.
+  const overTime = await page.evaluate(() => ({
+    ticked: [...document.querySelectorAll('#cr_impact_seq_term_type input:checked')].map((i) => i.value),
+    terms: [...document.querySelectorAll('#cr_impact_sequence_over_time .rt-tbody .rt-tr')]
+      .map((r) => r.querySelector('.rt-td')?.innerText.trim()),
+  }));
+  ok(overTime.ticked.length === 1, `Over Time opens on one term type (${overTime.ticked.join(', ')})`);
+  ok(overTime.terms.length > 0 &&
+     overTime.terms.every((t) => t.toLowerCase().startsWith(overTime.ticked[0])),
+     `every Over Time row is a ${overTime.ticked[0]} term (${overTime.terms.join(', ')})`);
   ok(/small observed difference/i.test(body) && /0\.10/.test(body),
      'the page defines the small observed-difference band');
   ok(/0\.10[–-]0\.25/.test(body) && /review/i.test(body),
