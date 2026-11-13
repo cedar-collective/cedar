@@ -249,6 +249,45 @@ attempt_outcome_flags <- function(attempts, passing_values = GRADES_PASS) {
 }
 
 
+#' The grade band of each attempt
+#'
+#' Reads the band off the stored `outcome_category`, so a band sits on one
+#' side of the pass line by construction: a passing attempt is "A", "B" or "C"
+#' by its letter (GRADE_LETTER_BANDS) or "Other passing" (CR); a C-, D or F is
+#' "C- to F"; a late drop or W is "Withdrew"; any other recorded nonpassing
+#' grade is "Other nonpassing"; an early drop or an attempt with no grade is
+#' "Not graded".
+#'
+#' @param attempts Rows of cedar_attempts; needs `outcome_category` and
+#'   `final_grade`.
+#' @return `attempts` with `grade_band` (one of GRADE_BAND_LEVELS).
+add_attempt_grade_band <- function(attempts) {
+  missing <- setdiff(c("outcome_category", "final_grade"), names(attempts))
+  if (length(missing)) {
+    stop("[attempts.R] add_attempt_grade_band(): attempts lacks ", paste(missing, collapse = ", "))
+  }
+  category <- attempts$outcome_category
+  unknown <- setdiff(unique(category), ATTEMPT_OUTCOME_CATEGORIES)
+  if (length(unknown)) {
+    stop("[attempts.R] add_attempt_grade_band(): outcome_category holds ",
+         paste(unknown, collapse = ", "), ", which build_attempts() never writes")
+  }
+  grade <- trimws(as.character(attempts$final_grade))
+  letter <- rep("Other passing", length(grade))
+  for (band in names(GRADE_LETTER_BANDS)) {
+    letter[grade %in% GRADE_LETTER_BANDS[[band]]] <- band
+  }
+  attempts$grade_band <- dplyr::case_when(
+    category == "pass" ~ letter,
+    category %in% c("c_minus", "d", "f") ~ "C- to F",
+    category == "w_late_withdrawal" ~ "Withdrew",
+    category == "other_nonpassing" ~ "Other nonpassing",
+    TRUE ~ "Not graded"
+  )
+  attempts
+}
+
+
 #' Outcome counts per course term, at the course-terms grain
 #'
 #' @param attempts A current cedar_attempts.

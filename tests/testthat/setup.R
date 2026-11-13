@@ -25,6 +25,8 @@ test_sections        <<- cedar_sections
 test_sections_sf     <<- cedar_sections_sf      # seatfinder-specific: 2024/2025 terms (test-seatfinder.R)
 test_students_mc     <<- cedar_registrations_mc       # MC02: sequence + co-req + repeat, 2 campuses
 test_programs_mc     <<- cedar_programs_mc       # MC02 covariates
+test_students_ds     <<- cedar_registrations_ds       # DS01: a course and its sequel (Later Course)
+test_programs_ds     <<- cedar_programs_ds       # DS01 covariates
 test_students_mcret  <<- cedar_registrations_mcret    # MC03: retention cohorts, incl. a campus move
 test_students_wlmkt  <<- cedar_registrations_wlmkt    # WL01: a waitlist in the pooled ABQ+EA market
 test_students_wlterm <<- cedar_registrations_wlterm   # WL02: waiting counted per term
@@ -92,6 +94,7 @@ test_student_terms_roadblocks <<- .fixture_student_terms(cedar_registrations_roa
 test_student_terms_mcret      <<- .fixture_student_terms(cedar_registrations_mcret)
 test_student_terms_rp         <<- .fixture_student_terms(cedar_registrations_rp, cedar_degrees_rp)
 test_student_terms_mc         <<- .fixture_student_terms(cedar_registrations_mc)
+test_student_terms_ds         <<- .fixture_student_terms(cedar_registrations_ds)
 # RW01 carries programs rows (unit, standing); Spring 2021 is in registration,
 # so Fall 2020 is the settled edge.
 test_student_terms_rw         <<- suppressMessages(build_student_terms(
@@ -114,6 +117,7 @@ attach_test_student_terms <<- function(st) {
 }
 for (.st in c("test_student_terms", "test_student_terms_audits", "test_student_terms_roadblocks",
               "test_student_terms_mcret", "test_student_terms_rp", "test_student_terms_mc",
+              "test_student_terms_ds",
               "test_student_terms_rw", "test_student_terms_gen_ed_assoc", "test_student_terms_st")) {
   assign(.st, attach_test_student_terms(get(.st)), envir = globalenv())
 }

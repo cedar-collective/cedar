@@ -36,8 +36,6 @@ alongside other work (M14, M16).
 
 | ID | Kind | Summary |
 |---|---|---|
-| [I57](#i57--the-instructor-patterns-column-guide-states-a-pass-rule-cedar-does-not-use) | Defect | The Instructor Patterns column guide says "Passing is C− or better, CR, P, or S"; CEDAR passes A+ through C and CR, and the table beside the sentence follows CEDAR |
-| [I56](#i56--downstream-continuation-misses-every-later-enrollment-after-the-grade-edge) | Defect | Downstream continuation reads the later course only to the graded edge while counting eligibility to the settled edge, so the newest students who continued count as not continuing: 183 of 557 for CHEM 1215 to 1225 when measured 2026-10-29 (suspected on today's data: the code path is unchanged, the counts not rerun) |
 | [I55](#i55--the-instructor-gate-password-stopped-reaching-the-app) | Defect | The instructor-gate password stopped reaching the app: since 2026-09-05 `.Renviron` is kept out of the image and nothing else passed `CEDAR_DFW_PASSWORD`, so every instructor gate on production reads "not configured" (fixed in code 2026-11-12; production needs the password in its `.env`) |
 | [I46](#i46--a-deploy-that-must-rebuild-a-table-the-app-cannot-start-without-takes-the-site-down) | Defect | The deploy's table gate ran after the health check, so a deploy that added a column to `cedar_student_terms` failed its health check on the missing column and never reached the gate: production served the restart page from 17:07 UTC on 2026-11-04 (gate moved before the first request) |
 | [I45](#i45--the-class-list-and-the-schedule-name-the-same-section-with-different-course-codes) | Defect | The class list and the schedule name the same section with different course codes for renamed subjects (SOC to SOCI, PSY to PSYC): SOCI 371 had class-list history from Fall 2019 but no sections before Fall 2021 (fixed for every reader by keying the loaded tables on the course, 2026-11-07; open until the remaining successions are confirmed) |
@@ -51,7 +49,7 @@ alongside other work (M14, M16).
 | [I20](#i20--cedar_programs-holds-almost-no-branch-campus-students) | Defect | `cedar_programs` holds 1–3% of branch-campus students; branch program counts read near zero |
 | [I18](#i18--cedar_degrees-holds-no-associate-degrees-so-branch-campus-completions-read-zero) | Defect | `cedar_degrees` holds no associate degrees: branch-campus completions read zero |
 | [I4](#i4--pre-change-course-ratios-are-confounded-by-career-stage) | Defect | Pre-change course ratios confounded by career stage (deferred) |
-| M1–M39 | Improvement | See [Improvements](#improvements) |
+| M1–M42 | Improvement | See [Improvements](#improvements) |
 
 ### Resolved since the last release
 
@@ -59,6 +57,8 @@ Kept until the next release, so a recurrence is recognisable; each entry below g
 
 | ID | Kind | Summary |
 |---|---|---|
+| [I57](#i57--the-instructor-patterns-column-guide-states-a-pass-rule-cedar-does-not-use) | Defect | The Instructor Patterns column guide said "Passing is C− or better, CR, P, or S" beside a table that followed CEDAR's rule (A+ through C and CR). The tab is gone: the breakdown by instructor is a section of Downstream > Later Course, which states no pass rule of its own (resolved 2026-11-13, #280) |
+| [I56](#i56--downstream-continuation-misses-every-later-enrollment-after-the-grade-edge) | Defect | Downstream continuation read the later course only to the graded edge while counting eligibility to the settled edge, so the newest students who continued counted as not continuing: 183 of 557 for CHEM 1215 to 1225, confirmed on the 2026-11-13 tables. One cohort (`build_downstream_cohort()`) now reads enrollment to the settled edge and grades to the graded edge, inside a fixed window, by the campus that taught the first course (resolved 2026-11-13, #280) |
 | [I54](#i54--the-gen-ed-list-had-no-second-language-area) | Defect | The Gen Ed list had no area 6 (second language): no language course counted as Gen Ed anywhere, 36 courses and 2,228 enrolled seats in Fall 2025 on ABQ and online (reported in #269; the 55 catalog courses added and production's sections rebuilt 2026-11-12) |
 | [I52](#i52--sections-stored-the-instructors-employee-id-so-they-joined-no-other-table) | Defect | The DESR's instructor ID was saved as the employee ID while the class list and HR hash theirs: the transform's HR merge matched nothing (`job_cat` NA on all 242,413 sections) and sections joined neither table. Fixed in the transform (every source hashed alike, the merge and `job_cat` removed; resolved 2026-11-12, when the deploy rebuilt production's sections) |
 | [I50](#i50--the-class-list-dedup-can-keep-an-early-drop-over-a-late-withdrawal) | Defect | The transform keeps one class-list row per student-course-campus-term but ranked only "registered first": a student who early-dropped one section and withdrew late from another could keep the early drop, so the W left the loaded class list (703 student-course-terms on the 2026-10-08 pull; 651 on the 2026-02-04 one). Every outcome reader now classifies that table (`cedar_attempts`); fixed in the transform (resolved 2026-11-12, when the deploy rebuilt production's class list) |
@@ -92,7 +92,12 @@ Kept until the next release, so a recurrence is recognisable; each entry below g
 
 ## I57 — The Instructor Patterns column guide states a pass rule CEDAR does not use
 
-**Status:** open.
+**Status:** resolved 2026-11-13 (#280). The Instructor Patterns tab and its
+column guide are removed. The breakdown by instructor is a section of
+Downstream > Later Course, which states no pass rule of its own: the shared
+`downstream-outcomes` definition gives the rule (A+ through C, and CR), and
+the page's words are covered by snapshots
+(`tests/testthat/_snaps/later-course.md`).
 **Found:** 2026-10-29, auditing the Course Report's Downstream tab on the
 branch `course-dynamics/downstream`, which fixed it there and was never
 merged; confirmed still on `main` 2026-11-12.
@@ -121,9 +126,19 @@ page's words are covered by a snapshot.
 
 ## I56 — Downstream continuation misses every later enrollment after the grade edge
 
-**Status:** open, and suspected on today's data. The code path is unchanged on
-`main` (read 2026-11-12 at `2317b0c`); the counts below were measured
-2026-10-29, before the measure tables, and have not been rerun.
+**Status:** resolved 2026-11-13 (#280). Confirmed on `shared-data` the same
+day, before the fix, with the check below: first X in Spring 2026 and Y in
+Fall 2026, counted as not continuing, CHEM 1215 → 1225, 183 of 557;
+MATH 1512 → 1522, 67 of 185; ENGL 1110 → 1120, 85 of 167. The fix is one
+cohort definition, `build_downstream_cohort()`
+(`R/branches/downstream-cohort.R`), behind the picker, the outcomes and the
+instructor balance check: enrollment in Y is read off the class list to the
+settled edge and grades off `cedar_attempts` to the graded edge, Y counts
+inside a fixed window of regular terms (default 3), and every table is grouped
+by the campus that taught X. `get_instructor_effect()` and
+`get_downstream_pair_audit()` are removed. DS01's `DS_E1` row expresses the
+case, and `test-later-course.R` fails (22 expectations) with the graded-edge
+filter restored.
 **Found:** 2026-10-29, auditing the Course Report's Downstream tab on the
 branch `course-dynamics/downstream` (two local commits, never merged). The
 branch fixed it against the tables of the time and cannot be merged now: 16 of
@@ -3568,6 +3583,25 @@ population, the richer out-of-unit scenario, is unreachable. *Done when:* the
 two fixtures carry the builder's required columns and `setup.R` builds
 `test_student_terms_hp2` and `test_student_terms_mc` over them, with the
 fixture header's expected values checked.
+
+**M42 — Setting the Course Dynamics course picker with `setInput()` can lose
+the value on the first session after a restart.** `cr_course` is a server-side
+selectize; on a cold worker its initialisation can land after a browser test's
+`setInput(page, 'cr_course', …)` and clear it. Seen 2026-11-13 on three of
+three first sessions after a container start while writing
+`tests/e2e/later-course.test.mjs` (each after `warmup.mjs`, which opens Home
+only): `Shiny.shinyapp.$inputValues.cr_course` read `"HIST 1110"` after the set
+and `""` once Analyze Course returned, and Downstream, which reads the picker,
+stayed on "Select a course, then click Analyze Course to view this tab." until
+the suite timed out. Every later session passed, so the failure follows suite
+order and reads like a broken tab. `course-impact-covariates.test.mjs` and
+`course-cohort.test.mjs` set the picker the same way; the first passed on the
+one cold session tried, so there the race is possible, not certain.
+`later-course.test.mjs` loads the course through a deep link
+(`connect(page, { search })`, as `course-dynamics-deeplink.test.mjs` does) and
+passed cold. *Done when:* `lib.mjs` has one helper that loads a Course Dynamics
+course and waits for the picker to hold it, and every suite that needs a course
+uses it.
 
 ### Architecture rules (`AGENTS.md`)
 

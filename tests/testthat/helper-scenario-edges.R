@@ -20,6 +20,16 @@ mc02_edges <- list(last_enrolled = 202180L, last_enrolled_complete = 202110L, la
   last_degree = NULL
 )
 
+# DS01: Fall 2022 is settled and Summer 2022 is the last graded term, so a
+# Fall 2022 enrollment counts as taken and is not graded yet.
+ds01_edges <- list(
+  first_enrolled = 202010L,
+  last_enrolled = 202310L,
+  last_enrolled_complete = 202280L,
+  last_graded = 202260L,
+  last_degree = NULL
+)
+
 # RW01: Spring 2021 is in registration, so Fall 2020 is the settled and graded
 # edge. rw01_settled_edges reads the same rows once Spring 2021 has settled.
 rw01_edges <- list(last_enrolled = 202110L, last_enrolled_complete = 202080L, last_graded = 202080L)

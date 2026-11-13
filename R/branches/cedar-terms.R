@@ -235,3 +235,26 @@ validate_cedar_terms <- function(terms) {
   }
   terms
 }
+
+
+#' Move term codes forward a number of terms
+#'
+#' The last term of a follow-up window: retention's term T+n, the later-course
+#' window's end. Each code is advanced independently, `n_steps` times through
+#' add_next_term_col() (trunk/utils.R), so it needs no term table and reaches
+#' past the loaded data.
+#'
+#' @param term_codes Term codes (`YYYYSS`).
+#' @param n_steps How many terms forward.
+#' @param summer Whether Summer is a step. Default FALSE: regular terms only,
+#'   a Summer code moving to its Fall first.
+#' @return Integer term codes, one per input; an unrecognized code is NA.
+advance_term <- function(term_codes, n_steps, summer = FALSE) {
+  result <- as.integer(term_codes)
+  for (i in seq_len(n_steps)) {
+    result <- as.integer(add_next_term_col(
+      data.frame(term = result), "term", summer = summer
+    )$next_term)
+  }
+  result
+}
