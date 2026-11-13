@@ -61,12 +61,8 @@ one_unit <- list(
   subjects = subject_rows("HIST")
 )
 
-unm_programs <- function() {
-  read_institution_mappings(cedar_institution_dir(cedar_base_dir, "unm"))$programs
-}
-
 unit_of <- function(code, college = rep("", length(code))) {
-  resolve_program_units(code, college, unm_programs())
+  resolve_program_units(code, college, unm_programs)
 }
 
 write_config_dir <- function(campuses, course_levels, student_levels = NULL) {

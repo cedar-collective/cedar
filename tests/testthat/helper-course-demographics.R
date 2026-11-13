@@ -1,11 +1,5 @@
 # What the tests in test-course-demographics.R share: builders, option lists, constants.
 
-.hist_1110_registered <- function() {
-  test_students %>%
-    filter(subject_course == "HIST 1110",
-           registration_status_code %in% STATUS_REGISTERED)
-}
-
 .class_opt <- list(group_cols = c("campus", "college", "term", "term_type",
                                   "student_classification", "subject_course"))
 

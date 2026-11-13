@@ -72,7 +72,7 @@ test_that("check_student_id_integrity counts term statuses per table", {
 })
 
 test_that("check_student_id_integrity stops on a table missing a required column", {
-  bad <- ids_tables()
+  bad <- ids_tables
   bad$ids_clean <- bad$ids_clean %>% select(-term)
 
   expect_error(
@@ -91,7 +91,7 @@ test_that("check_student_id_integrity stops on unnamed or empty table lists", {
 
 test_that("check_student_id_integrity stops when the spine lacks the id column", {
   expect_error(
-    check_student_id_integrity(test_ids_spine %>% select(-student_id), ids_tables()),
+    check_student_id_integrity(test_ids_spine %>% select(-student_id), ids_tables),
     "student_id"
   )
 })

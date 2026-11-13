@@ -40,7 +40,6 @@ test_that("create_dept_report_base requires the current term", {
 })
 
 test_that("Dept Trends base no longer requires unused faculty data", {
-  data_objects <- data_objects
   data_objects$cedar_faculty <- NULL
 
   expect_no_error(create_dept_report_base(
@@ -72,7 +71,6 @@ test_that("Dept Trends preloads every non-Gen-Ed analysis tab", {
 })
 
 test_that("Dept Trends prepares tabs and Refresh bypasses every main-tab cache", {
-  data_objects <- data_objects
   errors <- character(0)
   headcount_writes <- 0L
   cached_base <- create_dept_report_base(
@@ -138,7 +136,6 @@ test_that("Dept Trends prepares tabs and Refresh bypasses every main-tab cache",
 })
 
 test_that("compute_dept_enrl_tab carries historical enrollment plots", {
-  data_objects <- data_objects
   base <- list(
     dept_code = "HIST",
     palette = "Set2",
@@ -159,7 +156,6 @@ test_that("compute_dept_enrl_tab carries historical enrollment plots", {
 })
 
 test_that("Dept Trends data-only tab payloads rebuild their plots", {
-  data_objects <- data_objects
   base <- list(
     dept_code = "HIST",
     dept_name = "History",
@@ -453,7 +449,6 @@ test_that("get_degrees_for_dept_report produces NULL plots when prog_codes has n
 test_that("compute_dept_course_units_tab reads the majors' teaching units and pools small rows", {
   # ST01's HIST majors, as test-major-course-units.R reads them: their own
   # student-term table and class list, to a settled edge of 202110.
-  data_objects <- data_objects
   data_objects$cedar_student_terms <- test_student_terms_st
   data_objects$cedar_registrations <- test_students_st
   data_objects$cedar_edges <- list(last_enrolled = 202110L, last_enrolled_complete = 202110L,

@@ -13,14 +13,6 @@ write_saved_fixtures <- function(dir) {
   invisible(dir)
 }
 
-# The fixtures' pulls are all within a fortnight of their terms' start, so no
-# settled edge can be determined from them (cedar_report_edges() stops, as it
-# should in production); the tests state the edge, as test-course-flows.R does.
-fixture_edges <- function() {
-  terms <- sort(unique(test_students$term))
-  modifyList(data_objects$cedar_edges, list(last_enrolled_complete = terms[length(terms) - 1L]))
-}
-
 # The saved fixtures as the loader (and transform_measures()) holds them:
 # units attached from the mapping files and course ids keyed. The fixtures'
 # own colleges are not UNM's, so the attached rows carry the files' verdict

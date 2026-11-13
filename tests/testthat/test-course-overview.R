@@ -363,7 +363,7 @@ test_that("overview term scoping and defaults follow same-season history", {
 
 test_that("the snapshot sets the latest term beside the same term in earlier years", {
   spec <- prepare_course_snapshot_tables(
-    .snapshot_overview(), "HIST 1110", campuses = "ABQ", term_type = "fall"
+    .snapshot_overview, "HIST 1110", campuses = "ABQ", term_type = "fall"
   )[[1]]
   row <- function(label) spec$rows[[which(vapply(spec$rows, `[[`, "", "label") == label)]]
 
@@ -382,7 +382,7 @@ test_that("the snapshot sets the latest term beside the same term in earlier yea
 
 test_that("the snapshot keeps each campus's latest offering and labels terms in progress", {
   tables <- prepare_course_snapshot_tables(
-    .snapshot_overview(), "HIST 1110", term_type = "fall",
+    .snapshot_overview, "HIST 1110", term_type = "fall",
     in_progress_terms = 202380L
   )
   expect_equal(vapply(tables, `[[`, "", "caption"),
@@ -399,13 +399,13 @@ test_that("the snapshot keeps each campus's latest offering and labels terms in 
 test_that("the snapshot refuses an overview with a campus-term twice", {
   # Joining or reading a doubled key would double a measure or quietly keep
   # one row; either way the table would show a number nobody computed.
-  doubled <- .snapshot_overview()
+  doubled <- .snapshot_overview
   doubled$lifecycle <- dplyr::bind_rows(doubled$lifecycle, doubled$lifecycle[4, ])
   expect_error(
     prepare_course_snapshot_tables(doubled, "HIST 1110", term_type = "fall"),
     "overview\\$lifecycle has more than one row"
   )
-  doubled <- .snapshot_overview()
+  doubled <- .snapshot_overview
   doubled$sections <- dplyr::bind_rows(doubled$sections, doubled$sections[1, ])
   expect_error(
     prepare_course_snapshot_tables(doubled, "HIST 1110", term_type = "fall"),
@@ -495,7 +495,7 @@ test_that("overview plot builders return campus-separated Plotly charts", {
 # Spring 2021 and HIST 320's two terms were a different course.
 
 test_that("Course Dynamics follows a course across its codes and names the former ones", {
-  rn <- rn01_course_tables()
+  rn <- rn01_course_tables
   opt <- create_test_opt(list(course = "HIST 3201"))
   payload <- assemble_course_enrollment_payload(rn$cedar_registrations, rn$cedar_sections, opt)
 
@@ -558,7 +558,7 @@ test_that("Course Dynamics follows a course across its codes and names the forme
 })
 
 test_that("the whole Course Dynamics payload is keyed on the course", {
-  rn <- rn01_course_tables()
+  rn <- rn01_course_tables
   rn_objects <- list(
     cedar_registrations = rn$cedar_registrations, cedar_sections = rn$cedar_sections,
     cedar_student_terms = attach_test_student_terms(suppressMessages(build_student_terms(

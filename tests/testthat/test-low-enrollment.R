@@ -536,7 +536,7 @@ test_that("a schedule check finds each course's history or lists its other offer
 # =============================================================================
 
 test_that("a schedule check finds a renumbered course's history under its former codes (RN01)", {
-  concerns <- get_enrollment_concerns(rn01_sections(), list(term = "202110"), n_history_terms = 4) %>%
+  concerns <- get_enrollment_concerns(rn01_course_tables$cedar_sections, list(term = "202110"), n_history_terms = 4) %>%
     arrange(subject_course)
   expect_equal(concerns$subject_course, c("HIST 3201", "LING 2110", "SOCI 2315"))
   expect_equal(concerns$course_id, concerns$subject_course)
@@ -552,7 +552,7 @@ test_that("a schedule check finds a renumbered course's history under its former
 })
 
 test_that("a single course's history runs through every code it has carried (RN01)", {
-  sections <- rn01_sections()
+  sections <- rn01_course_tables$cedar_sections
   history <- get_course_enrollment_history(sections, campus = "ABQ", dept = "SOCI",
                                            subj_crse = "SOCI 2315", crse_title = "Social Problems",
                                            im = NULL, n_terms = 10)

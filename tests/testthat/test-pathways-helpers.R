@@ -1,7 +1,7 @@
 context("Pathways branch helpers")
 
 test_that("grouped paths count concurrent same-category courses once per student and campus", {
-  p <- get_grouped_student_paths(test_students_mc, grouped_path_population(),
+  p <- get_grouped_student_paths(test_students_mc, grouped_path_population,
     CEDAR_PATHWAY_SUBJECT_GROUPS, grouped_path_opt())
   first <- p$cells %>% filter(relative_term == 1, group_id == "languages")
   expect_equal(first$n_students[first$campus == "ABQ"], 4L)
@@ -10,14 +10,14 @@ test_that("grouped paths count concurrent same-category courses once per student
   expect_equal(second$n_students, 4L)
   expect_equal(second$n_eligible, 5L)
   # Campus filtering must not re-anchor MC_G1 at term 1 after moving to ABQ.
-  scoped <- get_grouped_student_paths(test_students_mc, grouped_path_population(),
+  scoped <- get_grouped_student_paths(test_students_mc, grouped_path_population,
     CEDAR_PATHWAY_SUBJECT_GROUPS, grouped_path_opt(campus = "ABQ"))
   expect_equal(scoped$cells, filter(p$cells, campus == "ABQ"))
   expect_equal(nrow(filter(p$courses, subject_course == "SPAN 201", campus == "ABQ")), 2L)
 })
 
 test_that("grouped paths suppress thin bands and cells without leaking their counts", {
-  p <- get_grouped_student_paths(test_students_mc, grouped_path_population(),
+  p <- get_grouped_student_paths(test_students_mc, grouped_path_population,
     CEDAR_PATHWAY_SUBJECT_GROUPS, grouped_path_opt(min_n = 3L, min_band_n = 4L))
   thin_band <- p$cells %>% filter(campus == "GA" | relative_term == 3)
   expect_true(all(is.na(thin_band$n_students)))
@@ -32,7 +32,7 @@ test_that("grouped paths suppress thin bands and cells without leaking their cou
 })
 
 test_that("grouped paths honor population ceilings and the settled observation edge", {
-  pop <- grouped_path_population()
+  pop <- grouped_path_population
   pop$relevant_until[pop$student_id == "MC_A1"] <- 202010L
   p <- get_grouped_student_paths(test_students_mc, pop, CEDAR_PATHWAY_SUBJECT_GROUPS,
     grouped_path_opt(data_edges = list(first_enrolled = 202010L, last_enrolled_complete = 202080L)))
@@ -42,7 +42,7 @@ test_that("grouped paths honor population ceilings and the settled observation e
   expect_error(get_grouped_student_paths(test_students_mc, pop, CEDAR_PATHWAY_SUBJECT_GROUPS,
     list(data_edges = list())), "settled enrollment edge")
   partial <- CEDAR_PATHWAY_SUBJECT_GROUPS %>% filter(subject_code != "PHIL")
-  unmapped <- get_grouped_student_paths(test_students_mc, grouped_path_population(), partial, grouped_path_opt())
+  unmapped <- get_grouped_student_paths(test_students_mc, grouped_path_population, partial, grouped_path_opt())
   expect_equal(unmapped$meta$n_unmapped_rows, 1L)
   expect_true("Unmapped coursework" %in% unmapped$cells$group_label)
 })
@@ -144,7 +144,7 @@ test_that("pathways_observation_boundary returns NULL when the anchor is unknown
 # be counted as fully readable.
 
 test_that("coverage facts count truncation, censoring and complete records", {
-  f <- pathways_coverage_facts(cov_pop(), min_data_term = 202010L, max_data_term = 202480L)
+  f <- pathways_coverage_facts(cov_pop, min_data_term = 202010L, max_data_term = 202480L)
 
   expect_equal(f$n, 6)
   expect_equal(f$n_truncated, 2)   # S1, S3
@@ -176,13 +176,13 @@ test_that("coverage facts return NA rather than a confident zero when bookends a
 })
 
 test_that("an empty population yields NA counts, not zero coverage", {
-  f <- pathways_coverage_facts(cov_pop()[0, ], min_data_term = 202010L, max_data_term = 202480L)
+  f <- pathways_coverage_facts(cov_pop[0, ], min_data_term = 202010L, max_data_term = 202480L)
   expect_equal(f$n, 0)
   expect_true(is.na(f$pct_truncated))
 })
 
 test_that("coverage percentages never exceed 100 or fall below 0", {
-  f <- pathways_coverage_facts(cov_pop(), min_data_term = 202010L, max_data_term = 202480L)
+  f <- pathways_coverage_facts(cov_pop, min_data_term = 202010L, max_data_term = 202480L)
   for (p in c(f$pct_truncated, f$pct_censored, f$pct_complete)) {
     expect_gte(p, 0); expect_lte(p, 100)
   }
@@ -199,20 +199,20 @@ test_that("coverage percentages never exceed 100 or fall below 0", {
 # with no grades, in which every student reads as stopped out).
 
 test_that("the boundary is the last term whose grades are posted", {
-  expect_equal(latest_graded_term(graded_students()), 202580L)
+  expect_equal(latest_graded_term(graded_students), 202580L)
 })
 
 test_that("a term with a trickle of early grades does not qualify", {
   # Spring 2026 sat at 7% on real data — enough to look non-empty, nowhere near
   # enough to measure a DFW rate against.
-  expect_equal(latest_graded_term(graded_students(), min_graded_share = 0.5), 202580L)
-  expect_true(latest_graded_term(graded_students()) < 202610L)
+  expect_equal(latest_graded_term(graded_students, min_graded_share = 0.5), 202580L)
+  expect_true(latest_graded_term(graded_students) < 202610L)
 })
 
 test_that("the boundary advances on its own once grades land", {
   # The behaviour the arithmetic version could not have: no config edit needed.
   later <- dplyr::bind_rows(
-    dplyr::filter(graded_students(), term != 202610L),
+    dplyr::filter(graded_students, term != 202610L),
     tibble::tibble(term = rep(202610L, 100),
                    final_grade = c(rep("A", 88), rep(NA_character_, 12)))
   )
@@ -220,13 +220,13 @@ test_that("the boundary advances on its own once grades land", {
 })
 
 test_that("max_term caps the boundary without changing the grade rule", {
-  expect_equal(latest_graded_term(graded_students(), max_term = 202510L), 202480L)
+  expect_equal(latest_graded_term(graded_students, max_term = 202510L), 202480L)
 })
 
 test_that("no graded term yields NULL rather than a confident guess", {
   ungraded <- tibble::tibble(term = rep(202680L, 10), final_grade = NA_character_)
   expect_null(latest_graded_term(ungraded))
-  expect_null(latest_graded_term(graded_students()[0, ]))
+  expect_null(latest_graded_term(graded_students[0, ]))
 })
 
 test_that("missing columns fail loudly", {

@@ -20,7 +20,7 @@ test_that("an unavailable target schedule produces a planning recommendation", {
   inputs <- list(
     enrollment_history = history,
     preceding_term_history = history,
-    waitlist_history = empty_projection_test_waitlists(),
+    waitlist_history = empty_projection_test_waitlists,
     section_history = sections,
     students = list(
       target_students = tibble::tibble(
@@ -34,9 +34,9 @@ test_that("an unavailable target schedule produces a planning recommendation", {
     target_courses = "TEST 101", target_campuses = c("ABQ", "EA"),
     target_market_id = "abq_ea_course_market",
     enrollment_through_term = 202380L,
-    delivery_components = empty_projection_test_components(),
-    delivery_section_history = empty_projection_test_delivery_sections(),
-    delivery_first_day = empty_projection_test_delivery_first_day()
+    delivery_components = empty_projection_test_components,
+    delivery_section_history = empty_projection_test_delivery_sections,
+    delivery_first_day = empty_projection_test_delivery_first_day
   )
 
   result <- get_course_enrollment_projections(
@@ -69,7 +69,7 @@ test_that("planning sections are sized from projected registrations, not first-d
   inputs <- list(
     enrollment_history = history,
     preceding_term_history = history,
-    waitlist_history = empty_projection_test_waitlists(),
+    waitlist_history = empty_projection_test_waitlists,
     section_history = sections,
     students = list(
       target_students = tibble::tibble(
@@ -83,9 +83,9 @@ test_that("planning sections are sized from projected registrations, not first-d
     target_courses = "TEST 101", target_campuses = c("ABQ", "EA"),
     target_market_id = "abq_ea_course_market",
     enrollment_through_term = 202380L,
-    delivery_components = empty_projection_test_components(),
-    delivery_section_history = empty_projection_test_delivery_sections(),
-    delivery_first_day = empty_projection_test_delivery_first_day()
+    delivery_components = empty_projection_test_components,
+    delivery_section_history = empty_projection_test_delivery_sections,
+    delivery_first_day = empty_projection_test_delivery_first_day
   )
 
   result <- get_course_enrollment_projections(
@@ -976,7 +976,7 @@ test_that("cone preserves candidate provenance when backtests are empty", {
   inputs <- list(
     enrollment_history = projection_test_history(100, terms = 202380L),
     preceding_term_history = projection_test_history(100, terms = 202380L),
-    waitlist_history = empty_projection_test_waitlists(),
+    waitlist_history = empty_projection_test_waitlists,
     section_history = tibble::tibble(
       market_id = "abq_ea_course_market", college = "AS", department = "TEST",
       course_title = "Test Course", subject_course = "TEST 101",
@@ -998,9 +998,9 @@ test_that("cone preserves candidate provenance when backtests are empty", {
     target_campuses = c("ABQ", "EA"),
     target_market_id = "abq_ea_course_market",
     enrollment_through_term = 202380L,
-    delivery_components = empty_projection_test_components(),
-    delivery_section_history = empty_projection_test_delivery_sections(),
-    delivery_first_day = empty_projection_test_delivery_first_day()
+    delivery_components = empty_projection_test_components,
+    delivery_section_history = empty_projection_test_delivery_sections,
+    delivery_first_day = empty_projection_test_delivery_first_day
   )
 
   analysis <- get_course_enrollment_projections(
@@ -1016,7 +1016,7 @@ test_that("pressure-only scopes can publish an explicit empty result", {
   inputs <- list(
     enrollment_history = projection_test_history(),
     preceding_term_history = projection_test_history(),
-    waitlist_history = empty_projection_test_waitlists(),
+    waitlist_history = empty_projection_test_waitlists,
     section_history = tibble::tibble(
       market_id = character(), college = character(), department = character(),
       course_title = character(), subject_course = character(), term = integer(),
@@ -1030,9 +1030,9 @@ test_that("pressure-only scopes can publish an explicit empty result", {
     target_campuses = c("ABQ", "EA"),
     target_market_id = "abq_ea_course_market",
     enrollment_through_term = 202380L,
-    delivery_components = empty_projection_test_components(),
-    delivery_section_history = empty_projection_test_delivery_sections(),
-    delivery_first_day = empty_projection_test_delivery_first_day()
+    delivery_components = empty_projection_test_components,
+    delivery_section_history = empty_projection_test_delivery_sections,
+    delivery_first_day = empty_projection_test_delivery_first_day
   )
 
   analysis <- get_course_enrollment_projections(

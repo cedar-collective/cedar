@@ -13,7 +13,7 @@
 context("Course demographics donuts")
 
 test_that("donut collapses duplicate category rows instead of ranking them separately", {
-  demo <- make_multi_campus_demo()
+  demo <- multi_campus_demo
   tr <- donut_trace(demo, build_color_map(c("HIST", "ANTH", "ENGL")))
   labs <- unlist(tr$labels)
 
@@ -23,7 +23,7 @@ test_that("donut collapses duplicate category rows instead of ranking them separ
 })
 
 test_that("donut slices account for every student and label to 100%", {
-  demo <- make_multi_campus_demo()
+  demo <- multi_campus_demo
   tr <- donut_trace(demo, build_color_map(c("HIST", "ANTH", "ENGL")))
   vals <- unlist(tr$values)
 
@@ -34,7 +34,7 @@ test_that("donut slices account for every student and label to 100%", {
 })
 
 test_that("grey is reserved for Other and every other slice is distinct", {
-  demo <- make_multi_campus_demo()
+  demo <- multi_campus_demo
   # Palette knows only 3 of the 5 categories that will be plotted.
   tr <- donut_trace(demo, build_color_map(c("HIST", "ANTH", "ENGL")))
   labs <- unlist(tr$labels)
@@ -47,7 +47,7 @@ test_that("grey is reserved for Other and every other slice is distinct", {
 })
 
 test_that("a category set with no remainder produces no Other slice", {
-  demo <- make_multi_campus_demo()
+  demo <- multi_campus_demo
   demo <- demo[demo$major_code %in% c("HIST", "ANTH", "ENGL"), ]
   tr <- donut_trace(demo, build_color_map(c("HIST", "ANTH", "ENGL")))
   labs <- unlist(tr$labels)

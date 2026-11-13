@@ -85,7 +85,7 @@ test_that("shipped annual shared-rule files are coherent without a private sourc
 })
 
 test_that("planned coverage consumes each course once and never resolves an open choice", {
-  reference <- planning_reference()
+  reference <- planning_reference
   view <- build_degree_roadmap_view(test_degree_catalog, test_degree_roadmaps,
     "demo-biology-bs-2026", "calculus", "composition", shared = reference)
   # 1120 = 3 writing, calculus = 3 math, paired chemistry = 4 science,
@@ -123,7 +123,7 @@ test_that("planned coverage consumes each course once and never resolves an open
 })
 
 test_that("placement does not award preparation coverage and absent profiles stay generic", {
-  reference <- planning_reference()
+  reference <- planning_reference
   ready <- build_degree_roadmap_view(test_degree_catalog, test_degree_roadmaps,
     "demo-biology-bs-2026", "calculus", "composition2", shared = reference)
   completed <- build_degree_roadmap_view(test_degree_catalog, test_degree_roadmaps,

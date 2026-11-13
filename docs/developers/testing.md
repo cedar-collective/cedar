@@ -86,10 +86,11 @@ are facts about how the data looks, and every analytic touching them needs the
 same shape. These belong in `designed_test_data.R`; tests filter from the
 `test_*` variables.
 
-**No: it exists only inside the pipeline.** Build it in a function in the test
-file's helper (`helper-<topic>.R`, [where test code lives](#where-test-code-lives)),
-with its expected values documented directly above and a comment saying why it
-is local. The legitimate cases:
+**No: it exists only inside the pipeline.** Write it once, as a fixed object in
+`fixtures/scenario_tables.R` ([where test code lives](#where-test-code-lives)),
+under the heading of the test file that reads it, with its expected values
+documented directly above and a comment saying why it is not in the shared
+fixture. The legitimate cases:
 
 - **Intermediate frames.** `compute_stopout_for_group()` takes a frame with
   `outcome` and `stopped_out` already derived; that shape is one function's
@@ -139,42 +140,61 @@ it.
 
 ### Where test code lives
 
-**A test file holds `test_that()` blocks and nothing else** (a `context()` line
-and `testthat::local_edition()` aside). `test-architecture.R` fails on any
-other expression at a test file's top level: a function, an object, a
-`library()` or a `source()`. Whatever tests share has one of four homes, and
-testthat loads all four before every test file, whichever file is run:
+**A test reads fixed data, and a helper is something a test does.** Three
+rules, each enforced by `test-architecture.R`:
+
+1. **A test file holds `test_that()` blocks and nothing else** (a `context()`
+   line and `testthat::local_edition()` aside): no function, object,
+   `library()` or `source()` at its top level.
+2. **Every table a test reads is a fixed object,** built once before any test
+   runs and the same object for every test. It is never a function.
+3. **A helper function takes an argument or does something.** A function with
+   no argument returns the same thing every call, so a table written as one is
+   fixed data and belongs with the tables. The twelve helpers that take no
+   argument each run something (the function under test, a script, a skip);
+   they are listed by name in `helper_actions_without_arguments`
+   (`helper-architecture.R`), and the list may only get shorter.
+
+Everything loads before every test file, whichever file is run:
 
 | What | Where |
 |---|---|
-| Rows that enter the system, and the tables the transform builds from them (student terms, attempts, course terms, flows) | `fixtures/designed_test_data.R`, exposed by `setup.R` as `test_*` and `data_objects` |
-| A builder, an option list or a constant that tests share: a pipeline-internal frame, a scenario's population, a scaffolded mapping file | `helper-<topic>.R`, named for the test file it serves |
+| Rows that enter the system | `fixtures/designed_test_data.R`, exposed by `setup.R` as `test_*` and `data_objects` |
+| The tables the transform builds from them (student terms, attempts, course terms, flows) | Built once in `setup.R`, by the production builders |
+| A table one test file reads: a frame typed by hand as the input of one function, or a population, an attempts table or a mapping-file list derived from the fixtures | `fixtures/scenario_tables.R`, one section per test file, sourced once at the end of `setup.R` |
 | The right edges a designed scenario is read through | `helper-scenario-edges.R`, one list per scenario |
+| What a test does: run the function under test with its options, build a variant from arguments, write to a temporary directory, read a plot. Also ids and option lists | `helper-<topic>.R`, named for the test file it serves |
 | Packages, and the source files `load_funcs()` leaves out | `helper-load-functions.R` |
 
-Three rules keep the helpers dependable:
+What follows from a table being fixed:
 
-- **Anything built from the fixtures is a function, never an object.** Helper
-  files load before `setup.R`, in alphabetical order, so an object that read a
-  fixture or called a production function at load would stop every test file.
-  A function costs nothing until a test calls it, and a builder that breaks
-  fails the tests that use it and no others. A helper file's top level is
-  function definitions and literal values.
-- **Helper names are global to the suite.** Prefix a name with its scenario or
-  topic (`hp2_population()`, `ss_attempts()`, `roadmap_plan()`), and `grep` the
-  helper files before adding one: the builder may exist.
+- **A test that needs a variant says so in its own body:**
+  `pathway_students %>% filter(term < 202510L)`. The fixed table is the base
+  and the test states the one thing it changes. R copies on modify, so a test
+  cannot change a table for the test after it.
+- **A scenario table that cannot be built stops every test file,** as a broken
+  fixture does. Derive one through the builders, readers and filters that
+  produce the input of the function under test (`build_population()`,
+  `build_attempts()`, `build_cedar_dims()`, `cedar_data_edges()`), never
+  through the function under test itself: its output stays an action in a
+  helper (`ch_result()`, `gpa_timeline()`), so breaking it fails its own tests
+  and no others.
+- **Names are global to the suite.** Prefix a name with its scenario or topic
+  (`hp2_population`, `ss_attempts`, `roadmap_plan()`), and `grep` the scenario
+  tables and the helpers before adding one: it may exist.
 - **A helper selects and shapes; it never reimplements a calculation.** The
   expected values stay in the test, beside the assertion.
 
-A scratch session loads the same homes the same way, from `tests/testthat`,
-into an environment of its own (`setup.R` assigns with `<<-`, which fails when
-it is sourced straight into the global environment):
+The scenario tables add under a second to setup. A scratch session loads the
+same homes the same way, from `tests/testthat`, into an environment of its own
+(`setup.R` assigns with `<<-`, which fails when it is sourced straight into the
+global environment):
 
 ```r
 e <- new.env(parent = globalenv())
 invisible(testthat::source_test_helpers(".", env = e))
 invisible(testthat::source_test_setup(".", env = e))
-local(print(hp2_population()), envir = e)
+local(print(hp2_population), envir = e)
 ```
 
 Until 2026-11 these definitions sat at the top of 57 of the 86 test files (141
@@ -182,7 +202,10 @@ functions, 60 objects). A scratch session could not reach them; two files held
 different values under one name (`mc02_edges`); the same builder was written
 out in two files; and a file run alone attached different packages from the
 same file run in the suite, because `library()` and `source()` calls in one
-test file stayed in effect for every file after it.
+test file stayed in effect for every file after it. A first pass moved them
+into helper files as functions. 78 of those took no argument and returned the
+same table every call, so the data a test read was still spread over 34 files
+and rebuilt on every call; they became the fixed objects above.
 
 ---
 

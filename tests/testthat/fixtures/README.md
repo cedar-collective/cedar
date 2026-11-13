@@ -20,8 +20,10 @@ export instructions, scenario coverage, and examples of selecting cohort 1.
 
 Add reusable institutional scenarios here with an EC/XL/MC identifier and
 hand-worked expected values. Update affected numerical tests when a scenario
-changes. A single function's intermediate or deliberately malformed inputs may
-stay local to its test, as explained in the testing guide.
+changes. A single function's intermediate or deliberately malformed inputs are
+not institutional scenarios: they are fixed objects in `scenario_tables.R`, one
+section per test file, built once when `setup.R` sources it. Nothing there is a
+function, as explained in the testing guide.
 
 `create-test-fixtures.R` is an unused historical sampling recipe. Do not add
 records there or revive its binary fixtures.

@@ -157,5 +157,5 @@ test_that("the build check is the measure's, the currency check the class list's
                "build_course_terms")
   # Current for the class list it was counted over, not for another's codes.
   expect_true(course_terms_is_current(tbl, test_students_regstats))
-  expect_false(course_terms_is_current(tbl, rn01_course_tables()$cedar_registrations))
+  expect_false(course_terms_is_current(tbl, rn01_course_tables$cedar_registrations))
 })

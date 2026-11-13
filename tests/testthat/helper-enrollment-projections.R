@@ -94,42 +94,6 @@ projection_fixture_bundle <- function(target_term, as_of_term,
   )
 }
 
-empty_projection_test_waitlists <- function() {
-  tibble::tibble(
-    market_id = character(), subject_course = character(), term = integer(),
-    waitlisted = integer()
-  )
-}
-
-empty_projection_test_components <- function() {
-  tibble::tibble(
-    market_id = character(), campus = character(), college = character(),
-    department = character(), subject_course = character(),
-    part_term = character(), target_term = integer(),
-    target_term_label = character(), scheduled_sections = integer(),
-    scheduled_enrl = numeric(), scheduled_capacity = numeric(),
-    capacity_share = numeric(), prior_comparable_term = integer(),
-    prior_census_enrl = numeric(), prior_scheduled_capacity = numeric(),
-    prior_census_fill = numeric()
-  )
-}
-
-# No delivery campus rows: these inputs test the pooled market alone.
-empty_projection_test_delivery_sections <- function() {
-  tibble::tibble(
-    campus = character(), college = character(), subject_course = character(),
-    part_term = character(), term = integer(), scheduled_sections = integer(),
-    scheduled_capacity = numeric()
-  )
-}
-
-empty_projection_test_delivery_first_day <- function() {
-  tibble::tibble(
-    campus = character(), term = integer(), subject_course = character(),
-    first_day_enrl = numeric(), first_day_basis = character()
-  )
-}
-
 projection_summary_backtests <- function(
     projected = rep(110, 6), actual = rep(100, length(projected)),
     method_id = "seasonal_last", method_role = "observed_enrollment",

@@ -533,31 +533,53 @@ test_that("units are resolved only by attach_unit() and the lists layer (ADR-001
   architecture_expect_ratchet(measured, allowance, "unit resolution(s) outside attach_unit()")
 })
 
-test_that("a test file holds tests and a helper file holds definitions", {
-  # docs/developers/testing.md (Where test code lives): whatever tests share
-  # is defined in tests/testthat/helper-*.R, which testthat loads before every
-  # test file and a scratch session loads the same way. So a test file's top
-  # level is test_that() blocks, a helper's is definitions, and attaching a
-  # package or sourcing a file is helper-load-functions.R's alone. A definition
-  # in a test file reaches that file only, and a library() or source() there
-  # stays in effect for every file after it. Not a ratchet: the count is zero.
+test_that("a test file holds tests, a table is a fixed object, a helper is a tool", {
+  # docs/developers/testing.md (Where test code lives). A test file's top level
+  # is test_that() blocks. Every table a test reads is a fixed object, built
+  # once before any test runs: the designed fixtures, the tables setup.R
+  # derives from them, and fixtures/scenario_tables.R. A helper file
+  # (tests/testthat/helper-*.R) holds what a test does, never what it reads:
+  # functions and constants. Attaching a package or sourcing a file is
+  # helper-load-functions.R's alone. A definition in a test file reaches that
+  # file only, and a library() or source() there stays in effect for every file
+  # after it. Not a ratchet: each count is zero.
   dir <- file.path(cedar_base_dir, "tests", "testthat")
   test_files <- list.files(dir, "^test-.*\\.R$", full.names = TRUE)
   helper_files <- setdiff(list.files(dir, "^helper-.*\\.R$", full.names = TRUE),
                           file.path(dir, "helper-load-functions.R"))
   expect_gt(length(test_files), 80L)
-  expect_gt(length(helper_files), 40L)
+  expect_gt(length(helper_files), 30L)
   top_level <- function(files) do.call(rbind, lapply(files, architecture_top_level))
   describe <- function(rows) paste(sprintf("%s:%d %s", rows$file, rows$line, rows$what), collapse = "\n")
 
   in_tests <- top_level(test_files)
   stray <- in_tests[in_tests$kind != "test", ]
   expect(nrow(stray) == 0L, paste0(
-    "outside a test_that() block; move each to tests/testthat/helper-<topic>.R:\n", describe(stray)))
+    "outside a test_that() block; a table goes in fixtures/scenario_tables.R, ",
+    "a tool in tests/testthat/helper-<topic>.R:\n", describe(stray)))
 
   in_helpers <- top_level(helper_files)
   stray <- in_helpers[in_helpers$kind != "definition", ]
   expect(nrow(stray) == 0L, paste0(
     "a helper file runs something at load; define a function, or load it in ",
     "helper-load-functions.R:\n", describe(stray)))
+
+  # A function with no argument returns the same thing every call: fixed data
+  # written as a function. The exceptions do something and are listed by name.
+  no_args <- in_helpers[in_helpers$n_args %in% 0L, ]
+  stray <- no_args[!no_args$what %in% names(helper_actions_without_arguments), ]
+  expect(nrow(stray) == 0L, paste0(
+    "a helper function with no argument is a fixed table; make it an object in ",
+    "fixtures/scenario_tables.R:\n", describe(stray)))
+  gone <- setdiff(names(helper_actions_without_arguments), no_args$what)
+  expect(length(gone) == 0L, paste0(
+    "listed in helper_actions_without_arguments but no longer a helper function ",
+    "with no argument; remove from the list: ", paste(gone, collapse = ", ")))
+
+  scenario <- architecture_top_level(file.path(dir, "fixtures", "scenario_tables.R"))
+  expect_gt(nrow(scenario), 50L)
+  stray <- scenario[scenario$kind != "definition" | !is.na(scenario$n_args), ]
+  expect(nrow(stray) == 0L, paste0(
+    "fixtures/scenario_tables.R holds fixed objects only; a function is a helper:\n",
+    describe(stray)))
 })

@@ -3,12 +3,12 @@
 # NUTR 2110. Every expected number is pinned in the fixture header.
 
 test_that("HP02 settles as the header says", {
-  expect_equal(hp2_edges()$last_graded, 202080L)
-  expect_equal(hp2_edges()$last_enrolled_complete, 202110L)
-  expect_equal(nrow(hp2_population()), 12L)
-  expect_true(all(hp2_population()$outcome == "ongoing"))
-  expect_true(all(is.na(hp2_population()$relevant_until)))
-  entry <- setNames(hp2_population()$first_unit_term, hp2_population()$student_id)
+  expect_equal(hp2_edges$last_graded, 202080L)
+  expect_equal(hp2_edges$last_enrolled_complete, 202110L)
+  expect_equal(nrow(hp2_population), 12L)
+  expect_true(all(hp2_population$outcome == "ongoing"))
+  expect_true(all(is.na(hp2_population$relevant_until)))
+  entry <- setNames(hp2_population$first_unit_term, hp2_population$student_id)
   expect_equal(unname(entry[sprintf("HP2-P%02d", 1:8)]), rep(202010L, 8))
   expect_equal(unname(entry[sprintf("HP2-P%02d", 9:12)]), rep(202080L, 4))
 })
@@ -18,8 +18,8 @@ test_that("HP02 settles as the header says", {
 
 test_that("uptake counts takers, entry timing and suppresses small rows", {
   up <- get_population_course_uptake(
-    test_students_hp2, hp2_population(),
-    list(course = c(hp2_courses, "PHYS 1110"), data_edges = hp2_edges(), min_n = 2L)
+    test_students_hp2, hp2_population,
+    list(course = c(hp2_courses, "PHYS 1110"), data_edges = hp2_edges, min_n = 2L)
   )
   expect_equal(up$subject_course, c("BIOL 1140", "CHEM 1215"))
   expect_equal(up$campus, c("ABQ", "ABQ"))
@@ -48,9 +48,9 @@ test_that("uptake pins summer to the spring before it and stops at the settled e
   # P05's summer retake is a later take; the first take decides the timing.
   # With the edge moved back to Fall 2020, the Spring 2021 rows vanish:
   # CHEM 1215 keeps P01 and P02 only.
-  earlier <- modifyList(hp2_edges(), list(last_enrolled_complete = 202080L))
+  earlier <- modifyList(hp2_edges, list(last_enrolled_complete = 202080L))
   up <- get_population_course_uptake(
-    test_students_hp2, hp2_population(),
+    test_students_hp2, hp2_population,
     list(course = hp2_courses, data_edges = earlier, min_n = 1L)
   )
   chem <- up[up$subject_course == "CHEM 1215", ]
@@ -64,25 +64,25 @@ test_that("uptake keeps campus beside the course", {
   moved <- test_students_hp2 %>%
     mutate(campus = if_else(student_id == "HP2-P07" & term == 202110L, "GA", campus))
   up <- get_population_course_uptake(
-    moved, hp2_population(), list(course = "BIOL 1140", data_edges = hp2_edges(), min_n = 1L)
+    moved, hp2_population, list(course = "BIOL 1140", data_edges = hp2_edges, min_n = 1L)
   )
   expect_equal(up$campus, c("ABQ", "GA"))
   expect_equal(up$n_takers, c(11L, 1L))
   expect_equal(up$median_terms_after_entry, c(0, 2))
   scoped <- get_population_course_uptake(
-    moved, hp2_population(),
-    list(course = "BIOL 1140", campus = "ABQ", data_edges = hp2_edges(), min_n = 1L)
+    moved, hp2_population,
+    list(course = "BIOL 1140", campus = "ABQ", data_edges = hp2_edges, min_n = 1L)
   )
   expect_equal(scoped$campus, "ABQ")
 })
 
 test_that("uptake refuses to run without a settled edge or a course", {
   expect_error(
-    get_population_course_uptake(test_students_hp2, hp2_population(), list(course = "BIOL 1140")),
+    get_population_course_uptake(test_students_hp2, hp2_population, list(course = "BIOL 1140")),
     "last_enrolled_complete"
   )
   expect_error(
-    get_population_course_uptake(test_students_hp2, hp2_population(), list(data_edges = hp2_edges())),
+    get_population_course_uptake(test_students_hp2, hp2_population, list(data_edges = hp2_edges)),
     "course is required"
   )
 })
@@ -92,9 +92,9 @@ test_that("uptake refuses to run without a settled edge or a course", {
 
 test_that("retake timing classifies each DFW's first retake and holds out recent ones", {
   rt <- get_course_retake_timing(
-    hp2_attempts(), test_students_hp2,
-    list(course = "BIOL 1140", population_ids = hp2_population()$student_id,
-         data_edges = hp2_edges(), min_n = 1L)
+    hp2_attempts, test_students_hp2,
+    list(course = "BIOL 1140", population_ids = hp2_population$student_id,
+         data_edges = hp2_edges, min_n = 1L)
   )
   expect_equal(nrow(rt), 1L)
   expect_equal(rt$campus, "ABQ")
@@ -106,8 +106,8 @@ test_that("retake timing classifies each DFW's first retake and holds out recent
   expect_equal(rt$n_unobservable, 1L)        # P11's Fall 2020 DFW; its year ends 202180
 
   everyone <- get_course_retake_timing(
-    hp2_attempts(), test_students_hp2,
-    list(course = "BIOL 1140", data_edges = hp2_edges(), min_n = 1L)
+    hp2_attempts, test_students_hp2,
+    list(course = "BIOL 1140", data_edges = hp2_edges, min_n = 1L)
   )
   expect_equal(everyone$n_dfw, 5L)           # plus N02
   expect_equal(everyone$n_none_within_year, 2L)
@@ -115,14 +115,14 @@ test_that("retake timing classifies each DFW's first retake and holds out recent
 
 test_that("retake timing suppresses small rows and returns no rows without a DFW", {
   rt <- get_course_retake_timing(
-    hp2_attempts(), test_students_hp2,
-    list(course = "BIOL 1140", data_edges = hp2_edges(), min_n = 10L)
+    hp2_attempts, test_students_hp2,
+    list(course = "BIOL 1140", data_edges = hp2_edges, min_n = 10L)
   )
   expect_equal(nrow(rt), 0L)
   expect_equal(attr(rt, "suppressed")$n_dfw, 5L)
   none <- get_course_retake_timing(
-    hp2_attempts(), test_students_hp2,
-    list(course = "CHEM 1215", data_edges = hp2_edges(), min_n = 1L)
+    hp2_attempts, test_students_hp2,
+    list(course = "CHEM 1215", data_edges = hp2_edges, min_n = 1L)
   )
   expect_equal(nrow(none), 0L)
   expect_true(all(c("n_dfw", "n_next_regular", "n_unobservable") %in% names(none)))
@@ -130,13 +130,13 @@ test_that("retake timing suppresses small rows and returns no rows without a DFW
 
 test_that("retake timing needs the settled edge and agrees with the table's graded edge", {
   expect_error(
-    get_course_retake_timing(hp2_attempts(), test_students_hp2, list(course = "BIOL 1140")),
+    get_course_retake_timing(hp2_attempts, test_students_hp2, list(course = "BIOL 1140")),
     "last_enrolled_complete"
   )
   expect_error(
     get_course_retake_timing(
-      hp2_attempts(), test_students_hp2,
-      list(course = "BIOL 1140", data_edges = modifyList(hp2_edges(), list(last_graded = 202010L)))
+      hp2_attempts, test_students_hp2,
+      list(course = "BIOL 1140", data_edges = modifyList(hp2_edges, list(last_graded = 202010L)))
     ),
     "built to"
   )
@@ -147,7 +147,7 @@ test_that("retake timing needs the settled edge and agrees with the table's grad
 
 test_that("offering pattern counts seasons, parts of term, seats and first-day fill", {
   off <- get_course_offering_pattern(
-    hp2_course_terms(), list(course = hp2_courses, data_edges = hp2_edges(), n_years = 3L)
+    hp2_course_terms, list(course = hp2_courses, data_edges = hp2_edges, n_years = 3L)
   )
   expect_equal(attr(off, "window"), c(first = 202010L, last = 202110L))
   expect_true(all(off$campus == "ABQ"))
@@ -184,9 +184,9 @@ test_that("offering pattern counts seasons, parts of term, seats and first-day f
 })
 
 test_that("offering pattern stops at the settled edge and refuses an unknown fill", {
-  earlier <- modifyList(hp2_edges(), list(last_enrolled_complete = 202080L))
+  earlier <- modifyList(hp2_edges, list(last_enrolled_complete = 202080L))
   off <- get_course_offering_pattern(
-    hp2_course_terms(), list(course = "BIOL 1140", data_edges = earlier, n_years = 3L)
+    hp2_course_terms, list(course = "BIOL 1140", data_edges = earlier, n_years = 3L)
   )
   expect_equal(max(off$last_offered), 202080L)
   spring <- off[off$term_type == "spring", ]
@@ -196,9 +196,9 @@ test_that("offering pattern stops at the settled edge and refuses an unknown fil
   # a partial figure.
   blind <- test_sections_hp2 %>%
     mutate(available = if_else(crn == "HP2-B1140-SU20", NA_integer_, available))
-  blind_terms <- course_terms_for(test_students_hp2, blind, hp2_edges())
+  blind_terms <- course_terms_for(test_students_hp2, blind, hp2_edges)
   off <- get_course_offering_pattern(
-    blind_terms, list(course = "BIOL 1140", data_edges = hp2_edges())
+    blind_terms, list(course = "BIOL 1140", data_edges = hp2_edges)
   )
   summer <- off[off$term_type == "summer", ]
   expect_equal(summer$n_terms_offered, 1L)
@@ -209,11 +209,11 @@ test_that("offering pattern stops at the settled edge and refuses an unknown fil
 
 test_that("offering pattern requires a built table, a course and the edge", {
   expect_error(get_course_offering_pattern(test_sections_hp2, list(course = "BIOL 1140",
-                                                                   data_edges = hp2_edges())),
+                                                                   data_edges = hp2_edges)),
                "build_course_terms")
-  expect_error(get_course_offering_pattern(hp2_course_terms(), list(data_edges = hp2_edges())),
+  expect_error(get_course_offering_pattern(hp2_course_terms, list(data_edges = hp2_edges)),
                "course is required")
-  expect_error(get_course_offering_pattern(hp2_course_terms(), list(course = "BIOL 1140")),
+  expect_error(get_course_offering_pattern(hp2_course_terms, list(course = "BIOL 1140")),
                "last_enrolled_complete")
 })
 
@@ -222,8 +222,8 @@ test_that("offering pattern requires a built table, a course and the edge", {
 
 test_that("the payload joins the four measures on course and campus", {
   payload <- build_population_course_pressure(
-    hp2_population(), test_students_hp2, hp2_attempts(), hp2_course_terms(),
-    list(courses = hp2_courses, plan_courses = hp2_plans, data_edges = hp2_edges(),
+    hp2_population, test_students_hp2, hp2_attempts, hp2_course_terms,
+    list(courses = hp2_courses, plan_courses = hp2_plans, data_edges = hp2_edges,
          min_n = 2L, n_years = 3L, label = "Pre-nursing")
   )
   expect_s3_class(payload, "population_course_pressure")
@@ -264,21 +264,21 @@ test_that("the payload joins the four measures on course and campus", {
 
 test_that("the courses come from the plans when none are named", {
   payload <- build_population_course_pressure(
-    hp2_population(), test_students_hp2, hp2_attempts(), hp2_course_terms(),
-    list(plan_courses = hp2_plans, min_plans = 2L, data_edges = hp2_edges(), min_n = 2L)
+    hp2_population, test_students_hp2, hp2_attempts, hp2_course_terms,
+    list(plan_courses = hp2_plans, min_plans = 2L, data_edges = hp2_edges, min_n = 2L)
   )
   expect_equal(payload$meta$courses, "BIOL 1140")
   expect_equal(payload$courses$subject_course, "BIOL 1140")
   expect_error(
     build_population_course_pressure(
-      hp2_population(), test_students_hp2, hp2_attempts(), hp2_course_terms(),
-      list(plan_courses = hp2_plans, min_plans = 4L, data_edges = hp2_edges())
+      hp2_population, test_students_hp2, hp2_attempts, hp2_course_terms,
+      list(plan_courses = hp2_plans, min_plans = 4L, data_edges = hp2_edges)
     ),
     "No course is required by 4"
   )
   expect_error(
     build_population_course_pressure(
-      hp2_population(), test_students_hp2, hp2_attempts(), hp2_course_terms(),
+      hp2_population, test_students_hp2, hp2_attempts, hp2_course_terms,
       list(courses = "BIOL 1140")
     ),
     "data_edges"
@@ -287,8 +287,8 @@ test_that("the courses come from the plans when none are named", {
 
 test_that("the text preview rounds once and names every suppression", {
   payload <- build_population_course_pressure(
-    hp2_population(), test_students_hp2, hp2_attempts(), hp2_course_terms(),
-    list(courses = hp2_courses, plan_courses = hp2_plans, data_edges = hp2_edges(),
+    hp2_population, test_students_hp2, hp2_attempts, hp2_course_terms,
+    list(courses = hp2_courses, plan_courses = hp2_plans, data_edges = hp2_edges,
          min_n = 2L, label = "Pre-nursing")
   )
   text <- format_population_course_pressure(payload)

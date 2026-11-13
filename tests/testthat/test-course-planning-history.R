@@ -5,7 +5,7 @@
 
 test_that("Gen Ed suggestions retain season, campus and session and suppress small first-day cells", {
   h <- course_history(c("SOCI 100", "SOCI 101", "SOCI 104"))
-  x <- get_gen_ed_planning_options(test_sections_regstats, h, planning_gen_ed(), "fall", 3)
+  x <- get_gen_ed_planning_options(test_sections_regstats, h, planning_gen_ed, "fall", 3)
   social <- x[x$subject_course == "SOCI 100", ]
   expect_equal(nrow(social), 3L)
   expect_equal(social$first_day_enrl[social$campus == "ABQ" & social$part_term == "1"], 107)
@@ -15,17 +15,17 @@ test_that("Gen Ed suggestions retain season, campus and session and suppress sma
   expect_true(all(x$term <= history_edges$last_enrolled_complete))
   expect_true(all(x$term %% 100 == 80))
   expect_false(anyDuplicated(x[c("campus", "subject_course", "college", "part_term")]) > 0L)
-  spring <- get_gen_ed_planning_options(test_sections_regstats, h, planning_gen_ed(), "spring", 3)
+  spring <- get_gen_ed_planning_options(test_sections_regstats, h, planning_gen_ed, "spring", 3)
   expect_setequal(spring$term, 202010L)
   expect_true(all(spring$season_frequency == "1 of 1"))
   # An earlier source edge makes EA's small 2018 offering the latest one.
   early <- get_course_planning_history(test_sections_regstats, test_course_terms_regstats, "SOCI 100",
     list(last_enrolled_complete = 201880L))
-  small <- get_gen_ed_planning_options(test_sections_regstats, early, planning_gen_ed(), "fall", 3)
+  small <- get_gen_ed_planning_options(test_sections_regstats, early, planning_gen_ed, "fall", 3)
   expect_true(is.na(small$first_day_enrl[small$campus == "EA"]))
   expect_equal(small$pressure_status[small$campus == "EA"], "Suppressed (<10)")
   expect_error(get_gen_ed_planning_options(select(test_sections_regstats, -credits_min), h,
-    planning_gen_ed(), "fall", 3), "missing: credits_min")
+    planning_gen_ed, "fall", 3), "missing: credits_min")
 })
 
 test_that("course pressure retains campus, college and session and uses first-day capacity", {
@@ -92,7 +92,7 @@ test_that("a session not yet begun leaves the first day pending, with the begun 
   expect_equal(later$first_day_basis, "sessions_pending")
   expect_equal(later$first_day_started_enrl, 0L)
   # The table carries the same verdicts per session.
-  tbl <- pending_session_terms() %>% arrange(part_term)
+  tbl <- pending_session_terms %>% arrange(part_term)
   expect_equal(tbl$part_term, c("1", "2H"))
   expect_equal(tbl$first_day_basis, c("complete", "sessions_pending"))
   expect_equal(tbl$first_day_enrl, c(8L, NA_integer_))
@@ -104,7 +104,7 @@ test_that("a session not yet begun leaves the first day pending, with the begun 
   expect_equal(undated$first_day_basis, "undated")
   expect_true(is.na(undated$first_day_started_enrl))
   # Course history names the reason per session.
-  h <- get_course_planning_history(test_sections_pending_session, pending_session_terms(),
+  h <- get_course_planning_history(test_sections_pending_session, pending_session_terms,
     "SOCI 100", list(last_enrolled_complete = 202180L))
   expect_equal(h$pressure$pressure_status[h$pressure$part_term == "2H"], "Session not yet begun")
   expect_false(h$pressure$pressure_status[h$pressure$part_term == "1"] == "Session not yet begun")
@@ -136,7 +136,7 @@ test_that("a section with no start date is not reported as missing status dates"
   one_undated$registration_date[one_undated$registration_status_code %in% STATUS_REGISTERED][1] <- NA
   expect_equal(calc_first_day_enrl(one_undated, no_start)$first_day_basis, "undated")
   # Course history names the reason on the session it belongs to.
-  terms <- pending_session_terms() %>%
+  terms <- pending_session_terms %>%
     mutate(first_day_basis = if_else(part_term == "2H", "no_start_date", first_day_basis))
   h <- get_course_planning_history(no_start, terms, "SOCI 100",
     list(last_enrolled_complete = 202180L))
@@ -165,7 +165,7 @@ test_that("frequency includes observed source terms when a course was absent", {
 
 test_that("unmatched, implausible, small and missing capacity histories fail closed", {
   h <- course_history(c("SOCI 100", "SOCI 101", "SOCI 102", "SOCI 103", "SOCI 104"),
-    test_sections_course_history, course_history_terms())
+    test_sections_course_history, course_history_terms)
   p <- h$pressure
   expect_false(any(p$subject_course == "SOCI 102" & p$term == 202080L))
   expect_true(is.na(p$capacity[p$subject_course == "SOCI 103" & p$term == 202080L]))

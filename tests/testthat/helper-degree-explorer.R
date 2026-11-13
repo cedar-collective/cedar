@@ -1,24 +1,12 @@
 # What the tests in test-degree-explorer.R share: builders, option lists, constants.
 
-# Public-source ingestion uses an authored catalog fixture, just like the demo
-# CSVs setup.R reads. It models nested alternatives/bundles, a prose condition, an
-# unlabeled minor, an excluded graduate credential, and cyclic course links.
-scan_fixture <- function() read_source_json(file.path(cedar_institution_dir(cedar_base_dir, "demo"), "catalog-source-fixture.json"))
-
-scan_config <- function() {
-  dir <- cedar_institution_dir(cedar_base_dir, "demo")
-  list(source = as.list(read_institution_file("catalog_scan_sources", dir)[1, ]),
-    credentials = read_institution_file("catalog_scan_credentials", dir),
-    fields = read_institution_file("catalog_scan_fields", dir))
-}
-
-scan_fetcher <- function(fixture = scan_fixture(), observer = function(url) NULL) {
+scan_fetcher <- function(fixture = scan_fixture, observer = function(url) NULL) {
   force(fixture)
   function(url) {
     observer(url)
-    base <- scan_config()$source$api_base
+    base <- scan_config$source$api_base
     edition <- fixture$edition$`_id`
-    if (identical(url, scan_config()$source$landing_url)) {
+    if (identical(url, scan_config$source$landing_url)) {
       bytes <- charToRaw(paste0("<script>window.catalogId='", edition, "'</script>"))
     } else {
       path <- substring(url, nchar(base) + 1L)
@@ -56,7 +44,7 @@ normalization_proposal <- function(request) {
 }
 
 normalization_fixture <- function(root) {
-  config <- scan_config(); capture <- file.path(root, "captures", "designed")
+  config <- scan_config; capture <- file.path(root, "captures", "designed")
   capture_degree_catalog(config$source, config$credentials, config$fields, capture, fetch = scan_fetcher(), pause = 0)
   analyze_degree_catalog(capture)
   payload <- load_catalog_review(dirname(capture), "designed/analysis")

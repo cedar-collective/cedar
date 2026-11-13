@@ -364,7 +364,7 @@ test_that("a college-specific row wins in its college: the branch campuses", {
 
 test_that("major_to_dept and premajor_leads_to are read from programs.csv", {
   skip_if_no_lookups()
-  pr <- unm_programs()
+  pr <- unm_programs
   every <- pr[pr$status == "confirmed" & !nzchar(pr$in_college) & nzchar(pr$unit_code), ]
   expect_equal(unname(major_to_dept[every$program_code]), every$unit_code)
   expect_setequal(names(major_to_dept), every$program_code)
@@ -859,7 +859,7 @@ test_that("the text-map validator reports every problem at once", {
 # guard the one function that resolves a unit and the two rules it wraps.
 
 test_that("dims wraps the validated mapping files, and refuses anything else", {
-  dims <- demo_dims()
+  dims <- demo_dims
   expect_s3_class(dims, "cedar_dims")
   expect_setequal(names(dims), c("colleges", "units", "subjects", "programs", "code_history", "settings"))
   expect_error(validate_cedar_dims(unclass(dims)), "build_cedar_dims")
@@ -869,7 +869,7 @@ test_that("dims wraps the validated mapping files, and refuses anything else", {
 })
 
 test_that("attach_unit() reproduces the subject rule under the readers' column names", {
-  dims <- demo_dims()
+  dims <- demo_dims
   # The designed sections as the fact table keeps them: subject, the source's
   # college and the level are keys; the unit columns are what attach adds.
   rows <- test_sections %>% select(-department) %>% rename(source_college = college)
@@ -979,7 +979,7 @@ test_that("attach_unit() reproduces the program rule, and a student's college fo
 })
 
 test_that("attach_default_units() replaces whatever a file stamped and keeps the table's attributes", {
-  dims <- demo_dims()
+  dims <- demo_dims
   stamped <- test_sections %>%
     mutate(source_college = college, department = "WRONG", college = "WRONG", college_basis = "x")
   attr(stamped, "cedar_example_stamp") <- list(combined = "abc")

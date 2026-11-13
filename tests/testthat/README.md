@@ -26,7 +26,8 @@ Rscript --vanilla -e "testthat::test_file('tests/testthat/test-filtering.R')"
 
 ## Key Files
 
-- `setup.R` - Loads the fixtures and the tables built from them, and defines `create_test_opt()`
-- `helper-*.R` - Everything else tests share: builders, option lists and constants in `helper-<topic>.R`, scenario edges in `helper-scenario-edges.R`, packages and sourced files in `helper-load-functions.R`. A `test-*.R` file holds `test_that()` blocks only ([where test code lives](../../docs/developers/testing.md#where-test-code-lives))
-- `fixtures/designed_test_data.R` - Hand-crafted test data with known values — the single source of all test data
+- `setup.R` - Loads the fixtures, builds the tables derived from them, sources the scenario tables, and defines `create_test_opt()`
+- `helper-*.R` - What a test does, never what it reads: functions that run the code under test, build a variant from arguments or write a temporary file, with ids and option lists, in `helper-<topic>.R`; scenario edges in `helper-scenario-edges.R`; packages and sourced files in `helper-load-functions.R`. A `test-*.R` file holds `test_that()` blocks only ([where test code lives](../../docs/developers/testing.md#where-test-code-lives))
+- `fixtures/designed_test_data.R` - Hand-crafted test data with known values: the test database
+- `fixtures/scenario_tables.R` - The fixed tables one test file reads, typed by hand or derived once from the database; no functions
 - `create-test-fixtures.R` - Legacy real-data sampling script; not part of the test pipeline (see its header)

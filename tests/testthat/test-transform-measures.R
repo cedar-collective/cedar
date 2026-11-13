@@ -13,7 +13,7 @@ test_that("transform_measures() builds the three tables the app loads, as the ap
   dir <- withr::local_tempdir()
   write_saved_fixtures(dir)
   min_term <- min(test_students$term)
-  edges <- fixture_edges()
+  edges <- fixture_edges
 
   # Without an edge it fails closed on these fixtures, as the refresh would.
   expect_error(suppressMessages(env$transform_measures(dir, ".qs", min_term = min_term, dims = test_dims)),
@@ -188,7 +188,7 @@ test_that("the measure tables are stale when missing, older than the class list,
 # never builds.
 test_that("the app refuses a measure table that is missing, older than the class list, from other mapping files, another first term or another build", {
   dir <- withr::local_tempdir()
-  edges <- fixture_edges()
+  edges <- fixture_edges
   attempts <- attempts_for(test_students, edges)
   attr(attempts, "cedar_dims_fingerprint") <- cedar_dims_fingerprint(test_dims)
   attr(attempts, "cedar_min_term") <- 201980L

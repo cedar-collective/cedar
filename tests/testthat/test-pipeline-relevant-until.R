@@ -39,8 +39,8 @@ context("Pipeline: relevant_until enrollment window restriction")
 # =============================================================================
 
 test_that("relevant_until filter removes STU_BOUNDED records after 202480", {
-  pop      <- make_pipeline_population()
-  students <- make_pipeline_students()
+  pop      <- pipeline_population
+  students <- pipeline_students
   filtered <- apply_pathways_population_window(students, pop)
 
   bounded_terms <- filtered$term[filtered$student_id == "STU_BOUNDED"]
@@ -50,8 +50,8 @@ test_that("relevant_until filter removes STU_BOUNDED records after 202480", {
 })
 
 test_that("relevant_until filter keeps all STU_ONGOING records (NA window)", {
-  pop      <- make_pipeline_population()
-  students <- make_pipeline_students()
+  pop      <- pipeline_population
+  students <- pipeline_students
   filtered <- apply_pathways_population_window(students, pop)
 
   ongoing_terms <- filtered$term[filtered$student_id == "STU_ONGOING"]
@@ -61,17 +61,17 @@ test_that("relevant_until filter keeps all STU_ONGOING records (NA window)", {
 })
 
 test_that("relevant_until filter removes exactly one row (STU_BOUNDED at 202510)", {
-  pop      <- make_pipeline_population()
-  students <- make_pipeline_students()
+  pop      <- pipeline_population
+  students <- pipeline_students
   filtered <- apply_pathways_population_window(students, pop)
 
   expect_equal(nrow(filtered), nrow(students) - 1L)
 })
 
 test_that("relevant_until filter with all-NA population is a no-op", {
-  pop_all_na <- make_pipeline_population() %>%
+  pop_all_na <- pipeline_population %>%
     dplyr::mutate(relevant_until = NA_integer_)
-  students <- make_pipeline_students()
+  students <- pipeline_students
   filtered <- apply_pathways_population_window(students, pop_all_na)
 
   expect_equal(nrow(filtered), nrow(students))
@@ -83,8 +83,8 @@ test_that("relevant_until filter with all-NA population is a no-op", {
 # =============================================================================
 
 test_that("pipeline: ENGL 1110 at RT3 has n_students=1 after relevant_until filter", {
-  pop      <- make_pipeline_population()
-  students <- make_pipeline_students()
+  pop      <- pipeline_population
+  students <- pipeline_students
   filtered <- apply_pathways_population_window(students, pop)
 
   result <- get_course_timing(
@@ -101,8 +101,8 @@ test_that("pipeline: ENGL 1110 at RT3 has n_students=1 after relevant_until filt
 })
 
 test_that("pipeline: without filter ENGL 1110 at RT3 would have n_students=2", {
-  pop      <- make_pipeline_population()
-  students <- make_pipeline_students()
+  pop      <- pipeline_population
+  students <- pipeline_students
 
   # Unfiltered — both students reach RT3
   result <- get_course_timing(
@@ -118,8 +118,8 @@ test_that("pipeline: without filter ENGL 1110 at RT3 would have n_students=2", {
 })
 
 test_that("pipeline: BIOL 2310 at RT2 still has n_students=2 after filter (202480 within window)", {
-  pop      <- make_pipeline_population()
-  students <- make_pipeline_students()
+  pop      <- pipeline_population
+  students <- pipeline_students
   filtered <- apply_pathways_population_window(students, pop)
 
   result <- get_course_timing(
@@ -135,8 +135,8 @@ test_that("pipeline: BIOL 2310 at RT2 still has n_students=2 after filter (20248
 })
 
 test_that("pipeline: CHEM 1215 at RT1 still has n_students=2 after filter (202410 within window)", {
-  pop      <- make_pipeline_population()
-  students <- make_pipeline_students()
+  pop      <- pipeline_population
+  students <- pipeline_students
   filtered <- apply_pathways_population_window(students, pop)
 
   result <- get_course_timing(
@@ -152,8 +152,8 @@ test_that("pipeline: CHEM 1215 at RT1 still has n_students=2 after filter (20241
 })
 
 test_that("pipeline: n_eligible at RT3 drops from 2 to 1 after relevant_until filter", {
-  pop      <- make_pipeline_population()
-  students <- make_pipeline_students()
+  pop      <- pipeline_population
+  students <- pipeline_students
   filtered <- apply_pathways_population_window(students, pop)
 
   result_filtered   <- get_course_timing(

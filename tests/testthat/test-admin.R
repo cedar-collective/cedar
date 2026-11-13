@@ -111,7 +111,7 @@ test_that("loading overlays embed learned ranges before a report can block", {
 # ── Admin > Mappings: programs.csv rows awaiting a decision ──────────────────
 
 test_that("the program queue merges proposed rows with today's issues, most students first", {
-  res <- build_program_mapping_queue(review_files(), test_programs_hp, review_issues(),
+  res <- build_program_mapping_queue(review_files, test_programs_hp, review_issues,
                                      known_units = c("NURS", "RADS", "MEDL", "BIOL"))
   q <- res$queue
   expect_equal(q$program_code, c("FRAD", "NOFILE", "ZZZZ"))
@@ -120,8 +120,8 @@ test_that("the program queue merges proposed rows with today's issues, most stud
   expect_equal(q$today, c("FRAD (phantom)", "none", "none"))
   expect_equal(q$problem, c("pre-major mapped to itself", "far more majors than graduates", NA))
   expect_equal(q$problem_detail[1], "pre-major maps to itself")
-  bad <- review_issues(); bad$issue_type[1] <- "new_screen"
-  expect_error(build_program_mapping_queue(review_files(), test_programs_hp, bad, "NURS"),
+  bad <- review_issues; bad$issue_type[1] <- "new_screen"
+  expect_error(build_program_mapping_queue(review_files, test_programs_hp, bad, "NURS"),
                "No Problem label for issue type\\(s\\): new_screen")
   expect_equal(q$basis, c("inherited", "no row in programs.csv", "unresolved"))
   expect_equal(q$program_name[2], "Banner program BA-NOFILE-AS")
@@ -130,8 +130,8 @@ test_that("the program queue merges proposed rows with today's issues, most stud
                c("https://github.com/org/repo/blob/main/institution/x/programs.csv?plain=1#L3",
                  NA, "https://github.com/org/repo/blob/main/institution/x/programs.csv?plain=1#L4"))
   expect_equal(res$n_decided_issues, 1L)
-  expect_error(build_program_mapping_queue(review_files(), dplyr::select(test_programs_hp, -term),
-                                           review_issues(), "NURS"),
+  expect_error(build_program_mapping_queue(review_files, dplyr::select(test_programs_hp, -term),
+                                           review_issues, "NURS"),
                "cedar_programs lacks term")
 })
 
@@ -163,7 +163,7 @@ test_that("the mapping work list separates decisions from problems no mapping fi
     file = c("subjects", "programs", "programs", "programs", "programs", "programs", "units"),
     line = c(NA, 2L, 5L, NA, NA, NA, 4L))
   sd <- data.frame(source_name = "Catch-all", unit_code = "", kind = "bucket", notes = "")
-  w <- build_mapping_worklist(c(review_files(), list(
+  w <- build_mapping_worklist(c(review_files, list(
     units = data.frame(unit_code = c("NURS", "RADS", "MEDL", "BIOL"),
                        unit_name = c("Nursing", "Radiologic Sciences", "Medical Lab", "Biology"),
                        college_code = "", kind = "department", notes = ""),
@@ -172,7 +172,7 @@ test_that("the mapping work list separates decisions from problems no mapping fi
     subjects = data.frame(
     subject_code = character(), in_college = character(), in_level = character(),
     unit_code = character(), college_code = character(), status = character(),
-    evidence = character(), notes = character()))), test_programs_hp, review_issues(), audit, sd)
+    evidence = character(), notes = character()))), test_programs_hp, review_issues, audit, sd)
   # FRAD is a pre-major in the file; ZZZZ has no program rows to say more.
   expect_setequal(paste(w$decisions$kind, w$decisions$code),
                   c("Program (pre-major) FRAD", "Program ZZZZ", "Course subject BIOL",
@@ -213,7 +213,7 @@ test_that("the mapping work list separates decisions from problems no mapping fi
 # proposed) plus a no_unit program and a branch-only row, and subjects with an
 # every-college row and a college- and level-specific one.
 test_that("the mapping reference tables carry every confirmed row, with names", {
-  files <- review_files()
+  files <- review_files
   files$programs <- rbind(files$programs, data.frame(
     program_code = c("NOND", "BADM"), in_college = c("", "AD"),
     program_name = c("Non-Degree", "Business Administration"),
@@ -253,7 +253,7 @@ test_that("the mapping reference tables carry every confirmed row, with names", 
 # reference-table files above, with HLED's every-college and AD-only rows, a
 # proposed subject that must not appear, and a pre-major leading to NURS.
 test_that("a unit's scope names every confirmed subject and program row behind it", {
-  files <- review_files()
+  files <- review_files
   files$programs <- rbind(files$programs, data.frame(
     program_code = c("FNRS", "BADM"), in_college = c("", "AD"),
     program_name = c("Pre-Nursing", "Business Administration"),
@@ -287,8 +287,8 @@ test_that("a unit's scope names every confirmed subject and program row behind i
 })
 
 test_that("counting rules report what each touches in the loaded tables", {
-  t <- counting_rule_tables()
-  files <- review_files()
+  t <- counting_rule_tables
+  files <- review_files
   files$subjects <- data.frame(subject_code = c("HIST", "HIST"), in_level = c("", "grad"))
   rules <- build_counting_rules(files, t$programs, t$sections, t$students, t$student_terms)
   affects <- stats::setNames(rules$affects, rules$rule)
@@ -315,7 +315,7 @@ test_that("counting rules report what each touches in the loaded tables", {
 })
 
 test_that("the campus table lists every defined code and any the data adds", {
-  t <- counting_rule_tables()
+  t <- counting_rule_tables
   campuses <- build_campus_reference(t$sections, t$students, t$student_terms)
   expect_equal(head(campuses$campus, 3), c("ABQ", "EA", "GA"))
   zz <- campuses[campuses$campus == "ZZ", ]
@@ -363,7 +363,7 @@ test_that("a suggestion's confidence follows the evidence the assistant recorded
 #   SOCI 250 -> SOCI 2315: the schedule never lists SOCI 250 (it says SOC 250).
 test_that("the code history lists every succession with when each code was offered", {
   files <- read_institution_mappings(cedar_institution_dir(cedar_base_dir, "demo"))
-  sections <- rn01_course_tables()$cedar_sections
+  sections <- rn01_course_tables$cedar_sections
   got <- build_code_history_table(files, sections)
 
   expect_equal(got$from_code, c("PHIL 150", "SOC", "HIST 320", "SOCI 250"))

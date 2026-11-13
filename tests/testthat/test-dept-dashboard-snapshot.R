@@ -386,7 +386,7 @@ test_that("the dashboard follows a renumbered course instead of calling it new (
   # Spring 2021, a confirmed renumbering. Read by code, Spring 2021 shows
   # HIST 3201 as new. (Missing-from-earlier compares the same term two years
   # back, which RN01 does not reach.)
-  rn <- rn01_course_tables()
+  rn <- rn01_course_tables
   objects <- list(cedar_programs = test_programs, cedar_registrations = rn$cedar_registrations,
                   cedar_student_terms = attach_test_student_terms(suppressMessages(build_student_terms(
                     test_students_rn, programs = NULL,

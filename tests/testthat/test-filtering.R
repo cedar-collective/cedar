@@ -522,7 +522,7 @@ test_that("the excluded-course list removes a course by any code it carries on a
   # one course (SOCI 371). A list naming the old code removes the whole course
   # from a loaded table, keyed on the course, and only the old code's row from
   # the table as saved.
-  rn <- rn01_course_tables()
+  rn <- rn01_course_tables
   keyed <- rn$cedar_sections
   sections <- test_sections_rn
   expect_equal(excluded_course_ids(keyed, excl = "soc  371"), c("SOC 371", "SOCI 371"))

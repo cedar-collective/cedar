@@ -200,20 +200,20 @@ test_that("coalesce fallback fires for a course absent from counts", {
 context("filter_downstream_by_dept")
 
 test_that("returns full data frame unchanged when dept is empty", {
-  df <- make_downstream()
+  df <- downstream_flows
   result <- filter_downstream_by_dept(df, character(0), test_sections)
   expect_equal(nrow(result), nrow(df))
   expect_equal(result, df)
 })
 
 test_that("returns full data frame unchanged when dept is NULL", {
-  df <- make_downstream()
+  df <- downstream_flows
   result <- filter_downstream_by_dept(df, NULL, test_sections)
   expect_equal(nrow(result), nrow(df))
 })
 
 test_that("returns empty data frame unchanged", {
-  empty_df <- make_downstream()[0, ]
+  empty_df <- downstream_flows[0, ]
   result <- filter_downstream_by_dept(empty_df, c("HIST"), test_sections)
   expect_equal(nrow(result), 0)
 })
@@ -224,7 +224,7 @@ test_that("returns NULL unchanged", {
 })
 
 test_that("filters to dest_courses in dept's subjects", {
-  df <- make_downstream()
+  df <- downstream_flows
 
   # HIST department teaches HIST courses → keep only dest_course starting with "HIST"
   result <- filter_downstream_by_dept(df, c("HIST"), test_sections)
@@ -235,7 +235,7 @@ test_that("filters to dest_courses in dept's subjects", {
 })
 
 test_that("multi-dept filter keeps destinations in any of the depts", {
-  df <- make_downstream()
+  df <- downstream_flows
 
   result <- filter_downstream_by_dept(df, c("HIST", "ANTH"), test_sections)
   dest_subjects <- sub(" .*", "", result$dest_course)
@@ -244,7 +244,7 @@ test_that("multi-dept filter keeps destinations in any of the depts", {
 })
 
 test_that("preserves all columns in the filtered result", {
-  df <- make_downstream()
+  df <- downstream_flows
   result <- filter_downstream_by_dept(df, c("MATH"), test_sections)
   expect_equal(names(result), names(df))
 })

@@ -130,12 +130,38 @@ architecture_top_level <- function(file) {
     else if (nzchar(heads[[i]])) paste0(heads[[i]], "()")
     else "a bare value"
   }, character(1))
+  # A definition's arguments: NA for an object, 0 for `function()`.
+  n_args <- vapply(seq_along(exprs), function(i) {
+    if (!heads[[i]] %in% c("<-", "=", "<<-")) return(NA_integer_)
+    value <- exprs[[i]][[3]]
+    if (is.call(value) && identical(value[[1]], as.name("function"))) length(value[[2]]) else NA_integer_
+  }, integer(1))
   data.frame(
     file = rep(basename(file), length(exprs)),
     line = vapply(attr(exprs, "srcref"), function(ref) ref[[1]], integer(1)),
     what = what,
     kind = ifelse(heads %in% c("test_that", "context", "testthat::local_edition"), "test",
                   ifelse(heads %in% c("<-", "=", "<<-"), "definition", "call")),
+    n_args = n_args,
     stringsAsFactors = FALSE
   )
 }
+
+# The helper functions that take no argument. A function with no argument
+# returns the same thing every call, so a table written as one is fixed data
+# and belongs in fixtures/scenario_tables.R as an object. These are not tables:
+# each does something when a test calls it. The list may only get shorter.
+helper_actions_without_arguments <- c(
+  skip_if_no_catalogs       = "skips the test",
+  skip_if_no_lookups        = "skips the test",
+  load_r_environment_script = "sources scripts/r-environment.R into a fresh environment",
+  load_transform_helpers    = "sources the transform into a fresh environment",
+  projection_request_runner = "sources the projection build script",
+  make_shared_rule_artifact = "writes rule files to a temporary directory",
+  st01                      = "runs build_student_terms(), the function under test",
+  ch_result                 = "runs credit_hours_by_major(), the function under test",
+  ids_result                = "runs check_student_id_integrity(), the function under test",
+  gpa_timeline              = "runs build_gpa_timeline(), the function under test",
+  pcc_changes               = "runs detect_major_changes(), tested in the same file",
+  gg_population             = "runs get_gen_ed_grad_cohort(), tested in the same file"
+)

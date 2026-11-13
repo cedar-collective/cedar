@@ -65,7 +65,7 @@ test_that("credit_hours_by_major takes its home major codes from the caller (M12
     "major_codes"
   )
 
-  terms <- ch_student_terms_with_majors()
+  terms <- ch_student_terms_with_majors
   run  <- function(codes, st = terms, rows = test_students) {
     credit_hours_by_major(rows, test_sections, "HIST", codes, cedar_report_start_term, cedar_report_end_term,
                           student_terms = st, include_all_ug = FALSE, include_wide_table = FALSE)
@@ -84,7 +84,7 @@ test_that("credit_hours_by_major takes its home major codes from the caller (M12
 })
 
 test_that("credit_hours_by_major reads each row's major off the student-term table, named by the caller", {
-  terms <- ch_student_terms_with_majors()
+  terms <- ch_student_terms_with_majors
   run  <- function(codes, st = terms, rows = test_students, names = NULL) {
     credit_hours_by_major(rows, test_sections, "HIST", codes, cedar_report_start_term, cedar_report_end_term,
                           student_terms = st, major_names = names,

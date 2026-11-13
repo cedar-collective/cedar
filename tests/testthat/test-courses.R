@@ -1,9 +1,9 @@
 # The course dimension (ADR-001 step 4): one course_id per code, through the
 # confirmed successions in institution/<id>/code_history.csv. Fixtures: RN01
-# (designed_test_data.R) read with the demo institution's file (demo_dims()).
+# (designed_test_data.R) read with the demo institution's file (demo_dims).
 
 test_that("every code gets one course_id, following confirmed successions step by step", {
-  cc <- suppressMessages(build_cedar_courses(test_sections_rn, test_students_rn, demo_dims()))
+  cc <- suppressMessages(build_cedar_courses(test_sections_rn, test_students_rn, demo_dims))
   expect_s3_class(cc, "cedar_courses")
   codes <- cc$codes
   expect_equal(names(codes), CEDAR_COURSE_CODES_COLUMNS)
@@ -33,7 +33,7 @@ test_that("every code gets one course_id, following confirmed successions step b
 })
 
 test_that("a course's row spans every code it has carried", {
-  cc <- suppressMessages(build_cedar_courses(test_sections_rn, test_students_rn, demo_dims()))
+  cc <- suppressMessages(build_cedar_courses(test_sections_rn, test_students_rn, demo_dims))
   courses <- cc$courses
   expect_equal(names(courses), CEDAR_COURSES_COLUMNS)
   expect_equal(nrow(courses), 7L)
@@ -54,14 +54,14 @@ test_that("a course's row spans every code it has carried", {
 })
 
 test_that("the main fixtures build one course per code: the demo file touches none of them", {
-  cc <- suppressMessages(build_cedar_courses(test_sections, test_students, demo_dims()))
+  cc <- suppressMessages(build_cedar_courses(test_sections, test_students, demo_dims))
   expect_equal(nrow(cc$courses), nrow(cc$codes))
   expect_true(all(cc$codes$steps == 0L))
   expect_setequal(cc$codes$subject_course, union(test_sections$subject_course, test_students$subject_course))
 })
 
 test_that("attach_course_ids keys each table on the course, the registrar's code in listed_code", {
-  cc <- suppressMessages(build_cedar_courses(test_sections_rn, test_students_rn, demo_dims()))
+  cc <- suppressMessages(build_cedar_courses(test_sections_rn, test_students_rn, demo_dims))
   stale <- dplyr::mutate(test_sections_rn, course_id = "STALE")
   attr(stale, "cedar_provenance") <- "kept"
   out <- suppressMessages(attach_course_ids(
@@ -80,14 +80,14 @@ test_that("attach_course_ids keys each table on the course, the registrar's code
   again <- suppressMessages(attach_course_ids(out["cedar_sections"], cc))$cedar_sections
   expect_identical(again, secs)
   # The code-level functions read the registrar's code off a keyed table.
-  expect_equal(suppressMessages(build_cedar_courses(secs, out$cedar_registrations, demo_dims()))$codes, cc$codes)
+  expect_equal(suppressMessages(build_cedar_courses(secs, out$cedar_registrations, demo_dims))$codes, cc$codes)
   # A table with a code the dimension never saw is a stop, not an NA.
   expect_error(suppressMessages(attach_course_ids(list(cedar_sections = test_sections), cc)),
                "does not know")
 })
 
 test_that("resolve_course_codes refuses a malformed code and a cycle the validator missed", {
-  history <- demo_files()$code_history
+  history <- demo_files$code_history
   expect_error(resolve_course_codes(c("SOCI 371", "SOCI371"), history), "SUBJECT NUMBER")
   looped <- rbind(history,
                   data.frame(kind = "course", from_code = c("MATH 1", "MATH 2"), to_code = c("MATH 2", "MATH 1"),
@@ -97,7 +97,7 @@ test_that("resolve_course_codes refuses a malformed code and a cycle the validat
 })
 
 test_that("detect_course_renamings finds the shared section and the one-to-one title match", {
-  files <- demo_files()
+  files <- demo_files
   cand <- detect_course_renamings(test_sections_rn, test_students_rn, files)
   subj <- cand[cand$kind == "subject", ]
   expect_equal(nrow(subj), 1L)
@@ -123,7 +123,7 @@ test_that("detect_course_renamings finds the shared section and the one-to-one t
                   c("SOC SOCI", "HIST 320 HIST 3201", "PHIL 150 PHIL 1115"))
   # With only the subject rename confirmed, the two retired codes are one
   # course, and the renumbering is found under the resolved code.
-  files$code_history <- demo_files()$code_history
+  files$code_history <- demo_files$code_history
   files$code_history <- files$code_history[files$code_history$kind == "subject", ]
   one <- detect_course_renamings(test_sections_rn, test_students_rn, files)
   expect_true("SOCI 250 SOCI 2315" %in% paste(one$from_code, one$to_code))
@@ -132,7 +132,7 @@ test_that("detect_course_renamings finds the shared section and the one-to-one t
   # A file that joins the two sections' codes course by course (as UNM's joins
   # each CCST nnn to its CCS nnn, CCS staying the upper-division prefix) gets
   # no subject candidate for them.
-  history <- demo_files()$code_history
+  history <- demo_files$code_history
   history <- history[history$kind != "subject", ]
   files$code_history <- rbind(history, data.frame(
     kind = "course", from_code = c("SOC 371", "SOC 250"), to_code = c("SOCI 371", "SOCI 250"),
@@ -143,7 +143,7 @@ test_that("detect_course_renamings finds the shared section and the one-to-one t
 })
 
 test_that("course_id_of resolves any code a loaded table carries to its course", {
-  rn <- rn01_course_tables()
+  rn <- rn01_course_tables
   keyed <- rn$cedar_sections
   # Any code the course has carried names it; a code the table does not carry
   # is its own course.
@@ -169,7 +169,7 @@ test_that("course_id_of resolves any code a loaded table carries to its course",
 })
 
 test_that("course_former_code_spans names each course's former codes with their terms", {
-  rn <- rn01_course_tables()
+  rn <- rn01_course_tables
   spans <- course_former_code_spans(rn$cedar_registrations, rn$cedar_sections)
   expect_equal(spans$subject_course, c("HIST 3201", "SOCI 2315", "SOCI 371"))
   expect_equal(spans$former_codes, c(
@@ -189,7 +189,7 @@ test_that("course_former_code_spans names each course's former codes with their 
 })
 
 test_that("course_ids_of resolves picked codes, current or former, over a reader's tables", {
-  rn <- rn01_course_tables()
+  rn <- rn01_course_tables
   expect_equal(course_ids_of("SOC 250, HIST 3201", rn$cedar_sections, rn$cedar_registrations),
                c("SOCI 2315", "HIST 3201"))
   # Two codes of one course are one id.

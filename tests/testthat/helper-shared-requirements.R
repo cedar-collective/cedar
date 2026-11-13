@@ -39,28 +39,3 @@ make_shared_rule_artifact <- function() {
     file.path(directory, "gen-ed-course-memberships.csv"), row.names = FALSE)
   list(directory = directory, capture = capture, set = set, bundle = bundle, body = body)
 }
-
-# Derived planning/reference scaffolding: these invented memberships exercise
-# allocation against the existing demo roadmap. They are not UNM claims or new
-# student/section domain rows.
-planning_reference <- function() {
-  ref <- list(source_id = "page", pointer = "/body", anchor = "Designed policy")
-  area <- function(id, label, minimum, method = "listed_course", ...) c(list(
-    rule_id = paste0("example.", id), area = id, label = label, statement = label,
-    role = "gen_ed_area", minimum = minimum, planning_method = method, source_refs = list(ref)), list(...))
-  gen <- list(planning = list(preparation_rule_id = "example.prep",
-    completed_courses_by_english_start = list(complete = list("ENGL 1120")), note = "Designed illustrative policy."),
-    rules = list(
-      area("A", "Writing and communication", 6, planning_parts = list(
-        list(label = "Writing", minimum = 3, subject_courses = list("ENGL 1120")),
-        list(label = "Communication", minimum = 3, subject_courses = list("COMM 1130")))),
-      area("B", "Math", 3), area("C", "Science", 4, "related_science"),
-      area("F", "Flexible", 6, "distinct_areas", planning_course_count = 2),
-      list(rule_id = "example.prep", subject_courses = list("ENGL 1110", "ENGL 1110Y"))))
-  list(bundle = list(catalog_year = test_degree_catalog$catalogs$catalog_year[1], profiles = list(
-      list(catalog_id = "demo-biology-bs-2026", rule_set_ids = list("example")))),
-    sets = list(example = gen), provenance = list(sources = list(page = list(catalog_url = "https://example.invalid/policy"))),
-    memberships = data.frame(area = c("A", "B", "C", "C", "C", "C"),
-      subject_course = c("ENGL 1120", "MATH 1512", "CHEM 1215", "CHEM 1215L", "PHYS 1230", "PHYS 1230L"),
-      credits = c(3, 4, 3, 1, 3, 1)))
-}

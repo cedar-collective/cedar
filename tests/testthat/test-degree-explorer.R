@@ -194,7 +194,7 @@ test_that("versioned local drafts stage automatically without creating human app
 })
 
 test_that("catalog extraction preserves OR options containing AND course bundles", {
-  fixture <- scan_fixture()
+  fixture <- scan_fixture
   tree <- extract_catalog_rule_tree(fixture$programs$biology$degreeRequirements)
   choice <- tree$children[[1]]$children[[1]]
   expect_identical(tree$children[[1]]$operator, "all")
@@ -214,12 +214,12 @@ test_that("catalog extraction preserves OR options containing AND course bundles
   expect_true(qualified$requires_review)
   expect_error(validate_catalog_index(list()), "nonempty")
   bad <- fixture$index; bad[[1]]$degreeType$name <- "Unclassified new credential"
-  expect_error(catalog_program_scope(bad, scan_config()$credentials), "Unclassified degree types")
-  expect_error(catalog_program_scope(fixture$index, scan_config()$credentials["degree_type"]), "credential classification")
+  expect_error(catalog_program_scope(bad, scan_config$credentials), "Unclassified degree types")
+  expect_error(catalog_program_scope(fixture$index, scan_config$credentials["degree_type"]), "credential classification")
 })
 
 test_that("standard grade rules retain threshold, selection and nested course scope", {
-  fixture <- scan_fixture()
+  fixture <- scan_fixture
   all <- extract_catalog_rule_tree(fixture$courses$biolab$corequisites)
   expect_false(all$requires_review)
   rule <- all$children[[1]]
@@ -253,7 +253,7 @@ test_that("standard grade rules retain threshold, selection and nested course sc
 })
 
 test_that("catalog option wrappers preserve every group and distinguish headings from conditions", {
-  fixture <- scan_fixture()
+  fixture <- scan_fixture
   tree <- extract_catalog_rule_tree(fixture$parser_cases$wrapped_choice)
   choice <- tree$children[[1]]
   expect_false(tree$requires_review)
@@ -285,7 +285,7 @@ test_that("catalog option wrappers preserve every group and distinguish headings
 })
 
 test_that("standing milestones preserve literal statuses, exclusions and OR context", {
-  fixture <- scan_fixture()
+  fixture <- scan_fixture
   tree <- extract_catalog_rule_tree(fixture$courses$biolab$prerequisites)
   choice <- tree$children[[1]]
   expect_false(tree$requires_review)
@@ -309,7 +309,7 @@ test_that("standing milestones preserve literal statuses, exclusions and OR cont
 })
 
 test_that("program milestones resolve source links, retain policy evidence and share definitions", {
-  fixture <- scan_fixture(); config <- scan_config(); root <- tempfile("catalog-milestones-")
+  fixture <- scan_fixture; config <- scan_config; root <- tempfile("catalog-milestones-")
   out <- file.path(root, "capture")
   withr::defer(unlink(root, recursive = TRUE))
   capture_degree_catalog(config$source, config$credentials, config$fields, out, fetch = scan_fetcher(), pause = 0)
@@ -352,7 +352,7 @@ test_that("program milestones resolve source links, retain policy evidence and s
 })
 
 test_that("catalog capture inventories every entry and follows course links without looping", {
-  config <- scan_config(); out <- tempfile("catalog-capture-")
+  config <- scan_config; out <- tempfile("catalog-capture-")
   withr::defer(unlink(out, recursive = TRUE))
   capture_degree_catalog(config$source, config$credentials, config$fields, out, fetch = scan_fetcher(), pause = 0)
   manifest <- catalog_capture_manifest(out)
@@ -395,7 +395,7 @@ test_that("catalog capture inventories every entry and follows course links with
 })
 
 test_that("conflicting total-credit mentions are flagged without claiming which number is right", {
-  config <- scan_config()
+  config <- scan_config
   baseline <- tempfile("catalog-credits-baseline-")
   withr::defer(unlink(baseline, recursive = TRUE))
   capture_degree_catalog(config$source, config$credentials, config$fields, baseline, fetch = scan_fetcher(), pause = 0)
@@ -403,7 +403,7 @@ test_that("conflicting total-credit mentions are flagged without claiming which 
   clean_issues <- read.csv(file.path(baseline, "analysis", "source-issues.csv"))
   expect_false("total_credit_conflict" %in% clean_issues$issue)
 
-  conflicting <- scan_fixture()
+  conflicting <- scan_fixture
   conflicting$programs$biology$description <- "<p>Grand Total Credits: 130</p>"
   out <- tempfile("catalog-credits-conflict-")
   withr::defer(unlink(out, recursive = TRUE))
@@ -417,7 +417,7 @@ test_that("conflicting total-credit mentions are flagged without claiming which 
   expect_match(flagged$detail, "Grand Total Credits: 130", perl = TRUE)
   expect_match(flagged$detail, "does not say which number is correct", fixed = TRUE)
 
-  consistent <- scan_fixture()
+  consistent <- scan_fixture
   consistent$programs$biology$description <- "<p>Grand Total Credits: 120</p>"
   matched <- tempfile("catalog-credits-consistent-")
   withr::defer(unlink(matched, recursive = TRUE))
@@ -428,7 +428,7 @@ test_that("conflicting total-credit mentions are flagged without claiming which 
 })
 
 test_that("failed captures resume from verified bytes and tampering blocks extraction", {
-  config <- scan_config(); out <- tempfile("catalog-resume-")
+  config <- scan_config; out <- tempfile("catalog-resume-")
   withr::defer(unlink(out, recursive = TRUE))
   failed <- FALSE; calls <- character()
   observe <- function(url) {
@@ -450,7 +450,7 @@ test_that("failed captures resume from verified bytes and tampering blocks extra
 })
 
 test_that("catalog review connects flagged language to full immutable source context", {
-  config <- scan_config(); root <- tempfile("catalog-review-"); out <- file.path(root, "capture")
+  config <- scan_config; root <- tempfile("catalog-review-"); out <- file.path(root, "capture")
   withr::defer(unlink(root, recursive = TRUE))
   expect_equal(nrow(list_catalog_review_scans(root)), 0)
   capture_degree_catalog(config$source, config$credentials, config$fields, out, fetch = scan_fetcher(), pause = 0)
@@ -479,26 +479,26 @@ test_that("catalog review connects flagged language to full immutable source con
   admission <- filter_catalog_review(payload, kind = "Degree", phase = "Admission")$interpretation
   expect_equal(nrow(admission), 1)
   detail <- catalog_review_detail(payload, admission$item_id)
-  expect_identical(detail$source, scan_fixture()$programs$biology$graduateAdmissionsRequirements)
+  expect_identical(detail$source, scan_fixture$programs$biology$graduateAdmissionsRequirements)
   expect_equal(detail$item$source_pointer, "/graduateAdmissionsRequirements")
   expect_equal(detail$catalog_url, paste0(config$source$landing_url, "#/programs/biology"))
   concentration <- views$sections[views$sections$kind == "Concentration", ]
   detail <- catalog_review_detail(payload, concentration$item_id)
-  expect_identical(detail$source, scan_fixture()$programs$biology$specializations[[1]]$concentrationRequirements)
+  expect_identical(detail$source, scan_fixture$programs$biology$specializations[[1]]$concentrationRequirements)
   expect_equal(detail$item$source_pointer, "/specializations/0/concentrationRequirements")
   expect_match(detail$catalog_url, "#/programs/biology", fixed = TRUE)
   program <- views$sections[views$sections$kind == "Degree" & views$sections$phase == "Degree", ]
   detail <- catalog_review_detail(payload, program$item_id)
   expect_match(detail$tree, "Choose at least 1", fixed = TRUE)
   expect_match(detail$tree, "BIOL2110L", fixed = TRUE)
-  expect_identical(detail$source, scan_fixture()$programs$biology$degreeRequirements)
+  expect_identical(detail$source, scan_fixture$programs$biology$degreeRequirements)
   lab <- views$sections[views$sections$entity == "courses:course-lab" & views$sections$phase == "Corequisite", ]
   expect_match(catalog_review_detail(payload, lab$item_id)$tree, "[minimum grade C]", fixed = TRUE)
   expect_false(any(views$interpretation$entity == "courses:course-lab"))
   expect_identical(catalog_review_detail(payload, views$source$item_id)$source, FALSE)
   expect_error(load_catalog_review(root, "../elsewhere"), "Select an available")
   expect_error(catalog_review_detail(payload, "missing-id"), "Select one available")
-  expect_error(source_json_pointer(scan_fixture(), "/programs/biology/not-a-field"), "does not resolve")
+  expect_error(source_json_pointer(scan_fixture, "/programs/biology/not-a-field"), "does not resolve")
   # Early schema-1.0.0 analyses lack the later source-issues report. The same
   # source checks still run against frozen records; missing facts are not zeros.
   meta_path <- file.path(out, "analysis", "analysis-manifest.json")
@@ -534,10 +534,10 @@ test_that("catalog evidence renderer preserves nesting and cannot execute source
 })
 
 test_that("catalog comparisons separate choice changes, formatting and missing scope", {
-  config <- scan_config(); old <- tempfile("catalog-before-"); new <- tempfile("catalog-after-"); diff <- tempfile("catalog-diff-")
+  config <- scan_config; old <- tempfile("catalog-before-"); new <- tempfile("catalog-after-"); diff <- tempfile("catalog-diff-")
   withr::defer(unlink(c(old, new, diff), recursive = TRUE))
   capture_degree_catalog(config$source, config$credentials, config$fields, old, fetch = scan_fetcher(), pause = 0)
-  changed <- scan_fixture()
+  changed <- scan_fixture
   changed$edition$`_id` <- "demo-next-edition"
   changed$edition$title <- "2027-2028 Designed Catalog"
   changed$programs$biology$degreeRequirements <- sub("<span>1</span>", "<span>2</span>", changed$programs$biology$degreeRequirements, fixed = TRUE)
@@ -1101,7 +1101,7 @@ test_that("allowance popups disclose credit fit and exclude courses the plan alr
   remainder <- v$allowances$node_id[v$allowances$credits == 2]
   selection <- list(type = "allowance", catalog_id = BIOLOGY, math_start = "calculus",
     english_start = "composition", start_season = "fall", node_id = remainder)
-  membership <- rbind(planning_gen_ed(), data.frame(subject_course = c("MATH 1512", "ENGL 1120"),
+  membership <- rbind(planning_gen_ed, data.frame(subject_course = c("MATH 1512", "ENGL 1120"),
     area_label = c("2: Math", "1: Communication")))
   h <- build_degree_popup_history(test_sections_regstats, test_course_terms_regstats, history_edges,
     test_degree_catalog, test_degree_roadmaps, membership, selection)
@@ -1174,7 +1174,7 @@ test_that("popup history renders one standard table with first-day seats", {
   selection <- list(type = "allowance", catalog_id = BIOLOGY, math_start = "calculus",
     english_start = "composition", start_season = "fall", node_id = v$allowances$node_id[1])
   suggestions <- build_degree_popup_history(test_sections_regstats, test_course_terms_regstats, history_edges,
-    test_degree_catalog, test_degree_roadmaps, planning_gen_ed(), selection)
+    test_degree_catalog, test_degree_roadmaps, planning_gen_ed, selection)
   expect_s3_class(degree_allowance_table(suggestions), "reactable")
   html <- as.character(degree_allowance_history_ui(suggestions, "suggestion_table"))
   expect_match(html, "Fall course options", fixed = TRUE)

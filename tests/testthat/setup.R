@@ -147,17 +147,17 @@ rm(.stu)
 rm(.sec)
 # RN01 read with the demo institution's code_history.csv, as its tests read it:
 # both tables attached from one dimension built over both, as global.R does.
-rn01_course_tables <<- function(students = test_students_rn) {
+.rn_course_tables <- function(students) {
   dims <- build_cedar_dims(read_institution_mappings(cedar_institution_dir(cedar_base_dir, "demo")))
   courses <- suppressMessages(build_cedar_courses(test_sections_rn, students, dims))
   suppressMessages(attach_course_ids(
     list(cedar_sections = test_sections_rn, cedar_registrations = students), courses
   ))
 }
+rn01_course_tables <<- .rn_course_tables(test_students_rn)
 # RN02 rides on RN01: its class-list rows added to RN01's.
-rn02_course_tables <<- function() {
-  rn01_course_tables(dplyr::bind_rows(test_students_rn, test_students_rn02))
-}
+rn02_course_tables <<- .rn_course_tables(dplyr::bind_rows(test_students_rn, test_students_rn02))
+rm(.rn_course_tables)
 # Degree Explorer: the demo institution's designed catalog (institution/demo/),
 # two synthetic programs whose schedules are worked by hand in
 # test-degree-explorer.R. Independent of any real institution's annual catalog.
@@ -244,6 +244,14 @@ message(sprintf("  test_sections: %d rows (%d XL) | test_students: %d rows | tes
                 nrow(test_students), nrow(test_programs)))
 message(sprintf("  test_faculty:  %d rows | test_degrees:  %d rows",
                 nrow(test_faculty), nrow(test_degrees)))
+
+# -----------------------------------------------------------------------------
+# SCENARIO TABLES - the fixed tables one test file reads, each built once here
+# -----------------------------------------------------------------------------
+# Typed by hand or derived from the fixtures above; never a function. Sourced
+# into this environment, after the fixtures and measure tables it reads, so a
+# helper function can read a table and a table can use a helper's row builder.
+suppressMessages(source("fixtures/scenario_tables.R", local = TRUE))
 
 # Helper function to create standard opt list
 create_test_opt <- function(overrides = list()) {

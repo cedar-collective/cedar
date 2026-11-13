@@ -378,7 +378,7 @@ test_that("seatfinder parses single term correctly", {
 
 test_that("seatfinder keeps topic titles distinct without many-to-many repeats", {
   with_seatfinder_test_terms({
-    sections <- seatfinder_topic_sections()
+    sections <- seatfinder_topic_sections
     result <- seatfinder(
       seatfinder_grade_attempts(seatfinder_grade_students(sections)),
       sections,
@@ -428,7 +428,7 @@ test_that("seatfinder parses comma-separated terms correctly", {
 
 test_that("seatfinder filters gen ed courses correctly", {
   with_seatfinder_test_terms({
-    sections <- seatfinder_gen_ed_sections()
+    sections <- seatfinder_gen_ed_sections
     result <- seatfinder(
       seatfinder_grade_attempts(seatfinder_grade_students(sections)),
       sections,

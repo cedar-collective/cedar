@@ -114,7 +114,7 @@ test_that("missing columns and the class list's window options are explicit erro
     "missing required column"
   )
   # The class list itself is not the table.
-  expect_error(build_gpa_timeline(make_gpa_students()), "missing required column")
+  expect_error(build_gpa_timeline(gpa_students), "missing required column")
   expect_error(
     build_gpa_timeline(gpa_student_terms(), opt = list(min_data_term = 202010L)),
     "not an option it answers"

@@ -315,7 +315,7 @@ test_that("Course Dynamics groups both downstream questions under one top-level 
 })
 
 test_that("sequence effect uses one canonical Y outcome and scopes both courses", {
-  fixture <- .sequence_audit_fixture()
+  fixture <- .sequence_audit_fixture
   result <- suppressMessages(get_course_sequence_effect(
     fixture$students,
     keyed_attempts(fixture$students, .impact_edges),
@@ -342,7 +342,7 @@ test_that("sequence effect uses one canonical Y outcome and scopes both courses"
 })
 
 test_that("an active HS GPA band excludes and reports missing GPAs", {
-  fixture <- .sequence_audit_fixture()
+  fixture <- .sequence_audit_fixture
   applicants <- tibble::tibble(
     student_id = fixture$ids,
     high_school_cum_gpa = c(3.0, NA, 3.2, 2.8, NA)
@@ -367,7 +367,7 @@ test_that("an active HS GPA band excludes and reports missing GPAs", {
 })
 
 test_that("the control group splits into attempted-not-passed and never-sat X", {
-  result <- .run_sequence_bands(.sequence_band_fixture(), course_y = "SEQ 201")
+  result <- .run_sequence_bands(.sequence_band_fixture, course_y = "SEQ 201")
   expect_equal(result$n_treatment, 2L)
   expect_equal(result$n_control, 4L)
   # Every Y attempt is in Fall 2020: one term, both groups, rates over min_n = 1.
@@ -387,7 +387,7 @@ test_that("the sequence over time is one row per term, never per calendar year",
   # calendar year as everyone else's, another term type. By year the control
   # group would be 4 students at 25%; by term it is 1 in Spring (passed) and
   # 3 in Fall (SEQ_C1 and SEQ_XC passed, SEQ_F1 did not: 33.3%).
-  fixture <- .sequence_band_fixture()
+  fixture <- .sequence_band_fixture
   moved <- fixture$students$student_id == "SEQ_C2" & fixture$students$subject_course == "SEQ 201"
   expect_equal(sum(moved), 1L)
   fixture$students$term[moved] <- 202010L
@@ -403,7 +403,7 @@ test_that("the sequence over time is one row per term, never per calendar year",
 })
 
 test_that("outcomes are compared inside HS GPA bands and standardized to the treatment mix", {
-  fixture <- .sequence_band_fixture()
+  fixture <- .sequence_band_fixture
   result <- .run_sequence_bands(fixture, course_y = "SEQ 201", min_band_n = 1L)
   bands <- result$by_hs_gpa_band
   expect_equal(as.character(bands$band), c("2.76 to 3.25", "2.76 to 3.25", "not on file", "not on file"))
@@ -436,16 +436,16 @@ test_that("outcomes are compared inside HS GPA bands and standardized to the tre
 })
 
 test_that("an ACT window keeps both groups inside it and reports the students with no score", {
-  result <- .run_sequence_bands(.sequence_band_fixture(), course_y = "SEQ 201", act_min = 18)
+  result <- .run_sequence_bands(.sequence_band_fixture, course_y = "SEQ 201", act_min = 18)
   expect_equal(result$n_missing_act_excluded, 2L)
   expect_equal(result$n_treatment, 1L)
   expect_equal(result$n_control, 2L)
-  no_app <- .sequence_band_fixture(); no_app["applicants"] <- list(NULL)
+  no_app <- .sequence_band_fixture; no_app["applicants"] <- list(NULL)
   expect_error(.run_sequence_bands(no_app, course_y = "SEQ 201", act_min = 18), "ACT window")
 })
 
 test_that("several later-course codes are one course: each student once, at the earliest attempt", {
-  fixture <- .sequence_band_fixture()
+  fixture <- .sequence_band_fixture
   family <- .run_sequence_bands(fixture, course_y = c("SEQ 201", "SEQ 201X"))
   expect_equal(family$course_y, c("SEQ 201", "SEQ 201X"))
   expect_equal(family$n_treatment, 3L)
@@ -599,7 +599,7 @@ test_that("a co-requisite in the rollup set does not erase students", {
   # the filter then discards it, and the student vanishes from the rollup
   # despite having taken SPAN 201 later.
   r <- suppressMessages(get_instructor_effect(
-    test_students_mc, .impact_attempts(), test_programs_mc, NULL,
+    test_students_mc, .impact_attempts, test_programs_mc, NULL,
     list(course_x = "SPAN 101",
          course_y = c("SPAN 101L", "SPAN 201"),   # lab sorts first
          min_n = 1L), data_edges = .impact_edges))
@@ -615,7 +615,7 @@ test_that("n_took_y counts students, not enrolments, when a course is repeated",
   # They are one student. Counting enrolments instead double-weights them and
   # reports a pass rate over attempts while labelling it students.
   r <- suppressMessages(get_instructor_effect(
-    test_students_mc, .impact_attempts(), test_programs_mc, NULL,
+    test_students_mc, .impact_attempts, test_programs_mc, NULL,
     list(course_x = "SPAN 101", course_y = "SPAN 201", min_n = 1L),
     data_edges = .impact_edges))
 
@@ -793,7 +793,7 @@ test_that("balance values preserve meaningful continuous precision", {
 test_that("course_sequence_headline says the two rates, their counts and the balance verdict", {
   testthat::local_edition(3)
   result <- suppressMessages(get_course_sequence_effect(
-    test_students_mc, .impact_attempts(), test_programs_mc, NULL,
+    test_students_mc, .impact_attempts, test_programs_mc, NULL,
     opt = list(course_x = "SPAN 101", course_y = "SPAN 201", campus = "ABQ", min_n = 1L),
     student_terms = test_student_terms_mc, data_edges = .impact_edges
   ))

@@ -603,7 +603,7 @@ test_that("cedar_attempts is refused when built to another edge, build or set of
   older <- attempts; attr(older, "attempts_build_version") <- ATTEMPTS_BUILD_VERSION - 1L
   expect_false(attempts_is_current(older, test_students, edges))
   expect_false(attempts_is_current(NULL, test_students, edges))
-  rn <- rn01_course_tables()
+  rn <- rn01_course_tables
   expect_false(attempts_is_current(attempts, rn$cedar_registrations, edges))
   expect_error(require_current_attempts(attempts, rn$cedar_registrations, "a reader"), "build_attempts")
   expect_error(build_attempts(test_students, modifyList(edges, list(last_graded = NULL))),

@@ -172,7 +172,7 @@ test_that("an event in a term the student has no row for keeps the row with NA",
 
 test_that("inst_credit_band places a course by UNM credits entering the term", {
   timing <- suppressMessages(get_course_timing(
-    ct_students(), ct_population(),
+    ct_students, ct_population,
     opt = list(x_axis = "inst_credit_band", min_n = 1L, campus = "ABQ",
                group_campus = FALSE),
     student_terms = cedar_student_terms_ct
@@ -183,7 +183,7 @@ test_that("inst_credit_band places a course by UNM credits entering the term", {
 
 test_that("overall_credit_band adds the transfer block and shifts the bands", {
   timing <- suppressMessages(get_course_timing(
-    ct_students(), ct_population(), programs = cedar_programs_ct,
+    ct_students, ct_population, programs = cedar_programs_ct,
     opt = list(x_axis = "overall_credit_band", min_n = 1L, campus = "ABQ",
                group_campus = FALSE),
     student_terms = cedar_student_terms_ct
@@ -197,7 +197,7 @@ test_that("overall_credit_band adds the transfer block and shifts the bands", {
 test_that("credit axes refuse to run without student_terms", {
   expect_error(
     suppressMessages(get_course_timing(
-      ct_students(), ct_population(), programs = cedar_programs_ct,
+      ct_students, ct_population, programs = cedar_programs_ct,
       opt = list(x_axis = "inst_credit_band", min_n = 1L, campus = "ABQ"))),
     "require cedar_student_terms"
   )
@@ -209,7 +209,7 @@ test_that("overall_credit_band refuses to run without programs", {
   # under the right label.
   expect_error(
     suppressMessages(get_course_timing(
-      ct_students(), ct_population(),
+      ct_students, ct_population,
       opt = list(x_axis = "overall_credit_band", min_n = 1L, campus = "ABQ"),
       student_terms = cedar_student_terms_ct)),
     "recover the transfer block"
@@ -220,7 +220,7 @@ test_that("the credit position moves across a student's terms on both axes", {
   # The single property the frozen columns failed.
   for (ax in c("inst_credit_band", "overall_credit_band")) {
     timing <- suppressMessages(get_course_timing(
-      ct_students(), ct_population(), programs = cedar_programs_ct,
+      ct_students, ct_population, programs = cedar_programs_ct,
       opt = list(x_axis = ax, min_n = 1L, campus = "ABQ", group_campus = FALSE),
       student_terms = cedar_student_terms_ct))
     expect_gt(dplyr::n_distinct(timing$relative_term), 1)

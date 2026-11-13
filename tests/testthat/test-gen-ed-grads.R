@@ -457,8 +457,8 @@ test_that("own-unit min_n filters on distinct students like the main scope", {
 })
 
 test_that("uptake exposes per-student own-unit counts", {
-  cohort <- get_gen_ed_grad_cohort(gg_students_own(), cedar_degrees_gg, cedar_student_terms_gg, gg_opt())
-  u <- get_gen_ed_grad_uptake(gg_students_own(), cohort, gen_ed_course_lookup(),
+  cohort <- get_gen_ed_grad_cohort(gg_students_own, cedar_degrees_gg, cedar_student_terms_gg, gg_opt())
+  u <- get_gen_ed_grad_uptake(gg_students_own, cohort, gen_ed_course_lookup(),
                               opt = list(campus = "ABQ", dept_code = "LING", min_n = 1L))
 
   expect_true("n_dept_courses" %in% names(u$per_student))
@@ -467,8 +467,8 @@ test_that("uptake exposes per-student own-unit counts", {
 })
 
 test_that("uptake omits summary_dept when there is no department to scope to", {
-  cohort <- get_gen_ed_grad_cohort(gg_students_own(), cedar_degrees_gg, cedar_student_terms_gg, gg_opt())
-  u <- get_gen_ed_grad_uptake(gg_students_own(), cohort, gen_ed_course_lookup(),
+  cohort <- get_gen_ed_grad_cohort(gg_students_own, cedar_degrees_gg, cedar_student_terms_gg, gg_opt())
+  u <- get_gen_ed_grad_uptake(gg_students_own, cohort, gen_ed_course_lookup(),
                               opt = list(campus = "ABQ", min_n = 1L))
 
   expect_null(u$summary_dept)
@@ -711,12 +711,12 @@ test_that("the conditional denominator still describes itself correctly", {
   # into the population denominator. ct_* fixtures live in test-credit-timeline.R,
   # so this rebuilds the same shape locally.
   timing <- suppressMessages(get_course_timing(
-    gg_students_own(),
-    get_gen_ed_grad_cohort(gg_students_own(), cedar_degrees_gg, cedar_student_terms_gg, gg_opt()) %>%
+    gg_students_own,
+    get_gen_ed_grad_cohort(gg_students_own, cedar_degrees_gg, cedar_student_terms_gg, gg_opt()) %>%
       dplyr::select(student_id, population_label),
     opt = list(x_axis = "unm_credit_band", min_n = 1L, campus = "ABQ",
                group_campus = FALSE),
-    student_terms = gg_credits_own()))
+    student_terms = gg_credits_own))
   p <- suppressMessages(plot_curriculum_map(timing, opt = list(min_pct = 0)))
 
   expect_match(p$labels$subtitle, "students who reached that position")
@@ -828,7 +828,7 @@ test_that("the entry breakdown reports own-unit and other gen ed separately", {
 })
 
 test_that("own-unit counts only courses this department teaches", {
-  # PHIL 1115 is GG-taught in the gg_students_own() fixture; ENGL 1120 and
+  # PHIL 1115 is GG-taught in the gg_students_own fixture; ENGL 1120 and
   # MATH 1350 are not. A course taught elsewhere must never land in the own
   # column even when the department's majors take it.
   res <- gg_profile_own()

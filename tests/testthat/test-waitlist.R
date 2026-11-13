@@ -452,7 +452,7 @@ test_that("attach_enrollment_history follows the course when the class list name
   # Spring 2021 offering cedar_course_terms counts under its id (build_course_terms()).
   # A waitlist row names the class list's code; matched by code it finds no
   # base row and reads no census and no history.
-  rn <- rn01_course_tables()
+  rn <- rn01_course_tables
   students <- rn$cedar_registrations
   base <- course_terms_for(students, rn$cedar_sections)
   expect_false("HIST 320" %in% base$subject_course)
@@ -485,7 +485,7 @@ test_that("attach_enrollment_history follows the course when the class list name
 test_that("inspect_waitlist counts a course's waitlist across its live codes (RN02)", {
   # RN02: in Spring 2020 W1 waits under SOC 371, W2 under SOCI 371, and W3
   # waits under SOC 371 while registered under SOCI 371, one course.
-  rn <- rn02_course_tables()
+  rn <- rn02_course_tables
   # The description table is scaffolding: one row per class-list student-term.
   student_terms <- rn$cedar_registrations %>%
     distinct(student_id, term) %>%

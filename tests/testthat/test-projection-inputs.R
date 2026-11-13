@@ -786,7 +786,7 @@ test_that("target class-list snapshot drives the active seat check", {
   )
   inputs <- list(
     enrollment_history = history, preceding_term_history = history,
-    waitlist_history = empty_projection_test_waitlists(),
+    waitlist_history = empty_projection_test_waitlists,
     section_history = sections,
     target_registration_snapshot = tibble::tibble(
       market_id = "abq_ea_course_market", college = "AS",
@@ -800,9 +800,9 @@ test_that("target class-list snapshot drives the active seat check", {
     target_campuses = c("ABQ", "EA"),
     target_market_id = "abq_ea_course_market",
     enrollment_through_term = 202380L,
-    delivery_components = empty_projection_test_components(),
-    delivery_section_history = empty_projection_test_delivery_sections(),
-    delivery_first_day = empty_projection_test_delivery_first_day()
+    delivery_components = empty_projection_test_components,
+    delivery_section_history = empty_projection_test_delivery_sections,
+    delivery_first_day = empty_projection_test_delivery_first_day
   )
 
   result <- get_course_enrollment_projections(
@@ -867,15 +867,15 @@ test_that("registrations over the recorded cap still count as capacity reached",
   )
   inputs <- list(
     enrollment_history = history, preceding_term_history = history,
-    waitlist_history = empty_projection_test_waitlists(),
+    waitlist_history = empty_projection_test_waitlists,
     section_history = sections,
     students = empty_students, target_courses = "TEST 101",
     target_campuses = c("ABQ", "EA"),
     target_market_id = "abq_ea_course_market",
     enrollment_through_term = 202380L,
-    delivery_components = empty_projection_test_components(),
-    delivery_section_history = empty_projection_test_delivery_sections(),
-    delivery_first_day = empty_projection_test_delivery_first_day()
+    delivery_components = empty_projection_test_components,
+    delivery_section_history = empty_projection_test_delivery_sections,
+    delivery_first_day = empty_projection_test_delivery_first_day
   )
 
   result <- get_course_enrollment_projections(
