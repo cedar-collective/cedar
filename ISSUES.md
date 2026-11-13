@@ -36,6 +36,8 @@ alongside other work (M14, M16).
 
 | ID | Kind | Summary |
 |---|---|---|
+| [I57](#i57--the-instructor-patterns-column-guide-states-a-pass-rule-cedar-does-not-use) | Defect | The Instructor Patterns column guide says "Passing is C− or better, CR, P, or S"; CEDAR passes A+ through C and CR, and the table beside the sentence follows CEDAR |
+| [I56](#i56--downstream-continuation-misses-every-later-enrollment-after-the-grade-edge) | Defect | Downstream continuation reads the later course only to the graded edge while counting eligibility to the settled edge, so the newest students who continued count as not continuing: 183 of 557 for CHEM 1215 to 1225 when measured 2026-10-29 (suspected on today's data: the code path is unchanged, the counts not rerun) |
 | [I55](#i55--the-instructor-gate-password-stopped-reaching-the-app) | Defect | The instructor-gate password stopped reaching the app: since 2026-09-05 `.Renviron` is kept out of the image and nothing else passed `CEDAR_DFW_PASSWORD`, so every instructor gate on production reads "not configured" (fixed in code 2026-11-12; production needs the password in its `.env`) |
 | [I46](#i46--a-deploy-that-must-rebuild-a-table-the-app-cannot-start-without-takes-the-site-down) | Defect | The deploy's table gate ran after the health check, so a deploy that added a column to `cedar_student_terms` failed its health check on the missing column and never reached the gate: production served the restart page from 17:07 UTC on 2026-11-04 (gate moved before the first request) |
 | [I45](#i45--the-class-list-and-the-schedule-name-the-same-section-with-different-course-codes) | Defect | The class list and the schedule name the same section with different course codes for renamed subjects (SOC to SOCI, PSY to PSYC): SOCI 371 had class-list history from Fall 2019 but no sections before Fall 2021 (fixed for every reader by keying the loaded tables on the course, 2026-11-07; open until the remaining successions are confirmed) |
@@ -87,6 +89,96 @@ Kept until the next release, so a recurrence is recognisable; each entry below g
 ---
 
 # Defects
+
+## I57 — The Instructor Patterns column guide states a pass rule CEDAR does not use
+
+**Status:** open.
+**Found:** 2026-10-29, auditing the Course Report's Downstream tab on the
+branch `course-dynamics/downstream`, which fixed it there and was never
+merged; confirmed still on `main` 2026-11-12.
+**Severity:** low. The numbers use the canonical classifier; the words beside
+them do not describe it.
+**Affects:** the Instructor Patterns column guide, `server.R`.
+
+### What is wrong
+
+The column guide says "Passing is C− or better, CR, P, or S; Failed is a
+canonical D/F/W grade". CEDAR's default passes A+ through C and CR only; C−,
+P and S are DFW (AGENTS.md, Grades and the DFW policy). The table beside the
+sentence follows the default: `get_instructor_effect()` counts the stored
+`outcome_category` of `cedar_attempts`. A reader comparing the page with the
+DFW tab would conclude the two count differently.
+
+### Reproduction
+
+`grep -n "C− or better" server.R` (line 4804 at `2317b0c`).
+
+### Done when
+
+The page states no pass rule of its own: the sentence says A+ through C or CR,
+or gives the shared definition through `cedar_definition_note()`, and the
+page's words are covered by a snapshot.
+
+## I56 — Downstream continuation misses every later enrollment after the grade edge
+
+**Status:** open, and suspected on today's data. The code path is unchanged on
+`main` (read 2026-11-12 at `2317b0c`); the counts below were measured
+2026-10-29, before the measure tables, and have not been rerun.
+**Found:** 2026-10-29, auditing the Course Report's Downstream tab on the
+branch `course-dynamics/downstream` (two local commits, never merged). The
+branch fixed it against the tables of the time and cannot be merged now: 16 of
+its 24 files conflict with `main`. It is the specification of the fix.
+**Severity:** high. The continuation rate, the later-course picker's
+percentages and every instructor row undercount, most for the most recent
+students.
+**Affects:** `get_instructor_effect()` (`R/cones/course-instructor-effect.R`),
+`get_downstream_pair_audit()` and `get_downstream_course_options()`
+(`R/branches/course-flows.R`).
+
+### What is wrong
+
+**The later course (Y) is read to the graded edge, and eligibility to the
+settled edge.** In `get_downstream_pair_audit()` a student of the first course
+(X) is in the denominator when their first follow-up term is at or before
+`edge$observation_end`, but Y rows are kept only where
+`term <= edge$grade_end`. `get_instructor_effect()` does the same: `took_y`
+comes from `cedar_attempts`, which stops at `last_graded`, while
+`right_censored` compares with the settled edge. Whenever the settled edge is
+later than the graded edge (each regular term, from the day it settles until
+its grades post), a student whose first X was in the last graded regular term had a
+full follow-up and counts in the denominator, and their enrollment in Y in the
+settled term is never seen. They count as not continuing.
+
+The branch found two more things in the same denominator:
+
+- **No follow-up window.** Y counts in any later term, so a 2019 student has
+  seven years to take Y and a 2025 student one, and the pooled rate mixes both.
+- **Campuses pooled.** The headline is one number across the selected
+  campuses, and Y is read only on those campuses. The pooling carries a
+  `CAMPUS_ROLLUP` comment; the branch grouped every table by the campus that
+  taught X instead.
+
+### How to check
+
+Measured 2026-10-29 on `shared-data`, campuses ABQ + EA. First X attempt in
+Spring 2026, Y in Fall 2026, all counted as not continuing: CHEM 1215 → 1225,
+183 of 557; MATH 1512 → 1522, 66 of 185; ENGL 1110 → 1120, 85 of 167.
+
+To check on today's tables (`scripts/cedar-repl.R`): for one pair, count the
+students whose first registered X is in the last graded regular term and who
+hold a registered Y row in the next regular term, at or before
+`last_enrolled_complete`, in `cedar_registrations`. The audit counts none of
+them as taking Y while it keeps Y rows only to `edge$grade_end`
+(`R/branches/course-flows.R:535`).
+
+### Done when
+
+Enrollment in Y counts through the settled edge, and a Y taken after the graded
+edge counts as taken, not yet graded; grade outcomes still stop at the graded
+edge. A fixture row expresses the case and its test fails with the graded-edge
+filter restored. The branch's `build_downstream_cohort()` and its DS01 fixture
+are the worked design: a fixed window of regular terms after X (default 3),
+and every table grouped by the campus that taught X.
 
 ## I55 — The instructor-gate password stopped reaching the app
 
