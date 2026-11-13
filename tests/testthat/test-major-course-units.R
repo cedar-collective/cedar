@@ -231,17 +231,19 @@ test_that("get_major_course_units() stops without a unit, an edge, or the attach
 
 # ── Plot preparation and plots ───────────────────────────────────────────────
 
-test_that("ST01: the top-units bars are the own unit, the largest outside units and the rest, summing to one", {
+test_that("ST01: the top-units bars are the own unit, the largest outside units and each college's rest, summing to one", {
   # 202010 ABQ: HIST 8 of 10 registrations, ENGL 1, MATH 1; 8 members.
   rows <- get_major_course_units(test_student_terms_st, test_students_st,
                                  list(dept_code = "HIST", min_n = 1L, term = 202010L, data_edges = st01_edges)) %>%
     mutate(unit_label = dept_code, college_label = college)
 
   bars <- prepare_major_course_units_top_units(rows, own_label = "History", min_n = 1L, n_top = 1L)
-  expect_equal(names(bars), c("campus", "unit_label", "kind", "n_units", "n_registrations", "share",
-                              "term_students", "term_registrations"))
-  # One outside bar asked for: ENGL (first of the tie by name), MATH pooled.
-  expect_equal(bars$unit_label, c("History (own courses)", "ENGL", "All other units (1)"))
+  expect_equal(names(bars), c("campus", "unit_label", "college_label", "kind", "n_units", "n_registrations",
+                              "share", "term_students", "term_registrations"))
+  # One outside bar asked for: ENGL (first of the tie by name); MATH is the
+  # rest of the college HIST and ENGL already have bars in.
+  expect_equal(bars$unit_label, c("History (own courses)", "ENGL", "ARTS: 1 other unit"))
+  expect_equal(bars$college_label, rep("ARTS", 3))
   expect_equal(bars$kind, c("own", "outside", "rest"))
   expect_equal(bars$n_registrations, c(8L, 1L, 1L))
   expect_equal(bars$share, c(0.8, 0.1, 0.1))
@@ -254,19 +256,53 @@ test_that("ST01: the top-units bars are the own unit, the largest outside units 
 
   # An outside unit under the guard has no bar of its own: both are the rest.
   guarded <- prepare_major_course_units_top_units(rows, own_label = "History", min_n = 2L, n_top = 8L)
-  expect_equal(guarded$unit_label, c("History (own courses)", "All other units (2)"))
+  expect_equal(guarded$unit_label, c("History (own courses)", "ARTS: 2 other units"))
   expect_equal(guarded$share, c(0.8, 0.2))
+
+  # The rest is one bar per college, so the bars under a college's label add
+  # up to the college: with MATH taught by another college and no outside bar
+  # asked for, ARTS is HIST's 8 and ENGL's 1, and ENGR is MATH's 1. A college
+  # none of whose units has a bar is not "other" units; the label named as
+  # pooled is drawn last whatever its size.
+  two_colleges <- rows %>% mutate(college_label = if_else(dept_code == "MATH", "ENGR", college_label))
+  by_band <- prepare_major_course_units_top_units(two_colleges, own_label = "History", min_n = 1L, n_top = 0L)
+  expect_equal(by_band$unit_label, c("History (own courses)", "ARTS: 1 other unit", "ENGR: 1 unit"))
+  expect_equal(by_band$kind, c("own", "rest", "rest"))
+  expect_equal(by_band %>% group_by(college_label) %>% summarize(n = sum(n_registrations)) %>% pull(n),
+               c(9L, 1L))
+  expect_equal(sum(by_band$share), 1)
+  pooled_last <- prepare_major_course_units_top_units(two_colleges, own_label = "History", min_n = 1L, n_top = 0L,
+                                                      pooled_label = "ARTS")
+  expect_equal(pooled_last$college_label, c("ARTS", "ENGR", "ARTS"))
+
+  # The own unit teaching under two colleges (ST_A's and ST_B's HIST 1110
+  # seats under ENGR) has a bar under each, named by the college, so each
+  # college still adds up: ARTS 6 + ENGL 1 + MATH 1, ENGR 2.
+  own_twice <- get_major_course_units(
+    test_student_terms_st,
+    test_students_st %>% mutate(college = if_else(subject_course == "HIST 1110" & student_id %in% c("ST_A", "ST_B"),
+                                                  "ENGR", college)),
+    list(dept_code = "HIST", min_n = 1L, term = 202010L, data_edges = st01_edges)) %>%
+    mutate(unit_label = dept_code, college_label = college)
+  split_own <- prepare_major_course_units_top_units(own_twice, own_label = "History", min_n = 1L, n_top = 0L)
+  expect_equal(split_own$unit_label, c("History (own courses, ARTS)", "History (own courses, ENGR)",
+                                       "ARTS: 2 other units"))
+  expect_equal(split_own$kind, c("own", "own", "rest"))
+  expect_equal(split_own$n_registrations, c(6L, 2L, 2L))
+  expect_equal(split_own %>% group_by(college_label) %>% summarize(n = sum(n_registrations)) %>% pull(n),
+               c(8L, 2L))
 
   # A campus with fewer members than the guard is not drawn at all.
   expect_equal(nrow(prepare_major_course_units_top_units(rows, own_label = "History", min_n = 9L)), 0L)
 
   # A subject with no unit is marked, never read as a unit; and a campus where
-  # the own unit taught nothing still has its bar, at zero.
+  # the own unit taught nothing still has its bar, at zero and under no college.
   undecided <- rows %>% mutate(dept_code = if_else(dept_code == "ENGL", NA_character_, dept_code),
                                is_own_unit = FALSE)
   none_own <- prepare_major_course_units_top_units(undecided, own_label = "Spanish", min_n = 1L)
   expect_equal(none_own$unit_label[[1]], "Spanish (own courses)")
   expect_equal(none_own$n_registrations[[1]], 0L)
+  expect_true(is.na(none_own$college_label[[1]]))
   expect_equal(none_own$kind[none_own$unit_label == "ENGL"], "undecided")
   expect_equal(sum(none_own$share), 1)
 
@@ -276,5 +312,91 @@ test_that("ST01: the top-units bars are the own unit, the largest outside units 
     mutate(unit_label = dept_code, college_label = college)
   expect_error(prepare_major_course_units_top_units(two_terms, own_label = "History"), "one term")
   expect_error(prepare_major_course_units_top_units(rows %>% select(-unit_label), own_label = "History"),
+               "unit_label")
+
+  # Drawn: a trace per college in the colours given, a college's rest paler
+  # than a unit's own bar; a college with no colour is refused.
+  colors <- c(ARTS = "#111111", ENGR = "#222222")
+  drawn <- plotly::plotly_build(plot_major_course_units_top_units(by_band, colors)[["ABQ"]])
+  expect_equal(vapply(drawn$x$data, function(tr) tr$name, character(1)), c("ARTS", "ENGR"))
+  expect_equal(as.character(drawn$x$data[[1]]$y), c("History (own courses)", "ARTS: 1 other unit"))
+  expect_equal(as.numeric(drawn$x$data[[1]]$x), c(0.8, 0.1))
+  expect_equal(as.numeric(drawn$x$data[[1]]$marker$opacity), c(1, 0.45))
+  expect_equal(as.numeric(drawn$x$data[[2]]$x), 0.1)
+  expect_equal(names(plot_major_course_units_top_units(none_own, c(ARTS = "#111111"))), "ABQ")
+  expect_error(plot_major_course_units_top_units(by_band, colors["ARTS"]), "ENGR")
+  expect_equal(plot_major_course_units_top_units(by_band[0, ], colors), list())
+})
+
+test_that("the colleges keep one colour: ordered by registrations, the pooled label last and grey", {
+  # ST01's HIST majors with MATH taught by another college: ARTS holds 9
+  # registrations in 202010 and 1 in 202110, ENGR 1. Called pooled, ARTS is
+  # last and grey though it is the largest.
+  by_college <- get_major_course_units(
+    test_student_terms_st,
+    test_students_st %>% mutate(college = if_else(subject_course == "MATH 1215", "ENGR", college)),
+    list(dept_code = "HIST", min_n = 1L, grain = "college", data_edges = st01_edges)) %>%
+    mutate(college_label = college, pooled = FALSE)
+  colors <- major_course_units_college_colors(by_college)
+  expect_equal(colors, c(ARTS = CEDAR_PALETTE[[1]], ENGR = CEDAR_PALETTE[[2]]))
+  pooled <- major_course_units_college_colors(by_college %>% mutate(pooled = college_label == "ARTS"))
+  expect_equal(pooled, c(ENGR = CEDAR_PALETTE[[1]], ARTS = CEDAR_SEMANTIC_COLORS[["other"]]))
+  expect_error(major_course_units_college_colors(by_college %>% select(-pooled)), "pooled")
+})
+
+test_that("RW01: the outside courses term by term, ranked over the terms kept", {
+  # SPAN majors, in-progress terms in: 202080 ABQ ENGL 1110 (RW_H);
+  # 202110 ABQ HIST 2110 (RW_A, RW_F, RW_G); 202110 EA MATH 1240 (RW_E).
+  rows <- get_major_course_units(test_student_terms_rw, test_students_rw,
+                                 list(dept_code = "SPAN", min_n = 1L, grain = "course",
+                                      include_in_progress = TRUE, data_edges = rw01_edges)) %>%
+    filter(!is_own_unit) %>%
+    mutate(unit_label = dept_code)
+  terms <- c(202080L, 202110L)
+
+  history <- prepare_major_course_units_course_history(rows, terms = terms, n_top = 1L)
+  expect_equal(names(history), c("terms", "courses", "cells", "table"))
+  expect_equal(history$terms, terms)
+  expect_equal(names(history$courses), c("campus", "rank", "subject_course", "unit_label", "n_terms",
+                                         "student_terms", "top"))
+  expect_equal(history$courses$campus, c("ABQ", "ABQ", "EA"))
+  expect_equal(history$courses$subject_course, c("HIST 2110", "ENGL 1110", "MATH 1240"))
+  expect_equal(history$courses$rank, c(1L, 2L, 1L))
+  expect_equal(history$courses$student_terms, c(3L, 1L, 1L))
+  expect_equal(history$courses$top, c(TRUE, FALSE, TRUE))
+  # A column per term kept; NA where the course has no row that term.
+  expect_equal(names(history$table), c(names(history$courses), "t_202080", "t_202110"))
+  expect_equal(history$table$t_202080, c(NA, 1L, NA))
+  expect_equal(history$table$t_202110, c(3L, NA, 1L))
+
+  # The fall terms alone: ENGL 1110 is the one course, and it leads.
+  fall <- prepare_major_course_units_course_history(rows, terms = terms, term_types = "fall", n_top = 1L)
+  expect_equal(fall$terms, 202080L)
+  expect_equal(fall$courses$subject_course, "ENGL 1110")
+  expect_true(fall$courses$top)
+  expect_equal(names(fall$table), c(names(fall$courses), "t_202080"))
+  # No term of the type: nothing listed, and nothing to draw.
+  summer <- prepare_major_course_units_course_history(rows, terms = terms, term_types = "summer")
+  expect_equal(nrow(summer$courses), 0L)
+  expect_equal(nrow(summer$table), 0L)
+  expect_equal(plot_major_course_units_course_history(summer), list())
+
+  # The grid: a chart per campus with a top course, a row per top course and
+  # a column per term kept, shaded by the share of that term's majors.
+  grids <- plot_major_course_units_course_history(history)
+  expect_equal(names(grids), c("ABQ", "EA"))
+  abq <- plotly::plotly_build(grids[["ABQ"]])$x$data[[1]]
+  expect_equal(abq$type, "heatmap")
+  expect_equal(unique(as.character(abq$y)), "HIST 2110")
+  expect_equal(as.character(abq$x), c("Fa 20", "Sp 21"))
+  # 3 of the 3 SPAN majors registered on ABQ in Spring 2021; no row in Fall 2020.
+  expect_equal(as.numeric(abq$z), c(NA, 1))
+  expect_equal(as.character(abq$text), c("", "3"))
+  expect_equal(names(plot_major_course_units_course_history(history, campuses = "EA")), "EA")
+
+  # A term the axis does not hold, a repeated row and a missing column are refused.
+  expect_error(prepare_major_course_units_course_history(rows, terms = 202080L), "term")
+  expect_error(prepare_major_course_units_course_history(bind_rows(rows, rows), terms = terms), "repeats")
+  expect_error(prepare_major_course_units_course_history(rows %>% select(-unit_label), terms = terms),
                "unit_label")
 })

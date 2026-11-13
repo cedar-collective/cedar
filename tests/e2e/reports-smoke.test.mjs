@@ -347,6 +347,18 @@ export async function runReportChecks({ scope = 'smoke', synthetic = false } = {
       if (/were in the unit's own courses/.test(coursesTaken.text)) {
         throw new Error('Courses Taken still opens with the latest-term paragraph');
       }
+      // The outside courses are read term by term, not for the latest term
+      // alone: the section carries its grids and table, or the reason it has
+      // neither (no outside course clears the small-cell guard in any term).
+      const outside = await page.$eval('#dept_trends-mcu_body', (el) => ({
+        heading: /Top Outside Courses Over Time/.test(el.innerText),
+        charts: !!el.querySelector('#dept_trends-mcu_outside_charts'),
+        table: !!el.querySelector('#dept_trends-mcu_outside_table'),
+        none: /No outside course has \d+ or more of these majors in any term/.test(el.innerText),
+      }));
+      if (!guarded && !(outside.heading && ((outside.charts && outside.table) || outside.none))) {
+        throw new Error(`Courses Taken has no outside courses over time: ${JSON.stringify(outside)}`);
+      }
 
       await clickSubTabIn(page, 'dept_trends-tabs', 'Demographics');
       await waitForOutput(page, 'Dept Trends Demographics tab', [

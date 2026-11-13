@@ -371,6 +371,11 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
             shiny::validate(shiny::need(!is.null(plot), paste0("No ", campus_key, " term of the ticked types to draw.")))
             mark_plotly_terms(plot, in_progress_labels)
           })
+          output[[paste0("mcu_outside_", campus_key)]] <- renderPlotly({
+            plot <- mcu_course_plots()[[campus_key]]
+            req(plot)
+            mark_plotly_terms(plot, in_progress_labels)
+          })
         })
         for (cmp in names(payload$plots$top_units)) local({
           campus_key <- cmp
@@ -427,6 +432,37 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
       plot_major_course_units_by_college(data$tables$by_college, term_types = mcu_term_types(),
                                          campuses = data$meta$chart_campuses)
     })
+    # The outside courses are ranked over the terms drawn, so ticking a term
+    # type re-ranks them; the grids and the table read the one ranking.
+    mcu_course_history <- reactive({
+      data <- mcu_data()
+      req(data)
+      prepare_major_course_units_course_history(data$tables$outside_courses, terms = data$tables$own_share$term,
+                                                term_types = mcu_term_types(), n_top = data$meta$n_outside)
+    })
+    mcu_course_plots <- reactive({
+      data <- mcu_data()
+      req(data)
+      plot_major_course_units_course_history(mcu_course_history(), campuses = data$meta$chart_campuses)
+    })
+    # One grid per campus with a course to draw, a row of the grid the same
+    # height whether the campus lists two courses or fifteen.
+    output$mcu_outside_charts <- renderUI({
+      data <- mcu_data()
+      req(data)
+      plots <- mcu_course_plots()
+      if (length(plots) == 0L) {
+        return(empty_state(paste0("No outside course has ", data$meta$min_n,
+                                  " or more of these majors in a term of the ticked types on a campus that is charted.")))
+      }
+      listed <- mcu_course_history()$courses
+      lapply(names(plots), function(cmp) tagList(
+        section_heading(cmp, level = "h6"),
+        plotlyOutput(ns(paste0("mcu_outside_", cmp)),
+                     height = paste0(110L + 26L * sum(listed$campus == cmp & listed$top), "px"))
+      ))
+    })
+
     output$mcu_own_share_plot <- renderPlotly({
       data <- mcu_data()
       req(data)
@@ -466,8 +502,9 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
             tags$li("A registration is a member's class-list row registered at the pull or withdrawn late; early drops and waitlist rows are not course-taking. Each student and course counts once per term and teaching campus."),
             tags$li("The teaching unit is the subject's unit in the mapping files; ", n(meta$n_unmapped),
                     " registrations are in subjects no mapping row has decided and are shown as their own row, never given a unit."),
-            tags$li("Shares are within the term and teaching campus over every member registration there. A teaching unit or college with fewer than ",
-                    meta$min_n, " of these majors in a term is pooled with the others like it, and a campus with fewer than ",
+            tags$li("Shares are within the term and teaching campus over every member registration there. A college that taught fewer than ",
+                    meta$min_n, " of these majors in a term is pooled with the others like it; a unit that taught fewer than ",
+                    meta$min_n, " is pooled with the other small units of its college; and a campus with fewer than ",
                     meta$min_n, " of them is in the tables, not the charts."),
             if (isTRUE(meta$latest_in_progress)) tags$li("The latest term is in progress: its registrations are current, not settled.")
           )
@@ -486,14 +523,15 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
         dashboard_subsection(
           paste0("Teaching Units, ", latest_label),
           paste0("Who taught these majors in the latest term, one chart per teaching campus: the department's own courses first, then the ",
-                 meta$n_top, " outside units with the most of their registrations, then every other unit together. The table lists every unit."),
+                 meta$n_top, " outside units with the most of their registrations, then each college's remaining units as one paler bar. A bar is the colour of its teaching college, so the bars of one colour add up to that college's segment for the term in Teaching Colleges Over Time below. The table gives a row to every unit that taught ",
+                 meta$min_n, " or more of these majors and one row per college to the smaller units, and its College column adds up to the same segments."),
           if (nrow(top_campuses) == 0L) empty_state(paste0(too_few, " in ", fmt_term(meta$latest_term), ".")),
           lapply(seq_len(nrow(top_campuses)), function(i) tagList(
             section_heading(paste0(top_campuses$campus[[i]], ": ", n(top_campuses$term_students[[i]]), " majors, ",
                                    n(top_campuses$term_registrations[[i]]), " registrations"), level = "h6"),
             # A bar keeps its thickness whether the campus has two or ten.
             plotlyOutput(ns(paste0("mcu_top_units_", top_campuses$campus[[i]])),
-                         height = paste0(90L + 30L * sum(data$tables$top_units$campus == top_campuses$campus[[i]]), "px"))
+                         height = paste0(150L + 30L * sum(data$tables$top_units$campus == top_campuses$campus[[i]]), "px"))
           )),
           reactable::reactableOutput(ns("mcu_units_table"))
         ),
@@ -508,13 +546,18 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
           ))
         ),
         dashboard_subsection(
-          paste0("Top Outside Courses, ", latest_label),
-          paste0("The courses outside the department's own unit that the most of these majors sit in during the latest term, by teaching campus, with the share of that term's majors and the count in the same term a year earlier: the seats another unit's schedule supplies, and where two curricula overlap. Up to ",
-                 meta$n_outside, " per campus; a course or a year-earlier count under ", meta$min_n, " students is not shown."),
+          "Top Outside Courses Over Time",
+          paste0("The courses outside the department's own unit that the most of these majors sit in, term by term, for the term types ticked above: the seats another unit's schedule supplies, and where two curricula overlap. One grid per teaching campus, a row for each of the ",
+                 meta$n_outside, " courses most taken over the terms drawn; a cell gives the majors in the course that term and is shaded by their share of that term's majors on the campus. A blank cell is a term with fewer than ",
+                 meta$min_n, " of them in the course, which is not shown. The table lists every outside course that reached ",
+                 meta$min_n, " in a term drawn."),
           if (nrow(data$tables$outside_courses) == 0L) {
-            empty_state(paste0("No outside course has ", meta$min_n, " or more of these majors in ", fmt_term(meta$latest_term), "."))
+            empty_state(paste0("No outside course has ", meta$min_n, " or more of these majors in any term."))
           } else {
-            reactable::reactableOutput(ns("mcu_outside_table"))
+            tagList(
+              uiOutput(ns("mcu_outside_charts")),
+              reactable::reactableOutput(ns("mcu_outside_table"))
+            )
           }
         )
       )
@@ -544,20 +587,26 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
     })
 
     output$mcu_outside_table <- reactable::renderReactable({
-      data <- mcu_data()
-      req(data, nrow(data$tables$outside_courses) > 0L)
-      display <- data$tables$outside_courses %>%
-        dplyr::transmute(campus, subject_course, unit_label, n_students, share_of_students, students_year_earlier)
+      history <- mcu_course_history()
+      req(nrow(history$table) > 0L)
+      term_ids <- paste0("t_", history$terms)
+      term_cols <- stats::setNames(lapply(history$terms, function(term) {
+        cedar_count_coldef(paste0(term_code_to_axis_label(term),
+                                  if (term %in% as.integer(in_progress$term)) " (in progress)" else ""),
+                           minWidth = 70)
+      }), term_ids)
       reactable::reactable(
-        display, theme = cedar_tbl_theme, compact = TRUE, striped = TRUE, highlight = TRUE,
+        history$table[c("campus", "subject_course", "unit_label", "student_terms", term_ids)],
+        theme = cedar_tbl_theme, compact = TRUE, striped = TRUE, highlight = TRUE,
         searchable = TRUE, defaultPageSize = 15, showPageSizeOptions = TRUE, pageSizeOptions = c(15, 30, 100),
-        columns = list(
-          campus = reactable::colDef(name = "Campus", maxWidth = 90),
-          subject_course = reactable::colDef(name = "Course", minWidth = 110),
-          unit_label = reactable::colDef(name = "Teaching unit", minWidth = 200),
-          n_students = cedar_count_coldef("Majors in it"),
-          share_of_students = cedar_percent_coldef("Share of majors"),
-          students_year_earlier = cedar_count_coldef("A year earlier")
+        columns = c(
+          list(
+            campus = reactable::colDef(name = "Campus", maxWidth = 90),
+            subject_course = reactable::colDef(name = "Course", minWidth = 110),
+            unit_label = reactable::colDef(name = "Teaching unit", minWidth = 200),
+            student_terms = cedar_count_coldef("Majors, terms shown", minWidth = 110)
+          ),
+          term_cols
         )
       )
     })

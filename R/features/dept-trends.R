@@ -737,26 +737,31 @@ rebuild_dept_credit_hours_tab <- function(cached, base) {
 #' @param campus_filter Teaching campuses to keep (the page's scope); NULL
 #'   keeps every campus, each its own row.
 #' @param min_n The smallest distinct-student count a teaching unit or college
-#'   shows on its own; smaller ones are pooled as one row. An outside course
-#'   under it is left out, and a term and campus with fewer members has no
-#'   point or chart of its own.
+#'   shows on its own. Colleges under it are pooled as one row; units under it
+#'   are pooled with the other small units of their college. An outside
+#'   course under it in a term has no row for that term, and a term and campus
+#'   with fewer members has no point or chart of its own.
 #' @param program_code One or more of the unit's program codes to narrow the
 #'   members to (`meta$programs` lists them); NULL reads every program.
-#' @param n_outside How many outside courses to list per teaching campus.
+#' @param n_outside How many outside courses the page charts per teaching
+#'   campus (`meta$n_outside`).
 #' @param n_top How many outside units get a bar in the latest-term chart.
 #' @return `tables` (`own_share`: per term and campus, the members' students
 #'   and registrations and the share in the unit's own courses; `by_college`:
 #'   per term, campus and teaching college, the share, with every college
 #'   under `min_n` students that term pooled as one row (`pooled`,
 #'   `n_pooled`); `latest_units`: the latest term's teaching units per campus,
-#'   small ones pooled; `top_units`: the same term as bars
-#'   (`prepare_major_course_units_top_units()`); `outside_courses`: the latest
-#'   term's courses outside the unit that most members sit in, per campus,
-#'   with the share of that term's members and the count in the same term a
-#'   year earlier), `plots` (`top_units`: one plotly per campus with `min_n`
-#'   members in the latest term) and `meta` (`chart_campuses`: the campuses
-#'   with `min_n` members in some term, which the over-time charts draw). The
-#'   over-time charts are drawn by the page from `own_share` and `by_college`,
+#'   the units under `min_n` students pooled one row per label of
+#'   `by_college` (`n_pooled` units), so the rows under a college's label add
+#'   up to its row of `by_college` for that term; `top_units`: the same term
+#'   as bars (`prepare_major_course_units_top_units()`), under the same
+#'   labels; `outside_courses`: per term, campus and course outside the unit
+#'   with `min_n` members in it, the members in it and their share of that
+#'   term's members on the campus), `plots` (`top_units`: one plotly per
+#'   campus with `min_n` members in the latest term, a bar in its college's
+#'   colour) and `meta` (`chart_campuses`: the campuses with `min_n` members
+#'   in some term, which the over-time charts draw). The over-time charts are
+#'   drawn by the page from `own_share`, `by_college` and `outside_courses`,
 #'   for the term types its reader ticks.
 compute_dept_course_units_tab <- function(base, data_objects, campus_filter = NULL, min_n = 10L,
                                           program_code = NULL, n_outside = 15L, n_top = 8L) {
@@ -796,14 +801,7 @@ compute_dept_course_units_tab <- function(base, data_objects, campus_filter = NU
 
   rows <- result %>%
     left_join(unit_labels, by = "dept_code") %>%
-    mutate(
-      unit_label = case_when(is.na(dept_code) ~ no_unit, is.na(dept_name) ~ dept_code, TRUE ~ dept_name),
-      college_label = case_when(
-        is.na(dept_code) ~ no_unit,
-        is.na(college) ~ "No college",
-        TRUE ~ coalesce(unname(college_labels[college]), college)
-      )
-    )
+    mutate(unit_label = case_when(is.na(dept_code) ~ no_unit, is.na(dept_name) ~ dept_code, TRUE ~ dept_name))
 
   own_share <- rows %>%
     group_by(term, campus, in_progress) %>%
@@ -828,7 +826,7 @@ compute_dept_course_units_tab <- function(base, data_objects, campus_filter = NU
          grain = "college", include_in_progress = TRUE, data_edges = data_objects[["cedar_edges"]])
   )
   other_colleges <- paste0("Other colleges (each under ", min_n, " students)")
-  by_college <- colleges %>%
+  colleges <- colleges %>%
     mutate(
       pooled = n_students < min_n,
       college_label = case_when(
@@ -837,7 +835,8 @@ compute_dept_course_units_tab <- function(base, data_objects, campus_filter = NU
         is.na(college) ~ "No college",
         TRUE ~ coalesce(unname(college_labels[college]), college)
       )
-    ) %>%
+    )
+  by_college <- colleges %>%
     group_by(term, campus, in_progress, college_label, pooled) %>%
     summarize(
       n_pooled = sum(pooled),
@@ -854,65 +853,80 @@ compute_dept_course_units_tab <- function(base, data_objects, campus_filter = NU
   # which is earlier for a department whose majors have stopped enrolling.
   window_end <- attr(result, "latest_term")
   latest <- if (nrow(rows) > 0L) max(rows$term) else window_end
-  latest_rows <- rows %>% filter(term == latest)
+  # Each of the latest term's units under the label the college chart draws its
+  # college under that term and campus, so the table and the bars pool small
+  # units inside a segment of that chart and add up to it. One row for every
+  # small unit hid a college whose units are each under the guard: Fine Arts
+  # taught History's majors through six of them in Fall 2026. The label is the
+  # chart's for every row, the department's own unit included: where its
+  # college is under the guard, its row is under the pooled label too.
+  latest_rows <- rows %>%
+    filter(term == latest) %>%
+    mutate(unit_decided = !is.na(dept_code),
+           band_key = if_else(unit_decided, college, NA_character_)) %>%
+    left_join(colleges %>% transmute(term, campus, unit_decided, band_key = college, college_label,
+                                     band_pooled = pooled, band_students = n_students),
+              by = c("term", "campus", "unit_decided", "band_key"))
+  if (anyNA(latest_rows$college_label)) {
+    stop("[dept-trends.R] compute_dept_course_units_tab: a unit row has no college row for its term and campus")
+  }
   shown <- latest_rows %>% filter(n_students >= min_n | is_own_unit)
   pooled <- latest_rows %>%
     filter(n_students < min_n, !is_own_unit) %>%
-    group_by(term, campus, in_progress) %>%
+    group_by(term, campus, in_progress, college_label, band_pooled) %>%
     summarize(
       n_pooled = n(),
       n_registrations = sum(n_registrations),
       share_of_registrations = sum(share_of_registrations),
+      band_students = first(band_students),
       .groups = "drop"
     ) %>%
+    left_join(shown %>% count(campus, college_label, name = "n_shown"), by = c("campus", "college_label")) %>%
     mutate(
+      n_shown = coalesce(n_shown, 0L),
       college = NA_character_, dept_code = NA_character_, is_own_unit = FALSE,
-      n_students = NA_integer_,
-      unit_label = paste0("Other units (", n_pooled, " under ", min_n, " students)"),
-      college_label = "Pooled"
+      # Distinct students cannot be added across unit rows; the college's own
+      # count stands when the row is every unit of a college above the guard.
+      n_students = if_else(n_shown == 0L & !band_pooled, band_students, NA_integer_),
+      unit_label = paste0(n_pooled, if_else(n_shown > 0L, " other", ""),
+                          if_else(n_pooled == 1L, " unit under ", " units, each under "), min_n, " students")
     )
-  latest_units <- bind_rows(shown, pooled) %>%
-    select(term, campus, in_progress, college_label, unit_label, dept_code, is_own_unit,
+  latest_units <- bind_rows(shown %>% mutate(n_pooled = 0L), pooled) %>%
+    select(term, campus, in_progress, college_label, unit_label, dept_code, is_own_unit, n_pooled,
            n_students, n_registrations, share_of_registrations) %>%
-    arrange(campus, desc(is_own_unit), is.na(n_students), desc(n_registrations))
+    arrange(campus, desc(is_own_unit), n_pooled > 0L, college_label == other_colleges, desc(n_registrations))
 
-  # The courses themselves, for the latest term and the same term a year
-  # earlier: the seats another unit's schedule supplies to these majors, and
-  # where two curricula overlap. Same members, same registrations, one grain
-  # down; a course under min_n students is not listed, and a year-earlier
-  # count under it is not shown.
+  # The courses themselves, term by term: the seats another unit's schedule
+  # supplies to these majors, and where two curricula overlap. Same members,
+  # same registrations, one grain down; a course under min_n students in a
+  # term has no row for it. The page ranks them over the term types its
+  # reader ticks (prepare_major_course_units_course_history()).
   courses <- get_major_course_units(
     data_objects[["cedar_student_terms"]], data_objects[["cedar_registrations"]],
     list(dept_code = base$dept_code, campus = campus_filter, min_n = 1L, program_code = program_code,
-         grain = "course", term = c(latest, latest - 100L), include_in_progress = TRUE,
-         data_edges = data_objects[["cedar_edges"]])
+         grain = "course", include_in_progress = TRUE, data_edges = data_objects[["cedar_edges"]])
   ) %>% filter(!is_own_unit)
-  year_earlier <- courses %>%
-    filter(term == latest - 100L, n_students >= min_n) %>%
-    select(campus, dept_code, subject_course, students_year_earlier = n_students)
   outside_courses <- courses %>%
-    filter(term == latest, n_students >= min_n) %>%
-    left_join(year_earlier, by = c("campus", "dept_code", "subject_course")) %>%
+    filter(n_students >= min_n) %>%
     left_join(unit_labels, by = "dept_code") %>%
     mutate(unit_label = case_when(is.na(dept_code) ~ no_unit, is.na(dept_name) ~ dept_code, TRUE ~ dept_name)) %>%
-    group_by(campus) %>%
-    slice_max(n_students, n = as.integer(n_outside), with_ties = FALSE) %>%
-    ungroup() %>%
     select(term, campus, in_progress, subject_course, unit_label, dept_code,
-           n_students, share_of_students, students_year_earlier) %>%
-    arrange(campus, desc(n_students), subject_course)
+           n_students, term_students, share_of_students) %>%
+    arrange(term, campus, desc(n_students), subject_course)
 
   # A chart is drawn for a campus that has min_n members to read: in some
   # term for the series, in the latest term for its bars. A smaller campus is
   # in the tables.
   chart_campuses <- own_share %>% filter(students >= min_n) %>% distinct(campus) %>% pull(campus) %>% sort()
   top_units <- prepare_major_course_units_top_units(latest_rows, own_label = dept_name, min_n = min_n,
-                                                    n_top = n_top)
+                                                    n_top = n_top, pooled_label = other_colleges)
+  # The colours the page's colleges-over-time charts give the same campuses.
+  college_colors <- major_course_units_college_colors(by_college %>% filter(campus %in% chart_campuses))
 
   list(
     tables = list(own_share = own_share, by_college = by_college, latest_units = latest_units,
                   top_units = top_units, outside_courses = outside_courses),
-    plots = list(top_units = plot_major_course_units_top_units(top_units)),
+    plots = list(top_units = plot_major_course_units_top_units(top_units, college_colors)),
     meta = list(
       dept_code = base$dept_code,
       dept_name = dept_name,
