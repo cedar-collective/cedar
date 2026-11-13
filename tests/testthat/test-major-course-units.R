@@ -76,6 +76,43 @@ test_that("ST01: the course grain is the same registrations one level down, with
                "grain")
 })
 
+test_that("ST01: the college grain counts a student once per college, and asserts no college for an undecided unit", {
+  res <- get_major_course_units(test_student_terms_st, test_students_st,
+                                list(dept_code = "HIST", min_n = 1L, grain = "college", data_edges = st01_edges))
+  expect_equal(names(res), c("term", "campus", "college", "unit_decided", "in_progress", "n_registrations",
+                             "n_students", "term_registrations", "term_students", "share_of_registrations"))
+  expect_equal(res$term, c(202010L, 202110L))
+  expect_equal(res$college, c("ARTS", "ARTS"))
+  # 202010: ST_H sits in three units of one college. The college's students
+  # are the 8 distinct members, not the unit rows' 8 + 1 + 1.
+  expect_equal(res$n_registrations, c(10L, 1L))
+  expect_equal(res$n_students, c(8L, 1L))
+  expect_equal(res$share_of_registrations, c(1, 1))
+
+  # ENGL's subject undecided and MATH taught by another college: three rows
+  # in 202010. The undecided row carries no college, though its class-list
+  # row does, and the totals are still the term and campus's.
+  regs <- test_students_st %>%
+    mutate(department = if_else(subject_course == "ENGL 1110", NA_character_, department),
+           college = if_else(subject_course == "MATH 1215", "ENGR", college))
+  split <- get_major_course_units(test_student_terms_st, regs,
+                                  list(dept_code = "HIST", min_n = 1L, grain = "college",
+                                       data_edges = st01_edges)) %>%
+    filter(term == 202010L)
+  expect_equal(split$college, c("ARTS", "ENGR", NA))
+  expect_equal(split$unit_decided, c(TRUE, TRUE, FALSE))
+  expect_equal(split$n_registrations, c(8L, 1L, 1L))
+  expect_equal(split$n_students, c(8L, 1L, 1L))
+  expect_equal(split$term_registrations, rep(10L, 3))
+  expect_equal(sum(split$share_of_registrations), 1)
+
+  sup <- attr(get_major_course_units(test_student_terms_st, regs,
+                                     list(dept_code = "HIST", min_n = 2L, grain = "college",
+                                          data_edges = st01_edges)), "suppressed")
+  expect_equal(names(sup), c("term", "campus", "college", "unit_decided", "n_students"))
+  expect_equal(sup$college, c("ENGR", NA, "ARTS"))
+})
+
 test_that("MC02: two courses of one unit are two rows at the course grain, each with its own students", {
   res <- get_major_course_units(test_student_terms_mc, test_students_mc,
                                 list(dept_code = "SPAN", min_n = 1L, grain = "course", data_edges = mc02_edges))
@@ -189,4 +226,55 @@ test_that("get_major_course_units() stops without a unit, an edge, or the attach
   expect_error(get_major_course_units(test_student_terms_st, test_students_st %>% select(-department),
                                       list(dept_code = "HIST", data_edges = st01_edges)),
                "department")
+})
+
+
+# ── Plot preparation and plots ───────────────────────────────────────────────
+
+test_that("ST01: the top-units bars are the own unit, the largest outside units and the rest, summing to one", {
+  # 202010 ABQ: HIST 8 of 10 registrations, ENGL 1, MATH 1; 8 members.
+  rows <- get_major_course_units(test_student_terms_st, test_students_st,
+                                 list(dept_code = "HIST", min_n = 1L, term = 202010L, data_edges = st01_edges)) %>%
+    mutate(unit_label = dept_code, college_label = college)
+
+  bars <- prepare_major_course_units_top_units(rows, own_label = "History", min_n = 1L, n_top = 1L)
+  expect_equal(names(bars), c("campus", "unit_label", "kind", "n_units", "n_registrations", "share",
+                              "term_students", "term_registrations"))
+  # One outside bar asked for: ENGL (first of the tie by name), MATH pooled.
+  expect_equal(bars$unit_label, c("History (own courses)", "ENGL", "All other units (1)"))
+  expect_equal(bars$kind, c("own", "outside", "rest"))
+  expect_equal(bars$n_registrations, c(8L, 1L, 1L))
+  expect_equal(bars$share, c(0.8, 0.1, 0.1))
+  expect_equal(bars$term_students, rep(8L, 3))
+
+  # Room for both: no remainder row.
+  both <- prepare_major_course_units_top_units(rows, own_label = "History", min_n = 1L, n_top = 8L)
+  expect_equal(both$kind, c("own", "outside", "outside"))
+  expect_equal(sum(both$share), 1)
+
+  # An outside unit under the guard has no bar of its own: both are the rest.
+  guarded <- prepare_major_course_units_top_units(rows, own_label = "History", min_n = 2L, n_top = 8L)
+  expect_equal(guarded$unit_label, c("History (own courses)", "All other units (2)"))
+  expect_equal(guarded$share, c(0.8, 0.2))
+
+  # A campus with fewer members than the guard is not drawn at all.
+  expect_equal(nrow(prepare_major_course_units_top_units(rows, own_label = "History", min_n = 9L)), 0L)
+
+  # A subject with no unit is marked, never read as a unit; and a campus where
+  # the own unit taught nothing still has its bar, at zero.
+  undecided <- rows %>% mutate(dept_code = if_else(dept_code == "ENGL", NA_character_, dept_code),
+                               is_own_unit = FALSE)
+  none_own <- prepare_major_course_units_top_units(undecided, own_label = "Spanish", min_n = 1L)
+  expect_equal(none_own$unit_label[[1]], "Spanish (own courses)")
+  expect_equal(none_own$n_registrations[[1]], 0L)
+  expect_equal(none_own$kind[none_own$unit_label == "ENGL"], "undecided")
+  expect_equal(sum(none_own$share), 1)
+
+  # Two terms' rows are refused: the bars are shares of one term.
+  two_terms <- get_major_course_units(test_student_terms_st, test_students_st,
+                                      list(dept_code = "HIST", min_n = 1L, data_edges = st01_edges)) %>%
+    mutate(unit_label = dept_code, college_label = college)
+  expect_error(prepare_major_course_units_top_units(two_terms, own_label = "History"), "one term")
+  expect_error(prepare_major_course_units_top_units(rows %>% select(-unit_label), own_label = "History"),
+               "unit_label")
 })

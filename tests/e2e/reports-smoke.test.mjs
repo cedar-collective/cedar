@@ -310,15 +310,42 @@ export async function runReportChecks({ scope = 'smoke', synthetic = false } = {
       ]);
 
       // Courses Taken computes on open (R/features/dept-trends.R,
-      // compute_dept_course_units_tab()); the latest-term table is its anchor.
+      // compute_dept_course_units_tab()). It leads with the own-unit share
+      // line, then one bar chart of the latest term's teaching units per
+      // campus; the tables sit under their charts. A chart is drawn only for
+      // a campus with enough majors to read (the small-cell guard), and the
+      // page says so where it draws none, as it may in the synthetic
+      // institution.
       await clickSubTabIn(page, 'dept_trends-tabs', 'Courses Taken');
       await waitForOutput(page, 'Dept Trends Courses Taken tab', [
-        { type: 'reactable', id: 'dept_trends-mcu_units_table' },
         { type: 'reactable', id: 'dept_trends-mcu_own_share_table' },
+        { type: 'reactable', id: 'dept_trends-mcu_units_table' },
       ], { all: true });
-      const coursesTaken = await page.$eval('#dept_trends-mcu_body', (el) => el.innerText);
-      if (!/were in the unit's own courses|holds a registration/.test(coursesTaken)) {
-        throw new Error(`Courses Taken lead missing: ${coursesTaken.slice(0, 200)}`);
+      // The over-time charts open on Fall and Spring; Summer is a tick away.
+      const termTypes = await page.$$eval('#dept_trends-mcu_term_type input:checked', (els) => els.map((el) => el.value));
+      if (termTypes.join(',') !== 'fall,spring') {
+        throw new Error(`Courses Taken term types open as "${termTypes.join(',')}", not fall,spring`);
+      }
+      const coursesTaken = await page.$eval('#dept_trends-mcu_body', (el) => ({
+        text: el.innerText,
+        ownShareChart: !!el.querySelector('#dept_trends-mcu_own_share_plot'),
+        topUnitCharts: el.querySelectorAll('[id^="dept_trends-mcu_top_units_"]').length,
+        collegeCharts: el.querySelectorAll('[id^="dept_trends-mcu_college_share_"]').length,
+      }));
+      const guarded = /No teaching campus has \d+ or more of these majors/.test(coursesTaken.text);
+      const charted = coursesTaken.ownShareChart && coursesTaken.topUnitCharts > 0
+        && coursesTaken.collegeCharts > 0;
+      if (!charted && !guarded) {
+        throw new Error(`Courses Taken has neither its charts nor the reason: ${JSON.stringify(coursesTaken).slice(0, 300)}`);
+      }
+      if (coursesTaken.ownShareChart) {
+        await waitForOutput(page, 'Dept Trends Courses Taken own-share chart', [
+          { type: 'plotly', id: 'dept_trends-mcu_own_share_plot' },
+        ]);
+      }
+      // The latest term's numbers are in the charts, not in a paragraph.
+      if (/were in the unit's own courses/.test(coursesTaken.text)) {
+        throw new Error('Courses Taken still opens with the latest-term paragraph');
       }
 
       await clickSubTabIn(page, 'dept_trends-tabs', 'Demographics');

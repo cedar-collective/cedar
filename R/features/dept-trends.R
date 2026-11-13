@@ -725,8 +725,9 @@ rebuild_dept_credit_hours_tab <- function(cached, base) {
 # ── Courses Taken: where this unit's majors take their courses ───────────────
 # The inverse of Students Served on the Credit Hours tab: that asks whose
 # majors fill this unit's seats; this asks which units teach the courses this
-# unit's majors sit in. Computed on activation (0.4 s on the full class list,
-# 2026-11-10), never cached, so it is not in DEPT_CACHE_TABLES.
+# unit's majors sit in. Computed on activation (three passes of the cone, under
+# two seconds on the full class list, 2026-11-12), never cached, so it is not
+# in DEPT_CACHE_TABLES.
 
 #' Compute the Courses Taken tab
 #'
@@ -735,22 +736,30 @@ rebuild_dept_credit_hours_tab <- function(cached, base) {
 #'   `cedar_registrations`, `cedar_dims`, `cedar_edges`.
 #' @param campus_filter Teaching campuses to keep (the page's scope); NULL
 #'   keeps every campus, each its own row.
-#' @param min_n The smallest distinct-student count a unit row shows on its
-#'   own in the latest-term table; smaller rows are pooled as one. An outside
-#'   course under it is left out.
+#' @param min_n The smallest distinct-student count a teaching unit or college
+#'   shows on its own; smaller ones are pooled as one row. An outside course
+#'   under it is left out, and a term and campus with fewer members has no
+#'   point or chart of its own.
 #' @param program_code One or more of the unit's program codes to narrow the
 #'   members to (`meta$programs` lists them); NULL reads every program.
 #' @param n_outside How many outside courses to list per teaching campus.
+#' @param n_top How many outside units get a bar in the latest-term chart.
 #' @return `tables` (`own_share`: per term and campus, the members' students
 #'   and registrations and the share in the unit's own courses; `by_college`:
-#'   per term, campus and teaching college, the share; `latest_units`: the
-#'   latest term's teaching units per campus, small ones pooled;
-#'   `outside_courses`: the latest term's courses outside the unit that most
-#'   members sit in, per campus, with the share of that term's members and
-#'   the count in the same term a year earlier), `plots`
-#'   (`plot_major_course_units_by_college()`, one per campus) and `meta`.
+#'   per term, campus and teaching college, the share, with every college
+#'   under `min_n` students that term pooled as one row (`pooled`,
+#'   `n_pooled`); `latest_units`: the latest term's teaching units per campus,
+#'   small ones pooled; `top_units`: the same term as bars
+#'   (`prepare_major_course_units_top_units()`); `outside_courses`: the latest
+#'   term's courses outside the unit that most members sit in, per campus,
+#'   with the share of that term's members and the count in the same term a
+#'   year earlier), `plots` (`top_units`: one plotly per campus with `min_n`
+#'   members in the latest term) and `meta` (`chart_campuses`: the campuses
+#'   with `min_n` members in some term, which the over-time charts draw). The
+#'   over-time charts are drawn by the page from `own_share` and `by_college`,
+#'   for the term types its reader ticks.
 compute_dept_course_units_tab <- function(base, data_objects, campus_filter = NULL, min_n = 10L,
-                                          program_code = NULL, n_outside = 15L) {
+                                          program_code = NULL, n_outside = 15L, n_top = 8L) {
   for (key in c("cedar_student_terms", "cedar_registrations", "cedar_dims", "cedar_edges")) {
     if (is.null(data_objects[[key]])) stop("[dept-trends.R] compute_dept_course_units_tab: data_objects lacks ", key)
   }
@@ -808,10 +817,37 @@ compute_dept_course_units_tab <- function(base, data_objects, campus_filter = NU
     mutate(own_share = own_registrations / registrations) %>%
     arrange(term, campus)
 
-  by_college <- rows %>%
-    group_by(term, campus, in_progress, college_label) %>%
-    summarize(n_registrations = sum(n_registrations), share = sum(share_of_registrations), .groups = "drop") %>%
-    arrange(term, campus, desc(share))
+  # The same registrations one level up. A college under min_n students in a
+  # term and campus is pooled there: most colleges teach a major's students a
+  # course or two, and a legend of every one of them hides the few that
+  # matter. The students are counted per college by the cone, since a unit
+  # row's students cannot be added up to a college's.
+  colleges <- get_major_course_units(
+    data_objects[["cedar_student_terms"]], data_objects[["cedar_registrations"]],
+    list(dept_code = base$dept_code, campus = campus_filter, min_n = 1L, program_code = program_code,
+         grain = "college", include_in_progress = TRUE, data_edges = data_objects[["cedar_edges"]])
+  )
+  other_colleges <- paste0("Other colleges (each under ", min_n, " students)")
+  by_college <- colleges %>%
+    mutate(
+      pooled = n_students < min_n,
+      college_label = case_when(
+        pooled ~ other_colleges,
+        !unit_decided ~ no_unit,
+        is.na(college) ~ "No college",
+        TRUE ~ coalesce(unname(college_labels[college]), college)
+      )
+    ) %>%
+    group_by(term, campus, in_progress, college_label, pooled) %>%
+    summarize(
+      n_pooled = sum(pooled),
+      # Distinct students cannot be added across the rows of a pooled cell.
+      n_students = if (n() == 1L && !pooled[[1]]) n_students[[1]] else NA_integer_,
+      n_registrations = sum(n_registrations),
+      share = sum(share_of_registrations),
+      .groups = "drop"
+    ) %>%
+    arrange(term, campus, pooled, desc(share))
 
   # The cone's latest_term is the end of the data window. The table and the
   # lead read the latest term in which a member actually holds a registration,
@@ -838,7 +874,7 @@ compute_dept_course_units_tab <- function(base, data_objects, campus_filter = NU
   latest_units <- bind_rows(shown, pooled) %>%
     select(term, campus, in_progress, college_label, unit_label, dept_code, is_own_unit,
            n_students, n_registrations, share_of_registrations) %>%
-    arrange(campus, desc(is_own_unit), desc(n_registrations))
+    arrange(campus, desc(is_own_unit), is.na(n_students), desc(n_registrations))
 
   # The courses themselves, for the latest term and the same term a year
   # earlier: the seats another unit's schedule supplies to these majors, and
@@ -866,10 +902,17 @@ compute_dept_course_units_tab <- function(base, data_objects, campus_filter = NU
            n_students, share_of_students, students_year_earlier) %>%
     arrange(campus, desc(n_students), subject_course)
 
+  # A chart is drawn for a campus that has min_n members to read: in some
+  # term for the series, in the latest term for its bars. A smaller campus is
+  # in the tables.
+  chart_campuses <- own_share %>% filter(students >= min_n) %>% distinct(campus) %>% pull(campus) %>% sort()
+  top_units <- prepare_major_course_units_top_units(latest_rows, own_label = dept_name, min_n = min_n,
+                                                    n_top = n_top)
+
   list(
     tables = list(own_share = own_share, by_college = by_college, latest_units = latest_units,
-                  outside_courses = outside_courses),
-    plots = plot_major_course_units_by_college(by_college),
+                  top_units = top_units, outside_courses = outside_courses),
+    plots = list(top_units = plot_major_course_units_top_units(top_units)),
     meta = list(
       dept_code = base$dept_code,
       dept_name = dept_name,
@@ -880,47 +923,33 @@ compute_dept_course_units_tab <- function(base, data_objects, campus_filter = NU
       window_end = window_end,
       latest_term = latest,
       latest_in_progress = latest > attr(result, "edge"),
+      chart_campuses = chart_campuses,
       n_members = attr(result, "n_members"),
       n_member_student_terms = attr(result, "n_member_student_terms"),
       n_unmapped = attr(result, "n_unmapped"),
       min_n = min_n,
-      n_outside = as.integer(n_outside)
+      n_outside = as.integer(n_outside),
+      n_top = as.integer(n_top)
     )
   )
 }
 
-#' The Courses Taken lead, one sentence group per campus of the latest term
+#' What the Courses Taken tab has to say before its charts, when anything
+#'
+#' The numbers are in the charts. This is only the sentence a chart cannot
+#' carry: that no member holds a registration, or that the latest term read is
+#' earlier than the data's last term.
 #'
 #' @param payload `compute_dept_course_units_tab()` output.
-#' @return Character vector, one paragraph per campus.
-dept_course_units_headline <- function(payload) {
+#' @return Character vector: empty, or one sentence.
+dept_course_units_note <- function(payload) {
   meta <- payload$meta
-  own <- payload$tables$own_share %>% filter(term == meta$latest_term) %>% arrange(campus)
-  if (nrow(own) == 0L) {
+  if (nrow(payload$tables$own_share) == 0L) {
     return(paste0("No enrolled ", meta$member_name, " major holds a registration to ", fmt_term(meta$window_end), "."))
   }
-  n <- function(x) format(as.integer(x), big.mark = ",", trim = TRUE)
-  plural <- function(k, noun) paste0(n(k), " ", noun, if (k == 1) "" else "s")
-  pct <- function(x) sprintf("%.1f%%", 100 * x)
-  stale <- if (meta$latest_term < meta$window_end) {
-    paste0("No enrolled ", meta$member_name, " major holds a registration after ", fmt_term(meta$latest_term),
-           "; the data runs to ", fmt_term(meta$window_end), ", so that is the latest term read here.")
+  if (meta$latest_term < meta$window_end) {
+    return(paste0("No enrolled ", meta$member_name, " major holds a registration after ", fmt_term(meta$latest_term),
+                  "; the data runs to ", fmt_term(meta$window_end), ", so that is the latest term read here."))
   }
-  c(stale, vapply(seq_len(nrow(own)), function(i) {
-    o <- own[i, ]
-    others <- payload$tables$latest_units %>%
-      filter(campus == o$campus, !is_own_unit, !is.na(dept_code)) %>%
-      arrange(desc(n_registrations)) %>%
-      head(3)
-    paste0(
-      "In ", fmt_term(o$term), if (isTRUE(o$in_progress)) " (in progress)" else "", ", ",
-      plural(o$students, paste(meta$member_name, "major")), " held ", plural(o$registrations, "registration"),
-      " in courses taught on ", o$campus, "; ", pct(o$own_share),
-      " were in the unit's own courses",
-      if (nrow(others) > 0L) {
-        paste0(", and ", paste0(others$unit_label, " (", pct(others$share_of_registrations), ")", collapse = ", "),
-               " taught the most outside it.")
-      } else "."
-    )
-  }, character(1)))
+  character(0)
 }

@@ -97,18 +97,38 @@ decide it. Shares are within the term and teaching campus, over every member
 registration there. A subject no mapping row has decided appears as its own
 "No unit decided" row rather than being given a unit.
 
-The tab opens with one sentence per teaching campus for the latest term: how
-many majors, how many registrations, the share in the department's own
-courses, and the three outside units that taught the most. Below it:
+The tab reads from the top:
 
+- **Own-unit share over time** — a line per teaching campus: of the majors'
+  registrations each term, the share in the department's own courses. The
+  table under the chart gives the students and registrations behind each
+  point. A shaded term is in progress.
+- **Teaching units, latest term** — one bar chart per teaching campus, headed
+  by that campus's majors and registrations: the department's own courses
+  first, then the eight outside units that taught the most of the majors'
+  registrations, then every other unit as one grey bar. The table under the
+  charts lists every unit, with students, registrations and share.
 - **Teaching colleges over time** — one stacked bar per term, split by the
-  college of the teaching unit, one chart per teaching campus. A shaded term
-  is in progress.
-- **Teaching units, latest term** — every unit that taught the department's
-  majors, with students, registrations and share; units under ten students
-  are pooled into one row.
-- **Own-unit share by term** — the members' students and registrations each
-  term, and the share in the department's own courses.
+  college of the teaching unit, one chart per teaching campus.
+- **Top outside courses, latest term** — the courses outside the department
+  that the most of its majors sit in, with the share of that term's majors
+  and the count a year earlier.
+
+A teaching unit or college that taught fewer than ten of the majors in a term
+is not shown on its own: it is pooled with the others like it, as one table
+row or one grey segment. Most colleges teach a department's majors a course
+or two, and listing each would hide the few that carry the load. A campus
+with fewer than ten of the majors in a term has no point on the line that
+term and no chart; its counts are in the tables.
+
+**Term types** chooses the terms the two over-time charts and the table under
+the first one show. It opens on Fall and Spring. Summer is a tick away, and
+off to begin with: few majors enrol in summer and they take a different mix
+of courses, so a summer point between a spring and a fall reads as a change
+when nothing about the department changed.
+
+Where a department has more than one program, a Program picker narrows the
+majors to one of them.
 
 The tab computes when you open it and is not cached; it follows the page's
 campus scope.
