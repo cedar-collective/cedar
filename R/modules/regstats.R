@@ -557,6 +557,7 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
       sat_count         <- if ("sat"         %in% names(flagged)) nrow(flagged$sat)         else 0
       early_drops_count <- if ("early_drops" %in% names(flagged)) nrow(flagged$early_drops) else 0
       late_drops_count  <- if ("late_drops"  %in% names(flagged)) nrow(flagged$late_drops)  else 0
+      watch_listed      <- rs_watch()$meta$n_listed %||% 0
 
       downstream_df <- filter_downstream_by_dept(
         if (!is.null(signals$downstream)) signals$downstream else tibble(),
@@ -654,6 +655,18 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
               id = ns("rs_tabs"),
               selected = isolate(rs_selected_tab()),
 
+              tabPanel("Worth a Look",
+                dashboard_section(
+                  "Worth a look",
+                  "Each flagged course, by how its census compares with its usual and how full its seats are, with the list ranked below.",
+                  method = uiOutput(ns("rs_watch_method")),
+                  if (watch_listed > 0) tagList(
+                    plotly::plotlyOutput(ns("rs_watch_plot"), height = "540px"),
+                    reactable::reactableOutput(ns("rs_watch_table")))
+                  else empty_state("No course in this scope was flagged by a Regstats screen.")
+                )
+              ),
+
               tabPanel("Enrollment Bumps",
                 cedar_definition_panel(c("census-enrollment", "regstats"), "About enrollment bumps"),
                 if (bumps_count > 0) reactable::reactableOutput(ns("rs_bumps_table"))
@@ -739,6 +752,94 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
             )
           )
         )
+      )
+    })
+
+    # ── Worth a look: the screens read together (features/registration-watch.R) ──
+
+    rs_watch <- reactive({
+      data <- regstats_data()
+      req(data)
+      tryCatch(build_registration_watch(data$flagged), error = function(e) {
+        showNotification(paste("Worth a look could not be built:", conditionMessage(e)),
+                         type = "error", duration = NULL)
+        NULL
+      })
+    })
+
+    rs_watch_plot_data <- reactive({
+      w <- rs_watch()
+      req(w)
+      prepare_registration_watch_plot_data(w)
+    })
+
+    output$rs_watch_plot <- plotly::renderPlotly({
+      pd <- rs_watch_plot_data()
+      shiny::validate(shiny::need(nrow(pd$points) > 0,
+        "No flagged course has both an earlier offering and usable seats to place on the chart."))
+      plot_registration_watch(pd)
+    })
+
+    output$rs_watch_method <- renderUI({
+      w <- rs_watch()
+      req(w)
+      near_full <- format(100 * .registration_watch_near_full(w$meta))
+      tagList(
+        tags$p("Regstats runs several screens, each against the course's own earlier terms of the ",
+               "same type and part of term. This view reads them together, each campus apart: a ",
+               "course takes the first of these patterns its flags make."),
+        tags$ul(lapply(seq_len(nrow(REGISTRATION_WATCH_PATTERNS)), function(i)
+          tags$li(tags$strong(REGISTRATION_WATCH_PATTERNS$label[i]), ": ",
+                  REGISTRATION_WATCH_PATTERNS$sentence[i], "."))),
+        tags$p(sprintf("Near full means at least %s%% of seats filled at census (the Chronic Fill Rate). ", near_full),
+               sprintf("%d %s only usually near full %s counted, not listed.", w$meta$n_usually_full,
+                       if (w$meta$n_usually_full == 1) "course" else "courses",
+                       if (w$meta$n_usually_full == 1) "is" else "are")),
+        tags$p("Across: census enrollment as a multiple of the course's average in its earlier ",
+               "matching terms, on a log scale, so half and twice its usual sit the same distance from ",
+               "usual. Up: census as a share of scheduled seats. Size: the students behind the flag ",
+               "(beyond the usual range, waiting, or dropping); a fill flag has no count and is drawn ",
+               "smallest. Colour: short of seats, demand moving with seats to spare, or another flag; ",
+               "shape: the pattern, pointing down for fewer students and up for more."),
+        tags$p(registration_watch_plot_note(rs_watch_plot_data()))
+      )
+    })
+
+    output$rs_watch_table <- reactable::renderReactable({
+      w <- rs_watch()
+      req(w, nrow(w$courses) > 0)
+      several_terms <- length(w$meta$terms) > 1
+      df <- w$courses %>%
+        dplyr::select(dplyr::any_of(if (several_terms) "term"), label, subject_course, course_title,
+                      campus, college, part_term, students, census_enrl, census_enrl_mean,
+                      enrl_ratio, fill_rate, waiting, n_screens)
+      reactable::reactable(
+        df,
+        theme = cedar_tbl_theme, striped = TRUE, highlight = TRUE, compact = TRUE,
+        defaultPageSize = 15, showPageSizeOptions = TRUE, pageSizeOptions = c(15, 50, 100),
+        defaultColDef = reactable::colDef(na = "\u2014"),
+        columns = list(
+          term             = reactable::colDef(name = "Term", maxWidth = 75),
+          label            = reactable::colDef(name = "Pattern", minWidth = 130),
+          subject_course   = reactable::colDef(name = "Course", minWidth = 90),
+          course_title     = reactable::colDef(name = "Title", minWidth = 130,
+            cell = function(v) if (!is.na(v)) htmltools::span(class = "text-sub", v) else ""),
+          campus           = reactable::colDef(name = "Campus", maxWidth = 75),
+          college          = reactable::colDef(name = "College", maxWidth = 75),
+          part_term        = cedar_pot_coldef(),
+          students         = reactable::colDef(name = "Students", maxWidth = 85, align = "right",
+                                               format = reactable::colFormat(digits = 0)),
+          census_enrl      = reactable::colDef(name = "Census", maxWidth = 80, align = "right",
+                                               format = reactable::colFormat(digits = 0, separators = TRUE)),
+          census_enrl_mean = reactable::colDef(name = "Usual", maxWidth = 80, align = "right",
+                                               format = reactable::colFormat(digits = 0, separators = TRUE)),
+          enrl_ratio       = reactable::colDef(name = "\u00d7 Usual", maxWidth = 80, align = "right",
+                                               format = reactable::colFormat(digits = 2)),
+          fill_rate        = reactable::colDef(name = "Fill", maxWidth = 75, align = "right",
+                                               format = reactable::colFormat(percent = TRUE, digits = 1)),
+          waiting          = reactable::colDef(name = "Waiting", maxWidth = 80, align = "right"),
+          n_screens        = reactable::colDef(name = "Screens", maxWidth = 80, align = "right")
+        )[names(df)]
       )
     })
 

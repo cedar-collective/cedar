@@ -119,9 +119,9 @@ unusually; provost: cross-college patterns and risks).
   by the watch: 363 courses flagged (333 course-campus pairs, each part of term
   read apart), 297 by two or more screens; 110 only usually near full, counted
   and not listed; 16 seats cut, led by MATH 1430 at ABQ, 165 enrolled against
-  a usual 360 in 174 seats, 94.8% filled at census. Step 1, the text-first
-  preview over the Regstats payload (`build_registration_watch()`). Step 2, a
-  picture of it: each course a point at its change against its usual
+  a usual 360 in 174 seats, 94.8% filled at census. Done: step 1, the
+  text-first preview over the Regstats payload (`build_registration_watch()`),
+  and step 2, Regstats' Worth a Look tab, a picture of it: each course a point at its change against its usual
   enrollment (across) and its census fill (up), sized by the students behind
   it and coloured by pattern, with the near-full line drawn, so seats cut,
   growth near capacity, falling and rising demand sit in their own corners and

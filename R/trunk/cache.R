@@ -22,7 +22,9 @@ cedar_course_neighbors_cache_version <- 6L
 #    headcount, and a zero-seat, zero-student section is not an offering.
 # v8 the table counts a crosslisted section once, under its home listing
 #    (cedar_course_terms build 4): a partner listing has students and no seats.
-cedar_regstats_cache_version <- 8L
+# v9 adds course_context: every raised course's census, usual census and fill,
+#    whichever screen raised it (the registration watch's two axes).
+cedar_regstats_cache_version <- 9L
 
 course_neighbors_content_hash <- function(df, relevant_cols) {
   cols <- intersect(relevant_cols, names(df))

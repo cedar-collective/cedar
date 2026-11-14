@@ -1328,6 +1328,13 @@ snapshot_students <- attach_test_course_ids(dplyr::bind_rows(test_students_inter
 #   RW09 ARTH 1120 ABQ FA  near full now + running hot, not usually   -> fuller than usual, no count
 #   RW10 FDMA 1520 ABQ FA  dip (30 beyond) + near full now + usually  -> seats cut, 30
 #   RW11 BIOL 2305 ABQ AS  bump (50 beyond) + full, no waitlist  -> growth at capacity, 50
+#   RW12 MATH 1350 EA  AS  9 waiting, a first offering, no seats -> students waiting, 9
+# course_context is every raised row's census, usual census, seats and fill,
+# as Regstats returns it: CHEM 1215 has no usable seats (NA fill), MATH 1350
+# no earlier offering (NA usual) and no seats, so neither can be placed on the
+# watch's chart; HIST 1110 and PSYC 1110 have room; FDMA 1520 fell to under a
+# fifth of its usual (12 against 62), past the chart's quarter, so it is drawn
+# at the edge.
 watch_flagged <- local({
   rw <- function(...) tibble::tribble(...) %>% dplyr::mutate(term = 202680L, part_term = "1")
   list(
@@ -1341,11 +1348,12 @@ watch_flagged <- local({
       ~campus, ~college, ~subject_course, ~course_title,     ~census_enrl, ~census_enrl_mean, ~impacted,
       "ABQ",   "AS",     "SPAN 1110",     "Elementary Span I", 445,         548,               60,
       "ABQ",   "AS",     "HIST 1110",     "US History I",      60,          110,               30,
-      "ABQ",   "FA",     "FDMA 1520",     "Film Production",   18,          62,                30),
+      "ABQ",   "FA",     "FDMA 1520",     "Film Production",   12,          62,                30),
     waits = rw(
       ~campus, ~college, ~subject_course, ~course_title,     ~waiting,
       "EA",    "AS",     "SPAN 1110",     "Elementary Span I", 12,
-      "ABQ",   "AS",     "BIOL 2210",     "Anatomy & Phys I",  69),
+      "ABQ",   "AS",     "BIOL 2210",     "Anatomy & Phys I",  69,
+      "EA",    "AS",     "MATH 1350",     "College Algebra",   9),
     sat = rw(
       ~campus, ~college, ~subject_course, ~course_title,     ~census_enrl, ~capacity, ~fill_rate, ~is_full_now, ~is_chronic_hist, ~is_running_hot,
       "ABQ",   "AS",     "SPAN 1110",     "Elementary Span I", 445,         456,       0.976,      TRUE,         TRUE,             FALSE,
@@ -1353,7 +1361,7 @@ watch_flagged <- local({
       "ABQ",   "AS",     "BIOL 2210",     "Anatomy & Phys I",  165,         168,       0.982,      TRUE,         TRUE,             FALSE,
       "ABQ",   "AS",     "ENGL 1120",     "Composition II",    1080,        1100,      0.982,      TRUE,         TRUE,             FALSE,
       "ABQ",   "FA",     "ARTH 1120",     "Art Appreciation",  178,         180,       0.989,      TRUE,         FALSE,            TRUE,
-      "ABQ",   "FA",     "FDMA 1520",     "Film Production",   18,          20,        0.900,      TRUE,         TRUE,             FALSE,
+      "ABQ",   "FA",     "FDMA 1520",     "Film Production",   12,          13,        0.923,      TRUE,         TRUE,             FALSE,
       "ABQ",   "AS",     "BIOL 2305",     "General Biology",   285,         288,       0.990,      TRUE,         TRUE,             TRUE),
     early_drops = rw(
       ~campus, ~college, ~subject_course, ~course_title,     ~impacted,
@@ -1362,6 +1370,20 @@ watch_flagged <- local({
     late_drops = rw(
       ~campus, ~college, ~subject_course, ~course_title,     ~impacted,
       "ABQ",   "AS",     "MATH 1215",     "Intermediate Alg",  18),
+    course_context = rw(
+      ~campus, ~college, ~subject_course, ~census_enrl, ~census_enrl_mean, ~capacity, ~fill_rate,
+      "ABQ",   "AS",     "SPAN 1110",     445,          548,               456,       0.976,
+      "EA",    "AS",     "SPAN 1110",     80,           50,                80,        1.000,
+      "ABQ",   "AS",     "BIOL 2210",     165,          160,               168,       0.982,
+      "ABQ",   "AS",     "CHEM 1215",     700,          500,               NA,        NA,
+      "ABQ",   "AS",     "HIST 1110",     60,           110,               150,       0.400,
+      "ABQ",   "AS",     "PSYC 1110",     300,          250,               400,       0.750,
+      "ABQ",   "AS",     "MATH 1215",     340,          330,               400,       0.850,
+      "ABQ",   "AS",     "ENGL 1120",     1080,         1060,              1100,      0.982,
+      "ABQ",   "FA",     "ARTH 1120",     178,          170,               180,       0.989,
+      "ABQ",   "FA",     "FDMA 1520",     12,           62,                13,        0.923,
+      "ABQ",   "AS",     "BIOL 2305",     285,          210,               288,       0.990,
+      "EA",    "AS",     "MATH 1350",     40,           NA,                NA,        NA),
     thresholds = list(min_impacted = 10, pct_sd = 1, chronic_fill_rate = 0.9,
                       min_sat_terms = 3, min_wait = 8)
   )

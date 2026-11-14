@@ -53,6 +53,41 @@ test_that("Regstats uses earlier matching terms for every mean and population SD
   expect_equal(dip$impacted, 50)
 })
 
+test_that("every raised course carries its census, usual census and fill, whichever screen raised it", {
+  # Raise the fill thresholds so SOCI 101 is raised by its dip alone: its fill
+  # must still come from the saturation frame, not from a fill screen's row.
+  opt <- regstats_history_opt()
+  opt$thresholds$chronic_fill_rate <- .95
+  opt$thresholds$min_sat_terms <- 3
+  result <- get_reg_stats(test_students_regstats, test_sections_regstats, opt,
+                          course_terms = test_course_terms_regstats)
+  keys <- c("campus", "college", "subject_course", "part_term", "term")
+  raised <- dplyr::bind_rows(lapply(
+    result[c("bumps", "dips", "waits", "early_drops", "late_drops", "sat")],
+    function(d) dplyr::distinct(dplyr::ungroup(d), dplyr::across(dplyr::all_of(keys))))) %>%
+    dplyr::distinct()
+  ctx <- result$course_context
+  expect_equal(nrow(ctx), nrow(raised))
+  expect_equal(nrow(dplyr::anti_join(raised, ctx, by = keys)), 0L)
+
+  expect_false("SOCI 101" %in% result$sat$subject_course)
+  soci101 <- dplyr::filter(ctx, subject_course == "SOCI 101")
+  expect_equal(soci101$census_enrl, 10)
+  expect_equal(soci101$census_enrl_mean, 70)
+  expect_equal(soci101$capacity, 100)
+  expect_equal(soci101$fill_rate, .1)
+
+  # The same numbers the screens tested, for the rows they raised.
+  b <- dplyr::inner_join(result$bumps, ctx, by = keys, suffix = c("", ".ctx"))
+  expect_equal(nrow(b), nrow(result$bumps))
+  expect_equal(b$census_enrl.ctx, b$census_enrl)
+  expect_equal(b$census_enrl_mean.ctx, b$census_enrl_mean)
+  s <- dplyr::inner_join(result$sat, ctx, by = keys, suffix = c("", ".ctx"))
+  expect_equal(nrow(s), nrow(result$sat))
+  expect_equal(s$fill_rate.ctx, s$fill_rate)
+  expect_equal(s$capacity.ctx, s$capacity)
+})
+
 test_that("later data cannot change past Regstats flags or baselines", {
   full <- get_reg_stats(test_students_regstats, test_sections_regstats, regstats_history_opt(),
                          course_terms = test_course_terms_regstats)
