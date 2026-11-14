@@ -231,3 +231,48 @@ test_that("get_gen_ed_profile can include chair-facing instructor DFW rows", {
   expect_equal(baker$early_drop_pct, 0)
   expect_equal(baker$n_terms, 1L)
 })
+
+test_that("gen_ed_scope_terms keeps the range's terms of the chosen types", {
+  # The fixture's terms: 201910, 202010, 202060 (summer), 202080, 202110.
+  expect_equal(gen_ed_scope_terms(test_sections$term, c("fall", "spring")),
+               c(201910L, 202010L, 202080L, 202110L))
+  expect_equal(gen_ed_scope_terms(test_sections$term, "summer"), 202060L)
+  expect_equal(gen_ed_scope_terms(test_sections$term, c("fall", "spring"),
+                                  from = 202010L, to = 202080L),
+               c(202010L, 202080L))
+  expect_equal(gen_ed_scope_terms(test_sections$term, "summer", from = 202080L),
+               integer(0))
+})
+
+test_that("gen_ed_scope_terms refuses an empty choice or a reversed range", {
+  expect_error(gen_ed_scope_terms(test_sections$term, character(0)))
+  expect_error(gen_ed_scope_terms(test_sections$term, "winter"))
+  expect_error(gen_ed_scope_terms(test_sections$term, "fall", from = 202110L, to = 201910L))
+})
+
+test_that("get_gen_ed_profile refuses an empty term list rather than reading every term", {
+  expect_error(get_gen_ed_profile(
+    gen_ed_assoc_students,
+    gen_ed_assoc_attempts,
+    gen_ed_assoc_sections,
+    gen_ed_assoc_programs,
+    student_terms = test_student_terms_gen_ed_assoc,
+    dims = test_dims,
+    opt = list(data_edges = data_objects$cedar_edges, min_n = 1L, campus = "ABQ",
+               terms = integer(0))
+  ))
+})
+
+test_that("Gen Ed deep links round-trip the term types", {
+  spec <- CEDAR_SHARE_SPECS[["Gen Ed"]]
+  query_string <- cedar_share_query(
+    spec$slug,
+    list(campus = c("ABQ", "EA"), from_term = 201910L, to_term = 202110L,
+         term_type = c("fall", "spring"))
+  )
+  state <- cedar_parse_link_state(paste0("?", query_string))
+  item <- cedar_restore_item(spec, state$query, "term_type")
+  expect_equal(item$id, "gen_ed-ge_term_type")
+  expect_equal(item$type, "checkbox_group")
+  expect_equal(item$value, c("fall", "spring"))
+})

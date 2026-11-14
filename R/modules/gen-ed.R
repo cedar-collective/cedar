@@ -91,6 +91,18 @@ gen_ed_term_choices <- function(sections, current_term = NULL) {
 }
 
 
+# The Term types control both Gen Ed views share. Fall and Spring by default: a
+# Summer term is a small, different mix, and pooled with the regular terms it
+# reads as a dip in every series.
+GEN_ED_TERM_TYPES <- c("Fall" = "fall", "Spring" = "spring", "Summer" = "summer")
+GEN_ED_DEFAULT_TERM_TYPES <- c("fall", "spring")
+
+gen_ed_term_type_input <- function(id) {
+  checkboxGroupInput(id, "Term types", choices = GEN_ED_TERM_TYPES,
+                     selected = GEN_ED_DEFAULT_TERM_TYPES, inline = TRUE)
+}
+
+
 gen_ed_dept_sections <- function(sections, dept = NULL) {
   dept_val <- if (is.function(dept)) dept() else dept
   if (is.null(dept_val) || length(dept_val) == 0 || !nzchar(dept_val[1])) return(sections)
@@ -113,7 +125,7 @@ gen_ed_area_choices <- function(sections) {
 genEdExploreUI <- function(id, sections, dept_choices, current_term = NULL, default_term = NULL) {
   ns <- NS(id)
   term_choices <- gen_ed_term_choices(sections, current_term)
-  snapshot_term <- resolve_default_term_choice(
+  last_term <- resolve_default_term_choice(
     term_choices,
     default_term = default_term,
     fallback_term = current_term
@@ -135,13 +147,15 @@ genEdExploreUI <- function(id, sections, dept_choices, current_term = NULL, defa
           selectInput(ns("ge_college"), "College", multiple = TRUE,
             choices = sort(unique(sections$college[!is.na(sections$college)])))
         ),
+        # Opens on every term to the default term: a Gen Ed pattern is read
+        # over its history, one term type at a time, never off one term.
         column(2,
           selectizeInput(ns("ge_from_term"), "From term",
-            choices = term_choices, selected = snapshot_term)
+            choices = term_choices, selected = unname(term_choices[1]))
         ),
         column(2,
           selectizeInput(ns("ge_to_term"), "To term",
-            choices = term_choices, selected = snapshot_term)
+            choices = term_choices, selected = last_term)
         ),
         column(2,
           selectizeInput(ns("ge_dept"), "Department", multiple = TRUE,
@@ -154,9 +168,19 @@ genEdExploreUI <- function(id, sections, dept_choices, current_term = NULL, defa
         # Min N is no longer a user control — see GEN_ED_MIN_N in the server.
         column(1,
           filter_actions(
-            actionButton(ns("ge_button"), "Run", class = "btn-sm btn-primary", icon = icon("play"))
+            actionButton(ns("ge_button"), "Run", class = "btn-sm btn-primary", icon = icon("play")),
+            actionButton(ns("ge_copy_url"), label = NULL, icon = icon("link"),
+                         title = "Copy shareable link for current view",
+                         class = "btn-outline-secondary btn-sm")
           )
         )
+      ),
+      fluidRow(class = "explore-filter-row",
+        column(3, gen_ed_term_type_input(ns("ge_term_type"))),
+        column(9, helpText(
+          "Every number below pools the terms of the chosen types between From and To. ",
+          "A Fall term and a Spring one hold different students, and a Summer term a small, different mix."
+        ))
       )
       # Scope stripe removed: it restated the same course/department/enrollment
       # counts that the summary cards show immediately below, in prose.
@@ -259,6 +283,13 @@ deptProfileGenEdUI <- function(id, sections = NULL, current_term = NULL) {
       "Enrollment figures come from section records; outcome tables use ",
       "class-list course attempts under the versioned DFW policy below, so their ",
       "totals can run lower than the enrollment figures."
+    ),
+    div(class = "explore-filter-row",
+      gen_ed_term_type_input(ns("term_type")),
+      helpText(
+        "The term types govern Gen Ed Enrollment and Course Outcomes. ",
+        "The two graduate sections follow each graduate's whole record, every term type included."
+      )
     ),
     dashboard_section(
       "Gen Ed Enrollment",
@@ -1147,11 +1178,21 @@ genEdExploreServer <- function(id, students, attempts, sections, programs, degre
                                dims) {
   moduleServer(id, function(input, output, session) {
     build_terms <- reactive({
-      all_terms <- sort(unique(sections$term[!is.na(sections$term)]))
-      from_term <- as.integer(input$ge_from_term)
-      to_term <- as.integer(input$ge_to_term)
-      all_terms[all_terms >= from_term & all_terms <= to_term]
+      shiny::validate(shiny::need(length(input$ge_term_type) > 0, "Tick at least one term type."))
+      gen_ed_scope_terms(sections$term, input$ge_term_type,
+                         from = input$ge_from_term, to = input$ge_to_term)
     })
+
+    cedar_copy_url_observer(input, session, "ge_copy_url", spec_title = "Gen Ed",
+      values_fn = function() list(
+        campus      = input$ge_campus,
+        college     = input$ge_college,
+        from_term   = input$ge_from_term,
+        to_term     = input$ge_to_term,
+        term_type   = input$ge_term_type,
+        dept        = input$ge_dept,
+        gen_ed_area = input$ge_gen_ed_area
+      ))
 
     opt_builder <- reactive({
       list(
@@ -1190,11 +1231,15 @@ deptProfileGenEdServer <- function(id, students, attempts, sections, programs, d
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
 
+    # The term types govern the enrollment and outcome sections only: the
+    # graduate sections follow each graduate's whole record (grad_ge_scope).
     build_terms <- reactive({
+      shiny::validate(shiny::need(length(input$term_type) > 0, "Tick at least one term type."))
       term_sections <- gen_ed_dept_sections(sections, dept)
-      all_terms <- sort(unique(term_sections$term[!is.na(term_sections$term)]))
-      if (!is.null(current_term)) all_terms <- all_terms[all_terms <= current_term]
-      all_terms
+      terms <- gen_ed_scope_terms(term_sections$term, input$term_type, to = current_term)
+      shiny::validate(shiny::need(length(terms) > 0,
+                                  "This department has no Gen Ed terms of the chosen types."))
+      terms
     })
 
     opt_builder <- reactive({
@@ -1250,12 +1295,19 @@ deptProfileGenEdServer <- function(id, students, attempts, sections, programs, d
     # so they are combined into one trigger. The axis is read here rather than
     # inside the renderers because it changes what get_course_timing() computes,
     # not merely how it is drawn.
+    # Department and campus only, never opt_builder(): the term types scope the
+    # sections above, and a graduate's Gen Ed is their whole record, so ticking
+    # a term type must not rebuild (or blank) the graduate cohort.
     grad_ge_trigger <- reactive({
       if (!is.null(active)) {
         active_value <- if (is.function(active)) active() else active
         req(isTRUE(active_value))
       }
-      list(opt = opt_builder(),
+      dept_val <- if (is.function(dept)) dept() else dept
+      campus_val <- if (is.null(campus)) NULL else if (is.function(campus)) campus() else campus
+      req(dept_val, nzchar(dept_val))
+      list(opt = list(dept_code = dept_val,
+                      campus = if (length(campus_val) > 0) campus_val else NULL),
            x_axis = input$grad_ge_axis %||% GRAD_GEN_ED_DEFAULT_AXIS)
     })
 
