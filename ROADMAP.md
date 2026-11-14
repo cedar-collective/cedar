@@ -55,7 +55,9 @@ loads, and the cones read the measure tables. What remains of it is under
 **Decisions waiting on a person:** the 37 renumberings still proposed in
 `institution/unm/code_history.csv` ([I37](ISSUES.md)); decide the largest
 programs and subjects still proposed (Admin → Data & Usage → Mappings,
-`scripts/mapping-review.R`).
+`scripts/mapping-review.R`). Whether FYEX 1110's *Starts Here* is *Success Starts
+Here* and *Fndmntl / Found. / Foundatnl Math Transition* one seminar
+(`institution/unm/topic_titles.csv`).
 
 ---
 
@@ -191,6 +193,17 @@ contracts: [degree-requirements.md](docs/developers/degree-requirements.md),
 - [ ] **Operational monitoring.** Shiny errors, usage logs, scheduled-refresh
   outcomes and cold-cache latency after release.
 - [ ] **Standard CSV export** across user-facing tables through a shared helper.
+- [ ] **A topic filter for the whole Course Dynamics page.** The Topics tab
+  counts a course's topics from the schedule and class list, because the
+  measure tables are counted by course and part of term. A section (or topic)
+  grain on `cedar_course_terms` and `cedar_attempts`, with a schema bump and
+  rebuild, would let every tab scope to one topic and the Topics cone read the
+  measures.
+- [ ] **One test for a topics course.** Low Enrollment, the Dept Dashboard and
+  planning history call a course topics when a title starts `T:`
+  (`is_topics_course()`, `is_topics`); Course Dynamics > Topics calls it topics
+  when one campus-term offered two or more titles (`course_has_topics()`).
+  Move the others to the data-driven rule.
 - [ ] **ADR-001's open questions:** size the pulls layer (full extracts or a
   changes-only log), and decide which `cedar_student_terms` measures need a
   home-campus variant

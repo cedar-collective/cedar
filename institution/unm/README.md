@@ -29,6 +29,7 @@ and the generated [2026–2027 rules](shared_requirements/2026-2027/RULES.md).
 | `program_names.csv` | program name as an export writes it | `program_name`, `program_code` |
 | `program_name_aliases.csv` | variant program name | `source_name`, `program_name` |
 | `source_organizations.csv` | HR organisation name | `source_name`, `unit_code` |
+| `topic_titles.csv` | section title merged into another topic of its course | `subject_course`, `title`, `topic`, `notes` |
 
 **Every row is one line.** No blank lines and no line breaks inside a field:
 Admin > Mappings links to rows by line number, and the loader refuses a file
@@ -334,6 +335,26 @@ moves of +25 and -21 were followed by -4 and +2). Courses that share students
 without one leading to the other (cohort blocks, lecture and lab, a first-year
 seminar beside composition) are not sequences either. `notes` records the
 evidence. Added 2026-10-24 (model 0.26.0).
+
+## topic_titles.csv
+
+One course number can carry many courses, each section titled with its own
+topic: FYEX 1110's seminars, a special-topics slot. Course Dynamics > Topics
+reads each section's title as its topic, wording-blind: a leading section
+label (`Sem:`, `T:`, `Perf Conc:`, up to 12 characters before a colon) is
+dropped, and case, punctuation, spacing and `&` against `and` are ignored
+(`topic_title_key()`, `R/lists/topic_titles.R`). A row here merges what that
+cannot: a misspelling, an abbreviation, a title cut short at the schedule's
+length limit. `subject_course` is the code the sections are listed under,
+`title` a title as the schedule printed it, `topic` the title its sections
+are counted with; both are matched wording-blind. The loader refuses a row
+that merges nothing (its title already reads as its topic), a title merged
+twice, and a topic that is itself merged (name the final one). A title no row
+merges stays a topic of its own; the tab's last table lists every title and
+how it was counted, which is where a missing merge shows. Started 2026-11-13
+with FYEX 1110's five variants on the 2026-10-08 pull; Fndmntl / Found. /
+Foundatnl Math Transition and Starts Here / Success Starts Here are left
+unmerged until someone who knows the seminars confirms them.
 
 ## The text maps: program_names.csv, program_name_aliases.csv, source_organizations.csv
 

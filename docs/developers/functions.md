@@ -8,7 +8,7 @@ parent: Developer Guide
 
 This reference is auto-generated from roxygen2 comments in the source code.
 
-*Generated: 2026-11-13 11:26:30.19905*
+*Generated: 2026-11-13 17:47:07.51412*
 
 ---
 
@@ -1114,6 +1114,72 @@ Stop unless a course-term table is this build's  For a reader that holds the tab
 
 - `course_terms` - cedar_course_terms as passed to a reader.
 - `caller` - The reader's name, for the error.
+
+---
+
+## course-topics
+
+### `get_course_topic_terms()`
+
+*Source: course-topics.R*
+
+**A course's topics by campus and term**
+
+**Parameters:**
+
+- `sections` - `cedar_sections`.
+- `students` - `cedar_registrations`.
+- `attempts` - `cedar_attempts`.
+- `student_terms` - `cedar_student_terms`.
+- `topic_titles` - CEDAR_TOPIC_TITLES, or another validate_topic_titles() result.
+- `opt` - `course` (one course id; required), `campus` (campuses that taught it; NULL for every campus), `data_edges` (`cedar_data_edges()` output with `last_enrolled`, `last_enrolled_complete` and `last_graded`; required).
+
+**Returns:** Named list: `terms`: one row per campus, term and topic with an offered section or a student: `campus`, `term`, `term_type`, `topic_key`, `topic`, `sections`, `crosslisted_sections`, `seats`, `seats_known`, `n_instructors` (distinct recorded instructors of its sections), `registered`, `dr_late`, `census_enrl`, `attempts` (classified: the DFW denominator), `passed`, `dfw`, `n_return_observable`, `n_returned`, `in_progress` (after the settled edge) and `graded` (at or before the graded edge). Outcome and return counts are NA in a term past the graded edge; return is counted over the students whose return is observable, none in a term whose next regular term has not settled. `instructors`: `campus`, `term`, `topic_key`, `instructor_id`, one row per recorded instructor of a topic-term's offered sections, for counting instructors across terms. `titles`: one row per campus and title an offered section carried: `campus`, `course_title`, `topic_key`, `topic`, `topic_basis`, `sections`, `first_term`, `last_term`. `unmatched`: class-list rows (`students`) and classified attempts (`attempts`) whose CRN no section of the course carries. `course`, `campus`, `last_enrolled`, `settled_edge`, `graded_edge`.
+
+---
+
+### `attach_section_topics()`
+
+*Source: course-topics.R*
+
+**Attach each section's topic**
+
+Attach each section's topic  A section's topic is its title's key (topic_title_key()), or, where topic_titles.csv lists the title under the code the section is listed under, the key of the topic that row names. A topic is labelled with the wording most of its own-titled sections used (the label dropped), the most recent on a tie; a topic only merged rows reach takes the row's wording.
+
+**Parameters:**
+
+- `sections` - `cedar_sections` rows with `subject_course` (the course id), `listed_code`, `term` and `course_title`.
+- `topic_titles` - CEDAR_TOPIC_TITLES, or another validate_topic_titles() result.
+
+**Returns:** `sections` with `topic_key` ("" for a section with no title), `topic` (the label) and `topic_basis` (one of TOPIC_BASES).
+
+---
+
+### `course_topic_counts()`
+
+*Source: course-topics.R*
+
+**How many topics each campus-term of a course offered**
+
+**Parameters:**
+
+- `sections` - `cedar_sections` rows, with `status`, `enrolled`, `available` and `total_enrl` beside the columns attach_section_topics() needs.
+- `topic_titles` - As for attach_section_topics().
+- `opt` - `course` (one course id; required), `campus` (campuses that taught it; NULL for every campus).
+
+**Returns:** One row per campus and term with an offered section: `campus`, `term`, `n_topics`, `n_sections`.
+
+---
+
+### `course_has_topics()`
+
+*Source: course-topics.R*
+
+**Does a course offer topics?**
+
+Does a course offer topics?  TRUE when some campus-term offered sections of two or more topics.
+
+**Returns:** TRUE or FALSE.
 
 ---
 

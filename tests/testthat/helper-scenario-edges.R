@@ -30,6 +30,15 @@ ds01_edges <- list(
   last_degree = NULL
 )
 
+# TP01: Fall 2021 is settled and graded; Spring 2022 is in registration.
+tp01_edges <- list(
+  first_enrolled = 202080L,
+  last_enrolled = 202210L,
+  last_enrolled_complete = 202180L,
+  last_graded = 202180L,
+  last_degree = NULL
+)
+
 # RW01: Spring 2021 is in registration, so Fall 2020 is the settled and graded
 # edge. rw01_settled_edges reads the same rows once Spring 2021 has settled.
 rw01_edges <- list(last_enrolled = 202110L, last_enrolled_complete = 202080L, last_graded = 202080L)

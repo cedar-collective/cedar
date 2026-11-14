@@ -231,7 +231,14 @@ CEDAR_CONFIG_FILE_SPECS <- list(
   program_name_aliases = c("source_name", "program_name"),
   # The HR report's "Home Organization Desc" text to the unit a faculty member
   # belongs to; organisations not listed are dropped when the report is parsed.
-  source_organizations = c("source_name", "unit_code")
+  source_organizations = c("source_name", "unit_code"),
+  # Section titles of one course that name the same topic in words the
+  # wording-blind key (topic_title_key()) cannot match: a typo, an
+  # abbreviation, a title cut short at the schedule's length limit.
+  # subject_course is the code the schedule lists the sections under; title is
+  # a title as the schedule printed it; topic is the title its sections are
+  # counted with. notes is free text for why. Read by R/lists/topic_titles.R.
+  topic_titles = c("subject_course", "title", "topic", "notes")
 )
 CEDAR_CAMPUS_KINDS <- c("main", "online", "branch")
 # Where a population group can be the preselected choice: the Pathways major

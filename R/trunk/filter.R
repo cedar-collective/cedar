@@ -530,6 +530,26 @@ filter_class_list <- function(students, opt) {
 #' @param sections Section rows; must include \code{crosslist_group} and
 #'   \code{crosslist_role}.
 #' @return \code{sections} with crosslist partner (non-home) rows removed.
+#' Keep the sections that were offered
+#'
+#' An active section (status "A") with seats or students. A zero-seat,
+#' zero-enrollment active section is a placeholder, not an offering; one whose
+#' capacity is unknown still offers. The rule cedar_course_terms counts its
+#' offerings and seats by (build_course_terms()).
+#'
+#' @param sections Section rows with `status`, `enrolled`, `available` and
+#'   `total_enrl`.
+#' @return The offered rows.
+keep_offered_sections <- function(sections) {
+  missing <- setdiff(c("status", "enrolled", "available", "total_enrl"), names(sections))
+  if (length(missing) > 0) {
+    stop("[filter.R] keep_offered_sections() requires column(s) ", paste(missing, collapse = ", "))
+  }
+  sections %>%
+    filter(status == "A",
+           !is.finite(enrolled + available) | enrolled + available > 0 | total_enrl > 0)
+}
+
 keep_home_sections <- function(sections) {
   if (!all(c("crosslist_group", "crosslist_role") %in% names(sections))) {
     stop("[filter.R] keep_home_sections() requires columns crosslist_group and crosslist_role")

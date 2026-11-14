@@ -48,6 +48,13 @@
 #            202280). Timing 5 / 3 / 1 by regular term after X.
 #          GA: 1 in STAT 145 (DS_G1), who took STAT 245 at ABQ.
 #
+#   TP01 — cedar_sections_tp (16 rows) + cedar_registrations_tp (41 rows) +
+#          cedar_topic_titles_tp (2 rows). FYEX 1110, a seminar number whose
+#          sections each carry a topic, Fall 2020 to Spring 2022 on ABQ and
+#          EA, for Course Dynamics > Topics. Edges (tp01_edges): settled and
+#          graded through Fall 2021; Spring 2022 in progress. The per-topic
+#          counts are worked out beside the rows below.
+#
 #   HP01 — cedar_programs_hp (20 rows). Named population groups resolving to
 #          Banner codes, covering all three ways a pre-major is reached (or
 #          missed). Used by test-population-groups.R.
@@ -3339,6 +3346,163 @@ cedar_programs_ds <- local({
                   program_id = paste0("DS-PROG-", i), student_campus = "ABQ")
   }))
 })
+
+
+# ── TP01 — one course number, many topics (Course Dynamics > Topics) ─────────
+# FYEX 1110's sections each carry a seminar topic in the title. Every rule the
+# Topics tab applies has a row that breaks if the rule does:
+#
+#   - "Success Starts Here" (S7) lacks the "Sem:" label its other sections
+#     carry: one topic, by the wording-blind key.
+#   - "Sem: Intro to UNM and Higher Ed" (S9) says "and" where S3 says "&":
+#     one topic, by the key.
+#   - "Sem: Intro to UNM & HED" (S8) and "Sem: Math Learning Stategies" (S6)
+#     are merged only by cedar_topic_titles_tp's two rows.
+#   - Success Starts Here runs on ABQ and EA in Fall 2020: two rows, never one.
+#   - S10 is crosslisted (home of TPX1): its seats are the family's, so its
+#     topic-term has no fill.
+#   - S11 was cancelled; its one student dropped early. Not an offering, not
+#     a topic.
+#   - Spring 2022 is in progress: students counted, nothing graded.
+#   - Fall 2020 ABQ has one one-instructor topic (Intro, TP_I3) beside one
+#     with two (Success Starts Here, TP_I1 and TP_I2): the term's total would
+#     give Intro's rates back, so Success Starts Here's are withheld too.
+#
+#   sec  term    crn    campus  title                              instructor  seats  students (grade)
+#   S1   202080  41001  ABQ     Sem: Success Starts Here           TP_I1       20     A1 A, A2 B, A3 F, A4 DW, A5 DR
+#   S2   202080  41002  ABQ     Sem: Success Starts Here           TP_I2       20     B1 A, B2 C, B3 D
+#   S3   202080  41003  ABQ     Sem: Intro to UNM & Higher Ed      TP_I3       20     C1 A, C2 B, C3 B, C4 F
+#   S4   202080  41004  EA      Sem: Success Starts Here           TP_I4       25     E1 A, E2 F
+#   S5   202110  41101  ABQ     Sem: Math Learning Strategies      TP_I5       15     D1 A, D2 B
+#   S6   202110  41102  ABQ     Sem: Math Learning Stategies       TP_I5       15     D3 C, D4 W
+#   S7   202180  41801  ABQ     Success Starts Here                TP_I1       20     F1 A, F2 A, F3 F
+#   S8   202180  41802  ABQ     Sem: Intro to UNM & HED            TP_I3       20     G1 B, G2 B
+#   S9   202180  41803  ABQ     Sem: Intro to UNM and Higher Ed    TP_I6       20     G3 A, G4 D
+#   S10  202180  41804  ABQ     Sem: Black Minds Matter (XL home)  TP_I7       20     H1 A, H2 B
+#   S11  202180  41805  ABQ     Sem: Cancelled Topic (status C)    —           20     K1 DR
+#   S12  202210  42101  ABQ     Sem: Success Starts Here           TP_I1       20     J1, J2 (not graded)
+#   S13  202210  42102  ABQ     Sem: Financial Capabilities        TP_I2       20     J3 (not graded)
+#   TPCO 101 "Composition I" twice in Spring 2021 (two sections, one title)
+#   and "Composition One" in Fall 2021: a course that offers no topics.
+#
+# Back the next regular term (in TPCO 101): A1, A2, B1, B2, C1, C2, C3, E1
+# (at ABQ) in Spring 2021; D1 and D3 in Fall 2021. Fall 2021's return is not
+# observable: Spring 2022 has not settled.
+#
+# Pinned (min_n 1, every term type):
+#   ABQ Fall 2020  Success Starts Here  2 sections, 40 seats, census 7 (A4's
+#                  late drop counts; A5's early drop does not), fill 17.5%,
+#                  2 instructors, DFW 3 of 7, returned 4 of 7; withheld as the
+#                  complement. Intro to UNM & Higher Ed  1 section, census 4,
+#                  DFW 1 of 4, returned 3 of 4; withheld, one instructor.
+#                  All topics  3 sections, 60 seats, census 11, 3 instructors,
+#                  DFW 4 of 11, returned 7 of 11.
+#   EA  Fall 2020  Success Starts Here  1 section, 25 seats, census 2, DFW 1
+#                  of 2, returned 1 of 2; withheld, one instructor.
+#   ABQ Spring 2021 Math Learning Strategies  2 sections, 30 seats, census 4,
+#                  1 instructor, DFW 1 of 4 (the W), returned 2 of 4.
+#   ABQ Fall 2021  Success Starts Here 1 section, census 3, DFW 1 of 3;
+#                  Intro 2 sections (S8, S9), census 4, 2 instructors, DFW 1
+#                  of 4, not withheld; Black Minds Matter census 2, DFW 0 of
+#                  2, no fill. All topics 4 sections, 80 seats, census 9,
+#                  no fill, 4 instructors, DFW 2 of 9; no return observable.
+#   ABQ Spring 2022 in progress: Success Starts Here census 2, Financial
+#                  Capabilities census 1; no outcomes.
+#   Pooled over the settled terms, ABQ: Success Starts Here 2 terms, census
+#   10, 2 instructors, DFW 4 of 10, returned 4 of 7; Intro 2 terms, census 8,
+#   DFW 2 of 8, returned 3 of 4 (locked: Fall 2021 only, DFW 1 of 4); All
+#   topics census 24, 6 instructors, DFW 7 of 24, returned 9 of 15.
+
+.tp_section <- function(sec, term, crn, campus, title, instructor, seats, enrolled,
+                        status = "A", course = "FYEX 1110", xl_group = NA_character_) {
+  cedar_sections_topics[1, ] %>%
+    dplyr::mutate(
+      # .env: term, crn, campus, enrolled and status are also the template's
+      # columns, which mutate() would read instead of the arguments.
+      section_id = sec, term = as.integer(.env$term), crn = .env$crn,
+      subject = sub(" .*", "", course), course_number = sub(".* ", "", course),
+      subject_course = course, section = sec, course_title = title,
+      campus = .env$campus, college = "UC", department = sub(" .*", "", course),
+      instructor_id = instructor, instructor_name = instructor,
+      enrolled = as.integer(.env$enrolled), total_enrl = as.integer(.env$enrolled),
+      capacity = as.integer(seats), available = as.integer(seats - .env$enrolled),
+      status = .env$status, level = "lower",
+      term_type = dplyr::case_when(term %% 100 == 10 ~ "spring", term %% 100 == 60 ~ "summer",
+                                   TRUE ~ "fall"),
+      crosslist_group = xl_group,
+      crosslist_code = xl_group,
+      crosslist_role = if (is.na(xl_group)) NA_character_ else "home",
+      is_topics = grepl("^T:", title)
+    )
+}
+
+cedar_sections_tp <- dplyr::bind_rows(
+  .tp_section("S1",  202080, "41001", "ABQ", "Sem: Success Starts Here",        "TP_I1", 20, 4),
+  .tp_section("S2",  202080, "41002", "ABQ", "Sem: Success Starts Here",        "TP_I2", 20, 3),
+  .tp_section("S3",  202080, "41003", "ABQ", "Sem: Intro to UNM & Higher Ed",   "TP_I3", 20, 4),
+  .tp_section("S4",  202080, "41004", "EA",  "Sem: Success Starts Here",        "TP_I4", 25, 2),
+  .tp_section("S5",  202110, "41101", "ABQ", "Sem: Math Learning Strategies",   "TP_I5", 15, 2),
+  .tp_section("S6",  202110, "41102", "ABQ", "Sem: Math Learning Stategies",    "TP_I5", 15, 2),
+  .tp_section("S7",  202180, "41801", "ABQ", "Success Starts Here",             "TP_I1", 20, 3),
+  .tp_section("S8",  202180, "41802", "ABQ", "Sem: Intro to UNM & HED",         "TP_I3", 20, 2),
+  .tp_section("S9",  202180, "41803", "ABQ", "Sem: Intro to UNM and Higher Ed", "TP_I6", 20, 2),
+  .tp_section("S10", 202180, "41804", "ABQ", "Sem: Black Minds Matter",         "TP_I7", 20, 2,
+              xl_group = "TPX1"),
+  .tp_section("S11", 202180, "41805", "ABQ", "Sem: Cancelled Topic",            NA,      20, 0,
+              status = "C"),
+  .tp_section("S12", 202210, "42101", "ABQ", "Sem: Success Starts Here",        "TP_I1", 20, 2),
+  .tp_section("S13", 202210, "42102", "ABQ", "Sem: Financial Capabilities",     "TP_I2", 20, 1),
+  .tp_section("C1",  202110, "51101", "ABQ", "Composition I",   "TP_N1", 25, 5, course = "TPCO 101"),
+  .tp_section("C2",  202110, "51102", "ABQ", "Composition I",   "TP_N2", 25, 3, course = "TPCO 101"),
+  .tp_section("C3",  202180, "51801", "ABQ", "Composition One", "TP_N1", 25, 2, course = "TPCO 101")
+)
+
+.tp_row <- function(sid, term, crn, grade = NA_character_, status = "RE") {
+  sec <- cedar_sections_tp[cedar_sections_tp$term == term & cedar_sections_tp$crn == crn, ]
+  stopifnot(nrow(sec) == 1L)
+  .mc_row(sid, term, sec$subject_course, sec$campus, sec$department, grade, sec$instructor_id) %>%
+    dplyr::mutate(crn = .env$crn, course_title = sec$course_title, college = "UC",
+                  registration_status_code = .env$status)
+}
+
+cedar_registrations_tp <- dplyr::bind_rows(
+  # Fall 2020
+  .tp_row("TP_A1", 202080, "41001", "A"), .tp_row("TP_A2", 202080, "41001", "B"),
+  .tp_row("TP_A3", 202080, "41001", "F"), .tp_row("TP_A4", 202080, "41001", status = "DW"),
+  .tp_row("TP_A5", 202080, "41001", status = "DR"),
+  .tp_row("TP_B1", 202080, "41002", "A"), .tp_row("TP_B2", 202080, "41002", "C"),
+  .tp_row("TP_B3", 202080, "41002", "D"),
+  .tp_row("TP_C1", 202080, "41003", "A"), .tp_row("TP_C2", 202080, "41003", "B"),
+  .tp_row("TP_C3", 202080, "41003", "B"), .tp_row("TP_C4", 202080, "41003", "F"),
+  .tp_row("TP_E1", 202080, "41004", "A"), .tp_row("TP_E2", 202080, "41004", "F"),
+  # Spring 2021
+  .tp_row("TP_D1", 202110, "41101", "A"), .tp_row("TP_D2", 202110, "41101", "B"),
+  .tp_row("TP_D3", 202110, "41102", "C"), .tp_row("TP_D4", 202110, "41102", "W"),
+  .tp_row("TP_A1", 202110, "51101", "A"), .tp_row("TP_A2", 202110, "51101", "B"),
+  .tp_row("TP_B1", 202110, "51101", "A"), .tp_row("TP_B2", 202110, "51101", "B"),
+  .tp_row("TP_C1", 202110, "51101", "A"), .tp_row("TP_C2", 202110, "51102", "B"),
+  .tp_row("TP_C3", 202110, "51102", "A"), .tp_row("TP_E1", 202110, "51102", "A"),
+  # Fall 2021
+  .tp_row("TP_F1", 202180, "41801", "A"), .tp_row("TP_F2", 202180, "41801", "A"),
+  .tp_row("TP_F3", 202180, "41801", "F"),
+  .tp_row("TP_G1", 202180, "41802", "B"), .tp_row("TP_G2", 202180, "41802", "B"),
+  .tp_row("TP_G3", 202180, "41803", "A"), .tp_row("TP_G4", 202180, "41803", "D"),
+  .tp_row("TP_H1", 202180, "41804", "A"), .tp_row("TP_H2", 202180, "41804", "B"),
+  .tp_row("TP_K1", 202180, "41805", status = "DR"),
+  .tp_row("TP_D1", 202180, "51801", "A"), .tp_row("TP_D3", 202180, "51801", "B"),
+  # Spring 2022, in progress
+  .tp_row("TP_J1", 202210, "42101"), .tp_row("TP_J2", 202210, "42101"),
+  .tp_row("TP_J3", 202210, "42102")
+)
+
+# The reviewed merges the two variants need, as topic_titles.csv writes them.
+cedar_topic_titles_tp <- data.frame(
+  subject_course = c("FYEX 1110", "FYEX 1110"),
+  title = c("Sem: Intro to UNM & HED", "Sem: Math Learning Stategies"),
+  topic = c("Sem: Intro to UNM & Higher Ed", "Sem: Math Learning Strategies"),
+  notes = c("", ""),
+  stringsAsFactors = FALSE
+)
 
 
 # ── MC03 — retention cohorts on two campuses ─────────────────────────────────

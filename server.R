@@ -6259,4 +6259,31 @@ output$enrl_classlist_download <- downloadHandler(
     campus        = reactive(input$cr_campus)
   )
 
+  # Course Dynamics > Topics: a course number's topics side by side
+  # (R/modules/course-topics.R). The tab is there only when the analysed
+  # course offered two or more topics in a term on the page's campuses.
+  cr_offers_topics <- courseTopicsServer(
+    "cr_topics",
+    course        = reactive({
+      data <- course_report_data()
+      if (is.null(data)) NULL else data$course_code
+    }),
+    campus        = reactive(if (length(input$cr_campus) > 0) input$cr_campus else NULL),
+    sections      = data_objects[["cedar_sections"]],
+    students      = cr_students,
+    attempts      = data_objects[["cedar_attempts"]],
+    student_terms = data_objects[["cedar_student_terms"]],
+    edges         = data_objects[["cedar_edges"]],
+    topic_titles  = CEDAR_TOPIC_TITLES,
+    instructor_access = dfw_authenticated, instructor_password = dfw_password
+  )
+  observe({
+    if (isTRUE(cr_offers_topics())) {
+      nav_show("cr_tabs", "Topics")
+    } else {
+      if (identical(isolate(input$cr_tabs), "Topics")) nav_select("cr_tabs", "Overview")
+      nav_hide("cr_tabs", "Topics")
+    }
+  })
+
 } # end server

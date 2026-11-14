@@ -405,8 +405,9 @@ test_that("every table that names an instructor beside outcomes waits for the in
   server <- paste(readLines("../../server.R", warn = FALSE), collapse = "\n")
   # Retention: the breakout is honoured only behind the gate.
   expect_true(grepl("isTRUE(input$cr_ret_by_instructor) && isTRUE(dfw_authenticated())", server, fixed = TRUE))
-  # The modules that name instructors are handed the shared flag.
-  expect_equal(lengths(regmatches(server, gregexpr("instructor_access = dfw_authenticated", server, fixed = TRUE))), 3L)
+  # The modules that name instructors, or show the rates of a topic one
+  # instructor taught (Topics), are handed the shared flag.
+  expect_equal(lengths(regmatches(server, gregexpr("instructor_access = dfw_authenticated", server, fixed = TRUE))), 4L)
   # Later Course: the breakdown and its balance check render only while open.
   later <- paste(readLines("../../R/modules/later-course.R", warn = FALSE), collapse = "\n")
   expect_true(grepl("if (access) .later_course_instructor_reactable(later_course_instructor_table(r), r)\n      else instructorGateUI(ns(\"instructor_gate\"))",
