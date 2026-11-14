@@ -250,8 +250,8 @@ test_that("Course Dynamics groups both downstream questions under one top-level 
   )
   expect_gt(combined_start, 0L)
   combined_copy <- substr(server_src, combined_start, combined_start + 2200L)
-  expect_match(combined_copy, 'nav_panel\\(\\s*"Later Course"', perl = TRUE)
-  expect_match(combined_copy, 'nav_panel\\(\\s*"Course Sequence"', perl = TRUE)
+  expect_match(combined_copy, 'nav_panel\\(\\s*"Where Students Go Next"', perl = TRUE)
+  expect_match(combined_copy, 'nav_panel\\(\\s*"With or Without This Course"', perl = TRUE)
   expect_match(combined_copy, 'laterCourseUI("cr_later")', fixed = TRUE)
   expect_match(combined_copy, "cr_impact_sequence_ui", fixed = TRUE)
   # Instructor Patterns is Later Course's gated breakdown now, not a tab.

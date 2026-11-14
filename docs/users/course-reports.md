@@ -197,9 +197,19 @@ difference says the gap describes who is placed into the course.
 
 ## Downstream
 
-The Downstream tab holds two views of what happens after the course. **Later Course** follows the course's own students forward: how many took a later course within a set number of terms, and how they did in it. **Course Sequence** starts from the later course and compares students who reached it after passing this one with students who reached it without. Both offer the later courses this course's students actually took.
+The Downstream tab asks two questions about what comes after the course, and each starts from a different group of students:
 
-### Later Course
+| | **Where Students Go Next** | **With or Without This Course** |
+|---|---|---|
+| Starts from | everyone who took this course | everyone in a later course you choose |
+| Asks | how many went on to the later course, and how they did in it | did students who passed this course first do better there than those who did not? |
+| Compares | this course's students with each other: by term, by the grade they earned, by instructor | two groups of later-course students: passed this course first, or not |
+| Time limit | a window of regular terms (three unless you change it) | any earlier term |
+
+Use the first for where a course's students go and how its grades carry forward; use the second for whether this course prepares students for the later one as well as the other routes into it do. Both offer the later courses this course's students actually took.
+
+### Where Students Go Next
+{: #later-course}
 
 {% include definition-summary.html id="downstream-outcomes" %}
 
@@ -242,7 +252,8 @@ The page gives, for each campus that taught the course:
 A student who took the later course in a term whose grades are not posted yet
 counts as having taken it, and is listed as not yet graded, never as failing.
 
-### Course Sequence
+### With or Without This Course
+{: #course-sequence}
 
 {% include definition-summary.html id="course-sequence" %}
 
@@ -279,7 +290,7 @@ This depends on what your institution has loaded into CEDAR. Check with your CED
 
 Two tabs answer two halves of this, and neither answers the whole of it.
 
-- **Downstream → Course Sequence** compares grades in one later course you
+- **Downstream → With or Without This Course** compares grades in one later course you
   name (ENGL 1120, say) between students who passed the first-year course
   first and students who took the later course without it. The first sentence
   of the result gives both rates with their counts and says how alike the

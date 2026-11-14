@@ -4170,7 +4170,11 @@ output$enrl_classlist_download <- downloadHandler(
     if (length(d) == 0) NA_character_ else d[[1]]
   })
 
-  # ── Later-course choices, shared by Later Course and Course Sequence ────────
+  # ── Later-course choices, shared by both Downstream views ──────────────────
+  # The views start from different students (ISSUES M52): "Where Students Go
+  # Next" (Later Course in code, R/modules/later-course.R) from everyone who
+  # took this course; "With or Without This Course" (Course Sequence in code)
+  # from everyone in a later course, split by whether they passed this one first.
   #
   # These choices come from courses students actually took after X, within the
   # default follow-up window. Department ownership is retained only as a
@@ -4201,21 +4205,19 @@ output$enrl_classlist_download <- downloadHandler(
       subtab_header(
         "Downstream",
         paste0(
-          "Two views of what happens after ", course, ". Later Course follows its students ",
-          "forward: how many took a later course within a set number of terms, and how they ",
-          "did in it. Course Sequence compares students who reached a later course after ",
-          "passing ", course, " with students who reached it without."
+          "Two questions about what comes after ", course, ": where its students go next, ",
+          "and whether students in a later course did better having passed ", course, " first."
         )
       ),
       navset_tab(
         id = "cr_downstream_view",
         nav_panel(
-          "Later Course",
+          "Where Students Go Next",
           icon = icon("arrow-right-long"),
           laterCourseUI("cr_later")
         ),
         nav_panel(
-          "Course Sequence",
+          "With or Without This Course",
           icon = icon("shuffle"),
           uiOutput("cr_impact_sequence_ui")
         )
@@ -4223,7 +4225,7 @@ output$enrl_classlist_download <- downloadHandler(
     )
   })
 
-  # ── Course Sequence view ────────────────────────────────────────────────────
+  # ── With or Without This Course (Course Sequence in code) ───────────────────
   # One interpretation panel for the sequence comparison. Keep this guidance
   # together so readers do not have to reconcile two nearly identical warnings.
   # The result-specific "Who is being counted" panel remains separate because it
@@ -4264,14 +4266,15 @@ output$enrl_classlist_download <- downloadHandler(
       return(empty_state("Select a course, then click Analyze Course to view this tab."))
     tagList(
       subtab_header(
-        "Course Sequence",
-        cedar_definition_summary("course-sequence")
+        "With or Without This Course",
+        paste0("Starts from the students in a later course you choose: did those who passed ",
+               course, " first do better there than those who did not?")
       ),
       cedar_definition_panel("course-sequence"),
       cr_impact_limits_panel(),
       fluidRow(
         column(5,
-          selectizeInput("cr_impact_seq_course_y", "Later course:",
+          selectizeInput("cr_impact_seq_course_y", "Students in:",
                          choices  = downstream_course_choices(
                            cr_downstream_options(), include_rollup = FALSE,
                            dept = cr_course_dept()),
@@ -6229,7 +6232,7 @@ output$enrl_classlist_download <- downloadHandler(
   # registering outputs nothing rendered. Re-enable both together.
   # retentionServer("retention", students = cedar_registrations, student_terms = cedar_student_terms)
 
-  # Course Dynamics > Downstream > Later Course: the analysed course's students
+  # Course Dynamics > Downstream > Where Students Go Next: the analysed course's students
   # in a later course, by term, grade and instructor (R/modules/later-course.R).
   laterCourseServer(
     "cr_later",

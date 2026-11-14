@@ -49,7 +49,7 @@ alongside other work (M14, M16).
 | [I20](#i20--cedar_programs-holds-almost-no-branch-campus-students) | Defect | `cedar_programs` holds 1–3% of branch-campus students; branch program counts read near zero |
 | [I18](#i18--cedar_degrees-holds-no-associate-degrees-so-branch-campus-completions-read-zero) | Defect | `cedar_degrees` holds no associate degrees: branch-campus completions read zero |
 | [I4](#i4--pre-change-course-ratios-are-confounded-by-career-stage) | Defect | Pre-change course ratios confounded by career stage (deferred) |
-| M1–M51 | Improvement | See [Improvements](#improvements) |
+| M1–M52 | Improvement | See [Improvements](#improvements) |
 
 ### Resolved since the last release
 
@@ -3975,6 +3975,21 @@ and says "near full", printing the rate it used. *Done when:* the badges, the
 method text in `R/modules/regstats.R` and the guide say near full (or name the
 rate), and a full badge, if kept, is judged at `CEDAR_FULL_FILL` on the first
 day.
+
+**M52 — Course Dynamics' two Downstream views read alike but count different
+students.** **Later Course** starts from everyone who took the course (X) and
+follows them into a later course (Y); **Course Sequence** starts from everyone
+in Y and compares those who passed X first with those who did not. Both had a
+"Later course" picker and both report results in Y, the names did not say
+which students each counts, and the tab's one sentence described both at once,
+so a reader could not tell what separates them.
+*Done when:* each view's name and opening sentence say which students it starts
+from, its picker says what the course is to those students, and the guide sets
+the two side by side. *Status: resolved 2026-11-14:* renamed **Where Students
+Go Next** and **With or Without This Course** (the code keeps `later-course`
+and `course-sequence`); each opens on the students it starts from; the pickers
+read "Later course(s) its students took" and "Students in"; the guide's
+Downstream section is a side-by-side table, and its anchors are unchanged.
 
 ### Documentation and naming
 

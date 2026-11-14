@@ -1,4 +1,4 @@
-// Course Dynamics > Downstream > Later Course: of the analysed course's
+// Course Dynamics > Downstream > Where Students Go Next (Later Course in code): of the analysed course's
 // students, how many took a later course within the window, when, and how they
 // did in it (R/modules/later-course.R over build_later_course()).
 //
@@ -39,13 +39,13 @@ try {
   await waitForIdle(page, { timeout: 300000 });
   console.log(`course loaded: ${COURSE_X}`);
 
-  // Later Course is the first view under Downstream: opening Downstream shows it.
+  // Where Students Go Next is the first view under Downstream: opening Downstream shows it.
   // The two views are themselves rendered by cr_impact_downstream_ui, so wait
   // for their links before clicking one. The picker starts with nothing chosen
   // and so has no text: wait for the control, not for words in it.
   await openSubTab(page, 'Downstream', { timeout: 300000 });
   await waitForSelector(page, '#cr_impact_downstream_ui .nav-link', { timeout: 120000 });
-  await openSubTab(page, 'Later Course', { timeout: 300000 });
+  await openSubTab(page, 'Where Students Go Next', { timeout: 300000 });
   await waitForSelector(page, '#cr_later-picker .selectize-control', { timeout: 120000, nonEmpty: false });
   await requireIds(page, ['cr_later-course_y', 'cr_later-window_terms', 'cr_later-min_n',
                           'cr_later-run', 'cr_later-results']);
