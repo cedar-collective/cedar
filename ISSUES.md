@@ -49,7 +49,7 @@ alongside other work (M14, M16).
 | [I20](#i20--cedar_programs-holds-almost-no-branch-campus-students) | Defect | `cedar_programs` holds 1–3% of branch-campus students; branch program counts read near zero |
 | [I18](#i18--cedar_degrees-holds-no-associate-degrees-so-branch-campus-completions-read-zero) | Defect | `cedar_degrees` holds no associate degrees: branch-campus completions read zero |
 | [I4](#i4--pre-change-course-ratios-are-confounded-by-career-stage) | Defect | Pre-change course ratios confounded by career stage (deferred) |
-| M1–M49 | Improvement | See [Improvements](#improvements) |
+| M1–M50 | Improvement | See [Improvements](#improvements) |
 
 ### Resolved since the last release
 
@@ -3953,6 +3953,16 @@ and links resolve to Overview.
 *Status: resolved 2026-11-14:* the drops chart and the Enrollment by Term table
 are on Overview, following its Term type, and the subtab and its second
 lifecycle chart are gone; the guide's links point to `course-reports#overview`.
+
+**M50 — Two branch units are named for something they do not teach.** In
+`units.csv`, MAS is "Medical Administrative Specialist" and STIN "STEM
+Integration", but every MAS section in the data (from Fall 2018) is massage therapy at
+UNM-Taos (Massage Therapy I, Deep Tissue Techniques, Cranial Sacral) and every
+STIN section structural integration, the courses MASS and SHIN renumbered in
+Fall 2026. The names were proposed from the codes on 2026-10-04. A page that
+names the unit (Dept Trends, Courses Taken's teaching units) shows the wrong
+discipline. *Done when:* each AD unit's name is checked against the titles it
+taught, MAS and STIN first.
 
 ### Documentation and naming
 
