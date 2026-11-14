@@ -27,6 +27,8 @@ test_students_mc     <<- cedar_registrations_mc       # MC02: sequence + co-req 
 test_programs_mc     <<- cedar_programs_mc       # MC02 covariates
 test_students_ds     <<- cedar_registrations_ds       # DS01: a course and its sequel (Later Course)
 test_programs_ds     <<- cedar_programs_ds       # DS01 covariates
+test_sections_tp     <<- cedar_sections_tp       # TP01: one course number, many topics (Course Dynamics > Topics)
+test_students_tp     <<- cedar_registrations_tp  # TP01
 test_students_mcret  <<- cedar_registrations_mcret    # MC03: retention cohorts, incl. a campus move
 test_students_wlmkt  <<- cedar_registrations_wlmkt    # WL01: a waitlist in the pooled ABQ+EA market
 test_students_wlterm <<- cedar_registrations_wlterm   # WL02: waiting counted per term
@@ -95,6 +97,8 @@ test_student_terms_mcret      <<- .fixture_student_terms(cedar_registrations_mcr
 test_student_terms_rp         <<- .fixture_student_terms(cedar_registrations_rp, cedar_degrees_rp)
 test_student_terms_mc         <<- .fixture_student_terms(cedar_registrations_mc)
 test_student_terms_ds         <<- .fixture_student_terms(cedar_registrations_ds)
+# TP01: Fall 2021 is settled; Spring 2022 is in registration.
+test_student_terms_tp         <<- .fixture_student_terms(cedar_registrations_tp, settled = 202180L)
 # RW01 carries programs rows (unit, standing); Spring 2021 is in registration,
 # so Fall 2020 is the settled edge.
 test_student_terms_rw         <<- suppressMessages(build_student_terms(
@@ -117,7 +121,7 @@ attach_test_student_terms <<- function(st) {
 }
 for (.st in c("test_student_terms", "test_student_terms_audits", "test_student_terms_roadblocks",
               "test_student_terms_mcret", "test_student_terms_rp", "test_student_terms_mc",
-              "test_student_terms_ds",
+              "test_student_terms_ds", "test_student_terms_tp",
               "test_student_terms_rw", "test_student_terms_gen_ed_assoc", "test_student_terms_st")) {
   assign(.st, attach_test_student_terms(get(.st)), envir = globalenv())
 }
@@ -137,14 +141,16 @@ attach_test_course_ids <<- function(tbl, role = c("sections", "students")) {
 }
 for (.sec in c("test_sections", "test_sections_sf", "test_sections_topics", "test_sections_schedule",
                "test_sections_regstats", "test_sections_course_history", "test_sections_xl_switch",
-               "test_sections_intersession", "test_sections_pending_session", "test_sections_hp2")) {
+               "test_sections_intersession", "test_sections_pending_session", "test_sections_hp2",
+               "test_sections_tp")) {
   assign(.sec, attach_test_course_ids(get(.sec), "sections"), envir = globalenv())
 }
 # Loaded as global.R loads them: without the student-description columns
 # (thin_class_list(), ADR-001 step 5); a reader attaches them from the
 # student-term table built above from the full fixtures.
 for (.stu in c("test_students", "test_students_xl_switch", "test_students_regstats",
-               "test_students_course_history", "test_students_pending_session", "test_students_hp2")) {
+               "test_students_course_history", "test_students_pending_session", "test_students_hp2",
+               "test_students_tp")) {
   assign(.stu, attach_test_course_ids(thin_class_list(get(.stu)), "students"), envir = globalenv())
 }
 rm(.stu)

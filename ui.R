@@ -1111,6 +1111,16 @@ nav_panel(
         )
       ),
 
+      # Shown only for a course whose sections carry two or more topics in a
+      # term (FYEX 1110's seminars); the server hides it for every other
+      # course (R/modules/course-topics.R).
+      nav_panel(
+        "Topics",
+        value = "Topics",
+        icon = icon("layer-group"),
+        courseTopicsUI("cr_topics")
+      ),
+
       nav_panel(
         "Projections",
         icon = icon("calendar-check"),

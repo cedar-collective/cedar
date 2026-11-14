@@ -40,6 +40,27 @@ The report tabs appear once **Analyze Course** has finished; changing the course
 
 ---
 
+## Topics
+
+Some course numbers carry many courses: FYEX 1110's seminars, a department's special-topics slot. Each section's title names its topic, and the **Topics** tab counts each topic separately so they can be compared within that one course number. The tab appears only for a course that offered two or more topics in the same term on a campus picked.
+
+- **Topics by Term** — one line per topic and campus for the measure chosen: students at census, sections, fill, DFW or return to the next regular term. On a rate, a grey line shows every topic together. Choose the term types and which topics to draw; the five with the most students are drawn first.
+- **Topics Side by Side** — each topic pooled over its settled terms beside every topic together, one table per campus.
+- **Topic by Term** — the topics drawn, term by term, with each term's total.
+- **Titles Behind Each Topic** — every title the schedule printed and the topic it was counted under.
+
+How the tab reads a title:
+
+- A leading section label such as *Sem:* or *T:* is dropped, and case, punctuation and *&* against *and* are ignored, so *Sem: Success Starts Here* and *Success Starts Here* are one topic.
+- A misspelling or a title cut short at the schedule's length limit is merged only when someone has reviewed it into the institution's topic-titles file; until then it is a topic of its own, and the last table shows it.
+- Only students registered under this course number count. Students registered under a crosslisted partner code belong to that code's report, and fill is left blank for a crosslisted section, whose seats are shared.
+- A term still in progress is shaded and counts current registration; DFW is read through the last graded term, and return once the next regular term has settled. A rate is shown only when enough students stand behind it (the minimum is a control on the page).
+
+{: .warning }
+A topic taught by one instructor in a term is that instructor's course, so its DFW and return rates are withheld without the instructor password, the same password as the DFW tab's instructor results. So is the next smallest topic in a term where exactly one topic was withheld, since the term's total would otherwise give the withheld rate back. Pooled rates then cover only the terms shown, and the table says so. Student, section and seat counts are never withheld, nor are the rates for every topic together.
+
+---
+
 ## Projections
 
 The published plan for this course in each term CEDAR has projected, read from

@@ -50,6 +50,7 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
   source_file("lists/campuses.R")           # campus constants from campuses.csv, campus guards
   source_file("lists/student_levels.R")     # student level codes and their source spellings, from student_levels.csv
   source_file("lists/seat_fill.R")          # near full / full seat fill levels
+  source_file("lists/topic_titles.R")       # a course's topics from its section titles, and topic_titles.csv
   source_file("lists/enrollment_projection_groups.R")
   source_file("lists/degree_catalog.R")
 
@@ -86,6 +87,7 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
   source_file("branches/return-snapshots.R")      # next-term registration of last term's students
   source_file("branches/enrl.R")
   source_file("branches/course-terms.R")          # cedar_course_terms: the course-term measure table (ADR-001 step 4)
+  source_file("branches/course-topics.R")         # a course's topics, from its sections' titles
   source_file("branches/credit-hours.R")
   source_file("branches/data-edges.R")            # where the loaded data starts/stops; see the right-edge policy in AGENTS.md
   source_file("branches/cedar-terms.R")           # the term dimension: one row per term, the edges as flags (ADR-001 step 1)
@@ -161,6 +163,7 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
   source_file("cones/major-course-units.R")        # which units teach the courses a major's students take
   source_file("cones/course-cohort-effect.R")      # a course's takers against its non-takers: return and next-term outcomes
   source_file("cones/course-similar-students.R")   # a course's takers against non-takers of the same term, campus, HS GPA band and time status
+  source_file("cones/course-topics.R")             # a course's topics by campus and term: sections, census, DFW, return
 
   # 5. Features (app-facing orchestration — call multiple branches/cones)
   message("[load-funcs.R] Loading features...")
@@ -181,6 +184,7 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
   source_file("features/course-cohort-context.R")       # text-first preview: a course's takers-vs-non-takers gap against its college's courses
   source_file("features/course-similar-students.R")     # text-first preview: a course against similar non-takers, beside every course and by instructor
   source_file("features/later-course.R")                # text-first preview: a course's students in a later course, by term, grade and instructor
+  source_file("features/course-topics.R")               # text-first preview: a course's topics side by side, with one-instructor rates withheld
   source_file("features/shared-requirements.R")
   source_file("features/catalog-capture.R")
   source_file("features/catalog-analysis.R")
@@ -208,6 +212,7 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
     source_file("modules/instructor-gate.R") # the one password gate in front of every table that names an instructor
     source_file("modules/course-cohort.R")   # Course Dynamics > Retention > Takers vs Non-Takers
     source_file("modules/later-course.R")    # Course Dynamics > Downstream > Later Course
+    source_file("modules/course-topics.R")   # Course Dynamics > Topics
     source_file("modules/degree-explorer.R")
   } else {
     message("[load-funcs.R] Skipping Shiny modules (modules = FALSE).")

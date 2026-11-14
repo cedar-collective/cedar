@@ -140,8 +140,7 @@ build_course_terms <- function(students, attempts, sections) {
   # A crosslisted section is one offering, counted under its home listing
   # (keep_home_sections()): a partner listing's row has students and no section.
   active <- sections %>%
-    filter(status == "A",
-           !is.finite(enrolled + available) | enrolled + available > 0 | total_enrl > 0) %>%
+    keep_offered_sections() %>%
     keep_home_sections()
   if (nrow(active) > 0) {
     supply <- get_enrl(active, list(status = "A", uel = FALSE, crosslist = "home",

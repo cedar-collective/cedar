@@ -928,6 +928,14 @@ headcount_fixture_dims <- local({
   validate_cedar_dims(dims)
 })
 
+# ── test-course-topics.R ────────────────────────────────────────────────────────
+
+# TP01's attempt table, built to its edges (graded through Fall 2021).
+tp_attempts <- keyed_attempts(cedar_registrations_tp, tp01_edges)
+
+# TP01's two reviewed merges, read as the app reads topic_titles.csv.
+tp_topic_titles <- validate_topic_titles(cedar_topic_titles_tp)
+
 # ── test-later-course.R ─────────────────────────────────────────────────────────
 
 # DS01's attempt table, built to its edges (graded through Summer 2022).
