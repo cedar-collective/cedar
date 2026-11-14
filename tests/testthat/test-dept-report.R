@@ -51,7 +51,7 @@ test_that("Dept Trends base no longer requires unused faculty data", {
 test_that("Dept Trends preloads every non-Gen-Ed analysis tab", {
   expect_identical(
     DEPT_TRENDS_PRELOAD_TABS,
-    c("Enrollment", "Credit Hours", "Degrees", "Demographics")
+    c("Course Demand", "Credit Hours", "Degrees", "Demographics")
   )
 
   specs <- lapply(DEPT_TRENDS_PRELOAD_TABS, dept_trends_tab_spec)

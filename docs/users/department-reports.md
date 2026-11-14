@@ -36,7 +36,7 @@ headline headcounts also use program records.
 
 ---
 
-## Enrollment
+## Course Demand
 
 Section-level enrollment analysis across all terms in the data:
 

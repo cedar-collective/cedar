@@ -4,7 +4,7 @@
 # and compute tab payloads. Heavy analysis stays in branches/cones.
 
 DEPT_TRENDS_PRELOAD_TABS <- c(
-  "Enrollment", "Credit Hours", "Degrees", "Demographics"
+  "Course Demand", "Credit Hours", "Degrees", "Demographics"
 )
 
 DEPT_TRENDS_CREDIT_HOUR_PLOTS <- c(
@@ -25,7 +25,7 @@ DEPT_TRENDS_CREDIT_HOUR_PLOTS <- c(
 # plot payloads directly testable.
 dept_trends_tab_spec <- function(tab) {
   switch(tab,
-    Enrollment = list(
+    `Course Demand` = list(
       code = "enrl",
       compute = compute_dept_enrl_tab,
       rebuild = rebuild_dept_enrl_tab,

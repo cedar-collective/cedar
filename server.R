@@ -1948,7 +1948,7 @@ output$enrl_classlist_download <- downloadHandler(
 
   # Shared helper — compute one tab's data and merge it into course_report_data().
   # Called from both the tab-click observer and the "Analyze Course" handler
-  # (for the case where the user was already on a non-Enrollment tab).
+  # (for the case where the user was already on a tab other than Overview).
   cr_load_tab <- function(tab, base = course_report_data()) {
     if (is.null(base) || is.null(tab)) return()
 
@@ -1964,7 +1964,7 @@ output$enrl_classlist_download <- downloadHandler(
 
     }
 
-    if (tab == "Projections") {
+    if (tab == "Section Plan") {
       base <- course_report_data() %||% base
       if (is.null(base$projections)) {
         base$projections <- with_cr_tab_loading(
@@ -2006,7 +2006,7 @@ output$enrl_classlist_download <- downloadHandler(
     cr_load_tab(input$cr_tabs)
   }, ignoreInit = TRUE)
 
-  # Course Dynamics > Projections reads the saved bundles Registration >
+  # Course Dynamics > Section Plan reads the saved bundles Registration >
   # Projections reads, one per published target term, through the same loader
   # and view (enrollment-projections.md: Shiny never fits a model). Each file is
   # read once per session; a bundle this build cannot read is reported and left
@@ -2127,18 +2127,6 @@ output$enrl_classlist_download <- downloadHandler(
     )
   })
 
-  cr_enrollment_lifecycle_data <- reactive({
-    data <- course_report_data()
-    if (is.null(data) || is.null(data$overview$lifecycle)) return(NULL)
-    # The detailed Enrollment charts read the exact lifecycle series assembled
-    # for Overview so crosslist membership and student de-duplication cannot
-    # diverge between Course Dynamics tabs.
-    lifecycle <- data$overview$lifecycle
-    cedar_filter_campus(
-      lifecycle, input$cr_campus, "cr_enrollment_lifecycle_data"
-    )
-  })
-
   output$cr_overview_scope_note <- renderUI({
     data <- course_report_data()
     overview <- cr_overview_data()
@@ -2243,16 +2231,12 @@ output$enrl_classlist_download <- downloadHandler(
     plot
   })
 
-  output$cr_enrollment_pressure_plot <- renderPlotly({
-    plot <- build_course_enrollment_history_plot(
-      cr_enrollment_lifecycle_data(), in_progress_terms = cr_in_progress_terms
-    )
-    req(!is.null(plot))
-    plot
-  })
-
+  # Overview's drops chart reads the same lifecycle series as its enrollment
+  # chart, under the same campus and Term type scope (ISSUES M49).
   output$cr_enrollment_drop_plot <- renderPlotly({
-    plot <- build_course_drop_plot(cr_enrollment_lifecycle_data())
+    overview <- cr_overview_data()
+    req(!is.null(overview))
+    plot <- build_course_drop_plot(overview$lifecycle)
     req(!is.null(plot))
     plot
   })
@@ -2539,6 +2523,11 @@ output$enrl_classlist_download <- downloadHandler(
       campus_vals <- input$cr_campus
       if (!is.null(campus_vals) && length(campus_vals) > 0) {
         cl_enrls_data <- cl_enrls_data %>% filter(campus %in% campus_vals)
+      }
+      # On Overview, the table reads the terms its charts draw.
+      selected_type <- input$cr_overview_term_type %||% "all"
+      if (!identical(selected_type, "all")) {
+        cl_enrls_data <- cl_enrls_data %>% filter(get_term_type(term) == selected_type)
       }
 
       cl_enrls_data <- cl_enrls_data %>%

@@ -45,7 +45,7 @@ deptTrendsUI <- function(id, sections, dept_choices, current_term = NULL) {
           cached_default = 5,
           loading_label = "Preparing department trends…",
           loading_detail = paste(
-            "Loading Headcount, Enrollment, Credit Hours, Degrees, and",
+            "Loading Headcount, Course Demand, Credit Hours, Degrees, and",
             "Demographics now so those tabs are ready when you open them."
           ),
           uiOutput(ns("profile"))
@@ -172,7 +172,7 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
 
     tab_value <- function(tab) {
       switch(tab,
-        Enrollment = enrl_data,
+        `Course Demand` = enrl_data,
         Degrees = deg_data,
         `Credit Hours` = ch_data,
         Demographics = demo_data,
@@ -718,9 +718,9 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
             )
           )
         ),
-        tabPanel("Enrollment",
+        tabPanel("Course Demand",
           subtab_header(
-            "Enrollment",
+            "Course Demand",
             "Long-run course demand for this department: how much teaching it carries, ",
             "how that compares with its college, and which courses drive the change."
           ),

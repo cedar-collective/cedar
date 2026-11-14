@@ -814,7 +814,7 @@ nav_panel(
       dashboard_subsection(
         "Credit Hour Shifts",
         "Credit hours by course level this term, against the recent norm for the season.",
-        method = tags$p("A level is listed when it has at least 25 credit hours and is 10% or more away from the average of the prior three same-season terms. Full trendlines are in Dept Trends > Enrollment."),
+        method = tags$p("A level is listed when it has at least 25 credit hours and is 10% or more away from the average of the prior three same-season terms. Full trendlines are in Dept Trends > Course Demand."),
         uiOutput("dashboard_credit_hour_shifts")
       )
     ),
@@ -869,7 +869,7 @@ nav_panel(
     dashboard_section(
       "Audience Shifts",
       "Changes this term in who takes the department's courses and which programs its majors pair with.",
-      method = tags$p("A share is listed when it is at least 10 percentage points away from its average over the prior three same-season terms, with enough students present. Full audience detail is in Dept Trends > Enrollment."),
+      method = tags$p("A share is listed when it is at least 10 percentage points away from its average over the prior three same-season terms, with enough students present. Full audience detail is in Dept Trends > Course Demand."),
       uiOutput("dashboard_composition_shifts")
     )
 
@@ -1019,11 +1019,21 @@ nav_panel(
       nav_panel(
         "Overview",
         icon = icon("chart-line"),
+        # The Enrollment subtab drew the same first-day, census and final
+        # series as Overview (ISSUES M49); its drops chart and class-list
+        # table now sit here, under the same Term type control.
         subtab_header(
           "Course Overview",
-          "A same-season view of enrollment history, registration activity, active sections, and average section size. ",
-          "Crosslisted offerings count every listing together, each student once; the snapshot also gives the count under each code. ",
-          "Campuses remain separate so differences between Main, Online, and branch offerings stay visible."
+          "How many students this course draws each term, how many it loses to drops, and how many sections it runs.",
+          method = tagList(
+            lapply(c("first-day-enrollment", "census-enrollment", "registered"), cedar_definition_note),
+            tags$p(
+              tags$strong("This page's scope. "),
+              "Final is the registered definition, which is current registration while a term is in progress. ",
+              "A crosslisted offering counts every listing together and each student once, deduplicated within delivery campus and term; the snapshot also gives the count under each code. ",
+              "Campuses stay separate, so Main, Online and branch offerings can be told apart."
+            )
+          )
         ),
         div(
           class = "course-overview-controls",
@@ -1043,32 +1053,35 @@ nav_panel(
           ),
           uiOutput("cr_overview_scope_note")
         ),
-        cedar_definition_panel(c("first-day-enrollment", "census-enrollment", "registered")),
         dashboard_subsection(
           "Latest-Term Snapshot",
-          "The latest term in the selected term type beside the same term in the three years before it, one table per campus. A crosslisted term also shows each code's own count; hover an earlier year for its split. The plots below show the full history.",
+          "The latest term beside the same term in the three years before it, one table per campus.",
+          method = tags$p("A crosslisted term also shows each code's own count; hover an earlier year for its split. The charts below show the full history."),
           uiOutput("cr_overview_metrics")
         ),
         dashboard_subsection(
           "Enrollment History",
-          tagList(
-            "Three points in each term: first class day (dotted), census (solid), and final enrollment (dashed). ",
-            "First day is reconstructed from class-list status dates and is left blank for terms whose class list has none. ",
-            "A shaded term is still in progress, so its final point is current registration. ",
-            "For a crosslisted offering, every line combines students across all active listings. ",
-            cedar_docs_link(
-              "users/course-reports#enrollment",
-              "How enrollment is counted \u2192"
-            )
+          "First class day (dotted), census (solid) and final enrollment (dashed) in each term.",
+          method = tagList(
+            tags$p("First day is reconstructed from class-list status dates and is left blank for terms whose class list has none. Census minus final is the late-drop count; first day minus census is mostly early drops after classes began, offset by students who added late. Neither is a frozen roster."),
+            tags$p("A shaded term is still in progress, so its final point is current registration. For a crosslisted offering, every line combines students across all active listings."),
+            tags$p(cedar_docs_link("users/course-reports#overview", "How enrollment is counted \u2192"))
           ),
           plotlyOutput("cr_overview_enrollment_plot", height = "340px")
+        ),
+        dashboard_subsection(
+          "Early and Late Drops",
+          "Students who dropped before the grade deadline, and those who withdrew after it, each term.",
+          method = tags$p("Early drops (DR, DD) carry no grade and are never DFW; late drops (DG, DW) are withdrawals. Early drops dated after the first class day are in the first-day count but not census; late drops are the difference between census and final."),
+          plotlyOutput("cr_enrollment_drop_plot", height = "300px")
         ),
         fluidRow(
           column(
             6,
             dashboard_subsection(
               "Active Sections",
-              "The number of active home sections in each same-season term. A crosslist family is represented once, not once per partner code.",
+              "Active home sections in each term.",
+              method = tags$p("A crosslist family is counted once, not once per partner code."),
               plotlyOutput("cr_overview_sections_plot", height = "300px")
             )
           ),
@@ -1076,51 +1089,16 @@ nav_panel(
             6,
             dashboard_subsection(
               "Average Section Size",
-              "Crosslist-aware total enrollment divided by active home sections.",
+              "Students per active section in each term.",
+              method = tags$p("Crosslist-aware total enrollment divided by active home sections."),
               plotlyOutput("cr_overview_avg_size_plot", height = "300px")
             )
           )
-        )
-      ),
-
-      nav_panel(
-        "Enrollment",
-        icon = icon("users"),
-        subtab_header(
-          "Enrollment",
-          tagList(
-            cedar_definition_summary("first-day-enrollment"), " ",
-            cedar_definition_summary("census-enrollment"), " ",
-            cedar_definition_summary("registered"), " ",
-            "This page keeps delivery campuses and terms separate. Crosslisted offerings are combined as one course family."
-          )
-        ),
-        info_panel(
-          "More On How This Is Counted",
-          lapply(c("first-day-enrollment", "census-enrollment", "registered"), cedar_definition_note),
-          tags$p(
-            tags$strong("This page's scope. "),
-            "First day and Census are the reconstructed definitions above; Final is the registered definition, which is current registration while a term is in progress. ",
-            "The selected course's active section family is resolved through the same pipeline used by Overview. ",
-            "For a crosslisted offering, registrations under every partner code are combined and students are deduplicated within delivery campus and term before the status buckets are summarized. ",
-            "Early and late drops remain visible as separate lifecycle counts."
-          ),
-          description = "Versioned first-day, census, and registered definitions, plus this page's grouping."
         ),
         dashboard_subsection(
-          "First Day, Census, and Final Enrollment",
-          "The three versioned class-list measures above, using the same crosslist-family totals as Overview. Census minus final is the late-drop count. First day minus census is mostly early drops after classes began, offset by students who added late. Neither reconstruction is a frozen roster.",
-          plotlyOutput("cr_enrollment_pressure_plot", height = "340px")
-        ),
-        dashboard_subsection(
-          "Early and Late Drops",
-          "Separates DR/DD drops before the grade-consequence deadline from DG/DW late withdrawals. Early drops dated after the first class day are in the first-day count but not census; late drops explain the difference between Census and Final.",
-          plotlyOutput("cr_enrollment_drop_plot", height = "300px")
-        ),
-        br(),
-        dashboard_subsection(
-          "Classlist Enrollment History",
-          "Reference rows for the plotted crosslist-family counts, including same-term-type historical averages and the drop buckets used to distinguish pressure from survival. A dash marks a term whose first day cannot be reconstructed.",
+          "Enrollment by Term",
+          "The counts behind the charts above, term by term, with each term type's average.",
+          method = tags$p("Class-list counts for the crosslist family. A dash marks a term whose first day cannot be reconstructed."),
           reactable::reactableOutput("cr_enrollment_table")
         )
       ),
@@ -1136,13 +1114,13 @@ nav_panel(
       ),
 
       nav_panel(
-        "Projections",
+        "Section Plan",
         icon = icon("calendar-check"),
         subtab_header(
-          "Projections",
-          "The published plan for this course in each projected term, read from the same saved projection as Registration > Projections: ",
-          "the sections to schedule, the registrations they are sized for, each step that built the number, and how close past forecasts came. ",
-          "A course outside the monitored groups, or screened out of a term, says so."
+          "Section Plan",
+          "How many sections to schedule for this course in each projected term, and the registrations they are sized for. ",
+          "It is the course's row of Registration > Projections, read from the same saved projection.",
+          method = tags$p("Each plan opens to the steps that built the number and how close past forecasts came. A course outside the monitored groups, or screened out of a term, says so.")
         ),
         # The model pools ABQ and EA as one market (enrollment-projections.md,
         # Grain and Scope), so the page's campus filter cannot apply here.
@@ -1790,7 +1768,7 @@ nav_panel(
           "a straight line through each course's last six offerings, so a course needs ",
           "at least two offerings to appear and a single unusual term can tilt a short ",
           "series. Treat the lists as a shortlist to look into, not a ranking. For ",
-          "curated chair-facing patterns, use Dept Trends > Enrollment."
+          "curated chair-facing patterns, use Dept Trends > Course Demand."
         ),
 
         section_heading("Enrollment by Campus and Level"),
@@ -1800,7 +1778,7 @@ nav_panel(
 
         hr(class = "mt-4 mb-2"),
 
-        p("A filter-driven workspace for exploring course enrollment trajectories. For curated chair-facing patterns, use Dept Trends > Enrollment. Based on
+        p("A filter-driven workspace for exploring course enrollment trajectories. For curated chair-facing patterns, use Dept Trends > Course Demand. Based on
           linear regression across each course's last 6 offerings; courses with fewer than
           2 offerings are excluded.",
           class = "cedar-body"),

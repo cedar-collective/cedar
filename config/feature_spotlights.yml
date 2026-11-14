@@ -74,7 +74,7 @@ spotlights:
     text: "Dept Trends calls out repeated topics courses so recurring special topics are reviewable without looking like duplicate rows."
     icon: "tags"
     tab: "dept-trends"
-    cta: "Open Enrollment Trends"
+    cta: "Open Dept Trends"
 
   - title: "Open Seats handles topics courses"
     text: "Open Seats keeps course titles in the course identity where needed, so topics sections do not repeat or collapse incorrectly."

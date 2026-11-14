@@ -297,7 +297,7 @@ assemble_course_overview <- function(sections, cl_enrls, opt,
 #'
 #' Resolves the selected course's active crosslist family once, calculates its
 #' class-list lifecycle through the standard enrollment branch, and supplies
-#' that same family series to both Overview and the detailed Enrollment tab.
+#' that same family series to Overview's enrollment and drops charts.
 #' Each listing's own counts are retained only for labeled comparison in the
 #' Overview snapshot and the enrollment-history hover.
 #'

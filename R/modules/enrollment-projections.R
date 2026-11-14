@@ -511,7 +511,7 @@ projection_attempts_explainer <- function() {
 
 # ---- Findings as figures ---------------------------------------------------------
 #
-# The two findings the Projections tab leads with, drawn from the counts the
+# The two findings the Plan tab leads with, drawn from the counts the
 # view computed. Each part takes the colour its rows carry in the table it
 # summarises: a draft verdict's swatch in the Draft schedule table, a
 # reliability badge's tone in the projections table.
@@ -541,7 +541,7 @@ projection_miss_tone <- function(part) {
   ), "miss group")
 }
 
-# `link` is the Projections tab's way to the course-by-course comparison; the
+# `link` is the Plan tab's way to the course-by-course comparison; the
 # Draft schedule tab, which is that comparison, passes none.
 projection_draft_finding <- function(comparison, link = NULL) {
   parts <- dplyr::mutate(comparison$parts, tone = projection_draft_tone(status))
@@ -775,7 +775,7 @@ projection_detail_ui <- function(data, ns) {
 # The scope stripe over a bundle's view: target term, data window, market,
 # course count, when it was built, the draft schedule it was set beside, and
 # the model with its provenance behind an info icon. Shared by the Projections
-# page and Course Dynamics > Projections, which show the same saved bundles;
+# page and Course Dynamics > Section Plan, which show the same saved bundles;
 # the course page is about one course, so it leaves the count out.
 projection_scope_bar <- function(meta, course_count = TRUE) {
   provenance <- meta$model_provenance
@@ -1507,12 +1507,14 @@ enrollmentProjectionsUI <- function(id) {
     ),
     navset_tab(
       id = ns("projection_tabs"),
-      selected = "Projections",
+      selected = "Plan",
 
+      # "Plan", not "Projections": the page is Projections, and a subtab of
+      # the same name read as the page again.
       nav_panel(
-        "Projections",
+        "Plan",
         subtab_header(
-          "Projections",
+          "Plan",
           paste(
             "One published projection per course, opening with the courses whose",
             "plans add most to last year; click a header to sort by it instead."
@@ -1806,7 +1808,7 @@ enrollmentProjectionsServer <- function(id, bundles, load_bundle, programs) {
     # ---- Draft schedule sub-tab ---------------------------------------------
     draft <- reactive(build_enrollment_projection_draft_comparison(view()))
 
-    # The same figure the Projections tab leads with; with no schedule in the
+    # The same figure the Plan tab leads with; with no schedule in the
     # data there is nothing to draw, and the sentence says so.
     output$draft_summary <- renderUI({
       comparison <- draft()

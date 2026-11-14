@@ -320,8 +320,7 @@ export async function openSubTab(page, text, opts = {}) {
 
   const shown = await waitFor(page, new Function('t', `${VIS}
     // Visible links only, as clickSubTab() chose: two pages can name a
-    // sub-tab the same (Course Dynamics and Registration both have
-    // "Projections"), and the hidden page's link may come first in the DOM.
+    // sub-tab the same, and the hidden page's link may come first in the DOM.
     const links = [...document.querySelectorAll('a.nav-link, .nav-tabs a, .nav-pills a')]
       .filter(__vis)
       .filter((a) => !a.closest('.navbar'));

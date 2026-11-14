@@ -3940,6 +3940,8 @@ empty state).
 32 HIST courses with no cap or collapse, and the Low Enrollment table clips
 its Recent History column at the default width. *Done when:* each list shows
 its top rows with the rest one click away, and no table clips a column.
+*Status: resolved 2026-11-14:* every course list shows its top rows with "Show
+N more" for the rest, and Recent History wraps.
 
 **M49 — Course Dynamics draws first day, census and final twice.** Overview's
 Enrollment History (`cr_overview_enrollment_plot`) and the Enrollment subtab's
@@ -3948,6 +3950,9 @@ the same three class-list measures over the same crosslist-family totals; the
 subtab's own sentence says so. *Done when:* the Enrollment subtab is folded
 into Overview (its drops chart and class-list table move there) and its slug
 and links resolve to Overview.
+*Status: resolved 2026-11-14:* the drops chart and the Enrollment by Term table
+are on Overview, following its Term type, and the subtab and its second
+lifecycle chart are gone; the guide's links point to `course-reports#overview`.
 
 ### Documentation and naming
 

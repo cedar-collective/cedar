@@ -316,7 +316,7 @@ test_that("standalone feature builder runs without Shiny or global data", {
   ) %in% names(bundle$projections)))
 })
 
-# Course Dynamics > Projections shows one course's saved outlook per bundle,
+# Course Dynamics > Section Plan shows one course's saved outlook per bundle,
 # through the Projections page's own view, and says why a course has none
 # rather than showing an empty panel.
 test_that("Course Dynamics reads one course's outlook off the saved bundle and says why a course has none", {

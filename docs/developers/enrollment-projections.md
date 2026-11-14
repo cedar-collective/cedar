@@ -490,7 +490,7 @@ the four verdicts always, a course not in the draft only when there is one),
 `headline` and `caption` (how many are short of day one), and `meters` (the
 draft's seats over the registrations planned for them, and for the courses
 near full last year `if_seats_fill` over their plan, each with `share`). The
-Projections tab leads with the figure and the Draft schedule tab repeats it
+Plan tab leads with the figure and the Draft schedule tab repeats it
 over its table, whose verdicts carry the same swatches.
 
 Expected first-day seats are still shown beside the plan, as context. For each
@@ -943,7 +943,7 @@ multiplier.
 | Module | `R/modules/enrollment-projections.R` | Read-only Registration page over the saved feature payload |
 | Script | `scripts/build-enrollment-projections.R` | Clean-process artifact publication |
 
-Future modules, like Course Dynamics' Projections tab, must call the feature/cone
+Future modules, like Course Dynamics' Section Plan tab, must call the feature/cone
 or read the saved bundle. They must not reproduce a model, backtest, pressure
 calculation, or recommendation pipeline.
 
@@ -1160,7 +1160,7 @@ with `load_enrollment_projection_bundle()`, and filters it through
 `build_enrollment_projection_view()`. It never runs a candidate method, aftcast,
 calibration, or pressure screen. `server.R` owns the path and the file read; the
 module receives a discovery reactive and a loader function. Course Dynamics >
-Projections (2026-11-09) reads the same files through the same boundary: `server.R`
+Section Plan (2026-11-09) reads the same files through the same boundary: `server.R`
 loads every saved bundle once per session, and
 `enrollment_projection_course_outlook(bundle, subject_course)` (the feature)
 builds the course's view and detail, or says why the bundle has none for it
