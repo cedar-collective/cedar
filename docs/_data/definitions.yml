@@ -18,7 +18,7 @@ definitions:
         exclusions: Waitlists and all drops are excluded from registered enrollment.
         limitations:
           - This is a snapshot, not a frozen census count. It describes final enrollment only after the term is complete.
-        guide: users/course-reports#enrollment
+        guide: users/course-reports#overview
         implementation:
           - file: R/branches/enrl.R
             functions: [calc_cl_enrls]
@@ -79,8 +79,8 @@ definitions:
         limitations:
           - The class list keeps only the date of each row's current status, so a student who added after the first day and later dropped counts as present.
           - Shown only when every enrolled or dropped row in the group has a status date, its section has a start date, and the row was pulled on or after that day. Class lists pulled before status dates were exported have none, and those terms show no value rather than a partial count. A course with a session that had not begun when its class list was pulled likewise shows no value until a later pull covers that session. Waitlist rows never count and do not need dates.
-          - Unlike the Enrollment tab's "Ever Registered Proxy", this does not count students who registered and dropped before classes began.
-        guide: users/course-reports#enrollment
+          - Unlike Explore > Enrollment's "Ever Registered Proxy", this does not count students who registered and dropped before classes began.
+        guide: users/course-reports#overview
         implementation:
           - file: R/branches/enrl.R
             functions: [calc_first_day_enrl]

@@ -323,7 +323,8 @@ test_that("Course Dynamics renders the snapshot from the shared table helper", {
 
   expect_match(server_source, "prepare_course_snapshot_tables(", fixed = TRUE)
   expect_match(server_source, "lapply(tables, cedar_snapshot_table)", fixed = TRUE)
-  expect_match(server_source, "lifecycle <- data$overview$lifecycle", fixed = TRUE)
+  # The drops chart reads Overview's shared lifecycle, never its own (M49).
+  expect_match(server_source, "build_course_drop_plot(overview$lifecycle)", fixed = TRUE)
 })
 
 test_that("overview retains the latest descriptive enrollment term", {

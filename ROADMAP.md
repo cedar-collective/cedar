@@ -184,12 +184,58 @@ contracts: [degree-requirements.md](docs/developers/degree-requirements.md),
 - [ ] **A requirement-informed demand challenger,** scored through the rolling
   projection contract.
 
+## Finding your way
+
+The 2026-11-14 page audit found the app does more than a reader can see.
+Page-level legibility is [M43](ISSUES.md)–M48; these are the new pieces.
+
+- [ ] **Every course code and department opens its page.** A course code in any
+  table opens Course Dynamics for that course, a department opens Dept Trends;
+  only Waitlists and Regstats drill today, and the Dashboard's "Full trendlines
+  are in Dept Trends > Course Demand" is plain text.
+- [ ] **A Home page organized by question.** "Is my department growing?",
+  "Which courses are under pressure this term?", "Where do students go after
+  this course?", each a deep link to the subtab that answers it; Course
+  Dynamics' eight subtabs and Pathways' six are invisible from Home now.
+- [ ] **Cancellations is an analysis filed under Admin.** Move it beside the
+  other Explore tools; its old slug keeps resolving. (The colliding
+  Enrollment and Projections names were settled 2026-11-14.)
+
 ## Platform
 
 - [ ] **Code history by unit.** Admin → Mappings → Code history lists every
   `code_history.csv` row with when each code was offered. Still to do: each
   unit's program codes and course subjects with when each was in use, and the
-  `program` rows, which are validated but no reader follows yet.
+  `program` rows, which are validated but no reader follows yet (the file
+  holds none). Picking a unit or college already counts every code mapped to
+  it: Liberal Arts & Integrative Studies (LAIS, in University College) holds
+  LIBA, INGI and LAIS and the pre-majors FLIB, FING, FINN and FLAI, and LAIS
+  itself is only 1,619 of their 8,531 enrolled student-terms since Fall 2019.
+  Picking one major does not: Pathways' Majors picker by name, or Dept
+  Trends' program filter, set to LAIS misses LIBA's 4,372. Show each code's
+  years in use in the Data scope disclosure (from `cedar_class_list_majors`),
+  and record successions such as LIBA → LAIS as `program` rows that a major
+  picker follows, naming the earlier codes it added.
+- [ ] **Courses Taken for any major, Undecided included.** "What courses do
+  students in major X take?" is Dept Trends > Courses Taken, entered by
+  department; "what do undecided students take?" has no answer, because
+  `get_major_course_units()` picks its members by `primary_dept_code` and
+  Undecided (`UNDC`, 3,790 enrolled student-terms since Fall 2022) and
+  Non-Degree (`NOND`, 23,427) are deliberately owned by no unit. Pathways'
+  by-major population cannot stand in: it reads `cedar_programs`, which holds
+  no `UNDC` row (the code is on the class list only). Let the cone take
+  `opt$program_code` without a unit (own-unit share then blank), and give a
+  page a "Students in" picker by major name that includes them; list the
+  unit's own courses course by course beside the outside ones.
+- [ ] **The mapping assistant proposes ADCW for a branch-only code.**
+  `scripts/propose-mappings.R` stops at "no evidence settles the unit" for a
+  subject or program whose only source department is the Provost Branch
+  Campuses bucket. The rule decided 2026-11-14: the branch unit that teaches
+  it (or, for a new subject, the unit of the subject it renumbers, read from
+  `code_history.csv`) where one exists, otherwise ADCW. Propose rows by that
+  rule, still `proposed`, and review the proposals after each term's first
+  pull, largest first, stopping when the tail is under about 50 student-terms
+  a term.
 - [ ] **Operational monitoring.** Shiny errors, usage logs, scheduled-refresh
   outcomes and cold-cache latency after release.
 - [ ] **Standard CSV export** across user-facing tables through a shared helper.

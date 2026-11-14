@@ -492,6 +492,35 @@ test_that("cones and branches do not read global state (M12)", {
   architecture_expect_ratchet(measured, integer(0), "global-state read(s)")
 })
 
+test_that("open blue boxes do not grow, and the backlog shrinks on record (M43)", {
+  # Blue is for how a number is counted, and that text is collapsed: a
+  # section's method slot (dashboard_section(method =), cedar_method_panel())
+  # or info_panel(). An open box is for a caveat that changes the reading, and
+  # is not blue. Each file's allowance is today's count of open blue boxes.
+  files <- c(
+    r_files_under("R"),
+    file.path(cedar_base_dir, c("global.R", "server.R", "ui.R"))
+  )
+  measured <- architecture_count_by_file(files, function(file) {
+    hits <- gregexpr("alert alert-info|alert-box alert-box--info", read_code(file))[[1]]
+    sum(hits > 0L)
+  })
+  # Measured 2026-11-14. Lower a number when you fold one away; never raise one.
+  allowance <- c(
+    "R/modules/cancellations.R" = 1L,
+    "R/modules/catalog-normalization.R" = 2L,
+    "R/modules/catalog-review.R" = 4L,
+    "R/modules/course-cohort.R" = 1L,
+    "R/modules/enrollment-projections.R" = 1L,
+    "R/modules/gen-ed.R" = 3L,
+    "R/modules/pathways.R" = 4L,
+    "R/modules/regstats.R" = 7L,
+    "server.R" = 14L,
+    "ui.R" = 1L
+  )
+  architecture_expect_ratchet(measured, allowance, "open blue box(es)")
+})
+
 test_that("units are resolved only by attach_unit() and the lists layer (ADR-001 step 3)", {
   # The invariant that prevents I9: one place reads the mapping files into a
   # unit, so two readers cannot drift apart. attach_unit() in

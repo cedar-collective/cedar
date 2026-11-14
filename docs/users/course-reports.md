@@ -18,7 +18,9 @@ Select a course using the search box (type a subject code or course number to fi
 
 ---
 
-## Enrollment
+## Overview
+
+The first tab: how many students the course draws each term, how many it loses to drops, and how many sections it runs. The **Term type** control at the top applies to every chart and the table below it.
 
 {% include definition-summary.html id="first-day-enrollment" %}
 {% include definition-summary.html id="census-enrollment" %}
@@ -31,8 +33,9 @@ Select a course using the search box (type a subject code or course number to fi
   - *First day* is reconstructed from the date on each class-list row: students still enrolled who registered by the first class day, plus anyone who dropped after it. It is blank for terms whose class list was exported without status dates, rather than shown as a partial count; re-pulling those terms' class lists fills it in.
   - *Final* is enrollment when the term ended. A shaded term is still in progress, so its final point is current registration.
   - First day minus census is mostly early drops after classes began, offset by late adds; census minus final is the late withdrawals.
-- **First Day, Census, and Final Enrollment** — the same crosslist-family lifecycle series used by Overview, rather than a separate selected-code calculation
-- **Classlist Enrollment History** — a table of the plotted crosslist-family first-day, census, and final counts, drops, and same-term-type averages from class-list records. A dash marks a term whose first day cannot be reconstructed.
+- **Early and Late Drops** — early drops (no grade, never DFW) and late drops (withdrawals) each term, from the same crosslist-family series.
+- **Active Sections** and **Average Section Size** — home sections each term, a crosslist family counted once, and students per section.
+- **Enrollment by Term** — the counts behind the charts, term by term: first day, census, final, drops and each term type's average, from class-list records. A dash marks a term whose first day cannot be reconstructed.
 
 Useful for seeing whether course registrations are growing, declining, or stable. Every enrollment surface in Course Dynamics uses one shared crosslist-aware payload: registrations under active partner codes are combined and deduplicated per campus and term, one home section represents each crosslist group, and standalone sections of the selected course are added normally. A student who drops one listing and registers under its partner — common when students switch codes inside a shared section — counts once, as enrolled. Because standalone sections belong only to their own code, a course and its partner can show different totals: the partner's report counts only the sections the two share. Per-code counts appear only as explicitly labeled comparisons on Overview cards and in the history hover.
 
@@ -61,10 +64,10 @@ A topic taught by one instructor in a term is that instructor's course, so its D
 
 ---
 
-## Projections
+## Section Plan
 
 The published plan for this course in each term CEDAR has projected, read from
-the same saved projection as **Registration → Projections**. One block per
+the same saved projection as **Registration → Projections → Plan**. One block per
 projected term (a Fall and a Spring are both current) shows the sections to
 schedule, the registrations they are sized for, each step that built the number
 from last year's class list, the recent same-season evidence, and how close

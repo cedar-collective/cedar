@@ -49,7 +49,7 @@ alongside other work (M14, M16).
 | [I20](#i20--cedar_programs-holds-almost-no-branch-campus-students) | Defect | `cedar_programs` holds 1–3% of branch-campus students; branch program counts read near zero |
 | [I18](#i18--cedar_degrees-holds-no-associate-degrees-so-branch-campus-completions-read-zero) | Defect | `cedar_degrees` holds no associate degrees: branch-campus completions read zero |
 | [I4](#i4--pre-change-course-ratios-are-confounded-by-career-stage) | Defect | Pre-change course ratios confounded by career stage (deferred) |
-| M1–M42 | Improvement | See [Improvements](#improvements) |
+| M1–M50 | Improvement | See [Improvements](#improvements) |
 
 ### Resolved since the last release
 
@@ -3837,8 +3837,8 @@ its repeated code extracted — alongside other work on the file.
 
 ### Interface consistency
 
-**M17 — Inline styles.** 153 `style =` attributes in module and UI code.
-*Done when:* replaced by shared helpers and CSS classes
+**M17 — Inline styles.** 153 `style =` attributes in module and UI code
+(133 lines on 2026-11-14, 91 of them in `server.R`). *Done when:* replaced by shared helpers and CSS classes
 (`R/modules/ui-helpers.R`), one tab per PR.
 
 **M18 — Bare headings.** 53 `h3()`–`h6()`. *Done when:* each is
@@ -3856,7 +3856,9 @@ Explorer and the projections percent columns use them. Projections' count
 columns, Regstats' fill bar (whole percents, hard-coded hex colors and inline
 styles in `fill_bar()`) and the other tabs' tables still format their own. The
 projections browser suite parses some count cells with `parseFloat`, which
-breaks on a thousands separator. *Done when:* every count and rate column uses
+breaks on a thousands separator. Seen 2026-11-14: Open Seats prints DFW % at
+two decimals (31.76), and the Dept Dashboard's credit-hour shifts print
+`-12%` beside `-18.3%`. *Done when:* every count and rate column uses
 the shared definitions, and the browser checks read the number, not the text.
 
 **M27 — Headcount lists a department's programs by name.** Its program
@@ -3865,6 +3867,102 @@ dropdown takes a department's programs from `cedar_lookups$program_name_lookup`
 lists under one. Counting is by each row's own department (I15); only the
 choices are affected. *Done when:* the choices come from the rows'
 `dept_code`, or from `unit_mapping_rows()`.
+
+The entries below come from the 2026-11-14 page audit (HIST and HIST 1110 on
+the institutional app). Order: M43 first, on the dean-facing pages, then one
+tab per PR; M44–M47 ride along with whichever tab is being touched.
+
+**M43 — Method text leads the page instead of the finding.** Explanations
+arrived in layers, each with its own device: an italic filter-bar subtitle, a
+grey scope strip, the subtab sentence, open blue alert boxes, collapsible blue
+`info_panel()`s and open definition notes. Most method text sits above the
+first number. Worst cases: Dept Trends > Headcount states its definition twice
+(the subtab sentence is the first line of an open `cedar_definition_note()`,
+`R/modules/dept-trends.R:677`), then exclusions and three caveats; Regstats
+opens with seven threshold inputs and Scope, Thresholds, Method and
+"Unscored SD comparisons" lines plus three caveats; Course Dynamics > Course
+Flows opens with about 200 words in three paragraphs; DFW with a five-sentence
+policy paragraph; Explore > Enrollment with "XL-aware Enrl…"; the Dept
+Dashboard leaves a six-line COUNTING block open under its student cards and
+tells deans Low Enrollment "uses the same low-enrollment helper". There are
+three blue-box systems: 22 collapsible definition panels, 28 open
+`alert alert-info` boxes and 7 `alert-box--info`. *Done when:* every section
+is title, one plain sentence saying what it answers (no method vocabulary),
+one collapsed method panel (scope, exclusions, thresholds, edge, definition
+links), then the result; an open box appears only
+for a caveat that changes the reading (term in progress, data window), in one
+shared style; tuning inputs (Regstats thresholds, flow minimums) sit behind a
+disclosure; and the open-blue-box ratchet in `test-architecture.R` (added
+2026-11-14, 38 boxes in 10 files) reaches zero. Course Dynamics > Overview is
+the model; the Dept Dashboard and Dept Trends were the pilot. The pattern is in [shiny-modules.md](docs/developers/shiny-modules.md#explaining-a-section).
+
+**M44 — Term codes on reader-facing surfaces.** The term inputs of Regstats,
+Open Seats, Waitlists and Explore > Enrollment show `202680`; the Dept
+Dashboard's High Waitlists table has a `TERM` column of codes while its own
+term filter reads "Fall 2026". *Done when:* every term input and term column a
+reader sees is labelled through `fmt_term()` (the code stays the value).
+Regstats' and Waitlists' tables change together, with
+`tests/e2e/waitlist-reconciliation.test.mjs`, which matches their Term cells
+to each other and to the Waitlists term input.
+
+**M45 — Per-term charts do not all use the Term types control.** The
+pattern (PRs #273–#289): a "Term types" checkbox group, Fall and Spring ticked
+by default and Summer opt-in, under the section's heading and sentence, above
+the chart it governs. Gen Ed, Course Cohort, Topics, Later Course, Dept
+Trends > Courses Taken and Course Dynamics > DFW use it; Gen Ed places it in
+the top filter stripe instead of in the section. The exceptions: Course
+Dynamics > Overview has an All / Fall / Spring / Summer radio; Rollcall draws
+Fall and Spring side by side; Dept Trends' Headcount, Credit Hours and
+Enrollment have no control and put every term, summers included, on one
+axis, so the bars saw-tooth and a summer reads as a collapse (Credit Hours'
+College Comparison index falls from about 100 to near 0 every summer). Dept
+Trends' charts are stored in its cache, so that change bumps
+`cedar_dept_cache_version`. *Done when:* every per-term chart uses the Term
+types control, defaulting to Fall and Spring, placed in its section.
+
+**M46 — Raw column names reach the reader.** Dept Trends' headcount charts
+label their axes `term` and `student_count` (`R/branches/headcount.R`, every
+`plot_ly(x = ~term, y = ~student_count)` without axis titles; fixed
+2026-11-14), Credit Hours' charts `term`, "Academic Period" and lowercase
+level legends (`grad`, `lower`, `upper`); Explore > Enrollment's Group by
+shows `subject_course` and `term`. *Done when:* every
+axis title and choice label is a word a dean would use.
+
+**M47 — Filter bars disagree.** Headcount labels its inputs "Select Campus",
+"Select College"… where every other tab says "Campus"; Pathways spells the
+campus "Albuquerque/Main" where the rest say ABQ; the Waitlists campus box
+wraps to one chip per line; empty states say "Select X, then click Y" except
+Pathways', which says what each subtab will show. *Done when:* labels, campus
+values and empty states follow one pattern (Pathways' start card for the
+empty state).
+
+**M48 — Dept Dashboard lists run unbounded.** "Missing vs. two years ago" listed
+32 HIST courses with no cap or collapse, and the Low Enrollment table clips
+its Recent History column at the default width. *Done when:* each list shows
+its top rows with the rest one click away, and no table clips a column.
+*Status: resolved 2026-11-14:* every course list shows its top rows with "Show
+N more" for the rest, and Recent History wraps.
+
+**M49 — Course Dynamics draws first day, census and final twice.** Overview's
+Enrollment History (`cr_overview_enrollment_plot`) and the Enrollment subtab's
+First Day, Census, and Final Enrollment (`cr_enrollment_pressure_plot`) chart
+the same three class-list measures over the same crosslist-family totals; the
+subtab's own sentence says so. *Done when:* the Enrollment subtab is folded
+into Overview (its drops chart and class-list table move there) and its slug
+and links resolve to Overview.
+*Status: resolved 2026-11-14:* the drops chart and the Enrollment by Term table
+are on Overview, following its Term type, and the subtab and its second
+lifecycle chart are gone; the guide's links point to `course-reports#overview`.
+
+**M50 — Two branch units are named for something they do not teach.** In
+`units.csv`, MAS is "Medical Administrative Specialist" and STIN "STEM
+Integration", but every MAS section in the data (from Fall 2018) is massage therapy at
+UNM-Taos (Massage Therapy I, Deep Tissue Techniques, Cranial Sacral) and every
+STIN section structural integration, the courses MASS and SHIN renumbered in
+Fall 2026. The names were proposed from the codes on 2026-10-04. A page that
+names the unit (Dept Trends, Courses Taken's teaching units) shows the wrong
+discipline. *Done when:* each AD unit's name is checked against the titles it
+taught, MAS and STIN first.
 
 ### Documentation and naming
 

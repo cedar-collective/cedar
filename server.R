@@ -1948,7 +1948,7 @@ output$enrl_classlist_download <- downloadHandler(
 
   # Shared helper — compute one tab's data and merge it into course_report_data().
   # Called from both the tab-click observer and the "Analyze Course" handler
-  # (for the case where the user was already on a non-Enrollment tab).
+  # (for the case where the user was already on a tab other than Overview).
   cr_load_tab <- function(tab, base = course_report_data()) {
     if (is.null(base) || is.null(tab)) return()
 
@@ -1964,7 +1964,7 @@ output$enrl_classlist_download <- downloadHandler(
 
     }
 
-    if (tab == "Projections") {
+    if (tab == "Section Plan") {
       base <- course_report_data() %||% base
       if (is.null(base$projections)) {
         base$projections <- with_cr_tab_loading(
@@ -2006,7 +2006,7 @@ output$enrl_classlist_download <- downloadHandler(
     cr_load_tab(input$cr_tabs)
   }, ignoreInit = TRUE)
 
-  # Course Dynamics > Projections reads the saved bundles Registration >
+  # Course Dynamics > Section Plan reads the saved bundles Registration >
   # Projections reads, one per published target term, through the same loader
   # and view (enrollment-projections.md: Shiny never fits a model). Each file is
   # read once per session; a bundle this build cannot read is reported and left
@@ -2127,18 +2127,6 @@ output$enrl_classlist_download <- downloadHandler(
     )
   })
 
-  cr_enrollment_lifecycle_data <- reactive({
-    data <- course_report_data()
-    if (is.null(data) || is.null(data$overview$lifecycle)) return(NULL)
-    # The detailed Enrollment charts read the exact lifecycle series assembled
-    # for Overview so crosslist membership and student de-duplication cannot
-    # diverge between Course Dynamics tabs.
-    lifecycle <- data$overview$lifecycle
-    cedar_filter_campus(
-      lifecycle, input$cr_campus, "cr_enrollment_lifecycle_data"
-    )
-  })
-
   output$cr_overview_scope_note <- renderUI({
     data <- course_report_data()
     overview <- cr_overview_data()
@@ -2243,16 +2231,12 @@ output$enrl_classlist_download <- downloadHandler(
     plot
   })
 
-  output$cr_enrollment_pressure_plot <- renderPlotly({
-    plot <- build_course_enrollment_history_plot(
-      cr_enrollment_lifecycle_data(), in_progress_terms = cr_in_progress_terms
-    )
-    req(!is.null(plot))
-    plot
-  })
-
+  # Overview's drops chart reads the same lifecycle series as its enrollment
+  # chart, under the same campus and Term type scope (ISSUES M49).
   output$cr_enrollment_drop_plot <- renderPlotly({
-    plot <- build_course_drop_plot(cr_enrollment_lifecycle_data())
+    overview <- cr_overview_data()
+    req(!is.null(overview))
+    plot <- build_course_drop_plot(overview$lifecycle)
     req(!is.null(plot))
     plot
   })
@@ -2539,6 +2523,11 @@ output$enrl_classlist_download <- downloadHandler(
       campus_vals <- input$cr_campus
       if (!is.null(campus_vals) && length(campus_vals) > 0) {
         cl_enrls_data <- cl_enrls_data %>% filter(campus %in% campus_vals)
+      }
+      # On Overview, the table reads the terms its charts draw.
+      selected_type <- input$cr_overview_term_type %||% "all"
+      if (!identical(selected_type, "all")) {
+        cl_enrls_data <- cl_enrls_data %>% filter(get_term_type(term) == selected_type)
       }
 
       cl_enrls_data <- cl_enrls_data %>%
@@ -4901,12 +4890,20 @@ output$enrl_classlist_download <- downloadHandler(
 
     tagList(
       render_tier_row("undergrad"),
-      render_tier_row("grad"),
-      # What the cards count, in the Headcount tab's words.
-      headcount_scope_bar(describe_headcount_scope(
-        d$headcount_scope, cedar_in_progress_terms(data_objects[["cedar_edges"]])$term))
+      render_tier_row("grad")
     )
   })
+
+  # What the cards count, in the Headcount tab's words. It sits in the Students
+  # section's collapsed method panel, not under the cards (ISSUES M43).
+  output$dashboard_headcount_scope <- renderUI({
+    d <- dashboard_data()
+    req(d)
+    headcount_scope_bar(describe_headcount_scope(
+      d$headcount_scope, cedar_in_progress_terms(data_objects[["cedar_edges"]])$term))
+  })
+  # Rendered while the panel is closed, so opening it never shows an empty box.
+  outputOptions(output, "dashboard_headcount_scope", suspendWhenHidden = FALSE)
 
   # Headcount sparkline (static ggplot — no hover).
   # Hidden when a subject is selected (sparklines show dept-level trends, not subject).
@@ -4936,7 +4933,7 @@ output$enrl_classlist_download <- downloadHandler(
     fmt_diff <- function(diff, pct) {
       if (is.na(diff)) return("-")
       sign_chr <- if (diff > 0) "+" else ""
-      pct_txt <- if (!is.na(pct)) paste0(" (", sign_chr, round(pct, 1), "%)") else ""
+      pct_txt <- if (!is.na(pct)) paste0(" (", sign_chr, sprintf("%.1f", pct), "%)") else ""
       paste0(sign_chr, scales::comma(round(diff)), pct_txt)
     }
     diff_color <- function(x) {
@@ -4944,7 +4941,6 @@ output$enrl_classlist_download <- downloadHandler(
     }
     cell_left <- "padding: 4px 10px 4px 0; font-weight: 600;"
     cell_num <- "padding: 4px 10px; text-align: right; white-space: nowrap;"
-    hint_style <- "margin-top: 6px;"
 
     rows <- lapply(seq_len(nrow(shifts)), function(i) {
       r <- shifts[i, ]
@@ -4964,23 +4960,16 @@ output$enrl_classlist_download <- downloadHandler(
       )
     })
 
-    tagList(
-      tags$table(
-        class = "table table-sm",
-        style = "font-size: 0.84em; margin-bottom: 0;",
-        tags$thead(tags$tr(
-          tags$th("Level"),
-          tags$th(style = "text-align: right;", "Current SCH"),
-          tags$th(style = "text-align: right;", "Recent Norm"),
-          tags$th(style = "text-align: right;", "Difference")
-        )),
-        tags$tbody(rows)
-      ),
-      p(
-        "Dashboard threshold: at least 25 SCH and 10% away from the prior three same-season terms. Full trendlines are in Dept Trends > Enrollment.",
-        class = "text-hint",
-        style = hint_style
-      )
+    tags$table(
+      class = "table table-sm",
+      style = "font-size: 0.84em; margin-bottom: 0;",
+      tags$thead(tags$tr(
+        tags$th("Level"),
+        tags$th(style = "text-align: right;", "Current SCH"),
+        tags$th(style = "text-align: right;", "Recent Norm"),
+        tags$th(style = "text-align: right;", "Difference")
+      )),
+      tags$tbody(rows)
     )
   })
 
@@ -5088,11 +5077,25 @@ output$enrl_classlist_download <- downloadHandler(
   # Render a standard dashboard course table, capping at max_rows (default: .dash_max_rows).
   # Pass max_rows = Inf to render all rows without a cap.
   # row_fn(i, data) should return a tags$tr() for row i.
-  .render_course_table <- function(data, row_fn, empty_msg = "No courses to display", max_rows = .dash_max_rows) {
+  # With show_rest = TRUE the rows past max_rows are kept, one click away under
+  # a "Show N more" line, instead of dropped or listed in full (ISSUES M48).
+  .render_course_table <- function(data, row_fn, empty_msg = "No courses to display",
+                                   max_rows = .dash_max_rows, show_rest = FALSE) {
     if (is.null(data) || nrow(data) == 0) {
       return(p(empty_msg, class = "cedar-dashboard-empty-note"))
     }
-    .make_dashboard_table(lapply(seq_len(min(max_rows, nrow(data))), function(i) row_fn(i, data)))
+    shown <- seq_len(min(max_rows, nrow(data)))
+    head_table <- .make_dashboard_table(lapply(shown, function(i) row_fn(i, data)))
+    if (!show_rest || nrow(data) <= max_rows) return(head_table)
+    rest <- setdiff(seq_len(nrow(data)), shown)
+    tagList(
+      head_table,
+      tags$details(
+        class = "cedar-more-rows",
+        tags$summary(sprintf("Show %d more", length(rest))),
+        .make_dashboard_table(lapply(rest, function(i) row_fn(i, data)))
+      )
+    )
   }
 
   output$dashboard_above_avg_courses <- renderUI({
@@ -5159,6 +5162,7 @@ output$enrl_classlist_download <- downloadHandler(
       empty_msg = "No selected-term courses with waitlists.",
       include_supply = FALSE,
       include_hist_terms = FALSE,
+      include_scope = FALSE,
       searchable = TRUE,
       defaultPageSize = 10,
       showPageSizeOptions = TRUE,
@@ -5173,10 +5177,12 @@ output$enrl_classlist_download <- downloadHandler(
                          empty_msg = "No selected-term courses with elevated early drops under dashboard thresholds.",
                          function(i, x) {
       r <- x[i, ]
-      diff_txt <- if (!is.na(r$diff)) paste0("+", r$diff, " vs hist") else ""
-      rate_txt <- if (!is.na(r$drop_rate)) sprintf("%.1f%% rate", 100 * r$drop_rate) else "rate unavailable"
-      hist_rate_txt <- if (!is.na(r$hist_rate)) sprintf("%.1f%%", 100 * r$hist_rate) else "unavailable"
-      rate_diff_txt <- if (!is.na(r$rate_diff_pp)) sprintf("%+.1f pp", r$rate_diff_pp) else ""
+      # Two lines per figure: the count, then its rate. "Usual" is the
+      # course's own history, the comparison the watch is built on.
+      diff_txt <- if (!is.na(r$diff)) paste0("+", r$diff, " drops") else ""
+      rate_txt <- if (!is.na(r$drop_rate)) sprintf("rate %.1f%%", 100 * r$drop_rate) else "rate unknown"
+      hist_rate_txt <- if (!is.na(r$hist_rate)) sprintf("%.1f%%", 100 * r$hist_rate) else "unknown"
+      rate_diff_txt <- if (!is.na(r$rate_diff_pp)) sprintf("%+.1f pts", r$rate_diff_pp) else ""
       tags$tr(
         tags$td(style = "padding: 2px 6px 2px 0; font-weight: 600; white-space: nowrap;",
                 paste0(r$subject_course, .campus_suffix(r, x))),
@@ -5185,8 +5191,8 @@ output$enrl_classlist_download <- downloadHandler(
                 paste0(r$drop_early, " early drops"), tags$br(),
                 tags$small(style = "color:#666;", rate_txt)),
         tags$td(style = "padding: 2px 4px; text-align: right; white-space: nowrap; color: #666;",
-                paste0("hist ", r$hist_avg), tags$br(),
-                tags$small(paste0("hist rate ", hist_rate_txt))),
+                paste0("usually ", r$hist_avg), tags$br(),
+                tags$small(paste0("usual rate ", hist_rate_txt))),
         tags$td(style = paste0("padding: 2px 0 2px 6px; text-align: right; white-space: nowrap; color: ", .dash_down, ";"),
                 diff_txt, tags$br(), tags$small(rate_diff_txt))
       )
@@ -5200,10 +5206,12 @@ output$enrl_classlist_download <- downloadHandler(
                          empty_msg = "No selected-term courses with elevated late drops under dashboard thresholds.",
                          function(i, x) {
       r <- x[i, ]
-      diff_txt <- if (!is.na(r$diff)) paste0("+", r$diff, " vs hist") else ""
-      rate_txt <- if (!is.na(r$drop_rate)) sprintf("%.1f%% rate", 100 * r$drop_rate) else "rate unavailable"
-      hist_rate_txt <- if (!is.na(r$hist_rate)) sprintf("%.1f%%", 100 * r$hist_rate) else "unavailable"
-      rate_diff_txt <- if (!is.na(r$rate_diff_pp)) sprintf("%+.1f pp", r$rate_diff_pp) else ""
+      # Two lines per figure: the count, then its rate. "Usual" is the
+      # course's own history, the comparison the watch is built on.
+      diff_txt <- if (!is.na(r$diff)) paste0("+", r$diff, " drops") else ""
+      rate_txt <- if (!is.na(r$drop_rate)) sprintf("rate %.1f%%", 100 * r$drop_rate) else "rate unknown"
+      hist_rate_txt <- if (!is.na(r$hist_rate)) sprintf("%.1f%%", 100 * r$hist_rate) else "unknown"
+      rate_diff_txt <- if (!is.na(r$rate_diff_pp)) sprintf("%+.1f pts", r$rate_diff_pp) else ""
       tags$tr(
         tags$td(style = "padding: 2px 6px 2px 0; font-weight: 600; white-space: nowrap;",
                 paste0(r$subject_course, .campus_suffix(r, x))),
@@ -5212,8 +5220,8 @@ output$enrl_classlist_download <- downloadHandler(
                 paste0(r$drop_late, " late drops"), tags$br(),
                 tags$small(style = "color:#666;", rate_txt)),
         tags$td(style = "padding: 2px 4px; text-align: right; white-space: nowrap; color: #666;",
-                paste0("hist ", r$hist_avg), tags$br(),
-                tags$small(paste0("hist rate ", hist_rate_txt))),
+                paste0("usually ", r$hist_avg), tags$br(),
+                tags$small(paste0("usual rate ", hist_rate_txt))),
         tags$td(style = paste0("padding: 2px 0 2px 6px; text-align: right; white-space: nowrap; color: ", .dash_down, ";"),
                 diff_txt, tags$br(), tags$small(rate_diff_txt))
       )
@@ -5281,11 +5289,8 @@ output$enrl_classlist_download <- downloadHandler(
       else if (value < 10) list(fontWeight = "700", color = "#7A5010")
       else list(fontWeight = "600")
     }
-    # Recent History has no fixed max length, so size it to the longest
-    # value actually present rather than a static minWidth that either
-    # truncates real content or leaves unused blank space.
-    history_chars <- max(nchar(display$recent_history), nchar("Recent History"), na.rm = TRUE)
-    history_width <- min(max(history_chars * 7 + 24, 140), 320)
+    # Recent History has no fixed length, so it wraps within its column
+    # rather than clipping at the table's edge (ISSUES M48).
 
     reactable::reactable(
       display,
@@ -5301,7 +5306,7 @@ output$enrl_classlist_download <- downloadHandler(
         threshold = reactable::colDef(name = "Target", minWidth = 66, maxWidth = 78, align = "right", headerStyle = header_nowrap),
         priority = reactable::colDef(name = "Priority", minWidth = 84, maxWidth = 96, cell = priority_badge, headerStyle = header_nowrap),
         repeated = reactable::colDef(name = "Rpt", minWidth = 54, maxWidth = 62, align = "center", headerStyle = header_nowrap),
-        recent_history = reactable::colDef(name = "Recent History", width = history_width, style = list(whiteSpace = "nowrap"), headerStyle = header_nowrap),
+        recent_history = reactable::colDef(name = "Recent History", minWidth = 180, style = list(whiteSpace = "normal"), headerStyle = header_nowrap),
         .priority_rank = reactable::colDef(show = FALSE)
       ),
       defaultSorted = list(.priority_rank = "asc", enrolled = "asc"),
@@ -5319,7 +5324,7 @@ output$enrl_classlist_download <- downloadHandler(
     d <- dashboard_data(); req(d)
     .render_course_table(d$new_this_term,
                          empty_msg = "No new courses found for this term.",
-                         max_rows = Inf,
+                         show_rest = TRUE,
                          function(i, x) {
       r        <- x[i, ]
       has_slot <- !is.na(r$slot_avg_enrl)
@@ -5343,7 +5348,7 @@ output$enrl_classlist_download <- downloadHandler(
     d <- dashboard_data(); req(d)
     .render_course_table(d$missing_from_earlier,
                          empty_msg = "No courses missing vs. two years ago.",
-                         max_rows = Inf,
+                         show_rest = TRUE,
                          function(i, x) {
       r        <- x[i, ]
       hist_txt <- if (!is.na(r$recent_history)) r$recent_history else paste0("last seen: ", r$prior_enrl)
@@ -5362,7 +5367,7 @@ output$enrl_classlist_download <- downloadHandler(
     d <- dashboard_data(); req(d)
     .render_course_table(d$repeated_topics,
                          empty_msg = "No recurring topics courses this term.",
-                         max_rows = Inf,
+                         show_rest = TRUE,
                          function(i, x) {
       r <- x[i, ]
       hist_txt <- if (!is.null(r$recent_history) && !is.na(r$recent_history))

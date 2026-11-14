@@ -424,7 +424,7 @@ async function closeEvidence(page) {
     findings.scope);
   if (findings.link) {
     // innerText applies CSS text-transform: the card titles read in capitals.
-    check('the draft verdict leads the Projections tab',
+    check('the draft verdict leads the Plan tab',
       /^draft schedule against the plan/i.test(findings.text.trim()) &&
         /short of the students expected on day one/.test(findings.text) &&
         findings.cards[0].meters >= 1, findings.text);
@@ -434,7 +434,7 @@ async function closeEvidence(page) {
       return Boolean(pane && pane.checkVisibility());
     }, { timeout: 30000 });
     check('the draft link opens the draft comparison', draftShown);
-    await openSubTab(page, 'Projections');
+    await openSubTab(page, 'Plan');
     await waitForIdle(page);
   }
   // The method and its evidence live in the course modal; the department sits
@@ -828,7 +828,7 @@ async function closeEvidence(page) {
   // Returning from the Scenario sub-tab and clicking a row is an ordinary path
   // through this page, and it exercises the projection table after its panel has
   // been hidden and shown again.
-  await openSubTab(page, 'Projections');
+  await openSubTab(page, 'Plan');
   const detailAfterScenario = await page.evaluate(() => {
     const rows = document.querySelectorAll(
       '#enrollment_projections-projection_table .rt-tbody .rt-tr');

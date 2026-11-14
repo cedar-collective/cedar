@@ -45,7 +45,7 @@ deptTrendsUI <- function(id, sections, dept_choices, current_term = NULL) {
           cached_default = 5,
           loading_label = "Preparing department trends…",
           loading_detail = paste(
-            "Loading Headcount, Enrollment, Credit Hours, Degrees, and",
+            "Loading Headcount, Course Demand, Credit Hours, Degrees, and",
             "Demographics now so those tabs are ready when you open them."
           ),
           uiOutput(ns("profile"))
@@ -172,7 +172,7 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
 
     tab_value <- function(tab) {
       switch(tab,
-        Enrollment = enrl_data,
+        `Course Demand` = enrl_data,
         Degrees = deg_data,
         `Credit Hours` = ch_data,
         Demographics = demo_data,
@@ -491,8 +491,8 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
         info_panel(
           "Who is being counted",
           description = "Members, registrations, teaching units and the guard.",
-          div(class = "alert alert-info", tags$strong("Data window: "),
-              cedar_longitudinal_edge_note(data_objects[["cedar_edges"]], grade_dependent = FALSE)),
+          tags$p(tags$strong("Data window: "),
+                 cedar_longitudinal_edge_note(data_objects[["cedar_edges"]], grade_dependent = FALSE)),
           tags$ul(class = "mb-0",
             tags$li("A member is an enrolled student-term whose primary major ",
                     if (is.null(meta$program_code)) paste0("belongs to ", meta$dept_name, " (pre-majors included)")
@@ -511,8 +511,11 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
         ),
         dashboard_subsection(
           "Own-Unit Share Over Time",
-          paste0("Of these majors' registrations each term, the share in the department's own courses, one line per teaching campus, for the term types ticked above; the table gives the counts behind each point. Summer starts unticked: few majors enrol then, and they take a different mix. A term with fewer than ",
-                 meta$min_n, " of these majors on a campus has no point. A shaded term is in progress."),
+          "The share of these majors' registrations that are in the department's own courses, one line per teaching campus.",
+          method = tagList(
+            tags$p(paste0("Drawn for the term types ticked above; the table gives the counts behind each point. Summer starts unticked: few majors enrol then, and they take a different mix. A term with fewer than ",
+                          meta$min_n, " of these majors on a campus has no point. A shaded term is in progress."))
+          ),
           if (length(meta$chart_campuses) == 0L) {
             empty_state(paste0(too_few, " in any term."))
           } else {
@@ -522,9 +525,10 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
         ),
         dashboard_subsection(
           paste0("Teaching Units, ", latest_label),
-          paste0("Who taught these majors in the latest term, one chart per teaching campus: the department's own courses first, then the ",
+          "Who taught these majors in the latest term, one chart per teaching campus.",
+          method = tags$p(paste0("The department's own courses come first, then the ",
                  meta$n_top, " outside units with the most of their registrations, then each college's remaining units as one paler bar. A bar is the colour of its teaching college, so the bars of one colour add up to that college's segment for the term in Teaching Colleges Over Time below. The table gives a row to every unit that taught ",
-                 meta$min_n, " or more of these majors and one row per college to the smaller units, and its College column adds up to the same segments."),
+                 meta$min_n, " or more of these majors and one row per college to the smaller units, and its College column adds up to the same segments.")),
           if (nrow(top_campuses) == 0L) empty_state(paste0(too_few, " in ", fmt_term(meta$latest_term), ".")),
           lapply(seq_len(nrow(top_campuses)), function(i) tagList(
             section_heading(paste0(top_campuses$campus[[i]], ": ", n(top_campuses$term_students[[i]]), " majors, ",
@@ -537,8 +541,9 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
         ),
         dashboard_subsection(
           "Teaching Colleges Over Time",
-          paste0("Each bar is one term's member registrations split by the college of the unit that taught the course, one chart per teaching campus, for the term types ticked above. A college that taught fewer than ",
-                 meta$min_n, " of these majors in a term is in that term's grey segment. A shaded term is in progress."),
+          "Each term's registrations by these majors, split by the college that taught the course, one chart per teaching campus.",
+          method = tags$p(paste0("Drawn for the term types ticked above. A college that taught fewer than ",
+                 meta$min_n, " of these majors in a term is in that term's grey segment. A shaded term is in progress.")),
           if (length(meta$chart_campuses) == 0L) empty_state(paste0(too_few, " in any term.")),
           lapply(meta$chart_campuses, function(cmp) tagList(
             section_heading(cmp, level = "h6"),
@@ -547,10 +552,11 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
         ),
         dashboard_subsection(
           "Top Outside Courses Over Time",
-          paste0("The courses outside the department's own unit that the most of these majors sit in, term by term, for the term types ticked above: the seats another unit's schedule supplies, and where two curricula overlap. One grid per teaching campus, a row for each of the ",
+          "Other departments' courses these majors take most, term by term: the seats another schedule supplies, and where two curricula overlap.",
+          method = tags$p(paste0("Drawn for the term types ticked above, one grid per teaching campus, a row for each of the ",
                  meta$n_outside, " courses most taken over the terms drawn; a cell gives the majors in the course that term and is shaded by their share of that term's majors on the campus. A blank cell is a term with fewer than ",
                  meta$min_n, " of them in the course, which is not shown. The table lists every outside course that reached ",
-                 meta$min_n, " in a term drawn."),
+                 meta$min_n, " in a term drawn.")),
           if (nrow(data$tables$outside_courses) == 0L) {
             empty_state(paste0("No outside course has ", meta$min_n, " or more of these majors in any term."))
           } else {
@@ -666,15 +672,16 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
         id = ns("tabs"),
         selected = selected_tab,
         tabPanel("Headcount",
+          # One section, so the subtab header is the only heading and carries
+          # the method panel (shiny-modules.md#explaining-a-section).
           subtab_header(
             "Headcount",
-            cedar_definition_summary("program-headcount")
+            "How many students hold this department's majors and minors each term.",
+            method = cedar_definition_note("program-headcount")
           ),
           fluidRow(
             column(12,
-              dashboard_section(
-                "Program Headcount",
-                cedar_definition_note("program-headcount"),
+              div(
                 fluidRow(
                   column(6,
                     dashboard_subsection(
@@ -711,9 +718,9 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
             )
           )
         ),
-        tabPanel("Enrollment",
+        tabPanel("Course Demand",
           subtab_header(
-            "Enrollment",
+            "Course Demand",
             "Long-run course demand for this department: how much teaching it carries, ",
             "how that compares with its college, and which courses drive the change."
           ),
@@ -813,7 +820,8 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
               ),
               dashboard_section(
                 "Course Trajectories",
-                "Longer-run course-level movement across the report window. Topics courses use exact titles so unrelated rotating topics are not merged.",
+                "Which courses have grown or shrunk most across the report window.",
+                method = tags$p("Each course's recent average is compared with its early report-window average. A topics course is matched on its exact title, so unrelated rotating topics under one number are not merged."),
                 fluidRow(
                   column(6,
                     dashboard_subsection(
@@ -1402,24 +1410,23 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
 
 deptTrendsCreditHoursUI <- function(ns, home_major_code_label) {
   tagList(
-    # The counting rules used to sit in a collapsed blue box. They are the three
-    # things a reader has to know before reading any number on the tab, so they
-    # belong in the description where they cannot be missed — and every other
-    # subtab now opens the same way.
+    # The one fact that changes how every number here reads (the course's
+    # department, not the student's) stays in the sentence; the census rule,
+    # statuses and exclusions are in the collapsed panel (ISSUES M43).
     subtab_header(
       "Credit Hours",
-      cedar_definition_summary("credit-hours"),
-      " Each course counts toward the department that owns it rather than the student's major."
+      "Credit hours taught in this department's courses each term, whoever takes them.",
+      method = cedar_definition_note("credit-hours")
     ),
-    cedar_definition_panel("credit-hours"),
     fluidRow(
       column(12,
         dashboard_section(
         "Credit Hour Production",
-        "How much SCH this department generates over time, how that production is distributed across subject codes and course levels, and how its trajectory compares with the college.",
+        "How much the department teaches over time, by subject code and course level, against its college.",
         dashboard_subsection(
           "At Census and End of Term",
-          "SCH in this department's courses at census (the solid line, and the count every other chart here uses) and still registered at the end of term (dashed). The gap is the credits of students who withdrew after census. For a term in progress, both lines show registration so far.",
+          "Credit hours at census (solid) and still registered at the end of term (dashed); the gap is students who withdrew after census.",
+          method = tags$p("Census is the count every other chart on this tab uses. For a term in progress, both lines show registration so far."),
           plotlyOutput(ns("sch_census_final_plot"))
         ),
         dashboard_subsection(
@@ -1447,13 +1454,11 @@ deptTrendsCreditHoursUI <- function(ns, home_major_code_label) {
       ),
       dashboard_section(
         "Students Served",
-        tagList(
-          tags$p(
-            class = "cedar-dashboard-section-description",
-            "How SCH is split between home majors and students from other programs. Home majors match this department's program codes (",
-            tags$code(home_major_code_label),
-            "). Outside majors include students from other programs, pre-majors, undeclared students, and other colleges."
-          )
+        "How much of the department's teaching goes to its own majors, and how much to everyone else.",
+        method = tags$p(
+          "Home majors match this department's program codes (",
+          tags$code(home_major_code_label),
+          "). Outside majors are everyone else: students in other programs, pre-majors, undeclared students and other colleges."
         ),
         fluidRow(
           column(6,
@@ -1547,8 +1552,8 @@ deptTrendsCourseUnitsUI <- function(ns) {
   tagList(
     subtab_header(
       "Courses Taken",
-      "Which units teach the courses this department's majors take: for each term and teaching campus, every enrolled major's registrations split by the unit that taught the course, with the share in the department's own courses. ",
-      "The inverse of Students Served on the Credit Hours tab, which asks whose majors fill this department's seats."
+      "Which departments teach the courses this department's majors take, and how much of their schedule stays at home. ",
+      "Its mirror is Students Served on the Credit Hours tab: whose majors fill this department's seats."
     ),
     uiOutput(ns("mcu_controls")),
     checkboxGroupInput(ns("mcu_term_type"), "Term types in the charts over time",

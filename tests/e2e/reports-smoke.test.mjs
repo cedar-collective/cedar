@@ -253,11 +253,20 @@ export async function runReportChecks({ scope = 'smoke', synthetic = false } = {
         { type: 'text', id: 'dashboard_headcount_cards', disallowed: ['Gather Data'] },
         { type: 'plot', id: 'dashboard_headcount_sparkline' },
       ]);
-      // The cards say what they count, in the Headcount tab's words.
-      const cards = await page.$eval('#dashboard_headcount_cards', (el) => el.textContent);
-      if (!cards.includes('ignores the campus control') ||
-          !cards.includes("the program's owning department")) {
-        throw new Error(`Dashboard headcount scope strip missing: ${cards}`);
+      // The Students section's collapsed method panel says what the cards
+      // count, in the Headcount tab's words (shiny-modules.md#explaining-a-section).
+      // Open it as a reader would: closed, its text has no innerText.
+      await page.evaluate(() => {
+        const panel = document.getElementById('dashboard_headcount_scope')?.closest('details');
+        if (panel) panel.open = true;
+      });
+      await waitForOutput(page, 'Dept Dashboard headcount scope', [
+        { type: 'text', id: 'dashboard_headcount_scope' },
+      ]);
+      const scope = await page.$eval('#dashboard_headcount_scope', (el) => el.textContent);
+      if (!scope.includes('ignores the campus control') ||
+          !scope.includes("the program's owning department")) {
+        throw new Error(`Dashboard headcount scope missing from the Students method panel: ${scope}`);
       }
       // The filter strip names the codes behind the department, from the files.
       const codes = await page.$eval('#dashboard_program_info', (el) => el.textContent);
@@ -287,8 +296,8 @@ export async function runReportChecks({ scope = 'smoke', synthetic = false } = {
       ].some((id) => document.getElementById(id)?.querySelector('svg.main-svg, img')));
       if (hiddenChartsRendered) throw new Error('Hidden Department Trends charts rendered before opening their tabs');
 
-      await clickSubTabIn(page, 'dept_trends-tabs', 'Enrollment');
-      await waitForOutput(page, 'Dept Trends Enrollment tab', [
+      await clickSubTabIn(page, 'dept_trends-tabs', 'Course Demand');
+      await waitForOutput(page, 'Dept Trends Course Demand tab', [
         { type: 'plotly', id: 'dept_trends-highest_total_enrl_plot' },
         { type: 'plotly', id: 'dept_trends-enrl_college_dept_dual_plot' },
       ], { all: true });
@@ -724,17 +733,21 @@ export async function runReportChecks({ scope = 'smoke', synthetic = false } = {
         }
       }
 
-      await clickSubTabIn(page, 'cr_tabs', 'Enrollment');
-      await waitForOutput(page, 'Course Dynamics enrollment detail', [
-        { type: 'plotly', id: 'cr_enrollment_pressure_plot' },
+      // The drops chart and the class-list table moved to Overview (M49).
+      await clickSubTabIn(page, 'cr_tabs', 'Overview');
+      await waitForOutput(page, 'Course Dynamics drops and term table', [
+        { type: 'plotly', id: 'cr_enrollment_drop_plot' },
         { type: 'reactable', id: 'cr_enrollment_table' },
       ], { all: true });
+      const removedSubtab = await page.evaluate(() =>
+        [...document.querySelectorAll('#cr_tabs a.nav-link')].some((a) => a.textContent.trim() === 'Enrollment'));
+      if (removedSubtab) throw new Error('Course Dynamics still has an Enrollment subtab');
 
-      // Projections reads the saved bundles. With bundles mounted, every
+      // Section Plan reads the saved bundles. With bundles mounted, every
       // published term gets a "<term> plan" block whether the course was
       // projected, screened out or outside the monitored groups; without
       // bundles the tab says so instead of staying blank.
-      await clickSubTabIn(page, 'cr_tabs', 'Projections');
+      await clickSubTabIn(page, 'cr_tabs', 'Section Plan');
       await waitForOutput(page, 'Course Dynamics projections', [
         { type: 'text', id: 'cr_projections_ui' },
       ]);
