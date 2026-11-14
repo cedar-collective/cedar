@@ -109,6 +109,27 @@ signals, a sentence each, and links into the evidence, aimed at its audience
 (chairs: what needs attention now; associate deans: what is changing
 unusually; provost: cross-college patterns and risks).
 
+- [ ] **A registration watch: what is worth a look, ranked.** One list built
+  from the screens Regstats already runs, read together: a course flagged by
+  several independent screens outranks any single flag, and their
+  combinations are named (seats cut: a dip in a near-full course; students still
+  waiting; growth near capacity; churn; falling or rising demand with room; a
+  drop spike), with a state that holds every year (usually near full) counted but
+  not listed. Measured on Fall 2026 lower division (ABQ and EA, Oct 8 pull),
+  by the watch: 363 courses flagged (333 course-campus pairs, each part of term
+  read apart), 297 by two or more screens; 110 only usually near full, counted
+  and not listed; 16 seats cut, led by MATH 1430 at ABQ, 165 enrolled against
+  a usual 360 in 174 seats, 94.8% filled at census. Step 1, the text-first
+  preview over the Regstats payload (`build_registration_watch()`). Step 2, a
+  picture of it: each course a point at its change against its usual
+  enrollment (across) and its census fill (up), sized by the students behind
+  it and coloured by pattern, with the near-full line drawn, so seats cut,
+  growth near capacity, falling and rising demand sit in their own corners and
+  waiting and drops are marked on the point; the ranked list beside it. Then
+  the Dept Dashboard (chairs), a college roll-up (deans) and Home (provost),
+  each item a sentence and a link. Later: a department roll-up
+  (`attach_unit()` on the flagged rows) and the return watch as another
+  screen. Regstats' own "full" badges: ISSUES M51.
 - [ ] **Choose the tabs** that get one: likely DFW, Enrollment Trends,
   Headcount Trends and Gen Ed.
 

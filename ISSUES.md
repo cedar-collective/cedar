@@ -49,7 +49,7 @@ alongside other work (M14, M16).
 | [I20](#i20--cedar_programs-holds-almost-no-branch-campus-students) | Defect | `cedar_programs` holds 1–3% of branch-campus students; branch program counts read near zero |
 | [I18](#i18--cedar_degrees-holds-no-associate-degrees-so-branch-campus-completions-read-zero) | Defect | `cedar_degrees` holds no associate degrees: branch-campus completions read zero |
 | [I4](#i4--pre-change-course-ratios-are-confounded-by-career-stage) | Defect | Pre-change course ratios confounded by career stage (deferred) |
-| M1–M50 | Improvement | See [Improvements](#improvements) |
+| M1–M51 | Improvement | See [Improvements](#improvements) |
 
 ### Resolved since the last release
 
@@ -3963,6 +3963,18 @@ Fall 2026. The names were proposed from the codes on 2026-10-04. A page that
 names the unit (Dept Trends, Courses Taken's teaching units) shows the wrong
 discipline. *Done when:* each AD unit's name is checked against the titles it
 taught, MAS and STIN first.
+
+**M51 — Regstats calls a course at 90% census fill "full".** Its saturation
+badges read **Full now** and **Chronically full** for census fill at or above
+the Chronic Fill Rate, whose default is `CEDAR_NEAR_FULL_FILL` (90%), and
+`docs/users/regstats.md` defines the rate as the fill "to count as full". CEDAR
+calls 90% near full; full is `CEDAR_FULL_FILL`, 98% of seats on the first day.
+A course at 91% shows the same badge as one turning students away. The
+registration watch (`R/features/registration-watch.R`) reads the same flags
+and says "near full", printing the rate it used. *Done when:* the badges, the
+method text in `R/modules/regstats.R` and the guide say near full (or name the
+rate), and a full badge, if kept, is judged at `CEDAR_FULL_FILL` on the first
+day.
 
 ### Documentation and naming
 
