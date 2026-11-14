@@ -174,6 +174,7 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
   source_file("features/dept-trends.R")
   source_file("features/gen-ed.R")
   source_file("features/regstats.R")
+  source_file("features/registration-watch.R")         # text-first preview: the Regstats screens read together, ranked
   source_file("features/enrollment-projection-refresh.R")
   source_file("features/enrollment-projections.R")
   source_file("features/enrollment-projection-view.R")  # page-only; not model source

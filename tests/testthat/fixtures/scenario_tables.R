@@ -1313,6 +1313,70 @@ population_degrees <- tibble(
 # tabulated at the top of test-registration-snapshots.R.
 snapshot_students <- attach_test_course_ids(dplyr::bind_rows(test_students_intersession, test_students_wlmkt), "students")
 
+# ── test-registration-watch.R ───────────────────────────────────────────────────
+
+# A Regstats payload typed by hand: every pattern once, one course on two
+# campuses, and a "usually near full" course. Fall 2026, part of term 1. Expected:
+#   RW01 SPAN 1110 ABQ AS  dip + near full now + usually near full  -> seats cut, 60 below the usual range
+#   RW02 SPAN 1110 EA  AS  bump + near full + running hot + 12 waiting -> students waiting, 12
+#   RW03 BIOL 2210 ABQ AS  69 waiting + near full now + usually near full -> students waiting, 69
+#   RW04 CHEM 1215 ABQ AS  bump (120 beyond) + early drops (15)  -> growth with churn, 15
+#   RW05 HIST 1110 ABQ AS  dip (30 beyond), no fill flag         -> falling demand, 30
+#   RW06 PSYC 1110 ABQ AS  bump (25 beyond), no fill flag        -> rising demand, 25
+#   RW07 MATH 1215 ABQ AS  early drops 4 + late drops 18         -> drop spike, 22
+#   RW08 ENGL 1120 ABQ AS  near full now + usually near full, nothing else -> usually near full (not listed)
+#   RW09 ARTH 1120 ABQ FA  near full now + running hot, not usually   -> fuller than usual, no count
+#   RW10 FDMA 1520 ABQ FA  dip (30 beyond) + near full now + usually  -> seats cut, 30
+#   RW11 BIOL 2305 ABQ AS  bump (50 beyond) + full, no waitlist  -> growth at capacity, 50
+watch_flagged <- local({
+  rw <- function(...) tibble::tribble(...) %>% dplyr::mutate(term = 202680L, part_term = "1")
+  list(
+    bumps = rw(
+      ~campus, ~college, ~subject_course, ~course_title,     ~census_enrl, ~census_enrl_mean, ~impacted,
+      "EA",    "AS",     "SPAN 1110",     "Elementary Span I", 80,          50,                20,
+      "ABQ",   "AS",     "CHEM 1215",     "General Chem I",    700,         500,               120,
+      "ABQ",   "AS",     "PSYC 1110",     "Intro Psychology",  300,         250,               25,
+      "ABQ",   "AS",     "BIOL 2305",     "General Biology",   285,         210,               50),
+    dips = rw(
+      ~campus, ~college, ~subject_course, ~course_title,     ~census_enrl, ~census_enrl_mean, ~impacted,
+      "ABQ",   "AS",     "SPAN 1110",     "Elementary Span I", 445,         548,               60,
+      "ABQ",   "AS",     "HIST 1110",     "US History I",      60,          110,               30,
+      "ABQ",   "FA",     "FDMA 1520",     "Film Production",   18,          62,                30),
+    waits = rw(
+      ~campus, ~college, ~subject_course, ~course_title,     ~waiting,
+      "EA",    "AS",     "SPAN 1110",     "Elementary Span I", 12,
+      "ABQ",   "AS",     "BIOL 2210",     "Anatomy & Phys I",  69),
+    sat = rw(
+      ~campus, ~college, ~subject_course, ~course_title,     ~census_enrl, ~capacity, ~fill_rate, ~is_full_now, ~is_chronic_hist, ~is_running_hot,
+      "ABQ",   "AS",     "SPAN 1110",     "Elementary Span I", 445,         456,       0.976,      TRUE,         TRUE,             FALSE,
+      "EA",    "AS",     "SPAN 1110",     "Elementary Span I", 80,          80,        1.000,      TRUE,         FALSE,            TRUE,
+      "ABQ",   "AS",     "BIOL 2210",     "Anatomy & Phys I",  165,         168,       0.982,      TRUE,         TRUE,             FALSE,
+      "ABQ",   "AS",     "ENGL 1120",     "Composition II",    1080,        1100,      0.982,      TRUE,         TRUE,             FALSE,
+      "ABQ",   "FA",     "ARTH 1120",     "Art Appreciation",  178,         180,       0.989,      TRUE,         FALSE,            TRUE,
+      "ABQ",   "FA",     "FDMA 1520",     "Film Production",   18,          20,        0.900,      TRUE,         TRUE,             FALSE,
+      "ABQ",   "AS",     "BIOL 2305",     "General Biology",   285,         288,       0.990,      TRUE,         TRUE,             TRUE),
+    early_drops = rw(
+      ~campus, ~college, ~subject_course, ~course_title,     ~impacted,
+      "ABQ",   "AS",     "CHEM 1215",     "General Chem I",    15,
+      "ABQ",   "AS",     "MATH 1215",     "Intermediate Alg",  4),
+    late_drops = rw(
+      ~campus, ~college, ~subject_course, ~course_title,     ~impacted,
+      "ABQ",   "AS",     "MATH 1215",     "Intermediate Alg",  18),
+    thresholds = list(min_impacted = 10, pct_sd = 1, chronic_fill_rate = 0.9,
+                      min_sat_terms = 3, min_wait = 8)
+  )
+})
+watch_payload <- build_registration_watch(watch_flagged)
+
+# The fixture Regstats run (EC-11, Fall 2020 against its two earlier Falls),
+# with the thresholds test-regstats.R uses, so the watch reads real output.
+watch_regstats <- get_reg_stats(
+  test_students_regstats, test_sections_regstats,
+  list(term = 202080L, bypass_cache = TRUE,
+       thresholds = list(min_impacted = 1, pct_sd = 1, chronic_fill_rate = .60,
+                         min_sat_terms = 1, min_wait = 1, section_proximity = .3)),
+  course_terms = test_course_terms_regstats)
+
 # ── test-seatfinder.R ───────────────────────────────────────────────────────────
 
 seatfinder_topic_sections <- local({
