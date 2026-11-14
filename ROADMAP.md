@@ -205,6 +205,19 @@ contracts: [degree-requirements.md](docs/developers/degree-requirements.md),
 - [ ] **A requirement-informed demand challenger,** scored through the rolling
   projection contract.
 
+## Course Dynamics
+
+- [ ] **Courses taken alongside, by major.** Course Flows' treemap pools every
+  student, so the courses everyone takes lead it. One list per major instead:
+  the five largest majors in the course that term type (a pre-major its own
+  group) and "All other majors", each with the courses its students took the
+  same term on the same campus and the share of the group that took each, over
+  the course's last three terms of the type up to the settled edge; the
+  course's own lab once, above the lists. Step 1,
+  the text-first preview (`get_concurrent_courses_by_major()`,
+  `format_concurrent_courses_by_major()`); step 2, the page, in place of the
+  treemap.
+
 ## Finding your way
 
 The 2026-11-14 page audit found the app does more than a reader can see.
