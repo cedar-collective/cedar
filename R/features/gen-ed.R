@@ -11,8 +11,42 @@ gen_ed_course_lookup <- function() {
 }
 
 
+#' The terms a Gen Ed view reads: a range, then the chosen term types
+#'
+#' A Fall term and a Spring one hold different students, and a Summer term a
+#' small, different mix, so a Gen Ed view pools only the term types chosen. The
+#' result may be empty (Summer only, in a range with no summer); the caller
+#' says so rather than reading every term.
+#'
+#' @param terms The term codes available.
+#' @param term_types One or more of `"fall"`, `"spring"`, `"summer"`.
+#' @param from,to The range's first and last term, or NULL for no bound.
+#' @return The term codes in the range whose type was chosen, sorted.
+gen_ed_scope_terms <- function(terms, term_types, from = NULL, to = NULL) {
+  known <- c("fall", "spring", "summer")
+  if (length(term_types) == 0) stop("[gen-ed.R] gen_ed_scope_terms(): choose at least one term type.")
+  if (!all(term_types %in% known)) {
+    stop("[gen-ed.R] gen_ed_scope_terms(): unknown term type ",
+         paste(setdiff(term_types, known), collapse = ", "), ".")
+  }
+  terms <- sort(unique(as.integer(terms[!is.na(terms)])))
+  from <- if (length(from)) as.integer(from) else NULL
+  to   <- if (length(to)) as.integer(to) else NULL
+  if (!is.null(from) && !is.null(to) && from > to) {
+    stop("From term ", fmt_term(from), " is after To term ", fmt_term(to), ".")
+  }
+  if (!is.null(from)) terms <- terms[terms >= from]
+  if (!is.null(to))   terms <- terms[terms <= to]
+  terms[get_term_type(terms) %in% term_types]
+}
+
+
 filter_gen_ed_scope <- function(data, opt = list()) {
   campus <- opt$campus %||% NULL
+  # An empty term list is a scope that holds nothing, never "every term".
+  if (!is.null(opt$terms) && length(opt$terms) == 0) {
+    stop("No terms of the chosen types fall in this range.")
+  }
   terms  <- opt$terms %||% opt$term %||% NULL
   area   <- opt$gen_ed_area %||% NULL
   college <- opt$college %||% NULL

@@ -26,6 +26,7 @@
 #                               the controller waits but never writes it
 #               "numeric"       numericInput
 #               "checkbox"      checkboxInput
+#               "checkbox_group" checkboxGroupInput (comma-separated values)
 #               "slider"        sliderInput
 #               "radio"         radioButtons
 #               "text"          textInput
@@ -33,7 +34,7 @@
 #             (e.g. headcount's short "conc" -> "concentration").
 #
 # Tabs that support deep-link RESTORE but have no copy button (Dept Dashboard,
-# Gen Ed, Dept Trends) are listed too, so a hand-crafted URL
+# Dept Trends) are listed too, so a hand-crafted URL
 # keeps working exactly as before.
 
 CEDAR_SHARE_SPECS <- list(
@@ -94,8 +95,9 @@ CEDAR_SHARE_SPECS <- list(
   ),
   "Gen Ed"              = list(
     slug = "gen-ed", prefix = "gen_ed-ge", sep = "_", run = "button",
-    fields = c("campus", "college", "from_term", "to_term", "dept", "gen_ed_area"),
-    overlay = "gen_ed-loading-overlay"
+    fields = c("campus", "college", "from_term", "to_term", "term_type", "dept", "gen_ed_area"),
+    overlay = "gen_ed-loading-overlay",
+    types = list(term_type = "checkbox_group")
   ),
 
   # Dept Trends has NO run button — selecting a department fires the analysis
@@ -378,6 +380,7 @@ cedar_apply_restore_item <- function(session, item) {
     "select_server" = invisible(),
     "numeric" = shiny::updateNumericInput(session, item$id, value = item$value),
     "checkbox" = shiny::updateCheckboxInput(session, item$id, value = item$value),
+    "checkbox_group" = shiny::updateCheckboxGroupInput(session, item$id, selected = item$value),
     "slider" = shiny::updateSliderInput(session, item$id, value = item$value),
     "radio" = shiny::updateRadioButtons(session, item$id, selected = item$value[[1]]),
     "text" = shiny::updateTextInput(session, item$id, value = item$value[[1]]),
