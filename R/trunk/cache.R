@@ -244,7 +244,9 @@ clear_course_cache <- function(course_code) {
 #        renamed course's rows are one course in every tab (ADR-001 step 4).
 #   v13 — the student donuts read each seat's major and class standing off
 #        cedar_student_terms (ADR-001 step 5); the enrl tab hashes it.
-cedar_dept_cache_version <- 13L
+#   v14 — Headcount charts title their axes in words ("Students", no
+#        `student_count`; ISSUES M46). The charts are stored in the payload.
+cedar_dept_cache_version <- 14L
 
 # Include lookup-derived labels/department metadata where a tab uses them.
 # Credit Hours reads class lists, sections for late drops' credit values, the

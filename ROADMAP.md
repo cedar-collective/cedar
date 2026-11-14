@@ -184,6 +184,23 @@ contracts: [degree-requirements.md](docs/developers/degree-requirements.md),
 - [ ] **A requirement-informed demand challenger,** scored through the rolling
   projection contract.
 
+## Finding your way
+
+The 2026-11-14 page audit found the app does more than a reader can see.
+Page-level legibility is [M43](ISSUES.md)–M48; these are the new pieces.
+
+- [ ] **Every course code and department opens its page.** A course code in any
+  table opens Course Dynamics for that course, a department opens Dept Trends;
+  only Waitlists and Regstats drill today, and the Dashboard's "Full trendlines
+  are in Dept Trends > Enrollment" is plain text.
+- [ ] **A Home page organized by question.** "Is my department growing?",
+  "Which courses are under pressure this term?", "Where do students go after
+  this course?", each a deep link to the subtab that answers it; Course
+  Dynamics' eight subtabs and Pathways' six are invisible from Home now.
+- [ ] **Tab names that do not collide.** Three "Enrollment"s (Explore, Dept
+  Trends, Course Dynamics), two "Projections", and Cancellations, an analysis,
+  filed under Admin. Needs a naming decision; old slugs keep resolving.
+
 ## Platform
 
 - [ ] **Code history by unit.** Admin → Mappings → Code history lists every

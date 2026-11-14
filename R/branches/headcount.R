@@ -1045,7 +1045,10 @@ plot_dept_program_headcount <- function(data) {
           type          = "bar",
           hovertemplate = "%{x}<br>Students: %{y}<extra>%{fullData.name}</extra>") %>%
     layout(barmode = "stack",
-           xaxis   = list(tickangle = -45),
+           # The term labels name the axis; a column name never reaches the
+           # reader (ISSUES M46).
+           xaxis   = list(tickangle = -45, title = ""),
+           yaxis   = list(title = "Students"),
            legend  = list(orientation = "h", x = 0, y = -0.2))
 }
 

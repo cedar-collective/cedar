@@ -88,6 +88,15 @@ cedar_definition_panel <- function(ids, title = "What this view counts") {
   info_panel(title, lapply(ids, cedar_definition_note))
 }
 
+# The method slot of a section: scope, exclusions, thresholds, the edge used
+# and the definition links, collapsed. A section's visible sentence says what
+# it answers in a reader's words; how it is counted goes here (ISSUES M43;
+# docs/developers/shiny-modules.md#explaining-a-section). NULL renders nothing.
+cedar_method_panel <- function(method, title = "How this is counted") {
+  if (is.null(method)) return(NULL)
+  info_panel(title, method, class = "cedar-method-panel")
+}
+
 # Shared compact metric card. Keep the card itself column-agnostic so callers
 # can place it in fluid rows, grids, or repeated campus summaries.
 cedar_stat_card <- function(value, label, note = NULL, class = NULL) {
@@ -411,7 +420,7 @@ section_block <- function(title, description = NULL, ..., level = "h5", class = 
 # title indistinguishable from a divider inside it.
 #
 # Usage: subtab_header("Rollcall", "Who takes this course, by classification and major.")
-subtab_header <- function(title, description = NULL, ..., class = NULL) {
+subtab_header <- function(title, description = NULL, ..., method = NULL, class = NULL) {
   description_parts <- Filter(Negate(is.null), c(list(description), list(...)))
   description_tag <- NULL
   if (length(description_parts) > 0) {
@@ -433,7 +442,8 @@ subtab_header <- function(title, description = NULL, ..., class = NULL) {
   div(
     class = paste(c("cedar-subtab-header", class), collapse = " "),
     tags$h2(class = "cedar-subtab-title", title),
-    description_tag
+    description_tag,
+    cedar_method_panel(method, title = "What this view counts")
   )
 }
 
@@ -466,16 +476,16 @@ dashboard_section_header <- function(title, description = NULL, ..., class = NUL
   )
 }
 
-dashboard_section <- function(title, description = NULL, ..., class = NULL) {
+dashboard_section <- function(title, description = NULL, ..., method = NULL, class = NULL) {
   div(
     class = paste(c("cedar-dashboard-section", class), collapse = " "),
     dashboard_section_header(title, description),
-    div(class = "cedar-dashboard-section-body", ...)
+    div(class = "cedar-dashboard-section-body", cedar_method_panel(method), ...)
   )
 }
 
-dashboard_subsection <- function(title, description = NULL, ..., class = NULL,
-                                 tone = NULL) {
+dashboard_subsection <- function(title, description = NULL, ..., method = NULL,
+                                 class = NULL, tone = NULL) {
   description_tag <- NULL
   if (!is.null(description)) {
     description_tag <- if (inherits(description, "shiny.tag") ||
@@ -490,6 +500,7 @@ dashboard_subsection <- function(title, description = NULL, ..., class = NULL,
     class = paste(c("cedar-dashboard-subsection", class), collapse = " "),
     tags$h3(class = paste(c("cedar-dashboard-subsection-title", tone), collapse = " "), title),
     description_tag,
+    cedar_method_panel(method),
     ...
   )
 }
@@ -557,6 +568,21 @@ unit_codes_scope <- function(rows) {
     tags$div(class = "filter-context-row",
              tags$span(label, class = "filter-context-label"), items)
   }
+  # The unit and its college stay in view; the codes behind them open on a
+  # click (ISSUES M43). The text is in the page either way, so a search or a
+  # browser check still finds every code.
+  unit_titles <- vapply(seq_len(nrow(rows$units)), function(i) {
+    u <- rows$units[i, ]
+    college <- if (is.na(u$college_code)) "no home college" else
+      if (is.na(u$college_name)) u$college_code else u$college_name
+    paste0(u$unit_name, " (", u$unit_code, "), ", college)
+  }, character(1))
+  n_codes <- function(n, one, many) if (n > 0) paste(n, if (n == 1) one else many)
+  code_counts <- paste(c(
+    n_codes(nrow(rows$subjects), "course subject", "course subjects"),
+    n_codes(sum(!rows$programs$is_pre_major), "program", "programs"),
+    n_codes(sum(rows$programs$is_pre_major), "pre-major", "pre-majors")
+  ), collapse = " · ")
   blocks <- lapply(seq_len(nrow(rows$units)), function(i) {
     u  <- rows$units[i, ]
     sj <- rows$subjects[rows$subjects$unit_code == u$unit_code, ]
@@ -568,11 +594,9 @@ unit_codes_scope <- function(rows) {
         if (p$is_pre_major[j] && !is.na(p$leads_to[j])) paste0(" → ", p$leads_to[j]),
         only(p$in_college[j], NA)))
     })
-    college <- if (is.na(u$college_code)) "no home college" else
-      if (is.na(u$college_name)) u$college_code else u$college_name
     tagList(
-      div(class = "filter-context-title",
-          paste0("Data scope for ", u$unit_name, " (dept code: ", u$unit_code, "), ", college)),
+      # One unit is named in the summary already; several are told apart here.
+      if (nrow(rows$units) > 1) div(class = "filter-context-title", unit_titles[[i]]),
       row_item("Course subject codes:",
                lapply(seq_len(nrow(sj)), function(j)
                  item(sj$subject_code[j], only(sj$in_college[j], sj$in_level[j])))),
@@ -581,13 +605,21 @@ unit_codes_scope <- function(rows) {
       row_item("Pre-major codes:", program_items(pr[pr$is_pre_major, ]))
     )
   })
-  div(class = "scope-bar scope-bar--stacked",
-      blocks,
-      tags$div(class = "filter-context-row",
-               tags$span(class = "filter-context-label",
-                         paste("Concentrations count with the student's primary major.",
-                               "Every code is a row in the institution mapping files;",
-                               "see Admin > Data & Usage > Mappings."))))
+  tags$details(
+    class = "scope-bar scope-bar--stacked cedar-scope-details",
+    tags$summary(
+      tags$span(class = "filter-context-title",
+                paste0("Data scope for ", paste(unit_titles, collapse = "; "))),
+      tags$span(class = "cedar-scope-details-hint",
+                paste0(code_counts, if (nzchar(code_counts)) " — " else "", "show the codes"))
+    ),
+    blocks,
+    tags$div(class = "filter-context-row",
+             tags$span(class = "filter-context-label",
+                       paste("Concentrations count with the student's primary major.",
+                             "Every code is a row in the institution mapping files;",
+                             "see Admin > Data & Usage > Mappings.")))
+  )
 }
 
 # Shared campus + single-department selector formulation for department tabs.

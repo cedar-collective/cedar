@@ -1473,6 +1473,31 @@ a:hover { color: var(--juniper-blue-dark); }
   padding-top: 5px;
   padding-bottom: 5px;
 }
+/* A department's data scope, folded to one line: the unit stays in view and
+   its codes open on a click (unit_codes_scope(), ISSUES M43). */
+details.cedar-scope-details { display: block; }
+details.cedar-scope-details > summary {
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+}
+details.cedar-scope-details > summary::-webkit-details-marker { display: none; }
+details.cedar-scope-details > summary::before {
+  content: "\25B6";
+  font-size: 0.68em;
+  color: var(--cedar-green);
+  transition: transform 0.15s;
+}
+details.cedar-scope-details[open] > summary::before { transform: rotate(90deg); }
+details.cedar-scope-details > summary .filter-context-title { margin-bottom: 0; }
+details.cedar-scope-details .cedar-scope-details-hint {
+  color: var(--text-secondary);
+  font-size: 0.82em;
+}
+details.cedar-scope-details[open] > summary { margin-bottom: 4px; }
 .enrl-scope-bar strong { color: var(--cedar-green-dark); }
 .enrl-scope-bar code {
   background: rgba(0, 0, 0, 0.07);
@@ -2860,4 +2885,23 @@ details.cedar-detail-panel .panel-body p {
   background: var(--bs-tertiary-bg, #f5f5f5);
   padding: .75rem 1rem;
   overflow-wrap: anywhere;
+}
+
+/* The rest of a capped dashboard list, one click away (ISSUES M48). Neutral,
+   not blue: blue is for how a number is counted. */
+details.cedar-more-rows > summary {
+  cursor: pointer;
+  color: var(--text-secondary);
+  font-size: 0.82em;
+  font-weight: 600;
+  margin: 4px 0;
+}
+
+/* A scope bar inside a method panel is part of the panel's text, not a band
+   of its own. */
+details.cedar-method-panel .scope-bar {
+  background: transparent;
+  border-top: 0;
+  padding-left: 0;
+  padding-right: 0;
 }

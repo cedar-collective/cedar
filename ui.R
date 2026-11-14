@@ -708,7 +708,7 @@ nav_panel(
 
     dept_selector_bar(
       title = "Dept Dashboard",
-      subtitle = cedar_definition_summary("dashboard-headcount"),
+      subtitle = "One term at a glance: a department's students, how its courses compare with recent terms, and what may need review.",
       campus_input = selectizeInput(
         inputId   = "dashboard_campus",
         label     = "Campus",
@@ -740,7 +740,6 @@ nav_panel(
     )
   },
 
-  cedar_definition_panel("dashboard-headcount"),
   cedar_loading_overlay("dashboard", run_button = NULL,
     trigger_input = "dashboard_button",
     emoji = "\U0001f332", report_type = "dept_dashboard", fresh_default = 20,
@@ -760,14 +759,22 @@ nav_panel(
 
     dashboard_section(
       "Students",
-      "Selected-term headcount and recent movement worth noticing.",
+      "How many students hold the department's majors this term, against the same term 1, 3 and 6 years earlier. Majors are counted on every campus; the Campus filter applies to the courses below.",
+      method = tagList(
+        cedar_definition_note("dashboard-headcount"),
+        uiOutput("dashboard_headcount_scope")
+      ),
       uiOutput("dashboard_headcount_cards"),
       plotOutput("dashboard_headcount_sparkline", height = "200px")
     ),
 
     dashboard_section(
       "Enrollment Signals",
-      "Current-term enrollment signals for the selected department and campus. Above/below average compares to the recent same-term average: last 3 years, with at least 2 prior same-season offerings.",
+      "Courses this term running well above or below their recent enrollment, and courses losing more students than usual.",
+      method = tagList(
+        tags$p("Above and below average compare a course's enrollment with its average in the same term over the last three years; a course needs at least two earlier offerings in that season to be compared."),
+        tags$p("The drop watches list courses whose drops this term are unusually high against the course's own history. Early drops come before census and carry no grade; late drops come after it and are withdrawals. The rate beside each count shows whether drops rose with enrollment or faster than it.")
+      ),
       fluidRow(
         column(6,
           dashboard_subsection(
@@ -790,7 +797,7 @@ nav_panel(
         column(6,
           dashboard_subsection(
             "Early Drop Watch",
-            "Courses with unusually high pre-census drop counts; rates show whether volume changed with enrollment.",
+            "Courses losing more students before census than they usually do.",
             uiOutput("dashboard_early_drop_watch"),
             tone = "text-amber"
           )
@@ -798,7 +805,7 @@ nav_panel(
         column(6,
           dashboard_subsection(
             "Late Drop Watch",
-            "Courses with unusually high post-census drop counts; rates show whether volume changed with enrollment.",
+            "Courses losing more students after census than they usually do.",
             uiOutput("dashboard_late_drop_watch"),
             tone = "text-amber"
           )
@@ -806,21 +813,26 @@ nav_panel(
       ),
       dashboard_subsection(
         "Credit Hour Shifts",
-        "Course-level SCH this term compared with the recent same-season pattern.",
+        "Credit hours by course level this term, against the recent norm for the season.",
+        method = tags$p("A level is listed when it has at least 25 credit hours and is 10% or more away from the average of the prior three same-season terms. Full trendlines are in Dept Trends > Enrollment."),
         uiOutput("dashboard_credit_hour_shifts")
       )
     ),
 
     dashboard_section(
       "Low Enrollment Review",
-      "Selected-term sections under the low-enrollment thresholds for associate dean and chair review. Uses the same low-enrollment helper as the Enrollment tab and omits green buffer rows.",
+      "Sections this term small enough for a chair or associate dean to review.",
+      method = tagList(
+        tags$p("Each section's enrollment is compared with the target for its course level (the Target column). Critical, Warning and Watch are bands below that target, the same bands as Explore > Enrollment > Low Enrollment; sections just above the target are left out here."),
+        tags$p("Rpt is Y when the course has run low in most of its earlier offerings. Recent History gives its last offerings, with C for a term in which it had no active section.")
+      ),
       uiOutput("dashboard_low_enrollment_review_summary"),
       reactable::reactableOutput("dashboard_low_enrollment_review_table")
     ),
 
     dashboard_section(
       "High Waitlists",
-      "Selected-term course groups with class-list true demand.",
+      "Courses this term with students still waiting for a seat, not counting anyone already registered in the same course.",
       uiOutput("dashboard_high_waitlist_scope"),
       reactable::reactableOutput("dashboard_high_waitlist_table")
     ),
@@ -832,7 +844,8 @@ nav_panel(
         column(6,
           dashboard_subsection(
             "New This Term",
-            "Courses whose course number and title have not appeared in the historical data. Topics courses count each distinct title separately.",
+            "Courses whose number and title have not run before.",
+            method = tags$p("A topics course counts each distinct title separately, so a new topic under an old number is new. The slot average is the course number's mean enrollment over its earlier topics on the same campus."),
             uiOutput("dashboard_new_courses"),
             tone = "text-success"
           )
@@ -855,7 +868,8 @@ nav_panel(
 
     dashboard_section(
       "Audience Shifts",
-      "Program overlap and course-audience shares that moved enough to notice this term. Dashboard threshold: at least 10 percentage points away from the prior three same-season terms, with enough students present. Full audience detail is in Dept Trends > Enrollment.",
+      "Changes this term in who takes the department's courses and which programs its majors pair with.",
+      method = tags$p("A share is listed when it is at least 10 percentage points away from its average over the prior three same-season terms, with enough students present. Full audience detail is in Dept Trends > Enrollment."),
       uiOutput("dashboard_composition_shifts")
     )
 

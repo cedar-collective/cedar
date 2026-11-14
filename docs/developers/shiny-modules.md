@@ -175,34 +175,73 @@ forced-collision scenario in `nav.test.mjs` guard this.
 **Shared definitions:** `docs/_data/definitions.yml` is the authored source for
 the migrated metric explanations. `R/trunk/definitions.R` validates and selects
 records; `load_funcs()` loads them once as static metadata. Use
-`cedar_definition_summary()` for descriptions and `cedar_definition_note()` /
-`cedar_definition_panel()` from `ui-helpers.R` for blue boxes;
-`cedar_definition_links()` gives the definition and user-guide links alone, to
-end a box that already explains the measure in its own words. Jekyll uses the
-same records in its user guides and versioned reference page. Keep actual run
-scope, data edges, and exclusion counts beside results. Full methodology lives
-on the docs site; do not add static Methodology tabs. Preserve published record
+`cedar_definition_note()` / `cedar_definition_panel()` from `ui-helpers.R` in a
+section's method slot; `cedar_definition_links()` gives the definition and
+user-guide links alone, to end a panel that already explains the measure in its
+own words. A definition's `summary` is written for that panel and the user
+guide, so it is not a section's visible sentence. Jekyll uses the same records
+in its user guides and versioned reference page. Full methodology lives on the
+docs site; do not add static Methodology tabs. Preserve published record
 versions and append a new version when meaning or wording changes. See
 `docs/developers/definitions.md` for the contract and release order.
 
-**A tab body is a stack of `dashboard_section()`s. Every section states what it
-shows in one sentence, directly under its heading.** A heading alone makes the
-reader infer the counting rule; the sentence is where scope, denominator, and
-exclusions get said. This is the "transparency" half of the 1.0 UX north star,
-and it is why the helpers take a `description` argument rather than just a
-title.
+**A tab body is a stack of `dashboard_section()`s. Every section says, in one
+plain sentence under its heading, what question it answers; how it is counted
+is one click away in its method slot.**
 
 The hierarchy, all from `R/modules/ui-helpers.R`:
 
 | level | helper | renders |
 |---|---|---|
 | tab title + subtitle | `filter_bar(title, subtitle, …)` | the green band at the top of every tab |
-| **subtab title** | **`subtab_header(title, description, …)`** | **near-black h2 + copy, no fill** |
-| major group | `dashboard_section(title, description, …)` | filled green heading bar + copy |
-| block inside a group | `dashboard_subsection(title, description, …)` | uppercase green heading + copy |
+| **subtab title** | **`subtab_header(title, description, …, method =)`** | **near-black h2 + copy, no fill** |
+| major group | `dashboard_section(title, description, …, method =)` | filled green heading bar + copy |
+| block inside a group | `dashboard_subsection(title, description, …, method =)` | uppercase green heading + copy |
 | minor in-flow heading | `section_heading(title, level = "h5"/"h6")` | plain text heading, no description slot |
 
+### Explaining a section
+
+CEDAR's promise is that every number is explainable, not that every
+explanation is on screen. Transparency arrived in layers (subtitles, scope
+strips, open blue boxes, open definition notes, caveat lines), and by November
+2026 most pages opened with how a number was counted instead of what it showed
+(ISSUES M43). Every section now has four parts, in this order:
+
+1. **Title.**
+2. **One plain sentence: the question the section answers**, in words a chair
+   would use. It may carry the one scoping fact that changes how every number
+   reads ("credit hours in this department's courses, whoever takes them").
+   It never carries procedure: no DESR, class list, Academic Studies, census
+   proxy, SD, crosslist handling, threshold values or helper names.
+3. **The method slot, collapsed** (`method =` on the three section helpers,
+   rendered by `cedar_method_panel()`). Scope, denominator, exclusions,
+   thresholds, the edge used (`cedar_edge_note()`), small-cell guards, what a
+   shaded or blank cell means, and the definition links. A run-specific count
+   (rows dropped, codes in scope) goes here too, through a `uiOutput()` inside
+   the slot.
+4. **The result**: chart, table or cards. Where a sentence of the finding can
+   be computed, it leads ("History majors are down 10% from Fall 2025").
+
 Rules:
+
+- **Blue is for method, and method is collapsed.** An open box is for a caveat
+  that changes the reading of the numbers below it (a term in progress, a data
+  window cut short), stated in one line. `test-architecture.R` ratchets open
+  `alert alert-info` / `alert-box--info` boxes per file (M43); fold one into a
+  method slot and lower the allowance.
+- **One explanation, once.** The visible sentence and the method panel never
+  repeat each other, and a page-level panel does not restate a section's. Two
+  sections showing the same numbers is a bug; so is the same sentence twice.
+- **Tuning inputs are method too.** Thresholds and minimums a dean does not
+  change (Regstats' anomaly settings, flow minimums) sit behind a disclosure,
+  with their current values stated in the method slot.
+- **A long list shows its top rows** and keeps the rest one click away
+  ("Show N more"), never dropped and never listed in full.
+- **Course Dynamics → Overview is the reference**, with the Dept Dashboard and
+  Dept Trends (Headcount, Credit Hours, Courses Taken) after the 2026-11-14
+  pilot.
+
+### Headings
 
 - **A subtab opens with `subtab_header()`, never with a section bar.** The
   subtab's own title must not look like a divider inside itself. `subtab_header`
@@ -211,23 +250,15 @@ Rules:
   that holds content gets one.
 - **Section bars are for dividing a subtab that has more than one section.** A
   subtab with a single section does not need both — the `subtab_header()` alone
-  is the heading, and its `dashboard_subsection()`s can sit directly beneath.
+  is the heading and carries the method slot, and its `dashboard_subsection()`s
+  sit directly beneath.
 - **Use `dashboard_section()` / `dashboard_subsection()` for anything a user
   reads as a section of the page.** Reach for `section_heading()` only for a
   minor label inside an already-described block.
 - **Never use a bare `h3()`–`h6()`.** An unclassed heading renders at browser
   default and will not match anything around it.
 - **`description` is not optional in spirit.** If a section genuinely needs no
-  explanation, that is a signal the section may not need to exist.
-- **Say the exclusions.** If a number leaves something out — early drops are not
-  in DFW, crosslist partners are deduplicated, summers are dropped — the
-  description is where that goes, not the docs. Pages should not depend on the
-  user guide to explain a basic calculation difference.
-- **Two sections showing the same numbers is a bug.** If a scope strip restates
-  what the summary cards already show, delete one.
-
-Reference implementations: Dept Dashboard (`ui.R`), Course Dynamics → Rollcall,
-Explore → Gen Ed.
+  sentence, that is a signal the section may not need to exist.
 
 ## Module inventory
 
@@ -307,65 +338,6 @@ This applies everywhere: cones, branches, trunk, data pipeline scripts, and test
 - **Column groups in a wide table are banded** with `cedar-col-band` on every other group (`colGroup(headerClass = )`, and `class` / `headerClass` on its columns), so each group reads as one block from its heading to the last row.
 - **Current-term snapshots** use `cedar_snapshot_table(spec)`: grouped measure rows, the current term as a bold tinted anchor column (optionally split into sub-columns, such as All plus each crosslisted code), and earlier comparison terms beside it, with an optional footnote. A feature-layer `prepare_*` adapter builds the spec with values already formatted (see `prepare_course_snapshot_tables()`); prefer it over a row of stat cards when each measure carries its own history.
 - When a computation or component is currently inline and you touch nearby code, that's the moment to promote it to a helper and migrate the other callers — leave the codebase more standardized than you found it.
-
-## Page structure — every section is a heading plus a description
-
-**Shared definitions:** `docs/_data/definitions.yml` is the authored source for
-the migrated metric explanations. `R/trunk/definitions.R` validates and selects
-records; `load_funcs()` loads them once as static metadata. Use
-`cedar_definition_summary()` for descriptions and `cedar_definition_note()` /
-`cedar_definition_panel()` from `ui-helpers.R` for blue boxes;
-`cedar_definition_links()` gives the definition and user-guide links alone, to
-end a box that already explains the measure in its own words. Jekyll uses the
-same records in its user guides and versioned reference page. Keep actual run
-scope, data edges, and exclusion counts beside results. Full methodology lives
-on the docs site; do not add static Methodology tabs. Preserve published record
-versions and append a new version when meaning or wording changes. See
-`docs/developers/definitions.md` for the contract and release order.
-
-**A tab body is a stack of `dashboard_section()`s. Every section states what it
-shows in one sentence, directly under its heading.** A heading alone makes the
-reader infer the counting rule; the sentence is where scope, denominator, and
-exclusions get said. This is the "transparency" half of the 1.0 UX north star,
-and it is why the helpers take a `description` argument rather than just a
-title.
-
-The hierarchy, all from `R/modules/ui-helpers.R`:
-
-| level | helper | renders |
-|---|---|---|
-| tab title + subtitle | `filter_bar(title, subtitle, …)` | the green band at the top of every tab |
-| **subtab title** | **`subtab_header(title, description, …)`** | **near-black h2 + copy, no fill** |
-| major group | `dashboard_section(title, description, …)` | filled green heading bar + copy |
-| block inside a group | `dashboard_subsection(title, description, …)` | uppercase green heading + copy |
-| minor in-flow heading | `section_heading(title, level = "h5"/"h6")` | plain text heading, no description slot |
-
-Rules:
-
-- **A subtab opens with `subtab_header()`, never with a section bar.** The
-  subtab's own title must not look like a divider inside itself. `subtab_header`
-  is larger than a section bar (1.35 vs 1.2rem) but carries no fill, so the page
-  reads *subtab by size, section by fill*. Every `nav_panel()` / `tabPanel()`
-  that holds content gets one.
-- **Section bars are for dividing a subtab that has more than one section.** A
-  subtab with a single section does not need both — the `subtab_header()` alone
-  is the heading, and its `dashboard_subsection()`s can sit directly beneath.
-- **Use `dashboard_section()` / `dashboard_subsection()` for anything a user
-  reads as a section of the page.** Reach for `section_heading()` only for a
-  minor label inside an already-described block.
-- **Never use a bare `h3()`–`h6()`.** An unclassed heading renders at browser
-  default and will not match anything around it.
-- **`description` is not optional in spirit.** If a section genuinely needs no
-  explanation, that is a signal the section may not need to exist.
-- **Say the exclusions.** If a number leaves something out — early drops are not
-  in DFW, crosslist partners are deduplicated, summers are dropped — the
-  description is where that goes, not the docs. Pages should not depend on the
-  user guide to explain a basic calculation difference.
-- **Two sections showing the same numbers is a bug.** If a scope strip restates
-  what the summary cards already show, delete one.
-
-Reference implementations: Dept Dashboard (`ui.R`), Course Dynamics → Rollcall,
-Explore → Gen Ed.
 
 ## Reuse before writing
 

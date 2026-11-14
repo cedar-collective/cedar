@@ -54,6 +54,7 @@ make_waitlist_course_overview_reactable <- function(data,
                                                     drill_term = NULL,
                                                     include_supply = TRUE,
                                                     include_hist_terms = TRUE,
+                                                    include_scope = TRUE,
                                                     searchable = TRUE,
                                                     defaultPageSize = 15,
                                                     showPageSizeOptions = TRUE,
@@ -76,6 +77,9 @@ make_waitlist_course_overview_reactable <- function(data,
   )
   if (include_hist_terms) base_cols <- c(base_cols, "n_hist_terms")
   if (include_supply) base_cols <- c(base_cols, "n_sections", "avg_size", "sections_needed")
+  # A page already scoped to one department and term (the Dept Dashboard)
+  # drops the columns that would repeat its filters on every row.
+  if (!include_scope) base_cols <- setdiff(base_cols, c("college", "term"))
   data <- data %>%
     dplyr::arrange(dplyr::desc(.data$count)) %>%
     dplyr::select(dplyr::any_of(base_cols))

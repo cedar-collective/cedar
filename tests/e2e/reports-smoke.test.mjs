@@ -253,11 +253,20 @@ export async function runReportChecks({ scope = 'smoke', synthetic = false } = {
         { type: 'text', id: 'dashboard_headcount_cards', disallowed: ['Gather Data'] },
         { type: 'plot', id: 'dashboard_headcount_sparkline' },
       ]);
-      // The cards say what they count, in the Headcount tab's words.
-      const cards = await page.$eval('#dashboard_headcount_cards', (el) => el.textContent);
-      if (!cards.includes('ignores the campus control') ||
-          !cards.includes("the program's owning department")) {
-        throw new Error(`Dashboard headcount scope strip missing: ${cards}`);
+      // The Students section's collapsed method panel says what the cards
+      // count, in the Headcount tab's words (shiny-modules.md#explaining-a-section).
+      // Open it as a reader would: closed, its text has no innerText.
+      await page.evaluate(() => {
+        const panel = document.getElementById('dashboard_headcount_scope')?.closest('details');
+        if (panel) panel.open = true;
+      });
+      await waitForOutput(page, 'Dept Dashboard headcount scope', [
+        { type: 'text', id: 'dashboard_headcount_scope' },
+      ]);
+      const scope = await page.$eval('#dashboard_headcount_scope', (el) => el.textContent);
+      if (!scope.includes('ignores the campus control') ||
+          !scope.includes("the program's owning department")) {
+        throw new Error(`Dashboard headcount scope missing from the Students method panel: ${scope}`);
       }
       // The filter strip names the codes behind the department, from the files.
       const codes = await page.$eval('#dashboard_program_info', (el) => el.textContent);
