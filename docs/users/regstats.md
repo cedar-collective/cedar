@@ -16,7 +16,7 @@ Regstats shows courses where something is a bit out of the ordinary — waitlist
 
 It is most useful during active registration, when current patterns can still inform scheduling conversations, capacity checks, or outreach to departments.
 
-Set your filters, click **Get Stats**, and the dashboard assembles across seven signal categories. A summary bar at the top shows the scope and the count in each category; its **How courses are flagged** panel opens to the thresholds the run used, in words, the comparison baseline, and whether the run came from cache.
+Set your filters, click **Get Stats**, and the dashboard assembles across seven signal categories, opening on **Worth a Look**, which reads them together. A summary bar at the top shows the scope and the count in each category; its **How courses are flagged** panel opens to the thresholds the run used, in words, the comparison baseline, and whether the run came from cache.
 
 ---
 
@@ -77,6 +77,57 @@ codes as two courses. The scope bar says how many flagged courses ran under
 another code.
 
 ---
+
+## Worth a Look
+
+The first tab reads the screens below together. One screen alone can mislead:
+a dip looks like falling demand until you see the same course is also near
+full, which means the seats fell. Each flagged course takes the first pattern
+its flags make, read on each campus separately:
+
+| Pattern | What it says |
+|---|---|
+| **Seats cut** | fewer students than usual, and its sections are near full |
+| **Students waiting** | students are still waiting for a seat |
+| **Growth near capacity** | more students than usual, and its sections are now near full |
+| **Growth with churn** | more students than usual, and more of them dropping |
+| **Falling demand** | fewer students than usual, with seats to spare |
+| **Rising demand** | more students than usual, with seats to spare |
+| **Drop spike** | more drops than usual |
+| **Fuller than usual** | fuller than its usual pattern |
+
+A course that is only **usually near full** (near full in most earlier terms,
+with nothing else unusual) is counted in the method panel but not listed:
+that is a known state, not news.
+
+**The chart** places each course by two measures:
+
+- **Across:** its census enrollment as a multiple of its average in earlier
+  matching terms, on a log scale, so half and twice its usual sit the same
+  distance from **usual**.
+- **Up:** the share of its seats filled at census, with the **near full** line
+  drawn at the Chronic Fill Rate (90% unless you change it).
+
+Courses short of seats sit at the top, left of usual when they shrank and
+right of it when they grew. Courses with room sit below the line.
+
+- **Colour:** whether the course is short of seats (rust), has demand moving
+  with seats to spare (blue), or carries another flag (gray).
+- **Shape:** the pattern. Triangles point down for fewer students than usual
+  and up for more.
+- **Size:** the students behind the flag: those beyond the usual range, those
+  waiting, or the extra drops. A course flagged only for its fill has no count
+  and is drawn smallest.
+
+A course more than four times or less than a quarter of its usual is drawn at
+the chart's edge, and its hover gives its actual multiple. A course with no
+earlier offering, or no usable seat count, can't be placed, so it is left off
+the chart. The method panel counts both. **The list under the chart has every
+course**, ranked by pattern, then by the students behind it.
+
+"Near full" is not "full": CEDAR calls a course full at 98% of its seats on the
+first day. The Saturation tab's **Full now** and **Chronically full** badges
+use the same 90% line (ISSUES.md M51).
 
 ## Signal categories
 

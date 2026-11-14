@@ -454,6 +454,47 @@ attach_regstats_former_codes <- function(flagged, students, courses) {
 }
 
 
+#' Every raised course's census, usual census and fill, in one table
+#'
+#' @param flagged The flagged tables, already cut to the run's terms.
+#' @param regstats The course-term frame the enrollment screens tested
+#'   (census_enrl, census_enrl_mean, census_enrl_sd, n_hist_terms).
+#' @param sat The saturation frame the fill screens tested (every course-term
+#'   with usable seats: capacity, fill_rate, fill_rate_mean).
+#' @return One row per campus, college, course, part of term and term that
+#'   any screen raised.
+#' @keywords internal
+regstats_course_context <- function(flagged, regstats, sat) {
+  keys <- c("campus", "college", "subject_course", "part_term", "term")
+  raised <- dplyr::bind_rows(lapply(
+    c("bumps", "dips", "waits", "early_drops", "late_drops", "sat"),
+    function(nm) {
+      df <- flagged[[nm]]
+      if (is.null(df) || nrow(df) == 0) return(NULL)
+      dplyr::distinct(dplyr::ungroup(df), dplyr::across(dplyr::all_of(keys)))
+    }
+  )) %>% dplyr::distinct()
+  if (nrow(raised) == 0) {
+    return(tibble::tibble(campus = character(), college = character(), subject_course = character(),
+                          part_term = character(), term = integer(), census_enrl = numeric(),
+                          census_enrl_mean = numeric(), census_enrl_sd = numeric(),
+                          enrl_hist_terms = integer(), capacity = numeric(),
+                          fill_rate = numeric(), fill_rate_mean = numeric()))
+  }
+  # Both frames are unique on campus, college, course, term type, part of term
+  # and term; a term fixes its type, so each is unique on `keys`.
+  enrl <- regstats %>% dplyr::ungroup() %>%
+    dplyr::select(dplyr::all_of(keys), census_enrl, census_enrl_mean, census_enrl_sd,
+                  enrl_hist_terms = n_hist_terms)
+  fill <- sat %>% dplyr::ungroup() %>%
+    dplyr::select(dplyr::all_of(keys), capacity, fill_rate, fill_rate_mean)
+  raised %>%
+    dplyr::left_join(enrl, by = keys, relationship = "one-to-one") %>%
+    dplyr::left_join(fill, by = keys, relationship = "one-to-one") %>%
+    dplyr::arrange(campus, college, subject_course, part_term, term)
+}
+
+
 # What the page says about following courses across their codes: how many
 # flagged courses also ran under another code. The module renders
 # the sentence; the counts stay typed beside it.
@@ -512,6 +553,7 @@ regstats_course_key_info <- function(flagged) {
 #'     \item \code{running_hot_sat} - "Running hot" courses: fill above their own prior pattern by the configured SD band
 #'     \item \code{chronic_sat} - "Chronically full" courses: above the selected fill ceiling for the required number of prior same-type terms
 #'     \item \code{all_flagged_courses} - Character vector of all flagged course identifiers
+#'     \item \code{course_context} - One row per course any screen raised (campus, college, course, part of term, term): its census, usual census and SD, comparison terms, seats, census fill and usual fill; NA where there is no prior offering or no usable seats
 #'     \item \code{course_key_info} - How many flagged courses ran under another code, and the sentence the page shows
 #'     \item \code{code_renames} - The renames the class list carried when this was counted (the cache compares them)
 #'     \item \code{tiered_summary} - Summary of concerns by severity tier
@@ -1157,6 +1199,15 @@ flagged[["bumps"]] <- bumps %>% arrange(across(all_of(std_arrange_cols)))
   cedar_debug("[regstats.R] Filtered flagged_courses has ", length(flagged_courses), " courses.")
 
   flagged[["all_flagged_courses"]] <- sort(unique(flagged_courses))
+
+  # One row per course a screen raised, with its census against its usual and
+  # its census fill, whichever screen raised it. Each screen keeps only the
+  # measures it tested, so a course raised for its waitlist alone carried no
+  # usual enrollment; read together (features/registration-watch.R) every
+  # course needs the same two. Read off the same frames the screens tested:
+  # nothing is recounted. NA means the course has no prior offering to compare
+  # (usual) or no usable seats (fill), never zero.
+  flagged[["course_context"]] <- regstats_course_context(flagged, regstats, sat)
 
   # save thresholds for adding to report, and the renames this was counted over
   flagged[["thresholds"]] <- thresholds

@@ -494,7 +494,20 @@ export async function runReportChecks({ scope = 'smoke', synthetic = false } = {
           text.includes('distinct prior comparison term') &&
           text.includes('class-list census proxy');
       }, { timeout: STEP_TIMEOUT, polling: 500 });
+      // Worth a Look opens first: the screens read together, as a chart and a
+      // ranked list (features/registration-watch.R).
+      await page.waitForFunction(() => {
+        const plot = document.querySelector('#regstats-rs_watch_plot .main-svg');
+        const empty = document.body.innerText.includes('No course in this scope was flagged by a Regstats screen.');
+        return !!plot || empty;
+      }, { timeout: STEP_TIMEOUT, polling: 500 });
       if (synthetic) {
+        await waitForOutput(page, 'registration watch', [
+          { type: 'plotly', id: 'regstats-rs_watch_plot' },
+          { type: 'reactable', id: 'regstats-rs_watch_table' },
+        ]);
+        assert.match(await page.$eval('#regstats-rs_watch_table', el => el.innerText), /SOCI 100/);
+        await clickSubTabIn(page, 'regstats-rs_tabs', 'Enrollment Bumps');
         await waitForOutput(page, 'fixture enrollment bump', [
           { type: 'reactable', id: 'regstats-rs_bumps_table' },
         ]);
