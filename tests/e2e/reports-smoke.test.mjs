@@ -448,6 +448,26 @@ export async function runReportChecks({ scope = 'smoke', synthetic = false } = {
 
     await withStep(page, [], 'Regstats runs', async () => {
       await openReport(page, 'Regstats', 'registration');
+      // The thresholds are folded under "Adjust thresholds" (ISSUES M43); the
+      // closed line says whether the standard values are in force, and names
+      // a changed one.
+      const thresholdLine = () => page.evaluate(() => {
+        const d = document.querySelector('#regstats-rs_threshold_state')?.closest('details');
+        return { open: d?.open, text: document.getElementById('regstats-rs_threshold_state')?.innerText };
+      });
+      await page.waitForFunction(() =>
+        document.getElementById('regstats-rs_threshold_state')?.innerText === 'standard values',
+        { timeout: STEP_TIMEOUT, polling: 250 });
+      assert.equal((await thresholdLine()).open, false, 'Adjust thresholds should start closed');
+      const standardWait = await page.$eval('#regstats-rs_min_wait', (el) => Number(el.value));
+      await setInput(page, 'regstats-rs_min_wait', standardWait + 7);
+      await page.waitForFunction((v) =>
+        document.getElementById('regstats-rs_threshold_state')?.innerText.includes(`Min Waiting ${v}`),
+        { timeout: STEP_TIMEOUT, polling: 250 }, standardWait + 7);
+      await setInput(page, 'regstats-rs_min_wait', standardWait);
+      await page.waitForFunction(() =>
+        document.getElementById('regstats-rs_threshold_state')?.innerText === 'standard values',
+        { timeout: STEP_TIMEOUT, polling: 250 });
       await setInput(page, 'regstats-rs_campus', CAMPUSES);
       await setInput(page, 'regstats-rs_term', [TERM]);
       await setInput(page, 'regstats-rs_dept', [synthetic ? 'SOCI' : DEPT]);
@@ -456,6 +476,14 @@ export async function runReportChecks({ scope = 'smoke', synthetic = false } = {
       await waitForOutput(page, 'Regstats dashboard', [
         { type: 'text', id: 'regstats-rs_dashboard', disallowed: ['click Get Stats'] },
       ]);
+      // The baseline and coverage lines are in the stripe's collapsed method
+      // panel; open it as a reader would before reading its text.
+      await page.waitForFunction(() =>
+        !!document.querySelector('#regstats-rs_filter_summary details.cedar-method-panel'),
+        { timeout: STEP_TIMEOUT, polling: 500 });
+      await page.evaluate(() => {
+        document.querySelector('#regstats-rs_filter_summary details.cedar-method-panel').open = true;
+      });
       await page.waitForFunction(() => {
         const note = document.querySelector('[data-definition-id="regstats"][data-definition-version="5.0.0"]');
         const text = document.body.innerText;

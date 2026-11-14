@@ -16,7 +16,7 @@ Regstats shows courses where something is a bit out of the ordinary — waitlist
 
 It is most useful during active registration, when current patterns can still inform scheduling conversations, capacity checks, or outreach to departments.
 
-Set your filters, click **Get Stats**, and the dashboard assembles across seven signal categories. A summary bar at the top shows counts in each category, the thresholds used, the comparison baseline, and whether the run came from cache.
+Set your filters, click **Get Stats**, and the dashboard assembles across seven signal categories. A summary bar at the top shows the scope and the count in each category; its **How courses are flagged** panel opens to the thresholds the run used, in words, the comparison baseline, and whether the run came from cache.
 
 ---
 
@@ -26,6 +26,8 @@ Set your filters, click **Get Stats**, and the dashboard assembles across seven 
 - Use an exact term code to inspect one term. Term-type values such as `fall` or `spring` scan several terms; each is compared separately with its own earlier matching offerings.
 
 ### Threshold controls
+
+The thresholds sit under **Adjust thresholds**, below the filters. Closed, that line says whether the standard values are in force or names each one that was changed, so a shared link with custom thresholds says so.
 
 | Field | What it controls |
 |---|---|
