@@ -34,26 +34,42 @@ regstatsUI <- function(id, sections, thresholds, dept_choices, default_term = NU
             selected = "lower")
         ),
       ),
+      # The flagging thresholds are a reader's adjustment, not a filter: they
+      # stay folded under one line that says whether the standard values are
+      # in force, so a shared link that changed one is visible while closed
+      # (ISSUES M43). A link still restores them; hidden inputs keep binding.
       fluidRow(
-        column(2,
-          numericInput(ns("rs_min_impacted"), "Min Impacted",
-            value = thresholds[["min_impacted"]])
-        ),
-        column(2,
-          numericInput(ns("rs_pct_sd"), "Min SDs",
-            value = thresholds[["pct_sd"]])
-        ),
-        column(2,
-          numericInput(ns("rs_chronic_fill_rate"), "Chronic Fill Rate",
-            value = thresholds[["chronic_fill_rate"]], min = 0, max = 1, step = 0.05)
-        ),
-        column(2,
-          numericInput(ns("rs_min_wait"), "Min Waiting",
-            value = thresholds[["min_wait"]])
-        ),
-        column(2,
-          numericInput(ns("rs_min_sat_terms"), "Min Terms at Cap",
-            value = thresholds[["min_sat_terms"]], min = 1, step = 1)
+        column(10,
+          tags$details(
+            class = "cedar-scope-details cedar-threshold-details",
+            tags$summary(
+              tags$span(class = "filter-context-title", "Adjust thresholds"),
+              tags$span(class = "cedar-scope-details-hint",
+                        textOutput(ns("rs_threshold_state"), inline = TRUE))
+            ),
+            fluidRow(
+              column(2,
+                numericInput(ns("rs_min_impacted"), "Min Impacted",
+                  value = thresholds[["min_impacted"]])
+              ),
+              column(2,
+                numericInput(ns("rs_pct_sd"), "Min SDs",
+                  value = thresholds[["pct_sd"]])
+              ),
+              column(2,
+                numericInput(ns("rs_chronic_fill_rate"), "Chronic Fill Rate",
+                  value = thresholds[["chronic_fill_rate"]], min = 0, max = 1, step = 0.05)
+              ),
+              column(2,
+                numericInput(ns("rs_min_wait"), "Min Waiting",
+                  value = thresholds[["min_wait"]])
+              ),
+              column(2,
+                numericInput(ns("rs_min_sat_terms"), "Min Terms at Cap",
+                  value = thresholds[["min_sat_terms"]], min = 1, step = 1)
+              )
+            )
+          )
         ),
         column(2,
           filter_actions(
@@ -370,6 +386,45 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
         min_sat_terms     = input$rs_min_sat_terms
       ))
 
+    # ── Thresholds ─────────────────────────────────────────────────────────────
+
+    # The closed "Adjust thresholds" line says which values differ from the
+    # configured standard ones, so a reader (or a shared link) never runs on
+    # changed thresholds without seeing it.
+    threshold_labels <- c(min_impacted = "Min Impacted", pct_sd = "Min SDs",
+                          chronic_fill_rate = "Chronic Fill Rate",
+                          min_wait = "Min Waiting", min_sat_terms = "Min Terms at Cap")
+    output$rs_threshold_state <- renderText({
+      changed <- Filter(function(k) {
+        v <- input[[paste0("rs_", k)]]
+        !is.null(v) && !is.na(v) &&
+          !isTRUE(all.equal(as.numeric(v), as.numeric(thresholds[[k]])))
+      }, names(threshold_labels))
+      if (length(changed) == 0) return("standard values")
+      paste0("changed: ", paste(vapply(changed, function(k) sprintf(
+        "%s %s (standard %s)", threshold_labels[[k]], input[[paste0("rs_", k)]],
+        thresholds[[k]]), character(1)), collapse = "; "))
+    })
+
+    # The thresholds a run used, in words, for its method panel.
+    threshold_sentences <- function(th) {
+      tagList(
+        tags$p(sprintf(paste0(
+          "A course is a bump or a dip when more than %s students sit beyond %s ",
+          "%s of its own history for the same season and part of ",
+          "term; early and late drops are flagged the same way."),
+          th$min_impacted, th$pct_sd,
+          if (isTRUE(as.numeric(th$pct_sd) == 1)) "standard deviation" else "standard deviations")),
+        tags$p(sprintf(paste0(
+          "High waitlists: at least %s students still waiting, after removing anyone ",
+          "registered in the same course. Saturation: full at %s%% fill, and ",
+          "chronically full after %s earlier same-season terms at that fill, for ",
+          "a course with at least %s students at census."),
+          th$min_wait, round(as.numeric(th$chronic_fill_rate) * 100), th$min_sat_terms,
+          th$min_impacted))
+      )
+    }
+
     # ── Scope stripe ───────────────────────────────────────────────────────────
 
     output$rs_filter_summary <- renderUI({
@@ -446,15 +501,8 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
             paste0("Data as of ", age_label, calc_label))
         ),
         div(class = "rs-stripe-row",
-          tags$span(class = "rs-stripe-label", "Thresholds:"),
-          tags$span(
-            paste0("min impacted · ", thresholds$min_impacted,
-                   "  —  min SDs · ", thresholds$pct_sd,
-                   "  —  chronic fill · ", thresholds$chronic_fill_rate,
-                   "  —  min terms at cap · ", thresholds$min_sat_terms,
-                   "  —  min wait · ", thresholds$min_wait),
-            class = "rs-stripe-thresholds"),
-          div(class = "rs-stripe-counts rs-stripe-right",
+          tags$span(class = "rs-stripe-label", "Flagged:"),
+          div(class = "rs-stripe-counts",
             tags$span(class = "rs-count-item rs-count-bump",    tags$strong(bumps_count),       " bumps"),
             tags$span("·", class = "rs-stripe-sep"),
             tags$span(class = "rs-count-item rs-count-dip",    tags$strong(dips_count),        " dips"),
@@ -468,12 +516,12 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
             tags$span(class = "rs-count-item rs-count-drop",   tags$strong(late_drops_count),  " late drops")
           )
         ),
-        div(class = "rs-stripe-row",
-          tags$span(class = "rs-stripe-label", "Method:"),
-          tags$span(paste0(hist_label, " · ", baseline_label, " · ", cache_label),
-            class = "rs-stripe-thresholds")
-        ),
-        div(class = "rs-stripe-row", tags$span(baseline$coverage_note, class = "rs-stripe-thresholds"))
+        cedar_method_panel(tagList(
+          threshold_sentences(thresholds),
+          tags$p(paste0("Baseline: ", hist_label, "; ", baseline_label, ".")),
+          if (!is.null(baseline$coverage_note)) tags$p(baseline$coverage_note),
+          tags$p(paste0("This run: ", cache_label, "."))
+        ), title = "How courses are flagged")
       )
     })
 
