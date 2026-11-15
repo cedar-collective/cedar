@@ -1,4 +1,5 @@
-# Course Dynamics > Downstream > Later Course
+# Course Dynamics > Downstream > Where Students Go Next ("Later Course" in
+# code; the page names the students it starts from, ISSUES M52)
 #
 # Of the analysed course's students, how many took a later course within a set
 # number of regular terms, when, and how did they do in it, read by the term
@@ -17,7 +18,7 @@
 #   laterCourseUI(id)
 #   laterCourseServer(id, ...)
 #   downstream_course_choices(opts, include_rollup, dept)   shared with the
-#     Course Sequence picker in server.R
+#     With or Without This Course picker in server.R
 
 LATER_COURSE_WINDOW_CHOICES <- stats::setNames(
   as.character(1:6),
@@ -56,7 +57,9 @@ downstream_course_choices <- function(opts, include_rollup = FALSE, dept = NULL)
 laterCourseUI <- function(id) {
   ns <- NS(id)
   tagList(
-    subtab_header("Later Course", cedar_definition_summary("downstream-outcomes")),
+    subtab_header("Where Students Go Next",
+                  paste0("Starts from everyone who took this course: how many went on to a later ",
+                         "course you choose, and how they did in it.")),
     cedar_definition_panel("downstream-outcomes"),
     fluidRow(
       column(5, uiOutput(ns("picker"))),
@@ -355,7 +358,7 @@ later_course_view <- function(r, ns, access) {
 # students, attempts, programs, applicants, student_terms, edges
 #                     CEDAR tables and the data edges; applicants may be NULL.
 # default_options     reactive: get_downstream_course_options() at the default
-#                     window, shared with the Course Sequence picker.
+#                     window, shared with the With or Without This Course picker.
 # instructor_access   the session's shared instructor-gate flag.
 # instructor_password the configured password ("" when none is).
 laterCourseServer <- function(id, course, campus, students, attempts, programs, applicants,
@@ -391,7 +394,7 @@ laterCourseServer <- function(id, course, campus, students, attempts, programs, 
       choices <- downstream_course_choices(course_options(), include_rollup = TRUE)
       offered <- unlist(choices, use.names = FALSE)
       selectizeInput(
-        ns("course_y"), "Later course(s)", choices = choices,
+        ns("course_y"), "Later course(s) its students took", choices = choices,
         selected = intersect(isolate(input$course_y), offered), multiple = TRUE, width = "100%",
         options = list(placeholder = if (length(offered) > 0) "Choose one or more…"
                                      else "No later course had 15 students")
@@ -417,7 +420,7 @@ laterCourseServer <- function(id, course, campus, students, attempts, programs, 
         payload <- tryCatch(
           build_later_course(students, attempts, opt),
           error = function(e) {
-            showNotification(paste("Later Course:", conditionMessage(e)), type = "error", duration = 10)
+            showNotification(paste("Where Students Go Next:", conditionMessage(e)), type = "error", duration = 10)
             NULL
           }
         )
