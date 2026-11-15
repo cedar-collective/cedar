@@ -7,11 +7,11 @@
       
       ABQ: 18 student-terms in CHEM 1215 (Fall 2020, Fall 2021)
         Its lab, CHEM 1215L: 22.2% (4), every major together; not in the lists below
-        Nursing (pre-major) (5 student-terms, 5 students): BIOL 2210 80.0% (4), ENGL 1120 40.0% (2), PSYC 1110 20.0% (1)
-        Mechanical Engineering (4 student-terms, 3 students): MATH 1512 75.0% (3), PHYS 1310 50.0% (2)
-        Undecided (3 student-terms, 3 students): ENGL 1110 66.7% (2), MATH 1220 33.3% (1)
-        Biology (2 student-terms, 2 students): BIOL 2110C 100.0% (2), MATH 1220 50.0% (1)
-        Nursing (2 student-terms, 2 students): BIOL 2210 50.0% (1)
+        Nursing (pre-major) [FNRS] (5 student-terms, 5 students): BIOL 2210 80.0% (4), ENGL 1120 40.0% (2), PSYC 1110 20.0% (1)
+        Mechanical Engineering [ME] (4 student-terms, 3 students): MATH 1512 75.0% (3), PHYS 1310 50.0% (2)
+        Undecided [UNDC] (3 student-terms, 3 students): ENGL 1110 66.7% (2), MATH 1220 33.3% (1)
+        Biology [BIOL] (2 student-terms, 2 students): BIOL 2110C 100.0% (2), MATH 1220 50.0% (1)
+        Nursing [NURS] (2 student-terms, 2 students): BIOL 2210 50.0% (1)
         All other majors (2 student-terms, 2 students, 2 majors): MATH 1512 50.0% (1), PSYC 1110 50.0% (1)
       
       EA: 2 student-terms in CHEM 1215 (Fall 2020, Fall 2021)
