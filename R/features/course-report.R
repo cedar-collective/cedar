@@ -89,7 +89,7 @@ get_course_data <- function(data_objects, opt, skip_neighbors = FALSE,
   ####################
   # run LOOKOUT functions to see where students are coming and going from
   # Use caching to avoid expensive recomputation.
-  # Skipped when skip_neighbors = TRUE (Shiny lazy-loads this on Course Flows tab click).
+  # Skipped when skip_neighbors = TRUE (Shiny lazy-loads this on Other Courses tab click).
   if (!skip_neighbors) {
     use_cache <- is.null(opt[["skip_cache"]]) || !opt[["skip_cache"]]
     campus_scope <- opt[["course_campus"]] %||% opt[["campus"]] %||% NULL
@@ -1087,7 +1087,7 @@ build_retention_benchmark_plot <- function(diff_data) {
 #   Enrollment table and rollcall tables are available immediately because
 #   renderers read directly from tables$.
 #
-# compute_cr_flows_tab(): Course Flows — the term-before and term-after
+# compute_cr_flows_tab(): Other Courses — the term-before and term-after
 #   flow diagrams. The same-term courses are the Courses Taken Alongside
 #   module's (get_concurrent_courses_by_major()).
 # compute_cr_outcomes_tab(): Outcomes — calls get_course_outcomes().
