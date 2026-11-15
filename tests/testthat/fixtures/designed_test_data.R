@@ -55,6 +55,16 @@
 #          graded through Fall 2021; Spring 2022 in progress. The per-topic
 #          counts are worked out beside the rows below.
 #
+#   CM01 — cedar_registrations_cm (56 rows). CHEM 1215 on ABQ, Fall 2020 and
+#          Fall 2021 (settled edge Fall 2021), for the courses taken alongside
+#          it by major. Two falls, min_n 2: Nursing (pre-major) 5 student-terms
+#          (BIOL 2210 80%), Mechanical Engineering 4 (3 students; MATH 1512
+#          75%), Undecided 3, Biology 2, Nursing 2, All other majors 2 (2
+#          majors). The lab, CHEM 1215L, 4 of 18 (22.2%), is read once and
+#          kept out of the lists. A course at EA and an early drop are not
+#          counted. The full
+#          table is beside the rows.
+#
 #   HP01 — cedar_programs_hp (20 rows). Named population groups resolving to
 #          Banner codes, covering all three ways a pre-major is reached (or
 #          missed). Used by test-population-groups.R.
@@ -4824,4 +4834,97 @@ cedar_registrations_rn02 <- dplyr::bind_rows(
   .rn02_row("RN02-W2", "SOCI 371", "WL"),
   .rn02_row("RN02-W3", "SOC 371",  "WL"),
   .rn02_row("RN02-W3", "SOCI 371", "RE")
+)
+
+# =============================================================================
+# CM01 — courses taken alongside CHEM 1215, by major (see the header)
+# =============================================================================
+#
+# Course Dynamics > courses taken alongside, by major
+# (get_concurrent_courses_by_major()). CHEM 1215 on ABQ in Fall 2020 and Fall
+# 2021, with the settled edge at Fall 2021. Each student's major is the class
+# list's major_code (no programs rows), so it is the student-term's primary
+# major. Every row is registered (RE) unless marked.
+#
+#   major   student-term      also registered that term (ABQ unless marked)
+#   FNRS    CM_N1 202080      BIOL 2210, ENGL 1120
+#   FNRS    CM_N2 202080      BIOL 2210, ENGL 1120
+#   FNRS    CM_N3 202180      BIOL 2210, PSYC 1110
+#   FNRS    CM_N4 202180      BIOL 2210; PSYC 1110 at EA (not counted)
+#   FNRS    CM_N5 202180      ENGL 1120 as an early drop, DR (not counted)
+#   ME      CM_M1 202080      MATH 1512, PHYS 1310
+#   ME      CM_M2 202080      MATH 1512
+#   ME      CM_M3 202080      MATH 1512
+#   ME      CM_M3 202180      PHYS 1310 (the same student a second time)
+#   UNDC    CM_D1 202080      ENGL 1110, MATH 1220
+#   UNDC    CM_D2 202180      ENGL 1110
+#   UNDC    CM_D3 202180      nothing else
+#   NURS    CM_U1 202080      BIOL 2210
+#   NURS    CM_U2 202180      nothing else
+#   BIOL    CM_B1 202080      BIOL 2110C
+#   BIOL    CM_B2 202180      BIOL 2110C, MATH 1220
+#   CHEM    CM_C1 202080      MATH 1512
+#   PSY     CM_P1 202180      PSYC 1110
+#
+#   The course's own lab, CHEM 1215L, beside it: CM_N1, CM_N2, CM_N3 and CM_M1
+#   at ABQ, CM_E1 at EA. Read once per campus, never in a list.
+#
+#   Outside the question: CM_S1 (FNRS, Spring 2021, with BIOL 2210: another
+#   term type); CM_L1 (ME, Fall 2022, past the edge); CM_O1 (ME, Fall 2019,
+#   with MATH 1512: in the window at the default three falls, outside it at
+#   two). EA: CM_E1 (FNRS, Fall 2020) and CM_E2 (UNDC, Fall 2021) take CHEM
+#   1215 with ENGL 1110 at EA.
+#
+# Pinned, ABQ, two falls, min_n 2, min_course_n 1: 18 student-terms, 4 of
+# them (22.2%) with the lab (EA: 1 of 2, 50%).
+#   Nursing (pre-major)     5 student-terms, 5 students: BIOL 2210 80%,
+#                           ENGL 1120 40%, PSYC 1110 20%
+#   Mechanical Engineering  4 student-terms, 3 students: MATH 1512 75%,
+#                           PHYS 1310 50%
+#   Undecided               3: ENGL 1110 66.7%, MATH 1220 33.3%
+#   Biology                 2: BIOL 2110C 100%, MATH 1220 50% (ties Nursing
+#                           at 2 and is first by name)
+#   Nursing                 2: BIOL 2210 50%
+#   All other majors        2 student-terms, 2 majors: MATH 1512 50%,
+#                           PSYC 1110 50%
+# At min_n 3, Biology and Nursing fold into All other majors (6 student-terms,
+# 4 majors). EA at min_n 2: All other majors only, 2 student-terms, ENGL 1110
+# 100%. At three falls, Mechanical Engineering has 5 student-terms (CM_O1),
+# MATH 1512 80%, and is listed first: it ties Nursing (pre-major) at 5 and
+# is first by name.
+.cm_rows <- function(sid, term, major, courses, campus = "ABQ", status = "RE") {
+  home <- campus[1]  # the student's home campus, one per pull
+  campus <- rep_len(campus, length(courses))
+  status <- rep_len(status, length(courses))
+  dplyr::bind_rows(lapply(seq_along(courses), function(i) {
+    .mc_row(sid, term, courses[i], campus[i], sub(" .*", "", courses[i])) %>%
+      dplyr::mutate(registration_status_code = status[i], major_code = major, major_name = major, student_campus = home,
+                    section_id = paste0("CMSEC-", gsub(" ", "", courses[i]), "-", term, "-", campus[i]),
+                    as_of_date = as.Date("2022-09-15"))
+  }))
+}
+cedar_registrations_cm <- dplyr::bind_rows(
+  .cm_rows("CM_N1", 202080L, "FNRS", c("CHEM 1215", "CHEM 1215L", "BIOL 2210", "ENGL 1120")),
+  .cm_rows("CM_N2", 202080L, "FNRS", c("CHEM 1215", "CHEM 1215L", "BIOL 2210", "ENGL 1120")),
+  .cm_rows("CM_N3", 202180L, "FNRS", c("CHEM 1215", "CHEM 1215L", "BIOL 2210", "PSYC 1110")),
+  .cm_rows("CM_N4", 202180L, "FNRS", c("CHEM 1215", "BIOL 2210", "PSYC 1110"), campus = c("ABQ", "ABQ", "EA")),
+  .cm_rows("CM_N5", 202180L, "FNRS", c("CHEM 1215", "ENGL 1120"), status = c("RE", "DR")),
+  .cm_rows("CM_M1", 202080L, "ME",   c("CHEM 1215", "CHEM 1215L", "MATH 1512", "PHYS 1310")),
+  .cm_rows("CM_M2", 202080L, "ME",   c("CHEM 1215", "MATH 1512")),
+  .cm_rows("CM_M3", 202080L, "ME",   c("CHEM 1215", "MATH 1512")),
+  .cm_rows("CM_M3", 202180L, "ME",   c("CHEM 1215", "PHYS 1310")),
+  .cm_rows("CM_D1", 202080L, "UNDC", c("CHEM 1215", "ENGL 1110", "MATH 1220")),
+  .cm_rows("CM_D2", 202180L, "UNDC", c("CHEM 1215", "ENGL 1110")),
+  .cm_rows("CM_D3", 202180L, "UNDC", "CHEM 1215"),
+  .cm_rows("CM_U1", 202080L, "NURS", c("CHEM 1215", "BIOL 2210")),
+  .cm_rows("CM_U2", 202180L, "NURS", "CHEM 1215"),
+  .cm_rows("CM_B1", 202080L, "BIOL", c("CHEM 1215", "BIOL 2110C")),
+  .cm_rows("CM_B2", 202180L, "BIOL", c("CHEM 1215", "BIOL 2110C", "MATH 1220")),
+  .cm_rows("CM_C1", 202080L, "CHEM", c("CHEM 1215", "MATH 1512")),
+  .cm_rows("CM_P1", 202180L, "PSY",  c("CHEM 1215", "PSYC 1110")),
+  .cm_rows("CM_S1", 202110L, "FNRS", c("CHEM 1215", "BIOL 2210")),
+  .cm_rows("CM_L1", 202280L, "ME",   c("CHEM 1215", "MATH 1512")),
+  .cm_rows("CM_O1", 201980L, "ME",   c("CHEM 1215", "MATH 1512")),
+  .cm_rows("CM_E1", 202080L, "FNRS", c("CHEM 1215", "CHEM 1215L", "ENGL 1110"), campus = "EA"),
+  .cm_rows("CM_E2", 202180L, "UNDC", c("CHEM 1215", "ENGL 1110"), campus = "EA")
 )

@@ -161,6 +161,7 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
   source_file("cones/course-retake-timing.R")      # after a DFW, when the student sits in the course again
   source_file("cones/course-offering-pattern.R")   # seasons, parts of term, seats and day-1 fill
   source_file("cones/major-course-units.R")        # which units teach the courses a major's students take
+  source_file("cones/concurrent-courses-by-major.R")  # what else a course's students take that term, by major
   source_file("cones/course-cohort-effect.R")      # a course's takers against its non-takers: return and next-term outcomes
   source_file("cones/course-similar-students.R")   # a course's takers against non-takers of the same term, campus, HS GPA band and time status
   source_file("cones/course-topics.R")             # a course's topics by campus and term: sections, census, DFW, return
