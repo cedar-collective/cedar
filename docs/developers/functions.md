@@ -8,7 +8,7 @@ parent: Developer Guide
 
 This reference is auto-generated from roxygen2 comments in the source code.
 
-*Generated: 2026-11-13 17:47:07.51412*
+*Generated: 2026-11-14 17:10:23.055361*
 
 ---
 
@@ -425,6 +425,39 @@ One high-school GPA per student, off the applicants table  The first row per stu
 
 ---
 
+## concurrent-courses-by-major
+
+### `get_concurrent_courses_by_major()`
+
+*Source: concurrent-courses-by-major.R*
+
+**What else a course's students take that term, by their major**
+
+**Parameters:**
+
+- `registrations` - `cedar_registrations` as loaded (`subject_course` is the course id).
+- `student_terms` - `cedar_student_terms`, read for `primary_major_code` and `is_pre_major`.
+- `dims` - `cedar_dims`, to name the majors.
+- `opt` - `course` (one course id; required), `term_type` (`"fall"`, `"spring"` or `"summer"`; required), `campus` (campuses to keep; NULL keeps every campus, each read apart), `n_terms` (the course's last terms of that type on each campus; default 3), `n_majors` (default 5), `n_courses` (courses listed per group; default 5), `min_n` (the fewest student-terms a major needs for a list of its own; default 20), `min_course_n` (the fewest student-terms a listed course needs; default 5), `data_edges` (`cedar_data_edges()` output; required).
+
+**Returns:** A list: `lab` (one row per campus where at least `min_course_n` of the course's student-terms took its own lab: `lab_course`, `n_student_terms`, `course_student_terms`, `pct`); `groups` (one row per campus and group: `group`, `group_rank`, the "All other majors" group last, `n_student_terms`, `n_students`, `n_majors`, `program_codes`: the Banner codes behind a named group, so two names that read alike are told apart; NA for All other majors); `courses` (one row per campus, group and listed course: `subject_course`, `n_student_terms` taking it, `pct` of the group's student-terms, `course_rank`); `meta` (`course`, `term_type`, `terms`: one row per campus with its terms, `edge`, and the options used).
+
+---
+
+### `format_concurrent_courses_by_major()`
+
+*Source: concurrent-courses-by-major.R*
+
+**The by-major lists as text**
+
+**Parameters:**
+
+- `payload` - get_concurrent_courses_by_major() output.
+
+**Returns:** A character vector of lines.
+
+---
+
 ## course-adjacency
 
 ### `get_event_adjacent_courses()`
@@ -814,40 +847,6 @@ Courses taken the term before a course  The same next-term pairs as get_course_d
 - `opt` - `course` (or `courses`): the target course(s), required; `course_campus` / `campus`: keep pairs on these campuses.
 
 **Returns:** One row per campus, feeder course and the pair's term types: `campus`, `college` (the feeder's), `subject_course` (the feeder), `source_term_type`, `target_term_type`, `to_crse`, `total_students`, `num_terms`, `min_contrib`, `max_contrib`, `avg_contrib` (students per target term).
-
----
-
-### `summarize_concurrent_courses()`
-
-*Source: course-flows.R*
-
-**Summarize courses taken alongside a selected course**
-
-Summarize courses taken alongside a selected course  Collapses the term-type detail returned by `get_concurrent_courses()` into one campus-course row. Counts use student-term enrollments, so a student who takes the selected course in two terms contributes twice. The denominator includes every registered selected-course student-term in the campus scope, including students who did not take a given companion course.
-
-**Parameters:**
-
-- `concurrent` - Output from `get_concurrent_courses()`.
-- `top_n` - Optional maximum number of campus-course rows to retain.
-
-**Returns:** A campus-grained tibble ordered by share of selected-course student-term enrollments.
-
----
-
-## course-neighbors
-
-### `plot_concurrent_course_treemap()`
-
-*Source: course-neighbors.R*
-
-**Plot courses taken alongside a selected course**
-
-**Parameters:**
-
-- `concurrent_courses` - Output from `summarize_concurrent_courses()`.
-- `opt` - Named list. `max_courses` limits displayed campus-course rows.
-
-**Returns:** A Plotly treemap, or `NULL` when no concurrent courses are present.
 
 ---
 

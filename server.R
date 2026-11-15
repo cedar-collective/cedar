@@ -2080,11 +2080,8 @@ output$enrl_classlist_download <- downloadHandler(
       "Recomputing flow diagrams...",
       compute_cr_flows_tab(base, data_objects, min_contrib = min_contrib, max_courses = max_courses)
     )
-    existing <- base$plots[
-      !grepl("^sankey_|^concurrent_treemap_plot$", names(base$plots))
-    ]
+    existing <- base$plots[!grepl("^sankey_", names(base$plots))]
     base$plots <- c(existing, flow_payload$plots)
-    base$tables$concurrent_courses <- flow_payload$tables$concurrent_courses
     base$flows_loaded <- TRUE
     course_report_data(base)
   }, ignoreInit = TRUE)
@@ -2260,36 +2257,6 @@ output$enrl_classlist_download <- downloadHandler(
       cedar_longitudinal_edge_note(
         data_objects[["cedar_edges"]], grade_dependent = FALSE
       )
-    )
-  })
-
-  output$cr_concurrent_treemap_plot <- renderPlotly({
-    data <- course_report_data()
-    req(
-      !is.null(data),
-      !is.null(data$plots),
-      !is.null(data$plots$concurrent_treemap_plot)
-    )
-    data$plots$concurrent_treemap_plot
-  })
-
-  output$cr_concurrent_courses_ui <- renderUI({
-    data <- course_report_data()
-    if (is.null(data) || !isTRUE(data$flows_loaded)) {
-      return(tags$p("Open Course Flows to compute same-term course patterns.",
-                    class = "text-hint"))
-    }
-
-    concurrent <- data$tables$concurrent_courses
-    if (is.null(concurrent) || nrow(concurrent) == 0L) {
-      return(empty_state(
-        "No other registered courses were found in the same campus and term."
-      ))
-    }
-
-    fluidRow(
-      column(7, plotlyOutput("cr_concurrent_treemap_plot", height = "520px")),
-      column(5, reactable::reactableOutput("cr_concurrent_courses_table"))
     )
   })
 
@@ -2492,29 +2459,6 @@ output$enrl_classlist_download <- downloadHandler(
   }
 
   # Render Course Dynamics data tables
-  output$cr_concurrent_courses_table <- reactable::renderReactable({
-    data <- course_report_data()
-    if (is.null(data) || is.null(data$tables$concurrent_courses)) return(NULL)
-
-    table_data <- data$tables$concurrent_courses %>%
-      dplyr::select(
-        campus,
-        subject_course,
-        college,
-        coenrolled_student_terms,
-        pct_selected_student_terms,
-        avg_students_per_target_term,
-        target_terms
-      )
-
-    cr_basic_reactable(
-      cr_humanize_columns(table_data),
-      default_page_size = 20L,
-      searchable = FALSE,
-      default_sorted = list("% Taking Both" = "desc")
-    )
-  })
-
   output$cr_enrollment_table <- reactable::renderReactable({
     data <- course_report_data()
     if (!is.null(data) && "tables" %in% names(data) && !is.null(data$tables$cl_enrls)) {
@@ -6231,6 +6175,24 @@ output$enrl_classlist_download <- downloadHandler(
   # cross-course comparison work. The server was still running on every session,
   # registering outputs nothing rendered. Re-enable both together.
   # retentionServer("retention", students = cedar_registrations, student_terms = cedar_student_terms)
+
+  # Course Dynamics > Course Flows > Courses Taken Alongside: what the analysed
+  # course's students take the same term, by major
+  # (R/modules/concurrent-by-major.R). It counts only while Course Flows is
+  # open, for the course the report was run for.
+  concurrentByMajorServer(
+    "cr_concurrent",
+    course = reactive({
+      d <- course_report_data()
+      if (is.null(d)) NULL else d$course_code
+    }),
+    campus = reactive(if (length(input$cr_campus) > 0) input$cr_campus else NULL),
+    active = reactive(identical(input$cr_tabs, "Course Flows")),
+    registrations = cr_students,
+    student_terms = data_objects[["cedar_student_terms"]],
+    dims = data_objects[["cedar_dims"]],
+    edges = data_objects[["cedar_edges"]]
+  )
 
   # Course Dynamics > Downstream > Where Students Go Next: the analysed course's students
   # in a later course, by term, grade and instructor (R/modules/later-course.R).
