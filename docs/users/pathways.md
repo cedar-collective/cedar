@@ -12,7 +12,7 @@ nav_order: 5
 
 ---
 
-Pathways lets you define a student population, then look at how that group appears in courses, sequences, roadblocks, and major-change records. It is meant to make program-level patterns easier to inspect, not to turn those patterns into automatic judgments about courses, instructors, or students.
+Open **Pathways > Student Pathways**. It lets you define a student population, then look at how that group appears in courses, sequences, roadblocks, and major-change records. It is meant to make program-level patterns easier to inspect, not to turn those patterns into automatic judgments about courses, instructors, or students.
 
 Most Pathways views are descriptive. They can show where a pattern is worth asking about, but they do not by themselves explain why the pattern exists.
 

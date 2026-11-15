@@ -108,7 +108,7 @@ populationSelectorUI <- function(id, campus_choices, program_choices = character
     "Pathways",
     tags$span(
       "Define a student population, then explore course timing, roadblocks, sequences, and major changes. ",
-      tags$a("Institution-level Gen Ed patterns are in Explore > Gen Ed.", href = "?tab=gen-ed")
+      tags$a("Institution-level Gen Ed patterns are in Bird's Eye > Gen Ed.", href = "?tab=gen-ed")
     ),
     class = "pathways-population-filter",
     fluidRow(

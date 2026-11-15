@@ -17,7 +17,7 @@ spotlights:
     cta: "Open Waitlists"
 
   - title: "Headcount is program-based"
-    text: "Explore > Headcount counts unique students with active declared program records, not students sitting in a department's courses."
+    text: "Bird's Eye > Headcount counts unique students with active declared program records, not students sitting in a department's courses."
     icon: "users"
     tab: "headcount"
     cta: "Open Headcount"
@@ -29,7 +29,7 @@ spotlights:
     cta: "Open Cancellations"
 
   - title: "Gen Ed can be scoped"
-    text: "Explore > Gen Ed can be filtered by campus, college, department, area, level, and term window before reviewing enrollment and outcome patterns."
+    text: "Bird's Eye > Gen Ed can be filtered by campus, college, department, area, level, and term window before reviewing enrollment and outcome patterns."
     icon: "graduation-cap"
     tab: "gen-ed"
     cta: "Open Gen Ed"

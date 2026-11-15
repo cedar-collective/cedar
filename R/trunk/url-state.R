@@ -140,7 +140,7 @@ CEDAR_TAB_SLUGS <- c(
   "course-dynamics"    = "Course Dynamics",
   "gen-ed"             = "Gen Ed",
   "degree-explorer"    = "Degree Explorer",
-  "pathways"           = "Pathways",
+  "pathways"           = "Student Pathways",  # the Pathways menu's first page (was its own tab)
   "registration"       = "Regstats",
   "open-seats"         = "Open Seats",
   "waitlists"          = "Waitlists",
