@@ -8,7 +8,7 @@ parent: Developer Guide
 
 This reference is auto-generated from roxygen2 comments in the source code.
 
-*Generated: 2026-11-14 17:10:23.055361*
+*Generated: 2026-11-15 08:56:59.271589*
 
 ---
 
@@ -167,7 +167,7 @@ Compute Waitlist Pressure for a Student Cohort  CEDAR's class-list true waitlist
 
 **Analyze Cancelled Course Sections**
 
-Analyze Cancelled Course Sections  Returns cancelled section rows and summary tables for the Explore > Cancellations page. Cancellation is defined narrowly as section status "C"; related non-active statuses are counted separately for page context.
+Analyze Cancelled Course Sections  Returns cancelled section rows and summary tables for the Bird's Eye > Cancellations page. Cancellation is defined narrowly as section status "C"; related non-active statuses are counted separately for page context.
 
 **Parameters:**
 

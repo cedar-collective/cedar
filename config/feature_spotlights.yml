@@ -23,7 +23,7 @@ spotlights:
     cta: "Open Headcount"
 
   - title: "Cancellations has timing context"
-    text: "Explore > Cancellations shows cancelled sections and timing relative to course start, with repeated cancellation patterns by course."
+    text: "Bird's Eye > Cancellations shows cancelled sections and timing relative to course start, with repeated cancellation patterns by course."
     icon: "ban"
     tab: "cancellations"
     cta: "Open Cancellations"

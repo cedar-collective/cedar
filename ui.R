@@ -329,6 +329,12 @@ cedar_home_ui <- function() {
           "Inspect general-education offerings and fulfillment patterns.",
           "?tab=gen-ed",
           "graduation-cap"
+        ),
+        cedar_home_card(
+          "Cancellations",
+          "Review canceled courses by term, campus, department, and course level.",
+          "?tab=cancellations",
+          "ban"
         )
       )
     ),
@@ -338,12 +344,6 @@ cedar_home_ui <- function() {
       tags$h2("Admin Tools"),
       div(
         class = "cedar-home-grid cedar-home-grid--top",
-        cedar_home_card(
-          "Cancellations",
-          "Review canceled courses by term, campus, department, and course level.",
-          "?tab=cancellations",
-          "ban"
-        ),
         cedar_home_card(
           "Data & Usage",
           "Review data freshness, mappings, usage patterns, and cache tools.",
@@ -1827,7 +1827,13 @@ nav_panel(
       title = "Gen Ed",
       icon = icon("layer-group"),
       genEdExploreUI("gen_ed", cedar_sections, .dept_choices, cedar_current_term, cedar_default_term)
-    ) # end gen ed nav_panel
+    ), # end gen ed nav_panel
+
+    nav_panel(
+      title = "Cancellations",
+      icon = icon("ban"),
+      cancellationsUI("cancellations", cedar_sections, cedar_default_reg_term, .dept_choices)
+    ) # end cancellations nav_panel (was under Admin)
 
     # RETENTION (inside Bird's Eye) — hidden until cross-course comparison
     # is ready. Course-level retention trend lives in Course Dynamics tab.
@@ -1843,14 +1849,6 @@ nav_panel(
   nav_menu(
     title = "Admin",
     icon = icon("cog"),
-
-  nav_panel(
-    title = "Cancellations",
-    icon = icon("ban"),
-    cancellationsUI("cancellations", cedar_sections, cedar_default_reg_term, .dept_choices)
-  ),
-
-  nav_item(tags$hr(class = "my-1")),
 
   nav_panel(
     title = "Data & Usage",
