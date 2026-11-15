@@ -267,7 +267,7 @@ Rules:
 | `pathways.R` | `pathwaysUI/Server`, `populationSelectorUI/Server` | Pathways > Student Pathways |
 | `headcount.R` | `headcountUI/Server` | Bird's Eye > Headcount |
 | `seatfinder.R` | `seatfinderUI/Server` | Registration > Open Seats |
-| `cancellations.R` | `cancellationsUI/Server` | Admin > Cancellations |
+| `cancellations.R` | `cancellationsUI/Server` | Bird's Eye > Cancellations |
 | `waitlist.R` | `waitlistUI/Server` | Registration > Waitlists |
 | `gen-ed.R` | `genEdExploreUI/Server`, `deptProfileGenEdUI/Server` | Bird's Eye > Gen Ed; Dept Trends Gen Ed panel (`deptProfileGenEd*` is the legacy internal function name) |
 | `regstats.R` | `regstatsUI/Server` | Regstats |

@@ -34,8 +34,8 @@ moving toward:
 
 Supported surfaces: Dept Dashboard, Dept Trends, Course Dynamics; Student
 Pathways, Degree Explorer (Pathways); Regstats, Open Seats, Waitlists,
-Projections (Registration); Enrollment, Headcount, Gen Ed (Bird's Eye);
-Cancellations, Data & Usage, Changelog (Admin). Cross-course Retention is
+Projections (Registration); Enrollment, Headcount, Gen Ed, Cancellations
+(Bird's Eye); Data & Usage, Changelog (Admin). Cross-course Retention is
 built but hidden.
 
 ---
@@ -219,9 +219,6 @@ Page-level legibility is [M43](ISSUES.md)–M48; these are the new pieces.
   "Which courses are under pressure this term?", "Where do students go after
   this course?", each a deep link to the subtab that answers it; Course
   Dynamics' eight subtabs and Pathways' six are invisible from Home now.
-- [ ] **Cancellations is an analysis filed under Admin.** Move it beside the
-  other Explore tools; its old slug keeps resolving. (The colliding
-  Enrollment and Projections names were settled 2026-11-14.)
 
 ## Platform
 
