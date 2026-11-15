@@ -32,10 +32,11 @@ moving toward:
 - **Focused surfaces:** the Shiny app is the product; RStudio analysis is
   supported through the same tables and functions.
 
-Supported surfaces: Dept Dashboard, Dept Trends, Pathways, Course Dynamics;
-Regstats, Open Seats, Waitlists, Projections (Registration); Enrollment,
-Headcount, Gen Ed, Degree Explorer (Explore); Cancellations, Data & Usage,
-Changelog (Admin). Cross-course Retention is built but hidden.
+Supported surfaces: Dept Dashboard, Dept Trends, Course Dynamics; Student
+Pathways, Degree Explorer (Pathways); Regstats, Open Seats, Waitlists,
+Projections (Registration); Enrollment, Headcount, Gen Ed (Bird's Eye);
+Cancellations, Data & Usage, Changelog (Admin). Cross-course Retention is
+built but hidden.
 
 ---
 
