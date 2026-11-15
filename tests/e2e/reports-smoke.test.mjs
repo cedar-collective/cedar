@@ -533,7 +533,7 @@ export async function runReportChecks({ scope = 'smoke', synthetic = false } = {
     });
 
     await withStep(page, ['roadblocks'], 'Pathways population builds', async () => {
-      await openReport(page, 'Pathways', 'pathways');
+      await openReport(page, 'Student Pathways', 'pathways');
       // No population-campus here. That control filters cedar_programs$student_campus
       // (home campus, "Albuquerque/Main"), not the ABQ/EA section-campus codes in
       // CAMPUSES — see the two campus fields in AGENTS.md. Passing section codes

@@ -79,13 +79,17 @@ the page from **Registration > Projections**.
 
 ---
 
-### Pathways
+### Pathways menu
 
-Student-population analysis. Build a population by major, department, preset group, or demographics, then inspect course timing, roadblocks, course sequences, course-to-major patterns, and major changes.
+How students move through courses and programs: the routes they took, and the
+routes a degree lays out.
+
+| Tab | What it answers |
+|-----|----------------|
+| **Student Pathways** | Build a population by major, department, preset group or demographics, then see its course timing, roadblocks, course sequences, course-to-major patterns and major changes. [Guide →](pathways) |
+| **Degree Explorer** | What route does a degree's catalog lay out, semester by semester, from a given math and English start? [Guide →](degree-explorer) |
 
 **Best for:** program review, advising and curriculum conversations, and checking patterns in course-taking or major movement.
-
-[Pathways guide →](pathways)
 
 ---
 
@@ -103,9 +107,10 @@ active registration review:
 
 ---
 
-### Explore menu
+### Bird's Eye menu
 
-The **Explore** dropdown contains analyses organized around specific questions:
+The **Bird's Eye** dropdown holds the broad views across the institution, each
+narrowed by campus, college, department or level:
 
 | Tab | What it answers |
 |-----|----------------|

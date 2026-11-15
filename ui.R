@@ -256,11 +256,18 @@ cedar_home_ui <- function() {
       div(
         class = "cedar-home-grid cedar-home-grid--dept",
         cedar_home_card(
-          "Pathways",
+          "Student Pathways",
           "Build a student population and examine timing, sequences, roadblocks, major movement, and outcomes.",
           "?tab=pathways",
           "route",
           "Best for curriculum and student-progress questions."
+        ),
+        cedar_home_card(
+          "Degree Explorer",
+          "A degree's catalog plan, semester by semester, with each course's prerequisites and enrollment history.",
+          "?tab=degree-explorer",
+          "graduation-cap",
+          "Best for seeing the route a degree lays out."
         ),
         cedar_home_card(
           "Course Dynamics",
@@ -301,7 +308,7 @@ cedar_home_ui <- function() {
 
     tags$section(
       class = "cedar-home-section",
-      tags$h2("Explore Tools"),
+      tags$h2("Bird's Eye"),
       div(
         class = "cedar-home-grid cedar-home-grid--explore",
         cedar_home_card(
@@ -823,7 +830,7 @@ nav_panel(
       "Low Enrollment Review",
       "Sections this term small enough for a chair or associate dean to review.",
       method = tagList(
-        tags$p("Each section's enrollment is compared with the target for its course level (the Target column). Critical, Warning and Watch are bands below that target, the same bands as Explore > Enrollment > Low Enrollment; sections just above the target are left out here."),
+        tags$p("Each section's enrollment is compared with the target for its course level (the Target column). Critical, Warning and Watch are bands below that target, the same bands as Bird's Eye > Enrollment > Low Enrollment; sections just above the target are left out here."),
         tags$p("Rpt is Y when the course has run low in most of its earlier offerings. Recent History gives its last offerings, with C for a term in which it had no active section.")
       ),
       uiOutput("dashboard_low_enrollment_review_summary"),
@@ -887,10 +894,16 @@ nav_panel(
   deptTrendsUI("dept_trends", cedar_sections, .dept_choices, cedar_current_term)
 ), # end department trends nav_panel
 
-# Pathways tab — population-aware curriculum analytics
-nav_panel(
+# Pathways menu — how students move through courses and programs: the routes
+# they took (Student Pathways, population-aware) and the routes a degree lays
+# out (Degree Explorer, the catalog's semester plan).
+nav_menu(
   title = "Pathways",
   icon  = icon("route"),
+
+nav_panel(
+  title = "Student Pathways",
+  icon  = icon("users-line"),
   pathwaysUI(
     "pathways",
     campus_choices = sort(unique(cedar_programs$student_campus[
@@ -900,7 +913,15 @@ nav_panel(
     dept_choices = cedar_pathways_choices$dept_choices,
     course_campus_choices = cedar_campus_choices(cedar_registrations)
   )
-), # end Pathways nav_panel
+), # end Student Pathways nav_panel
+
+nav_panel(
+  title = "Degree Explorer",
+  icon = icon("graduation-cap"),
+  degreeExplorerUI("degree_explorer", CEDAR_DEGREE_CATALOG, CEDAR_DEGREE_ROADMAPS)
+)
+
+), # end Pathways nav_menu
 
 # Course Dynamics tab — promoted from Explore
 nav_panel(
@@ -1357,8 +1378,8 @@ nav_menu(
 
 # Explore dropdown menu
 nav_menu(
-  title = "Explore",
-  icon = icon("search"),
+  title = "Bird's Eye",
+  icon = icon("binoculars"),
 
 ######################
 # ENROLLMENT NAV PANEL
@@ -1806,15 +1827,9 @@ nav_panel(
       title = "Gen Ed",
       icon = icon("layer-group"),
       genEdExploreUI("gen_ed", cedar_sections, .dept_choices, cedar_current_term, cedar_default_term)
-    ), # end gen ed nav_panel
+    ) # end gen ed nav_panel
 
-    nav_panel(
-      title = "Degree Explorer",
-      icon = icon("graduation-cap"),
-      degreeExplorerUI("degree_explorer", CEDAR_DEGREE_CATALOG, CEDAR_DEGREE_ROADMAPS)
-    )
-
-    # RETENTION (inside Explore) — hidden until cross-course comparison
+    # RETENTION (inside Bird's Eye) — hidden until cross-course comparison
     # is ready. Course-level retention trend lives in Course Dynamics tab.
     # nav_panel(
     #   title = "Retention",
@@ -1822,7 +1837,7 @@ nav_panel(
     #   retentionUI("retention")
     # ), # end retention nav_panel
 
-  ), # end Explore nav_menu
+  ), # end Bird's Eye nav_menu
 
   # Admin dropdown menu
   nav_menu(

@@ -6,7 +6,7 @@ nav_order: 14
 
 # Degree Explorer
 
-Open **Explore > Degree Explorer**. Choose one degree, your math starting
+Open **Pathways > Degree Explorer**. Choose one degree, your math starting
 course, and your English starting course. A semester board immediately shows
 courses and course groups. The latest 2026–2027 catalog examples use one interface:
 
@@ -176,7 +176,7 @@ says 18. These conflicts and selections remain in the workload/source notes.
 
 ## Observed course paths
 
-Open **Pathways > Course paths**. Define the student population with the shared
+Open **Pathways > Student Pathways > Course paths**. Define the student population with the shared
 Pathways controls, choose delivery campuses and enrolled-term count, and click
 **Show course paths**. This is a separate descriptive view of what students
 actually take. Changing the population clears its old result.

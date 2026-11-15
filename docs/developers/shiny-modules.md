@@ -7,7 +7,7 @@ nav_order: 26
 # Shiny Module Detail
 
 `R/modules/degree-explorer.R` mounts `degreeExplorerUI/Server(id, catalog, roadmaps)`
-at Explore > Degree Explorer. It displays one adaptive semester board
+at Pathways > Degree Explorer. It displays one adaptive semester board
 (`degree_semester_board()`, in the same file) with `www/cedar-roadmap.css` and
 `www/cedar-roadmap.js`. Math and English starting points redraw immediately;
 URL state restores them and the copy button shares them. A tile click opens the
@@ -264,12 +264,12 @@ Rules:
 
 | File | UI / server pairs | Mounted at |
 |------|-------------------|------------|
-| `pathways.R` | `pathwaysUI/Server`, `populationSelectorUI/Server` | Pathways |
-| `headcount.R` | `headcountUI/Server` | Explore > Headcount |
-| `seatfinder.R` | `seatfinderUI/Server` | Explore > Open Seats |
-| `cancellations.R` | `cancellationsUI/Server` | Explore > Cancellations |
-| `waitlist.R` | `waitlistUI/Server` | Explore > Waitlists |
-| `gen-ed.R` | `genEdExploreUI/Server`, `deptProfileGenEdUI/Server` | Explore > Gen Ed; Dept Trends Gen Ed panel (`deptProfileGenEd*` is the legacy internal function name) |
+| `pathways.R` | `pathwaysUI/Server`, `populationSelectorUI/Server` | Pathways > Student Pathways |
+| `headcount.R` | `headcountUI/Server` | Bird's Eye > Headcount |
+| `seatfinder.R` | `seatfinderUI/Server` | Registration > Open Seats |
+| `cancellations.R` | `cancellationsUI/Server` | Admin > Cancellations |
+| `waitlist.R` | `waitlistUI/Server` | Registration > Waitlists |
+| `gen-ed.R` | `genEdExploreUI/Server`, `deptProfileGenEdUI/Server` | Bird's Eye > Gen Ed; Dept Trends Gen Ed panel (`deptProfileGenEd*` is the legacy internal function name) |
 | `regstats.R` | `regstatsUI/Server` | Regstats |
 | `retention.R` | `retentionUI/Server` | **Hidden** — UI commented out in ui.R pending cross-course comparison (`retentionServer` is still wired in server.R); course-level retention lives in Course Dynamics |
 | `dept-trends.R` | `deptTrendsUI/Server` | Dept Trends: Headcount, Enrollment, Credit Hours, Courses Taken (where the unit's majors take their courses; computed on open from `compute_dept_course_units_tab()`, never cached), Gen Ed, Degrees, Demographics; the four main tabs preload through `DEPT_CACHE_TABLES` |

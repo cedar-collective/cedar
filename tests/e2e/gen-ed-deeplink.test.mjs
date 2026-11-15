@@ -1,4 +1,4 @@
-// Explore > Gen Ed: the opening scope, the Term types control and the share link.
+// Bird's Eye > Gen Ed: the opening scope, the Term types control and the share link.
 // A plain visit opens on every term with Fall and Spring ticked; a link with
 // term_type=fall restores that one box, runs, and draws Fall terms only; the
 // link button copies the same scope back out.

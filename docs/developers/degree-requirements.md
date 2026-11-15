@@ -405,9 +405,9 @@ Moved from `AGENTS.md` on 2026-11-07.
 Degree Explorer adds `R/branches/degree-requirements.R` (rule outlines, semester scheduling and descriptive
 grouping), `R/cones/grouped-student-paths.R` (`get_grouped_student_paths()`),
 `R/features/degree-explorer.R` (semester-roadmap and observed-path payloads), and
-`R/modules/degree-explorer.R` (`degreeExplorerUI/Server()`, Explore > Degree Explorer).
+`R/modules/degree-explorer.R` (`degreeExplorerUI/Server()`, Pathways > Degree Explorer).
 `R/modules/observed-course-paths.R` mounts `observedCoursePathsUI/Server()` in
-Pathways > Course paths, sharing that tab's population. Degree Explorer displays
+Pathways > Student Pathways > Course paths, sharing that tab's population. Degree Explorer displays
 one program and adapts its semester board to math/English starting points.
 Course-count/permission conditions are separate from named-course arrows; suggested
 Gen Ed tiles are labelled and lighter. Its popup uses one standard CEDAR table

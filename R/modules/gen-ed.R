@@ -537,7 +537,7 @@ gen_ed_module_server <- function(input, output, session, students, attempts, sec
   run_profile <- function() {
     data_rv(NULL)
     instructor_dfw_authenticated(FALSE)
-    # Button-driven (Explore > Gen Ed) shows the shared centered overlay, like
+    # Button-driven (Bird's Eye > Gen Ed) shows the shared centered overlay, like
     # every other run-button tab. The auto-running Dept Trends > Gen Ed variant
     # (run_id = NULL) is covered by the parent Dept Trends overlay.
     uses_overlay <- !is.null(overlay_id)
@@ -1270,7 +1270,7 @@ deptProfileGenEdServer <- function(id, students, attempts, sections, programs, d
 
     # ── Gen Ed taken by this department's graduates ─────────────────────────
     # Deliberately separate from gen_ed_module_server(): that server is shared
-    # with Explore > Gen Ed, which has no single department and therefore no
+    # with Bird's Eye > Gen Ed, which has no single department and therefore no
     # graduate cohort to build. This section only makes sense department-scoped.
 
     # Committed to a reactiveVal by an observer rather than read from a plain

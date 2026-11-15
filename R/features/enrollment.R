@@ -2,7 +2,7 @@
 
 #' Check whether an Enrollment request has a narrowing filter
 #'
-#' Explore > Enrollment can otherwise scan the full section and class-list
+#' Bird's Eye > Enrollment can otherwise scan the full section and class-list
 #' histories in one Shiny worker. Any selected filter may establish the scope,
 #' except Level: undergraduate is the page default and is too broad to protect
 #' the shared worker by itself.
@@ -79,7 +79,7 @@ filter_enrollment_classlist_scope <- function(students, desr_sections,
   scoped
 }
 
-#' Prepare the Classlist table shown on Explore > Enrollment
+#' Prepare the Classlist table shown on Bird's Eye > Enrollment
 #'
 #' Keeps the registration-status audit columns beside the three canonical
 #' lifecycle counts so users can see exactly how census and the outer proxies

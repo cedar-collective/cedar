@@ -89,12 +89,12 @@ const back = (page) => page.evaluate(() => history.back());
   check('  → stamped to ?tab=home', (await search(page)) === '?tab=home', await search(page));
 
   // 2. Clicking a top-level tab pushes ?tab=<slug> (pushState writer).
-  await clickTab(page, 'Pathways');
-  check('click Pathways → ?tab=pathways',
+  await clickTab(page, 'Student Pathways');
+  check('click Student Pathways → ?tab=pathways',
     await waitFor(page, () => location.search === '?tab=pathways'), await search(page));
 
   const definitionNavigation = await page.evaluate(() => {
-    const pane = document.querySelector('.tab-pane[data-value="Pathways"]');
+    const pane = document.querySelector('.tab-pane[data-value="Student Pathways"]');
     if (!pane) return { hasMethods: true, hasVersionLink: false };
     return {
       hasMethods: !!pane.querySelector('[role="tab"][data-value="Methodology"]'),
@@ -114,7 +114,7 @@ const back = (page) => page.evaluate(() => history.back());
   await back(page);
   check('Back → URL ?tab=pathways',
     await waitFor(page, () => location.search === '?tab=pathways'), await search(page));
-  check('Back → Pathways tab active', (await activeTab(page)) === 'Pathways', await activeTab(page));
+  check('Back → Student Pathways tab active', (await activeTab(page)) === 'Student Pathways', await activeTab(page));
 
   // 4. Regstats → Waitlists cross-nav (the waitlist count link fires this input),
   //    then Back must return to Regstats. Tests the exact mechanism the link relies on.

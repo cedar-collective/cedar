@@ -264,7 +264,7 @@ on every row of the area; shown as "1: Communication"), and the course. Areas
 listed. Areas 1 to 5 and 7 were last reviewed against the catalog 2024-08-27;
 area 6 (second language) was added from the catalog 2026-11-12 (ISSUES.md
 I54). Many area 3 courses have associated labs that are not listed. The transform stamps `cedar_sections$gen_ed_area` from this
-file, so a change here takes effect at the next rebuild; Explore > Gen Ed and
+file, so a change here takes effect at the next rebuild; Bird's Eye > Gen Ed and
 Dept Trends > Gen Ed read it live.
 
 ## excluded_courses.csv
