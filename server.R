@@ -1952,7 +1952,7 @@ output$enrl_classlist_download <- downloadHandler(
   cr_load_tab <- function(tab, base = course_report_data()) {
     if (is.null(base) || is.null(tab)) return()
 
-    if (tab == "Course Flows" && !isTRUE(base$flows_loaded)) {
+    if (tab == "Other Courses" && !isTRUE(base$flows_loaded)) {
       flow_payload <- with_cr_tab_loading(
         "Computing course flows...",
         compute_cr_flows_tab(base, data_objects)
@@ -6176,9 +6176,9 @@ output$enrl_classlist_download <- downloadHandler(
   # registering outputs nothing rendered. Re-enable both together.
   # retentionServer("retention", students = cedar_registrations, student_terms = cedar_student_terms)
 
-  # Course Dynamics > Course Flows > Courses Taken Alongside: what the analysed
+  # Course Dynamics > Other Courses > Courses Taken Alongside: what the analysed
   # course's students take the same term, by major
-  # (R/modules/concurrent-by-major.R). It counts only while Course Flows is
+  # (R/modules/concurrent-by-major.R). It counts only while Other Courses is
   # open, for the course the report was run for.
   concurrentByMajorServer(
     "cr_concurrent",
@@ -6187,7 +6187,7 @@ output$enrl_classlist_download <- downloadHandler(
       if (is.null(d)) NULL else d$course_code
     }),
     campus = reactive(if (length(input$cr_campus) > 0) input$cr_campus else NULL),
-    active = reactive(identical(input$cr_tabs, "Course Flows")),
+    active = reactive(identical(input$cr_tabs, "Other Courses")),
     registrations = cr_students,
     student_terms = data_objects[["cedar_student_terms"]],
     dims = data_objects[["cedar_dims"]],

@@ -37,6 +37,43 @@ test_that("a share is of the group's student-terms, same campus and term, regist
   expect_false("CHEM 1215" %in% r$courses$subject_course)
 })
 
+test_that("every student-term together lists the courses under the college that taught them", {
+  opt <- list(course = "CHEM 1215", term_type = "fall", n_terms = 2, min_n = 2, min_course_n = 1,
+              data_edges = cm01_edges)
+  r <- get_concurrent_courses_by_major(test_students_cm, test_student_terms_cm, test_dims, opt)
+  abq <- dplyr::filter(r$all_courses, campus == "ABQ")
+  expect_equal(abq$subject_course, c("BIOL 2210", "MATH 1512", "BIOL 2110C", "ENGL 1110", "ENGL 1120",
+                                     "MATH 1220", "PHYS 1310", "PSYC 1110"))
+  expect_equal(abq$n_student_terms, c(5L, 4L, rep(2L, 6)))
+  expect_equal(abq$pct[1:2], c(500 / 18, 400 / 18))
+  expect_equal(abq$per_term[1], 2.5)
+  names <- college_code_names(test_dims)
+  expect_equal(unique(abq$college[abq$subject_course %in% c("ENGL 1110", "ENGL 1120")]), unname(names["UC"]))
+  expect_equal(abq$college[abq$subject_course == "PSYC 1110"], "College not decided")
+  expect_false(any(c("CHEM 1215", "CHEM 1215L") %in% r$all_courses$subject_course))
+  top <- get_concurrent_courses_by_major(test_students_cm, test_student_terms_cm, test_dims,
+                                         utils::modifyList(opt, list(n_all = 2)))
+  expect_equal(top$all_courses$subject_course[top$all_courses$campus == "ABQ"], c("BIOL 2210", "MATH 1512"))
+})
+
+test_that("the treemap nests each course under its college and labels it with its share of students", {
+  opt <- list(course = "CHEM 1215", term_type = "fall", n_terms = 2, min_n = 2, min_course_n = 1,
+              data_edges = cm01_edges)
+  r <- get_concurrent_courses_by_major(test_students_cm, test_student_terms_cm, test_dims, opt)
+  nodes <- prepare_concurrent_courses_treemap(r, "ABQ")
+  names <- college_code_names(test_dims)
+  colleges <- nodes[nodes$parent == "", ]
+  expect_equal(colleges$label, c(unname(names["AS"]), unname(names["UC"]), "College not decided"))
+  expect_equal(colleges$value, c(15L, 4L, 2L))
+  leaves <- nodes[nodes$parent != "", ]
+  expect_equal(nrow(leaves), 8L)
+  expect_true(all(leaves$parent %in% colleges$id))
+  expect_equal(leaves$text[leaves$label == "BIOL 2210"], "28% of students")
+  # A college's area is its courses' areas: plotly's branchvalues = "total".
+  expect_equal(as.numeric(tapply(leaves$value, leaves$parent, sum)[colleges$id]), as.numeric(colleges$value))
+  expect_error(prepare_concurrent_courses_treemap(r, "GA"), "no all-students courses")
+})
+
 test_that("the course's own lab is read once per campus and kept out of the lists", {
   opt <- list(course = "CHEM 1215", term_type = "fall", n_terms = 2, min_n = 2, min_course_n = 1,
               data_edges = cm01_edges)

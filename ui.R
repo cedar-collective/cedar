@@ -1133,15 +1133,15 @@ nav_panel(
       ),
 
       nav_panel(
-        "Course Flows",
+        "Other Courses",
         icon = icon("arrow-right-arrow-left"),
         subtab_header(
-          "Course Flows",
+          "Other Courses",
           tagList(
             tags$p(
               tags$strong("What you are looking at. "),
-              "The cards show what students took alongside this course the same term, ",
-              "one card for each of its largest majors. ",
+              "The treemap and cards show what students took alongside this course the same term: ",
+              "all of them together, then one card for each of its largest majors. ",
               "The flow diagrams trace what they took the term before (left) and ",
               "the term after (right). Band thickness represents the ",
               tags$em("average number of students per term"),
@@ -1169,7 +1169,7 @@ nav_panel(
               "not name. If your course is a broad elective with no sequence, expect a ",
               "diffuse picture — that is a finding too."
             ),
-            cedar_docs_link("users/course-reports#course-flows")
+            cedar_docs_link("users/course-reports#other-courses")
           )
         ),
         uiOutput("cr_flow_scope_note"),

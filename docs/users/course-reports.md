@@ -86,19 +86,31 @@ past forecasts for the course came.
 
 ---
 
-## Course Flows
+## Other Courses
+{: #other-courses}
 
 What do students take alongside this course, where do they come from before it,
-and where do they go after?
+and where do they go after? (This tab was called Course Flows.)
 
 ### Courses Taken Alongside
 {: #courses-taken-alongside}
 
-What else this course's students take the same term, grouped by their major.
-A course's students differ by major: pre-nursing students take BIOL 2210
-beside CHEM 1215, engineering students MATH 1512. One list for everyone would
-be led by the courses everybody takes, so each of the five largest majors gets
-a card of its own, and every other student is in **All other majors**.
+What else this course's students take the same term: all of them together,
+then by major.
+
+**All students.** A treemap of the 20 courses taken by the most students
+alongside this one, each block grouped under the college that taught it, beside
+the ten largest as bars. Read the treemap for the overall shape: which one or
+two courses dominate, and whether they come from one college or many. Each
+block is labelled with its share of students; its area understates that share,
+because every student takes several courses, so the areas add up to more
+students than there are. The bars give the exact shares, with the count and
+the average a term.
+
+**By major.** A course's students differ by major: pre-nursing students take
+BIOL 2210 beside CHEM 1215, engineering students MATH 1512. So each of the five
+largest majors gets a card of its own, and every other student is in **All
+other majors**.
 
 - Choose **Fall**, **Spring** or **Summer**: the view reads the course's last
   three terms of that type on each campus, up to the last term whose
@@ -112,7 +124,8 @@ a card of its own, and every other student is in **All other majors**.
   each taken by at least five of the group. Every bar is on the same 0–100%
   scale, so cards can be compared side by side.
 - The course's own lab (CHEM 1215L for CHEM 1215) is shown once, above the
-  cards: most students take it whatever their major.
+  cards, and left out of the treemap and the cards: most students take it
+  whatever their major.
 - Waitlists, drops and courses on another campus are not counted. On a campus
   whose students take their other courses elsewhere, a card can list nothing.
 
