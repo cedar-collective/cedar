@@ -28,6 +28,11 @@ GRADES_DFW <- c(
   "RC-", "RD+", "RD", "RD-", "RF", "RI", "RNC", "RNR", "RP"
 )
 
+# "Not reported": the instructor posted no grade by the deadline. DFW like any
+# other nonpassing grade, and counted apart (`is_nr`), because a term or
+# section full of them reads high for that reason (ISSUES I61).
+GRADES_NOT_REPORTED <- c("NR", "RNR")
+
 # AUD is not a final academic outcome, even under DG/DW late-drop status.
 # Blank/NA grades are handled separately: a late drop still supplies a withdrawal.
 GRADES_EXCLUDED_FROM_OUTCOMES <- c("AUD")

@@ -96,6 +96,7 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
   source_file("branches/gpa-timeline.R")     # per-term cumulative GPA; shares credit_timeline_validity(), so must load after it
   source_file("branches/degrees.R")
   source_file("branches/course-attempts.R")
+  source_file("branches/dfw-scope.R")            # the DFW dashboard's scoped attempts and counts
   source_file("branches/attempts.R")             # cedar_attempts: one classified outcome per graded attempt (ADR-001 step 4)
   source_file("branches/course-flows.R")
   source_file("branches/downstream-cohort.R")    # students who took course X, and what each did in course Y
@@ -162,6 +163,9 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
   source_file("cones/course-offering-pattern.R")   # seasons, parts of term, seats and day-1 fill
   source_file("cones/major-course-units.R")        # which units teach the courses a major's students take
   source_file("cones/concurrent-courses-by-major.R")  # what else a course's students take that term, by major
+  source_file("cones/dfw-term-series.R")         # the DFW rate term by term, with its trend
+  source_file("cones/dfw-course-board.R")        # the courses ranked by DFW grades, with their trends
+  source_file("cones/dfw-section-spread.R")      # whether a course's sections agree on its DFW rate
   source_file("cones/course-cohort-effect.R")      # a course's takers against its non-takers: return and next-term outcomes
   source_file("cones/course-similar-students.R")   # a course's takers against non-takers of the same term, campus, HS GPA band and time status
   source_file("cones/course-topics.R")             # a course's topics by campus and term: sections, census, DFW, return
@@ -185,6 +189,7 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
   source_file("features/population-course-pressure.R")  # text-first preview: a population through its shared courses
   source_file("features/course-cohort-context.R")       # text-first preview: a course's takers-vs-non-takers gap against its college's courses
   source_file("features/course-similar-students.R")     # text-first preview: a course against similar non-takers, beside every course and by instructor
+  source_file("features/dfw-dashboard.R")              # text-first preview: Bird's Eye > DFW
   source_file("features/later-course.R")                # text-first preview: a course's students in a later course, by term, grade and instructor
   source_file("features/course-topics.R")               # text-first preview: a course's topics side by side, with one-instructor rates withheld
   source_file("features/shared-requirements.R")

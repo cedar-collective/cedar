@@ -517,6 +517,97 @@ compute_trend <- function(values, min_n = 2, threshold = 0) {
 }
 
 
+#' The trend of a rate over terms, judged against chance and its own scatter
+#'
+#' One fitted line per group through each term's rate (`100 * k / n`), in
+#' points a year. The line's standard error is the larger of two: binomial
+#' chance at the group's pooled rate, and the terms' own scatter around the
+#' line. Chance alone calls a large course's ordinary ups and downs a trend
+#' (thousands of students a term make the binomial error tiny), so the
+#' scatter guards it; scatter alone over three terms can be near zero by
+#' luck, so chance guards that. A slope beyond two standard errors is a
+#' trend. The first and last terms' rates are returned apart from the verdict:
+#' the two can point different ways.
+#'
+#' @param series One row per group and term: the `group_cols`, an integer
+#'   `term` and the rate's numerator `k` and denominator `n` (n > 0). The terms
+#'   of a group must fall in different years (one term type a group).
+#' @param group_cols The columns a line is fitted within; may be empty.
+#' @param min_terms A group with fewer terms gets no slope (`too_few_terms`).
+#' @return One row per group: `n_terms`, `first_term`, `first_pct`,
+#'   `last_term`, `last_pct`, `pooled_pct`, `slope` (points a year),
+#'   `se_chance`, `se_scatter`, `slope_se` (the larger), `direction`
+#'   ("rising", "falling", "steady" or "too_few_terms"), and the scatter
+#'   around the line: `resid_sd` (points) and `resid_p`, the chance of
+#'   scatter that large under binomial variation alone (NA under four terms).
+compute_rate_trend <- function(series, group_cols = character(), min_terms = 3L) {
+  missing <- setdiff(c(group_cols, "term", "k", "n"), names(series))
+  if (length(missing)) {
+    stop("[utils.R] compute_rate_trend(): series lacks ", paste(missing, collapse = ", "), call. = FALSE)
+  }
+  if (any(is.na(series$n) | series$n <= 0)) {
+    stop("[utils.R] compute_rate_trend(): every term needs a positive denominator n", call. = FALSE)
+  }
+  series <- series %>%
+    dplyr::ungroup() %>%
+    dplyr::mutate(year = as.integer(term) %/% 100L, pct = 100 * k / n)
+  repeated <- series %>% dplyr::count(dplyr::across(dplyr::all_of(c(group_cols, "year")))) %>%
+    dplyr::filter(n > 1L)
+  if (nrow(repeated)) {
+    stop("[utils.R] compute_rate_trend(): a group holds two terms of one year; fit one term type ",
+         "a group (add term_type to group_cols)", call. = FALSE)
+  }
+  series %>%
+    dplyr::group_by(dplyr::across(dplyr::all_of(group_cols))) %>%
+    dplyr::arrange(term, .by_group = TRUE) %>%
+    dplyr::summarize(
+      n_terms = dplyr::n(),
+      first_term = dplyr::first(term),
+      first_pct = dplyr::first(pct),
+      last_term = dplyr::last(term),
+      last_pct = dplyr::last(pct),
+      pooled_pct = 100 * sum(k) / sum(n),
+      .sxx = sum((year - mean(year))^2),
+      .sxy = sum((year - mean(year)) * pct),
+      .syy = sum((pct - mean(pct))^2),
+      # Each term's variance at the pooled rate, in squared points.
+      .svar = sum((year - mean(year))^2 * pooled_pct * (100 - pooled_pct) / n),
+      # Scatter around the line against each term's binomial variance there.
+      .chisq = {
+        fit <- mean(pct) + (.sxy / .sxx) * (year - mean(year))
+        fit <- pmin(pmax(fit, 0.5), 99.5)
+        sum((pct - fit)^2 / (fit * (100 - fit) / n))
+      },
+      chance_var = {
+        fit <- mean(pct) + (.sxy / .sxx) * (year - mean(year))
+        fit <- pmin(pmax(fit, 0.5), 99.5)
+        mean(fit * (100 - fit) / n)
+      },
+      .groups = "drop"
+    ) %>%
+    dplyr::mutate(
+      enough = n_terms >= min_terms,
+      slope = dplyr::if_else(enough, .sxy / .sxx, NA_real_),
+      se_chance = dplyr::if_else(enough, sqrt(.svar) / .sxx, NA_real_),
+      # What is left around the line, per term beyond the two the line uses.
+      se_scatter = dplyr::if_else(
+        enough, sqrt(pmax(.syy - .sxy^2 / .sxx, 0) / pmax(n_terms - 2L, 1L) / .sxx), NA_real_),
+      slope_se = pmax(se_chance, se_scatter),
+      direction = dplyr::case_when(
+        !enough ~ "too_few_terms",
+        slope > 2 * slope_se ~ "rising",
+        slope < -2 * slope_se ~ "falling",
+        TRUE ~ "steady"
+      ),
+      resid_sd = dplyr::if_else(n_terms >= 4L, sqrt(pmax(.syy - .sxy^2 / .sxx, 0) / (n_terms - 2L)), NA_real_),
+      resid_p = dplyr::if_else(n_terms >= 4L, stats::pchisq(.chisq, df = n_terms - 2L, lower.tail = FALSE),
+                               NA_real_)
+    ) %>%
+    dplyr::select(dplyr::all_of(group_cols), n_terms, first_term, first_pct, last_term, last_pct,
+                  pooled_pct, slope, se_chance, se_scatter, slope_se, direction, resid_sd, resid_p, chance_var)
+}
+
+
 # Windowed trend comparison
 # ---------------------------------------------------------------------------
 

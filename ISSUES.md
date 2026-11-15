@@ -36,6 +36,7 @@ alongside other work (M14, M16).
 
 | ID | Kind | Summary |
 |---|---|---|
+| [I61](#i61--summer-2025-holds-nr-grades-where-summer-2024-held-none-and-reads-as-a-dfw-spike) | Defect | Summer 2025 holds 1,479 NR grades in 336 sections (Summer 2024: none), so it reads 22.5% DFW against about 13% for other summers; suspected an early pull before grades rolled |
 | [I55](#i55--the-instructor-gate-password-stopped-reaching-the-app) | Defect | The instructor-gate password stopped reaching the app: since 2026-09-05 `.Renviron` is kept out of the image and nothing else passed `CEDAR_DFW_PASSWORD`, so every instructor gate on production reads "not configured" (fixed in code 2026-11-12; production needs the password in its `.env`) |
 | [I46](#i46--a-deploy-that-must-rebuild-a-table-the-app-cannot-start-without-takes-the-site-down) | Defect | The deploy's table gate ran after the health check, so a deploy that added a column to `cedar_student_terms` failed its health check on the missing column and never reached the gate: production served the restart page from 17:07 UTC on 2026-11-04 (gate moved before the first request) |
 | [I45](#i45--the-class-list-and-the-schedule-name-the-same-section-with-different-course-codes) | Defect | The class list and the schedule name the same section with different course codes for renamed subjects (SOC to SOCI, PSY to PSYC): SOCI 371 had class-list history from Fall 2019 but no sections before Fall 2021 (fixed for every reader by keying the loaded tables on the course, 2026-11-07; open until the remaining successions are confirmed) |
@@ -49,7 +50,7 @@ alongside other work (M14, M16).
 | [I20](#i20--cedar_programs-holds-almost-no-branch-campus-students) | Defect | `cedar_programs` holds 1–3% of branch-campus students; branch program counts read near zero |
 | [I18](#i18--cedar_degrees-holds-no-associate-degrees-so-branch-campus-completions-read-zero) | Defect | `cedar_degrees` holds no associate degrees: branch-campus completions read zero |
 | [I4](#i4--pre-change-course-ratios-are-confounded-by-career-stage) | Defect | Pre-change course ratios confounded by career stage (deferred) |
-| M1–M52 | Improvement | See [Improvements](#improvements) |
+| M1–M54 | Improvement | See [Improvements](#improvements) |
 
 ### Resolved since the last release
 
@@ -92,6 +93,34 @@ Kept until the next release, so a recurrence is recognisable; each entry below g
 ---
 
 # Defects
+
+## I61 — Summer 2025 holds NR grades where Summer 2024 held none, and reads as a DFW spike
+
+**Status:** open. Recorded on the DFW dashboard (Bird's Eye > DFW), which names
+a term whose NR grades are 1% or more of its attempts; nothing is corrected.
+**Found:** 2026-11-15, while sizing the DFW dashboard on the 2026-11-15 tables.
+**Severity:** moderate. Summer 2025's DFW rate, every level, reads 22.5%
+against 12.4–15.5% for every other summer, and any summer series, course DFW
+rate or GPA that reads that term carries it. Fall and Spring are barely
+touched (31 to 223 NR a term since Fall 2024).
+**Affects:** every grade reader over Summer 2025 (`cedar_attempts` classifies
+NR as DFW under the default policy, as it should for a grade that was never
+posted).
+**Cause (suspected):** the Summer 2025 class list was pulled before its
+grades were rolled. It holds 1,479 NR ("not reported") grades in 336 of its
+1,291 sections (265 of those sections are NR for every student), where
+Summer 2024 held none; and only 86 PR (thesis in progress) grades, where
+every other summer held 182–249, as if NR stood in for grades yet to post.
+NR first appears in Fall 2024 (31), and every term since has some. A re-pull
+of Summer 2025's class list would settle it.
+
+### Reproduction
+
+On the loaded tables: `cedar_attempts %>% dplyr::filter(final_grade %in%
+c("NR", "PR")) %>% dplyr::count(term, final_grade)` shows NR 1,479 and PR 86
+in 202560, NR absent and PR 243 in 202460. The DFW rate by term,
+`summarize_attempt_outcomes(attempt_outcome_flags(cedar_attempts), "term")`,
+reads 22.50% for 202560 and 12.97% for 202460.
 
 ## I60 — Takers vs Non-Takers opens on a classification its home-campus scope hardly holds
 
@@ -3665,6 +3694,44 @@ view takes a classification scope through
 `cedar_student_terms$student_classification` (the Explore page's cohort
 builder and Course Dynamics' campus control are the places), and a cohort's
 concurrent-enrollment share is shown beside its rate.
+
+**M53 — Two readers still classify the class list instead of reading
+`cedar_attempts`.** The Course Report's next-term persistence
+(`next_term_persistence()`, `R/cones/course-outcomes.R`, from
+`get_course_persistence()` in `server.R`) runs `classify_enrollment_outcomes()`
+over `cedar_registrations` and rebuilds pass / fail / late drop / early drop by
+hand, which `outcome_category` already stores. Stop-out (`get_stopout()`,
+`get_dfw_rates()`, `R/cones/stopout.R`) keeps a class-list path
+(`classify_outcomes()`) that only tests reach, since Pathways always passes
+`attempts`, and scopes its attempts with its own filters
+(`.stopout_attempt_outcomes()`) instead of `prepare_course_attempts()`.
+`classify_grades()` (`R/trunk/utils.R`) has no caller but a test. Found
+2026-11-15 surveying DFW code for consolidation. Two more callers of
+`classify_enrollment_outcomes()` are harder and can wait:
+`build_student_terms()` runs before `build_attempts()` in the transform, and
+`prepare_projection_student_inputs()` is a projection model-source file
+(editing it rebuilds both bundles at deploy). *Done when:* persistence and
+stop-out read `cedar_attempts` through `prepare_course_attempts()` and
+`attempt_outcome_flags()`, the class-list path and `classify_grades()` are
+gone, their tests run on `test_attempts`, and the two remaining callers are
+the only ones, each with a comment saying why.
+
+**M54 — A DFW rate is computed by hand in about eight places, each with its
+own floor and rounding.** `100 * n_dfw / n` with a small-cell guard is
+written out in `R/cones/course-sequence-effect.R` (3),
+`course-cohort-effect.R` (`rate_or_na()`), `course-similar-students.R`
+(`ratio()`), `R/features/course-topics.R` (2), `R/cones/stopout.R`
+(`round(n_dfw / n_graded, 3)`, a 0-1 rate rounded in the calculation) and
+the two `safe_pct()` copies in `R/branches/course-attempts.R`
+(`get_course_dfw_demographics()` rounds to one decimal);
+`get_course_outcome_rates()` rounds its rates to two decimals because the
+pages that read it (`server.R`'s Course Report tables, Seatfinder, Gen Ed,
+Bottleneck, Population Course Pressure) display them as they come. Reading
+`outcome == "dfw"` off the stored table is right; the arithmetic around it
+drifts. Found 2026-11-15. *Done when:* one trunk helper (a rate with a
+floor, NA under it, never rounded) computes every one of them, each display
+rounds for itself, and `get_course_outcome_rates()` returns
+`summarize_attempt_outcomes()`' rates unrounded.
 
 ### Testing and pipeline safety
 

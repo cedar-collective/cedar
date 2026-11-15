@@ -229,6 +229,7 @@ classify_attempt_outcomes <- function(attempts, policy = "cedar_dfw",
         !is_blank_outcome & !is_pass & !is_c_minus & !is_d & !is_f,
       is_failed_legacy = !is_early_drop & !is_late_withdrawal &
         !is_blank_outcome & !is_pass,
+      is_nr = is_failed_legacy & .grade %in% GRADES_NOT_REPORTED,
       is_denominator_attempt = is_pass | is_failed_legacy | is_late_withdrawal,
       is_dfw_legacy = is_failed_legacy | is_late_withdrawal,
       is_dfw_strict = is_d | is_f | is_late_withdrawal,
@@ -249,6 +250,21 @@ classify_attempt_outcomes <- function(attempts, policy = "cedar_dfw",
 }
 
 
+#' Outcome counts and rates by group, over flagged attempts
+#'
+#' The one counter of the outcome hub: every DFW count and rate CEDAR shows
+#' from cedar_attempts is these columns, grouped some way.
+#'
+#' @param classified attempt_outcome_flags() output (or rows of it).
+#' @param group_cols Columns to group by; campus beside any course.
+#' @param min_n Smallest DFW denominator a group needs to be kept.
+#' @return One row per group: `n_attempts` (the DFW denominator), `n_pass`,
+#'   `n_c_minus`, `n_d`, `n_f`, `n_w`, `n_early_drop`, `n_other_nonpassing`,
+#'   `n_missing`, `n_nr` (GRADES_NOT_REPORTED, a part of the nonpassing
+#'   counts), `passed`, `failed`, `early_dropped`, `late_dropped`, `n_dfw`,
+#'   `n_dfw_strict`, and the rates `dfw_pct`, `w_pct`, `df_pct`,
+#'   `below_c_pct`, `dfw_strict_pct` (0-100, unrounded; NA with no
+#'   denominator).
 summarize_attempt_outcomes <- function(classified, group_cols, min_n = 1L) {
   min_n <- suppressWarnings(as.integer(min_n %||% 1L))
   if (length(min_n) == 0 || is.na(min_n) || min_n < 1L) min_n <- 1L
@@ -262,8 +278,17 @@ summarize_attempt_outcomes <- function(classified, group_cols, min_n = 1L) {
          paste(missing_cols, collapse = ", "))
   }
 
+  flags <- c("is_denominator_attempt", "is_pass", "is_c_minus", "is_d", "is_f", "is_late_withdrawal",
+             "is_early_drop", "is_other_nonpassing", "is_blank_outcome", "is_nr", "is_failed_legacy",
+             "is_dfw_strict")
+  missing_flags <- setdiff(flags, names(classified))
+  if (length(missing_flags) > 0) {
+    stop("[course-attempts.R] summarize_attempt_outcomes(): rows lack ",
+         paste(missing_flags, collapse = ", "), "; pass attempt_outcome_flags() output.")
+  }
+
   safe_pct <- function(num, den) {
-    dplyr::if_else(den > 0, round(100 * num / den, 2), NA_real_)
+    dplyr::if_else(den > 0, 100 * num / den, NA_real_)
   }
 
   classified %>%
@@ -278,6 +303,7 @@ summarize_attempt_outcomes <- function(classified, group_cols, min_n = 1L) {
       n_early_drop = sum(is_early_drop, na.rm = TRUE),
       n_other_nonpassing = sum(is_other_nonpassing, na.rm = TRUE),
       n_missing = sum(is_blank_outcome, na.rm = TRUE),
+      n_nr = sum(is_nr, na.rm = TRUE),
       passed = n_pass,
       failed = sum(is_failed_legacy, na.rm = TRUE),
       early_dropped = n_early_drop,
@@ -304,13 +330,18 @@ summarize_attempt_outcomes <- function(classified, group_cols, min_n = 1L) {
 #'   GRADES_PASS; a page's visible opt-in passes GRADES_PASS_SUB_C_OPT_IN).
 #' @param group_cols Columns of the table to group by; campus beside the course.
 #' @param min_n Smallest DFW denominator a group needs to be shown.
-#' @return summarize_attempt_outcomes()' columns per group.
+#' @return summarize_attempt_outcomes()' columns per group, the rates rounded
+#'   to two decimals.
 get_course_outcome_rates <- function(attempts, opt = list(),
                                      group_cols = c("campus", "college", "subject_course"),
                                      min_n = 1L) {
   scoped <- prepare_course_attempts(attempts, opt)
   flagged <- attempt_outcome_flags(scoped, passing_values = opt$passing_grades %||% GRADES_PASS)
-  summarize_attempt_outcomes(flagged, group_cols = group_cols, min_n = min_n)
+  # The pages that read this display the rates as they come, so the rounding
+  # stays here until each display rounds for itself (ISSUES M54).
+  summarize_attempt_outcomes(flagged, group_cols = group_cols, min_n = min_n) %>%
+    dplyr::mutate(dplyr::across(dplyr::any_of(c("dfw_pct", "w_pct", "df_pct", "below_c_pct", "dfw_strict_pct")),
+                                ~ round(.x, 2)))
 }
 
 

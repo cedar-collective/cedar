@@ -8,7 +8,7 @@ parent: Developer Guide
 
 This reference is auto-generated from roxygen2 comments in the source code.
 
-*Generated: 2026-11-15 09:57:26.467106*
+*Generated: 2026-11-15 12:47:32.997651*
 
 ---
 
@@ -540,6 +540,24 @@ The class-list rows cedar_attempts leaves out, by status  A data-quality report,
 
 ---
 
+### `summarize_attempt_outcomes()`
+
+*Source: course-attempts.R*
+
+**Outcome counts and rates by group, over flagged attempts**
+
+Outcome counts and rates by group, over flagged attempts  The one counter of the outcome hub: every DFW count and rate CEDAR shows from cedar_attempts is these columns, grouped some way.
+
+**Parameters:**
+
+- `classified` - attempt_outcome_flags() output (or rows of it).
+- `group_cols` - Columns to group by; campus beside any course.
+- `min_n` - Smallest DFW denominator a group needs to be kept.
+
+**Returns:** One row per group: `n_attempts` (the DFW denominator), `n_pass`, `n_c_minus`, `n_d`, `n_f`, `n_w`, `n_early_drop`, `n_other_nonpassing`, `n_missing`, `n_nr` (GRADES_NOT_REPORTED, a part of the nonpassing counts), `passed`, `failed`, `early_dropped`, `late_dropped`, `n_dfw`, `n_dfw_strict`, and the rates `dfw_pct`, `w_pct`, `df_pct`, `below_c_pct`, `dfw_strict_pct` (0-100, unrounded; NA with no denominator).
+
+---
+
 ### `get_course_outcome_rates()`
 
 *Source: course-attempts.R*
@@ -553,7 +571,7 @@ The class-list rows cedar_attempts leaves out, by status  A data-quality report,
 - `group_cols` - Columns of the table to group by; campus beside the course.
 - `min_n` - Smallest DFW denominator a group needs to be shown.
 
-**Returns:** summarize_attempt_outcomes()' columns per group.
+**Returns:** summarize_attempt_outcomes()' columns per group, the rates rounded to two decimals.
 
 ---
 
@@ -2414,6 +2432,90 @@ Summarize Student Demographics  Flexible demographic summary function that group
 - `cols` - Names of `DEMOGRAPHIC_STUDENT_TERM_COLS` to attach.
 
 **Returns:** `rows` with each named column read off the student-term table.
+
+---
+
+## dfw-course-board
+
+### `get_dfw_course_board()`
+
+*Source: dfw-course-board.R*
+
+**The courses ranked by DFW grades, with their trends**
+
+**Parameters:**
+
+- `attempts` - The attempt measure table (`cedar_attempts`).
+- `opt` - prepare_dfw_attempts()' options (`term_type` required, `level`, `campus`, `data_edges`), plus `n_window` (default 3 terms), `min_window_n` (default 50: a course is `listed` with this many attempts in the window), `min_term_n` (default 30) and `min_trend_terms` (default 4).
+
+**Returns:** A list: `courses` (one row per campus-course with an attempt in the window, most DFW grades first: `rank`, `campus`, `college` (the code most of its window attempts carry), `subject_course`, summarize_attempt_outcomes()' columns, `dfw_share` and `cum_share` (of the window's DFW grades, 0-1), `listed`, the trend's columns (compute_rate_trend()), `swing_p` and `swings`), `totals` (`n_courses`, `n_attempts`, `n_dfw`, `dfw_pct`, `courses_for_quarter`, `courses_for_half`: how many courses, from the top, hold a quarter and half of the DFW grades), `meta` (`window_terms`, `graded_edge`, `typical_extra_sd` (points a term), `n_swing_tests`, `swing_p_cut` and the options).
+
+---
+
+## dfw-scope
+
+### `prepare_dfw_attempts()`
+
+*Source: dfw-scope.R*
+
+**The DFW attempts in scope**
+
+**Parameters:**
+
+- `attempts` - The attempt measure table (`cedar_attempts`).
+- `opt` - `term_type` (required: "fall", "spring" or "summer"), `level` (default "lower"), `campus` (the teaching campus; NULL for every campus), `data_edges` (optional; must agree with the table's graded edge).
+
+**Returns:** The denominator attempts of that term type (graded or late withdrawn), with attempt_outcome_flags()' columns; attribute `graded_edge`.
+
+---
+
+### `dfw_window_terms()`
+
+*Source: dfw-scope.R*
+
+**The last terms of the type that hold an attempt**
+
+**Parameters:**
+
+- `rows` - prepare_dfw_attempts() output.
+- `n_window` - How many terms.
+
+**Returns:** Integer term codes, newest first; fewer when the history is shorter.
+
+---
+
+## dfw-section-spread
+
+### `get_dfw_section_spread()`
+
+*Source: dfw-section-spread.R*
+
+**Whether a course's sections agree, term by term**
+
+**Parameters:**
+
+- `attempts` - The attempt measure table (`cedar_attempts`).
+- `opt` - prepare_dfw_attempts()' options (`term_type` required, `level`, `campus`, `data_edges`), plus `n_window` (default 3 terms), `min_section_n` (default 10), `min_sections` (default 3) and `alpha` (default 0.01).
+
+**Returns:** A list: `sections` (one row per tested section: `campus`, `subject_course`, `term`, `crn`, summarize_attempt_outcomes()' columns, `band_lo`, `band_hi` (0-100) and `position`), `course_terms` (one row per tested course-term: `n_sections`, `n_small_sections` (left out under `min_section_n`), `n_attempts`, `n_dfw`, `dfw_pct`, `lo_pct`, `hi_pct`, `chisq`, `p_value`, `uneven`), `courses` (one row per campus-course with a tested term: `terms_tested`, `terms_uneven`, `n_attempts`, `n_dfw`, `sections_above`, `sections_below`; most uneven terms first), `meta`.
+
+---
+
+## dfw-term-series
+
+### `get_dfw_term_series()`
+
+*Source: dfw-term-series.R*
+
+**The DFW rate term by term, with its trend**
+
+**Parameters:**
+
+- `attempts` - The attempt measure table (`cedar_attempts`).
+- `opt` - prepare_dfw_attempts()' options (`term_type` required, `level`, `campus`, `data_edges`), plus `min_term_n` (default 30) and `min_trend_terms` (default 4).
+- `group_cols` - `character()` for UNM as a whole, or columns of the attempts to read apart (`"campus"`, `"college"`).
+
+**Returns:** A list: `terms` (one row per group and term: summarize_attempt_outcomes()' columns and `in_trend`), `trend` (one row per group: compute_rate_trend()' columns), `meta` (`term_type`, `level`, `campus`, `group_cols`, `graded_edge`, `min_term_n`, `min_trend_terms`).
 
 ---
 
