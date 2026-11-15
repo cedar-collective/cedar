@@ -8,7 +8,7 @@ parent: Developer Guide
 
 This reference is auto-generated from roxygen2 comments in the source code.
 
-*Generated: 2026-11-15 08:56:59.271589*
+*Generated: 2026-11-15 09:57:26.467106*
 
 ---
 
@@ -438,9 +438,9 @@ One high-school GPA per student, off the applicants table  The first row per stu
 - `registrations` - `cedar_registrations` as loaded (`subject_course` is the course id).
 - `student_terms` - `cedar_student_terms`, read for `primary_major_code` and `is_pre_major`.
 - `dims` - `cedar_dims`, to name the majors.
-- `opt` - `course` (one course id; required), `term_type` (`"fall"`, `"spring"` or `"summer"`; required), `campus` (campuses to keep; NULL keeps every campus, each read apart), `n_terms` (the course's last terms of that type on each campus; default 3), `n_majors` (default 5), `n_courses` (courses listed per group; default 5), `min_n` (the fewest student-terms a major needs for a list of its own; default 20), `min_course_n` (the fewest student-terms a listed course needs; default 5), `data_edges` (`cedar_data_edges()` output; required).
+- `opt` - `course` (one course id; required), `term_type` (`"fall"`, `"spring"` or `"summer"`; required), `campus` (campuses to keep; NULL keeps every campus, each read apart), `n_terms` (the course's last terms of that type on each campus; default 3), `n_majors` (default 5), `n_courses` (courses listed per group; default 5), `min_n` (the fewest student-terms a major needs for a list of its own; default 20), `min_course_n` (the fewest student-terms a listed course needs; default 5), `n_all` (courses in the all-students list; default 20), `data_edges` (`cedar_data_edges()` output; required).
 
-**Returns:** A list: `lab` (one row per campus where at least `min_course_n` of the course's student-terms took its own lab: `lab_course`, `n_student_terms`, `course_student_terms`, `pct`); `groups` (one row per campus and group: `group`, `group_rank`, the "All other majors" group last, `n_student_terms`, `n_students`, `n_majors`, `program_codes`: the Banner codes behind a named group, so two names that read alike are told apart; NA for All other majors); `courses` (one row per campus, group and listed course: `subject_course`, `n_student_terms` taking it, `pct` of the group's student-terms, `course_rank`); `meta` (`course`, `term_type`, `terms`: one row per campus with its terms, `edge`, and the options used).
+**Returns:** A list: `all_courses` (one row per campus and course across every student-term: `college` (the teaching college's name, "College not decided" where no mapping row decides it), `subject_course`, `n_student_terms`, `pct` of the campus's student-terms, `per_term` (the average a term over the window), `course_rank`; the `n_all` largest with at least `min_course_n`); `lab` (one row per campus where at least `min_course_n` of the course's student-terms took its own lab: `lab_course`, `n_student_terms`, `course_student_terms`, `pct`); `groups` (one row per campus and group: `group`, `group_rank`, the "All other majors" group last, `n_student_terms`, `n_students`, `n_majors`, `program_codes`: the Banner codes behind a named group, so two names that read alike are told apart; NA for All other majors); `courses` (one row per campus, group and listed course: `subject_course`, `n_student_terms` taking it, `pct` of the group's student-terms, `course_rank`); `meta` (`course`, `term_type`, `terms`: one row per campus with its terms, `edge`, and the options used).
 
 ---
 
@@ -455,6 +455,37 @@ One high-school GPA per student, off the applicants table  The first row per stu
 - `payload` - get_concurrent_courses_by_major() output.
 
 **Returns:** A character vector of lines.
+
+---
+
+### `prepare_concurrent_courses_treemap()`
+
+*Source: concurrent-courses-by-major.R*
+
+**One campus's all-students courses as treemap nodes**
+
+One campus's all-students courses as treemap nodes  A block's area is the student-terms that took the course. Each student-term takes several, so the areas do not add up to the students: every block is labelled with its share of students, which the area understates.
+
+**Parameters:**
+
+- `payload` - get_concurrent_courses_by_major() output.
+- `campus` - One campus on `payload$all_courses`.
+
+**Returns:** A tibble of nodes: `id`, `parent` ("" for a college), `label`, `value`, `text` (the block's label line), `hover`, `college`, one row per college, then one per course.
+
+---
+
+### `plot_concurrent_courses_treemap()`
+
+*Source: concurrent-courses-by-major.R*
+
+**The all-students treemap for one campus**
+
+**Parameters:**
+
+- `nodes` - prepare_concurrent_courses_treemap() output.
+
+**Returns:** A plotly treemap: one colour per college, every course block named with its share of students.
 
 ---
 

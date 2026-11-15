@@ -1,13 +1,16 @@
-# Course Dynamics > Course Flows > Courses Taken Alongside
+# Course Dynamics > Other Courses > Courses Taken Alongside
 #
-# What else do this course's students take the same term, by their major? One
-# card per major (the five largest, then All other majors) on each campus,
-# each listing the courses its students took beside this one and the share of
-# the group that took each; the course's own lab once, above the cards.
+# What else do this course's students take the same term? On each campus,
+# first every student together: a treemap of the courses grouped by the
+# college that taught them, beside the same courses' shares as bars (one
+# figure and its readable list, not two answers). Then the course's own lab
+# once, and one card per major (the five largest, then All other majors),
+# each listing the courses its students took and the share of the group that
+# took each.
 #
 # The module holds no analysis: it collects the course, campus and term type,
 # calls get_concurrent_courses_by_major() (cones/concurrent-courses-by-major.R)
-# and lays out its payload. It computes only while Course Flows is open, for
+# and lays out its payload. It computes only while Other Courses is open, for
 # the course the report was run for.
 #
 # Exported functions:
@@ -20,7 +23,7 @@ concurrentByMajorUI <- function(id) {
   ns <- NS(id)
   dashboard_subsection(
     "Courses Taken Alongside",
-    "What else this course's students take the same term, grouped by their major.",
+    "What else this course's students take the same term: all of them together, then by major.",
     method = uiOutput(ns("method")),
     radioButtons(ns("term_type"), "Term type", choices = CONCURRENT_BY_MAJOR_TERM_TYPES,
                  selected = "fall", inline = TRUE),
@@ -62,13 +65,40 @@ concurrentByMajorUI <- function(id) {
   )
 }
 
-.concurrent_by_major_campus <- function(p, campus) {
+.concurrent_by_major_treemap_id <- function(campus) paste0("treemap_", make.names(campus))
+
+# Every student together: the ten largest of the treemap's courses as bars,
+# each with its count and its average a term.
+.concurrent_by_major_all_card <- function(rows, total) {
+  n <- .concurrent_by_major_n
+  top <- utils::head(rows, 10)
+  cedar_finding_card(
+    "All students", scope = paste("the", nrow(top), "most taken"),
+    headline = n(total), caption = "student-terms",
+    cedar_meter_list(data.frame(
+      label = top$subject_course,
+      share = top$pct / 100,
+      text = paste0(n(top$n_student_terms), " of ", n(total), ", about ", n(round(top$per_term)), " a term"),
+      stringsAsFactors = FALSE
+    ))
+  )
+}
+
+.concurrent_by_major_campus <- function(p, campus, ns) {
   n <- .concurrent_by_major_n
   g <- p$groups[p$groups$campus == campus, , drop = FALSE]
   lab <- p$lab[p$lab$campus == campus, , drop = FALSE]
+  every <- p$all_courses[p$all_courses$campus == campus, , drop = FALSE]
+  total <- sum(g$n_student_terms)
   tagList(
-    section_heading(paste0(campus, ": ", n(sum(g$n_student_terms)), " student-terms in ", p$meta$course,
+    section_heading(paste0(campus, ": ", n(total), " student-terms in ", p$meta$course,
                            " (", .concurrent_by_major_terms(p$meta, campus), ")"), level = "h4"),
+    if (nrow(every) > 0L) {
+      fluidRow(
+        column(7, plotly::plotlyOutput(ns(.concurrent_by_major_treemap_id(campus)), height = "460px")),
+        column(5, .concurrent_by_major_all_card(every, total))
+      )
+    },
     if (nrow(lab) == 1L) {
       cedar_meter_list(data.frame(
         label = paste0(lab$lab_course, ", its lab"),
@@ -78,6 +108,7 @@ concurrentByMajorUI <- function(id) {
         stringsAsFactors = FALSE
       ))
     },
+    section_heading("By major", level = "h5"),
     div(class = "finding-card-row", lapply(seq_len(nrow(g)), function(i) {
       .concurrent_by_major_card(
         g[i, , drop = FALSE],
@@ -103,8 +134,12 @@ concurrentByMajorUI <- function(id) {
                    "and drops are not counted, and neither is a course on another campus. A course is listed when at ",
                    "least ", m$min_course_n, " of the group took it, up to ", m$n_courses, " a card, and its share ",
                    "is of the group's student-terms.")),
+    tags$li(paste0("All students: the ", m$n_all, " courses taken by the most student-terms, each grouped under the ",
+                   "college that taught it on that campus. A block's area is how many took the course; since each ",
+                   "student takes several, the areas understate the shares, so each block carries its share of ",
+                   "students. The bars beside it are the ten largest of the same courses.")),
     tags$li(paste0("The course's own lab (", m$course, "L) is taken by most of its students whatever their major, ",
-                   "so it is shown once per campus and left out of the cards."))
+                   "so it is shown once per campus and left out of the treemap and the cards."))
   )
 }
 
@@ -113,7 +148,7 @@ concurrentByMajorUI <- function(id) {
 # course, campus   reactives: the course the report was run for (its course
 #                  id; NULL before a run) and the campus input (NULL means
 #                  every campus, each read apart).
-# active           reactive: TRUE while Course Flows is the open tab.
+# active           reactive: TRUE while Other Courses is the open tab.
 # registrations, student_terms, dims, edges
 #                  the loaded class list, cedar_student_terms, cedar_dims and
 #                  the data edges.
@@ -147,7 +182,22 @@ concurrentByMajorServer <- function(id, course, campus, active, registrations, s
         return(empty_state(paste0("No student was registered in ", p$meta$course, " in a ", p$meta$term_type,
                                   " term through ", fmt_term(p$meta$edge), ". Try another term type.")))
       }
-      tagList(lapply(unique(p$groups$campus), function(cp) .concurrent_by_major_campus(p, cp)))
+      tagList(lapply(unique(p$groups$campus), function(cp) .concurrent_by_major_campus(p, cp, session$ns)))
+    })
+
+    # One treemap per campus with all-students courses, drawn into the outputs
+    # the panels lay out.
+    observe({
+      p <- payload()
+      req(p)
+      for (cp in unique(p$all_courses$campus)) {
+        local({
+          campus <- cp
+          output[[.concurrent_by_major_treemap_id(campus)]] <- plotly::renderPlotly(
+            plot_concurrent_courses_treemap(prepare_concurrent_courses_treemap(p, campus))
+          )
+        })
+      }
     })
   })
 }

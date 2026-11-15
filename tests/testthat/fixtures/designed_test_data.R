@@ -4887,11 +4887,20 @@ cedar_registrations_rn02 <- dplyr::bind_rows(
 #   Nursing                 2: BIOL 2210 50%
 #   All other majors        2 student-terms, 2 majors: MATH 1512 50%,
 #                           PSYC 1110 50%
+# All students, ABQ (18 student-terms, two falls): BIOL 2210 5 (27.8%, 2.5 a
+# term), MATH 1512 4 (22.2%), then 2 each, by code: BIOL 2110C, ENGL 1110,
+# ENGL 1120, MATH 1220, PHYS 1310, PSYC 1110. By college: Arts and Sciences 15
+# student-term enrollments over five courses, University College 4 (the two
+# ENGL), College not decided 2 (PSYC 1110).
 # At min_n 3, Biology and Nursing fold into All other majors (6 student-terms,
 # 4 majors). EA at min_n 2: All other majors only, 2 student-terms, ENGL 1110
 # 100%. At three falls, Mechanical Engineering has 5 student-terms (CM_O1),
 # MATH 1512 80%, and is listed first: it ties Nursing (pre-major) at 5 and
 # is first by name.
+# The college that teaches each CM01 subject: Arts and Sciences, except ENGL at
+# University College and PSYC with no college decided, so the all-students
+# treemap groups the courses under more than one college.
+.cm_colleges <- c(BIOL = "AS", CHEM = "AS", MATH = "AS", PHYS = "AS", ENGL = "UC", PSYC = NA_character_)
 .cm_rows <- function(sid, term, major, courses, campus = "ABQ", status = "RE") {
   home <- campus[1]  # the student's home campus, one per pull
   campus <- rep_len(campus, length(courses))
@@ -4899,6 +4908,7 @@ cedar_registrations_rn02 <- dplyr::bind_rows(
   dplyr::bind_rows(lapply(seq_along(courses), function(i) {
     .mc_row(sid, term, courses[i], campus[i], sub(" .*", "", courses[i])) %>%
       dplyr::mutate(registration_status_code = status[i], major_code = major, major_name = major, student_campus = home,
+                    college = unname(.cm_colleges[sub(" .*", "", courses[i])]),
                     section_id = paste0("CMSEC-", gsub(" ", "", courses[i]), "-", term, "-", campus[i]),
                     as_of_date = as.Date("2022-09-15"))
   }))
