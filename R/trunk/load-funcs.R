@@ -214,6 +214,7 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
     source_file("modules/instructor-gate.R") # the one password gate in front of every table that names an instructor
     source_file("modules/course-cohort.R")   # Course Dynamics > Retention > Takers vs Non-Takers
     source_file("modules/later-course.R")    # Course Dynamics > Downstream > Later Course
+    source_file("modules/concurrent-by-major.R")  # Course Dynamics > Course Flows > Courses Taken Alongside
     source_file("modules/course-topics.R")   # Course Dynamics > Topics
     source_file("modules/degree-explorer.R")
   } else {

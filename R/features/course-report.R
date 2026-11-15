@@ -1087,8 +1087,9 @@ build_retention_benchmark_plot <- function(diff_data) {
 #   Enrollment table and rollcall tables are available immediately because
 #   renderers read directly from tables$.
 #
-# compute_cr_flows_tab(): Course Flows — computes neighbors, plots, and the
-#   ranked concurrent-course table.
+# compute_cr_flows_tab(): Course Flows — the term-before and term-after
+#   flow diagrams. The same-term courses are the Courses Taken Alongside
+#   module's (get_concurrent_courses_by_major()).
 # compute_cr_outcomes_tab(): Outcomes — calls get_course_outcomes().
 #
 # Server merges each result's plots/outcomes back into course_report_data().
@@ -1126,8 +1127,7 @@ create_course_base_data <- function(data_objects, opt) {
   )
 }
 
-compute_cr_flows_tab <- function(base, data_objects, min_contrib = 2,
-                                 max_courses = 8, concurrent_top_n = 20) {
+compute_cr_flows_tab <- function(base, data_objects, min_contrib = 2, max_courses = 8) {
   opt      <- base$opt
   # The loaded tables are keyed on the course: a feeder or destination
   # renumbered mid-history is one course.
@@ -1142,8 +1142,7 @@ compute_cr_flows_tab <- function(base, data_objects, min_contrib = 2,
     stop("[course_report.R] Course flows need a complete longitudinal observation term.")
   }
   # The term-before and term-after courses are read off cedar_course_flows,
-  # counted by the transform to the same edge; the same-term courses are
-  # counted from the class list bounded at it.
+  # counted by the transform to the same edge.
   course_flows <- data_objects[["cedar_course_flows"]]
   if (is.null(course_flows)) {
     stop("[course_report.R] cedar_course_flows dataset is NULL in data_objects\n",
@@ -1176,26 +1175,21 @@ compute_cr_flows_tab <- function(base, data_objects, min_contrib = 2,
       message("[course_report.R] Cache hit: course-neighbors (flows tab) for ", opt[["course"]])
       where_from_data <- cached$where_from
       where_to_data   <- cached$where_to
-      where_at_data   <- cached$where_at
     } else {
       message("[course_report.R] Cache miss: computing course-neighbors (flows tab) for ", opt[["course"]])
       where_from_data <- get_course_feeders(course_flows, myopt)
       where_to_data   <- get_course_destinations(course_flows, myopt)
-      where_at_data   <- get_concurrent_courses(students, myopt)
       message("[course_report.R] Course-neighbors rows (flows tab): destinations=",
-              nrow(where_to_data), ", feeders=", nrow(where_from_data),
-              ", concurrent=", nrow(where_at_data))
+              nrow(where_to_data), ", feeders=", nrow(where_from_data))
       save_course_neighbors_cache(opt[["course"]],
-        list(where_from = where_from_data, where_to = where_to_data, where_at = where_at_data),
+        list(where_from = where_from_data, where_to = where_to_data),
         students, courses, cache_scope)
     }
   } else {
     where_from_data <- get_course_feeders(course_flows, myopt)
     where_to_data   <- get_course_destinations(course_flows, myopt)
-    where_at_data   <- get_concurrent_courses(students, myopt)
     message("[course_report.R] Course-neighbors rows (flows tab, no cache): destinations=",
-            nrow(where_to_data), ", feeders=", nrow(where_from_data),
-            ", concurrent=", nrow(where_at_data))
+            nrow(where_to_data), ", feeders=", nrow(where_from_data))
   }
 
   sankey_opt <- opt
@@ -1210,19 +1204,7 @@ compute_cr_flows_tab <- function(base, data_objects, min_contrib = 2,
     plots[[paste0("sankey_", term_type, "_plot")]] <- raw_plots[[term_type]]
   }
 
-  concurrent_courses <- summarize_concurrent_courses(
-    where_at_data,
-    top_n = concurrent_top_n
-  )
-  plots[["concurrent_treemap_plot"]] <- plot_concurrent_course_treemap(
-    concurrent_courses,
-    opt = list(max_courses = concurrent_top_n)
-  )
-
-  list(
-    plots = plots,
-    tables = list(concurrent_courses = concurrent_courses)
-  )
+  list(plots = plots, tables = list())
 }
 
 compute_cr_outcomes_tab <- function(base, data_objects) {

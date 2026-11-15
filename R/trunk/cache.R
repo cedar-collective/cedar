@@ -9,7 +9,9 @@
 # and the loaded class list no longer carries (ADR-001 step 5).
 # v6: where_to and where_from are read off cedar_course_flows (ADR-001 step 7
 # group 4), bounded at the table's enrolled_edge, which the scope carries.
-cedar_course_neighbors_cache_version <- 6L
+# v7: the Course Flows tab no longer saves the same-term courses (where_at);
+# Courses Taken Alongside counts them by major, uncached.
+cedar_course_neighbors_cache_version <- 7L
 
 # Regstats v2 uses a separate prior-only baseline for every reported term;
 # v3 preserves one reporting row when source sections carry different titles;

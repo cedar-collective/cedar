@@ -64,7 +64,9 @@ CONCURRENT_OTHER_MAJORS <- "All other majors"
 #'   `lab_course`, `n_student_terms`, `course_student_terms`, `pct`);
 #'   `groups` (one row per campus and group: `group`,
 #'   `group_rank`, the "All other majors" group last, `n_student_terms`,
-#'   `n_students`, `n_majors`); `courses` (one row per campus, group and
+#'   `n_students`, `n_majors`, `program_codes`: the Banner codes behind a
+#'   named group, so two names that read alike are told apart; NA for All
+#'   other majors); `courses` (one row per campus, group and
 #'   listed course: `subject_course`, `n_student_terms` taking it,
 #'   `pct` of the group's student-terms, `course_rank`); `meta` (`course`,
 #'   `term_type`, `terms`: one row per campus with its terms, `edge`, and the
@@ -147,7 +149,12 @@ get_concurrent_courses_by_major <- function(registrations, student_terms, dims, 
   groups <- members %>%
     dplyr::group_by(campus, group, group_rank) %>%
     dplyr::summarise(n_student_terms = dplyr::n(), n_students = dplyr::n_distinct(student_id),
-                     n_majors = dplyr::n_distinct(major), .groups = "drop") %>%
+                     n_majors = dplyr::n_distinct(major),
+                     program_codes = paste(sort(unique(stats::na.omit(primary_major_code))), collapse = ", "),
+                     .groups = "drop") %>%
+    # A pooled group's codes are its majors' count; a group with none is NA.
+    dplyr::mutate(program_codes = dplyr::if_else(group == CONCURRENT_OTHER_MAJORS | !nzchar(program_codes),
+                                                 NA_character_, program_codes)) %>%
     dplyr::arrange(campus, group_rank)
 
   # Each member's other registered courses that term on that campus.
@@ -230,13 +237,14 @@ format_concurrent_courses_by_major <- function(payload) {
     }
     for (i in seq_len(nrow(g))) {
       size <- sprintf("%s student-terms, %s students", whole(g$n_student_terms[i]), whole(g$n_students[i]))
+      name <- if (is.na(g$program_codes[i])) g$group[i] else sprintf("%s [%s]", g$group[i], g$program_codes[i])
       if (g$group[i] == CONCURRENT_OTHER_MAJORS) {
         size <- paste0(size, sprintf(", %s majors", whole(g$n_majors[i])))
       }
       cs <- payload$courses[payload$courses$campus == cp & payload$courses$group == g$group[i], ]
       listed <- if (nrow(cs) == 0) "no other course with enough students" else
         paste(sprintf("%s %.1f%% (%s)", cs$subject_course, cs$pct, whole(cs$n_student_terms)), collapse = ", ")
-      out <- c(out, sprintf("  %s (%s): %s", g$group[i], size, listed))
+      out <- c(out, sprintf("  %s (%s): %s", name, size, listed))
     }
   }
   out

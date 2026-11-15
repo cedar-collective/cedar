@@ -114,37 +114,6 @@ test_that("concurrent course summaries keep student classification", {
   expect_true("TEST 999" %in% concurrent$subject_course)
 })
 
-test_that("concurrent course shares use every selected-course student-term", {
-  students <- tibble::tribble(
-    ~student_id, ~term, ~subject_course, ~campus, ~college, ~term_type, ~student_classification, ~registration_status_code,
-    "s1", 202010L, "TEST 100", "ABQ", "TEST", "spring", "Freshman", "RE",
-    "s1", 202010L, "TEST 200", "ABQ", "TEST", "spring", "Freshman", "RE",
-    "s2", 202010L, "TEST 100", "ABQ", "TEST", "spring", "Freshman", "RE",
-    "s2", 202010L, "TEST 200", "ABQ", "TEST", "spring", "Freshman", "RE",
-    "s3", 202010L, "TEST 100", "ABQ", "TEST", "spring", "Sophomore", "RE",
-    "s3", 202010L, "TEST 300", "ABQ", "TEST", "spring", "Sophomore", "RE",
-    "s4", 202080L, "TEST 100", "ABQ", "TEST", "fall", "Sophomore", "RE",
-    "s4", 202080L, "TEST 400", "ABQ", "TEST", "fall", "Sophomore", "WL"
-  )
-
-  concurrent <- get_concurrent_courses(
-    students,
-    opt = list(course = "TEST 100", campus = "ABQ")
-  )
-  summary <- summarize_concurrent_courses(concurrent)
-
-  test_200 <- summary %>% dplyr::filter(subject_course == "TEST 200")
-  expect_equal(test_200$coenrolled_student_terms, 2L)
-  expect_equal(test_200$target_student_terms, 4L)
-  expect_equal(test_200$target_terms, 2L)
-  expect_equal(test_200$avg_students_per_target_term, 1)
-  expect_equal(test_200$pct_selected_student_terms, 50)
-  expect_false("TEST 400" %in% summary$subject_course)
-
-  treemap <- plot_concurrent_course_treemap(summary, list(max_courses = 20L))
-  expect_s3_class(treemap, "plotly")
-})
-
 test_that("old course-neighbor function names are intentionally unavailable", {
   expect_false(exists("where_to", mode = "function"))
   expect_false(exists("where_from", mode = "function"))
@@ -153,6 +122,9 @@ test_that("old course-neighbor function names are intentionally unavailable", {
   # The class-list readers the flows table replaced (ADR-001 step 7 group 4).
   expect_false(exists("get_previous_course_pairs", mode = "function"))
   expect_false(exists("get_course_flow_neighbors", mode = "function"))
+  # The pooled treemap Courses Taken Alongside replaced, by major.
+  expect_false(exists("summarize_concurrent_courses", mode = "function"))
+  expect_false(exists("plot_concurrent_course_treemap", mode = "function"))
 })
 
 test_that("course report flow tab returns sankey plots from branch outputs", {
@@ -189,7 +161,7 @@ test_that("course report flow tab returns sankey plots from branch outputs", {
   expect_named(payload, c("plots", "tables"))
   sankey_names <- names(payload$plots)[grepl("^sankey_.*_plot$", names(payload$plots))]
   expect_true(length(sankey_names) > 0)
-  expect_true("concurrent_courses" %in% names(payload$tables))
+  expect_false("concurrent_courses" %in% names(payload$tables))
 
   # The flows table is required, and must be bounded at the edges' settled term.
   flows_tab <- function(objects) compute_cr_flows_tab(

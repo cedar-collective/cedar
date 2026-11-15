@@ -89,14 +89,36 @@ past forecasts for the course came.
 ## Course Flows
 
 What do students take alongside this course, where do they come from before it,
-and where do they go after? The first view is a treemap and ranked table of the
-20 most common same-campus, same-term companion courses. Rectangle area shows
-co-enrolled student-term enrollments; the table also gives the share of all
-selected-course student-term enrollments that included each companion course.
-A student taking the selected course in two terms contributes two student-term
-enrollments.
+and where do they go after?
 
-The flow diagrams below the treemap show the most frequent ordered pairs —
+### Courses Taken Alongside
+{: #courses-taken-alongside}
+
+What else this course's students take the same term, grouped by their major.
+A course's students differ by major: pre-nursing students take BIOL 2210
+beside CHEM 1215, engineering students MATH 1512. One list for everyone would
+be led by the courses everybody takes, so each of the five largest majors gets
+a card of its own, and every other student is in **All other majors**.
+
+- Choose **Fall**, **Spring** or **Summer**: the view reads the course's last
+  three terms of that type on each campus, up to the last term whose
+  enrollment has settled.
+- Each card names the major (a pre-major is its own card, as in *Nursing
+  (pre-major)* beside *Nursing*), the program codes behind it, and how many
+  student-terms it holds. A student who took the course in two terms counts
+  twice. A major needs 20 student-terms for its own card.
+- Each bar is the share of that card's student-terms that were registered in
+  the course the same term on the same campus. Up to five courses are listed,
+  each taken by at least five of the group. Every bar is on the same 0–100%
+  scale, so cards can be compared side by side.
+- The course's own lab (CHEM 1215L for CHEM 1215) is shown once, above the
+  cards: most students take it whatever their major.
+- Waitlists, drops and courses on another campus are not counted. On a campus
+  whose students take their other courses elsewhere, a card can list nothing.
+
+### Before and After
+
+The flow diagrams show the most frequent ordered pairs —
 courses students took in the term immediately before or after the selected
 course.
 

@@ -1140,10 +1140,10 @@ nav_panel(
           tagList(
             tags$p(
               tags$strong("What you are looking at. "),
-              "The treemap and table show what students took alongside this course. ",
+              "The cards show what students took alongside this course the same term, ",
+              "one card for each of its largest majors. ",
               "The flow diagrams trace what they took the term before (left) and ",
-              "the term after (right). Rectangle area represents co-enrolled ",
-              "student-term enrollments; band thickness represents the ",
+              "the term after (right). Band thickness represents the ",
               tags$em("average number of students per term"),
               " who followed a path — so a thick band is a well-worn route, not a ",
               "single unusual term. There is one diagram per term type, because fall ",
@@ -1203,15 +1203,7 @@ nav_panel(
           )
         ),
         br(),
-        dashboard_subsection(
-          "Courses Taken Alongside",
-          paste0(
-            "The 20 most common same-campus, same-term companion courses. Rectangle area ",
-            "shows co-enrolled student-term enrollments; the table reports both exact ",
-            "counts and the share of selected-course student-term enrollments taking both."
-          ),
-          uiOutput("cr_concurrent_courses_ui")
-        ),
+        concurrentByMajorUI("cr_concurrent"),
         dashboard_subsection(
           "Before and After",
           "Immediate prior-term and next-term pathways, shown separately by term type."

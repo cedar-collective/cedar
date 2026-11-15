@@ -13,6 +13,8 @@ test_that("each of the largest majors gets its own list, and the rest are All ot
   expect_equal(abq$n_student_terms, c(5L, 4L, 3L, 2L, 2L, 2L))
   expect_equal(abq$n_students, c(5L, 3L, 3L, 2L, 2L, 2L))
   expect_equal(abq$n_majors, c(1L, 1L, 1L, 1L, 1L, 2L))
+  # The codes tell Nursing (pre-major) from Nursing; a pooled group has none.
+  expect_equal(abq$program_codes, c("FNRS", "ME", "UNDC", "BIOL", "NURS", NA))
   expect_equal(r$meta$terms$terms[r$meta$terms$campus == "ABQ"][[1]], c(202080L, 202180L))
 })
 
