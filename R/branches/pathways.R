@@ -338,20 +338,8 @@ pathways_population_choice_lists <- function(programs, dims,
          paste(missing, collapse = ", "))
 
   rows <- programs[programs$program_type %in% c("Major", "Second Major"), , drop = FALSE]
-  declared <- sort(unique(stats::na.omit(rows$major_code[!rows$is_pre_major])))
-  ids <- program_id_of(declared, successions)
-  by_id <- split(declared, ids)
-  id_names <- name_program_codes(names(by_id), dims)
-  in_file <- names(by_id) %in% dims$programs$program_code
-  labels <- vapply(seq_along(by_id), function(i) {
-    id <- names(by_id)[i]
-    codes <- c(id, setdiff(sort(by_id[[id]]), id))
-    # A code programs.csv lacks has no name and says so (the mapping audit
-    # lists it); it is never named after itself.
-    name <- if (in_file[i]) id_names[[id]] else "[no programs.csv row]"
-    paste0(name, " (", paste(codes, collapse = ", "), ")")
-  }, character(1))
-  program_choices <- stats::setNames(names(by_id), labels)[order(labels)]
+  declared <- rows$major_code[!rows$is_pre_major]
+  program_choices <- program_choices(declared, dims, successions)
 
   depts <- sort(unique(stats::na.omit(rows$dept_code[!rows$is_pre_major])))
   depts <- depts[nzchar(depts)]

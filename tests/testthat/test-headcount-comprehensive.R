@@ -6,8 +6,9 @@
 #   HIST dept student_count: 25
 #   MATH dept student_count: 2
 #   ANTH dept student_count: 5
-#   History major students (all terms): 46 distinct
-#   Psychology minor rows (all terms): 10  (First Minor only)
+#   History major students (all terms): 46 distinct (HIST-BA and HIST-MA,
+#     two programs Banner names "History": 44 hold HIST-BA, 2 HIST-MA)
+#   Psychology minor rows (all terms): 10  (First Minor only, PSYC-MIN)
 #   Archaeology concentration rows (all terms): 4  (First Concentration only)
 #
 # Student IDs used in specific-value assertions (from designed_test_data.R):
@@ -43,21 +44,24 @@ test_that("test_programs contains expected program types", {
 # =============================================================================
 
 test_that("filter_programs_by_opt sets has_program_filter TRUE for minor", {
-  result <- filter_programs_by_opt(test_programs, opt = list(minor = "Psychology"))
+  result <- filter_programs_by_opt(test_programs, opt = list(minor_codes = "PSYC-MIN"),
+                                       dims = test_dims)
   expect_true(result$has_program_filter)
 })
 
 test_that("filter_programs_by_opt Psychology minor returns 205 minor rows", {
-  result     <- filter_programs_by_opt(test_programs, opt = list(minor = "Psychology"))
+  result     <- filter_programs_by_opt(test_programs, opt = list(minor_codes = "PSYC-MIN"),
+                                       dims = test_dims)
   minor_rows <- result$data %>%
     filter(program_type %in% c("First Minor", "Second Minor"),
-           program_name == "Psychology")
+           major_code == "PSYC-MIN")
 
   expect_equal(nrow(minor_rows), 10)
 })
 
 test_that("filter_programs_by_opt Psychology minor includes PSYCH_MINOR_STUDENT", {
-  result <- filter_programs_by_opt(test_programs, opt = list(minor = "Psychology"))
+  result <- filter_programs_by_opt(test_programs, opt = list(minor_codes = "PSYC-MIN"),
+                                       dims = test_dims)
   expect_true(PSYCH_MINOR_STUDENT %in% result$data$student_id)
 })
 
@@ -96,8 +100,7 @@ test_that("filter_programs_by_opt returns empty for nonexistent program name", {
 test_that("combined program filters require membership in the same term", {
   result <- filter_programs_by_opt(
     test_programs_concurrent,
-    list(major = "History", minor = "English")
-  )$data %>% arrange(student_id, term)
+    list(major_codes = "HIST", minor_codes = "ENGL"), dims = test_dims)$data %>% arrange(student_id, term)
 
   expect_equal(result$student_id, c("EC10-B", "EC10-B", "EC10-C", "EC10-F", "EC10-G"))
   expect_equal(result$term, c(202010L, 202080L, 202010L, 202010L, 202010L))
@@ -107,10 +110,9 @@ test_that("combined program filters require membership in the same term", {
 test_that("all three filters intersect within term with OR inside each filter", {
   result <- filter_programs_by_opt(
     test_programs_concurrent,
-    list(major = c("History", "Anthropology"),
-         minor = c("English", "Psychology"),
-         concentration = c("Medieval Studies", "Archaeology"))
-  )$data %>% arrange(student_id, term)
+    list(major_codes = c("HIST", "ANTH"),
+         minor_codes = c("ENGL", "PSY"),
+         concentration = c("Medieval Studies", "Archaeology")), dims = test_dims)$data %>% arrange(student_id, term)
 
   expect_equal(result$student_id, c("EC10-B", "EC10-C", "EC10-D"))
   expect_equal(result$term, c(202080L, 202010L, 202010L))
@@ -120,8 +122,7 @@ test_that("all three filters intersect within term with OR inside each filter", 
 test_that("minor and concentration filters retain only concurrent minor rows", {
   result <- filter_programs_by_opt(
     test_programs_concurrent,
-    list(minor = "English", concentration = "Medieval Studies")
-  )$data %>% arrange(student_id, term)
+    list(minor_codes = "ENGL", concentration = "Medieval Studies"), dims = test_dims)$data %>% arrange(student_id, term)
 
   expect_equal(result$student_id, c("EC10-B", "EC10-C"))
   expect_equal(result$term, c(202080L, 202010L))
@@ -131,9 +132,8 @@ test_that("minor and concentration filters retain only concurrent minor rows", {
 test_that("combined filters respect institutional scope and do not inflate duplicates", {
   result <- get_headcount(
     test_programs_concurrent,
-    list(campus = "ABQ", college = "ARTS", major = "History", minor = "English"),
-    group_by = "term"
-  )
+    list(campus = "ABQ", college = "ARTS", major_codes = "HIST", minor_codes = "ENGL"),
+    group_by = "term", dims = test_dims)
 
   expect_equal(result$data$term, c(202010L, 202080L))
   expect_equal(result$data$student_count, c(2L, 1L))
@@ -144,45 +144,43 @@ test_that("combined filters respect institutional scope and do not inflate dupli
 test_that("nonconcurrent and out-of-department combinations stay empty", {
   never_concurrent <- test_programs_concurrent %>% filter(student_id == "EC10-A")
   expect_equal(nrow(filter_programs_by_opt(
-    never_concurrent, list(major = "History", minor = "English")
-  )$data), 0L)
+    never_concurrent, list(major_codes = "HIST", minor_codes = "ENGL"), dims = test_dims)$data), 0L)
 
   # Department remains a row filter; omit it for a cross-department combination.
   expect_equal(nrow(filter_programs_by_opt(
     test_programs_concurrent,
-    list(dept_code = "HIST", major = "History", minor = "English")
-  )$data), 0L)
+    list(dept_code = "HIST", major_codes = "HIST", minor_codes = "ENGL"), dims = test_dims)$data), 0L)
 })
 
 test_that("headcount for a term does not change when other terms are supplied", {
-  opt <- list(major = "History", minor = "English")
-  pooled <- get_headcount(test_programs_concurrent, opt, group_by = "term")$data
+  opt <- list(major_codes = "HIST", minor_codes = "ENGL")
+  pooled <- get_headcount(test_programs_concurrent, opt, group_by = "term", dims = test_dims)$data
   separately <- bind_rows(lapply(c(202010L, 202080L, 202110L), function(term_value) {
     get_headcount(test_programs_concurrent %>% filter(term == term_value),
-                  opt, group_by = "term")$data
+                  opt, group_by = "term", dims = test_dims)$data
   }))
 
   expect_equal(pooled, separately)
 })
 
 test_that("get_headcount History major finds 46 distinct students", {
-  result <- get_headcount(test_programs, opt = list(major = "History"),
-                          group_by = c("student_id"))
+  result <- get_headcount(test_programs, opt = list(major_codes = HC_HISTORY_CODES),
+                          group_by = c("student_id"), dims = test_dims)
 
   expect_equal(n_distinct(result$data$student_id), 46)
 })
 
 test_that("get_headcount History major does not include PSYCH_MINOR_STUDENT", {
   # This student has Psychology minor but not History major
-  result <- get_headcount(test_programs, opt = list(major = "History"),
-                          group_by = c("student_id"))
+  result <- get_headcount(test_programs, opt = list(major_codes = HC_HISTORY_CODES),
+                          group_by = c("student_id"), dims = test_dims)
 
   expect_false(PSYCH_MINOR_STUDENT %in% result$data$student_id)
 })
 
 test_that("get_headcount Psychology minor includes PSYCH_MINOR_STUDENT", {
-  result <- get_headcount(test_programs, opt = list(minor = "Psychology"),
-                          group_by = c("student_id"))
+  result <- get_headcount(test_programs, opt = list(minor_codes = "PSYC-MIN"),
+                          group_by = c("student_id"), dims = test_dims)
 
   expect_true(PSYCH_MINOR_STUDENT %in% result$data$student_id)
 })
@@ -192,6 +190,68 @@ test_that("get_headcount Archaeology concentration includes ARCH_CONC_STUDENT", 
                           group_by = c("student_id"))
 
   expect_true(ARCH_CONC_STUDENT %in% result$data$student_id)
+})
+
+
+test_that("a major is picked by code: two programs sharing a name stay apart", {
+  # HIST-BA and HIST-MA are both "History" in Banner: one is not the other.
+  ba <- get_headcount(test_programs, opt = list(major_codes = "HIST-BA"),
+                      group_by = "student_id", dims = test_dims)
+  both <- get_headcount(test_programs, opt = list(major_codes = HC_HISTORY_CODES),
+                        group_by = "student_id", dims = test_dims)
+  expect_equal(n_distinct(ba$data$student_id), 44)
+  expect_equal(n_distinct(both$data$student_id), 46)
+
+  series <- get_headcount(test_programs, opt = list(major_codes = HC_HISTORY_CODES),
+                          dims = test_dims)
+  expect_setequal(unique(series$data$program_name),
+                  c("[no programs.csv row] (HIST-BA)", "[no programs.csv row] (HIST-MA)"))
+
+  expect_error(get_headcount(test_programs, opt = list(major = "History"), dims = test_dims),
+               "by program code")
+  expect_error(filter_programs_by_opt(test_programs, opt = list(minor_codes = "PSYC-MIN")),
+               "needs dims")
+})
+
+test_that("a picked major follows a confirmed rename as one series, and says so", {
+  # STU-MGMT-CHG1 holds BUAN-BBA in Spring 2020 and BUMG-BBA in Fall 2020.
+  opt <- list(major_codes = "BUMG-BBA", program_successions = program_rename_successions)
+  renamed <- get_headcount(test_programs, opt = opt, dims = test_dims)
+  expect_equal(renamed$data$term, c(202010L, 202080L))
+  expect_equal(renamed$data$student_count, c(1L, 1L))
+  expect_equal(unique(renamed$data$program_name),
+               "[no programs.csv row] (BUMG-BBA, BUAN-BBA)")
+
+  unrenamed <- get_headcount(test_programs, opt = list(major_codes = "BUMG-BBA",
+    program_successions = program_rename_successions[0, ]), dims = test_dims)
+  expect_equal(unrenamed$data$term, 202080L)
+
+  testthat::local_edition(3)
+  expect_snapshot(describe_headcount_scope(renamed$scope))
+})
+
+test_that("Headcount's choices: a department's own programs, by code, renames joined", {
+  hist <- headcount_filter_choices(test_programs, test_dims, list(dept_code = "HIST"))
+  expect_equal(unname(hist$major), c("HIST-BA", "HIST-MA"))
+
+  mgmt <- headcount_filter_choices(test_programs, test_dims,
+    list(dept_code = "MGMT", program_successions = program_rename_successions))
+  expect_true("BUMG-BBA" %in% mgmt$major)
+  expect_false("BUAN-BBA" %in% mgmt$major)
+
+  # A picked major narrows the minors to its students' own.
+  everyone <- headcount_filter_choices(test_programs, test_dims)
+  expect_true("PSYC-MIN" %in% everyone$minor)
+  holders <- test_programs$student_id[test_programs$major_code == "HIST-BA"]
+  hist_minors <- headcount_filter_choices(test_programs, test_dims,
+                                          list(major_codes = "HIST-BA"))$minor
+  expect_equal(unname(hist_minors), sort(unique(test_programs$major_code[
+    test_programs$student_id %in% holders & test_programs$program_type == "First Minor"])))
+
+  # A department's minors are its own rows, never a name shared with them.
+  anth <- headcount_filter_choices(test_programs, test_dims, list(dept_code = "ANTH"))
+  expect_equal(anth$concentration, "Archaeology")
+  expect_length(anth$minor, 0)
 })
 
 
@@ -397,6 +457,16 @@ test_that("Headcount and the Dept Dashboard count a department's own rows alike"
   expect_equal(headcount_students("ENG"), 3)
   expect_equal(dashboard_students("ASPE"), headcount_students("ASPE"))
   expect_equal(dashboard_students("ENG"), headcount_students("ENG"))
+})
+
+test_that("a department's minor choices are its own rows, never a shared name", {
+  aspe <- headcount_filter_choices(cedar_programs_shared_name, test_dims,
+                                   list(dept_code = "ASPE"))
+  eng <- headcount_filter_choices(cedar_programs_shared_name, test_dims,
+                                  list(dept_code = "ENG"))
+  expect_equal(unname(aspe$major), "ASPE")
+  expect_length(aspe$minor, 0)
+  expect_equal(unname(eng$minor), "ENG")
 })
 
 test_that("a rollup to department totals names departments, and says when there is none", {

@@ -315,7 +315,8 @@
 #   Two departments each own a major named "Engineering" at 202110: ENG (three
 #   students) and the branch unit ASPE (two). A department is the rows whose
 #   own dept_code it is: ASPE has 2 majors, ENG 3. Matching by program name
-#   gave ASPE all 5 (ISSUES I15).
+#   gave ASPE all 5 (ISSUES I15). EC16-E1 also holds an ENG minor named
+#   "Engineering": Headcount offers it under ENG only (ISSUES M55).
 #
 # RN01 (separate cedar_sections_rn / cedar_registrations_rn tables, read with
 #   institution/demo/code_history.csv): course codes that succeed one another,
@@ -4327,12 +4328,17 @@ cedar_ids_orphan <- dplyr::bind_rows(
 # D exercises OR within each selection and a second concentration.
 # E moves from ABQ to EA; F is EA only; G belongs to BUS rather than ARTS.
 # Missing student IDs/terms cannot establish simultaneous membership.
+# Majors and minors carry UNM's program code (HIST, ENGL, ANTH, PSY), which
+# Headcount selects on; a concentration has none, as in the real export.
 .hc_program_row <- function(sid, term, type, name, dept,
-                            campus = "ABQ", college = "ARTS") {
+                            campus = "ABQ", college = "ARTS",
+                            code = unname(c(History = "HIST", English = "ENGL",
+                                            Anthropology = "ANTH", Psychology = "PSY")[name])) {
   tibble::tibble(
     student_id = sid, term = as.integer(term), student_campus = campus,
     student_college = college, student_level = "Undergraduate", degree = "BA",
-    program_type = type, program_name = name, dept_code = dept
+    program_type = type, program_name = name, dept_code = dept,
+    major_code = if (grepl("Concentration", type)) NA_character_ else code
   )
 }
 
@@ -4688,9 +4694,12 @@ academic_studies_program_units <- tibble::tibble(
 # the base population's pinned counts are unchanged.
 cedar_programs_shared_name <- dplyr::bind_rows(
   .hc_program_row(c("EC16-E1", "EC16-E2", "EC16-E3"), 202110, "Major", "Engineering", "ENG",
-                  college = "EN"),
+                  college = "EN", code = "ENG"),
   .hc_program_row(c("EC16-B1", "EC16-B2"), 202110, "Major", "Engineering", "ASPE",
-                  campus = "VA", college = "AD")
+                  campus = "VA", college = "AD", code = "ASPE"),
+  # An ENG minor, also "Engineering": ENG's to offer, never ASPE's.
+  .hc_program_row("EC16-E1", 202110, "First Minor", "Engineering", "ENG",
+                  college = "EN", code = "ENG")
 )
 
 

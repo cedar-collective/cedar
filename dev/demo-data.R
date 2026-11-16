@@ -30,8 +30,7 @@ build_demo_sources <- function(cohorts = 5L,
   # major/minor intersections; preserve the malformed rows for unit tests only.
   concurrent <- fixture$cedar_programs_concurrent %>%
     filter(!is.na(student_id), nzchar(student_id), !is.na(term)) %>% distinct() %>%
-    mutate(fixture_source = "concurrent_programs", major_code = dept_code,
-           is_pre_major = FALSE)
+    mutate(fixture_source = "concurrent_programs", is_pre_major = FALSE)
   programs <- bind_rows(programs, concurrent)
   degrees <- collect(c(base = "cedar_degrees", graduates = "cedar_degrees_gg"))
   faculty <- collect(c(base = "cedar_faculty"))

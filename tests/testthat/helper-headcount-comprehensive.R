@@ -4,6 +4,9 @@
 PSYCH_MINOR_STUDENT <- "STU-PSYCH-MINOR"
 ARCH_CONC_STUDENT   <- "STU-ARCH-CONC"
 
+# The fixture's two programs Banner names "History" (a code each).
+HC_HISTORY_CODES <- c("HIST-BA", "HIST-MA")
+
 headcount_plot_xaxes <- function(plot) {
   plot$x$layout[grepl("^xaxis[0-9]*$", names(plot$x$layout))]
 }

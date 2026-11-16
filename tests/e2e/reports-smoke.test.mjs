@@ -727,9 +727,9 @@ export async function runReportChecks({ scope = 'smoke', synthetic = false } = {
       // Cross-department selections must not retain the department row filter.
       await setInput(page, 'headcount-dept', []);
       await waitForIdle(page);
-      await setInput(page, 'headcount-major', ['History']);
+      await setInput(page, 'headcount-major', ['HIST']);
       await waitForIdle(page);
-      await setInput(page, 'headcount-minor', ['English']);
+      await setInput(page, 'headcount-minor', ['ENGL']);
       await waitForIdle(page);
       await click(page, 'headcount-button');
       await waitForIdle(page);
