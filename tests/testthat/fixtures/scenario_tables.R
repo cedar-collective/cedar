@@ -227,6 +227,25 @@ mapping_code_history_invalid <- tibble::tribble(
   mutate(evidence = "", notes = "") %>%
   as.data.frame()
 
+# code_history.csv program rows, one or a pair per fault the validator names,
+# over programs.csv rows OLD, NEW, ALT, P and Q (mapping_program_row, each
+# named for its code).
+mapping_program_history <- list(
+  programs = do.call(rbind, lapply(c("OLD", "NEW", "ALT", "P", "Q"), function(code)
+    transform(mapping_program_row, program_code = code, program_name = code))),
+  code_history = tibble::tribble(
+    ~kind,     ~from_code, ~to_code, ~effective_term, ~scope,           ~basis,    ~status,
+    "program", "GONE",     "NEW",    "202380",        "",               "decided", "confirmed",  # GONE is not in programs.csv
+    "program", "OLD",      "NEW",    "202380",        "",               "decided", "confirmed",  # a confirmed split...
+    "program", "OLD",      "ALT",    "202380",        "",               "decided", "confirmed",  # ...into two codes
+    "program", "P",        "Q",      "202380",        "",               "decided", "confirmed",  # a cycle...
+    "program", "Q",        "P",      "202380",        "",               "decided", "confirmed",  # ...of two
+    "program", "NEW",      "P",      "202380",        "graduate only",  "decided", "confirmed"   # partial: not followed, so no split
+  ) %>%
+    mutate(evidence = "", notes = "") %>%
+    as.data.frame()
+)
+
 unm_settings <- data.frame(
   setting = c("mapping_files_url", "source_files_url", "projection_history_start_term"),
   value   = c("https://github.com/org/repo/blob/main/institution/x",
@@ -245,6 +264,16 @@ good_levels <- data.frame(leading_digit = as.character(0:9),
                           level = c(rep("lower", 3), rep("upper", 2), rep("grad", 5)))
 
 unm_programs <- read_institution_mappings(cedar_institution_dir(cedar_base_dir, "unm"))$programs
+
+# A program renamed in code_history.csv, stated on the shared fixture's
+# STU-MGMT-CHG1 (Business Analytics, BUAN-BBA, in Spring 2020; Business
+# Management, BUMG-BBA, in Fall 2020): read as one program renamed from Fall
+# 2020. The real files rename no fixture code, so without this table the two
+# are two programs. Read by test-population.R, test-pathways-helpers.R and
+# test-pathways-integration.R.
+program_rename_successions <- data.frame(
+  from_code = "BUAN-BBA", to_code = "BUMG-BBA", effective_term = 202080L,
+  stringsAsFactors = FALSE)
 
 # ── test-course-attempts.R ──────────────────────────────────────────────────────
 

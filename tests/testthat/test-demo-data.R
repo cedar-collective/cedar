@@ -39,6 +39,11 @@ test_that("fixture institution survives production transforms with usable proven
   students <- qs2::qs_read(file.path(target, "cedar_registrations.qs"))
   sections <- qs2::qs_read(file.path(target, "cedar_sections.qs"))
   programs <- qs2::qs_read(file.path(target, "cedar_programs.qs"))
+  degrees <- qs2::qs_read(file.path(target, "cedar_degrees.qs"))
+  # A degree's major code is one the demo's programs.csv has, as its programs'
+  # are: Dept Trends finds a department's degrees by its programs' codes.
+  demo_codes <- read_institution_file("programs", cedar_institution_dir(root, "demo"))$program_code
+  expect_true(all(degrees$major_code %in% demo_codes))
   # Outcomes are classified at load (cedar_attempts), never saved.
   expect_false(file.exists(file.path(target, "cedar_grades.qs")))
   # The saved tables carry keys, never a unit (ADR-001 step 3); the loader

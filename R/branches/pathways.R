@@ -119,6 +119,11 @@ filter_pathways_analysis_population <- function(population, split_by = "none",
 
 #' Resolve focal program names for a Pathways population option
 #'
+#' The names the population's focal codes carry in cedar_programs, for the
+#' analyses that compare a student's majors by name (Major Changes). The codes
+#' come from resolve_focal_programs(), the population's own resolution, so a
+#' renamed program's old name and its pre-majors' names are focal too.
+#'
 #' @param population_opt Option list used to build the population.
 #' @param programs cedar_programs.
 #' @param pop_programs Optional cedar_programs already filtered to population IDs.
@@ -128,18 +133,13 @@ resolve_pathways_focal_programs <- function(population_opt, programs,
                                             pop_programs = NULL) {
   population_type <- population_opt$type %||% "preset"
 
-  if (identical(population_type, "dept")) {
+  if (population_type %in% c("major", "preset", "dept")) {
+    codes <- resolve_focal_programs(programs, population_opt)$codes$program_code
     return(programs %>%
-      dplyr::filter(
-        dept_code == population_opt$dept_code,
-        program_type %in% c("Major", "Second Major")
-      ) %>%
+      dplyr::filter(program_type %in% c("Major", "Second Major"),
+                    major_code %in% codes, !is.na(program_name)) %>%
       dplyr::distinct(program_name) %>%
       dplyr::pull(program_name))
-  }
-
-  if (population_type %in% c("major", "preset")) {
-    return(population_opt$program_names %||% character(0))
   }
 
   # Demographic populations have no single focal program. Use all primary
@@ -157,7 +157,8 @@ resolve_pathways_focal_programs <- function(population_opt, programs,
 #' @param population_opt Option list used to build the population.
 #' @param programs cedar_programs.
 #' @param pop_programs Optional cedar_programs already filtered to population IDs.
-#' @return Character vector of dept_code values.
+#' @return Character vector of dept_code values: the units of the focal
+#'   declared codes (resolve_focal_programs()), or the department itself.
 #' @keywords internal
 resolve_pathways_focal_dept_codes <- function(population_opt, programs,
                                               pop_programs = NULL) {
@@ -166,11 +167,12 @@ resolve_pathways_focal_dept_codes <- function(population_opt, programs,
   dept_codes <- if (identical(population_type, "dept")) {
     population_opt$dept_code %||% character(0)
   } else if (population_type %in% c("major", "preset")) {
-    focal_prog_names <- population_opt$program_names %||% character(0)
+    focal <- resolve_focal_programs(programs, population_opt)$codes
+    declared <- focal$program_code[focal$role != "pre_major"]
     programs %>%
       dplyr::filter(
         program_type %in% c("Major", "Second Major"),
-        program_name %in% focal_prog_names,
+        major_code %in% declared,
         !is_pre_major
       ) %>%
       dplyr::pull(dept_code)
@@ -304,4 +306,97 @@ latest_graded_term <- function(students, min_graded_share = 0.5, max_term = NULL
   if (is.null(students) || nrow(students) == 0) return(NULL)
   cedar_data_edges(students, min_graded_share = min_graded_share,
                    max_term = max_term)$last_graded
+}
+
+
+#' The Pathways population selector's Majors and Department choices
+#'
+#' Majors: one choice per program, valued by its program id (program_id_of():
+#' a renamed program's newest code) and labelled with its programs.csv name
+#' and every code it covers, so a program renamed in code_history.csv is one
+#' choice ("Liberal Arts & Integrative Studies (LAIS, LIBA)") and two programs
+#' that share a Banner name are two ("Architecture (ARCH)", "Architecture
+#' (ARCT)"). Only codes declared as a major in cedar_programs are offered; a
+#' pre-major joins its program through leads_to when the population is built.
+#' A code programs.csv has no row for is offered as "[no programs.csv row]
+#' (CODE)", never named after itself.
+#' Departments: the units owning a declared major, named from units.csv.
+#'
+#' @param programs cedar_programs.
+#' @param dims The dimension tables (build_cedar_dims()).
+#' @param successions The confirmed program renames (default
+#'   `program_successions`, from code_history.csv).
+#' @return list(program_choices, dept_choices): named character vectors, label
+#'   to value, in label order.
+pathways_population_choice_lists <- function(programs, dims,
+                                             successions = program_successions) {
+  validate_cedar_dims(dims)
+  required <- c("program_type", "major_code", "is_pre_major", "dept_code")
+  missing <- setdiff(required, names(programs))
+  if (length(missing))
+    stop("[pathways.R] pathways_population_choice_lists: programs lacks ",
+         paste(missing, collapse = ", "))
+
+  rows <- programs[programs$program_type %in% c("Major", "Second Major"), , drop = FALSE]
+  declared <- sort(unique(stats::na.omit(rows$major_code[!rows$is_pre_major])))
+  ids <- program_id_of(declared, successions)
+  by_id <- split(declared, ids)
+  id_names <- name_program_codes(names(by_id), dims)
+  in_file <- names(by_id) %in% dims$programs$program_code
+  labels <- vapply(seq_along(by_id), function(i) {
+    id <- names(by_id)[i]
+    codes <- c(id, setdiff(sort(by_id[[id]]), id))
+    # A code programs.csv lacks has no name and says so (the mapping audit
+    # lists it); it is never named after itself.
+    name <- if (in_file[i]) id_names[[id]] else "[no programs.csv row]"
+    paste0(name, " (", paste(codes, collapse = ", "), ")")
+  }, character(1))
+  program_choices <- stats::setNames(names(by_id), labels)[order(labels)]
+
+  depts <- sort(unique(stats::na.omit(rows$dept_code[!rows$is_pre_major])))
+  depts <- depts[nzchar(depts)]
+  units <- unit_names(dims)
+  dept_names <- units$dept_name[match(depts, units$dept_code)]
+  if (anyNA(dept_names))
+    stop("[pathways.R] pathways_population_choice_lists: units.csv names no unit ",
+         paste(depts[is.na(dept_names)], collapse = ", "),
+         "; validate_mapping_files() should have refused programs.csv")
+  dept_choices <- stats::setNames(depts, dept_names)[order(dept_names)]
+
+  list(program_choices = program_choices, dept_choices = dept_choices)
+}
+
+
+#' The program codes a Pathways population counted, for its scope bar
+#'
+#' Every code build_population() matched, why it is in, its programs.csv name
+#' and how many of the population's students hold it; and the code_history.csv
+#' renames that joined codes. A page shows these as facts, so a reader can see
+#' that "Liberal Arts" counted LAIS, LIBA and their pre-majors.
+#'
+#' @param population build_population() output, with attr(, "focal_programs").
+#' @param programs cedar_programs.
+#' @param dims The dimension tables (build_cedar_dims()).
+#' @return NULL for a population with no focal programs (a demographic one);
+#'   else list(codes, successions). `codes`: program_code, program_name, role
+#'   ("selected", "succession", "pre_major"), leads_to, n_students.
+#'   `successions`: from_code, to_code, effective_term.
+pathways_focal_program_facts <- function(population, programs, dims) {
+  focal <- attr(population, "focal_programs")
+  if (is.null(focal)) return(NULL)
+  validate_cedar_dims(dims)
+  codes <- focal$codes
+  held <- programs %>%
+    dplyr::filter(program_type %in% c("Major", "Second Major"),
+                  major_code %in% codes$program_code,
+                  student_id %in% population$student_id) %>%
+    dplyr::distinct(major_code, student_id) %>%
+    dplyr::count(major_code, name = "n_students")
+  names_of <- name_program_codes(codes$program_code, dims)
+  codes <- codes %>%
+    dplyr::mutate(program_name = unname(names_of[program_code])) %>%
+    dplyr::left_join(held, by = c(program_code = "major_code")) %>%
+    dplyr::mutate(n_students = dplyr::coalesce(n_students, 0L)) %>%
+    dplyr::select(program_code, program_name, role, leads_to, n_students)
+  list(codes = codes, successions = focal$successions)
 }

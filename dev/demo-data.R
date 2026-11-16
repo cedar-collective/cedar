@@ -103,7 +103,9 @@ build_demo_sources <- function(cohorts = 5L,
       major_code = sub("-(BA|BS|MA|MS|BBA|MN)$", "", major_code),
       program_name = coalesce(program_name, major_code),
       as_of_date = term_start(term) + 130L)
+  # A degree carries its program's code, so it gets the same demo code.
   degrees <- degrees %>% mutate(fixture_student_id = student_id,
+    major_code = sub("-(BA|BS|MA|MS|BBA|MN)$", "", major_code),
     program_name = coalesce(program_name, major_code),
     student_college = college_code(student_college),
     as_of_date = term_start(term) + 130L)

@@ -25,7 +25,7 @@ test_that("get_degrees_for_dept_report scatter plot is plotly", {
   result <- get_degrees_for_dept_report(
     test_degrees,
     dept_name  = "History",
-    prog_codes = "HIST",
+    prog_codes = "HIST-BA",
     term_start = cedar_report_start_term,
     term_end   = cedar_report_end_term,
     palette    = "Set2"
@@ -57,7 +57,7 @@ test_that("get_degrees_for_dept_report stacked bar is plotly", {
   result <- get_degrees_for_dept_report(
     test_degrees,
     dept_name  = "History",
-    prog_codes = "HIST",
+    prog_codes = "HIST-BA",
     term_start = cedar_report_start_term,
     term_end   = cedar_report_end_term,
     palette    = "Set2"
@@ -71,7 +71,7 @@ test_that("get_degrees_for_dept_report stacked bar has bar trace type", {
   result <- get_degrees_for_dept_report(
     test_degrees,
     dept_name  = "History",
-    prog_codes = "HIST",
+    prog_codes = "HIST-BA",
     term_start = cedar_report_start_term,
     term_end   = cedar_report_end_term,
     palette    = "Set2"
@@ -85,7 +85,7 @@ test_that("get_degrees_for_dept_report stacked bar y values sum to 5 for HIST BA
   result <- get_degrees_for_dept_report(
     test_degrees,
     dept_name  = "History",
-    prog_codes = "HIST",
+    prog_codes = "HIST-BA",
     term_start = cedar_report_start_term,
     term_end   = cedar_report_end_term,
     palette    = "Set2"

@@ -8,7 +8,7 @@ parent: Developer Guide
 
 This reference is auto-generated from roxygen2 comments in the source code.
 
-*Generated: 2026-11-16 12:33:43.122029*
+*Generated: 2026-11-16 14:11:26.354523*
 
 ---
 
@@ -4157,7 +4157,7 @@ Detect major changes for each student across their academic timeline  Compares e
 - `programs` - cedar_programs data frame.
 - `cohort` - Optional tibble(student_id, cohort_label). If provided, only students in the cohort are analyzed.
 - `student_terms` - Optional. `cedar_student_terms`. Supplies the credit position at each change via [build_credit_timeline()]. When NULL the credit columns are returned as NA rather than being read off the frozen cumulative columns on `programs` — see the note below.
-- `opt` - Options list: \itemize{ \item \code{campus}  — character; filter by student_campus \item \code{college} — character; filter by student_college \item \code{dept_code} — character; filter by dept_code \item \code{premajor_leads_to} — named character, pre-major code to the code it leads to (default \code{premajor_leads_to}, from programs.csv) \item \code{observation_end_term} — integer; exclude program records after the settled longitudinal enrollment edge }
+- `opt` - Options list: \itemize{ \item \code{campus}  — character; filter by student_campus \item \code{college} — character; filter by student_college \item \code{dept_code} — character; filter by dept_code \item \code{premajor_leads_to} — named character, pre-major code to the code it leads to (default \code{premajor_leads_to}, from programs.csv) \item \code{program_successions} — the confirmed program renames (default \code{program_successions}, from code_history.csv); a student moved from a program's old code to its new one has not changed major \item \code{observation_end_term} — integer; exclude program records after the settled longitudinal enrollment edge }
 
 **Returns:** Tibble with one row per major change event: student_id, change_term, prev_term, from_major, to_major, unm_credits_before_change, total_credits_before_change (credits entering the term before the change posted, UNM-only and UNM + transfer), credits_position_valid, student_college, student_campus, dept_code, student_level, degree   This function used to read `inst_credits_attempted` / `overall_credits_attempted` at the change term and lag them by one term, on the stated reasoning that "because these columns are running totals, lag() subtracts exactly that student's lagged-term load". They are not running totals. Academic Studies stamps the student's total as of the pull onto every historical row, so within one full re-pull the value moves across a student's own terms only 16% of the time. `lag()` on a frozen column subtracts zero, and the reported "credits before the change" was approximately the student's FINAL credit total — overstating the position at a student's first term by a median of 84 credits. See the field reliability contract in AGENTS.md.
 
@@ -4625,6 +4625,8 @@ Latest term whose outcomes are fully observable  Right-censoring guard shared by
 
 **Resolve focal program names for a Pathways population option**
 
+Resolve focal program names for a Pathways population option  The names the population's focal codes carry in cedar_programs, for the analyses that compare a student's majors by name (Major Changes). The codes come from resolve_focal_programs(), the population's own resolution, so a renamed program's old name and its pre-majors' names are focal too.
+
 **Parameters:**
 
 - `population_opt` - Option list used to build the population.
@@ -4647,7 +4649,7 @@ Latest term whose outcomes are fully observable  Right-censoring guard shared by
 - `programs` - cedar_programs.
 - `pop_programs` - Optional cedar_programs already filtered to population IDs.
 
-**Returns:** Character vector of dept_code values.
+**Returns:** Character vector of dept_code values: the units of the focal declared codes (resolve_focal_programs()), or the department itself.
 
 ---
 
@@ -4712,6 +4714,42 @@ Latest term whose grades are actually posted  Thin wrapper over [cedar_data_edge
 
 ---
 
+### `pathways_population_choice_lists()`
+
+*Source: pathways.R*
+
+**The Pathways population selector's Majors and Department choices**
+
+The Pathways population selector's Majors and Department choices  Majors: one choice per program, valued by its program id (program_id_of(): a renamed program's newest code) and labelled with its programs.csv name and every code it covers, so a program renamed in code_history.csv is one choice ("Liberal Arts & Integrative Studies (LAIS, LIBA)") and two programs that share a Banner name are two ("Architecture (ARCH)", "Architecture (ARCT)"). Only codes declared as a major in cedar_programs are offered; a pre-major joins its program through leads_to when the population is built. A code programs.csv has no row for is offered as "[no programs.csv row] (CODE)", never named after itself. Departments: the units owning a declared major, named from units.csv.
+
+**Parameters:**
+
+- `programs` - cedar_programs.
+- `dims` - The dimension tables (build_cedar_dims()).
+- `successions` - The confirmed program renames (default `program_successions`, from code_history.csv).
+
+**Returns:** list(program_choices, dept_choices): named character vectors, label to value, in label order.
+
+---
+
+### `pathways_focal_program_facts()`
+
+*Source: pathways.R*
+
+**The program codes a Pathways population counted, for its scope bar**
+
+The program codes a Pathways population counted, for its scope bar  Every code build_population() matched, why it is in, its programs.csv name and how many of the population's students hold it; and the code_history.csv renames that joined codes. A page shows these as facts, so a reader can see that "Liberal Arts" counted LAIS, LIBA and their pre-majors.
+
+**Parameters:**
+
+- `population` - build_population() output, with attr(, "focal_programs").
+- `programs` - cedar_programs.
+- `dims` - The dimension tables (build_cedar_dims()).
+
+**Returns:** NULL for a population with no focal programs (a demographic one); else list(codes, successions). `codes`: program_code, program_name, role ("selected", "succession", "pre_major"), leads_to, n_students. `successions`: from_code, to_code, effective_term.
+
+---
+
 ## population-course-uptake
 
 ### `get_population_course_uptake()`
@@ -4762,7 +4800,7 @@ Get Ongoing Student IDs  Returns all students currently engaged with a focal pro
 **Parameters:**
 
 - `programs` - Data frame. cedar_programs.
-- `focal_names` - Character vector. Focal program names.
+- `focal_codes` - Character vector. Focal program codes, pre-majors included (resolve_focal_programs()).
 - `max_data_term` - Integer. The most recent term in the data.
 
 **Returns:** Character vector of student IDs.
@@ -4775,14 +4813,13 @@ Get Ongoing Student IDs  Returns all students currently engaged with a focal pro
 
 **Get Graduated Student IDs**
 
-Get Graduated Student IDs  Returns students who received a focal-program degree within the graduation window: [last_declared_term, last_declared_term + 100]. The +100 window covers the typical 1–2 term lag between a student's last program record and when their degree is formally conferred.  Only counts graduation_status values that represent a real outcome: "Awarded", "Pending", "Sought". Excludes "Hold Pending" (admin block) and "Record Clear" (application withdrawn).
+Get Graduated Student IDs  Returns students who received a focal-program degree within the graduation window: [last_declared_term, last_declared_term + 100]. The +100 window covers the typical 1–2 term lag between a student's last program record and when their degree is formally conferred.  Only counts graduation_status values that represent a real outcome: "Awarded", "Pending", "Sought". Excludes "Hold Pending" (admin block) and "Record Clear" (application withdrawn).  Degrees are matched by `cedar_degrees$major_code`, the same short code cedar_programs carries (every degree row has one), never by name: Banner's degree "Major" and "Program" names cover several programs that share a name ("Architecture" is ARCH, ARCT and its pre-major).
 
 **Parameters:**
 
 - `programs` - Data frame. cedar_programs.
 - `degrees` - Data frame or NULL. cedar_degrees. Returns empty vector if NULL.
-- `focal_names` - Character vector. Focal program names.
-- `focal_codes` - Character vector. Focal program codes (optional). When supplied and the degrees table has a major_code column, restricts matches to degrees in those codes.
+- `focal_codes` - Character vector. Focal program codes; the declared ones anchor the window, and a degree in any of them counts.
 
 **Returns:** Character vector of student IDs.
 
@@ -4799,7 +4836,7 @@ Get Switched-Out Student IDs (detection only)  Returns students who have a decla
 **Parameters:**
 
 - `programs` - Data frame. cedar_programs.
-- `focal_names` - Character vector. Focal program names.
+- `focal_codes` - Character vector. Focal program codes.
 
 **Returns:** Character vector of student IDs.
 
@@ -4816,7 +4853,7 @@ Get Never-Declared Student IDs  Returns students who appeared only as a pre-majo
 **Parameters:**
 
 - `programs` - Data frame. cedar_programs.
-- `focal_names` - Character vector. Focal program names.
+- `focal_codes` - Character vector. Focal program codes, pre-majors included.
 - `max_data_term` - Integer. The most recent term in the data.
 
 **Returns:** Character vector of student IDs.
@@ -4834,7 +4871,7 @@ Get Entry Pathways for Declared Focal Students  Returns a data frame of student_
 **Parameters:**
 
 - `programs` - Data frame. cedar_programs.
-- `focal_names` - Character vector. Focal program names.
+- `focal_codes` - Character vector. Focal program codes, pre-majors included.
 
 **Returns:** Data frame with columns student_id (chr) and entry_pathway (chr).
 
@@ -4868,7 +4905,7 @@ Classify How a Student First Arrived at the Focal Unit  Returns one of three val
 **Parameters:**
 
 - `programs` - Data frame. cedar_programs (all programs, not just focal).
-- `focal_names` - Character vector. Focal program names.
+- `focal_codes` - Character vector. Focal program codes, pre-majors included.
 - `min_data_term` - Integer. Earliest term in the full programs table.
 
 **Returns:** Data frame with columns student_id (chr) and entry_method (chr).
@@ -4886,7 +4923,7 @@ Classify Whether a Student First Engaged as a Pre-Major or Declared Major  Retur
 **Parameters:**
 
 - `programs` - Data frame. cedar_programs (all programs, not just focal).
-- `focal_names` - Character vector. Focal program names.
+- `focal_codes` - Character vector. Focal program codes, pre-majors included.
 
 **Returns:** Data frame with columns student_id (chr) and entry_status (chr).
 
@@ -4905,26 +4942,26 @@ Build a Student Population  Constructs a population data frame from cedar_progra
 - `programs` - Data frame. cedar_programs.
 - `degrees` - Data frame or NULL. cedar_degrees.
 - `student_terms` - Data frame or NULL. cedar_student_terms. Its `enrolled` rows supply the UNM-wide enrollment bookends and the enrollment-based continuation evidence; without it both bookends are NA and no candidate is reclassified. Never cedar_registrations: a waitlist or an early drop is not an enrolled term.
-- `opt` - List of options: type          — "preset", "dept", or "major". Default "preset". program_names — required for preset/major types. dept_code     — required for dept type. outcomes      — character vector of outcomes to include. Default: all six outcomes (graduated, switched_out, stopped_out, ongoing, chose_elsewhere, left_undeclared). split_by      — "none" (default), "outcome", "entry", "entry_status", or "transfer". When "entry", population_label is set to entry_method per student. When "entry_status", population_label is set to whether the student first appeared as a declared major or pre-major. When "transfer", population_label is set to origin per student. campus        — character vector. Filter by student_campus. Optional. student_level — character vector. Filter by student_level before outcome detection. Common values: "Undergraduate", "Graduate". When omitted, all levels are included and undergrad/grad students are mixed in a single population. Pass "Undergraduate" to build a clean undergrad cohort for a department that also has grad programs.
+- `opt` - List of options: type          — "preset", "dept", or "major". Default "preset". program_codes — required for the major type: program codes, each a declared program; a renamed program's other codes and its pre-majors are added by resolve_focal_programs(). program_names — required for the preset type (population_groups.csv names its programs), resolved to the codes whose declared rows carry the name. dept_code     — required for dept type. program_successions, premajor_leads_to — override the mapping files' program_successions and premajor_leads_to (tests and what-ifs). outcomes      — character vector of outcomes to include. Default: all six outcomes (graduated, switched_out, stopped_out, ongoing, chose_elsewhere, left_undeclared). split_by      — "none" (default), "outcome", "entry", "entry_status", or "transfer". When "entry", population_label is set to entry_method per student. When "entry_status", population_label is set to whether the student first appeared as a declared major or pre-major. When "transfer", population_label is set to origin per student. campus        — character vector. Filter by student_campus. Optional. student_level — character vector. Filter by student_level before outcome detection. Common values: "Undergraduate", "Graduate". When omitted, all levels are included and undergrad/grad students are mixed in a single population. Pass "Undergraduate" to build a clean undergrad cohort for a department that also has grad programs.
 
-**Returns:** Data frame with one row per student.
+**Returns:** Data frame with one row per student, carrying attr(, "focal_programs"): resolve_focal_programs()'s list of the codes counted and why.
 
 ---
 
-### `get_focal_programs()`
+### `resolve_focal_programs()`
 
 *Source: population.R*
 
-**Get Focal Program Names for a Population Build**
+**The program codes a population build counts, and why each is in**
 
-Get Focal Program Names for a Population Build  Resolves focal program names from opt depending on type. Returns a data frame of distinct program_name + major_code values that are in scope.
+The program codes a population build counts, and why each is in  Codes, never names. The selected codes come from opt: the major type's `program_codes` as given, the dept type's declared codes whose own `dept_code` is the department, the preset type's declared codes carrying one of `program_names`. To those it adds every code a confirmed whole succession joins them to (code_history.csv, `program_successions`), then the pre-majors that lead to any of them (programs.csv `leads_to`; FFDA is named "FDMA" and leads to Film and Digital Arts, ISSUES.md I38) and, for a department, the department's own pre-major codes.
 
 **Parameters:**
 
-- `programs` - Data frame. cedar_programs.
-- `opt` - List of options (type, program_names, dept_code).
+- `programs` - Data frame. cedar_programs, scoped to the eligible rows.
+- `opt` - List of options (type, program_codes, program_names, dept_code, and the program_successions / premajor_leads_to overrides).
 
-**Returns:** Data frame with columns program_name and major_code.
+**Returns:** A list: `codes`, a tibble of program_code and role ("selected", "succession" or "pre_major") with `leads_to` on a pre-major; and `successions`, the code_history.csv rows that joined codes (from_code, to_code, effective_term).
 
 ---
 
@@ -4975,6 +5012,38 @@ Build a Demographic Population  Identifies students based on demographic indicat
 
 ---
 
+### `program_succession_family()`
+
+*Source: population.R*
+
+**Every program code a confirmed succession joins to the given codes**
+
+**Parameters:**
+
+- `codes` - Program codes.
+- `successions` - from_code, to_code, effective_term: the confirmed whole program successions (default `program_successions`, from code_history.csv).
+
+**Returns:** Character vector: `codes` and every code a chain of successions joins to one of them, in either direction (LIBA gives LIBA and LAIS).
+
+---
+
+### `program_id_of()`
+
+*Source: population.R*
+
+**The program each code is: the last code of its succession chain**
+
+The program each code is: the last code of its succession chain  A renamed program is one program across its codes, named by the newest (LIBA and LAIS are LAIS). A code no succession names is its own id.
+
+**Parameters:**
+
+- `codes` - Program codes.
+- `successions` - As for program_succession_family().
+
+**Returns:** Character vector parallel to `codes`.
+
+---
+
 ### `population_group_major_codes()`
 
 *Source: population.R*
@@ -5013,9 +5082,8 @@ Semantic annotations that apply to a population  Looks up CEDAR_DATA_SEMANTICS (
 
 **Parameters:**
 
-- `population` - A population tibble from build_population().
+- `population` - A population tibble from build_population(); its attr(, "focal_programs") names the codes in scope. Without it (a demographic population has none) every program the population's students held is in scope.
 - `programs` - cedar_programs.
-- `opt` - The opt used to build the population; `program_names` or `dept_code` identifies which programs are in scope.
 
 **Returns:** A list of registry entries, empty when nothing applies.
 

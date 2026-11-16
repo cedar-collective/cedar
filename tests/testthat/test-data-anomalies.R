@@ -198,9 +198,7 @@ test_that("a population picks up the annotations that apply to its programs", {
   rads_pop <- tibble::tibble(
     student_id = c("HP_RADS_1", "HP_RADS_2", "HP_FRAD_1")
   )
-  notes <- population_data_notes(
-    rads_pop, test_programs_hp, list(program_names = "Radiologic Sciences")
-  )
+  notes <- population_data_notes(rads_pop, test_programs_hp)
   expect_equal(
     vapply(notes, function(n) n$id, character(1)),
     "rads-major-code-records-intent"
@@ -208,16 +206,16 @@ test_that("a population picks up the annotations that apply to its programs", {
 
   biol_pop <- tibble::tibble(student_id = c("HP_BIOL_1", "HP_BIOL_2"))
   expect_length(
-    population_data_notes(biol_pop, test_programs_hp, list(program_names = "Biology")),
+    population_data_notes(biol_pop, test_programs_hp),
     0L
   )
 
   # An empty population annotates nothing rather than erroring.
   expect_length(
-    population_data_notes(rads_pop[0, ], test_programs_hp, list()), 0L
+    population_data_notes(rads_pop[0, ], test_programs_hp), 0L
   )
   expect_error(
-    population_data_notes(rads_pop, dplyr::select(test_programs_hp, -term), list()),
+    population_data_notes(rads_pop, dplyr::select(test_programs_hp, -term)),
     "programs is missing: term"
   )
 })
@@ -229,7 +227,7 @@ test_that("an annotation stops applying once its term bound passes", {
   expect_length(
     population_data_notes(
       tibble::tibble(student_id = c("HP_RADS_1", "HP_RADS_2")),
-      after, list(program_names = "Radiologic Sciences")
+      after
     ),
     0L
   )

@@ -134,6 +134,25 @@ confirmed it (`status`).
   what owns this."** A no_unit row may still name a college (Undecided: UC).
 - **`in_college` rows** — a code whose unit differs in one college (CRIM and
   BADM at the branch campuses).
+- **`program_name`** is the name every page shows for the code (the Pathways
+  Majors choices, the department scope bars), not a match key: no code reads a
+  record by it. Write the program's full name where Banner truncated it at 30
+  characters ("Liberal Arts & Integrative Studies", not "…Integrative Stu").
+
+### `code_history.csv` program rows — a renamed program
+
+A `kind = program` row says one program code replaced another (LIBA, Liberal
+Arts, became LAIS, Liberal Arts & Integrative Studies, from Fall 2023). A
+confirmed row with a blank `scope` makes the two codes one program wherever a
+population is built: the Pathways Majors list offers one choice for both, a
+population counts students under either, and a student moved from the old code
+to the new one has not changed major. A row with a `scope` in words (a partial
+succession) is recorded and never followed. **Look for** codes that ran side by
+side and both took new students (LIBA kept taking students for five terms after
+LAIS began): a rename can overlap, and its evidence says so. Two programs that
+merely share a name (a B.A. and a B.S., an online X code) are not a rename and
+get no row. Pre-majors need their own row only for the record: each already
+joins its major through `leads_to`.
 
 ### `subjects.csv` — course subject to unit
 

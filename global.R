@@ -548,7 +548,10 @@ cedar_default_reg_term <- as.character(cedar_default_term)
 # Pathways population selectors use small choice lists derived from the large
 # cedar_programs table. Build them once at startup so each browser session does
 # not scan the full program history before the Majors input becomes searchable.
-cedar_pathways_choices <- pathways_population_choice_lists(data_objects[["cedar_programs"]])
+# One Majors choice per program code (renames in code_history.csv joined), named
+# from programs.csv; departments named from units.csv.
+cedar_pathways_choices <- pathways_population_choice_lists(data_objects[["cedar_programs"]],
+                                                           data_objects[["cedar_dims"]])
 message("[global.R] Pathways choices ready: ",
         length(cedar_pathways_choices$program_choices), " programs, ",
         length(cedar_pathways_choices$dept_choices), " departments")

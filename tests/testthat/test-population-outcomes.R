@@ -6,24 +6,24 @@
 #
 # Function signatures being tested:
 #
-#   get_ongoing_ids(programs, focal_names, max_data_term)
+#   get_ongoing_ids(programs, focal_codes, max_data_term)
 #     Returns character vector: students who are currently ongoing —
 #     either declared focal at max_data_term OR pre-major-only at max_data_term.
 #
-#   get_graduated_ids(programs, degrees, focal_names, focal_codes = NULL)
+#   get_graduated_ids(programs, degrees, focal_codes)
 #     Returns character vector: students with a focal degree in the
 #     graduation window [last_declared_term, last_declared_term + 100].
 #
-#   get_switched_out_ids(programs, focal_names)
+#   get_switched_out_ids(programs, focal_codes)
 #     Returns character vector: students (detection only) with a declared
 #     non-focal program record AFTER their last declared focal term.
 #     Priority over graduated/stopped_out is applied by the orchestrator.
 #
-#   get_never_declared_ids(programs, focal_names, max_data_term)
+#   get_never_declared_ids(programs, focal_codes, max_data_term)
 #     Returns character vector: students who were only ever pre-major in
 #     the focal program, AND whose last focal record predates max_data_term.
 #
-#   get_entry_pathways(programs, focal_names)
+#   get_entry_pathways(programs, focal_codes)
 #     Returns data frame (student_id, entry_pathway) for all declared focal
 #     students. entry_pathway is one of: "direct", "switched_in", "pre_major".
 #
@@ -63,33 +63,33 @@
 context("get_ongoing_ids")
 
 test_that("returns 15 total ongoing HIST students (12 declared + 3 current pre-major)", {
-  result <- get_ongoing_ids(test_programs, HIST_NAMES, MAX_TERM)
+  result <- get_ongoing_ids(test_programs, HIST_CODES, MAX_TERM)
   expect_equal(length(result), 15)
 })
 
 test_that("includes all 9 directly-declared HIST students at max_data_term", {
-  result <- get_ongoing_ids(test_programs, HIST_NAMES, MAX_TERM)
+  result <- get_ongoing_ids(test_programs, HIST_CODES, MAX_TERM)
   expect_true(all(sprintf("STU-HD-SP2-%03d", 1:9) %in% result))
 })
 
 test_that("includes switched-in students declared HIST at max_data_term", {
-  result <- get_ongoing_ids(test_programs, HIST_NAMES, MAX_TERM)
+  result <- get_ongoing_ids(test_programs, HIST_CODES, MAX_TERM)
   expect_true("STU-ENGL-HIST-001" %in% result)
   expect_true("STU-ENGL-HIST-002" %in% result)
 })
 
 test_that("includes pre-major pathway student declared HIST at max_data_term", {
-  result <- get_ongoing_ids(test_programs, HIST_NAMES, MAX_TERM)
+  result <- get_ongoing_ids(test_programs, HIST_CODES, MAX_TERM)
   expect_true("STU-HIST-PREDECL-001" %in% result)
 })
 
 test_that("includes current pre-majors (focal pre-major in max_data_term, never declared)", {
-  result <- get_ongoing_ids(test_programs, HIST_NAMES, MAX_TERM)
+  result <- get_ongoing_ids(test_programs, HIST_CODES, MAX_TERM)
   expect_true(all(sprintf("STU-HP-SP2-%03d", 1:3) %in% result))
 })
 
 test_that("excludes declared HIST students whose last HIST term predates max_data_term", {
-  result <- get_ongoing_ids(test_programs, HIST_NAMES, MAX_TERM)
+  result <- get_ongoing_ids(test_programs, HIST_CODES, MAX_TERM)
   # SP1 students appeared in 202010 only
   expect_false("STU-HD-SP1-005" %in% result)
   expect_false("STU-HD-SP1-039" %in% result)
@@ -100,13 +100,13 @@ test_that("excludes declared HIST students whose last HIST term predates max_dat
 })
 
 test_that("excludes switched-out students (HIST 202010 only, then POLS/BIOL in 202110)", {
-  result <- get_ongoing_ids(test_programs, HIST_NAMES, MAX_TERM)
+  result <- get_ongoing_ids(test_programs, HIST_CODES, MAX_TERM)
   expect_false("STU-HIST-SWOUT-001" %in% result)
   expect_false("STU-HIST-SWOUT-003" %in% result)
 })
 
 test_that("excludes historical pre-majors (last focal term < max_data_term)", {
-  result <- get_ongoing_ids(test_programs, HIST_NAMES, MAX_TERM)
+  result <- get_ongoing_ids(test_programs, HIST_CODES, MAX_TERM)
   expect_false("STU-HP-FA1-001" %in% result)
   expect_false("STU-HP-SU1-001" %in% result)
   expect_false("STU-HP-SP1-001" %in% result)
@@ -120,44 +120,47 @@ test_that("excludes historical pre-majors (last focal term < max_data_term)", {
 context("get_graduated_ids")
 
 test_that("returns 5 HIST graduates", {
-  result <- get_graduated_ids(test_programs, test_degrees, HIST_NAMES)
+  result <- get_graduated_ids(test_programs, test_degrees, HIST_CODES)
   expect_equal(length(result), 5)
 })
 
 test_that("includes the four direct-entry History graduates", {
-  result <- get_graduated_ids(test_programs, test_degrees, HIST_NAMES)
+  result <- get_graduated_ids(test_programs, test_degrees, HIST_CODES)
   expect_true(all(sprintf("STU-HD-SP1-%03d", 1:4) %in% result))
 })
 
 test_that("includes pre-major pathway graduate (STU-HIST-PREDECL-002)", {
-  result <- get_graduated_ids(test_programs, test_degrees, HIST_NAMES)
+  result <- get_graduated_ids(test_programs, test_degrees, HIST_CODES)
   expect_true("STU-HIST-PREDECL-002" %in% result)
 })
 
 test_that("catches graduation lag: degree awarded 100 terms after last_declared_term", {
   # STU-HD-SP1-004: last HIST term = 202010, degree at 202110 (= 202010 + 100)
-  result <- get_graduated_ids(test_programs, test_degrees, HIST_NAMES)
+  result <- get_graduated_ids(test_programs, test_degrees, HIST_CODES)
   expect_true("STU-HD-SP1-004" %in% result)
 })
 
 test_that("excludes non-focal degrees (Mathematics, Anthropology graduates)", {
-  result <- get_graduated_ids(test_programs, test_degrees, HIST_NAMES)
+  result <- get_graduated_ids(test_programs, test_degrees, HIST_CODES)
   expect_false("STU-MA-001" %in% result)
   expect_false("STU-AN-001" %in% result)
 })
 
 test_that("returns empty vector when degrees is NULL", {
-  result <- get_graduated_ids(test_programs, NULL, HIST_NAMES)
+  result <- get_graduated_ids(test_programs, NULL, HIST_CODES)
   expect_equal(length(result), 0)
   expect_type(result, "character")
 })
 
-test_that("graduation matched by program_name, not major_code (formats differ across tables)", {
-  # cedar_degrees uses major_code = department ("HIST");
-  # cedar_programs uses Banner code ("HIST-BA"). program_name ("History") is
-  # the reliable match key shared by both tables.
-  result <- get_graduated_ids(test_programs, test_degrees, HIST_NAMES)
-  expect_equal(length(result), 5)
+test_that("a degree counts by its major_code, never by a shared name", {
+  # DEG001 restated as another program that Banner also names "History": the
+  # name matches, the code does not, so STU-HD-SP1-001 has no focal degree.
+  degrees <- dplyr::mutate(test_degrees,
+    major_code = dplyr::if_else(degree_id == test_degrees$degree_id[1], "HIST-BS", major_code))
+  expect_equal(degrees$major[1], "History")
+  result <- get_graduated_ids(test_programs, degrees, HIST_CODES)
+  expect_false("STU-HD-SP1-001" %in% result)
+  expect_equal(length(result), 4)
 })
 
 
@@ -168,14 +171,14 @@ test_that("graduation matched by program_name, not major_code (formats differ ac
 context("get_switched_out_ids")
 
 test_that("detects 3 HIST students with non-focal program after last_declared_term", {
-  result <- get_switched_out_ids(test_programs, HIST_NAMES)
+  result <- get_switched_out_ids(test_programs, HIST_CODES)
   expect_true("STU-HIST-SWOUT-001" %in% result)
   expect_true("STU-HIST-SWOUT-002" %in% result)
   expect_true("STU-HIST-SWOUT-003" %in% result)
 })
 
 test_that("excludes STU-ENGL-HIST students (non-HIST record is BEFORE first HIST term, not after)", {
-  result <- get_switched_out_ids(test_programs, HIST_NAMES)
+  result <- get_switched_out_ids(test_programs, HIST_CODES)
   # ENGL-HIST students have ENGL in 202010, HIST in 202110.
   # last_declared_term = 202110. ENGL 202010 < 202110 → not after → not switched_out.
   expect_false("STU-ENGL-HIST-001" %in% result)
@@ -183,13 +186,13 @@ test_that("excludes STU-ENGL-HIST students (non-HIST record is BEFORE first HIST
 })
 
 test_that("excludes students with no post-focal non-focal program record", {
-  result <- get_switched_out_ids(test_programs, HIST_NAMES)
+  result <- get_switched_out_ids(test_programs, HIST_CODES)
   # STU-HD-SP1-005: HIST only in 202010, never appeared in another major
   expect_false("STU-HD-SP1-005" %in% result)
 })
 
 test_that("returns only character vector (student IDs)", {
-  result <- get_switched_out_ids(test_programs, HIST_NAMES)
+  result <- get_switched_out_ids(test_programs, HIST_CODES)
   expect_type(result, "character")
 })
 
@@ -201,12 +204,12 @@ test_that("returns only character vector (student IDs)", {
 context("get_never_declared_ids")
 
 test_that("returns 7 historical never-declared HIST pre-majors", {
-  result <- get_never_declared_ids(test_programs, HIST_NAMES, MAX_TERM)
+  result <- get_never_declared_ids(test_programs, HIST_CODES, MAX_TERM)
   expect_equal(length(result), 7)
 })
 
 test_that("includes pre-majors from all three historical terms", {
-  result <- get_never_declared_ids(test_programs, HIST_NAMES, MAX_TERM)
+  result <- get_never_declared_ids(test_programs, HIST_CODES, MAX_TERM)
   # 202010 pre-majors
   expect_true("STU-HP-SP1-001" %in% result)
   expect_true("STU-HP-SP1-004" %in% result)
@@ -218,13 +221,13 @@ test_that("includes pre-majors from all three historical terms", {
 })
 
 test_that("excludes current pre-majors (last focal term == max_data_term)", {
-  result <- get_never_declared_ids(test_programs, HIST_NAMES, MAX_TERM)
+  result <- get_never_declared_ids(test_programs, HIST_CODES, MAX_TERM)
   # STU-HP-SP2-001..003 are pre-major in 202110 = max_data_term → ongoing, not never_declared
   expect_false(any(sprintf("STU-HP-SP2-%03d", 1:3) %in% result))
 })
 
 test_that("excludes students who eventually declared (pre_major pathway)", {
-  result <- get_never_declared_ids(test_programs, HIST_NAMES, MAX_TERM)
+  result <- get_never_declared_ids(test_programs, HIST_CODES, MAX_TERM)
   # PREDECL-001: pre-major 202010, declared 202080 → NOT never_declared
   expect_false("STU-HIST-PREDECL-001" %in% result)
   # PREDECL-002: pre-major 202010, declared 202060 → NOT never_declared
@@ -239,52 +242,52 @@ test_that("excludes students who eventually declared (pre_major pathway)", {
 context("get_entry_pathways")
 
 test_that("returns data frame with student_id and entry_pathway columns", {
-  result <- get_entry_pathways(test_programs, HIST_NAMES)
+  result <- get_entry_pathways(test_programs, HIST_CODES)
   expect_true("student_id"    %in% names(result))
   expect_true("entry_pathway" %in% names(result))
 })
 
 test_that("covers all 36 declared HIST students (one row each)", {
-  result <- get_entry_pathways(test_programs, HIST_NAMES)
+  result <- get_entry_pathways(test_programs, HIST_CODES)
   expect_equal(nrow(result), 36)
   expect_equal(n_distinct(result$student_id), 36)
 })
 
 test_that("excludes pre-major-only students (never declared)", {
-  result <- get_entry_pathways(test_programs, HIST_NAMES)
+  result <- get_entry_pathways(test_programs, HIST_CODES)
   expect_false("STU-HP-SP1-001" %in% result$student_id)
   expect_false("STU-HP-FA1-001" %in% result$student_id)
   expect_false("STU-HP-SP2-001" %in% result$student_id)
 })
 
 test_that("direct pathway: first UNM major was the focal program", {
-  result <- get_entry_pathways(test_programs, HIST_NAMES)
+  result <- get_entry_pathways(test_programs, HIST_CODES)
   expect_equal(result$entry_pathway[result$student_id == "STU-HD-SP1-005"],     "direct")
   expect_equal(result$entry_pathway[result$student_id == "STU-HIST-SWOUT-001"], "direct")
   expect_equal(result$entry_pathway[result$student_id == "STU-HD-SP2-001"],     "direct")
 })
 
 test_that("switched_in pathway: had non-focal declared major before first HIST declaration", {
-  result <- get_entry_pathways(test_programs, HIST_NAMES)
+  result <- get_entry_pathways(test_programs, HIST_CODES)
   expect_equal(result$entry_pathway[result$student_id == "STU-ENGL-HIST-001"], "switched_in")
   expect_equal(result$entry_pathway[result$student_id == "STU-ENGL-HIST-002"], "switched_in")
 })
 
 test_that("pre_major pathway: had focal pre-major record before declaring", {
-  result <- get_entry_pathways(test_programs, HIST_NAMES)
+  result <- get_entry_pathways(test_programs, HIST_CODES)
   expect_equal(result$entry_pathway[result$student_id == "STU-HIST-PREDECL-001"], "pre_major")
   expect_equal(result$entry_pathway[result$student_id == "STU-HIST-PREDECL-002"], "pre_major")
 })
 
 test_that("pathway counts: 32 direct, 2 switched_in, 2 pre_major", {
-  result <- get_entry_pathways(test_programs, HIST_NAMES)
+  result <- get_entry_pathways(test_programs, HIST_CODES)
   expect_equal(sum(result$entry_pathway == "direct"),     32)
   expect_equal(sum(result$entry_pathway == "switched_in"), 2)
   expect_equal(sum(result$entry_pathway == "pre_major"),   2)
 })
 
 test_that("all entry_pathway values are valid", {
-  result <- get_entry_pathways(test_programs, HIST_NAMES)
+  result <- get_entry_pathways(test_programs, HIST_CODES)
   expect_true(all(result$entry_pathway %in% c("direct", "switched_in", "pre_major")))
 })
 

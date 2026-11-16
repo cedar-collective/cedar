@@ -2864,14 +2864,16 @@ cedar_degrees <- tribble(
 
 # Add columns present in real cedar_degrees that are missing from the tribble.
 # program_code: Banner compound code used to derive degree_abbr (e.g., "BA-HIST-AS").
-# major_code: catalog key (e.g., "HIST") — matches major_dept_map$major_code.
+# major_code: the program code cedar_programs carries for the same program
+# ("HIST-BA"), as in the real export, where a degree's major_code is its
+# program's code; populations match degrees by it, never by name.
 # degree_id format fixed to match real data: term-student_id-program_code.
 cedar_degrees <- cedar_degrees %>%
   dplyr::mutate(
     student_college     = college,    # student home college same as translated college here
     award_category      = dplyr::if_else(degree %in% c("BA", "BS"), "Baccalaureate", "Other"),
     program_code        = paste0(degree, "-", department, "-AS"),  # e.g., "BA-HIST-AS"
-    major_code          = department,    # major code (e.g., "HIST") matches major_dept_map keys
+    major_code          = paste0(department, "-", degree),  # "HIST-BA", the programs' code
     major               = program_name,
     second_major        = NA_character_,
     first_minor         = NA_character_,

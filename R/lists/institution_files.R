@@ -84,9 +84,11 @@ CEDAR_MAPPING_FILE_SPECS <- list(
   # became ACCT 3401) or program. effective_term: the first term the new code
   # was in use. scope: blank for a whole succession; a program row may name a
   # partial one (undergraduate PHRD to FPHS) in words. Only confirmed subject
-  # and course rows reach the course dimension (course_id); a proposed row is
-  # the renaming screen's candidate, with its evidence. An annotation: it
-  # never rewrites a saved row to the new code.
+  # and course rows reach the course dimension (course_id), and only confirmed
+  # whole program rows join two programs into one (program_successions, read
+  # by populations and the Pathways program choices); a proposed row is the
+  # renaming screen's candidate, with its evidence. An annotation: it never
+  # rewrites a saved row to the new code.
   code_history = c("kind", "from_code", "to_code", "effective_term", "scope",
                    "basis", "status", "evidence", "notes"),
   settings = c("setting", "value")
@@ -727,8 +729,9 @@ validate_mapping_files <- function(files) {
 }
 
 # code_history.csv: every succession the course dimension can follow is
-# well-formed, and the confirmed subject and course rows make course_id a
-# function (one successor per code, no cycles).
+# well-formed, the confirmed subject and course rows make course_id a function
+# (one successor per code, no cycles), and the confirmed whole program rows do
+# the same for program_successions.
 .validate_code_history_rows <- function(files) {
   ch <- files$code_history
   problems <- character(0)
@@ -760,14 +763,24 @@ validate_mapping_files <- function(files) {
   # give a code one id.
   add("scope must be blank on a subject or course row (the course dimension follows whole successions):",
       row_id(which(ch$kind %in% c("subject", "course") & !blank(ch$scope))))
-  # Confirmed subject and course rows: one successor per code, and no cycle,
-  # so every code resolves to exactly one id.
+  # A program row names two programs.csv codes, so the succession joins rows
+  # the mapping files already describe.
+  if (!is.null(files$programs)) {
+    prog_rows <- which(ch$kind == "program")
+    add("a program row names a code programs.csv does not have:",
+        row_id(prog_rows[!ch$from_code[prog_rows] %in% files$programs$program_code |
+                         !ch$to_code[prog_rows] %in% files$programs$program_code]))
+  }
+  # Confirmed subject and course rows, and confirmed whole program rows (blank
+  # scope; program_successions follows only those): one successor per code,
+  # and no cycle, so every code resolves to exactly one id.
   # A duplicate row and a self-succession are reported above; here they would
   # only read as a split and a cycle, so each pair is taken once and a code
   # named as its own successor is left out.
-  live <- ch[ch$status == "confirmed" & ch$kind %in% c("subject", "course") & ch$from_code != ch$to_code, ]
+  live <- ch[ch$status == "confirmed" & ch$from_code != ch$to_code &
+               (ch$kind %in% c("subject", "course") | (ch$kind == "program" & blank(ch$scope))), ]
   live <- live[!duplicated(live[c("kind", "from_code", "to_code")]), ]
-  for (k in c("subject", "course")) {
+  for (k in c("subject", "course", "program")) {
     rows <- live[live$kind == k, ]
     split_from <- unique(rows$from_code[duplicated(rows$from_code)])
     add(paste0("a confirmed ", k, " code succeeds to more than one code (a split cannot give it one id):"), split_from)

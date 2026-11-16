@@ -457,7 +457,7 @@ test_that("campus and level scope candidate membership without truncating histor
   pop <- build_population(
     programs,
     opt = list(
-      type = "major", program_names = "History", campus = "M",
+      type = "major", program_codes = "HIST", campus = "M",
       student_level = "Undergraduate",
       outcomes = c("ongoing", "graduated", "switched_out", "stopped_out")
     )
@@ -522,7 +522,7 @@ test_that("demographic populations honor level and carry enrollment bookends", {
 test_that("enrollment-based switch detection and the UNM bookends read enrolled student-terms", {
   pop <- suppressMessages(build_population(
     test_programs_st, degrees = test_degrees_st, student_terms = test_student_terms_st,
-    opt = list(type = "major", program_names = "HIST")
+    opt = list(type = "major", program_codes = "HIST")
   ))
   outcome <- setNames(pop$outcome, pop$student_id)
 
@@ -542,7 +542,7 @@ test_that("enrollment-based switch detection and the UNM bookends read enrolled 
   # Without the table: no reclassification, NA bookends, never a guess.
   bare <- suppressMessages(build_population(
     test_programs_st, degrees = test_degrees_st,
-    opt = list(type = "major", program_names = "HIST")
+    opt = list(type = "major", program_codes = "HIST")
   ))
   expect_equal(bare$outcome[bare$student_id == "ST_A"], "stopped_out")
   expect_true(all(is.na(bare$first_unm_term)))
@@ -614,4 +614,55 @@ test_that("split_by = transfer sets population_label to origin", {
   expect_true(all(pop$population_label == pop$origin))
   expect_true("transfer" %in% pop$population_label)
   expect_true("unm" %in% pop$population_label)
+})
+
+
+# =============================================================================
+# Program codes, renames and shared names (resolve_focal_programs())
+# =============================================================================
+
+test_that("a major population follows a confirmed rename to the program's old code", {
+  renamed <- suppressMessages(build_population(test_programs, test_degrees,
+    opt = list(type = "major", program_codes = "BUMG-BBA",
+               program_successions = program_rename_successions)))
+  # STU-MGMT-CHG1 held BUAN-BBA in Spring 2020 and BUMG-BBA in Fall 2020: one
+  # program, entered in Spring 2020.
+  row <- renamed[renamed$student_id == "STU-MGMT-CHG1", ]
+  expect_equal(row$first_unit_term, 202010L)
+  focal <- attr(renamed, "focal_programs")
+  expect_equal(focal$codes$program_code, c("BUMG-BBA", "BUAN-BBA"))
+  expect_equal(focal$codes$role, c("selected", "succession"))
+  expect_equal(focal$successions$to_code, "BUMG-BBA")
+
+  # Selecting the old code finds the same program.
+  old <- suppressMessages(build_population(test_programs, test_degrees,
+    opt = list(type = "major", program_codes = "BUAN-BBA",
+               program_successions = program_rename_successions)))
+  expect_equal(old$first_unit_term, row$first_unit_term)
+
+  # Without the rename the old code is another program the student switched from.
+  bare <- suppressMessages(build_population(test_programs, test_degrees,
+    opt = list(type = "major", program_codes = "BUMG-BBA",
+               program_successions = program_rename_successions[0, ])))
+  bare_row <- bare[bare$student_id == "STU-MGMT-CHG1", ]
+  expect_equal(bare_row$first_unit_term, 202080L)
+  expect_equal(bare_row$entry_method, "switched_in")
+  expect_equal(attr(bare, "focal_programs")$codes$program_code, "BUMG-BBA")
+})
+
+test_that("two programs sharing a name are two populations", {
+  # HIST-BA and HIST-MA are both named "History"; the M.A. students are not
+  # B.A. students.
+  ba <- suppressMessages(build_population(test_programs, test_degrees,
+    opt = list(type = "major", program_codes = "HIST-BA")))
+  expect_false(any(c("STU-HGRAD-SP10-001", "STU-HGRAD-SP10-002") %in% ba$student_id))
+  ma <- suppressMessages(build_population(test_programs, test_degrees,
+    opt = list(type = "major", program_codes = "HIST-MA")))
+  expect_setequal(ma$student_id, c("STU-HGRAD-SP10-001", "STU-HGRAD-SP10-002"))
+
+  expect_error(build_population(test_programs,
+                                opt = list(type = "major", program_names = "History")),
+               "selects by program code")
+  expect_error(build_population(test_programs, opt = list(type = "major")),
+               "program_codes is required")
 })

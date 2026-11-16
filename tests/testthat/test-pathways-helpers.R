@@ -88,8 +88,8 @@ test_that("filter_pathways_analysis_population applies selected population label
 })
 
 
-test_that("resolve_pathways_focal_dept_codes resolves selected program names", {
-  opt <- list(type = "major", program_names = "History")
+test_that("resolve_pathways_focal_dept_codes resolves selected program codes", {
+  opt <- list(type = "major", program_codes = "HIST-BA")
 
   dept_codes <- resolve_pathways_focal_dept_codes(opt, test_programs)
 
@@ -233,4 +233,64 @@ test_that("missing columns fail loudly", {
   # Delegates to cedar_data_edges(), which owns the schema check.
   expect_error(latest_graded_term(tibble::tibble(term = 202480L)),
                "missing required column")
+})
+
+
+# ── Program choices and the codes a population counted ───────────────────────
+
+test_that("the Majors choices are one per program code, a rename joined, a shared name split", {
+  # FSEC is the fixture's dept_code on Secondary Education; units.csv has no
+  # FSEC, which real data cannot carry (units come from the mapping files).
+  programs <- dplyr::filter(test_programs, dept_code != "FSEC")
+  choices <- pathways_population_choice_lists(programs, test_dims, program_rename_successions)
+  majors <- choices$program_choices
+
+  # Renamed: one choice, valued by the newest code, listing both codes.
+  expect_true("BUMG-BBA" %in% majors)
+  expect_false("BUAN-BBA" %in% majors)
+  expect_match(names(majors)[majors == "BUMG-BBA"], "\\(BUMG-BBA, BUAN-BBA\\)$")
+  # One Banner name ("History"), two programs: two choices.
+  expect_true(all(c("HIST-BA", "HIST-MA") %in% majors))
+  # Labels are programs.csv's names; a code the file lacks says so, never
+  # named after itself (the fixture's HIST-BA is not a UNM code).
+  expect_equal(names(majors)[majors == "FDMA"],
+               paste0(name_program_codes("FDMA", test_dims)[["FDMA"]], " (FDMA)"))
+  expect_equal(names(majors)[majors == "HIST-BA"], "[no programs.csv row] (HIST-BA)")
+  # A pre-major is never offered; it joins its program through leads_to.
+  expect_false("FFDA" %in% majors)
+  expect_equal(unname(majors), unname(majors[order(names(majors))]))
+
+  # Without the rename the two codes are two programs.
+  bare <- pathways_population_choice_lists(programs, test_dims, program_rename_successions[0, ])
+  expect_true(all(c("BUAN-BBA", "BUMG-BBA") %in% bare$program_choices))
+
+  # Departments are named from units.csv, never by their code.
+  depts <- choices$dept_choices
+  expect_equal(names(depts)[depts == "HIST"], unit_names(test_dims)$dept_name[unit_names(test_dims)$dept_code == "HIST"])
+  expect_error(pathways_population_choice_lists(test_programs, test_dims), "units.csv names no unit FSEC")
+})
+
+test_that("the focal program facts name every code a population counted and why", {
+  pop <- suppressMessages(build_population(test_programs, test_degrees,
+    opt = list(type = "major", program_codes = "BUMG-BBA",
+               program_successions = program_rename_successions)))
+  facts <- pathways_focal_program_facts(pop, test_programs, test_dims)
+
+  expect_equal(facts$codes$program_code, c("BUMG-BBA", "BUAN-BBA"))
+  expect_equal(facts$codes$role, c("selected", "succession"))
+  expect_equal(facts$codes$n_students, c(1L, 1L))
+  expect_equal(facts$successions$from_code, "BUAN-BBA")
+  expect_equal(facts$successions$effective_term, 202080L)
+
+  # A pre-major is listed with the code it leads to.
+  film <- suppressMessages(build_population(test_programs, test_degrees,
+    opt = list(type = "major", program_codes = "FDMA", premajor_leads_to = c(FFDA = "FDMA"),
+               outcomes = c("graduated", "switched_out", "stopped_out", "ongoing",
+                            "chose_elsewhere", "left_undeclared"))))
+  film_facts <- pathways_focal_program_facts(film, test_programs, test_dims)$codes
+  expect_equal(film_facts$role[film_facts$program_code == "FFDA"], "pre_major")
+  expect_equal(film_facts$leads_to[film_facts$program_code == "FFDA"], "FDMA")
+
+  # A demographic population has no focal programs and no facts.
+  expect_null(pathways_focal_program_facts(tibble::tibble(student_id = "x"), test_programs, test_dims))
 })

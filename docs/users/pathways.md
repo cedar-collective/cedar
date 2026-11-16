@@ -27,12 +27,12 @@ Use the filter stripe at the top of the tab, then click **Define Population**.
 | Control | What it does |
 |---|---|
 | **Select population by** | Choose majors, a department, a preset major group, or demographic criteria. |
-| **Majors / Department / Major Group / Demographics** | Defines the starting population. Major and department searches are based on program records. |
+| **Majors / Department / Major Group / Demographics** | Defines the starting population. Each major is one program code, shown with its catalog name and code; a program that was renamed is one choice listing both codes (Liberal Arts & Integrative Studies: LAIS, LIBA). Two programs that share a name, such as a B.A. and a B.S. or an online version, are separate choices. A department means the programs it owns. |
 | **Population scope** | For major, department, and preset populations, choose declared majors only, declared + pre-major, or pre-major only. |
 | **Level** | Limits the population to undergraduate, graduate, or all levels. |
 | **Campus** | Limits the population by student campus. |
 
-The scope stripe below the filters shows how many students matched, how many program records were used, what the focal programs resolved to, and the analysis-through term. For Major Changes, it also shows how many selected-unit students are excluded from timing cards because their first observed UNM course history begins too late to estimate credits reliably.
+The scope stripe below the filters shows how many students matched, the span of program records used, every program code counted with its name and how many students hold it, any rename that joined two codes (from the institution's code history), the pre-majors counted with the program each leads to, and the analysis-through term. Students are matched by program code, never by name. For Major Changes, it also shows how many selected-unit students are excluded from timing cards because their first observed UNM course history begins too late to estimate credits reliably.
 
 ---
 
