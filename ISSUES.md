@@ -36,7 +36,6 @@ alongside other work (M14, M16).
 
 | ID | Kind | Summary |
 |---|---|---|
-| [I63](#i63--the-online-psychology-pre-major-leads-to-the-campus-major-not-the-online-one) | Defect | `programs.csv` says the online Psychology pre-major XFPY leads to PSY, but its students declare XPSY: 364 of a PSY population's 615 "chose elsewhere" students declared XPSY (suspected mapping error; a decision for the file) |
 | [I61](#i61--summer-2025-holds-nr-grades-where-summer-2024-held-none-and-reads-as-a-dfw-spike) | Defect | Summer 2025 holds 1,479 NR grades in 336 sections (Summer 2024: none), so it reads 22.5% DFW against about 13% for other summers; suspected an early pull before grades rolled |
 | [I55](#i55--the-instructor-gate-password-stopped-reaching-the-app) | Defect | The instructor-gate password stopped reaching the app: since 2026-09-05 `.Renviron` is kept out of the image and nothing else passed `CEDAR_DFW_PASSWORD`, so every instructor gate on production reads "not configured" (fixed in code 2026-11-12; production needs the password in its `.env`) |
 | [I46](#i46--a-deploy-that-must-rebuild-a-table-the-app-cannot-start-without-takes-the-site-down) | Defect | The deploy's table gate ran after the health check, so a deploy that added a column to `cedar_student_terms` failed its health check on the missing column and never reached the gate: production served the restart page from 17:07 UTC on 2026-11-04 (gate moved before the first request) |
@@ -59,6 +58,7 @@ Kept until the next release, so a recurrence is recognisable; each entry below g
 
 | ID | Kind | Summary |
 |---|---|---|
+| [I63](#i63--the-online-psychology-pre-major-leads-to-the-campus-major-not-the-online-one) | Defect | `programs.csv` said the online Psychology pre-major XFPY leads to PSY, though 360 of its students declared XPSY (57 PSY): a PSY population counted them as "chose elsewhere". XFPY now leads to XPSY, a separate program (resolved 2026-11-16) |
 | [I62](#i62--a-pathways-population-counted-every-program-that-shared-a-name) | Defect | A Pathways population matched programs by Banner name: department BIOL took in 1,873 Biochemistry students (BIOC and FBIC, another unit) because CHBI is named "Biochemistry", "Architecture" merged ARCH and ARCT, and "Liberal Arts" missed its renamed code LAIS (7 ongoing students instead of 411). Populations now match codes, follow confirmed renames in `code_history.csv`, and keep same-named programs apart (resolved 2026-11-16) |
 | [I60](#i60--takers-vs-non-takers-opens-on-a-classification-its-home-campus-scope-hardly-holds) | Defect | Takers vs Non-Takers picked its opening classification from the course's takers on every campus and then opened on the page's home campus: HIST 1110 opened on Concurrent Enrollment, nearly all of them dual-credit students at branch campuses, so on ABQ its passed and DFW'd groups were empty in almost every term. The defaults are now read off the takers in the opening home-campus scope (resolved) |
 | [I59](#i59--the-dfw-tabs-dfw-by-term-table-stopped-with-an-error-for-every-course) | Defect | The DFW tab's DFW by Term table stopped with an error for every course from 2026-10-16 (#143) to 2026-11-13: its status-exclusion summary read the class list without the graded edge (resolved) |
@@ -98,7 +98,9 @@ Kept until the next release, so a recurrence is recognisable; each entry below g
 
 ## I63 — The online Psychology pre-major leads to the campus major, not the online one
 
-**Status:** open (suspected). A decision for `programs.csv`, not code.
+**Status:** resolved 2026-11-16: `programs.csv` gives XFPY `leads_to =
+XPSY`, PSY and XPSY being separate programs at UNM; FHIL, which led nowhere,
+leads to HILA.
 **Found:** 2026-11-16, comparing Pathways populations before and after I62.
 **Severity:** moderate for Psychology only. `programs.csv` gives XFPY (the
 accelerated-online Psychology pre-major) `leads_to = PSY`. Its students
@@ -111,9 +113,9 @@ pre-majors.
 cedar_student_terms, opt = list(type = "major", program_codes = "PSY",
 outcomes = c("chose_elsewhere")))`, then count the declared `major_code` of
 those students in `cedar_programs`: XPSY 364, NURS 33.
-**Done when:** someone who knows the program confirms XFPY's target and the
-row says so (`leads_to = XPSY`, or a note on why PSY is right); the other X
-pre-majors (XFBA) get the same look.
+**Fix:** a mapping edit, no code. Of XFPY's 704 students, 360 later declared
+XPSY and 57 PSY. XFBA, the other online pre-major, already led to its online
+major (XBAD).
 
 ## I62 — A Pathways population counted every program that shared a name
 
