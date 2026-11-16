@@ -13,9 +13,17 @@
 #
 # FOCAL PROGRAMS AND CANDIDATES
 #   A "focal program" is the program (or set of programs) the analysis is
-#   about — resolved from opt by get_focal_programs(). A "candidate" is any
-#   student who EVER had a focal program record, declared or pre-major.
-#   Candidates are the universe; everything below classifies them.
+#   about — resolved from opt by resolve_focal_programs() to PROGRAM CODES,
+#   never names: the codes selected, every code a confirmed whole succession
+#   in code_history.csv joins to them (program_successions: LIBA was renamed
+#   LAIS), and the pre-majors programs.csv says lead to them (leads_to). A
+#   name is not an identity: one Banner name covers several programs (the
+#   B.A. and B.S., an online code, a branch campus's), and one program has
+#   several names. The resolution rides on the population as
+#   attr(, "focal_programs") so a page can say which codes it counted. A
+#   "candidate" is any student who EVER had a focal program record, declared
+#   or pre-major. Candidates are the universe; everything below classifies
+#   them.
 #
 # SIX OUTCOMES — every candidate gets exactly one
 #   Assigned by the case_when in build_population(); FIRST MATCH WINS, so the
@@ -110,13 +118,14 @@
 #'     (these students haven't had a chance to declare yet)
 #'
 #' @param programs Data frame. cedar_programs.
-#' @param focal_names Character vector. Focal program names.
+#' @param focal_codes Character vector. Focal program codes, pre-majors
+#'   included (resolve_focal_programs()).
 #' @param max_data_term Integer. The most recent term in the data.
 #' @return Character vector of student IDs.
-get_ongoing_ids <- function(programs, focal_names, max_data_term, focal_codes = character(0)) {
+get_ongoing_ids <- function(programs, focal_codes, max_data_term) {
   focal <- programs %>%
     filter(program_type %in% c("Major", "Second Major"),
-           major_code %in% focal_codes | program_name %in% focal_names)
+           major_code %in% focal_codes)
 
   # Declared focal students present in max_data_term
   declared_ongoing <- focal %>%
@@ -156,19 +165,25 @@ get_ongoing_ids <- function(programs, focal_names, max_data_term, focal_codes = 
 #' "Awarded", "Pending", "Sought". Excludes "Hold Pending" (admin block)
 #' and "Record Clear" (application withdrawn).
 #'
+#' Degrees are matched by `cedar_degrees$major_code`, the same short code
+#' cedar_programs carries (every degree row has one), never by name: Banner's
+#' degree "Major" and "Program" names cover several programs that share a
+#' name ("Architecture" is ARCH, ARCT and its pre-major).
+#'
 #' @param programs Data frame. cedar_programs.
 #' @param degrees Data frame or NULL. cedar_degrees. Returns empty vector if NULL.
-#' @param focal_names Character vector. Focal program names.
-#' @param focal_codes Character vector. Focal program codes (optional). When
-#'   supplied and the degrees table has a major_code column, restricts matches
-#'   to degrees in those codes.
+#' @param focal_codes Character vector. Focal program codes; the declared ones
+#'   anchor the window, and a degree in any of them counts.
 #' @return Character vector of student IDs.
-get_graduated_ids <- function(programs, degrees, focal_names) {
+get_graduated_ids <- function(programs, degrees, focal_codes) {
   if (is.null(degrees) || nrow(degrees) == 0) return(character(0))
+  if (!"major_code" %in% names(degrees))
+    stop("[population.R:get_graduated_ids] cedar_degrees is missing the 'major_code' column. ",
+         "Re-run transform-to-cedar.R to regenerate cedar_degrees from the Banner degrees export.")
 
   focal_declared <- programs %>%
     filter(program_type %in% c("Major", "Second Major"),
-           program_name %in% focal_names,
+           major_code %in% focal_codes,
            !is_pre_major)
 
   # Last declared focal term per student (the graduation window anchor)
@@ -178,50 +193,12 @@ get_graduated_ids <- function(programs, degrees, focal_names) {
 
   if (nrow(last_focal) == 0) return(character(0))
 
-  # Focal program codes — fallback match key when program_name values differ
-  # between cedar_programs and cedar_degrees. Banner's degrees export ("Program"
-  # field) sometimes uses different formatting than the programs table
-  # (e.g., "History, Bachelor of Arts" vs "History"), causing silent zero-
-  # graduation counts if we rely on name alone. The short code ("HIST") is
-  # consistent across both tables.
-  focal_codes <- focal_declared %>%
-    filter(!is.na(major_code)) %>%
-    pull(major_code) %>%
-    unique()
-
-  # Three match strategies, tried together (OR):
-  #
-  # major_match: degrees$major (Banner "Major" field) — same source as
-  #   cedar_programs$program_name (academic_studies "Major" field). Both say
-  #   "History". Most reliable name match; use as primary.
-  #
-  # pcode_match: degrees$major_code ("HIST") — short catalog code, format-
-  #   independent. Reliable after data is regenerated with current transform.
-  #
-  # pname_match: degrees$program_name (Banner "Program" field) says
-  #   "History, Bachelor of Arts" — a different format that will never match
-  #   cedar_programs$program_name ("History"). Kept only as a last resort for
-  #   non-standard exports where major/major_code are both absent.
-  #
   # UNM term codes are YYYYSS integers (10=spring, 60=summer, 80=fall).
   # Adding 100 gives an ~one-academic-year window regardless of starting semester:
   #   spring anchor (202010) → window closes at 202110 (next spring)
   #   fall anchor   (202080) → window closes at 202180 (next fall)
   #   summer anchor (202060) → window closes at 202160 (next summer)
-  if (!"major" %in% names(degrees))
-    stop("[population.R:get_graduated_ids] cedar_degrees is missing the 'major' column. ",
-         "Re-run transform-to-cedar.R to regenerate cedar_degrees from the Banner degrees export.")
-  if (!"major_code" %in% names(degrees))
-    stop("[population.R:get_graduated_ids] cedar_degrees is missing the 'major_code' column. ",
-         "Re-run transform-to-cedar.R to regenerate cedar_degrees from the Banner degrees export.")
-
-  major_match <- !is.na(degrees$major) & degrees$major %in% focal_names
-  pcode_match <- if (length(focal_codes) > 0)
-    !is.na(degrees$major_code) & degrees$major_code %in% focal_codes else rep(FALSE, nrow(degrees))
-  pname_match <- if ("program_name" %in% names(degrees))
-    degrees$program_name %in% focal_names else rep(FALSE, nrow(degrees))
-
-  deg <- degrees[major_match | pcode_match | pname_match, , drop = FALSE]
+  deg <- degrees[!is.na(degrees$major_code) & degrees$major_code %in% focal_codes, , drop = FALSE]
   if (nrow(deg) == 0) return(character(0))
 
   deg <- deg %>%
@@ -250,16 +227,16 @@ get_graduated_ids <- function(programs, degrees, focal_names) {
 #' orchestrator, not here.
 #'
 #' @param programs Data frame. cedar_programs.
-#' @param focal_names Character vector. Focal program names.
+#' @param focal_codes Character vector. Focal program codes.
 #' @return Character vector of student IDs.
-get_switched_out_ids <- function(programs, focal_names, focal_codes = character(0)) {
+get_switched_out_ids <- function(programs, focal_codes) {
   declared <- programs %>%
     filter(program_type %in% c("Major", "Second Major"),
            !is_pre_major)
 
   # Last declared focal term per student
   last_focal <- declared %>%
-    filter(major_code %in% focal_codes | program_name %in% focal_names) %>%
+    filter(major_code %in% focal_codes) %>%
     group_by(student_id) %>%
     summarize(last_focal_term = max(term, na.rm = TRUE), .groups = "drop")
 
@@ -267,7 +244,7 @@ get_switched_out_ids <- function(programs, focal_names, focal_codes = character(
 
   # Non-focal declared records for those students, after their last focal term
   declared %>%
-    filter(!major_code %in% focal_codes, !program_name %in% focal_names,
+    filter(!major_code %in% focal_codes,
            student_id %in% last_focal$student_id) %>%
     inner_join(last_focal, by = "student_id") %>%
     filter(term > last_focal_term) %>%
@@ -288,13 +265,13 @@ get_switched_out_ids <- function(programs, focal_names, focal_codes = character(
 #' classified as ongoing (current pre-majors), not never_declared.
 #'
 #' @param programs Data frame. cedar_programs.
-#' @param focal_names Character vector. Focal program names.
+#' @param focal_codes Character vector. Focal program codes, pre-majors included.
 #' @param max_data_term Integer. The most recent term in the data.
 #' @return Character vector of student IDs.
-get_never_declared_ids <- function(programs, focal_names, max_data_term, focal_codes = character(0)) {
+get_never_declared_ids <- function(programs, focal_codes, max_data_term) {
   focal <- programs %>%
     filter(program_type %in% c("Major", "Second Major"),
-           major_code %in% focal_codes | program_name %in% focal_names)
+           major_code %in% focal_codes)
 
   # Students who ever declared the focal program
   ever_declared <- focal %>%
@@ -334,12 +311,12 @@ get_never_declared_ids <- function(programs, focal_names, max_data_term, focal_c
 #' it is assigned by build_population() to historical pre-major-only students.
 #'
 #' @param programs Data frame. cedar_programs.
-#' @param focal_names Character vector. Focal program names.
+#' @param focal_codes Character vector. Focal program codes, pre-majors included.
 #' @return Data frame with columns student_id (chr) and entry_pathway (chr).
-get_entry_pathways <- function(programs, focal_names, focal_codes = character(0)) {
+get_entry_pathways <- function(programs, focal_codes) {
   focal_major <- programs %>%
     filter(program_type %in% c("Major", "Second Major"),
-           major_code %in% focal_codes | program_name %in% focal_names)
+           major_code %in% focal_codes)
 
   # Declared focal students and their first declaration term
   declared_focal <- focal_major %>%
@@ -363,7 +340,7 @@ get_entry_pathways <- function(programs, focal_names, focal_codes = character(0)
   # Non-focal declared records before first declaration → switched_in pathway
   had_nonfocal_prior <- programs %>%
     filter(program_type %in% c("Major", "Second Major"),
-           !major_code %in% focal_codes, !program_name %in% focal_names,
+           !major_code %in% focal_codes,
            !is_pre_major,
            student_id %in% declared_focal$student_id) %>%
     inner_join(select(declared_focal, student_id, first_decl_term),
@@ -437,13 +414,13 @@ classify_origin <- function(programs, candidate_ids) {
 #' pre-major record, that evidence stands regardless of the data boundary.
 #'
 #' @param programs Data frame. cedar_programs (all programs, not just focal).
-#' @param focal_names Character vector. Focal program names.
+#' @param focal_codes Character vector. Focal program codes, pre-majors included.
 #' @param min_data_term Integer. Earliest term in the full programs table.
 #' @return Data frame with columns student_id (chr) and entry_method (chr).
-classify_entry_method <- function(programs, focal_names, min_data_term, focal_codes = character(0)) {
+classify_entry_method <- function(programs, focal_codes, min_data_term) {
   focal_records <- programs %>%
     filter(program_type %in% c("Major", "Second Major"),
-           major_code %in% focal_codes | program_name %in% focal_names)
+           major_code %in% focal_codes)
 
   first_focal <- focal_records %>%
     group_by(student_id) %>%
@@ -482,12 +459,12 @@ classify_entry_method <- function(programs, focal_names, min_data_term, focal_co
 #' first record — does not consider later declarations.
 #'
 #' @param programs Data frame. cedar_programs (all programs, not just focal).
-#' @param focal_names Character vector. Focal program names.
+#' @param focal_codes Character vector. Focal program codes, pre-majors included.
 #' @return Data frame with columns student_id (chr) and entry_status (chr).
-classify_entry_status <- function(programs, focal_names, focal_codes = character(0)) {
+classify_entry_status <- function(programs, focal_codes) {
   programs %>%
     filter(program_type %in% c("Major", "Second Major"),
-           major_code %in% focal_codes | program_name %in% focal_names) %>%
+           major_code %in% focal_codes) %>%
     group_by(student_id) %>%
     filter(term == min(term)) %>%
     summarize(
@@ -523,8 +500,15 @@ classify_entry_status <- function(programs, focal_names, focal_codes = character
 #'   an enrolled term.
 #' @param opt List of options:
 #'   type          — "preset", "dept", or "major". Default "preset".
-#'   program_names — required for preset/major types.
+#'   program_codes — required for the major type: program codes, each a
+#'     declared program; a renamed program's other codes and its pre-majors
+#'     are added by resolve_focal_programs().
+#'   program_names — required for the preset type (population_groups.csv
+#'     names its programs), resolved to the codes whose declared rows carry
+#'     the name.
 #'   dept_code     — required for dept type.
+#'   program_successions, premajor_leads_to — override the mapping files'
+#'     program_successions and premajor_leads_to (tests and what-ifs).
 #'   outcomes      — character vector of outcomes to include. Default: all six outcomes
 #'     (graduated, switched_out, stopped_out, ongoing, chose_elsewhere, left_undeclared).
 #'   split_by      — "none" (default), "outcome", "entry", "entry_status", or
@@ -538,7 +522,9 @@ classify_entry_status <- function(programs, focal_names, focal_codes = character
 #'     all levels are included and undergrad/grad students are mixed in a
 #'     single population. Pass "Undergraduate" to build a clean undergrad
 #'     cohort for a department that also has grad programs.
-#' @return Data frame with one row per student.
+#' @return Data frame with one row per student, carrying
+#'   attr(, "focal_programs"): resolve_focal_programs()'s list of the codes
+#'   counted and why.
 build_population <- function(programs, degrees = NULL, student_terms = NULL, opt = list()) {
   type <- opt$type %||% "preset"
   enrolled_terms <- .population_enrolled_terms(student_terms)
@@ -570,9 +556,19 @@ build_population <- function(programs, degrees = NULL, student_terms = NULL, opt
             paste(opt$student_level, collapse = ", "))
   }
 
-  # Identify focal programs
-  focal_programs <- get_focal_programs(scope_programs, opt)
-  if (nrow(focal_programs) == 0) {
+  # Identify focal programs: codes only, never names (see CONCEPTS).
+  focal <- resolve_focal_programs(scope_programs, opt)
+  focal_codes <- focal$codes$program_code
+  selected_codes <- focal$codes$program_code[focal$codes$role == "selected"]
+  # Names label the population; they never select a row.
+  focal_names <- scope_programs %>%
+    filter(program_type %in% c("Major", "Second Major"), !is_pre_major,
+           major_code %in% selected_codes, !is.na(program_name)) %>%
+    distinct(program_name) %>%
+    pull(program_name)
+  if (length(focal_names) == 0) focal_names <- selected_codes
+  empty <- function() structure(.empty_population(), focal_programs = focal)
+  if (length(selected_codes) == 0) {
     if (type == "dept") {
       message("[population.R] No declared-major records found for dept_code = '", opt$dept_code,
               "'. Check that cedar_programs has rows with program_type = 'Major' and ",
@@ -582,28 +578,19 @@ build_population <- function(programs, degrees = NULL, student_terms = NULL, opt
               paste(opt$program_names, collapse = ", "), "'. ",
               "Check program_names spelling against cedar_programs$program_name.")
     }
-    return(.empty_population())
+    return(empty())
   }
-  focal_names <- focal_programs$program_name
-  focal_codes <- unique(na.omit(focal_programs$major_code))
-  # A pre-major is matched to its major by the mapping file's leads_to, not by
-  # sharing its name: FFDA is named "FDMA" and leads to Film and Digital Arts
-  # (ISSUES.md I38). Its rows are is_pre_major, so every step below already
-  # treats them as the focal program's pre-major records.
-  focal_codes <- union(focal_codes, pre_major_codes_leading_to(
-    focal_codes, opt$premajor_leads_to %||% premajor_leads_to))
   message("[population.R] Building ", type, " population: ",
           paste(focal_names, collapse = ", "),
-          " | codes: ", if (length(focal_codes)) paste(focal_codes, collapse = ", ") else "(none)")
+          " | codes: ", paste(focal_codes, collapse = ", "))
 
   # All candidates: ever appeared in a focal program (declared or pre-major).
-  # Code-first matching; name fallback covers un-coded records in older data.
   scoped_focal <- scope_programs %>%
     filter(program_type %in% c("Major", "Second Major"),
-           major_code %in% focal_codes | program_name %in% focal_names)
+           major_code %in% focal_codes)
 
   candidate_ids <- unique(scoped_focal$student_id)
-  if (length(candidate_ids) == 0) return(.empty_population())
+  if (length(candidate_ids) == 0) return(empty())
 
   # From this point on, restore complete program history for the eligible
   # students. Candidate membership stays scoped; classification does not.
@@ -612,7 +599,7 @@ build_population <- function(programs, degrees = NULL, student_terms = NULL, opt
     filter(
       student_id %in% candidate_ids,
       program_type %in% c("Major", "Second Major"),
-      major_code %in% focal_codes | program_name %in% focal_names
+      major_code %in% focal_codes
     )
 
   # ── Outcome detection ──────────────────────────────────────────────────────
@@ -632,10 +619,10 @@ build_population <- function(programs, degrees = NULL, student_terms = NULL, opt
   max_data_term <- max(programs$term, na.rm = TRUE)
   message("[population.R] max_data_term resolved to: ", max_data_term)
 
-  ongoing_ids     <- get_ongoing_ids(programs, focal_names, max_data_term, focal_codes = focal_codes)
-  graduated_ids   <- get_graduated_ids(programs, degrees, focal_names)
-  switched_ids    <- get_switched_out_ids(programs, focal_names, focal_codes = focal_codes)
-  never_decl_ids  <- get_never_declared_ids(programs, focal_names, max_data_term, focal_codes = focal_codes)
+  ongoing_ids     <- get_ongoing_ids(programs, focal_codes, max_data_term)
+  graduated_ids   <- get_graduated_ids(programs, degrees, focal_codes)
+  switched_ids    <- get_switched_out_ids(programs, focal_codes)
+  never_decl_ids  <- get_never_declared_ids(programs, focal_codes, max_data_term)
 
   # Split never_declared into two meaningful sub-outcomes:
   #   chose_elsewhere — had a focal pre-major but declared a different program
@@ -712,8 +699,8 @@ build_population <- function(programs, degrees = NULL, student_terms = NULL, opt
   # ── Entry classification ────────────────────────────────────────────────────
   min_data_term  <- min(programs$term, na.rm = TRUE)
   origin_tbl     <- classify_origin(programs, candidate_ids)
-  entry_meth_tbl <- classify_entry_method(programs, focal_names, min_data_term, focal_codes = focal_codes)
-  entry_stat_tbl <- classify_entry_status(programs, focal_names, focal_codes = focal_codes)
+  entry_meth_tbl <- classify_entry_method(programs, focal_codes, min_data_term)
+  entry_stat_tbl <- classify_entry_status(programs, focal_codes)
 
   # ── Timing: unit entry, unit exit, and UNM-wide records ───────────────────
   # first_unit_term   = first term in any focal program record (declared or pre-major)
@@ -817,7 +804,7 @@ build_population <- function(programs, degrees = NULL, student_terms = NULL, opt
 
   result <- filter(result, outcome %in% outcomes_keep)
 
-  if (nrow(result) == 0) return(.empty_population())
+  if (nrow(result) == 0) return(empty())
 
   # ── Assign population_label ────────────────────────────────────────────────
   split_by   <- opt$split_by %||% "none"
@@ -845,49 +832,88 @@ build_population <- function(programs, degrees = NULL, student_terms = NULL, opt
                 first_unm_term, first_unit_term, last_unit_term, last_declared_term,
                 last_record_term, relevant_until)
   attr(out, "conversion_stats") <- .conv_stats
+  attr(out, "focal_programs") <- focal
   out
 }
 
 
 # ---------------------------------------------------------------------------
-# get_focal_programs  (shared helper, called by build_population)
+# resolve_focal_programs  (shared helper, called by build_population)
 # ---------------------------------------------------------------------------
 
-#' Get Focal Program Names for a Population Build
+#' The program codes a population build counts, and why each is in
 #'
-#' Resolves focal program names from opt depending on type. Returns a data frame
-#' of distinct program_name + major_code values that are in scope.
+#' Codes, never names. The selected codes come from opt: the major type's
+#' `program_codes` as given, the dept type's declared codes whose own
+#' `dept_code` is the department, the preset type's declared codes carrying
+#' one of `program_names`. To those it adds every code a confirmed whole
+#' succession joins them to (code_history.csv, `program_successions`), then
+#' the pre-majors that lead to any of them (programs.csv `leads_to`; FFDA is
+#' named "FDMA" and leads to Film and Digital Arts, ISSUES.md I38) and, for a
+#' department, the department's own pre-major codes.
 #'
-#' @param programs Data frame. cedar_programs.
-#' @param opt List of options (type, program_names, dept_code).
-#' @return Data frame with columns program_name and major_code.
+#' @param programs Data frame. cedar_programs, scoped to the eligible rows.
+#' @param opt List of options (type, program_codes, program_names, dept_code,
+#'   and the program_successions / premajor_leads_to overrides).
+#' @return A list: `codes`, a tibble of program_code and role ("selected",
+#'   "succession" or "pre_major") with `leads_to` on a pre-major; and
+#'   `successions`, the code_history.csv rows that joined codes
+#'   (from_code, to_code, effective_term).
 #' @keywords internal
-get_focal_programs <- function(programs, opt) {
+resolve_focal_programs <- function(programs, opt) {
   type <- opt$type %||% "preset"
+  successions <- opt$program_successions %||% program_successions
+  leads_to <- opt$premajor_leads_to %||% premajor_leads_to
+  declared <- programs %>%
+    filter(program_type %in% c("Major", "Second Major"), !is_pre_major)
 
-  if (type %in% c("preset", "major")) {
+  own_pre_majors <- character(0)
+  selected <- if (type == "major") {
+    if (length(opt$program_names) > 0)
+      stop("[population.R] type = 'major' selects by program code: pass opt$program_codes, ",
+           "not program_names (one name covers several programs).")
+    if (length(opt$program_codes) == 0)
+      stop("[population.R] opt$program_codes is required for type = 'major'")
+    as.character(opt$program_codes)
+  } else if (type == "preset") {
     pnames <- opt$program_names
     if (is.null(pnames) || length(pnames) == 0)
       stop("[population.R] opt$program_names is required for type = '", type, "'")
-    programs %>%
-      filter(program_type %in% c("Major", "Second Major"),
-             program_name %in% pnames, !is_pre_major) %>%
-      distinct(program_name, major_code)
-
+    declared$major_code[declared$program_name %in% pnames]
   } else if (type == "dept") {
     dept <- opt$dept_code
     if (is.null(dept) || !nzchar(dept))
       stop("[population.R] opt$dept_code is required for type = 'dept'")
     if (!"dept_code" %in% names(programs))
       stop("[population.R] cedar_programs missing dept_code column. Re-run transform-to-cedar.R.")
-    programs %>%
-      filter(program_type %in% c("Major", "Second Major"),
-             dept_code == dept, !is_pre_major) %>%
-      distinct(program_name, major_code)
-
+    own_pre_majors <- programs$major_code[programs$program_type %in% c("Major", "Second Major") &
+                                            programs$is_pre_major & programs$dept_code %in% dept]
+    declared$major_code[declared$dept_code %in% dept]
   } else {
-    stop("[population.R] get_focal_programs() not supported for type = '", type, "'")
+    stop("[population.R] resolve_focal_programs() not supported for type = '", type, "'")
   }
+  selected <- sort(unique(stats::na.omit(selected)))
+
+  family <- program_succession_family(selected, successions)
+  joined <- sort(setdiff(family, selected))
+  pre <- union(pre_major_codes_leading_to(family, leads_to),
+               stats::na.omit(own_pre_majors))
+  pre <- sort(setdiff(pre, family))
+
+  used <- successions[successions$from_code %in% family & successions$to_code %in% family, ,
+                      drop = FALSE]
+  list(
+    codes = tibble(
+      program_code = c(selected, joined, pre),
+      role = rep(c("selected", "succession", "pre_major"),
+                 c(length(selected), length(joined), length(pre))),
+      leads_to = c(rep(NA_character_, length(selected) + length(joined)),
+                   unname(leads_to[pre]))
+    ),
+    successions = tibble(from_code = as.character(used$from_code),
+                         to_code = as.character(used$to_code),
+                         effective_term = as.integer(used$effective_term))
+  )
 }
 
 
@@ -1123,6 +1149,62 @@ pre_major_codes_leading_to <- function(codes, leads_to = premajor_leads_to) {
 }
 
 
+#' Every program code a confirmed succession joins to the given codes
+#'
+#' @param codes Program codes.
+#' @param successions from_code, to_code, effective_term: the confirmed whole
+#'   program successions (default `program_successions`, from
+#'   code_history.csv).
+#' @return Character vector: `codes` and every code a chain of successions
+#'   joins to one of them, in either direction (LIBA gives LIBA and LAIS).
+program_succession_family <- function(codes, successions = program_successions) {
+  .population_need_successions(successions)
+  family <- unique(as.character(codes))
+  repeat {
+    linked <- c(successions$to_code[successions$from_code %in% family],
+                successions$from_code[successions$to_code %in% family])
+    grown <- union(family, linked)
+    if (length(grown) == length(family)) return(family)
+    family <- grown
+  }
+}
+
+
+#' The program each code is: the last code of its succession chain
+#'
+#' A renamed program is one program across its codes, named by the newest
+#' (LIBA and LAIS are LAIS). A code no succession names is its own id.
+#'
+#' @param codes Program codes.
+#' @param successions As for program_succession_family().
+#' @return Character vector parallel to `codes`.
+program_id_of <- function(codes, successions = program_successions) {
+  .population_need_successions(successions)
+  succ <- stats::setNames(as.character(successions$to_code), successions$from_code)
+  current <- as.character(codes)
+  # validate_mapping_files() refuses a split or a cycle; one step more than
+  # the rows could chain is a cycle it missed.
+  for (i in seq_len(nrow(successions) + 1L)) {
+    nxt <- unname(succ[current])
+    moving <- !is.na(nxt)
+    if (!any(moving)) return(current)
+    current[moving] <- nxt[moving]
+  }
+  stop("[population.R] program_successions form a cycle; validate_mapping_files() should have refused it")
+}
+
+
+.population_need_successions <- function(successions) {
+  missing <- setdiff(c("from_code", "to_code", "effective_term"), names(successions))
+  if (!is.data.frame(successions) || length(missing))
+    stop("[population.R] program successions need from_code, to_code and effective_term",
+         call. = FALSE)
+  if (anyDuplicated(successions$from_code))
+    stop("[population.R] a program code succeeds to more than one code", call. = FALSE)
+  invisible(successions)
+}
+
+
 #' Resolve a named population group to Banner major codes
 #'
 #' @param group_id Name of an entry in CEDAR_POPULATION_GROUPS.
@@ -1219,12 +1301,13 @@ population_group_audit <- function(group_id, programs) {
 #' range, so an annotation bounded at a term stops applying once the population
 #' no longer reaches into it.
 #'
-#' @param population A population tibble from build_population().
+#' @param population A population tibble from build_population(); its
+#'   attr(, "focal_programs") names the codes in scope.
+#'   Without it (a demographic population has none) every program the
+#'   population's students held is in scope.
 #' @param programs cedar_programs.
-#' @param opt The opt used to build the population; `program_names` or
-#'   `dept_code` identifies which programs are in scope.
 #' @return A list of registry entries, empty when nothing applies.
-population_data_notes <- function(population, programs, opt = list()) {
+population_data_notes <- function(population, programs) {
   if (is.null(population) || nrow(population) == 0) return(list())
   required <- c("major_code", "program_name", "student_id", "term")
   missing <- setdiff(required, names(programs))
@@ -1234,12 +1317,9 @@ population_data_notes <- function(population, programs, opt = list()) {
   }
 
   scoped <- programs %>% filter(student_id %in% population$student_id)
-  program_names <- opt$program_names
-  dept_code <- opt$dept_code
-  if (length(program_names) > 0) {
-    scoped <- scoped %>% filter(program_name %in% program_names)
-  } else if (length(dept_code) > 0 && "dept_code" %in% names(scoped)) {
-    scoped <- scoped %>% filter(dept_code %in% .env$dept_code)
+  focal_codes <- attr(population, "focal_programs")$codes$program_code
+  if (length(focal_codes) > 0) {
+    scoped <- scoped %>% filter(major_code %in% focal_codes)
   }
   if (nrow(scoped) == 0) return(list())
 

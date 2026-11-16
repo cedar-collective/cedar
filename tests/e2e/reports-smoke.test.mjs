@@ -591,7 +591,8 @@ export async function runReportChecks({ scope = 'smoke', synthetic = false } = {
     await withStep(page, ['roadblocks'], 'population audit surfaces data semantics', async () => {
       if (synthetic) return;
       await setInput(page, 'pathways-population-population_type', 'major');
-      await setInput(page, 'pathways-population-program_names', ['Radiologic Sciences']);
+      // The Majors choice is valued by program code (RADS), never by name.
+      await setInput(page, 'pathways-population-program_codes', ['RADS']);
       await setInput(page, 'pathways-population-population_scope', 'all');
       await click(page, 'pathways-population-build_btn');
       // The previous step left Roadblocks showing. innerText of a hidden bslib

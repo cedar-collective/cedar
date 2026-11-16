@@ -28,7 +28,7 @@
 #
 # Internal sub-module:
 #   populationSelectorUI(id, campus_choices, program_choices, dept_choices)
-#   populationSelectorServer(id, programs)  → returns reactive list(population, description)
+#   populationSelectorServer(id, programs, dims, ...)  → returns reactive list(population, description)
 
 
 # Standardized subtab intro: a slightly-larger, plain-language description of what
@@ -48,39 +48,51 @@ pathways_section_heading <- function(title, ..., level = "h3", class = NULL) {
 # Population Selector sub-module
 # =============================================================================
 
-pathways_population_choice_lists <- function(programs) {
-  empty <- list(program_choices = character(), dept_choices = character())
-  if (is.null(programs) || nrow(programs) == 0) return(empty)
+# The selector's choices come from pathways_population_choice_lists()
+# (R/branches/pathways.R): one Majors choice per program code, renames joined.
 
-  major_rows <- programs %>%
-    filter(
-      program_type %in% c("Major", "Second Major"),
-      !is.na(program_name), nzchar(program_name)
-    )
-
-  dept_codes <- major_rows %>%
-    filter(!is.na(dept_code), nzchar(dept_code)) %>%
-    distinct(dept_code) %>%
-    pull(dept_code) %>%
-    sort()
-
-  dept_lookup <- if (exists("dept_code_to_name", envir = .GlobalEnv)) {
-    get("dept_code_to_name", envir = .GlobalEnv)
-  } else {
-    setNames(character(), character())
+# The population's codes as labelled rows of facts, from
+# pathways_focal_program_facts(): one row per role, each code with its
+# programs.csv name and the population's students holding it, and the
+# code_history.csv renames that joined codes. NULL renders nothing.
+pathways_focal_program_rows <- function(facts) {
+  if (is.null(facts)) return(NULL)
+  codes <- facts$codes
+  item <- function(i) {
+    r <- codes[i, ]
+    tags$span(class = "text-nowrap",
+      tags$code(class = "filter-context-code", r$program_code), " ",
+      r$program_name,
+      if (identical(r$role, "pre_major") && !is.na(r$leads_to)) paste0(" \u2192 ", r$leads_to),
+      tags$span(class = "text-muted-sm",
+                paste0(" ", format(r$n_students, big.mark = ","),
+                       if (r$n_students == 1) " student" else " students")))
   }
-  dept_names <- dept_lookup[dept_codes]
-  dept_names[is.na(dept_names) | !nzchar(dept_names)] <- dept_codes[is.na(dept_names) | !nzchar(dept_names)]
-
-  prog_names <- major_rows %>%
-    filter(!is_pre_major) %>%
-    distinct(program_name) %>%
-    arrange(program_name) %>%
-    pull(program_name)
-
-  list(
-    program_choices = prog_names,
-    dept_choices = setNames(dept_codes, dept_names)
+  joined <- function(idx) {
+    out <- list()
+    for (k in seq_along(idx)) {
+      if (k > 1L) out[[length(out) + 1L]] <- " \u00b7 "
+      out[[length(out) + 1L]] <- item(idx[[k]])
+    }
+    do.call(tagList, out)
+  }
+  row <- function(label, role) {
+    idx <- which(codes$role == role)
+    if (length(idx) == 0) return(NULL)
+    tagList(tags$br(), tags$strong(label), joined(idx))
+  }
+  renames <- facts$successions
+  tagList(
+    row("Programs: ", "selected"),
+    row("Same program, renamed: ", "succession"),
+    if (nrow(renames) > 0) tagList(
+      tags$br(), tags$strong("Renames (code_history.csv): "),
+      paste(paste0(renames$from_code, " \u2192 ", renames$to_code, " from ",
+                   fmt_term(renames$effective_term)), collapse = "; ")
+    ),
+    row("Pre-majors (programs.csv): ", "pre_major"),
+    tags$br(), tags$strong("Matched on: "), "program code",
+    tags$span(class = "text-muted-sm", " (Major + Second Major records)")
   )
 }
 
@@ -157,10 +169,10 @@ populationSelectorUI <- function(id, campus_choices, program_choices = character
         conditionalPanel(
           condition = sprintf("input['%s'] == 'major'", ns("population_type")),
           selectizeInput(
-            ns("program_names"), "Majors",
+            ns("program_codes"), "Majors",
             choices  = program_choices,
             multiple = TRUE,
-            options  = list(placeholder = "Type to search majors...", maxOptions = 500),
+            options  = list(placeholder = "Type a major's name or code...", maxOptions = 500),
             width    = "100%"
           )
         ),
@@ -227,23 +239,22 @@ populationSelectorUI <- function(id, campus_choices, program_choices = character
   )
 }
 
-populationSelectorServer <- function(id, programs, degrees = NULL, student_terms = NULL,
+populationSelectorServer <- function(id, programs, dims, degrees = NULL, student_terms = NULL,
                                      program_choices = character(), dept_choices = character()) {
   moduleServer(id, function(input, output, session) {
 
     # The normal path receives precomputed choices from global.R so the selector
-    # is searchable as soon as the page loads. Keep this fallback for tests or
-    # standalone module use where the caller did not provide choices.
+    # is searchable as soon as the page loads. Standalone module use that
+    # passes none builds the same lists here.
     if (length(program_choices) == 0 || length(dept_choices) == 0) {
-      observe({
-        choices <- pathways_population_choice_lists(programs)
-        updateSelectizeInput(session, "dept_code",
-                             choices = choices$dept_choices,
-                             server  = FALSE)
-        updateSelectizeInput(session, "program_names",
-                             choices = choices$program_choices,
-                             server  = FALSE)
-      })
+      choices <- pathways_population_choice_lists(programs, dims)
+      program_choices <- choices$program_choices
+      dept_choices <- choices$dept_choices
+      updateSelectizeInput(session, "dept_code", choices = dept_choices, server = FALSE)
+      updateSelectizeInput(session, "program_codes", choices = program_choices, server = FALSE)
+    }
+    choice_label <- function(values, choices) {
+      unname(names(choices)[match(values, choices)])
     }
 
     population_rv <- eventReactive(input$build_btn, {
@@ -273,8 +284,8 @@ populationSelectorServer <- function(id, programs, degrees = NULL, student_terms
              outcomes = scope_outcomes)
 
       } else if (type == "major") {
-        req(length(input$program_names) > 0)
-        list(type = "major", program_names = input$program_names,
+        req(length(input$program_codes) > 0)
+        list(type = "major", program_codes = input$program_codes,
              outcomes = scope_outcomes)
 
       } else {  # demographic
@@ -296,14 +307,14 @@ populationSelectorServer <- function(id, programs, degrees = NULL, student_terms
       description <- if (type == "preset") {
         paste0("students in ", input$preset)
       } else if (type == "dept") {
-        dept_display <- dept_code_to_name[input$dept_code] %||% input$dept_code
-        paste0(dept_display, " department students")
+        paste0(choice_label(input$dept_code, dept_choices), " department students")
       } else if (type == "major") {
-        prog_str <- if (length(input$program_names) <= 3) {
-          paste(input$program_names, collapse = ", ")
+        picked <- choice_label(input$program_codes, program_choices)
+        prog_str <- if (length(picked) <= 3) {
+          paste(picked, collapse = ", ")
         } else {
-          paste0(paste(input$program_names[1:2], collapse = ", "),
-                 " + ", length(input$program_names) - 2, " more")
+          paste0(paste(picked[1:2], collapse = ", "),
+                 " + ", length(picked) - 2, " more")
         }
         paste0(prog_str, " students")
       } else {
@@ -1079,7 +1090,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
     }
 
     # ---- Population selector sub-module ----
-    population_rv <- populationSelectorServer("population", programs,
+    population_rv <- populationSelectorServer("population", programs, dims,
                                                degrees = degrees, student_terms = cedar_student_terms,
                                                program_choices = program_choices,
                                                dept_choices = dept_choices)
@@ -1119,80 +1130,10 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
       n_total <- format(nrow(population), big.mark = ",")
       opt      <- population_rv()$opt
 
-      # Focal program codes — show how students were matched and which major codes
-      # the selection resolved to in cedar_programs.
-      focal_codes_result <- {
-        # Build human-readable description of the matching criterion
-        match_basis <- if (opt$type == "dept") {
-          paste0("cedar_programs.dept_code = “", opt$dept_code, "”")
-        } else if (opt$type %in% c("major", "preset") &&
-                   length(opt$program_names %||% character(0)) > 0) {
-          nms <- opt$program_names
-          if (length(nms) == 1) {
-            paste0("cedar_programs.program_name = “", nms, "”")
-          } else {
-            paste0("cedar_programs.program_name ∈ {",
-                   paste(nms, collapse = ", "), "}")
-          }
-        } else NULL
-
-        prog_detail <- if (opt$type == "dept") {
-          programs %>%
-            filter(program_type %in% c("Major", "Second Major"),
-                          dept_code == opt$dept_code) %>%
-            distinct(major_code, program_name) %>%
-            arrange(major_code)
-        } else if (opt$type %in% c("major", "preset") &&
-                   length(opt$program_names %||% character(0)) > 0) {
-          programs %>%
-            filter(program_type %in% c("Major", "Second Major"),
-                          program_name %in% opt$program_names) %>%
-            distinct(major_code, program_name) %>%
-            arrange(major_code)
-        } else {
-          NULL
-        }
-
-        if (!is.null(prog_detail) && nrow(prog_detail) > 0) {
-          # Exclude numeric major_codes (Banner internal org IDs that leaked into
-          # source data — same logic the transform uses to nullify numeric dept_codes).
-          coded   <- filter(prog_detail,
-                                   !is.na(major_code),
-                                   !grepl("^[0-9]+$", major_code))
-          uncoded <- filter(prog_detail,
-                                   is.na(major_code) | grepl("^[0-9]+$", major_code))
-          # Suppress the warning for programs that already resolved to a code in
-          # other records — Banner sometimes omits the code column in older exports,
-          # producing mixed coded/uncoded rows for the same program name.
-          uncoded <- filter(uncoded, !program_name %in% coded$program_name)
-          MAX_SHOW <- 8L
-          # Each "CODE (Name)" pair is wrapped in a nowrap span so the code and its
-          # parenthetical name never break across lines, while the list as a whole
-          # still wraps at the " · " separators. (Replaces an embedded NBSP.)
-          pair_spans <- Map(function(code, name)
-            tags$span(class = "text-nowrap", paste0(code, " (", name, ")")),
-            coded$major_code, coded$program_name)
-          join_pairs <- function(spans) {
-            out <- list()
-            for (i in seq_along(spans)) {
-              if (i > 1L) out[[length(out) + 1L]] <- " · "
-              out[[length(out) + 1L]] <- spans[[i]]
-            }
-            do.call(tagList, out)
-          }
-          coded_text <- if (nrow(coded) == 0) {
-            NULL
-          } else if (length(pair_spans) > MAX_SHOW) {
-            tagList(join_pairs(pair_spans[seq_len(MAX_SHOW)]),
-                    paste0(" · … +", nrow(coded) - MAX_SHOW, " more"))
-          } else {
-            join_pairs(pair_spans)
-          }
-          list(match_basis  = match_basis,
-               coded_text   = coded_text,
-               uncoded      = if (nrow(uncoded) > 0) uncoded$program_name else NULL)
-        } else NULL
-      }
+      # The codes the population counted and why each is in (build_population()
+      # records them): the programs selected, codes joined by a confirmed rename
+      # in code_history.csv, and pre-majors by programs.csv's leads_to.
+      focal_facts <- pathways_focal_program_facts(population, programs, dims)
 
       # Program record span — shows what time window population students appear in cedar_programs
       prog_span <- programs %>%
@@ -1253,29 +1194,14 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
               label_breakdown
             )
           },
-          if (!is.null(focal_codes_result) || nrow(prog_span) > 0) {
+          if (nrow(prog_span) > 0) {
             div(class = "pathways-population-detail pathways-population-detail-bordered",
               tags$strong("Program records: "),
               fmt_term(prog_span$from),
               "–",
               fmt_term(prog_span$to),
               analysis_window,
-              if (!is.null(focal_codes_result)) tagList(
-                tags$br(),
-                tags$strong("Matched on: "),
-                focal_codes_result$match_basis,
-                tags$span(" (Major + Second Major records only)", class = "text-muted-sm")
-              ),
-              if (!is.null(focal_codes_result) && !is.null(focal_codes_result$coded_text)) tagList(
-                tags$br(),
-                tags$strong("Resolved to: "),
-                focal_codes_result$coded_text
-              ),
-              if (!is.null(focal_codes_result) && !is.null(focal_codes_result$uncoded)) tags$span(
-                class = "pathways-population-warning",
-                paste0(paste(focal_codes_result$uncoded, collapse = ", "),
-                       ": matched by program name only — no major code found in any record")
-              )
+              pathways_focal_program_rows(focal_facts)
             )
           },
           if (split_by == "entry" && n_unclear > 0) {
@@ -1436,7 +1362,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
       # What the data means, where that is not visible in the outcome mix. A
       # program whose major code recorded intent rather than admission reads as
       # heavy attrition, and nothing on this page would otherwise say so.
-      data_notes <- population_data_notes(pop, programs, rv$opt %||% list())
+      data_notes <- population_data_notes(pop, programs)
 
       outcome_order <- c("ongoing", "graduated", "switched_out", "stopped_out",
                          "chose_elsewhere", "left_undeclared")
@@ -1492,18 +1418,12 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
         opt <- rv$opt %||% list()
         benchmark <- NULL
         if (!identical(opt$type, "demographic")) {
-          focal_rows <- if (identical(opt$type, "dept")) {
-            programs %>%
-              filter(program_type %in% c("Major", "Second Major"),
-                     dept_code == opt$dept_code, !is_pre_major)
-          } else if (opt$type %in% c("major", "preset")) {
-            programs %>%
-              filter(program_type %in% c("Major", "Second Major"),
-                     program_name %in% (opt$program_names %||% character(0)),
-                     !is_pre_major)
-          } else {
-            tibble()
-          }
+          # The population's own declared codes (build_population() records them).
+          focal <- attr(pop, "focal_programs")$codes
+          focal_rows <- programs %>%
+            filter(program_type %in% c("Major", "Second Major"),
+                   major_code %in% focal$program_code[focal$role != "pre_major"],
+                   !is_pre_major)
 
           focal_college_counts <- focal_rows %>%
             { if (!is.null(opt$campus) && length(opt$campus) > 0L) {
@@ -1522,14 +1442,16 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
                 filter(program_type %in% c("Major", "Second Major"),
                        student_college == focal_college,
                        !is_pre_major,
-                       !is.na(program_name), nzchar(program_name)) %>%
-                distinct(program_name) %>%
-                pull(program_name)
+                       !is.na(major_code)) %>%
+                distinct(major_code) %>%
+                pull(major_code)
 
               if (length(college_programs) > 0) {
                 bench_opt <- opt
                 bench_opt$type <- "major"
-                bench_opt$program_names <- college_programs
+                bench_opt$program_names <- NULL
+                bench_opt$dept_code <- NULL
+                bench_opt$program_codes <- college_programs
                 bench_pop <- build_population(
                   programs, degrees = degrees, student_terms = cedar_student_terms, opt = bench_opt
                 )

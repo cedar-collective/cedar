@@ -36,6 +36,7 @@ alongside other work (M14, M16).
 
 | ID | Kind | Summary |
 |---|---|---|
+| [I63](#i63--the-online-psychology-pre-major-leads-to-the-campus-major-not-the-online-one) | Defect | `programs.csv` says the online Psychology pre-major XFPY leads to PSY, but its students declare XPSY: 364 of a PSY population's 615 "chose elsewhere" students declared XPSY (suspected mapping error; a decision for the file) |
 | [I61](#i61--summer-2025-holds-nr-grades-where-summer-2024-held-none-and-reads-as-a-dfw-spike) | Defect | Summer 2025 holds 1,479 NR grades in 336 sections (Summer 2024: none), so it reads 22.5% DFW against about 13% for other summers; suspected an early pull before grades rolled |
 | [I55](#i55--the-instructor-gate-password-stopped-reaching-the-app) | Defect | The instructor-gate password stopped reaching the app: since 2026-09-05 `.Renviron` is kept out of the image and nothing else passed `CEDAR_DFW_PASSWORD`, so every instructor gate on production reads "not configured" (fixed in code 2026-11-12; production needs the password in its `.env`) |
 | [I46](#i46--a-deploy-that-must-rebuild-a-table-the-app-cannot-start-without-takes-the-site-down) | Defect | The deploy's table gate ran after the health check, so a deploy that added a column to `cedar_student_terms` failed its health check on the missing column and never reached the gate: production served the restart page from 17:07 UTC on 2026-11-04 (gate moved before the first request) |
@@ -50,7 +51,7 @@ alongside other work (M14, M16).
 | [I20](#i20--cedar_programs-holds-almost-no-branch-campus-students) | Defect | `cedar_programs` holds 1–3% of branch-campus students; branch program counts read near zero |
 | [I18](#i18--cedar_degrees-holds-no-associate-degrees-so-branch-campus-completions-read-zero) | Defect | `cedar_degrees` holds no associate degrees: branch-campus completions read zero |
 | [I4](#i4--pre-change-course-ratios-are-confounded-by-career-stage) | Defect | Pre-change course ratios confounded by career stage (deferred) |
-| M1–M54 | Improvement | See [Improvements](#improvements) |
+| M1–M57 | Improvement | See [Improvements](#improvements) |
 
 ### Resolved since the last release
 
@@ -58,6 +59,7 @@ Kept until the next release, so a recurrence is recognisable; each entry below g
 
 | ID | Kind | Summary |
 |---|---|---|
+| [I62](#i62--a-pathways-population-counted-every-program-that-shared-a-name) | Defect | A Pathways population matched programs by Banner name: department BIOL took in 1,873 Biochemistry students (BIOC and FBIC, another unit) because CHBI is named "Biochemistry", "Architecture" merged ARCH and ARCT, and "Liberal Arts" missed its renamed code LAIS (7 ongoing students instead of 411). Populations now match codes, follow confirmed renames in `code_history.csv`, and keep same-named programs apart (resolved 2026-11-16) |
 | [I60](#i60--takers-vs-non-takers-opens-on-a-classification-its-home-campus-scope-hardly-holds) | Defect | Takers vs Non-Takers picked its opening classification from the course's takers on every campus and then opened on the page's home campus: HIST 1110 opened on Concurrent Enrollment, nearly all of them dual-credit students at branch campuses, so on ABQ its passed and DFW'd groups were empty in almost every term. The defaults are now read off the takers in the opening home-campus scope (resolved) |
 | [I59](#i59--the-dfw-tabs-dfw-by-term-table-stopped-with-an-error-for-every-course) | Defect | The DFW tab's DFW by Term table stopped with an error for every course from 2026-10-16 (#143) to 2026-11-13: its status-exclusion summary read the class list without the graded edge (resolved) |
 | [I58](#i58--courses-taken-calls-a-term-in-progress-in-its-charts-and-settled-in-its-tables) | Defect | Courses Taken shaded Fall 2026 "In progress" in its charts and called it settled in its tables, heading and note; every label now reads `cedar_term_in_progress()` (resolved) |
@@ -93,6 +95,59 @@ Kept until the next release, so a recurrence is recognisable; each entry below g
 ---
 
 # Defects
+
+## I63 — The online Psychology pre-major leads to the campus major, not the online one
+
+**Status:** open (suspected). A decision for `programs.csv`, not code.
+**Found:** 2026-11-16, comparing Pathways populations before and after I62.
+**Severity:** moderate for Psychology only. `programs.csv` gives XFPY (the
+accelerated-online Psychology pre-major) `leads_to = PSY`. Its students
+declare XPSY, the online major. Since populations keep same-named programs
+apart (I62), a PSY population counts an XFPY student who declared XPSY as
+"chose elsewhere": 364 of the 615 such students in a PSY population on the
+2026-11-16 tables, against 251 before. An XPSY population misses its own
+pre-majors.
+**Reproduction:** `build_population(cedar_programs, cedar_degrees,
+cedar_student_terms, opt = list(type = "major", program_codes = "PSY",
+outcomes = c("chose_elsewhere")))`, then count the declared `major_code` of
+those students in `cedar_programs`: XPSY 364, NURS 33.
+**Done when:** someone who knows the program confirms XFPY's target and the
+row says so (`leads_to = XPSY`, or a note on why PSY is right); the other X
+pre-majors (XFBA) get the same look.
+
+## I62 — A Pathways population counted every program that shared a name
+
+**Status:** resolved 2026-11-16.
+**Found:** 2026-11-16, asked why the Pathways Majors list holds many spellings
+of Liberal Arts.
+**Severity:** high for the programs affected. The Majors list offered Banner's
+raw program names (234 names over 360 codes; 93 names cover more than one
+code), and `build_population()` matched `major_code %in% codes | program_name
+%in% names` in every detector, graduation included. On the 2026-11-16 tables:
+department BIOL counted 7,303 students where 5,855 hold its own codes, because
+CHBI is named "Biochemistry" and pulled in the BIOC unit's Biochemistry
+students (BIOC 810, FBIC 1,063); department MGMT took in 45 students of
+same-named programs elsewhere; the "Architecture" major merged ARCH and ARCT
+(1,655 students where ARCH holds 640); "Liberal Arts" held LIBA and FLIB but
+not LAIS and FLAI, which replaced them in Fall 2023, so it read 7 ongoing
+students instead of 411; "Psychology" merged PSY with the online XPSY (149
+students). The History major and the HIST, ARCH, PSYC, NURS, ENGL and CHEM
+departments were unchanged.
+**Cause:** the selector and `get_focal_programs()` treated a program name as
+an identity; the confirmed program renames had nowhere to live.
+**Reproduction:** before the fix, `build_population(cedar_programs,
+cedar_degrees, cedar_student_terms, opt = list(type = "dept", dept_code =
+"BIOL"))` returned 7,303 students; 1,448 of them hold no BIOL-owned code.
+**Fix:** a population selects codes (`resolve_focal_programs()`): the major
+type takes `program_codes`, a department its own codes and pre-majors, a
+preset its names resolved to codes once; confirmed `kind = program` rows in
+`code_history.csv` join a renamed program's codes (`program_successions`; LIBA
+to LAIS and FLIB to FLAI confirmed 2026-11-16); degrees match by `major_code`.
+The Majors list is one choice per program, named from `programs.csv`, and the
+scope bar lists every code counted, each rename and each pre-major. Major
+Changes no longer counts a rename as a change. Tests in `test-population.R`,
+`test-population-outcomes.R`, `test-pathways-helpers.R` and
+`test-pathways-integration.R` fail with name matching or without the renames.
 
 ## I61 — Summer 2025 holds NR grades where Summer 2024 held none, and reads as a DFW spike
 
@@ -3733,7 +3788,34 @@ floor, NA under it, never rounded) computes every one of them, each display
 rounds for itself, and `get_course_outcome_rates()` returns
 `summarize_attempt_outcomes()`' rates unrounded.
 
+**M55 — Headcount selects a department's programs by name.** The Headcount
+module filters minors and concentrations with `program_name %in%
+dept_program_names` (`R/modules/headcount.R`, four places, from
+`headcount_program_names()`), the name matching I62 removed from Pathways: a
+name another unit's program shares counts toward the department. Found
+2026-11-16. *Done when:* Headcount scopes rows by code or by their own
+`dept_code` (`filter_programs_to_dept()`), and the filtering leaves the module.
+
+**M56 — Population groups declare program names.** `population_groups.csv`
+lists names, resolved to codes by `population_group_major_codes()` and the
+preset type of `resolve_focal_programs()`, so a group follows every program
+that shares a name and drops one whose name drifts (the reason for
+`population_group_audit()`'s near misses). Found 2026-11-16. *Done when:* the
+file lists program codes, renames following through `program_successions`,
+and the audit checks codes against `programs.csv`.
+
 ### Testing and pipeline safety
+
+**M57 — The fixture's program codes are not programs.csv codes.** The shared
+fixture's program rows carry made-up codes (`HIST-BA`, `MATH-BS`), and its
+degrees carry the same since 2026-11-16 (I62), while the tests read the UNM
+mapping files, whose History code is `HIST`. Real data holds one code per
+program across programs, degrees and programs.csv; the fixture can hold only
+two of the three, so a Dept Trends build on the fixture (prog codes from
+`major_to_dept`) finds no degrees, and the pre-major and name of every
+fixture code come from the fixture, not the file. *Done when:* the fixture's
+programs and degrees use codes `programs.csv` has (or a fixture institution
+directory maps them), and a Dept Trends degree count is pinned on it.
 
 **M7 — Untested analytical code.** No direct tests for
 `R/branches/credit-hours.R`; thin coverage for `R/cones/course-neighbors.R` and

@@ -956,6 +956,31 @@ test_that("attach_default_units() replaces whatever a file stamped and keeps the
   expect_error(attach_default_units(list(cedar_sections = stamped), unclass(dims)), "build_cedar_dims")
 })
 
+test_that("the code-history validator checks program rows against programs.csv and for one successor", {
+  dir <- do.call(write_mapping_dir, c(one_unit, list(programs = mapping_program_history$programs,
+                                                     code_history = mapping_program_history$code_history)))
+  err <- tryCatch(read_institution_mappings(dir), error = conditionMessage)
+  expect_match(err, "a program row names a code programs.csv does not have: program GONE -> NEW")
+  expect_match(err, "a confirmed program code succeeds to more than one code \\(a split cannot give it one id\\): OLD")
+  expect_match(err, "confirmed program successions form a cycle, starting at: P, Q")
+  # A partial succession (a scope in words) is never followed, so NEW -> P is
+  # not a split of NEW.
+  expect_false(grepl("one id\\): [^\n]*NEW", err))
+})
+
+test_that("program_successions holds code_history.csv's confirmed whole program rows", {
+  ch <- cedar_institution_files$code_history
+  want <- ch[ch$kind == "program" & ch$status == "confirmed" & !nzchar(ch$scope), ]
+  expect_equal(program_successions$from_code, want$from_code)
+  expect_equal(program_successions$to_code, want$to_code)
+  expect_equal(program_successions$effective_term, as.integer(want$effective_term))
+  # Each code is its program's newest code; a code no row names is its own.
+  expect_equal(program_id_of(want$from_code), want$to_code)
+  expect_equal(program_id_of("NO-SUCH-CODE"), "NO-SUCH-CODE")
+  expect_setequal(program_succession_family(want$to_code[1]),
+                  c(want$from_code[1], want$to_code[1]))
+})
+
 test_that("the code-history validator reports every problem at once", {
   # mapping_code_history_invalid has one row or pair of rows per fault; its
   # proposed split (MATH 122) is not one.

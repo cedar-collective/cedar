@@ -597,7 +597,9 @@ clear_dept_cache <- function(dept_code = NULL) {
 # CEDAR term. Programs/degrees may refresh daily, but these benchmarks should
 # roll when cedar_current_term changes or when the manual version is bumped.
 
-cedar_population_benchmark_cache_version <- 1L
+# 2: populations match program codes, never names, and follow confirmed
+# program renames (code_history.csv) and leads_to, which the key now records.
+cedar_population_benchmark_cache_version <- 2L
 
 get_population_benchmark_cache_key <- function(college, opt = list()) {
   term_key <- if (exists("cedar_current_term", envir = .GlobalEnv)) {
@@ -611,7 +613,11 @@ get_population_benchmark_cache_key <- function(college, opt = list()) {
     college = college,
     campus = sort(opt$campus %||% character(0)),
     student_level = sort(opt$student_level %||% character(0)),
-    outcomes = sort(opt$outcomes %||% character(0))
+    outcomes = sort(opt$outcomes %||% character(0)),
+    # The mapping decisions that choose a population's codes: a newly
+    # confirmed rename or pre-major target is a miss, never a stale hit.
+    program_successions = opt$program_successions %||% program_successions,
+    premajor_leads_to = opt$premajor_leads_to %||% premajor_leads_to
   )
   paste0("pathways_pop_benchmark_", substr(digest::digest(key_obj), 1, 16))
 }

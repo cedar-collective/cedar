@@ -366,7 +366,9 @@ test_that("count_degrees does not include a bare 'major' column", {
 
 test_that("count_degrees returns correct degree counts for HIST", {
   result <- count_degrees(test_degrees)
-  hist_rows <- result[result$major_code == "HIST" & result$degree == "BA", ]
+  # The fixture's degrees carry its programs' code (HIST-BA), one code per
+  # program across tables as in the real export.
+  hist_rows <- result[result$major_code == "HIST-BA" & result$degree == "BA", ]
   # Fixture: DEG001+DEG002 in 202060, DEG007 in 202080, DEG010 in 202110, DEG011 in 202080
   # → 202060: 2, 202080: 2 (DEG007 + DEG011), 202110: 1
   expect_equal(sum(hist_rows$majors), 5L,
@@ -389,7 +391,7 @@ test_that("get_degrees_for_dept_report returns list with plots and tables keys",
   result <- get_degrees_for_dept_report(
     test_degrees,
     dept_name  = "History",
-    prog_codes = "HIST",
+    prog_codes = "HIST-BA",
     term_start = cedar_report_start_term,
     term_end   = cedar_report_end_term,
     palette    = "Set2"
@@ -402,7 +404,7 @@ test_that("get_degrees_for_dept_report tables contain major_code not major", {
   result <- get_degrees_for_dept_report(
     test_degrees,
     dept_name  = "History",
-    prog_codes = "HIST",
+    prog_codes = "HIST-BA",
     term_start = cedar_report_start_term,
     term_end   = cedar_report_end_term,
     palette    = "Set2"
@@ -418,14 +420,15 @@ test_that("get_degrees_for_dept_report filters to the requested prog_codes", {
   result <- get_degrees_for_dept_report(
     test_degrees,
     dept_name  = "History",
-    prog_codes = "HIST",
+    prog_codes = "HIST-BA",
     term_start = cedar_report_start_term,
     term_end   = cedar_report_end_term,
     palette    = "Set2"
   )
   deg_filtered <- result$tables$degree_summary_filtered
-  expect_true(all(deg_filtered$major_code == "HIST"),
-              info = "All rows should have major_code == 'HIST'")
+  expect_gt(nrow(deg_filtered), 0L)
+  expect_true(all(deg_filtered$major_code == "HIST-BA"),
+              info = "All rows should have major_code == 'HIST-BA'")
 })
 
 test_that("get_degrees_for_dept_report produces NULL plots when prog_codes has no matches", {

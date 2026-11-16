@@ -24,6 +24,11 @@
 #                        resolve_program_units().
 #   premajor_leads_to  — pre-major program_code → the program code it leads to
 #                        (programs.csv leads_to). Translation only, never history.
+#   program_successions — the confirmed whole program successions in
+#                        code_history.csv (kind program, blank scope): from_code,
+#                        to_code, effective_term. History only: a renamed program
+#                        is one program across its codes. A partial succession
+#                        (a scope in words) is an annotation, never followed.
 #
 # To change a mapping, edit institution/<id>/*.csv — not this file.
 
@@ -53,4 +58,16 @@ major_to_dept <- stats::setNames(.every$unit_code, .every$program_code)
                     !nzchar(.programs$in_college), ]
 premajor_leads_to <- stats::setNames(.pre$leads_to, .pre$program_code)
 
-rm(.college_lu, .units, .programs, .every, .pre)
+# ── From code_history.csv ─────────────────────────────────────────────────────
+
+.ch <- cedar_institution_files$code_history
+.ps <- .ch[.ch$kind == "program" & .ch$status == "confirmed" &
+             (is.na(.ch$scope) | !nzchar(.ch$scope)), ]
+program_successions <- data.frame(
+  from_code      = as.character(.ps$from_code),
+  to_code        = as.character(.ps$to_code),
+  effective_term = as.integer(.ps$effective_term),
+  stringsAsFactors = FALSE
+)
+
+rm(.college_lu, .units, .programs, .every, .pre, .ch, .ps)

@@ -360,3 +360,17 @@ test_that("declaring the major a pre-major leads to is not a major change", {
   untied <- suppressMessages(detect_major_changes(rows, opt = list(premajor_leads_to = c(FFDA = "IFDM"))))
   expect_equal(untied$to_major, "Film and Digital Arts")
 })
+
+
+# A confirmed rename (program_rename_successions: BUAN-BBA renamed BUMG-BBA)
+# is not a change of major, though the two rows carry different names.
+test_that("moving from a program's old code to its new one is not a major change", {
+  rows <- test_programs[test_programs$student_id == "STU-MGMT-CHG1", ]
+  renamed <- suppressMessages(detect_major_changes(rows,
+    opt = list(program_successions = program_rename_successions)))
+  expect_equal(nrow(renamed), 0L)
+  two <- suppressMessages(detect_major_changes(rows,
+    opt = list(program_successions = program_rename_successions[0, ])))
+  expect_equal(two$from_major, "Business Analytics")
+  expect_equal(two$to_major, "Business Management")
+})
