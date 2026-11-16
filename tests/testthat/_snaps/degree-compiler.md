@@ -34,6 +34,7 @@
       Biology B.S. · math start: calculus
         Semesters: 8 draft, 8 on the board
         Arrows: 1 draft, 11 on the board; 0 held for a reviewer
+        Waits on a choice: 0 course-count conditions
         Courses on both: 2, same semester for 2
           ENGL 1110         draft 1 · board 1
           BIOL 2110C        draft — · board 1

@@ -18,7 +18,10 @@
 # timed by the catalog's own template ("Earned" before; "or concurrently
 # enrolled" before or same term). A requisite under wording the extractor does
 # not recognise is held for a reviewer, never drawn. A pair listed each way
-# (a lecture and its lab) is held too: the board cannot draw a cycle.
+# (a lecture and its lab) is held too: the board cannot draw a cycle. A choice
+# draws no arrow, so a course that needs one of its options waits on the
+# choice's tiles as a course-count condition: planned a semester after the
+# first of them, shown as a condition, never as an arrow.
 
 DEGREE_BOARD_TIMING <- c(prior = "before", prior_or_concurrent = "before_or_same", concurrent = "before_or_same")
 DEGREE_BOARD_DRAFT_NOTE <- "Draft compiled from a catalog reading that no one has reviewed yet."
@@ -60,6 +63,7 @@ degree_packet_program_facts <- function(packet) {
 #' @return Tibble: `subject_course` (the course), `requisite` (the course it
 #'   needs), `timing` (`prior`, `prior_or_concurrent`, `concurrent`, or `NA` when
 #'   the wording is not a recognised template), `alternative` (one of several),
+#'   `group` (the nearest "one of" node it sits under, "" when none),
 #'   `quote`, `source_url` (the course's page).
 degree_course_requisites <- function(rule_nodes, courses) {
   needed <- c("entity", "phase", "node_id", "parent_id", "operator", "course_codes", "text", "timing")
@@ -70,22 +74,22 @@ degree_course_requisites <- function(rule_nodes, courses) {
   parent_of <- stats::setNames(rows$parent_id, rows$node_id)
   leaves <- rows[rows$operator == "course" & nzchar(rows$course_codes), ]
   out <- lapply(seq_len(nrow(leaves)), function(i) {
-    leaf <- leaves[i, ]; at <- leaf$parent_id; timing <- NA_character_; alternative <- FALSE; opaque <- FALSE
+    leaf <- leaves[i, ]; at <- leaf$parent_id; timing <- NA_character_; alternative <- FALSE; group <- ""; opaque <- FALSE
     while (nzchar(at) && at %in% rows$node_id) {
       node <- rows[rows$node_id == at, ]
       if (is.na(timing) && nzchar(node$timing)) timing <- node$timing
-      if (node$operator %in% c("choose_n", "credits")) alternative <- TRUE
+      if (node$operator %in% c("choose_n", "credits")) { if (!alternative) group <- at; alternative <- TRUE }
       if (node$operator == "condition") opaque <- TRUE
       at <- parent_of[[at]]
     }
     if (opaque) timing <- NA_character_
     codes <- trimws(strsplit(leaf$course_codes, "|", fixed = TRUE)[[1]])
     tibble::tibble(subject_course = courses$subject_course[match(leaf$entity, courses$course_ref)],
-                   requisite = degree_compiler_course_code(codes), timing = timing, alternative = alternative,
+                   requisite = degree_compiler_course_code(codes), timing = timing, alternative = alternative, group = group,
                    quote = leaf$text, source_url = courses$catalog_url[match(leaf$entity, courses$course_ref)])
   })
   none <- tibble::tibble(subject_course = character(), requisite = character(), timing = character(),
-                         alternative = logical(), quote = character(), source_url = character())
+                         alternative = logical(), group = character(), quote = character(), source_url = character())
   dplyr::distinct(dplyr::bind_rows(none, out), subject_course, requisite, .keep_all = TRUE)
 }
 
@@ -101,8 +105,9 @@ degree_course_requisites <- function(rule_nodes, courses) {
 #'   its shared rows (`catalog_id` "*"), program math routes and planning defaults.
 #' @param evidence The institution's `degree_catalog_evidence`, for the shared routes' citations.
 #' @param general_math The shared math node a program with no math requirement plans toward.
-#' @return List: `catalog`, `roadmaps` (validated), `held` (requisites among the
-#'   board's courses not drawn, with why).
+#' @return List: `catalog`, `roadmaps` (validated; a course that needs a
+#'   choice's option carries a course-count condition on its tiles), `held`
+#'   (requisites among the board's courses neither drawn nor made a condition, with why).
 assemble_compiled_degree_board <- function(compiled, courses, program, requisites, catalog_row, shared, evidence, general_math) {
   id <- catalog_row$catalog_id
   if (catalog_row$source_url != program$catalog_url) stop("[degree-compiler-board.R] The draft's source must be its program page")
@@ -219,6 +224,7 @@ assemble_compiled_degree_board <- function(compiled, courses, program, requisite
   shared_evidence <- evidence[evidence$evidence_id %in% c(shared$links$evidence_id[shared$links$catalog_id == "*"],
                                                           vapply(basis, function(b) b$evidence_id, "")), ]
 
+  empty <- function(spec) as.data.frame(stats::setNames(replicate(length(spec), character(), simplify = FALSE), spec))
   # Arrows between course tiles this board shows.
   # (A board of choices alone has no course tiles of its own.)
   code_to_node <- c(stats::setNames(as.character(names(components)), vapply(components, function(x) x$subject_course, "")),
@@ -227,16 +233,37 @@ assemble_compiled_degree_board <- function(compiled, courses, program, requisite
   candidates$from <- unname(code_to_node[candidates$requisite]); candidates$to <- unname(code_to_node[candidates$subject_course])
   candidates <- candidates[!(candidates$from %in% shown & candidates$to %in% shown), ]
   mutual <- paste(candidates$from, candidates$to) %in% paste(candidates$to, candidates$from)
-  # A course that needs one of a choice's options: the board draws no arrow
-  # from a choice (the option a student takes is not known), so say so.
-  option_codes <- unique(unlist(lapply(options, function(o) o$subject_course)))
-  from_choice <- requisites[requisites$subject_course %in% names(code_to_node) & requisites$requisite %in% option_codes &
+  drawn <- candidates[!is.na(candidates$timing) & !mutual, ]
+  # A course that needs one of a choice's options: a choice draws no arrow (the
+  # option a student takes is not known), so the course waits on the choice's
+  # tiles as a course-count condition, a semester after the first of them. One
+  # condition per "one of" group (or per requisite outside one), over every
+  # choice tile offering a member; a group a drawn arrow already serves needs
+  # none. A shared tile takes no condition: its shared route places it.
+  own_codes <- vapply(components, function(x) x$subject_course, "")
+  option_tiles <- do.call(rbind, c(list(data.frame(node_id = character(), subject_course = character())),
+    lapply(options, function(o) o[c("node_id", "subject_course")])))
+  from_choice <- requisites[requisites$subject_course %in% names(code_to_node) & requisites$requisite %in% option_tiles$subject_course &
                               !requisites$requisite %in% names(code_to_node), ]
+  waiting <- from_choice[!is.na(from_choice$timing) & from_choice$subject_course %in% own_codes, ]
+  waiting$key <- paste(waiting$subject_course, ifelse(nzchar(waiting$group), waiting$group, waiting$requisite))
+  waiting <- waiting[!waiting$key %in% paste(drawn$subject_course, drawn$group)[nzchar(drawn$group)], ]
+  waits <- split(waiting, factor(waiting$key, unique(waiting$key)))
+  conditions <- do.call(rbind, c(list(empty(CEDAR_CONFIG_FILE_SPECS$degree_roadmap_conditions)), lapply(seq_along(waits), function(k) {
+    w <- waits[[k]]
+    target <- unname(code_to_node[w$subject_course[1]])
+    cid <- paste0("after-", id, "-", target, "-", k)
+    eid <- cite(cid, "course", w$source_url[1], "Prerequisites", paste(unique(w$quote), collapse = " / "))
+    data.frame(condition_id = cid, catalog_id = id, node_id = target, kind = "course_count", minimum = "1",
+      eligible_node_ids = paste(sort(unique(option_tiles$node_id[option_tiles$subject_course %in% w$requisite])), collapse = "|"),
+      label = paste0("Needs ", paste(sort(unique(w$requisite)), collapse = " or "), ", offered in a choice"), evidence_id = eid)
+  })))
   held <- dplyr::bind_rows(
-    dplyr::mutate(from_choice, why = "needs a course offered in a choice; a choice draws no arrow"),
+    dplyr::mutate(from_choice[is.na(from_choice$timing), ], why = "needs a course offered in a choice, in wording that is not a recognised requisite template"),
+    dplyr::mutate(from_choice[!is.na(from_choice$timing) & !from_choice$subject_course %in% own_codes, ],
+                  why = "a shared course that needs a course offered in a choice; its shared route places it"),
     dplyr::mutate(candidates[is.na(candidates$timing), ], why = "wording is not a recognised requisite template"),
     dplyr::mutate(candidates[!is.na(candidates$timing) & mutual, ], why = "listed each way; the board cannot draw a cycle"))
-  drawn <- candidates[!is.na(candidates$timing) & !mutual, ]
   links <- do.call(rbind, c(list(shared$links[shared$links$catalog_id == "*", ]), lapply(seq_len(nrow(drawn)), function(i) {
     d <- drawn[i, ]
     eid <- cite(paste0("route-", id, "-", d$from, "-", d$to), "course", d$source_url, "Prerequisites", d$quote)
@@ -252,7 +279,6 @@ assemble_compiled_degree_board <- function(compiled, courses, program, requisite
     evidence_id = plan_evidence, assumption = DEGREE_BOARD_DRAFT_NOTE, upper_level_from_semester = upper_from,
     allowance_slot_credits = as.character(degree_board_plan_default(shared$plans, "allowance_slot_credits")),
     gen_ed_source_url = as.character(degree_board_plan_default(shared$plans, "gen_ed_source_url")))
-  empty <- function(spec) as.data.frame(stats::setNames(replicate(length(spec), character(), simplify = FALSE), spec))
   catalog <- validate_degree_catalog(list(
     catalogs = as.data.frame(catalog_row),
     rules = data.frame(rule_id = paste0(id, "-total"), catalog_id = id, parent_id = "", phase = "degree", area = "completion",
@@ -262,7 +288,7 @@ assemble_compiled_degree_board <- function(compiled, courses, program, requisite
     evidence = rbind(shared_evidence[CEDAR_CONFIG_FILE_SPECS$degree_catalog_evidence], do.call(rbind, ev))))
   roadmaps <- validate_degree_roadmaps(list(
     nodes = roadmaps$nodes, links = links, starts = shared$starts, math_routes = math_routes,
-    conditions = empty(CEDAR_CONFIG_FILE_SPECS$degree_roadmap_conditions),
+    conditions = conditions,
     basis = do.call(rbind, basis), plans = plan,
     courses = rbind(shared$courses[shared$courses$catalog_id == "*", ], do.call(rbind, components)),
     options = if (length(options)) do.call(rbind, options) else empty(CEDAR_CONFIG_FILE_SPECS$degree_roadmap_options)), catalog)
@@ -304,6 +330,7 @@ format_degree_board_comparison <- function(title, math, draft, board, held) {
   c(paste0(title, " \u00b7 math start: ", math),
     paste0("  Semesters: ", nrow(draft$terms), " draft, ", nrow(board$terms), " on the board"),
     paste0("  Arrows: ", nrow(draft$links), " draft, ", nrow(board$links), " on the board; ", nrow(held), " held for a reviewer"),
+    paste0("  Waits on a choice: ", nrow(draft$conditions[draft$conditions$kind == "course_count", ]), " course-count conditions"),
     paste0("  Courses on both: ", both, ", same semester for ", same),
     paste0("    ", formatC(rows$code, width = -12), " draft ", show(rows$draft_semester), " \u00b7 board ", show(rows$board_semester)),
     if (nrow(held)) {

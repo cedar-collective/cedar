@@ -230,8 +230,15 @@ beside its hand-built board, semester by semester.
   is held for a reviewer, never drawn, when:
   - its wording isn't a recognised template;
   - the pair lists each other (the board can't draw a cycle);
-  - it starts from a course offered in a choice, because a choice tile carries
-    no arrows (the authored boards' rule).
+  - a shared tile needs a course offered in a choice (its shared route places it).
+- **Waiting on a choice.** A choice tile carries no arrows (the authored boards'
+  rule: the option a student takes isn't known). A course that needs one of a
+  choice's options instead gets a course-count condition on the choice's tiles,
+  so it's planned a semester after the first of them and shows the condition
+  rather than an arrow. Requisites under one "one of" in the course page share
+  a condition across every choice that offers a member; a "one of" a drawn
+  arrow already serves needs none. The condition always adds a semester, even
+  where the catalog allows the same term.
 - **The shared routes** come from the institution's boards:
   - Math plans toward the reading's required shared math course. A program
     with none plans toward the course most authored boards use for general
@@ -243,22 +250,25 @@ beside its hand-built board, semester by semester.
 
 On the pilot, with the calculus start:
 
-| Program | Courses on both boards | Same semester | Within one | Arrows, draft / board | Held |
-|---|---|---|---|---|---|
-| History B.A. | 5 | 3 | 4 | 1 / 1 | 0 |
-| Philosophy B.A. | 4 | 3 | 3 | 1 / 1 | 0 |
-| Business Administration B.B.A. | 19 | 11 | 19 | 14 / 25 | 20 |
-| Computer Science B.S. | 18 | 8 | 13 | 17 / 25 | 8 |
+| Program | Courses on both boards | Same semester | Within one | Arrows, draft / board | Waits on a choice | Held |
+|---|---|---|---|---|---|---|
+| History B.A. | 5 | 3 | 4 | 1 / 1 | 0 | 0 |
+| Philosophy B.A. | 4 | 3 | 3 | 1 / 1 | 0 | 0 |
+| Business Administration B.B.A. | 19 | 11 | 19 | 14 / 25 | 10 | 0 |
+| Computer Science B.S. | 18 | 8 | 14 | 17 / 25 | 5 | 1 |
 
-Where the semesters differ, the draft is almost always earlier: 19 of the 21
-differences, all but Business's BUSA 1110 and CS's STAT 345. Two things drive
-most of that:
-- The draft starts every tile as early as its level allows, where an author
-  spaces a sequence.
-- The arrows a draft holds back are the ones from choices. Business's writing
-  choice gates seven upper-division courses, and CS's Java I choice gates C
-  Programming and Java II. The hand boards draw those from their example pick.
-  The draft says which courses wait on a choice instead of choosing one.
+Where the semesters differ, the draft is usually earlier: 18 of the 21
+differences. The draft starts every tile as early as its level allows, where an
+author spaces a sequence. The three later ones are Business's BUSA 1110 and
+CS's MATH 1522 and CS 375. CS 375 waits on the linear algebra choice, which
+load pushes to semester 6.
+
+The conditions barely move placement: Business's placements don't change, and
+in CS only C Programming and Java II move, from semester 1 to 2 (13 to 14 within
+one semester). The other waiting courses already started after their choice by
+level or load. The hand boards draw those arrows from an example pick (Business's writing
+choice gates seven upper-division courses, CS's Java I choice gates C
+Programming and Java II); the draft names the wait instead of choosing one.
 
 ## Where draft interpretations live
 

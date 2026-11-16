@@ -8,7 +8,7 @@ parent: Developer Guide
 
 This reference is auto-generated from roxygen2 comments in the source code.
 
-*Generated: 2026-11-16 08:43:05.958964*
+*Generated: 2026-11-16 10:20:04.911835*
 
 ---
 
@@ -2278,7 +2278,7 @@ Snapshot of credits and prior course history at the moment students first declar
 - `rule_nodes` - An analysis `rule-nodes.csv` (extractor 1.4.0 or later).
 - `courses` - `degree_packet_course_facts()`: the courses whose requisites are read.
 
-**Returns:** Tibble: `subject_course` (the course), `requisite` (the course it needs), `timing` (`prior`, `prior_or_concurrent`, `concurrent`, or `NA` when the wording is not a recognised template), `alternative` (one of several), `quote`, `source_url` (the course's page).
+**Returns:** Tibble: `subject_course` (the course), `requisite` (the course it needs), `timing` (`prior`, `prior_or_concurrent`, `concurrent`, or `NA` when the wording is not a recognised template), `alternative` (one of several), `group` (the nearest "one of" node it sits under, "" when none), `quote`, `source_url` (the course's page).
 
 ---
 
@@ -2299,7 +2299,7 @@ Snapshot of credits and prior course history at the moment students first declar
 - `evidence` - The institution's `degree_catalog_evidence`, for the shared routes' citations.
 - `general_math` - The shared math node a program with no math requirement plans toward.
 
-**Returns:** List: `catalog`, `roadmaps` (validated), `held` (requisites among the board's courses not drawn, with why).
+**Returns:** List: `catalog`, `roadmaps` (validated; a course that needs a choice's option carries a course-count condition on its tiles), `held` (requisites among the board's courses neither drawn nor made a condition, with why).
 
 ---
 
