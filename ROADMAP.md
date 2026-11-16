@@ -212,6 +212,11 @@ contracts: [degree-requirements.md](docs/developers/degree-requirements.md),
   minor/residence/college constraints and selectable choices, without silently
   adding credits or certifying completion.
 - [ ] **Compile approved rules** into runtime degree tables and route templates.
+  Draft rows and the board comparison exist (`degree-compiler.R`,
+  [results](docs/developers/catalog-normalization.md#compiling-a-reading-into-board-rows));
+  next, semester placement and prerequisite links from course-unit readings,
+  then publishing: a compiled board shows as a labelled draft until its reading
+  is signed off in Admin > Catalog Review, and as reviewed after.
 - [ ] **AI automation** behind the same proposal/review boundary, evaluated on
   the four-program pilot first.
 - [ ] **Routes and constraints.** Selectable elective/science routes, all

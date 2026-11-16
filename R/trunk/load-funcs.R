@@ -126,6 +126,7 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
   source_file("branches/catalog-comparison.R")
   source_file("branches/catalog-review.R")
   source_file("branches/catalog-normalization.R")
+  source_file("branches/degree-compiler.R")
   source_file("lists/data_semantics.R")       # what CEDAR knows that the data does not say
   source_file("lists/population-presets.R")    # defines CEDAR_POPULATION_GROUPS, shared by Pathways and projections
 

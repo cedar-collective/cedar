@@ -177,6 +177,41 @@ controls, then exercises flags, edits, one-click sign-off and persistence on an
 explicitly attributed disposable workflow fixture. It removes only that fixture
 and its receipts afterward; no real program is approved by a test.
 
+## Compiling a reading into board rows
+
+`R/branches/degree-compiler.R` turns one interpretation into draft Degree
+Explorer rows, and `scripts/compile-degree-interpretations.R --root
+REVIEW_ROOT` prints each committed interpretation beside its hand-built board.
+It reads prepared packets for course credits (each course unit's own catalog
+record) and writes nothing.
+
+| Reading | Draft |
+|---|---|
+| a required `course` | one tile |
+| `choose_n` / `any`, or credits from a listed set | one choice, with its options; a two-course option fills two tiles |
+| a credit group whose listed courses add to its minimum | each course required |
+| an unlisted credit pool inside a group | elective space, credits ÷ 3 tiles (rounded, at least one) |
+| an unlisted credit rule at the top of the tree | listed for a reviewer, never a tile: the schema cannot tell an elective pool from a total or a residency rule |
+| admission, policy, GPA, grade, permission, standing, restriction | a condition |
+| `unresolved` | a question for the reviewer, never an option |
+| a concentration's rules | listed, not compiled |
+
+Semesters are not placed and prerequisite arrows are not drawn: those wait on
+readings of the course units. On the four-program pilot (2026-2027 catalog)
+the comparison found:
+
+| Program | Tiles, compiled / board | What differs |
+|---|---|---|
+| History B.A. | 12 / 12 | nothing; the same 18 elective credits |
+| Computer Science B.S. | 26 / 26 | the board shows CSCI 1210, which the reading does not name; the science pool drafts five tiles for "14 credits" where the rule means four courses with labs (flagged) |
+| Philosophy B.A. | 14 / 10 | three overlapping elective rules draft 12 credits where the board holds 6 (the reading flags the overlap) |
+| Business Administration B.B.A. | 24 / 23 | four Gen Ed area pools become elective space; nine concentrations not compiled |
+
+Every required course is either on its board or on the shared math and English
+routes, and every board course except CS's CSCI 1210 is in its reading. The
+differences are where the reading is ambiguous, and each such passage is
+already an unresolved question in its reading.
+
 ## Where draft interpretations live
 
 Moved from `AGENTS.md` on 2026-11-07.
@@ -193,5 +228,6 @@ and passages need no individual approval clicks. Edits reopen sign-off. This
 optional workflow is under **Draft interpretations**; old queues are **Extraction
 diagnostics**, loaded only on demand. `scripts/normalize-degree-catalog.R` and
 `config/catalog-normalization*` define the exchange contract. No AI API calls,
-automatic approvals or runtime compilation occur. See
+automatic approvals or runtime compilation occur; the draft compiler above runs
+offline and writes nothing. See
 [catalog-normalization.md](catalog-normalization.md).

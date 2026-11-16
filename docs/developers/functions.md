@@ -8,7 +8,7 @@ parent: Developer Guide
 
 This reference is auto-generated from roxygen2 comments in the source code.
 
-*Generated: 2026-11-15 22:03:42.430078*
+*Generated: 2026-11-16 08:29:12.210186*
 
 ---
 
@@ -2248,6 +2248,67 @@ Snapshot of credits and prior course history at the moment students first declar
 - `opt` - Options list; uses opt$min_n (default 5)
 
 **Returns:** Named list: credits (summary tibble), courses_focal, courses_other, n_declarers, focal_subjects
+
+---
+
+## degree-compiler
+
+### `degree_packet_course_facts()`
+
+*Source: degree-compiler.R*
+
+**The courses a prepared catalog packet cites, from each course unit's record**
+
+**Parameters:**
+
+- `packet` - A prepared packet (`load_catalog_normalization_program()$packet`).
+
+**Returns:** Tibble: `course_ref` (`courses:<id>`), `subject_course`, `title`, `credits_min`, `credits_max`. A course record without credits stops.
+
+---
+
+### `compile_degree_interpretation()`
+
+*Source: degree-compiler.R*
+
+**Compile one interpretation's base program into draft board rows**
+
+**Parameters:**
+
+- `proposal` - The interpretation's `proposal` (parsed JSON, unsimplified).
+- `courses` - `degree_packet_course_facts()` for the same packet.
+
+**Returns:** List: `rules` (one row per compiled rule: `rule_id`, `role`, `subject_course`, `label`, `tiles`, `credits`, `quote`), `options` (`rule_id`, `option_id`, `subject_course`), `conditions`, `credit_rules`, `flags`, `concentrations`, and `skipped` (information nodes).
+
+---
+
+### `compare_compiled_degree()`
+
+*Source: degree-compiler.R*
+
+**Compare a compiled program with its hand-built board**
+
+**Parameters:**
+
+- `compiled` - `compile_degree_interpretation()` output.
+- `roadmaps` - `read_degree_roadmaps()` output.
+- `catalog_id` - The hand-built board's catalog id.
+
+**Returns:** List: `required_on_board`, `required_on_shared_routes` (math and English starting routes), `required_not_on_board` (compiled required courses), `board_not_compiled` (courses the board shows that the compiled rules neither require nor offer), `choices` (each compiled choice with the board courses among its options), `slot_credits` (compiled vs board), `tiles` (compiled vs board count).
+
+---
+
+### `format_compiled_degree_preview()`
+
+*Source: degree-compiler.R*
+
+**The compiled program and its comparison as plain text, for a reviewer**
+
+**Parameters:**
+
+- `title` - The program's name.
+- `compiled` - `compile_degree_interpretation()` output.
+- `comparison` - `compare_compiled_degree()` output, or `NULL` when the program has no hand-built board.
 
 ---
 

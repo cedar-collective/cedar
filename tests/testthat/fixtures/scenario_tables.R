@@ -649,6 +649,61 @@ scan_config <- local({
     fields = read_institution_file("catalog_scan_fields", dir))
 })
 
+# ── test-degree-compiler.R ─────────────────────────────────────────────────────
+
+# The designed Biology B.S. interpretation the degree compiler reads: every rule
+# the demo catalog fixture states for the program and its concentration, cited
+# to its source block (ids are content hashes of institution/demo/
+# catalog-source-fixture.json). BIOL 200 against the lab pair is left
+# unresolved, as a reader would.
+compiler_biology_proposal <- local({
+  compiler_rule <- function(id, parent, kind, label, block, quote, entity = "programs:biology", phase = "degree",
+                            minimum = NULL, unit = "none", value = "", refs = list(), comparison = "none") {
+    list(id = id, parent_id = parent, entity_id = entity, phase = phase, kind = kind, label = label,
+         minimum = minimum, maximum = NULL, unit = unit, comparison = comparison, value = value, minimum_grade = "",
+         course_refs = refs, program_ref = "", timing = "not_applicable",
+         citations = list(list(block_id = block, quote = quote)))
+  }
+  compiler_cover <- function(block, disposition, nodes = character(), why = "Designed interpretation")
+    list(block_id = block, disposition = disposition, node_ids = as.list(nodes), explanation = why)
+  list(schema_version = "1.0.0", questions = list(),
+    nodes = list(
+      compiler_rule("major", "", "all", "Complete the Biology major", "b-7dcbcb97cd7ee63e0e5368a9", "Complete all of the following"),
+      compiler_rule("start", "major", "choose_n", "Biology I with its lab, or Combined Biology", "b-d393fa921001d2c885dde016",
+                    "Complete at least 1 of the following", minimum = 1, unit = "courses", comparison = "at_least"),
+      compiler_rule("pair", "start", "all", "Biology I and its lab", "b-944c096cfb5151e26839fa49", "Complete the following"),
+      compiler_rule("bio1", "pair", "course", "BIOL2110 - Biology I (3)", "b-f22d0c38b4ae90977f7c5b99", "BIOL2110 - Biology I (3)", refs = list("courses:course-one")),
+      compiler_rule("lab", "pair", "course", "BIOL2110L - Biology I Lab (1)", "b-9e466020241662f635910b1d", "BIOL2110L - Biology I Lab (1)", refs = list("courses:course-lab")),
+      compiler_rule("combined", "start", "course", "BIOL200 - Combined Biology (4)", "b-12cf2b1d2a007e540e5f8c49", "BIOL200 - Combined Biology (4)", refs = list("courses:course-two")),
+      compiler_rule("combined-scope", "start", "unresolved", "Does Combined Biology replace both Biology I and its lab?",
+                    "b-12cf2b1d2a007e540e5f8c49", "Combined Biology (4)", value = "The list offers BIOL200 beside the pair without saying it covers the lab"),
+      compiler_rule("admit-upper", "", "course_pool", "At least two upper-level courses", "b-c83ed948337af5e15eada1e2",
+                    "At least two upper-level courses", phase = "admission", minimum = 2, unit = "courses", value = "upper-level courses", comparison = "at_least"),
+      compiler_rule("admit-permission", "", "permission", "Department permission", "b-c83ed948337af5e15eada1e2",
+                    "department permission", phase = "admission", value = "department permission"),
+      compiler_rule("degree-total", "", "credits", "At least 120 degree credits", "b-70866de17388f7d2b5a24491", "120",
+                    minimum = 120, unit = "credits", comparison = "at_least"),
+      compiler_rule("cellular", "", "all", "Cellular Biology concentration", "b-d0c4bcb6e7a2da072eaa9347", "Complete the following", entity = "specializations:cellular"),
+      compiler_rule("cellular-combined", "cellular", "course", "BIOL200 - Combined Biology (4)", "b-5bd56eb0159be765a0e60837",
+                    "BIOL200 - Combined Biology (4)", entity = "specializations:cellular", refs = list("courses:course-two"))),
+    coverage = list(
+      compiler_cover("b-7dcbcb97cd7ee63e0e5368a9", "requirements", "major"),
+      compiler_cover("b-d393fa921001d2c885dde016", "requirements", "start"),
+      compiler_cover("b-944c096cfb5151e26839fa49", "requirements", "pair"),
+      compiler_cover("b-f22d0c38b4ae90977f7c5b99", "requirements", "bio1"),
+      compiler_cover("b-9e466020241662f635910b1d", "requirements", "lab"),
+      compiler_cover("b-12cf2b1d2a007e540e5f8c49", "unresolved", c("combined", "combined-scope")),
+      compiler_cover("b-c83ed948337af5e15eada1e2", "requirements", c("admit-upper", "admit-permission")),
+      compiler_cover("b-5450e022abf0d057ec85a9ce", "information"),
+      compiler_cover("b-f5c805f0f7ad0f3f03b55b63", "information"),
+      compiler_cover("b-cd9154d612042d822e5c8bc2", "information"),
+      compiler_cover("b-f94d4b00cf84a04d3bcca5d1", "information"),
+      compiler_cover("b-70866de17388f7d2b5a24491", "requirements", "degree-total"),
+      compiler_cover("b-d0c4bcb6e7a2da072eaa9347", "requirements", "cellular"),
+      compiler_cover("b-5bd56eb0159be765a0e60837", "requirements", "cellular-combined"),
+      compiler_cover("b-5d7913605fd3394402fa1faf", "information")))
+})
+
 # ── test-enrollment-projection-scenario.R, test-projection-inputs.R, ─────────────
 # ── test-projection-model.R, test-projection-view.R ─────────────────────────────
 
