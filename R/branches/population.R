@@ -864,7 +864,7 @@ resolve_focal_programs <- function(programs, opt) {
   own_pre_majors <- character(0)
   selected <- if (type %in% c("major", "preset")) {
     if (length(opt[["program_names"]]) > 0)
-      stop("[population.R] type = '", type, "' selects by program code: pass opt$program_codes, ",
+      stop("[population.R] type = '", type, "' selects by major code: pass opt$program_codes, ",
            "not program_names (one name covers several programs).")
     if (length(opt$program_codes) == 0)
       stop("[population.R] opt$program_codes is required for type = '", type, "'")

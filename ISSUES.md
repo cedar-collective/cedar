@@ -3815,30 +3815,27 @@ program's name, a pre-major with no `leads_to`), and found none.
 
 ### Testing and pipeline safety
 
-**M57 — The fixture's program codes are not programs.csv codes.** The shared
-fixture's program rows carry made-up codes (`HIST-BA`, `MATH-BS`), and its
-degrees carry the same since 2026-11-16 (I62), while the tests read the UNM
-mapping files, whose History code is `HIST`. Real data holds one code per
-program across programs, degrees and programs.csv; the fixture can hold only
-two of the three, so a Dept Trends build on the fixture (prog codes from
-`major_to_dept`) finds no degrees, and every fixture code's name and pre-major
-come from the fixture, not the file (Pathways and Headcount label them
-"[no programs.csv row] (HIST-BA)").
+**M57 — The fixture's major codes carry the degree.** The shared fixture's
+program and degree rows put a made-up, degree-specific code in `major_code`
+(`HIST-BA`, `HIST-MA`, `MATH-BS`). Real data keeps the two apart (see
+[major code and program code](docs/developers/data-model.md#major-code-and-program-code-what-a-program-is)):
+`major_code` is the field, one code across degrees (`HIST` for the B.A., M.A.
+and Ph.D.), and the degree program is `program_code` (`BA-HIST-AS`,
+`MA-HIST`). A pre-major has its own major code (History's is `FHIS`); the
+fixture gives History's pre-majors the major's (`HIST-BA`, `is_pre_major =
+TRUE`). Because the tests read UNM's `programs.csv`, keyed on major codes, no
+fixture code has a row there: a Dept Trends build on the fixture finds no
+degrees, and Pathways and Headcount label the fixture's codes "[no
+programs.csv row] (HIST-BA)". Tests that rest on the made-up codes: "two
+programs sharing a name are two populations" (`test-population.R`) and the
+Headcount test of the same name (44 `HIST-BA` / 2 `HIST-MA`, really one
+program at two degrees), the dept-report degree counts by `HIST-BA`, and
+`HIST_CODES` / `HC_HISTORY_CODES`.
 
-The fixture also models what UNM's data does not. On the 2026-11-16 tables
-UNM has one code across degrees (HIST is the B.A., M.A. and Ph.D.; MATH the
-B.S., M.S. and Ph.D.; NURS the B.S.N. and M.S.N.) and gives a pre-major its
-own code (History's is FHIS, which leads to HIST). The fixture writes a code
-per degree (`HIST-BA`, `HIST-MA`) and gives History's pre-majors the major's
-code (`HIST-BA`, `is_pre_major = TRUE`). Tests that rest on that:
-"two programs sharing a name are two populations" (`test-population.R`), the
-Headcount test of the same name (44 `HIST-BA` / 2 `HIST-MA`), the
-dept-report degree counts by `HIST-BA`, and `HIST_CODES` /
-`HC_HISTORY_CODES`.
-
-*Plan:* move the fixture's programs and degrees to UNM codes (`HIST`, `FHIS`
+*Plan:* move the fixture's `major_code` to UNM's major codes (`HIST`, `FHIS`
 for History's pre-majors, `MATH`, `ANTH`, `BADM`, `PSY`; a concentration has
-no code, as in the export); re-pin each B.A./M.A. count that changes, checking
+none, as in the export) and put the degree program in `program_code`
+(`BA-HIST-AS`, `MA-HIST`); re-pin each B.A./M.A. count that changes, checking
 each one; move the same-name-programs tests to a pair UNM really has (PSY and
 XPSY, or ARCH and ARCT); keep the rename tests on a scenario
 `program_successions` table. Update the header's pinned counts in the same

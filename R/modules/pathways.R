@@ -91,7 +91,7 @@ pathways_focal_program_rows <- function(facts) {
                    fmt_term(renames$effective_term)), collapse = "; ")
     ),
     row("Pre-majors (programs.csv): ", "pre_major"),
-    tags$br(), tags$strong("Matched on: "), "program code",
+    tags$br(), tags$strong("Matched on: "), "major code",
     tags$span(class = "text-muted-sm", " (Major + Second Major records)")
   )
 }

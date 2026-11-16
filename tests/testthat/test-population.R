@@ -60,7 +60,7 @@ test_that("a preset population selects by code, never by name", {
   )
   expect_error(
     build_population(programs, opt = list(type = "preset", program_names = "Nursing")),
-    "selects by program code"
+    "selects by major code"
   )
 })
 
@@ -666,7 +666,7 @@ test_that("two programs sharing a name are two populations", {
 
   expect_error(build_population(test_programs,
                                 opt = list(type = "major", program_names = "History")),
-               "selects by program code")
+               "selects by major code")
   expect_error(build_population(test_programs, opt = list(type = "major")),
                "program_codes is required")
 })

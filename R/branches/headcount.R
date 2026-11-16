@@ -76,7 +76,7 @@ normalize_headcount_opt <- function(programs, opt = list(), dims = NULL) {
   # code, so they are the one program picked by name.
   # [[ ]], not $: opt$major would partial-match major_codes.
   if (length(opt[["major"]]) || length(opt[["minor"]])) {
-    stop("[headcount.R] Headcount selects majors and minors by program code: pass ",
+    stop("[headcount.R] Headcount selects majors and minors by major code: pass ",
          "opt$major_codes / opt$minor_codes, not major / minor (one name covers ",
          "several programs).", call. = FALSE)
   }

@@ -208,7 +208,7 @@ test_that("a major is picked by code: two programs sharing a name stay apart", {
                   c("[no programs.csv row] (HIST-BA)", "[no programs.csv row] (HIST-MA)"))
 
   expect_error(get_headcount(test_programs, opt = list(major = "History"), dims = test_dims),
-               "by program code")
+               "by major code")
   expect_error(filter_programs_by_opt(test_programs, opt = list(minor_codes = "PSYC-MIN")),
                "needs dims")
 })
