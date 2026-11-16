@@ -37,7 +37,8 @@ degree_compiler_course_code <- function(code) {
 #'
 #' @param packet A prepared packet (`load_catalog_normalization_program()$packet`).
 #' @return Tibble: `course_ref` (`courses:<id>`), `subject_course`, `title`,
-#'   `credits_min`, `credits_max`, `catalog_url`. A course record without credits stops.
+#'   `credits_min`, `credits_max`, `catalog_url`, `subject_name` (the catalog's
+#'   name for the course's subject). A record without credits or a subject stops.
 degree_packet_course_facts <- function(packet) {
   rows <- lapply(packet$units, function(unit) {
     docs <- unit$request$documents
@@ -50,9 +51,12 @@ degree_packet_course_facts <- function(packet) {
     }
     credits <- field("credits")$credits
     if (is.null(credits$min) || is.null(credits$max)) stop("[degree-compiler.R] Course ", docs[[1]]$code, " has no credit range")
+    subject <- field("subjectCode")
+    if (!nzchar(subject$description %||% "")) stop("[degree-compiler.R] Course ", docs[[1]]$code, " has no subject name")
     tibble::tibble(course_ref = docs[[1]]$id, subject_course = degree_compiler_course_code(docs[[1]]$code),
                    title = docs[[1]]$title, credits_min = as.numeric(credits$min),
-                   credits_max = as.numeric(credits$max), catalog_url = docs[[1]]$catalog_url)
+                   credits_max = as.numeric(credits$max), catalog_url = docs[[1]]$catalog_url,
+                   subject_name = subject$description)
   })
   dplyr::bind_rows(rows)
 }

@@ -5,7 +5,7 @@
 # them. www/cedar-roadmap.js handles hover previews and connectors only; a
 # click opens the standard CEDAR modal, rendered here from the same payload.
 
-degreeExplorerUI <- function(id, catalog, roadmaps) {
+degreeExplorerUI <- function(id, catalog, roadmaps, status = NULL) {
   ns <- NS(id)
   if (!nrow(catalog$catalogs)) return(empty_state("No degree roadmaps are configured for this institution."))
   english <- roadmaps$starts[roadmaps$starts$track == "english", ]
@@ -14,7 +14,7 @@ degreeExplorerUI <- function(id, catalog, roadmaps) {
       stylesheet = "cedar-roadmap.css", script = "cedar-roadmap.js"),
     filter_bar("Build your degree roadmap", "Choose a degree and your starting courses. Watch the sequence change.",
       fluidRow(
-        column(4, selectInput(ns("dx_catalog_id"), "Degree · latest catalog", choices = degree_catalog_choices(catalog))),
+        column(4, selectInput(ns("dx_catalog_id"), "Degree · latest catalog", choices = degree_catalog_choices(catalog, status))),
         column(3, selectInput(ns("dx_math_start"), "Where will you start in math?",
           choices = degree_math_start_choices(roadmaps, catalog$catalogs$catalog_id[1]))),
         column(3, selectInput(ns("dx_english_start"), "Where will you start in English?",
@@ -27,7 +27,7 @@ degreeExplorerUI <- function(id, catalog, roadmaps) {
     tags$p(class = "text-hint", "Want to see what students actually take? Open Pathways → Course paths."))
 }
 
-degreeExplorerServer <- function(id, catalog, roadmaps, sections, course_terms, edges, shared = NULL) {
+degreeExplorerServer <- function(id, catalog, roadmaps, sections, course_terms, edges, shared = NULL, status = NULL) {
   if (!nrow(catalog$catalogs)) return(invisible(NULL))
   moduleServer(id, function(input, output, session) {
     observeEvent(input$dx_catalog_id, {
@@ -57,7 +57,8 @@ degreeExplorerServer <- function(id, catalog, roadmaps, sections, course_terms, 
     output$roadmap <- renderUI({
       current <- view()
       if (is.null(current)) return(empty_state("This roadmap could not be built; the notification explains why."))
-      degree_semester_board(current, session$ns("semester_board"), select_id = session$ns("course_node"))
+      degree_semester_board(current, session$ns("semester_board"), select_id = session$ns("course_node"),
+        board = if (!is.null(status)) status[status$catalog_id == current$catalog$catalog_id, ])
     })
 
     observeEvent(input$show_rules, {
@@ -159,7 +160,9 @@ degreePlanRulesServer <- function(id, catalog, roadmaps, shared = NULL) {
 
 #' The semester board: course tiles in aligned rows, with the hover preview
 #' skeleton and the JSON payload cedar-roadmap.js reads.
-degree_semester_board <- function(view, id, select_id = paste0(id, "-select")) {
+#' `board` is the board's row of `publish_degree_drafts()$status`: a board
+#' compiled from the catalog says so, and whether its reading is reviewed.
+degree_semester_board <- function(view, id, select_id = paste0(id, "-select"), board = NULL) {
   legend <- c(green = "0 prerequisite courses", yellow = "1–2 prerequisite courses",
               red = "3+ prerequisite courses", unresolved = "Choice: prerequisites vary",
               conditional = "◇ Coursework / permission condition", suggested = "Suggested Gen Ed course")
@@ -169,7 +172,10 @@ degree_semester_board <- function(view, id, select_id = paste0(id, "-select")) {
     subtab_header(view$title, "A semester-by-semester picture · hover for prerequisites · click for enrollment history"),
     div(class = "scope-bar cedar-roadmap-summary", role = "status",
       tags$strong(view$math_note), tags$span(view$change_note),
-      tags$span(class = "cedar-roadmap-prototype", "Planning prototype")),
+      tags$span(class = "cedar-roadmap-prototype", title = if (!is.null(board) && nrow(board) && board$source == "compiled") board$note,
+        if (is.null(board) || !nrow(board) || board$source == "authored") "Planning prototype"
+        else if (board$review == "reviewed") "Planning prototype · from the catalog, reviewed"
+        else "Planning prototype · draft from the catalog, not yet reviewed")),
     # Condensed until cedar-roadmap.js reads the viewer's remembered choice.
     div(id = id, class = "cedar-roadmap cedar-roadmap--condensed", `data-roadmap` = "true",
       `data-view` = "condensed", `data-select-input` = select_id,

@@ -212,13 +212,14 @@ contracts: [degree-requirements.md](docs/developers/degree-requirements.md),
   minor/residence/college constraints and selectable choices, without silently
   adding credits or certifying completion.
 - [ ] **Compile approved rules** into runtime degree tables and route templates.
-  Draft rows and the board comparison exist (`degree-compiler.R`,
-  [results](docs/developers/catalog-normalization.md#compiling-a-reading-into-board-rows));
-  draft boards are assembled, validated and placed, with arrows from the
-  course pages' timed requisites (`degree-compiler-board.R`). Next, publishing:
-  a compiled board shows as a labelled draft until its reading is signed off
-  in Admin > Catalog Review, and as reviewed after. A course that needs a
-  choice's option waits on it as a course-count condition, not an arrow.
+  Draft rows, placed draft boards and the board comparison exist
+  (`degree-compiler.R`, `degree-compiler-board.R`,
+  [results](docs/developers/catalog-normalization.md#compiling-a-reading-into-board-rows)).
+  Compiled boards are published (`--write`, `features/degree-drafts.R`): each
+  takes its program's hand board's place on Degree Explorer, labelled a draft
+  until its reading is signed off, then reviewed. Next: readings for programs
+  with no hand board (a draft needs a catalog row for them), and showing a
+  sign-off without a restart.
 - [ ] **AI automation** behind the same proposal/review boundary, evaluated on
   the four-program pilot first.
 - [ ] **Routes and constraints.** Selectable elective/science routes, all

@@ -1130,6 +1130,23 @@ test_that("allowance popups disclose credit fit and exclude courses the plan alr
 
 # ── Rendering ────────────────────────────────────────────────────────────────
 
+test_that("a board compiled from the catalog says so in the degree list and on the board", {
+  testthat::local_edition(3)
+  withr::local_package("shiny")
+  withr::local_package("bslib")
+  load_funcs(cedar_base_dir, modules = TRUE)
+  chip <- function(row) regmatches(html <- as.character(degree_semester_board(roadmap_view(), "board", board = row)),
+                                   regexpr("<span class=\"cedar-roadmap-prototype\"[^>]*>[^<]*</span>", html))
+  # Change for the second chip: Biology's reading is signed off.
+  reviewed <- degree_board_status_demo; reviewed$review[1] <- "reviewed"; reviewed$note[1] <- "Its catalog reading was signed off in Catalog Review on 2026-11-16."
+  expect_snapshot({
+    names(degree_catalog_choices(test_degree_catalog, degree_board_status_demo))
+    chip(degree_board_status_demo[1, ])
+    chip(reviewed[1, ])
+    chip(degree_board_status_demo[2, ])
+  })
+})
+
 test_that("the board and popups render the payload; catalog evidence lives in the server modal", {
   withr::local_package("shiny")
   withr::local_package("bslib")

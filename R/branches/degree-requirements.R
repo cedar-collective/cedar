@@ -6,9 +6,14 @@
 # docs/developers/degree-explorer-rules.md; contract:
 # docs/developers/degree-requirements.md.
 
-degree_catalog_choices <- function(catalog) {
-  stats::setNames(catalog$catalogs$catalog_id,
-    paste(catalog$catalogs$degree_label, catalog$catalogs$catalog_year, sep = " · "))
+#' The degree list; with `status` (publish_degree_drafts()), a draft board says so.
+degree_catalog_choices <- function(catalog, status = NULL) {
+  label <- paste(catalog$catalogs$degree_label, catalog$catalogs$catalog_year, sep = " · ")
+  if (!is.null(status)) {
+    draft <- status$review[match(catalog$catalogs$catalog_id, status$catalog_id)] %in% "draft"
+    label[draft] <- paste(label[draft], "draft", sep = " · ")
+  }
+  stats::setNames(catalog$catalogs$catalog_id, label)
 }
 
 degree_math_start_choices <- function(roadmaps, catalog_id) {
