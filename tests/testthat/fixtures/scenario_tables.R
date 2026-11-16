@@ -30,6 +30,20 @@ review_files <- list(
                                   "https://github.com/org/repo/blob/main"))
 )
 
+# ── test-scope-bar.R ────────────────────────────────────────────────────────────
+
+# Scaffolding: unit_mapping_rows() output for one department with one subject,
+# one program and one pre-major, the shape unit_codes_scope() reads.
+scope_unit_rows <- list(
+  units = tibble::tibble(unit_code = "HIST", unit_name = "History", college_code = "AS",
+                         college_name = "Arts and Sciences"),
+  subjects = tibble::tibble(unit_code = "HIST", subject_code = "HIST", in_college = NA_character_,
+                            in_level = NA_character_),
+  programs = tibble::tibble(unit_code = "HIST", program_code = c("HIST", "FHIS"),
+                            program_name = c("History", "Pre-History"), is_pre_major = c(FALSE, TRUE),
+                            leads_to = c(NA, "HIST"), in_college = NA_character_)
+)
+
 # Scaffolding: what build_admin_mapping_issues() would say about three codes.
 # FRAD is proposed in the file (merged into its row), NOFILE has no row at all
 # (listed, unlinked), and NURS is already confirmed (not listed, but counted).

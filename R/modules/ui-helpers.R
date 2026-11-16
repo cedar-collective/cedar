@@ -553,7 +553,11 @@ headcount_scope_bar <- function(described, ...) {
 # one block per unit, from unit_mapping_rows(). Shared by Dept Trends, the Dept
 # Dashboard and Headcount, so every scope bar names the same codes the mapping
 # files assign. Rows wrap (filter-context-row), since names make them long.
-unit_codes_scope <- function(rows) {
+#
+# The visible line is facts only: the unit, its code counts and, given
+# `time_facts` (cedar_scope_time_facts()), one chip per time fact. Explanation
+# (`time_meaning`, cedar_in_progress_meaning()) opens with the codes.
+unit_codes_scope <- function(rows, time_facts = NULL, time_meaning = NULL) {
   only <- function(college, level) {
     parts <- c(if (!is.na(college)) paste(college, "only"),
                if (!is.na(level)) paste(level, "only"))
@@ -610,9 +614,13 @@ unit_codes_scope <- function(rows) {
     tags$summary(
       tags$span(class = "filter-context-title",
                 paste0("Data scope for ", paste(unit_titles, collapse = "; "))),
+      lapply(names(time_facts), function(k) scope_chip(k, paste(time_facts[[k]], collapse = "; "))),
       tags$span(class = "cedar-scope-details-hint",
-                paste0(code_counts, if (nzchar(code_counts)) " — " else "", "show the codes"))
+                paste0(code_counts, if (nzchar(code_counts)) " — " else "",
+                       if (is.null(time_meaning)) "show the codes" else "show the codes and term notes"))
     ),
+    if (!is.null(time_meaning)) tags$div(class = "filter-context-row",
+      tags$span(class = "filter-context-label", time_meaning)),
     blocks,
     tags$div(class = "filter-context-row",
              tags$span(class = "filter-context-label",

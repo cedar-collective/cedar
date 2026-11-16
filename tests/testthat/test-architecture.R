@@ -521,6 +521,22 @@ test_that("open blue boxes do not grow, and the backlog shrinks on record (M43)"
   architecture_expect_ratchet(measured, allowance, "open blue box(es)")
 })
 
+test_that("scope bars hold facts, never an explanation row", {
+  # A scope bar names what the numbers cover: the unit and its codes, campus,
+  # terms in progress, grades through, counts in and out. How they are counted
+  # goes in a method slot, and what a fact means in the bar's disclosure
+  # (unit_codes_scope(time_meaning =)). A "Method:" or "Note:" row in the bar
+  # is that explanation creeping back (shiny-modules.md#data-scope-bars).
+  files <- c(r_files_under("R", "modules"), file.path(cedar_base_dir, c("server.R", "ui.R")))
+  label <- "(Method|Methodology|Note|Notes|How|Why|About)\\b"
+  pattern <- paste0("\"(rs-stripe-label|scope-chip-key|filter-context-label)\"\\s*,\\s*\"", label,
+                    "|scope_chip\\(\\s*\"", label)
+  measured <- architecture_count_by_file(files, function(file) {
+    sum(gregexpr(pattern, read_code(file), perl = TRUE)[[1]] > 0L)
+  })
+  architecture_expect_ratchet(measured, integer(0), "explanation row(s) in a scope bar")
+})
+
 test_that("units are resolved only by attach_unit() and the lists layer (ADR-001 step 3)", {
   # The invariant that prevents I9: one place reads the mapping files into a
   # unit, so two readers cannot drift apart. attach_unit() in

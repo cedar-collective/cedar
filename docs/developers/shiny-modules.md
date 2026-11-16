@@ -241,6 +241,27 @@ Rules:
   Dept Trends (Headcount, Credit Hours, Courses Taken) after the 2026-11-14
   pilot.
 
+### Data scope bars
+
+The light strip under a filter bar says **what the numbers cover**, as facts a
+reader can check: the unit and its codes, the campus, the terms still in
+progress and as of which pull, the last graded term, and counts in and out of
+the scope. It is not where a page explains itself.
+
+- **Visible line: facts only**, one labelled chip or count each
+  (`scope_chip()`). A page's time scope comes from
+  `cedar_scope_time_facts(in_progress, edges)`: `In progress` (each term, its
+  pull date, whether registration is still filling) and `Grades through`.
+- **What a fact means goes behind the disclosure.** `unit_codes_scope(rows,
+  time_facts, time_meaning)` puts `cedar_in_progress_meaning()` in the
+  collapsed part with the codes. Dept Trends is the reference.
+- **How a number is counted goes in the section's method slot**, never a
+  "Method:" row in the bar. Cancellations moved its row into each tab's method
+  (2026-11-15); `test-architecture.R` fails on a bar row labelled Method, Note,
+  How, Why or About.
+- **No page-level paragraph** restating the time scope above the tabs: the
+  charts mark in-progress terms (`mark_plotly_terms()`) and the bar names them.
+
 ### Headings
 
 - **A subtab opens with `subtab_header()`, never with a section bar.** The

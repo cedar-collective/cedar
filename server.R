@@ -4729,8 +4729,9 @@ output$enrl_classlist_download <- downloadHandler(
   # Which codes the selected department counts, each with its name: the
   # mapping-file rows behind it (unit_mapping_rows()), rendered by the shared
   # unit_codes_scope() that Headcount uses too.
-  dept_scope_info_ui <- function(dept) {
-    filter_scope_stripe(unit_codes_scope(unit_mapping_rows(dept, cedar_institution_files)))
+  dept_scope_info_ui <- function(dept, time_facts = NULL, time_meaning = NULL) {
+    filter_scope_stripe(unit_codes_scope(unit_mapping_rows(dept, cedar_institution_files),
+                                         time_facts = time_facts, time_meaning = time_meaning))
   }
 
   deptTrendsServer(

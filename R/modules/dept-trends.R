@@ -71,10 +71,12 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
     student_terms <- data_objects[["cedar_student_terms"]]
 
     # Charts run to the newest enrolled term. Terms after the graded edge are
-    # current registration, so every chart marks them and the page says so.
+    # current registration, so every chart marks them and the scope bar names
+    # them, with what that means behind its disclosure.
     in_progress <- cedar_in_progress_terms(data_objects[["cedar_edges"]])
     in_progress_labels <- as.character(term_code_to_axis_label(in_progress$term))
-    in_progress_note <- cedar_in_progress_note(in_progress)
+    scope_time_facts <- cedar_scope_time_facts(in_progress, data_objects[["cedar_edges"]])
+    scope_time_meaning <- cedar_in_progress_meaning(in_progress)
 
     dept_data <- reactiveVal(NULL)
     enrl_data <- reactiveVal(NULL)
@@ -167,7 +169,7 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
       dept <- active_scope()$dept
       req(dept, dept != "")
       if (is.null(scope_info_ui)) return(NULL)
-      scope_info_ui(dept)
+      scope_info_ui(dept, time_facts = scope_time_facts, time_meaning = scope_time_meaning)
     })
 
     tab_value <- function(tab) {
@@ -667,7 +669,6 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
       selected_tab <- isolate(input$tabs) %||% "Headcount"
 
       tagList(
-      if (!is.null(in_progress_note)) tags$p(class = "text-note", in_progress_note),
       tabsetPanel(
         id = ns("tabs"),
         selected = selected_tab,
