@@ -8,7 +8,7 @@ parent: Developer Guide
 
 This reference is auto-generated from roxygen2 comments in the source code.
 
-*Generated: 2026-11-16 10:20:04.911835*
+*Generated: 2026-11-16 12:33:43.122029*
 
 ---
 
@@ -2282,6 +2282,39 @@ Snapshot of credits and prior course history at the moment students first declar
 
 ---
 
+### `degree_reading_rules()`
+
+*Source: degree-compiler-board.R*
+
+**The reading's requirement tree as `degree_rules` rows**
+
+The reading's requirement tree as `degree_rules` rows  The page lists these as the board's recorded catalog requirements. Each reading node becomes one rule under its own parent: "all of" and "one of" groups, credit totals (a credit pool keeps its courses as children), courses, and every other kind (GPA, grade, permission, restriction, an open question) as a condition with the reading's wording. Information passages are left out. A program's own rules are its core; a concentration's are a concentration; admission and policy rules keep their own areas.
+
+**Parameters:**
+
+- `proposal` - The reading's `proposal`. @param courses `degree_packet_course_facts()`.
+
+**Returns:** List: `rules` (`degree_rules` columns), `courses` (`degree_rule_courses`).
+
+---
+
+### `degree_course_conditions()`
+
+*Source: degree-compiler-board.R*
+
+**Each course's enrollment conditions, from the catalog analysis**
+
+Each course's enrollment conditions, from the catalog analysis  The extractor structures class standing and program admission (its milestones) and keeps other conditions as text. Recognised here: "Restriction: permission ..." and other permission wording; "Admitted to ..."; and "a minimum of N upper-division courses in <subject>", where the subject is the catalog's own name for it. Alternatives made only of conditions ("Junior or Senior standing") become one condition. A condition offered as an alternative to coursework, an exclusion ("Not admitted to ..."), and wording nothing here recognises are held, with why.
+
+**Parameters:**
+
+- `rule_nodes` - An analysis `rule-nodes.csv` (extractor 1.4.0 or later).
+- `courses` - `degree_packet_course_facts()`.
+
+**Returns:** Tibble: `subject_course`, `kind` (`permission`, `course_count`, or NA when held), `label`, `minimum`, `subject_name` (a count's subject), `quote`, `section`, `source_url`, `why` (held only).
+
+---
+
 ### `assemble_compiled_degree_board()`
 
 *Source: degree-compiler-board.R*
@@ -2298,8 +2331,10 @@ Snapshot of credits and prior course history at the moment students first declar
 - `shared` - The institution's boards (`read_degree_roadmaps()`), read for its shared rows (`catalog_id` "*"), program math routes and planning defaults.
 - `evidence` - The institution's `degree_catalog_evidence`, for the shared routes' citations.
 - `general_math` - The shared math node a program with no math requirement plans toward.
+- `course_conditions` - `degree_course_conditions()`.
+- `proposal` - The reading's `proposal`, for its rules (`degree_reading_rules()`).
 
-**Returns:** List: `catalog`, `roadmaps` (validated; a course that needs a choice's option carries a course-count condition on its tiles), `held` (requisites among the board's courses neither drawn nor made a condition, with why).
+**Returns:** List: `catalog`, `roadmaps` (validated; a course that needs a choice's option carries a course-count condition on its tiles), `held` (requisites and conditions among the board's courses neither drawn nor shown, with why). Every evidence id the draft adds starts "compiled-".
 
 ---
 
@@ -2342,7 +2377,7 @@ Snapshot of credits and prior course history at the moment students first declar
 
 - `packet` - A prepared packet (`load_catalog_normalization_program()$packet`).
 
-**Returns:** Tibble: `course_ref` (`courses:<id>`), `subject_course`, `title`, `credits_min`, `credits_max`, `catalog_url`. A course record without credits stops.
+**Returns:** Tibble: `course_ref` (`courses:<id>`), `subject_course`, `title`, `credits_min`, `credits_max`, `catalog_url`, `subject_name` (the catalog's name for the course's subject). A record without credits or a subject stops.
 
 ---
 
@@ -2392,6 +2427,14 @@ Snapshot of credits and prior course history at the moment students first declar
 ---
 
 ## degree-requirements
+
+### `degree_catalog_choices()`
+
+*Source: degree-requirements.R*
+
+**The degree list; with `status` (publish_degree_drafts()), a draft board says so.**
+
+---
 
 ### `degree_rule_outline()`
 

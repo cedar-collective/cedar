@@ -245,17 +245,43 @@ beside its hand-built board, semester by semester.
     education math.
   - Preparation tiles cite their route's course evidence.
   - Other shared tiles are labelled illustrative.
+- **Enrollment conditions** come from the same course pages
+  (`degree_course_conditions()`). They show on their course and never move it,
+  except a count of courses:
+  - class standing and program admission, which the extractor structures;
+  - permission wording and "Admitted to ...", which it keeps as text;
+  - "a minimum of N upper-division courses in <subject>", with the subject
+    matched by the catalog's own name for it. It becomes a course-count
+    condition over the board's upper-division tiles in that subject: courses,
+    choices whose every option qualifies, and elective slots whose group's
+    required courses are all in that subject.
+
+  Alternatives made only of conditions ("Junior or Senior standing") are one
+  condition. A condition offered as an alternative to coursework, an exclusion
+  ("Not admitted to ..."), and wording not recognised are held.
+- **Recorded requirements.** The reading's own tree becomes the board's
+  `degree_rules` (`degree_reading_rules()`), which the page lists as its
+  catalog requirements: groups, credit totals (a credit pool keeps its courses
+  as children), courses, and every other kind as a condition in the reading's
+  words. Concentrations are listed as concentrations; information passages are
+  left out.
 - **Every tile** cites the reading's quotation for its rule, and every arrow
-  cites its course page. Each carries the draft note: no one has reviewed it.
+  and condition cites its course page. Each carries the draft note: no one has
+  reviewed it.
 
 On the pilot, with the calculus start:
 
-| Program | Courses on both boards | Same semester | Within one | Arrows, draft / board | Waits on a choice | Held |
+| Program | Courses on both boards | Same semester | Within one | Arrows, draft / board | Conditions, draft / board | Held |
 |---|---|---|---|---|---|---|
-| History B.A. | 5 | 3 | 4 | 1 / 1 | 0 | 0 |
-| Philosophy B.A. | 4 | 3 | 3 | 1 / 1 | 0 | 0 |
-| Business Administration B.B.A. | 19 | 11 | 19 | 14 / 25 | 10 | 0 |
-| Computer Science B.S. | 18 | 8 | 14 | 17 / 25 | 5 | 1 |
+| History B.A. | 5 | 3 | 4 | 1 / 1 | 2 / 2 | 0 |
+| Philosophy B.A. | 4 | 3 | 3 | 1 / 1 | 0 / 0 | 0 |
+| Business Administration B.B.A. | 19 | 11 | 19 | 14 / 25 | 11 / 0 | 1 |
+| Computer Science B.S. | 18 | 8 | 14 | 17 / 25 | 15 / 0 | 6 |
+
+History's two are HIST 491's, as on its hand board: two upper-division History
+courses first, and department permission. Business's and CS's conditions are
+the waits on a choice (10 and 5) and the admission and permission conditions
+their course pages state, which their hand boards leave out.
 
 Where the semesters differ, the draft is usually earlier: 18 of the 21
 differences. The draft starts every tile as early as its level allows, where an
@@ -269,6 +295,30 @@ one semester). The other waiting courses already started after their choice by
 level or load. The hand boards draw those arrows from an example pick (Business's writing
 choice gates seven upper-division courses, CS's Java I choice gates C
 Programming and Java II); the draft names the wait instead of choosing one.
+
+### Publishing a compiled board
+
+`--write` (with `--analysis`) replaces `institution/<id>/degree_drafts/` with
+every compiled board. A board's own rows are written in the same files and
+columns as the authored boards, and `degree_drafts.csv` records where it came
+from: the reading, its packet, unit and staged proposal, the reading's hash,
+and the analysis. Each reading must be staged first
+(`scripts/normalize-degree-catalog.R stage`). A reading whose program has no
+authored board is not written: the draft takes that board's catalog row.
+
+At startup (`R/features/degree-drafts.R`) the app reads the folder and puts
+each draft in place of the authored board with the same catalog id, keeping
+the degree list's order and every link to the board. The result passes the
+same validators. Catalog Review keeps the authored boards, the baseline the
+compiler is compared with; their files are not edited.
+
+A compiled board is labelled in the degree list ("· draft") and on the board's
+scope bar. It shows as reviewed only when the review store holds a complete
+sign-off of the exact reading it was compiled from. It stays a draft, with the
+reason on the label's hover, when the store is missing, the reading isn't
+staged, it isn't signed off, or it was signed off after edits (recompile from
+the edited reading). The status is read once at startup, so a sign-off shows
+after the next restart.
 
 ## Where draft interpretations live
 

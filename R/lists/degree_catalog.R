@@ -144,7 +144,8 @@ degree_catalog_program_codes <- function(catalogs, programs) {
       stop("[degree_catalog.R] Invalid choice group: ", rules$rule_id[i])
     }
   }
-  groups <- rules$rule_id[rules$operator %in% c("all", "choose_n")]
+  # A credit total may hold the pool its credits come from.
+  groups <- rules$rule_id[rules$operator %in% c("all", "choose_n", "credits")]
   if (any(nzchar(rules$parent_id) & !rules$parent_id %in% groups)) {
     stop("[degree_catalog.R] Only groups may have children")
   }

@@ -150,6 +150,11 @@ CEDAR_CONFIG_FILE_SPECS <- list(
                    "target_course", "label", "operator", "minimum", "min_grade",
                    "review_status", "detail"),
   degree_rule_courses = c("rule_id", "subject_course", "course_title", "credits"),
+  # A compiled board's provenance (institution/<id>/degree_drafts/, beside the
+  # board's own rows in the files above): the reading, its staged proposal and
+  # the catalog analysis it was compiled with.
+  degree_drafts = c("catalog_id", "program_id", "reading", "packet_key", "unit_key", "proposal_key",
+                    "reading_sha256", "analysis", "compiled_on"),
   # Authored semester templates, selected prerequisite routes and starting points.
   degree_roadmap_nodes = c("catalog_id", "node_id", "track", "code", "title", "credits",
                             "semester", "kind", "bundle", "detail", "source_url", "course_level", "row_group", "requirement_summary"),

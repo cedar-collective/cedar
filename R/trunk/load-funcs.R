@@ -200,6 +200,7 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
   source_file("features/catalog-analysis.R")
   source_file("features/catalog-review.R")
   source_file("features/catalog-normalization.R")
+  source_file("features/degree-drafts.R")
 
   # 6. Shiny modules (depend on branches + cones)
   if (modules) {

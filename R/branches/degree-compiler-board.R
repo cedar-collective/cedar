@@ -93,6 +93,136 @@ degree_course_requisites <- function(rule_nodes, courses) {
   dplyr::distinct(dplyr::bind_rows(none, out), subject_course, requisite, .keep_all = TRUE)
 }
 
+#' The reading's requirement tree as `degree_rules` rows
+#'
+#' The page lists these as the board's recorded catalog requirements. Each
+#' reading node becomes one rule under its own parent: "all of" and "one of"
+#' groups, credit totals (a credit pool keeps its courses as children), courses,
+#' and every other kind (GPA, grade, permission, restriction, an open question)
+#' as a condition with the reading's wording. Information passages are left
+#' out. A program's own rules are its core; a concentration's are a
+#' concentration; admission and policy rules keep their own areas.
+#' @param proposal The reading's `proposal`. @param courses `degree_packet_course_facts()`.
+#' @return List: `rules` (`degree_rules` columns), `courses` (`degree_rule_courses`).
+degree_reading_rules <- function(proposal, courses, catalog_id) {
+  nodes <- degree_compiler_nodes(proposal)
+  nodes$min_grade <- vapply(proposal$nodes, function(n) n$minimum_grade %||% "", "")
+  info <- nodes$id[nodes$kind == "information"]
+  if (any(nodes$parent_id %in% info)) stop("[degree-compiler-board.R] An information passage has rules under it")
+  nodes <- nodes[!nodes$id %in% info, ]
+  parents <- nodes$parent_id[nzchar(nodes$parent_id)]
+  if (any(!parents %in% nodes$id)) stop("[degree-compiler-board.R] A rule's parent is not in the reading")
+  root_of <- function(id) { while (nzchar(nodes$parent_id[nodes$id == id])) id <- nodes$parent_id[nodes$id == id]; id }
+  root <- nodes[match(vapply(nodes$id, root_of, ""), nodes$id), ]
+  area <- ifelse(root$phase == "admission", "entry", ifelse(root$phase == "policy", "completion",
+                 ifelse(startsWith(root$entity_id, "programs:"), "core", "minor")))
+  has_children <- nodes$id %in% parents
+  operator <- dplyr::case_when(
+    nodes$kind == "all" ~ "all",
+    nodes$kind %in% c("any", "choose_n") ~ "choose_n",
+    nodes$kind == "course_pool" & has_children & nodes$unit == "credits" ~ "credits",
+    nodes$kind == "course_pool" & has_children ~ "choose_n",
+    nodes$kind == "credits" ~ "credits",
+    nodes$kind == "course" ~ "course",
+    TRUE ~ "condition")
+  if (any(operator == "condition" & has_children)) stop("[degree-compiler-board.R] A condition in the reading has rules under it")
+  minimum <- ifelse(operator == "choose_n" & is.na(nodes$minimum), 1, nodes$minimum)
+  if (any(operator %in% c("credits", "choose_n") & (is.na(minimum) | minimum <= 0))) stop("[degree-compiler-board.R] A credit or choice rule in the reading has no minimum")
+  rule_id <- function(x) ifelse(nzchar(x), paste0(catalog_id, "-", degree_board_id(x)), "")
+  rules <- data.frame(rule_id = rule_id(nodes$id), catalog_id = catalog_id, parent_id = rule_id(nodes$parent_id),
+    phase = ifelse(root$phase == "admission", "admission", "degree"), area = area, target_course = "",
+    label = nodes$label, operator = operator, minimum = ifelse(operator %in% c("credits", "choose_n"), as.character(minimum), ""),
+    min_grade = nodes$min_grade, review_status = "draft",
+    detail = ifelse(is.na(nodes$value) | nodes$value == nodes$label, "", nodes$value))
+  leaf <- nodes[operator == "course", ]
+  facts <- courses[match(leaf$course_ref, courses$course_ref), ]
+  if (anyNA(facts$subject_course)) stop("[degree-compiler-board.R] A course rule names a course the packet does not have")
+  list(rules = rules, courses = data.frame(rule_id = rule_id(leaf$id), subject_course = facts$subject_course,
+    course_title = facts$title, credits = as.character(facts$credits_min)))
+}
+
+DEGREE_BOARD_COUNT_WORDS <- c(one = 1, two = 2, three = 3, four = 4, five = 5, six = 6)
+
+#' Each course's enrollment conditions, from the catalog analysis
+#'
+#' The extractor structures class standing and program admission (its
+#' milestones) and keeps other conditions as text. Recognised here:
+#' "Restriction: permission ..." and other permission wording; "Admitted to ...";
+#' and "a minimum of N upper-division courses in
+#' <subject>", where the subject is the catalog's own name for it. Alternatives
+#' made only of conditions ("Junior or Senior standing") become one condition.
+#' A condition offered as an alternative to coursework, an exclusion ("Not
+#' admitted to ..."), and wording nothing here recognises are held, with why.
+#' @param rule_nodes An analysis `rule-nodes.csv` (extractor 1.4.0 or later).
+#' @param courses `degree_packet_course_facts()`.
+#' @return Tibble: `subject_course`, `kind` (`permission`, `course_count`, or NA
+#'   when held), `label`, `minimum`, `subject_name` (a count's subject), `quote`,
+#'   `section`, `source_url`, `why` (held only).
+degree_course_conditions <- function(rule_nodes, courses) {
+  needed <- c("entity", "field", "phase", "node_id", "parent_id", "operator", "milestone_relation", "milestone_label", "text")
+  missing <- setdiff(needed, names(rule_nodes))
+  if (length(missing)) stop("[degree-compiler-board.R] rule nodes need ", paste(missing, collapse = ", "))
+  rows <- rule_nodes[rule_nodes$entity %in% courses$course_ref & rule_nodes$phase %in% c("prerequisite", "corequisite"), ]
+  parent_of <- stats::setNames(rows$parent_id, rows$node_id)
+  group_of <- function(id) {
+    at <- parent_of[[id]]
+    while (nzchar(at) && at %in% rows$node_id) {
+      if (rows$operator[rows$node_id == at] %in% c("choose_n", "credits")) return(at)
+      at <- parent_of[[at]]
+    }
+    ""
+  }
+  under <- function(group) { ids <- group; repeat { more <- setdiff(rows$node_id[rows$parent_id %in% ids], ids); if (!length(more)) return(ids); ids <- c(ids, more) } }
+  count_pattern <- "^(Prerequisite: )?a minimum of ([a-z0-9]+) upper[- ]division courses in ([A-Za-z &]+)[.]?$"
+  leaves <- rows[rows$operator %in% c("milestone", "condition"), ]
+  one <- lapply(seq_len(nrow(leaves)), function(i) {
+    leaf <- leaves[i, ]; text <- trimws(leaf$text)
+    out <- tibble::tibble(entity = leaf$entity, group = group_of(leaf$node_id), kind = "permission", label = NA_character_,
+      minimum = NA_real_, subject_name = NA_character_, quote = text, why = NA_character_,
+      section = tools::toTitleCase(gsub("([a-z])([A-Z])", "\\1 \\2", leaf$field)))
+    if (leaf$operator == "milestone") {
+      if (leaf$milestone_relation == "is") out$label <- leaf$milestone_label
+      else out$why <- "an exclusion, not a condition a student meets"
+    } else if (grepl("^Not admitted to", text)) {
+      out$why <- "an exclusion, not a condition a student meets"
+    } else if (grepl("permission", text, ignore.case = TRUE)) {
+      out$label <- sub("[.]$", "", sub("^Restriction: ", "", text)); substr(out$label, 1, 1) <- toupper(substr(out$label, 1, 1))
+    } else if (grepl("^Admitted to ", text)) {
+      out$label <- gsub(" ,", ",", sub("^Admitted to", "Admission to", text))
+    } else if (grepl(count_pattern, text)) {
+      n <- sub(count_pattern, "\\2", text); n <- if (grepl("^[0-9]+$", n)) as.numeric(n) else unname(DEGREE_BOARD_COUNT_WORDS[n])
+      if (is.na(n)) out$why <- "enrollment condition in wording not recognised"
+      else { out$kind <- "course_count"; out$minimum <- n; out$subject_name <- trimws(sub(count_pattern, "\\3", text))
+             out$label <- paste0(n, "+ upper-division ", out$subject_name, " courses") }
+    } else out$why <- "enrollment condition in wording not recognised"
+    if (!is.na(out$why)) out$kind <- NA_character_
+    out
+  })
+  none <- tibble::tibble(entity = character(), group = character(), kind = character(), label = character(), minimum = numeric(),
+    subject_name = character(), quote = character(), why = character(), section = character())
+  out <- dplyr::bind_rows(none, one)
+  # A "one of" made only of conditions is one condition; one that also offers
+  # coursework is an alternative a plan cannot show.
+  grouped <- nzchar(out$group)
+  coursework <- vapply(out$group, function(g) nzchar(g) && any(rows$operator[rows$node_id %in% under(g)] == "course"), TRUE, USE.NAMES = FALSE)
+  out$why[grouped & coursework] <- "a condition offered as an alternative to coursework"
+  out$kind[grouped & coursework] <- NA_character_
+  pooled <- grouped & !coursework & !is.na(out$kind) & out$kind == "permission"
+  if (any(out$kind[grouped & !coursework] %in% "course_count")) {
+    out$why[grouped & !coursework & out$kind %in% "course_count"] <- "a course count offered as one of several conditions"
+    out$kind[grouped & !coursework & out$kind %in% "course_count"] <- NA_character_
+  }
+  merged <- dplyr::summarize(dplyr::group_by(out[pooled, ], entity, group), kind = "permission",
+    label = paste0("One of: ", paste(label, collapse = " or ")), minimum = NA_real_, subject_name = NA_character_,
+    quote = paste(quote, collapse = " / "), why = NA_character_, section = section[1], .groups = "drop")
+  out <- dplyr::bind_rows(out[!pooled, ], merged)
+  out$subject_course <- courses$subject_course[match(out$entity, courses$course_ref)]
+  out$source_url <- courses$catalog_url[match(out$entity, courses$course_ref)]
+  # CAMPUS_ROLLUP: catalog course codes and the conditions their pages state; no
+  # enrollment row and no campus is read here.
+  dplyr::distinct(out[c("subject_course", "kind", "label", "minimum", "subject_name", "quote", "section", "source_url", "why")])
+}
+
 #' A compiled reading as a validated draft board
 #'
 #' @param compiled `compile_degree_interpretation()` output.
@@ -105,10 +235,14 @@ degree_course_requisites <- function(rule_nodes, courses) {
 #'   its shared rows (`catalog_id` "*"), program math routes and planning defaults.
 #' @param evidence The institution's `degree_catalog_evidence`, for the shared routes' citations.
 #' @param general_math The shared math node a program with no math requirement plans toward.
+#' @param course_conditions `degree_course_conditions()`.
+#' @param proposal The reading's `proposal`, for its rules (`degree_reading_rules()`).
 #' @return List: `catalog`, `roadmaps` (validated; a course that needs a
 #'   choice's option carries a course-count condition on its tiles), `held`
-#'   (requisites among the board's courses neither drawn nor made a condition, with why).
-assemble_compiled_degree_board <- function(compiled, courses, program, requisites, catalog_row, shared, evidence, general_math) {
+#'   (requisites and conditions among the board's courses neither drawn nor
+#'   shown, with why). Every evidence id the draft adds starts "compiled-".
+assemble_compiled_degree_board <- function(compiled, courses, program, requisites, catalog_row, shared, evidence, general_math,
+                                           course_conditions, proposal) {
   id <- catalog_row$catalog_id
   if (catalog_row$source_url != program$catalog_url) stop("[degree-compiler-board.R] The draft's source must be its program page")
   year <- catalog_row$catalog_year
@@ -116,6 +250,7 @@ assemble_compiled_degree_board <- function(compiled, courses, program, requisite
   section_of <- function(block) { hit <- Filter(function(b) identical(b$id, block), blocks); if (length(hit)) hit[[1]]$section else "Program requirements" }
   ev <- list()
   cite <- function(eid, type, url, section, quote) {
+    eid <- paste0("compiled-", eid)
     ev[[eid]] <<- data.frame(evidence_id = eid, catalog_year = year, source_type = type, source_url = url, section = section,
       quote = quote, retrieved_on = catalog_row$retrieved_on, review_status = "transcribed", note = DEGREE_BOARD_DRAFT_NOTE)
     eid
@@ -134,7 +269,7 @@ assemble_compiled_degree_board <- function(compiled, courses, program, requisite
     data.frame(catalog_id = id, node_id = node_id, track = "main", code = code, title = title, credits = as.character(credits),
       semester = level_semester(level), kind = kind, bundle = "0", detail = detail, source_url = url,
       course_level = level, row_group = row_group, requirement_summary = "")
-  nodes <- list(); options <- list(); components <- list(); basis <- list()
+  nodes <- list(); options <- list(); components <- list(); basis <- list(); slot_subjects <- list()
   add_basis <- function(node_id, kind, eid, why) basis[[node_id]] <<- data.frame(catalog_id = id, node_id = node_id, basis = kind, evidence_id = eid, explanation = why)
   rule_evidence <- function(r) cite(paste0("degree-", id, "-", degree_board_id(r$rule_id)), "program", program$catalog_url,
                                     section_of(r$block_id), r$quote)
@@ -158,10 +293,13 @@ assemble_compiled_degree_board <- function(compiled, courses, program, requisite
     if (r$role == "slot") {
       siblings <- rules$subject_course[rules$role == "course" & rules$parent_id == r$parent_id & nzchar(r$parent_id)]
       level <- if (length(siblings) && all(course_level_from_number(siblings) == "upper")) "upper" else "lower"
+      # Its subject, like its level, is its group's: the one subject every course the group requires shares.
+      subject <- unique(sub(" .*", "", siblings))
       credits <- degree_board_split_credits(if (is.na(r$credits)) 3 * r$tiles else r$credits, r$tiles)
       for (k in seq_len(r$tiles)) {
         nid <- paste0(degree_board_id(r$rule_id), "_", k)
         nodes[[nid]] <- node(nid, "Elective", r$label, credits[k], "choice", level, program$catalog_url, group, detail)
+        slot_subjects[[nid]] <- list(subject = if (length(subject) == 1L) subject else character(), level = level)
         add_basis(nid, "degree", eid, "Elective credits in the draft reading.")
       }
       next
@@ -258,7 +396,40 @@ assemble_compiled_degree_board <- function(compiled, courses, program, requisite
       eligible_node_ids = paste(sort(unique(option_tiles$node_id[option_tiles$subject_course %in% w$requisite])), collapse = "|"),
       label = paste0("Needs ", paste(sort(unique(w$requisite)), collapse = " or "), ", offered in a choice"), evidence_id = eid)
   })))
+  # Enrollment conditions on the board's own course tiles. Standing, admission
+  # and permission show on their course; a count of a subject's upper-division
+  # courses waits on the board's tiles that qualify: courses, choices whose
+  # every option is an upper-division course in that subject, and upper-division
+  # elective slots of that subject.
+  enrol <- course_conditions[course_conditions$subject_course %in% own_codes, ]
+  # A condition listed under both a course's prerequisites and its corequisites is one condition.
+  enrol <- enrol[is.na(enrol$kind) | !duplicated(enrol[c("subject_course", "kind", "label", "minimum")]), ]
+  tile_codes <- c(lapply(components, function(x) x$subject_course), lapply(options, function(o) o$subject_course))
+  enrol_held <- list()
+  enrol_rows <- lapply(seq_len(nrow(enrol)), function(k) {
+    e <- enrol[k, ]
+    if (is.na(e$kind)) { enrol_held[[length(enrol_held) + 1L]] <<- e; return(NULL) }
+    target <- unname(code_to_node[e$subject_course]); pool <- ""; minimum <- ""
+    if (e$kind == "course_count") {
+      subjects <- unique(sub(" .*", "", courses$subject_course[tolower(courses$subject_name) == tolower(e$subject_name)]))
+      fits <- vapply(tile_codes, function(codes) all(sub(" .*", "", codes) %in% subjects & course_level_from_number(codes) == "upper"), TRUE)
+      slots <- vapply(slot_subjects, function(x) length(x$subject) == 1L && x$subject %in% subjects && x$level == "upper", TRUE)
+      qualifying <- setdiff(c(names(tile_codes)[fits], names(slot_subjects)[slots]), target)
+      if (!length(subjects) || length(qualifying) < e$minimum) {
+        e$why <- paste0("counts ", e$minimum, " upper-division ", e$subject_name, " courses; the board shows ", length(qualifying), " that qualify")
+        enrol_held[[length(enrol_held) + 1L]] <<- e; return(NULL)
+      }
+      pool <- paste(qualifying, collapse = "|"); minimum <- format(e$minimum, trim = TRUE)
+    }
+    cid <- paste0("enrol-", id, "-", target, "-", k)
+    eid <- cite(cid, "course", e$source_url, e$section, e$quote)
+    data.frame(condition_id = cid, catalog_id = id, node_id = target, kind = e$kind, minimum = minimum,
+      eligible_node_ids = pool, label = e$label, evidence_id = eid)
+  })
+  conditions <- do.call(rbind, c(list(conditions), enrol_rows))
+  enrol_held <- dplyr::bind_rows(enrol[0, ], enrol_held)
   held <- dplyr::bind_rows(
+    dplyr::mutate(enrol_held[c("subject_course", "quote", "source_url", "why")], requisite = enrol_held$quote),
     dplyr::mutate(from_choice[is.na(from_choice$timing), ], why = "needs a course offered in a choice, in wording that is not a recognised requisite template"),
     dplyr::mutate(from_choice[!is.na(from_choice$timing) & !from_choice$subject_course %in% own_codes, ],
                   why = "a shared course that needs a course offered in a choice; its shared route places it"),
@@ -279,12 +450,13 @@ assemble_compiled_degree_board <- function(compiled, courses, program, requisite
     evidence_id = plan_evidence, assumption = DEGREE_BOARD_DRAFT_NOTE, upper_level_from_semester = upper_from,
     allowance_slot_credits = as.character(degree_board_plan_default(shared$plans, "allowance_slot_credits")),
     gen_ed_source_url = as.character(degree_board_plan_default(shared$plans, "gen_ed_source_url")))
+  reading <- degree_reading_rules(proposal, courses, id)
   catalog <- validate_degree_catalog(list(
     catalogs = as.data.frame(catalog_row),
-    rules = data.frame(rule_id = paste0(id, "-total"), catalog_id = id, parent_id = "", phase = "degree", area = "completion",
+    rules = rbind(data.frame(rule_id = paste0(id, "-total"), catalog_id = id, parent_id = "", phase = "degree", area = "completion",
       target_course = "", label = "Minimum degree credits", operator = "credits", minimum = as.character(program$degree_hours),
-      min_grade = "", review_status = "draft", detail = DEGREE_BOARD_DRAFT_NOTE),
-    courses = empty(CEDAR_CONFIG_FILE_SPECS$degree_rule_courses),
+      min_grade = "", review_status = "draft", detail = DEGREE_BOARD_DRAFT_NOTE), reading$rules),
+    courses = reading$courses,
     evidence = rbind(shared_evidence[CEDAR_CONFIG_FILE_SPECS$degree_catalog_evidence], do.call(rbind, ev))))
   roadmaps <- validate_degree_roadmaps(list(
     nodes = roadmaps$nodes, links = links, starts = shared$starts, math_routes = math_routes,
@@ -330,7 +502,9 @@ format_degree_board_comparison <- function(title, math, draft, board, held) {
   c(paste0(title, " \u00b7 math start: ", math),
     paste0("  Semesters: ", nrow(draft$terms), " draft, ", nrow(board$terms), " on the board"),
     paste0("  Arrows: ", nrow(draft$links), " draft, ", nrow(board$links), " on the board; ", nrow(held), " held for a reviewer"),
-    paste0("  Waits on a choice: ", nrow(draft$conditions[draft$conditions$kind == "course_count", ]), " course-count conditions"),
+    paste0("  Conditions: ", sum(draft$conditions$kind == "course_count"), " course-count (", sum(startsWith(draft$conditions$condition_id, "after-")),
+           " wait on a choice), ", sum(draft$conditions$kind == "permission"), " standing, admission or permission; ",
+           nrow(board$conditions), " on the board"),
     paste0("  Courses on both: ", both, ", same semester for ", same),
     paste0("    ", formatC(rows$code, width = -12), " draft ", show(rows$draft_semester), " \u00b7 board ", show(rows$board_semester)),
     if (nrow(held)) {

@@ -711,6 +711,14 @@ compiler_biology_catalog_row <- data.frame(catalog_id = "demo-biology-draft", pr
   source_url = "https://catalog.example.invalid/#/programs/biology", retrieved_on = "2026-10-17", coverage = "excerpt",
   notes = "Draft compiled from the designed reading")
 
+# ── test-degree-drafts.R, test-degree-explorer.R ──────────────────────────────
+
+# The page's board status (publish_degree_drafts()$status) for the demo
+# institution's two boards: Biology compiled from its catalog reading and not
+# yet signed off, History authored by hand.
+degree_board_status_demo <- data.frame(catalog_id = c("demo-biology-bs-2026", "demo-history-ba-2026"),
+  source = c("compiled", "authored"), review = c("draft", NA), note = c("Its catalog reading is not signed off in Catalog Review.", ""))
+
 # ── test-enrollment-projection-scenario.R, test-projection-inputs.R, ─────────────
 # ── test-projection-model.R, test-projection-view.R ─────────────────────────────
 

@@ -553,6 +553,15 @@ message("[global.R] Pathways choices ready: ",
         length(cedar_pathways_choices$program_choices), " programs, ",
         length(cedar_pathways_choices$dept_choices), " departments")
 
+# Degree Explorer's boards: each compiled draft in place of its authored board,
+# labelled draft or reviewed from the Catalog Review store (R/features/degree-drafts.R).
+# Catalog Review itself keeps the authored boards, the compiler's baseline.
+CEDAR_DEGREE_DRAFTS <- read_degree_drafts(file.path(cedar_institution_dir(), "degree_drafts"))
+CEDAR_DEGREE_BOARDS <- publish_degree_drafts(CEDAR_DEGREE_CATALOG, CEDAR_DEGREE_ROADMAPS, CEDAR_DEGREE_DRAFTS,
+  degree_board_review_status(CEDAR_DEGREE_DRAFTS, file.path(data_dir, "catalog-normalizations", cedar_institution_id())))
+message("[global.R] Degree boards: ", sum(CEDAR_DEGREE_BOARDS$status$source == "compiled"), " compiled from the catalog, ",
+        sum(CEDAR_DEGREE_BOARDS$status$review %in% "reviewed"), " of them reviewed")
+
 # Timestamp when computed
 cedar_data_summary$computed_at <- Sys.time()
 
