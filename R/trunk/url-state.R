@@ -47,6 +47,10 @@ CEDAR_SHARE_SPECS <- list(
     fields = c("campus", "college", "dept", "term", "pt", "im", "level"),
     overlay = "seatfinder-loading-overlay"
   ),
+  "DFW Rates" = list(
+    slug = "dfw-rates", prefix = "dfw_rates-dr", sep = "_", run = NULL,
+    fields = c("term_type", "campus")
+  ),
   "Cancellations" = list(
     slug = "cancellations", prefix = "cancellations-cn", sep = "_", run = "button",
     fields = c("campus", "college", "dept", "term", "pt", "im", "level"),
@@ -146,6 +150,7 @@ CEDAR_TAB_SLUGS <- c(
   "waitlists"          = "Waitlists",
   "projections"        = "Projections",
   "cancellations"      = "Cancellations",
+  "dfw-rates"          = "DFW Rates",
   "data-usage"         = "Data & Usage",
   "changelog"          = "Changelog",
 

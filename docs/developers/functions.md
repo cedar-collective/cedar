@@ -8,7 +8,7 @@ parent: Developer Guide
 
 This reference is auto-generated from roxygen2 comments in the source code.
 
-*Generated: 2026-11-15 12:47:32.997651*
+*Generated: 2026-11-15 15:02:01.881896*
 
 ---
 
@@ -2448,7 +2448,7 @@ Summarize Student Demographics  Flexible demographic summary function that group
 - `attempts` - The attempt measure table (`cedar_attempts`).
 - `opt` - prepare_dfw_attempts()' options (`term_type` required, `level`, `campus`, `data_edges`), plus `n_window` (default 3 terms), `min_window_n` (default 50: a course is `listed` with this many attempts in the window), `min_term_n` (default 30) and `min_trend_terms` (default 4).
 
-**Returns:** A list: `courses` (one row per campus-course with an attempt in the window, most DFW grades first: `rank`, `campus`, `college` (the code most of its window attempts carry), `subject_course`, summarize_attempt_outcomes()' columns, `dfw_share` and `cum_share` (of the window's DFW grades, 0-1), `listed`, the trend's columns (compute_rate_trend()), `swing_p` and `swings`), `totals` (`n_courses`, `n_attempts`, `n_dfw`, `dfw_pct`, `courses_for_quarter`, `courses_for_half`: how many courses, from the top, hold a quarter and half of the DFW grades), `meta` (`window_terms`, `graded_edge`, `typical_extra_sd` (points a term), `n_swing_tests`, `swing_p_cut` and the options).
+**Returns:** A list: `courses` (one row per campus-course with an attempt in the window, most DFW grades first: `rank`, `campus`, `college` (the code most of its window attempts carry), `subject_course`, summarize_attempt_outcomes()' columns, `dfw_share` and `cum_share` (of the window's DFW grades, 0-1), `listed`, the trend's columns (compute_rate_trend()), `swing_p` and `swings`), `terms` (every term of the type for each of those courses: `n_attempts`, `n_dfw`, `dfw_pct`, `in_trend`, the series its trend is read from), `totals` (`n_courses`, `n_attempts`, `n_dfw`, `dfw_pct`, `courses_for_quarter`, `courses_for_half`: how many courses, from the top, hold a quarter and half of the DFW grades), `meta` (`window_terms`, `graded_edge`, `typical_extra_sd` (points a term), `n_swing_tests`, `swing_p_cut` and the options).
 
 ---
 

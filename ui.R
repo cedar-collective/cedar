@@ -331,6 +331,12 @@ cedar_home_ui <- function() {
           "graduation-cap"
         ),
         cedar_home_card(
+          "DFW Rates",
+          "How lower-division DFW rates are moving, which courses hold the DFW grades, and where sections disagree.",
+          "?tab=dfw-rates",
+          "percent"
+        ),
+        cedar_home_card(
           "Cancellations",
           "Review canceled courses by term, campus, department, and course level.",
           "?tab=cancellations",
@@ -1828,6 +1834,12 @@ nav_panel(
       icon = icon("layer-group"),
       genEdExploreUI("gen_ed", cedar_sections, .dept_choices, cedar_current_term, cedar_default_term)
     ), # end gen ed nav_panel
+
+    nav_panel(
+      title = "DFW Rates",
+      icon = icon("percent"),
+      dfwRatesUI("dfw_rates", cedar_campus_choices(data_objects[["cedar_attempts"]]))
+    ), # end DFW Rates nav_panel
 
     nav_panel(
       title = "Cancellations",

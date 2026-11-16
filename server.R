@@ -4545,6 +4545,13 @@ output$enrl_classlist_download <- downloadHandler(
   cancellationsServer("cancellations", cedar_sections, error_handler = handle_error)
 
   # ===========================================================================
+  # Bird's Eye > DFW Rates (Shiny module); builds only while the tab is open
+  # ===========================================================================
+  dfwRatesServer("dfw_rates", attempts = data_objects[["cedar_attempts"]], dims = data_objects[["cedar_dims"]],
+                 edges = data_objects[["cedar_edges"]],
+                 active = reactive(identical(input$main_navbar, "DFW Rates")))
+
+  # ===========================================================================
   # Waitlists tab (Shiny module)
   # ===========================================================================
   waitlistServer("waitlist", cedar_registrations, session,
