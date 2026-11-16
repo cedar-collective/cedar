@@ -197,3 +197,77 @@ get_cancellations <- function(sections, opt = list()) {
     status_note = status_note
   )
 }
+
+
+# ── Plot prep ────────────────────────────────────────────────────────────────
+
+#' Department bars for Cancellations > By Department
+#'
+#' One row per department and term with the department's total across the
+#' selected terms, departments ordered by that total (largest first, ties by
+#' name). Every department is drawn on one scale, so a department with one
+#' cancellation reads as one, not as a full bar.
+#'
+#' @param by_department_term `get_cancellations()$by_department_term`.
+#' @return Tibble: `department` (factor, smallest total first so plotly draws
+#'   the largest at the top), `term`, `term_label` (ordered factor), `n_cancelled`,
+#'   `dept_total`.
+prepare_cancellations_dept_plot_data <- function(by_department_term) {
+  required <- c("term", "term_label", "department", "n_cancelled")
+  missing <- setdiff(required, names(by_department_term))
+  if (length(missing)) stop("prepare_cancellations_dept_plot_data needs columns: ", paste(missing, collapse = ", "))
+  totals <- by_department_term %>%
+    dplyr::group_by(department) %>%
+    dplyr::summarize(dept_total = sum(n_cancelled), .groups = "drop") %>%
+    dplyr::arrange(dplyr::desc(dept_total), department)
+  by_department_term %>%
+    dplyr::left_join(totals, by = "department") %>%
+    dplyr::mutate(
+      department = factor(department, levels = rev(totals$department)),
+      term_label = term_axis_factor(term)
+    ) %>%
+    dplyr::select(department, term, term_label, n_cancelled, dept_total) %>%
+    dplyr::arrange(dplyr::desc(department), term)
+}
+
+#' Pixel height for the department bars: one row per department
+cancellations_dept_plot_height <- function(plot_data) {
+  max(240L, 26L * dplyr::n_distinct(plot_data$department) + 110L)
+}
+
+
+# ── Plotting ─────────────────────────────────────────────────────────────────
+
+#' Horizontal bars of cancelled sections by department, on one shared scale
+#'
+#' Several terms stack in chronological order, light to dark in one hue; the
+#' department's total is labelled at the end of its bar.
+#'
+#' @param plot_data `prepare_cancellations_dept_plot_data()` output.
+#' @return A plotly object.
+plot_cancellations_by_department <- function(plot_data) {
+  terms <- levels(droplevels(plot_data$term_label))
+  colors <- if (length(terms) == 1L) unname(CEDAR_COLORS["blue"]) else
+    grDevices::colorRampPalette(unname(CEDAR_COLORS[c("blue_light", "blue_dark")]))(length(terms))
+  totals <- dplyr::distinct(plot_data, department, dept_total)
+  p <- plotly::plot_ly(height = cancellations_dept_plot_height(plot_data))
+  for (i in seq_along(terms)) {
+    rows <- plot_data[plot_data$term_label == terms[i], ]
+    p <- plotly::add_bars(p, data = rows, x = ~n_cancelled, y = ~department, orientation = "h",
+      name = terms[i], marker = list(color = colors[i], line = list(color = "#ffffff", width = 1)),
+      hovertext = ~paste0(department, " · ", term_label, ": ", n_cancelled, " cancelled"),
+      hoverinfo = "text", textposition = "none")
+  }
+  plotly::layout(p,
+    barmode = "stack", bargap = 0.3,
+    xaxis = list(title = "Cancelled sections", rangemode = "tozero", zeroline = FALSE,
+                 range = c(0, max(totals$dept_total) * 1.12)),
+    yaxis = list(title = "", categoryorder = "array", categoryarray = levels(plot_data$department),
+                 automargin = TRUE),
+    showlegend = length(terms) > 1L,
+    legend = list(orientation = "h", x = 0, y = 1, yanchor = "bottom", traceorder = "normal"),
+    margin = list(t = if (length(terms) > 1L) 40 else 10, r = 20),
+    annotations = lapply(seq_len(nrow(totals)), function(i) list(
+      x = totals$dept_total[i], y = as.character(totals$department[i]), text = totals$dept_total[i],
+      xanchor = "left", xshift = 4, showarrow = FALSE, font = list(size = 11))))
+}

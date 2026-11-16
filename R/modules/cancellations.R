@@ -269,24 +269,25 @@ cancellationsServer <- function(id, sections, error_handler = NULL) {
       )
     })
 
-    output$cn_dept_term_plot <- renderPlot({
+    cn_dept_plot_data <- reactive({
       data <- cn_data()
-      if (is.null(data) || nrow(data$by_department_term) == 0) return(NULL)
-      term_levels <- data$by_department_term %>%
-        dplyr::arrange(term) %>%
-        dplyr::distinct(term_label) %>%
-        dplyr::pull(term_label)
-      ggplot2::ggplot(data$by_department_term,
-                      ggplot2::aes(x = factor(term_label, levels = term_levels),
-                                   y = n_cancelled)) +
-        ggplot2::geom_col(fill = unname(CEDAR_COLORS["blue"])) +
-        ggplot2::facet_wrap(~ department, scales = "free_y", ncol = 4) +
-        ggplot2::scale_y_continuous(breaks = scales::breaks_width(1)) +
-        ggplot2::labs(x = NULL, y = "Cancelled sections") +
-        ggplot2::theme_minimal(base_size = 12) +
-        ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 45, hjust = 1),
-                       panel.grid.minor = ggplot2::element_blank())
-    }, height = 520)
+      req(data, nrow(data$by_department_term) > 0)
+      prepare_cancellations_dept_plot_data(data$by_department_term)
+    })
+
+    # The plot's height follows the number of departments, one row each.
+    output$cn_dept_term_ui <- renderUI({
+      data <- cn_data()
+      if (is.null(data) || nrow(data$by_department_term) == 0) {
+        return(empty_state("No cancelled sections in this scope."))
+      }
+      plotly::plotlyOutput(session$ns("cn_dept_term_plot"),
+                           height = paste0(cancellations_dept_plot_height(cn_dept_plot_data()), "px"))
+    })
+
+    output$cn_dept_term_plot <- plotly::renderPlotly({
+      plot_cancellations_by_department(cn_dept_plot_data())
+    })
 
     output$cn_trends_plot <- plotly::renderPlotly({
       data <- cn_data()
@@ -443,7 +444,16 @@ cancellationsServer <- function(id, sections, error_handler = NULL) {
         if (no_cancelled_sections) no_data_callout,
         tabsetPanel(
           tabPanel("Cancelled Sections", reactable::reactableOutput(session$ns("cn_cancelled_sections"))),
-          tabPanel("By Department", plotOutput(session$ns("cn_dept_term_plot"))),
+          tabPanel("By Department",
+            subtab_header("By Department",
+              "Which departments had the most sections cancelled in the selected terms.",
+              method = tags$p(paste(
+                "Counts cancelled (status C) section rows in the filters' scope; removed (R) and",
+                "suspended (S) sections are not counted. Every department is on one scale, ordered by",
+                "its total across the selected terms, which stack oldest to newest. Departments with no",
+                "cancelled sections are not listed. A count is not a rate: a department that schedules",
+                "more sections has more to cancel."))),
+            uiOutput(session$ns("cn_dept_term_ui"))),
           tabPanel("Timing", plotOutput(session$ns("cn_timing_plot"))),
           tabPanel("Common Courses", reactable::reactableOutput(session$ns("cn_common_courses"))),
           tabPanel("Trends",
