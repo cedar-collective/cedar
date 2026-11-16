@@ -39,7 +39,7 @@ The link button copies a shareable URL for the current view.
 | View | What it shows |
 |---|---|
 | **Cancelled Sections** | Section-level rows: term, department, course, title, section, CRN, enrollment/capacity, cancellation date, start date, days before start, and comments where available. |
-| **By Department** | Cancelled section counts by department and term. |
+| **By Department** | Cancelled sections by department, every department on one scale and ordered by its total across the selected terms; several terms stack oldest to newest. A count, not a rate: a department that schedules more sections has more to cancel. |
 | **Timing** | Cancellation counts by days before course start, limited to 0-100 days before start. |
 | **Common Courses** | Courses with repeated cancellation patterns across terms. |
 | **Trends** | Term-level cancellation counts by department. Units outside the top ten are grouped as Other. |

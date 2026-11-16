@@ -187,3 +187,28 @@ test_that("get_cancellations keeps expected common-course column types", {
   expect_type(result$common_courses$n_terms_cancelled, "integer")
   expect_type(result$common_courses$median_days_before_start, "double")
 })
+
+test_that("the department bars share one scale, ordered by each department's total", {
+  result <- get_cancellations(test_sections, create_test_opt(list(
+    term = c(202010L, 202060L, 202080L, 202110L),
+    level = NULL
+  )))
+  bars <- prepare_cancellations_dept_plot_data(result$by_department_term)
+
+  # Plotly draws the first level at the bottom: the largest totals end on top,
+  # ties by name.
+  expect_equal(levels(bars$department), c("MATH", "CHEM", "PSYC", "HIST", "ANTH"))
+  expect_equal(sum(bars$n_cancelled), sum(result$by_department_term$n_cancelled))
+  expect_equal(unique(bars$dept_total[bars$department == "ANTH"]), 2L)
+  expect_true(is.ordered(bars$term_label))
+
+  built <- plotly::plotly_build(plot_cancellations_by_department(bars))
+  expect_equal(vapply(built$x$data, function(t) t$name, ""), c("Sp 20", "Su 20", "Fa 20", "Sp 21"))
+  expect_true(all(vapply(built$x$data, function(t) t$orientation, "") == "h"))
+  expect_equal(vapply(built$x$layout$annotations, function(a) as.integer(a$text), 1L), c(2L, 2L, 2L, 1L, 1L))
+  expect_equal(built$x$layout$xaxis$range[2], 2 * 1.12)
+})
+
+test_that("prepare_cancellations_dept_plot_data stops on a missing column", {
+  expect_error(prepare_cancellations_dept_plot_data(dplyr::select(test_sections, term, department)), "needs columns")
+})

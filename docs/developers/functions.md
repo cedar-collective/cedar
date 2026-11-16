@@ -8,7 +8,7 @@ parent: Developer Guide
 
 This reference is auto-generated from roxygen2 comments in the source code.
 
-*Generated: 2026-11-15 15:02:01.881896*
+*Generated: 2026-11-15 21:23:01.780429*
 
 ---
 
@@ -175,6 +175,46 @@ Analyze Cancelled Course Sections  Returns cancelled section rows and summary ta
 - `opt` - Filter options compatible with filter_DESRs().
 
 **Returns:** Named list with cancelled sections, summary tables, and status notes.
+
+---
+
+### `prepare_cancellations_dept_plot_data()`
+
+*Source: cancellations.R*
+
+**Department bars for Cancellations > By Department**
+
+Department bars for Cancellations > By Department  One row per department and term with the department's total across the selected terms, departments ordered by that total (largest first, ties by name). Every department is drawn on one scale, so a department with one cancellation reads as one, not as a full bar.
+
+**Parameters:**
+
+- `by_department_term` - `get_cancellations()$by_department_term`.
+
+**Returns:** Tibble: `department` (factor, smallest total first so plotly draws the largest at the top), `term`, `term_label` (ordered factor), `n_cancelled`, `dept_total`.
+
+---
+
+### `cancellations_dept_plot_height()`
+
+*Source: cancellations.R*
+
+**Pixel height for the department bars: one row per department**
+
+---
+
+### `plot_cancellations_by_department()`
+
+*Source: cancellations.R*
+
+**Horizontal bars of cancelled sections by department, on one shared scale**
+
+Horizontal bars of cancelled sections by department, on one shared scale  Several terms stack in chronological order, light to dark in one hue; the department's total is labelled at the end of its bar.
+
+**Parameters:**
+
+- `plot_data` - `prepare_cancellations_dept_plot_data()` output.
+
+**Returns:** A plotly object.
 
 ---
 

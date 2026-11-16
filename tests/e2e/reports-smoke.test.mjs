@@ -654,6 +654,21 @@ export async function runReportChecks({ scope = 'smoke', synthetic = false } = {
         ]);
         assert.match(await page.$eval('#cancellations-cn_cancelled_sections', el => el.innerText), /PSYC 3200/);
       }
+      // By Department: one horizontal bar chart on a shared axis, or an empty
+      // state when the scope has no cancelled sections.
+      await page.evaluate(() => [...document.querySelectorAll('#cancellations-cn_output .nav-link')]
+        .find(a => a.textContent.trim() === 'By Department').click());
+      await page.waitForFunction(() => {
+        const plot = document.getElementById('cancellations-cn_dept_term_plot');
+        return (plot?.data?.length > 0) || !!document.querySelector('#cancellations-cn_dept_term_ui .empty-state');
+      }, { timeout: STEP_TIMEOUT, polling: 500 });
+      const deptBars = await page.evaluate(() => {
+        const plot = document.getElementById('cancellations-cn_dept_term_plot');
+        return plot?.data ? { n: plot.data.length, horizontal: plot.data.every(t => t.orientation === 'h'),
+                              y: [...new Set(plot.data.flatMap(t => t.y))] } : null;
+      });
+      if (synthetic) assert.ok(deptBars?.horizontal && deptBars.y.includes('PSYC'), 'PSYC drawn as a horizontal department bar');
+      else if (deptBars) assert.ok(deptBars.horizontal, 'department bars are horizontal on one axis');
     });
 
     await withStep(page, [], 'Waitlists runs', async () => {
