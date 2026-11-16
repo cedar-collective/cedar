@@ -25,7 +25,7 @@ catalog_extractor_provenance <- function() {
     catalog_credit_conflict_rows = catalog_credit_conflict_rows,
     write_catalog_jsonl = write_catalog_jsonl, source_json_bytes = source_json_bytes,
     analyze_degree_catalog = analyze_degree_catalog)
-  list(version = "1.3.0", r_version = R.version.string, locale = Sys.getlocale(),
+  list(version = "1.4.0", r_version = R.version.string, locale = Sys.getlocale(),
     packages = lapply(stats::setNames(c("xml2", "jsonlite", "digest"), c("xml2", "jsonlite", "digest")),
       function(x) as.character(utils::packageVersion(x))),
     functions = lapply(functions, function(x) paste(deparse(x, width.cutoff = 500L), collapse = "\n")))

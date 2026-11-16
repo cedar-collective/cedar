@@ -7,6 +7,7 @@ catalog_rule_structure <- function(node) {
   # Optional constraint added by extractor 1.1.0. Do not change fingerprints
   # of older grade-free trees simply by introducing a new optional field.
   if (!is.null(node$minimum_grade)) structure$minimum_grade <- node$minimum_grade
+  if (!is.null(node$timing)) structure$timing <- node$timing  # extractor 1.4.0
   if (!is.null(node$milestone)) structure$milestone <- node$milestone[c("type", "relation", "value")]
   structure
 }

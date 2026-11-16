@@ -241,11 +241,21 @@ test_that("standard grade rules retain threshold, selection and nested course sc
   expect_null(rule$children[[1]]$children[[1]]$minimum_grade)
   higher <- all; higher$children[[1]]$minimum_grade <- "C-"
   expect_false(identical(catalog_rule_structure(all), catalog_rule_structure(higher)))
-  for (name in c("grade_qualified", "grade_empty", "grade_impossible", "grade_concurrent")) {
+  for (name in c("grade_qualified", "grade_empty", "grade_impossible")) {
     unresolved <- extract_catalog_rule_tree(fixture$parser_cases[[name]])
     expect_true(unresolved$requires_review, info = name)
     expect_equal(unresolved$children[[1]]$operator, "condition", info = name)
   }
+  # The requisite templates say when a course counts (extractor 1.4.0).
+  expect_equal(all$children[[1]]$timing, "prior")
+  either <- extract_catalog_rule_tree(fixture$parser_cases$grade_concurrent)$children[[1]]
+  expect_equal(c(either$operator, either$timing, either$minimum_grade), c("all", "prior_or_concurrent", "C"))
+  same <- extract_catalog_rule_tree(fixture$parser_cases$corequisite_concurrent)$children[[1]]
+  expect_equal(c(same$operator, same$timing), c("all", "concurrent"))
+  credit <- extract_catalog_rule_tree(fixture$parser_cases$grade_credit)$children[[1]]
+  expect_equal(c(credit$operator, credit$timing, credit$minimum_grade), c("all", "prior", "CR"))
+  expect_false(identical(catalog_rule_structure(list(operator = "all", timing = "prior", children = list())),
+                         catalog_rule_structure(list(operator = "all", timing = "concurrent", children = list()))))
   missing <- extract_catalog_rule_tree(fixture$parser_cases$missing_course)
   expect_true(missing$requires_review)
   expect_equal(missing$children[[1]]$minimum_grade, "C")

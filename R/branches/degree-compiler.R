@@ -37,7 +37,7 @@ degree_compiler_course_code <- function(code) {
 #'
 #' @param packet A prepared packet (`load_catalog_normalization_program()$packet`).
 #' @return Tibble: `course_ref` (`courses:<id>`), `subject_course`, `title`,
-#'   `credits_min`, `credits_max`. A course record without credits stops.
+#'   `credits_min`, `credits_max`, `catalog_url`. A course record without credits stops.
 degree_packet_course_facts <- function(packet) {
   rows <- lapply(packet$units, function(unit) {
     docs <- unit$request$documents
@@ -52,7 +52,7 @@ degree_packet_course_facts <- function(packet) {
     if (is.null(credits$min) || is.null(credits$max)) stop("[degree-compiler.R] Course ", docs[[1]]$code, " has no credit range")
     tibble::tibble(course_ref = docs[[1]]$id, subject_course = degree_compiler_course_code(docs[[1]]$code),
                    title = docs[[1]]$title, credits_min = as.numeric(credits$min),
-                   credits_max = as.numeric(credits$max))
+                   credits_max = as.numeric(credits$max), catalog_url = docs[[1]]$catalog_url)
   })
   dplyr::bind_rows(rows)
 }
@@ -65,6 +65,7 @@ degree_compiler_nodes <- function(proposal) {
     id = n$id, parent_id = n$parent_id, entity_id = n$entity_id, phase = n$phase, kind = n$kind,
     label = n$label, minimum = num(n$minimum), unit = n$unit, value = n$value,
     course_ref = if (length(n$course_refs)) unlist(n$course_refs)[1] else NA_character_,
+    block_id = if (length(n$citations)) n$citations[[1]]$block_id else NA_character_,
     quote = if (length(n$citations)) n$citations[[1]]$quote else NA_character_)))
 }
 
@@ -72,8 +73,8 @@ degree_compiler_nodes <- function(proposal) {
 #'
 #' @param proposal The interpretation's `proposal` (parsed JSON, unsimplified).
 #' @param courses `degree_packet_course_facts()` for the same packet.
-#' @return List: `rules` (one row per compiled rule: `rule_id`, `role`, `subject_course`,
-#'   `label`, `tiles`, `credits`, `quote`), `options` (`rule_id`, `option_id`,
+#' @return List: `rules` (one row per compiled rule: `rule_id`, `parent_id`, `role`,
+#'   `subject_course`, `label`, `tiles`, `credits`, `block_id`, `quote`), `options` (`rule_id`, `option_id`,
 #'   `subject_course`), `conditions`, `credit_rules`, `flags`, `concentrations`,
 #'   and `skipped` (information nodes).
 compile_degree_interpretation <- function(proposal, courses) {
@@ -94,8 +95,9 @@ compile_degree_interpretation <- function(proposal, courses) {
   kids <- function(id) base[base$parent_id == id, ]
   out <- list(rules = list(), options = list())
   add_rule <- function(node, role, tiles, credits, code = NA_character_) {
-    out$rules[[length(out$rules) + 1L]] <<- tibble::tibble(rule_id = node$id, role = role, subject_course = code,
-      label = node$label, tiles = as.integer(tiles), credits = credits, quote = node$quote)
+    out$rules[[length(out$rules) + 1L]] <<- tibble::tibble(rule_id = node$id, parent_id = node$parent_id, role = role,
+      subject_course = code, label = node$label, tiles = as.integer(tiles), credits = credits,
+      block_id = node$block_id, quote = node$quote)
   }
   add_options <- function(rule_id, children) {
     for (k in seq_len(nrow(children))) {
