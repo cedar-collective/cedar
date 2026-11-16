@@ -503,9 +503,8 @@ classify_entry_status <- function(programs, focal_codes) {
 #'   program_codes — required for the major type: program codes, each a
 #'     declared program; a renamed program's other codes and its pre-majors
 #'     are added by resolve_focal_programs().
-#'   program_names — required for the preset type (population_groups.csv
-#'     names its programs), resolved to the codes whose declared rows carry
-#'     the name.
+#'   For the preset type, program_codes are a population group's declared
+#'     codes (population_group_codes()), resolved the same way.
 #'   dept_code     — required for dept type.
 #'   program_successions, premajor_leads_to — override the mapping files'
 #'     program_successions and premajor_leads_to (tests and what-ifs).
@@ -573,10 +572,6 @@ build_population <- function(programs, degrees = NULL, student_terms = NULL, opt
       message("[population.R] No declared-major records found for dept_code = '", opt$dept_code,
               "'. Check that cedar_programs has rows with program_type = 'Major' and ",
               "is_pre_major = FALSE for this department.")
-    } else {
-      message("[population.R] No declared-major records matched program_names = '",
-              paste(opt$program_names, collapse = ", "), "'. ",
-              "Check program_names spelling against cedar_programs$program_name.")
     }
     return(empty())
   }
@@ -843,17 +838,16 @@ build_population <- function(programs, degrees = NULL, student_terms = NULL, opt
 
 #' The program codes a population build counts, and why each is in
 #'
-#' Codes, never names. The selected codes come from opt: the major type's
-#' `program_codes` as given, the dept type's declared codes whose own
-#' `dept_code` is the department, the preset type's declared codes carrying
-#' one of `program_names`. To those it adds every code a confirmed whole
+#' Codes, never names. The selected codes come from opt: the major and preset
+#' types' `program_codes` as given (a preset's are a population group's), the
+#' dept type's declared codes whose own `dept_code` is the department. To those it adds every code a confirmed whole
 #' succession joins them to (code_history.csv, `program_successions`), then
 #' the pre-majors that lead to any of them (programs.csv `leads_to`; FFDA is
 #' named "FDMA" and leads to Film and Digital Arts, ISSUES.md I38) and, for a
 #' department, the department's own pre-major codes.
 #'
 #' @param programs Data frame. cedar_programs, scoped to the eligible rows.
-#' @param opt List of options (type, program_codes, program_names, dept_code,
+#' @param opt List of options (type, program_codes, dept_code,
 #'   and the program_successions / premajor_leads_to overrides).
 #' @return A list: `codes`, a tibble of program_code and role ("selected",
 #'   "succession" or "pre_major") with `leads_to` on a pre-major; and
@@ -868,18 +862,13 @@ resolve_focal_programs <- function(programs, opt) {
     filter(program_type %in% c("Major", "Second Major"), !is_pre_major)
 
   own_pre_majors <- character(0)
-  selected <- if (type == "major") {
-    if (length(opt$program_names) > 0)
-      stop("[population.R] type = 'major' selects by program code: pass opt$program_codes, ",
+  selected <- if (type %in% c("major", "preset")) {
+    if (length(opt[["program_names"]]) > 0)
+      stop("[population.R] type = '", type, "' selects by program code: pass opt$program_codes, ",
            "not program_names (one name covers several programs).")
     if (length(opt$program_codes) == 0)
-      stop("[population.R] opt$program_codes is required for type = 'major'")
+      stop("[population.R] opt$program_codes is required for type = '", type, "'")
     as.character(opt$program_codes)
-  } else if (type == "preset") {
-    pnames <- opt$program_names
-    if (is.null(pnames) || length(pnames) == 0)
-      stop("[population.R] opt$program_names is required for type = '", type, "'")
-    declared$major_code[declared$program_name %in% pnames]
   } else if (type == "dept") {
     dept <- opt$dept_code
     if (is.null(dept) || !nzchar(dept))
@@ -1129,12 +1118,13 @@ population_group_default <- function(surface) {
 }
 
 
-population_group_program_names <- function(group_id) {
+#' The declared program codes population_groups.csv lists for a group
+population_group_codes <- function(group_id) {
   group <- CEDAR_POPULATION_GROUPS[[group_id]]
   if (is.null(group)) {
     stop("[population.R] Unknown population group: ", group_id, call. = FALSE)
   }
-  unique(group$programs)
+  unique(group$codes)
 }
 
 
@@ -1240,81 +1230,77 @@ program_choices <- function(codes, dims, successions = program_successions) {
 
 #' Resolve a named population group to Banner major codes
 #'
+#' The group's declared codes (population_groups.csv), every code a confirmed
+#' rename joins them to (code_history.csv), and the pre-majors that lead to
+#' any of them (programs.csv leads_to). Codes only: a Banner name joins
+#' nothing (ISSUES I62, M56).
+#'
 #' @param group_id Name of an entry in CEDAR_POPULATION_GROUPS.
-#' @param programs cedar_programs. Required — the mapping lives in the data.
 #' @param include_pre_majors "lump" (default, declared + pre-major),
 #'   "majors_only", or "pre_only". Matches build_population()'s vocabulary.
+#' @param successions,leads_to Override program_successions and
+#'   premajor_leads_to (tests and what-ifs).
 #' @return Character vector of major codes, sorted.
-population_group_major_codes <- function(group_id, programs,
-                                         include_pre_majors = "lump") {
-  names_wanted <- population_group_program_names(group_id)
+population_group_major_codes <- function(group_id, include_pre_majors = "lump",
+                                         successions = program_successions,
+                                         leads_to = premajor_leads_to) {
+  if (!include_pre_majors %in% c("lump", "majors_only", "pre_only")) {
+    stop("[population.R] include_pre_majors must be lump, majors_only, or pre_only.",
+         call. = FALSE)
+  }
+  declared <- program_succession_family(population_group_codes(group_id), successions)
+  pre <- setdiff(pre_major_codes_leading_to(declared, leads_to), declared)
+  sort(unique(switch(include_pre_majors,
+    lump = c(declared, pre), majors_only = declared, pre_only = pre)))
+}
+
+
+#' Audit a named population group against real program data
+#'
+#' A group lists codes, so what drifts is Banner adding a code the file does not
+#' list. The audit reports what the group resolved to, the codes no student
+#' holds, and the near misses a code list is most likely to leave out: a
+#' declared code sharing a group program's Banner name (a new online or
+#' campus variant), and a pre-major with no leads_to whose name matches a group
+#' program's once case, punctuation and a plural are set aside ("Radiologic
+#' Science" beside "Radiologic Sciences"). Each is for a person to decide in
+#' the file; none joins the group.
+#'
+#' @param group_id Name of an entry in CEDAR_POPULATION_GROUPS.
+#' @param programs cedar_programs (major_code, program_name, is_pre_major).
+#' @param successions,leads_to As for population_group_major_codes().
+#' @return A list: `codes`, `unheld_codes`, `near_miss` (program_name,
+#'   major_code, is_pre_major).
+population_group_audit <- function(group_id, programs,
+                                   successions = program_successions,
+                                   leads_to = premajor_leads_to) {
   required <- c("major_code", "program_name", "is_pre_major")
   missing <- setdiff(required, names(programs))
   if (length(missing) > 0) {
     stop("[population.R] programs is missing: ", paste(missing, collapse = ", "),
          call. = FALSE)
   }
-  if (!include_pre_majors %in% c("lump", "majors_only", "pre_only")) {
-    stop("[population.R] include_pre_majors must be lump, majors_only, or pre_only.",
-         call. = FALSE)
-  }
-
-  matched <- programs %>%
-    filter(program_name %in% names_wanted, !is.na(major_code)) %>%
-    distinct(major_code, is_pre_major)
-
-  # Pre-majors whose own name has drifted, recovered through their leads_to.
-  declared <- matched$major_code[!matched$is_pre_major]
-  drifted <- setdiff(pre_major_codes_leading_to(declared), matched$major_code)
-  if (length(drifted) > 0) {
-    matched <- bind_rows(
-      matched,
-      tibble(major_code = drifted, is_pre_major = TRUE)
-    )
-  }
-
-  keep <- switch(
-    include_pre_majors,
-    lump = matched,
-    majors_only = filter(matched, !is_pre_major),
-    pre_only = filter(matched, is_pre_major)
-  )
-  sort(unique(keep$major_code))
-}
-
-
-#' Audit a named population group against real program data
-#'
-#' Reports what the group actually resolved to, what it failed to match, and the
-#' near-miss names that a name-declared group is most likely to drop silently
-#' ("Medical Laboratory Science" beside "Medical Laboratory Sciences").
-#'
-#' @return A list: `codes`, `unmatched_names`, `near_miss`.
-population_group_audit <- function(group_id, programs) {
-  names_wanted <- population_group_program_names(group_id)
-  codes <- population_group_major_codes(group_id, programs)
+  codes <- population_group_major_codes(group_id, "lump", successions, leads_to)
 
   present <- programs %>%
-    filter(!is.na(program_name), nzchar(program_name)) %>%
+    filter(!is.na(major_code), !is.na(program_name), nzchar(program_name)) %>%
     distinct(program_name, major_code, is_pre_major)
 
-  # Normalized comparison: case, punctuation, spacing, and a trailing plural
-  # are exactly the differences Banner names drift by.
   normalize <- function(x) {
-    x <- tolower(gsub("[^a-z0-9]+", " ", tolower(x)))
-    x <- trimws(gsub("\\s+", " ", x))
+    x <- trimws(gsub("\\s+", " ", gsub("[^a-z0-9]+", " ", tolower(x))))
     sub("s$", "", x)
   }
-  wanted_norm <- unique(normalize(names_wanted))
+  group_names <- unique(present$program_name[present$major_code %in% codes])
 
   list(
     codes = codes,
-    unmatched_names = sort(setdiff(names_wanted, present$program_name)),
+    unheld_codes = sort(setdiff(codes, present$major_code)),
     near_miss = present %>%
-      filter(!program_name %in% names_wanted,
-             !major_code %in% codes,
-             normalize(program_name) %in% wanted_norm) %>%
-      arrange(program_name)
+      filter(!major_code %in% codes,
+             (!is_pre_major & program_name %in% group_names) |
+               (is_pre_major & !major_code %in% names(leads_to)[!is.na(leads_to)] &
+                  normalize(program_name) %in% normalize(group_names))) %>%
+      arrange(program_name, major_code)
   )
 }
 

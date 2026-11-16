@@ -1305,12 +1305,12 @@ graded_students <- local({
 # the shared fixtures, and each one's class list inside its Pathways window.
 hist_pop <- build_population(
   test_programs, test_degrees,
-  opt = list(type = "preset", program_names = "History")
+  opt = list(type = "preset", program_codes = c("HIST-BA", "HIST-MA"))
 )
 
 math_pop <- build_population(
   test_programs,
-  opt = list(type = "preset", program_names = "Mathematics")
+  opt = list(type = "preset", program_codes = "MATH-BS")
 )
 
 anth_pop <- build_population(
@@ -1363,7 +1363,7 @@ hp2_attempts <- attempts_for(test_students_hp2, hp2_edges)
 hp2_course_terms <- course_terms_for(test_students_hp2, test_sections_hp2, hp2_edges)
 
 hp2_population <- suppressMessages(build_population(
-  test_programs_hp2, opt = list(type = "preset", program_names = "Nursing")
+  test_programs_hp2, opt = list(type = "preset", program_codes = "NURS")
 ))
 
 # Which designed catalogs name each HP02 course.
@@ -1778,3 +1778,11 @@ scaffold_dims <- build_cedar_dims(scaffold_mapping_files)
 
 # DF01's attempt table, built to its edges (graded through Fall 2022).
 df_attempts <- keyed_attempts(test_students_df, df01_edges)
+
+# ── test-population-groups.R ────────────────────────────────────────────────────
+
+# A confirmed rename into a group program: HSCI (in no file) renamed NURS from
+# Fall 2020, so a group listing NURS reaches HSCI's students too.
+population_group_rename_successions <- data.frame(
+  from_code = "HSCI", to_code = "NURS", effective_term = 202080L,
+  stringsAsFactors = FALSE)

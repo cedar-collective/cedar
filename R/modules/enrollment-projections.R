@@ -1620,7 +1620,7 @@ enrollmentProjectionsUI <- function(id) {
 }
 
 
-enrollmentProjectionsServer <- function(id, bundles, load_bundle, programs) {
+enrollmentProjectionsServer <- function(id, bundles, load_bundle) {
   moduleServer(id, function(input, output, session) {
     saved_bundles <- reactive({
       if (shiny::is.reactive(bundles) || is.function(bundles)) bundles() else bundles
@@ -1862,7 +1862,7 @@ enrollmentProjectionsServer <- function(id, bundles, load_bundle, programs) {
       req(is.finite(growth))
       tryCatch(
         build_enrollment_projection_scenario(
-          value, programs = programs,
+          value,
           opt = list(
             group_id = input$group %||% "always_monitored",
             departments = input$department,

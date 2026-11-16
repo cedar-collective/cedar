@@ -95,9 +95,9 @@ What each file in `R/branches/`, `R/cones/`, `R/features/` and `R/trunk/` is for
 | Function | Purpose |
 |---|---|
 | `population_group_ids()` / `population_group_choices()` / `population_group_default(surface)` | The shared group registry (`CEDAR_POPULATION_GROUPS`, from `institution/<id>/population_groups.csv`) as ids or selectize choices, and the group a surface preselects (`default_for` in the file, else the first group) |
-| `population_group_program_names(group_id)` | The program names a group declares |
-| `population_group_major_codes(group_id, programs, include_pre_majors)` | Resolves a group to Banner major codes through name matching **and** each pre-major's `leads_to` (programs.csv), because each alone misses real pre-majors. `include_pre_majors` takes `build_population()`'s vocabulary: `lump` / `majors_only` / `pre_only` |
-| `population_group_audit(group_id, programs)` | `codes`, `unmatched_names`, and `near_miss` — the drifted names a name-declared group would otherwise drop silently. Run it when adding a group |
+| `population_group_codes(group_id)` | The declared program codes a group lists |
+| `population_group_major_codes(group_id, include_pre_majors, successions, leads_to)` | Resolves a group to Banner major codes: its codes, the codes a confirmed rename joins (`program_successions`) and the pre-majors that lead to them (`premajor_leads_to`); never a name. `include_pre_majors` takes `build_population()`'s vocabulary: `lump` / `majors_only` / `pre_only` |
+| `population_group_audit(group_id, programs)` | `codes`, `unheld_codes`, and `near_miss` — a code Banner added under a group program's name, or a pre-major with no `leads_to` whose name resembles one. Run it when adding a group |
 
 ### Data anomaly screens (`R/branches/data-anomalies.R`)
 

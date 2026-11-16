@@ -9,29 +9,29 @@
 # population_groups.csv (read and validated here at load). This file names no
 # group and no program.
 #
-# Groups are declared as PROGRAM NAMES, not Banner codes, and resolved to codes
-# against cedar_programs by population_group_major_codes() in
-# R/branches/population.R. Names are the right declaration because a pre-major
-# usually carries the same program_name as the major it leads to (FRAD and RADS
-# are both "Radiologic Sciences"), so declared and pre-major students resolve
-# together without a hand-maintained code list going stale every time Banner
-# adds a variant. Where a pre-major's name has drifted from its major's, the
-# file lists BOTH spellings; population_group_audit() reports near-miss names
-# precisely so that drift is found rather than silently dropped (ISSUES.md I7).
+# Groups list declared PROGRAM CODES from programs.csv, never names: one Banner
+# name covers several programs (ISSUES I62, M56). A group's pre-majors join
+# through programs.csv's leads_to (FRAD leads to RADS) and a renamed program's
+# codes through code_history.csv, both in population_group_major_codes()
+# (R/branches/population.R). A new Banner variant joins no group until the
+# file lists it; population_group_audit() reports one that shares a group
+# program's name, and a pre-major with no leads_to, so it is found rather than
+# silently dropped (ISSUES.md I7).
 #
 # CEDAR_POPULATION_GROUPS: a named list in file order, one entry per group:
-#   programs    — character vector of program_name values
+#   codes       — character vector of declared program codes
 #   description — one-line description (shown as a selectize option label)
 # CEDAR_POPULATION_GROUP_DEFAULTS: the group preselected on each surface in
 #   CEDAR_POPULATION_GROUP_SURFACES that the file names one for.
 
-.cedar_population_groups <- validate_population_groups(read_institution_file("population_groups"))
+.cedar_population_groups <- validate_population_groups(read_institution_file("population_groups"),
+                                                       cedar_institution_files$programs)
 
 CEDAR_POPULATION_GROUPS <- local({
   ids <- unique(.cedar_population_groups$group)
   stats::setNames(lapply(ids, function(id) {
     rows <- .cedar_population_groups[.cedar_population_groups$group == id, ]
-    list(programs = unique(rows$program_name), description = rows$description[[1]])
+    list(codes = unique(rows$program_code), description = rows$description[[1]])
   }), ids)
 })
 

@@ -3802,13 +3802,16 @@ majors and minors are offered and counted by program code
 joined through `program_successions`); concentrations, which carry no code,
 stay by name. EC-16's ENG minor guards it.
 
-**M56 — Population groups declare program names.** `population_groups.csv`
-lists names, resolved to codes by `population_group_major_codes()` and the
-preset type of `resolve_focal_programs()`, so a group follows every program
-that shares a name and drops one whose name drifts (the reason for
-`population_group_audit()`'s near misses). Found 2026-11-16. *Done when:* the
-file lists program codes, renames following through `program_successions`,
-and the audit checks codes against `programs.csv`.
+**M56 — Population groups declare program names.** **Done 2026-11-16.**
+`population_groups.csv` listed names, resolved to codes by
+`population_group_major_codes()` and the preset type of
+`resolve_focal_programs()`. It now lists declared program codes, validated
+against `programs.csv` (a pre-major code is refused: it joins through
+`leads_to`); renames join through `program_successions`. The preset type takes
+`program_codes`, so `build_population()` matches no name anywhere. The
+conversion kept every UNM group's codes exactly; the audit now reports
+`unheld_codes` and the codes a list leaves out (a variant under a group
+program's name, a pre-major with no `leads_to`), and found none.
 
 ### Testing and pipeline safety
 

@@ -37,14 +37,11 @@ enrollment_projection_scenario_config <- function(opt = list()) {
 #' Project a named population's growth onto published course demand
 #'
 #' @param bundle A validated enrollment-projection bundle.
-#' @param programs cedar_programs, used to resolve a named population group to
-#'   Banner major codes. Required when `opt$population_group` is given.
 #' @param opt Scenario options plus the usual view filters (`group_id`,
 #'   `departments`, `courses`).
 #' @return A list: `rows` (one row per course per year), `courses` (one row per
 #'   course with its cohort and share), `meta`, and `excluded`.
-build_enrollment_projection_scenario <- function(bundle, programs = NULL,
-                                                 opt = list()) {
+build_enrollment_projection_scenario <- function(bundle, opt = list()) {
   validate_enrollment_projection_bundle(bundle)
   config <- enrollment_projection_scenario_config(opt)
   if (!is.finite(config$growth_rate)) {
@@ -61,12 +58,8 @@ build_enrollment_projection_scenario <- function(bundle, programs = NULL,
       stop("[scenario] Give either a population_group or explicit major_codes.",
            call. = FALSE)
     }
-    if (is.null(programs)) {
-      stop("[scenario] A programs table is required to resolve a population group.",
-           call. = FALSE)
-    }
     codes <- population_group_major_codes(
-      config$population_group, programs,
+      config$population_group,
       include_pre_majors = config$include_pre_majors
     )
     group_label <- config$population_group

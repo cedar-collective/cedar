@@ -1,15 +1,14 @@
-group,description,default_for,program_name
-Business,Business and management programs in the fixtures,pathways,Business Administration
-Business,Business and management programs in the fixtures,pathways,Business Analytics
-Business,Business and management programs in the fixtures,pathways,Business Management
-Business,Business and management programs in the fixtures,pathways,Accounting
-Business,Business and management programs in the fixtures,pathways,Finance
-Health Programs,Health programs in the fixtures,scenario,Nursing
-Humanities & Social Sciences,Humanities and social-science programs in the fixtures,,History
-Humanities & Social Sciences,Humanities and social-science programs in the fixtures,,English
-Humanities & Social Sciences,Humanities and social-science programs in the fixtures,,Political Science
-Humanities & Social Sciences,Humanities and social-science programs in the fixtures,,Psychology
-Humanities & Social Sciences,Humanities and social-science programs in the fixtures,,Anthropology
-Humanities & Social Sciences,Humanities and social-science programs in the fixtures,,Archaeology
-STEM,Science and mathematics programs in the fixtures,,Biology
-STEM,Science and mathematics programs in the fixtures,,Mathematics
+group,description,default_for,program_code
+Business,Business and management programs in the fixtures,pathways,BUSA
+Business,Business and management programs in the fixtures,pathways,BUAN
+Business,Business and management programs in the fixtures,pathways,BUMG
+Business,Business and management programs in the fixtures,pathways,ACCT
+Business,Business and management programs in the fixtures,pathways,FINC
+Health Programs,Health programs in the fixtures,scenario,NURS
+Humanities & Social Sciences,Humanities and social-science programs in the fixtures,,HIST
+Humanities & Social Sciences,Humanities and social-science programs in the fixtures,,ENGL
+Humanities & Social Sciences,Humanities and social-science programs in the fixtures,,POLS
+Humanities & Social Sciences,Humanities and social-science programs in the fixtures,,PSYC
+Humanities & Social Sciences,Humanities and social-science programs in the fixtures,,ANTH
+STEM,Science and mathematics programs in the fixtures,,BIOL
+STEM,Science and mathematics programs in the fixtures,,MATH

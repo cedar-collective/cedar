@@ -337,7 +337,7 @@ test_that("detect_major_changes: no changes for pure single-program populations"
 test_that("a pre-major is matched to its major by leads_to, not by sharing its name", {
   film <- function(leads_to) suppressMessages(build_population(
     test_programs, test_degrees,
-    opt = list(type = "preset", program_names = "Film and Digital Arts",
+    opt = list(type = "preset", program_codes = "FDMA",
                outcomes = c("graduated", "switched_out", "stopped_out", "ongoing",
                             "chose_elsewhere", "left_undeclared"),
                premajor_leads_to = leads_to)
