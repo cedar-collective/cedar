@@ -262,7 +262,13 @@ if (!"dept_code" %in% names(df)) stop("dept_code column required")    # right
 
 `tryCatch` is allowed only in a module server that shows the error via `showNotification()`, and around a genuinely fallible statistic where `NA` is the right answer. `tryCatch(..., error = function(e) NULL)` around a data pipeline is always a bug.
 
-**Reuse before writing.** Search `R/trunk/utils.R` and `filter.R`, then `R/lists/`, then `R/branches/`, then the cones. There is one canonical way to count each thing: census `add_census_enrl()`, DFW `classify_enrollment_outcomes()`, term type `add_term_type_col()`, enrollment history `summarize_term_enrl_series()` / `format_term_history()`. Shared visuals (sparklines, fill bars, badges) live in `R/modules/ui-helpers.R`. Duplicated logic is consolidated up a layer, never copied sideways.
+**Reuse before writing, on every request.** A request names an outcome, not the code to write. Before writing any function, helper or pipeline, search for code that already computes the same thing or nearly does: [layer-inventory.md](docs/developers/layer-inventory.md), then `grep` the source for the columns and verbs involved (`n_dfw`, `dfw_pct`, `summarize(`), through `R/trunk/utils.R` and `filter.R`, `R/lists/`, `R/branches/`, then the cones.
+
+- **Extend before adding.** A missing column, option or grouping goes into the existing function. A sibling is allowed only when extending would change its callers' answers, and the new file's header says why.
+- **Say what you reused** when reporting the work: what was extended, and what was new and why.
+- **Report duplication the search turns up** beyond the request as an `M` entry in `ISSUES.md`, and mention it; don't fold it into the change unasked.
+
+There is one canonical way to count each thing: census `add_census_enrl()`; DFW counts and rates `summarize_attempt_outcomes()` over `attempt_outcome_flags()` (`get_course_outcome_rates()` for a course page), with `classify_enrollment_outcomes()` only where no `cedar_attempts` exists (M53); term type `add_term_type_col()`; enrollment history `summarize_term_enrl_series()` / `format_term_history()`; a rate's trend across terms `compute_rate_trend()`. Shared visuals (sparklines, fill bars, badges) live in `R/modules/ui-helpers.R`. Duplicated logic is consolidated up a layer, never copied sideways.
 
 **Numbers.** Round for display only, once, in the display adapter. Counts whole, percentages one decimal, GPA and means two, SMDs three; more when the default would collapse a reported difference. Missing values show as an em dash. Identifiers (terms, CRNs, IDs, course numbers) get no separators or decimals. Don't apply one formatter to different kinds of column.
 

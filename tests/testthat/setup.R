@@ -28,6 +28,7 @@ test_programs_mc     <<- cedar_programs_mc       # MC02 covariates
 test_students_ds     <<- cedar_registrations_ds       # DS01: a course and its sequel (Later Course)
 test_programs_ds     <<- cedar_programs_ds       # DS01 covariates
 test_students_cm     <<- cedar_registrations_cm       # CM01: courses taken alongside, by major
+test_students_df     <<- cedar_registrations_df       # DF01: the lower-division DFW dashboard
 test_sections_tp     <<- cedar_sections_tp       # TP01: one course number, many topics (Course Dynamics > Topics)
 test_students_tp     <<- cedar_registrations_tp  # TP01
 test_students_mcret  <<- cedar_registrations_mcret    # MC03: retention cohorts, incl. a campus move

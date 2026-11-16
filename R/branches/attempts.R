@@ -241,6 +241,7 @@ attempt_outcome_flags <- function(attempts, passing_values = GRADES_PASS) {
       is_f = .env$category == "f",
       is_other_nonpassing = .env$category == "other_nonpassing" & !is_pass,
       is_failed_legacy = .env$graded & !is_pass,
+      is_nr = is_failed_legacy & .env$grade %in% GRADES_NOT_REPORTED,
       is_denominator_attempt = .env$graded | is_late_withdrawal,
       is_dfw_legacy = is_failed_legacy | is_late_withdrawal,
       is_dfw_strict = is_d | is_f | is_late_withdrawal,

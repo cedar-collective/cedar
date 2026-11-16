@@ -28,6 +28,7 @@
 # definitions. format_later_course() is the one text rendering of it.
 #
 # Depends on: get_downstream_outcomes() (cones/downstream-outcomes.R)
+#             compute_rate_trend() (trunk/utils.R)
 #             get_downstream_instructor_balance() (cones/downstream-instructor-balance.R)
 #             GRADE_LETTER_BANDS, GRADE_BAND_LEVELS (lists/grade_bands.R)
 #             fmt_term(), term_axis_factor(), CEDAR_SEMANTIC_COLORS (trunk/utils.R)
@@ -269,44 +270,14 @@ later_course_term_table <- function(payload, term_types = NULL) {
 later_course_trend <- function(payload, term_types = NULL) {
   .later_course_series(payload, term_types) %>%
     dplyr::filter(!is.na(pct)) %>%
-    dplyr::mutate(
-      year = term_x %/% 100L,
+    dplyr::transmute(
+      campus,
+      term_type = factor(term_type, levels = LATER_COURSE_TERM_TYPES),
       measure = factor(measure, levels = c("took_y", "pass")),
-      term_type = factor(term_type, levels = LATER_COURSE_TERM_TYPES)
+      term = term_x, k, n
     ) %>%
-    dplyr::group_by(campus, term_type, measure) %>%
-    dplyr::arrange(term_x, .by_group = TRUE) %>%
-    dplyr::summarize(
-      n_terms = dplyr::n(),
-      first_term = dplyr::first(term_x),
-      first_pct = dplyr::first(pct),
-      last_term = dplyr::last(term_x),
-      last_pct = dplyr::last(pct),
-      pooled_pct = 100 * sum(k) / sum(n),
-      .sxx = sum((year - mean(year))^2),
-      .sxy = sum((year - mean(year)) * pct),
-      .syy = sum((pct - mean(pct))^2),
-      # Each term's variance at the pooled rate, in squared points.
-      .svar = sum((year - mean(year))^2 * pooled_pct * (100 - pooled_pct) / n),
-      .groups = "drop"
-    ) %>%
-    dplyr::mutate(
-      enough = n_terms >= LATER_COURSE_MIN_TREND_TERMS,
-      slope = dplyr::if_else(enough, .sxy / .sxx, NA_real_),
-      se_chance = dplyr::if_else(enough, sqrt(.svar) / .sxx, NA_real_),
-      # What is left around the line, per term beyond the two the line uses.
-      se_scatter = dplyr::if_else(
-        enough, sqrt(pmax(.syy - .sxy^2 / .sxx, 0) / pmax(n_terms - 2L, 1L) / .sxx), NA_real_),
-      slope_se = pmax(se_chance, se_scatter),
-      direction = dplyr::case_when(
-        !enough ~ "too_few_terms",
-        slope > 2 * slope_se ~ "rising",
-        slope < -2 * slope_se ~ "falling",
-        TRUE ~ "steady"
-      ),
-      measure = as.character(measure),
-      term_type = as.character(term_type)
-    ) %>%
+    compute_rate_trend(c("campus", "term_type", "measure"), min_terms = LATER_COURSE_MIN_TREND_TERMS) %>%
+    dplyr::mutate(measure = as.character(measure), term_type = as.character(term_type)) %>%
     dplyr::select(campus, term_type, measure, n_terms, first_term, first_pct, last_term,
                   last_pct, pooled_pct, slope, se_chance, se_scatter, slope_se, direction)
 }

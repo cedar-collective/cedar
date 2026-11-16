@@ -1660,3 +1660,8 @@ scaffold_mapping_files <- list(
 # The same files as the loader reads them: the transform stores keys, and
 # attach_unit() (R/branches/dims.R) resolves them at every start.
 scaffold_dims <- build_cedar_dims(scaffold_mapping_files)
+
+# ── test-dfw-dashboard.R ────────────────────────────────────────────────────────
+
+# DF01's attempt table, built to its edges (graded through Fall 2022).
+df_attempts <- keyed_attempts(test_students_df, df01_edges)

@@ -131,6 +131,20 @@ unusually; provost: cross-college patterns and risks).
   each item a sentence and a link. Later: a department roll-up
   (`attach_unit()` on the flagged rows) and the return watch as another
   screen. Regstats' own "full" badges: ISSUES M51.
+- [ ] **Bird's Eye > DFW: how UNM is doing on DFW, and where to act.**
+  Lower division, one term type at a time, replacing OIA's course fail rates
+  page: the UNM-wide series with a trend verdict and what the DFW grades
+  were; the courses ranked by DFW grades (on the 2026-11-15 tables, 23 of
+  1,396 fall campus-courses hold a quarter of them, 90 half); which are
+  rising, falling or swinging more than courses usually do; courses whose
+  sections disagree term after term (25 in fall); campus and college. Done:
+  step 1, the text-first preview (`build_dfw_dashboard()`). Next: step 2,
+  the page under Bird's Eye. Graduate rates wait on how PR (thesis in
+  progress) is read; upper division is left to the department pages.
+- [ ] **A trend verdict on the Course Report's DFW by term:** the table mixes
+  Fall, Spring and Summer and says nothing about direction; read it one term
+  type at a time with `compute_rate_trend()`, the test Later Course and the
+  DFW dashboard share.
 - [ ] **Choose the tabs** that get one: likely DFW, Enrollment Trends,
   Headcount Trends and Gen Ed.
 
@@ -278,7 +292,11 @@ Page-level legibility is [M43](ISSUES.md)–M48; these are the new pieces.
 
 - [ ] **Demographics** by race/ethnicity/gender on chair-facing or Explore
   surfaces, with small-cell suppression.
-- [ ] **Named-instructor DFW,** if policy supports showing it.
+- [ ] **Named-instructor DFW,** if policy supports showing it. Three views
+  now ask whether a teaching unit differs from its course (the Course Report's
+  and Gen Ed's instructor DFW, the dashboard's section spread); only the
+  section spread tests it against chance. Build one branch for units against
+  the course's pooled rate and give the gated instructor views its test.
 - [ ] **Faculty counts** through the existing faculty/FTE helpers.
 - [ ] **Low-enrollment exception workflow** for dean/chair decisions on
   flagged courses.

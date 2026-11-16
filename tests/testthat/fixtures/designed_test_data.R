@@ -55,6 +55,13 @@
 #          graded through Fall 2021; Spring 2022 in progress. The per-topic
 #          counts are worked out beside the rows below.
 #
+#   DF01 — cedar_registrations_df (591 rows). Four lower-division
+#          course-campuses over Fall 2019-2022 (graded edge Fall 2022,
+#          df01_edges) for Bird's Eye > DFW: one rising with uneven sections
+#          (MATH 1220 ABQ), one falling (ENGL 1110 ABQ, with an NR), one steady
+#          on EA, one that swings (PSYC 1110 ABQ), plus rows outside the scope.
+#          Pinned values beside the rows.
+#
 #   CM01 — cedar_registrations_cm (56 rows). CHEM 1215 on ABQ, Fall 2020 and
 #          Fall 2021 (settled edge Fall 2021), for the courses taken alongside
 #          it by major. Two falls, min_n 2: Nursing (pre-major) 5 student-terms
@@ -4937,4 +4944,84 @@ cedar_registrations_cm <- dplyr::bind_rows(
   .cm_rows("CM_O1", 201980L, "ME",   c("CHEM 1215", "MATH 1512")),
   .cm_rows("CM_E1", 202080L, "FNRS", c("CHEM 1215", "CHEM 1215L", "ENGL 1110"), campus = "EA"),
   .cm_rows("CM_E2", 202180L, "UNDC", c("CHEM 1215", "ENGL 1110"), campus = "EA")
+)
+
+# =============================================================================
+# DF01 — the lower-division DFW dashboard (see the header)
+# =============================================================================
+#
+# Bird's Eye > DFW (get_dfw_term_series(), get_dfw_course_board(),
+# get_dfw_section_spread(), build_dfw_dashboard()). Four lower-division
+# course-campuses over four falls, 2019-2022; graded edge Fall 2022
+# (df01_edges). Each section is `n` graded attempts with `dfw` of them DFW,
+# the DFW grades cycling F, W (a late drop, DW), D; the rest pass with A.
+# Every student takes one course once.
+#
+#   course-campus    college  sections x size  DFW a fall (2019, 2020, 2021, 2022)
+#   MATH 1220 ABQ    AS       3 x 10           6, 9, 12, 16 (2,2,2 / 3,3,3 /
+#                                              0,4,8 / 2,4,10): rising, and its
+#                                              Fall 2021 and 2022 sections disagree
+#   ENGL 1110 ABQ    UC       4 x 10           12, 9, 6, 3 (3,3,3,3 / 3,2,2,2 /
+#                                              2,2,1,1 / 1,1,0,1): falling;
+#                                              Fall 2022's fourth section's one DFW is an NR
+#   MATH 1220 EA     AS       1 x 30           10 each fall: steady
+#   PSYC 1110 ABQ    AS       1 x 40           4, 16, 4, 16: steady, but swings
+#
+#   Outside the scope: HIST 3010 ABQ (upper division, Fall 2022, 10 attempts,
+#   5 DFW); MATH 1220 ABQ Spring 2021 (another term type, 10 attempts, 9
+#   DFW); MATH 1220 ABQ Fall 2023 (past the graded edge, 10 rows); one early
+#   drop (DR) in MATH 1220 ABQ Fall 2020, never in a denominator.
+#
+# Pinned, fall terms, lower division, three-fall window (2020-2022):
+#   UNM-wide by fall: 32/140 (22.9%), 44/140 (31.4%), 32/140 (22.9%),
+#     45/140 (32.1%): steady. Fall 2022's 45 DFW: 13 W, 19 F, 12 D, 1 other
+#     (the NR).
+#   DFW in the window, 121: MATH 1220 ABQ 37 of 90 (41.1%), PSYC 1110 ABQ 36
+#     of 120 (30%), MATH 1220 EA 30 of 90 (33.3%), ENGL 1110 ABQ 18 of 120
+#     (15%). One course holds a quarter (30.6%), two hold half (60.3%).
+#   Trends over the four falls: MATH 1220 ABQ rising (20, 30, 40, 53.3%),
+#     ENGL 1110 ABQ falling (30, 22.5, 15, 7.5%, -7.5 points a year), MATH
+#     1220 EA steady (33.3% each fall), PSYC 1110 ABQ steady (10, 40, 10,
+#     40%) and the one that swings: the typical course's scatter beyond
+#     chance is 0, so it is judged against chance, at 0.05 over 4 courses.
+#   Sections, window: MATH 1220 ABQ tested in 3 falls, uneven in Fall 2021
+#     (0, 4 and 8 of 10) and Fall 2022 (2, 4 and 10 of 10); ENGL 1110 ABQ
+#     tested in 3, uneven in none. MATH 1220 EA and PSYC 1110 ABQ have one
+#     section a fall and are not tested.
+.df_section <- function(course, term, campus, sec, n, dfw, college, level = "lower", nr = 0L) {
+  cycle <- c("F", "W", "D")
+  grades <- c(rep_len(cycle, dfw), rep("A", n - dfw))
+  if (nr > 0L) grades[seq_len(nr) + dfw - nr] <- "NR"
+  dplyr::bind_rows(lapply(seq_len(n), function(i) {
+    sid <- sprintf("DF_%s_%s_%d_%s_%02d", gsub(" ", "", course), campus, term, sec, i)
+    .mc_row(sid, term, course, campus, sub(" .*", "", course), grade = grades[i]) %>%
+      dplyr::mutate(
+        registration_status_code = if (grades[i] == "W") "DW" else "RE",
+        college = .env$college, level = .env$level, student_college = .env$college,
+        crn = paste0("DF", substr(gsub(" ", "", course), 1, 4), campus, term %% 10000, sec),
+        section_id = paste0("DFSEC-", gsub(" ", "", course), "-", term, "-", campus, "-", sec),
+        as_of_date = as.Date("2023-01-20")
+      )
+  }))
+}
+.df_course <- function(course, campus, college, sizes, dfw_by_term, terms = c(201980L, 202080L, 202180L, 202280L)) {
+  dplyr::bind_rows(lapply(seq_along(terms), function(t) {
+    dplyr::bind_rows(lapply(seq_along(dfw_by_term[[t]]), function(s) {
+      .df_section(course, terms[t], campus, letters[s], sizes, dfw_by_term[[t]][s], college)
+    }))
+  }))
+}
+cedar_registrations_df <- dplyr::bind_rows(
+  .df_course("MATH 1220", "ABQ", "AS", 10L, list(c(2, 2, 2), c(3, 3, 3), c(0, 4, 8), c(2, 4, 10))),
+  .df_course("ENGL 1110", "ABQ", "UC", 10L, list(c(3, 3, 3, 3), c(3, 2, 2, 2), c(2, 2, 1, 1), c(1, 1, 0))),
+  .df_section("ENGL 1110", 202280L, "ABQ", "d", 10L, 1L, "UC", nr = 1L),
+  .df_course("MATH 1220", "EA", "AS", 30L, list(10, 10, 10, 10)),
+  .df_course("PSYC 1110", "ABQ", "AS", 40L, list(4, 16, 4, 16)),
+  .df_section("HIST 3010", 202280L, "ABQ", "a", 10L, 5L, "AS", level = "upper"),
+  .df_section("MATH 1220", 202110L, "ABQ", "a", 10L, 9L, "AS"),
+  .df_section("MATH 1220", 202380L, "ABQ", "a", 10L, 0L, "AS"),
+  .mc_row("DF_EARLY_DROP", 202080L, "MATH 1220", "ABQ", "MATH") %>%
+    dplyr::mutate(registration_status_code = "DR", college = "AS", student_college = "AS",
+                  crn = "DFMATHABQ2080a", section_id = "DFSEC-MATH1220-202080-ABQ-a",
+                  as_of_date = as.Date("2023-01-20"))
 )
