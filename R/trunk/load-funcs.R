@@ -189,7 +189,8 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
   source_file("features/population-course-pressure.R")  # text-first preview: a population through its shared courses
   source_file("features/course-cohort-context.R")       # text-first preview: a course's takers-vs-non-takers gap against its college's courses
   source_file("features/course-similar-students.R")     # text-first preview: a course against similar non-takers, beside every course and by instructor
-  source_file("features/dfw-dashboard.R")              # text-first preview: Bird's Eye > DFW
+  source_file("features/dfw-dashboard.R")              # payload and text preview: Bird's Eye > DFW Rates
+  source_file("features/dfw-dashboard-view.R")         # what the DFW Rates page draws
   source_file("features/later-course.R")                # text-first preview: a course's students in a later course, by term, grade and instructor
   source_file("features/course-topics.R")               # text-first preview: a course's topics side by side, with one-instructor rates withheld
   source_file("features/shared-requirements.R")
@@ -206,6 +207,7 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
     source_file("modules/headcount.R")
     source_file("modules/seatfinder.R")
     source_file("modules/cancellations.R")
+    source_file("modules/dfw-rates.R")       # Bird's Eye > DFW Rates
     source_file("modules/waitlist.R")
     source_file("modules/regstats.R")
     source_file("modules/admin.R")

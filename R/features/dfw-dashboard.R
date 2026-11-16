@@ -14,6 +14,7 @@
 # Exported functions:
 #   build_dfw_dashboard(attempts, dims, opt)
 #   format_dfw_dashboard(payload, n_list)
+#   dfw_trend_sentence(trend_row, min_terms)
 #
 # Depends on: get_dfw_term_series() (cones/dfw-term-series.R)
 #             get_dfw_course_board() (cones/dfw-course-board.R)
@@ -68,7 +69,9 @@ build_dfw_dashboard <- function(attempts, dims, opt = list()) {
 .dfw_dash_direction <- c(rising = "rising (worse)", falling = "falling (better)", steady = "steady",
                          too_few_terms = "too few terms for a trend")
 
-.dfw_dash_trend_sentence <- function(t, min_terms) {
+# A group's trend line in one sentence: its first and last rate, the slope a
+# year, and what chance and the terms' scatter give. Shared with the page.
+dfw_trend_sentence <- function(t, min_terms) {
   if (t$direction == "too_few_terms") {
     return(paste0("A trend is read from ", min_terms, " or more terms; ", t$n_terms, " have enough attempts."))
   }
@@ -88,7 +91,7 @@ build_dfw_dashboard <- function(attempts, dims, opt = list()) {
                    .dfw_dash_n(terms$n_other_nonpassing))
   nr <- terms[terms$n_nr / terms$n_attempts >= DFW_NR_NOTE_SHARE, , drop = FALSE]
   c("1. How UNM is doing", lines,
-    paste0("  Trend: ", .dfw_dash_trend_sentence(s$trend[1, ], s$meta$min_trend_terms)),
+    paste0("  Trend: ", dfw_trend_sentence(s$trend[1, ], s$meta$min_trend_terms)),
     if (nrow(nr)) paste0("  Not reported: ", fmt_term(nr$term), " holds ", .dfw_dash_n(nr$n_nr),
                          " NR grades (", .dfw_dash_pct(100 * nr$n_nr / nr$n_attempts),
                          " of its attempts), each counted as DFW."))
@@ -161,17 +164,12 @@ build_dfw_dashboard <- function(attempts, dims, opt = list()) {
 }
 
 .dfw_dash_groups <- function(series, label_col, title) {
-  g <- series$meta$group_cols
-  # Every group with a term, largest last term first; a group with too few
-  # terms of enough attempts has no line and says so.
-  groups <- series$terms %>%
-    dplyr::group_by(dplyr::across(dplyr::all_of(c(g, label_col)))) %>%
-    dplyr::arrange(term, .by_group = TRUE) %>%
-    dplyr::summarize(last_n = dplyr::last(n_attempts), .groups = "drop") %>%
-    dplyr::left_join(dplyr::select(series$trend, dplyr::all_of(g), first_pct, last_pct, direction), by = g) %>%
-    dplyr::arrange(dplyr::desc(last_n))
+  # Every group with a term, largest last term first (dfw_group_table(), the
+  # page's table too); a group with too few terms of enough attempts has no
+  # line and says so.
+  groups <- dfw_group_table(series, label_col)
   c(title,
-    sprintf("  %-36s %6s -> %6s  %s", substr(groups[[label_col]], 1, 36), .dfw_dash_pct(groups$first_pct),
+    sprintf("  %-36s %6s -> %6s  %s", substr(groups$label, 1, 36), .dfw_dash_pct(groups$first_pct),
             .dfw_dash_pct(groups$last_pct),
             ifelse(is.na(groups$direction), paste0("fewer than ", series$meta$min_trend_terms, " terms of ",
                                                    series$meta$min_term_n, "+ attempts"),

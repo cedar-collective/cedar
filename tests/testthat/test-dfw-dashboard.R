@@ -140,3 +140,66 @@ test_that("the DFW dashboard's text preview", {
   p <- build_dfw_dashboard(df_attempts, test_dims, df01_fall_opt)
   expect_snapshot(cat(format_dfw_dashboard(p)))
 })
+
+test_that("the course board carries each course's term series", {
+  b <- get_dfw_course_board(df_attempts, df01_fall_opt)
+  math <- b$terms[b$terms$subject_course == "MATH 1220" & b$terms$campus == "ABQ", ]
+  expect_equal(math$term, c(201980L, 202080L, 202180L, 202280L))
+  expect_equal(math$n_dfw, c(6L, 9L, 12L, 16L))
+  expect_true(all(math$in_trend))
+  expect_setequal(paste(b$terms$subject_course, b$terms$campus), paste(b$courses$subject_course, b$courses$campus))
+})
+
+test_that("the page's figures split the totals they stand for", {
+  p <- build_dfw_dashboard(df_attempts, test_dims, df01_fall_opt)
+  bars <- prepare_dfw_overall_plot_data(p)
+  expect_equal(levels(bars$kind), unname(DFW_GRADE_KIND_LABELS))
+  by_term <- dplyr::summarize(dplyr::group_by(bars, term), pts = sum(pts), n = sum(n), rate = dplyr::first(dfw_pct),
+                              n_dfw = dplyr::first(n_dfw))
+  expect_equal(by_term$pts, by_term$rate)
+  expect_equal(by_term$n, by_term$n_dfw)
+
+  conc <- dfw_concentration_parts(p)
+  # MATH 1220 (ABQ) alone holds 37 of 121, past a quarter; PSYC 1110 takes it past half.
+  expect_equal(conc$n, c(37L, 36L, 48L))
+  expect_equal(conc$n_courses, c(1L, 1L, 2L))
+
+  changes <- dfw_change_counts(p)
+  expect_equal(changes$n, c(1L, 1L, 1L))
+  expect_equal(changes$n_listed, rep(4L, 3))
+
+  sec <- dfw_section_parts(p)
+  expect_equal(sec$n, c(2L, 4L))
+  expect_equal(attr(sec, "n_repeat"), 1L)
+})
+
+test_that("the page's tables and strips keep each course's own series and sections", {
+  p <- build_dfw_dashboard(df_attempts, test_dims, df01_fall_opt)
+  courses <- dfw_course_table(p)
+  expect_equal(courses$series[[1]], c(20, 30, 40, 160 / 3))
+  expect_equal(courses$cum_pct[nrow(courses)], 100)
+  expect_equal(dfw_swing_table(p)$subject_course, "PSYC 1110")
+
+  strip <- prepare_dfw_section_strip_data(p)
+  expect_equal(strip$rows, c("MATH 1220 (ABQ) · Fall 2021", "MATH 1220 (ABQ) · Fall 2022"))
+  expect_equal(nrow(strip$sections), 6L)
+  expect_equal(strip$course_terms$dfw_pct, c(40, 160 / 3))
+
+  slopes <- prepare_dfw_slope_plot_data(p)
+  expect_equal(slopes$label, c("MATH 1220 (ABQ)", "ENGL 1110 (ABQ)"))
+  expect_equal(as.character(slopes$direction), c("Rising", "Falling"))
+
+  campus <- dfw_group_table(p$by_campus, "campus")
+  expect_equal(campus$campus, c("ABQ", "EA"))
+  expect_equal(lengths(campus$series), c(4L, 4L))
+})
+
+test_that("the page's charts draw a trace per part they show", {
+  p <- build_dfw_dashboard(df_attempts, test_dims, df01_fall_opt)
+  names_of <- function(plot) vapply(plotly::plotly_build(plot)$x$data, function(t) t$name, character(1))
+  expect_equal(names_of(plot_dfw_overall(prepare_dfw_overall_plot_data(p))), unname(DFW_GRADE_KIND_LABELS))
+  expect_setequal(names_of(plot_dfw_course_bars(prepare_dfw_course_bars(p))), c("Rising", "Falling", "Steady"))
+  expect_equal(names_of(plot_dfw_slopes(prepare_dfw_slope_plot_data(p))), c("Rising", "Falling"))
+  expect_equal(names_of(plot_dfw_section_strip(prepare_dfw_section_strip_data(p))),
+               c("The course's rate that term", unname(DFW_SECTION_POSITION_LABELS)))
+})

@@ -138,9 +138,14 @@ unusually; provost: cross-college patterns and risks).
   1,396 fall campus-courses hold a quarter of them, 90 half); which are
   rising, falling or swinging more than courses usually do; courses whose
   sections disagree term after term (25 in fall); campus and college. Done:
-  step 1, the text-first preview (`build_dfw_dashboard()`). Next: step 2,
-  the page under Bird's Eye. Graduate rates wait on how PR (thesis in
-  progress) is read; upper division is left to the department pages.
+  step 1, the text-first preview (`build_dfw_dashboard()`), and step 2, the
+  page (Bird's Eye > DFW Rates). Next: a course row opens it in Course
+  Dynamics. Graduate rates wait on how PR (thesis in progress) is read; upper
+  division is left to the department pages.
+- [ ] **Gen Ed's DFW table from the DFW course board.** Gen Ed pools the term
+  types chosen and rounds in its own way, so a course can read two DFW rates
+  on two pages. Give `get_dfw_course_board()` a Gen Ed course scope and make
+  Gen Ed's DFW table that board, which also gives it trends and swings.
 - [ ] **A trend verdict on the Course Report's DFW by term:** the table mixes
   Fall, Spring and Summer and says nothing about direction; read it one term
   type at a time with `compute_rate_trend()`, the test Later Course and the

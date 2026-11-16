@@ -117,6 +117,7 @@ narrowed by campus, college, department or level:
 | **Enrollment** | Section- and course-level enrollment across terms, with Low Enrollment alerts. [Guide →](enrollment-tab) |
 | **Headcount** | How many unique students are declared in a major/minor/concentration, per term? [Guide →](headcount) |
 | **Gen Ed** | How are Gen Ed courses enrolling, and what grade-outcome patterns are visible? [Guide →](gen-ed) |
+| **DFW Rates** | Is the lower-division DFW rate going up or down, which courses hold the DFW grades, and where do sections disagree? [Guide →](dfw-rates) |
 | **Cancellations** | Which scheduled sections were cancelled, and how does that vary by term or department? [Guide →](cancellations) |
 
 **Course Dynamics** — the one-course view of enrollment trends, student flows,

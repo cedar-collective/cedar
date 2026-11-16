@@ -216,6 +216,23 @@ optional breakdown by instructor type. **Dept Trends → DFW** for a department.
 **More:** [What CEDAR counts](users/what-cedar-counts#grade-outcomes) ·
 [Course Dynamics](users/course-reports#dfw)
 
+### How is UNM doing on DFW rates, and where should we act?
+
+**Short answer:** Lower division, one term type at a time: whether the rate is
+rising or falling beyond chance, which few courses hold most of the DFW grades,
+which courses are getting worse, and which courses' sections disagree term
+after term.
+
+**In CEDAR:** **Bird's Eye → DFW Rates**. It builds when it opens; pick Fall,
+Spring or Summer, and a campus if you want one.
+
+**Watch out for:**
+- Courses are ranked by DFW grades, not rate: the count is where the students are.
+- A term with many NR (not reported) grades reads high; the page says so.
+- Sections are CRNs; no instructor is named.
+
+**More:** [DFW Rates](users/dfw-rates)
+
 ### Which courses are roadblocks for a group of students?
 
 **Short answer:** Find courses where students in the group commonly do not pass,

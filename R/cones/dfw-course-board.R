@@ -42,6 +42,9 @@ DFW_SWING_FAMILY_P <- 0.05
 #'   summarize_attempt_outcomes()' columns, `dfw_share` and `cum_share` (of the window's DFW grades,
 #'   0-1), `listed`, the trend's columns (compute_rate_trend()), `swing_p`
 #'   and `swings`),
+#'   `terms` (every term of the type for each of those courses:
+#'   `n_attempts`, `n_dfw`, `dfw_pct`, `in_trend`, the series its trend is
+#'   read from),
 #'   `totals` (`n_courses`, `n_attempts`, `n_dfw`, `dfw_pct`,
 #'   `courses_for_quarter`, `courses_for_half`: how many courses, from the
 #'   top, hold a quarter and half of the DFW grades), `meta` (`window_terms`,
@@ -63,8 +66,10 @@ get_dfw_course_board <- function(attempts, opt = list()) {
     dplyr::distinct(campus, subject_course, .keep_all = TRUE) %>%
     dplyr::select(-.n)
 
-  trend <- summarize_attempt_outcomes(rows, c(key, "term")) %>%
-    dplyr::filter(n_attempts >= min_term_n) %>%
+  course_terms <- summarize_attempt_outcomes(rows, c(key, "term")) %>%
+    dplyr::mutate(in_trend = n_attempts >= min_term_n)
+  trend <- course_terms %>%
+    dplyr::filter(in_trend) %>%
     dplyr::transmute(campus, subject_course, term, k = n_dfw, n = n_attempts) %>%
     compute_rate_trend(key, min_terms = min_trend_terms)
   extra_var <- pmax(trend$resid_sd^2 - trend$chance_var, 0)
@@ -99,6 +104,10 @@ get_dfw_course_board <- function(attempts, opt = list()) {
               paste(window, collapse = ", "))
   list(
     courses = courses,
+    terms = course_terms %>%
+      dplyr::semi_join(courses, by = key) %>%
+      dplyr::select(campus, subject_course, term, n_attempts, n_dfw, dfw_pct, in_trend) %>%
+      dplyr::arrange(campus, subject_course, term),
     totals = list(n_courses = nrow(courses), n_attempts = nrow(in_window), n_dfw = total_dfw,
                   dfw_pct = 100 * total_dfw / nrow(in_window),
                   courses_for_quarter = first_to(0.25), courses_for_half = first_to(0.5)),
