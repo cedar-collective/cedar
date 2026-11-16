@@ -27,15 +27,15 @@ Set the filters, then click **Update Headcount**.
 | **Campus** | Limits by student campus. |
 | **College** | Limits records by student college and narrows the available departments and programs. |
 | **Department** | Limits program records and available choices by department code or CEDAR's program-to-department mappings. Leave unselected for combinations across departments. |
-| **Major** | Counts students holding selected majors or second majors. |
-| **Minor** | Counts students holding selected first or second minors. |
+| **Major** | Counts students holding selected majors or second majors. Each choice is one program, named from the mapping files with its program codes, so two programs that share a name in Banner (Architecture's ARCH and ARCT) are separate choices, and a renamed program is one choice that counts its old and new codes. |
+| **Minor** | Counts students holding selected first or second minors, chosen by program code in the same way. |
 | **Concentration** | Counts students holding selected concentrations. |
 
-The major, minor, and concentration controls update based on the broader college and department selections.
+The major, minor, and concentration controls update based on the broader college and department selections. With a department selected they offer only that department's own programs, never another department's program that shares a name.
 
 ### What's counted
 
-After each run, the strip under the filters says what the numbers count, read from the run itself rather than from the filters: which program types, which campuses (the student's *home* campus), which terms (any term still in progress is named), how students were assigned to the department, how many pre-majors are included, and how to read totals across rows. A student in two programs counts in each program's row, so rows do not add up to unique students.
+After each run, the strip under the filters says what the numbers count, read from the run itself rather than from the filters: which program types, which campuses (the student's *home* campus), which terms (any term still in progress is named), how students were assigned to the department, how many pre-majors are included, and how to read totals across rows. With a major or minor selected it also names each program counted, with every code behind it, and each rename that joined an old code to a new one (from the mapping files' code history). A student in two programs counts in each program's row, so rows do not add up to unique students.
 
 When a department is selected, Headcount counts the programs that department owns, as the mapping files assign them: a concentration counts with the student's primary major. Programs that share a name with one of the department's own are not included. Dept Trends and the Dept Dashboard's headcount cards use the same rule, so the three agree. A program still awaiting a mapping decision counts toward no department until it is decided.
 

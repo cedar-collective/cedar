@@ -8,7 +8,7 @@ parent: Developer Guide
 
 This reference is auto-generated from roxygen2 comments in the source code.
 
-*Generated: 2026-11-16 14:11:26.354523*
+*Generated: 2026-11-16 15:02:43.881166*
 
 ---
 
@@ -3857,6 +3857,24 @@ Attach Cumulative GPA to an Event Table  Joins `gpa_entering` onto rows keyed by
 
 ---
 
+### `headcount_filter_choices()`
+
+*Source: headcount.R*
+
+**The Headcount tab's Major, Minor and Concentration choices for a scope**
+
+The Headcount tab's Major, Minor and Concentration choices for a scope  The picker cascade in one place: a college or department narrows the majors, a picked major narrows the minors to those its students hold, a picked minor narrows the concentrations. A department's rows are those whose own `dept_code` it is (filter_programs_to_dept()), never rows sharing a name with one of its programs (ISSUES I15, M55). Majors and minors are offered by program code through program_choices() (a renamed program is one choice; two sharing a name are two); a concentration has no code and is offered by name.
+
+**Parameters:**
+
+- `programs` - cedar_programs.
+- `dims` - The dimension tables (build_cedar_dims()).
+- `opt` - college, dept_code, major_codes, minor_codes: the scope so far; program_successions overrides the renames.
+
+**Returns:** list(major, minor, concentration): major and minor are named character vectors (label to program id), concentration a character vector of names.
+
+---
+
 ### `filter_programs_to_dept()`
 
 *Source: headcount.R*
@@ -3979,7 +3997,8 @@ Delegates to \code{\link{filter_programs_by_opt}}, \code{\link{summarize_headcou
 result <- get_headcount(cedar_programs, list(dept_code = "HIST"))
 
 # History majors who also have an Anthropology minor
-result <- get_headcount(cedar_programs, list(major = "History", minor = "Anthropology"))
+result <- get_headcount(cedar_programs, list(major_codes = "HIST", minor_codes = "ANTH"),
+                        dims = cedar_dims)
 
 # SFR aggregation
 result <- get_headcount(
@@ -5041,6 +5060,24 @@ The program each code is: the last code of its succession chain  A renamed progr
 - `successions` - As for program_succession_family().
 
 **Returns:** Character vector parallel to `codes`.
+
+---
+
+### `program_choices()`
+
+*Source: population.R*
+
+**Picker choices for program codes: one per program, renames joined**
+
+Picker choices for program codes: one per program, renames joined  The one way a page offers programs to pick (Pathways' Majors, Headcount's Major and Minor). Each choice is valued by its program id (program_id_of()) and labelled with programs.csv's name and every code it covers, so a renamed program is one choice ("Liberal Arts & Integrative Studies (LAIS, LIBA)") and two programs sharing a Banner name are two ("Architecture (ARCH)", "Architecture (ARCT)"). A code programs.csv lacks is offered as "[no programs.csv row] (CODE)", never named after itself.
+
+**Parameters:**
+
+- `codes` - Program codes (NA dropped, repeats ignored).
+- `dims` - The dimension tables (build_cedar_dims()).
+- `successions` - As for program_succession_family().
+
+**Returns:** Named character vector, label to program id, in label order.
 
 ---
 

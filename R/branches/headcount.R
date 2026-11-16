@@ -32,8 +32,10 @@
 #' # Headcount for a department
 #' result <- get_headcount(cedar_programs, list(dept_code = "MATH"))
 #'
-#' # Students with both a History major and an Anthropology minor
-#' result <- get_headcount(cedar_programs, list(major = "History", minor = "Anthropology"))
+#' # Students with both a History major and an Anthropology minor (program
+#' # codes; a renamed program's other codes follow)
+#' result <- get_headcount(cedar_programs, list(major_codes = "HIST", minor_codes = "ANTH"),
+#'                         dims = cedar_dims)
 #'
 #' # Custom grouping for SFR calculations
 #' result <- get_headcount(
@@ -69,8 +71,17 @@ normalize_headcount_opt <- function(programs, opt = list(), dims = NULL) {
   opt$campus        <- normalize_empty(opt$campus)
   opt$college       <- normalize_empty(opt$college)
   opt$dept_code     <- toupper(normalize_empty(opt$dept_code))
-  opt$major         <- normalize_empty(opt$major)
-  opt$minor         <- normalize_empty(opt$minor)
+  # Majors and minors are picked by program code, never by name: one Banner
+  # name covers several programs (ISSUES I62, M55). Concentrations carry no
+  # code, so they are the one program picked by name.
+  # [[ ]], not $: opt$major would partial-match major_codes.
+  if (length(opt[["major"]]) || length(opt[["minor"]])) {
+    stop("[headcount.R] Headcount selects majors and minors by program code: pass ",
+         "opt$major_codes / opt$minor_codes, not major / minor (one name covers ",
+         "several programs).", call. = FALSE)
+  }
+  opt$major_codes   <- normalize_empty(opt$major_codes)
+  opt$minor_codes   <- normalize_empty(opt$minor_codes)
   opt$concentration <- normalize_empty(opt$concentration)
 
   if (!is.null(opt$college) && "student_college" %in% names(programs)) {
@@ -106,7 +117,7 @@ normalize_headcount_opt <- function(programs, opt = list(), dims = NULL) {
 
 
 headcount_has_program_filter <- function(opt) {
-  any(vapply(c("major", "minor", "concentration"), function(key) {
+  any(vapply(c("major_codes", "minor_codes", "concentration"), function(key) {
     !is.null(opt[[key]]) && length(opt[[key]]) > 0
   }, logical(1)))
 }
@@ -125,24 +136,67 @@ headcount_should_plot_aggregate <- function(opt) {
 }
 
 
-# The programs a department owns, by name: one row per program_name with the
-# unit most of its rows resolve to (ADR-001 step 3: read off the attached
-# programs at run time, never saved). The Headcount tab's department picker
-# turns a department into its program names through this.
-headcount_program_names <- function(programs) {
-  needed <- c("program_name", "dept_code")
+HEADCOUNT_MAJOR_TYPES <- c("Major", "Second Major")
+HEADCOUNT_MINOR_TYPES <- c("First Minor", "Second Minor")
+HEADCOUNT_CONCENTRATION_TYPES <- c("First Concentration", "Second Concentration",
+                                   "Third Concentration")
+
+
+#' The Headcount tab's Major, Minor and Concentration choices for a scope
+#'
+#' The picker cascade in one place: a college or department narrows the
+#' majors, a picked major narrows the minors to those its students hold, a
+#' picked minor narrows the concentrations. A department's rows are those whose
+#' own `dept_code` it is (filter_programs_to_dept()), never rows sharing a name
+#' with one of its programs (ISSUES I15, M55). Majors and minors are offered by
+#' program code through program_choices() (a renamed program is one choice;
+#' two sharing a name are two); a concentration has no code and is offered by
+#' name.
+#'
+#' @param programs cedar_programs.
+#' @param dims The dimension tables (build_cedar_dims()).
+#' @param opt college, dept_code, major_codes, minor_codes: the scope so far;
+#'   program_successions overrides the renames.
+#' @return list(major, minor, concentration): major and minor are named
+#'   character vectors (label to program id), concentration a character vector
+#'   of names.
+headcount_filter_choices <- function(programs, dims, opt = list()) {
+  needed <- c("student_id", "program_type", "program_name", "major_code",
+              "dept_code", "student_college")
   missing <- setdiff(needed, names(programs))
   if (length(missing) > 0) {
-    stop("[headcount.R] headcount_program_names: programs lack ",
+    stop("[headcount.R] headcount_filter_choices: programs lack ",
          paste(missing, collapse = ", "), call. = FALSE)
   }
-  programs %>%
-    filter(!is.na(program_name), program_name != "", !is.na(dept_code), dept_code != "") %>%
-    count(program_name, dept_code, sort = TRUE) %>%
-    group_by(program_name) %>%
-    slice_head(n = 1) %>%
-    ungroup() %>%
-    select(program_name, dept_code)
+  successions <- opt$program_successions %||% program_successions
+  scope <- programs
+  if (length(opt$college)) scope <- filter(scope, student_college %in% opt$college)
+  dept <- opt$dept_code
+  in_dept <- function(rows) if (length(dept)) filter_programs_to_dept(rows, dept) else rows
+  # The students among ids holding one of codes (a rename followed) as types.
+  holders <- function(ids, types, codes) {
+    if (!length(codes)) return(ids)
+    family <- program_succession_family(codes, successions)
+    unique(programs$student_id[programs$student_id %in% ids &
+                                 programs$program_type %in% types &
+                                 programs$major_code %in% family])
+  }
+
+  majors <- in_dept(filter(scope, program_type %in% HEADCOUNT_MAJOR_TYPES))
+  ids <- unique(stats::na.omit(in_dept(scope)$student_id))
+  ids <- holders(ids, HEADCOUNT_MAJOR_TYPES, opt$major_codes)
+  minors <- in_dept(filter(programs, student_id %in% ids,
+                           program_type %in% HEADCOUNT_MINOR_TYPES))
+  conc_ids <- holders(ids, HEADCOUNT_MINOR_TYPES, opt$minor_codes)
+  concentrations <- in_dept(filter(programs, student_id %in% conc_ids,
+                                   program_type %in% HEADCOUNT_CONCENTRATION_TYPES,
+                                   !is.na(program_name), nzchar(program_name)))
+
+  list(
+    major = program_choices(majors$major_code, dims, successions),
+    minor = program_choices(minors$major_code, dims, successions),
+    concentration = sort(unique(concentrations$program_name))
+  )
 }
 
 
@@ -239,7 +293,7 @@ filter_programs_by_opt <- function(programs, opt = list(), dims = NULL) {
   # Select important columns (CEDAR naming)
   important_cols <- c("student_id", "term", "student_college", "student_campus",
                       "student_level", "degree", "dept_code",
-                      "program_type", "program_name",
+                      "program_type", "program_name", "major_code",
                       # Carried for the scope description (pre-majors counted).
                       "is_pre_major")
 
@@ -274,34 +328,29 @@ filter_programs_by_opt <- function(programs, opt = list(), dims = NULL) {
     filter(!is.na(student_id), !is.na(term)) %>%
     distinct(student_id, term)
 
-  if (!is.null(opt$major) && length(opt$major) > 0) {
-    message("[headcount.R] Filtering by major: ", paste(opt$major, collapse = ", "))
-    major_terms <- df %>%
-      filter(program_type %in% c("Major", "Second Major"),
-             program_name %in% opt$major, !is.na(student_id)) %>%
-      distinct(student_id, term)
-    scoped_terms <- semi_join(scoped_terms, major_terms,
-                              by = c("student_id", "term"), na_matches = "never")
+  # A picked major or minor is a program code; a renamed program's other codes
+  # count with it (code_history.csv, program_successions).
+  successions <- opt$program_successions %||% program_successions
+  major_family <- if (length(opt$major_codes)) program_succession_family(opt$major_codes, successions)
+  minor_family <- if (length(opt$minor_codes)) program_succession_family(opt$minor_codes, successions)
+  if ((length(major_family) || length(minor_family)) && !"major_code" %in% names(df)) {
+    stop("[headcount.R] filter_programs_by_opt: programs lack major_code, which a ",
+         "major or minor filter matches", call. = FALSE)
   }
+  is_major <- function(d) d$program_type %in% HEADCOUNT_MAJOR_TYPES & d$major_code %in% major_family
+  is_minor <- function(d) d$program_type %in% HEADCOUNT_MINOR_TYPES & d$major_code %in% minor_family
+  is_conc <- function(d) d$program_type %in% HEADCOUNT_CONCENTRATION_TYPES &
+    d$program_name %in% opt$concentration
 
-  if (!is.null(opt$minor) && length(opt$minor) > 0) {
-    message("[headcount.R] Filtering by minor: ", paste(opt$minor, collapse = ", "))
-    minor_terms <- df %>%
-      filter(program_type %in% c("First Minor", "Second Minor"),
-             program_name %in% opt$minor, !is.na(student_id)) %>%
-      distinct(student_id, term)
-    scoped_terms <- semi_join(scoped_terms, minor_terms,
-                              by = c("student_id", "term"), na_matches = "never")
+  keep_terms <- function(scoped_terms, rows, what, values) {
+    message("[headcount.R] Filtering by ", what, ": ", paste(values, collapse = ", "))
+    held <- rows %>% filter(!is.na(student_id)) %>% distinct(student_id, term)
+    semi_join(scoped_terms, held, by = c("student_id", "term"), na_matches = "never")
   }
-
-  if (!is.null(opt$concentration) && length(opt$concentration) > 0) {
-    message("[headcount.R] Filtering by concentration: ", paste(opt$concentration, collapse = ", "))
-    conc_terms <- df %>%
-      filter(program_type %in% c("First Concentration", "Second Concentration", "Third Concentration"),
-             program_name %in% opt$concentration, !is.na(student_id)) %>%
-      distinct(student_id, term)
-    scoped_terms <- semi_join(scoped_terms, conc_terms,
-                              by = c("student_id", "term"), na_matches = "never")
+  if (length(major_family)) scoped_terms <- keep_terms(scoped_terms, df[is_major(df), ], "major", major_family)
+  if (length(minor_family)) scoped_terms <- keep_terms(scoped_terms, df[is_minor(df), ], "minor", minor_family)
+  if (length(opt$concentration)) {
+    scoped_terms <- keep_terms(scoped_terms, df[is_conc(df), ], "concentration", opt$concentration)
   }
 
   if (has_program_filter) {
@@ -311,16 +360,18 @@ filter_programs_by_opt <- function(programs, opt = list(), dims = NULL) {
     # already narrowed scoped_terms above. Now keep only the rows for the PRIMARY filter
     # so the plot shows a single series rather than one facet per program type.
     # Priority: major > minor > concentration.
-    if (!is.null(opt$major) && length(opt$major) > 0) {
-      df <- df %>% filter(program_type %in% c("Major", "Second Major"),
-                          program_name %in% opt$major)
-    } else if (!is.null(opt$minor) && length(opt$minor) > 0) {
-      df <- df %>% filter(program_type %in% c("First Minor", "Second Minor"),
-                          program_name %in% opt$minor)
-    } else if (!is.null(opt$concentration) && length(opt$concentration) > 0) {
-      df <- df %>% filter(
-        program_type %in% c("First Concentration", "Second Concentration", "Third Concentration"),
-        program_name %in% opt$concentration)
+    df <- if (length(major_family)) df[is_major(df), ] else
+      if (length(minor_family)) df[is_minor(df), ] else df[is_conc(df), ]
+
+    # A picked program's series is named as the picker names it: one per
+    # program, renames joined, two programs sharing a Banner name apart.
+    if (length(major_family) || length(minor_family)) {
+      if (is.null(dims)) {
+        stop("[headcount.R] filter_programs_by_opt: a major or minor filter needs dims ",
+             "to name its programs", call. = FALSE)
+      }
+      labels <- program_choices(df$major_code, dims, successions)
+      df$program_name <- names(labels)[match(program_id_of(df$major_code, successions), labels)]
     }
   }
 
@@ -547,7 +598,8 @@ format_headcount_export <- function(result) {
 #' result <- get_headcount(cedar_programs, list(dept_code = "HIST"))
 #'
 #' # History majors who also have an Anthropology minor
-#' result <- get_headcount(cedar_programs, list(major = "History", minor = "Anthropology"))
+#' result <- get_headcount(cedar_programs, list(major_codes = "HIST", minor_codes = "ANTH"),
+#'                         dims = cedar_dims)
 #'
 #' # SFR aggregation
 #' result <- get_headcount(
@@ -627,7 +679,17 @@ headcount_scope_facts <- function(df, summarized, opt, rolled_up_by_dept) {
   latest <- if (length(terms)) max(terms) else NA_integer_
   grouping <- if (rolled_up_by_dept) "department" else
     if ("program_name" %in% names(summarized)) "program" else "program_type"
+  # A picked major or minor: the programs counted (named as the picker names
+  # them, every code shown) and the renames that joined their codes.
+  picked <- c(opt$major_codes, opt$minor_codes)
+  successions <- opt$program_successions %||% program_successions
+  renames <- if (length(picked)) {
+    family <- program_succession_family(picked, successions)
+    successions[successions$from_code %in% family, , drop = FALSE]
+  } else successions[0, , drop = FALSE]
   list(
+    programs = if (length(picked)) sort(unique(df$program_name)) else character(0),
+    renames = renames,
     program_types = sort(unique(df$program_type)),
     levels = sort(unique(df$student_level)),
     terms = terms,
@@ -702,7 +764,15 @@ describe_headcount_scope <- function(facts, in_progress_terms = integer(0)) {
                   "primary majors only; percentages compare the same term 1, 3 and 6 years earlier"),
     NA_character_)
 
-  out <- c(Counting = counting, Campus = campus, Terms = term_text,
+  programs <- if (length(facts$programs)) paste(facts$programs, collapse = "; ") else NA_character_
+  renames <- if (NROW(facts$renames)) {
+    paste0(paste0(facts$renames$from_code, " \u2192 ", facts$renames$to_code, " from ",
+                  fmt_term(facts$renames$effective_term), collapse = "; "),
+           " (code_history.csv)")
+  } else NA_character_
+
+  out <- c(Counting = counting, Programs = programs, Renames = renames,
+           Campus = campus, Terms = term_text,
            Department = department, `Pre-majors` = pre, Reading = reading)
   out[!is.na(out)]
 }

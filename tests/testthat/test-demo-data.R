@@ -106,7 +106,8 @@ test_that("fixture institution survives production transforms with usable proven
   concurrent <- programs %>% filter(fixture_source == "concurrent_programs")
   expect_setequal(concurrent$fixture_student_id, paste0("EC10-", LETTERS[1:7]))
   combined <- get_headcount(concurrent,
-    list(major = "History", minor = "English"), group_by = "term")$data
+    list(major_codes = "HIST", minor_codes = "ENGL"), group_by = "term",
+    dims = test_dims)$data
   expect_equal(combined %>% arrange(term) %>% pull(student_count), c(20L, 5L))
 })
 

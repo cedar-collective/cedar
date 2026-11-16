@@ -3790,13 +3790,17 @@ floor, NA under it, never rounded) computes every one of them, each display
 rounds for itself, and `get_course_outcome_rates()` returns
 `summarize_attempt_outcomes()`' rates unrounded.
 
-**M55 — Headcount selects a department's programs by name.** The Headcount
-module filters minors and concentrations with `program_name %in%
-dept_program_names` (`R/modules/headcount.R`, four places, from
-`headcount_program_names()`), the name matching I62 removed from Pathways: a
-name another unit's program shares counts toward the department. Found
-2026-11-16. *Done when:* Headcount scopes rows by code or by their own
-`dept_code` (`filter_programs_to_dept()`), and the filtering leaves the module.
+**M55 — Headcount selects a department's programs by name.** **Done
+2026-11-16.** The module filtered minors and concentrations with
+`program_name %in% dept_program_names` (four places, from the retired
+`headcount_program_names()`), and majors and minors were picked and counted by
+name: a name another unit's program shares counted toward the department (I62's
+pattern). `headcount_filter_choices()` (`R/branches/headcount.R`) now builds
+the whole picker cascade from rows whose own `dept_code` is the department;
+majors and minors are offered and counted by program code
+(`opt$major_codes` / `opt$minor_codes`, `program_choices()` labels, renames
+joined through `program_successions`); concentrations, which carry no code,
+stay by name. EC-16's ENG minor guards it.
 
 **M56 — Population groups declare program names.** `population_groups.csv`
 lists names, resolved to codes by `population_group_major_codes()` and the

@@ -1194,6 +1194,39 @@ program_id_of <- function(codes, successions = program_successions) {
 }
 
 
+#' Picker choices for program codes: one per program, renames joined
+#'
+#' The one way a page offers programs to pick (Pathways' Majors, Headcount's
+#' Major and Minor). Each choice is valued by its program id (program_id_of())
+#' and labelled with programs.csv's name and every code it covers, so a
+#' renamed program is one choice ("Liberal Arts & Integrative Studies (LAIS,
+#' LIBA)") and two programs sharing a Banner name are two ("Architecture
+#' (ARCH)", "Architecture (ARCT)"). A code programs.csv lacks is offered as
+#' "[no programs.csv row] (CODE)", never named after itself.
+#'
+#' @param codes Program codes (NA dropped, repeats ignored).
+#' @param dims The dimension tables (build_cedar_dims()).
+#' @param successions As for program_succession_family().
+#' @return Named character vector, label to program id, in label order.
+program_choices <- function(codes, dims, successions = program_successions) {
+  validate_cedar_dims(dims)
+  codes <- sort(unique(stats::na.omit(as.character(codes))))
+  codes <- codes[nzchar(codes)]
+  if (length(codes) == 0) return(stats::setNames(character(0), character(0)))
+  by_id <- split(codes, program_id_of(codes, successions))
+  ids <- names(by_id)
+  id_names <- name_program_codes(ids, dims)
+  in_file <- ids %in% dims$programs$program_code
+  labels <- vapply(seq_along(ids), function(i) {
+    id <- ids[i]
+    covered <- c(id, setdiff(sort(by_id[[id]]), id))
+    name <- if (in_file[i]) id_names[[id]] else "[no programs.csv row]"
+    paste0(name, " (", paste(covered, collapse = ", "), ")")
+  }, character(1))
+  stats::setNames(ids, labels)[order(labels)]
+}
+
+
 .population_need_successions <- function(successions) {
   missing <- setdiff(c("from_code", "to_code", "effective_term"), names(successions))
   if (!is.data.frame(successions) || length(missing))

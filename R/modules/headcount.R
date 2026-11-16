@@ -62,20 +62,6 @@ headcountServer <- function(id, programs, dims, in_progress_terms, error_handler
 
     hc_has_run <- reactiveVal(FALSE)
 
-    # The programs each department owns, by name, read off the attached
-    # programs once per session (ADR-001 step 3).
-    program_names <- headcount_program_names(programs)
-
-    get_selected_dept_program_names <- function() {
-      if (is.null(input$dept) || length(input$dept) == 0) {
-        return(NULL)
-      }
-
-      program_names %>%
-        filter(dept_code %in% input$dept) %>%
-        pull(program_name)
-    }
-
     output$output <- renderUI({
       if (!hc_has_run()) {
         return(empty_state("Select a department, major, or program, then click Update Headcount."))
@@ -96,79 +82,27 @@ headcountServer <- function(id, programs, dims, in_progress_terms, error_handler
       )
     })
 
-    # Updates major/minor/conc dropdowns after a college or dept selection changes.
-    # filtered_data is cedar_programs pre-filtered by college/dept; minors and
-    # concentrations are resolved against all programs for those students so that
-    # cross-department combinations remain visible.
-    update_downstream_filters <- function(filtered_data) {
-      # When a dept is selected, use headcount_program_names() to find programs that
-      # belong to that dept rather than deriving them from student enrollment records.
-      # cedar_programs$dept_code only reflects a student's major, so going through
-      # student IDs would show minors/concentrations from unrelated departments.
-      dept_program_names <- get_selected_dept_program_names()
-
-      available_majors <- filtered_data %>%
-        filter(!is.na(program_name), program_name != "",
-               program_type %in% c("Major", "Second Major")) %>%
-        distinct(program_name) %>%
-        arrange(program_name) %>%
-        pull(program_name)
-
-      updateSelectizeInput(session, "major",
-                           choices = available_majors,
-                           selected = intersect(input$major %||% character(0), available_majors),
-                           server = TRUE)
-
-      if (!is.null(dept_program_names)) {
-        available_minors <- programs %>%
-          filter(!is.na(program_name), program_name != "",
-                 program_type %in% c("First Minor", "Second Minor"),
-                 program_name %in% dept_program_names) %>%
-          distinct(program_name) %>%
-          arrange(program_name) %>%
-          pull(program_name)
-
-        available_concentrations <- programs %>%
-          filter(!is.na(program_name), program_name != "",
-                 program_type %in% c("First Concentration", "Second Concentration", "Third Concentration"),
-                 program_name %in% dept_program_names) %>%
-          distinct(program_name) %>%
-          arrange(program_name) %>%
-          pull(program_name)
-      } else {
-        student_ids <- filtered_data %>%
-          filter(!is.na(student_id)) %>%
-          distinct(student_id) %>%
-          pull(student_id)
-
-        student_data <- programs %>% filter(student_id %in% student_ids)
-
-        available_minors <- student_data %>%
-          filter(!is.na(program_name), program_name != "",
-                 program_type %in% c("First Minor", "Second Minor")) %>%
-          distinct(program_name) %>%
-          arrange(program_name) %>%
-          pull(program_name)
-
-        available_concentrations <- student_data %>%
-          filter(!is.na(program_name), program_name != "",
-                 program_type %in% c("First Concentration", "Second Concentration", "Third Concentration")) %>%
-          distinct(program_name) %>%
-          arrange(program_name) %>%
-          pull(program_name)
+    # The Major / Minor / Concentration choices for the scope picked so far,
+    # one branch call (headcount_filter_choices()): majors and minors by program
+    # code, renames joined, a department's own programs only.
+    program_labels <- reactiveVal(character(0))
+    update_program_choices <- function(which = c("major", "minor", "concentration")) {
+      choices <- headcount_filter_choices(programs, dims, list(
+        college = input$college, dept_code = input$dept,
+        major_codes = input$major, minor_codes = input$minor))
+      # Code to label, so the scope bar names a picked program as the picker did.
+      known <- c(choices$major, choices$minor)
+      program_labels(c(stats::setNames(names(known), known),
+                       program_labels()[setdiff(names(program_labels()), known)]))
+      for (key in which) {
+        updateSelectizeInput(session, key, choices = choices[[key]],
+                             selected = intersect(input[[key]] %||% character(0),
+                                                  unname(choices[[key]])),
+                             server = TRUE)
       }
-
-      updateSelectizeInput(session, "minor",
-                           choices = available_minors,
-                           selected = intersect(input$minor %||% character(0), available_minors),
-                           server = TRUE)
-      updateSelectizeInput(session, "concentration",
-                           choices = available_concentrations,
-                           selected = intersect(input$concentration %||% character(0), available_concentrations),
-                           server = TRUE)
     }
 
-    # College changes reset department and all downstream filters (hierarchical).
+    # College changes narrow the departments and every program list.
     observeEvent(input$college, {
       if (cedar_logging_enabled) {
         write_log("INFO", "data_filter", "headcount_college", session$token, list(
@@ -191,148 +125,25 @@ headcountServer <- function(id, programs, dims, in_progress_terms, error_handler
                            choices = filtered_choices,
                            selected = intersect(input$dept %||% character(0), unname(filtered_choices)),
                            server = TRUE)
-      update_downstream_filters(filtered_data)
-
+      update_program_choices()
     }, ignoreInit = FALSE, ignoreNULL = FALSE)
 
-    # Department changes update the major list and reset minor/conc.
     observeEvent(input$dept, {
       if (cedar_logging_enabled) {
         write_log("INFO", "data_filter", "headcount_dept", session$token, list(
           dept = input$dept
         ))
       }
-
-      filtered_data <- programs
-      if (!is.null(input$college) && length(input$college) > 0) {
-        filtered_data <- filtered_data %>% filter(student_college %in% input$college)
-      }
-      if (!is.null(input$dept) && length(input$dept) > 0) {
-        filtered_data <- filtered_data %>% filter(dept_code %in% input$dept)
-      }
-
-      update_downstream_filters(filtered_data)
-
+      update_program_choices()
     }, ignoreInit = TRUE, ignoreNULL = FALSE)
 
-    # Major selection limits minor choices to those held by students with that major.
-    observeEvent(input$major, {
-      filtered_data <- programs
-      if (!is.null(input$college) && length(input$college) > 0) {
-        filtered_data <- filtered_data %>% filter(student_college %in% input$college)
-      }
-      if (!is.null(input$dept) && length(input$dept) > 0) {
-        filtered_data <- filtered_data %>% filter(dept_code %in% input$dept)
-      }
+    # A picked major narrows the minors to those its students hold; a picked
+    # minor narrows the concentrations.
+    observeEvent(input$major, update_program_choices(c("minor", "concentration")),
+                 ignoreInit = TRUE, ignoreNULL = FALSE)
+    observeEvent(input$minor, update_program_choices("concentration"),
+                 ignoreInit = TRUE, ignoreNULL = FALSE)
 
-      base_ids <- filtered_data %>% filter(!is.na(student_id)) %>% distinct(student_id) %>% pull(student_id)
-
-      if (!is.null(input$major) && length(input$major) > 0) {
-        scoped_ids <- programs %>%
-          filter(student_id %in% base_ids,
-                 program_type %in% c("Major", "Second Major"),
-                 program_name %in% input$major,
-                 !is.na(student_id)) %>%
-          distinct(student_id) %>%
-          pull(student_id)
-      } else {
-        scoped_ids <- base_ids
-      }
-
-      dept_program_names <- get_selected_dept_program_names()
-
-      student_data <- programs %>% filter(student_id %in% scoped_ids)
-
-      minor_data <- student_data %>%
-        filter(!is.na(program_name), program_name != "",
-               program_type %in% c("First Minor", "Second Minor"))
-      if (!is.null(dept_program_names)) {
-        minor_data <- minor_data %>% filter(program_name %in% dept_program_names)
-      }
-      available_minors <- minor_data %>%
-        distinct(program_name) %>%
-        arrange(program_name) %>%
-        pull(program_name)
-
-      conc_data <- student_data %>%
-        filter(!is.na(program_name), program_name != "",
-               program_type %in% c("First Concentration", "Second Concentration", "Third Concentration"))
-      if (!is.null(dept_program_names)) {
-        conc_data <- conc_data %>% filter(program_name %in% dept_program_names)
-      }
-      available_concentrations <- conc_data %>%
-        distinct(program_name) %>%
-        arrange(program_name) %>%
-        pull(program_name)
-
-      updateSelectizeInput(session, "minor",
-                           choices = available_minors,
-                           selected = intersect(input$minor %||% character(0), available_minors),
-                           server = TRUE)
-      updateSelectizeInput(session, "concentration",
-                           choices = available_concentrations,
-                           selected = intersect(input$concentration %||% character(0), available_concentrations),
-                           server = TRUE)
-
-    }, ignoreInit = TRUE, ignoreNULL = FALSE)
-
-    # Minor selection limits concentration choices to those held by matching students.
-    observeEvent(input$minor, {
-      filtered_data <- programs
-      if (!is.null(input$college) && length(input$college) > 0) {
-        filtered_data <- filtered_data %>% filter(student_college %in% input$college)
-      }
-      if (!is.null(input$dept) && length(input$dept) > 0) {
-        filtered_data <- filtered_data %>% filter(dept_code %in% input$dept)
-      }
-
-      base_ids <- filtered_data %>% filter(!is.na(student_id)) %>% distinct(student_id) %>% pull(student_id)
-
-      if (!is.null(input$major) && length(input$major) > 0) {
-        base_ids <- programs %>%
-          filter(student_id %in% base_ids,
-                 program_type %in% c("Major", "Second Major"),
-                 program_name %in% input$major,
-                 !is.na(student_id)) %>%
-          distinct(student_id) %>%
-          pull(student_id)
-      }
-
-      if (!is.null(input$minor) && length(input$minor) > 0) {
-        scoped_ids <- programs %>%
-          filter(student_id %in% base_ids,
-                 program_type %in% c("First Minor", "Second Minor"),
-                 program_name %in% input$minor,
-                 !is.na(student_id)) %>%
-          distinct(student_id) %>%
-          pull(student_id)
-      } else {
-        scoped_ids <- base_ids
-      }
-
-      dept_program_names <- get_selected_dept_program_names()
-
-      student_data <- programs %>% filter(student_id %in% scoped_ids)
-
-      conc_data <- student_data %>%
-        filter(!is.na(program_name), program_name != "",
-               program_type %in% c("First Concentration", "Second Concentration", "Third Concentration"))
-      if (!is.null(dept_program_names)) {
-        conc_data <- conc_data %>% filter(program_name %in% dept_program_names)
-      }
-      available_concentrations <- conc_data %>%
-        distinct(program_name) %>%
-        arrange(program_name) %>%
-        pull(program_name)
-
-      updateSelectizeInput(session, "concentration",
-                           choices = available_concentrations,
-                           selected = intersect(input$concentration %||% character(0), available_concentrations),
-                           server = TRUE)
-
-    }, ignoreInit = TRUE, ignoreNULL = FALSE)
-
-    # Initialize all filter choices with the full data
     updateSelectizeInput(session, "college",
                          choices = sort(unique(programs$student_college[!is.na(programs$student_college) & programs$student_college != ""])),
                          server = TRUE)
@@ -341,15 +152,6 @@ headcountServer <- function(id, programs, dims, in_progress_terms, error_handler
                          server = TRUE)
     updateSelectizeInput(session, "campus",
                          choices = sort(unique(programs$student_campus[!is.na(programs$student_campus) & programs$student_campus != ""])),
-                         server = TRUE)
-    updateSelectizeInput(session, "major",
-                         choices = sort(unique(programs$program_name[!is.na(programs$program_name) & programs$program_type %in% c("Major", "Second Major")])),
-                         server = TRUE)
-    updateSelectizeInput(session, "minor",
-                         choices = sort(unique(programs$program_name[!is.na(programs$program_name) & programs$program_type %in% c("First Minor", "Second Minor")])),
-                         server = TRUE)
-    updateSelectizeInput(session, "concentration",
-                         choices = sort(unique(programs$program_name[!is.na(programs$program_name) & programs$program_type %in% c("First Concentration", "Second Concentration", "Third Concentration")])),
                          server = TRUE)
 
     hc_data_rv <- reactiveVal(NULL)
@@ -365,7 +167,11 @@ headcountServer <- function(id, programs, dims, in_progress_terms, error_handler
 
       # What the run counted, in words -- read off the result, not the inputs.
       described <- describe_headcount_scope(result$scope, in_progress_terms)
-      selected <- c(input$college, input$dept, input$major, input$minor, input$concentration)
+      labels <- isolate(program_labels())
+      picked <- c(input$major, input$minor)
+      selected <- c(input$college, input$dept,
+                    ifelse(picked %in% names(labels), labels[picked], picked),
+                    input$concentration)
 
       # The codes behind each department the run counted, by name, from the
       # mapping files: the same block Dept Trends and the Dept Dashboard show.
@@ -445,8 +251,8 @@ headcountServer <- function(id, programs, dims, in_progress_terms, error_handler
         college       = input$college,
         dept_code     = input$dept,
         campus        = input$campus,
-        major         = input$major,
-        minor         = input$minor,
+        major_codes   = input$major,
+        minor_codes   = input$minor,
         concentration = input$concentration
       )
 
