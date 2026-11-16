@@ -214,9 +214,11 @@ contracts: [degree-requirements.md](docs/developers/degree-requirements.md),
 - [ ] **Compile approved rules** into runtime degree tables and route templates.
   Draft rows and the board comparison exist (`degree-compiler.R`,
   [results](docs/developers/catalog-normalization.md#compiling-a-reading-into-board-rows));
-  next, semester placement and prerequisite links from course-unit readings,
-  then publishing: a compiled board shows as a labelled draft until its reading
-  is signed off in Admin > Catalog Review, and as reviewed after.
+  draft boards are assembled, validated and placed, with arrows from the
+  course pages' timed requisites (`degree-compiler-board.R`). Next, publishing:
+  a compiled board shows as a labelled draft until its reading is signed off
+  in Admin > Catalog Review, and as reviewed after. Open: how a choice's
+  follow-on courses wait for it (held arrows).
 - [ ] **AI automation** behind the same proposal/review boundary, evaluated on
   the four-program pilot first.
 - [ ] **Routes and constraints.** Selectable elective/science routes, all

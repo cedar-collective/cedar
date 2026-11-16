@@ -196,9 +196,7 @@ record) and writes nothing.
 | `unresolved` | a question for the reviewer, never an option |
 | a concentration's rules | listed, not compiled |
 
-Semesters are not placed and prerequisite arrows are not drawn: those wait on
-readings of the course units. On the four-program pilot (2026-2027 catalog)
-the comparison found:
+On the four-program pilot (2026-2027 catalog) the comparison found:
 
 | Program | Tiles, compiled / board | What differs |
 |---|---|---|
@@ -211,6 +209,56 @@ Every required course is either on its board or on the shared math and English
 routes, and every board course except CS's CSCI 1210 is in its reading. The
 differences are where the reading is ambiguous, and each such passage is
 already an unresolved question in its reading.
+
+### The draft board
+
+`R/branches/degree-compiler-board.R` turns the compiled rows into the tables an
+authored board has (`degree_catalogs` through `degree_roadmap_plans`), runs them
+through the same validators (`validate_degree_catalog()`,
+`validate_degree_roadmaps()`), and hands them to `build_degree_roadmap()`
+unchanged. With `--analysis DIR` the script builds each draft and prints it
+beside its hand-built board, semester by semester.
+
+- **Placement.** A lower-division tile starts in semester 1 and an upper-division
+  one at the semester most authored plans use (5). The scheduler moves each one
+  later for prerequisites and load, as it does for an authored board. An elective
+  slot takes the level of its group: upper when every course its group requires
+  is upper.
+- **Arrows** come from the course pages' structured requisites in a catalog
+  analysis from extractor 1.4.0 or later, timed by the catalog's own template
+  ([catalog-scanning.md](catalog-scanning.md#requisite-timing)). A requisite
+  is held for a reviewer, never drawn, when:
+  - its wording isn't a recognised template;
+  - the pair lists each other (the board can't draw a cycle);
+  - it starts from a course offered in a choice, because a choice tile carries
+    no arrows (the authored boards' rule).
+- **The shared routes** come from the institution's boards:
+  - Math plans toward the reading's required shared math course. A program
+    with none plans toward the course most authored boards use for general
+    education math.
+  - Preparation tiles cite their route's course evidence.
+  - Other shared tiles are labelled illustrative.
+- **Every tile** cites the reading's quotation for its rule, and every arrow
+  cites its course page. Each carries the draft note: no one has reviewed it.
+
+On the pilot, with the calculus start:
+
+| Program | Courses on both boards | Same semester | Within one | Arrows, draft / board | Held |
+|---|---|---|---|---|---|
+| History B.A. | 5 | 3 | 4 | 1 / 1 | 0 |
+| Philosophy B.A. | 4 | 3 | 3 | 1 / 1 | 0 |
+| Business Administration B.B.A. | 19 | 11 | 19 | 14 / 25 | 20 |
+| Computer Science B.S. | 18 | 8 | 13 | 17 / 25 | 8 |
+
+Where the semesters differ, the draft is almost always earlier: 19 of the 21
+differences, all but Business's BUSA 1110 and CS's STAT 345. Two things drive
+most of that:
+- The draft starts every tile as early as its level allows, where an author
+  spaces a sequence.
+- The arrows a draft holds back are the ones from choices. Business's writing
+  choice gates seven upper-division courses, and CS's Java I choice gates C
+  Programming and Java II. The hand boards draw those from their example pick.
+  The draft says which courses wait on a choice instead of choosing one.
 
 ## Where draft interpretations live
 

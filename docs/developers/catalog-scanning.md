@@ -147,6 +147,22 @@ retain separate enclosing AND/OR context, course evidence, pointers and hashes.
 The program definition includes its captured admission-policy context once.
 Changing a standing, negation or linked program changes the structure fingerprint.
 
+### Requisite timing
+
+Extractor 1.4.0 records when a requisite counts, from the catalog's own
+template, in a `timing` column (and in the structure fingerprint):
+
+| Template | Operator | `timing` |
+|---|---|---|
+| Earned a minimum grade of X in each / at least N of the following | `all` / `choose_n` | `prior` |
+| Completed with a minimum grade of X or concurrently enrolled in all / at least N of the following | `all` / `choose_n` | `prior_or_concurrent` |
+| Concurrently enrolled in: | `all` | `concurrent` |
+
+X may be a letter grade or CR. Other wording keeps no timing, and anything still
+unrecognised stays a condition for review. The draft board compiler reads this
+column. An analysis from an earlier extractor has none, and the compiler stops
+on it rather than guess.
+
 Extractor 1.3.0 also flags conflicting total-credit mentions: a structured
 `degreeHours` value (itself sometimes a range, e.g. `"123-130"`) compared
 against every "Grand Total Credits" / "Total Credits" / "Total Program

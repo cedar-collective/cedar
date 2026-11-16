@@ -8,7 +8,7 @@ parent: Developer Guide
 
 This reference is auto-generated from roxygen2 comments in the source code.
 
-*Generated: 2026-11-16 08:29:12.210186*
+*Generated: 2026-11-16 08:43:05.958964*
 
 ---
 
@@ -2251,6 +2251,85 @@ Snapshot of credits and prior course history at the moment students first declar
 
 ---
 
+## degree-compiler-board
+
+### `degree_packet_program_facts()`
+
+*Source: degree-compiler-board.R*
+
+**The program page's own facts a board cites**
+
+**Parameters:**
+
+- `packet` - A prepared packet.
+
+**Returns:** List: `entity_id`, `title`, `catalog_url`, `degree_hours`, `blocks` (every program and concentration source block, for citation sections).
+
+---
+
+### `degree_course_requisites()`
+
+*Source: degree-compiler-board.R*
+
+**Each course's structured requisites, from the catalog analysis**
+
+**Parameters:**
+
+- `rule_nodes` - An analysis `rule-nodes.csv` (extractor 1.4.0 or later).
+- `courses` - `degree_packet_course_facts()`: the courses whose requisites are read.
+
+**Returns:** Tibble: `subject_course` (the course), `requisite` (the course it needs), `timing` (`prior`, `prior_or_concurrent`, `concurrent`, or `NA` when the wording is not a recognised template), `alternative` (one of several), `quote`, `source_url` (the course's page).
+
+---
+
+### `assemble_compiled_degree_board()`
+
+*Source: degree-compiler-board.R*
+
+**A compiled reading as a validated draft board**
+
+**Parameters:**
+
+- `compiled` - `compile_degree_interpretation()` output.
+- `courses` - `degree_packet_course_facts()`.
+- `program` - `degree_packet_program_facts()`.
+- `requisites` - `degree_course_requisites()`.
+- `catalog_row` - One row of `degree_catalogs` columns for the draft (its `catalog_id`, names, Banner codes, year); `source_url` must be the program page.
+- `shared` - The institution's boards (`read_degree_roadmaps()`), read for its shared rows (`catalog_id` "*"), program math routes and planning defaults.
+- `evidence` - The institution's `degree_catalog_evidence`, for the shared routes' citations.
+- `general_math` - The shared math node a program with no math requirement plans toward.
+
+**Returns:** List: `catalog`, `roadmaps` (validated), `held` (requisites among the board's courses not drawn, with why).
+
+---
+
+### `compare_degree_board_semesters()`
+
+*Source: degree-compiler-board.R*
+
+**Where a draft board and the hand-built board place each course**
+
+**Parameters:**
+
+- `draft,board` - `build_degree_roadmap()` output for the same starting points.
+
+**Returns:** Tibble: `code`, `draft_semester`, `board_semester` for each course tile either shows (NA where one does not), ordered by the board.
+
+---
+
+### `format_degree_board_comparison()`
+
+*Source: degree-compiler-board.R*
+
+**A draft board beside the hand-built one, as text**
+
+**Parameters:**
+
+- `title` - Program name. @param math The math starting point both used.
+- `draft,board` - `build_degree_roadmap()` output. @param held The requisites the draft did not draw.
+
+---
+
 ## degree-compiler
 
 ### `degree_packet_course_facts()`
@@ -2263,7 +2342,7 @@ Snapshot of credits and prior course history at the moment students first declar
 
 - `packet` - A prepared packet (`load_catalog_normalization_program()$packet`).
 
-**Returns:** Tibble: `course_ref` (`courses:<id>`), `subject_course`, `title`, `credits_min`, `credits_max`. A course record without credits stops.
+**Returns:** Tibble: `course_ref` (`courses:<id>`), `subject_course`, `title`, `credits_min`, `credits_max`, `catalog_url`. A course record without credits stops.
 
 ---
 
@@ -2278,7 +2357,7 @@ Snapshot of credits and prior course history at the moment students first declar
 - `proposal` - The interpretation's `proposal` (parsed JSON, unsimplified).
 - `courses` - `degree_packet_course_facts()` for the same packet.
 
-**Returns:** List: `rules` (one row per compiled rule: `rule_id`, `role`, `subject_course`, `label`, `tiles`, `credits`, `quote`), `options` (`rule_id`, `option_id`, `subject_course`), `conditions`, `credit_rules`, `flags`, `concentrations`, and `skipped` (information nodes).
+**Returns:** List: `rules` (one row per compiled rule: `rule_id`, `parent_id`, `role`, `subject_course`, `label`, `tiles`, `credits`, `block_id`, `quote`), `options` (`rule_id`, `option_id`, `subject_course`), `conditions`, `credit_rules`, `flags`, `concentrations`, and `skipped` (information nodes).
 
 ---
 

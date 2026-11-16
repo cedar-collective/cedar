@@ -135,7 +135,7 @@ extract_catalog_rule_tree <- function(html) {
     children <- unlist(lapply(lists, parse_list), recursive = FALSE)
     references <- catalog_course_references(as.character(own))
     program_references <- catalog_program_references(as.character(own))
-    operator <- "condition"; minimum <- NULL; minimum_grade <- NULL; milestone <- NULL
+    operator <- "condition"; minimum <- NULL; minimum_grade <- NULL; milestone <- NULL; timing <- NULL
     if (grepl("^Complete (all of the following|the following):?$", label, ignore.case = TRUE)) operator <- "all"
     choice <- regexec("^Complete (?:at least )?([0-9]+) of the following:?$", label, ignore.case = TRUE, perl = TRUE)
     count <- regmatches(label, choice)[[1]]
@@ -145,14 +145,27 @@ extract_catalog_rule_tree <- function(html) {
     if (length(count)) { operator <- "credits"; minimum <- as.numeric(count[2]) }
     # A grade is a constraint on this group, not an ignorable heading. Retain
     # its literal threshold (C != C-); no CEDAR outcome/pass policy is applied.
-    grade <- regexec("^Earned a minimum grade of ([A-F][+-]?) in (each|at least ([0-9]+)) of the following:?$",
+    # The catalog's requisite templates also say when a course counts:
+    # "Earned" means completed before; "Completed ... or concurrently enrolled"
+    # allows the same term; "Concurrently enrolled in:" means the same term.
+    # Kept literal (prior / prior_or_concurrent / concurrent), never inferred.
+    grade <- regexec("^Earned a minimum grade of ([A-F][+-]?|CR) in (each|at least ([0-9]+)) of the following:?$",
       label, ignore.case = TRUE, perl = TRUE)
     count <- regmatches(label, grade)[[1]]
     if (length(count)) {
-      minimum_grade <- toupper(count[2])
+      minimum_grade <- toupper(count[2]); timing <- "prior"
       operator <- if (tolower(count[3]) == "each") "all" else "choose_n"
       if (operator == "choose_n") minimum <- as.integer(count[4])
     }
+    either <- regexec("^Completed with a minimum grade of ([A-F][+-]?|CR) or concurrently enrolled in (all|at least ([0-9]+)) of the following:?$",
+      label, ignore.case = TRUE, perl = TRUE)
+    count <- regmatches(label, either)[[1]]
+    if (length(count)) {
+      minimum_grade <- toupper(count[2]); timing <- "prior_or_concurrent"
+      operator <- if (tolower(count[3]) == "all") "all" else "choose_n"
+      if (operator == "choose_n") minimum <- as.integer(count[4])
+    }
+    if (grepl("^Concurrently enrolled in:?$", label, ignore.case = TRUE)) { operator <- "all"; timing <- "concurrent" }
     if (!length(children) && length(references) == 1L &&
         grepl("^[A-Z]+[[:space:]]*[0-9]+[A-Z]*[[:space:]]*[-–].*\\([0-9]+([[:space:]]*[-–][[:space:]]*[0-9]+)?\\)$", label)) operator <- "course"
     if (!length(children) && !length(references) && !length(program_references)) {
@@ -178,7 +191,7 @@ extract_catalog_rule_tree <- function(html) {
         (operator == "choose_n" && (minimum <= 0L || minimum > length(children) || !length(children)))) operator <- "condition"
     anchor <- xml2::xml_attr(node, "data-test")
     if (is.na(anchor)) anchor <- ""
-    list(operator = operator, minimum = minimum, minimum_grade = minimum_grade, milestone = milestone, text = label,
+    list(operator = operator, minimum = minimum, minimum_grade = minimum_grade, timing = timing, milestone = milestone, text = label,
       locator = xml2::xml_path(node), source_anchor = anchor,
       course_references = references, program_references = program_references, children = children,
       requires_review = operator == "condition" ||
@@ -256,6 +269,7 @@ catalog_rule_rows <- function(record, section) {
       title = record$title, field = section$field, phase = section$phase, node_id = id, parent_id = parent,
       operator = node$operator, minimum = if (is.null(node$minimum)) "" else as.character(node$minimum),
       minimum_grade = if (is.null(node$minimum_grade)) "" else node$minimum_grade,
+      timing = if (is.null(node$timing)) "" else node$timing,
       milestone_id = if (is.null(node$milestone$id)) "" else node$milestone$id,
       milestone_type = if (is.null(node$milestone)) "" else node$milestone$type,
       milestone_relation = if (is.null(node$milestone)) "" else node$milestone$relation,

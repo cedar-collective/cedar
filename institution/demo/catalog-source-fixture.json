@@ -29,6 +29,8 @@
     "grade_qualified":"<ul><li>Earned a minimum grade of C in each of the following, unless the department grants permission:<ul><li><a href=\"#/courses/view/bio1\">BIOL2110</a> - Biology I (3)</li></ul></li></ul>",
     "grade_empty":"<ul><li>Earned a minimum grade of C in each of the following:</li></ul>",
     "grade_impossible":"<ul><li>Earned a minimum grade of C in at least 2 of the following:<ul><li><a href=\"#/courses/view/bio1\">BIOL2110</a> - Biology I (3)</li></ul></li></ul>",
+    "corequisite_concurrent":"<ul><li>Concurrently enrolled in:<ul><li><a href=\"#/courses/view/bio1\">BIOL2110</a> - Biology I (3)</li></ul></li></ul>",
+    "grade_credit":"<ul><li>Earned a minimum grade of <span>CR</span> in each of the following:<ul><li><a href=\"#/courses/view/bio1\">BIOL2110</a> - Biology I (3)</li></ul></li></ul>",
     "grade_concurrent":"<ul><li>Completed with a minimum grade of C or concurrently enrolled in all of the following:<ul><li><a href=\"#/courses/view/bio1\">BIOL2110</a> - Biology I (3)</li></ul></li></ul>",
     "wrapped_choice":"<ul><li>Complete 1 of the following<ul><div><span class=\"rules_groupHeader_37\">Major study</span><li>Complete all of the following<ul><li><a href=\"#/courses/view/bio1\">BIOL2110</a> - Biology I (3)</li><li><a href=\"#/courses/view/biolab\">BIOL2110L</a> - Biology I Lab (1)</li></ul></li></div><div><span class=\"rules_groupHeader_37\">Second major</span><li>Complete the following:<ul><li><a href=\"#/courses/view/bio2\">BIOL200</a> - Combined Biology (4)</li></ul></li></div></ul></li></ul>",
     "qualified_wrapper":"<ul><div><span>Only with department permission</span><li>Complete the following:<ul><li><a href=\"#/courses/view/bio2\">BIOL200</a> - Combined Biology (4)</li></ul></li></div></ul>",

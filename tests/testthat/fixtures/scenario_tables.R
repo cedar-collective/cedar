@@ -704,6 +704,13 @@ compiler_biology_proposal <- local({
       compiler_cover("b-5d7913605fd3394402fa1faf", "information")))
 })
 
+# The draft board's catalog entry: the designed Biology program, under its own
+# id so it never collides with the authored demo board.
+compiler_biology_catalog_row <- data.frame(catalog_id = "demo-biology-draft", program_name = "Biology",
+  degree_label = "Biology B.S. (draft)", degree_code = "BS", program_codes = "BS-BIOL-AS", catalog_year = "2026-2027",
+  source_url = "https://catalog.example.invalid/#/programs/biology", retrieved_on = "2026-10-17", coverage = "excerpt",
+  notes = "Draft compiled from the designed reading")
+
 # ── test-enrollment-projection-scenario.R, test-projection-inputs.R, ─────────────
 # ── test-projection-model.R, test-projection-view.R ─────────────────────────────
 

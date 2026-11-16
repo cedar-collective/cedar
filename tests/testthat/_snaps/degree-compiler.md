@@ -25,3 +25,28 @@
         On the board, not in the reading: BIOL 2110C, BIOL 2120C, BIOL 2305, BIOL 300C, BIOL 304C, BIOL 3200, BIOL 499, CHEM 1215, CHEM 1215L, CHEM 1225, CHEM 1225L, ENVS 1110C, GEOL 1110, GEOL 1110L, PHYS 1230, PHYS 1230L, PHYS 1310
         Choice Biology I with its lab, or Combined Biology: 3 options; the board shows none
 
+# the board comparison reads as a semester-by-semester checklist
+
+    Code
+      cat(format_degree_board_comparison("Biology B.S.", "calculus", placed, hand,
+        draft$held))
+    Output
+      Biology B.S. · math start: calculus
+        Semesters: 8 draft, 8 on the board
+        Arrows: 1 draft, 11 on the board; 0 held for a reviewer
+        Courses on both: 2, same semester for 2
+          ENGL 1110         draft 1 · board 1
+          BIOL 2110C        draft — · board 1
+          CHEM 1215 + 1215L draft — · board 1
+          MATH 1512         draft — · board 1
+          ENGL 1120         draft 2 · board 2
+          BIOL 2120C        draft — · board 2
+          CHEM 1225 + 1225L draft — · board 2
+          PHYS 1310         draft — · board 2
+          BIOL 2305         draft — · board 3
+          BIOL 300C         draft — · board 5
+          BIOL 304C         draft — · board 5
+          BIOL 3200         draft — · board 5
+          BIOL 499          draft — · board 8
+          MATH 1350         draft 1 · board —
+

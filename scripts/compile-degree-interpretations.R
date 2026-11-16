@@ -3,14 +3,17 @@
 # rows beside its hand-built board. Read-only: no model or network calls, and
 # nothing is written. See docs/developers/catalog-normalization.md.
 #
-# Rscript --vanilla scripts/compile-degree-interpretations.R --root REVIEW_ROOT [--institution ID]
+# Rscript --vanilla scripts/compile-degree-interpretations.R --root REVIEW_ROOT [--analysis DIR] [--institution ID]
 #   REVIEW_ROOT  the prepared packets (scripts/normalize-degree-catalog.R prepare --output)
+#   DIR          a catalog analysis from extractor 1.4.0 or later: with it, each
+#                reading is also assembled into a draft board and placed beside
+#                the hand-built board, semester by semester
 args <- commandArgs(trailingOnly = TRUE)
-usage <- "Usage: Rscript --vanilla scripts/compile-degree-interpretations.R --root REVIEW_ROOT [--institution ID]"
+usage <- "Usage: Rscript --vanilla scripts/compile-degree-interpretations.R --root REVIEW_ROOT [--analysis DIR] [--institution ID]"
 if (!length(args) || args[1] %in% c("--help", "-h")) { cat(usage, "\n"); quit(status = 0) }
 opts <- list()
 while (length(args)) {
-  if (!args[1] %in% c("--root", "--institution") || args[1] %in% names(opts) || length(args) < 2L) stop(usage, call. = FALSE)
+  if (!args[1] %in% c("--root", "--analysis", "--institution") || args[1] %in% names(opts) || length(args) < 2L) stop(usage, call. = FALSE)
   opts[[args[1]]] <- args[2]; args <- args[-c(1L, 2L)]
 }
 if (is.null(opts[["--root"]])) stop(usage, call. = FALSE)
@@ -27,6 +30,15 @@ root <- normalizePath(opts[["--root"]], mustWork = TRUE)
 keys <- basename(list.dirs(file.path(root, "programs"), recursive = FALSE))
 packets <- lapply(stats::setNames(keys, keys), function(key) load_catalog_normalization_program(root, key)$packet)
 packet_programs <- vapply(packets, function(p) p$program_id, "")
+if (!is.null(opts[["--analysis"]])) {
+  rule_nodes <- utils::read.csv(file.path(normalizePath(opts[["--analysis"]], mustWork = TRUE), "rule-nodes.csv"),
+                                colClasses = "character", check.names = FALSE)
+  # A program with no math requirement plans toward the shared course most
+  # authored boards show as their illustrative general-education math.
+  r <- CEDAR_DEGREE_ROADMAPS
+  general <- r$basis$node_id[r$basis$basis == "general" & r$basis$node_id %in% r$nodes$node_id[r$nodes$catalog_id == "*" & r$nodes$track == "math"]]
+  general_math <- names(sort(table(general), decreasing = TRUE))[1]
+}
 readings <- list.files(file.path(cedar_institution_dir(), "catalog_interpretations"), "\\.json$", recursive = TRUE, full.names = TRUE)
 if (!length(readings)) stop("No catalog interpretations under ", file.path(cedar_institution_dir(), "catalog_interpretations"))
 
@@ -39,4 +51,15 @@ for (path in readings) {
   board <- CEDAR_DEGREE_CATALOG$catalogs$catalog_id[grepl(reading$program_id, CEDAR_DEGREE_CATALOG$catalogs$source_url, fixed = TRUE)]
   comparison <- if (length(board) == 1L) compare_compiled_degree(compiled, CEDAR_DEGREE_ROADMAPS, board)
   cat(format_compiled_degree_preview(packet$title, compiled, comparison), "\n\n")
+  if (is.null(opts[["--analysis"]]) || length(board) != 1L) next
+  courses <- degree_packet_course_facts(packet)
+  row <- CEDAR_DEGREE_CATALOG$catalogs[CEDAR_DEGREE_CATALOG$catalogs$catalog_id == board, ]
+  row$catalog_id <- paste0(board, "-draft")
+  draft <- assemble_compiled_degree_board(compiled, courses, degree_packet_program_facts(packet),
+    degree_course_requisites(rule_nodes, courses), row, CEDAR_DEGREE_ROADMAPS, CEDAR_DEGREE_CATALOG$evidence, general_math)
+  for (math in c("calculus", "intermediate")) {
+    placed <- build_degree_roadmap(draft$catalog, draft$roadmaps, row$catalog_id, math, "composition")
+    hand <- build_degree_roadmap(CEDAR_DEGREE_CATALOG, CEDAR_DEGREE_ROADMAPS, board, math, "composition")
+    cat(format_degree_board_comparison(packet$title, math, placed, hand, draft$held), "\n\n")
+  }
 }
