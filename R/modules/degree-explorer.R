@@ -10,7 +10,7 @@ degreeExplorerUI <- function(id, catalog, roadmaps) {
   if (!nrow(catalog$catalogs)) return(empty_state("No degree roadmaps are configured for this institution."))
   english <- roadmaps$starts[roadmaps$starts$track == "english", ]
   tagList(
-    htmltools::htmlDependency("cedar-roadmap", "2.0.0", src = c(href = ""),
+    htmltools::htmlDependency("cedar-roadmap", "2.1.0", src = c(href = ""),
       stylesheet = "cedar-roadmap.css", script = "cedar-roadmap.js"),
     filter_bar("Build your degree roadmap", "Choose a degree and your starting courses. Watch the sequence change.",
       fluidRow(
@@ -170,11 +170,13 @@ degree_semester_board <- function(view, id, select_id = paste0(id, "-select")) {
     div(class = "scope-bar cedar-roadmap-summary", role = "status",
       tags$strong(view$math_note), tags$span(view$change_note),
       tags$span(class = "cedar-roadmap-prototype", "Planning prototype")),
-    div(id = id, class = "cedar-roadmap", `data-roadmap` = "true",
-      `data-select-input` = select_id,
+    # Condensed until cedar-roadmap.js reads the viewer's remembered choice.
+    div(id = id, class = "cedar-roadmap cedar-roadmap--condensed", `data-roadmap` = "true",
+      `data-view` = "condensed", `data-select-input` = select_id,
       `data-catalog` = view$catalog$catalog_id,
       `data-math-start` = view$starts[["math"]], `data-english-start` = view$starts[["english"]],
       `data-start-season` = view$start_season,
+      degree_view_toggle(),
       div(class = "cedar-roadmap-legend", lapply(names(legend), function(level)
         tags$span(class = paste("cedar-roadmap-key", paste0("cedar-roadmap-key--", level)), legend[[level]])),
         tags$span("Counts name courses in the chain; ◇ conditions are separate. ↔ = courses planned together.")),
@@ -199,6 +201,20 @@ degree_semester_board <- function(view, id, select_id = paste0(id, "-select")) {
     tags$p(class = "text-hint", view$note, " ",
       tags$a(href = view$catalog$source_url, target = "_blank", rel = "noopener noreferrer", "Degree catalog source"),
       " · saved ", view$catalog$catalog_year, " excerpt, retrieved ", view$catalog$retrieved_on, "."))
+}
+
+# Condensed cards show each course's code, title and credits, so the plan and
+# its prerequisite arrows fit on screen; Detailed shows every line of the tile.
+# The browser switches the class; nothing is re-rendered.
+degree_view_toggle <- function() {
+  views <- c(condensed = "Condensed", detailed = "Detailed")
+  div(class = "cedar-roadmap-view",
+    tags$span(class = "cedar-roadmap-view-label", "Cards"),
+    div(class = "btn-group btn-group-sm", role = "group", `aria-label` = "Card detail",
+      lapply(names(views), function(view) tags$button(type = "button",
+        class = paste("btn btn-outline-secondary", if (view == "condensed") "active"),
+        `data-roadmap-view` = view, `aria-pressed` = if (view == "condensed") "true" else "false",
+        views[[view]]))))
 }
 
 # JSON for the browser, with "<" escaped so a catalog quote cannot close the script.
@@ -243,7 +259,7 @@ degree_course_tile <- function(view, course) {
     `data-node` = course$node_id, `data-card-type` = "course", `data-kind` = course$kind,
     `data-semester` = course$semester, `data-row` = course$row, `data-row-group` = course$row_group,
     `data-course-level` = course$course_level, `data-credits` = course$credits,
-    `data-option-count` = course$option_count, `data-basis` = course$basis,
+    `data-option-count` = course$option_count, `data-basis` = course$basis, `data-bundle` = tolower(course$bundle),
     `data-conditions` = course$n_conditions, `data-title` = paste(course$code, "·", course$title),
     `data-planning-level` = course$planning_level, `data-prerequisites` = course$n_prerequisites,
     `data-downstream` = course$n_downstream, `aria-pressed` = "false", `aria-haspopup` = "dialog",

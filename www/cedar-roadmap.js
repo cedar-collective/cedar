@@ -6,6 +6,14 @@
   const svgNS = 'http://www.w3.org/2000/svg';
   const splitIds = ids => (ids ? ids.split('|') : []);
   const modalOpen = () => document.body.classList.contains('modal-open');
+  // The card view is a per-viewer convenience: remembered in this browser when
+  // storage allows, condensed otherwise.
+  const VIEW_KEY = 'cedar-roadmap-view', VIEWS = ['condensed', 'detailed'];
+  const rememberedView = () => {
+    try { const view = window.localStorage.getItem(VIEW_KEY); return VIEWS.includes(view) ? view : 'condensed'; }
+    catch (error) { return 'condensed'; }
+  };
+  const rememberView = view => { try { window.localStorage.setItem(VIEW_KEY, view); } catch (error) { /* not remembered */ } };
 
   function initialize(root) {
     if (!root || root.dataset.ready) return;
@@ -22,6 +30,23 @@
     svg.classList.add('cedar-roadmap-connectors');
     svg.setAttribute('aria-hidden', 'true');
     board.prepend(svg);
+
+    // Switching views changes only the tiles' height; the ResizeObserver below
+    // redraws the connectors and moves the preview.
+    function setView(view) {
+      root.classList.toggle('cedar-roadmap--condensed', view === 'condensed');
+      root.dataset.view = view;
+      root.querySelectorAll('[data-roadmap-view]').forEach(button => {
+        const on = button.dataset.roadmapView === view;
+        button.classList.toggle('active', on);
+        button.setAttribute('aria-pressed', on ? 'true' : 'false');
+      });
+    }
+    root.querySelectorAll('[data-roadmap-view]').forEach(button => button.addEventListener('click', () => {
+      setView(button.dataset.roadmapView);
+      rememberView(button.dataset.roadmapView);
+    }));
+    setView(rememberedView());
 
     let selected = null, hovered = null, focused = null, previewed = null;
     let restoreTimer, insidePreview = false, returningFocus = false, dismissed = false;

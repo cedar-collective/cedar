@@ -20,6 +20,13 @@ These are selected routes, not every concentration or alternative in each progra
 
 ## Read the semester board
 
+**Cards** switches between two views. **Condensed**, the default, shows each
+course's code, title and credits, so the whole plan and its prerequisite
+arrows fit on screen; ◇ after a code marks a coursework or permission
+condition and ↔ courses planned together. **Detailed** shows every line
+described below. Hover and the popup work the same in both. The browser
+remembers your choice.
+
 Each column is a semester. Tile color shows how much prerequisite planning a
 course needs: green means zero shown prerequisite courses, yellow one or two,
 and red three or more, counting earlier courses throughout the chain. Gray
@@ -75,7 +82,7 @@ count**. These are planning spaces, not verified Gen Ed or upper-division credit
 totals. Prerequisites and the 16-credit ceiling still apply, so a sequence can
 extend the plan.
 
-Every tile shows its prerequisite count and how many later courses it leads
+In the Detailed view, every tile shows its prerequisite count and how many later courses it leads
 to. Entry courses identify the chain they start. These numbers describe the
 selected route after placement, not difficulty or eligibility to register.
 

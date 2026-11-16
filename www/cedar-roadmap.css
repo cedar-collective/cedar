@@ -85,6 +85,24 @@
 .cedar-roadmap-course.is-qualifying { outline:2px dotted var(--roadmap-conditional); outline-offset:2px; }
 .cedar-roadmap-course:hover,.cedar-roadmap-course:focus-visible { outline:2px solid var(--roadmap-ink); outline-offset:2px; }
 
+/* Card detail toggle */
+.cedar-roadmap-view { display:flex; align-items:center; gap:.5rem; font-size:.78rem; margin:.6rem 0 .2rem; }
+.cedar-roadmap-view-label { color:var(--text-muted); text-transform:uppercase; letter-spacing:.06em; font-size:10px; }
+
+/* Condensed cards: code, one line of title and credits, so the whole plan and its
+   arrows fit on screen. Empty rows collapse; the hover preview and popup keep
+   every detail. A ◇ after the code marks a coursework condition, ↔ a pairing. */
+.cedar-roadmap--condensed .cedar-roadmap-board { grid-template-rows:94px repeat(var(--roadmap-rows),minmax(0,auto)) auto; row-gap:6px; }
+.cedar-roadmap--condensed .cedar-roadmap-course { min-height:0; min-width:0; gap:1px; padding:5px 7px; }
+.cedar-roadmap--condensed .cedar-roadmap-course > * { min-width:0; max-width:100%; }
+.cedar-roadmap--condensed .cedar-roadmap-course > :is(.cedar-roadmap-requirement-summary,.cedar-roadmap-option-preview,.cedar-roadmap-category,.cedar-roadmap-coverage-badge,.cedar-roadmap-prereq-count,.cedar-roadmap-condition-badge,.cedar-roadmap-chain-badge) { display:none; }
+.cedar-roadmap--condensed .cedar-roadmap-course-code { display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow:hidden; }
+.cedar-roadmap--condensed .cedar-roadmap-course-title { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:11px; }
+.cedar-roadmap--condensed .cedar-roadmap-course-meta { margin-top:0; flex-wrap:nowrap; }
+.cedar-roadmap--condensed .cedar-roadmap-course:not([data-conditions="0"])[data-conditions] .cedar-roadmap-course-code::after { content:' ◇'; color:var(--roadmap-conditional-ink); }
+.cedar-roadmap--condensed .cedar-roadmap-course[data-bundle="true"] .cedar-roadmap-course-code::after { content:' ↔'; color:var(--text-muted); }
+.cedar-roadmap--condensed .cedar-roadmap-course[data-bundle="true"]:not([data-conditions="0"])[data-conditions] .cedar-roadmap-course-code::after { content:' ◇ ↔'; }
+
 /* Prerequisite connectors */
 .cedar-roadmap-connectors { position:absolute; top:0; left:0; overflow:visible; pointer-events:none; z-index:1; }
 .cedar-roadmap-connectors path { fill:none; stroke:var(--cedar-green-light); stroke-width:3; }
