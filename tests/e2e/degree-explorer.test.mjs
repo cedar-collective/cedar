@@ -149,6 +149,31 @@ const checkAdminSharedRules = async () => {
 const checkDegreeExplorer = async () => {
   await connect(page, { tab: 'degree-explorer' });
   await waitForSelector(page, '[data-roadmap][data-ready]');
+  // Condensed cards first: code, title and credits only, empty rows collapsed.
+  const tileHeights = () => page.$$eval('.cedar-roadmap-course', els => els.map(el => el.getBoundingClientRect().height));
+  const condensedHeights = await tileHeights();
+  check(await page.$eval('[data-roadmap]', el => el.dataset.view === 'condensed') &&
+    Math.max(...condensedHeights) < 90 &&
+    await page.$$eval('.cedar-roadmap-course .cedar-roadmap-prereq-count, .cedar-roadmap-course .cedar-roadmap-chain-badge',
+      els => els.length > 0 && els.every(el => getComputedStyle(el).display === 'none')),
+    `the board opens with condensed cards (tallest ${Math.round(Math.max(...condensedHeights))}px), detail hidden`);
+  check(await soundRows() && await alignedHeaders() &&
+    await page.$$eval('.cedar-roadmap-course', els => els.every(el => {
+      const tile = el.getBoundingClientRect(), term = el.closest('.cedar-roadmap-semester').getBoundingClientRect();
+      return tile.left >= term.left - 1 && tile.right <= term.right + 1;
+    })),
+    'condensed rows still align, and every card stays inside its semester column');
+  await hoverCourse('java1');
+  check(await page.$$eval('.cedar-roadmap-connectors path', els => els.length > 0) &&
+    await page.$eval('.cedar-roadmap-hover', el => el.querySelector('.cedar-roadmap-hover-before').innerText.includes('CSCI 1210')),
+    'condensed cards keep the hover preview and its prerequisite arrows');
+  await page.mouse.move(0, 0);
+  await page.screenshot({ path: '/tmp/cedar-degree-condensed.png', fullPage: true });
+  await page.click('[data-roadmap-view="detailed"]');
+  check(await waitFor(page, () => document.querySelector('[data-roadmap]').dataset.view === 'detailed' &&
+    getComputedStyle(document.querySelector('.cedar-roadmap-course .cedar-roadmap-prereq-count')).display !== 'none') &&
+    Math.max(...await tileHeights()) > Math.max(...condensedHeights),
+    'Detailed restores every line of each card');
   check(await page.$$eval('.cedar-roadmap-semester', els => els.length === 8),
     'one degree starts with an eight-semester visual roadmap');
   check(await page.$$eval('.cedar-roadmap-semester', els => els.every(el => Number(el.dataset.plannedCredits) <= 16)),
@@ -256,6 +281,8 @@ const checkDegreeExplorer = async () => {
     'the roadmap is visible without opening requirement accordions');
   const originalCalcTerm = await semester('calc1');
   await choose('degree_explorer-dx_start_season', 'spring');
+  check(await page.$eval('[data-roadmap]', el => el.dataset.view === 'detailed' && !el.classList.contains('cedar-roadmap--condensed')),
+    'the chosen card view survives a redrawn board');
   // textContent, not innerText: the year label is styled uppercase, and
   // innerText returns the rendered "YEAR 1 · SPRING".
   check(await page.$eval('.cedar-roadmap-year', el => el.textContent.includes('Spring')) &&
