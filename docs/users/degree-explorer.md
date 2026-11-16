@@ -21,8 +21,9 @@ These are selected routes, not every concentration or alternative in each progra
 ## Read the semester board
 
 **Cards** switches between two views. **Condensed**, the default, shows each
-course's code, title and credits, so the whole plan and its prerequisite
-arrows fit on screen; ◇ after a code marks a coursework or permission
+course's code, title and credits, so the whole plan fits on screen, and draws
+every prerequisite link as a faint line, so the dependencies show without
+hovering; ◇ after a code marks a coursework or permission
 condition and ↔ courses planned together. **Detailed** shows every line
 described below. Hover and the popup work the same in both. The browser
 remembers your choice.

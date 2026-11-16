@@ -10,7 +10,7 @@ degreeExplorerUI <- function(id, catalog, roadmaps) {
   if (!nrow(catalog$catalogs)) return(empty_state("No degree roadmaps are configured for this institution."))
   english <- roadmaps$starts[roadmaps$starts$track == "english", ]
   tagList(
-    htmltools::htmlDependency("cedar-roadmap", "2.1.0", src = c(href = ""),
+    htmltools::htmlDependency("cedar-roadmap", "2.2.0", src = c(href = ""),
       stylesheet = "cedar-roadmap.css", script = "cedar-roadmap.js"),
     filter_bar("Build your degree roadmap", "Choose a degree and your starting courses. Watch the sequence change.",
       fluidRow(
@@ -181,7 +181,8 @@ degree_semester_board <- function(view, id, select_id = paste0(id, "-select")) {
         tags$span(class = paste("cedar-roadmap-key", paste0("cedar-roadmap-key--", level)), legend[[level]])),
         tags$span("Counts name courses in the chain; ◇ conditions are separate. ↔ = courses planned together.")),
       tags$p(class = "text-hint", paste("Hover or focus a course to preview its prerequisite chain and the",
-        "courses that depend on it. Blue lines lead in; purple lines lead out. Click for first-day seats and",
+        "courses that depend on it. Blue lines lead in; purple lines lead out; condensed cards show every",
+        "prerequisite link as a faint line. Click for first-day seats and",
         "enrollment history. Related courses line up across semesters.")),
       tags$p(class = "text-hint cedar-roadmap-timing", view$timing_note),
       tags$p(class = "text-hint cedar-roadmap-coverage", view$coverage_note),

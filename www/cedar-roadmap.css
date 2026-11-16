@@ -110,6 +110,10 @@
 .cedar-roadmap-connectors .cedar-roadmap-link-before { stroke:var(--roadmap-upstream); }
 .cedar-roadmap-connectors .cedar-roadmap-link-after { stroke:var(--roadmap-downstream); }
 .cedar-roadmap-connectors .cedar-roadmap-concurrent { stroke-dasharray:4 3; }
+/* Condensed boards: every link, faint, behind the active chain; fainter while a chain is shown. */
+.cedar-roadmap-connectors path.cedar-roadmap-link-faint { stroke:var(--cedar-green-light); stroke-width:1.5; opacity:.5; }
+.cedar-roadmap-connectors polygon.cedar-roadmap-link-faint { fill:var(--cedar-green-light); opacity:.5; }
+.cedar-roadmap-connectors.has-chain .cedar-roadmap-link-faint { opacity:.15; }
 
 /* Tile popup (a standard CEDAR modal; these style its catalog evidence) */
 .cedar-roadmap-detail-actions { display:flex; flex-wrap:wrap; gap:.7rem; justify-content:flex-end; font-size:.78rem; margin-bottom:.55rem; }
