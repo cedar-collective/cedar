@@ -31,8 +31,8 @@
     svg.setAttribute('aria-hidden', 'true');
     board.prepend(svg);
 
-    // Switching views changes only the tiles' height; the ResizeObserver below
-    // redraws the connectors and moves the preview.
+    // Switching views changes the tiles' height and whether the faint links show;
+    // a click redraws the connectors, and the ResizeObserver below moves the preview.
     function setView(view) {
       root.classList.toggle('cedar-roadmap--condensed', view === 'condensed');
       root.dataset.view = view;
@@ -45,6 +45,7 @@
     root.querySelectorAll('[data-roadmap-view]').forEach(button => button.addEventListener('click', () => {
       setView(button.dataset.roadmapView);
       rememberView(button.dataset.roadmapView);
+      draw();
     }));
     setView(rememberedView());
 
@@ -68,7 +69,13 @@
       svg.setAttribute('width', board.scrollWidth);
       svg.setAttribute('height', board.scrollHeight);
       svg.replaceChildren();
-      links.filter(link => relevant.has(link.from) && relevant.has(link.to)).forEach(link => {
+      // Condensed boards draw every prerequisite link faintly, so the plan's
+      // dependencies show without hovering; the active chain is drawn over them.
+      const inChain = link => relevant.has(link.from) && relevant.has(link.to);
+      const backdrop = root.dataset.view === 'condensed';
+      svg.classList.toggle('has-chain', relevant.size > 0);
+      const drawn = backdrop ? [...links.filter(link => !inChain(link)), ...links.filter(inChain)] : links.filter(inChain);
+      drawn.forEach(link => {
         const fromCard = byId.get(link.from), toCard = byId.get(link.to);
         const from = fromCard.getBoundingClientRect(), to = toCard.getBoundingClientRect();
         const x1 = from.right - box.left, y1 = from.top + from.height / 2 - box.top;
@@ -81,7 +88,9 @@
           ? `M ${x1} ${y1} C ${x1 + 12} ${y1}, ${x1 + 12} ${y2}, ${to.right - box.left} ${y2}`
           : `M ${x1} ${y1} C ${x1 + 20} ${y1}, ${x2 - 20} ${y2}, ${x2} ${y2}`);
         if (link.timing === 'before_or_same') path.classList.add('cedar-roadmap-concurrent');
-        path.classList.add(upstream.has(link.to) ? 'cedar-roadmap-link-before' : 'cedar-roadmap-link-after');
+        const role = !inChain(link) ? 'cedar-roadmap-link-faint'
+          : upstream.has(link.to) ? 'cedar-roadmap-link-before' : 'cedar-roadmap-link-after';
+        path.classList.add(role);
         const title = document.createElementNS(svgNS, 'title');
         title.textContent = `${fromCard.dataset.title} → ${toCard.dataset.title}`;
         path.append(title);
@@ -90,6 +99,7 @@
         const endX = sameTerm ? to.right - box.left : x2;
         const tailX = endX + (sameTerm ? 6 : -6);
         arrow.setAttribute('points', `${endX},${y2} ${tailX},${y2 - 3} ${tailX},${y2 + 3}`);
+        if (role === 'cedar-roadmap-link-faint') arrow.classList.add(role);
         svg.append(arrow);
       });
     }

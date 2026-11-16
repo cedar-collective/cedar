@@ -163,13 +163,25 @@ const checkDegreeExplorer = async () => {
       return tile.left >= term.left - 1 && tile.right <= term.right + 1;
     })),
     'condensed rows still align, and every card stays inside its semester column');
+  const linkCount = await page.$eval('.cedar-roadmap-links', el => JSON.parse(el.textContent).length);
+  check(linkCount > 0 && await page.$$eval('.cedar-roadmap-connectors path', (els, n) =>
+    els.length === n && els.every(el => el.classList.contains('cedar-roadmap-link-faint')), linkCount),
+    `condensed cards draw all ${linkCount} prerequisite links faintly with nothing hovered`);
   await hoverCourse('java1');
+  check(await page.$$eval('.cedar-roadmap-connectors path', (els, n) => els.length === n &&
+      els.some(el => el.classList.contains('cedar-roadmap-link-before')) &&
+      els.some(el => el.classList.contains('cedar-roadmap-link-faint')), linkCount) &&
+    await page.$eval('.cedar-roadmap-connectors', el => el.classList.contains('has-chain')),
+    'a hovered chain is drawn over the faint links');
   check(await page.$$eval('.cedar-roadmap-connectors path', els => els.length > 0) &&
     await page.$eval('.cedar-roadmap-hover', el => el.querySelector('.cedar-roadmap-hover-before').innerText.includes('CSCI 1210')),
     'condensed cards keep the hover preview and its prerequisite arrows');
   await page.mouse.move(0, 0);
   await page.screenshot({ path: '/tmp/cedar-degree-condensed.png', fullPage: true });
   await page.click('[data-roadmap-view="detailed"]');
+  check(await waitFor(page, () => document.querySelector('[data-roadmap]').dataset.chainNode === '' &&
+    !document.querySelector('.cedar-roadmap-connectors .cedar-roadmap-link-faint')),
+    'Detailed cards draw no faint links; lines appear only for a hovered chain');
   check(await waitFor(page, () => document.querySelector('[data-roadmap]').dataset.view === 'detailed' &&
     getComputedStyle(document.querySelector('.cedar-roadmap-course .cedar-roadmap-prereq-count')).display !== 'none') &&
     Math.max(...await tileHeights()) > Math.max(...condensedHeights),
