@@ -152,7 +152,7 @@ The dropdown shows departments with course data in CEDAR. If your department is 
 They should. CEDAR counts attempted credit hours at census, as UNM's official enrollment report does: every enrollment still registered, plus every student who withdrew after census, whatever grade they receive. For Chemistry, Fall 2022–2026, the two agree to within 0.2%. Remaining differences come from scope: the official report covers every location of the Albuquerque campus, so compare it with Albuquerque and online (EA) together. A figure that counts only earned credits, or only students still enrolled at the end of term, will be lower. The end-of-term count is the dashed line on the first Credit Hours chart. The Credit Hours tab explains the exact methodology.
 
 **Why does the newest term look different on the charts?**
-A term that has not finished is shown as soon as it has registrations, shaded and labeled *In progress*, with the date of the data pull. Its enrollment, headcount, and credit hours are current registration and will change until the term closes. DFW and other grade-based measures stop at the last term with grades posted.
+A term that has not finished is shown as soon as it has registrations, shaded and labeled *In progress*. The data scope bar under the filters names each such term with the date of its data pull, and the last term with grades posted; open it for what that means. Its enrollment, headcount, and credit hours are current registration and will change until the term closes. DFW and other grade-based measures stop at the last term with grades posted.
 
 **Can I compare two departments side by side?**
 Not currently — generate profiles separately for each department. Cross-department comparison is on the roadmap.

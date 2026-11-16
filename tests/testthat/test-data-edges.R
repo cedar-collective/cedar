@@ -255,18 +255,24 @@ test_that("every enrolled term after the graded edge is in progress", {
   expect_equal(ip$newest_pull[ip$term == 202680L], as.Date("2026-06-18"))
 })
 
-test_that("a fully graded snapshot has no in-progress terms and no note", {
+test_that("a fully graded snapshot has no in-progress terms and nothing to explain", {
   graded <- edge_settled_students %>% dplyr::mutate(final_grade = "A")
-  ip <- cedar_in_progress_terms(cedar_data_edges(graded))
+  edges <- cedar_data_edges(graded)
+  ip <- cedar_in_progress_terms(edges)
   expect_equal(nrow(ip), 0)
-  expect_null(cedar_in_progress_note(ip))
+  expect_null(cedar_in_progress_meaning(ip))
+  expect_named(cedar_scope_time_facts(ip, edges), "Grades through")
 })
 
-test_that("the in-progress note names the term, its pull date, and filling state", {
-  ip <- cedar_in_progress_terms(cedar_data_edges(edge_settled_students))
-  note <- cedar_in_progress_note(ip[ip$term == 202680L, ])
-  expect_match(note, "Fall 2026 as of Jun 18, 2026, registration still filling")
-  expect_match(note, "last graded term")
+test_that("the time scope names each in-progress term, its pull and filling state, and the graded edge", {
+  edges <- cedar_data_edges(edge_settled_students)
+  facts <- cedar_scope_time_facts(cedar_in_progress_terms(edges), edges)
+  expect_equal(facts[["In progress"]], c(
+    "Spring 2026 (as of Apr 20, 2026)",
+    "Summer 2026 (as of Apr 27, 2026; registration filling)",
+    "Fall 2026 (as of Jun 18, 2026; registration filling)"))
+  expect_equal(facts[["Grades through"]], "Fall 2025")
+  expect_error(cedar_scope_time_facts(cedar_in_progress_terms(edges), NULL), "edges")
 })
 
 test_that("in-progress terms fail loudly without edges", {

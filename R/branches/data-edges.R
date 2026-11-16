@@ -285,26 +285,46 @@ cedar_in_progress_terms <- function(edges) {
 }
 
 
-#' One-sentence description of in-progress terms, for a page note
+#' A page's time scope, as short facts for its data scope bar
+#'
+#' Facts only, one chip each (`scope_chip()`): which terms are still in
+#' progress, as of which pull, and the last graded term. What a term in
+#' progress means for the numbers is [cedar_in_progress_meaning()], which goes
+#' in the scope bar's collapsed part, never in the visible line.
+#'
+#' @param in_progress Output of [cedar_in_progress_terms()].
+#' @param edges Output of [cedar_data_edges()].
+#' @return Named list of character vectors: `In progress` (one per term, absent
+#'   when none) and `Grades through` (absent when nothing is graded).
+cedar_scope_time_facts <- function(in_progress, edges) {
+  if (is.null(edges)) stop("cedar_scope_time_facts needs the data edges")
+  facts <- list()
+  if (!is.null(in_progress) && nrow(in_progress) > 0) {
+    facts[["In progress"]] <- vapply(seq_len(nrow(in_progress)), function(i) {
+      row <- in_progress[i, ]
+      parts <- c(
+        if (!is.na(row$newest_pull)) paste0("as of ", format(row$newest_pull, "%b "),
+                                            as.integer(format(row$newest_pull, "%d")),
+                                            format(row$newest_pull, ", %Y")),
+        if (!isTRUE(row$settled)) "registration filling")
+      paste0(fmt_term(row$term), if (length(parts)) paste0(" (", paste(parts, collapse = "; "), ")"))
+    }, character(1))
+  }
+  graded <- edges[["last_graded"]]
+  if (!is.null(graded)) facts[["Grades through"]] <- fmt_term(graded)
+  facts
+}
+
+#' What a term in progress means for a page's numbers, for the scope bar's
+#' collapsed part
 #'
 #' @param in_progress Output of [cedar_in_progress_terms()].
 #' @return Character string, or NULL when no term is in progress.
-cedar_in_progress_note <- function(in_progress) {
+cedar_in_progress_meaning <- function(in_progress) {
   if (is.null(in_progress) || nrow(in_progress) == 0) return(NULL)
-  parts <- vapply(seq_len(nrow(in_progress)), function(i) {
-    row <- in_progress[i, ]
-    pulled <- if (is.na(row$newest_pull)) "" else
-      paste0(" as of ", format(row$newest_pull, "%b "),
-             as.integer(format(row$newest_pull, "%d")), format(row$newest_pull, ", %Y"))
-    paste0(fmt_term(row$term), pulled,
-           if (isTRUE(row$settled)) "" else ", registration still filling")
-  }, character(1))
-  paste0(
-    "In progress: ", paste(parts, collapse = "; "), ". ",
-    "Enrollment, headcount, and credit hours for ",
-    if (nrow(in_progress) == 1) "this term" else "these terms",
-    " are current registration and will change until the term closes. ",
-    "Grade-based measures stop at the last graded term."
+  paste(
+    "Enrollment, headcount and credit hours for a term in progress are current registration",
+    "and change until the term closes. Grade-based measures stop at the last graded term."
   )
 }
 

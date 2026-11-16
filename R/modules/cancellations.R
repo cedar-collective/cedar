@@ -215,7 +215,6 @@ cancellationsServer <- function(id, sections, error_handler = NULL) {
       rs <- data$status_note
       removed <- rs$n_sections[rs$status == "R"]
       suspended <- rs$n_sections[rs$status == "S"]
-      parse_rate <- if (is.na(summary$parse_rate)) "n/a" else paste0(round(summary$parse_rate * 100, 1), "%")
       div(class = "scope-bar scope-bar--stacked",
         div(class = "rs-stripe-row",
           tags$span(class = "rs-stripe-label", "Count scope:"),
@@ -254,19 +253,21 @@ cancellationsServer <- function(id, sections, error_handler = NULL) {
             tags$span(class = "rs-stripe-val", summary$missing_timing_reference),
             tags$span("missing timing date")
           )
-        ),
-        div(class = "rs-stripe-row",
-          tags$span(class = "rs-stripe-label", "Method:"),
-          tags$span(
-            paste0(
-              "status C section/CRN rows only; R/S are excluded · ",
-              "timing uses parsed comments vs start_date, falling back to census1 · ",
-              "parsed coverage ", parse_rate, " · trends ignore exact term codes"
-            ),
-            class = "rs-stripe-thresholds"
-          )
         )
       )
+    })
+
+    # The Timing tab's method, with this run's share of cancelled rows whose
+    # cancellation date parsed from the section comments.
+    output$cn_timing_method <- renderUI({
+      data <- cn_data()
+      req(data)
+      rate <- data$timing_summary$parse_rate
+      tags$p(paste0(
+        "Days before start compare the cancellation date written in the section comments with the ",
+        "section's start date, or its census date when the start date is missing. ",
+        if (length(rate) == 1 && !is.na(rate)) paste0(round(rate * 100, 1), "% of cancelled rows in this run had a parseable date. ") else "",
+        "Only cancellations 0 to 100 days before start are drawn; the scope bar counts the rest."))
     })
 
     cn_dept_plot_data <- reactive({
@@ -383,18 +384,7 @@ cancellationsServer <- function(id, sections, error_handler = NULL) {
         yaxis = list(title = "Cancelled sections"),
         legend = list(title = list(text = "Unit")),
         margin = list(l = 55, r = 20, t = 10, b = 80),
-        hoverlabel = list(align = "left"),
-        annotations = list(list(
-          text = "Trend view ignores specific term-code filters; Fall, Spring, and Summer filters are retained. Units outside the top ten are grouped as Other.",
-          x = 0,
-          y = -0.22,
-          xref = "paper",
-          yref = "paper",
-          showarrow = FALSE,
-          xanchor = "left",
-          align = "left",
-          font = list(size = 11, color = "#555")
-        ))
+        hoverlabel = list(align = "left")
       )
     })
 
@@ -443,7 +433,13 @@ cancellationsServer <- function(id, sections, error_handler = NULL) {
       tagList(
         if (no_cancelled_sections) no_data_callout,
         tabsetPanel(
-          tabPanel("Cancelled Sections", reactable::reactableOutput(session$ns("cn_cancelled_sections"))),
+          tabPanel("Cancelled Sections",
+            subtab_header("Cancelled Sections",
+              "Every cancelled section in the filters' scope.",
+              method = tags$p(paste(
+                "One row per cancelled (status C) section row. Removed (R) and suspended (S) sections",
+                "are not listed; the scope bar counts them."))),
+            reactable::reactableOutput(session$ns("cn_cancelled_sections"))),
           tabPanel("By Department",
             subtab_header("By Department",
               "Which departments had the most sections cancelled in the selected terms.",
@@ -454,9 +450,22 @@ cancellationsServer <- function(id, sections, error_handler = NULL) {
                 "cancelled sections are not listed. A count is not a rate: a department that schedules",
                 "more sections has more to cancel."))),
             uiOutput(session$ns("cn_dept_term_ui"))),
-          tabPanel("Timing", plotOutput(session$ns("cn_timing_plot"))),
-          tabPanel("Common Courses", reactable::reactableOutput(session$ns("cn_common_courses"))),
+          tabPanel("Timing",
+            subtab_header("Timing", "How long before the start of term each department cancelled.",
+              method = uiOutput(session$ns("cn_timing_method"))),
+            plotOutput(session$ns("cn_timing_plot"))),
+          tabPanel("Common Courses",
+            subtab_header("Common Courses", "Which courses are cancelled term after term.",
+              method = tags$p(paste(
+                "Courses ranked by cancelled sections across the selected terms, then by the number",
+                "of terms with a cancellation, grouped by campus and college."))),
+            reactable::reactableOutput(session$ns("cn_common_courses"))),
           tabPanel("Trends",
+            subtab_header("Trends", "How many sections each department cancelled, term by term.",
+              method = tags$p(paste(
+                "Every term in the data, not only the selected terms: a Fall, Spring or Summer choice",
+                "is kept, specific terms are ignored. Departments outside the ten with the most",
+                "cancellations are grouped as Other."))),
             plotly::plotlyOutput(session$ns("cn_trends_plot"), height = "480px"),
             reactable::reactableOutput(session$ns("cn_trends_table"))
           )

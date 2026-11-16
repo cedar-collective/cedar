@@ -8,7 +8,7 @@ parent: Developer Guide
 
 This reference is auto-generated from roxygen2 comments in the source code.
 
-*Generated: 2026-11-15 21:23:01.780429*
+*Generated: 2026-11-15 22:03:42.430078*
 
 ---
 
@@ -2127,11 +2127,30 @@ Terms shown on descriptive charts that are not yet complete  Descriptive enrollm
 
 ---
 
-### `cedar_in_progress_note()`
+### `cedar_scope_time_facts()`
 
 *Source: data-edges.R*
 
-**One-sentence description of in-progress terms, for a page note**
+**A page's time scope, as short facts for its data scope bar**
+
+A page's time scope, as short facts for its data scope bar  Facts only, one chip each (`scope_chip()`): which terms are still in progress, as of which pull, and the last graded term. What a term in progress means for the numbers is [cedar_in_progress_meaning()], which goes in the scope bar's collapsed part, never in the visible line.
+
+**Parameters:**
+
+- `in_progress` - Output of [cedar_in_progress_terms()].
+- `edges` - Output of [cedar_data_edges()].
+
+**Returns:** Named list of character vectors: `In progress` (one per term, absent when none) and `Grades through` (absent when nothing is graded).
+
+---
+
+### `cedar_in_progress_meaning()`
+
+*Source: data-edges.R*
+
+**What a term in progress means for a page's numbers, for the scope bar's**
+
+What a term in progress means for a page's numbers, for the scope bar's collapsed part
 
 **Parameters:**
 
