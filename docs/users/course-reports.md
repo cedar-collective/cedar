@@ -228,6 +228,24 @@ measured covariates (ACT, high-school GPA, Pell eligibility, first-generation
 share and the rest) at each student's first selected term. A substantial
 difference says the gap describes who is placed into the course.
 
+**Against Similar Students** narrows the comparison to students like the
+takers: the same term, home campus, high-school GPA band and full- or
+part-time status. It pools the selected terms and reports return, the DFW
+share of the takers' other courses that term, and next-term GPA, each beside
+the rate the takers would have had at their similar peers' rates.
+**Similar students compared** chooses those peers:
+
+- **Everyone else**: every similar student who did not take the course.
+- **In a Gen Ed course**: only similar students who took a Gen Ed course that
+  term (the institution's Gen Ed list) and not this one. For a course outside
+  Gen Ed, such as a first-year seminar, this asks whether its students did
+  better than students like them in Gen Ed courses. The page says what share
+  of the population that is; most first-semester freshmen take a Gen Ed
+  course, so the two choices usually differ little.
+
+Either way the cells remove term, campus, high-school GPA and time status and
+nothing else: placement, advising and motivation are not in them.
+
 ---
 
 ## Downstream

@@ -8,7 +8,7 @@ parent: Developer Guide
 
 This reference is auto-generated from roxygen2 comments in the source code.
 
-*Generated: 2026-11-16 15:34:54.08848*
+*Generated: 2026-11-16 17:15:43.512872*
 
 ---
 
@@ -1126,9 +1126,9 @@ Course Sequence Effect  Compares grades in course Y between students who passed 
 - `student_terms` - `cedar_student_terms`.
 - `attempts` - `cedar_attempts`.
 - `applicants` - `cedar_applicants` (the high-school GPA band).
-- `opt` - `classification` (one or more `student_classification` values; required), `course` (course ids; NULL reads every course with `min_n` takers), `term` (anchor terms; default every term to the settled edge), `campus` (home campuses; NULL keeps every campus, each its own cell), `grain` (`"course"`, the default, or `"instructor"`: a course's takers by the instructor of their attempt, against the course's non-takers), `by_term` (TRUE gives one row per anchor term as well, with `term` after the course: the same comparison term by term, for change over time; default FALSE pools the terms), `min_n` (smallest covered taker count a row needs; default 30), `min_cell_n` (smallest non-taker count a cell needs; default 5), `data_edges` (`cedar_data_edges()` output, required).
+- `opt` - `classification` (one or more `student_classification` values; required), `course` (course ids; NULL reads every course with `min_n` takers), `term` (anchor terms; default every term to the settled edge), `campus` (home campuses; NULL keeps every campus, each its own cell), `grain` (`"course"`, the default, or `"instructor"`: a course's takers by the instructor of their attempt, against the course's non-takers), `by_term` (TRUE gives one row per anchor term as well, with `term` after the course: the same comparison term by term, for change over time; default FALSE pools the terms), `comparison_courses` (course ids: the non-takers are only members with a classified attempt in one of them that term; NULL, the default, every member without a row in the course), `min_n` (smallest covered taker count a row needs; default 30), `min_cell_n` (smallest non-taker count a cell needs; default 5), `data_edges` (`cedar_data_edges()` output, required).
 
-**Returns:** A tibble, one row per `course` (and `instructor_id`, `instructor_name` at the instructor grain): `n_takers`, `n_covered`, `n_terms`; `return_n`, `return_pct`, `return_expected_pct`, `return_gap`, `return_gap_se`; `other_attempts`, `other_dfw_pct`, `other_dfw_expected_pct`, `other_dfw_gap`; `next_gpa_n`, `next_gpa`, `next_gpa_expected`, `next_gpa_gap`. Gaps are actual minus expected (a positive DFW gap is worse); an outcome with nothing observable is NA. Attributes: `edge`, `graded_edge`, `n_population_student_terms`, `cells` (the cell columns), `suppressed` (rows under `min_n`).
+**Returns:** A tibble, one row per `course` (and `instructor_id`, `instructor_name` at the instructor grain): `n_takers`, `n_covered`, `n_terms`; `return_n`, `return_pct`, `return_expected_pct`, `return_gap`, `return_gap_se`; `other_attempts`, `other_dfw_pct`, `other_dfw_expected_pct`, `other_dfw_gap`; `next_gpa_n`, `next_gpa`, `next_gpa_expected`, `next_gpa_gap`. Gaps are actual minus expected (a positive DFW gap is worse); an outcome with nothing observable is NA. Attributes: `edge`, `graded_edge`, `n_population_student_terms`, `cells` (the cell columns), `suppressed` (rows under `min_n`), `comparison_courses` (as given, NULL for every non-taker), `n_comparison_student_terms` (the members who may stand as non-takers: every member without comparison courses).
 
 ---
 

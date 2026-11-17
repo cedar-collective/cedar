@@ -24,6 +24,12 @@
 #                    It is conditional on returning, so it is read beside the
 #                    return gap, never instead of it.
 #
+# Who the non-takers are: by default every member of the cell without a row
+# in the course. With `comparison_courses` (Gen Ed, say), only members with a
+# classified attempt in one of those courses that term: "students like them
+# in Gen Ed courses", not "students like them". The takers are the same
+# either way; a taker who also took a comparison course is a taker.
+#
 # A taker is a member with a classified attempt (pass or DFW) of the course
 # in the anchor term, on any campus. A member whose only rows are an early
 # drop or an ungraded registration is neither a taker nor a non-taker of
@@ -56,6 +62,9 @@
 #'   `by_term` (TRUE gives one row per anchor term as well, with `term`
 #'   after the course: the same comparison term by term, for change over
 #'   time; default FALSE pools the terms),
+#'   `comparison_courses` (course ids: the non-takers are only members with
+#'   a classified attempt in one of them that term; NULL, the default, every
+#'   member without a row in the course),
 #'   `min_n` (smallest covered taker count a row needs; default 30),
 #'   `min_cell_n` (smallest non-taker count a cell needs; default 5),
 #'   `data_edges` (`cedar_data_edges()` output, required).
@@ -67,7 +76,10 @@
 #'   `next_gpa_expected`, `next_gpa_gap`. Gaps are actual minus expected (a
 #'   positive DFW gap is worse); an outcome with nothing observable is NA.
 #'   Attributes: `edge`, `graded_edge`, `n_population_student_terms`,
-#'   `cells` (the cell columns), `suppressed` (rows under `min_n`).
+#'   `cells` (the cell columns), `suppressed` (rows under `min_n`),
+#'   `comparison_courses` (as given, NULL for every non-taker),
+#'   `n_comparison_student_terms` (the members who may stand as non-takers:
+#'   every member without comparison courses).
 get_course_similar_students <- function(student_terms, attempts, applicants, opt = list()) {
   classification <- opt$classification
   if (is.null(classification) || length(classification) == 0L) {
@@ -129,6 +141,14 @@ get_course_similar_students <- function(student_terms, attempts, applicants, opt
     )
   cedar_debug("[course-similar-students.R] ", nrow(members), " member student-terms to ", edge)
 
+  comparison <- opt$comparison_courses
+  if (!is.null(comparison)) {
+    comparison <- unique(as.character(comparison))
+    if (length(comparison) == 0L || anyNA(comparison)) {
+      stop("[course-similar-students.R] opt$comparison_courses must name at least one course.", call. = FALSE)
+    }
+  }
+
   # CAMPUS_ROLLUP: a student took the course wherever it was taught; the grain
   # kept is the student's home campus (student_campus), which is in the cell.
   touched <- attempts %>%
@@ -146,28 +166,44 @@ get_course_similar_students <- function(student_terms, attempts, applicants, opt
     left_join(totals, by = c("student_id", "term")) %>%
     mutate(tot_att = if_else(term <= graded_edge, coalesce(tot_att, 0L), 0L),
            tot_dfw = if_else(term <= graded_edge, coalesce(tot_dfw, 0L), 0L))
+  # Who may stand as a non-taker (see the header).
+  members$in_comparison <- if (is.null(comparison)) TRUE else {
+    holders <- touched %>% filter(course %in% comparison, att > 0L) %>% distinct(student_id, term)
+    paste(members$student_id, members$term) %in% paste(holders$student_id, holders$term)
+  }
 
   measures <- c("n", "ret_obs", "ret", "gpa_n", "gpa_sum", "tot_att", "tot_dfw")
   cells <- members %>%
+    filter(in_comparison) %>%
     group_by(across(all_of(cell_cols))) %>%
     summarize(n = n(), across(all_of(measures[-1]), sum), .groups = "drop") %>%
     rename_with(~ paste0(.x, ".cell"), all_of(measures))
 
   if (!is.null(opt$course)) touched <- touched %>% filter(course %in% as.character(opt$course))
   touched <- touched %>%
-    inner_join(members %>% select(student_id, term, all_of(cell_cols[-1]), all_of(measures[-1])),
+    inner_join(members %>% select(student_id, term, all_of(cell_cols[-1]), all_of(measures[-1]), in_comparison),
                by = c("student_id", "term")) %>%
     mutate(n = 1L, taker = att > 0L,
            # A taker's other courses: the term's attempts less this course's.
            other_att = if_else(term <= graded_edge, tot_att - att, 0L),
            other_dfw = if_else(term <= graded_edge, tot_dfw - dfw, 0L))
 
-  # The non-takers of each course in each cell: the cell less everyone with a
-  # row in the course, and the rate they supply.
-  non_takers <- touched %>%
+  # The non-takers of each course in each cell: the cell (its comparison
+  # members) less those of them with a row in the course, and the rate they
+  # supply. A cell where none of a course's holders is a comparison member
+  # subtracts nothing.
+  holder_sums <- touched %>%
+    filter(in_comparison) %>%
     group_by(course, across(all_of(cell_cols))) %>%
-    summarize(across(all_of(measures), sum), .groups = "drop") %>%
-    inner_join(cells, by = cell_cols) %>%
+    summarize(across(all_of(measures), sum), .groups = "drop")
+  non_takers <- touched %>%
+    distinct(course, across(all_of(cell_cols))) %>%
+    left_join(holder_sums, by = c("course", cell_cols)) %>%
+    mutate(across(all_of(measures), ~ coalesce(as.numeric(.x), 0))) %>%
+    # A cell with no comparison member has no non-takers: its takers are
+    # not covered, never dropped.
+    left_join(cells, by = cell_cols) %>%
+    mutate(across(ends_with(".cell"), ~ coalesce(as.numeric(.x), 0))) %>%
     transmute(
       course, across(all_of(cell_cols)),
       nt_n = n.cell - n,
@@ -226,6 +262,8 @@ get_course_similar_students <- function(student_terms, attempts, applicants, opt
   attr(result, "n_population_student_terms") <- nrow(members)
   attr(result, "cells") <- cell_cols
   attr(result, "suppressed") <- suppressed
+  attr(result, "comparison_courses") <- comparison
+  attr(result, "n_comparison_student_terms") <- sum(members$in_comparison)
   cedar_debug("[course-similar-students.R] ", nrow(result), " rows (", nrow(suppressed), " under min_n = ", min_n, ")")
   result
 }
