@@ -120,12 +120,6 @@ test_that("the scenario fails loudly rather than guessing", {
   )
   expect_error(
     build_enrollment_projection_scenario(
-      bundle, opt = list(population_group = "Health Professions (Clinical)")
-    ),
-    "A programs table is required"
-  )
-  expect_error(
-    build_enrollment_projection_scenario(
       bundle, opt = list(major_codes = "NURS", horizon_years = 0L)
     ),
     "horizon_years must be at least 1"
@@ -145,7 +139,7 @@ test_that("the scenario fails loudly rather than guessing", {
 test_that("meta states the assumption and names the population", {
   bundle <- scenario_test_bundle(scenario_test_composition)
   scenario <- build_enrollment_projection_scenario(
-    bundle, programs = test_programs_hp,
+    bundle,
     opt = list(group_id = "all_saved",
                population_group = "Health Professions (Clinical)",
                growth_rate = 0.10, min_population_cohort = 1L)

@@ -201,13 +201,15 @@ CEDAR_CONFIG_FILE_SPECS <- list(
   # dissertation, honors-credit, independent study and the like. notes is free
   # text for why.
   excluded_courses = c("subject_course", "notes"),
-  # One row per (group, program name). description is the same on every row of
+  # One row per (group, program code). description is the same on every row of
   # a group and is shown as the selector's option label. default_for names the
   # surfaces this group is preselected on, |-separated from
   # CEDAR_POPULATION_GROUP_SURFACES; each surface at most once across the file.
-  # Groups declare program NAMES, resolved to codes against cedar_programs at
-  # run time (population_group_major_codes()).
-  population_groups = c("group", "description", "default_for", "program_name"),
+  # A group lists declared program codes from programs.csv, never names (one
+  # Banner name covers several programs): a renamed program's other codes join
+  # through code_history.csv and its pre-majors through leads_to
+  # (population_group_major_codes()).
+  population_groups = c("group", "description", "default_for", "program_code"),
   # Enrollment-projection monitoring scopes. campuses: |-separated codes from
   # campuses.csv, the market the group projects (branch campuses never enter
   # it). include_gen_ed: TRUE adds every gen_ed_courses.csv course to the group,
@@ -441,12 +443,22 @@ validate_excluded_courses <- function(df) {
 
 #' Check population_groups.csv
 #'
+#' @param df The table as read.
+#' @param programs programs.csv as read: every code must be one of its
+#'   declared programs (a pre-major joins through its leads_to, never by name).
 #' @return The table, if valid. Stops listing every problem otherwise.
-validate_population_groups <- function(df) {
+validate_population_groups <- function(df, programs) {
   problems <- character(0)
   blank <- function(x) is.na(x) | !nzchar(x)
   if (any(blank(df$group))) problems <- c(problems, "population_groups.csv: blank group")
-  if (any(blank(df$program_name))) problems <- c(problems, "population_groups.csv: blank program_name")
+  if (any(blank(df$program_code))) problems <- c(problems, "population_groups.csv: blank program_code")
+  codes <- df$program_code[!blank(df$program_code)]
+  unknown <- unique(setdiff(codes, programs$program_code))
+  if (length(unknown)) problems <- c(problems, paste("population_groups.csv: a program_code programs.csv does not have:",
+                                                     paste(unknown, collapse = ", ")))
+  pre <- unique(intersect(codes, programs$program_code[programs$is_pre_major == "TRUE"]))
+  if (length(pre)) problems <- c(problems, paste("population_groups.csv: a pre-major code (list the program it leads to; pre-majors join through leads_to):",
+                                                 paste(pre, collapse = ", ")))
   one_per_group <- function(col) {
     n <- tapply(df[[col]], df$group, function(x) length(unique(x)))
     names(n)[n > 1]
@@ -456,7 +468,7 @@ validate_population_groups <- function(df) {
   if (any(blank(df$description))) problems <- c(problems, "population_groups.csv: blank description")
   multi <- one_per_group("default_for")
   if (length(multi)) problems <- c(problems, paste("population_groups.csv: default_for differs within group", paste(multi, collapse = ", ")))
-  key <- paste(df$group, df$program_name, sep = " / ")
+  key <- paste(df$group, df$program_code, sep = " / ")
   d <- unique(key[duplicated(key)])
   if (length(d)) problems <- c(problems, paste("population_groups.csv: duplicate program in a group:", paste(d, collapse = "; ")))
   per_group <- df[!duplicated(df$group), c("group", "default_for")]

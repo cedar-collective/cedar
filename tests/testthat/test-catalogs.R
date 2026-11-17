@@ -602,11 +602,12 @@ test_that("the Gen Ed and excluded validators report every problem at once", {
 
 test_that("the population group registry is the institution's population_groups.csv", {
   dir <- cedar_institution_dir(cedar_base_dir, "unm")
-  pg <- validate_population_groups(read_institution_file("population_groups", dir))
+  pg <- validate_population_groups(read_institution_file("population_groups", dir),
+                                   read_institution_file("programs", dir))
   expect_equal(names(CEDAR_POPULATION_GROUPS), unique(pg$group))
   for (id in names(CEDAR_POPULATION_GROUPS)) {
     rows <- pg[pg$group == id, ]
-    expect_equal(CEDAR_POPULATION_GROUPS[[id]]$programs, unique(rows$program_name), info = id)
+    expect_equal(CEDAR_POPULATION_GROUPS[[id]]$codes, unique(rows$program_code), info = id)
     expect_equal(CEDAR_POPULATION_GROUPS[[id]]$description, rows$description[[1]], info = id)
   }
   # The preselected groups come from default_for, one per surface.
@@ -622,10 +623,12 @@ test_that("the population group registry is the institution's population_groups.
   expect_false(any(grepl(paste0('"', unique(pg$group), '"', collapse = "|"), code_lines)))
 })
 
-test_that("the demo institution's population groups load and name fixture programs", {
+test_that("the demo institution's population groups load and list its programs", {
   dir <- cedar_institution_dir(cedar_base_dir, "demo")
-  pg <- validate_population_groups(read_institution_file("population_groups", dir))
-  expect_true(all(pg$program_name %in% test_programs$program_name))
+  pg <- validate_population_groups(read_institution_file("population_groups", dir),
+                                   read_institution_file("programs", dir))
+  # The demo's codes are the fixtures' without the degree suffix (dev/demo-data.R).
+  expect_true(all(pg$program_code %in% sub("-[A-Z]+$", "", test_programs$major_code)))
   expect_true(all(c("pathways", "scenario") %in% unlist(strsplit(pg$default_for, "|", fixed = TRUE))))
 })
 
@@ -635,13 +638,17 @@ test_that("the population group validator reports every problem at once", {
   utils::write.csv(data.frame(group = c("A", "A", "A", "B", "B", "C"),
                               description = c("Group A", "Group A", "Group A", "Group B", "Group B!", ""),
                               default_for = c("pathways", "pathways", "pathways", "pathways|sidebar", "pathways|sidebar", ""),
-                              program_name = c("History", "History", "", "Nursing", "Biology", "Mathematics")),
+                              program_code = c("HIST", "HIST", "", "NOPE", "FNRS", "MATH")),
                    file.path(dir, "population_groups.csv"), row.names = FALSE)
-  err <- tryCatch(validate_population_groups(read_institution_file("population_groups", dir)), error = conditionMessage)
-  expect_match(err, "blank program_name")
+  unm_programs <- read_institution_file("programs", cedar_institution_dir(cedar_base_dir, "unm"))
+  err <- tryCatch(validate_population_groups(read_institution_file("population_groups", dir),
+                                             unm_programs), error = conditionMessage)
+  expect_match(err, "blank program_code")
+  expect_match(err, "a program_code programs.csv does not have: NOPE")
+  expect_match(err, "a pre-major code .*: FNRS")
   expect_match(err, "more than one description for group B")
   expect_match(err, "blank description")
-  expect_match(err, "duplicate program in a group: A / History")
+  expect_match(err, "duplicate program in a group: A / HIST")
   expect_match(err, "default_for must be pathways, scenario .*found sidebar")
   expect_match(err, "more than one group is default_for pathways")
 })

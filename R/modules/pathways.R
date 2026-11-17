@@ -91,7 +91,7 @@ pathways_focal_program_rows <- function(facts) {
                    fmt_term(renames$effective_term)), collapse = "; ")
     ),
     row("Pre-majors (programs.csv): ", "pre_major"),
-    tags$br(), tags$strong("Matched on: "), "program code",
+    tags$br(), tags$strong("Matched on: "), "major code",
     tags$span(class = "text-muted-sm", " (Major + Second Major records)")
   )
 }
@@ -273,9 +273,8 @@ populationSelectorServer <- function(id, programs, dims, degrees = NULL, student
 
       opt <- if (type == "preset") {
         preset <- CEDAR_POPULATION_GROUPS[[input$preset]]
-        programs_selected <- preset$programs
-        req(length(programs_selected) > 0)
-        list(type = "preset", program_names = programs_selected,
+        req(length(preset$codes) > 0)
+        list(type = "preset", program_codes = preset$codes,
              outcomes = scope_outcomes)
 
       } else if (type == "dept") {
@@ -1449,7 +1448,6 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
               if (length(college_programs) > 0) {
                 bench_opt <- opt
                 bench_opt$type <- "major"
-                bench_opt$program_names <- NULL
                 bench_opt$dept_code <- NULL
                 bench_opt$program_codes <- college_programs
                 bench_pop <- build_population(

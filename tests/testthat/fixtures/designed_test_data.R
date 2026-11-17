@@ -72,24 +72,23 @@
 #          counted. The full
 #          table is beside the rows.
 #
-#   HP01 — cedar_programs_hp (20 rows). Named population groups resolving to
-#          Banner codes, covering all three ways a pre-major is reached (or
-#          missed). Used by test-population-groups.R.
-#          Radiologic Sciences: RADS declared (2) + FRAD pre-major (3) — SAME
-#            program_name, different code. Name matching must capture both; a
-#            group built from declared codes alone loses 3 of 5 students.
-#          Nursing: NURS declared (2) + FNRS pre-major (4) — same name AND
-#            programs.csv leads FNRS to NURS, so both mechanisms agree.
+#   HP01 — cedar_programs_hp (21 rows). Named population groups resolving to
+#          Banner codes: a group lists declared codes (population_groups.csv)
+#          and reaches its pre-majors through programs.csv leads_to, never a
+#          name (ISSUES I7, M56). Used by test-population-groups.R.
+#          Radiologic Sciences: RADS declared (2) + FRAD pre-major (3) — FRAD
+#            leads to RADS; a group listing RADS alone, with no leads_to, would
+#            lose 3 of 5 students.
+#          Nursing: NURS declared (2) + FNRS pre-major (4), FNRS leading to NURS.
 #          Medical Laboratory Sciences: MEDL declared (2); Medical Laboratory
-#            Science (singular): FMDL pre-major (2) — a name that has DRIFTED
-#            from its major's. It is reached because the registry lists both
-#            spellings (and, in UNM's files, because FMDL leads to MEDL). This is
-#            the fix for ISSUES.md I7 in miniature: with neither, 2 students
-#            vanish silently.
-#          Radiologic Science (singular): XRAD pre-major (2) — the SAME drift
-#            with no registry entry, i.e. the next one nobody has noticed yet.
-#            It must NOT be captured, and population_group_audit() must report
-#            it as a near miss so a human can decide.
+#            Science (singular): FMDL pre-major (2) — a DRIFTED name, reached
+#            because FMDL leads to MEDL. The name plays no part.
+#          Radiologic Science (singular): XRAD pre-major (2), in no file — the
+#            next drift nobody has decided. It must NOT be captured, and
+#            population_group_audit() reports it as a near miss.
+#          Nursing: XNUR declared (1), a code Banner added under a group
+#            program's name and population_groups.csv does not list. It must
+#            NOT join the group, and the audit reports it.
 #          Biology: BIOL declared (3) — a non-health control that must never
 #            resolve into a health group.
 #
@@ -4534,18 +4533,20 @@ cedar_degrees_roadblocks <- cedar_degrees[1, ] %>%
 }
 
 cedar_programs_hp <- dplyr::bind_rows(
-  # Same name, different code: only name matching reaches FRAD.
+  # Same name, different code: FRAD is reached through its leads_to.
   .hp_row(c("HP_RADS_1", "HP_RADS_2"), "Radiologic Sciences", "RADS", FALSE, "RADS"),
   .hp_row(c("HP_FRAD_1", "HP_FRAD_2", "HP_FRAD_3"), "Radiologic Sciences", "FRAD", TRUE, "FRAD"),
-  # Same name AND a leads_to in programs.csv: both mechanisms agree.
+  # Same name AND a leads_to in programs.csv: the leads_to joins them.
   .hp_row(c("HP_NURS_1", "HP_NURS_2"), "Nursing", "NURS", FALSE, "NURS"),
   .hp_row(c("HP_FNRS_1", "HP_FNRS_2", "HP_FNRS_3", "HP_FNRS_4"), "Nursing", "FNRS", TRUE, "NURS"),
-  # Drifted name, no canon entry: unreachable, and must be REPORTED not guessed.
+  # Drifted name; FMDL leads to MEDL, so the drift costs nothing.
   .hp_row(c("HP_MEDL_1", "HP_MEDL_2"), "Medical Laboratory Sciences", "MEDL", FALSE, "MEDL"),
   .hp_row(c("HP_FMDL_1", "HP_FMDL_2"), "Medical Laboratory Science", "FMDL", TRUE, "FMDL"),
   # The same drift with NO registry entry: unreachable by either mechanism, and
   # therefore something the audit has to surface rather than quietly lose.
   .hp_row(c("HP_XRAD_1", "HP_XRAD_2"), "Radiologic Science", "XRAD", TRUE, "XRAD"),
+  # A declared variant Banner added under "Nursing" that no group lists.
+  .hp_row("HP_XNUR_1", "Nursing", "XNUR", FALSE, "NURS"),
   # Control: never resolves into a health group.
   .hp_row(c("HP_BIOL_1", "HP_BIOL_2", "HP_BIOL_3"), "Biology", "BIOL", FALSE, "BIOL")
 )

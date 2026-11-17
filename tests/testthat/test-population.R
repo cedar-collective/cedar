@@ -36,7 +36,7 @@ test_that("build_population returns data frame with required columns", {
   programs <- population_programs
   result <- build_population(programs,
                              opt = list(type = "preset",
-                                        program_names = c("Nursing", "Public Health")))
+                                        program_codes = c("NURS", "POHE")))
   expect_s3_class(result, "data.frame")
   expect_true(all(c("student_id", "population_label", "outcome",
                     "origin", "entry_method", "entry_status",
@@ -52,11 +52,15 @@ test_that("build_population stops on unknown type", {
   )
 })
 
-test_that("build_population errors without program_names for preset type", {
+test_that("a preset population selects by code, never by name", {
   programs <- population_programs
   expect_error(
     build_population(programs, opt = list(type = "preset")),
-    "program_names is required"
+    "program_codes is required"
+  )
+  expect_error(
+    build_population(programs, opt = list(type = "preset", program_names = "Nursing")),
+    "selects by major code"
   )
 })
 
@@ -65,7 +69,7 @@ test_that("build_population errors on unknown outcome value", {
   expect_error(
     build_population(programs,
                      opt = list(type = "preset",
-                                program_names = "Nursing",
+                                program_codes = "NURS",
                                 outcomes = "banana")),
     "Unknown outcome values"
   )
@@ -80,7 +84,7 @@ test_that("default scope includes declared majors (outcome = ongoing in single-t
   programs <- population_programs
   pop <- build_population(programs,
                           opt = list(type = "preset",
-                                     program_names = c("Nursing", "Public Health")))
+                                     program_codes = c("NURS", "POHE")))
   # With all records in one term (max_data_term), declared students are "ongoing"
   expect_setequal(pop$student_id, c("S001", "S002", "S006", "S007"))
   expect_true(all(pop$population_label == "preset"))
@@ -91,7 +95,7 @@ test_that("default scope omits pre-major-only students", {
   programs <- population_programs
   pop <- build_population(programs,
                           opt = list(type = "preset",
-                                     program_names = c("Nursing", "Public Health")))
+                                     program_codes = c("NURS", "POHE")))
   expect_false("S003" %in% pop$student_id)
   expect_false("S004" %in% pop$student_id)
 })
@@ -100,7 +104,7 @@ test_that("default scope omits students with no focal program", {
   programs <- population_programs
   pop <- build_population(programs,
                           opt = list(type = "preset",
-                                     program_names = c("Nursing", "Public Health")))
+                                     program_codes = c("NURS", "POHE")))
   expect_false("S005" %in% pop$student_id)
   expect_false("S008" %in% pop$student_id)
 })
@@ -109,7 +113,7 @@ test_that("Second Major counts as a declared major", {
   programs <- population_programs
   pop <- build_population(programs,
                           opt = list(type = "preset",
-                                     program_names = c("Nursing")))
+                                     program_codes = "NURS"))
   expect_true("S006" %in% pop$student_id)  # S006 has Nursing as Second Major
 })
 
@@ -117,7 +121,7 @@ test_that("one row per student", {
   programs <- population_programs
   pop <- build_population(programs,
                           opt = list(type = "preset",
-                                     program_names = c("Nursing", "Public Health")))
+                                     program_codes = c("NURS", "POHE")))
   expect_equal(nrow(pop), n_distinct(pop$student_id))
 })
 
@@ -130,7 +134,7 @@ test_that("pre-major sub-outcomes give pre-major-only students", {
   programs <- population_programs
   pop <- build_population(programs,
                           opt = list(type = "preset",
-                                     program_names = c("Nursing", "Public Health"),
+                                     program_codes = c("NURS", "POHE"),
                                      outcomes = c("chose_elsewhere", "left_undeclared")))
   expect_true("S003" %in% pop$student_id)
   expect_true("S004" %in% pop$student_id)
@@ -142,7 +146,7 @@ test_that("pre-major scope excludes declared students", {
   programs <- population_programs
   pop <- build_population(programs,
                           opt = list(type = "preset",
-                                     program_names = c("Nursing", "Public Health"),
+                                     program_codes = c("NURS", "POHE"),
                                      outcomes = c("chose_elsewhere", "left_undeclared")))
   expect_false("S001" %in% pop$student_id)
   expect_false("S002" %in% pop$student_id)
@@ -152,7 +156,7 @@ test_that("S007 is not in pre-major scope (has both declared and pre in same ter
   programs <- population_programs
   pop <- build_population(programs,
                           opt = list(type = "preset",
-                                     program_names = c("Nursing", "Public Health"),
+                                     program_codes = c("NURS", "POHE"),
                                      outcomes = c("chose_elsewhere", "left_undeclared")))
   expect_false("S007" %in% pop$student_id)
 })
@@ -166,7 +170,7 @@ test_that("all outcomes includes both declared and pre-major students", {
   programs <- population_programs
   pop <- build_population(programs,
                           opt = list(type = "preset",
-                                     program_names = c("Nursing", "Public Health"),
+                                     program_codes = c("NURS", "POHE"),
                                      outcomes = c("ongoing", "chose_elsewhere", "left_undeclared",
                                                   "graduated", "switched_out", "stopped_out")))
   expect_setequal(pop$student_id, c("S001", "S002", "S003", "S004", "S006", "S007"))
@@ -176,7 +180,7 @@ test_that("all outcomes still excludes non-focal students", {
   programs <- population_programs
   pop <- build_population(programs,
                           opt = list(type = "preset",
-                                     program_names = c("Nursing", "Public Health"),
+                                     program_codes = c("NURS", "POHE"),
                                      outcomes = c("ongoing", "chose_elsewhere", "left_undeclared",
                                                   "graduated", "switched_out", "stopped_out")))
   expect_false("S005" %in% pop$student_id)
@@ -192,7 +196,7 @@ test_that("split_by = outcome assigns distinct labels per outcome group", {
   programs <- population_programs
   pop <- build_population(programs,
                           opt = list(type = "preset",
-                                     program_names = c("Nursing", "Public Health"),
+                                     program_codes = c("NURS", "POHE"),
                                      outcomes = c("ongoing", "chose_elsewhere", "left_undeclared",
                                                   "graduated", "switched_out", "stopped_out"),
                                      split_by = "outcome"))
@@ -206,7 +210,7 @@ test_that("split_by = outcome: declared students labeled 'ongoing' in single-ter
   programs <- population_programs
   pop <- build_population(programs,
                           opt = list(type = "preset",
-                                     program_names = c("Nursing", "Public Health"),
+                                     program_codes = c("NURS", "POHE"),
                                      outcomes = c("ongoing", "chose_elsewhere", "left_undeclared",
                                                   "graduated", "switched_out", "stopped_out"),
                                      split_by = "outcome"))
@@ -224,7 +228,7 @@ test_that("split_by = entry assigns entry_method as label", {
   programs <- population_programs
   pop <- build_population(programs,
                           opt = list(type = "preset",
-                                     program_names = c("Nursing", "Public Health"),
+                                     program_codes = c("NURS", "POHE"),
                                      outcomes = c("ongoing", "chose_elsewhere", "left_undeclared",
                                                   "graduated", "switched_out", "stopped_out"),
                                      split_by = "entry"))
@@ -235,7 +239,7 @@ test_that("S007 gets entry_method = first_program, entry_status = major", {
   programs <- population_programs
   pop <- build_population(programs,
                           opt = list(type = "preset",
-                                     program_names = c("Nursing", "Public Health"),
+                                     program_codes = c("NURS", "POHE"),
                                      outcomes = c("ongoing", "chose_elsewhere", "left_undeclared",
                                                   "graduated", "switched_out", "stopped_out"),
                                      split_by = "entry"))
@@ -250,7 +254,7 @@ test_that("S003 and S004 (left_undeclared) get entry_method = first_program, ent
   programs <- population_programs
   pop <- build_population(programs,
                           opt = list(type = "preset",
-                                     program_names = c("Nursing", "Public Health"),
+                                     program_codes = c("NURS", "POHE"),
                                      outcomes = c("ongoing", "chose_elsewhere", "left_undeclared",
                                                   "graduated", "switched_out", "stopped_out"),
                                      split_by = "entry"))
@@ -266,7 +270,7 @@ test_that("split_by = entry_status distinguishes declared majors from pre-majors
   programs <- population_programs
   pop <- build_population(programs,
                           opt = list(type = "preset",
-                                     program_names = c("Nursing", "Public Health"),
+                                     program_codes = c("NURS", "POHE"),
                                      outcomes = c("ongoing", "chose_elsewhere", "left_undeclared",
                                                   "graduated", "switched_out", "stopped_out"),
                                      split_by = "entry_status"))
@@ -280,7 +284,7 @@ test_that("entry_method values are only first_program, switched_in, or unclear",
   programs <- population_programs
   pop <- build_population(programs,
                           opt = list(type = "preset",
-                                     program_names = c("Nursing", "Public Health"),
+                                     program_codes = c("NURS", "POHE"),
                                      outcomes = c("ongoing", "chose_elsewhere", "left_undeclared",
                                                   "graduated", "switched_out", "stopped_out")))
   expect_true(all(pop$entry_method %in% c("first_program", "switched_in", "unclear")))
@@ -303,7 +307,7 @@ test_that("students at min_data_term get entry_method = unclear", {
     student_population = c("Continuing Student", "Continuing Student")
   )
   pop <- build_population(trunc_programs,
-                          opt = list(type = "preset", program_names = "History"))
+                          opt = list(type = "preset", program_codes = "HIST"))
   trunc_row <- pop[pop$student_id == "TRUNC", ]
   expect_equal(trunc_row$entry_method, "unclear")
 })
@@ -312,7 +316,7 @@ test_that("no duplicate student IDs in split_by = entry mode", {
   programs <- population_programs
   pop <- build_population(programs,
                           opt = list(type = "preset",
-                                     program_names = c("Nursing", "Public Health"),
+                                     program_codes = c("NURS", "POHE"),
                                      outcomes = c("ongoing", "chose_elsewhere", "left_undeclared",
                                                   "graduated", "switched_out", "stopped_out"),
                                      split_by = "entry"))
@@ -328,7 +332,7 @@ test_that("ongoing students have relevant_until = NA", {
   programs <- population_programs
   pop <- build_population(programs,
                           opt = list(type = "preset",
-                                     program_names = c("Nursing", "Public Health")))
+                                     program_codes = c("NURS", "POHE")))
   ongoing <- pop[pop$outcome == "ongoing", ]
   expect_true(all(is.na(ongoing$relevant_until)))
 })
@@ -337,7 +341,7 @@ test_that("pre-major-only students have relevant_until = their last pre-major te
   programs <- population_programs
   pop <- build_population(programs,
                           opt = list(type = "preset",
-                                     program_names = c("Nursing", "Public Health"),
+                                     program_codes = c("NURS", "POHE"),
                                      outcomes = c("chose_elsewhere", "left_undeclared")))
   nd <- pop[pop$outcome %in% c("chose_elsewhere", "left_undeclared"), ]
   expect_true(all(!is.na(nd$relevant_until)))
@@ -350,7 +354,7 @@ test_that("current pre-major (last_unit_term == max_data_term) gets outcome = on
   # → hasn't had a chance to declare yet → should be "ongoing", not a pre-major sub-outcome
   pop <- build_population(test_programs,
                           opt = list(type = "preset",
-                                     program_names = "History",
+                                     program_codes = HIST_CODES,
                                      outcomes = c("ongoing", "chose_elsewhere", "left_undeclared",
                                                   "graduated", "switched_out", "stopped_out")))
   expect_equal(pop$outcome[pop$student_id == "STU-HP-SP2-001"], "ongoing")
@@ -361,7 +365,7 @@ test_that("historical pre-major (last_unit_term < max_data_term) gets left_undec
   # → never declared elsewhere → left_undeclared
   pop <- build_population(test_programs,
                           opt = list(type = "preset",
-                                     program_names = "History",
+                                     program_codes = HIST_CODES,
                                      outcomes = c("chose_elsewhere", "left_undeclared")))
   expect_equal(pop$outcome[pop$student_id == "STU-HP-FA1-001"], "left_undeclared")
 })
@@ -388,7 +392,7 @@ test_that("student with matching degree in last focal term gets outcome = gradua
 
   pop <- build_population(programs2, degrees = degrees,
                           opt = list(type = "preset",
-                                     program_names = c("Nursing", "Public Health"),
+                                     program_codes = c("NURS", "POHE"),
                                      outcomes = c("graduated", "switched_out", "stopped_out", "ongoing")))
 
   # S001: last focal term = 202510, has NURS degree in 202510 → graduated
@@ -406,7 +410,7 @@ test_that("student whose last focal term < max_data_term (no declared switch) ge
   # STU-HD-SP2-001 is HIST declared in 202110 = max_data_term → ongoing
   pop <- build_population(test_programs,
                           opt = list(type = "preset",
-                                     program_names = "History",
+                                     program_codes = HIST_CODES,
                                      outcomes = c("graduated", "switched_out", "stopped_out", "ongoing")))
   expect_equal(pop$outcome[pop$student_id == "STU-HD-SP1-005"], "stopped_out")
   expect_equal(pop$outcome[pop$student_id == "STU-HD-SP2-001"], "ongoing")
@@ -421,7 +425,7 @@ test_that("student who switched from non-focal to focal gets entry_method = swit
   # STU-ENGL-HIST-001: English (202010) → History (202110) → switched_in for HIST population
   pop <- build_population(test_programs,
                           opt = list(type = "preset",
-                                     program_names = "History"))
+                                     program_codes = HIST_CODES))
   expect_equal(pop$entry_method[pop$student_id == "STU-ENGL-HIST-001"], "switched_in")
 })
 
@@ -434,7 +438,7 @@ test_that("campus filter restricts cohort to specified campus", {
   programs <- population_programs
   pop <- build_population(programs,
                           opt = list(type = "preset",
-                                     program_names = c("Nursing", "Public Health"),
+                                     program_codes = c("NURS", "POHE"),
                                      campus = "V"))
   expect_equal(nrow(pop), 0)
 })
@@ -577,7 +581,7 @@ test_that("origin column is present in result", {
   programs <- population_programs
   pop <- build_population(programs,
                           opt = list(type = "preset",
-                                     program_names = c("Nursing", "Public Health")))
+                                     program_codes = c("NURS", "POHE")))
   expect_true("origin" %in% names(pop))
 })
 
@@ -585,7 +589,7 @@ test_that("S002 (Transfer Student) gets origin = 'transfer'", {
   programs <- population_programs
   pop <- build_population(programs,
                           opt = list(type = "preset",
-                                     program_names = c("Nursing", "Public Health")))
+                                     program_codes = c("NURS", "POHE")))
   expect_equal(pop$origin[pop$student_id == "S002"], "transfer")
 })
 
@@ -593,7 +597,7 @@ test_that("S001 (Continuing Student) gets origin = 'unm'", {
   programs <- population_programs
   pop <- build_population(programs,
                           opt = list(type = "preset",
-                                     program_names = c("Nursing", "Public Health")))
+                                     program_codes = c("NURS", "POHE")))
   expect_equal(pop$origin[pop$student_id == "S001"], "unm")
 })
 
@@ -601,7 +605,7 @@ test_that("missing student_population column yields origin = 'unknown'", {
   programs <- population_programs %>% select(-student_population)
   pop <- build_population(programs,
                           opt = list(type = "preset",
-                                     program_names = c("Nursing", "Public Health")))
+                                     program_codes = c("NURS", "POHE")))
   expect_true(all(pop$origin == "unknown"))
 })
 
@@ -609,7 +613,7 @@ test_that("split_by = transfer sets population_label to origin", {
   programs <- population_programs
   pop <- build_population(programs,
                           opt = list(type = "preset",
-                                     program_names = c("Nursing", "Public Health"),
+                                     program_codes = c("NURS", "POHE"),
                                      split_by = "transfer"))
   expect_true(all(pop$population_label == pop$origin))
   expect_true("transfer" %in% pop$population_label)
@@ -662,7 +666,7 @@ test_that("two programs sharing a name are two populations", {
 
   expect_error(build_population(test_programs,
                                 opt = list(type = "major", program_names = "History")),
-               "selects by program code")
+               "selects by major code")
   expect_error(build_population(test_programs, opt = list(type = "major")),
                "program_codes is required")
 })

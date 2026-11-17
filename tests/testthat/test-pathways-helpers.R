@@ -61,7 +61,7 @@ test_that("pathways_level_filter translates UI values to CEDAR level values", {
 test_that("filter_pathways_analysis_population excludes unclear entry rows only for entry split", {
   hist_pop <- build_population(
     test_programs, test_degrees,
-    opt = list(type = "preset", program_names = "History", split_by = "entry")
+    opt = list(type = "preset", program_codes = HIST_CODES, split_by = "entry")
   )
 
   filtered <- filter_pathways_analysis_population(hist_pop, split_by = "entry")
@@ -75,7 +75,7 @@ test_that("filter_pathways_analysis_population excludes unclear entry rows only 
 test_that("filter_pathways_analysis_population applies selected population label", {
   hist_pop <- build_population(
     test_programs, test_degrees,
-    opt = list(type = "preset", program_names = "History", split_by = "transfer")
+    opt = list(type = "preset", program_codes = HIST_CODES, split_by = "transfer")
   )
   label <- hist_pop$population_label[1]
 

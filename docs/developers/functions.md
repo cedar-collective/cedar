@@ -8,7 +8,7 @@ parent: Developer Guide
 
 This reference is auto-generated from roxygen2 comments in the source code.
 
-*Generated: 2026-11-16 15:02:43.881166*
+*Generated: 2026-11-16 15:34:54.08848*
 
 ---
 
@@ -4961,7 +4961,7 @@ Build a Student Population  Constructs a population data frame from cedar_progra
 - `programs` - Data frame. cedar_programs.
 - `degrees` - Data frame or NULL. cedar_degrees.
 - `student_terms` - Data frame or NULL. cedar_student_terms. Its `enrolled` rows supply the UNM-wide enrollment bookends and the enrollment-based continuation evidence; without it both bookends are NA and no candidate is reclassified. Never cedar_registrations: a waitlist or an early drop is not an enrolled term.
-- `opt` - List of options: type          — "preset", "dept", or "major". Default "preset". program_codes — required for the major type: program codes, each a declared program; a renamed program's other codes and its pre-majors are added by resolve_focal_programs(). program_names — required for the preset type (population_groups.csv names its programs), resolved to the codes whose declared rows carry the name. dept_code     — required for dept type. program_successions, premajor_leads_to — override the mapping files' program_successions and premajor_leads_to (tests and what-ifs). outcomes      — character vector of outcomes to include. Default: all six outcomes (graduated, switched_out, stopped_out, ongoing, chose_elsewhere, left_undeclared). split_by      — "none" (default), "outcome", "entry", "entry_status", or "transfer". When "entry", population_label is set to entry_method per student. When "entry_status", population_label is set to whether the student first appeared as a declared major or pre-major. When "transfer", population_label is set to origin per student. campus        — character vector. Filter by student_campus. Optional. student_level — character vector. Filter by student_level before outcome detection. Common values: "Undergraduate", "Graduate". When omitted, all levels are included and undergrad/grad students are mixed in a single population. Pass "Undergraduate" to build a clean undergrad cohort for a department that also has grad programs.
+- `opt` - List of options: type          — "preset", "dept", or "major". Default "preset". program_codes — required for the major type: program codes, each a declared program; a renamed program's other codes and its pre-majors are added by resolve_focal_programs(). For the preset type, program_codes are a population group's declared codes (population_group_codes()), resolved the same way. dept_code     — required for dept type. program_successions, premajor_leads_to — override the mapping files' program_successions and premajor_leads_to (tests and what-ifs). outcomes      — character vector of outcomes to include. Default: all six outcomes (graduated, switched_out, stopped_out, ongoing, chose_elsewhere, left_undeclared). split_by      — "none" (default), "outcome", "entry", "entry_status", or "transfer". When "entry", population_label is set to entry_method per student. When "entry_status", population_label is set to whether the student first appeared as a declared major or pre-major. When "transfer", population_label is set to origin per student. campus        — character vector. Filter by student_campus. Optional. student_level — character vector. Filter by student_level before outcome detection. Common values: "Undergraduate", "Graduate". When omitted, all levels are included and undergrad/grad students are mixed in a single population. Pass "Undergraduate" to build a clean undergrad cohort for a department that also has grad programs.
 
 **Returns:** Data frame with one row per student, carrying attr(, "focal_programs"): resolve_focal_programs()'s list of the codes counted and why.
 
@@ -4973,12 +4973,12 @@ Build a Student Population  Constructs a population data frame from cedar_progra
 
 **The program codes a population build counts, and why each is in**
 
-The program codes a population build counts, and why each is in  Codes, never names. The selected codes come from opt: the major type's `program_codes` as given, the dept type's declared codes whose own `dept_code` is the department, the preset type's declared codes carrying one of `program_names`. To those it adds every code a confirmed whole succession joins them to (code_history.csv, `program_successions`), then the pre-majors that lead to any of them (programs.csv `leads_to`; FFDA is named "FDMA" and leads to Film and Digital Arts, ISSUES.md I38) and, for a department, the department's own pre-major codes.
+The program codes a population build counts, and why each is in  Codes, never names. The selected codes come from opt: the major and preset types' `program_codes` as given (a preset's are a population group's), the dept type's declared codes whose own `dept_code` is the department. To those it adds every code a confirmed whole succession joins them to (code_history.csv, `program_successions`), then the pre-majors that lead to any of them (programs.csv `leads_to`; FFDA is named "FDMA" and leads to Film and Digital Arts, ISSUES.md I38) and, for a department, the department's own pre-major codes.
 
 **Parameters:**
 
 - `programs` - Data frame. cedar_programs, scoped to the eligible rows.
-- `opt` - List of options (type, program_codes, program_names, dept_code, and the program_successions / premajor_leads_to overrides).
+- `opt` - List of options (type, program_codes, dept_code, and the program_successions / premajor_leads_to overrides).
 
 **Returns:** A list: `codes`, a tibble of program_code and role ("selected", "succession" or "pre_major") with `leads_to` on a pre-major; and `successions`, the code_history.csv rows that joined codes (from_code, to_code, effective_term).
 
@@ -5013,6 +5013,14 @@ Build a Demographic Population  Identifies students based on demographic indicat
 - `surface` - One of CEDAR_POPULATION_GROUP_SURFACES ("pathways", "scenario").
 
 **Returns:** The group id population_groups.csv marks default_for that surface, else the first group in the file. Documented, not a silent fallback: a file that names no default for a surface gets its first group.
+
+---
+
+### `population_group_codes()`
+
+*Source: population.R*
+
+**The declared program codes population_groups.csv lists for a group**
 
 ---
 
@@ -5087,11 +5095,13 @@ Picker choices for program codes: one per program, renames joined  The one way a
 
 **Resolve a named population group to Banner major codes**
 
+Resolve a named population group to Banner major codes  The group's declared codes (population_groups.csv), every code a confirmed rename joins them to (code_history.csv), and the pre-majors that lead to any of them (programs.csv leads_to). Codes only: a Banner name joins nothing (ISSUES I62, M56).
+
 **Parameters:**
 
 - `group_id` - Name of an entry in CEDAR_POPULATION_GROUPS.
-- `programs` - cedar_programs. Required — the mapping lives in the data.
 - `include_pre_majors` - "lump" (default, declared + pre-major), "majors_only", or "pre_only". Matches build_population()'s vocabulary.
+- `successions,leads_to` - Override program_successions and premajor_leads_to (tests and what-ifs).
 
 **Returns:** Character vector of major codes, sorted.
 
@@ -5103,9 +5113,15 @@ Picker choices for program codes: one per program, renames joined  The one way a
 
 **Audit a named population group against real program data**
 
-Audit a named population group against real program data  Reports what the group actually resolved to, what it failed to match, and the near-miss names that a name-declared group is most likely to drop silently ("Medical Laboratory Science" beside "Medical Laboratory Sciences").
+Audit a named population group against real program data  A group lists codes, so what drifts is Banner adding a code the file does not list. The audit reports what the group resolved to, the codes no student holds, and the near misses a code list is most likely to leave out: a declared code sharing a group program's Banner name (a new online or campus variant), and a pre-major with no leads_to whose name matches a group program's once case, punctuation and a plural are set aside ("Radiologic Science" beside "Radiologic Sciences"). Each is for a person to decide in the file; none joins the group.
 
-**Returns:** A list: `codes`, `unmatched_names`, `near_miss`.
+**Parameters:**
+
+- `group_id` - Name of an entry in CEDAR_POPULATION_GROUPS.
+- `programs` - cedar_programs (major_code, program_name, is_pre_major).
+- `successions,leads_to` - As for population_group_major_codes().
+
+**Returns:** A list: `codes`, `unheld_codes`, `near_miss` (program_name, major_code, is_pre_major).
 
 ---
 

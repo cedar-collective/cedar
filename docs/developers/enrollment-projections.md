@@ -41,7 +41,7 @@ The rules an agent must not violate, each written out in full below. This is the
 - **Horizon, not season, decides which adjustments apply.** The Fall deltas read the term immediately before the target; two steps past the settled edge that term is itself unobserved, so the adjusted candidate carries the spine and the floor only and says so. Which season is the two-step target alternates through the year. A saturated prior term with no retained waitlist rows reports the spine as its own floor — an absence of evidence, never evidence that there is no latent demand.
 - **One bundle per season, never "the latest".** Spring and Fall publish separately and neither supersedes the other, so discovery is season-aware: `find_enrollment_projection_bundles()` lists what is saved and every loader names either a season or an exact target term. Picking the highest saved target term would hide Spring the day Fall publishes. Summer is refused at the builder — a different demand regime with no comparable evidence base.
 - **A growth scenario is arithmetic over saved rows, never a second forecast.** `build_enrollment_projection_scenario()` grows one named population's cohort and holds every other student in the course flat. Year 1 *is* the published projection at any growth rate; later years are labeled `Scenario`, carry no accuracy axes, and never borrow year 1's. Show the population's share of the course — 10% growth on 13% of a roster is a 1.3% course effect, and a reader who cannot see the share will assume the whole course grew.
-- **Named populations come from `CEDAR_POPULATION_GROUPS`** (`institution/<id>/population_groups.csv`, read by `R/lists/population-presets.R`), shared by Pathways and projections so a group means one thing everywhere. Groups declare *program names*; `population_group_major_codes()` resolves them to Banner codes through both name matching and each pre-major's `leads_to` in `programs.csv` (`premajor_leads_to`), because each alone misses real pre-majors. Never hand-list codes in a caller, and run `population_group_audit()` when adding a group — its `near_miss` output is how a drifted name is caught instead of silently dropped.
+- **Named populations come from `CEDAR_POPULATION_GROUPS`** (`institution/<id>/population_groups.csv`, read by `R/lists/population-presets.R`), shared by Pathways and projections so a group means one thing everywhere. Groups list *declared program codes* from `programs.csv`, never names; `population_group_major_codes()` adds each pre-major whose `leads_to` is one of them (`premajor_leads_to`) and each code a confirmed rename joins (`program_successions`). Never hand-list codes in a caller, and run `population_group_audit()` when adding a group — its `near_miss` output is how a code Banner added under a group program's name, or a pre-major with no `leads_to`, is caught instead of silently left out.
 - `model_version` changes for calculation/selection/calibration/scoring; `schema_version` for artifact shape. Reused bundles are never rewritten.
 - A new method is incomplete until the registry, branch candidate, rolling aftcast, bundle validator, text preview, designed fixture, real-data audit, and any affected UI/browser test agree.
 
@@ -1233,20 +1233,22 @@ at 0% growth cannot disagree with the projection it is anchored on.
 
 Groups live in `CEDAR_POPULATION_GROUPS` (`institution/<id>/population_groups.csv`, read by `R/lists/population-presets.R`) and are
 shared with Pathways, so "health professions" means one thing across CEDAR. They
-declare **program names**; `population_group_major_codes()` resolves those to
-Banner codes through two mechanisms, because neither is complete:
+list **declared program codes** (since 2026-11-16; they listed names before,
+and one Banner name covers several programs, ISSUES M56).
+`population_group_major_codes()` adds the pre-majors whose `programs.csv`
+`leads_to` is a group code and the codes a confirmed rename in
+`code_history.csv` joins. A name joins nothing.
 
-| Mechanism | Catches | Misses |
-|---|---|---|
-| Name match | A pre-major carrying its major's name (`FRAD` / `RADS`), including codes Banner added after the list was written | A pre-major whose name has drifted |
-| `leads_to` (programs.csv) | A drifted pre-major whose row leads to the right major | A pre-major with no `leads_to` |
-
-Both once failed on the same row for `FMDL` ("Medical Laboratory Science"
-against `MEDL`'s "Medical Laboratory Sciences", with no canon entry). Its
-`programs.csv` row now leads it to `MEDL`, and the registry still lists both
-spellings and `population_group_audit()` reports `near_miss`
-names. Run that audit when adding a group. ISSUES.md I7 documents the live
-mapping defect this work uncovered.
+What a code list can leave out is a code Banner adds later: a new variant under
+a group program's name, or a pre-major with no `leads_to`.
+`population_group_audit()` reports both as `near_miss`, and `unheld_codes`
+lists group codes no student holds; neither joins the group until the file
+says so. Run that audit when adding a group. `FMDL` ("Medical Laboratory
+Science" against `MEDL`'s "Medical Laboratory Sciences") is the case that once
+went missing; its `programs.csv` row leads it to `MEDL`. ISSUES.md I7
+documents the mapping defect. The conversion from names kept every group's
+codes exactly (each group resolves to the same codes it did by name on the
+2026-11-16 tables), and the audit found no near miss.
 
 **Measured on real data** (Fall 2026 baseline, 139-course scope): the clinical
 group resolves to 27 codes and holds 4,358 of 27,982 seats — 15.6% — across
@@ -1256,8 +1258,8 @@ and `FMDL` would have missed 1,281 of those seats.
 ### Real-data audit of the saved composition
 
 The check the designed fixtures cannot make: `cohort_composition` keys on
-`cedar_registrations$major_code` while a population group resolves against
-`cedar_programs$major_code`. If those vocabularies disagreed, every cohort would
+`cedar_registrations$major_code` while a population group's codes are
+`programs.csv`'s. If those vocabularies disagreed, every cohort would
 silently be zero and the scenario would report a flat line as a finding. They
 agree:
 

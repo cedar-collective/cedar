@@ -16,7 +16,7 @@ course numbers follow. `gen_ed_courses.csv` lists the fixture courses UNM's
 Gen Ed areas contain, under those areas, and `excluded_courses.csv` the two
 fixture courses UNM excludes, so the demo's Gen Ed tab and excluded-list
 controls have something to show. `population_groups.csv` groups the fixtures'
-program names into four named populations for Pathways and the projections
+program codes into four named populations for Pathways and the projections
 scenario. `projection_groups.csv` and `projection_courses.csv` declare one
 monitoring scope over the fixture Gen Ed courses, with the window start in
 `settings.csv`, and `projection_sequences.csv` one course sequence; the demo

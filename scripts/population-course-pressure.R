@@ -53,10 +53,10 @@ run_population_course_pressure <- function(args) {
   repo_root <- getwd()
   source(file.path(repo_root, "scripts", "cedar-repl.R"))
 
-  program_names <- population_group_program_names(group_id)
+  program_codes <- population_group_codes(group_id)
   population <- build_population(
     cedar_programs, cedar_degrees, cedar_student_terms,
-    opt = list(type = "preset", program_names = program_names, student_level = level)
+    opt = list(type = "preset", program_codes = program_codes, student_level = level)
   )
   if (nrow(population) == 0L) stop("The population is empty for group ", group_id, call. = FALSE)
   edges <- cedar_data_edges(cedar_registrations, degrees = cedar_degrees)
@@ -78,7 +78,7 @@ run_population_course_pressure <- function(args) {
     population, cedar_registrations, cedar_attempts, cedar_course_terms,
     list(courses = courses, plan_courses = plan_courses, min_plans = min_plans,
          campus = campus, data_edges = edges, min_n = min_n, n_years = n_years,
-         label = paste0(group_id, " (", paste(program_names, collapse = ", "), ")"))
+         label = paste0(group_id, " (", paste(program_codes, collapse = ", "), ")"))
   )
   text <- format_population_course_pressure(payload)
   if (is.null(output)) writeLines(text) else {

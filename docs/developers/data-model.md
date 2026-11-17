@@ -287,8 +287,8 @@ Major Changes is intentionally explicit about CEDAR-to-Banner derivations:
 | `cedar_programs$term` | Academic Studies `Academic Period` | Converted to CEDAR `YYYYSS` term code via `academic_period_to_term()`. |
 | `program_name` | Academic Studies `Major`, `Second Major`, minor/concentration name columns | `transform_programs()` expands wide program columns into one row per student-program-term. |
 | `program_type` | Derived from which Academic Studies program column supplied the row | Examples: `Major`, `Second Major`, `First Minor`. |
-| `major_code` | Academic Studies `Major Code`, `Second Major Code`, etc. | Used for mapping and disambiguation. |
-| `program_code` | Academic Studies `Program Code` | Present primarily for primary major rows. |
+| `major_code` | Academic Studies `Major Code`, `Second Major Code`, etc. | **The program's identity in CEDAR** (see below): the field, one code across degrees (`HIST`). |
+| `program_code` | Academic Studies `Program Code` | Banner's degree program, `<degree>-<major>[-<college>]` (`BA-HIST-AS`, `MA-HIST`). Major rows only; a Second Major row has NA. |
 | `is_pre_major` | CEDAR-computed | Derived from program naming/code patterns; not used as a separate major-change trigger when the program itself is unchanged. |
 | `student_population` | Academic Studies `Student Population` | Used to label Native UNM vs Transfer in Pathways movement cards. |
 | `inst_credits_attempted` | Academic Studies `Institution Credits Attempted` | Cumulative attempted UNM-only hours as recorded on the program row; not used for movement-card UNM medians. |
@@ -650,7 +650,7 @@ The column lists are the constants the builders and loaders check (`ATTEMPTS_COL
 | `campus`, `source_course`, `term`, `dest_course`, `next_term` | the key: registered on the same campus both terms; `next_term` is the term's next regular term, never Summer |
 | `source_college`, `source_term_type`, `dest_college`, `dest_term_type` | each side's college and term type |
 | `n_students` | distinct students in the pair |
-| `cedar_dims` | — | The mapping files as dimension tables (`colleges`, `units`, `subjects`, `programs`, `settings`), built once at startup by `build_cedar_dims()` (`R/branches/dims.R`) and held at `data_objects[["cedar_dims"]]`. Never saved. A cone that needs a dimension by name takes it as `dims`; `attach_unit()` reads it (ADR-001 step 3). Every lookup the retired `cedar_lookups.qs` used to carry is read off it: `unit_names(dims)`, `college_code_names(dims)`, `subject_units(dims)`, and `name_program_codes(codes, dims)` for a program code's display name (programs.csv's, which names every code the data carries, the class-list-only ones as proposed rows; a code with no row is shown as itself and listed by the mapping audit). A department's program names are counted from the programs table by `headcount_program_names()` |
+| `cedar_dims` | — | The mapping files as dimension tables (`colleges`, `units`, `subjects`, `programs`, `settings`), built once at startup by `build_cedar_dims()` (`R/branches/dims.R`) and held at `data_objects[["cedar_dims"]]`. Never saved. A cone that needs a dimension by name takes it as `dims`; `attach_unit()` reads it (ADR-001 step 3). Every lookup the retired `cedar_lookups.qs` used to carry is read off it: `unit_names(dims)`, `college_code_names(dims)`, `subject_units(dims)`, and `name_program_codes(codes, dims)` for a program code's display name (programs.csv's, which names every code the data carries, the class-list-only ones as proposed rows; a code with no row is shown as itself and listed by the mapping audit). A department's programs are its own rows (`filter_programs_to_dept()`), never names |
 
 **Every unit is attached at load, by one function (ADR-001 step 3, 2026-11-06).** No saved table stores a unit or a college. `cedar_sections` and `cedar_registrations` carry the subject and Banner's section college (`source_college`); `cedar_programs` and `cedar_degrees` carry the program code and Banner's two college values (`source_college` and `source_college_code` / `source_student_college`); `cedar_student_terms` carries its primary major's code and the source's college for it (`primary_source_college_code`, `primary_source_college`). The in-memory `department` / `college` / `college_basis` on sections and class-list rows, `dept_code` / `program_college` / `college_code` / `college_basis` / `student_college` on programs and degrees, `primary_dept_code` / `primary_college_code` / `primary_college_basis` on student-terms, and the `crosslist_external` / `crosslist_partners` that follow a department, are written by `attach_default_units()` in `R/branches/dims.R` at every start (`global.R`, the cache-warming scripts, `cedar-repl.R`) through `attach_unit(rows, dims, hierarchy)`: the only code that resolves a unit, wrapping the two rules in `R/lists/institution_files.R`. `tests/testthat/test-architecture.R` ratchets every other resolution site, the transform included. A file stamped by an older transform loads the same way: the loader drops its copy first. The default columns always mean the subject's unit (sections, class lists) or the program's unit (declarations, degrees, student-terms); a reader that wants another hierarchy calls `attach_unit()` with its own `cols`, never into those names. Measured on the 2026-10-08 pull: every value the transform used to stamp is reproduced on all five tables.
 
@@ -659,5 +659,31 @@ The column lists are the constants the builders and loaders check (`ATTEMPTS_COL
 **The mapping files decide every unit (ADR-002 Stage 3).** A program's unit is the one its row in `institution/<id>/programs.csv` names: the confirmed row for (code, college), else the code's every-college row. Concentrations take the unit of the student's primary major that term. A course's unit comes the same way from `subjects.csv`, keyed on subject, section college (translated through `colleges.csv`, so a renamed college still matches) and level. **A code with no confirmed row has no unit (`NA`)** and is listed on Admin > Data & Usage > Mappings and in the end-of-transform mapping audit: the designed state for a code awaiting a decision, never a department named after itself. Programs no department owns (Non-Degree, Undecided) are `basis = no_unit`. A decision is an edit to the file, through a pull request; it takes effect at the next start, and the deploy restarts the app. Nothing is rebuilt for it. The deploy gate (`scripts/rebuild-programs-if-mappings-changed.R`, also run by every refresh; the name is historical) now builds only `cedar_student_terms`: when it is missing, older than the students, programs or degrees file it reads (by file time), short a column the builder now writes, or stamped with an older rule version than `STUDENT_TERMS_BUILD_VERSION` (bump it when the builder's rules change the values it writes), it is built in its own R process (`--tables student_terms`), so the app never starts without it. The transform keeps every stage's heap until it exits, and one process carrying four tables into the student-term stage was killed for memory on an 8.6 GB host.
 
 **Colleges come from the files too (Stage 3b).** A student counts under their primary major's college that term, on all their rows (`college_code`, `student_college`; each row's own is `program_college`); a course under its subject row's `college_code`, else its unit's home college; a degree under its program's. A code not yet decided reports Banner's college, labelled `college_basis = "banner"`. Banner's values stay beside as `source_college` (and `source_college_code`): the mapping audit reads those, reports never should.
+
+### Major code and program code: what "a program" is
+
+Banner gives each declaration two codes, and CEDAR uses them for different
+things:
+
+| | History B.A. | History M.A. | History Ph.D. | History pre-major |
+|---|---|---|---|---|
+| `major_code` (the field) | `HIST` | `HIST` | `HIST` | `FHIS` |
+| `degree` | Bachelor of Arts | Master of Arts | Doctor of Philosophy | Bachelor of Arts |
+| `program_code` (Banner's degree program) | `BA-HIST-AS` | `MA-HIST` | `PHD-HIST` | `BA-FHIS-AS` |
+
+**A program in CEDAR is a major code.** `programs.csv` is keyed on it (its
+`program_code` column holds major codes, not Banner program codes), and so are
+a program's unit, its pre-major `leads_to`, its renames in `code_history.csv`,
+the population groups, and every program a page lets you pick (Pathways,
+Headcount): one choice per major code, renames joined, its degrees together.
+The degree is a separate attribute, in `degree` and Banner's `program_code`;
+`cedar_degrees` carries both too. A B.A. and an M.A. in History are one
+program at two degrees, and a B.A. and a B.S. in Psychology (`BA-PSY-AS`,
+`BS-PSY-AS`) one program at two (ISSUES M37: no population can yet be
+restricted to one degree). A pre-major has its own major code and joins its
+program through `leads_to`. Two programs that share a Banner name are two
+major codes and stay two (`ARCH`, `ARCT`). The degree-specific code is read
+where a degree matters: each Degree Explorer map names its own
+`program_codes` (`degree_catalogs.csv`).
 
 **The self-named fallback is gone and must not return.** The old chain ended at `major_code` itself, giving an unmapped program a department named after its own code that no report could tell from a real one — which is how Radiologic Sciences reported 35 students at department level when it had 229 (ISSUES.md I7). EC-14 in `tests/testthat/test-transform-status.R` fails if it comes back. `program_map.qs` and `R/lists/program_code_maps.R` were retired at Stage 4: the runtime lookups in `catalog_lookups.R` come from the files too, and a pre-major's flag and target are the file's (`is_pre_major`, `leads_to`), never inferred from an F prefix. A department's rows are the rows whose own `dept_code` it is — `filter_programs_to_dept()` in `R/branches/headcount.R`, shared by Headcount, Dept Trends and the Dept Dashboard — never rows matched by program name (ISSUES.md I15).

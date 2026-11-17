@@ -3802,26 +3802,47 @@ majors and minors are offered and counted by program code
 joined through `program_successions`); concentrations, which carry no code,
 stay by name. EC-16's ENG minor guards it.
 
-**M56 — Population groups declare program names.** `population_groups.csv`
-lists names, resolved to codes by `population_group_major_codes()` and the
-preset type of `resolve_focal_programs()`, so a group follows every program
-that shares a name and drops one whose name drifts (the reason for
-`population_group_audit()`'s near misses). Found 2026-11-16. *Done when:* the
-file lists program codes, renames following through `program_successions`,
-and the audit checks codes against `programs.csv`.
+**M56 — Population groups declare program names.** **Done 2026-11-16.**
+`population_groups.csv` listed names, resolved to codes by
+`population_group_major_codes()` and the preset type of
+`resolve_focal_programs()`. It now lists declared program codes, validated
+against `programs.csv` (a pre-major code is refused: it joins through
+`leads_to`); renames join through `program_successions`. The preset type takes
+`program_codes`, so `build_population()` matches no name anywhere. The
+conversion kept every UNM group's codes exactly; the audit now reports
+`unheld_codes` and the codes a list leaves out (a variant under a group
+program's name, a pre-major with no `leads_to`), and found none.
 
 ### Testing and pipeline safety
 
-**M57 — The fixture's program codes are not programs.csv codes.** The shared
-fixture's program rows carry made-up codes (`HIST-BA`, `MATH-BS`), and its
-degrees carry the same since 2026-11-16 (I62), while the tests read the UNM
-mapping files, whose History code is `HIST`. Real data holds one code per
-program across programs, degrees and programs.csv; the fixture can hold only
-two of the three, so a Dept Trends build on the fixture (prog codes from
-`major_to_dept`) finds no degrees, and the pre-major and name of every
-fixture code come from the fixture, not the file. *Done when:* the fixture's
-programs and degrees use codes `programs.csv` has (or a fixture institution
-directory maps them), and a Dept Trends degree count is pinned on it.
+**M57 — The fixture's major codes carry the degree.** The shared fixture's
+program and degree rows put a made-up, degree-specific code in `major_code`
+(`HIST-BA`, `HIST-MA`, `MATH-BS`). Real data keeps the two apart (see
+[major code and program code](docs/developers/data-model.md#major-code-and-program-code-what-a-program-is)):
+`major_code` is the field, one code across degrees (`HIST` for the B.A., M.A.
+and Ph.D.), and the degree program is `program_code` (`BA-HIST-AS`,
+`MA-HIST`). A pre-major has its own major code (History's is `FHIS`); the
+fixture gives History's pre-majors the major's (`HIST-BA`, `is_pre_major =
+TRUE`). Because the tests read UNM's `programs.csv`, keyed on major codes, no
+fixture code has a row there: a Dept Trends build on the fixture finds no
+degrees, and Pathways and Headcount label the fixture's codes "[no
+programs.csv row] (HIST-BA)". Tests that rest on the made-up codes: "two
+programs sharing a name are two populations" (`test-population.R`) and the
+Headcount test of the same name (44 `HIST-BA` / 2 `HIST-MA`, really one
+program at two degrees), the dept-report degree counts by `HIST-BA`, and
+`HIST_CODES` / `HC_HISTORY_CODES`.
+
+*Plan:* move the fixture's `major_code` to UNM's major codes (`HIST`, `FHIS`
+for History's pre-majors, `MATH`, `ANTH`, `BADM`, `PSY`; a concentration has
+none, as in the export) and put the degree program in `program_code`
+(`BA-HIST-AS`, `MA-HIST`); re-pin each B.A./M.A. count that changes, checking
+each one; move the same-name-programs tests to a pair UNM really has (PSY and
+XPSY, or ARCH and ARCT); keep the rename tests on a scenario
+`program_successions` table. Update the header's pinned counts in the same
+change. **Deferred (user, 2026-11-16)** until #311–#313 are merged and
+checked in the browser. *Done when:* the fixture's programs and degrees use
+codes `programs.csv` has, every test reads them through it, and a Dept Trends
+degree count is pinned on it.
 
 **M7 — Untested analytical code.** No direct tests for
 `R/branches/credit-hours.R`; thin coverage for `R/cones/course-neighbors.R` and

@@ -27,8 +27,8 @@ Set the filters, then click **Update Headcount**.
 | **Campus** | Limits by student campus. |
 | **College** | Limits records by student college and narrows the available departments and programs. |
 | **Department** | Limits program records and available choices by department code or CEDAR's program-to-department mappings. Leave unselected for combinations across departments. |
-| **Major** | Counts students holding selected majors or second majors. Each choice is one program, named from the mapping files with its program codes, so two programs that share a name in Banner (Architecture's ARCH and ARCT) are separate choices, and a renamed program is one choice that counts its old and new codes. |
-| **Minor** | Counts students holding selected first or second minors, chosen by program code in the same way. |
+| **Major** | Counts students holding selected majors or second majors. Each choice is one program, a major code (History is `HIST` at every degree), named from the mapping files with its codes, so two programs that share a name in Banner (Architecture's ARCH and ARCT) are separate choices, and a renamed program is one choice that counts its old and new codes. |
+| **Minor** | Counts students holding selected first or second minors, chosen by major code in the same way. |
 | **Concentration** | Counts students holding selected concentrations. |
 
 The major, minor, and concentration controls update based on the broader college and department selections. With a department selected they offer only that department's own programs, never another department's program that shares a name.
