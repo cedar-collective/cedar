@@ -45,9 +45,15 @@ course_similar_comparisons <- function() {
 #'   `median`, `q3` of the courses' gaps, `focal_gap`, `share_below`);
 #'   `instructors` (the focal course's instructors at `min_n`) and
 #'   `instructor_spread` (`n_instructors`, `sd_return_gap`, `mean_se`,
-#'   `n_beyond_2se`; NULL under two instructors); `by_term` (the focal
+#'   `n_beyond_2se`; NULL under two instructors); `courses_by_term` (every
 #'   course's row per anchor term at `min_term_n` covered takers, default
-#'   10) and `trend` (`course_similar_students_trend()` over it).
+#'   10) and `by_term` (the focal course's); `trends`
+#'   (`course_similar_students_trend()` over every course, in
+#'   `meta$trend_term_type`, the regular term type with the most covered
+#'   takers) and `trend` (the focal course's rows). `courses` carries its
+#'   return-gap trend: `return_trend`, `return_trend_slope`,
+#'   `return_trend_chance` (two standard errors) and `return_gap_series` (the
+#'   gaps in term order, a list column).
 build_course_similar_students <- function(student_terms, attempts, applicants, opt = list()) {
   course <- opt$course
   if (is.null(course) || length(course) != 1L || is.na(course) || !nzchar(course)) {
@@ -87,7 +93,32 @@ build_course_similar_students <- function(student_terms, attempts, applicants, o
     n_population_student_terms = attr(courses, "n_population_student_terms"),
     focal_under_min_n = suppressed[suppressed$course == course, , drop = FALSE]
   )
-  courses <- courses %>% mutate(is_focal = course == .env$course)
+  # Every course term by term, so each course's gaps read as a series and a
+  # trend, fitted within one regular term type.
+  term_opt <- cone_opt
+  term_opt$min_n <- as.integer(opt$min_term_n %||% 10L)
+  courses_by_term <- get_course_similar_students(
+    student_terms, attempts, applicants, c(term_opt, list(by_term = TRUE))
+  )
+  meta$min_term_n <- term_opt$min_n
+  regular <- courses_by_term %>%
+    mutate(term_type = get_term_type(term)) %>%
+    filter(term_type %in% c("fall", "spring"))
+  covered_by_type <- tapply(regular$n_covered, regular$term_type, sum)
+  meta$trend_term_type <- if (length(covered_by_type)) names(covered_by_type)[which.max(covered_by_type)] else NA_character_
+  trends <- course_similar_students_trend(courses_by_term, meta$trend_term_type)
+  series <- regular %>%
+    filter(term_type == meta$trend_term_type, !is.na(return_gap)) %>%
+    arrange(course, term) %>%
+    group_by(course) %>%
+    summarize(return_gap_series = list(return_gap), .groups = "drop")
+  courses <- courses %>%
+    mutate(is_focal = course == .env$course) %>%
+    left_join(trends %>% filter(outcome == "return") %>%
+                transmute(course, return_trend = direction, return_trend_slope = slope,
+                          return_trend_chance = 2 * slope_se),
+              by = "course") %>%
+    left_join(series, by = "course")
   focal <- courses %>% filter(is_focal)
   if (nrow(focal) == 0L) focal <- NULL
 
@@ -125,16 +156,11 @@ build_course_similar_students <- function(student_terms, attempts, applicants, o
     )
   }
 
-  term_opt <- cone_opt
-  term_opt$min_n <- as.integer(opt$min_term_n %||% 10L)
-  by_term <- get_course_similar_students(
-    student_terms, attempts, applicants, c(term_opt, list(course = course, by_term = TRUE))
-  )
-  meta$min_term_n <- term_opt$min_n
-
   structure(list(meta = meta, focal = focal, courses = courses, benchmark = benchmark,
                  instructors = instructors, instructor_spread = spread,
-                 by_term = by_term, trend = course_similar_students_trend(by_term)),
+                 courses_by_term = courses_by_term,
+                 by_term = courses_by_term %>% filter(course == .env$course),
+                 trends = trends, trend = trends %>% filter(course == .env$course)),
             class = "course_similar_students")
 }
 
@@ -212,79 +238,121 @@ course_similar_students_headline <- function(payload) {
     ))
   }
   tr <- payload$trend
-  if (!is.null(tr)) {
-    sentences <- c(sentences, paste0(
-      "Term by term, the return gap went from ", pts(tr$first_gap), " points in ", fmt_term(tr$first_term),
-      " to ", pts(tr$last_gap), " in ", fmt_term(tr$last_term), " over ", tr$n_terms, " terms: ",
-      switch(tr$direction,
-             improving = "an upward trend",
-             declining = "a downward trend",
-             steady = "no trend beyond chance"),
-      " (", pts(tr$slope), " points a term, where chance alone gives about ", sprintf("%.1f", 2 * tr$slope_se), ")."
-    ))
+  if (!is.null(tr) && any(tr$direction != "too_few_terms")) {
+    verdict <- c(rising = "rising", falling = "falling", steady = "no trend beyond chance")
+    say <- function(outcome, label, unit, digits) {
+      r <- tr[tr$outcome == outcome & tr$direction != "too_few_terms", , drop = FALSE]
+      if (nrow(r) == 0L) return(NULL)
+      signed <- function(x) sprintf(paste0("%+.", digits, "f"), x)
+      paste0(label, " went from ", signed(r$first_gap), unit, " in ", fmt_term(r$first_term), " to ",
+             signed(r$last_gap), " in ", fmt_term(r$last_term), " over ", r$n_terms, " terms: ",
+             verdict[[r$direction]], " (", signed(r$slope), " a year; a trend needs more than ±",
+             sprintf(paste0("%.", digits, "f"), 2 * r$slope_se), ").")
+    }
+    type <- tools::toTitleCase(tr$term_type[1])
+    parts <- c(say("return", paste0(type, " to ", tolower(type), ", the return gap"), " points", 1),
+               say("other_dfw", "The other-course DFW gap", " points", 1),
+               say("next_gpa", "The next-term GPA gap", "", 2))
+    sentences <- c(sentences, parts)
   }
   sentences
 }
 
-#' Whether a course's return gap is rising, falling or steady across terms
+# The three gaps a trend is read for, each beside its standard error column.
+SIMILAR_GAP_COLS <- c(return = "return_gap", other_dfw = "other_dfw_gap", next_gpa = "next_gpa_gap")
+
+#' Whether each course's gaps are rising, falling or steady across terms
 #'
-#' The slope of the per-term return gap on the term's position
-#' (`compute_trend()`), judged against its own standard error from the
-#' per-term errors: beyond two standard errors is a trend, inside is steady.
-#' Summer terms are left out: a summer cohort is a different population.
+#' compute_rate_trend() over each course's per-term gaps, given with their
+#' standard errors: the slope a year within one regular term type, beyond two
+#' standard errors (the larger of chance and the terms' own scatter) a trend.
+#' A term whose gap has no standard error above zero (an expected rate of 0
+#' or 100%) carries no chance error and is left out of the line.
 #'
-#' @param by_term `get_course_similar_students(by_term = TRUE)` rows of one course.
-#' @return NULL under three regular terms with a return gap, else a list:
-#'   `n_terms`, `first_term`, `first_gap`, `last_term`, `last_gap`, `slope`
-#'   (points per term), `slope_se`, `direction` (`improving`, `declining`,
-#'   `steady`).
-course_similar_students_trend <- function(by_term) {
-  rows <- by_term %>%
-    filter(!is.na(return_gap), !is.na(return_gap_se), get_term_type(term) %in% c("fall", "spring")) %>%
-    arrange(term)
-  if (nrow(rows) < 3L) return(NULL)
-  x <- seq_len(nrow(rows)) - mean(seq_len(nrow(rows)))
-  slope <- unname(compute_trend(rows$return_gap)$slope)
-  slope_se <- sqrt(sum(x^2 * rows$return_gap_se^2)) / sum(x^2)
-  list(
-    n_terms = nrow(rows),
-    first_term = rows$term[1], first_gap = rows$return_gap[1],
-    last_term = rows$term[nrow(rows)], last_gap = rows$return_gap[nrow(rows)],
-    slope = slope, slope_se = slope_se,
-    direction = if (slope > 2 * slope_se) "improving" else if (slope < -2 * slope_se) "declining" else "steady"
-  )
+#' @param by_term `get_course_similar_students(by_term = TRUE)` rows.
+#' @param term_type The one term type the lines are fitted in (`"fall"`).
+#' @return One row per course and outcome (`return`, `other_dfw`,
+#'   `next_gpa`): `term_type`, `n_terms`, `first_term`, `first_gap`,
+#'   `last_term`, `last_gap`, `slope` (gap units a year), `slope_se`,
+#'   `direction` (`rising`, `falling`, `steady`, `too_few_terms`), and the
+#'   fitted line's ends, `fit_first` and `fit_last`. No rows for an NA
+#'   term type.
+course_similar_students_trend <- function(by_term, term_type) {
+  missing <- setdiff(c("course", "term", SIMILAR_GAP_COLS, paste0(SIMILAR_GAP_COLS, "_se")), names(by_term))
+  if (length(missing)) {
+    stop("[course-similar-students.R] by_term lacks ", paste(missing, collapse = ", "), call. = FALSE)
+  }
+  if (length(term_type) != 1L) stop("[course-similar-students.R] term_type must be one term type.", call. = FALSE)
+  long <- bind_rows(lapply(names(SIMILAR_GAP_COLS), function(outcome) {
+    col <- SIMILAR_GAP_COLS[[outcome]]
+    tibble::tibble(course = by_term$course, term = by_term$term, outcome = outcome,
+                   value = by_term[[col]], se = by_term[[paste0(col, "_se")]])
+  })) %>%
+    filter(!is.na(term_type), get_term_type(term) == term_type, !is.na(value), !is.na(se), se > 0)
+  mids <- long %>%
+    group_by(course, outcome) %>%
+    summarize(.mid_value = mean(value), .mid_year = mean(term %/% 100L), .groups = "drop")
+  compute_rate_trend(long, c("course", "outcome"), min_terms = 3L) %>%
+    left_join(mids, by = c("course", "outcome")) %>%
+    transmute(course, outcome, term_type = .env$term_type, n_terms, first_term, first_gap = first_pct,
+              last_term, last_gap = last_pct, slope, slope_se, direction,
+              fit_first = .mid_value + slope * (first_term %/% 100L - .mid_year),
+              fit_last = .mid_value + slope * (last_term %/% 100L - .mid_year))
 }
 
-#' The takers' return rate against the expected rate, term by term
+#' The focal course's three gaps term by term, with chance and the trend
+#'
+#' One panel a gap: each term's gap with the band chance alone gives (two
+#' standard errors), zero marked, and the fitted line across the trend's
+#' term type when there is one.
 #'
 #' @param payload `build_course_similar_students()` output.
-#' @return A plotly object, or NULL when no term has a return to show.
+#' @return A plotly subplot, or NULL with no terms.
 plot_course_similar_students_trend <- function(payload) {
   if (!inherits(payload, "course_similar_students")) {
     stop("[course-similar-students.R] payload must come from build_course_similar_students().", call. = FALSE)
   }
-  rows <- payload$by_term %>% filter(!is.na(return_pct)) %>% arrange(term) %>%
-    mutate(term_label = term_axis_factor(term))
+  rows <- payload$by_term %>% arrange(term)
   if (nrow(rows) == 0L) return(NULL)
-  plotly::plot_ly(rows, x = ~term_label) %>%
-    plotly::add_trace(
-      y = ~return_expected_pct / 100, type = "scatter", mode = "lines+markers", name = "Expected from similar non-takers",
-      line = list(color = unname(CEDAR_SEMANTIC_COLORS["reference"]), dash = "dot"),
-      marker = list(color = unname(CEDAR_SEMANTIC_COLORS["reference"])),
-      hovertemplate = "%{x}<br>Expected: %{y:.1%}<extra></extra>"
-    ) %>%
-    plotly::add_trace(
-      y = ~return_pct / 100, type = "scatter", mode = "lines+markers", name = paste0("Took ", payload$meta$course),
-      line = list(color = unname(CEDAR_SEMANTIC_COLORS["positive"])),
-      marker = list(color = unname(CEDAR_SEMANTIC_COLORS["positive"])),
-      customdata = ~return_n,
-      hovertemplate = "%{x}<br>Returned: %{y:.1%} of %{customdata}<extra></extra>"
-    ) %>%
-    plotly::layout(
-      xaxis = list(title = "", tickangle = -45),
-      yaxis = list(title = "Returned the next regular term", tickformat = ".0%"),
-      legend = list(orientation = "h", x = 0, y = -0.25)
-    )
+  rows$term_label <- term_axis_factor(rows$term)
+  levels_x <- levels(rows$term_label)
+  panels <- list(
+    list(outcome = "return", title = "Return gap (points)", digits = 1),
+    list(outcome = "other_dfw", title = "Other-course DFW gap (points)", digits = 1),
+    list(outcome = "next_gpa", title = "Next-term GPA gap", digits = 2)
+  )
+  plots <- lapply(panels, function(pn) {
+    col <- SIMILAR_GAP_COLS[[pn$outcome]]
+    d <- rows[!is.na(rows[[col]]), , drop = FALSE]
+    d$gap <- d[[col]]
+    d$chance <- 2 * d[[paste0(col, "_se")]]
+    fmt <- paste0("%{y:+.", pn$digits, "f}")
+    p <- plotly::plot_ly(d, x = ~term_label) %>%
+      plotly::add_trace(
+        y = ~gap, type = "scatter", mode = "markers", showlegend = FALSE,
+        marker = list(color = unname(CEDAR_SEMANTIC_COLORS["neutral"]), size = 8),
+        error_y = list(type = "data", array = ~chance, color = unname(CEDAR_SEMANTIC_COLORS["reference"]),
+                       thickness = 1.5, width = 0),
+        customdata = ~chance,
+        hovertemplate = paste0("%{x}<br>Gap: ", fmt, "<br>Chance alone: ±%{customdata:.", pn$digits,
+                               "f}<extra></extra>")
+      )
+    tr <- payload$trend[payload$trend$outcome == pn$outcome & payload$trend$direction != "too_few_terms", , drop = FALSE]
+    if (nrow(tr) == 1L) {
+      ends <- tibble::tibble(term_label = factor(term_code_to_axis_label(c(tr$first_term, tr$last_term)), levels = levels_x),
+                             fit = c(tr$fit_first, tr$fit_last))
+      p <- p %>% plotly::add_trace(
+        data = ends, x = ~term_label, y = ~fit, type = "scatter", mode = "lines", showlegend = FALSE,
+        line = list(color = unname(CEDAR_SEMANTIC_COLORS["caution"]), dash = "dash"),
+        hovertemplate = paste0("Trend: ", sprintf(paste0("%+.", pn$digits, "f"), tr$slope), " a year (",
+                               c(rising = "rising", falling = "falling", steady = "no trend beyond chance")[[tr$direction]],
+                               ")<extra></extra>"))
+    }
+    p %>% plotly::layout(yaxis = list(title = pn$title, zeroline = TRUE,
+                                      zerolinecolor = unname(CEDAR_SEMANTIC_COLORS["reference"])))
+  })
+  plotly::subplot(plots, nrows = 3, shareX = TRUE, titleY = TRUE, margin = 0.04) %>%
+    plotly::layout(xaxis = list(title = "", tickangle = -45, categoryorder = "array", categoryarray = levels_x))
 }
 
 #' The similar-students payload as plain text (the text-first preview)

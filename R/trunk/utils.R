@@ -529,28 +529,41 @@ compute_trend <- function(values, min_n = 2, threshold = 0) {
 #' trend. The first and last terms' rates are returned apart from the verdict:
 #' the two can point different ways.
 #'
+#' A series of measured values with their own standard errors (a gap between
+#' a group and what was expected of it, say) carries `value` and `se` in
+#' place of `k` and `n`: chance is then each term's stated error, the pooled
+#' value their inverse-variance mean, and the scatter guard is the same.
+#'
 #' @param series One row per group and term: the `group_cols`, an integer
-#'   `term` and the rate's numerator `k` and denominator `n` (n > 0). The terms
-#'   of a group must fall in different years (one term type a group).
+#'   `term` and the rate's numerator `k` and denominator `n` (n > 0), or a
+#'   `value` and its standard error `se` (se > 0). The terms of a group must
+#'   fall in different years (one term type a group).
 #' @param group_cols The columns a line is fitted within; may be empty.
 #' @param min_terms A group with fewer terms gets no slope (`too_few_terms`).
 #' @return One row per group: `n_terms`, `first_term`, `first_pct`,
-#'   `last_term`, `last_pct`, `pooled_pct`, `slope` (points a year),
+#'   `last_term`, `last_pct`, `pooled_pct` (each the value, for a value
+#'   series), `slope` (points a year),
 #'   `se_chance`, `se_scatter`, `slope_se` (the larger), `direction`
 #'   ("rising", "falling", "steady" or "too_few_terms"), and the scatter
 #'   around the line: `resid_sd` (points) and `resid_p`, the chance of
 #'   scatter that large under binomial variation alone (NA under four terms).
 compute_rate_trend <- function(series, group_cols = character(), min_terms = 3L) {
-  missing <- setdiff(c(group_cols, "term", "k", "n"), names(series))
+  with_se <- all(c("value", "se") %in% names(series))
+  missing <- setdiff(c(group_cols, "term", if (with_se) c("value", "se") else c("k", "n")), names(series))
   if (length(missing)) {
     stop("[utils.R] compute_rate_trend(): series lacks ", paste(missing, collapse = ", "), call. = FALSE)
   }
-  if (any(is.na(series$n) | series$n <= 0)) {
+  if (with_se && any(is.na(series$value) | is.na(series$se) | series$se <= 0)) {
+    stop("[utils.R] compute_rate_trend(): every term needs a value and a positive standard error se", call. = FALSE)
+  }
+  if (!with_se && any(is.na(series$n) | series$n <= 0)) {
     stop("[utils.R] compute_rate_trend(): every term needs a positive denominator n", call. = FALSE)
   }
   series <- series %>%
     dplyr::ungroup() %>%
-    dplyr::mutate(year = as.integer(term) %/% 100L, pct = 100 * k / n)
+    dplyr::mutate(year = as.integer(term) %/% 100L,
+                  pct = if (with_se) value else 100 * k / n,
+                  .var_se = if (with_se) se^2 else NA_real_)
   repeated <- series %>% dplyr::count(dplyr::across(dplyr::all_of(c(group_cols, "year")))) %>%
     dplyr::filter(n > 1L)
   if (nrow(repeated)) {
@@ -566,19 +579,22 @@ compute_rate_trend <- function(series, group_cols = character(), min_terms = 3L)
       first_pct = dplyr::first(pct),
       last_term = dplyr::last(term),
       last_pct = dplyr::last(pct),
-      pooled_pct = 100 * sum(k) / sum(n),
+      pooled_pct = if (with_se) sum(pct / .var_se) / sum(1 / .var_se) else 100 * sum(k) / sum(n),
       .sxx = sum((year - mean(year))^2),
       .sxy = sum((year - mean(year)) * pct),
       .syy = sum((pct - mean(pct))^2),
       # Each term's variance at the pooled rate, in squared points.
-      .svar = sum((year - mean(year))^2 * pooled_pct * (100 - pooled_pct) / n),
-      # Scatter around the line against each term's binomial variance there.
+      .svar = if (with_se) sum((year - mean(year))^2 * .var_se)
+              else sum((year - mean(year))^2 * pooled_pct * (100 - pooled_pct) / n),
+      # Scatter around the line against each term's chance variance there.
       .chisq = {
         fit <- mean(pct) + (.sxy / .sxx) * (year - mean(year))
-        fit <- pmin(pmax(fit, 0.5), 99.5)
-        sum((pct - fit)^2 / (fit * (100 - fit) / n))
+        if (with_se) sum((pct - fit)^2 / .var_se) else {
+          fit <- pmin(pmax(fit, 0.5), 99.5)
+          sum((pct - fit)^2 / (fit * (100 - fit) / n))
+        }
       },
-      chance_var = {
+      chance_var = if (with_se) mean(.var_se) else {
         fit <- mean(pct) + (.sxy / .sxx) * (year - mean(year))
         fit <- pmin(pmax(fit, 0.5), 99.5)
         mean(fit * (100 - fit) / n)
