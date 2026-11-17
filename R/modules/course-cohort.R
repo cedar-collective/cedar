@@ -93,7 +93,11 @@ courseCohortServer <- function(id, student_terms, attempts, programs, dims, edge
           column(2, checkboxGroupInput(ns("term_type"), "Term types", choices = term_type_choices,
                                        selected = d$term_type, inline = TRUE)),
           column(2, numericInput(ns("min_n"), "Min students per group:", value = 10, min = 1, max = 1000)),
-          column(6, helpText(
+          column(2, selectInput(ns("comparison"), "Similar students compared",
+                                choices = stats::setNames(names(course_similar_comparisons()),
+                                                          c("Everyone else", "In a Gen Ed course")),
+                                selected = "all")),
+          column(4, helpText(
             "Choosing term types selects every term of those types; narrow them in Terms. ",
             "Students are counted by home campus, and a student who took the course on any campus is a taker. ",
             "A benchmark course needs the minimum in both its passed and its never-took groups; this course is never its own benchmark."
@@ -154,7 +158,7 @@ courseCohortServer <- function(id, student_terms, attempts, programs, dims, edge
             build_course_similar_students(
               student_terms, attempts, applicants,
               list(course = crs, classification = opt$classification, campus = opt$campus, term = opt$term,
-                   data_edges = edges)),
+                   comparison = input$comparison %||% "all", data_edges = edges)),
             error = function(e) {
               showNotification(paste("Similar-students comparison:", conditionMessage(e)), type = "error", duration = 10)
               NULL
@@ -230,7 +234,9 @@ courseCohortServer <- function(id, student_terms, attempts, programs, dims, edge
       tagList(
         dashboard_subsection(
           "Against Similar Students",
-          paste0("The students who took ", m$course, " against students of the same term, home campus, high-school GPA band and time status who did not, pooled over the selected terms. Expected is what the takers would have done at their non-taking peers' rates; a cell with fewer than ",
+          paste0("The students who took ", m$course, " against students of the same term, home campus, high-school GPA band and time status who did not",
+                 if (identical(m$comparison, "gen_ed")) " and who took a Gen Ed course that term (gen_ed_courses.csv)" else "",
+                 ", pooled over the selected terms. Expected is what the takers would have done at their non-taking peers' rates; a cell with fewer than ",
                  m$min_cell_n, " non-takers supplies no rate and its takers are left out. The cells remove those four things and nothing else: placement, advising and major are not in them."),
           lapply(course_similar_students_headline(s), function(x) tags$p(class = "cedar-lead", x)),
           if (!is.null(s$focal)) reactable::reactableOutput(ns("similar_focal_table"))

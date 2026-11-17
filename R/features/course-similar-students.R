@@ -13,14 +13,31 @@
 #
 # Depends on: get_course_similar_students() (cones/course-similar-students.R)
 
+#' Who a course's takers are compared with
+#'
+#' The named comparisons the page offers: every similar student who did not
+#' take the course, or only those who took a Gen Ed course that term (the
+#' institution's gen_ed_courses.csv) -- for a course outside Gen Ed, "did its
+#' students do better than students like them in Gen Ed courses?".
+#'
+#' @return Named character vector, comparison id to the words the page uses
+#'   for the compared students.
+course_similar_comparisons <- function() {
+  c(all = "similar students who did not take it",
+    gen_ed = "similar students who took a Gen Ed course that term and not this one")
+}
+
+
 #' A course against similar non-takers, beside every other course and by instructor
 #'
 #' @param student_terms `cedar_student_terms`.
 #' @param attempts `cedar_attempts`.
 #' @param applicants `cedar_applicants`.
 #' @param opt `course` (the focal course id; required), `classification`
-#'   (required), `term`, `campus`, `min_n` (covered takers a course or an
-#'   instructor needs; default 30), `min_cell_n`, `data_edges` (required).
+#'   (required), `term`, `campus`, `comparison` (who the non-takers are, one
+#'   of course_similar_comparisons(): "all", the default, or "gen_ed"), `min_n`
+#'   (covered takers a course or an instructor needs; default 30),
+#'   `min_cell_n`, `data_edges` (required).
 #' @return A `course_similar_students` list: `meta`; `focal` (the course's
 #'   one row, or NULL when it has fewer than `min_n` covered takers);
 #'   `courses` (every course at `min_n`, the focal one among them, with
@@ -36,7 +53,25 @@ build_course_similar_students <- function(student_terms, attempts, applicants, o
   if (is.null(course) || length(course) != 1L || is.na(course) || !nzchar(course)) {
     stop("[course-similar-students.R] opt$course (one focal course id) is required.", call. = FALSE)
   }
+  comparison <- opt$comparison %||% "all"
+  if (length(comparison) != 1L || !comparison %in% names(course_similar_comparisons())) {
+    stop("[course-similar-students.R] opt$comparison must be one of ",
+         paste(names(course_similar_comparisons()), collapse = ", "), call. = FALSE)
+  }
   cone_opt <- opt[intersect(names(opt), c("classification", "term", "campus", "min_n", "min_cell_n", "data_edges"))]
+  if (comparison == "gen_ed") {
+    # The Gen Ed list names registrar codes; the loaded attempts key on the
+    # course id, their subject_course (a renamed Gen Ed course is one course).
+    if (!"listed_code" %in% names(attempts)) {
+      stop("[course-similar-students.R] attempts lacks listed_code, which the Gen Ed comparison ",
+           "resolves its codes through.", call. = FALSE)
+    }
+    # CAMPUS_ROLLUP: a code-to-course lookup, not a count; a code names one
+    # course on every campus.
+    keyed <- dplyr::distinct(dplyr::transmute(attempts, course_id = subject_course, listed_code))
+    cone_opt$comparison_courses <- course_ids_of(unlist(gen_ed_all, use.names = FALSE), keyed,
+                                                 caller = "build_course_similar_students")
+  }
   courses <- get_course_similar_students(student_terms, attempts, applicants, cone_opt)
   min_n <- as.integer(opt$min_n %||% 30L)
   suppressed <- attr(courses, "suppressed")
@@ -44,6 +79,9 @@ build_course_similar_students <- function(student_terms, attempts, applicants, o
     course = course,
     classification = opt$classification,
     term = opt$term, campus = opt$campus,
+    comparison = comparison,
+    comparison_courses = attr(courses, "comparison_courses"),
+    n_comparison_student_terms = attr(courses, "n_comparison_student_terms"),
     min_n = min_n, min_cell_n = as.integer(opt$min_cell_n %||% 5L),
     edge = attr(courses, "edge"), graded_edge = attr(courses, "graded_edge"),
     n_population_student_terms = attr(courses, "n_population_student_terms"),
@@ -124,7 +162,9 @@ course_similar_students_headline <- function(payload) {
       " this comparison needs."
     ))
   }
-  like <- "non-takers of the same term, home campus, high-school GPA band and time status"
+  like <- if (identical(meta$comparison, "gen_ed")) {
+    "students of the same term, home campus, high-school GPA band and time status who took a Gen Ed course and not this one"
+  } else "non-takers of the same term, home campus, high-school GPA band and time status"
   sentences <- if (is.na(f$return_gap)) {
     paste0("No return is observable yet for the ", fmt_n(f$n_covered), " students who took ", meta$course, ".")
   } else {
@@ -146,6 +186,13 @@ course_similar_students_headline <- function(payload) {
   if (length(second) > 0) {
     second <- paste0(paste(second, collapse = "; "), ".")
     sentences <- c(sentences, paste0(toupper(substr(second, 1, 1)), substring(second, 2)))
+  }
+  if (identical(meta$comparison, "gen_ed")) {
+    sentences <- c(sentences, paste0(
+      "The compared students come from the ", fmt_n(meta$n_comparison_student_terms), " of ",
+      fmt_n(meta$n_population_student_terms), " student-terms in this population with a Gen Ed course that term (",
+      sprintf("%.0f%%", 100 * meta$n_comparison_student_terms / meta$n_population_student_terms), ")."
+    ))
   }
   b <- payload$benchmark[payload$benchmark$outcome == "return", , drop = FALSE]
   if (b$n_courses > 0L && !is.na(b$share_below)) {
@@ -258,7 +305,8 @@ format_course_similar_students <- function(payload) {
   }
   rows_of <- function(tbl, labels) vapply(seq_len(nrow(tbl)), function(i) course_line(tbl[i, ], labels[i]), character(1))
   lines <- c(
-    paste0(meta$course, " against similar non-takers: ", paste(meta$classification, collapse = ", ")),
+    paste0(meta$course, " against ", course_similar_comparisons()[[meta$comparison]], ": ",
+           paste(meta$classification, collapse = ", ")),
     paste0("Population: ", format(meta$n_population_student_terms, big.mark = ","), " student-terms; ",
            "cells of term, home campus, high-school GPA band and time status with at least ", meta$min_cell_n,
            " non-takers; rows with at least ", meta$min_n, " covered takers."),

@@ -1,9 +1,19 @@
+# the gen_ed comparison reads the Gen Ed list and says whom it compared
+
+    Code
+      cat(course_similar_students_headline(payload), sep = "\n")
+    Output
+      Of 1 students who took HIST 499, 100.0% returned the next regular term, against 0.0% expected from students of the same term, home campus, high-school GPA band and time status who took a Gen Ed course and not this one: a gap of +100.0 points, where chance alone moves it about 0.0.
+      In their other courses that term they did not pass 100.0% of attempts against 25.0% expected (+75.0 points).
+      The compared students come from the 3 of 4 student-terms in this population with a Gen Ed course that term (75%).
+      Taking almost any course goes with returning: across the 1 other courses these students took, the median return gap is -100.0 points, and HIST 499's is larger than 100% of them.
+
 # the payload carries the focal row, the benchmark and the instructors; the text preview reads it
 
     Code
       cat(format_course_similar_students(payload), sep = "\n")
     Output
-      HIST 101 against similar non-takers: Freshman
+      HIST 101 against similar students who did not take it: Freshman
       Population: 11 student-terms; cells of term, home campus, high-school GPA band and time status with at least 1 non-takers; rows with at least 1 covered takers.
       
       Of 5 students who took HIST 101, 60.0% returned the next regular term, against 10.0% expected from non-takers of the same term, home campus, high-school GPA band and time status: a gap of +50.0 points, where chance alone moves it about 24.5.

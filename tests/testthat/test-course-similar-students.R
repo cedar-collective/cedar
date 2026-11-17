@@ -127,6 +127,54 @@ test_that("by_term gives the same comparison one anchor term at a time, and the 
   expect_equal(course_similar_students_trend(series(c(0, 2, 4, 6, 0), 5))$direction, "steady")
 })
 
+test_that("comparison_courses keeps only non-takers in those courses; a cell with none leaves its takers uncovered", {
+  # HIST 499 in 202080: taker REP; non-takers BACK, EDROP, FAIL, with 5 other
+  # attempts and 1 DFW. Only BACK and FAIL took HIST 101 that term: 4
+  # attempts (2 HIST 300, 2 HIST 101), FAIL's HIST 101 the 1 DFW.
+  every <- get_course_similar_students(ss_student_terms2, ss_attempts2, ss_app,
+                                       ss_opt(course = "HIST 499", term = 202080L))
+  in_101 <- get_course_similar_students(ss_student_terms2, ss_attempts2, ss_app,
+                                        ss_opt(course = "HIST 499", term = 202080L, comparison_courses = "HIST 101"))
+  expect_equal(every$other_dfw_expected_pct, 20)
+  expect_equal(in_101$other_dfw_expected_pct, 25)
+  expect_equal(in_101$n_takers, 1L)
+  expect_equal(attr(every, "n_comparison_student_terms"), 4L)
+  expect_equal(attr(in_101, "n_comparison_student_terms"), 3L)
+  expect_null(attr(every, "comparison_courses"))
+  expect_equal(attr(in_101, "comparison_courses"), "HIST 101")
+
+  # Nobody took the comparison course: HIST 300's three takers are counted,
+  # none covered, never dropped.
+  none <- get_course_similar_students(ss_student_terms2, ss_attempts2, ss_app,
+                                      ss_opt(course = "HIST 300", term = 202080L, comparison_courses = "NOPE 100"))
+  expect_equal(nrow(none), 0L)
+  expect_equal(attr(none, "suppressed")$n_takers, 3L)
+  expect_equal(attr(none, "suppressed")$n_covered, 0L)
+  expect_error(get_course_similar_students(ss_student_terms2, ss_attempts2, ss_app,
+                                           ss_opt(comparison_courses = character(0))), "at least one course")
+})
+
+test_that("the gen_ed comparison reads the Gen Ed list and says whom it compared", {
+  # HIST 101 relisted as HIST 1105, a UNM Gen Ed course: the HIST 499 case
+  # above, through the named comparison.
+  gen_ed_101 <- ss_attempts2 %>%
+    mutate(across(c(subject_course, listed_code), ~ if_else(.x == "HIST 101", "HIST 1105", .x)))
+  payload <- build_course_similar_students(ss_student_terms2, gen_ed_101, ss_app,
+                                           ss_opt(course = "HIST 499", term = 202080L, comparison = "gen_ed"))
+  expect_equal(payload$meta$comparison, "gen_ed")
+  expect_true("HIST 1105" %in% payload$meta$comparison_courses)
+  expect_equal(payload$focal$other_dfw_expected_pct, 25)
+  expect_equal(payload$meta$n_comparison_student_terms, 3L)
+  testthat::local_edition(3)
+  expect_snapshot(cat(course_similar_students_headline(payload), sep = "\n"))
+
+  expect_equal(build_course_similar_students(ss_student_terms2, ss_attempts2, ss_app,
+                                             ss_opt(course = "HIST 499", term = 202080L))$meta$comparison, "all")
+  expect_error(build_course_similar_students(ss_student_terms2, ss_attempts2, ss_app,
+                                             ss_opt(course = "HIST 499", comparison = "honors")),
+               "comparison must be one of")
+})
+
 test_that("get_course_similar_students() stops without its inputs", {
   expect_error(get_course_similar_students(ss_student_terms2, ss_attempts2, ss_app, list(data_edges = rp01_edges)), "classification")
   expect_error(get_course_similar_students(ss_student_terms2, ss_attempts2, NULL, ss_opt()), "applicants")

@@ -30,7 +30,7 @@ try {
   await openSubTab(page, 'Retention', { timeout: 300000 });
   await openSubTab(page, 'Takers vs Non-Takers', { timeout: 300000 });
   await requireIds(page, ['cr_cohort-classification', 'cr_cohort-college', 'cr_cohort-terms',
-                          'cr_cohort-term_type', 'cr_cohort-min_n', 'cr_cohort-run']);
+                          'cr_cohort-term_type', 'cr_cohort-min_n', 'cr_cohort-comparison', 'cr_cohort-run']);
 
   // The controls open filled from the data, never empty.
   const defaults = await page.evaluate(() => ({
@@ -75,6 +75,14 @@ try {
      'the similar-students sections are on the page');
   ok(await page.evaluate(() => !!document.querySelector('#cr_cohort-similar_courses_table .rt-table')),
      'cr_cohort-similar_courses_table rendered');
+
+  // Comparing with similar students in Gen Ed courses: the run says so.
+  ok(!/who took a Gen Ed course that term/.test(body), 'the default compares with everyone else');
+  await page.evaluate(() => $('#cr_cohort-comparison')[0].selectize.setValue('gen_ed'));
+  await runAndWait(page, 'cr_cohort-run', { timeout: 300000 });
+  await waitForIdle(page);
+  const genEd = await page.evaluate(() => document.getElementById('cr_cohort-results').textContent);
+  ok(/who took a Gen Ed course that term/.test(genEd), 'the Gen Ed comparison names whom it compared');
 
   // Instructor names sit behind the gate: a session that has not unlocked it
   // sees the prompt, never the by-instructor table.
