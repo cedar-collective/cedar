@@ -246,6 +246,17 @@ the rate the takers would have had at their similar peers' rates.
 Either way the cells remove term, campus, high-school GPA and time status and
 nothing else: placement, advising and motivation are not in them.
 
+**Over Time** shows the three gaps one term at a time, each with the band
+chance alone gives, so a gap that is shrinking or growing shows as a series
+rather than hiding in the pooled average. A dashed line is fitted from fall
+to fall (or spring to spring, whichever has more takers), and the lead says
+whether each gap is rising, falling or showing no trend beyond chance. A
+line needs at least three terms, and its slope must be larger than both
+chance and the terms' own ups and downs before it counts as a trend.
+**Every Course These Students Take** shows the same return-gap line for
+every course, with its slope a year, so a set of courses can be read for
+their trends side by side.
+
 ---
 
 ## Downstream

@@ -29,7 +29,8 @@ test_that("takers are read against the non-takers of their cell: return, other-c
   expect_equal(names(res), c("course", "n_takers", "n_covered", "n_terms",
                              "return_n", "return_pct", "return_expected_pct", "return_gap", "return_gap_se",
                              "other_attempts", "other_dfw_pct", "other_dfw_expected_pct", "other_dfw_gap",
-                             "next_gpa_n", "next_gpa", "next_gpa_expected", "next_gpa_gap"))
+                             "other_dfw_gap_se", "next_gpa_n", "next_gpa", "next_gpa_expected", "next_gpa_gap",
+                             "next_gpa_gap_se"))
   expect_equal(res$course, "HIST 101")
   expect_equal(res$n_takers, 2L)
   expect_equal(res$n_covered, 2L)
@@ -111,20 +112,34 @@ test_that("by_term gives the same comparison one anchor term at a time, and the 
   expect_equal(by_term$return_pct, c(100, 100 / 3))
   expect_equal(by_term$return_expected_pct, c(25, 0))
   # Two terms are not a trend.
-  expect_null(course_similar_students_trend(by_term))
+  expect_true(all(course_similar_students_trend(by_term, "fall")$direction == "too_few_terms"))
+})
 
-  # A local series of per-term gaps: the slope against its own standard error.
-  series <- function(gaps, se) tibble::tibble(term = c(202080L, 202110L, 202180L, 202210L, 202260L),
-                                               return_gap = gaps, return_gap_se = se)
-  up <- course_similar_students_trend(series(c(0, 2, 4, 6, 99), 0.5))
-  # The summer term (202260) is left out: four regular terms, +2 a term.
-  expect_equal(up$n_terms, 4L)
-  expect_equal(up$slope, 2)
-  expect_equal(up$slope_se, sqrt(5 * 0.25) / 5)
-  expect_equal(up$direction, "improving")
-  expect_equal(up$last_term, 202210L)
-  expect_equal(course_similar_students_trend(series(c(6, 4, 2, 0, 0), 0.5))$direction, "declining")
-  expect_equal(course_similar_students_trend(series(c(0, 2, 4, 6, 0), 5))$direction, "steady")
+test_that("each course's gaps get a line a year within one term type, judged against chance and scatter", {
+  # ss_gap_series (scenario_tables.R): falls 2019-2022; the spring and summer
+  # rows are left out of a fall line.
+  trends <- course_similar_students_trend(ss_gap_series, "fall")
+  ret <- trends %>% filter(outcome == "return") %>% arrange(course)
+  expect_equal(ret$course, c("GAP 100", "GAP 200", "GAP 300"))
+  expect_equal(ret$n_terms, c(4L, 4L, 4L))
+  expect_equal(ret$last_term, rep(202280L, 3))
+  expect_equal(ret$slope, c(2, -2, 1.2))
+  # Chance: sqrt(sum of x^2 * se^2) / sum of x^2, x = -1.5 .. 1.5 years.
+  expect_equal(ret$slope_se[1], sqrt(5 * 0.25) / 5)
+  # GAP 300's scatter (28.8 left around the line over 2 spare terms) is the error.
+  expect_equal(ret$slope_se[3], sqrt(28.8 / 2 / 5))
+  expect_equal(ret$direction, c("rising", "falling", "steady"))
+  expect_equal(ret$fit_first[1], 0)
+  expect_equal(ret$fit_last[1], 6)
+  expect_equal(trends$direction[trends$outcome == "next_gpa"], rep("too_few_terms", 3))
+  expect_equal(trends %>% filter(outcome == "other_dfw") %>% arrange(course) %>% pull(direction),
+               c("rising", "falling", "steady"))
+  # Springs alone: one term a course.
+  expect_true(all(course_similar_students_trend(ss_gap_series, "spring")$direction == "too_few_terms"))
+  expect_equal(nrow(course_similar_students_trend(ss_gap_series, NA_character_)), 0L)
+  expect_error(course_similar_students_trend(ss_gap_series %>% select(-next_gpa_gap_se), "fall"), "next_gpa_gap_se")
+  expect_error(compute_rate_trend(ss_gap_series %>% transmute(term, value = return_gap, se = 0)),
+               "positive standard error")
 })
 
 test_that("comparison_courses keeps only non-takers in those courses; a cell with none leaves its takers uncovered", {
@@ -138,6 +153,8 @@ test_that("comparison_courses keeps only non-takers in those courses; a cell wit
   expect_equal(every$other_dfw_expected_pct, 20)
   expect_equal(in_101$other_dfw_expected_pct, 25)
   expect_equal(in_101$n_takers, 1L)
+  # Chance at the expected rate over REP's one other attempt: 100 * sqrt(0.2 * 0.8).
+  expect_equal(every$other_dfw_gap_se, 100 * sqrt(0.2 * 0.8))
   expect_equal(attr(every, "n_comparison_student_terms"), 4L)
   expect_equal(attr(in_101, "n_comparison_student_terms"), 3L)
   expect_null(attr(every, "comparison_courses"))
@@ -152,6 +169,18 @@ test_that("comparison_courses keeps only non-takers in those courses; a cell wit
   expect_equal(attr(none, "suppressed")$n_covered, 0L)
   expect_error(get_course_similar_students(ss_student_terms2, ss_attempts2, ss_app,
                                            ss_opt(comparison_courses = character(0))), "at least one course")
+})
+
+test_that("the next-term GPA gap's error is the non-takers' own spread of GPAs", {
+  # REP's 202010 HIST 499 attempt relisted as HIST 102: its one taker against
+  # non-takers BACK and FAIL, who returned with GPAs 3.0 and 2.0 (variance
+  # 0.25), and DROP, GONE and GRAD, who did not.
+  rep_102 <- ss_attempts2 %>%
+    mutate(subject_course = if_else(student_id == "RP_REP" & term == 202010L, "HIST 102", subject_course))
+  res <- get_course_similar_students(ss_student_terms2, rep_102, ss_app, ss_opt(course = "HIST 102", term = 202010L))
+  expect_equal(res$next_gpa_n, 1L)
+  expect_equal(res$next_gpa_expected, 2.5)
+  expect_equal(res$next_gpa_gap_se, 0.5)
 })
 
 test_that("the gen_ed comparison reads the Gen Ed list and says whom it compared", {
@@ -185,7 +214,8 @@ test_that("get_course_similar_students() stops without its inputs", {
 })
 
 test_that("the payload carries the focal row, the benchmark and the instructors; the text preview reads it", {
-  payload <- build_course_similar_students(ss_student_terms2, ss_attempts2, ss_app, ss_opt(course = "HIST 101"))
+  payload <- build_course_similar_students(ss_student_terms2, ss_attempts2, ss_app,
+                                           ss_opt(course = "HIST 101", min_term_n = 1L))
   expect_s3_class(payload, "course_similar_students")
   expect_equal(payload$focal$course, "HIST 101")
   expect_true(all(c("HIST 101", "HIST 499", "HIST 300") %in% payload$courses$course))
@@ -194,6 +224,12 @@ test_that("the payload carries the focal row, the benchmark and the instructors;
   expect_equal(payload$benchmark$n_courses[1], nrow(payload$courses) - 1L)
   expect_equal(payload$benchmark$focal_gap[1], payload$focal$return_gap)
   expect_equal(sort(payload$instructors$instructor_id), c("RP_I1", "RP_I3"))
+  # Every course's terms, the focal one's among them; fall has the most takers.
+  expect_equal(payload$by_term, payload$courses_by_term %>% filter(course == "HIST 101"))
+  expect_true(all(c("HIST 300", "HIST 499") %in% payload$courses_by_term$course))
+  expect_equal(payload$meta$trend_term_type, "fall")
+  expect_true(all(c("return_trend", "return_trend_slope", "return_trend_chance", "return_gap_series") %in% names(payload$courses)))
+  expect_equal(payload$trend, payload$trends %>% filter(course == "HIST 101"))
   testthat::local_edition(3)
   expect_snapshot(cat(format_course_similar_students(payload), sep = "\n"))
 
@@ -201,6 +237,10 @@ test_that("the payload carries the focal row, the benchmark and the instructors;
   thin <- build_course_similar_students(ss_student_terms2, ss_attempts2, ss_app, ss_opt(course = "HIST 101", min_n = 50L)[-2])
   expect_null(thin$focal)
   expect_snapshot(cat(course_similar_students_headline(thin), sep = "\n"))
+  # The lead reads each gap's line: GAP 100's series stands in for the trend.
+  trended <- payload
+  trended$trend <- course_similar_students_trend(ss_gap_series, "fall") %>% filter(course == "GAP 100")
+  expect_snapshot(cat(tail(course_similar_students_headline(trended), 2), sep = "\n"))
   expect_error(build_course_similar_students(ss_student_terms2, ss_attempts2, ss_app, ss_opt()), "focal course")
   expect_error(course_similar_students_headline(list()), "build_course_similar_students")
 })

@@ -243,14 +243,16 @@ courseCohortServer <- function(id, student_terms, attempts, programs, dims, edge
         ),
         if (nrow(s$by_term) > 0L) dashboard_subsection(
           "Over Time",
-          paste0("The same comparison one term at a time: the takers' return rate beside the rate expected from similar non-takers, and the three gaps. A term needs ",
-                 m$min_term_n, " covered takers. The trend in the lead is the slope of the return gap across regular terms against its own standard error."),
-          plotly::plotlyOutput(ns("similar_trend_plot"), height = "320px"),
+          paste0("The three gaps one term at a time, each with the band chance alone gives (two standard errors) and, dashed, the line fitted ",
+                 m$trend_term_type, " to ", m$trend_term_type, " (the term type with the most takers). A term needs ", m$min_term_n,
+                 " covered takers. A line is a trend when its slope a year is beyond two standard errors, the larger of chance and the terms' own scatter around it; fewer than three terms is no line."),
+          plotly::plotlyOutput(ns("similar_trend_plot"), height = "560px"),
           reactable::reactableOutput(ns("similar_term_table"))
         ),
         dashboard_subsection(
           "Every Course These Students Take",
-          paste0("The same gaps for every course with ", m$min_n, " or more covered takers in this population, largest return gap first. Taking almost any course goes with returning, so a course is read against the other courses here, never against zero; a course students are placed into shows its placement."),
+          paste0("The same gaps for every course with ", m$min_n, " or more covered takers in this population, largest return gap first. Taking almost any course goes with returning, so a course is read against the other courses here, never against zero; a course students are placed into shows its placement. ",
+                 "Return trend is each course's return gap ", m$trend_term_type, " to ", m$trend_term_type, ", read as in Over Time: the line, its slope a year, and rising or falling only beyond two standard errors."),
           reactable::reactableOutput(ns("similar_courses_table"))
         ),
         if (nrow(s$instructors) > 0L) dashboard_subsection(
@@ -288,18 +290,31 @@ courseCohortServer <- function(id, student_terms, attempts, programs, dims, edge
                           columns = c("other_dfw_pct", "other_dfw_expected_pct", "other_dfw_gap")),
       reactable::colGroup(name = "Next-term GPA, returners", columns = c("next_gpa", "next_gpa_expected", "next_gpa_gap"))
     )
-    similar_display <- function(rows, first_cols) {
+    similar_display <- function(rows, first_cols, extra_cols = character()) {
       rows %>% transmute(
-        across(all_of(first_cols)), n_covered,
+        across(all_of(first_cols)), n_covered, across(all_of(extra_cols)),
         return_pct = return_pct / 100, return_expected_pct = return_expected_pct / 100, return_gap,
         return_chance = 2 * return_gap_se,
         other_dfw_pct = other_dfw_pct / 100, other_dfw_expected_pct = other_dfw_expected_pct / 100, other_dfw_gap,
         next_gpa, next_gpa_expected, next_gpa_gap)
     }
-    similar_table <- function(rows, first_cols, first_defs, ...) {
+    similar_table <- function(rows, first_cols, first_defs, extra_defs = list(), ...) {
       reactable::reactable(
-        similar_display(rows, first_cols), theme = cedar_tbl_theme, compact = TRUE, striped = TRUE,
-        columns = similar_columns(first_defs), columnGroups = similar_groups, ...)
+        similar_display(rows, first_cols, names(extra_defs)), theme = cedar_tbl_theme, compact = TRUE, striped = TRUE,
+        columns = c(similar_columns(first_defs), extra_defs), columnGroups = similar_groups, ...)
+    }
+    # A course's return gap across terms: the line, its slope a year, the verdict.
+    trend_def <- function(rows) {
+      verdict <- c(rising = "rising", falling = "falling", steady = "steady", too_few_terms = "too few terms")
+      list(return_trend_slope = reactable::colDef(
+        name = "Return trend", minWidth = 150, align = "left", na = "—",
+        cell = function(value, index) {
+          dir <- rows$return_trend[index]
+          if (is.na(dir)) return("—")
+          label <- if (dir == "too_few_terms") verdict[[dir]]
+                   else paste0(sprintf("%+.1f", value), " a year, ", verdict[[dir]])
+          htmltools::tagList(make_sparkline(rows$return_gap_series[[index]]), " ", label)
+        }))
     }
     course_def <- list(course = reactable::colDef(name = "Course", minWidth = 110))
 
@@ -319,7 +334,7 @@ courseCohortServer <- function(id, student_terms, attempts, programs, dims, edge
     })
     output$similar_courses_table <- reactable::renderReactable({
       s <- similar(); req(s)
-      similar_table(s$courses, "course", course_def, highlight = TRUE, searchable = TRUE,
+      similar_table(s$courses, "course", course_def, extra_defs = trend_def(s$courses), highlight = TRUE, searchable = TRUE,
                     defaultPageSize = 15, showPageSizeOptions = TRUE, pageSizeOptions = c(15, 30, 100),
                     rowClass = reactable::JS(sprintf(
                       "function(rowInfo) { return rowInfo && rowInfo.values.course === %s ? 'fw-semibold' : null }",

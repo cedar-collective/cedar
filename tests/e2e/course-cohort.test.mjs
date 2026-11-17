@@ -75,6 +75,9 @@ try {
      'the similar-students sections are on the page');
   ok(await page.evaluate(() => !!document.querySelector('#cr_cohort-similar_courses_table .rt-table')),
      'cr_cohort-similar_courses_table rendered');
+  ok(await page.evaluate(() => /Return trend/.test(
+       document.querySelector('#cr_cohort-similar_courses_table .rt-thead')?.textContent || '')),
+     'every course carries its return-gap trend');
 
   // Comparing with similar students in Gen Ed courses: the run says so.
   ok(!/who took a Gen Ed course that term/.test(body), 'the default compares with everyone else');

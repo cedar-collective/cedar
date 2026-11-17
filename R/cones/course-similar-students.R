@@ -41,9 +41,11 @@
 # GPA and time status and nothing else. Placement, advising, major and
 # motivation are not in them, and a course students are placed into shows
 # its placement here. At the instructor grain a section tied to a program or
-# a learning community shows that program, not the teaching. The return
-# gap's standard error is the binomial error at the expected rates; it
-# ignores the error in the non-takers' rates and so is a floor.
+# a learning community shows that program, not the teaching. Each gap's
+# standard error is chance at the expected rates: binomial for return and
+# for other-course DFW (attempts counted as independent), the non-takers'
+# own spread of GPAs for next-term GPA. It ignores the error in the
+# non-takers' rates and so is a floor.
 #
 # Depends on: cedar_longitudinal_edge() (branches/data-edges.R)
 #             hs_gpa_band(), applicant_hs_gpa() (branches/comparison.R)
@@ -72,8 +74,9 @@
 #'   `instructor_name` at the instructor grain): `n_takers`, `n_covered`,
 #'   `n_terms`; `return_n`, `return_pct`, `return_expected_pct`,
 #'   `return_gap`, `return_gap_se`; `other_attempts`, `other_dfw_pct`,
-#'   `other_dfw_expected_pct`, `other_dfw_gap`; `next_gpa_n`, `next_gpa`,
-#'   `next_gpa_expected`, `next_gpa_gap`. Gaps are actual minus expected (a
+#'   `other_dfw_expected_pct`, `other_dfw_gap`, `other_dfw_gap_se`;
+#'   `next_gpa_n`, `next_gpa`, `next_gpa_expected`, `next_gpa_gap`,
+#'   `next_gpa_gap_se`. Gaps are actual minus expected (a
 #'   positive DFW gap is worse); an outcome with nothing observable is NA.
 #'   Attributes: `edge`, `graded_edge`, `n_population_student_terms`,
 #'   `cells` (the cell columns), `suppressed` (rows under `min_n`),
@@ -137,7 +140,8 @@ get_course_similar_students <- function(student_terms, attempts, applicants, opt
       ret_obs = as.integer(return_observable %in% TRUE),
       ret     = as.integer(return_observable %in% TRUE & returned_next_regular_term %in% TRUE),
       gpa_n   = as.integer(!is.na(next_gpa)),
-      gpa_sum = coalesce(next_gpa, 0)
+      gpa_sum = coalesce(next_gpa, 0),
+      gpa_sq  = coalesce(next_gpa^2, 0)
     )
   cedar_debug("[course-similar-students.R] ", nrow(members), " member student-terms to ", edge)
 
@@ -172,7 +176,7 @@ get_course_similar_students <- function(student_terms, attempts, applicants, opt
     paste(members$student_id, members$term) %in% paste(holders$student_id, holders$term)
   }
 
-  measures <- c("n", "ret_obs", "ret", "gpa_n", "gpa_sum", "tot_att", "tot_dfw")
+  measures <- c("n", "ret_obs", "ret", "gpa_n", "gpa_sum", "gpa_sq", "tot_att", "tot_dfw")
   cells <- members %>%
     filter(in_comparison) %>%
     group_by(across(all_of(cell_cols))) %>%
@@ -209,7 +213,9 @@ get_course_similar_students <- function(student_terms, attempts, applicants, opt
       nt_n = n.cell - n,
       nt_return = if_else(ret_obs.cell - ret_obs > 0L, (ret.cell - ret) / (ret_obs.cell - ret_obs), NA_real_),
       nt_dfw    = if_else(tot_att.cell - tot_att > 0L, (tot_dfw.cell - tot_dfw) / (tot_att.cell - tot_att), NA_real_),
-      nt_gpa    = if_else(gpa_n.cell - gpa_n > 0L, (gpa_sum.cell - gpa_sum) / (gpa_n.cell - gpa_n), NA_real_)
+      nt_gpa    = if_else(gpa_n.cell - gpa_n > 0L, (gpa_sum.cell - gpa_sum) / (gpa_n.cell - gpa_n), NA_real_),
+      nt_gpa_var = if_else(gpa_n.cell - gpa_n > 0L,
+                           pmax((gpa_sq.cell - gpa_sq) / (gpa_n.cell - gpa_n) - nt_gpa^2, 0), NA_real_)
     )
 
   row_cols <- c("course", if (grain == "instructor") c("instructor_id", "instructor_name"),
@@ -235,8 +241,10 @@ get_course_similar_students <- function(student_terms, attempts, applicants, opt
       .ret_var = sum(ret_obs[r_ok] * nt_return[r_ok] * (1 - nt_return[r_ok])),
       other_attempts = sum(other_att[d_ok]),
       .dfw = sum(other_dfw[d_ok]), .dfw_exp = sum(other_att[d_ok] * nt_dfw[d_ok]),
+      .dfw_var = sum(other_att[d_ok] * nt_dfw[d_ok] * (1 - nt_dfw[d_ok])),
       next_gpa_n = sum(gpa_n[g_ok]),
       .gpa = sum(gpa_sum[g_ok]), .gpa_exp = sum(gpa_n[g_ok] * nt_gpa[g_ok]),
+      .gpa_var = sum(gpa_n[g_ok] * nt_gpa_var[g_ok]),
       .groups = "drop"
     ) %>%
     mutate(
@@ -245,13 +253,15 @@ get_course_similar_students <- function(student_terms, attempts, applicants, opt
       other_dfw_pct = 100 * ratio(.dfw, other_attempts),
       other_dfw_expected_pct = 100 * ratio(.dfw_exp, other_attempts),
       other_dfw_gap = other_dfw_pct - other_dfw_expected_pct,
+      other_dfw_gap_se = 100 * ratio(sqrt(.dfw_var), other_attempts),
       next_gpa = ratio(.gpa, next_gpa_n), next_gpa_expected = ratio(.gpa_exp, next_gpa_n),
-      next_gpa_gap = next_gpa - next_gpa_expected
+      next_gpa_gap = next_gpa - next_gpa_expected,
+      next_gpa_gap_se = ratio(sqrt(.gpa_var), next_gpa_n)
     ) %>%
     select(all_of(row_cols), n_takers, n_covered, n_terms,
            return_n, return_pct, return_expected_pct, return_gap, return_gap_se,
-           other_attempts, other_dfw_pct, other_dfw_expected_pct, other_dfw_gap,
-           next_gpa_n, next_gpa, next_gpa_expected, next_gpa_gap) %>%
+           other_attempts, other_dfw_pct, other_dfw_expected_pct, other_dfw_gap, other_dfw_gap_se,
+           next_gpa_n, next_gpa, next_gpa_expected, next_gpa_gap, next_gpa_gap_se) %>%
     arrange(desc(return_gap), across(all_of(row_cols)))
   if (isTRUE(opt$by_term)) rows <- rows %>% arrange(across(all_of(row_cols)))
 

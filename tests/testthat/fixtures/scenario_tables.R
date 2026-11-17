@@ -490,6 +490,26 @@ ss_ids <- unique(test_student_terms_rp$student_id)
 
 ss_app <- tibble::tibble(student_id = ss_ids, high_school_cum_gpa = 3.0)
 
+# Per-term gaps in by_term's shape, four falls (2019-2022) with a spring and a
+# summer between: GAP 100's return gap climbs 0, 2, 4, 6 (+2 a year) with
+# standard error 0.5; GAP 200's falls 6, 4, 2, 0; GAP 300's zigzags 0, 6, 0, 6
+# with standard error 0.1, a line chance alone calls rising and its scatter
+# does not. The DFW gap is the return gap's; the GPA gap is NA but in two
+# terms, too few for a line. A spring term (202110) sits in each course.
+ss_gap_series <- local({
+  terms <- c(201980L, 202080L, 202110L, 202160L, 202180L, 202280L)
+  course_rows <- function(course, falls, se) {
+    gap <- c(falls[1:2], 50, 50, falls[3:4])
+    tibble::tibble(course = course, term = terms,
+                   return_gap = gap, return_gap_se = se,
+                   other_dfw_gap = gap, other_dfw_gap_se = se,
+                   next_gpa_gap = c(0.1, 0.2, NA, NA, NA, NA), next_gpa_gap_se = 0.05)
+  }
+  bind_rows(course_rows("GAP 100", c(0, 2, 4, 6), 0.5),
+            course_rows("GAP 200", c(6, 4, 2, 0), 0.5),
+            course_rows("GAP 300", c(0, 6, 0, 6), 0.1))
+})
+
 # ── test-courses.R ──────────────────────────────────────────────────────────────
 
 demo_files <- read_institution_mappings(cedar_institution_dir(cedar_base_dir, "demo"))

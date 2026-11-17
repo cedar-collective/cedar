@@ -26,6 +26,10 @@
         HIST 101 *                   n     5  return 60.0 vs 10.0 (50.0)  other DFW 20.0 vs 0.0 (20.0)  next GPA 2.50 vs 4.00
         HIST 300                     n     3  return 0.0 vs 100.0 (-100.0)  other DFW 50.0 vs 50.0 (0.0)  next GPA — vs —
       
+      HIST 101 term by term:
+        Spring 2020                  n     2  return 100.0 vs 25.0 (75.0)  other DFW 50.0 vs 0.0 (50.0)  next GPA 2.50 vs 4.00
+        Fall 2020                    n     3  return 33.3 vs 0.0 (33.3)  other DFW 0.0 vs 0.0 (0.0)  next GPA — vs —
+      
       HIST 101 by instructor, against the course's non-takers:
         RP_I3                        n     1  return 100.0 vs 25.0 (75.0)  other DFW 100.0 vs 0.0 (100.0)  next GPA 2.00 vs 4.00
         RP_I1                        n     4  return 50.0 vs 6.2 (43.8)  other DFW 0.0 vs 0.0 (0.0)  next GPA 3.00 vs 4.00
@@ -36,4 +40,12 @@
       cat(course_similar_students_headline(thin), sep = "\n")
     Output
       HIST 101 has 5 takers in this population with comparable non-takers, under the 50 this comparison needs.
+
+---
+
+    Code
+      cat(tail(course_similar_students_headline(trended), 2), sep = "\n")
+    Output
+      Fall to fall, the return gap went from +0.0 points in Fall 2019 to +6.0 in Fall 2022 over 4 terms: rising (+2.0 a year; a trend needs more than ±0.4).
+      The other-course DFW gap went from +0.0 points in Fall 2019 to +6.0 in Fall 2022 over 4 terms: rising (+2.0 a year; a trend needs more than ±0.4).
 
