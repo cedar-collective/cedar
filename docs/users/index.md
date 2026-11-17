@@ -125,7 +125,7 @@ grade distributions, DFW by instructor type, retention, and sequence
 comparisons — is on the top-level navbar. [Guide →](course-reports)
 
 **Retention** across courses is documented in its [guide](retention) but is not
-in the app yet; for one course, use Course Dynamics → Retention.
+in the app yet; for one course, use Course Dynamics → Downstream → Overall.
 
 ---
 

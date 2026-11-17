@@ -1,10 +1,10 @@
-// Course Dynamics > Retention > Takers vs Non-Takers: the analysed course's takers against
+// Course Dynamics > Downstream > Overall > Against Students Who Didn't Take It: the analysed course's takers against
 // the students of its classification who never took it, read against the
 // college's other courses (R/modules/course-cohort.R over
 // build_course_cohort_context()).
 //
 // Asserts the tab opens on data-read defaults, a run renders the lead
-// paragraph and the four tables, and the definition record reaches the page.
+// paragraph and the three tables, and the definition record reaches the page.
 //
 //   node tests/e2e/course-cohort.test.mjs
 
@@ -26,9 +26,10 @@ try {
   await runAndWait(page, 'cr_generate_button');
   console.log(`course loaded: ${COURSE}`);
 
-  // Takers vs Non-Takers is the second view under Retention.
-  await openSubTab(page, 'Retention', { timeout: 300000 });
-  await openSubTab(page, 'Takers vs Non-Takers', { timeout: 300000 });
+  // The comparison with non-takers is the second view on Downstream > Overall,
+  // under By Grade Here.
+  await openSubTab(page, 'Downstream', { timeout: 300000 });
+  await openSubTab(page, 'Overall', { timeout: 300000 });
   await requireIds(page, ['cr_cohort-classification', 'cr_cohort-college', 'cr_cohort-terms',
                           'cr_cohort-term_type', 'cr_cohort-min_n', 'cr_cohort-comparison', 'cr_cohort-run']);
 
@@ -54,17 +55,15 @@ try {
   // The synthetic institution is small: a guard of one lets every group show.
   await setInput(page, 'cr_cohort-min_n', 1);
   await runAndWait(page, 'cr_cohort-run', { timeout: 300000 });
-  await waitForSelector(page, '#cr_cohort-groups_table .rt-table', { timeout: 60000 });
+  await waitForSelector(page, '#cr_cohort-population_table .rt-table', { timeout: 60000 });
   await waitForIdle(page);
 
   // textContent, not innerText: the "Who is being counted" panel is a collapsed
   // <details>, and innerText leaves collapsed content out.
   const body = await page.evaluate(() => document.getElementById('cr_cohort-results').textContent);
-  ok(/Passed it/.test(body) && /Never took it/.test(body),
-     'the groups table names the three groups');
   ok(/describes who takes and passes the course before it describes the course/.test(body),
      'the page says the gaps are descriptive');
-  for (const id of ['cr_cohort-population_table', 'cr_cohort-groups_table',
+  for (const id of ['cr_cohort-population_table',
                     'cr_cohort-benchmark_table', 'cr_cohort-courses_table']) {
     const rendered = await page.evaluate((i) => !!document.querySelector(`#${i} .rt-table`), id);
     ok(rendered, `${id} rendered`);

@@ -8,7 +8,7 @@
 # the takers would have had if they had done as their non-taking peers did
 # (direct standardization). The gap is actual minus expected.
 #
-# Takers vs Non-Takers (course-cohort-effect.R) puts the raw groups side by
+# The raw comparison with non-takers (course-cohort-effect.R) puts the raw groups side by
 # side per term; this cone pools the terms and removes what the cells can
 # see, so one course, or every course a population takes, or one course's
 # instructors, can be read on one scale.
