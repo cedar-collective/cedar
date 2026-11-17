@@ -1312,39 +1312,39 @@ nav_panel(
         uiOutput("cr_dfw_tab_content")
       ),
 
-      # Two views of one question, whether students stay after the course:
-      # its own students by how they did in it, and its students against the
-      # students who never took it. Built here rather than in a renderUI, so
-      # choosing another course before Analyze Course redraws neither view.
-      nav_panel(
-        "Retention",
-        icon = icon("person-walking-arrow-right"),
-        subtab_header(
-          "Retention",
-          "Two views of whether students stay after this course. By Grade follows the course's own students and splits ",
-          "their return by how they did in it. Takers vs Non-Takers sets them beside students of the same classification ",
-          "who never took it, against the college's other courses and against similar students. The grade rule chosen ",
-          "under By Grade applies there only; Takers vs Non-Takers counts pass and DFW by the standard rule."
-        ),
-        navset_tab(
-          id = "cr_retention_view",
-          nav_panel(
-            "By Grade",
-            icon = icon("chart-simple"),
-            uiOutput("cr_impact_retention_ui")
-          ),
-          nav_panel(
-            "Takers vs Non-Takers",
-            icon = icon("people-arrows"),
-            courseCohortUI("cr_cohort")
-          )
-        )
-      ),
-
+      # What happens to the course's students afterwards, as a 2x2: what is
+      # measured (overall return and grades, or one later course) is the
+      # subtab; who is compared (this course's students by their grade here,
+      # or students who took it against students who did not) is the order
+      # within it. Built here rather than in a renderUI, so choosing another
+      # course before Analyze Course redraws none of the four views.
       nav_panel(
         "Downstream",
         icon = icon("arrow-right-long"),
-        uiOutput("cr_impact_downstream_ui")
+        subtab_header(
+          "Downstream",
+          "What happens to this course's students afterwards: whether they stay and do well, and how they do in a later course.",
+          method = tagList(
+            tags$p("Each subtab asks one of those questions twice. First it follows this course's own students, split by the grade they earned here. Then it sets students who took the course beside students who did not."),
+            tags$p("Overall reads return to the university, grades in other courses and GPA. In a Later Course reads results in one later course you choose."),
+            tags$p("The \"what counts as failing\" choice under By Grade Here applies to that view only; every other view counts pass and DFW by the standard rule.")
+          )
+        ),
+        navset_tab(
+          id = "cr_downstream_view",
+          nav_panel(
+            "Overall",
+            icon = icon("person-walking-arrow-right"),
+            uiOutput("cr_impact_retention_ui"),
+            courseCohortUI("cr_cohort")
+          ),
+          nav_panel(
+            "In a Later Course",
+            icon = icon("shuffle"),
+            laterCourseUI("cr_later"),
+            uiOutput("cr_impact_sequence_ui")
+          )
+        )
       )
 
       ) # end navset_tab

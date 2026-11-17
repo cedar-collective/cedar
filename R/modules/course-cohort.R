@@ -1,4 +1,5 @@
-# Shiny Module: Course Dynamics > Retention > Takers vs Non-Takers
+# Shiny Module: Course Dynamics > Downstream > Overall > Against Students Who
+# Didn't Take It ("Takers vs Non-Takers" before 2026-11-17)
 #
 # A course's takers against its non-takers, read against the college's other
 # courses. The module owns the controls and the rendering; every number comes
@@ -55,7 +56,7 @@ courseCohortServer <- function(id, student_terms, attempts, programs, dims, edge
         return(empty_state("Select a course and click Analyze Course first, then open this tab."))
       }
       d <- tryCatch(defaults(), error = function(e) {
-        showNotification(paste("Takers vs Non-Takers:", conditionMessage(e)), type = "error", duration = 10)
+        showNotification(paste("Comparison with non-takers:", conditionMessage(e)), type = "error", duration = 10)
         NULL
       })
       if (is.null(d)) return(empty_state(paste0("No graded attempt of ", crs, " to read.")))
@@ -70,7 +71,7 @@ courseCohortServer <- function(id, student_terms, attempts, programs, dims, edge
 
       tagList(
         subtab_header(
-          "Takers vs Non-Takers",
+          "Against Students Who Didn't Take It",
           paste0("Do students who take ", crs, " come back and do well the next semester more often than students who don't?"),
           method = tagList(
             cedar_definition_note("course-cohort-effect"),
@@ -135,7 +136,7 @@ courseCohortServer <- function(id, student_terms, attempts, programs, dims, edge
         payload <- tryCatch(
           build_course_cohort_context(student_terms, attempts, opt),
           error = function(e) {
-            showNotification(paste("Takers vs Non-Takers:", conditionMessage(e)), type = "error", duration = 10)
+            showNotification(paste("Comparison with non-takers:", conditionMessage(e)), type = "error", duration = 10)
             NULL
           }
         )
@@ -186,7 +187,7 @@ courseCohortServer <- function(id, student_terms, attempts, programs, dims, edge
           tags$ul(class = "mb-0",
             tags$li("The population is every enrolled student-term of the selected classification(s) in the selected terms, by home campus: ",
                     n(meta$n_population_student_terms), " student-terms."),
-            tags$li("Passed, DFW'd and never took it are read off every graded attempt (", meta$course,
+            tags$li("Passed and never took it are read off every graded attempt (", meta$course,
                     " taken on any campus counts); return is enrollment the next regular term, and summer is not a step."),
             tags$li("The next-term DFW share is DFW over the group's classified attempts in that next term; it is blank where the next term is not yet graded."),
             tags$li("In the population and in no group: ", n(sum(lo$n_early_drops)), " early drops and ",
@@ -199,20 +200,14 @@ courseCohortServer <- function(id, student_terms, attempts, programs, dims, edge
         uiOutput(ns("similar_ui")),
         dashboard_subsection(
           "The Population",
-          "How often every student in this population came back, and passed their courses, the next semester: the baseline for the groups below.",
+          "How often every student in this population came back, and passed their courses, the next semester: the baseline for the comparisons below.",
           method = tags$p("Every enrolled student of the selected classification in each selected term and home campus, with that group's own return rate and share of next-semester attempts not passed (DFW)."),
           reactable::reactableOutput(ns("population_table"))
         ),
         dashboard_subsection(
-          "Passed, DFW'd, Never Took It",
-          paste0("How the students who passed ", meta$course, ", those who got a D, an F or a withdrawal, and those who never took it fared the next semester."),
-          method = tags$p("Each gap column is the passed group's rate minus the never-took group's, in percentage points. A gap describes who takes and passes the course before it describes the course."),
-          reactable::reactableOutput(ns("groups_table"))
-        ),
-        dashboard_subsection(
           "Against the College's Courses",
           paste0("Whether passing ", meta$course, " goes with a bigger lead over never-takers than passing ", meta$college_label, "'s other courses does."),
-          method = tags$p("The same passed-minus-never-took gap for every other ", meta$college_label,
+          method = tags$p("A course's gap is its passers' rate minus the rate of the students who never took it, in percentage points; it describes who takes and passes the course before it describes the course. The same gap for every other ", meta$college_label,
                           " course the population took, summarised as the median and quartiles across courses, with the share of courses whose gap is below ",
                           meta$course, "'s. A median over courses counts a small course as much as a large one."),
           reactable::reactableOutput(ns("benchmark_table"))
@@ -420,40 +415,6 @@ courseCohortServer <- function(id, student_terms, attempts, programs, dims, edge
           return_pct = cedar_percent_coldef("Returned"),
           next_attempts = cedar_count_coldef("Next-term attempts"),
           next_dfw_pct = cedar_percent_coldef("Next-term DFW")
-        )
-      )
-    })
-
-    output$groups_table <- reactable::renderReactable({
-      p <- result(); req(p)
-      display <- p$focal %>%
-        transmute(term, student_campus,
-                  passed_n_students, passed_return_pct = pct(passed_return_pct), passed_next_dfw_pct = pct(passed_next_dfw_pct),
-                  dfw_n_students, dfw_return_pct = pct(dfw_return_pct), dfw_next_dfw_pct = pct(dfw_next_dfw_pct),
-                  none_n_students, none_return_pct = pct(none_return_pct), none_next_dfw_pct = pct(none_next_dfw_pct),
-                  lift_return, lift_next_dfw)
-      reactable::reactable(
-        display, theme = cedar_tbl_theme, compact = TRUE, striped = TRUE, pagination = FALSE,
-        defaultSorted = list(term = "desc"),
-        columns = list(
-          term = term_coldef, student_campus = campus_coldef,
-          passed_n_students = cedar_count_coldef("Students"),
-          passed_return_pct = cedar_percent_coldef("Returned"),
-          passed_next_dfw_pct = cedar_percent_coldef("Next-term DFW"),
-          dfw_n_students = cedar_count_coldef("Students"),
-          dfw_return_pct = cedar_percent_coldef("Returned"),
-          dfw_next_dfw_pct = cedar_percent_coldef("Next-term DFW"),
-          none_n_students = cedar_count_coldef("Students"),
-          none_return_pct = cedar_percent_coldef("Returned"),
-          none_next_dfw_pct = cedar_percent_coldef("Next-term DFW"),
-          lift_return = cedar_points_coldef("Return"),
-          lift_next_dfw = cedar_points_coldef("Next-term DFW")
-        ),
-        columnGroups = list(
-          reactable::colGroup(name = "Passed it", columns = c("passed_n_students", "passed_return_pct", "passed_next_dfw_pct")),
-          reactable::colGroup(name = "DFW'd it", columns = c("dfw_n_students", "dfw_return_pct", "dfw_next_dfw_pct")),
-          reactable::colGroup(name = "Never took it", columns = c("none_n_students", "none_return_pct", "none_next_dfw_pct")),
-          reactable::colGroup(name = "Gap, points", columns = c("lift_return", "lift_next_dfw"))
         )
       )
     })

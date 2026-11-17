@@ -1,4 +1,4 @@
-# Course Dynamics > Downstream > Where Students Go Next ("Later Course" in
+# Course Dynamics > Downstream > In a Later Course > Where Students Go Next ("Later Course" in
 # code; the page names the students it starts from, ISSUES M52)
 #
 # Of the analysed course's students, how many took a later course within a set
@@ -18,7 +18,7 @@
 #   laterCourseUI(id)
 #   laterCourseServer(id, ...)
 #   downstream_course_choices(opts, include_rollup, dept)   shared with the
-#     With or Without This Course picker in server.R
+#     Against Students Who Didn't Pass It First picker in server.R
 
 LATER_COURSE_WINDOW_CHOICES <- stats::setNames(
   as.character(1:6),
@@ -58,9 +58,8 @@ laterCourseUI <- function(id) {
   ns <- NS(id)
   tagList(
     subtab_header("Where Students Go Next",
-                  paste0("Starts from everyone who took this course: how many went on to a later ",
-                         "course you choose, and how they did in it.")),
-    cedar_definition_panel("downstream-outcomes"),
+                  "Of this course's students, how many went on to a later course you choose, and how did they do in it, by their grade here?",
+                  method = cedar_definition_note("downstream-outcomes")),
     fluidRow(
       column(5, uiOutput(ns("picker"))),
       column(2, selectInput(ns("window_terms"), "Within", choices = LATER_COURSE_WINDOW_CHOICES,
@@ -358,7 +357,7 @@ later_course_view <- function(r, ns, access) {
 # students, attempts, programs, applicants, student_terms, edges
 #                     CEDAR tables and the data edges; applicants may be NULL.
 # default_options     reactive: get_downstream_course_options() at the default
-#                     window, shared with the With or Without This Course picker.
+#                     window, shared with the Against Students Who Didn't Pass It First picker.
 # instructor_access   the session's shared instructor-gate flag.
 # instructor_password the configured password ("" when none is).
 laterCourseServer <- function(id, course, campus, students, attempts, programs, applicants,

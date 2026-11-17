@@ -1986,8 +1986,8 @@ output$enrl_classlist_download <- downloadHandler(
     }
 
     # Outcomes (dfw_trend, instructor_dfw, persistence) are needed by both the
-    # DFW and Retention tabs.
-    if (tab %in% c("DFW", "Retention")) {
+    # DFW and Downstream tabs.
+    if (tab %in% c("DFW", "Downstream")) {
       base <- course_report_data() %||% base
       if (is.null(base$outcomes)) {
         outcomes <- with_cr_tab_loading(
@@ -3524,20 +3524,16 @@ output$enrl_classlist_download <- downloadHandler(
       return(empty_state("Select a course and click Analyze Course first, then open this tab."))
     tagList(
       subtab_header(
-        "By Grade",
-        "Of the students who took this course, how many enrolled again the next ",
-        "fall or spring, or graduated first — split by how they did here. The ",
-        "trend below uses the same definition. Read the bars against each ",
-        "other: if students who failed return at close to the same rate as those ",
-        "who passed, the course is not where they are leaving. A wide gap says ",
-        "the opposite. This describes who came back, not why; students leave for ",
-        "reasons no course-level view can see."
+        "By Grade Here",
+        paste0("Did the students who passed ", course, " come back more often than those who did not?"),
+        method = tagList(
+          tags$p("Every student registered in the course, of any classification, by the campus that taught it. Came back means enrolled the next fall or spring semester, or graduated first; summer does not count."),
+          tags$p("If students who failed come back at close to the rate of those who passed, the course is not where they are leaving; a wide gap says the opposite. It describes who came back, not why."),
+          tags$p("The choice of what counts as failing applies to this view only.")
+        )
       ),
       div(class = "mb-3",
-        tags$strong("What counts as failing?"),
-        tags$span(style = "font-size: 0.85em; color: #555; margin-left: 8px;",
-          "Affects how grades are split between 'fail' and 'pass'."),
-        radioButtons("cr_ret_threshold", label = NULL,
+        radioButtons("cr_ret_threshold", label = "What counts as failing?",
           choices = c(
             "Standard: only A+ through C and CR pass; all other recorded outcomes count as fail" = "below_c",
             "Opt in: also treat C−, D+, D, and D− as passing" = "f_only"
@@ -3547,20 +3543,12 @@ output$enrl_classlist_download <- downloadHandler(
         )
       ),
       uiOutput("cr_persistence_ui"),
-      br(),
-      hr(),
       dashboard_subsection(
-        "Retention Over Time",
-        "Primary rows pool like term types across the data window; a collapsed semester view remains available for auditing individual terms.",
-        info_panel(
-          "How retention is calculated",
-          div(
-            class = "alert alert-info",
-            tags$strong("Data window: "),
-            cedar_longitudinal_edge_note(
-              data_objects[["cedar_edges"]], grade_dependent = FALSE
-            )
-          ),
+        "Semesters Later",
+        "How many of the course's students are still enrolled one, two and more semesters on, against the department's and the college's other courses.",
+        method = tagList(
+          tags$p(tags$strong("Data window: "),
+                 cedar_longitudinal_edge_note(data_objects[["cedar_edges"]], grade_dependent = FALSE)),
           tags$ul(
             tags$li("The starting cohort is every student officially registered in the selected course in each term, whatever their classification: concurrent-enrollment (dual-credit) high-school students are in it, and where they are most of a cohort, as in a branch-campus first-year course, a +1 rate can sit far below the +2 rate because they return on the high-school calendar."),
             tags$li("Primary tables pool Fall, Spring, and Summer cohorts separately across the data window, weighted by cohort size."),
@@ -3570,8 +3558,7 @@ output$enrl_classlist_download <- downloadHandler(
             tags$li("Summer terms are skipped when counting semesters forward, so +1 means the next fall or spring term."),
             tags$li("Blank cells mean the target term is beyond the latest available data, not that retention was 0%.")
           ),
-          cedar_definition_note("course-retention"),
-          description = "Cohort, graduation, summer-term, and blank-cell rules."
+          cedar_definition_note("course-retention")
         ),
 
         fluidRow(
@@ -3771,43 +3758,30 @@ output$enrl_classlist_download <- downloadHandler(
     if (nrow(aggregate) == 0)
       return(div(class = "alert alert-warning",
                  "No term-type summaries met the minimum student threshold for this course."))
-    retention_column_guide <- info_panel(
-      "Explain Columns",
-      tags$ul(
-        tags$li(tags$b("Campus"), ": rates are computed per campus. A course taught in Albuquerque and at a branch is two cohorts, never one blended rate."),
-        tags$li(tags$b("Term Type"), ": Fall, Spring, or Summer cohorts combined across the selected data window."),
-        tags$li(tags$b("Instructor"), ": shown only when instructor breakout is enabled; each row summarizes that instructor within one term type."),
-        tags$li(tags$b("Terms"), ": every distinct term in which this instructor taught the selected course for that campus and term type, including small terms pooled into the summary."),
-        tags$li(tags$b("Cohort Enrollments"), ": sum of the starting cohort sizes across those terms."),
-        tags$li(tags$b("+1 sem, +2 sem, ..."), ": percent of the starting cohort enrolled anywhere at UNM the given number of fall/spring semesters later, with later graduation also counted as retained."),
-        tags$li(tags$b("Weighted rates"), ": larger term cohorts contribute proportionally more than smaller cohorts. Each +N rate uses only terms whose future outcome is observable."),
-        tags$li(tags$b("Blank cells"), ": no term in that group has an observable future outcome at that horizon.")
-      ),
-      description = "How to read the term-type retention summary."
-    )
     tagList(
       uiOutput("cr_retention_benchmark_diff_ui"),
       if (by_instructor) uiOutput("cr_retention_instructor_highlights"),
-      h5("Retention Rates by Term Type", style = "margin-top: 1em; color: #555;"),
-      p(
-        "These data-window rates combine like terms to emphasize persistent patterns that are more useful for planning than a single-semester result.",
-        style = "font-size: 0.85em; color: #777; margin-bottom: 6px;"
-      ),
-      retention_column_guide,
-      reactable::reactableOutput("cr_retention_table"),
-      tags$details(
-        style = "margin-top: 1em;",
-        tags$summary(
-          "Show individual-semester detail",
-          style = "cursor: pointer; color: #555; font-weight: 600;"
+      dashboard_subsection(
+        "Rates by Term Type",
+        "Like terms pooled across the data window, the steadier pattern for planning than any one semester.",
+        method = tags$ul(
+          tags$li(tags$b("Campus"), ": rates are computed per campus. A course taught in Albuquerque and at a branch is two cohorts, never one blended rate."),
+          tags$li(tags$b("Term Type"), ": Fall, Spring, or Summer cohorts combined across the selected data window."),
+          tags$li(tags$b("Instructor"), ": shown only when instructor breakout is enabled; each row summarizes that instructor within one term type."),
+          tags$li(tags$b("Terms"), ": every distinct term in which this instructor taught the selected course for that campus and term type, including small terms pooled into the summary."),
+          tags$li(tags$b("Cohort Enrollments"), ": sum of the starting cohort sizes across those terms."),
+          tags$li(tags$b("+1 sem, +2 sem, ..."), ": percent of the starting cohort enrolled anywhere at UNM the given number of fall/spring semesters later, with later graduation also counted as retained."),
+          tags$li(tags$b("Weighted rates"), ": larger term cohorts contribute proportionally more than smaller cohorts. Each +N rate uses only terms whose future outcome is observable."),
+          tags$li(tags$b("Blank cells"), ": no term in that group has an observable future outcome at that horizon.")
         ),
-        p(
-          "Use these rows to audit unusual terms or explain a change in the trend chart; they are not used for the primary summary or instructor ranking.",
-          style = "font-size: 0.85em; color: #777; margin: 8px 0 6px;"
-        ),
-        reactable::reactableOutput("cr_retention_term_table")
+        reactable::reactableOutput("cr_retention_table"),
+        info_panel(
+          "Each semester",
+          tags$p(class = "text-note", "For auditing an unusual term or a change in the trend chart; these rows are not used in the summary or the instructor ranking."),
+          reactable::reactableOutput("cr_retention_term_table"),
+          description = "One row per term."
+        )
       ),
-      br(),
       uiOutput("cr_retention_benchmarks")
     )
   })
@@ -3820,12 +3794,10 @@ output$enrl_classlist_download <- downloadHandler(
       dplyr::n_distinct(stats::na.omit(diff_data$campus))
     )
     plot_height <- max(280L, 220L * campus_n + 60L)
-    tagList(
-      h5("Next-Term Retention Compared With Benchmarks", style = "margin-top: 1em; color: #555;"),
-      p(
-        "Each campus has its own panel. The lines show +1 semester retention percentages by term against department and college benchmarks from that same campus and course level.",
-        style = "font-size: 0.85em; color: #777; margin-bottom: 6px;"
-      ),
+    dashboard_subsection(
+      "Next Semester Against the Department and College",
+      "Whether this course's students come back the next semester more or less often than the students of the department's and the college's other courses.",
+      method = tags$p("One panel per campus. Each line is the share enrolled the next fall or spring semester, term by term, for this course and for the department's and college's courses at the same campus and course level."),
       plotlyOutput(
         "cr_retention_benchmark_diff_plot",
         height = paste0(plot_height, "px")
@@ -3850,12 +3822,10 @@ output$enrl_classlist_download <- downloadHandler(
         (is.null(ranked$bottom) || nrow(ranked$bottom) == 0)) {
       return(NULL)
     }
-    tagList(
-      h5("Instructor Patterns To Review", style = "margin-top: 1em; color: #555;"),
-      p(
-        "These are instructor-by-term-type summaries ranked across the available +N retention rates, weighted by the observable cohort at each horizon. Use them as a triage view, then check the number of terms and cohort enrollments before interpreting.",
-        style = "font-size: 0.85em; color: #777; margin-bottom: 6px;"
-      ),
+    dashboard_subsection(
+      "Instructor Patterns To Review",
+      "Instructors whose students stayed the most and the least, as a list to look into, not a verdict.",
+      method = tags$p("Instructor-by-term-type summaries ranked across the available semesters-later rates, weighted by the students who can be followed at each one. Check the number of terms and students before reading anything into a row."),
       fluidRow(
         column(6,
           tags$strong("Highest"),
@@ -4049,23 +4019,21 @@ output$enrl_classlist_download <- downloadHandler(
 
     if (!is.null(dept_result) && nrow(dept_result) > 0) {
       items <- c(items, list(
-        h5(paste0("Department Average — ", dept_code),
-           style = "margin-top: 1em; color: #555;"),
+        section_heading(paste0("Department Average — ", dept_code), level = "h6"),
         p(paste0("Retention for all students registered in any ", level_phrase,
                  dept_code, " course, summarized by term type across the data window."),
-          style = "font-size: 0.85em; color: #777; margin-bottom: 6px;"),
+          class = "text-note"),
         reactable::reactableOutput("cr_retention_dept_table")
       ))
     }
 
     if (!is.null(college_result) && nrow(college_result) > 0) {
       items <- c(items, list(
-        h5(paste0("College Average — ", college_code),
-           style = "margin-top: 1.5em; color: #555;"),
+        section_heading(paste0("College Average — ", college_code), level = "h6"),
         p(paste0("Retention for all students registered in any ", level_phrase,
                  "course in the ", college_code,
                  " college, summarized by term type across the data window."),
-          style = "font-size: 0.85em; color: #777; margin-bottom: 6px;"),
+          class = "text-note"),
         reactable::reactableOutput("cr_retention_college_table")
       ))
     }
@@ -4116,7 +4084,7 @@ output$enrl_classlist_download <- downloadHandler(
   # ── Later-course choices, shared by both Downstream views ──────────────────
   # The views start from different students (ISSUES M52): "Where Students Go
   # Next" (Later Course in code, R/modules/later-course.R) from everyone who
-  # took this course; "With or Without This Course" (Course Sequence in code)
+  # took this course; "Against Students Who Didn't Pass It First" (Course Sequence in code)
   # from everyone in a later course, split by whether they passed this one first.
   #
   # These choices come from courses students actually took after X, within the
@@ -4138,68 +4106,14 @@ output$enrl_classlist_download <- downloadHandler(
     )
   })
 
-  # ── Combined Downstream tab ─────────────────────────────────────────────────
-  output$cr_impact_downstream_ui <- renderUI({
-    course <- input$cr_course
-    if (is.null(course) || !nzchar(course))
-      return(empty_state("Select a course, then click Analyze Course to view this tab."))
-
+  # ── Against Students Who Didn't Pass It First (Course Sequence in code) ──
+  # What the comparison can and cannot show sits in the header's method slot;
+  # the result's "Who is being counted" panel stays separate because it
+  # documents the groups and sample the selected comparison produced.
+  cr_impact_limits <- function() {
     tagList(
-      subtab_header(
-        "Downstream",
-        paste0(
-          "Two questions about what comes after ", course, ": where its students go next, ",
-          "and whether students in a later course did better having passed ", course, " first."
-        )
-      ),
-      navset_tab(
-        id = "cr_downstream_view",
-        nav_panel(
-          "Where Students Go Next",
-          icon = icon("arrow-right-long"),
-          laterCourseUI("cr_later")
-        ),
-        nav_panel(
-          "With or Without This Course",
-          icon = icon("shuffle"),
-          uiOutput("cr_impact_sequence_ui")
-        )
-      )
-    )
-  })
-
-  # ── With or Without This Course (Course Sequence in code) ───────────────────
-  # One interpretation panel for the sequence comparison. Keep this guidance
-  # together so readers do not have to reconcile two nearly identical warnings.
-  # The result-specific "Who is being counted" panel remains separate because it
-  # documents the actual groups and sample produced by the selected comparison.
-  cr_impact_limits_panel <- function() {
-    info_panel(
-      "What this comparison can and cannot show",
-      tagList(
-        tags$p(class = "cedar-body",
-          "This is a ", tags$strong("descriptive contrast between two groups of students"),
-          ", not a measured effect of the course. Students choose their own courses and
-           sequences, so the two groups differ in ways CEDAR cannot see — motivation,
-           advising, schedule constraints, what else they were carrying that term."),
-        tags$p(class = "cedar-body",
-          tags$strong("The balance measures describe where students started."),
-          " Prior GPA and credits are reconstructed from term records and measured before
-           the relevant course. They can reveal observed differences between the groups,
-           but they cannot remove differences CEDAR does not observe."),
-        tags$ul(
-          tags$li(tags$strong("Check the balance table under the results."),
-                  " If the groups differ on entering GPA or credits, the outcome gap is
-                   partly describing who took each path."),
-          tags$li(tags$strong("Use the HS GPA filter as a sensitivity check."),
-                  " A gap that remains when both groups are restricted to the same band is
-                   more interesting, but it is still not causal evidence."),
-          tags$li(tags$strong("Use the result as a prompt, not a verdict."),
-                  " It can identify a sequence worth examining with advisors, students,
-                   or a more rigorous study."))
-      ),
-      description = "How self-selection, balance, and the GPA filter affect interpretation.",
-      class = "cedar-detail-panel"
+      tags$p("A descriptive contrast between two groups of students, not a measured effect of the course. Students choose their own courses and sequences, so the groups differ in ways CEDAR cannot see: motivation, advising, schedule, what else they carried that term."),
+      tags$p("Prior GPA and credits are rebuilt from term records and measured before the relevant course. The balance table under the results shows whether the groups started out different; if they did, the gap partly describes who took each path. A high-school GPA window is a sensitivity check: a gap that holds inside one band is more interesting, and still not causal evidence.")
     )
   }
 
@@ -4209,12 +4123,11 @@ output$enrl_classlist_download <- downloadHandler(
       return(empty_state("Select a course, then click Analyze Course to view this tab."))
     tagList(
       subtab_header(
-        "With or Without This Course",
-        paste0("Starts from the students in a later course you choose: did those who passed ",
-               course, " first do better there than those who did not?")
+        "Against Students Who Didn't Pass It First",
+        paste0("Of the students in a later course you choose, did those who passed ", course,
+               " first do better there than those who did not?"),
+        method = tagList(cedar_definition_note("course-sequence"), cr_impact_limits())
       ),
-      cedar_definition_panel("course-sequence"),
-      cr_impact_limits_panel(),
       fluidRow(
         column(5,
           selectizeInput("cr_impact_seq_course_y", "Students in:",
@@ -6201,7 +6114,7 @@ output$enrl_classlist_download <- downloadHandler(
     edges = data_objects[["cedar_edges"]]
   )
 
-  # Course Dynamics > Downstream > Where Students Go Next: the analysed course's students
+  # Course Dynamics > Downstream > In a Later Course > Where Students Go Next: the analysed course's students
   # in a later course, by term, grade and instructor (R/modules/later-course.R).
   laterCourseServer(
     "cr_later",
@@ -6217,7 +6130,7 @@ output$enrl_classlist_download <- downloadHandler(
     instructor_access = dfw_authenticated, instructor_password = dfw_password
   )
 
-  # Course Dynamics > Retention > Takers vs Non-Takers: the analysed course against the
+  # Course Dynamics > Downstream > Overall > Against Students Who Didn't Take It: the analysed course against the
   # students of its classification who never took it, read against the
   # college's other courses (R/modules/course-cohort.R).
   courseCohortServer(

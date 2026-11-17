@@ -875,8 +875,8 @@ cedar_pct_count_coldef <- function(name, counts, of = FALSE, ...) {
 # \u2500\u2500 Balance tables (build_comparison() / compute_balance()) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 # The SMD rows as a display tibble, one row per measured covariate, with the
 # band marked beside the number; and the one-line verdict above them. Shared
-# by Course Dynamics' Downstream tabs (server.R) and the Takers vs Non-Takers
-# module, so the two pages read a balance table the same way. Neither infers
+# by Course Dynamics' Downstream views (server.R and the later-course and
+# course-cohort modules), so the two pages read a balance table the same way. Neither infers
 # comparability from the absence of a substantial difference.
 cedar_balance_smd_rows <- function(smd, group_labels = c("Treatment", "Control")) {
   group_a <- group_labels[[1]]

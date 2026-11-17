@@ -180,7 +180,8 @@ worth a page is who does not pass a course, which is the return watch.
 - [ ] **Roadblocks on the Dept Dashboard,** ranked by Impact (`get_stopout()`).
 - [ ] **Unhide cross-course Retention** once it sets each course against its
   department and college.
-- [ ] **Give Retention the classification scope** Takers vs Non-Takers has
+- [ ] **Give By Grade Here the classification scope** (Course Dynamics >
+  Downstream > Overall) that Against Students Who Didn't Take It has
   (M41), so its cohorts can leave concurrent-enrollment students out.
 - [ ] **Near-completers and stalled pre-majors** as outreach counts.
 

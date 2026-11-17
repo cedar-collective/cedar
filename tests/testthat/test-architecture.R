@@ -515,7 +515,7 @@ test_that("open blue boxes do not grow, and the backlog shrinks on record (M43)"
     "R/modules/gen-ed.R" = 3L,
     "R/modules/pathways.R" = 4L,
     "R/modules/regstats.R" = 7L,
-    "server.R" = 14L,
+    "server.R" = 13L,
     "ui.R" = 1L
   )
   architecture_expect_ratchet(measured, allowance, "open blue box(es)")

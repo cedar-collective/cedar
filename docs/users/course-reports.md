@@ -179,11 +179,21 @@ The DFW tab is intended to support conversations about course design and student
 
 ---
 
-## Retention
+## Downstream
 
-The Retention tab holds two views of whether students stay after the course. **By Grade** follows the course's own students and splits their return by how they did in it. **Takers vs Non-Takers** sets them beside students of the same classification who never took the course, against the college's other courses and against similar students. The **What counts as failing?** choice under By Grade applies there only; Takers vs Non-Takers counts pass and DFW by the standard rule.
+The Downstream tab asks what happens to the course's students afterwards. Each subtab asks it about one outcome, and asks it twice: first of the course's own students, split by the grade they earned in it, then of students who took the course against students who did not.
 
-### By Grade
+| | **Overall**: return, grades, GPA | **In a Later Course**: results in one course you choose |
+|---|---|---|
+| **This course's students, by their grade here** | By Grade Here | Where Students Go Next |
+| **Took it against didn't** | Against Students Who Didn't Take It | Against Students Who Didn't Pass It First |
+
+The two comparisons in the bottom row read alike because they use one method on two outcomes. The **What counts as failing?** choice under By Grade Here applies there only; every other view counts pass and DFW by the standard rule.
+
+### Overall
+{: #retention}
+
+#### By Grade Here
 
 {% include definition-summary.html id="course-retention" %}
 
@@ -191,17 +201,18 @@ Summer terms are skipped when counting forward.
 
 You can configure how many semesters to track, set a minimum cohort size per row, and optionally break out results by instructor.
 
-### Takers vs Non-Takers
+#### Against Students Who Didn't Take It
+{: #takers-vs-non-takers}
 
 {% include definition-summary.html id="course-cohort-effect" %}
 
-By Grade follows the students who took the course. This view adds the
+By Grade Here follows the students who took the course. This view adds the
 students who did not: for every enrolled student of a classification in a
-term (first-semester freshmen, say), by home campus, it splits the population
-into those who passed the course, those who DFW'd it, and those who never took
-it that term, and shows each group's return the next regular term and the DFW
-share of its next-term attempts. The gap columns are the passed group's rate
-minus the never-took group's, in points.
+term (first-semester freshmen, say), by home campus, it sets the course's
+takers beside the students who never took it that term, on return the next
+regular term, the DFW share of their next-term attempts and next-term GPA.
+The split of the course's own students by grade is By Grade Here's, and is
+not repeated here.
 
 The page opens on the course's takers whose home campus is among the
 campuses chosen at the top of the page (every home campus when none of them
@@ -262,22 +273,20 @@ chance and the terms' own ups and downs before it counts as a trend.
 every course, with its slope a year, so a set of courses can be read for
 their trends side by side.
 
----
+### In a Later Course
 
-## Downstream
+Both views here offer the later courses this course's students actually took, and they start from different students:
 
-The Downstream tab asks two questions about what comes after the course, and each starts from a different group of students:
-
-| | **Where Students Go Next** | **With or Without This Course** |
+| | **Where Students Go Next** | **Against Students Who Didn't Pass It First** |
 |---|---|---|
 | Starts from | everyone who took this course | everyone in a later course you choose |
 | Asks | how many went on to the later course, and how they did in it | did students who passed this course first do better there than those who did not? |
 | Compares | this course's students with each other: by term, by the grade they earned, by instructor | two groups of later-course students: passed this course first, or not |
 | Time limit | a window of regular terms (three unless you change it) | any earlier term |
 
-Use the first for where a course's students go and how its grades carry forward; use the second for whether this course prepares students for the later one as well as the other routes into it do. Both offer the later courses this course's students actually took.
+Use the first for where a course's students go and how its grades carry forward; use the second for whether this course prepares students for the later one as well as the other routes into it do.
 
-### Where Students Go Next
+#### Where Students Go Next
 {: #later-course}
 
 {% include definition-summary.html id="downstream-outcomes" %}
@@ -321,7 +330,7 @@ The page gives, for each campus that taught the course:
 A student who took the later course in a term whose grades are not posted yet
 counts as having taken it, and is listed as not yet graded, never as failing.
 
-### With or Without This Course
+#### Against Students Who Didn't Pass It First
 {: #course-sequence}
 
 {% include definition-summary.html id="course-sequence" %}
@@ -357,9 +366,9 @@ This depends on what your institution has loaded into CEDAR. Check with your CED
 
 **Do students who take a first-year course (FYEX 1010, FYEX 1110) do better later, or come back more?**
 
-Two tabs answer two halves of this, and neither answers the whole of it.
+Two views answer two halves of this, and neither answers the whole of it.
 
-- **Downstream → With or Without This Course** compares grades in one later course you
+- **Downstream → In a Later Course → Against Students Who Didn't Pass It First** compares grades in one later course you
   name (ENGL 1120, say) between students who passed the first-year course
   first and students who took the later course without it. The first sentence
   of the result gives both rates with their counts and says how alike the
@@ -369,23 +378,22 @@ Two tabs answer two halves of this, and neither answers the whole of it.
   placed past it. On the 2026-11-04 pull, students who passed FYEX 1010 before
   ENGL 1120 did not pass ENGL 1120 14.2% of the time against 12.9%, and
   entered with 5 credits against 28. That gap describes who takes FYEX 1010.
-- **Retention → By Grade** shows, of the students who took the course, how many came
+- **Downstream → Overall → By Grade Here** shows, of the students who took the course, how many came
   back the next fall or spring, split by how they did in it. For FYEX 1010 on
   main campus, 92% of those who passed returned against 49% of those who
   failed. That is a strong signal about the students who fail a first-year
   seminar, not a measure of the seminar.
 
-What neither tab does is compare takers with students who did not take the
-course at all, holding classification constant. **Retention → Takers vs Non-Takers** does:
-for one classification, by home campus and term, return and next-term DFW
-share for students who passed the course, failed it, or never took it, with a
-balance table. For main-campus first-semester freshmen in Fall 2023, 94% of
-those who passed FYEX 1010 returned the next spring, 78% of those who never
-took it, and 46% of those who failed it; the groups differ substantially on
-ACT, high-school GPA, Pell eligibility and first-generation share, so these
-describe who is placed into the course as much as the course.
+What neither view does is compare takers with students who did not take the
+course at all, holding classification constant. **Downstream → Overall →
+Against Students Who Didn't Take It** does: for one classification, by home
+campus and term, return and next-term DFW share for the course's passers
+against students who never took it, with a balance table. The groups differ
+substantially on ACT, high-school GPA, Pell eligibility and first-generation
+share, so the gap describes who is placed into the course as much as the
+course.
 
-Is that gap unusual? The same tab runs the comparison for every Arts &
+Is that gap unusual? The same view runs the comparison for every Arts &
 Sciences lower-division course those freshmen took and places the first-year
 course among them. For the same students, passing any such course went with
 returning at a median 96%, a gap of 19 points over those who never took it;

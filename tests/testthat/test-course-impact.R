@@ -209,53 +209,42 @@ test_that("categorical covariates are returned as distributions, not SMDs", {
   expect_true(all(abs(sums - 100) < 0.5))
 })
 
-test_that("sequence effect presents one interpretation panel before its controls", {
+test_that("sequence comparison states its limits once, collapsed in its header", {
   src <- readLines("../../server.R", warn = FALSE)
   start <- grep("output\\$cr_impact_sequence_ui <- renderUI", src)
   end <- grep("^  observe\\(\\{", src)
   end <- min(end[end > start])
   block <- paste(src[start:(end - 1L)], collapse = "\n")
 
-  panel_calls <- regmatches(
-    block,
-    gregexpr("cr_impact_limits_panel\\(\\)", block)
-  )[[1]]
-  expect_length(panel_calls, 1L)
+  calls <- regmatches(block, gregexpr("cr_impact_limits\\(\\)", block))[[1]]
+  expect_length(calls, 1L)
+  expect_match(block, "method = tagList\\(cedar_definition_note\\(\"course-sequence\"\\), cr_impact_limits\\(\\)\\)")
   expect_false(grepl("info_panel\\(", block))
 
-  panel_start <- grep("cr_impact_limits_panel <- function", src)
-  panel_copy <- paste(src[panel_start:(start - 1L)], collapse = "\n")
-  expect_match(panel_copy, "balance table")
-  expect_match(panel_copy, "HS GPA filter")
-  expect_match(panel_copy, "reconstructed from term records")
-  expect_false(grepl("registrar's cumulative fields", panel_copy, fixed = TRUE))
+  # Prior GPA and credits come from term records, never the pull-stamped
+  # cumulative fields (field reliability).
+  limits_start <- grep("cr_impact_limits <- function", src)
+  limits_copy <- paste(src[limits_start:(start - 1L)], collapse = "\n")
+  expect_false(grepl("registrar's cumulative fields", limits_copy, fixed = TRUE))
 })
 
-test_that("Course Dynamics groups both downstream questions under one top-level tab", {
+test_that("Course Dynamics puts every after-the-course view under one Downstream tab", {
   ui_src <- paste(readLines("../../ui.R", warn = FALSE), collapse = "\n")
-  server_src <- paste(readLines("../../server.R", warn = FALSE), collapse = "\n")
-
-  expect_match(
-    ui_src,
-    'nav_panel\\(\\s*"Downstream"[\\s\\S]{0,180}cr_impact_downstream_ui',
-    perl = TRUE
-  )
+  expect_false(grepl('nav_panel\\(\\s*"Retention"', ui_src, perl = TRUE))
   expect_false(grepl('nav_panel\\(\\s*"Sequence Effect"', ui_src, perl = TRUE))
   expect_false(grepl('nav_panel\\(\\s*"Downstream Success"', ui_src, perl = TRUE))
 
-  combined_start <- regexpr(
-    "output\\$cr_impact_downstream_ui <- renderUI",
-    server_src,
-    perl = TRUE
-  )
-  expect_gt(combined_start, 0L)
-  combined_copy <- substr(server_src, combined_start, combined_start + 2200L)
-  expect_match(combined_copy, 'nav_panel\\(\\s*"Where Students Go Next"', perl = TRUE)
-  expect_match(combined_copy, 'nav_panel\\(\\s*"With or Without This Course"', perl = TRUE)
-  expect_match(combined_copy, 'laterCourseUI("cr_later")', fixed = TRUE)
-  expect_match(combined_copy, "cr_impact_sequence_ui", fixed = TRUE)
-  # Instructor Patterns is Later Course's gated breakdown now, not a tab.
-  expect_false(grepl("Instructor Patterns", combined_copy, fixed = TRUE))
+  start <- regexpr('nav_panel\\(\\s*"Downstream"', ui_src, perl = TRUE)
+  expect_gt(start, 0L)
+  tab <- substr(ui_src, start, regexpr("\\) # end navset_tab", ui_src))
+  # Overall first, then In a Later Course; in each, this course's students by
+  # their grade here, then the comparison with students who did not take it.
+  ids <- c('id = "cr_downstream_view"', 'nav_panel(\n            "Overall"', 'uiOutput("cr_impact_retention_ui")',
+           'courseCohortUI("cr_cohort")', '"In a Later Course"', 'laterCourseUI("cr_later")',
+           'uiOutput("cr_impact_sequence_ui")')
+  at <- vapply(ids, function(x) regexpr(x, tab, fixed = TRUE)[[1]], integer(1))
+  expect_true(all(at > 0L))
+  expect_false(is.unsorted(at))
 })
 
 test_that("sequence effect uses one canonical Y outcome and scopes both courses", {
