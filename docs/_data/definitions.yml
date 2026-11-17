@@ -501,7 +501,7 @@ definitions:
     versions:
       - version: "1.0.0"
         title: Takers against non-takers
-        summary: For the enrolled students of a classification in a term, by home campus, compares those who passed a course, those who DFW'd it, and those who never took it that term on two later outcomes, return the next regular term and the DFW share of their next-term attempts, and reads the passed-minus-never-took gap against every course of a college the same students took.
+        summary: Compares students who passed a course, students who got a D, an F or a withdrawal in it, and students of the same classification who never took it that term, on whether they came back the next semester and how many of their next-semester courses they did not pass. The passed group's lead over the never-took group is read against the same lead for the college's other courses.
         population: Enrolled student-terms of the selected classification(s) in the selected anchor terms, by home campus, from the student-term table.
         unit: Student-term, grouped by the student's outcome in the course that term.
         numerator: Group members enrolled the next regular term (return); DFW outcomes among the group's classified attempts in that next term (next-term DFW share).

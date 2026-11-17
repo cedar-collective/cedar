@@ -232,8 +232,13 @@ difference says the gap describes who is placed into the course.
 takers: the same term, home campus, high-school GPA band and full- or
 part-time status. It pools the selected terms and reports return, the DFW
 share of the takers' other courses that term, and next-term GPA, each beside
-the rate the takers would have had at their similar peers' rates.
-**Similar students compared** chooses those peers:
+the rate the takers would have had at their similar peers' rates. Each
+outcome is a card: the two figures as bars, and whether the course's students
+did better, worse or about the same once chance is allowed for. A dot chart
+then places the course's return gap among every other course these students
+take, since taking almost any course goes with coming back. The table below
+the cards holds every figure. **Similar students compared** chooses those
+peers:
 
 - **Everyone else**: every similar student who did not take the course.
 - **In a Gen Ed course**: only similar students who took a Gen Ed course that

@@ -71,10 +71,13 @@ courseCohortServer <- function(id, student_terms, attempts, programs, dims, edge
       tagList(
         subtab_header(
           "Takers vs Non-Takers",
-          cedar_definition_summary("course-cohort-effect"),
-          " The page opens on this course's takers whose home campus is among the page's campuses (every home campus when none is): every term of the term type most of them took it in, the classification most of them held, and its own college and level; change any of them and compare again. A Fall cohort and a Spring one are different students, so read one term type at a time."
+          paste0("Do students who take ", crs, " come back and do well the next semester more often than students who don't?"),
+          method = tagList(
+            cedar_definition_note("course-cohort-effect"),
+            tags$p("The page opens on this course's takers whose home campus is among the page's campuses (every home campus when none is): every term of the term type most of them took it in, the classification most of them held, and the course's own college and level. Change any of them and compare again."),
+            tags$p("A Fall cohort and a Spring one are different students, so read one term type at a time. Students are counted by home campus, and a student who took the course on any campus is a taker.")
+          )
         ),
-        cedar_definition_panel("course-cohort-effect"),
         fluidRow(
           column(3, selectizeInput(ns("classification"), "Classification",
                                    choices = d$choices$classifications$student_classification,
@@ -98,9 +101,7 @@ courseCohortServer <- function(id, student_terms, attempts, programs, dims, edge
                                                           c("Everyone else", "In a Gen Ed course")),
                                 selected = "all")),
           column(4, helpText(
-            "Choosing term types selects every term of those types; narrow them in Terms. ",
-            "Students are counted by home campus, and a student who took the course on any campus is a taker. ",
-            "A benchmark course needs the minimum in both its passed and its never-took groups; this course is never its own benchmark."
+            "Choosing term types selects every term of those types; narrow them in Terms."
           )),
           column(2, br(), actionButton(ns("run"), "Compare Groups", icon = icon("play"), class = "btn-primary"))
         ),
@@ -191,36 +192,41 @@ courseCohortServer <- function(id, student_terms, attempts, programs, dims, edge
             tags$li("In the population and in no group: ", n(sum(lo$n_early_drops)), " early drops and ",
                     n(sum(lo$n_unclassified)), " registrations with no posted grade."),
             tags$li("A group under ", meta$min_n, " students keeps its count and shows no rate. A benchmark course needs ",
-                    meta$min_n, " in both its passed and its never-took groups; ", n(meta$n_benchmark_candidates),
-                    " ", meta$college_label, " courses were candidates."),
-            tags$li("Both gaps are passed minus never took, in points, and describe who takes the course before they describe the course.")
+                    meta$min_n, " in both its passed and its never-took groups, and this course is never its own benchmark; ",
+                    n(meta$n_benchmark_candidates), " ", meta$college_label, " courses were candidates.")
           )
         ),
         uiOutput(ns("similar_ui")),
         dashboard_subsection(
           "The Population",
-          "Every enrolled student of the classification in each term and home campus, with its own return and next-term DFW share: the floor every group is read against.",
+          "How often every student in this population came back, and passed their courses, the next semester: the baseline for the groups below.",
+          method = tags$p("Every enrolled student of the selected classification in each selected term and home campus, with that group's own return rate and share of next-semester attempts not passed (DFW)."),
           reactable::reactableOutput(ns("population_table"))
         ),
         dashboard_subsection(
           "Passed, DFW'd, Never Took It",
-          paste0("The three groups side by side for ", meta$course, ". The gap columns are the passed group's rate minus the never-took group's, in points."),
+          paste0("How the students who passed ", meta$course, ", those who got a D, an F or a withdrawal, and those who never took it fared the next semester."),
+          method = tags$p("Each gap column is the passed group's rate minus the never-took group's, in percentage points. A gap describes who takes and passes the course before it describes the course."),
           reactable::reactableOutput(ns("groups_table"))
         ),
         dashboard_subsection(
           "Against the College's Courses",
-          paste0("The same gap for every other ", meta$college_label, " course the population took, summarised: the median and quartiles across courses, and the share of courses whose gap is below ", meta$course, "'s."),
+          paste0("Whether passing ", meta$course, " goes with a bigger lead over never-takers than passing ", meta$college_label, "'s other courses does."),
+          method = tags$p("The same passed-minus-never-took gap for every other ", meta$college_label,
+                          " course the population took, summarised as the median and quartiles across courses, with the share of courses whose gap is below ",
+                          meta$course, "'s. A median over courses counts a small course as much as a large one."),
           reactable::reactableOutput(ns("benchmark_table"))
         ),
         dashboard_subsection(
           "Every Course in the Benchmark",
-          "One row per benchmark course, term and home campus. Sort by a gap column to see which courses' passers return most, or fail least, relative to the students who never took them.",
+          "The same comparison for each of the college's other courses.",
+          method = tags$p("One row per benchmark course, term and home campus. Sort by a gap column to see which courses' passers return most, or fail least, relative to the students who never took them."),
           reactable::reactableOutput(ns("courses_table"))
         ),
         if (!is.null(p$balance)) dashboard_subsection(
           "How Alike Are Takers and Never-Takers",
-          paste0("Standardized mean differences between students who took ", meta$course,
-                 " and students who never did, at each student's first selected term. A substantial difference says the gap above describes who is placed into the course."),
+          paste0("Whether the students who took ", meta$course, " already differed from those who never did, before the course."),
+          method = tags$p("Standardized mean differences on measured characteristics at each student's first selected term. A substantial difference says the gaps above describe who is placed into the course; a small one does not show the groups are alike in what is not measured."),
           uiOutput(ns("balance_ui"))
         )
       )
@@ -231,39 +237,84 @@ courseCohortServer <- function(id, student_terms, attempts, programs, dims, edge
       s <- similar()
       if (is.null(s)) return(NULL)
       m <- s$meta
+      txt <- course_similar_students_text(s)
+      fnd <- course_similar_students_findings(s)
       tagList(
         dashboard_subsection(
           "Against Similar Students",
-          paste0("The students who took ", m$course, " against students of the same term, home campus, high-school GPA band and time status who did not",
-                 if (identical(m$comparison, "gen_ed")) " and who took a Gen Ed course that term (gen_ed_courses.csv)" else "",
-                 ", pooled over the selected terms. Expected is what the takers would have done at their non-taking peers' rates; a cell with fewer than ",
-                 m$min_cell_n, " non-takers supplies no rate and its takers are left out. The cells remove those four things and nothing else: placement, advising and major are not in them."),
-          lapply(course_similar_students_headline(s), function(x) tags$p(class = "cedar-lead", x)),
+          paste0("Did students who took ", m$course, " do better than students like them who did not",
+                 if (identical(m$comparison, "gen_ed")) " and took a Gen Ed course instead" else "", "?"),
+          method = tagList(
+            tags$p("Each student who took ", m$course, " is set beside students of the same term, home campus, high-school GPA band and full- or part-time status who did not take it, pooled over the selected terms. ",
+                   "The similar students' figure is what the takers would have shown at their peers' rates. A group of peers smaller than ", m$min_cell_n,
+                   " supplies no figure, and its takers are left out."),
+            if (length(txt$comparison)) tags$p(txt$comparison),
+            tags$p("Chance alone is two standard errors at the similar students' rates: a gap inside it could arise with no real difference. Came back means enrolled in the next fall or spring semester (summer does not count); other courses not passed counts a D, an F or a withdrawal among the semester's other attempts; GPA is the next semester's, for those who came back."),
+            tags$p("The matching removes those four things and nothing else: placement, advising, major and motivation are not in it.")
+          ),
+          if (nrow(fnd) == 0L) lapply(txt$findings, lead_text) else tagList(
+            div(class = "finding-card-row", lapply(seq_len(nrow(fnd)), function(i) similar_finding_card(fnd[i, ], m$course))),
+            tags$p(class = "text-note", "This shows who takes the course and how they fare, not what the course causes: students are matched on four things only.")
+          ),
           if (!is.null(s$focal)) reactable::reactableOutput(ns("similar_focal_table"))
+        ),
+        if (length(txt$benchmark)) dashboard_subsection(
+          "Against Every Course These Students Take",
+          txt$benchmark,
+          method = tags$p("Each dot is a course these students take with ", m$min_n, " or more students who can be compared, at its return gap. The shaded band holds the middle half of the courses, the solid line marks the typical (median) course, and the dotted line marks zero."),
+          plotly::plotlyOutput(ns("similar_benchmark_plot"), height = "220px")
         ),
         if (nrow(s$by_term) > 0L) dashboard_subsection(
           "Over Time",
-          paste0("The three gaps one term at a time, each with the band chance alone gives (two standard errors) and, dashed, the line fitted ",
-                 m$trend_term_type, " to ", m$trend_term_type, " (the term type with the most takers). A term needs ", m$min_term_n,
-                 " covered takers. A line is a trend when its slope a year is beyond two standard errors, the larger of chance and the terms' own scatter around it; fewer than three terms is no line."),
-          plotly::plotlyOutput(ns("similar_trend_plot"), height = "560px"),
+          paste0("Has each gap grown or shrunk from one ", m$trend_term_type, " to the next?"),
+          method = tags$p("Each dot is one term's gap and its bar the range chance alone gives (two standard errors). The dashed line is fitted ",
+                          m$trend_term_type, " to ", m$trend_term_type, ", the term type with the most takers; a term needs ", m$min_term_n,
+                          " students who can be compared. A line is a trend only when its slope a year is beyond two standard errors, the larger of chance and the terms' own ups and downs; fewer than three terms draws no line."),
+          lapply(txt$trend, lead_text),
+          plotly::plotlyOutput(ns("similar_trend_plot"), height = "680px"),
           reactable::reactableOutput(ns("similar_term_table"))
         ),
         dashboard_subsection(
           "Every Course These Students Take",
-          paste0("The same gaps for every course with ", m$min_n, " or more covered takers in this population, largest return gap first. Taking almost any course goes with returning, so a course is read against the other courses here, never against zero; a course students are placed into shows its placement. ",
-                 "Return trend is each course's return gap ", m$trend_term_type, " to ", m$trend_term_type, ", read as in Over Time: the line, its slope a year, and rising or falling only beyond two standard errors."),
+          "The same comparison for every course, with its return gap's trend.",
+          method = tags$p("Every course with ", m$min_n, " or more students who can be compared, largest return gap first. Taking almost any course goes with coming back, so read a course against the others here, never against zero; a course students are placed into shows its placement. ",
+                          "Return trend is each course's return gap ", m$trend_term_type, " to ", m$trend_term_type, ", read as in Over Time."),
           reactable::reactableOutput(ns("similar_courses_table"))
         ),
         if (nrow(s$instructors) > 0L) dashboard_subsection(
           paste0(m$course, " by Instructor"),
-          paste0("The course's takers by the instructor of their attempt, each against the course's similar non-takers; instructors with ",
-                 m$min_n, " or more covered takers. Not a measure of teaching and not a basis for evaluating anyone: a section tied to a program, a learning community or a time of day shows who enrolled in it."),
+          if (length(txt$instructors)) txt$instructors else paste0("The comparison for each instructor's students."),
+          method = tags$p("The course's takers by the instructor of their attempt, each against the course's similar students; instructors with ",
+                          m$min_n, " or more students who can be compared."),
+          tags$p(class = "text-note", "Not a measure of teaching and not a basis for evaluating anyone: a section tied to a program, a learning community or a time of day shows who enrolled in it."),
           if (isTRUE(instructor_access())) reactable::reactableOutput(ns("similar_instructors_table"))
           else instructorGateUI(ns("instructor_gate"))
         )
       )
     })
+
+    # One outcome's card: the gap, the two values as bars, the verdict.
+    similar_finding_card <- function(row, course) {
+      verdict <- switch(row$verdict,
+                        better = list(class = "stat-compare stat-compare--better", text = "Better than similar students"),
+                        worse = list(class = "stat-compare stat-compare--worse", text = "Worse than similar students"),
+                        same = list(class = "stat-compare", text = "About the same as similar students"),
+                        unclear = list(class = "stat-compare", text = "Too few similar students to judge"))
+      fmt <- if (row$unit == "pct") function(v) sprintf("%.1f%%", v) else function(v) sprintf("%.2f", v)
+      scale <- if (row$unit == "pct") 100 else 4
+      cedar_finding_card(
+        row$title,
+        headline = row$gap_label, caption = "against similar students",
+        tags$p(class = verdict$class, verdict$text,
+               span(class = "text-note", paste0(" (chance alone: \u00b1", if (row$unit == "pct") sprintf("%.1f", row$chance) else sprintf("%.2f", row$chance), ")"))),
+        cedar_compare_bars(tibble::tibble(
+          label = c(paste0("Took ", course), "Similar students"),
+          share = c(row$taker, row$similar) / scale,
+          text = c(fmt(row$taker), fmt(row$similar)),
+          reference = c(FALSE, TRUE))),
+        tags$p(class = "text-note", row$sentence)
+      )
+    }
 
     similar_columns <- function(first) {
       c(first, list(
@@ -327,6 +378,10 @@ courseCohortServer <- function(id, student_terms, attempts, programs, dims, edge
       similar_table(s$by_term, "term",
                     list(term = reactable::colDef(name = "Term", cell = function(v) fmt_term(v), minWidth = 100)),
                     pagination = FALSE, defaultSorted = list(term = "desc"))
+    })
+    output$similar_benchmark_plot <- plotly::renderPlotly({
+      s <- similar(); req(s)
+      plot_course_similar_students_benchmark(s)
     })
     output$similar_trend_plot <- plotly::renderPlotly({
       s <- similar(); req(s)
