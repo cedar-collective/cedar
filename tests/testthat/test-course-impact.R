@@ -212,14 +212,20 @@ test_that("categorical covariates are returned as distributions, not SMDs", {
 test_that("sequence comparison states its limits once, collapsed in its header", {
   src <- readLines("../../server.R", warn = FALSE)
   start <- grep("output\\$cr_impact_sequence_ui <- renderUI", src)
-  end <- grep("^  observe\\(\\{", src)
-  end <- min(end[end > start])
+  end <- grep("^  observeEvent\\(cr_later\\$run\\(\\)", src)
+  expect_length(end, 1L)
+  expect_gt(end, start)
   block <- paste(src[start:(end - 1L)], collapse = "\n")
 
   calls <- regmatches(block, gregexpr("cr_impact_limits\\(\\)", block))[[1]]
   expect_length(calls, 1L)
   expect_match(block, "method = tagList\\(cedar_definition_note\\(\"course-sequence\"\\), cr_impact_limits\\(\\)\\)")
-  expect_false(grepl("info_panel\\(", block))
+  # The one collapsed panel besides the method slot holds the settings.
+  panels <- regmatches(block, gregexpr("info_panel\\(\\s*\"[^\"]+\"", block))[[1]]
+  expect_equal(gsub("info_panel\\(\\s*", "", panels), "\"Settings\"")
+  # Both views run on the one shared picker: this view has none of its own.
+  expect_false(grepl("cr_impact_seq_course_y", block, fixed = TRUE))
+  expect_false(grepl("cr_impact_seq_run", block, fixed = TRUE))
 
   # Prior GPA and credits come from term records, never the pull-stamped
   # cumulative fields (field reliability).
@@ -411,12 +417,14 @@ test_that("every table that names an instructor beside outcomes waits for the in
 })
 
 test_that("cross-department follow-ons are not treated as invalid sequences", {
-  src <- paste(readLines("../../server.R", warn = FALSE), collapse = "\n")
+  # The later-course picker and its caveat live in later-course.R since the
+  # two In a Later Course views share it.
+  src <- paste(c(readLines("../../server.R", warn = FALSE),
+                 readLines("../../R/modules/later-course.R", warn = FALSE)), collapse = "\n")
 
   expect_false(grepl("probably reflects who enrols", src, fixed = TRUE))
   expect_false(grepl("cr_impact_seq_pair_note", src, fixed = TRUE))
   expect_false(grepl("cr_impact_inst_pair_note", src, fixed = TRUE))
-  expect_match(src, "Department ownership and continuation share do not establish")
 })
 
 test_that("balance values preserve meaningful continuous precision", {

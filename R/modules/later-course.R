@@ -15,8 +15,9 @@
 # is rendered only while the gate is open.
 #
 # Exported functions:
+#   laterCoursePickerUI(id)   the picker, window and run, shared by both views
 #   laterCourseUI(id)
-#   laterCourseServer(id, ...)
+#   laterCourseServer(id, ...)  returns list(course_y, run) for the other view
 #   downstream_course_choices(opts, include_rollup, dept)   shared with the
 #     Against Students Who Didn't Pass It First picker in server.R
 
@@ -54,22 +55,41 @@ downstream_course_choices <- function(opts, include_rollup = FALSE, dept = NULL)
   out
 }
 
+# The later-course picker, window and run button, shared by both views on
+# Downstream > In a Later Course: the server returns the chosen course(s) and
+# the run event, and server.R runs the sequence comparison on them too.
+laterCoursePickerUI <- function(id) {
+  ns <- NS(id)
+  tagList(
+    subtab_header(
+      "Choose a Later Course",
+      "Both views below read the later course you choose here.",
+      method = tagList(
+        tags$p("The list holds the later courses this course's students took within the window, each with how many took it and the share that is of those who could have. Students are grouped by the campus that taught them this course; the later course counts on any campus."),
+        tags$p("Choose several codes to read them as one course (a course and its modular or stretch forms): each student counts once, at their earliest attempt of any of them. Department ownership and how many continue neither establish nor rule out an intended sequence."),
+        tags$p("Within sets the window for Where Students Go Next. Against Students Who Didn't Pass It First counts a pass of this course in any earlier term, whatever the window.")
+      )
+    ),
+    fluidRow(
+      column(6, uiOutput(ns("picker"))),
+      column(3, selectInput(ns("window_terms"), "Within", choices = LATER_COURSE_WINDOW_CHOICES,
+                            selected = as.character(DOWNSTREAM_DEFAULT_WINDOW))),
+      column(3, br(), actionButton(ns("run"), "Show Results", icon = icon("play"), class = "btn-primary"))
+    )
+  )
+}
+
 laterCourseUI <- function(id) {
   ns <- NS(id)
   tagList(
     subtab_header("Where Students Go Next",
-                  "Of this course's students, how many went on to a later course you choose, and how did they do in it, by their grade here?",
+                  "Of this course's students, how many went on to the later course, and how did they do in it, by their grade here?",
                   method = cedar_definition_note("downstream-outcomes")),
-    fluidRow(
-      column(5, uiOutput(ns("picker"))),
-      column(2, selectInput(ns("window_terms"), "Within", choices = LATER_COURSE_WINDOW_CHOICES,
-                            selected = as.character(DOWNSTREAM_DEFAULT_WINDOW))),
-      column(2, numericInput(ns("min_n"), "Min students:", value = 10, min = 5, max = 100)),
-      column(3, br(), actionButton(ns("run"), "Show Outcomes", icon = icon("play"), class = "btn-primary"))
-    ),
-    helpText(
-      "Each course in the list shows how many of this course's students took it within the window. ",
-      "Students are grouped by the campus that taught them this course; the later course counts on any campus."
+    info_panel(
+      "Settings",
+      numericInput(ns("min_n"), "Min students per rate:", value = 10, min = 5, max = 100),
+      tags$p(class = "text-note", "Change it, then click Show Results again."),
+      description = "Minimum students per rate: 10 unless changed."
     ),
     uiOutput(ns("results"))
   )
@@ -400,16 +420,22 @@ laterCourseServer <- function(id, course, campus, students, attempts, programs, 
       )
     })
 
-    observeEvent(input$run, {
-      req(course())
+    # The chosen later course(s), the department rollup expanded to its courses.
+    resolved_y <- reactive({
       y <- input$course_y
-      if (length(y) == 0) {
-        showNotification("Choose at least one later course.", type = "warning")
-        return()
-      }
       if (CR_ROLLUP_SENTINEL %in% y) {
         opts <- course_options()
         y <- union(setdiff(y, CR_ROLLUP_SENTINEL), opts$subject_course[opts$same_dept %in% TRUE])
+      }
+      y
+    })
+
+    observeEvent(input$run, {
+      req(course())
+      y <- resolved_y()
+      if (length(y) == 0) {
+        showNotification("Choose at least one later course.", type = "warning")
+        return()
       }
       result(NULL)
       opt <- list(course_x = course(), course_y = y, campus = campus(),
@@ -444,7 +470,7 @@ laterCourseServer <- function(id, course, campus, students, attempts, programs, 
 
     output$results <- renderUI({
       r <- result()
-      if (is.null(r)) return(empty_state("Choose a later course, then click Show Outcomes."))
+      if (is.null(r)) return(empty_state("Choose a later course above, then click Show Results."))
       later_course_view(r, ns, isTRUE(instructor_access()))
     })
 
@@ -469,5 +495,9 @@ laterCourseServer <- function(id, course, campus, students, attempts, programs, 
       req(r, length(input$term_type) > 0)
       .later_course_term_reactable(later_course_term_table(r, input$term_type), r)
     })
+
+    # For the other view on the subtab: the chosen later course(s), with the
+    # department rollup resolved, read when the run button is pressed.
+    list(course_y = resolved_y, run = reactive(input$run))
   })
 }
