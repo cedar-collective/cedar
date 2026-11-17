@@ -223,6 +223,36 @@ cedar_meter_list <- function(meters) {
   )
 }
 
+# Two or more values set side by side as bars on one scale, one per row:
+# `bars` has `label`, `share` (the value over the scale's end, 0-1), `text`
+# (the value in words) and `reference` (TRUE draws the comparison's grey).
+# For a finding card that sets a group beside what was expected of it.
+cedar_compare_bars <- function(bars) {
+  required <- c("label", "share", "text", "reference")
+  if (!all(required %in% names(bars))) {
+    stop("cedar_compare_bars(): bars needs ", paste(required, collapse = ", "), ".", call. = FALSE)
+  }
+  pct <- function(x) paste0(round(100 * min(max(x, 0), 1), 3), "%")
+  tags$dl(
+    class = "meter-list compare-bars",
+    lapply(seq_len(nrow(bars)), function(i) {
+      tagList(
+        tags$dt(bars$label[[i]]),
+        tags$dd(
+          tags$svg(
+            class = "meter-bar", role = "img", `aria-label` = paste0(bars$label[[i]], ": ", bars$text[[i]]),
+            tags$rect(class = "meter-bar-track", width = "100%", height = "100%"),
+            tags$rect(class = paste(c("meter-bar-fill", if (isTRUE(bars$reference[[i]])) "meter-bar-fill--reference"),
+                                    collapse = " "),
+                      width = pct(bars$share[[i]]), height = "100%")
+          ),
+          span(class = "meter-list-figure", tags$strong(bars$text[[i]]))
+        )
+      )
+    })
+  )
+}
+
 # Compact current-term snapshot: grouped measure rows, the current term as the
 # anchor column, and earlier comparison terms beside it. The current column may
 # split into sub-columns (e.g. All plus each crosslisted code); a row whose

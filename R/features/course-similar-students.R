@@ -164,98 +164,163 @@ build_course_similar_students <- function(student_terms, attempts, applicants, o
             class = "course_similar_students")
 }
 
-#' The similar-students result as sentences
+#' Each outcome for the focal course in plain words, with a verdict
+#'
+#' One row per outcome the focal course has a gap for: what the takers did,
+#' what similar students did, the gap, chance (two standard errors), and the
+#' verdict. A gap beyond chance in the good direction is `better` (more
+#' returned, fewer other courses not passed, a higher GPA), in the other
+#' `worse`, and within it `same`. A gap whose chance is zero (one similar
+#' student, or an expected rate of 0 or 100%) cannot be judged: `unclear`.
 #'
 #' @param payload `build_course_similar_students()` output.
-#' @return Character vector: the return gap with its counts and chance band;
-#'   the other-course DFW and next-term GPA gaps; where the return gap sits
-#'   among the other courses; and, with two or more instructors, how far the
-#'   instructors' gaps spread beyond chance.
-course_similar_students_headline <- function(payload) {
+#' @return A tibble: `outcome` (`return`, `other_dfw`, `next_gpa`), `title`,
+#'   `n` (the takers the outcome reads), `taker`, `similar`, `gap`, `chance`,
+#'   `unit` (`pct` or `gpa`), `verdict`, `gap_label` (the gap in words, for a
+#'   card's headline) and `sentence`. No rows when the focal course has none.
+course_similar_students_findings <- function(payload) {
+  if (!inherits(payload, "course_similar_students")) {
+    stop("[course-similar-students.R] payload must come from build_course_similar_students().", call. = FALSE)
+  }
+  f <- payload$focal
+  course <- payload$meta$course
+  empty <- tibble::tibble(outcome = character(), title = character(), n = integer(), taker = numeric(),
+                          similar = numeric(), gap = numeric(), chance = numeric(), unit = character(),
+                          verdict = character(), gap_label = character(), sentence = character())
+  if (is.null(f)) return(empty)
+  fmt_n <- function(n) format(as.integer(n), big.mark = ",", trim = TRUE)
+  pct <- function(p) sprintf("%.1f%%", p)
+  gpa <- function(g) sprintf("%.2f", g)
+  rows <- tibble::tibble(
+    outcome = c("return", "other_dfw", "next_gpa"),
+    title = c("Came back the next semester", "Other courses not passed that semester", "GPA the next semester"),
+    n = c(f$return_n, f$n_covered, f$next_gpa_n),
+    taker = c(f$return_pct, f$other_dfw_pct, f$next_gpa),
+    similar = c(f$return_expected_pct, f$other_dfw_expected_pct, f$next_gpa_expected),
+    gap = c(f$return_gap, f$other_dfw_gap, f$next_gpa_gap),
+    chance = 2 * c(f$return_gap_se, f$other_dfw_gap_se, f$next_gpa_gap_se),
+    unit = c("pct", "pct", "gpa"),
+    higher_is_better = c(TRUE, FALSE, TRUE)
+  ) %>% filter(!is.na(gap), !is.na(chance))
+  if (nrow(rows) == 0L) return(empty)
+  rows %>%
+    mutate(
+      good = if_else(higher_is_better, gap, -gap),
+      verdict = case_when(chance <= 0 ~ "unclear", good > chance ~ "better", good < -chance ~ "worse",
+                          TRUE ~ "same"),
+      gap_label = case_when(
+        outcome == "return" ~ sprintf("%+.1f points", gap),
+        outcome == "other_dfw" ~ sprintf("%+.1f points", gap),
+        TRUE ~ sprintf("%+.2f", gap)
+      ),
+      sentence = case_when(
+        outcome == "return" ~ paste0(
+          pct(taker), " of the ", fmt_n(n), " students who took ", course, " came back the next semester, against ",
+          pct(similar), " of similar students who did not take it."),
+        outcome == "other_dfw" ~ paste0(
+          "In their other courses that semester they did not pass ", pct(taker),
+          " of attempts (a D, an F or a withdrawal), against ", pct(similar), " for similar students."),
+        TRUE ~ paste0(
+          "The ", fmt_n(n), " who came back earned a ", gpa(taker), " GPA the next semester, against ",
+          gpa(similar), " for similar students.")
+      )
+    ) %>%
+    select(outcome, title, n, taker, similar, gap, chance, unit, verdict, gap_label, sentence)
+}
+
+#' The similar-students result as sentences, by the section that shows them
+#'
+#' @param payload `build_course_similar_students()` output.
+#' @return A named list of character vectors: `findings` (each outcome's
+#'   sentence and verdict; a course under the guard says so instead),
+#'   `comparison` (who the similar students were, under Gen Ed), `benchmark`
+#'   (where the return gap sits among the other courses), `instructors` (how
+#'   far the instructors' gaps spread beyond chance) and `trend` (each gap's
+#'   line across terms). An empty part is `character(0)`.
+course_similar_students_text <- function(payload) {
   if (!inherits(payload, "course_similar_students")) {
     stop("[course-similar-students.R] payload must come from build_course_similar_students().", call. = FALSE)
   }
   meta <- payload$meta
-  f <- payload$focal
   fmt_n <- function(n) format(as.integer(n), big.mark = ",", trim = TRUE)
-  pct <- function(p) sprintf("%.1f%%", p)
   pts <- function(p) sprintf("%+.1f", p)
-  if (is.null(f)) {
+  out <- list(findings = character(0), comparison = character(0), benchmark = character(0),
+              instructors = character(0), trend = character(0))
+  if (is.null(payload$focal)) {
     under <- meta$focal_under_min_n
-    return(paste0(
+    out$findings <- paste0(
       meta$course, " has ", if (nrow(under) == 0L) "no" else fmt_n(under$n_covered),
-      " takers in this population with comparable non-takers, under the ", meta$min_n,
-      " this comparison needs."
-    ))
+      " students in this population who can be compared with similar students; this comparison needs ",
+      meta$min_n, ".")
+    return(out)
   }
-  like <- if (identical(meta$comparison, "gen_ed")) {
-    "students of the same term, home campus, high-school GPA band and time status who took a Gen Ed course and not this one"
-  } else "non-takers of the same term, home campus, high-school GPA band and time status"
-  sentences <- if (is.na(f$return_gap)) {
-    paste0("No return is observable yet for the ", fmt_n(f$n_covered), " students who took ", meta$course, ".")
-  } else {
-    paste0(
-      "Of ", fmt_n(f$return_n), " students who took ", meta$course, ", ", pct(f$return_pct),
-      " returned the next regular term, against ", pct(f$return_expected_pct), " expected from ", like,
-      ": a gap of ", pts(f$return_gap), " points, where chance alone moves it about ",
-      sprintf("%.1f", 2 * f$return_gap_se), "."
-    )
-  }
-  second <- c(
-    if (!is.na(f$other_dfw_gap)) paste0(
-      "in their other courses that term they did not pass ", pct(f$other_dfw_pct), " of attempts against ",
-      pct(f$other_dfw_expected_pct), " expected (", pts(f$other_dfw_gap), " points)"),
-    if (!is.na(f$next_gpa_gap)) paste0(
-      "those who returned earned a next-term GPA of ", sprintf("%.2f", f$next_gpa), " against ",
-      sprintf("%.2f", f$next_gpa_expected), " expected")
-  )
-  if (length(second) > 0) {
-    second <- paste0(paste(second, collapse = "; "), ".")
-    sentences <- c(sentences, paste0(toupper(substr(second, 1, 1)), substring(second, 2)))
+  verdict_words <- c(
+    better = "Better than similar students, by more than chance alone produces.",
+    worse = "Worse than similar students, by more than chance alone produces.",
+    same = "About the same as similar students: the difference is within what chance alone produces.",
+    unclear = "Too few similar students to tell this difference from chance.")
+  fnd <- course_similar_students_findings(payload)
+  out$findings <- paste(fnd$sentence, verdict_words[fnd$verdict])
+  if (is.na(payload$focal$return_gap)) {
+    out$findings <- c(paste0("No return is observable yet for the ", fmt_n(payload$focal$n_covered),
+                             " students who took ", meta$course, "."), out$findings)
   }
   if (identical(meta$comparison, "gen_ed")) {
-    sentences <- c(sentences, paste0(
-      "The compared students come from the ", fmt_n(meta$n_comparison_student_terms), " of ",
-      fmt_n(meta$n_population_student_terms), " student-terms in this population with a Gen Ed course that term (",
-      sprintf("%.0f%%", 100 * meta$n_comparison_student_terms / meta$n_population_student_terms), ")."
-    ))
+    out$comparison <- paste0(
+      "The similar students are those who took a Gen Ed course that semester and not ", meta$course, ": ",
+      fmt_n(meta$n_comparison_student_terms), " of the ", fmt_n(meta$n_population_student_terms),
+      " student-terms in this population (",
+      sprintf("%.0f%%", 100 * meta$n_comparison_student_terms / meta$n_population_student_terms), ").")
   }
   b <- payload$benchmark[payload$benchmark$outcome == "return", , drop = FALSE]
   if (b$n_courses > 0L && !is.na(b$share_below)) {
-    sentences <- c(sentences, paste0(
-      "Taking almost any course goes with returning: across the ", fmt_n(b$n_courses),
-      " other courses these students took, the median return gap is ", pts(b$median), " points, and ",
-      meta$course, "'s is larger than ", sprintf("%.0f%%", 100 * b$share_below), " of them."
-    ))
+    out$benchmark <- paste0(
+      "Taking almost any course goes with coming back, so read ", meta$course,
+      " against the other courses these students take, not against zero: its gap of ", pts(b$focal_gap),
+      " points is larger than ", sprintf("%.0f%%", 100 * b$share_below), " of the ", fmt_n(b$n_courses),
+      " other courses' gaps, where the typical course's is ", pts(b$median), ".")
   }
   s <- payload$instructor_spread
   if (!is.null(s)) {
-    sentences <- c(sentences, paste0(
-      "Its ", s$n_instructors, " instructors with ", meta$min_n, " or more takers differ by ",
-      sprintf("%.1f", s$sd_return_gap), " points in return gap (standard deviation) where chance alone gives about ",
-      sprintf("%.1f", s$mean_se), "; ", s$n_beyond_2se,
-      " sit more than two standard errors from the instructors' average."
-    ))
+    out$instructors <- paste0(
+      "Across its ", s$n_instructors, " instructors with ", meta$min_n, " or more students, the return gap varies by ",
+      sprintf("%.1f", s$sd_return_gap), " points (standard deviation), against about ", sprintf("%.1f", s$mean_se),
+      " from chance alone; ", s$n_beyond_2se, " ", if (s$n_beyond_2se == 1L) "instructor stands" else "instructors stand",
+      " apart from the rest by more than chance.")
   }
   tr <- payload$trend
   if (!is.null(tr) && any(tr$direction != "too_few_terms")) {
-    verdict <- c(rising = "rising", falling = "falling", steady = "no trend beyond chance")
     say <- function(outcome, label, unit, digits) {
       r <- tr[tr$outcome == outcome & tr$direction != "too_few_terms", , drop = FALSE]
       if (nrow(r) == 0L) return(NULL)
       signed <- function(x) sprintf(paste0("%+.", digits, "f"), x)
+      size <- sprintf(paste0("%.", digits, "f"), abs(r$slope))
+      chance <- sprintf(paste0("%.", digits, "f"), 2 * r$slope_se)
       paste0(label, " went from ", signed(r$first_gap), unit, " in ", fmt_term(r$first_term), " to ",
              signed(r$last_gap), " in ", fmt_term(r$last_term), " over ", r$n_terms, " terms: ",
-             verdict[[r$direction]], " (", signed(r$slope), " a year; a trend needs more than ±",
-             sprintf(paste0("%.", digits, "f"), 2 * r$slope_se), ").")
+             switch(r$direction,
+                    rising = paste0("rising ", size, " a year, more than chance alone (±", chance, ")."),
+                    falling = paste0("falling ", size, " a year, more than chance alone (±", chance, ")."),
+                    steady = paste0("no clear trend; the change of ", signed(r$slope),
+                                    " a year is within what chance alone produces (±", chance, ").")))
     }
     type <- tools::toTitleCase(tr$term_type[1])
-    parts <- c(say("return", paste0(type, " to ", tolower(type), ", the return gap"), " points", 1),
-               say("other_dfw", "The other-course DFW gap", " points", 1),
-               say("next_gpa", "The next-term GPA gap", "", 2))
-    sentences <- c(sentences, parts)
+    out$trend <- c(say("return", paste0(type, " to ", tolower(type), ", the return gap"), " points", 1),
+                   say("other_dfw", "The gap in other courses not passed", " points", 1),
+                   say("next_gpa", "The next-semester GPA gap", "", 2))
   }
-  sentences
+  out
+}
+
+#' The similar-students result as sentences
+#'
+#' Every part of course_similar_students_text(), in order: the text preview's
+#' lead.
+#'
+#' @param payload `build_course_similar_students()` output.
+#' @return Character vector.
+course_similar_students_headline <- function(payload) {
+  unname(unlist(course_similar_students_text(payload)))
 }
 
 # The three gaps a trend is read for, each beside its standard error column.
@@ -317,9 +382,9 @@ plot_course_similar_students_trend <- function(payload) {
   rows$term_label <- term_axis_factor(rows$term)
   levels_x <- levels(rows$term_label)
   panels <- list(
-    list(outcome = "return", title = "Return gap (points)", digits = 1),
-    list(outcome = "other_dfw", title = "Other-course DFW gap (points)", digits = 1),
-    list(outcome = "next_gpa", title = "Next-term GPA gap", digits = 2)
+    list(outcome = "return", title = "Came back the next semester: gap in points", axis = "Points", digits = 1),
+    list(outcome = "other_dfw", title = "Other courses not passed: gap in points (lower is better)", axis = "Points", digits = 1),
+    list(outcome = "next_gpa", title = "Next-semester GPA: gap", axis = "GPA", digits = 2)
   )
   plots <- lapply(panels, function(pn) {
     col <- SIMILAR_GAP_COLS[[pn$outcome]]
@@ -348,11 +413,69 @@ plot_course_similar_students_trend <- function(payload) {
                                c(rising = "rising", falling = "falling", steady = "no trend beyond chance")[[tr$direction]],
                                ")<extra></extra>"))
     }
-    p %>% plotly::layout(yaxis = list(title = pn$title, zeroline = TRUE,
-                                      zerolinecolor = unname(CEDAR_SEMANTIC_COLORS["reference"])))
+    p %>% plotly::layout(
+      yaxis = list(title = pn$axis, zeroline = TRUE, zerolinecolor = unname(CEDAR_SEMANTIC_COLORS["reference"])),
+      # The panel's title above its plot: subplot() keeps a paper-referenced
+      # annotation inside its own panel.
+      annotations = list(list(text = paste0("<b>", pn$title, "</b>"), x = 0, y = 1, xref = "paper", yref = "paper",
+                              xanchor = "left", yanchor = "bottom", showarrow = FALSE, font = list(size = 13)))
+    )
   })
-  plotly::subplot(plots, nrows = 3, shareX = TRUE, titleY = TRUE, margin = 0.04) %>%
-    plotly::layout(xaxis = list(title = "", tickangle = -45, categoryorder = "array", categoryarray = levels_x))
+  plotly::subplot(plots, nrows = 3, shareX = TRUE, titleY = TRUE, margin = c(0, 0, 0.07, 0.07)) %>%
+    plotly::layout(xaxis = list(title = "", tickangle = -45, categoryorder = "array", categoryarray = levels_x),
+                   margin = list(t = 30))
+}
+
+#' Every course's return gap as a dot, the focal course marked
+#'
+#' The courses these students take, each a dot at its return gap; the middle
+#' half of the courses shaded, the typical (median) course and zero marked,
+#' and the focal course drawn large and named. Rows are spread over a few
+#' lanes by rank so the dots do not sit on one another.
+#'
+#' @param payload `build_course_similar_students()` output.
+#' @return A plotly figure, or NULL with no course gaps.
+plot_course_similar_students_benchmark <- function(payload) {
+  if (!inherits(payload, "course_similar_students")) {
+    stop("[course-similar-students.R] payload must come from build_course_similar_students().", call. = FALSE)
+  }
+  rows <- payload$courses %>% filter(!is.na(return_gap)) %>% arrange(return_gap)
+  if (nrow(rows) == 0L) return(NULL)
+  rows$lane <- ((seq_len(nrow(rows)) - 1L) %% 5L - 2L) / 10
+  others <- rows %>% filter(!is_focal)
+  focal <- rows %>% filter(is_focal)
+  b <- payload$benchmark[payload$benchmark$outcome == "return", , drop = FALSE]
+  shapes <- list(list(type = "line", x0 = 0, x1 = 0, y0 = -0.5, y1 = 0.5,
+                      line = list(color = unname(CEDAR_SEMANTIC_COLORS["reference"]), dash = "dot")))
+  if (!is.na(b$q1)) {
+    shapes <- c(shapes, list(
+      list(type = "rect", x0 = b$q1, x1 = b$q3, y0 = -0.35, y1 = 0.35, line = list(width = 0),
+           fillcolor = unname(CEDAR_SEMANTIC_COLORS["other"]), opacity = 0.35, layer = "below"),
+      list(type = "line", x0 = b$median, x1 = b$median, y0 = -0.35, y1 = 0.35,
+           line = list(color = unname(CEDAR_SEMANTIC_COLORS["reference"]), width = 2))))
+  }
+  p <- plotly::plot_ly() %>%
+    plotly::add_trace(
+      data = others, x = ~return_gap, y = ~lane, type = "scatter", mode = "markers", name = "Other courses",
+      marker = list(color = unname(CEDAR_SEMANTIC_COLORS["neutral"]), size = 7, opacity = 0.55),
+      text = ~course, customdata = ~n_covered,
+      hovertemplate = "%{text}<br>Return gap: %{x:+.1f} points<br>%{customdata} students<extra></extra>")
+  if (nrow(focal) == 1L) {
+    p <- p %>% plotly::add_trace(
+      data = focal, x = ~return_gap, y = ~lane, type = "scatter", mode = "markers+text", name = focal$course,
+      marker = list(color = unname(CEDAR_SEMANTIC_COLORS["caution"]), size = 14,
+                    line = list(color = unname(CEDAR_COLORS["text"]), width = 1)),
+      text = ~course, textposition = "top center", textfont = list(size = 13),
+      customdata = ~n_covered,
+      hovertemplate = "%{text}<br>Return gap: %{x:+.1f} points<br>%{customdata} students<extra></extra>")
+  }
+  p %>% plotly::layout(
+    shapes = shapes, showlegend = FALSE,
+    xaxis = list(title = "Return gap in points: came back more (+) or less (\u2212) often than similar students",
+                 zeroline = FALSE),
+    yaxis = list(visible = FALSE, range = c(-0.6, 0.6), fixedrange = TRUE),
+    margin = list(t = 10, b = 50)
+  )
 }
 
 #' The similar-students payload as plain text (the text-first preview)

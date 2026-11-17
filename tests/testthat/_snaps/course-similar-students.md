@@ -3,10 +3,10 @@
     Code
       cat(course_similar_students_headline(payload), sep = "\n")
     Output
-      Of 1 students who took HIST 499, 100.0% returned the next regular term, against 0.0% expected from students of the same term, home campus, high-school GPA band and time status who took a Gen Ed course and not this one: a gap of +100.0 points, where chance alone moves it about 0.0.
-      In their other courses that term they did not pass 100.0% of attempts against 25.0% expected (+75.0 points).
-      The compared students come from the 3 of 4 student-terms in this population with a Gen Ed course that term (75%).
-      Taking almost any course goes with returning: across the 1 other courses these students took, the median return gap is -100.0 points, and HIST 499's is larger than 100% of them.
+      100.0% of the 1 students who took HIST 499 came back the next semester, against 0.0% of similar students who did not take it. Too few similar students to tell this difference from chance.
+      In their other courses that semester they did not pass 100.0% of attempts (a D, an F or a withdrawal), against 25.0% for similar students. About the same as similar students: the difference is within what chance alone produces.
+      The similar students are those who took a Gen Ed course that semester and not HIST 499: 3 of the 4 student-terms in this population (75%).
+      Taking almost any course goes with coming back, so read HIST 499 against the other courses these students take, not against zero: its gap of +100.0 points is larger than 100% of the 1 other courses' gaps, where the typical course's is -100.0.
 
 # the payload carries the focal row, the benchmark and the instructors; the text preview reads it
 
@@ -16,10 +16,11 @@
       HIST 101 against similar students who did not take it: Freshman
       Population: 11 student-terms; cells of term, home campus, high-school GPA band and time status with at least 1 non-takers; rows with at least 1 covered takers.
       
-      Of 5 students who took HIST 101, 60.0% returned the next regular term, against 10.0% expected from non-takers of the same term, home campus, high-school GPA band and time status: a gap of +50.0 points, where chance alone moves it about 24.5.
-      In their other courses that term they did not pass 20.0% of attempts against 0.0% expected (+20.0 points); those who returned earned a next-term GPA of 2.50 against 4.00 expected.
-      Taking almost any course goes with returning: across the 2 other courses these students took, the median return gap is +0.0 points, and HIST 101's is larger than 50% of them.
-      Its 2 instructors with 1 or more takers differ by 22.1 points in return gap (standard deviation) where chance alone gives about 27.1; 0 sit more than two standard errors from the instructors' average.
+      60.0% of the 5 students who took HIST 101 came back the next semester, against 10.0% of similar students who did not take it. Better than similar students, by more than chance alone produces.
+      In their other courses that semester they did not pass 20.0% of attempts (a D, an F or a withdrawal), against 0.0% for similar students. Too few similar students to tell this difference from chance.
+      The 2 who came back earned a 2.50 GPA the next semester, against 4.00 for similar students. Too few similar students to tell this difference from chance.
+      Taking almost any course goes with coming back, so read HIST 101 against the other courses these students take, not against zero: its gap of +50.0 points is larger than 50% of the 2 other courses' gaps, where the typical course's is +0.0.
+      Across its 2 instructors with 1 or more students, the return gap varies by 22.1 points (standard deviation), against about 27.1 from chance alone; 0 instructors stand apart from the rest by more than chance.
       
       Every course (3), by return gap:
         HIST 499                     n     1  return 100.0 vs 0.0 (100.0)  other DFW 100.0 vs 20.0 (80.0)  next GPA — vs —
@@ -39,13 +40,13 @@
     Code
       cat(course_similar_students_headline(thin), sep = "\n")
     Output
-      HIST 101 has 5 takers in this population with comparable non-takers, under the 50 this comparison needs.
+      HIST 101 has 5 students in this population who can be compared with similar students; this comparison needs 50.
 
 ---
 
     Code
       cat(tail(course_similar_students_headline(trended), 2), sep = "\n")
     Output
-      Fall to fall, the return gap went from +0.0 points in Fall 2019 to +6.0 in Fall 2022 over 4 terms: rising (+2.0 a year; a trend needs more than ±0.4).
-      The other-course DFW gap went from +0.0 points in Fall 2019 to +6.0 in Fall 2022 over 4 terms: rising (+2.0 a year; a trend needs more than ±0.4).
+      Fall to fall, the return gap went from +0.0 points in Fall 2019 to +6.0 in Fall 2022 over 4 terms: rising 2.0 a year, more than chance alone (±0.4).
+      The gap in other courses not passed went from +0.0 points in Fall 2019 to +6.0 in Fall 2022 over 4 terms: rising 2.0 a year, more than chance alone (±0.4).
 

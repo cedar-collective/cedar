@@ -2244,6 +2244,8 @@ h4.cedar-section-heading {
 .meter-bar-fill  { fill: var(--juniper-blue); }
 .meter-bar-mark  { fill: var(--charcoal-soil); }
 .meter-list-figure { display: block; margin-top: 2px; }
+/* A group beside what was expected of it (cedar_compare_bars()). */
+.compare-bars .meter-bar-fill--reference { fill: #a9afab; }
 
 /* Column-group banding for a reactable with column groups: put
    `cedar-col-band` on every other group's heading and columns (colGroup

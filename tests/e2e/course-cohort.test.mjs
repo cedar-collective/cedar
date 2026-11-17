@@ -62,7 +62,7 @@ try {
   const body = await page.evaluate(() => document.getElementById('cr_cohort-results').textContent);
   ok(/Passed it/.test(body) && /Never took it/.test(body),
      'the groups table names the three groups');
-  ok(/describe who takes the course before they describe the course/.test(body),
+  ok(/describes who takes and passes the course before it describes the course/.test(body),
      'the page says the gaps are descriptive');
   for (const id of ['cr_cohort-population_table', 'cr_cohort-groups_table',
                     'cr_cohort-benchmark_table', 'cr_cohort-courses_table']) {
@@ -80,12 +80,12 @@ try {
      'every course carries its return-gap trend');
 
   // Comparing with similar students in Gen Ed courses: the run says so.
-  ok(!/who took a Gen Ed course that term/.test(body), 'the default compares with everyone else');
+  ok(!/took a Gen Ed course instead/.test(body), 'the default compares with everyone else');
   await page.evaluate(() => $('#cr_cohort-comparison')[0].selectize.setValue('gen_ed'));
   await runAndWait(page, 'cr_cohort-run', { timeout: 300000 });
   await waitForIdle(page);
   const genEd = await page.evaluate(() => document.getElementById('cr_cohort-results').textContent);
-  ok(/who took a Gen Ed course that term/.test(genEd), 'the Gen Ed comparison names whom it compared');
+  ok(/took a Gen Ed course instead/.test(genEd), 'the Gen Ed comparison names whom it compared');
 
   // Instructor names sit behind the gate: a session that has not unlocked it
   // sees the prompt, never the by-instructor table.

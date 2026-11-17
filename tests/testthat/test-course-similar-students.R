@@ -183,6 +183,39 @@ test_that("the next-term GPA gap's error is the non-takers' own spread of GPAs",
   expect_equal(res$next_gpa_gap_se, 0.5)
 })
 
+test_that("each outcome's finding says better, worse or the same against chance, the right way round", {
+  payload <- build_course_similar_students(ss_student_terms2, ss_attempts2, ss_app,
+                                           ss_opt(course = "HIST 101", min_term_n = 1L))
+  f <- course_similar_students_findings(payload)
+  expect_equal(f$outcome, c("return", "other_dfw", "next_gpa"))
+  # Return 60% against 10%: +50 points beyond chance (2 x 12.2).
+  expect_equal(f$taker[1], 60)
+  expect_equal(f$similar[1], 10)
+  expect_equal(f$chance[1], 2 * payload$focal$return_gap_se)
+  expect_equal(f$verdict[1], "better")
+  # Other courses 20% against 0% expected, and next GPA against REP alone:
+  # chance is zero, and the gap cannot be judged.
+  expect_equal(f$verdict[2:3], c("unclear", "unclear"))
+
+  # Fewer other courses not passed is better: the same gap read both ways,
+  # stated on the focal row.
+  dfw_up <- payload
+  dfw_up$focal$other_dfw_gap <- 10
+  dfw_up$focal$other_dfw_gap_se <- 1
+  expect_equal(course_similar_students_findings(dfw_up)$verdict[2], "worse")
+  dfw_up$focal$other_dfw_gap <- -10
+  expect_equal(course_similar_students_findings(dfw_up)$verdict[2], "better")
+  dfw_up$focal$other_dfw_gap <- 1
+  expect_equal(course_similar_students_findings(dfw_up)$verdict[2], "same")
+
+  # The text holds the findings, and the headline is every part in order.
+  txt <- course_similar_students_text(payload)
+  expect_equal(length(txt$findings), 3L)
+  expect_equal(course_similar_students_headline(payload), unname(unlist(txt)))
+  thin <- build_course_similar_students(ss_student_terms2, ss_attempts2, ss_app, ss_opt(course = "HIST 101", min_n = 50L)[-2])
+  expect_equal(nrow(course_similar_students_findings(thin)), 0L)
+})
+
 test_that("the gen_ed comparison reads the Gen Ed list and says whom it compared", {
   # HIST 101 relisted as HIST 1105, a UNM Gen Ed course: the HIST 499 case
   # above, through the named comparison.
