@@ -4070,18 +4070,7 @@ output$enrl_classlist_download <- downloadHandler(
     .render_benchmark_reactable(bmark, n_terms_course)
   })
 
-  # Department of the currently selected course, for labelling the picker groups.
-  cr_course_dept <- reactive({
-    course <- input$cr_course
-    if (is.null(course) || !nzchar(course)) return(NA_character_)
-    d <- cr_students %>%
-      dplyr::filter(subject_course == cr_course_id(), !is.na(department)) %>%
-      dplyr::slice(1) %>%
-      dplyr::pull(department)
-    if (length(d) == 0) NA_character_ else d[[1]]
-  })
-
-  # ── Later-course choices, shared by both Downstream views ──────────────────
+  # ── Later-course choices, shared by both In a Later Course views ───────────
   # The views start from different students (ISSUES M52): "Where Students Go
   # Next" (Later Course in code, R/modules/later-course.R) from everyone who
   # took this course; "Against Students Who Didn't Pass It First" (Course Sequence in code)
@@ -4128,62 +4117,37 @@ output$enrl_classlist_download <- downloadHandler(
                " first do better there than those who did not?"),
         method = tagList(cedar_definition_note("course-sequence"), cr_impact_limits())
       ),
-      fluidRow(
-        column(5,
-          selectizeInput("cr_impact_seq_course_y", "Students in:",
-                         choices  = downstream_course_choices(
-                           cr_downstream_options(), include_rollup = FALSE,
-                           dept = cr_course_dept()),
-                         multiple = TRUE,
-                         options = list(placeholder = "Choose a later course...")),
-          helpText("Choose several codes to read them as one course (a course and its modular or stretch forms): each student counts once, at their earliest attempt of any of them. The list includes courses students actually took later across departments. Department ownership and continuation share do not establish — or rule out — an intended sequence; use curricular context.")
+      info_panel(
+        "Settings",
+        fluidRow(
+          column(3, numericInput("cr_impact_seq_min_n", "Min students per group:", value = 15, min = 5, max = 100)),
+          column(2, numericInput("cr_impact_seq_gpa_min", "HS GPA min:", value = NA, min = 0, max = 5, step = 0.1)),
+          column(2, numericInput("cr_impact_seq_gpa_max", "HS GPA max:", value = NA, min = 0, max = 5, step = 0.1)),
+          column(2, numericInput("cr_impact_seq_act_min", "ACT min:", value = NA, min = 1, max = 36, step = 1)),
+          column(2, numericInput("cr_impact_seq_act_max", "ACT max:", value = NA, min = 1, max = 36, step = 1))
         ),
-        column(2,
-          numericInput("cr_impact_seq_min_n", "Min students:", value = 15, min = 5, max = 100)
-        )
+        tags$p(class = "text-note", "Leave the windows blank to include every student. A window keeps both groups inside one high-school GPA or ACT range and leaves out anyone with no value on file; ACT is on file for a minority of students, so an ACT window usually removes most of both groups. The results compare the groups inside high-school GPA bands either way. Change a setting, then click Show Results again."),
+        description = "Minimum students per group: 15, and no GPA or ACT window, unless changed."
       ),
-      fluidRow(
-        column(2,
-          numericInput("cr_impact_seq_gpa_min", "HS GPA min:", value = NA, min = 0, max = 5, step = 0.1)
-        ),
-        column(2,
-          numericInput("cr_impact_seq_gpa_max", "HS GPA max:", value = NA, min = 0, max = 5, step = 0.1)
-        ),
-        column(2,
-          numericInput("cr_impact_seq_act_min", "ACT min:", value = NA, min = 1, max = 36, step = 1)
-        ),
-        column(2,
-          numericInput("cr_impact_seq_act_max", "ACT max:", value = NA, min = 1, max = 36, step = 1)
-        ),
-        column(2,
-          br(),
-          actionButton("cr_impact_seq_run", "Compare Groups",
-                       icon = icon("play"), class = "btn-primary")
-        )
-      ),
-      helpText("Leave the windows blank to include every student. A window keeps both groups inside one high-school GPA or ACT range and leaves out anyone with no value on file; ACT is on file for a minority of students, so an ACT window usually removes most of both groups. The results compare the groups inside high-school GPA bands either way."),
       uiOutput("cr_impact_sequence_results")
     )
   })
 
-  observe({
-    updateSelectizeInput(session, "cr_impact_seq_course_y",
-                         choices = sort(unique(cedar_sections$subject_course)),
-                         server  = TRUE)
-  })
-
-  observeEvent(input$cr_impact_seq_run, {
+  # Runs on the shared Show Results button above both views, on the later
+  # course(s) chosen there (cr_later, laterCourseServer() below; observers run
+  # after the server function returns, so cr_later exists by then).
+  observeEvent(cr_later$run(), {
     req(input$cr_course, nzchar(input$cr_course),
-        length(input$cr_impact_seq_course_y) > 0, all(nzchar(input$cr_impact_seq_course_y)))
+        length(cr_later$course_y()) > 0, all(nzchar(cr_later$course_y())))
     cr_impact_sequence_data(NULL)
     window_value <- function(v) if (is.numeric(v) && !is.na(v)) v else NULL
 
     gpa_min <- input$cr_impact_seq_gpa_min
     gpa_max <- input$cr_impact_seq_gpa_max
-    # Both courses by id: the Y picker lists schedule codes, former ones included.
+    # Both courses by id; the shared picker lists course ids already.
     opt <- list(
       course_x    = cr_course_id(),
-      course_y    = unique(vapply(input$cr_impact_seq_course_y, course_id_of, character(1),
+      course_y    = unique(vapply(cr_later$course_y(), course_id_of, character(1),
                                   tbl = data_objects[["cedar_sections"]],
                                   caller = "server.R Course Sequence", USE.NAMES = FALSE)),
       act_min     = window_value(input$cr_impact_seq_act_min),
@@ -4236,7 +4200,7 @@ output$enrl_classlist_download <- downloadHandler(
 
   output$cr_impact_sequence_results <- renderUI({
     result <- cr_impact_sequence_data()
-    if (is.null(result)) return(NULL)
+    if (is.null(result)) return(empty_state("Choose a later course above, then click Show Results."))
 
     fmt_term <- function(t) {
       yr <- t %/% 100
@@ -6116,7 +6080,7 @@ output$enrl_classlist_download <- downloadHandler(
 
   # Course Dynamics > Downstream > In a Later Course > Where Students Go Next: the analysed course's students
   # in a later course, by term, grade and instructor (R/modules/later-course.R).
-  laterCourseServer(
+  cr_later <- laterCourseServer(
     "cr_later",
     course        = cr_course_id,
     campus        = reactive(if (length(input$cr_campus) > 0) input$cr_campus else NULL),

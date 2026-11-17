@@ -286,17 +286,21 @@ Both views here offer the later courses this course's students actually took, an
 
 Use the first for where a course's students go and how its grades carry forward; use the second for whether this course prepares students for the later one as well as the other routes into it do.
 
+One picker at the top serves both. Choose one later course, or several to
+read as a set, and the window (three regular terms unless you change it),
+then click **Show Results**: both views run on that choice. The list shows,
+beside each course, how many of this course's students took it within the
+window; the window applies to Where Students Go Next only. Each view's own
+settings (the smallest group a rate is shown for and, for the second view, a
+high-school GPA or ACT window) are under its **Settings**; change one and
+click **Show Results** again.
+
 #### Where Students Go Next
 {: #later-course}
 
 {% include definition-summary.html id="downstream-outcomes" %}
 
-Choose one later course, or several to read as a set, the window (three
-regular terms unless you change it) and the smallest group a rate is shown
-for, then click **Show Outcomes**. The list shows, beside each course, how
-many of this course's students took it within the window.
-
-The page gives, for each campus that taught the course:
+The view gives, for each campus that taught the course:
 
 - **The two rates, with the counts behind them.** The share who took the later
   course and the share of those who passed it, each over all terms. Directly
@@ -335,8 +339,8 @@ counts as having taken it, and is listed as not yet graded, never as failing.
 
 {% include definition-summary.html id="course-sequence" %}
 
-The optional HS GPA filter restricts both groups to a selected range; it is a
-sensitivity check, not an adjustment for unobserved differences.
+The optional HS GPA window under **Settings** restricts both groups to a
+selected range; it is a sensitivity check, not an adjustment for unobserved differences.
 
 The balance table uses the absolute standardized mean difference (SMD) for
 measured continuous and binary covariates. CEDAR labels values below 0.10 as a

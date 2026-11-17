@@ -15,9 +15,11 @@
 
 // These are asserted ABSENT from the page, so they are not selectors:
 // check-ids-ignore: inst_gpa, overall_credits_earned, inst_credits_attempted
+// The sequence view's own picker, gone since the shared one; asserted absent:
+// check-ids-ignore: cr_impact_seq_course_y
 
 import { launch, connect, setInput, runAndWait, openSubTab,
-         waitForIdle, requireIds } from './lib.mjs';
+         waitForIdle, requireIds, waitForSelector } from './lib.mjs';
 
 const COURSE_X = process.env.CEDAR_COURSE_X || 'HIST 1110';
 const COURSE_Y = process.env.CEDAR_COURSE_Y || 'HIST 1120';
@@ -36,16 +38,19 @@ try {
   console.log(`course loaded: ${COURSE_X}`);
 
   // ── Downstream > In a Later Course, second view ──────────────────────────
-  // openSubTab waits for the pane to be visible and for its outputs to settle.
-  // Both matter here: the run button is itself rendered by cr_impact_sequence_ui,
-  // and innerText on a still-hidden pane returns '' — indistinguishable from a
-  // tab that rendered nothing.
+  // openSubTab waits for the pane to be visible and for its outputs to settle:
+  // innerText on a still-hidden pane returns '' — indistinguishable from a
+  // tab that rendered nothing. One picker and one run button above both views
+  // drive this comparison; the picker is rendered, so wait for it.
   await openSubTab(page, 'Downstream', { timeout: 300000 });
   await openSubTab(page, 'In a Later Course', { timeout: 300000 });
-  await requireIds(page, ['cr_impact_seq_course_y', 'cr_impact_seq_run']);
+  await waitForSelector(page, '#cr_later-picker .selectize-control', { timeout: 120000, nonEmpty: false });
+  await requireIds(page, ['cr_later-course_y', 'cr_later-run', 'cr_impact_seq_min_n']);
+  ok(!(await page.evaluate(() => !!document.getElementById('cr_impact_seq_course_y'))),
+     'the comparison has no picker of its own');
 
-  await setInput(page, 'cr_impact_seq_course_y', COURSE_Y);
-  await runAndWait(page, 'cr_impact_seq_run', { timeout: 300000 });
+  await setInput(page, 'cr_later-course_y', [COURSE_Y]);
+  await runAndWait(page, 'cr_later-run', { timeout: 300000 });
 
   const body = await page.evaluate(() =>
     document.getElementById('cr_impact_sequence_ui').innerText);

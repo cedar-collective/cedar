@@ -1341,6 +1341,7 @@ nav_panel(
           nav_panel(
             "In a Later Course",
             icon = icon("shuffle"),
+            laterCoursePickerUI("cr_later"),
             laterCourseUI("cr_later"),
             uiOutput("cr_impact_sequence_ui")
           )
