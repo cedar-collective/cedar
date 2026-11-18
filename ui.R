@@ -1312,8 +1312,8 @@ nav_panel(
         uiOutput("cr_dfw_tab_content")
       ),
 
-      # What happens to the course's students afterwards, one view a subtab,
-      # in story order: whether they come back (by their grade here, then
+      # What happens to the course's students afterwards: At a Glance first,
+      # one row a step, then one view a subtab, in story order: whether they come back (by their grade here, then
       # against students who did not take it), then a later course (where
       # they go next, then whether passing this course first prepared them).
       # Every view is laid out the same way (answer, Over Time, breakdowns,
@@ -1325,6 +1325,11 @@ nav_panel(
         icon = icon("arrow-right-long"),
         navset_tab(
           id = "cr_downstream_view",
+          nav_panel(
+            "At a Glance", value = "glance",
+            icon = icon("binoculars"),
+            uiOutput("cr_downstream_glance_ui")
+          ),
           nav_panel(
             "Coming Back", value = "coming_back",
             icon = icon("person-walking-arrow-right"),

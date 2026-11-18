@@ -194,6 +194,18 @@ The first two read the university as a whole (return, grades in other courses, G
 
 Each subtab runs when you open it, on the defaults its **Settings** box describes. Change a setting there and click **Update Results**.
 
+### At a Glance
+
+Downstream opens on **At a Glance**: the whole story in five cards, read top to bottom.
+
+1. **In the Course**: the share of the course's graded attempts that ended in DFW, across its terms, and whether that rate has risen or fallen (from the DFW tab).
+2. **Coming Back**: how often students who passed came back the next semester, against those who did not.
+3. **Against Non-Takers**: how often its students came back against similar students who did not take it, and whether that is better, worse or about the same once chance is allowed for. It needs admissions records; without them the card says so.
+4. **Next Courses**: of the students who could have taken the later course, how many did within the window, and how many of them passed it.
+5. **Prepared for It**: the later course's DFW rate for students who passed this course first against those who did not, and whether the two groups were alike before it.
+
+Each card gives its number as a sentence and a small figure, names the campus it reads (the one with the most students, so a number is never a blend of campuses), and opens the subtab behind it, where the same number comes with its change over time, its breakdowns and how far to trust it. Opening At a Glance runs the views it reads on their defaults, so its cards fill in one by one; the later course is the one Next Courses and Prepared for It show.
+
 Every view is laid out in the same order, so a reader who has learned one can read the others:
 
 1. **The answer**: the question, a lead sentence with the number, and its figure.

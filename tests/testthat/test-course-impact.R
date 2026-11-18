@@ -243,9 +243,9 @@ test_that("Course Dynamics puts every after-the-course view under one Downstream
   start <- regexpr('nav_panel\\(\\s*"Downstream"', ui_src, perl = TRUE)
   expect_gt(start, 0L)
   tab <- substr(ui_src, start, regexpr("\\) # end navset_tab", ui_src))
-  # One view a subtab, in story order: coming back, against non-takers, the
-  # next courses, prepared for them.
-  ids <- c('id = "cr_downstream_view"',
+  # At a Glance, then one view a subtab, in story order: coming back, against
+  # non-takers, the next courses, prepared for them.
+  ids <- c('id = "cr_downstream_view"', '"At a Glance", value = "glance"', 'uiOutput("cr_downstream_glance_ui")',
            '"Coming Back", value = "coming_back"', 'uiOutput("cr_impact_retention_ui")',
            '"Against Non-Takers", value = "non_takers"', 'courseCohortUI("cr_cohort")',
            '"Next Courses", value = "next_courses"', 'laterCourseUI("cr_later")',
@@ -266,7 +266,8 @@ test_that("each Downstream view runs on its own subtab's value", {
   cohort <- paste(readLines("../../R/modules/course-cohort.R", warn = FALSE), collapse = "\n")
   later <- paste(readLines("../../R/modules/later-course.R", warn = FALSE), collapse = "\n")
   runs <- c(
-    coming_back = grepl('cr_downstream_active() %in% c("glance", "coming_back")', server, fixed = TRUE),
+    glance = grepl('uiOutput("cr_downstream_glance_ui")', tab, fixed = TRUE),
+    coming_back = grepl('cr_downstream_active() %in% "coming_back"', server, fixed = TRUE),
     non_takers = grepl('view() %in% c("glance", "non_takers")', cohort, fixed = TRUE),
     next_courses = grepl('LATER_COURSE_RUN_VIEWS <- c("glance", "next_courses")', later, fixed = TRUE),
     prepared = grepl('cr_downstream_active() %in% c("glance", "prepared")', server, fixed = TRUE)
