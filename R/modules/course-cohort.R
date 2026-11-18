@@ -1,5 +1,5 @@
-# Shiny Module: Course Dynamics > Downstream > Overall > Against Students Who
-# Didn't Take It ("Takers vs Non-Takers" before 2026-11-17)
+# Shiny Module: Course Dynamics > Downstream > Against Non-Takers ("Takers vs
+# Non-Takers", then "Against Students Who Didn't Take It", before 2026-11-17)
 #
 # A course's takers against its non-takers, read against the college's other
 # courses. The module owns the controls and the rendering; every number comes
@@ -10,7 +10,11 @@
 # Exported functions:
 #   courseCohortUI(id)
 #   courseCohortServer(id, student_terms, attempts, programs, dims, edges,
-#                      course, campus, applicants)
+#                      course, campus, applicants, view)
+#
+# It runs when its subtab (or At a Glance) is open and the course has
+# changed, on the page's defaults; Update Results reruns it on the settings.
+# It returns its two results for At a Glance.
 #
 # With the applicants table, the same run also reads the course against
 # similar non-takers (build_course_similar_students()): the like-with-like
@@ -30,9 +34,12 @@ courseCohortUI <- function(id) {
 #' @param instructor_access The session's shared instructor-gate flag
 #'   (`reactiveVal`); the by-instructor table renders only when it is TRUE.
 #' @param instructor_password The gate's password ("" when none is configured).
+#' @param view Reactive: the open Downstream subtab's value (NULL when
+#'   Downstream is not open); the comparison runs on "non_takers" and "glance".
 courseCohortServer <- function(id, student_terms, attempts, programs, dims, edges,
                                course, campus, applicants = NULL,
-                               instructor_access = reactiveVal(FALSE), instructor_password = "") {
+                               instructor_access = reactiveVal(FALSE), instructor_password = "",
+                               view = reactive("non_takers")) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
     result <- reactiveVal(NULL)
@@ -47,8 +54,9 @@ courseCohortServer <- function(id, student_terms, attempts, programs, dims, edge
       course_cohort_context_defaults(crs, student_terms, attempts, edges, list(campus = campus()))
     })
 
+    last_run <- reactiveVal(NULL)
     # A new course is a new question: the old answer leaves with it.
-    observeEvent(course(), { result(NULL); similar(NULL) }, ignoreNULL = FALSE)
+    observeEvent(course(), { result(NULL); similar(NULL); last_run(NULL) }, ignoreNULL = FALSE)
 
     output$body <- renderUI({
       crs <- course()
@@ -71,14 +79,17 @@ courseCohortServer <- function(id, student_terms, attempts, programs, dims, edge
 
       tagList(
         subtab_header(
-          "Against Students Who Didn't Take It",
+          "Against Non-Takers",
           paste0("Do students who take ", crs, " come back and do well the next semester more often than students who don't?"),
           method = tagList(
             cedar_definition_note("course-cohort-effect"),
-            tags$p("The page opens on this course's takers whose home campus is among the page's campuses (every home campus when none is): every term of the term type most of them took it in, the classification most of them held, and the course's own college and level. Change any of them and compare again."),
+            tags$p("The view opens on this course's takers whose home campus is among the page's campuses (every home campus when none is): every term of the term type most of them took it in, the classification most of them held, and the course's own college and level. Change any of them under Settings and click Update Results."),
             tags$p("A Fall cohort and a Spring one are different students, so read one term type at a time. Students are counted by home campus, and a student who took the course on any campus is a taker.")
           )
         ),
+        info_panel(
+          "Settings",
+          description = "This course's usual classification, home campus, term type and terms; its own college and level as the benchmark; 10 students per group.",
         fluidRow(
           column(3, selectizeInput(ns("classification"), "Classification",
                                    choices = d$choices$classifications$student_classification,
@@ -102,9 +113,10 @@ courseCohortServer <- function(id, student_terms, attempts, programs, dims, edge
                                                           c("Everyone else", "In a Gen Ed course")),
                                 selected = "all")),
           column(4, helpText(
-            "Choosing term types selects every term of those types; narrow them in Terms."
+            "Choosing term types selects every term of those types; narrow them in Terms. Change a setting, then click Update Results."
           )),
-          column(2, br(), actionButton(ns("run"), "Compare Groups", icon = icon("play"), class = "btn-primary"))
+          column(2, br(), actionButton(ns("run"), "Update Results", icon = icon("rotate"), class = "btn-primary"))
+        )
         ),
         uiOutput(ns("results"))
       )
@@ -116,21 +128,45 @@ courseCohortServer <- function(id, student_terms, attempts, programs, dims, edge
       updateSelectizeInput(session, "terms", selected = terms[get_term_type(terms) %in% input$term_type])
     }, ignoreInit = TRUE)
 
-    observeEvent(input$run, {
+    # Run when this view is wanted and its question has changed: another
+    # course, or Update Results after a setting. Before the settings are
+    # shown (At a Glance reads this view first) the run reads the defaults
+    # they open on.
+    observe({
       crs <- course()
-      req(crs, nzchar(crs), input$classification, input$college)
+      req(crs, nzchar(crs), isTRUE(view() %in% c("glance", "non_takers")))
+      key <- list(crs, input$run %||% 0L)
+      if (identical(key, isolate(last_run()))) return()
+      last_run(key)
+      isolate(run_comparison(crs))
+    })
+
+    run_comparison <- function(crs) {
+      shown <- !is.null(input$run)
+      d <- if (!shown) tryCatch(defaults(), error = function(e) {
+        showNotification(paste("Comparison with non-takers:", conditionMessage(e)), type = "error", duration = 10)
+        NULL
+      })
+      if (!shown && is.null(d)) return()
+      setting <- function(name, default) if (shown) input[[name]] else default
+      classification <- setting("classification", d$classification)
+      college <- setting("college", d$college)
+      req(classification, college)
+      campus_sel <- setting("campus", d$campus)
+      terms <- setting("terms", d$terms)
+      level <- setting("level", d$level)
       result(NULL)
       similar(NULL)
       opt <- list(
         course = crs,
-        classification = input$classification,
-        campus = if (length(input$campus) > 0) input$campus else NULL,
-        term = if (length(input$terms) > 0) as.integer(input$terms) else NULL,
-        college = input$college,
-        level = if (length(input$level) > 0) input$level else NULL,
+        classification = classification,
+        campus = if (length(campus_sel) > 0) campus_sel else NULL,
+        term = if (length(terms) > 0) as.integer(terms) else NULL,
+        college = college,
+        level = if (length(level) > 0) level else NULL,
         min_n = as.integer(input$min_n %||% 10L),
         data_edges = edges,
-        college_label = if (input$college %in% names(college_names)) unname(college_names[[input$college]]) else input$college
+        college_label = if (college %in% names(college_names)) unname(college_names[[college]]) else college
       )
       withProgress(message = "Comparing takers with non-takers...", value = 0.3, {
         payload <- tryCatch(
@@ -170,7 +206,7 @@ courseCohortServer <- function(id, student_terms, attempts, programs, dims, edge
         result(payload)
         setProgress(1)
       })
-    })
+    }
 
     # The results in Downstream's order: the answer (against similar
     # students), its change over time, by instructor, against other courses,
@@ -485,5 +521,7 @@ courseCohortServer <- function(id, student_terms, attempts, programs, dims, edge
         )
       )
     })
+
+    list(result = result, similar = similar)
   })
 }

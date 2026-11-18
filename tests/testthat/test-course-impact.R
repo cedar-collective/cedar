@@ -212,7 +212,7 @@ test_that("categorical covariates are returned as distributions, not SMDs", {
 test_that("sequence comparison states its limits once, collapsed in its header", {
   src <- readLines("../../server.R", warn = FALSE)
   start <- grep("output\\$cr_impact_sequence_ui <- renderUI", src)
-  end <- grep("^  observeEvent\\(cr_later\\$run\\(\\)", src)
+  end <- grep("^  # Runs when Prepared for It \\(or At a Glance\\) is open", src)
   expect_length(end, 1L)
   expect_gt(end, start)
   block <- paste(src[start:(end - 1L)], collapse = "\n")
@@ -243,14 +243,37 @@ test_that("Course Dynamics puts every after-the-course view under one Downstream
   start <- regexpr('nav_panel\\(\\s*"Downstream"', ui_src, perl = TRUE)
   expect_gt(start, 0L)
   tab <- substr(ui_src, start, regexpr("\\) # end navset_tab", ui_src))
-  # Overall first, then In a Later Course; in each, this course's students by
-  # their grade here, then the comparison with students who did not take it.
-  ids <- c('id = "cr_downstream_view"', 'nav_panel(\n            "Overall"', 'uiOutput("cr_impact_retention_ui")',
-           'courseCohortUI("cr_cohort")', '"In a Later Course"', 'laterCourseUI("cr_later")',
-           'uiOutput("cr_impact_sequence_ui")')
+  # One view a subtab, in story order: coming back, against non-takers, the
+  # next courses, prepared for them.
+  ids <- c('id = "cr_downstream_view"',
+           '"Coming Back", value = "coming_back"', 'uiOutput("cr_impact_retention_ui")',
+           '"Against Non-Takers", value = "non_takers"', 'courseCohortUI("cr_cohort")',
+           '"Next Courses", value = "next_courses"', 'laterCourseUI("cr_later")',
+           '"Prepared for It", value = "prepared"', 'uiOutput("cr_impact_sequence_ui")')
   at <- vapply(ids, function(x) regexpr(x, tab, fixed = TRUE)[[1]], integer(1))
   expect_true(all(at > 0L))
   expect_false(is.unsorted(at))
+})
+
+test_that("each Downstream view runs on its own subtab's value", {
+  # A view runs when cr_downstream_active() names its subtab: a value that no
+  # longer matches ui.R leaves the view empty, with no error anywhere.
+  ui_src <- paste(readLines("../../ui.R", warn = FALSE), collapse = "\n")
+  tab <- substr(ui_src, regexpr('nav_panel\\(\\s*"Downstream"', ui_src, perl = TRUE), nchar(ui_src))
+  values <- regmatches(tab, gregexpr('value = "[a-z_]+"', tab))[[1]]
+  values <- gsub('value = "|"', "", values)
+  server <- paste(readLines("../../server.R", warn = FALSE), collapse = "\n")
+  cohort <- paste(readLines("../../R/modules/course-cohort.R", warn = FALSE), collapse = "\n")
+  later <- paste(readLines("../../R/modules/later-course.R", warn = FALSE), collapse = "\n")
+  runs <- c(
+    coming_back = grepl('cr_downstream_active() %in% c("glance", "coming_back")', server, fixed = TRUE),
+    non_takers = grepl('view() %in% c("glance", "non_takers")', cohort, fixed = TRUE),
+    next_courses = grepl('LATER_COURSE_RUN_VIEWS <- c("glance", "next_courses")', later, fixed = TRUE),
+    prepared = grepl('cr_downstream_active() %in% c("glance", "prepared")', server, fixed = TRUE)
+  )
+  expect_true(all(runs))
+  expect_true(all(names(runs) %in% values))
+  expect_true(grepl('LATER_COURSE_LIST_VIEWS <- c("glance", "next_courses", "prepared")', later, fixed = TRUE))
 })
 
 test_that("sequence effect uses one canonical Y outcome and scopes both courses", {

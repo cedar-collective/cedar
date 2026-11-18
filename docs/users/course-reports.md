@@ -181,14 +181,18 @@ The DFW tab is intended to support conversations about course design and student
 
 ## Downstream
 
-The Downstream tab asks what happens to the course's students afterwards. Each subtab asks it about one outcome, and asks it twice: first of the course's own students, split by the grade they earned in it, then of students who took the course against students who did not.
+The Downstream tab follows the course's students afterwards, one question a subtab, in the order a reader asks them: do they come back, do they do better than students who skipped the course, where do they go next, and did the course prepare them for it.
 
-| | **Overall**: return, grades, GPA | **In a Later Course**: results in one course you choose |
+| Subtab | Asks | Compares |
 |---|---|---|
-| **This course's students, by their grade here** | By Grade Here | Where Students Go Next |
-| **Took it against didn't** | Against Students Who Didn't Take It | Against Students Who Didn't Pass It First |
+| **Coming Back** | Did the students who passed the course come back more often than those who did not? | this course's students, by their result here |
+| **Against Non-Takers** | Do students who take it come back and do well more often than similar students who don't? | takers against students who did not take it |
+| **Next Courses** | How many went on to a later course, and how did they do in it, by their grade here? | this course's students, by their grade here |
+| **Prepared for It** | In a later course, did students who passed this one first do better? | later-course students who passed this one first against those who did not |
 
-The two comparisons in the bottom row read alike because they use one method on two outcomes. The **What counts as failing?** choice under By Grade Here applies there only; every other view counts pass and DFW by the standard rule.
+The first two read the university as a whole (return, grades in other courses, GPA); the last two read one later course. The **What counts as failing?** choice in Coming Back's Settings applies there only; every other view counts pass and DFW by the standard rule.
+
+Each subtab runs when you open it, on the defaults its **Settings** box describes. Change a setting there and click **Update Results**.
 
 Every view is laid out in the same order, so a reader who has learned one can read the others:
 
@@ -198,28 +202,26 @@ Every view is laid out in the same order, so a reader who has learned one can re
 4. **Against Other Courses**, where the view has a benchmark.
 5. **How Far to Trust It**: who was counted (collapsed), and how alike the compared groups were, in one table with a row per measured characteristic.
 
-### Overall
+### Coming Back
 {: #retention}
-
-#### By Grade Here
 
 {% include definition-summary.html id="course-retention" %}
 
 Summer terms are skipped when counting forward.
 
-You can configure how many semesters to track, set a minimum cohort size per row, and optionally break out results by instructor.
+Under Settings you can choose what counts as failing, how many semesters to track and the minimum cohort size per row, and, behind the instructor-data password, break the results out by instructor.
 
-#### Against Students Who Didn't Take It
+### Against Non-Takers
 {: #takers-vs-non-takers}
 
 {% include definition-summary.html id="course-cohort-effect" %}
 
-By Grade Here follows the students who took the course. This view adds the
+Coming Back follows the students who took the course. This view adds the
 students who did not: for every enrolled student of a classification in a
 term (first-semester freshmen, say), by home campus, it sets the course's
 takers beside the students who never took it that term, on return the next
 regular term, the DFW share of their next-term attempts and next-term GPA.
-The split of the course's own students by grade is By Grade Here's, and is
+The split of the course's own students by grade is Coming Back's, and is
 not repeated here.
 
 The page opens on the course's takers whose home campus is among the
@@ -231,7 +233,7 @@ main-campus students, even for a course most of whose takers are dual-credit
 students on a branch campus. A Fall cohort and a
 Spring one are different students, so read one term type at a time: **Term
 types** selects every term of the types you tick, and **Terms** narrows them.
-Change any of them and click **Compare Groups**.
+Change any of them under **Settings** and click **Update Results**.
 
 Read the gap against the benchmark, not on its own. Passing any course goes
 with returning, so the view runs the same comparison for every other course of
@@ -282,29 +284,22 @@ course these students take, and its table shows the same return-gap line for
 every course, with its slope a year, so a set of courses can be read for
 their trends side by side.
 
-### In a Later Course
+### Next Courses and Prepared for It
 
-Both views here offer the later courses this course's students actually took, and they start from different students:
+Both subtabs read one later course, chosen in a picker that sits on each: change it on one and the other follows. It opens on the first course the list offers, the later course of this course's own department that most of its students took (or the most-taken one when the department has none), so neither opens empty. The list shows, beside each course, how many of this course's students took it within the window (three regular terms unless you change it under Next Courses' Settings). Choose several codes to read them as one course.
 
-| | **Where Students Go Next** | **Against Students Who Didn't Pass It First** |
+They start from different students:
+
+| | **Next Courses** | **Prepared for It** |
 |---|---|---|
-| Starts from | everyone who took this course | everyone in a later course you choose |
+| Starts from | everyone who took this course | everyone in the later course |
 | Asks | how many went on to the later course, and how they did in it | did students who passed this course first do better there than those who did not? |
 | Compares | this course's students with each other: by term, by the grade they earned, by instructor | two groups of later-course students: passed this course first, or not |
 | Time limit | a window of regular terms (three unless you change it) | any earlier term |
 
 Use the first for where a course's students go and how its grades carry forward; use the second for whether this course prepares students for the later one as well as the other routes into it do.
 
-One picker at the top serves both. Choose one later course, or several to
-read as a set, and the window (three regular terms unless you change it),
-then click **Show Results**: both views run on that choice. The list shows,
-beside each course, how many of this course's students took it within the
-window; the window applies to Where Students Go Next only. Each view's own
-settings (the smallest group a rate is shown for and, for the second view, a
-high-school GPA or ACT window) are under its **Settings**; change one and
-click **Show Results** again.
-
-#### Where Students Go Next
+### Next Courses
 {: #later-course}
 
 {% include definition-summary.html id="downstream-outcomes" %}
@@ -344,7 +339,7 @@ The view gives, for each campus that taught the course:
 A student who took the later course in a term whose grades are not posted yet
 counts as having taken it, and is listed as not yet graded, never as failing.
 
-#### Against Students Who Didn't Pass It First
+### Prepared for It
 {: #course-sequence}
 
 {% include definition-summary.html id="course-sequence" %}
@@ -393,7 +388,7 @@ This depends on what your institution has loaded into CEDAR. Check with your CED
 
 Two views answer two halves of this, and neither answers the whole of it.
 
-- **Downstream → In a Later Course → Against Students Who Didn't Pass It First** compares grades in one later course you
+- **Downstream → Prepared for It** compares grades in one later course you
   name (ENGL 1120, say) between students who passed the first-year course
   first and students who took the later course without it. The first sentence
   of the result gives both rates with their counts and says how alike the
@@ -403,15 +398,15 @@ Two views answer two halves of this, and neither answers the whole of it.
   placed past it. On the 2026-11-04 pull, students who passed FYEX 1010 before
   ENGL 1120 did not pass ENGL 1120 14.2% of the time against 12.9%, and
   entered with 5 credits against 28. That gap describes who takes FYEX 1010.
-- **Downstream → Overall → By Grade Here** shows, of the students who took the course, how many came
+- **Downstream → Coming Back** shows, of the students who took the course, how many came
   back the next fall or spring, split by how they did in it. For FYEX 1010 on
   main campus, 92% of those who passed returned against 49% of those who
   failed. That is a strong signal about the students who fail a first-year
   seminar, not a measure of the seminar.
 
 What neither view does is compare takers with students who did not take the
-course at all, holding classification constant. **Downstream → Overall →
-Against Students Who Didn't Take It** does: for one classification, by home
+course at all, holding classification constant. **Downstream → Against
+Non-Takers** does: for one classification, by home
 campus and term, return and next-term DFW share for the course's passers
 against students who never took it, with a balance table. The groups differ
 substantially on ACT, high-school GPA, Pell eligibility and first-generation
