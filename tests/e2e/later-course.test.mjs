@@ -1,14 +1,17 @@
-// Course Dynamics > Downstream > In a Later Course > Where Students Go Next (Later Course in code): of the analysed course's
+// Course Dynamics > Downstream > Next Courses (Later Course in code): of the analysed course's
 // students, how many took a later course within the window, when, and how they
 // did in it (R/modules/later-course.R over build_later_course()).
 //
-// Asserts the tab opens first under Downstream with its definition and an
-// empty state, the picker offers the later course with its share, a run renders
+// Asserts the subtab opens on a later course already chosen and runs on its
+// own, the picker offers the later course with its share, a run renders
 // the two rates with the counts behind them, the per-term chart, sentences and
 // table read one term type at a time, and nothing that names an instructor is
 // on the page while the instructor gate is closed.
 //
 //   node tests/e2e/later-course.test.mjs
+
+// The pickers' ids are built per slot (paste0("course_y_", slot), later-course.R):
+// check-ids-ignore: cr_later-course_y_next
 
 import { launch, connect, setInput, runAndWait, openSubTab, waitFor,
          waitForIdle, requireIds, waitForSelector, readReactable } from './lib.mjs';
@@ -39,14 +42,13 @@ try {
   await waitForIdle(page, { timeout: 300000 });
   console.log(`course loaded: ${COURSE_X}`);
 
-  // Where Students Go Next is the first view on Downstream > In a Later Course.
-  // The picker starts with nothing chosen and so has no text: wait for the
-  // control, not for words in it.
+  // Next Courses opens on a later course already chosen, and runs on it with
+  // no click: neither of the subtabs that read the choice opens empty.
   await openSubTab(page, 'Downstream', { timeout: 300000 });
-  await openSubTab(page, 'In a Later Course', { timeout: 300000 });
-  await waitForSelector(page, '#cr_later-picker .selectize-control', { timeout: 120000, nonEmpty: false });
-  await requireIds(page, ['cr_later-course_y', 'cr_later-window_terms', 'cr_later-min_n',
-                          'cr_later-run', 'cr_later-results']);
+  await openSubTab(page, 'Next Courses', { timeout: 300000 });
+  await waitForSelector(page, '#cr_later-picker_next .selectize-control', { timeout: 120000, nonEmpty: false });
+  await requireIds(page, ['cr_later-course_y_next', 'cr_later-window_terms', 'cr_later-min_n',
+                          'cr_later-update', 'cr_later-results']);
 
   const definition = await page.evaluate(() => {
     const note = document.querySelector('[data-definition-id="downstream-outcomes"]');
@@ -54,13 +56,17 @@ try {
   });
   ok(definition === '1.0.0', 'the tab carries the downstream-outcomes definition v1');
 
-  const before = await page.evaluate(() => document.getElementById('cr_later-results').innerText);
-  ok(/Choose a later course/.test(before), 'before a run the results say what to do');
+  const opening = await waitFor(page, () =>
+    ($('#cr_later-course_y_next')[0]?.selectize?.getValue() || []).length > 0,
+  { timeout: 120000 });
+  ok(opening, 'the picker opens on a later course');
+  await waitForSelector(page, '#cr_later-results .stat-row', { timeout: 300000 });
+  ok(true, 'the view ran on it without a click');
 
   // The picker lists each later course with how many students took it and the
   // share that is of those who could have.
   const offered = await page.evaluate(() => {
-    const s = $('#cr_later-course_y')[0].selectize;
+    const s = $('#cr_later-course_y_next')[0].selectize;
     return Object.values(s.options).map((o) => ({ value: o.value, label: o.label }));
   });
   const choice = offered.find((o) => o.value === COURSE_Y);
@@ -69,9 +75,9 @@ try {
   ok(!!choice && /— [\d,]+ students \(\d+\.\d%\)$/.test(choice.label),
      `its label carries the count and the share (${choice ? choice.label : 'not offered'})`);
 
-  await setInput(page, 'cr_later-course_y', [COURSE_Y]);
+  await setInput(page, 'cr_later-course_y_next', [COURSE_Y]);
   await setInput(page, 'cr_later-min_n', 5);
-  await runAndWait(page, 'cr_later-run', { timeout: 300000 });
+  await runAndWait(page, 'cr_later-update', { timeout: 300000 });
   // The per-term table sits in a collapsed "Each term" panel, and Shiny
   // renders an output inside one only once it is opened.
   await page.evaluate(() => {

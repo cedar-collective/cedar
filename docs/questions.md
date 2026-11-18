@@ -248,7 +248,7 @@ course, so it differs from a course's all-attempt DFW rate on purpose.
 
 ### Do students keep enrolling after taking a course?
 
-**In CEDAR:** **Course Dynamics → Downstream → Overall** shows how many students enrolled
+**In CEDAR:** **Course Dynamics → Downstream → Coming Back** shows how many students enrolled
 in a course were still enrolled in later terms, optionally by instructor.
 
 **Watch out for:** "still enrolled" means anywhere at the university, not in the
@@ -259,9 +259,9 @@ the follow-up terms are left out rather than counted as gone.
 
 ### Does taking course A before course B help?
 
-**In CEDAR:** **Course Dynamics → Downstream → In a Later Course → Against Students Who Didn't Pass It First**
+**In CEDAR:** **Course Dynamics → Downstream → Prepared for It**
 starts from the students in course B and compares those who passed A first with
-those who did not; **Where Students Go Next** starts from course A's students
+those who did not; **Next Courses** starts from course A's students
 and follows them into B, by term, by the grade they earned and, with the
 instructor-data password, by instructor.
 

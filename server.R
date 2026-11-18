@@ -3440,15 +3440,16 @@ output$enrl_classlist_download <- downloadHandler(
       return(empty_state("Select a course and click Analyze Course first, then open this tab."))
     tagList(
       subtab_header(
-        "By Grade Here",
+        "Coming Back",
         paste0("Did the students who passed ", course, " come back more often than those who did not?"),
         method = tagList(
           tags$p("Every student registered in the course, of any classification, by the campus that taught it. Came back means enrolled the next fall or spring semester, or graduated first; summer does not count."),
           tags$p("If students who failed come back at close to the rate of those who passed, the course is not where they are leaving; a wide gap says the opposite. It describes who came back, not why."),
-          tags$p("The choice of what counts as failing applies to this view only.")
+          tags$p("The choice of what counts as failing, under Settings, applies to this view only.")
         )
       ),
-      div(class = "mb-3",
+      info_panel(
+        "Settings",
         radioButtons("cr_ret_threshold", label = "What counts as failing?",
           choices = c(
             "Standard: only A+ through C and CR pass; all other recorded outcomes count as fail" = "below_c",
@@ -3456,32 +3457,7 @@ output$enrl_classlist_download <- downloadHandler(
           ),
           selected = input$cr_ret_threshold %||% "below_c",
           inline = FALSE
-        )
-      ),
-      dashboard_subsection(
-        "Passed Against Did Not Pass",
-        paste0("How often ", course, "'s students came back the next semester, by their result here."),
-        method = tags$p("Each student's result in the course under the rule chosen above; a result needs 5 students to be shown."),
-        uiOutput("cr_persistence_ui")
-      ),
-      dashboard_subsection(
-        "Semesters Later",
-        "How many of the course's students are still enrolled one, two and more semesters on, against the department's and the college's other courses.",
-        method = tagList(
-          tags$p(tags$strong("Data window: "),
-                 cedar_longitudinal_edge_note(data_objects[["cedar_edges"]], grade_dependent = FALSE)),
-          tags$ul(
-            tags$li("The starting cohort is every student officially registered in the selected course in each term, whatever their classification: concurrent-enrollment (dual-credit) high-school students are in it, and where they are most of a cohort, as in a branch-campus first-year course, a +1 rate can sit far below the +2 rate because they return on the high-school calendar."),
-            tags$li("Primary tables pool Fall, Spring, and Summer cohorts separately across the data window, weighted by cohort size."),
-            tags$li("When instructor breakout is enabled, all terms taught by the same instructor ID are pooled before the minimum-student threshold is applied."),
-            tags$li("The +1, +2, and later columns show the share of that cohort still enrolled anywhere at UNM the given number of fall/spring semesters later."),
-            tags$li("Graduates count as retained if they graduated after taking the course; they are not treated as stop-outs."),
-            tags$li("Summer terms are skipped when counting semesters forward, so +1 means the next fall or spring term."),
-            tags$li("Blank cells mean the target term is beyond the latest available data, not that retention was 0%.")
-          ),
-          cedar_definition_note("course-retention")
         ),
-
         fluidRow(
           # Campus is a scope control, not a nicety: a course taught on six
           # campuses otherwise reports one blended cohort. Defaults to main +
@@ -3505,11 +3481,36 @@ output$enrl_classlist_download <- downloadHandler(
           ),
           column(2,
             div(class = "mt-4",
-              actionButton("cr_ret_run", "Run", icon = icon("play"), class = "btn-primary")
+              actionButton("cr_ret_run", "Update Results", icon = icon("rotate"), class = "btn-primary")
             )
           )
         ),
-        br(),
+        tags$p(class = "text-note", "The failing rule changes the chart at once. The other settings apply to Semesters Later: change one, then click Update Results."),
+        description = "Standard failing rule; main and online campuses; 4 semesters; 10 students per summary, unless changed."
+      ),
+      dashboard_subsection(
+        "Passed Against Did Not Pass",
+        paste0("How often ", course, "'s students came back the next semester, by their result here."),
+        method = tags$p("Each student's result in the course under the failing rule in Settings; a result needs 5 students to be shown."),
+        uiOutput("cr_persistence_ui")
+      ),
+      dashboard_subsection(
+        "Semesters Later",
+        "How many of the course's students are still enrolled one, two and more semesters on, against the department's and the college's other courses.",
+        method = tagList(
+          tags$p(tags$strong("Data window: "),
+                 cedar_longitudinal_edge_note(data_objects[["cedar_edges"]], grade_dependent = FALSE)),
+          tags$ul(
+            tags$li("The starting cohort is every student officially registered in the selected course in each term, whatever their classification: concurrent-enrollment (dual-credit) high-school students are in it, and where they are most of a cohort, as in a branch-campus first-year course, a +1 rate can sit far below the +2 rate because they return on the high-school calendar."),
+            tags$li("Primary tables pool Fall, Spring, and Summer cohorts separately across the data window, weighted by cohort size."),
+            tags$li("When instructor breakout is enabled, all terms taught by the same instructor ID are pooled before the minimum-student threshold is applied."),
+            tags$li("The +1, +2, and later columns show the share of that cohort still enrolled anywhere at UNM the given number of fall/spring semesters later."),
+            tags$li("Graduates count as retained if they graduated after taking the course; they are not treated as stop-outs."),
+            tags$li("Summer terms are skipped when counting semesters forward, so +1 means the next fall or spring term."),
+            tags$li("Blank cells mean the target term is beyond the latest available data, not that retention was 0%.")
+          ),
+          cedar_definition_note("course-retention")
+        ),
         uiOutput("cr_retention_results")
       )
     )
@@ -3545,7 +3546,20 @@ output$enrl_classlist_download <- downloadHandler(
     compare_retention_to_benchmarks(course_result, dept_result, college_result)
   })
 
-  observeEvent(input$cr_ret_run, {
+  # Semesters Later runs when Coming Back (or At a Glance) is open and its
+  # question has changed: another course, or Update Results after a setting.
+  # A setting never shown reads its default.
+  cr_retention_last <- reactiveVal(NULL)
+  observe({
+    req(isTRUE(cr_downstream_active() %in% c("glance", "coming_back")),
+        input$cr_course, nzchar(input$cr_course))
+    key <- list(cr_course_id(), input$cr_ret_run %||% 0L)
+    if (identical(key, isolate(cr_retention_last()))) return()
+    cr_retention_last(key)
+    isolate(cr_run_retention())
+  })
+
+  cr_run_retention <- function() {
     req(input$cr_course, nzchar(input$cr_course))
     cr_retention_data(NULL)
     cr_dept_retention_data(NULL)
@@ -3558,7 +3572,8 @@ output$enrl_classlist_download <- downloadHandler(
     n_terms   <- as.integer(input$cr_ret_n_terms %||% 4L)
     min_n     <- as.integer(input$cr_ret_min_n   %||% 10L)
 
-    campus_sel <- input$cr_ret_campus
+    campus_sel <- if (is.null(input$cr_ret_run)) cedar_campus_default(data_objects[["cedar_registrations"]])
+                  else input$cr_ret_campus
     if (length(campus_sel) == 0) campus_sel <- NULL
 
     opt <- list(
@@ -3664,7 +3679,7 @@ output$enrl_classlist_download <- downloadHandler(
                        type = "error", duration = 10)
       message("[server.R] cr_retention error: ", conditionMessage(e))
     })
-  })
+  }
 
   output$cr_retention_results <- renderUI({
     result <- cr_retention_data()
@@ -3993,11 +4008,20 @@ output$enrl_classlist_download <- downloadHandler(
     .render_benchmark_reactable(bmark, n_terms_course)
   })
 
-  # ── Later-course choices, shared by both In a Later Course views ───────────
-  # The views start from different students (ISSUES M52): "Where Students Go
-  # Next" (Later Course in code, R/modules/later-course.R) from everyone who
-  # took this course; "Against Students Who Didn't Pass It First" (Course Sequence in code)
-  # from everyone in a later course, split by whether they passed this one first.
+  # ── Downstream: which view is open ─────────────────────────────────────────
+  # Each Downstream view runs when its subtab is open (or At a Glance, which
+  # reads them all) and its question has changed, never on a hidden tab. NULL
+  # when Downstream itself is not the open Course Dynamics tab.
+  cr_downstream_active <- reactive({
+    if (!identical(input$cr_tabs, "Downstream")) return(NULL)
+    input$cr_downstream_view
+  })
+
+  # ── Later-course choices, shared by Next Courses and Prepared for It ──────
+  # The views start from different students (ISSUES M52): Next Courses
+  # (Later Course in code, R/modules/later-course.R) from everyone who took
+  # this course; Prepared for It (Course Sequence in code) from everyone in a
+  # later course, split by whether they passed this one first.
   #
   # These choices come from courses students actually took after X, within the
   # default follow-up window. Department ownership is retained only as a
@@ -4018,7 +4042,8 @@ output$enrl_classlist_download <- downloadHandler(
     )
   })
 
-  # ── Against Students Who Didn't Pass It First (Course Sequence in code) ──
+  # ── Prepared for It (Course Sequence in code; "Against Students Who Didn't
+  # Pass It First" before 2026-11-17) ──
   # What the comparison can and cannot show sits in the header's method slot;
   # the result's "Who is being counted" panel stays separate because it
   # documents the groups and sample the selected comparison produced.
@@ -4035,49 +4060,54 @@ output$enrl_classlist_download <- downloadHandler(
       return(empty_state("Select a course, then click Analyze Course to view this tab."))
     tagList(
       subtab_header(
-        "Against Students Who Didn't Pass It First",
-        paste0("Of the students in a later course you choose, did those who passed ", course,
+        "Prepared for It",
+        paste0("Of the students in a later course, did those who passed ", course,
                " first do better there than those who did not?"),
         method = tagList(cedar_definition_note("course-sequence"), cr_impact_limits())
       ),
+      laterCoursePickerUI("cr_later", "seq"),
       info_panel(
         "Settings",
         fluidRow(
-          column(3, numericInput("cr_impact_seq_min_n", "Min students per group:", value = 15, min = 5, max = 100)),
+          column(2, numericInput("cr_impact_seq_min_n", "Min students per group:", value = 15, min = 5, max = 100)),
           column(2, numericInput("cr_impact_seq_gpa_min", "HS GPA min:", value = NA, min = 0, max = 5, step = 0.1)),
           column(2, numericInput("cr_impact_seq_gpa_max", "HS GPA max:", value = NA, min = 0, max = 5, step = 0.1)),
           column(2, numericInput("cr_impact_seq_act_min", "ACT min:", value = NA, min = 1, max = 36, step = 1)),
-          column(2, numericInput("cr_impact_seq_act_max", "ACT max:", value = NA, min = 1, max = 36, step = 1))
+          column(2, numericInput("cr_impact_seq_act_max", "ACT max:", value = NA, min = 1, max = 36, step = 1)),
+          column(2, br(), actionButton("cr_impact_seq_update", "Update Results", icon = icon("rotate"), class = "btn-primary"))
         ),
-        tags$p(class = "text-note", "Leave the windows blank to include every student. A window keeps both groups inside one high-school GPA or ACT range and leaves out anyone with no value on file; ACT is on file for a minority of students, so an ACT window usually removes most of both groups. The results compare the groups inside high-school GPA bands either way. Change a setting, then click Show Results again."),
+        tags$p(class = "text-note", "Leave the windows blank to include every student. A window keeps both groups inside one high-school GPA or ACT range and leaves out anyone with no value on file; ACT is on file for a minority of students, so an ACT window usually removes most of both groups. The results compare the groups inside high-school GPA bands either way. Change a setting, then click Update Results."),
         description = "Minimum students per group: 15, and no GPA or ACT window, unless changed."
       ),
       uiOutput("cr_impact_sequence_results")
     )
   })
 
-  # Runs on the shared Show Results button above both views, on the later
-  # course(s) chosen there (cr_later, laterCourseServer() below; observers run
-  # after the server function returns, so cr_later exists by then).
-  observeEvent(cr_later$run(), {
-    req(input$cr_course, nzchar(input$cr_course),
-        length(cr_later$course_y()) > 0, all(nzchar(cr_later$course_y())))
+  # Runs when Prepared for It (or At a Glance) is open and its question has
+  # changed: another course, campus or later course (the choice Next Courses
+  # shares, cr_later below; observers run after the server function returns,
+  # so cr_later exists by then), or Update Results after a setting. A setting
+  # never shown reads its default.
+  cr_impact_sequence_last <- reactiveVal(NULL)
+  observeEvent(list(input$cr_course, input$cr_campus), {
     cr_impact_sequence_data(NULL)
-    window_value <- function(v) if (is.numeric(v) && !is.na(v)) v else NULL
+    cr_impact_sequence_last(NULL)
+  }, ignoreInit = TRUE)
 
-    gpa_min <- input$cr_impact_seq_gpa_min
-    gpa_max <- input$cr_impact_seq_gpa_max
-    # Both courses by id; the shared picker lists course ids already.
+  cr_run_sequence <- function(course_y) {
+    cr_impact_sequence_data(NULL)
+    window_value <- function(v) if (is.numeric(v) && length(v) == 1L && !is.na(v)) v else NULL
     opt <- list(
       course_x    = cr_course_id(),
-      course_y    = unique(vapply(cr_later$course_y(), course_id_of, character(1),
+      # Both courses by id; the shared picker lists course ids already.
+      course_y    = unique(vapply(course_y, course_id_of, character(1),
                                   tbl = data_objects[["cedar_sections"]],
                                   caller = "server.R Course Sequence", USE.NAMES = FALSE)),
       act_min     = window_value(input$cr_impact_seq_act_min),
       act_max     = window_value(input$cr_impact_seq_act_max),
       min_n       = as.integer(input$cr_impact_seq_min_n %||% 15L),
-      hs_gpa_min  = if (!is.na(gpa_min) && is.numeric(gpa_min)) gpa_min else NULL,
-      hs_gpa_max  = if (!is.na(gpa_max) && is.numeric(gpa_max)) gpa_max else NULL,
+      hs_gpa_min  = window_value(input$cr_impact_seq_gpa_min),
+      hs_gpa_max  = window_value(input$cr_impact_seq_gpa_max),
       campus      = if (length(input$cr_campus) > 0) input$cr_campus else NULL
     )
 
@@ -4100,6 +4130,17 @@ output$enrl_classlist_download <- downloadHandler(
         message("[server.R] cr_impact_seq error: ", conditionMessage(e))
       })
     })
+  }
+
+  observe({
+    req(isTRUE(cr_downstream_active() %in% c("glance", "prepared")),
+        input$cr_course, nzchar(input$cr_course))
+    y <- cr_later$course_y()
+    req(length(y) > 0, all(nzchar(y)))
+    key <- list(cr_course_id(), input$cr_campus, y, input$cr_impact_seq_update %||% 0L)
+    if (identical(key, isolate(cr_impact_sequence_last()))) return()
+    cr_impact_sequence_last(key)
+    isolate(cr_run_sequence(y))
   })
 
   output$cr_impact_sequence_over_time <- reactable::renderReactable({
@@ -4143,7 +4184,7 @@ output$enrl_classlist_download <- downloadHandler(
   # breakdowns, then How Far to Trust It.
   output$cr_impact_sequence_results <- renderUI({
     result <- cr_impact_sequence_data()
-    if (is.null(result)) return(empty_state("Choose a later course above, then click Show Results."))
+    if (is.null(result)) return(empty_state("Choose a later course above; the results follow."))
 
     x <- result$course_x
     y_label <- paste(result$course_y, collapse = " or ")
@@ -5997,8 +6038,9 @@ output$enrl_classlist_download <- downloadHandler(
     edges = data_objects[["cedar_edges"]]
   )
 
-  # Course Dynamics > Downstream > In a Later Course > Where Students Go Next: the analysed course's students
+  # Course Dynamics > Downstream > Next Courses: the analysed course's students
   # in a later course, by term, grade and instructor (R/modules/later-course.R).
+  # Its later-course choice is Prepared for It's too.
   cr_later <- laterCourseServer(
     "cr_later",
     course        = cr_course_id,
@@ -6010,10 +6052,11 @@ output$enrl_classlist_download <- downloadHandler(
     student_terms = data_objects[["cedar_student_terms"]],
     edges         = data_objects[["cedar_edges"]],
     default_options = cr_downstream_options,
+    view          = cr_downstream_active,
     instructor_access = dfw_authenticated, instructor_password = dfw_password
   )
 
-  # Course Dynamics > Downstream > Overall > Against Students Who Didn't Take It: the analysed course against the
+  # Course Dynamics > Downstream > Against Non-Takers: the analysed course against the
   # students of its classification who never took it, read against the
   # college's other courses (R/modules/course-cohort.R).
   courseCohortServer(
@@ -6029,7 +6072,8 @@ output$enrl_classlist_download <- downloadHandler(
       data <- course_report_data()
       if (is.null(data)) NULL else data$course_code
     }),
-    campus        = reactive(input$cr_campus)
+    campus        = reactive(input$cr_campus),
+    view          = cr_downstream_active
   )
 
   # Course Dynamics > Topics: a course number's topics side by side

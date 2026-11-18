@@ -13,7 +13,7 @@ nav_order: 16
 {: .note }
 > **Not in the app yet.** The Explore → Retention tab described here is hidden
 > until its cross-course comparison is ready. Retention for a single course is
-> available now in **Course Dynamics → Downstream → Overall**
+> available now in **Course Dynamics → Downstream → Coming Back**
 > ([guide](course-reports#retention)).
 
 ---

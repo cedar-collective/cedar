@@ -1,10 +1,11 @@
-// Course Dynamics > Downstream > Overall > Against Students Who Didn't Take It: the analysed course's takers against
+// Course Dynamics > Downstream > Against Non-Takers: the analysed course's takers against
 // the students of its classification who never took it, read against the
 // college's other courses (R/modules/course-cohort.R over
 // build_course_cohort_context()).
 //
-// Asserts the tab opens on data-read defaults, a run renders the lead
-// paragraph and the three tables, and the definition record reaches the page.
+// Asserts the subtab runs on its own when opened, on data-read defaults; an
+// Update Results run renders the sections in Downstream's order and the
+// tables; and the definition record reaches the page.
 //
 //   node tests/e2e/course-cohort.test.mjs
 
@@ -26,10 +27,12 @@ try {
   await runAndWait(page, 'cr_generate_button');
   console.log(`course loaded: ${COURSE}`);
 
-  // The comparison with non-takers is the second view on Downstream > Overall,
-  // under By Grade Here.
+  // The comparison with non-takers is Downstream's second subtab. It runs on
+  // its own when opened: the results arrive without a click.
   await openSubTab(page, 'Downstream', { timeout: 300000 });
-  await openSubTab(page, 'Overall', { timeout: 300000 });
+  await openSubTab(page, 'Against Non-Takers', { timeout: 300000 });
+  await waitForSelector(page, '#cr_cohort-benchmark_table .rt-table', { timeout: 300000 });
+  ok(true, 'the comparison ran when its subtab opened');
   await requireIds(page, ['cr_cohort-classification', 'cr_cohort-college', 'cr_cohort-terms',
                           'cr_cohort-term_type', 'cr_cohort-min_n', 'cr_cohort-comparison', 'cr_cohort-run']);
 

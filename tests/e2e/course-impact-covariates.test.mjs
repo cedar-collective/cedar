@@ -1,4 +1,4 @@
-// Course Dynamics > Downstream > In a Later Course > Against Students Who Didn't Pass It First (Course Sequence in code):
+// Course Dynamics > Downstream > Prepared for It (Course Sequence in code):
 // reconstructed matching covariates.
 //
 // build_comparison() used to match treatment and control on `inst_gpa` and the
@@ -15,8 +15,12 @@
 
 // These are asserted ABSENT from the page, so they are not selectors:
 // check-ids-ignore: inst_gpa, overall_credits_earned, inst_credits_attempted
-// The sequence view's own picker, gone since the shared one; asserted absent:
-// check-ids-ignore: cr_impact_seq_course_y
+// The sequence view's own picker and the later-course run button, gone since
+// the shared choice; asserted absent:
+// check-ids-ignore: cr_impact_seq_course_y, cr_later-run
+
+// The pickers' ids are built per slot (paste0("course_y_", slot), later-course.R):
+// check-ids-ignore: cr_later-course_y_next, cr_later-course_y_seq
 
 import { launch, connect, setInput, runAndWait, openSubTab,
          waitForIdle, requireIds, waitForSelector } from './lib.mjs';
@@ -37,20 +41,29 @@ try {
   await runAndWait(page, 'cr_generate_button');
   console.log(`course loaded: ${COURSE_X}`);
 
-  // ── Downstream > In a Later Course, second view ──────────────────────────
+  // ── Downstream > Prepared for It ─────────────────────────────────────────
   // openSubTab waits for the pane to be visible and for its outputs to settle:
   // innerText on a still-hidden pane returns '' — indistinguishable from a
-  // tab that rendered nothing. One picker and one run button above both views
-  // drive this comparison; the picker is rendered, so wait for it.
+  // tab that rendered nothing. The later-course choice is the one Next
+  // Courses shares; the subtab runs on it when opened.
   await openSubTab(page, 'Downstream', { timeout: 300000 });
-  await openSubTab(page, 'In a Later Course', { timeout: 300000 });
-  await waitForSelector(page, '#cr_later-picker .selectize-control', { timeout: 120000, nonEmpty: false });
-  await requireIds(page, ['cr_later-course_y', 'cr_later-run', 'cr_impact_seq_min_n']);
+  await openSubTab(page, 'Prepared for It', { timeout: 300000 });
+  await waitForSelector(page, '#cr_later-picker_seq .selectize-control', { timeout: 120000, nonEmpty: false });
+  await requireIds(page, ['cr_later-course_y_seq', 'cr_impact_seq_update', 'cr_impact_seq_min_n']);
   ok(!(await page.evaluate(() => !!document.getElementById('cr_impact_seq_course_y'))),
      'the comparison has no picker of its own');
+  ok(!(await page.evaluate(() => !!document.getElementById('cr_later-run'))),
+     'and no Show Results button: it runs when the subtab opens');
 
-  await setInput(page, 'cr_later-course_y', [COURSE_Y]);
-  await runAndWait(page, 'cr_later-run', { timeout: 300000 });
+  await setInput(page, 'cr_later-course_y_seq', [COURSE_Y]);
+  await waitForSelector(page, '#cr_impact_sequence_results .compare-bars', { timeout: 300000 });
+  await waitForIdle(page, { timeout: 300000 });
+  // Both pickers hold the one choice: Next Courses opens on it.
+  await openSubTab(page, 'Next Courses', { timeout: 300000 });
+  await waitForSelector(page, '#cr_later-picker_next .selectize-control', { timeout: 120000, nonEmpty: false });
+  const shared = await page.evaluate(() => $('#cr_later-course_y_next')[0].selectize.getValue());
+  ok(shared.length === 1 && shared[0] === COURSE_Y, `Next Courses' picker follows the choice (${shared})`);
+  await openSubTab(page, 'Prepared for It', { timeout: 300000 });
 
   // textContent, not innerText: the counting notes and the per-term table
   // sit in collapsed panels, and innerText leaves collapsed content out.
