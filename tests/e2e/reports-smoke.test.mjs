@@ -831,6 +831,9 @@ export async function runReportChecks({ scope = 'smoke', synthetic = false } = {
     await withStep(page, ['retention'], 'Course Dynamics Retention runs with benchmarks', async () => {
       await clickSubTabIn(page, 'cr_tabs', 'Downstream');
       await waitForIdle(page, { timeout: 120000 }).catch(() => {});
+      // Downstream opens on At a Glance; the retention view is Coming Back.
+      await clickSubTabIn(page, 'cr_downstream_view', 'Coming Back');
+      await waitForIdle(page, { timeout: 180000 }).catch(() => {});
       // The outcome-split persistence table shares the trend's definition of
       // "returned" (ISSUES.md I17); it renders before the trend is run.
       await waitForOutput(page, 'Course Dynamics persistence by outcome', [

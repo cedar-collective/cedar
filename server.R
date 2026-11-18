@@ -3546,12 +3546,13 @@ output$enrl_classlist_download <- downloadHandler(
     compare_retention_to_benchmarks(course_result, dept_result, college_result)
   })
 
-  # Semesters Later runs when Coming Back (or At a Glance) is open and its
-  # question has changed: another course, or Update Results after a setting.
-  # A setting never shown reads its default.
+  # Semesters Later runs when Coming Back is open and its question has
+  # changed: another course, or Update Results after a setting. At a Glance
+  # reads only the pass/fail chart above it, which needs no run. A setting
+  # never shown reads its default.
   cr_retention_last <- reactiveVal(NULL)
   observe({
-    req(isTRUE(cr_downstream_active() %in% c("glance", "coming_back")),
+    req(isTRUE(cr_downstream_active() %in% "coming_back"),
         input$cr_course, nzchar(input$cr_course))
     key <- list(cr_course_id(), input$cr_ret_run %||% 0L)
     if (identical(key, isolate(cr_retention_last()))) return()
@@ -6059,7 +6060,7 @@ output$enrl_classlist_download <- downloadHandler(
   # Course Dynamics > Downstream > Against Non-Takers: the analysed course against the
   # students of its classification who never took it, read against the
   # college's other courses (R/modules/course-cohort.R).
-  courseCohortServer(
+  cr_cohort <- courseCohortServer(
     "cr_cohort",
     student_terms = data_objects[["cedar_student_terms"]],
     attempts      = data_objects[["cedar_attempts"]],
@@ -6075,6 +6076,70 @@ output$enrl_classlist_download <- downloadHandler(
     campus        = reactive(input$cr_campus),
     view          = cr_downstream_active
   )
+
+  # Course Dynamics > Downstream > At a Glance: one card a step, each read off
+  # the subtab named on it (R/features/downstream-glance.R). Opening it runs
+  # Against Non-Takers, Next Courses and Prepared for It on their defaults
+  # (each runs on "glance" as on its own subtab); the course's DFW rate and
+  # Coming Back's pass/fail return need no run.
+  output$cr_downstream_glance_ui <- renderUI({
+    course <- input$cr_course
+    if (is.null(course) || !nzchar(course) || is.null(course_report_data()))
+      return(empty_state("Select a course and click Analyze Course first, then open this tab."))
+    rows <- tryCatch(
+      downstream_glance(
+        course,
+        dfw_by_term = cr_dfw_by_term_reactive(),
+        persistence = tryCatch(cr_persistence_reactive(), error = function(e) {
+          if (inherits(e, "shiny.silent.error")) NULL else stop(e)
+        }),
+        similar = cr_cohort$similar(),
+        similar_available = !is.null(data_objects[["cedar_applicants"]]),
+        later = cr_later$result(),
+        sequence = cr_impact_sequence_data()
+      ),
+      error = function(e) {
+        showNotification(paste("At a Glance:", conditionMessage(e)), type = "error", duration = 10)
+        NULL
+      })
+    tagList(
+      subtab_header(
+        "At a Glance",
+        paste0("What happens to ", course, "'s students, step by step: in the course, coming back, against students who skipped it, in the next course, and whether it prepared them."),
+        method = tagList(
+          tags$p("Each step is read off the view named on it, on that view's defaults, and opens it: there the same numbers come with their change over time, their breakdowns and how far to trust them. A step reads the one campus with the most students, named on it, so its numbers are never a blend of campuses."),
+          tags$p("The first two steps follow this course's own students; Against Non-Takers sets them beside similar students who did not take it. Next Courses and Prepared for It read one later course, the one both of those subtabs show. The In the Course step uses the DFW tab's grade rule and Coming Back its own; every other step the standard rule.")
+        )
+      ),
+      if (!is.null(rows)) div(class = "downstream-glance", lapply(seq_along(rows), function(i) .downstream_glance_card(i, rows[[i]])))
+    )
+  })
+
+  .downstream_glance_targets <- c(in_course = "DFW", coming_back = "coming_back", non_takers = "non_takers",
+                                  next_courses = "next_courses", prepared = "prepared")
+
+  .downstream_glance_card <- function(i, row) {
+    open_label <- if (row$step == "in_course") "Open the DFW tab \u2192" else paste0("Open ", row$title, " \u2192")
+    cedar_finding_card(
+      paste0(i, ". ", row$title),
+      scope = row$scope,
+      class = paste0("downstream-glance-step downstream-glance-step--", row$status),
+      tags$p(class = if (row$status == "ready") "downstream-glance-sentence" else "text-note", row$sentence),
+      if (row$status == "ready" && !is.null(row$bars)) cedar_compare_bars(row$bars),
+      if (row$status == "ready" && !is.na(row$verdict)) tags$p(
+        class = paste(c("stat-compare", if (!is.na(row$tone)) paste0("stat-compare--", row$tone)), collapse = " "),
+        row$verdict),
+      actionLink(paste0("cr_glance_go_", row$step), open_label, class = "downstream-glance-open")
+    )
+  }
+
+  lapply(names(.downstream_glance_targets), function(step) {
+    observeEvent(input[[paste0("cr_glance_go_", step)]], {
+      target <- .downstream_glance_targets[[step]]
+      if (identical(target, "DFW")) nav_select("cr_tabs", "DFW")
+      else nav_select("cr_downstream_view", target)
+    })
+  })
 
   # Course Dynamics > Topics: a course number's topics side by side
   # (R/modules/course-topics.R). The tab is there only when the analysed

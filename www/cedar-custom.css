@@ -2250,6 +2250,19 @@ h4.cedar-section-heading {
 /* How alike two compared groups were (cedar_alike_block()), inside a
    Downstream view's "How Far to Trust It" section. */
 .cedar-alike-block { margin-top: 1rem; }
+
+/* Downstream > At a Glance: the five steps as one column of cards, read top
+   to bottom; a step still running or with nothing to show is quieter. */
+.downstream-glance {
+  display: grid;
+  gap: var(--space-3);
+  max-width: 760px;
+  margin-bottom: var(--space-3);
+}
+.downstream-glance-sentence { margin: 0.25rem 0 0.5rem; }
+.downstream-glance-step--pending,
+.downstream-glance-step--none { opacity: 0.75; }
+.downstream-glance-open { display: inline-block; margin-top: 0.35rem; font-weight: 600; }
 .cedar-balance-verdict { margin: 0.25rem 0 0.5rem; }
 .cedar-balance-categories {
   display: grid;

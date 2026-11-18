@@ -194,6 +194,7 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
   source_file("features/dfw-dashboard.R")              # payload and text preview: Bird's Eye > DFW Rates
   source_file("features/dfw-dashboard-view.R")         # what the DFW Rates page draws
   source_file("features/later-course.R")                # text-first preview: a course's students in a later course, by term, grade and instructor
+  source_file("features/downstream-glance.R")           # Course Dynamics > Downstream > At a Glance: the five steps, read off the other views' payloads
   source_file("features/course-topics.R")               # text-first preview: a course's topics side by side, with one-instructor rates withheld
   source_file("features/shared-requirements.R")
   source_file("features/catalog-capture.R")
