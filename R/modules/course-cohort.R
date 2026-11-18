@@ -48,18 +48,27 @@ courseCohortServer <- function(id, student_terms, attempts, programs, dims, edge
     instructorGateServer("instructor_gate", instructor_access, instructor_password,
                          what = "Results by instructor")
 
+    # The analysed course as a value. course() is invalidated whenever the
+    # page's course data gains a tab (server.R's cr_load_tab), with the course
+    # unchanged; a reset on that threw away a finished run, and At a Glance
+    # waited on Against Non-Takers for good. A reactiveVal ignores an
+    # unchanged value, so everything below follows this, and it is set first.
+    analysed <- reactiveVal(NULL)
+    observe(analysed(course()), priority = 2)
+
     defaults <- reactive({
-      crs <- course()
+      crs <- analysed()
       req(crs, nzchar(crs))
       course_cohort_context_defaults(crs, student_terms, attempts, edges, list(campus = campus()))
     })
 
     last_run <- reactiveVal(NULL)
-    # A new course is a new question: the old answer leaves with it.
-    observeEvent(course(), { result(NULL); similar(NULL); last_run(NULL) }, ignoreNULL = FALSE)
+    # A new course is a new question: the old answer leaves with it, before
+    # the run below asks the new one.
+    observeEvent(analysed(), { result(NULL); similar(NULL); last_run(NULL) }, ignoreNULL = FALSE, priority = 1)
 
     output$body <- renderUI({
-      crs <- course()
+      crs <- analysed()
       if (is.null(crs) || !nzchar(crs)) {
         return(empty_state("Select a course and click Analyze Course first, then open this tab."))
       }
@@ -133,7 +142,7 @@ courseCohortServer <- function(id, student_terms, attempts, programs, dims, edge
     # shown (At a Glance reads this view first) the run reads the defaults
     # they open on.
     observe({
-      crs <- course()
+      crs <- analysed()
       req(crs, nzchar(crs), isTRUE(view() %in% c("glance", "non_takers")))
       key <- list(crs, input$run %||% 0L)
       if (identical(key, isolate(last_run()))) return()

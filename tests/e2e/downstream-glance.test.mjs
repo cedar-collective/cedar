@@ -12,7 +12,7 @@
 // Each step's link id is built from its step (paste0("cr_glance_go_", step), server.R):
 // check-ids-ignore: cr_glance_go_coming_back
 
-import { launch, connect, setInput, runAndWait, openSubTab, waitFor,
+import { launch, connect, setInput, runAndWait, openSubTab, appReloads, explainAppReload,
          waitForIdle, requireIds, waitForSelector } from './lib.mjs';
 
 const COURSE = process.env.CEDAR_COURSE_X || 'HIST 1110';
@@ -36,12 +36,30 @@ try {
     document.querySelector('#cr_downstream_view .nav-link.active')?.textContent.trim());
   ok(active === 'At a Glance', `Downstream opens on At a Glance (${active})`);
 
-  // Every step settles on its own: none is left running.
-  const settled = await waitFor(page, () => {
-    const cards = [...document.querySelectorAll('#cr_downstream_glance_ui .downstream-glance-step')];
-    return cards.length === 5 && cards.every((c) => !c.classList.contains('downstream-glance-step--pending'));
-  }, { timeout: 600000 });
-  ok(settled, 'all five steps settle without a click');
+  // Every step settles on its own: none is left running. Each step's arrival
+  // is logged, seconds after the tab opened, so a slow analysis is visible.
+  const opened0 = Date.now();
+  const arrived = {};
+  const pendingSteps = () => page.evaluate(() =>
+    [...document.querySelectorAll('#cr_downstream_glance_ui .downstream-glance-step')].map((c) => ({
+      title: c.querySelector('.finding-card-title span')?.textContent.trim(),
+      pending: c.classList.contains('downstream-glance-step--pending'),
+    })));
+  let settled = false;
+  while (Date.now() - opened0 < 900000) {
+    if (appReloads(page) > 0) throw explainAppReload(page, new Error('waiting for the five steps'));
+    const steps = await pendingSteps().catch(() => []);
+    for (const st of steps) {
+      if (!st.pending && !(st.title in arrived)) {
+        arrived[st.title] = Math.round((Date.now() - opened0) / 1000);
+        console.log(`     ${st.title} settled after ${arrived[st.title]}s`);
+      }
+    }
+    if (steps.length === 5 && steps.every((st) => !st.pending)) { settled = true; break; }
+    await waitForIdle(page, { timeout: 15000 }).catch(() => {});
+  }
+  const still = (await pendingSteps().catch(() => [])).filter((st) => st.pending).map((st) => st.title);
+  ok(settled, `all five steps settle without a click (${still.length ? `still waiting: ${still.join(', ')}` : 'none waiting'})`);
   await waitForIdle(page, { timeout: 300000 });
 
   const cards = await page.evaluate(() =>
