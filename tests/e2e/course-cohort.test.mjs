@@ -55,6 +55,12 @@ try {
   // The synthetic institution is small: a guard of one lets every group show.
   await setInput(page, 'cr_cohort-min_n', 1);
   await runAndWait(page, 'cr_cohort-run', { timeout: 300000 });
+  await waitForSelector(page, '#cr_cohort-benchmark_table .rt-table', { timeout: 60000 });
+  // The population and per-course tables sit in collapsed panels, and Shiny
+  // renders an output inside one only once it is opened.
+  await page.evaluate(() => {
+    document.querySelectorAll('#cr_cohort-results details.cedar-info-panel').forEach((d) => { d.open = true; });
+  });
   await waitForSelector(page, '#cr_cohort-population_table .rt-table', { timeout: 60000 });
   await waitForIdle(page);
 
@@ -70,8 +76,18 @@ try {
   }
 
   // The similar-students sections come from the same run.
-  ok(/Against Similar Students/.test(body) && /Every Course These Students Take/.test(body),
+  ok(/Against Similar Students/.test(body) && /Against Other Courses/.test(body),
      'the similar-students sections are on the page');
+  // Every Downstream view in the same order: the answer, over time, by
+  // instructor, against other courses, then How Far to Trust It.
+  const order = ['Against Similar Students', 'Against Other Courses', 'Before Matching', 'How Far to Trust It']
+    .map((h) => body.indexOf(h));
+  ok(order.every((i) => i >= 0) && order.every((i, k) => k === 0 || i > order[k - 1]),
+     `the sections run in Downstream's order (${order.join(', ')})`);
+  await page.evaluate(() => {
+    document.querySelectorAll('#cr_cohort-results details.cedar-info-panel').forEach((d) => { d.open = true; });
+  });
+  await waitForSelector(page, '#cr_cohort-similar_courses_table .rt-table', { timeout: 60000 });
   ok(await page.evaluate(() => !!document.querySelector('#cr_cohort-similar_courses_table .rt-table')),
      'cr_cohort-similar_courses_table rendered');
   ok(await page.evaluate(() => /Return trend/.test(

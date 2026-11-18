@@ -1235,6 +1235,26 @@ CEDAR_COVARIATE_LABELS <- c(
   first_gen              = "first-generation share"
 )
 
+#' The two groups' DFW rates in Y
+#'
+#' @param result `get_course_sequence_effect()` output.
+#' @return Two rows, treatment then control: `group`, `dfw`, `total`, `pct`.
+#'   Stops when a group has no classified outcome.
+course_sequence_rates <- function(result) {
+  outcomes <- result$outcomes
+  if (is.null(outcomes) || !all(c("group", "outcome", "n") %in% names(outcomes))) {
+    stop("[course-report.R] course_sequence_rates: result$outcomes needs group, outcome and n", call. = FALSE)
+  }
+  dplyr::bind_rows(lapply(c("treatment", "control"), function(group) {
+    rows <- outcomes[outcomes$group == group, , drop = FALSE]
+    total <- sum(rows$n)
+    dfw <- sum(rows$n[rows$outcome == "dfw"])
+    if (total == 0L) stop("[course-report.R] course_sequence_headline: no classified outcomes for ", group,
+                          call. = FALSE)
+    tibble::tibble(group = group, dfw = dfw, total = total, pct = 100 * dfw / total)
+  }))
+}
+
 #' The Course Sequence result as two or three sentences
 #'
 #' @param result `get_course_sequence_effect()` output.
@@ -1251,18 +1271,10 @@ course_sequence_headline <- function(result) {
     stop("[course-report.R] course_sequence_headline: result lacks ", paste(missing, collapse = ", "),
          call. = FALSE)
   }
-  outcomes <- result$outcomes
   course_y <- paste(result$course_y, collapse = " or ")
-  rate <- function(group) {
-    rows <- outcomes[outcomes$group == group, , drop = FALSE]
-    total <- sum(rows$n)
-    dfw <- sum(rows$n[rows$outcome == "dfw"])
-    if (total == 0L) stop("[course-report.R] course_sequence_headline: no classified outcomes for ", group,
-                          call. = FALSE)
-    list(dfw = dfw, total = total, pct = 100 * dfw / total)
-  }
-  t <- rate("treatment")
-  c <- rate("control")
+  rates <- course_sequence_rates(result)
+  t <- as.list(rates[rates$group == "treatment", ])
+  c <- as.list(rates[rates$group == "control", ])
   fmt_n <- function(n) format(n, big.mark = ",", trim = TRUE)
   fmt_pct <- function(p) sprintf("%.1f%%", p)
   gap <- t$pct - c$pct
@@ -1330,4 +1342,106 @@ course_sequence_headline <- function(result) {
     ))
   }
   sentences
+}
+
+# ── Course Sequence: the two rates over time ─────────────────────────────────
+#
+# Downstream > Prepared for It reads each view's change over time the same way
+# (Over Time: one term type at a time, two lines, a verdict under the chart).
+# These read the cone's `by_term` (one row per term of the Y attempt and
+# group; `dfw_pct` is NA for a group under the cone's `min_n` that term).
+
+.course_sequence_trend_rows <- function(result, term_types = NULL) {
+  required <- c("course_x", "course_y", "by_term")
+  missing <- setdiff(required, names(result))
+  if (length(missing) > 0) {
+    stop("[course-report.R] course sequence trend: result lacks ", paste(missing, collapse = ", "), call. = FALSE)
+  }
+  cols <- c("term", "term_type", "group", "n", "n_dfw", "dfw_pct")
+  missing <- setdiff(cols, names(result$by_term))
+  if (length(missing) > 0) {
+    stop("[course-report.R] course sequence trend: by_term lacks ", paste(missing, collapse = ", "), call. = FALSE)
+  }
+  rows <- result$by_term
+  if (!is.null(term_types)) rows <- rows[rows$term_type %in% term_types, , drop = FALSE]
+  rows[!is.na(rows$dfw_pct), , drop = FALSE]
+}
+
+.course_sequence_group_label <- function(result, group) {
+  ifelse(group == "treatment", paste0("Passed ", result$course_x, " first"), "No prior pass")
+}
+
+#' The Course Sequence DFW rates' trends in words
+#'
+#' One sentence per term type and group: the first and last terms' rates as
+#' they are, then the fitted line's verdict across every term with a rate
+#' ([compute_rate_trend()]).
+#'
+#' @param result `get_course_sequence_effect()` output.
+#' @param term_types Term types of the Y attempt to read; NULL reads all.
+#' @return Character vector; zero-length when no term holds a rate.
+course_sequence_trend_sentences <- function(result, term_types = NULL) {
+  rows <- .course_sequence_trend_rows(result, term_types)
+  if (nrow(rows) == 0L) return(character(0))
+  trend <- compute_rate_trend(dplyr::transmute(rows, term_type, group, term, k = n_dfw, n = n),
+                              group_cols = c("term_type", "group"))
+  trend <- trend[order(match(trend$term_type, c("fall", "spring", "summer")),
+                       match(trend$group, c("treatment", "control"))), , drop = FALSE]
+  y <- paste(result$course_y, collapse = " or ")
+  verdict <- c(rising = "an upward trend", falling = "a downward trend", steady = "no trend beyond that")
+  pct <- function(v) sprintf("%.1f%%", v)
+  vapply(seq_len(nrow(trend)), function(i) {
+    t <- trend[i, ]
+    who <- if (t$group == "treatment") paste0("students who passed ", result$course_x, " first")
+           else "students without a prior pass"
+    lead <- paste0(tools::toTitleCase(t$term_type), " terms of ", y, ", ", who, ": the DFW rate")
+    if (t$direction == "too_few_terms") {
+      return(paste0(lead, " has a value in ", t$n_terms, " term", if (t$n_terms == 1L) "" else "s",
+                    "; a trend is read from 3 or more."))
+    }
+    paste0(lead, " was ", pct(t$first_pct), " in ", fmt_term(t$first_term), " and ", pct(t$last_pct),
+           " in ", fmt_term(t$last_term), ". Across the ", t$n_terms, " terms the fitted line moves ",
+           sprintf("%+.1f", t$slope), " points a year, where chance and the terms' own scatter give about ",
+           sprintf("%.1f", 2 * t$slope_se), ": ", verdict[[t$direction]], ".")
+  }, character(1))
+}
+
+#' The two groups' DFW rates in Y by term
+#'
+#' One line per group and term type; a line never joins a Fall to a Spring.
+#'
+#' @param result `get_course_sequence_effect()` output.
+#' @param term_types Term types of the Y attempt to draw; NULL draws all.
+#' @return A plotly object, or NULL when no term has a rate.
+plot_course_sequence_trend <- function(result, term_types = NULL) {
+  rows <- .course_sequence_trend_rows(result, term_types)
+  if (nrow(rows) == 0L) return(NULL)
+  rows <- rows[order(rows$term), , drop = FALSE]
+  rows$term_label <- term_axis_factor(rows$term)
+  colors <- c(treatment = unname(CEDAR_SEMANTIC_COLORS["positive"]),
+              control = unname(CEDAR_SEMANTIC_COLORS["reference"]))
+  symbols <- c(fall = "circle", spring = "square", summer = "diamond")
+  types <- intersect(c("fall", "spring", "summer"), unique(rows$term_type))
+  p <- plotly::plot_ly()
+  for (g in c("treatment", "control")) {
+    for (type in types) {
+      d <- rows[rows$group == g & rows$term_type == type, , drop = FALSE]
+      if (nrow(d) == 0L) next
+      p <- plotly::add_trace(
+        p, data = d, x = ~term_label, y = ~dfw_pct / 100, customdata = ~n,
+        type = "scatter", mode = "lines+markers",
+        name = paste(c(.course_sequence_group_label(result, g),
+                       if (length(types) > 1L) tools::toTitleCase(type)), collapse = ", "),
+        line = list(color = colors[[g]]), marker = list(color = colors[[g]], symbol = symbols[[type]]),
+        hovertemplate = "%{x}<br>DFW: %{y:.1%} of %{customdata}<extra>%{fullData.name}</extra>"
+      )
+    }
+  }
+  plotly::layout(
+    p,
+    xaxis = list(title = paste0("Term of ", paste(result$course_y, collapse = " or ")), tickangle = -45,
+                 categoryorder = "array", categoryarray = levels(rows$term_label)),
+    yaxis = list(title = "DFW rate", tickformat = ".0%", rangemode = "tozero"),
+    legend = list(orientation = "h", x = 0, y = -0.3)
+  )
 }

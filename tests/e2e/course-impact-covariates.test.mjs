@@ -52,8 +52,10 @@ try {
   await setInput(page, 'cr_later-course_y', [COURSE_Y]);
   await runAndWait(page, 'cr_later-run', { timeout: 300000 });
 
+  // textContent, not innerText: the counting notes and the per-term table
+  // sit in collapsed panels, and innerText leaves collapsed content out.
   const body = await page.evaluate(() =>
-    document.getElementById('cr_impact_sequence_ui').innerText);
+    document.getElementById('cr_impact_sequence_ui').textContent);
 
   const definition = await page.evaluate(() => {
     const note = document.querySelector(
@@ -72,8 +74,23 @@ try {
      'the result opens with both groups\' rates and their counts');
   ok(/measured covariate/i.test(body),
      'the opening sentence carries the balance verdict');
+  // The answer is drawn: both groups' DFW rates as bars, with their counts.
+  ok(await page.evaluate(() => document.querySelectorAll(
+       '#cr_impact_sequence_results .compare-bars .meter-bar').length === 2),
+     'the two rates are drawn as a pair of bars');
+  // Downstream's order: the answer, Over Time, the breakdowns, How Far to Trust It.
+  const order = ['First, Against Not', 'Over Time', 'Who Is in the Comparison Group', 'How Far to Trust It']
+    .map((h) => body.indexOf(h));
+  ok(order.every((i) => i >= 0) && order.every((i, k) => k === 0 || i > order[k - 1]),
+     `the sections run in Downstream's order (${order.join(', ')})`);
+
   // Over Time is one row per term, of the ticked term types: never a calendar
-  // year, which mixes a Fall's students with a Spring's.
+  // year, which mixes a Fall's students with a Spring's. The table is in a
+  // collapsed panel: Shiny renders it once the panel opens.
+  await page.evaluate(() => {
+    document.querySelectorAll('#cr_impact_sequence_results details.cedar-info-panel').forEach((d) => { d.open = true; });
+  });
+  await waitForSelector(page, '#cr_impact_sequence_over_time .rt-table', { timeout: 60000 });
   const overTime = await page.evaluate(() => ({
     ticked: [...document.querySelectorAll('#cr_impact_seq_term_type input:checked')].map((i) => i.value),
     terms: [...document.querySelectorAll('#cr_impact_sequence_over_time .rt-tbody .rt-tr')]
@@ -83,28 +100,32 @@ try {
   ok(overTime.terms.length > 0 &&
      overTime.terms.every((t) => t.toLowerCase().startsWith(overTime.ticked[0])),
      `every Over Time row is a ${overTime.ticked[0]} term (${overTime.terms.join(', ')})`);
-  ok(/small observed difference/i.test(body) && /0\.10/.test(body),
-     'the page defines the small observed-difference band');
-  ok(/0\.10[–-]0\.25/.test(body) && /review/i.test(body),
-     'the page exposes the review band rather than a green success state');
-  ok(/substantial difference/i.test(body) && />0\.25/.test(body),
-     'the page defines the substantial observed-difference band');
+  ok(await page.evaluate(() => !!document.querySelector('#cr_impact_sequence_trend_plot .main-svg')),
+     'Over Time draws the two rates');
+  const sentences = await page.evaluate(() =>
+    [...document.querySelectorAll('#cr_impact_sequence_trend_text li')].map((li) => li.innerText.trim()));
+  ok(sentences.length > 0 &&
+     sentences.every((t) => /an upward trend|a downward trend|no trend beyond that|a trend is read from 3 or more/.test(t)),
+     `the chart is read in sentences that end in a verdict (${sentences.length})`);
+
+  // One balance table: a row per measured characteristic, the bands defined.
+  ok(/under 0\.10 is a small difference/i.test(body) && /0\.10 to 0\.25 one to review/i.test(body) &&
+     /above 0\.25 a substantial one/i.test(body),
+     'the page defines the three observed-difference bands');
   ok(!/Groups appear well-balanced/i.test(body),
      'the old all-values-at-or-below-0.25 success claim is absent');
+  ok(!/Group Profile/.test(body), 'the group profile is part of the balance table, not a second table');
 
   // ── The new covariates are present ────────────────────────────────────────
-  ok(/Cum GPA/i.test(body), 'group profile shows the reconstructed cumulative GPA');
-  ok(/cum_gpa_entering/i.test(body) || /Cum Gpa Entering/i.test(body),
-     'balance table lists cum_gpa_entering as a matched covariate');
-  ok(/credits_entering/i.test(body) || /Credits Entering/i.test(body),
-     'balance table lists a reconstructed credit covariate');
+  ok(/GPA entering/i.test(body), 'the balance table lists the reconstructed GPA entering');
+  ok(/credits entering/i.test(body), 'the balance table lists a reconstructed credit covariate');
 
   // ── Institution GPA: shown, but only as description ───────────────────────
   // It is the best-covered summary of overall academic strength, so it belongs
-  // in the profile. It is measured at the data pull — after the outcome — so it
-  // must never appear as a balanced covariate.
+  // in the table. It is measured at the data pull — after the outcome — so it
+  // is a described row with no difference, never a balanced covariate.
   ok(/Current UNM GPA/i.test(body),
-     'group profile shows the registrar current UNM GPA alongside the rebuilt one');
+     'the balance table shows the registrar current UNM GPA alongside the rebuilt one');
   ok(/description, not as evidence/i.test(body),
      'the page says plainly that the current GPA is description, not balance evidence');
 

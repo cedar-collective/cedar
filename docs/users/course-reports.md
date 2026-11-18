@@ -190,6 +190,14 @@ The Downstream tab asks what happens to the course's students afterwards. Each s
 
 The two comparisons in the bottom row read alike because they use one method on two outcomes. The **What counts as failing?** choice under By Grade Here applies there only; every other view counts pass and DFW by the standard rule.
 
+Every view is laid out in the same order, so a reader who has learned one can read the others:
+
+1. **The answer**: the question, a lead sentence with the number, and its figure.
+2. **Over Time**: the same rates term by term, one term type at a time, with a sentence saying whether each line is rising, falling or steady.
+3. **The breakdowns**: by grade, by campus, by who is in each group, and by instructor behind the instructor-data password.
+4. **Against Other Courses**, where the view has a benchmark.
+5. **How Far to Trust It**: who was counted (collapsed), and how alike the compared groups were, in one table with a row per measured characteristic.
+
 ### Overall
 {: #retention}
 
@@ -234,8 +242,8 @@ course; one far below it is where the question starts. A benchmark course
 needs the minimum in both its passed and its never-took groups, and the
 "Every Course in the Benchmark" table lists them.
 
-The balance table at the bottom compares takers with never-takers on the
-measured covariates (ACT, high-school GPA, Pell eligibility, first-generation
+Before Matching reads the gap with no matching at all. How Far to Trust It,
+at the bottom, compares takers with never-takers on the measured covariates (ACT, high-school GPA, Pell eligibility, first-generation
 share and the rest) at each student's first selected term. A substantial
 difference says the gap describes who is placed into the course.
 
@@ -269,7 +277,8 @@ to fall (or spring to spring, whichever has more takers), and the lead says
 whether each gap is rising, falling or showing no trend beyond chance. A
 line needs at least three terms, and its slope must be larger than both
 chance and the terms' own ups and downs before it counts as a trend.
-**Every Course These Students Take** shows the same return-gap line for
+**Against Other Courses** places the course's return gap among every other
+course these students take, and its table shows the same return-gap line for
 every course, with its slope a year, so a set of courses can be read for
 their trends side by side.
 
@@ -328,8 +337,9 @@ The view gives, for each campus that taught the course:
   a measure of teaching and not a basis for evaluating anyone. A balance check
   under it says whether the two largest instructor groups started alike; it
   changes no number above it.
-- **Course Order.** How many students had already passed the later course
-  before this one, or in the same term, by academic year.
+- **How Far to Trust It.** Course Order: how many students had already passed
+  the later course before this one, or in the same term, by academic year, and
+  so left the count. Behind the password, the instructor balance check.
 
 A student who took the later course in a term whose grades are not posted yet
 counts as having taken it, and is listed as not yet graded, never as failing.
@@ -342,8 +352,19 @@ counts as having taken it, and is listed as not yet graded, never as failing.
 The optional HS GPA window under **Settings** restricts both groups to a
 selected range; it is a sensitivity check, not an adjustment for unobserved differences.
 
-The balance table uses the absolute standardized mean difference (SMD) for
-measured continuous and binary covariates. CEDAR labels values below 0.10 as a
+The result opens with both groups' DFW rates in the later course, as a
+sentence and a pair of bars, then charts them term by term under **Over
+Time**. **Who Is in the Comparison Group** splits the students without a
+prior pass into those who tried this course and did not pass and those who
+never sat it, and **Within High-School GPA Bands** reads the same outcome
+among students with similar preparation.
+
+How Far to Trust It holds one balance table. It uses the absolute standardized
+mean difference (SMD) for measured continuous and binary covariates, each
+group's record entering the term that put it in its group. The registrar's
+current UNM GPA, measured at the data pull and so after the outcome, is a
+described row at the bottom with no difference: it is shown, never matched or
+balanced on. CEDAR labels values below 0.10 as a
 small observed difference, values from 0.10 through 0.25 as requiring review,
 and values above 0.25 as a substantial observed difference. These labels do not
 adjust the comparison or establish that the groups are comparable on unmeasured

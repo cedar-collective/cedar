@@ -172,6 +172,10 @@ courseCohortServer <- function(id, student_terms, attempts, programs, dims, edge
       })
     })
 
+    # The results in Downstream's order: the answer (against similar
+    # students), its change over time, by instructor, against other courses,
+    # then How Far to Trust It. Without the applicants table the answer is
+    # the unmatched comparison with the college's courses.
     output$results <- renderUI({
       p <- result()
       if (is.null(p)) return(NULL)
@@ -179,50 +183,50 @@ courseCohortServer <- function(id, student_terms, attempts, programs, dims, edge
       lo <- p$left_out
       n <- function(x) format(as.integer(x), big.mark = ",", trim = TRUE)
       tagList(
-        info_panel(
-          "Who is being counted",
-          description = "The population, the groups, who is in no group, and the guard.",
-          div(class = "alert alert-info", tags$strong("Data window: "),
-              cedar_longitudinal_edge_note(edges, grade_dependent = FALSE)),
-          tags$ul(class = "mb-0",
-            tags$li("The population is every enrolled student-term of the selected classification(s) in the selected terms, by home campus: ",
-                    n(meta$n_population_student_terms), " student-terms."),
-            tags$li("Passed and never took it are read off every graded attempt (", meta$course,
-                    " taken on any campus counts); return is enrollment the next regular term, and summer is not a step."),
-            tags$li("The next-term DFW share is DFW over the group's classified attempts in that next term; it is blank where the next term is not yet graded."),
-            tags$li("In the population and in no group: ", n(sum(lo$n_early_drops)), " early drops and ",
-                    n(sum(lo$n_unclassified)), " registrations with no posted grade."),
-            tags$li("A group under ", meta$min_n, " students keeps its count and shows no rate. A benchmark course needs ",
-                    meta$min_n, " in both its passed and its never-took groups, and this course is never its own benchmark; ",
-                    n(meta$n_benchmark_candidates), " ", meta$college_label, " courses were candidates.")
-          )
-        ),
         uiOutput(ns("similar_ui")),
         dashboard_subsection(
-          "The Population",
-          "How often every student in this population came back, and passed their courses, the next semester: the baseline for the comparisons below.",
-          method = tags$p("Every enrolled student of the selected classification in each selected term and home campus, with that group's own return rate and share of next-semester attempts not passed (DFW)."),
-          reactable::reactableOutput(ns("population_table"))
-        ),
-        dashboard_subsection(
-          "Against the College's Courses",
-          paste0("Whether passing ", meta$course, " goes with a bigger lead over never-takers than passing ", meta$college_label, "'s other courses does."),
+          "Before Matching: Against the College's Courses",
+          paste0("Whether passing ", meta$course, " goes with a bigger lead over every student who never took it than passing ", meta$college_label, "'s other courses does, with no matching."),
           method = tags$p("A course's gap is its passers' rate minus the rate of the students who never took it, in percentage points; it describes who takes and passes the course before it describes the course. The same gap for every other ", meta$college_label,
                           " course the population took, summarised as the median and quartiles across courses, with the share of courses whose gap is below ",
                           meta$course, "'s. A median over courses counts a small course as much as a large one."),
-          reactable::reactableOutput(ns("benchmark_table"))
+          reactable::reactableOutput(ns("benchmark_table")),
+          info_panel(
+            "Every course in the benchmark",
+            description = "The same comparison for each of the college's other courses.",
+            tags$p(class = "text-note", "One row per benchmark course, term and home campus. Sort by a gap column to see which courses' passers return most, or fail least, relative to the students who never took them."),
+            reactable::reactableOutput(ns("courses_table"))
+          ),
+          info_panel(
+            "The population",
+            description = "How often every student in the population came back, and passed their courses, the next semester.",
+            tags$p(class = "text-note", "Every enrolled student of the selected classification in each selected term and home campus, with that group's own return rate and share of next-semester attempts not passed (DFW): the baseline for both comparisons."),
+            reactable::reactableOutput(ns("population_table"))
+          )
         ),
-        dashboard_subsection(
-          "Every Course in the Benchmark",
-          "The same comparison for each of the college's other courses.",
-          method = tags$p("One row per benchmark course, term and home campus. Sort by a gap column to see which courses' passers return most, or fail least, relative to the students who never took them."),
-          reactable::reactableOutput(ns("courses_table"))
-        ),
-        if (!is.null(p$balance)) dashboard_subsection(
-          "How Alike Are Takers and Never-Takers",
-          paste0("Whether the students who took ", meta$course, " already differed from those who never did, before the course."),
-          method = tags$p("Standardized mean differences on measured characteristics at each student's first selected term. A substantial difference says the gaps above describe who is placed into the course; a small one does not show the groups are alike in what is not measured."),
-          uiOutput(ns("balance_ui"))
+        downstream_trust_section(
+          paste0("Who was compared with whom, and whether the students who took ", meta$course, " already differed from those who never did."),
+          who_counted = tagList(
+            tags$p(class = "text-note", tags$strong("Data window: "), cedar_longitudinal_edge_note(edges, grade_dependent = FALSE)),
+            tags$ul(class = "mb-0",
+              tags$li("The population is every enrolled student-term of the selected classification(s) in the selected terms, by home campus: ",
+                      n(meta$n_population_student_terms), " student-terms."),
+              tags$li("Passed and never took it are read off every graded attempt (", meta$course,
+                      " taken on any campus counts); return is enrollment the next regular term, and summer is not a step."),
+              tags$li("The next-term DFW share is DFW over the group's classified attempts in that next term; it is blank where the next term is not yet graded."),
+              tags$li("In the population and in no group: ", n(sum(lo$n_early_drops)), " early drops and ",
+                      n(sum(lo$n_unclassified)), " registrations with no posted grade."),
+              tags$li("A group under ", meta$min_n, " students keeps its count and shows no rate. A benchmark course needs ",
+                      meta$min_n, " in both its passed and its never-took groups, and this course is never its own benchmark; ",
+                      n(meta$n_benchmark_candidates), " ", meta$college_label, " courses were candidates.")
+            )
+          ),
+          if (!is.null(p$balance)) cedar_alike_block(
+            p$balance, c("Took it", "Never took it"),
+            paste0("The students who took ", meta$course, " against those who never did, measured at each student's first selected term."),
+            method = tags$p("A substantial difference says the gaps above describe who is placed into the course."),
+            title = "How Alike Takers and Never-Takers Were"),
+          method = tags$p("Matching on term, home campus, high-school GPA band and full- or part-time status removes those four differences and nothing else: placement, advising, major and motivation are not in it. The unmatched comparison removes none.")
         )
       )
     })
@@ -253,12 +257,6 @@ courseCohortServer <- function(id, student_terms, attempts, programs, dims, edge
           ),
           if (!is.null(s$focal)) reactable::reactableOutput(ns("similar_focal_table"))
         ),
-        if (length(txt$benchmark)) dashboard_subsection(
-          "Against Every Course These Students Take",
-          txt$benchmark,
-          method = tags$p("Each dot is a course these students take with ", m$min_n, " or more students who can be compared, at its return gap. The shaded band holds the middle half of the courses, the solid line marks the typical (median) course, and the dotted line marks zero."),
-          plotly::plotlyOutput(ns("similar_benchmark_plot"), height = "220px")
-        ),
         if (nrow(s$by_term) > 0L) dashboard_subsection(
           "Over Time",
           paste0("Has each gap grown or shrunk from one ", m$trend_term_type, " to the next?"),
@@ -267,14 +265,8 @@ courseCohortServer <- function(id, student_terms, attempts, programs, dims, edge
                           " students who can be compared. A line is a trend only when its slope a year is beyond two standard errors, the larger of chance and the terms' own ups and downs; fewer than three terms draws no line."),
           lapply(txt$trend, lead_text),
           plotly::plotlyOutput(ns("similar_trend_plot"), height = "680px"),
-          reactable::reactableOutput(ns("similar_term_table"))
-        ),
-        dashboard_subsection(
-          "Every Course These Students Take",
-          "The same comparison for every course, with its return gap's trend.",
-          method = tags$p("Every course with ", m$min_n, " or more students who can be compared, largest return gap first. Taking almost any course goes with coming back, so read a course against the others here, never against zero; a course students are placed into shows its placement. ",
-                          "Return trend is each course's return gap ", m$trend_term_type, " to ", m$trend_term_type, ", read as in Over Time."),
-          reactable::reactableOutput(ns("similar_courses_table"))
+          info_panel("Each term", description = "The gaps behind the chart, term by term.",
+                     reactable::reactableOutput(ns("similar_term_table")))
         ),
         if (nrow(s$instructors) > 0L) dashboard_subsection(
           paste0(m$course, " by Instructor"),
@@ -284,6 +276,15 @@ courseCohortServer <- function(id, student_terms, attempts, programs, dims, edge
           tags$p(class = "text-note", "Not a measure of teaching and not a basis for evaluating anyone: a section tied to a program, a learning community or a time of day shows who enrolled in it."),
           if (isTRUE(instructor_access())) reactable::reactableOutput(ns("similar_instructors_table"))
           else instructorGateUI(ns("instructor_gate"))
+        ),
+        dashboard_subsection(
+          "Against Other Courses",
+          if (length(txt$benchmark)) txt$benchmark else "The same comparison for every course these students take.",
+          method = tags$p("Each dot is a course these students take with ", m$min_n, " or more students who can be compared, at its return gap. The shaded band holds the middle half of the courses, the solid line marks the typical (median) course, and the dotted line marks zero. Taking almost any course goes with coming back, so read a course against the others here, never against zero; a course students are placed into shows its placement. ",
+                          "Return trend is each course's return gap ", m$trend_term_type, " to ", m$trend_term_type, ", read as in Over Time."),
+          if (length(txt$benchmark)) plotly::plotlyOutput(ns("similar_benchmark_plot"), height = "220px"),
+          info_panel("Every course these students take", description = "Largest return gap first, with each course's return-gap trend.",
+                     reactable::reactableOutput(ns("similar_courses_table")))
         )
       )
     })
@@ -481,19 +482,6 @@ courseCohortServer <- function(id, student_terms, attempts, programs, dims, edge
           none_return_pct = cedar_percent_coldef("Never-takers returned"),
           lift_return = cedar_points_coldef("Return gap"),
           lift_next_dfw = cedar_points_coldef("Next-term DFW gap")
-        )
-      )
-    })
-
-    output$balance_ui <- renderUI({
-      p <- result(); req(p, !is.null(p$balance))
-      smd <- p$balance$smd_table
-      if (is.null(smd) || nrow(smd) == 0L) return(tags$p(class = "text-note", "No balance data."))
-      tagList(
-        cedar_balance_summary(p$balance),
-        reactable::reactable(
-          cedar_balance_smd_rows(smd, c("Took it", "Never took it")),
-          theme = cedar_tbl_theme, compact = TRUE, striped = TRUE, pagination = FALSE
         )
       )
     })
