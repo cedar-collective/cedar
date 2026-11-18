@@ -2247,6 +2247,17 @@ h4.cedar-section-heading {
 /* A group beside what was expected of it (cedar_compare_bars()). */
 .compare-bars .meter-bar-fill--reference { fill: #a9afab; }
 
+/* How alike two compared groups were (cedar_alike_block()), inside a
+   Downstream view's "How Far to Trust It" section. */
+.cedar-alike-block { margin-top: 1rem; }
+.cedar-balance-verdict { margin: 0.25rem 0 0.5rem; }
+.cedar-balance-categories {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 0.75rem 1rem;
+  margin-top: 0.5rem;
+}
+
 /* Column-group banding for a reactable with column groups: put
    `cedar-col-band` on every other group's heading and columns (colGroup
    headerClass, colDef class and headerClass). The tint is translucent, so row

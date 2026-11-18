@@ -275,38 +275,29 @@ laterCourseUI <- function(id) {
 }
 
 # Whether the two largest instructor groups started alike, or why that cannot
-# be said.
+# be said: a block of How Far to Trust It, shown only behind the gate.
 .later_course_balance_section <- function(r) {
   b <- r$balance
   x <- r$course_x
   title <- "Did the Two Largest Instructor Groups Start Alike?"
   if (is.null(b)) {
-    return(dashboard_subsection(
-      title, "The balance check could not be built for this run; the rates above do not depend on it."))
+    return(div(class = "cedar-alike-block", section_heading(title, level = "h6"), tags$p(
+      class = "text-note", "The balance check could not be built for this run; the rates above do not depend on it.")))
   }
   if (is.null(b$balance)) {
-    return(dashboard_subsection(
-      title,
+    return(div(class = "cedar-alike-block", section_heading(title, level = "h6"), tags$p(
+      class = "text-note",
       paste0("A balance check compares two instructors' students who went on to ", r$course_y_label,
              ", and needs ", b$min_n, " such students in each group. ", b$n_comparable, " of ",
-             b$n_groups, " instructor groups have that many, so no two can be compared.")
-    ))
+             b$n_groups, " instructor groups have that many, so no two can be compared."))))
   }
-  smd <- b$balance$smd_table
-  dashboard_subsection(
-    title,
+  cedar_alike_block(
+    b$balance, c(b$reference_instructor, b$comparison_instructor),
     paste0("Students of ", b$reference_instructor, " (", b$reference_campus, ", ", b$n_treatment,
            ") and of ", b$comparison_instructor, " (", b$comparison_campus, ", ", b$n_control,
-           ") who went on to ", r$course_y_label, ", measured as they entered ", x,
-           ". This changes nothing above: it says whether those two groups began alike, which a reader needs before reading a gap between their rows as anything about the instructors."),
-    if (is.null(smd) || nrow(smd) == 0L) tags$p(class = "text-note", "No balance data.") else tagList(
-      cedar_balance_summary(b$balance),
-      reactable::reactable(
-        cedar_balance_smd_rows(smd, c(b$reference_instructor, b$comparison_instructor)),
-        theme = cedar_tbl_theme, compact = TRUE, striped = TRUE, pagination = FALSE
-      )
-    )
-  )
+           ") who went on to ", r$course_y_label, ", measured as they entered ", x, "."),
+    method = tags$p("This changes nothing above: it says whether those two groups began alike, which a reader needs before reading a gap between their rows as anything about the instructors."),
+    title = title)
 }
 
 # The whole result. `access` is whether the instructor gate is open now.
@@ -317,10 +308,10 @@ later_course_view <- function(r, ns, access) {
   types <- later_course_term_types(r)
   tagList(
     div(class = "scope-bar scope-bar--stacked", later_course_scope_note(r)),
-    dashboard_section(
+    dashboard_subsection(
       paste0(x, " → ", y),
-      paste0("Students who took ", x, " and had ", window, " afterwards to take ", y,
-             ", all terms pooled. The pass rate is among those who took it and have a grade. Under each pair of rates are the counts they come from."),
+      paste0("How many of ", x, "'s students took ", y, " within ", window, ", and how many of them passed it."),
+      method = tags$p("All terms pooled. The pass rate is among those who took it and have a grade. Under each pair of rates are the counts they come from."),
       if (isTRUE(r$rollup)) tags$p(class = "text-hint", paste0(
         "Each student counts once, at the first term they took any of these courses, and passed only if they passed everything they took from them that term: ",
         paste(r$course_y, collapse = ", "), ".")),
@@ -328,15 +319,17 @@ later_course_view <- function(r, ns, access) {
     ),
     dashboard_subsection(
       "Over Time",
-      paste0("The same two rates by the term students took ", x, ". Read one term type at a time: a Fall cohort and a Spring one are different students. A term needs ",
+      paste0("Have the two rates risen or fallen from one term of ", x, " to the next?"),
+      method = tags$p(paste0("The same two rates by the term students took ", x, ". Read one term type at a time: a Fall cohort and a Spring one are different students. A term needs ",
              r$min_n, " students for a rate; a recent term's students may not all be graded in ", y,
-             " yet, and the table counts them. Each term type has its own lines. The sentences under the chart judge each line across all of its terms: its slope a year beside the slope that chance and the terms' own scatter would give with no trend."),
+             " yet, and the table counts them. Each term type has its own lines. The sentences under the chart judge each line across all of its terms: its slope a year beside the slope that chance and the terms' own scatter would give with no trend.")),
       checkboxGroupInput(ns("term_type"), "Term types",
                          choices = stats::setNames(types, tools::toTitleCase(types)),
                          selected = r$main_term_type, inline = TRUE),
       plotly::plotlyOutput(ns("trend_plot"), height = "340px"),
       uiOutput(ns("trend_text")),
-      reactable::reactableOutput(ns("term_table"))
+      info_panel("Each term", description = "The rates behind the chart, term by term.",
+                 reactable::reactableOutput(ns("term_table")))
     ),
     dashboard_subsection(
       paste0("Results in ", y, " by Grade in ", x),
@@ -358,14 +351,19 @@ later_course_view <- function(r, ns, access) {
       if (access) .later_course_instructor_reactable(later_course_instructor_table(r), r)
       else instructorGateUI(ns("instructor_gate"))
     ),
-    if (access) .later_course_balance_section(r),
-    dashboard_subsection(
-      "Course Order",
-      paste0("Students who had already passed ", y, " before ", x, " or in the same term, by the academic year of their first ",
-             x, " attempt. A strictly earlier pass leaves the denominator above",
-             if (isTRUE(r$rollup)) " for a single later course; for a set nobody leaves" else "",
-             "; a same-term pass stays in it. Either is their union, not their sum."),
-      .later_course_order_reactable(later_course_order_table(r), r)
+    downstream_trust_section(
+      paste0("Who left the count before the rates were read: students who had already passed ", y, " before ", x, " or alongside it."),
+      div(class = "cedar-alike-block",
+        section_heading("Course Order", level = "h6"),
+        tags$p(class = "text-hint", paste0(
+          "Students who had already passed ", y, " before ", x, " or in the same term, by the academic year of their first ",
+          x, " attempt. A strictly earlier pass leaves the denominator above",
+          if (isTRUE(r$rollup)) " for a single later course; for a set nobody leaves" else "",
+          "; a same-term pass stays in it. Either is their union, not their sum.")),
+        .later_course_order_reactable(later_course_order_table(r), r)
+      ),
+      if (access) .later_course_balance_section(r),
+      method = cedar_definition_note("downstream-outcomes")
     )
   )
 }

@@ -22,3 +22,11 @@
       Students who passed SPAN 101 before SPAN 201 did not pass SPAN 201 33.3% of the time (1 of 3); students who took SPAN 201 without a prior pass in SPAN 101, 0.0% (0 of 1): a higher rate, by 33.3 points.
       The groups differ substantially on 2 of 2 measured covariates, most on Pell eligibility (33.3% against 100.0%), so the gap describes who took each path before it describes SPAN 101.
 
+# the sequence view's rates, chart and trend sentences read the cone's by_term
+
+    Code
+      cat(sentences, sep = "\n")
+    Output
+      Fall terms of SPAN 201, students who passed SPAN 101 first: the DFW rate has a value in 1 term; a trend is read from 3 or more.
+      Fall terms of SPAN 201, students without a prior pass: the DFW rate has a value in 1 term; a trend is read from 3 or more.
+

@@ -3427,90 +3427,6 @@ output$enrl_classlist_download <- downloadHandler(
   # and run on-demand (separate run buttons per tab) because each is slow and
   # may not be relevant for every course the user looks up.
 
-  # Shared helper: renders the SMD bands classified by compute_balance().
-  # It does not infer comparability from the absence of a >0.25 warning.
-  .render_balance_table <- function(
-    balance,
-    group_labels = c("Treatment", "Control")
-  ) {
-    smd <- balance$smd_table
-    if (is.null(smd) || nrow(smd) == 0) return(p("No balance data.", style = "color:#888;"))
-    group_a <- group_labels[[1]]
-    group_b <- group_labels[[2]]
-
-    smd_display <- cedar_balance_smd_rows(smd, c(group_a, group_b))
-
-    # Categorical distributions — one mini-table per variable, side by side
-    cat_panels <- NULL
-    cats <- balance$categorical
-    if (!is.null(cats) && length(cats) > 0) {
-      cat_panels <- tagList(
-        h6("Categorical Covariates", style = "margin-top: 16px; color: #555;"),
-        p(style = "font-size: 0.78em; color: #888; margin-bottom: 8px;",
-          "Proportions within each group. Categorical variables are not reduced to a
-           single SMD — review distributions directly for meaningful differences."),
-        fluidRow(
-          lapply(names(cats), function(varname) {
-            df <- cats[[varname]] %>%
-              tidyr::pivot_wider(
-                id_cols    = "value",
-                names_from = "group",
-                values_from = "pct",
-                values_fill = 0
-              ) %>%
-              dplyr::rename(
-                Value = value,
-                !!paste0(group_a, " (%)") := treatment,
-                !!paste0(group_b, " (%)") := control
-              ) %>%
-              dplyr::arrange(dplyr::desc(dplyr::across(dplyr::ends_with("(%)"))))
-            column(
-              width = 4,
-              div(
-                style = "margin-bottom: 16px;",
-                tags$strong(style = "font-size: 0.82em;", varname),
-                cr_basic_reactable(
-                  cr_humanize_columns(df),
-                  default_page_size = 20L,
-                  searchable = FALSE
-                )
-              )
-            )
-          })
-        )
-      )
-    }
-
-    balance_summary <- cedar_balance_summary(balance)
-
-    tagList(
-      balance_summary,
-      h6("Continuous & Binary Covariates", style = "color: #555;"),
-      p(style = "font-size: 0.78em; color: #888; margin-bottom: 6px;",
-        strong(paste0(group_a, " / ", group_b, " values:")),
-        " For ", strong("binary"), " covariates (first_gen, pell_eligible) these are the ",
-        "percentage of students in each group with that characteristic. For ", strong("continuous"),
-        " covariates (cum_gpa_entering, high_school_cum_gpa, etc.) these are the group means — ",
-        "for example, a value of 3.21 means that group's average high-school GPA was 3.21.",
-        br(),
-        strong("SMD"), " (standardized mean difference) expresses the gap between groups in ",
-        "units of the pooled standard deviation, so it's comparable across variables with ",
-        "different scales. CEDAR labels |SMD| < 0.10 as a small observed difference, ",
-        "0.10–0.25 as review (△), and >0.25 as a substantial difference (⚠). These bands ",
-        "describe measured covariates; they do not adjust the comparison or certify that the ",
-        "groups are otherwise comparable. ",
-        "Example: SMD = 0.40 on HS GPA means ", group_a, " students averaged 0.4 standard ",
-        "deviations higher than ", group_b,
-        " students — a meaningful difference that the analysis does not adjust for."),
-      cr_basic_reactable(
-        smd_display,
-        default_page_size = 15L,
-        searchable = FALSE
-      ),
-      cat_panels
-    )
-  }
-
   # ── Retention tab (Course Dynamics) ─────────────────────────────────────────
   # For the selected course, shows how T+1 to T+N retention has changed
   # term-over-term, optionally broken out by instructor.
@@ -3542,7 +3458,12 @@ output$enrl_classlist_download <- downloadHandler(
           inline = FALSE
         )
       ),
-      uiOutput("cr_persistence_ui"),
+      dashboard_subsection(
+        "Passed Against Did Not Pass",
+        paste0("How often ", course, "'s students came back the next semester, by their result here."),
+        method = tags$p("Each student's result in the course under the rule chosen above; a result needs 5 students to be shown."),
+        uiOutput("cr_persistence_ui")
+      ),
       dashboard_subsection(
         "Semesters Later",
         "How many of the course's students are still enrolled one, two and more semesters on, against the department's and the college's other courses.",
@@ -3758,9 +3679,9 @@ output$enrl_classlist_download <- downloadHandler(
     if (nrow(aggregate) == 0)
       return(div(class = "alert alert-warning",
                  "No term-type summaries met the minimum student threshold for this course."))
+    # Downstream's order: the rates, their change over time against the
+    # department and college, by instructor, then the benchmark tables.
     tagList(
-      uiOutput("cr_retention_benchmark_diff_ui"),
-      if (by_instructor) uiOutput("cr_retention_instructor_highlights"),
       dashboard_subsection(
         "Rates by Term Type",
         "Like terms pooled across the data window, the steadier pattern for planning than any one semester.",
@@ -3782,6 +3703,8 @@ output$enrl_classlist_download <- downloadHandler(
           description = "One row per term."
         )
       ),
+      uiOutput("cr_retention_benchmark_diff_ui"),
+      if (by_instructor) uiOutput("cr_retention_instructor_highlights"),
       uiOutput("cr_retention_benchmarks")
     )
   })
@@ -3795,8 +3718,8 @@ output$enrl_classlist_download <- downloadHandler(
     )
     plot_height <- max(280L, 220L * campus_n + 60L)
     dashboard_subsection(
-      "Next Semester Against the Department and College",
-      "Whether this course's students come back the next semester more or less often than the students of the department's and the college's other courses.",
+      "Over Time, Against the Department and College",
+      "Whether this course's students come back the next semester more or less often than the students of the department's and the college's other courses, term by term.",
       method = tags$p("One panel per campus. Each line is the share enrolled the next fall or spring semester, term by term, for this course and for the department's and college's courses at the same campus and course level."),
       plotlyOutput(
         "cr_retention_benchmark_diff_plot",
@@ -4198,157 +4121,153 @@ output$enrl_classlist_download <- downloadHandler(
       default_page_size = 12L, searchable = FALSE)
   })
 
+  output$cr_impact_sequence_trend_plot <- renderPlotly({
+    result <- cr_impact_sequence_data()
+    req(result, length(input$cr_impact_seq_term_type) > 0)
+    p <- plot_course_sequence_trend(result, input$cr_impact_seq_term_type)
+    req(!is.null(p))
+    p
+  })
+
+  output$cr_impact_sequence_trend_text <- renderUI({
+    result <- cr_impact_sequence_data()
+    req(result, length(input$cr_impact_seq_term_type) > 0)
+    sentences <- course_sequence_trend_sentences(result, input$cr_impact_seq_term_type)
+    if (length(sentences) == 0L) {
+      return(tags$p(class = "text-note", paste0("No term of this type has ", result$n_min_term, " students in a group to give a rate.")))
+    }
+    tags$ul(lapply(sentences, tags$li))
+  })
+
+  # The result in Downstream's order: the answer, its change over time, the
+  # breakdowns, then How Far to Trust It.
   output$cr_impact_sequence_results <- renderUI({
     result <- cr_impact_sequence_data()
     if (is.null(result)) return(empty_state("Choose a later course above, then click Show Results."))
 
-    fmt_term <- function(t) {
-      yr <- t %/% 100
-      ss <- t %% 100
-      season <- dplyr::case_when(ss == 10 ~ "Spring", ss == 60 ~ "Summer",
-                                 ss == 80 ~ "Fall",   TRUE ~ as.character(ss))
-      paste(season, yr)
-    }
-
+    x <- result$course_x
     y_label <- paste(result$course_y, collapse = " or ")
+    groups <- c(paste0("Passed ", x, " first"), "No prior pass")
+    n_fmt <- function(v) format(as.integer(v), big.mark = ",", trim = TRUE)
+    rates <- course_sequence_rates(result)
     pct_counts <- function(tbl, labels) {
       tbl %>% dplyr::transmute(
         !!labels[1] := as.character(.data[[names(tbl)[1]]]),
         Students = n, `Did not pass` = n_dfw, `DFW %` = round(dfw_pct, 1))
     }
+    # The registrar's current GPA describes where each group stands now, after
+    # both courses; it joins the balance table as description, never balanced on.
+    profile <- result$group_profile
+    current_gpa <- if (!is.null(profile) && "mean_current_gpa" %in% names(profile)) {
+      v <- function(g) {
+        x <- profile$mean_current_gpa[profile$group == g]
+        if (length(x) == 0L || is.na(x)) "—" else sprintf("%.2f", x)
+      }
+      tibble::tibble(measure = "Current UNM GPA, as of the data pull", value_treatment = v("treatment"),
+                     value_control = v("control"), note = "Description, not as evidence")
+    }
+
     tagList(
-      # The number first, its arithmetic beside it, the balance verdict after.
-      p(class = "cedar-lead", paste(course_sequence_headline(result), collapse = " ")),
-      # Methodology, not a warning — collapsible per the explain-box standard.
-      info_panel(
-        "Who is being counted",
-        description = "Group definitions, sample sizes, and term ranges.",
-        div(
-          class = "alert alert-info",
-          tags$strong("Data window: "), result$edge_note
-        ),
-        tags$ul(class = "mb-0",
-          tags$li(
-            strong("Treatment"), paste0(" (“passed ", result$course_x, " first”): "),
-            "Students who (1) registered for and ", strong("passed"), paste0(" ", result$course_x),
-            " at any point, and (2) later took ", y_label, " in a subsequent term. ",
-            "Any gap between the two courses qualifies — consecutive or not. ",
-            paste0(result$n_took_x_before_y, " students met this definition across "),
-            fmt_term(result$term_range_x[1]), "–", fmt_term(result$term_range_x[2]), ". ",
-            if (result$n_dropped_by_programs > 0)
-              paste0(result$n_dropped_by_programs,
-                     " were dropped for missing program records, leaving ",
-                     result$n_treatment, " in the final comparison.")
-            else
-              paste0("All ", result$n_treatment, " appear in the final comparison.")
-          ),
-          tags$li(
-            strong("Control"), paste0(" (“took ", y_label, " without prior ",
-                                      result$course_x, "”): "),
-            paste0("Students who took ", y_label, " but had no prior passing record in ",
-                   result$course_x, ". "),
-            paste0(result$n_took_y_without_x, " students across "),
-            fmt_term(result$term_range_y[1]), "–", fmt_term(result$term_range_y[2]),
-            paste0("; ", result$n_control, " in final comparison after program matching.")
-          ),
-          tags$li(
-            strong("Outcome attempt: "),
-            paste0("Each student contributes once, using their ", result$y_attempt_rule,
-                   ". A later retake cannot move a student between groups or overwrite that outcome.")
-          ),
-          if (result$n_missing_act_excluded > 0L) tags$li(
-            result$n_missing_act_excluded,
-            " students with no ACT score were excluded because an ACT window was active."
-          ),
-          if (result$n_missing_hs_gpa_excluded > 0L) tags$li(
-            result$n_missing_hs_gpa_excluded,
-            " students with no HS GPA were excluded because a GPA window was active."
-          )
-        )
-      ),
-      fluidRow(
-        column(6,
-          h5(paste0("Grade Outcomes in ", y_label)),
-          cr_basic_reactable(
-            cr_humanize_columns(result$outcomes),
-            default_page_size = 10L,
-            searchable = FALSE
-          )
-        ),
-        column(6,
-          h5("Group Profile"),
-          p(style = "font-size: 0.78em; color: #888; margin-bottom: 4px;",
-            strong("mean_cum_gpa"), " and ", strong("mean_credits_earned"),
-            " describe each student's record ", em("entering"), " the term they took ",
-            "course X (treatment) or course Y (control), so they exclude that term's ",
-            "own grade — which is the outcome being measured. Both are rebuilt from the ",
-            "per-term class list, and these are the figures the balance table matches on. ",
-            br(),
-            strong("mean_current_gpa"), " is the registrar's UNM cumulative GPA ",
-            em("as of the data pull"), " — where each group stands today, after the ",
-            "courses being compared. It covers far more students than the rebuilt ",
-            "figure, so it is the better summary of overall academic strength, but it ",
-            "is deliberately kept out of the balance table: it is measured after the ",
-            "outcome, and matching on it would partly match on the very thing being ",
-            "measured. Read it as description, not as evidence the groups were alike. ",
-            br(),
-            strong("mean_hs_gpa"), " and ", strong("mean_act"),
-            " are fixed pre-enrollment values from admissions records."),
-          cr_basic_reactable(
-            cr_humanize_columns(result$group_profile),
-            default_page_size = 10L,
-            searchable = FALSE
-          )
-        )
-      ),
       dashboard_subsection(
-        "The Comparison Group, by What They Did Before",
-        paste0("The students who took ", y_label, " without a prior pass in ", result$course_x,
-               " are two different groups: those who attempted ", result$course_x,
-               " in an earlier term and did not pass it, and those who never sat it before ", y_label,
-               " (placed past it, brought it in as transfer credit, or skipped it). Each student's one ",
-               y_label, " outcome; an attempt in the same term is not before."),
-        cr_basic_reactable(
-          pct_counts(result$control_split %>% dplyr::mutate(prior_x = dplyr::recode(
-            prior_x,
-            attempted_not_passed = paste0("Attempted ", result$course_x, " earlier, did not pass"),
-            no_prior_attempt = paste0("Never sat ", result$course_x, " before"))), "Comparison students"),
-          default_page_size = 5L, searchable = FALSE)
+        paste0("Passed ", x, " First, Against Not"),
+        paste0("How often each group did not pass ", y_label, "."),
+        method = tags$p(paste0("Each student counts once, at their ", result$y_attempt_rule,
+                               ". DFW is the default policy: only A+ through C and CR pass.")),
+        lead_text(paste(course_sequence_headline(result), collapse = " ")),
+        cedar_finding_card(
+          paste0("DFW rate in ", y_label),
+          cedar_compare_bars(tibble::tibble(
+            label = groups,
+            share = rates$pct / 100,
+            text = sprintf("%.1f%% (%s of %s)", rates$pct, n_fmt(rates$dfw), n_fmt(rates$total)),
+            reference = c(FALSE, TRUE)))
+        ),
+        info_panel(
+          "Every grade outcome",
+          description = paste0("Each group's results in ", y_label, ", counted."),
+          cr_basic_reactable(cr_humanize_columns(result$outcomes), default_page_size = 10L, searchable = FALSE)
+        )
       ),
       dashboard_subsection(
         "Over Time",
-        paste0("The two groups' DFW rates by the term of each student's ", y_label,
-               " attempt, and the gap between them in points (passed first minus no prior pass). Read one term type at a time: a Fall holds mostly new students placed straight into ",
-               y_label, ", a Spring mostly students who passed ", result$course_x,
+        paste0("Has either group's DFW rate in ", y_label, " risen or fallen from one term to the next?"),
+        method = tags$p(paste0("Each group's DFW rate by the term of its ", y_label,
+               " attempt. Read one term type at a time: a Fall holds mostly new students placed straight into ",
+               y_label, ", a Spring mostly students who passed ", x,
                " the term before. A group under ", result$n_min_term,
-               " students in a term keeps its count and shows no rate."),
+               " students in a term keeps its count and shows no rate. The sentences under the chart judge each line across all of its terms: its slope a year beside the slope that chance and the terms' own scatter would give with no trend.")),
         checkboxGroupInput(
           "cr_impact_seq_term_type", "Term types",
           choices = stats::setNames(unique(result$by_term$term_type),
                                     tools::toTitleCase(unique(result$by_term$term_type))),
           selected = result$main_term_type, inline = TRUE),
-        reactable::reactableOutput("cr_impact_sequence_over_time")
+        plotlyOutput("cr_impact_sequence_trend_plot", height = "340px"),
+        uiOutput("cr_impact_sequence_trend_text"),
+        info_panel("Each term", description = "The rates behind the chart, term by term, and the gap between them.",
+                   reactable::reactableOutput("cr_impact_sequence_over_time"))
+      ),
+      dashboard_subsection(
+        "Who Is in the Comparison Group",
+        paste0("The students without a prior pass in ", x, ": those who tried it earlier and did not pass, and those who never sat it before ", y_label, "."),
+        method = tags$p(paste0("Those who never sat ", x, " were placed past it, brought it in as transfer credit, or skipped it. Each student's one ",
+                               y_label, " outcome; an attempt in the same term is not before.")),
+        cr_basic_reactable(
+          pct_counts(result$control_split %>% dplyr::mutate(prior_x = dplyr::recode(
+            prior_x,
+            attempted_not_passed = paste0("Attempted ", x, " earlier, did not pass"),
+            no_prior_attempt = paste0("Never sat ", x, " before"))), "Comparison students"),
+          default_page_size = 5L, searchable = FALSE)
       ),
       if (!is.null(result$by_hs_gpa_band)) dashboard_subsection(
         "Within High-School GPA Bands",
-        paste0("The same outcome inside each high-school GPA band, so students are read against others who arrived with similar preparation; a student with no GPA on file is their own band. The lead's like-with-like rate weights the comparison group's band rates by the first group's mix, using bands with at least ",
-               result$standardized$min_band_n, " comparison students."),
+        "The same outcome among students who arrived with similar high-school GPAs.",
+        method = tags$p(paste0("A student with no GPA on file is their own band. The lead's like-with-like rate weights the comparison group's band rates by the first group's mix, using bands with at least ",
+               result$standardized$min_band_n, " comparison students.")),
         cr_basic_reactable(
           result$by_hs_gpa_band %>% dplyr::transmute(
             `HS GPA band` = as.character(band),
-            Group = dplyr::if_else(group == "treatment", paste0("Passed ", result$course_x, " first"),
-                                   "No prior pass"),
+            Group = dplyr::if_else(group == "treatment", groups[[1]], groups[[2]]),
             Students = n, `Did not pass` = n_dfw, `DFW %` = round(dfw_pct, 1)),
           default_page_size = 10L, searchable = FALSE)
       ),
-      hr(),
-      h5("Covariate Balance"),
-      p(style = "font-size: 0.8em; color: #666;",
-        "Review the observed-difference band for every measured covariate before ",
-        "interpreting grade differences. Even small measured differences do not address ",
-        "unobserved ways the groups may differ. ",
-        "Use the HS GPA band inputs above to compare students within the same GPA range."),
-      .render_balance_table(result$balance)
+      downstream_trust_section(
+        paste0("Who was in each group, and whether the two groups already differed as they entered the course that put them there."),
+        who_counted = tagList(
+          tags$p(class = "text-note", tags$strong("Data window: "), result$edge_note),
+          tags$ul(class = "mb-0",
+            tags$li(
+              tags$strong(groups[[1]]), ": students who registered for and passed ", x,
+              " at any point and later took ", y_label, " in a subsequent term; any gap between the two courses qualifies. ",
+              paste0(n_fmt(result$n_took_x_before_y), " students met this definition across "),
+              fmt_term(result$term_range_x[1]), "–", fmt_term(result$term_range_x[2]), ". ",
+              if (result$n_dropped_by_programs > 0)
+                paste0(n_fmt(result$n_dropped_by_programs), " were dropped for missing program records, leaving ",
+                       n_fmt(result$n_treatment), " in the comparison.")
+              else paste0("All ", n_fmt(result$n_treatment), " are in the comparison.")
+            ),
+            tags$li(
+              tags$strong(groups[[2]]), ": students who took ", y_label, " with no prior passing record in ", x, ". ",
+              paste0(n_fmt(result$n_took_y_without_x), " students across "),
+              fmt_term(result$term_range_y[1]), "–", fmt_term(result$term_range_y[2]),
+              paste0("; ", n_fmt(result$n_control), " in the comparison after program matching.")
+            ),
+            tags$li("A later retake cannot move a student between groups or overwrite their outcome."),
+            if (result$n_missing_act_excluded > 0L) tags$li(
+              n_fmt(result$n_missing_act_excluded), " students with no ACT score were left out because an ACT window was active."),
+            if (result$n_missing_hs_gpa_excluded > 0L) tags$li(
+              n_fmt(result$n_missing_hs_gpa_excluded), " students with no HS GPA were left out because a GPA window was active.")
+          )
+        ),
+        cedar_alike_block(
+          result$balance, groups,
+          paste0("Each student's record entering the term they took ", x, " (the first group) or ", y_label, " (the comparison group)."),
+          described = current_gpa,
+          method = tagList(
+            tags$p("GPA and credits entering exclude that term's own grade, which is the outcome being measured, and are rebuilt from the per-term class list: these are the figures matched on. High-school GPA and ACT are fixed admissions values."),
+            tags$p("The current UNM GPA is the registrar's cumulative GPA as of the data pull: where each group stands today, after the courses compared. It covers more students than the rebuilt figure, so it is shown for description, not as evidence the groups were alike, and never balanced on: it is measured after the outcome.")
+          )),
+        method = tags$p("What the comparison cannot show is in this view's header. Use the high-school GPA window in Settings to compare students within one GPA range.")
+      )
     )
   })
 

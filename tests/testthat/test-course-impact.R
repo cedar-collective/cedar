@@ -474,3 +474,68 @@ test_that("course_sequence_headline says the two rates, their counts and the bal
 test_that("course_sequence_headline stops on a payload without its tables", {
   expect_error(course_sequence_headline(list(course_x = "A", course_y = "B")), "lacks")
 })
+
+# ── The shared balance table and the sequence view's over-time reading ──────
+#
+# Every Downstream comparison reads its balance through cedar_balance_rows()
+# (R/modules/ui-helpers.R) and the sequence view reads its two rates and
+# their trend through course_sequence_rates() / course_sequence_trend_sentences()
+# (R/features/course-report.R). MC02 again: SPAN 101 -> SPAN 201 on ABQ.
+
+test_that("the balance table has a row per measured characteristic, then the described ones", {
+  result <- suppressMessages(get_course_sequence_effect(
+    test_students_mc, .impact_attempts, test_programs_mc, NULL,
+    opt = list(course_x = "SPAN 101", course_y = "SPAN 201", campus = "ABQ", min_n = 1L),
+    student_terms = test_student_terms_mc, data_edges = .impact_edges
+  ))
+  smd <- result$balance$smd_table
+  described <- tibble::tibble(measure = "Current UNM GPA", value_treatment = "3.10",
+                              value_control = "2.90", note = "Description, not as evidence")
+  rows <- cedar_balance_rows(result$balance, c("Passed first", "No prior pass"), described)
+
+  expect_equal(names(rows), c("Measure", "Passed first", "No prior pass", "With a value", "Difference", "Reading"))
+  expect_equal(nrow(rows), nrow(smd) + 1L)
+  # The measured rows keep the cone's order (largest difference first), each
+  # read through its band; the described row has no difference.
+  measured <- rows[seq_len(nrow(smd)), ]
+  expect_equal(measured$Reading, unname(CEDAR_BALANCE_READING[smd$balance_band]))
+  expect_equal(grepl("⚠", measured$Difference), smd$balance_band == "substantial")
+  expect_equal(measured$`With a value`, paste0(smd$n_treatment, " / ", smd$n_control))
+  binary <- smd$type == "binary" & !is.na(smd$value_treatment)
+  expect_true(all(grepl("%$", measured$`Passed first`[binary])))
+  expect_false(any(grepl("%$", measured$`Passed first`[smd$type == "continuous"])))
+  expect_equal(unlist(rows[nrow(rows), ], use.names = FALSE),
+               c("Current UNM GPA", "3.10", "2.90", "—", "—", "Description, not as evidence"))
+})
+
+test_that("the balance verdict follows the table's most serious band", {
+  for (band in c("small", "review", "substantial", "unavailable")) {
+    expect_type(cedar_balance_verdict(list(overall_balance = band)), "character")
+  }
+  expect_false(identical(cedar_balance_verdict(list(overall_balance = "small")),
+                         cedar_balance_verdict(list(overall_balance = "substantial"))))
+  expect_error(cedar_balance_rows(list(smd_table = tibble::tibble(covariate = "x")), c("A", "B")), "lacks")
+})
+
+test_that("the sequence view's rates, chart and trend sentences read the cone's by_term", {
+  testthat::local_edition(3)
+  result <- suppressMessages(get_course_sequence_effect(
+    test_students_mc, .impact_attempts, test_programs_mc, NULL,
+    opt = list(course_x = "SPAN 101", course_y = "SPAN 201", campus = "ABQ", min_n = 1L),
+    student_terms = test_student_terms_mc, data_edges = .impact_edges
+  ))
+  rates <- course_sequence_rates(result)
+  expect_equal(rates$group, c("treatment", "control"))
+  expect_equal(rates$dfw, c(1L, 0L))
+  expect_equal(rates$total, c(3L, 1L))
+
+  sentences <- course_sequence_trend_sentences(result)
+  # One sentence per term type and group with a rate.
+  with_rate <- result$by_term[!is.na(result$by_term$dfw_pct), ]
+  expect_length(sentences, nrow(dplyr::distinct(with_rate, term_type, group)))
+  expect_snapshot(cat(sentences, sep = "\n"))
+  expect_s3_class(plot_course_sequence_trend(result), "plotly")
+  # A term type with no rate reads nothing and draws nothing.
+  expect_length(course_sequence_trend_sentences(result, "summer"), 0L)
+  expect_null(plot_course_sequence_trend(result, "summer"))
+})

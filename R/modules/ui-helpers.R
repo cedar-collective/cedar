@@ -872,70 +872,168 @@ cedar_pct_count_coldef <- function(name, counts, of = FALSE, ...) {
   )
 }
 
-# \u2500\u2500 Balance tables (build_comparison() / compute_balance()) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-# The SMD rows as a display tibble, one row per measured covariate, with the
-# band marked beside the number; and the one-line verdict above them. Shared
-# by Course Dynamics' Downstream views (server.R and the later-course and
-# course-cohort modules), so the two pages read a balance table the same way. Neither infers
-# comparability from the absence of a substantial difference.
-cedar_balance_smd_rows <- function(smd, group_labels = c("Treatment", "Control")) {
-  group_a <- group_labels[[1]]
-  group_b <- group_labels[[2]]
-  display <- smd %>%
-    dplyr::mutate(
-      value_treatment = cedar_format_balance_value(value_treatment, type),
-      value_control = cedar_format_balance_value(value_control, type),
-      smd_value = dplyr::if_else(is.na(smd), "\u2014", sprintf("%.3f", smd)),
-      smd_fmt = dplyr::case_when(
-        balance_band == "substantial" ~ paste0(smd_value, " \u26a0"),
-        balance_band == "review" ~ paste0(smd_value, " \u25b3"),
-        TRUE ~ smd_value
-      ),
-      interpretation = dplyr::recode(
-        balance_band,
-        small = "Small difference",
-        review = "Review",
-        substantial = "Substantial difference",
-        unavailable = "Unavailable"
-      )
-    ) %>%
-    dplyr::select(covariate, type, n_treatment, n_control,
-                  value_treatment, value_control, unit, smd = smd_fmt,
-                  interpretation)
-  names(display) <- c(
-    "Covariate", "Type", paste0(group_a, " N"), paste0(group_b, " N"),
-    paste0(group_a, " Value"), paste0(group_b, " Value"), "Unit", "SMD",
-    "Interpretation"
-  )
-  display
+# ── How alike two groups were (build_comparison() / compute_balance()) ──────
+# Every observational comparison on Course Dynamics > Downstream reads its
+# balance through these: Against Non-Takers (course-cohort.R), Prepared for It
+# (server.R) and the instructor check in Next Courses (later-course.R). One
+# table, a row per measured characteristic with each group's value, the
+# standardized difference and its band; a characteristic measured after the
+# outcome (the registrar's current GPA) joins it as a described row with no
+# difference, so a reader never has two tables of the same people to reconcile.
+# Nothing here infers comparability from the absence of a substantial
+# difference.
+
+CEDAR_BALANCE_READING <- c(
+  small = "Small difference",
+  review = "Review",
+  substantial = "Substantial difference",
+  unavailable = "Unavailable"
+)
+
+CEDAR_BALANCE_CATEGORY_LABELS <- c(
+  ipeds_race = "Race and ethnicity", gender = "Gender", time_status = "Full- or part-time",
+  residency = "Residency", admissions_population = "Admissions population",
+  student_population = "Student population", student_classification = "Classification"
+)
+
+# A covariate's name for a reader: the course report's label where it has one.
+cedar_balance_measure_label <- function(covariate) {
+  label <- unname(CEDAR_COVARIATE_LABELS[covariate])
+  label[is.na(label)] <- gsub("_", " ", covariate[is.na(label)])
+  paste0(toupper(substr(label, 1, 1)), substr(label, 2, nchar(label)))
 }
 
-cedar_balance_summary <- function(balance) {
+# The verdict over the whole table, in one sentence.
+cedar_balance_verdict <- function(balance) {
   switch(
-    balance$overall_balance %||% "none",
-    substantial =
-      div(class = "alert alert-warning",
-          style = "font-size: 0.85em;",
-          icon("triangle-exclamation"), " ",
-          "One or more measured covariates have substantial observed differences (|SMD| > 0.25). ",
-          "Outcome gaps may partly reflect who entered each group."),
-    review =
-      div(class = "alert alert-warning",
-          style = "font-size: 0.85em;",
-          icon("circle-info"), " ",
-          "Review the measured covariate differences: at least one |SMD| is 0.10\u20130.25, ",
-          "even though none exceeds 0.25. Do not describe these groups as well-balanced."),
-    small =
-      div(class = "alert alert-success", style = "font-size: 0.85em;",
-          icon("circle-check"), " All estimated continuous and binary covariates have small ",
-          "observed differences (|SMD| < 0.10). This does not establish comparability on ",
-          "unmeasured factors."),
-    unavailable =
-      div(class = "alert alert-secondary", style = "font-size: 0.85em;",
-          icon("circle-info"), " No continuous or binary SMD could be estimated. ",
-          "Observed balance is unavailable; review the group descriptions and categorical distributions."),
-    div(class = "alert alert-secondary", style = "font-size: 0.85em;",
-        "Observed balance status is unavailable.")
+    balance$overall_balance %||% "unavailable",
+    substantial = paste0(
+      "At least one measured characteristic differs substantially between the groups (a standardized difference above 0.25), ",
+      "so a gap between them partly reflects who entered each group."),
+    review = paste0(
+      "At least one measured characteristic differs by 0.10 to 0.25 standard deviations and none by more: ",
+      "close, but not close enough to call the groups alike."),
+    small = paste0(
+      "Every measured characteristic differs by less than 0.10 standard deviations. ",
+      "That says nothing about what was not measured."),
+    "No measured characteristic could be compared between the groups."
+  )
+}
+
+#' The balance table for display
+#'
+#' @param balance `compute_balance()` output.
+#' @param group_labels The two groups' names, treatment first.
+#' @param described NULL, or rows shown for description only: `measure`,
+#'   `value_treatment`, `value_control` (already formatted) and `note`.
+#' @return One row per characteristic: Measure, each group's value, how many
+#'   in each group have one, the difference with its band marked, and the
+#'   reading.
+cedar_balance_rows <- function(balance, group_labels, described = NULL) {
+  smd <- balance$smd_table
+  required <- c("covariate", "type", "n_treatment", "n_control", "value_treatment",
+                "value_control", "smd", "balance_band")
+  missing <- setdiff(required, names(smd))
+  if (length(missing) > 0) stop("cedar_balance_rows(): smd_table lacks ", paste(missing, collapse = ", "), call. = FALSE)
+  value <- function(v, type) {
+    out <- cedar_format_balance_value(v, type)
+    ifelse(type == "binary" & out != "—", paste0(out, "%"), out)
+  }
+  rows <- tibble::tibble(
+    Measure = cedar_balance_measure_label(smd$covariate),
+    a = value(smd$value_treatment, smd$type),
+    b = value(smd$value_control, smd$type),
+    `With a value` = paste0(format(smd$n_treatment, big.mark = ",", trim = TRUE), " / ",
+                            format(smd$n_control, big.mark = ",", trim = TRUE)),
+    Difference = dplyr::case_when(
+      is.na(smd$smd) ~ "—",
+      smd$balance_band == "substantial" ~ paste0(sprintf("%.3f", smd$smd), " ⚠"),
+      smd$balance_band == "review" ~ paste0(sprintf("%.3f", smd$smd), " △"),
+      TRUE ~ sprintf("%.3f", smd$smd)
+    ),
+    Reading = unname(CEDAR_BALANCE_READING[smd$balance_band])
+  )
+  if (!is.null(described) && nrow(described) > 0) {
+    rows <- dplyr::bind_rows(rows, tibble::tibble(
+      Measure = described$measure, a = described$value_treatment, b = described$value_control,
+      `With a value` = "—", Difference = "—", Reading = described$note))
+  }
+  names(rows)[2:3] <- group_labels
+  rows
+}
+
+# The categorical characteristics: each group's share in every category.
+.cedar_balance_categories <- function(categorical, group_labels) {
+  if (is.null(categorical) || length(categorical) == 0L) return(NULL)
+  info_panel(
+    "Characteristics with categories",
+    description = "Each group's share in every category, read directly rather than as one difference.",
+    div(class = "cedar-balance-categories", lapply(names(categorical), function(varname) {
+      d <- categorical[[varname]] %>%
+        tidyr::pivot_wider(id_cols = "value", names_from = "group", values_from = "pct", values_fill = 0)
+      for (g in c("treatment", "control")) if (!g %in% names(d)) d[[g]] <- 0
+      d <- d %>%
+        dplyr::transmute(Value = as.character(value), a = treatment, b = control) %>%
+        dplyr::arrange(dplyr::desc(a))
+      names(d)[2:3] <- paste0(group_labels, ", %")
+      div(
+        section_heading(if (varname %in% names(CEDAR_BALANCE_CATEGORY_LABELS)) CEDAR_BALANCE_CATEGORY_LABELS[[varname]]
+                        else tools::toTitleCase(gsub("_", " ", varname)), level = "h6"),
+        reactable::reactable(d, theme = cedar_tbl_theme, compact = TRUE, striped = TRUE,
+                             pagination = FALSE, defaultColDef = reactable::colDef(minWidth = 90))
+      )
+    }))
+  )
+}
+
+#' How alike two groups were, as one block of the trust section
+#'
+#' @param balance `compute_balance()` output, or NULL when none was built.
+#' @param group_labels The two groups' names, treatment first.
+#' @param question One sentence: which two groups, measured when.
+#' @param described See [cedar_balance_rows()].
+#' @param method Extra method text for this comparison, beside the bands.
+#' @param title The block's heading.
+cedar_alike_block <- function(balance, group_labels, question, described = NULL, method = NULL,
+                              title = "How Alike the Groups Were") {
+  smd <- balance$smd_table
+  div(
+    class = "cedar-alike-block",
+    section_heading(title, level = "h6"),
+    tags$p(class = "text-hint", question),
+    cedar_method_panel(tagList(
+      tags$p("Each characteristic's difference is standardized: the gap between the two groups' values in units of their pooled standard deviation, so it reads the same for a GPA, a credit count or a share. Under 0.10 is a small difference, 0.10 to 0.25 one to review (\u25b3), above 0.25 a substantial one (\u26a0). For a yes-or-no characteristic the value is each group's share with it; for the rest, the group's average."),
+      tags$p("The bands describe what was measured. They adjust nothing, and a small difference on every row does not show the groups were alike in what was not measured."),
+      method
+    )),
+    if (is.null(balance) || is.null(smd) || nrow(smd) == 0L) {
+      tags$p(class = "text-note", "No characteristic could be measured for both groups.")
+    } else tagList(
+      tags$p(class = "cedar-balance-verdict", cedar_balance_verdict(balance)),
+      reactable::reactable(
+        cedar_balance_rows(balance, group_labels, described),
+        theme = cedar_tbl_theme, compact = TRUE, striped = TRUE, pagination = FALSE,
+        columns = list(Measure = reactable::colDef(minWidth = 170),
+                       Reading = reactable::colDef(minWidth = 150))
+      ),
+      .cedar_balance_categories(balance$categorical, group_labels)
+    )
+  )
+}
+
+# ── Downstream's last section ────────────────────────────────────────────────
+# Every view on Course Dynamics > Downstream ends the same way: one section
+# named "How Far to Trust It" holding who was counted (collapsed), how alike
+# the compared groups were, and anything else that bounds the reading. Its
+# sentence says what limits this comparison; `method` holds what it cannot
+# show.
+downstream_trust_section <- function(description, who_counted = NULL, ..., method = NULL) {
+  dashboard_subsection(
+    "How Far to Trust It", description, method = method,
+    if (!is.null(who_counted)) info_panel(
+      "Who is counted", who_counted,
+      description = "The groups, their sizes, the data window and who was left out."),
+    ...
   )
 }
 

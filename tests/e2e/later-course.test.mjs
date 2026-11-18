@@ -72,6 +72,11 @@ try {
   await setInput(page, 'cr_later-course_y', [COURSE_Y]);
   await setInput(page, 'cr_later-min_n', 5);
   await runAndWait(page, 'cr_later-run', { timeout: 300000 });
+  // The per-term table sits in a collapsed "Each term" panel, and Shiny
+  // renders an output inside one only once it is opened.
+  await page.evaluate(() => {
+    document.querySelectorAll('#cr_later-results details.cedar-info-panel').forEach((d) => { d.open = true; });
+  });
   await waitForSelector(page, '#cr_later-term_table .rt-table', { timeout: 120000 });
   await waitForIdle(page);
 
@@ -90,12 +95,12 @@ try {
   const steps = await page.evaluate(() =>
     [...document.querySelectorAll('#cr_later-results .stat-row table tr')].map((tr) => tr.innerText.trim()));
   ok(steps.length >= 4, `the counts behind the rates are open under them (${steps.length} rows)`);
-  ok(!(await page.evaluate(() => !!document.querySelector('#cr_later-results details'))),
-     'none of the result is collapsed');
+  ok(!(await page.evaluate(() => !!document.querySelector('#cr_later-results details .stat-row'))),
+     'the rates and their counts are never collapsed');
 
   for (const heading of ['Over Time', `Results in ${COURSE_Y} by Grade in ${COURSE_X}`,
                          `When They Took ${COURSE_Y}`, `By Instructor in ${COURSE_X}`,
-                         'Course Order']) {
+                         'How Far to Trust It', 'Course Order']) {
     ok(new RegExp(esc(heading), 'i').test(body), `section "${heading}" is on the page`);
   }
 
