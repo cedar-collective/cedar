@@ -280,53 +280,6 @@ server <- function(input, output, session) {
 
 #    ENROLLMENT    #
 #####################
-.format_enrl_desr_rows <- function(data, grouped = FALSE) {
-  if (is.null(data) || nrow(data) == 0 || isTRUE(grouped)) return(data)
-
-  if ("crosslist_partners" %in% names(data) || "split_sections" %in% names(data)) {
-    data <- data %>% mutate(
-      Partners = coalesce(
-        if ("split_sections" %in% names(data)) split_sections else NA_character_,
-        if ("crosslist_partners" %in% names(data)) crosslist_partners else NA_character_
-      )
-    )
-  }
-
-  # A section row names the code the schedule used that term (CCS 1150 where
-  # the course is CCST 1150); course rollups name the course.
-  base_select <- c(
-    Camp = "campus",
-    Col = "college",
-    Term = "term",
-    TermType = "term_type",
-    Course = if ("listed_code" %in% names(data)) "listed_code" else "subject_course",
-    Sec = "section"
-  )
-  if ("part_term" %in% names(data)) base_select <- c(base_select, PoT = "part_term")
-
-  base_select <- c(
-    base_select,
-    Title = "course_title",
-    SectionEnrl = "enrolled",
-    TotalEnrl = "total_enrl",
-    Inst = "instructor_name",
-    IM = "delivery_method",
-    GenEd = "gen_ed_area"
-  )
-  if ("Partners" %in% names(data)) base_select <- c(base_select, Partners = "Partners")
-  if ("crosslist_role" %in% names(data)) base_select <- c(base_select, XlistRole = "crosslist_role")
-  if ("crosslist_external" %in% names(data)) base_select <- c(base_select, XlistExternal = "crosslist_external")
-  if ("crosslist_primary" %in% names(data)) base_select <- c(base_select, XlistPrimary = "crosslist_primary")
-  if ("is_split" %in% names(data)) base_select <- c(base_select, IsSplit = "is_split")
-
-  data %>%
-    ungroup() %>%
-    select(all_of(base_select)) %>%
-    distinct() %>%
-    arrange(Course, TermType)
-}
-
-
 enrl_run_request <- cedar_run_trigger(input, session, "enrl_button", "Enrollment")
 
 # Gate the shared run signal, not only the browser button: deep-link autoruns
@@ -404,92 +357,33 @@ enrl_data <- eventReactive(enrl_run(), {
     opt[["group_cols"]] <- enforce_course_campus_grouping(c(opt[["group_cols"]], facet))
   }
 
-# Add enrollment min/max from numeric inputs
+# Census Min/Max: applied per crosslist view by summarize_enrollment_view().
   opt[["enrl_min"]] <- input$enrl_min
   opt[["enrl_max"]] <- input$enrl_max
 
-# Get enrollment data based on the options
   cedar_debug("[server.R] getting enrollment data with options: ", toString(opt))
 
-  # Keep section rows through the shared query. DESR subtabs filter these rows
-  # first and aggregate second, so crosslist classification is never lost and
-  # hidden metadata never fragments the user's requested grouping.
-  opt_for_enrl <- opt
-  opt_for_enrl[["enrl_min"]] <- NULL
-  opt_for_enrl[["enrl_max"]] <- NULL
-  raw_opt <- opt_for_enrl
-  raw_opt[["group_cols"]] <- NULL
-
+  # Section rows through the shared query: each crosslist view filters these
+  # first and groups second, so crosslist classification is never lost.
+  raw_opt <- opt
+  raw_opt[c("enrl_min", "enrl_max", "group_cols")] <- NULL
   timer_enrl <- start_report_timer("get_enrl", list(dept_code = opt[["dept_code"]], term = opt[["term"]]))
   desr_raw <- get_enrl(cedar_sections, raw_opt)
-  data <- if (!is.null(opt_for_enrl[["group_cols"]]) && length(opt_for_enrl[["group_cols"]]) > 0) {
-    aggregate_courses(desr_raw, opt_for_enrl)
-  } else {
-    desr_raw
-  }
-  end_report_timer(timer_enrl, result = data)
+  end_report_timer(timer_enrl, result = desr_raw)
 
-  rows_before_enrl_filter <- nrow(data)
-
-  # Apply enrollment min/max post-call (same logic as special_filters_desr in filter.R)
-  if (!is.null(opt[["enrl_min"]]) && !is.na(opt[["enrl_min"]])) {
-    data <- data %>% dplyr::filter(enrolled >= as.integer(opt[["enrl_min"]]))
-  }
-  if (!is.null(opt[["enrl_max"]]) && !is.na(opt[["enrl_max"]])) {
-    data <- data %>% dplyr::filter(enrolled <= as.integer(opt[["enrl_max"]]))
-  }
-
-  cedar_debug("[server.R] get_enrl() returned ", nrow(data), " rows (", rows_before_enrl_filter, " before enrollment filter)")
-  if (nrow(data) > 0) {
-    cedar_debug("[server.R] Sample courses returned: ", paste(unique(data$subject_course)[1:min(5, length(unique(data$subject_course)))], collapse=", "))
-  }
-
-  # Detect if enrollment filter eliminated all data
-  filter_warning <- ""
-  if (nrow(data) == 0 && rows_before_enrl_filter > 0 && (!is.null(input$enrl_min) || !is.null(input$enrl_max))) {
-    filter_warning <- paste0("⚠️ No DESR rows matched your enrollment filter (min: ", input$enrl_min, ", max: ", input$enrl_max, "). ",
-                            "There were ", rows_before_enrl_filter, " displayed groups before filtering. ",
-                            "For future/proposed schedules, try setting Min Enrollment to 0.")
-    cedar_debug("[server.R] FILTER WARNING: ", filter_warning)
-  }
-
-  # Classlist inherits the base active-section scope through the raw DESR
-  # CRN/term keys. DESR-only crosslist tabs, grouping, and Min/Max are applied
-  # later and therefore cannot silently change the student-count table.
-  filtered_students <- tryCatch(
-    filter_enrollment_classlist_scope(
-      cedar_registrations,
-      desr_raw,
-      dept_codes = opt[["dept_code"]]
-    ),
-    error = function(e) {
-      cedar_debug("[server.R] Classlist scope matching failed: ", e$message)
-      cedar_registrations[integer(0), ]
-    }
-  )
-  cedar_debug("[server.R] Filtered students to ", nrow(filtered_students), " rows for class list stats")
-
-  # Counted from the class list, not read off cedar_course_terms (ADR-001 step
-  # 7): this table is scoped to the sections the DESR filters selected, by CRN,
-  # so an instructor, method or status choice narrows it, and the course-term
-  # table cannot answer a question about one section.
-  timer_cl <- start_report_timer("calc_cl_enrls")
-  cl_data <- calc_cl_enrls(filtered_students)
-  end_report_timer(timer_cl, result = cl_data)
-
-
-  data <- .format_enrl_desr_rows(
-    data,
-    grouped = !is.null(opt[["group_cols"]]) && length(opt[["group_cols"]]) > 0
-  )
+  # The class list counted by section: the table's rows are the sections the
+  # filters chose (instructor, method, part of term), which cedar_course_terms
+  # cannot answer. A deliberate class-list count (AGENTS.md, CEDAR Data Tables).
+  timer_cl <- start_report_timer("attach_enrollment_section_counts")
+  counted <- attach_enrollment_section_counts(desr_raw, cedar_registrations, cedar_sections)
+  end_report_timer(timer_cl, result = counted$rows)
 
   payload <- list(
-    data = data,
     desr_raw = desr_raw,
-    cl_data = cl_data,
+    section_rows = counted$rows,
+    n_placeholders = counted$n_placeholders,
     opt = opt,
-    level_selection = input$enrl_level,
-    filter_warning = filter_warning
+    level_selection = input$enrl_level
   )
   duration_sec <- end_report_timer(timer, result = payload)
   signal_load_complete(session, "enrl", duration_sec = duration_sec)
@@ -504,38 +398,31 @@ enrl_data <- eventReactive(enrl_run(), {
   all = "all"
 )
 
-# Prepare every DESR slice once per Gather action. The table, scope count, and
-# downloads read this shared result so display/export cannot diverge and hidden
-# tab controls do not repeat aggregation work.
-.enrl_desr_views_data <- reactive({
+# Build every crosslist view once per Gather action. The table, the scope bar
+# and the downloads read this one result, so display and export cannot diverge.
+.enrl_views_data <- reactive({
   out <- enrl_data()
-  if (is.null(out) || is.null(out$desr_raw)) return(list())
-
+  if (is.null(out) || is.null(out$section_rows)) return(list())
   views <- unique(unname(.enrl_desr_view_ids))
-  prepared <- lapply(views, function(view) {
-    data <- filter_enrollment_crosslist_view(out$desr_raw, view)
-    grouped <- !is.null(out$opt[["group_cols"]]) && length(out$opt[["group_cols"]]) > 0
-    if (nrow(data) > 0 && grouped) {
-      data <- aggregate_courses(data, list(group_cols = out$opt[["group_cols"]]))
-    }
-
-    if (nrow(data) > 0 && !is.null(out$opt[["enrl_min"]]) && !is.na(out$opt[["enrl_min"]])) {
-      data <- data %>% dplyr::filter(enrolled >= as.integer(out$opt[["enrl_min"]]))
-    }
-    if (nrow(data) > 0 && !is.null(out$opt[["enrl_max"]]) && !is.na(out$opt[["enrl_max"]])) {
-      data <- data %>% dplyr::filter(enrolled <= as.integer(out$opt[["enrl_max"]]))
-    }
-
-    data %>%
-      .format_enrl_desr_rows(grouped = grouped) %>%
-      strip_enrollment_crosslist_metadata()
-  })
-  stats::setNames(prepared, views)
+  stats::setNames(lapply(views, function(view) {
+    summarize_enrollment_view(out$section_rows, list(
+      view = view,
+      group_cols = out$opt[["group_cols"]],
+      enrl_min = out$opt[["enrl_min"]],
+      enrl_max = out$opt[["enrl_max"]]
+    ))
+  }), views)
 })
 
-.enrl_desr_view_data <- function(view = input$enrl_crosslist_tabs) {
+.enrl_view <- function(view = input$enrl_crosslist_tabs) {
   view <- as.character(view %||% "home")[[1]]
-  .enrl_desr_views_data()[[view]]
+  .enrl_views_data()[[view]]
+}
+
+.enrl_view_table <- function(view = input$enrl_crosslist_tabs) {
+  result <- .enrl_view(view)
+  if (is.null(result)) return(NULL)
+  enrollment_table_display(result)
 }
 
 # Helper: derive dept display info from enrl_data() opt — used by both the
@@ -609,12 +496,14 @@ output$enrl_filter_summary <- renderUI({
   }
 
   tab <- as.character(input$enrl_crosslist_tabs %||% "home")[[1]]
-  data_shown <- .enrl_desr_view_data(tab)
-  data_all <- .enrl_desr_view_data("all")
+  view_shown <- .enrl_view(tab)
+  data_shown <- view_shown$rows
+  data_all <- .enrl_view("all")$rows
 
   n_rows_total <- if (!is.null(data_all)) nrow(data_all) else 0
-  course_col <- intersect(c("subject_course", "Course"), names(data_shown))[1]
-  n_c <- if (!is.null(data_shown) && !is.na(course_col)) length(unique(data_shown[[course_col]])) else 0
+  n_c <- if (!is.null(data_shown) && "subject_course" %in% names(data_shown)) {
+    length(unique(data_shown$subject_course))
+  } else 0
   n_rows <- if (!is.null(data_shown)) nrow(data_shown) else 0
   tab_display <- switch(
     tab,
@@ -626,7 +515,7 @@ output$enrl_filter_summary <- renderUI({
     tab
   )
   count_str <- paste0(
-    "DESR ", tab_display, ": ",
+    tab_display, ": ",
     n_c, " course", if (n_c != 1) "s" else "",
     ", ", n_rows, " row", if (n_rows != 1) "s" else ""
   )
@@ -645,6 +534,33 @@ output$enrl_filter_summary <- renderUI({
     )
   } else NULL
 
+  # Facts about the counts: which count Min/Max read, the rows it could not
+  # judge, the placeholder sections left out, and any term still in progress.
+  count_facts <- list()
+  if (any(!is.na(c(opt$enrl_min %||% NA, opt$enrl_max %||% NA)))) {
+    count_facts[["Min/Max on"]] <- "census"
+  }
+  n_unregistered <- view_shown$n_no_registrations %||% 0L
+  if (n_unregistered > 0) {
+    count_facts[["No registrations"]] <- paste0(n_unregistered, " row", if (n_unregistered != 1) "s")
+  }
+  if ((out$n_placeholders %||% 0L) > 0) {
+    count_facts[["Not offered"]] <- paste0(out$n_placeholders, " section",
+                                           if (out$n_placeholders != 1) "s", " with no seats or students")
+  }
+  in_progress <- cedar_in_progress_terms(data_objects[["cedar_edges"]])
+  if (!is.null(data_shown) && "term" %in% names(data_shown)) {
+    in_progress <- in_progress[in_progress$term %in% data_shown$term, , drop = FALSE]
+    count_facts <- c(count_facts, cedar_scope_time_facts(in_progress, data_objects[["cedar_edges"]])["In progress"])
+  }
+  count_facts <- Filter(Negate(is.null), count_facts)
+  fact_chips <- lapply(names(count_facts), function(k) {
+    tags$span(class = "scope-chip",
+      tags$span(class = "scope-chip-key", k), ": ",
+      tags$span(class = "scope-chip-val", paste(count_facts[[k]], collapse = "; "))
+    )
+  })
+
   info     <- .enrl_dept_info(out)
   dept_btn <- if (!is.null(info)) {
     actionButton("enrl_dept_info_btn", label = NULL, icon = icon("circle-question"),
@@ -655,6 +571,7 @@ output$enrl_filter_summary <- renderUI({
   div(class = "enrl-scope-bar",
     tagList(filter_chips),
     tags$span(class = "scope-count", count_str),
+    tagList(fact_chips),
     dedup_note,
     dept_btn
   )
@@ -855,122 +772,95 @@ cedar_copy_url_observer(
   })
 
 
-.enrl_col_defs <- function(df) {
-  # Header labels match the rest of the site: whole words rather than squeezed
-  # camelCase (Campus not Camp, Term Type not TermType, Gen Ed not GenEd), and
-  # the shared table theme uppercases them. Enrollment measures wrap onto two
-  # lines so their source and crosslist treatment remain visible in narrow tables.
+.enrl_col_defs <- function(df, grouped = FALSE) {
+  # Header labels match the rest of the site: whole words, uppercased by the
+  # shared table theme. Counts wrap onto two lines so their source stays
+  # visible in narrow tables; a missing count is a dash.
   header_nowrap <- list(whiteSpace = "nowrap")
   header_wrap   <- list(whiteSpace = "normal", lineHeight = "1.1")
+  count_def <- function(name, width = 82, ...) {
+    reactable::colDef(name = name, minWidth = width, align = "right", na = "—",
+                      headerStyle = header_wrap, ...)
+  }
 
   defs <- list(
-    # Unaggregated (renamed) columns
-    Camp        = reactable::colDef(name = "Campus",    maxWidth = 70,  headerStyle = header_nowrap),
-    Col         = reactable::colDef(name = "College",   maxWidth = 72,  headerStyle = header_nowrap),
-    Term        = reactable::colDef(name = "Term",      maxWidth = 75,  headerStyle = header_nowrap,
-                                    cell = function(value) as.character(value)),
-    TermType    = reactable::colDef(name = "Term Type", maxWidth = 82,  headerStyle = header_wrap),
-    Course      = reactable::colDef(name = "Course",    minWidth = 90,  headerStyle = header_nowrap),
-    Sec         = reactable::colDef(name = "Sec",       maxWidth = 55,  headerStyle = header_nowrap),
-    PoT         = cedar_pot_coldef(),
-    Title       = reactable::colDef(name = "Title",     minWidth = 180, headerStyle = header_nowrap),
-    SectionEnrl = reactable::colDef(name = "Section Enrl", width = 82, align = "right", headerStyle = header_wrap),
-    TotalEnrl   = reactable::colDef(name = "XL Total Enrl", width = 88, align = "right", headerStyle = header_wrap),
-    Inst        = reactable::colDef(name = "Instructor", minWidth = 160, headerStyle = header_nowrap),
-    IM          = reactable::colDef(name = "Method",    maxWidth = 72,  headerStyle = header_nowrap),
-    GenEd       = reactable::colDef(name = "Gen Ed",    maxWidth = 80,  headerStyle = header_nowrap),
-    Partners    = reactable::colDef(name = "Partners",  minWidth = 120, headerStyle = header_nowrap),
-    XlistRole   = reactable::colDef(show = FALSE),
-    # Aggregated (original) column names
     campus          = reactable::colDef(name = "Campus",    maxWidth = 70,  headerStyle = header_nowrap),
     college         = reactable::colDef(name = "College",   maxWidth = 72,  headerStyle = header_nowrap),
+    department      = reactable::colDef(name = "Dept",      maxWidth = 72,  headerStyle = header_nowrap),
     term            = reactable::colDef(name = "Term",      maxWidth = 75,  headerStyle = header_nowrap,
                                         cell = function(value) as.character(value)),
     term_type       = reactable::colDef(name = "Term Type", maxWidth = 82,  headerStyle = header_wrap),
+    subject         = reactable::colDef(name = "Subject",   maxWidth = 80,  headerStyle = header_nowrap),
     subject_course  = reactable::colDef(name = "Course",    minWidth = 90,  headerStyle = header_nowrap),
-    course_title    = reactable::colDef(name = "Title",     minWidth = 180, headerStyle = header_nowrap),
-    gen_ed_area     = reactable::colDef(name = "Gen Ed",    maxWidth = 80,  headerStyle = header_nowrap),
-    delivery_method = reactable::colDef(name = "Method",    maxWidth = 72,  headerStyle = header_nowrap),
+    listed_code     = reactable::colDef(name = "Course",    minWidth = 90,  headerStyle = header_nowrap),
+    section         = reactable::colDef(name = "Sec",       maxWidth = 55,  headerStyle = header_nowrap),
     part_term       = cedar_pot_coldef(),
+    level           = reactable::colDef(name = "Level",     maxWidth = 70,  headerStyle = header_nowrap),
+    course_title    = reactable::colDef(name = "Title",     minWidth = 180, headerStyle = header_nowrap),
     instructor_name = reactable::colDef(name = "Instructor", minWidth = 160, headerStyle = header_nowrap),
-    sections        = reactable::colDef(name = "Sections", minWidth = 72, align = "right", headerStyle = header_nowrap),
-    xl_sections     = reactable::colDef(name = "XL Sections", minWidth = 82, align = "right", headerStyle = header_wrap),
-    reg_sections    = reactable::colDef(name = "Non-XL Sections", minWidth = 96, align = "right", headerStyle = header_wrap),
-    avg_size        = reactable::colDef(name = "Avg DESR Enrl", minWidth = 92, align = "right", headerStyle = header_wrap),
-    enrolled        = reactable::colDef(name = "DESR Enrl", minWidth = 82, align = "right", headerStyle = header_wrap),
-    total_enrl      = reactable::colDef(name = "XL-aware Enrl", minWidth = 92, align = "right", headerStyle = header_wrap),
-    avail           = reactable::colDef(name = "Available", minWidth = 78, align = "right", headerStyle = header_nowrap),
-    waiting         = reactable::colDef(name = "DESR Waitlist", minWidth = 92, align = "right", headerStyle = header_wrap),
-    first_day_proxy = reactable::colDef(
-      name = "Ever Registered Proxy", minWidth = 125, align = "right",
-      headerStyle = header_wrap
-    ),
-    census_enrl = reactable::colDef(
-      name = "Census Estimate", minWidth = 92, align = "right", headerStyle = header_wrap
-    ),
-    last_day_or_current_enrl = reactable::colDef(
-      name = "Registered at Extract", minWidth = 110, align = "right",
-      headerStyle = header_wrap
-    ),
-    early_drops = reactable::colDef(
-      name = "Early Drops", minWidth = 82, align = "right", headerStyle = header_wrap
-    ),
-    late_drops = reactable::colDef(
-      name = "Late Drops", minWidth = 82, align = "right", headerStyle = header_wrap
-    ),
-    waitlisted = reactable::colDef(
-      name = "Waitlist Status", minWidth = 90, align = "right", headerStyle = header_wrap
-    )
+    delivery_method = reactable::colDef(name = "Method",    maxWidth = 72,  headerStyle = header_nowrap),
+    gen_ed_area     = reactable::colDef(name = "Gen Ed",    maxWidth = 80,  headerStyle = header_nowrap),
+    partners        = reactable::colDef(name = "Partners",  minWidth = 120, headerStyle = header_nowrap,
+                                        na = ""),
+    sections        = count_def("Sections", 72),
+    sections_matched = if (grouped) count_def("With Registrations", 98) else reactable::colDef(show = FALSE),
+    xl_sections     = count_def("XL Sections", 82),
+    seats           = count_def("Seats", 64),
+    first_day_enrl  = count_def("First Day", 72),
+    first_day_fill  = count_def("First-Day Fill", 96, cell = function(value, index) {
+      if (is.na(value)) return("—")
+      status <- df$fill_status[[index]]
+      tagList(sprintf("%.1f%%", value),
+              if (!is.na(status)) tags$span(class = "text-note", paste0(" ", status)))
+    }),
+    fill_status     = reactable::colDef(show = FALSE),
+    census_enrl     = count_def("Census", 78, cell = function(value, index) {
+      if (!is.na(value)) return(as.character(value))
+      if (identical(df$sections_matched[[index]], 0L)) {
+        return(tags$span(class = "text-note", "no registrations"))
+      }
+      "—"
+    }),
+    avg_census      = count_def("Avg Census per Section", 100),
+    registered      = count_def("Final", 64),
+    dr_early        = count_def("Early Drops", 72),
+    dr_late         = count_def("Late Drops", 72),
+    enrolled        = count_def("DESR Enrl", 78),
+    total_enrl      = count_def(if (grouped) "XL-aware DESR Enrl" else "XL Total DESR Enrl", 96)
   )
   defs[intersect(names(defs), names(df))]
 }
 
 output$enrl_summary <- reactable::renderReactable({
-  # Summary table works with or without grouping variables.
-  # Crosslist classification is applied to section rows before aggregation.
+  result <- .enrl_view(input$enrl_crosslist_tabs)
+  req(!is.null(result))
   tryCatch({
-    enrl_out <- enrl_data()
-    data <- .enrl_desr_view_data(input$enrl_crosslist_tabs)
-
-    if (!is.null(enrl_out$filter_warning) && nchar(enrl_out$filter_warning) > 0) {
-      showNotification(HTML(enrl_out$filter_warning), type = "warning",
-                       duration = 10, id = "enrl_filter_warning")
+    data <- enrollment_table_display(result)
+    if (nrow(data) == 0) {
+      if (result$n_before_filter > 0) {
+        showNotification(paste0(
+          "No rows have a census inside Census Min/Max; ", result$n_before_filter,
+          " rows were in this view before the filter."
+        ), type = "warning", duration = 10, id = "enrl_filter_warning")
+      }
+      return(NULL)
     }
 
-    if (is.null(data) || nrow(data) == 0) return(NULL)
-
-    # Default sort: by course (asc), then term (desc, so recent terms first).
-    # Handles both the renamed (Course/Term) and aggregated (subject_course/term)
-    # column naming.
-    course_col <- intersect(c("Course", "subject_course"), names(data))[1]
-    term_col   <- intersect(c("Term", "term"), names(data))[1]
+    course_col <- intersect(c("subject_course", "listed_code"), names(data))[1]
     default_sorted <- list()
     if (!is.na(course_col)) default_sorted[[course_col]] <- "asc"
-    if (!is.na(term_col))   default_sorted[[term_col]]   <- "desc"
+    if ("term" %in% names(data)) default_sorted[["term"]] <- "desc"
 
     reactable::reactable(data, theme = cedar_tbl_theme, striped = TRUE, highlight = TRUE,
                          compact = TRUE, resizable = TRUE, defaultPageSize = 50,
                          showPageSizeOptions = TRUE, pageSizeOptions = c(25, 50, 100),
                          defaultSorted = default_sorted,
-                         columns = .enrl_col_defs(data))
-  }, error = function(e) NULL)
-})
-
-# Class list enrollment summary table
-.enrl_classlist_view_data <- reactive({
-  prepare_enrollment_classlist_table(enrl_data()$cl_data)
-})
-
-output$enrl_cl_summary <- reactable::renderReactable({
-  tryCatch({
-    cl_data <- .enrl_classlist_view_data()
-    if (is.null(cl_data) || nrow(cl_data) == 0) return(NULL)
-    reactable::reactable(cl_data, theme = cedar_tbl_theme, striped = TRUE, highlight = TRUE,
-                         compact = TRUE, resizable = TRUE, defaultPageSize = 50,
-                         showPageSizeOptions = TRUE, pageSizeOptions = c(25, 50, 100),
-                         defaultSorted = list(term = "desc", subject_course = "asc"),
-                         columns = .enrl_col_defs(cl_data))
-  }, error = function(e) NULL)
+                         columns = .enrl_col_defs(data, grouped = result$grouped))
+  }, error = function(e) {
+    showNotification(paste("Enrollment table failed:", conditionMessage(e)),
+                     type = "error", duration = 10, id = "enrl_table_error")
+    NULL
+  })
 })
 
 
@@ -984,7 +874,7 @@ for (.download_key in names(.enrl_desr_view_ids)) {
     download_id <- paste0("enrl_desr_download_", download_key)
 
     output[[ui_id]] <- renderUI({
-      data <- .enrl_desr_view_data(view)
+      data <- .enrl_view_table(view)
       if (is.null(data) || nrow(data) == 0) return(NULL)
       downloadLink(
         download_id,
@@ -995,41 +885,18 @@ for (.download_key in names(.enrl_desr_view_ids)) {
 
     output[[download_id]] <- downloadHandler(
       filename = function() {
-        paste0("enrollment_desr_", gsub("-", "_", view), "_", Sys.Date(), ".csv")
+        paste0("enrollment_", gsub("-", "_", view), "_", Sys.Date(), ".csv")
       },
       content = function(file) {
-        data <- isolate(.enrl_desr_view_data(view))
+        data <- isolate(.enrl_view_table(view))
         if (is.null(data) || nrow(data) == 0) {
-          data <- data.frame(message = "No enrollment data available for this DESR view")
+          data <- data.frame(message = "No enrollment data available for this view")
         }
         write.csv(data, file, row.names = FALSE)
       }
     )
   })
 }
-
-output$enrl_classlist_download_ui <- renderUI({
-  data <- .enrl_classlist_view_data()
-  if (is.null(data) || nrow(data) == 0) return(NULL)
-  downloadLink(
-    "enrl_classlist_download",
-    tagList(icon("download"), " Download CSV"),
-    style = "font-size: 0.85em; color: #666; display: inline-block; margin-bottom: 8px;"
-  )
-})
-
-output$enrl_classlist_download <- downloadHandler(
-  filename = function() paste0("enrollment_classlist_", Sys.Date(), ".csv"),
-  content = function(file) {
-    data <- isolate(.enrl_classlist_view_data())
-    if (is.null(data) || nrow(data) == 0) {
-      data <- data.frame(message = "No classlist data available for selected filters")
-    }
-    write.csv(data, file, row.names = FALSE)
-  }
-)
-
-
 
   # Update subject choices when college or department changes
   observeEvent(list(input$enrl_college, input$enrl_dept), {

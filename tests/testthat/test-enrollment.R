@@ -486,49 +486,177 @@ test_that("classlist lifecycle counts preserve the registration-status chronolog
 })
 
 
-test_that("enrollment Classlist table keeps only clear lifecycle and audit columns", {
-  result <- calc_cl_enrls(test_students %>% filter(department == "HIST"))
-  out <- prepare_enrollment_classlist_table(result)
+# ---------------------------------------------------------------------------
+# The Enrollment table — EC-11b (test_sections_course_history /
+# test_students_course_history), Fall 2020 (202080):
+#   SOCI 100 ABQ full term: 100 seats; first day 107, census 100, final 80.
+#   SOCI 100 ABQ 1H: 100 seats; first day 28, census 30.
+#   SOCI 101 ABQ: two sections of 100; one (EC11B-NOMATCH) has no class-list
+#     rows, so the course's census is the other's 10 and its first day unknown.
+#   SOCI 103 ABQ: seats unknown (available NA); census 60.
+#   SOCI 104 ABQ: no class-list rows: no census, never zero.
+#   SOCI 100 EA: 100 seats; first day 58, census 60.
+#   SOCI 102 is cancelled and so not in an active-section query.
+# ---------------------------------------------------------------------------
 
-  expect_named(out, c(
-    "campus", "college", "term", "term_type", "subject_course",
-    "first_day_proxy", "census_enrl", "last_day_or_current_enrl",
-    "early_drops", "late_drops", "waitlisted"
-  ))
-  expect_false(any(grepl("_mean$", names(out))))
-  expect_true(all(out$campus == "ABQ"))
+test_that("calc_cl_enrls by section adds up to its course rows", {
+  by_section <- calc_cl_enrls(test_students_course_history, by_section = TRUE) %>%
+    ungroup() %>%
+    group_by(campus, college, term, subject_course) %>%
+    summarize(registered = sum(registered), census_enrl = sum(census_enrl), .groups = "drop")
+  by_course <- calc_cl_enrls(test_students_course_history) %>%
+    ungroup() %>%
+    select(campus, college, term, subject_course, registered, census_enrl)
+  expect_equal(arrange(by_section, campus, term, subject_course),
+               arrange(by_course, campus, term, subject_course))
+  expect_error(calc_cl_enrls(select(test_students_course_history, -crn), by_section = TRUE),
+               "requires a crn column")
 })
 
-test_that("Enrollment Classlist scope follows base DESR keys and department", {
-  students <- tibble::tibble(
-    student_id = c("keep-1", "other-dept", "other-term", "keep-2", "other-crn"),
-    crn = c("10001", "10001", "10001", "20002", "30003"),
-    term = c(202410L, 202410L, 202480L, 202410L, 202410L),
-    department = c("HIST", "ANTH", "HIST", "HIST", "HIST")
-  )
-  sections <- tibble::tibble(
-    crn = c("10001", "20002"),
-    term = c(202410L, 202410L)
-  )
+test_that("the Enrollment table attaches each section's class-list counts and leaves unregistered sections unknown", {
+  raw <- get_enrl(test_sections_course_history,
+                  list(status = "A", crosslist = "all", uel = FALSE, term = 202080L))
+  counted <- attach_enrollment_section_counts(raw, test_students_course_history,
+                                              test_sections_course_history)
+  rows <- counted$rows
+  expect_equal(counted$n_placeholders, 0L)
+  expect_equal(nrow(rows), 7L)
 
-  scoped <- filter_enrollment_classlist_scope(students, sections, "HIST")
-  expect_setequal(scoped$student_id, c("keep-1", "keep-2"))
+  full_term <- filter(rows, crn == "EC11-3")
+  expect_equal(c(full_term$seats, full_term$first_day_enrl, full_term$census_enrl,
+                 full_term$registered, full_term$dr_early, full_term$dr_late),
+               c(100, 107, 100, 80, 18, 20))
+  expect_equal(full_term$first_day_basis, "complete")
 
-  all_departments <- filter_enrollment_classlist_scope(students, sections)
-  expect_setequal(
-    all_departments$student_id,
-    c("keep-1", "other-dept", "keep-2")
-  )
+  unmatched <- filter(rows, crn %in% c("EC11B-NOMATCH", "EC11-21"))
+  expect_true(all(is.na(unmatched$census_enrl)))
+  expect_true(all(is.na(unmatched$first_day_enrl)))
+  expect_false(filter(rows, subject_course == "SOCI 103")$seats_known)
 
-  empty_sections <- sections[integer(0), , drop = FALSE]
-  expect_equal(nrow(filter_enrollment_classlist_scope(students, empty_sections)), 0L)
-  expect_error(
-    filter_enrollment_classlist_scope(
-      dplyr::select(students, -crn),
-      sections
-    ),
-    "requires crn and term"
-  )
+  # A section listed twice would attach its counts twice.
+  expect_error(attach_enrollment_section_counts(bind_rows(raw, raw[1, ]),
+                                                test_students_course_history,
+                                                test_sections_course_history),
+               "appears more than once")
+})
+
+test_that("a section with no seats and no students is not an offering", {
+  # The full-term SOCI 100 section stated as an empty placeholder.
+  schedule <- mutate(test_sections_course_history,
+                     enrolled = ifelse(crn == "EC11-3", 0L, enrolled),
+                     available = ifelse(crn == "EC11-3", 0, available),
+                     total_enrl = ifelse(crn == "EC11-3", 0L, total_enrl))
+  raw <- get_enrl(schedule, list(status = "A", crosslist = "all", uel = FALSE, term = 202080L))
+  counted <- attach_enrollment_section_counts(raw, test_students_course_history, schedule)
+  expect_equal(counted$n_placeholders, 1L)
+  expect_false("EC11-3" %in% counted$rows$crn)
+})
+
+test_that("a grouped Enrollment row sums its sections and knows its first day only when every section's is known", {
+  raw <- get_enrl(test_sections_course_history,
+                  list(status = "A", crosslist = "all", uel = FALSE, term = 202080L))
+  rows <- attach_enrollment_section_counts(raw, test_students_course_history,
+                                           test_sections_course_history)$rows
+  view <- summarize_enrollment_view(rows, list(
+    view = "home", group_cols = c("campus", "subject_course", "part_term", "term")
+  ))
+  expect_true(view$grouped)
+  expect_equal(view$n_before_filter, 6L)
+  expect_equal(view$n_no_registrations, 1L)
+
+  soci_101 <- filter(view$rows, subject_course == "SOCI 101")
+  expect_equal(c(soci_101$sections, soci_101$sections_matched, soci_101$seats,
+                 soci_101$census_enrl), c(2, 1, 200, 10))
+  expect_true(is.na(soci_101$first_day_enrl))
+  expect_equal(soci_101$enrolled, 20)
+
+  soci_104 <- filter(view$rows, subject_course == "SOCI 104")
+  expect_equal(soci_104$sections_matched, 0L)
+  expect_true(is.na(soci_104$census_enrl))
+  expect_true(is.na(soci_104$avg_census))
+
+  # The two campuses and the two parts of term stay separate rows.
+  soci_100 <- filter(view$rows, subject_course == "SOCI 100") %>% arrange(campus, part_term)
+  expect_equal(soci_100$census_enrl, c(100, 30, 60))
+})
+
+test_that("Enrollment first-day fill is judged against seats and withheld where seats cannot be read", {
+  raw <- get_enrl(test_sections_course_history,
+                  list(status = "A", crosslist = "all", uel = FALSE, term = c(202010L, 202080L)))
+  rows <- attach_enrollment_section_counts(raw, test_students_course_history,
+                                           test_sections_course_history)$rows
+  group_cols <- c("campus", "subject_course", "part_term", "term")
+  view <- summarize_enrollment_view(rows, list(view = "home", group_cols = group_cols))$rows
+
+  fall <- filter(view, term == 202080L)
+  full_term <- filter(fall, campus == "ABQ", subject_course == "SOCI 100", part_term == "1")
+  expect_equal(full_term$first_day_fill, 1.07)
+  expect_equal(full_term$fill_status, "full")
+  ea <- filter(fall, campus == "EA")
+  expect_equal(ea$first_day_fill, 0.58)
+  expect_true(is.na(ea$fill_status))
+  # Seats unknown, and a first day of 198 in 100 seats (implausible capacity).
+  expect_true(is.na(filter(fall, subject_course == "SOCI 103")$first_day_fill))
+  expect_true(is.na(filter(view, term == 202010L, subject_course == "SOCI 100")$first_day_fill))
+
+  # The full-term section with 110 seats: 107 of 110 is near full, not full.
+  near <- summarize_enrollment_view(
+    mutate(rows, seats = ifelse(crn == "EC11-3", 110, seats)),
+    list(view = "home", group_cols = group_cols)
+  )$rows %>% filter(subject_course == "SOCI 100", campus == "ABQ",
+                    part_term == "1", term == 202080L)
+  expect_equal(near$fill_status, "near full")
+
+  # A crosslisted section shares its seats with the partner listing: no fill.
+  shared <- summarize_enrollment_view(
+    mutate(rows, crosslisted = crn == "EC11-3"),
+    list(view = "all", group_cols = group_cols)
+  )$rows %>% filter(subject_course == "SOCI 100", campus == "ABQ", part_term == "1",
+                    term == 202080L)
+  expect_true(is.na(shared$first_day_fill))
+})
+
+test_that("Enrollment Min/Max reads census and keeps the rows it cannot judge", {
+  raw <- get_enrl(test_sections_course_history,
+                  list(status = "A", crosslist = "all", uel = FALSE, term = 202080L))
+  rows <- attach_enrollment_section_counts(raw, test_students_course_history,
+                                           test_sections_course_history)$rows
+  group_cols <- c("campus", "subject_course", "part_term", "term")
+  at_least_50 <- summarize_enrollment_view(rows, list(view = "home", group_cols = group_cols,
+                                                      enrl_min = 50))
+  expect_equal(nrow(at_least_50$rows), 4L)
+  expect_setequal(paste(at_least_50$rows$campus, at_least_50$rows$subject_course),
+                  c("ABQ SOCI 100", "ABQ SOCI 103", "ABQ SOCI 104", "EA SOCI 100"))
+  expect_equal(at_least_50$n_no_registrations, 1L)
+  expect_equal(at_least_50$n_before_filter, 6L)
+
+  # Census, not the DESR count: SOCI 101's DESR count is 20, its census 10.
+  at_most_15 <- summarize_enrollment_view(rows, list(view = "home", group_cols = group_cols,
+                                                     enrl_max = 15))
+  expect_setequal(at_most_15$rows$subject_course, c("SOCI 101", "SOCI 104"))
+  expect_equal(nrow(summarize_enrollment_view(rows, list(view = "home", group_cols = group_cols,
+                                                         enrl_min = NA))$rows), 6L)
+})
+
+test_that("the Enrollment table's display keeps one column order for each grain", {
+  raw <- get_enrl(test_sections_course_history,
+                  list(status = "A", crosslist = "all", uel = FALSE, term = 202080L))
+  rows <- attach_enrollment_section_counts(raw, test_students_course_history,
+                                           test_sections_course_history)$rows
+  grouped <- enrollment_table_display(summarize_enrollment_view(rows, list(
+    view = "home", group_cols = c("campus", "subject_course", "term")
+  )))
+  expect_named(grouped, c("campus", "subject_course", "term", "sections", "sections_matched",
+                          "xl_sections", "seats", "first_day_enrl", "first_day_fill",
+                          "fill_status", "census_enrl", "avg_census", "registered",
+                          "dr_early", "dr_late", "enrolled", "total_enrl"))
+  expect_equal(filter(grouped, campus == "ABQ", subject_course == "SOCI 100")$first_day_fill,
+               67.5)
+
+  by_section <- enrollment_table_display(summarize_enrollment_view(rows, list(view = "home")))
+  expect_equal(names(by_section)[1:5], c("campus", "college", "term", "term_type", "listed_code"))
+  expect_false(any(c("sections", "xl_sections", "avg_census") %in% names(by_section)))
+  expect_true(all(c("partners", "first_day_fill", "census_enrl", "enrolled") %in% names(by_section)))
 })
 
 test_that("Enrollment term filter opens on the shared configured default term", {

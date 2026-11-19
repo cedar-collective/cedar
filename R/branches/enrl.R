@@ -37,8 +37,16 @@
 #' calc_cl_enrls(students_df)
 #' # Summarize only registered and dropped students:
 #' calc_cl_enrls(students_df, reg_status = c("RE", "DR"))
+#' # One row per section, for a table whose rows are the schedule's sections:
+#' calc_cl_enrls(students_df, by_section = TRUE)
+#'
+#' @param by_part_term Keep each part of term as its own row.
+#' @param by_section Keep each section (`crn`) as its own row. A class-list row
+#'   sits in exactly one section, so the section rows of a course add up to its
+#'   course row.
 
-calc_cl_enrls <- function(filtered_students, reg_status = NULL, by_part_term = FALSE) {
+calc_cl_enrls <- function(filtered_students, reg_status = NULL, by_part_term = FALSE,
+                          by_section = FALSE) {
 
   # filtered_students <- load_students()
   #opt <- list()
@@ -56,7 +64,11 @@ calc_cl_enrls <- function(filtered_students, reg_status = NULL, by_part_term = F
   if (isTRUE(by_part_term) && !"part_term" %in% names(filtered_students)) {
     stop("[enrl.R] calc_cl_enrls(by_part_term = TRUE) requires a part_term column in filtered_students")
   }
-  pt_grp <- if (isTRUE(by_part_term)) "part_term" else character(0)
+  if (isTRUE(by_section) && !"crn" %in% names(filtered_students)) {
+    stop("[enrl.R] calc_cl_enrls(by_section = TRUE) requires a crn column in filtered_students")
+  }
+  pt_grp <- c(if (isTRUE(by_part_term)) "part_term", if (isTRUE(by_section)) "crn")
+  if (is.null(pt_grp)) pt_grp <- character(0)
 
   reg_stats_summary <- tibble()
 
@@ -274,6 +286,8 @@ class_list_status_date_coverage <- function(students) {
 #'   `campus`, `college`, `term`, `subject_course` grouping columns.
 #' @param sections Section rows supplying each `(term, crn)`'s `start_date`.
 #' @param by_part_term Retain each session as its own enrollment count.
+#' @param by_section Retain each section (`crn`) as its own count, for a table
+#'   whose rows are the schedule's sections.
 #' @param pool_campuses Count each student once per term and course across
 #'   every campus and college in `students`, for a named planning market whose
 #'   rows the caller has already restricted to its declared campuses.
@@ -281,7 +295,7 @@ class_list_status_date_coverage <- function(students) {
 #'   `first_day_basis` and `first_day_started_enrl` (per term and course when
 #'   `pool_campuses`).
 calc_first_day_enrl <- function(students, sections, by_part_term = FALSE,
-                                pool_campuses = FALSE) {
+                                pool_campuses = FALSE, by_section = FALSE) {
   # CAMPUS_ROLLUP: pool_campuses serves enrollment projections' named market,
   # which prefilters to its campuses and counts each student-course once.
   group_cols <- if (pool_campuses) {
@@ -290,6 +304,7 @@ calc_first_day_enrl <- function(students, sections, by_part_term = FALSE,
     c("campus", "college", "term", "subject_course")
   }
   if (by_part_term) group_cols <- c(group_cols, "part_term")
+  if (by_section) group_cols <- c(group_cols, "crn")
   missing <- setdiff(
     c(group_cols, "student_id", "crn", "registration_status_code",
       "registration_date", "as_of_date"),
@@ -893,16 +908,6 @@ filter_enrollment_crosslist_view <- function(data, view = "home") {
 
   data[!is.na(keep) & keep, , drop = FALSE]
 }
-
-
-strip_enrollment_crosslist_metadata <- function(data) {
-  if (is.null(data)) return(data)
-  data %>% select(-any_of(c(
-    "crosslist_role", "crosslist_external", "crosslist_primary", "is_split",
-    "XlistRole", "XlistExternal", "XlistPrimary", "IsSplit"
-  )))
-}
-
 
 
 #' Get Enrollment Summary and Plots for Dept Trends
