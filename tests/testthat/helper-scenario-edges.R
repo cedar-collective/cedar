@@ -67,3 +67,6 @@ seatfinder_test_edges <- list(
   last_graded = 202580L, last_enrolled = 202680L,
   last_enrolled_complete = 202580L
 )
+
+# PD01 (test-course-pair-dfw.R): three falls, all graded.
+pd01_edges <- list(last_enrolled = 202280L, last_enrolled_complete = 202280L, last_graded = 202280L)

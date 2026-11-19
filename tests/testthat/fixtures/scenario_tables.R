@@ -451,6 +451,58 @@ multi_campus_demo <- local({
   )
 })
 
+# ── test-course-pair-dfw.R ──────────────────────────────────────────────────────
+
+# PD01: CHEM 121 on ABQ in three falls (202080, 202180, 202280), the same
+# fourteen seats each fall (student ids carry the term):
+#   low band (entering GPA 2.0), L1-L4: L1 and L2 also take ENGL 220; L1 and
+#     L3 DFW, so CHEM 121's DFW is 1 of 2 with ENGL 220 and 1 of 2 without.
+#   mid band (3.2), M1-M9: M1-M3 also take MATH 162 and M1, M2 DFW; of M4-M8,
+#     M4 DFWs. M9's timeline is not valid, so M9 is left out.
+#   F1, a first-term student (no entering GPA), takes MATH 162 too and DFWs.
+# Every seat also takes the lab, CHEM 121L, one family with CHEM 121.
+# Per fall, MATH 162: 2 of 3 DFW against 3 x 1/5 = 0.6 expected.
+pd01 <- local({
+  falls <- c(202080L, 202180L, 202280L)
+  seats <- tibble::tribble(
+    ~seat, ~gpa, ~valid, ~dfw,  ~others,
+    "L1",  2.0,  TRUE,   TRUE,  "ENGL 220",
+    "L2",  2.0,  TRUE,   FALSE, "ENGL 220",
+    "L3",  2.0,  TRUE,   TRUE,  NA,
+    "L4",  2.0,  TRUE,   FALSE, NA,
+    "M1",  3.2,  TRUE,   TRUE,  "MATH 162",
+    "M2",  3.2,  TRUE,   TRUE,  "MATH 162",
+    "M3",  3.2,  TRUE,   FALSE, "MATH 162",
+    "M4",  3.2,  TRUE,   TRUE,  NA,
+    "M5",  3.2,  TRUE,   FALSE, NA,
+    "M6",  3.2,  TRUE,   FALSE, NA,
+    "M7",  3.2,  TRUE,   FALSE, NA,
+    "M8",  3.2,  TRUE,   FALSE, NA,
+    "M9",  3.2,  FALSE,  FALSE, NA,
+    "F1",  NA,   TRUE,   TRUE,  "MATH 162"
+  )
+  rows <- tidyr::crossing(term = falls, seats) %>%
+    dplyr::mutate(student_id = paste0("PD01-", seat, "-", term))
+  attempt <- function(r, course, outcome) tibble::tibble(
+    student_id = r$student_id, term = r$term, campus = "ABQ", subject_course = course, outcome = outcome)
+  attempts <- dplyr::bind_rows(
+    attempt(rows, "CHEM 121", ifelse(rows$dfw, "dfw", "pass")),
+    attempt(rows, "CHEM 121L", "pass"),
+    attempt(dplyr::filter(rows, !is.na(others)), dplyr::filter(rows, !is.na(others))$others, "pass")
+  )
+  # 30 earlier graded hours at the seat's GPA, then 12 this term; a first-term
+  # student has only this term's.
+  prior_hours <- ifelse(is.na(rows$gpa), 0, 30)
+  student_terms <- tibble::tibble(
+    student_id = rows$student_id, term = rows$term,
+    quality_points = 36, graded_hours = 12,
+    cumulative_quality_points = 36 + prior_hours * dplyr::coalesce(rows$gpa, 0),
+    cumulative_graded_hours = 12 + prior_hours,
+    timeline_valid = rows$valid
+  )
+  list(attempts = attempts, student_terms = student_terms)
+})
+
 # ── test-course-planning-history.R ──────────────────────────────────────────────
 
 course_history_terms <- course_terms_for(test_students_course_history, test_sections_course_history)

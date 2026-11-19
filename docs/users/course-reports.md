@@ -129,6 +129,31 @@ other majors**.
 - Waitlists, drops and courses on another campus are not counted. On a campus
   whose students take their other courses elsewhere, a card can list nothing.
 
+### Harder Together
+{: #harder-together}
+
+Which courses taken the same term go with failing this one more often. For
+each course taken alongside it, the section sets this course's DFW rate among
+the students who took both against the rate expected from this course's
+students of the same term and entering GPA who did not take the other one.
+The comparison is within GPA bands, so a course that strong or struggling
+students take does not look harder or easier for that reason alone.
+
+- Only **continuing students** are read: a student needs a GPA from earlier
+  terms. First-term students have none, and courses placed by test scores
+  would top the list for who takes them rather than for the pairing.
+- It reads every graded term of the chosen term type, not only the last
+  three, because a pattern has to repeat: a course is listed as a
+  **candidate** only when the gap is beyond chance, holds in at least three
+  terms, and holds in most of the terms it can be read in. A course needs 30
+  students taking both to be read at all.
+- The course's own lab and the other half of a stretch course are left out.
+- A candidate says the two go together, not that one causes the other. A heavy
+  term, a program's sequence or a schedule can produce the same pattern. The
+  **All students** bars mark each candidate "harder together".
+- **Every course read** lists all the pairs, largest gap first, including the
+  ones that are not candidates.
+
 ### Before and After
 
 The flow diagrams show the most frequent ordered pairs —
