@@ -355,12 +355,12 @@ plot_dfw_slopes <- function(slopes) {
       hovertext = paste0(rows$label, "<br>", sprintf("%.1f%%", rows$first_pct), " (",
                          vapply(rows$first_term, fmt_term, character(1)), ") to ",
                          sprintf("%.1f%%", rows$last_pct), " (", vapply(rows$last_term, fmt_term, character(1)),
-                         ")<br>", sprintf("%+.1f", rows$slope), " points a year"),
+                         ")<br>", sprintf("%+.1f", rows$slope), " percentage points a year along its trend"),
       hoverinfo = "text"
     )
   }
   plotly::layout(p, barmode = "overlay",
-                 xaxis = list(title = "Change in DFW rate, points a year", zeroline = TRUE),
+                 xaxis = list(title = "Change in DFW rate per year (percentage points)", zeroline = TRUE),
                  yaxis = list(title = "", categoryorder = "array", categoryarray = rev(slopes$label)),
                  legend = .dfw_plot_legend, margin = list(l = 140))
 }

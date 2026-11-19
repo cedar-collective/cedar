@@ -62,8 +62,10 @@ get_dfw_section_spread <- function(attempts, opt = list()) {
       chisq = if (dplyr::first(.p) %in% c(0, 1)) 0 else
         sum((n_dfw - n_attempts * .p)^2 / (n_attempts * .p * (1 - .p))),
       n_sections = dplyr::n(),
-      lo_pct = min(dfw_pct),
-      hi_pct = max(dfw_pct),
+      # A scope with no course-term of enough sections summarizes no group;
+      # dplyr still evaluates once on the empty frame.
+      lo_pct = if (dplyr::n() > 0L) min(dfw_pct) else NA_real_,
+      hi_pct = if (dplyr::n() > 0L) max(dfw_pct) else NA_real_,
       n_attempts = sum(n_attempts),
       n_dfw = sum(n_dfw),
       .groups = "drop"

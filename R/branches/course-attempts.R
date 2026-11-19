@@ -76,7 +76,17 @@ course_attempt_term_window <- function(opt, graded_edge = NULL) {
     stop("[course-attempts.R] opt$min_term must be one term code or NULL.",
          call. = FALSE)
   }
-  list(start = if (is.null(start)) NULL else as.integer(start), end = end)
+  last <- opt$max_term
+  if (!is.null(last) && (length(last) != 1L || is.na(last))) {
+    stop("[course-attempts.R] opt$max_term must be one term code or NULL.",
+         call. = FALSE)
+  }
+  if (!is.null(start) && !is.null(last) && as.integer(start) > as.integer(last)) {
+    stop("[course-attempts.R] opt$min_term (", start, ") is after opt$max_term (", last, ").",
+         call. = FALSE)
+  }
+  list(start = if (is.null(start)) NULL else as.integer(start), end = end,
+       last = if (is.null(last)) NULL else as.integer(last))
 }
 
 
@@ -87,7 +97,8 @@ course_attempt_term_window <- function(opt, graded_edge = NULL) {
 #' @param opt The standard filter options (filter_attempts(): `course`, `crn`,
 #'   `term`, `course_campus`, `course_college`, `dept_code`, `subj`, `inst`,
 #'   `level`, `pt`, `uel`), plus `population_ids` (or `cohort_ids`) to keep
-#'   those students' attempts, `min_term` for a left edge, and optionally
+#'   those students' attempts, `min_term` for a left edge, `max_term` for a
+#'   last term the caller chose (never past the graded edge), and optionally
 #'   `data_edges`, which must agree with the edge the table was built to.
 #' @return The rows in scope, with the table's columns; zero rows when nothing
 #'   matches.
@@ -109,6 +120,9 @@ prepare_course_attempts <- function(attempts, opt = list()) {
   # not this table's.
   if (any(as.integer(scoped$term) > window$end)) {
     stop("[course-attempts.R] cedar_attempts holds a term after its graded edge ", window$end)
+  }
+  if (!is.null(window$last)) {
+    scoped <- scoped %>% dplyr::filter(term <= window$last)
   }
   cedar_debug("[course-attempts.R] ", nrow(scoped), " of ", nrow(attempts),
               " attempts in scope, graded through ", window$end)

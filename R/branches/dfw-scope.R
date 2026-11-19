@@ -22,8 +22,10 @@ DFW_TERM_TYPES <- c("fall", "spring", "summer")
 #'
 #' @param attempts The attempt measure table (`cedar_attempts`).
 #' @param opt `term_type` (required: "fall", "spring" or "summer"), `level`
-#'   (default "lower"), `campus` (the teaching campus; NULL for every campus),
-#'   `data_edges` (optional; must agree with the table's graded edge).
+#'   (default "lower"), `campus` (teaching campus codes; NULL for every
+#'   campus), `from_term` and `to_term` (the first and last terms read; NULL
+#'   for the whole history to the graded edge), `data_edges` (optional; must
+#'   agree with the table's graded edge).
 #' @return The denominator attempts of that term type (graded or late
 #'   withdrawn), with attempt_outcome_flags()' columns; attribute
 #'   `graded_edge`.
@@ -36,7 +38,8 @@ prepare_dfw_attempts <- function(attempts, opt = list()) {
   }
   level <- opt$level %||% "lower"
   scoped <- prepare_course_attempts(attempts, list(
-    level = level, course_campus = opt$campus, data_edges = opt$data_edges))
+    level = level, course_campus = opt$campus, data_edges = opt$data_edges,
+    min_term = opt$from_term, max_term = opt$to_term))
   rows <- scoped %>%
     dplyr::filter(get_term_type(term) == .env$term_type) %>%
     attempt_outcome_flags() %>%

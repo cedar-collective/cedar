@@ -49,7 +49,7 @@ CEDAR_SHARE_SPECS <- list(
   ),
   "DFW Rates" = list(
     slug = "dfw-rates", prefix = "dfw_rates-dr", sep = "_", run = NULL,
-    fields = c("term_type", "campus")
+    fields = c("term_type", "campus", "from_term", "to_term")
   ),
   "Cancellations" = list(
     slug = "cancellations", prefix = "cancellations-cn", sep = "_", run = "button",

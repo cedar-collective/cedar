@@ -25,9 +25,10 @@ The page builds as soon as it opens; there is no run button.
 | Control | What it changes |
 |---|---|
 | **Term type** | Fall, spring or summer. One at a time: a fall's students are not a spring's, so mixing them blurs every trend. |
-| **Campus** | Every campus, or the one campus that taught the courses. |
+| **Campus** | The campuses that taught the courses. ABQ and EA to start; clear it to read every campus. The By Campus table always sets every campus side by side. |
+| **From term** / **To term** | The first and last terms read, earliest and latest graded by default. A trend and the course window read only the terms in this range. |
 
-The link button copies a shareable URL for the current term type and campus.
+The link button copies a shareable URL for the current term type, campuses and terms.
 
 ---
 
@@ -36,10 +37,10 @@ The link button copies a shareable URL for the current term type and campus.
 | Section | What it shows |
 |---|---|
 | **How UNM Is Doing** | The latest term's rate with its counts, the trend in points a year with its verdict (rising, falling or steady), and every term's rate as a bar split into what the DFW grades were: withdrawals, F, D or C-, and other nonpassing grades. |
-| **Where the DFW Grades Are** | How few courses hold a quarter and half of the last three terms' DFW grades, the fifteen courses with the most, coloured by their trend, and every listed course in a table with its share, running share and trend. |
-| **What Is Changing** | How many listed courses are rising, falling or swinging; the ten rising and ten falling courses with the most DFW grades, by points a year; and the courses that swing from term to term more than courses usually do. |
+| **Where the DFW Grades Are** | How few courses hold a quarter and half of the last three terms' DFW grades, the fifteen courses with the most, coloured by their trend, and every listed course in a table with its share, running share and its rates as a small line (hover for the trend). |
+| **What Is Changing** | How many listed courses are rising, falling or swinging; the ten rising and ten falling courses with the most DFW grades, each bar the change in its rate a year along its trend (+2 means a 20% rate becomes 22% a year later); and the courses that swing from term to term more than courses usually do. |
 | **Sections That Disagree** | How many course-terms had sections whose rates differed by more than chance, and, for the courses uneven in two or more terms, every section of their uneven terms against the course's rate that term. |
-| **By Campus and College** | Each campus and college's first and last rate, its terms as a small line, and its trend. |
+| **By Campus and College** | Each campus and college's first and last rate and its terms as a small line (hover for the trend). The campus table reads every campus; the college table reads the campuses picked. |
 
 Each section's **How this is counted** gives its thresholds and the edge it reads to.
 
