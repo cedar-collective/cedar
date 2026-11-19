@@ -36,7 +36,8 @@ alongside other work (M14, M16).
 
 | ID | Kind | Summary |
 |---|---|---|
-| [I65](#i65--the-degree-explorer-browser-suite-checks-the-hand-built-boards-the-compiled-drafts-replaced) | Defect | `tests/e2e/degree-explorer.test.mjs` has failed since the compiled drafts replaced the CS, Business, History and Philosophy boards (#309, 2026-11-16): it hovers hand-board tiles (`java1`, `java2`, `os`, `historiography`, `philbuddhist`, `buscapstone`, …) the page no longer draws, and stops at the first |
+| [I68](#i68--the-compiled-computer-science-board-plans-composition-i-twice) | Defect | The compiled CS board plans Composition I twice: the English route's ENGL 1110 (`engl1`) and the reading's "Composition I: ENGL1110Y, ENGL1110Z or ENGL1110" choice (`composition_one_1`), 3 credits too many |
+| [I67](#i67--a-compiled-business-board-plans-its-writing-choice-before-composition-ii) | Defect | With stretch English, the compiled Business board plans "3 credits: ENGL2120 or ENGL2210" (`writing_1`) in semester 2, before Composition II in semester 3, though both options require it: a compiled choice tile carries no prerequisite its options share |
 | [I61](#i61--summer-2025-holds-nr-grades-where-summer-2024-held-none-and-reads-as-a-dfw-spike) | Defect | Summer 2025 holds 1,479 NR grades in 336 sections (Summer 2024: none), so it reads 22.5% DFW against about 13% for other summers; suspected an early pull before grades rolled |
 | [I55](#i55--the-instructor-gate-password-stopped-reaching-the-app) | Defect | The instructor-gate password stopped reaching the app: since 2026-09-05 `.Renviron` is kept out of the image and nothing else passed `CEDAR_DFW_PASSWORD`, so every instructor gate on production reads "not configured" (fixed in code 2026-11-12; production needs the password in its `.env`) |
 | [I46](#i46--a-deploy-that-must-rebuild-a-table-the-app-cannot-start-without-takes-the-site-down) | Defect | The deploy's table gate ran after the health check, so a deploy that added a column to `cedar_student_terms` failed its health check on the missing column and never reached the gate: production served the restart page from 17:07 UTC on 2026-11-04 (gate moved before the first request) |
@@ -59,6 +60,7 @@ Kept until the next release, so a recurrence is recognisable; each entry below g
 
 | ID | Kind | Summary |
 |---|---|---|
+| [I65](#i65--the-degree-explorer-browser-suite-checks-the-hand-built-boards-the-compiled-drafts-replaced) | Defect | `tests/e2e/degree-explorer.test.mjs` has failed since the compiled drafts replaced the CS, Business, History and Philosophy boards (#309, 2026-11-16): it hovers hand-board tiles (`java1`, `java2`, `os`, `historiography`, `philbuddhist`, `buscapstone`, …) the page no longer draws, and stops at the first. The suite now names the compiled tiles and asserts I64 on Philosophy (resolved 2026-11-19) |
 | [I64](#i64--a-compiled-degree-board-plans-400-level-electives-in-the-first-semester) | Defect | The compiled Philosophy board plans its two "6 elective credits at the 400–499 level" tiles, and the four "two at the 400 level" elective tiles, in semester 1: a compiled elective slot was upper only when every course its group requires is upper. Readings can now state a pool's lowest course number (`minimum_course_number`, schema 1.1.0), and 400-level work is planned from a new `senior_level_from_semester` (6); Philosophy's tiles start in semester 6 (resolved 2026-11-18) |
 | [I63](#i63--the-online-psychology-pre-major-leads-to-the-campus-major-not-the-online-one) | Defect | `programs.csv` said the online Psychology pre-major XFPY leads to PSY, though 360 of its students declared XPSY (57 PSY): a PSY population counted them as "chose elsewhere". XFPY now leads to XPSY, a separate program (resolved 2026-11-16) |
 | [I62](#i62--a-pathways-population-counted-every-program-that-shared-a-name) | Defect | A Pathways population matched programs by Banner name: department BIOL took in 1,873 Biochemistry students (BIOC and FBIC, another unit) because CHBI is named "Biochemistry", "Architecture" merged ARCH and ARCT, and "Liberal Arts" missed its renamed code LAIS (7 ongoing students instead of 411). Populations now match codes, follow confirmed renames in `code_history.csv`, and keep same-named programs apart (resolved 2026-11-16) |
@@ -98,9 +100,50 @@ Kept until the next release, so a recurrence is recognisable; each entry below g
 
 # Defects
 
-## I65 — The Degree Explorer browser suite checks the hand-built boards the compiled drafts replaced
+## I68 — The compiled Computer Science board plans Composition I twice
 
 **Status:** open.
+**Found:** 2026-11-19, rewriting the Degree Explorer browser suite (I65).
+**Severity:** moderate, Degree Explorer only: the CS plan carries 3 credits of
+Composition I it does not need, and a student reading it sees two first-year
+composition courses.
+**Cause:** every board gets the English route's tiles (`engl1` ENGL 1110,
+`engl2` ENGL 1120) from the student's starting point; the compiled CS reading
+also lists Composition I as a program requirement, "Composition I: ENGL1110Y,
+ENGL1110Z or ENGL1110", which `assemble_compiled_degree_board()` places as its
+own choice tile (`composition_one_1`, semester 2). Nothing recognises that the
+route already holds it.
+**Reproduction:** Degree Explorer, Computer Science B.S., any starting point:
+`engl1` in semester 1 and `composition_one_1` in semester 2
+(`institution/unm/degree_drafts/degree_roadmap_nodes.csv`, `cs-bs-2026`).
+**Fix:** a compiled choice whose options are all English-route courses is the
+route's tile, not another one.
+
+## I67 — A compiled Business board plans its writing choice before Composition II
+
+**Status:** open.
+**Found:** 2026-11-19, rewriting the Degree Explorer browser suite (I65); the
+hand board it replaced held this course after Composition II.
+**Severity:** moderate, Degree Explorer only: with stretch English (ENGL
+1110X, 1110Y, then 1120 in semester 3) the plan puts ENGL 2120 or 2210 in
+semester 2, a term before its prerequisite.
+**Cause:** the compiled tile `writing_1` ("3 credits: ENGL2120 or ENGL2210")
+is a choice; the compiler links a named course to its prerequisites but gives
+a choice none, even when every option has the same one (ENGL 1120). No
+`degree_roadmap_links.csv` row reaches `writing_1`.
+**Reproduction:** `?tab=degree-explorer&catalog_id=business-bba-2026&math_start=algebra&english_start=stretch`:
+`engl2` in semester 3, `writing_1` in semester 2.
+**Fix:** link a choice tile to a prerequisite all its options share.
+
+## I65 — The Degree Explorer browser suite checks the hand-built boards the compiled drafts replaced
+
+**Status:** resolved 2026-11-19. The suite names the compiled tiles (`cs_361l`,
+`csci_2310`, `science_1`, `cs_481`, `hist_491`, `upper_electives_*`, `asian_1`,
+`knowledge_1`, `logic_1`, `busa_4988`, `communication_elective_1`) and the
+compiled boards' wording, and asserts I64: Philosophy's two 400-level
+electives start in semester 6 or later. Running it found the compiled
+boards' draft badge widening the page at phone width (fixed in
+`www/cedar-roadmap.css`), I67 and I68.
 **Found:** 2026-11-18, running the suite for I64.
 **Severity:** moderate, tests only: the page is not broken, but its browser
 suite has guarded nothing past its first three checks since 2026-11-16.
