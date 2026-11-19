@@ -580,6 +580,27 @@ test_that("a grouped Enrollment row sums its sections and knows its first day on
   expect_equal(soci_100$census_enrl, c(100, 30, 60))
 })
 
+test_that("a row grouped by course names its title, and says when its sections had several", {
+  raw <- get_enrl(test_sections, list(status = "A", crosslist = "all", uel = FALSE, term = 202010L))
+  rows <- attach_enrollment_section_counts(raw, test_students, test_sections)$rows
+  view <- summarize_enrollment_view(rows, list(view = "all", group_cols = c("term", "subject_course")))
+  shown <- enrollment_table_display(view)
+  # The title follows the course.
+  expect_equal(match("course_title", names(shown)), match("subject_course", names(shown)) + 1L)
+  expect_equal(filter(shown, subject_course == "HIST 327")$course_title, "Modern European History")
+  # HIST 490's two sections carry two titles (a topics course): one is shown,
+  # with the other counted.
+  hist_490 <- filter(view$rows, subject_course == "HIST 490")
+  expect_equal(c(hist_490$sections, hist_490$n_titles), c(2, 2))
+  expect_equal(filter(shown, subject_course == "HIST 490")$course_title,
+               "Historical Research Methods (+1 more)")
+  # Grouped by title itself, or not by course, a row adds no title of its own.
+  by_title <- summarize_enrollment_view(rows, list(view = "all", group_cols = c("subject_course", "course_title")))
+  expect_false("n_titles" %in% names(by_title$rows))
+  by_dept <- enrollment_table_display(summarize_enrollment_view(rows, list(view = "all", group_cols = "department")))
+  expect_false("course_title" %in% names(by_dept))
+})
+
 test_that("Enrollment first-day fill is judged against seats and withheld where seats cannot be read", {
   raw <- get_enrl(test_sections_course_history,
                   list(status = "A", crosslist = "all", uel = FALSE, term = c(202010L, 202080L)))
@@ -646,7 +667,7 @@ test_that("the Enrollment table's display keeps one column order for each grain"
   grouped <- enrollment_table_display(summarize_enrollment_view(rows, list(
     view = "home", group_cols = c("campus", "subject_course", "term")
   )))
-  expect_named(grouped, c("campus", "subject_course", "term", "sections", "sections_matched",
+  expect_named(grouped, c("campus", "subject_course", "course_title", "term", "sections", "sections_matched",
                           "xl_sections", "seats", "first_day_enrl", "first_day_fill",
                           "fill_status", "census_enrl", "avg_census", "registered",
                           "dr_early", "dr_late", "enrolled", "total_enrl"))

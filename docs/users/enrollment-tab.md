@@ -50,10 +50,10 @@ The selected crosslist view chooses section rows first. CEDAR then groups them b
 | **Census** | Students still registered plus late drops. For a term in progress it is the count so far; the bar above the table names any term in progress. |
 | **Final** | Students still registered when the class list was pulled: final for a finished term, current for one in progress. |
 | **Early Drops / Late Drops** | Drops before and after the early-drop deadline. Early drops are never DFW. |
-| **DESR Enrl** | The schedule's own count when the DESR file was pulled: near peak for the current term, after drops for past terms. It is not compared with census. |
-| **XL DESR Enrl** | For a section, its crosslist group's combined DESR enrollment; for a grouped row, each group's combined total counted once. |
 
-A grouped row also shows **Sections**, **With Registrations** (sections with at least one class-list row), **XL Sections**, and **Avg Census per Section**. The student counts are summed over the row's sections. Each student is listed under one section of a course, so the sum counts each student once per course, and a sum across courses counts enrollments, not unique students.
+A row grouped by course shows its **Title**: its sections' most common title, with "(+N more)" when they had several (a topics course, or a course retitled across the terms a row spans). A grouped row also shows **Sections**, noting how many are on the class list when not all are, **XL Sections**, and **Avg Census per Section**.
+
+The download adds three columns the table leaves out: **With Registrations** (sections with at least one class-list row), **DESR Enrl** (the schedule's own count when the DESR file was pulled: near peak for the current term, after drops for past terms; for a settled term it matches Final for nearly every course, and it is not compared with census) and **XL DESR Enrl** (a crosslist group's combined DESR enrollment, counted once). The student counts are summed over the row's sections. Each student is listed under one section of a course, so the sum counts each student once per course, and a sum across courses counts enrollments, not unique students.
 
 Sections with neither seats nor students are schedule placeholders and are left out; the bar says how many. Waitlist demand is on the [Waitlists report](waitlists), which removes students already registered in the same course group.
 
