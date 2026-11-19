@@ -21,7 +21,7 @@
 .cedar-roadmap-prototype { margin-left:auto; border:1px solid var(--roadmap-rule); border-radius:20px; padding:.15rem .6rem; white-space:nowrap; }
 
 /* Hover preview */
-.cedar-roadmap-hover { position:absolute; z-index:10; width:min(340px,calc(100vw - 24px)); max-height:calc(100vh - 24px); overflow:auto; padding:12px 14px; border:1px solid var(--cedar-green-light); border-radius:var(--radius-md); background:#fff; box-shadow:0 5px 20px var(--roadmap-shadow); color:var(--charcoal-soil); font-size:12px; line-height:1.45; }
+.cedar-roadmap-hover { position:absolute; z-index:10; width:min(340px,calc(100vw - 24px)); max-height:calc(100vh - 24px); overflow:auto; padding:12px 14px; border:1px solid var(--cedar-green-light); border-radius:var(--radius-md); background:var(--surface-raised); box-shadow:0 5px 20px var(--roadmap-shadow); color:var(--charcoal-soil); font-size:12px; line-height:1.45; }
 .cedar-roadmap-hover[hidden] { display:none; }
 .cedar-roadmap-hover-title { display:block; font-size:13px; margin-bottom:8px; }
 .cedar-roadmap-hover p { margin:3px 0 9px; overflow-wrap:anywhere; }
@@ -76,9 +76,9 @@
 .cedar-roadmap-prereq-count { font-size:11px; font-weight:750; color:var(--tile-ink); margin-top:2px; }
 .cedar-roadmap-condition-badge { font-size:11px; color:var(--roadmap-conditional-ink); background:var(--roadmap-veil); border:1px solid var(--roadmap-conditional); border-radius:4px; padding:4px; line-height:1.35; }
 .cedar-roadmap-chain-badge { font-size:10px; padding:2px 3px; border-radius:3px; background:var(--roadmap-veil); line-height:1.3; }
-.cedar-roadmap-course[data-prerequisites="0"]:not([data-downstream="0"]) .cedar-roadmap-chain-badge { background:var(--alert-info-bg); color:var(--juniper-blue-dark); font-weight:700; }
+.cedar-roadmap-course[data-prerequisites="0"]:not([data-downstream="0"]) .cedar-roadmap-chain-badge { background:var(--alert-info-bg); color:var(--link-color); font-weight:700; }
 .cedar-roadmap-course-meta { font-size:10px; display:flex; flex-wrap:wrap; gap:5px; color:var(--text-muted); margin-top:auto; }
-.cedar-roadmap-moved { background:var(--alert-warning-bg); border-radius:3px; padding:0 3px; color:var(--amber-dark); }
+.cedar-roadmap-moved { background:var(--alert-warning-bg); border-radius:3px; padding:0 3px; color:var(--text-warning); }
 .cedar-roadmap-course.is-selected { outline:3px solid var(--roadmap-ink); outline-offset:2px; box-shadow:0 3px 8px var(--roadmap-shadow); }
 .cedar-roadmap-course.is-before { box-shadow:0 0 0 2px var(--roadmap-upstream); }
 .cedar-roadmap-course.is-after { box-shadow:0 0 0 1px var(--roadmap-downstream); }
@@ -138,3 +138,14 @@
 @media(min-width:1500px) { .cedar-roadmap-course-code,.cedar-roadmap-course-title { font-size:13px; } }
 @media(max-width:700px) { .cedar-roadmap-prototype { margin-left:0; white-space:normal; max-width:100%; } .cedar-roadmap-detail-actions { justify-content:flex-start; } }
 @media(prefers-reduced-motion:reduce) { .cedar-roadmap-course { transition:none; } }
+
+/* Dark mode: the inks read the page's text tokens; the veil darkens. */
+[data-bs-theme="dark"] .cedar-roadmap,
+[data-bs-theme="dark"] .cedar-roadmap-dialog {
+  --roadmap-ink: var(--text-heading);
+  --roadmap-yellow-ink: var(--text-warning);
+  --roadmap-red-ink: var(--text-critical);
+  --roadmap-conditional-ink: var(--cedar-plum-dark);
+  --roadmap-veil: rgba(0, 0, 0, .22);
+  --roadmap-shadow: rgba(0, 0, 0, .5);
+}

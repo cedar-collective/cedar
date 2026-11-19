@@ -387,6 +387,8 @@ ui <- page_navbar(
   id = "main_navbar",  # Add ID to enable tab switching
 
   tags$head(
+    # First, so the page paints in the reader's mode (light or dark).
+    tags$script(src = "cedar-theme.js"),
     tags$script(src = "cedar-navigation.js"),
     # Switch to the URL-requested tab immediately at DOM-ready, before the Shiny
     # WebSocket connects. This prevents the homepage from showing for 5-7 seconds
@@ -2151,6 +2153,15 @@ nav_panel(
     ),
     changelogUI("changelog")
   )
-) # end Admin nav_menu
+), # end Admin nav_menu
+
+  # Light and dark mode: www/cedar-theme.js remembers the choice per browser.
+  nav_spacer(),
+  nav_item(tags$button(
+    type = "button", class = "cedar-theme-toggle", `aria-label` = "Switch to dark mode",
+    title = "Switch to dark mode",
+    tags$span(class = "cedar-theme-light", icon("moon")),
+    tags$span(class = "cedar-theme-dark", icon("sun"))
+  ))
 
 ) # end ui

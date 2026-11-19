@@ -282,6 +282,40 @@ the scope. It is not where a page explains itself.
 - **`description` is not optional in spirit.** If a section genuinely needs no
   sentence, that is a signal the section may not need to exist.
 
+## Light and dark mode
+
+The navbar's toggle sets `html[data-bs-theme]` to `light` or `dark`
+(`www/cedar-theme.js`, loaded first in `<head>` so the page paints in its
+mode). Until the reader chooses, the mode follows the system setting and any
+change to it; a choice is kept in the browser's `localStorage`
+(`cedar-theme`) and wins over the system from then on.
+
+- **Colours are tokens.** `:root` in `www/cedar-custom.css` gives each its
+  light value; the `[data-bs-theme="dark"]` block at the end of the file gives
+  the dark one. Write a new colour as a token with both values, never as a hex
+  in a rule.
+- **Text roles are separate from the brand colours.** The evergreen is the
+  navbar's and section headers' background in both modes, but text that used
+  it lightens in the dark: text reads `--text-heading`, `--text-green`,
+  `--link-color`, `--text-warning` or `--text-critical`, never
+  `--cedar-green-dark` and the like. A light chip that sits on a dark band in
+  both modes (the home page's Core Values) keeps the brand colour.
+- **Tables** read `cedar_tbl_theme` (`R/modules/ui-helpers.R`), whose colours
+  are the `--table-*` tokens, so a rendered table follows the mode without
+  re-rendering.
+- **Plotly figures** carry their colours in their layout. `cedar-theme.js`
+  re-colours each figure when it draws and when the mode changes: a clear
+  background, `--chart-text`, `--chart-grid` and `--chart-line`, and an
+  annotation coloured dark for a white page gets the light text (one given a
+  deliberate light or brand colour keeps it). It keeps the figure's own
+  values the first time, so light mode restores exactly what the server drew.
+  Trace colours are not changed: pick palette colours that read on both.
+- Degree Explorer's board names its roles in `www/cedar-roadmap.css` and
+  overrides its inks for the dark on `.cedar-roadmap`.
+- `tests/e2e/theme.test.mjs` covers the toggle, the remembered choice, a
+  table and a figure in both modes. Colours still written into R code are
+  ISSUES M58.
+
 ## Module inventory
 
 | File | UI / server pairs | Mounted at |

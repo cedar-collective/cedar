@@ -690,22 +690,26 @@ dept_selector_bar <- function(title, subtitle, campus_input, dept_input,
 
 # Shared reactable theme — used by all cedar tables for consistent styling.
 cedar_tbl_theme <- reactable::reactableTheme(
-  color           = "#232826",
-  backgroundColor = "#ffffff",
-  borderColor     = "#d4c5b0",
-  stripedColor    = "#faf5ee",
-  highlightColor  = "#f0e8d8",
+  # Colours are CSS tokens (www/cedar-custom.css), so a table follows the
+  # page between light and dark mode without re-rendering.
+  color           = "var(--table-text)",
+  backgroundColor = "var(--table-bg)",
+  borderColor     = "var(--table-border)",
+  stripedColor    = "var(--table-stripe)",
+  highlightColor  = "var(--table-highlight)",
   cellPadding     = "5px 10px",
   style           = list(fontSize = "0.87rem"),
   headerStyle     = list(
-    background    = "#706858", # trunk-bark — matches --trunk-bark in cedar-custom.css
-    color         = "#f5eedf",
+    background    = "var(--table-header-bg)",
+    color         = "var(--table-header-text)",
     fontWeight    = "600",
     fontSize      = "0.73rem",
     textTransform = "uppercase",
     letterSpacing = "0.05em",
-    borderBottom  = "2px solid #8C8474" # matches --trunk-bark-border
+    borderBottom  = "2px solid var(--table-header-rule)"
   ),
+  inputStyle      = list(backgroundColor = "var(--input-bg)", color = "var(--table-text)"),
+  pageButtonStyle = list(color = "var(--table-text)"),
   paginationStyle = list(fontSize = "0.82rem")
 )
 
