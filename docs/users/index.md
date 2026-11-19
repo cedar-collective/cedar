@@ -43,10 +43,9 @@ Longer-term department report. Shows program headcount, enrollment history, entr
 
 ### Enrollment
 
-Section-level and student-level enrollment data with filters for campus, college, department, term, course, instructor, level, and part of term. Sub-tabs:
+Seats and enrollment for the sections you choose, with filters for campus, college, department, term, course, instructor, level, and part of term. Sub-tabs:
 
-- **DESR** — section-level data with crosslist views (home, split-level, crosslisted, away, all)
-- **Classlist** — student-level enrollment records
+- **Courses** — seats, first-day fill, census and final for each section or course, with crosslist views (home, split-level, crosslisted, away, all)
 - **Trend Signals** — level trends and growing/declining course signals for one department
 - **Low Enrollment** — sections below configurable thresholds; a schedule check against history for future terms
 - **Trends** — multi-year growing/declining course analysis using regression

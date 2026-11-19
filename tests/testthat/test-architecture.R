@@ -465,7 +465,7 @@ test_that("silent error fallbacks do not grow, and the backlog shrinks on record
     "R/modules/ui-helpers.R" = 1L,
     "R/modules/waitlist.R" = 1L,
     "R/trunk/logging.R" = 7L,
-    "server.R" = 8L
+    "server.R" = 5L
   )
   architecture_expect_ratchet(measured, allowance, "silent fallback(s)")
 })

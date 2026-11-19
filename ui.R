@@ -1401,7 +1401,7 @@ nav_panel(
 
   filter_bar(
       "Enrollment",
-      "Section schedules from DESR and distinct-student lifecycle counts from class lists, with campus-safe crosslist handling.",
+      "Seats and enrollment for the sections you choose, from the first day of classes to the end of the term.",
     fluidRow(
       column(2,
              selectizeInput(
@@ -1502,10 +1502,10 @@ nav_panel(
       #          choices = sort(unique(cedar_sections$gen_ed_area))),
       # ),
       column(1,
-        numericInput("enrl_min", "DESR Min", value = 1, min = 0, step = 1)
+        numericInput("enrl_min", "Census Min", value = 1, min = 0, step = 1)
       ),
       column(1,
-        numericInput("enrl_max", "DESR Max", value = NA, min = 0, step = 1)
+        numericInput("enrl_max", "Census Max", value = NA, min = 0, step = 1)
       ),
       column(1,
         tags$div(
@@ -1593,22 +1593,50 @@ nav_panel(
     navset_tab(
       id = "enrl_output_tabs",
 
-      # DESR section-level data with crosslist sub-navigation
+      # The schedule's sections with their class-list counts, one crosslist
+      # view at a time (attach_enrollment_section_counts(),
+      # summarize_enrollment_view()).
       nav_panel(
-        title = "DESR",
+        title = "Courses",
+        value = "courses",
         icon = icon("table"),
         subtab_header(
-          "DESR",
-          cedar_definition_summary("desr-enrollment"), " Group by controls the ",
-          "displayed row grain; when Course is grouped, Campus remains in the key. ",
-          "DESR Enrl sums the contributing rows' enrollment, while XL-aware Enrl ",
-          "counts each crosslist group's combined total once within a displayed row. ",
-          "DESR Min/Max is applied to DESR Enrl after grouping."
+          "Courses",
+          "Each course's seats and its students through the term: on the first day, at census, and at the end.",
+          method = tagList(
+            tags$p(
+              "Rows are the sections your filters choose, grouped by Group by (no grouping ",
+              "gives one row per section; grouping by course keeps campus in the key). The ",
+              "student counts come from the class list, section by section, so they follow ",
+              "every filter and add up to any grouping."
+            ),
+            tags$ul(
+              tags$li(tags$strong("First Day"), " is reconstructed from status dates; a row ",
+                      "whose sections are not all known has none."),
+              tags$li(tags$strong("Census"), " is students still registered plus late drops; ",
+                      tags$strong("Final"), " is students still registered. For a term in ",
+                      "progress both are the count so far."),
+              tags$li(tags$strong("First-Day Fill"), " is the first day over seats: near full ",
+                      "at ", paste0(round(100 * CEDAR_NEAR_FULL_FILL), "%"), ", full at ",
+                      paste0(round(100 * CEDAR_FULL_FILL), "%"), ". It is left blank where ",
+                      "seats are unknown, the fill is implausible (over 125%), or a section ",
+                      "is crosslisted, since crosslisted listings share their seats."),
+              tags$li(tags$strong("Census Min/Max"), " filters on census after grouping. A ",
+                      "row with no registrations has no census, so it is kept, marked, and ",
+                      "counted in the bar above."),
+              tags$li(tags$strong("DESR Enrl"), " is the schedule's own count when the file was ",
+                      "pulled, near the peak for a current term and after drops for a past one, ",
+                      "so it is not compared with census. The XL DESR columns count a ",
+                      "crosslist group's combined enrollment once."),
+              tags$li("Sections with neither seats nor students are placeholders and are left ",
+                      "out. Waitlist demand is on the Waitlists report.")
+            ),
+            lapply(c("first-day-enrollment", "census-enrollment", "registered",
+                     "seat-fill", "desr-enrollment"), cedar_definition_note)
+          )
         ),
-        cedar_definition_panel("desr-enrollment", "How DESR enrollment is counted"),
-        # Crosslist view selector — tabs filter the DT below without re-querying.
-        # Each tab keeps a one-line note on what it scopes to; the per-column
-        # guides were dropped once the column headers were made self-explanatory.
+        # Crosslist view selector: each tab reads its own slice of the same
+        # Gather result, with a one-line note on what it scopes to.
         navset_tab(
           id = "enrl_crosslist_tabs",
           selected = "home",
@@ -1652,31 +1680,6 @@ nav_panel(
           )
         ),
         reactable::reactableOutput("enrl_summary")
-      ),
-
-      # Class list enrollment
-      nav_panel(
-        title = "Classlist",
-        icon = icon("list"),
-        subtab_header(
-          "Classlist",
-          cedar_definition_summary("registered"), " ",
-          cedar_definition_summary("census-enrollment"), " Rows are fixed at course + ",
-          "delivery campus + college + term. Group by, DESR Min/Max, and the DESR ",
-          "crosslist tabs do not change this table."
-        ),
-        cedar_definition_panel(
-          c("registered", "census-enrollment"),
-          "How Classlist enrollment is counted"
-        ),
-        tags$p(
-          class = "text-hint",
-          "Ever Registered Proxy adds all drop statuses to registered students; it can ",
-          "include pre-term churn and is not a frozen first-day roster. Waitlisted is a ",
-          "status audit column; use the Waitlists report for cross-section true demand."
-        ),
-        uiOutput("enrl_classlist_download_ui"),
-        reactable::reactableOutput("enrl_cl_summary")
       ),
 
       # Low enrollment — mode banner, summary cards, thresholds, then level sub-tabs

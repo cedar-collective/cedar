@@ -8,7 +8,7 @@ parent: Developer Guide
 
 This reference is auto-generated from roxygen2 comments in the source code.
 
-*Generated: 2026-11-18 17:05:44.974625*
+*Generated: 2026-11-18 18:56:43.994817*
 
 ---
 
@@ -3055,6 +3055,7 @@ Reconstruct first-class-day enrollment from class-list status dates  Unlike `fir
 - `students` - Class-list rows with `student_id`, `crn`, `registration_status_code`, `registration_date`, `as_of_date`, and the `campus`, `college`, `term`, `subject_course` grouping columns.
 - `sections` - Section rows supplying each `(term, crn)`'s `start_date`.
 - `by_part_term` - Retain each session as its own enrollment count.
+- `by_section` - Retain each section (`crn`) as its own count, for a table whose rows are the schedule's sections.
 - `pool_campuses` - Count each student once per term and course across every campus and college in `students`, for a named planning market whose rows the caller has already restricted to its declared campuses.
 
 **Returns:** One row per campus, college, term, and course with `first_day_enrl`, `first_day_basis` and `first_day_started_enrl` (per term and course when `pool_campuses`).
