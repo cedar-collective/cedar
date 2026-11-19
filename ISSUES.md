@@ -129,10 +129,10 @@ under the new schema; v1 kept). At the user's request every plan also gained
 400-level pool, starts no earlier. The recompiled Philosophy board starts its
 two 400-level tiles in semester 6; on the authored boards Population Health's
 POPH 420, Chemistry's instrumental analysis and Biochemistry's BIOC 445 move
-from 5 to 6. No plan grows a semester. Still open, and already flagged in the reading
-as the unresolved `elective-overlap`: "Four Philosophy electives, two at the
-400 level" restates the two credit pools as four more tiles in semester 1. Its
-limit covers only part of the pool, so it states no level.
+from 5 to 6. No plan grows a semester. The Philosophy reading's "Four Philosophy electives, two at
+the 400 level" is split, at the user's direction, into two 400-level electives
+(semester 6) and two at any level; whether those four restate the two credit
+pools is still the reading's unresolved `elective-overlap`.
 **Found:** 2026-11-18, from the user's to-do list ("Degree Explorer puts
 upper-level electives too early"), by building every board.
 **Severity:** moderate, Degree Explorer only. The compiled Philosophy B.A.

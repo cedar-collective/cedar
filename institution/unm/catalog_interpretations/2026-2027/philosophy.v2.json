@@ -4,7 +4,7 @@
   "catalog_id": "68a34618094c97cf857f1ec1",
   "program_id": "SkWn7eQ9o9",
   "unit_key": "6a2014e6e85d5589c229b83e90d111286c5442d2211a33eba63d2ccd25fdc817",
-  "producer": "Codex (GPT-6); source interpretation in the CEDAR development session, 2026-10-19; no API call. Version 2 (2026-11-18, CEDAR development session, no API call): version 1 with the lowest course number (schema 1.1.0) on the pool its catalog text limits to 300-499 or 400-499 (ISSUES I64).",
+  "producer": "Codex (GPT-6); source interpretation in the CEDAR development session, 2026-10-19; no API call. Version 2 (2026-11-18, CEDAR development session, no API call): version 1 with the lowest course number (schema 1.1.0) on the pool its catalog text limits to 300-499 or 400-499 (ISSUES I64); its four-elective pool split into two 400-level and two any-level electives at the user's direction.",
   "scope": "Program and embedded concentrations only. Linked course prerequisite units are not yet interpreted. Draft; no human academic approval.",
   "proposal": {
     "schema_version": "1.1.0",
@@ -841,17 +841,41 @@
         ]
       },
       {
-        "id": "elective-count",
+        "id": "elective-count-400",
         "parent_id": "major",
         "entity_id": "programs:SkWn7eQ9o9",
         "phase": "degree",
         "kind": "course_pool",
-        "label": "Four Philosophy electives, two at the 400 level",
-        "minimum": 4,
+        "label": "Two of the four Philosophy electives at the 400 level",
+        "minimum": 2,
         "maximum": null,
         "unit": "courses",
         "comparison": "at_least",
-        "value": "Philosophy electives; at least two at the 400 level",
+        "value": "Two Philosophy electives at the 400 level",
+        "minimum_grade": "",
+        "minimum_course_number": 400,
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-027bf9fb60fc36d3f5549b1f",
+            "quote": "Four electives, two of which must be at the 400-level. (Normally, 100-level Philosophy courses apply only if taken prior to any 200- or higher level course.)"
+          }
+        ]
+      },
+      {
+        "id": "elective-count-any",
+        "parent_id": "major",
+        "entity_id": "programs:SkWn7eQ9o9",
+        "phase": "degree",
+        "kind": "course_pool",
+        "label": "The other two of the four Philosophy electives",
+        "minimum": 2,
+        "maximum": null,
+        "unit": "courses",
+        "comparison": "at_least",
+        "value": "Two Philosophy electives at any level (100-level courses normally apply only if taken before any 200-level or higher course)",
         "minimum_grade": "",
         "course_refs": [],
         "program_ref": "",
@@ -1853,7 +1877,8 @@
         "block_id": "b-027bf9fb60fc36d3f5549b1f",
         "disposition": "unresolved",
         "node_ids": [
-          "elective-count",
+          "elective-count-400",
+          "elective-count-any",
           "intro-order",
           "elective-overlap"
         ],
