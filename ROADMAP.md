@@ -153,6 +153,15 @@ unusually; provost: cross-college patterns and risks).
 - [ ] **Choose the tabs** that get one: likely DFW, Enrollment Trends,
   Headcount Trends and Gen Ed.
 
+- [ ] **Harder together: course pairs worse taken in the same term**
+  (decided 2026-11-19). A's DFW rate among continuing students also taking B
+  that term against A's rate without B, within term, campus and entering-GPA
+  band (`gpa_entering`, `timeline_valid`); lecture–lab and stretch (X/Y) pairs
+  left out; a pair listed only when it holds in three or more terms, as a
+  candidate, never a verdict. A column on Course Dynamics > Other Courses >
+  Courses Taken Alongside. First-term students wait for placement measures:
+  without them placement courses top any list for who takes them.
+
 ## Retention signals while there is time to act
 
 Built: next-term registration of last term's students kept at every refresh
@@ -174,6 +183,20 @@ high-school GPA, Pell, first-generation all differ). The retention signal is
 the selection every course shows, not a lift the seminars add; the question
 worth a page is who does not pass a course, which is the return watch.
 
+- [ ] **Bird's Eye > Retention, settled return first** (decided 2026-11-19).
+  Shaped like DFW Rates: return to the next regular term, one term type at a
+  time, with a trend verdict (`returned_next_regular_term` where
+  `return_observable`, `compute_rate_trend()`); who is not coming back, by
+  warning sign (late withdrawal, a DFW, probation); by classification and
+  college of the primary major; then the courses where a DFW costs the most
+  (`get_stopout()`, opening Coming Back). The return watch below becomes its
+  top section once it is exact. Course lifts (Takers vs Non-Takers) and
+  IPEDS-style cohort retention stay off it.
+- [ ] **Against Non-Takers: a first-year Gen Ed benchmark** (decided
+  2026-11-19). Beside "the college's courses", benchmark a course against the
+  Gen Ed courses its population takes most (`build_course_cohort_context()`).
+  On real data FYEX 1110 sits in the upper middle of that set, as it does
+  among Arts & Sciences lower-division courses (above).
 - [ ] **Return watch** on the Dept Dashboard and UNM-wide: continuing students
   not yet registered against the same day a year earlier, by classification,
   standing and warning sign. Exact from Fall 2027.
@@ -247,6 +270,11 @@ Page-level legibility is [M43](ISSUES.md)–M48; these are the new pieces.
   "Which courses are under pressure this term?", "Where do students go after
   this course?", each a deep link to the subtab that answers it; Course
   Dynamics' eight subtabs and Pathways' six are invisible from Home now.
+
+- [ ] **A dark theme, with a toggle** (asked 2026-11-19). Every colour a
+  token, light and dark values, the reader's choice remembered per browser,
+  following the system setting until chosen; charts and tables read the same
+  tokens.
 
 ## Platform
 
