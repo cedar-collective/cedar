@@ -1858,3 +1858,62 @@ df_attempts <- keyed_attempts(test_students_df, df01_edges)
 population_group_rename_successions <- data.frame(
   from_code = "HSCI", to_code = "NURS", effective_term = 202080L,
   stringsAsFactors = FALSE)
+
+# ── test-return-rates.R ─────────────────────────────────────────────────────────
+
+# RR01: four falls (202080, 202180, 202280, 202380, k = 1..4) of the same
+# shape, and Fall 2024 with no settled next term. Each fall:
+#   ABQ freshmen (college AS), RR01-A01..A40: A01..A(26+2k) come back (28,
+#     30, 32, 34); A35..A40 withdrew late; A31..A37 got a DFW; A38 has no
+#     posted grade (its DFW is unknown). Every one takes MATH 101: DFW for
+#     A31..A37, no grade for A38, a pass otherwise.
+#   EA sophomores (college EN), RR01-E01..E20: E01..E15 come back. In the
+#     first two falls E01..E06 are juniors: a classification not read in the
+#     latest fall.
+#   Two ABQ seniors awarded a degree that term (left out, counted).
+#   Five ABQ graduate students, all back (out of an undergraduate scope).
+# Fall 2024: ten ABQ freshmen whose return cannot be observed yet.
+rr01 <- local({
+  falls <- c(202080L, 202180L, 202280L, 202380L)
+  one <- function(term, k) {
+    a <- tibble::tibble(i = 1:40, id = sprintf("RR01-A%02d", 1:40), student_campus = "ABQ",
+                        student_classification = "Freshman, 1st Yr, 1st Sem", primary_college_code = "AS",
+                        returned = (1:40) <= 26 + 2 * k, late_withdrawals = as.integer((1:40) >= 35),
+                        dfw_grades = as.integer((1:40) >= 31 & (1:40) <= 37),
+                        graded_rows = ifelse((1:40) == 38, 0L, 1L))
+    e <- tibble::tibble(i = 1:20, id = sprintf("RR01-E%02d", 1:20), student_campus = "EA",
+                        student_classification = ifelse(k <= 2 & (1:20) <= 6, "Junior, 3rd Yr", "Sophomore, 2nd Yr"),
+                        primary_college_code = "EN",
+                        returned = (1:20) <= 15, late_withdrawals = 0L, dfw_grades = 0L, graded_rows = 1L)
+    s <- tibble::tibble(i = 1:2, id = sprintf("RR01-S%02d", 1:2), student_campus = "ABQ",
+                        student_classification = "Senior, 4th Yr", primary_college_code = "AS",
+                        returned = FALSE, late_withdrawals = 0L, dfw_grades = 0L, graded_rows = 1L)
+    g <- tibble::tibble(i = 1:5, id = sprintf("RR01-G%02d", 1:5), student_campus = "ABQ",
+                        student_classification = "Graduate, First Masters", primary_college_code = "AS",
+                        returned = TRUE, late_withdrawals = 0L, dfw_grades = 0L, graded_rows = 1L)
+    dplyr::bind_rows(a, e, s, g) %>%
+      dplyr::mutate(term = term, student_id = paste0(id, "-", term), enrolled = TRUE,
+                    student_level = ifelse(grepl("-G", id), "GR", "UG"),
+                    return_observable = TRUE, degree_awarded = grepl("-S", id))
+  }
+  rows <- dplyr::bind_rows(lapply(seq_along(falls), function(k) one(falls[[k]], k)))
+  unsettled <- tibble::tibble(
+    id = sprintf("RR01-A%02d", 1:10), term = 202480L, student_id = paste0(id, "-", term), enrolled = TRUE,
+    student_level = "UG", student_campus = "ABQ", student_classification = "Freshman, 1st Yr, 1st Sem",
+    primary_college_code = "AS", returned = NA, late_withdrawals = 0L, dfw_grades = 0L, graded_rows = 0L,
+    return_observable = FALSE, degree_awarded = FALSE)
+  student_terms <- dplyr::bind_rows(rows, unsettled) %>%
+    dplyr::transmute(student_id, term, enrolled, student_level, student_campus, student_classification,
+                     primary_college_code, late_withdrawals, dfw_grades, graded_rows,
+                     returned_next_regular_term = dplyr::if_else(return_observable, returned, NA),
+                     return_observable, degree_awarded)
+  # MATH 101 attempts, stamped as test_attempts is (one of its rows, restated).
+  takers <- dplyr::filter(rows, grepl("-A", id), i != 38L)
+  attempts <- test_attempts[rep(1L, nrow(takers)), ] %>%
+    dplyr::mutate(student_id = takers$student_id, term = takers$term, campus = "ABQ",
+                  subject_course = "MATH 101", outcome = ifelse(takers$dfw_grades > 0L, "dfw", "pass"))
+  dashboard <- build_retention_dashboard(student_terms, attempts, NULL, list(
+    term_type = "fall", student_level = "UG", data_edges = rr01_edges,
+    min_n = 5L, course_min_n = 10L, course_min_dfw_n = 5L))
+  list(student_terms = student_terms, attempts = attempts, dashboard = dashboard)
+})

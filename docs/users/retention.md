@@ -7,32 +7,59 @@ nav_order: 16
 # Retention
 {: .fs-9 }
 
-**Course-anchored views of whether students stay enrolled in later terms**
+**Are students coming back the next semester, and who is not?**
 {: .fs-6 .fw-300 }
 
+---
+
+Retention is the institution-wide view of whether enrolled students come back. It lives under **Bird's Eye > Retention**. It answers four questions, in order: is the share who come back rising or falling; how often students with a warning sign came back; whether each classification and college is moving the same way; and in which courses a D, F or withdrawal goes with not coming back the most.
+
+One course's retention is **Course Dynamics > Downstream > Coming Back** ([guide](course-reports#retention)).
+
+---
+
+## Controls
+
+The page builds as soon as it opens; there is no run button.
+
+| Control | What it changes |
+|---|---|
+| **Term type** | Fall or spring: the term the students were enrolled in. One at a time, since a fall's students are not a spring's. |
+| **Student level** | Undergraduate to start. |
+| **Home campus** | The students' home campus. Leave it empty to read every campus. Coming back is counted at UNM on any campus. |
+
+---
+
+## Sections
+
+| Section | What it shows |
+|---|---|
+| **How Often Students Come Back** | The latest term's rate against the first, the trend's verdict (rising, falling or steady), and every term's rate as a line. |
+| **Who Isn't Coming Back** | For a late withdrawal and for a DFW grade: how many students had it, how often they came back against those without it, and what share of the students who did not come back had it. |
+| **By Classification and College** | Each classification and each primary-major college: its latest rate, its rate over the terms and its terms as a small line with the trend. |
+| **Courses Where a DFW Costs the Most** | Over the latest three terms with posted grades, the courses where students who got a DFW came back much less often than those who passed: the 25 largest gaps. |
+
+Each section's **How this is counted** gives its thresholds and the edge it reads to.
+
+---
+
+## Reading it
+
+- **Coming back means enrolled the next regular term,** registered or withdrawn after census, at UNM on any campus. Summer is not a step: a spring's next term is the fall.
+- **A degree that term is finishing, not leaving.** Those students are left out of the rate and counted in the method note.
+- **The latest terms wait for their next term to settle.** A term whose next term is still registering has no rate yet.
+- **A DFW sign needs posted grades.** A term past the last graded term, or a student with no grade posted, is in neither group.
+- **A course's gap describes who fails it as much as the course.** Students who fail one course often struggle in others. Open the course in Course Dynamics for its full picture.
+- **Probation is not yet a sign.** Banner's academic standings are not yet mapped to groups.
+
+---
+
+## Course-anchored retention (not in the app yet)
+
 {: .note }
-> **Not in the app yet.** The Explore → Retention tab described here is hidden
-> until its cross-course comparison is ready. Retention for a single course is
-> available now in **Course Dynamics → Downstream → Coming Back**
-> ([guide](course-reports#retention)).
+> A tab comparing later retention across the courses of one term, and one course's retention across its offerings, is built but hidden until it sets each course against its department and college. It is described below.
 
----
-
-Retention shows institution-level persistence after a course enrollment anchor.
-It lives under **Explore -> Retention**.
-
-Use it when you want to ask questions like:
-
-- Which courses were students taking in a term before they did or did not return?
-- How does later enrollment compare across courses in the same term?
-- For one course, has subsequent retention changed across offerings?
-
-This tab is descriptive. It can show where a pattern deserves attention, but it
-does not by itself prove that a course caused students to stay or leave.
-
----
-
-## What Counts As Retained
+### What Counts As Retained
 
 A student is counted as retained when they have any registered enrollment record
 at UNM in the target future term. The measure is institution-level retention,
@@ -49,7 +76,7 @@ For shared definitions, see [What CEDAR Counts](what-cedar-counts).
 
 ---
 
-## Display Options
+### Display Options
 
 | Control | What it does |
 |---|---|
@@ -60,7 +87,7 @@ Changing these controls affects both retention views.
 
 ---
 
-## Course Comparison
+### Course Comparison
 
 Course Comparison starts from one anchor term and compares later retention
 across courses.
@@ -79,7 +106,7 @@ Columns:
 
 ---
 
-## Course Trend
+### Course Trend
 
 Course Trend starts from one course and compares its retention pattern across
 terms.
@@ -100,7 +127,7 @@ Columns:
 
 ---
 
-## Reading The Results
+### Reading The Results
 
 Retention rates are most useful as prompts for better questions:
 

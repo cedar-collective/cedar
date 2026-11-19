@@ -139,6 +139,7 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
   source_file("cones/declaration-context.R")   # credits + prior coursework at first declaration
   source_file("cones/entry-heatmap.R")         # courses taken before entering the focal major
   source_file("cones/stopout.R")
+  source_file("cones/return-rates.R")  # how often enrolled students come back the next regular term
   source_file("cones/course-outcomes.R")
   source_file("cones/pathway.R")               # course timing + curriculum map
   source_file("cones/course-pairs.R")          # ordered A->B course sequences
@@ -192,6 +193,7 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
   source_file("features/course-cohort-context.R")       # text-first preview: a course's takers-vs-non-takers gap against its college's courses
   source_file("features/course-similar-students.R")     # text-first preview: a course against similar non-takers, beside every course and by instructor
   source_file("features/dfw-dashboard.R")              # payload and text preview: Bird's Eye > DFW Rates
+  source_file("features/retention-dashboard.R")  # Bird's Eye > Retention payload
   source_file("features/dfw-dashboard-view.R")         # what the DFW Rates page draws
   source_file("features/later-course.R")                # text-first preview: a course's students in a later course, by term, grade and instructor
   source_file("features/downstream-glance.R")           # Course Dynamics > Downstream > At a Glance: the five steps, read off the other views' payloads
@@ -212,6 +214,7 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
     source_file("modules/seatfinder.R")
     source_file("modules/cancellations.R")
     source_file("modules/dfw-rates.R")       # Bird's Eye > DFW Rates
+    source_file("modules/retention-dashboard.R")  # Bird's Eye > Retention
     source_file("modules/waitlist.R")
     source_file("modules/regstats.R")
     source_file("modules/admin.R")

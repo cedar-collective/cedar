@@ -4262,6 +4262,14 @@ for (.download_key in names(.enrl_desr_view_ids)) {
                  active = reactive(identical(input$main_navbar, "DFW Rates")))
 
   # ===========================================================================
+  # Bird's Eye > Retention (Shiny module); builds only while the tab is open
+  # ===========================================================================
+  retentionDashboardServer("retention_dashboard", student_terms = data_objects[["cedar_student_terms"]],
+                           attempts = data_objects[["cedar_attempts"]], degrees = cedar_degrees,
+                           dims = data_objects[["cedar_dims"]], edges = data_objects[["cedar_edges"]],
+                           active = reactive(identical(input$main_navbar, "Retention")))
+
+  # ===========================================================================
   # Waitlists tab (Shiny module)
   # ===========================================================================
   waitlistServer("waitlist", cedar_registrations, session,

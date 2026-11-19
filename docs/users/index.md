@@ -117,14 +117,14 @@ narrowed by campus, college, department or level:
 | **Headcount** | How many unique students are declared in a major/minor/concentration, per term? [Guide →](headcount) |
 | **Gen Ed** | How are Gen Ed courses enrolling, and what grade-outcome patterns are visible? [Guide →](gen-ed) |
 | **DFW Rates** | Is the lower-division DFW rate going up or down, which courses hold the DFW grades, and where do sections disagree? [Guide →](dfw-rates) |
+| **Retention** | Are students coming back the next semester, which warning signs go with not returning, and in which courses does a DFW cost the most? [Guide →](retention) |
 | **Cancellations** | Which scheduled sections were cancelled, and how does that vary by term or department? [Guide →](cancellations) |
 
 **Course Dynamics** — the one-course view of enrollment trends, student flows,
 grade distributions, DFW by instructor type, retention, and sequence
 comparisons — is on the top-level navbar. [Guide →](course-reports)
 
-**Retention** across courses is documented in its [guide](retention) but is not
-in the app yet; for one course, use Course Dynamics → Downstream → Coming Back.
+For one course's retention, use Course Dynamics → Downstream → Coming Back.
 
 ---
 

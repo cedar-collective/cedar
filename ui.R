@@ -335,6 +335,12 @@ cedar_home_ui <- function() {
           "percent"
         ),
         cedar_home_card(
+          "Retention",
+          "Whether students come back the next semester, which warning signs go with not returning, and where a DFW costs the most.",
+          "?tab=retention",
+          "user-check"
+        ),
+        cedar_home_card(
           "Cancellations",
           "Review canceled courses by term, campus, department, and course level.",
           "?tab=cancellations",
@@ -1853,18 +1859,18 @@ nav_panel(
     ), # end DFW Rates nav_panel
 
     nav_panel(
+      title = "Retention",
+      icon = icon("user-check"),
+      retentionDashboardUI("retention_dashboard",
+                           sort(unique(stats::na.omit(data_objects[["cedar_student_terms"]]$student_campus))))
+    ), # end Retention nav_panel
+
+    nav_panel(
       title = "Cancellations",
       icon = icon("ban"),
       cancellationsUI("cancellations", cedar_sections, cedar_default_reg_term, .dept_choices)
     ) # end cancellations nav_panel (was under Admin)
 
-    # RETENTION (inside Bird's Eye) — hidden until cross-course comparison
-    # is ready. Course-level retention trend lives in Course Dynamics tab.
-    # nav_panel(
-    #   title = "Retention",
-    #   icon  = icon("user-check"),
-    #   retentionUI("retention")
-    # ), # end retention nav_panel
 
   ), # end Bird's Eye nav_menu
 
