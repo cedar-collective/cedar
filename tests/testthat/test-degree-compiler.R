@@ -61,6 +61,47 @@ test_that("an unlisted credit pool is elective space inside the major and a cred
   expect_equal(compiled$credit_rules$id, c("degree-total", "electives"))
 })
 
+test_that("an elective slot takes the band of the lowest number its reading allows, else its group's level (I64)", {
+  f <- normalization_fixture(withr::local_tempdir())
+  courses <- degree_packet_course_facts(f$program$packet)
+  nodes <- utils::read.csv(file.path(f$capture, "analysis", "rule-nodes.csv"), colClasses = "character")
+  program <- degree_packet_program_facts(f$program$packet)
+  # Change: the major also asks for 6 elective credits at the 400 level; its
+  # group requires only lower-division courses.
+  pool <- compiler_biology_proposal$nodes[[match("degree-total", vapply(compiler_biology_proposal$nodes, `[[`, "", "id"))]]
+  pool <- modifyList(pool, list(id = "electives", parent_id = "major", minimum = 6,
+                                label = "At least 6 elective credits at the 400-499 level"))
+  board_level <- function(pool) {
+    reading <- compiler_biology_proposal
+    reading$nodes <- c(reading$nodes, list(pool))
+    compiled <- compile_degree_interpretation(reading, courses)
+    draft <- assemble_compiled_degree_board(compiled, courses, program, degree_course_requisites(nodes, courses),
+      compiler_biology_catalog_row, test_degree_roadmaps, test_degree_catalog$evidence, "math1350",
+      degree_course_conditions(nodes, courses), reading)
+    own <- draft$roadmaps$nodes[startsWith(draft$roadmaps$nodes$node_id, "electives_"), ]
+    list(level = unique(own$course_level), semester = unique(own$semester),
+         rule = compiled$rules$minimum_course_number[compiled$rules$rule_id == "electives"])
+  }
+  plan <- function(column) as.character(degree_board_plan_default(test_degree_roadmaps$plans, column))
+  # 400 is the highest undergraduate band: upper, and planned from the senior semester.
+  senior <- board_level(modifyList(pool, list(minimum_course_number = 400)))
+  expect_equal(senior$rule, 400)
+  expect_equal(senior$level, "upper")
+  expect_equal(senior$semester, plan("senior_level_from_semester"))
+  # 300 is upper division, planned from the upper-level semester.
+  upper <- board_level(modifyList(pool, list(minimum_course_number = 300)))
+  expect_equal(upper$level, "upper")
+  expect_equal(upper$semester, plan("upper_level_from_semester"))
+  expect_false(identical(upper$semester, senior$semester))
+  # With no stated number the label is never read: the group's lower courses decide.
+  unstated <- board_level(pool)
+  expect_true(is.na(unstated$rule))
+  expect_equal(unstated$level, "lower")
+  expect_equal(unstated$semester, "1")
+  # A number that is not an undergraduate course number stops.
+  expect_error(board_level(modifyList(pool, list(minimum_course_number = 500))), "not an undergraduate course number")
+})
+
 test_that("a credit group whose listed courses add up to its minimum requires each of them", {
   f <- normalization_fixture(withr::local_tempdir())
   # Change: the pair is "4 credits" rather than "all of", outside any choice.

@@ -170,6 +170,7 @@ CEDAR_CONFIG_FILE_SPECS <- list(
   degree_roadmap_basis = c("catalog_id", "node_id", "basis", "evidence_id", "explanation"),
   degree_roadmap_plans = c("catalog_id", "degree_credit_target", "normal_load", "max_load",
                            "baseline_semesters", "evidence_id", "assumption", "upper_level_from_semester",
+                           "senior_level_from_semester",
                            "allowance_slot_credits", "gen_ed_source_url"),
   degree_roadmap_starts = c("track", "start_id", "label", "node_ids", "completed_degree_credits"),
   degree_roadmap_math_routes = c("catalog_id", "start_id", "label", "node_ids"),

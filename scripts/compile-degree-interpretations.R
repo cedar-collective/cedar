@@ -35,7 +35,13 @@ source(file.path(base, "R/trunk/load-funcs.R")); load_funcs(base, modules = FALS
 root <- normalizePath(opts[["--root"]], mustWork = TRUE)
 keys <- basename(list.dirs(file.path(root, "programs"), recursive = FALSE))
 packets <- lapply(stats::setNames(keys, keys), function(key) load_catalog_normalization_program(root, key)$packet)
-packet_programs <- vapply(packets, function(p) p$program_id, "")
+# A program can have packets prepared under several schemas; each reading names
+# its unit, and the program unit's key picks the packet it was read from.
+packet_units <- vapply(packets, function(p) {
+  own <- Filter(function(u) startsWith(u$request$documents[[1]]$id, "programs:"), p$units)
+  if (length(own) != 1L) stop("Packet ", p$program_id, " has no single program unit")
+  own[[1]]$key
+}, "")
 if (!is.null(opts[["--analysis"]])) {
   rule_nodes <- utils::read.csv(file.path(normalizePath(opts[["--analysis"]], mustWork = TRUE), "rule-nodes.csv"),
                                 colClasses = "character", check.names = FALSE)
@@ -48,11 +54,17 @@ if (!is.null(opts[["--analysis"]])) {
 readings <- list.files(file.path(cedar_institution_dir(), "catalog_interpretations"), "\\.json$", recursive = TRUE, full.names = TRUE)
 boards <- list(); manifest <- list()
 if (!length(readings)) stop("No catalog interpretations under ", file.path(cedar_institution_dir(), "catalog_interpretations"))
+# Earlier versions are kept for the record; each program compiles from its latest.
+versions <- do.call(rbind, lapply(readings, function(path) {
+  r <- read_source_json(path); data.frame(path = path, program_id = r$program_id, version = as.numeric(r$version))
+}))
+readings <- versions$path[versions$version == stats::ave(versions$version, versions$program_id, FUN = max)]
+if (anyDuplicated(versions$program_id[versions$path %in% readings])) stop("Two readings share a program's latest version")
 
 for (path in readings) {
   reading <- read_source_json(path)
-  key <- names(packet_programs)[packet_programs == reading$program_id]
-  if (length(key) != 1L) stop("No single prepared packet for ", basename(path), " (", reading$program_id, ")")
+  key <- names(packet_units)[packet_units == reading$unit_key]
+  if (length(key) != 1L) stop("No single prepared packet for ", basename(path), " (unit ", reading$unit_key, ")")
   packet <- packets[[key]]
   compiled <- compile_degree_interpretation(reading$proposal, degree_packet_course_facts(packet))
   board <- CEDAR_DEGREE_CATALOG$catalogs$catalog_id[grepl(reading$program_id, CEDAR_DEGREE_CATALOG$catalogs$source_url, fixed = TRUE)]

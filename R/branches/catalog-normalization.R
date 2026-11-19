@@ -196,6 +196,7 @@ catalog_normalization_node_summary <- function(node, registry) {
     if (!is.null(node$maximum)) paste("maximum", node$maximum, node$unit),
     if (nzchar(node$value)) paste(node$comparison, node$value),
     if (nzchar(node$minimum_grade)) paste("minimum grade", node$minimum_grade),
+    if (!is.null(node$minimum_course_number)) paste("courses numbered", node$minimum_course_number, "or above"),
     if (length(refs)) titles[match(refs, catalog_normalization_ids(registry))],
     if (nzchar(node$program_ref)) titles[match(node$program_ref, catalog_normalization_ids(registry))],
     if (node$timing != "not_applicable") node$timing), collapse = " · ")

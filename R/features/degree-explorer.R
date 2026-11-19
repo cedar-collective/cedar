@@ -109,7 +109,9 @@ build_degree_plan_rules <- function(catalog, roadmaps, view) {
   add("Planning preference", paste0("Usually ", policy$normal_load, " credits; never more than ", policy$max_load, " in a semester."),
     "CEDAR planning setting. Extend the plan when prerequisites or workload require it.")
   add("Planning preference", paste0("Prioritize Gen Ed in semesters 1–", as.integer(policy$upper_level_from_semester) - 1L,
-    "; schedule upper-level work from semester ", policy$upper_level_from_semester, "."), "CEDAR planning setting, rather than a catalog prerequisite.")
+    "; schedule upper-level work from semester ", policy$upper_level_from_semester, " and ",
+    COURSE_SENIOR_LEADING_DIGIT, "00-level work from semester ", policy$senior_level_from_semester, "."),
+    "CEDAR planning setting, rather than a catalog prerequisite.")
   for (i in which(nodes$catalog_id == program$catalog_id)) add("Planning preference",
     paste0(nodes$code[i], ": preferred starting semester ", nodes$base_semester[i], "."),
     paste0("Authored template position; prerequisites, upper-level timing and the credit limit may move it later. Related courses align in the ", nodes$row_group[i], " row."),
@@ -129,6 +131,7 @@ build_degree_roadmap_view <- function(catalog, roadmaps, catalog_id, math_start,
   view <- build_degree_roadmap(catalog, roadmaps, catalog_id, math_start, english_start)
   view <- allocate_shared_degree_slots(view, degree_shared_coverage(view, roadmaps, shared))
   upper_start <- as.integer(view$policy$upper_level_from_semester)
+  senior_start <- as.integer(view$policy$senior_level_from_semester)
   view$start_season <- start_season
   view$terms$season <- degree_semester_seasons(view$terms$semester, start_season)
   view$terms$other_label <- ifelse(view$terms$other_phase == "foundation",
@@ -138,7 +141,7 @@ build_degree_roadmap_view <- function(catalog, roadmaps, catalog_id, math_start,
   view$options <- degree_option_courses(roadmaps, catalog, catalog_id)
   view$option_groups <- degree_option_groups(view$options)
   view$nodes <- label_degree_roadmap_nodes(view$nodes, view$options, view$option_groups,
-                                           view$conditions, view$links, upper_start)
+                                           view$conditions, view$links, upper_start, senior_start)
   view$nodes$coverage_label <- ""
   view$nodes$coverage_detail <- ""
   if (!is.null(view$shared)) for (i in seq_len(nrow(view$nodes))) {
@@ -164,8 +167,8 @@ build_degree_roadmap_view <- function(catalog, roadmaps, catalog_id, math_start,
   view$change_note <- paste0(nrow(view$terms), " semesters · ", view$policy$normal_load,
     " credits usual · ", view$policy$max_load, " maximum")
   view$timing_note <- paste0("Planning preference: prioritize Gen Ed in semesters 1–", upper_start - 1L,
-    "; required upper-level courses start in semester ", upper_start,
-    " or later. Other electives can be upper level when their entry requirements allow it.")
+    "; required upper-level courses start in semester ", upper_start, " or later, and ",
+    COURSE_SENIOR_LEADING_DIGIT, "00-level courses in semester ", senior_start, " or later. Other electives can be upper level when their entry requirements allow it.")
   view$coverage_note <- if (is.null(view$shared)) {
     "Shared Gen Ed coverage is not configured for this program. Elective boxes are unallocated credits, not additional Gen Ed requirements."
   } else paste0("Gen Ed: ", sum(view$shared$areas$planned), " of ", sum(view$shared$areas$minimum),
@@ -256,7 +259,7 @@ degree_option_groups <- function(options) {
 }
 
 #' Reader-facing labels for each tile: kind, prerequisite count, chain and notes
-label_degree_roadmap_nodes <- function(nodes, options, option_groups, conditions, links, upper_start) {
+label_degree_roadmap_nodes <- function(nodes, options, option_groups, conditions, links, upper_start, senior_start) {
   nodes$option_count <- vapply(nodes$node_id, function(id) sum(option_groups$node_id == id),
                                integer(1), USE.NAMES = FALSE)
   nodes$option_label <- ""
@@ -302,8 +305,9 @@ label_degree_roadmap_nodes <- function(nodes, options, option_groups, conditions
     is_choice ~ "Prerequisites depend on the course chosen.",
     TRUE ~ paste0(nodes$n_prerequisites, " prerequisite courses in this route (", nodes$n_direct,
       " direct); longest prerequisite sequence needs ", nodes$prereq_depth, " earlier semesters."))
-  upper_note <- ifelse(nodes$course_level == "upper",
-    paste0(" Upper-level planning starts in semester ", upper_start, "."), "")
+  upper_note <- ifelse(nodes$senior_level,
+    paste0(" ", COURSE_SENIOR_LEADING_DIGIT, "00-level planning starts in semester ", senior_start, "."),
+    ifelse(nodes$course_level == "upper", paste0(" Upper-level planning starts in semester ", upper_start, "."), ""))
   nodes$planning_note <- ifelse(has_options,
     paste0(nodes$option_label, ". ", nodes$credits,
       " credits reserved in this illustrative plan; prerequisites and credit hours depend on the selection."),

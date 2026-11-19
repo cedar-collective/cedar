@@ -212,7 +212,9 @@ optional styling suggestions. The data/API contract is in
   for the remainder within that horizon. Display total planned credits per term.
 - Prioritize Gen Ed and lower-level foundations in the first two years. Schedule
   upper-level requirements from semester 5 onward, including upper-level course
-  groups. The plan file supplies this boundary so programs use the same rule.
+  groups, and 400-level work from semester 6 onward (a tile whose courses are all
+  400-level, or an elective pool the catalog limits to 400–499). The plan file
+  supplies both boundaries so programs use the same rule.
   Later-semester allowances identify upper-level, minor and elective work rather
   than implying Gen Ed is still unfinished. These are planning allowances, not
   audited Gen Ed or upper-division credit totals.

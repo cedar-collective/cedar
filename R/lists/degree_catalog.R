@@ -476,7 +476,7 @@ validate_degree_roadmaps <- function(roadmaps, catalog) {
     stop("[degree_catalog.R] Roadmap needs one plan per catalog")
   }
   for (column in c("degree_credit_target", "normal_load", "max_load", "baseline_semesters",
-                   "upper_level_from_semester", "allowance_slot_credits")) {
+                   "upper_level_from_semester", "senior_level_from_semester", "allowance_slot_credits")) {
     value <- suppressWarnings(as.numeric(plans[[column]]))
     if (any(!is.finite(value) | value <= 0 | value != floor(value))) {
       stop("[degree_catalog.R] Invalid roadmap plan ", column)
@@ -491,6 +491,9 @@ validate_degree_roadmaps <- function(roadmaps, catalog) {
   }
   if (any(as.numeric(plans$upper_level_from_semester) < 2)) {
     stop("[degree_catalog.R] Upper-level timing needs an early-coursework stage")
+  }
+  if (any(as.numeric(plans$senior_level_from_semester) < as.numeric(plans$upper_level_from_semester))) {
+    stop("[degree_catalog.R] Senior-level timing starts before upper-level timing")
   }
 }
 

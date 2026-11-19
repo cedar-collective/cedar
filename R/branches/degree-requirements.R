@@ -96,7 +96,10 @@ build_degree_roadmap <- function(catalog, roadmaps, catalog_id, math_start, engl
   starts <- c(math = math_start, english = english_start)
   entry <- resolve_degree_entry_routes(roadmaps, catalog_id, starts)
   nodes <- prepare_degree_roadmap_nodes(roadmaps$nodes, catalog_id, unlist(entry$routes),
-                                        as.integer(policy$upper_level_from_semester))
+                                        as.integer(policy$upper_level_from_semester),
+                                        as.integer(policy$senior_level_from_semester),
+                                        rbind(roadmaps$courses[c("catalog_id", "node_id", "subject_course")],
+                                              roadmaps$options[c("catalog_id", "node_id", "subject_course")]))
   nodes$component_count <- vapply(seq_len(nrow(nodes)), function(i) as.integer(max(1L,
     sum(roadmaps$courses$catalog_id == nodes$catalog_id[i] & roadmaps$courses$node_id == nodes$node_id[i]))), integer(1))
   # Shared entry courses omitted by placement are already satisfied for this scenario.
@@ -156,13 +159,25 @@ resolve_degree_entry_routes <- function(roadmaps, catalog_id, starts) {
 }
 
 #' The program's tiles plus the shared entry courses its routes use, typed for scheduling
-prepare_degree_roadmap_nodes <- function(nodes, catalog_id, entry_ids, upper_start) {
+#'
+#' @param codes The course codes behind each tile (`catalog_id`, `node_id`,
+#'   `subject_course`): its components, or a choice's options. A tile whose
+#'   codes are all in the highest undergraduate band (`course_is_senior_level()`)
+#'   waits for `senior_start`.
+prepare_degree_roadmap_nodes <- function(nodes, catalog_id, entry_ids, upper_start, senior_start, codes) {
   nodes <- nodes[nodes$catalog_id == catalog_id | (nodes$catalog_id == "*" & nodes$node_id %in% entry_ids), ]
   nodes$credits <- as.numeric(nodes$credits)
   nodes$base_semester <- as.integer(nodes$semester)
+  key <- paste(codes$catalog_id, codes$node_id)
+  nodes$senior_level <- vapply(paste(nodes$catalog_id, nodes$node_id), function(k) {
+    own <- codes$subject_course[key == k]
+    length(own) > 0L && all(course_is_senior_level(own))
+  }, logical(1), USE.NAMES = FALSE)
   # An authored planning preference, distinct from catalog prerequisites. Choice
-  # groups carry explicit levels; a display label is never parsed for one.
-  nodes$earliest_semester <- pmax(nodes$base_semester, ifelse(nodes$course_level == "upper", upper_start, 1L))
+  # groups carry explicit levels; a display label is never parsed for one. An
+  # elective slot with no codes carries its band in its authored semester.
+  nodes$earliest_semester <- pmax(nodes$base_semester, ifelse(nodes$course_level == "upper", upper_start, 1L),
+                                  ifelse(nodes$senior_level, senior_start, 1L))
   nodes$semester <- nodes$base_semester
   nodes$bundle <- nodes$bundle == "1"
   nodes

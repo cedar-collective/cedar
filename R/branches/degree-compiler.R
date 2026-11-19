@@ -9,7 +9,9 @@
 #   course   a required course                       -> one tile
 #   choice   choose-N, any-of, or N credits from a list -> one tile with options
 #   slot     a credit or course pool inside a major group with no listed
-#            courses ("12 upper-level HIST credits")  -> credits / 3 tiles, rounded
+#            courses ("12 upper-level HIST credits")  -> credits / 3 tiles, rounded,
+#            at the band of the lowest number its reading allows
+#            (minimum_course_number), else at its group's level
 #   credit_rule  a credit requirement at the top of the tree with no listed
 #            courses. The schema cannot say whether it is an elective pool
 #            (CS's 9 technical-elective credits), a total (120 degree credits)
@@ -68,6 +70,9 @@ degree_compiler_nodes <- function(proposal) {
   dplyr::bind_rows(lapply(proposal$nodes, function(n) tibble::tibble(
     id = n$id, parent_id = n$parent_id, entity_id = n$entity_id, phase = n$phase, kind = n$kind,
     label = n$label, minimum = num(n$minimum), unit = n$unit, value = n$value,
+    # The lowest course number the reading allows for the whole requirement
+    # (schema 1.1.0, "from 400 - 499"); NA when it states none.
+    minimum_course_number = num(n$minimum_course_number),
     course_ref = if (length(n$course_refs)) unlist(n$course_refs)[1] else NA_character_,
     block_id = if (length(n$citations)) n$citations[[1]]$block_id else NA_character_,
     quote = if (length(n$citations)) n$citations[[1]]$quote else NA_character_)))
@@ -78,7 +83,8 @@ degree_compiler_nodes <- function(proposal) {
 #' @param proposal The interpretation's `proposal` (parsed JSON, unsimplified).
 #' @param courses `degree_packet_course_facts()` for the same packet.
 #' @return List: `rules` (one row per compiled rule: `rule_id`, `parent_id`, `role`,
-#'   `subject_course`, `label`, `tiles`, `credits`, `block_id`, `quote`), `options` (`rule_id`, `option_id`,
+#'   `subject_course`, `label`, `tiles`, `credits`, `minimum_course_number`
+#'   (the lowest course number the reading allows, NA for no limit), `block_id`, `quote`), `options` (`rule_id`, `option_id`,
 #'   `subject_course`), `conditions`, `credit_rules`, `flags`, `concentrations`,
 #'   and `skipped` (information nodes).
 compile_degree_interpretation <- function(proposal, courses) {
@@ -89,6 +95,11 @@ compile_degree_interpretation <- function(proposal, courses) {
   unknown <- setdiff(refs, courses$course_ref)
   if (length(unknown)) stop("[degree-compiler.R] Courses missing from the packet: ", paste(unknown, collapse = ", "))
   nodes <- dplyr::left_join(nodes, courses[c("course_ref", "subject_course", "credits_min")], by = "course_ref")
+  stated <- nodes$minimum_course_number[!is.na(nodes$minimum_course_number)]
+  if (any(stated != floor(stated) | !course_level_from_number(as.character(stated)) %in% c("lower", "upper"))) {
+    stop("[degree-compiler.R] A minimum_course_number is not an undergraduate course number: ",
+         paste(stated, collapse = ", "))
+  }
 
   base <- nodes[startsWith(nodes$entity_id, "programs:"), ]
   other <- nodes[!startsWith(nodes$entity_id, "programs:"), ]
@@ -101,7 +112,7 @@ compile_degree_interpretation <- function(proposal, courses) {
   add_rule <- function(node, role, tiles, credits, code = NA_character_) {
     out$rules[[length(out$rules) + 1L]] <<- tibble::tibble(rule_id = node$id, parent_id = node$parent_id, role = role,
       subject_course = code, label = node$label, tiles = as.integer(tiles), credits = credits,
-      block_id = node$block_id, quote = node$quote)
+      minimum_course_number = node$minimum_course_number, block_id = node$block_id, quote = node$quote)
   }
   add_options <- function(rule_id, children) {
     for (k in seq_len(nrow(children))) {
