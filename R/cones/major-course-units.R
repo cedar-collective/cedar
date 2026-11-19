@@ -55,9 +55,11 @@
 #'   (`primary_dept_code`).
 #' @param registrations `cedar_registrations`, with its units attached
 #'   (`department`, `college`).
-#' @param opt `dept_code` (the major's unit; required), `program_code` (one
-#'   or more program codes to narrow the members to; default every program
-#'   of the unit), `include_pre_majors` (default TRUE), `term` (terms to
+#' @param opt `dept_code` (the major's unit), `program_code` (one or more
+#'   major codes to narrow the members to; default every program of the
+#'   unit). One of the two is required: with `program_code` alone the
+#'   members are those majors whatever unit owns them, including a major no
+#'   unit owns (Undecided), and `is_own_unit` is NA. `include_pre_majors` (default TRUE), `term` (terms to
 #'   keep; default every term to the edge), `campus` (teaching campuses to
 #'   keep; NULL keeps every campus, each its own row), `min_n` (the smallest
 #'   distinct-student count a unit row needs; default 10),
@@ -85,8 +87,17 @@
 #'   `term`, `campus`, `dept_code`, `n_students`).
 get_major_course_units <- function(student_terms, registrations, opt = list()) {
   dept_code <- opt$dept_code
-  if (is.null(dept_code) || length(dept_code) != 1L || is.na(dept_code) || !nzchar(dept_code)) {
-    stop("[major-course-units.R] opt$dept_code (one unit code) is required.", call. = FALSE)
+  # Without a unit the members are the named majors, whoever owns them: a
+  # major no unit owns (Undecided, Non-Degree) has no own unit, so
+  # is_own_unit is NA rather than FALSE.
+  by_program <- is.null(dept_code)
+  if (by_program) {
+    if (is.null(opt$program_code) || length(opt$program_code) == 0L || anyNA(opt$program_code)) {
+      stop("[major-course-units.R] opt$dept_code (one unit code) or opt$program_code (one or more major codes) is required.",
+           call. = FALSE)
+    }
+  } else if (length(dept_code) != 1L || is.na(dept_code) || !nzchar(dept_code)) {
+    stop("[major-course-units.R] opt$dept_code must be one unit code.", call. = FALSE)
   }
   needed_st <- c("student_id", "term", "enrolled", "primary_major_code", "primary_dept_code", "is_pre_major")
   missing_st <- setdiff(needed_st, names(student_terms))
@@ -133,8 +144,12 @@ get_major_course_units <- function(student_terms, registrations, opt = list()) {
     latest <- max(as.integer(latest), edge)
   }
 
-  members <- student_terms %>%
-    filter(enrolled, !is.na(primary_dept_code), primary_dept_code == dept_code, term <= latest)
+  members <- student_terms %>% filter(enrolled, term <= latest)
+  members <- if (by_program) {
+    members %>% filter(primary_major_code %in% opt$program_code)
+  } else {
+    members %>% filter(!is.na(primary_dept_code), primary_dept_code == dept_code)
+  }
   if (!include_pre_majors) members <- members %>% filter(!is_pre_major %in% TRUE)
   if (!is.null(opt$term)) members <- members %>% filter(term %in% as.integer(opt$term))
   # The programs a caller may narrow to, counted before it does.
@@ -144,8 +159,8 @@ get_major_course_units <- function(student_terms, registrations, opt = list()) {
     arrange(desc(n_students), primary_major_code)
   if (!is.null(opt$program_code)) members <- members %>% filter(primary_major_code %in% opt$program_code)
   members <- members %>% distinct(student_id, term)
-  cedar_debug("[major-course-units.R] ", nrow(members), " member student-terms of ", dept_code,
-              " to ", latest)
+  cedar_debug("[major-course-units.R] ", nrow(members), " member student-terms of ",
+              if (by_program) paste(opt$program_code, collapse = ", ") else dept_code, " to ", latest)
 
   taken <- registrations %>%
     filter(registration_status_code %in% c(STATUS_REGISTERED, STATUS_DROP_LATE)) %>%
@@ -190,7 +205,9 @@ get_major_course_units <- function(student_terms, registrations, opt = list()) {
       share_of_students = n_students / term_students
     )
   if (grain != "college") {
-    by_unit <- by_unit %>% mutate(is_own_unit = !is.na(dept_code) & dept_code == .env$dept_code)
+    own <- dept_code
+    by_unit <- by_unit %>%
+      mutate(is_own_unit = if (by_program) NA else !is.na(dept_code) & dept_code == .env$own)
   }
   by_unit <- by_unit %>%
     select(all_of(c("term", "campus", key_cols,
