@@ -48,6 +48,31 @@ test_that("grouped paths honor population ceilings and the settled observation e
 })
 
 
+test_that("the courses inside the groups read as one row per campus and course, a column per term", {
+  p <- get_grouped_student_paths(test_students_mc, grouped_path_population,
+    CEDAR_PATHWAY_SUBJECT_GROUPS, grouped_path_opt())
+  t <- degree_path_course_table(p)
+  expect_equal(paste0("term_", seq_len(p$meta$max_terms)), grep("^term_", names(t), value = TRUE))
+  expect_false(anyDuplicated(t[c("campus", "subject_course")]) > 0L)
+  # Every long row lands in its own cell, unchanged; nothing else is filled in.
+  for (i in seq_len(nrow(p$courses))) {
+    r <- p$courses[i, ]
+    row <- t[t$campus == r$campus & t$subject_course == r$subject_course, ]
+    expect_equal(row[[paste0("term_", r$relative_term)]], r$pct_students)
+    expect_equal(row[[paste0("n_", r$relative_term)]], r$n_students)
+  }
+  expect_equal(sum(!is.na(as.matrix(t[grep("^term_", names(t))]))), nrow(p$courses))
+  # SPAN 201 on ABQ is one row with its two terms.
+  span <- t[t$campus == "ABQ" & t$subject_course == "SPAN 201", ]
+  expect_equal(nrow(span), 1L)
+  expect_equal(sum(!is.na(unlist(span[grep("^term_", names(span))]))), 2L)
+  expect_equal(span$peak_pct, max(p$courses$pct_students[p$courses$campus == "ABQ" & p$courses$subject_course == "SPAN 201"]))
+  # A group keeps only its own courses.
+  langs <- degree_path_course_table(p, "languages")
+  expect_true(nrow(langs) > 0L && all(langs$group_id == "languages"))
+  expect_error(degree_path_course_table(list(courses = p$courses["campus"], meta = p$meta)), "Course detail missing")
+})
+
 test_that("pathways_level_filter translates UI values to CEDAR level values", {
   expect_null(pathways_level_filter("all"))
   expect_null(pathways_level_filter(""))

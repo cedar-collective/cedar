@@ -72,9 +72,39 @@ attach_pathway_groups <- function(rows, groups) {
            group_label = coalesce(group_label, "Unmapped coursework"))
 }
 
+#' The courses inside the groups, one row per campus and course, a column per term
+#'
+#' Reads get_grouped_student_paths()'s `courses` (already past its small-cell
+#' guards) and turns its campus x term x course rows into a matrix: what share
+#' of a campus's students in each enrolled term took the course.
+#'
+#' @param paths get_grouped_student_paths() output.
+#' @param group_id A group's id, or "all".
+#' @return Tibble: `campus`, `group_id`, `group_label`, `subject_course`,
+#'   `peak_pct` (the course's largest share in any term), then for each term
+#'   k in 1..`paths$meta$max_terms`, `term_k` (percent of that campus's
+#'   students that term, NA where the course had too few) and `n_k` (its
+#'   students). Rows run by group, campus, then largest share first.
 degree_path_course_table <- function(paths, group_id = "all") {
-  if (identical(group_id, "all")) return(paths$courses)
-  paths$courses[paths$courses$group_id == group_id, ]
+  needed <- c("campus", "relative_term", "group_id", "group_label", "subject_course", "n_students", "pct_students")
+  missing <- setdiff(needed, names(paths$courses))
+  if (length(missing)) stop("[degree-requirements.R] Course detail missing: ", paste(missing, collapse = ", "))
+  terms <- seq_len(paths$meta$max_terms)
+  courses <- if (identical(group_id, "all")) paths$courses else paths$courses[paths$courses$group_id == group_id, ]
+  if (any(!courses$relative_term %in% terms)) stop("[degree-requirements.R] Course detail past max_terms")
+  key <- c("campus", "group_id", "group_label", "subject_course")
+  wide <- courses %>%
+    select(all_of(key), relative_term, n_students, pct_students) %>%
+    tidyr::pivot_wider(id_cols = all_of(key), names_from = relative_term, values_from = c(pct_students, n_students),
+                       names_glue = "{ifelse(.value == 'pct_students', 'term', 'n')}_{relative_term}")
+  for (k in terms) for (col in paste0(c("term_", "n_"), k)) {
+    if (!col %in% names(wide)) wide[[col]] <- if (startsWith(col, "n_")) NA_integer_ else NA_real_
+  }
+  pct_cols <- paste0("term_", terms)
+  wide$peak_pct <- if (nrow(wide)) apply(as.matrix(wide[pct_cols]), 1, max, na.rm = TRUE) else numeric(0)
+  wide %>%
+    select(all_of(key), peak_pct, all_of(as.vector(rbind(pct_cols, paste0("n_", terms))))) %>%
+    arrange(group_label, campus, desc(peak_pct), subject_course)
 }
 
 #' Schedule one selected route using prerequisite timing and authored semester floors

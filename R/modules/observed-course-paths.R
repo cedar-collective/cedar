@@ -12,7 +12,11 @@ observedCoursePathsUI <- function(id, campuses) {
     cedar_loading_overlay(id, "button", report_type = "degree-paths", fresh_default = 5,
       uiOutput(ns("path_scope")),
       plotly::plotlyOutput(ns("path_plot"), height = "620px"),
-      dashboard_section("Courses inside the groups", "Select a group to inspect its courses. Counts retain delivery campus and observed term.",
+      dashboard_section("Courses inside the groups", "Which courses make up each group, and when students take them.",
+        method = tags$ul(
+          tags$li("A row is a course on one delivery campus; a term column is the share of that campus's students in that observed enrolled term who took it, with the number of students in brackets."),
+          tags$li("A course needs 10 students in a term, and its campus 20 students that term, to be shown; a dash is a term below that."),
+          tags$li("Rows run by course group, then campus, then the course's largest share in any term.")),
         selectInput(ns("detail_group"), "Course group", choices = c("All groups" = "all")),
         reactable::reactableOutput(ns("path_courses")))),
     info_panel("How these paths are counted",
@@ -36,17 +40,19 @@ observedCoursePathsServer <- function(id, students, population, description, edg
     output$path_plot <- plotly::renderPlotly({ req(paths()); plot_grouped_student_paths(paths()) })
     output$path_courses <- reactable::renderReactable({
       req(paths())
-      display <- degree_path_course_table(paths(), input$detail_group %||% "all") %>%
-        select(campus, relative_term, group_label, subject_course, n_students, n_eligible, pct_students)
+      table <- degree_path_course_table(paths(), input$detail_group %||% "all")
+      terms <- seq_len(paths()$meta$max_terms)
+      display <- table %>% select(group_label, campus, subject_course, all_of(paste0("term_", terms)))
+      term_cols <- stats::setNames(lapply(terms, function(k)
+        cedar_pct_count_coldef(paste("Term", k), table[[paste0("n_", k)]])), paste0("term_", terms))
       reactable::reactable(display, theme = cedar_tbl_theme, compact = TRUE, searchable = TRUE,
-        defaultPageSize = 20, columns = list(
-          campus = reactable::colDef(name = "Campus"),
-          relative_term = reactable::colDef(name = "Enrolled term", format = reactable::colFormat(digits = 0)),
-          group_label = reactable::colDef(name = "Course group"),
-          subject_course = reactable::colDef(name = "Course"),
-          n_students = cedar_count_coldef("Students"),
-          n_eligible = cedar_count_coldef("Students at term"),
-          pct_students = reactable::colDef(name = "% at term", format = reactable::colFormat(digits = 1))))
+        defaultPageSize = 25, sortable = TRUE,
+        columnGroups = list(reactable::colGroup(name = "Share of the campus's students in each enrolled term",
+                                                columns = paste0("term_", terms))),
+        columns = c(list(
+          group_label = reactable::colDef(name = "Course group", minWidth = 150),
+          campus = reactable::colDef(name = "Campus", maxWidth = 80),
+          subject_course = reactable::colDef(name = "Course", minWidth = 100)), term_cols))
     })
 
     observeEvent(input$button, {
