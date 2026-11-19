@@ -265,15 +265,12 @@ Page-level legibility is [M43](ISSUES.md)–M48; these are the new pieces.
   picker follows, naming the earlier codes it added.
 - [ ] **Courses Taken for any major, Undecided included.** "What courses do
   students in major X take?" is Dept Trends > Courses Taken, entered by
-  department; "what do undecided students take?" has no answer, because
-  `get_major_course_units()` picks its members by `primary_dept_code` and
-  Undecided (`UNDC`, 3,790 enrolled student-terms since Fall 2022) and
-  Non-Degree (`NOND`, 23,427) are deliberately owned by no unit. Pathways'
-  by-major population cannot stand in: it reads `cedar_programs`, which holds
-  no `UNDC` row (the code is on the class list only). Let the cone take
-  `opt$program_code` without a unit (own-unit share then blank), and give a
-  page a "Students in" picker by major name that includes them; list the
-  unit's own courses course by course beside the outside ones.
+  department, so a major no unit owns (Undecided `UNDC`, Non-Degree `NOND`)
+  had no answer. The cone now reads any major by its code (PR #328; own-unit
+  share blank). Left: show it on Pathways for the majors its Major picker
+  already offers (Undecided among them; `cedar_programs` holds its
+  declarations), with no picker of its own, and list the unit's own courses
+  course by course beside the outside ones.
 - [ ] **The mapping assistant proposes ADCW for a branch-only code.**
   `scripts/propose-mappings.R` stops at "no evidence settles the unit" for a
   subject or program whose only source department is the Provost Branch

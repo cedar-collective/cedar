@@ -46,6 +46,25 @@ test_that("ST01: HIST majors' registrations by teaching unit, late drops in, dup
   expect_equal(nrow(attr(res, "suppressed")), 0L)
 })
 
+test_that("ST01: a major no unit owns is read by its code, with no own unit", {
+  # ST_G's major AA has no unit, so no dept_code reaches it; by its code it does.
+  res <- get_major_course_units(test_student_terms_st, test_students_st,
+                                list(program_code = "AA", min_n = 1L, data_edges = st01_edges))
+  expect_equal(attr(res, "n_members"), 1L)
+  expect_equal(attr(res, "member_programs")$primary_major_code, "AA")
+  expect_equal(res$dept_code, "HIST")
+  expect_equal(res$n_students, 1L)
+  expect_true(is.na(res$is_own_unit))
+  # Codes from two units pool their members; no unit is anyone's own.
+  both <- get_major_course_units(test_student_terms_st, test_students_st,
+                                 list(program_code = c("AA", "HIST"), min_n = 1L, data_edges = st01_edges))
+  expect_equal(both$term_students, c(9L, 9L, 9L, 1L))
+  expect_true(all(is.na(both$is_own_unit)))
+  expect_error(get_major_course_units(test_student_terms_st, test_students_st,
+                                      list(min_n = 1L, data_edges = st01_edges)),
+               "dept_code.*or opt\\$program_code")
+})
+
 test_that("ST01: the course grain is the same registrations one level down, with the share of members", {
   res <- get_major_course_units(test_student_terms_st, test_students_st,
                                 list(dept_code = "HIST", min_n = 1L, grain = "course", data_edges = st01_edges))
