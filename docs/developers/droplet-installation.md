@@ -9,23 +9,23 @@ nav_order: 0
 
 The order of work for standing up a production CEDAR on a fresh Linux server
 (a DigitalOcean droplet at UNM), from an empty machine to a GitHub push that
-deploys. Each step links to the page that owns its detail. A step marked
-**Confirm** is not settled by the repository; check it against the running
-production host before relying on it.
+deploys. Each step links to the page that owns its detail. "Production"
+below is the UNM droplet as read on 2026-11-19.
 
 ## 1. The machine
 
-- **Operating system.** Any current Linux that runs Docker Engine with the
-  Compose plugin. **Confirm** the release production runs.
-- **Memory.** Plan for at least 4 GiB, with swap. The image build on the
-  server peaked near 3.2 GiB of 3.8 GiB, and a second full copy of the class
-  list in one R process was killed for memory, and the refresh's measure-table
-  stage (about 1.2 GiB) runs beside the live app. **Confirm** the production
-  size.
-- **Disk.** The deploy refuses to start with less than 2 GiB free, after
-  pruning Docker build cache ([Release Runbook: no space left on
+- **Operating system.** Production runs Ubuntu 22.04 LTS. Any current Linux
+  that runs Docker Engine with the Compose plugin will do.
+- **Memory.** Production has 4 vCPUs, 8 GiB and a 4 GiB swap file; don't go
+  below that. The image build peaks near 3.2 GiB, a second full copy of the
+  class list in one R process has been killed for memory, and the refresh's
+  measure-table stage (about 1.2 GiB) runs beside the live app.
+- **Disk.** Production has 25 GB, and that is tight: the deploy refuses to
+  start with less than 2 GiB free after pruning Docker build cache
+  ([Release Runbook: no space left on
   device](release-runbook.html#if-github-deploy-fails-with-no-space-left-on-device)).
-  Leave room for several images, the data directory and its backups.
+  Choose 50 GB or more for a new server, for several images, the data
+  directory and its backups.
 - **Docker.** Install Docker Engine and the Compose plugin
   (`docker compose version` must work), then create the external network the
   Compose file expects:
@@ -37,16 +37,15 @@ production host before relying on it.
 ## 2. The checkout
 
 Clone the repository where the deploy workflow will find it (the GitHub
-secret `CEDAR_PATH`; the crontab example in `scripts/README.md` uses
-`/root/cedar`):
+secret `CEDAR_PATH`). Production uses `/root/cedar`:
 
 ```bash
 git clone https://github.com/cedar-collective/cedar.git /root/cedar
 cd /root/cedar
 ```
 
-**Confirm** the production path: `scripts/README.md` names both
-`/root/cedar` and `/root/shiny/docker-compose.yml`.
+Production also has `/root/shiny`, an older copy of the app from before the
+current layout. Nothing runs from it; a new server doesn't need it.
 
 ## 3. Machine-local configuration
 
@@ -102,9 +101,29 @@ laptop. Registration > Projections needs a published bundle in `output/`;
 
 Put nginx in front of port 3838 and install the restart and maintenance
 pages once ([Deployment Maintenance Page: server setup](deployment-maintenance.html#server-setup)).
-If nginx runs in Docker, `CEDAR_RESTARTING_FLAG` is the marker's path on the
-host. **Confirm** how production terminates TLS (certificate source and
-renewal).
+
+Production runs nginx in Docker, as its own Compose project in
+`/root/shiny-proxy` (container `shiny-proxy-nginx-1`), publishing ports 80
+and 443. It mounts three host directories:
+
+| Host | In the container | For |
+|---|---|---|
+| `/etc/letsencrypt` | `/etc/letsencrypt` | the certificates |
+| `/root/shiny-proxy/certbot-webroot` | `/var/www/certbot` | the certificate challenge |
+| `/root/shiny-proxy/flags` | `/var/maintenance` | the restart and maintenance markers and pages |
+
+Because nginx is in Docker, `CEDAR_RESTARTING_FLAG` is the restart marker's
+path on the host, under `/root/shiny-proxy/flags`.
+
+**TLS.** Certificates come from Let's Encrypt through certbot on the host,
+with the webroot authenticator writing into `certbot-webroot`. The system
+`certbot.timer` renews them, and a deploy hook
+(`/etc/letsencrypt/renewal-hooks/deploy/reload-nginx.sh`) reloads nginx in
+its container:
+
+```bash
+docker exec shiny-proxy-nginx-1 nginx -s reload
+```
 
 ## 7. Deploys from GitHub
 
