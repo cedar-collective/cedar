@@ -251,10 +251,6 @@ Page-level legibility is [M43](ISSUES.md)–M48; these are the new pieces.
   this course?", each a deep link to the subtab that answers it; Course
   Dynamics' eight subtabs and Pathways' six are invisible from Home now.
 
-- [ ] **A dark theme, with a toggle** (asked 2026-11-19). Every colour a
-  token, light and dark values, the reader's choice remembered per browser,
-  following the system setting until chosen; charts and tables read the same
-  tokens.
 
 ## Platform
 
