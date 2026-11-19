@@ -10,6 +10,7 @@ has_children: true
 Running CEDAR in production: preparing a release, the notice users see during a
 deploy, and watching performance afterwards.
 
+- [Installing on a Droplet](droplet-installation.html): a new production server, in order.
 - [Release Runbook](release-runbook.html): preparing a release and a production deploy.
 - [Deployment Maintenance Page](deployment-maintenance.html): the restart notice during deploys.
 - [Performance Monitoring](performance-monitoring.html): slow reports, memory growth and load contention.
