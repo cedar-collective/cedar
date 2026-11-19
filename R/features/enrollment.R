@@ -159,6 +159,9 @@ attach_enrollment_section_counts <- function(sections, students, schedule) {
 #' @param opt `view` (a `filter_enrollment_crosslist_view()` view, default
 #'   "home"), `group_cols` (NULL for one row per section), `enrl_min`,
 #'   `enrl_max` (census bounds; NULL or NA for none).
+#' A row grouped by `subject_course` (and not by `course_title`) carries
+#' `course_title`, its sections' most common title, and `n_titles`.
+#'
 #' @return list(rows, grouped, group_cols, n_before_filter, n_no_registrations).
 summarize_enrollment_view <- function(section_rows, opt = list()) {
   view <- opt[["view"]] %||% "home"
@@ -195,6 +198,21 @@ summarize_enrollment_view <- function(section_rows, opt = list()) {
       dplyr::mutate(avg_census = dplyr::if_else(
         sections_matched > 0, census_enrl / sections_matched, NA_real_
       ))
+    # A row grouped by course names it: its most common title over its
+    # sections, and how many titles they had (a topics course, or a course
+    # renamed across the terms a row spans).
+    if ("subject_course" %in% group_cols && !"course_title" %in% group_cols) {
+      if (!"course_title" %in% names(rows)) {
+        stop("[enrollment.R] summarize_enrollment_view(): section rows lack course_title")
+      }
+      titles <- rows %>%
+        dplyr::filter(!is.na(course_title), nzchar(course_title)) %>%
+        dplyr::count(dplyr::across(dplyr::all_of(c(group_cols, "course_title"))), name = "n_sections") %>%
+        dplyr::arrange(dplyr::desc(n_sections), course_title) %>%
+        dplyr::group_by(dplyr::across(dplyr::all_of(group_cols))) %>%
+        dplyr::summarize(course_title = dplyr::first(course_title), n_titles = dplyr::n(), .groups = "drop")
+      out <- out %>% dplyr::left_join(titles, by = group_cols, relationship = "one-to-one")
+    }
   } else {
     out <- rows %>%
       dplyr::mutate(sections_matched = as.integer(!is.na(registered)))
@@ -250,7 +268,9 @@ ENROLLMENT_TABLE_COUNT_COLS <- c(
 #'
 #' Rounds once, here: counts whole, fill a percentage to one decimal, the
 #' per-section census mean to two. A section row names the code the schedule
-#' used that term (`listed_code`) and its crosslist or split partners.
+#' used that term (`listed_code`) and its crosslist or split partners; a row
+#' grouped by course names its title after the course, "(+N more)" when its
+#' sections had several.
 #'
 #' @param view A `summarize_enrollment_view()` result.
 #' @return A tibble in display order.
@@ -258,7 +278,15 @@ enrollment_table_display <- function(view) {
   rows <- view$rows
   if (is.null(rows) || nrow(rows) == 0) return(tibble::tibble())
   if (isTRUE(view$grouped)) {
-    keep <- c(view$group_cols, intersect(ENROLLMENT_TABLE_COUNT_COLS, names(rows)))
+    keep <- view$group_cols
+    if ("n_titles" %in% names(rows)) {
+      # The title follows the course; a row with several says how many more.
+      rows <- rows %>% dplyr::mutate(course_title = dplyr::if_else(
+        n_titles > 1L, paste0(course_title, " (+", n_titles - 1L, " more)"), course_title))
+      at <- match("subject_course", keep)
+      keep <- append(keep, "course_title", after = at)
+    }
+    keep <- c(keep, intersect(ENROLLMENT_TABLE_COUNT_COLS, names(rows)))
   } else {
     partners <- dplyr::coalesce(
       if ("split_sections" %in% names(rows)) as.character(rows$split_sections) else NA_character_,

@@ -802,8 +802,16 @@ cedar_copy_url_observer(
     gen_ed_area     = reactable::colDef(name = "Gen Ed",    maxWidth = 80,  headerStyle = header_nowrap),
     partners        = reactable::colDef(name = "Partners",  minWidth = 120, headerStyle = header_nowrap,
                                         na = ""),
-    sections        = count_def("Sections", 72),
-    sections_matched = if (grouped) count_def("With Registrations", 98) else reactable::colDef(show = FALSE),
+    # A grouped row whose sections are not all on the class list says how
+    # many are; one with none says so in Census.
+    sections        = count_def("Sections", 72, cell = function(value, index) {
+      matched <- if ("sections_matched" %in% names(df)) df$sections_matched[[index]] else NA
+      if (is.na(value) || is.na(matched) || matched == 0L || matched >= value) return(as.character(value))
+      tagList(as.character(value), tags$span(class = "text-note", paste0(" \u00b7 ", matched, " registered")))
+    }),
+    # In the download, not on screen: With Registrations is in Sections and
+    # Census, and the DESR counts repeat Final but for pull timing.
+    sections_matched = reactable::colDef(show = FALSE),
     xl_sections     = count_def("XL Sections", 82),
     seats           = count_def("Seats", 64),
     first_day_enrl  = count_def("First Day", 72),
@@ -825,8 +833,8 @@ cedar_copy_url_observer(
     registered      = count_def("Final", 64),
     dr_early        = count_def("Early Drops", 72),
     dr_late         = count_def("Late Drops", 72),
-    enrolled        = count_def("DESR Enrl", 78),
-    total_enrl      = count_def(if (grouped) "XL-aware DESR Enrl" else "XL Total DESR Enrl", 96)
+    enrolled        = reactable::colDef(show = FALSE),
+    total_enrl      = reactable::colDef(show = FALSE)
   )
   defs[intersect(names(defs), names(df))]
 }

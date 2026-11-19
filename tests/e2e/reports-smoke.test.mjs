@@ -407,20 +407,22 @@ export async function runReportChecks({ scope = 'smoke', synthetic = false } = {
       await setInput(page, 'enrl_campus', CAMPUSES);
       await setInput(page, 'enrl_term', [TERM]);
       await setInput(page, 'enrl_dept', [DEPT]);
-      await setInput(page, 'enrl_agg_by', ['campus', 'subject_course', 'course_title', 'term']);
+      await setInput(page, 'enrl_agg_by', ['campus', 'subject_course', 'term']);
       await click(page, 'enrl_button');
       await waitForOutput(page, 'Enrollment rows', [
         { type: 'reactable', id: 'enrl_summary' },
       ]);
-      // One table: the class-list counts through the term beside the DESR
-      // count, Min/Max read on census, and the definitions in the method slot.
+      // One table: each course with its title and the class-list counts
+      // through the term (the DESR count is in the download only), Min/Max
+      // read on census, and the definitions in the method slot.
       await page.waitForFunction(() => {
         const scope = document.getElementById('enrl_filter_summary')?.innerText || '';
         const minLabel = document.querySelector('label[for="enrl_min"]')?.innerText || '';
         const table = document.getElementById('enrl_summary')?.innerText || '';
         return scope.includes('Home:') && scope.includes('census') &&
           minLabel.toUpperCase().includes('CENSUS MIN') &&
-          ['FIRST DAY', 'CENSUS', 'FINAL', 'SEATS', 'DESR ENRL'].every(h => table.includes(h)) &&
+          ['TITLE', 'FIRST DAY', 'CENSUS', 'FINAL', 'SEATS'].every(h => table.includes(h)) &&
+          !table.includes('DESR ENRL') && !table.includes('WITH REGISTRATIONS') &&
           ['first-day-enrollment', 'census-enrollment', 'desr-enrollment']
             .every(id => !!document.querySelector(`[data-definition-id="${id}"]`));
       }, { timeout: STEP_TIMEOUT, polling: 500 });
