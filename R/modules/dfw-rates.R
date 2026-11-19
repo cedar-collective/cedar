@@ -6,34 +6,43 @@
 # swinging, which courses' sections disagree term after term, and each campus
 # and college.
 #
-# The module holds no analysis: it collects the term type and campus, calls
+# The module holds no analysis: it collects the term type, campuses and term
+# range, calls
 # build_dfw_dashboard() (features/dfw-dashboard.R), and lays out what
 # features/dfw-dashboard-view.R computes from it. It builds only while the tab
-# is open, once per term type and campus a session asks for.
+# is open, once per scope a session asks for.
 #
 # Exported functions:
-#   dfwRatesUI(id, campuses)
+#   dfwRatesUI(id, campuses, terms)
 #   dfwRatesServer(id, attempts, dims, edges, active)
 
 DFW_RATES_TERM_TYPES <- c(Fall = "fall", Spring = "spring", Summer = "summer")
-DFW_RATES_ALL_CAMPUSES <- "all"
 
 # The tone each part of a figure carries; the same tone marks its rows below.
 DFW_RATES_TONES <- c(quarter = "critical", half = "warning", rest = "muted",
                      uneven = "warning", even = "muted")
 
-dfwRatesUI <- function(id, campuses) {
+# campuses  the teaching campuses to offer; ABQ and EA are selected, and none
+#           selected reads every campus.
+# terms     the graded terms to offer as the first and last term read.
+dfwRatesUI <- function(id, campuses, terms) {
   ns <- NS(id)
+  terms <- sort(unique(as.integer(terms)))
+  term_choices <- stats::setNames(terms, vapply(terms, fmt_term, character(1)))
   tagList(
     filter_bar(
       "DFW Rates",
       "How lower-division courses are doing on D, F and withdrawal grades, and where to act.",
       fluidRow(
-        column(5, radioButtons(ns("dr_term_type"), "Term type", choices = DFW_RATES_TERM_TYPES,
+        column(3, radioButtons(ns("dr_term_type"), "Term type", choices = DFW_RATES_TERM_TYPES,
                                selected = "fall", inline = TRUE)),
-        column(4, selectInput(ns("dr_campus"), "Campus",
-                              choices = c(stats::setNames(DFW_RATES_ALL_CAMPUSES, "Every campus"), campuses))),
-        column(3, filter_actions(actionButton(ns("dr_copy_url"), label = NULL, icon = icon("link"),
+        column(3, selectInput(ns("dr_campus"), "Campus", multiple = TRUE, choices = campuses,
+                              selected = intersect(CEDAR_CAMPUS_DEFAULT, campuses))),
+        column(2, selectizeInput(ns("dr_from_term"), "From term", choices = term_choices,
+                                 selected = unname(utils::head(term_choices, 1L)))),
+        column(2, selectizeInput(ns("dr_to_term"), "To term", choices = term_choices,
+                                 selected = unname(utils::tail(term_choices, 1L)))),
+        column(2, filter_actions(actionButton(ns("dr_copy_url"), label = NULL, icon = icon("link"),
                                               title = "Copy shareable link for current view",
                                               class = "btn-outline-secondary btn-sm")))
       )
@@ -59,7 +68,13 @@ dfwRatesUI <- function(id, campuses) {
       "Which courses are getting worse or better, and which swing from term to term more than courses usually do.",
       method = uiOutput(ns("method_changing")),
       uiOutput(ns("change_cards")),
-      plotly::plotlyOutput(ns("slope_plot"), height = "520px"),
+      dashboard_subsection(
+        "Rising and Falling",
+        paste("The ten courses getting worse and the ten getting better with the most DFW grades.",
+              "A bar is how much the course's DFW rate changes in a year along its trend:",
+              "+2 means a 20% rate is 22% a year later."),
+        plotly::plotlyOutput(ns("slope_plot"), height = "520px")
+      ),
       dashboard_subsection(
         "Swinging More Than Courses Usually Do",
         "Courses whose rate jumps around its line by more than chance and the usual term-to-term change.",
@@ -79,7 +94,7 @@ dfwRatesUI <- function(id, campuses) {
       "Whether each campus and college is moving the same way.",
       method = uiOutput(ns("method_groups")),
       fluidRow(
-        column(6, dashboard_subsection("Campus", "The campus that taught the course.",
+        column(6, dashboard_subsection("Campus", "Every campus, whichever the Campus filter picks: the campus that taught the course.",
                                        reactable::reactableOutput(ns("campus_table")))),
         column(6, dashboard_subsection("College", "The college that offers the course.",
                                        reactable::reactableOutput(ns("college_table"))))
@@ -95,8 +110,13 @@ dfwRatesUI <- function(id, campuses) {
 .dfw_rates_terms <- function(terms) paste(vapply(terms, fmt_term, character(1)), collapse = ", ")
 .dfw_rates_type <- function(p) tolower(names(DFW_RATES_TERM_TYPES)[DFW_RATES_TERM_TYPES == p$meta$term_type])
 .dfw_rates_scope <- function(p) {
-  paste0(p$meta$level, "-division courses, ", .dfw_rates_type(p), " terms, ",
-         if (is.null(p$meta$campus)) "every campus" else p$meta$campus)
+  m <- p$meta
+  range <- if (!is.null(m$from_term) || !is.null(m$to_term)) {
+    paste0(" from ", fmt_term(m$from_term %||% min(p$overall$terms$term)),
+           " to ", fmt_term(m$to_term %||% m$graded_edge))
+  } else ""
+  paste0(m$level, "-division courses, ", .dfw_rates_type(p), " terms", range, ", ",
+         if (is.null(m$campus)) "every campus" else paste(m$campus, collapse = " and "))
 }
 
 .dfw_rates_table <- function(d, columns, page_size = 15L, ...) {
@@ -110,13 +130,14 @@ dfwRatesUI <- function(id, campuses) {
   reactable::colDef(name = name, align = "right", na = "—",
                     format = reactable::colFormat(digits = 1, suffix = "%"), ...)
 }
-# A trend cell: the rates its line reads, then its verdict. `series` is the
-# table's list of rate vectors, in its row order.
+# A trend cell: the rates its line reads; the line is the message, and its
+# verdict is the cell's tooltip. `series` is the table's list of rate vectors,
+# in its row order.
 .dfw_rates_trend_coldef <- function(series, name = "Trend") {
   force(series)
-  reactable::colDef(name = name, minWidth = 150, html = TRUE, cell = function(value, index) {
+  reactable::colDef(name = name, minWidth = 110, html = TRUE, cell = function(value, index) {
     label <- unname(DFW_DIRECTION_LABELS[dplyr::coalesce(value, "none")])
-    paste0(as.character(make_sparkline(series[[index]])), " ", htmltools::htmlEscape(label))
+    as.character(tags$span(title = label, make_sparkline(series[[index]])))
   })
 }
 .dfw_rates_campus_label <- function(codes) {
@@ -179,7 +200,7 @@ dfwRatesUI <- function(id, campuses) {
 
 .dfw_rates_course_reactable <- function(t) {
   series <- t$series
-  d <- dplyr::select(t, -series, -slope)
+  d <- dplyr::select(t, -series, -slope, -dplyr::any_of("swings"))
   .dfw_rates_table(d, list(
     rank = reactable::colDef(name = "#", maxWidth = 50, align = "right"),
     subject_course = reactable::colDef(name = "Course", minWidth = 100),
@@ -190,9 +211,7 @@ dfwRatesUI <- function(id, campuses) {
     dfw_pct = .dfw_rates_rate_coldef("DFW rate"),
     share_pct = .dfw_rates_rate_coldef("Share of all DFW"),
     cum_pct = .dfw_rates_rate_coldef("Cumulative share"),
-    direction = .dfw_rates_trend_coldef(series),
-    swings = reactable::colDef(name = "Swings", maxWidth = 80, align = "center",
-                               cell = function(v) if (isTRUE(v)) "Swings" else "")
+    direction = .dfw_rates_trend_coldef(series)
   ), searchable = TRUE)
 }
 
@@ -256,7 +275,7 @@ dfwRatesUI <- function(id, campuses) {
     tags$li("A course taught on two campuses is two rows: each campus's attempts are its own."),
     tags$li(paste0("A course is listed with ", m$min_window_n, " or more attempts over those terms; every course counts in the totals and shares.")),
     tags$li("Courses are ranked by DFW grades, not rate: the count is where the students are. Share is of every DFW grade in scope; cumulative share adds the courses above."),
-    tags$li("The trend and the small line beside it read every term of the type, as in How UNM Is Doing.")
+    tags$li("The small line is the course's rate in every term of the type, as in How UNM Is Doing; hover over it for the trend's verdict.")
   )
 }
 
@@ -287,7 +306,8 @@ dfwRatesUI <- function(id, campuses) {
 .dfw_rates_method_groups <- function(p) {
   m <- p$by_campus$meta
   tags$ul(
-    tags$li("Each row reads its own rate term by term and judges its line as How UNM Is Doing does; the small line is its rates."),
+    tags$li("Each row reads its own rate term by term and judges its line as How UNM Is Doing does; the small line is its rates, and hovering gives the verdict."),
+    tags$li("The campus table sets every campus beside the others, whichever campuses the filter picks; the college table reads the campuses picked."),
     tags$li(paste0("A row with fewer than ", m$min_trend_terms, " terms of ", m$min_term_n,
                    "+ attempts has no trend. A course's college is the one that offers it; College not decided marks courses the mapping files do not yet place."))
   )
@@ -302,16 +322,26 @@ dfwRatesServer <- function(id, attempts, dims, edges, active) {
     built <- new.env(parent = emptyenv())
 
     cedar_copy_url_observer(input, session, "dr_copy_url", spec_title = "DFW Rates",
-                            values_fn = function() list(term_type = input$dr_term_type, campus = input$dr_campus))
+                            values_fn = function() list(term_type = input$dr_term_type, campus = input$dr_campus,
+                                                        from_term = input$dr_from_term, to_term = input$dr_to_term))
 
     payload <- reactive({
-      req(isTRUE(active()), input$dr_term_type, input$dr_campus)
-      key <- paste(input$dr_term_type, input$dr_campus)
+      req(isTRUE(active()), input$dr_term_type, input$dr_from_term, input$dr_to_term)
+      # No campus picked reads every campus.
+      campus <- if (length(input$dr_campus) == 0L) NULL else sort(input$dr_campus)
+      from_term <- as.integer(input$dr_from_term)
+      to_term <- as.integer(input$dr_to_term)
+      if (from_term > to_term) {
+        showNotification("DFW Rates: the From term is after the To term.", type = "warning",
+                         duration = 6, id = "dfw_rates_term_order")
+        req(FALSE)
+      }
+      key <- paste(input$dr_term_type, paste(campus, collapse = "+"), from_term, to_term)
       if (!is.null(built[[key]])) return(built[[key]])
-      campus <- if (identical(input$dr_campus, DFW_RATES_ALL_CAMPUSES)) NULL else input$dr_campus
       p <- withProgress(message = "Reading every lower-division course's DFW grades…", value = 0.3, {
         tryCatch(
           build_dfw_dashboard(attempts, dims, list(term_type = input$dr_term_type, campus = campus,
+                                                   from_term = from_term, to_term = to_term,
                                                    data_edges = edges)),
           error = function(e) {
             showNotification(paste("DFW Rates:", conditionMessage(e)), type = "error", duration = 10)

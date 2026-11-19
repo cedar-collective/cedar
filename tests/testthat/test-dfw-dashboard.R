@@ -38,6 +38,41 @@ test_that("the series refuses a mixed or missing term type, another grouping and
                "graded edge|built to")
 })
 
+test_that("the DFW scope reads only the terms and campuses chosen", {
+  middle <- get_dfw_term_series(df_attempts, modifyList(df01_fall_opt, list(from_term = 202080L, to_term = 202180L)))
+  expect_equal(middle$terms$term, c(202080L, 202180L))
+  expect_equal(middle$terms$n_dfw, c(44L, 32L))
+  # The early terms and the last one are left out of the line too: two terms
+  # are too few for a trend.
+  expect_equal(middle$trend$direction, "too_few_terms")
+  from_2020 <- prepare_dfw_attempts(df_attempts, modifyList(df01_fall_opt, list(from_term = 202080L)))
+  expect_equal(sort(unique(from_2020$term)), c(202080L, 202180L, 202280L))
+
+  ea <- get_dfw_term_series(df_attempts, modifyList(df01_fall_opt, list(campus = "EA")))
+  expect_equal(ea$terms$n_attempts, rep(30L, 4))
+  both <- get_dfw_term_series(df_attempts, modifyList(df01_fall_opt, list(campus = c("ABQ", "EA"))))
+  every <- get_dfw_term_series(df_attempts, df01_fall_opt)
+  abq_ea <- df_attempts %>% dplyr::filter(campus %in% c("ABQ", "EA"))
+  expect_lte(sum(both$terms$n_attempts), sum(every$terms$n_attempts))
+  expect_equal(sum(both$terms$n_attempts),
+               nrow(prepare_dfw_attempts(abq_ea, df01_fall_opt)))
+
+  expect_error(prepare_dfw_attempts(df_attempts, modifyList(df01_fall_opt, list(from_term = 202280L, to_term = 202080L))),
+               "after opt\\$max_term")
+})
+
+test_that("the dashboard's campus table reads every campus whichever the page scopes to", {
+  p <- build_dfw_dashboard(df_attempts, test_dims, modifyList(df01_fall_opt, list(campus = "EA")))
+  every <- get_dfw_term_series(df_attempts, df01_fall_opt, "campus")
+  expect_setequal(p$by_campus$trend$campus, every$trend$campus)
+  expect_true(length(unique(every$trend$campus)) > 1L)
+  # The rest of the page is EA's.
+  expect_equal(unique(p$courses$courses$campus), "EA")
+  expect_setequal(unique(p$by_college$terms$college),
+                  unique(dplyr::filter(df_attempts, campus == "EA", level == "lower")$college))
+  expect_equal(p$meta$campus, "EA")
+})
+
 test_that("a rate trend refuses two terms of one year in a line", {
   two_types <- df_attempts %>%
     dplyr::filter(subject_course == "MATH 1220", campus == "ABQ") %>%

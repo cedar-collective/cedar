@@ -7,8 +7,10 @@
 // add to its headline, the course bars and table, the rising/falling/swinging
 // cards with the slope chart, the section strip and table, the campus and
 // college tables; every method slot filled; no instructor anywhere; a re-read
-// when the term type changes; and a deep link that restores the term type and
-// campus.
+// when the term type changes; ABQ and EA as the opening campuses, with the
+// campus table still setting every campus side by side; trend cells that are
+// a line with no word; no Swings column; a From term that shortens the series;
+// and a deep link that restores the term type, campus and term range.
 //
 //   node tests/e2e/dfw-rates.test.mjs
 
@@ -46,8 +48,11 @@ const waitBuilt = async (termType) => {
 try {
   await connect(page, { tab: 'dfw-rates', expect: 'DFW Rates' });
   await waitBuilt('fall');
-  await requireIds(page, ['dfw_rates-dr_term_type', 'dfw_rates-dr_campus', 'dfw_rates-dr_copy_url',
+  await requireIds(page, ['dfw_rates-dr_term_type', 'dfw_rates-dr_campus', 'dfw_rates-dr_from_term',
+                          'dfw_rates-dr_to_term', 'dfw_rates-dr_copy_url',
                           'dfw_rates-overall_plot', 'dfw_rates-course_table', 'dfw_rates-campus_table']);
+  const campuses = await page.$eval('#dfw_rates-dr_campus', (el) => [...el.selectedOptions].map((o) => o.value).sort());
+  ok(campuses.join(',') === 'ABQ,EA', `the page opens on ABQ and EA (${campuses})`);
 
   const overall = await cards('overall_finding');
   ok(overall.map((c) => c.title).join('|') === 'Latest term|Trend', `latest-term and trend cards (${overall.map((c) => c.title)})`);
@@ -67,6 +72,11 @@ try {
   const courses = await readReactable(page, `${NS}course_table`, { limit: 15 });
   ok(courses.rows?.length === 15, `the course table shows its first 15 rows (${courses.rows?.length})`);
   ok(courses.rows?.[0]?.[0] === '1', `the table is ranked from the course with the most DFW grades (${courses.rows?.[0]?.[0]})`);
+  ok(courses.rows?.every((r) => ['ABQ', 'EA'].includes(r[2])), `the course table holds ABQ and EA courses (${[...new Set(courses.rows?.map((r) => r[2]))]})`);
+  ok(!courses.headers?.some((h) => /swings/i.test(h)), `no Swings column (${courses.headers})`);
+  const trendWords = await page.evaluate(() => [...document.querySelectorAll('#dfw_rates-course_table .rt-tbody .rt-tr')]
+    .map((r) => r.lastElementChild?.innerText.trim()).filter(Boolean));
+  ok(trendWords.length === 0, `a trend cell is its line, with no word (${trendWords.slice(0, 3)})`);
 
   const change = await cards('change_cards');
   ok(change.map((c) => c.title).join('|') === 'Rising|Falling|Swinging', `rising, falling and swinging cards (${change.map((c) => c.title)})`);
@@ -82,6 +92,8 @@ try {
     const t = await readReactable(page, `${NS}${id}`, { limit: 5 });
     ok(t.rows?.length > 0 && t.rows.every((r) => r.length === 5), `${id} lists groups with a trend cell (${t.rows?.length})`);
   }
+  const campusRows = await readReactable(page, `${NS}campus_table`, { limit: 20 });
+  ok(campusRows.rows?.length > 2, `the campus table sets every campus side by side, not only ABQ and EA (${campusRows.rows?.length})`);
 
   const methods = await page.evaluate(() => [...document.querySelectorAll('#dfw_rates-method_overall, #dfw_rates-method_courses, #dfw_rates-method_changing, #dfw_rates-method_sections, #dfw_rates-method_groups')]
     .map((m) => m.textContent.trim().length));
@@ -97,15 +109,31 @@ try {
   const spring = await cards('overall_finding');
   ok(spring[0]?.headline && spring[0].headline !== fallLatest, `spring re-reads the page (${fallLatest} -> ${spring[0]?.headline})`);
 
-  await connect(page, { tab: 'dfw-rates', search: 'tab=dfw-rates&term_type=spring&campus=EA', expect: 'DFW Rates' });
-  const restored = await waitFor(page, () =>
+  const springTerms = (await plot('overall_plot'))?.n[0];
+  const terms = await page.$eval('#dfw_rates-dr_from_term', (el) => Object.keys(el.selectize?.options || {}));
+  const springs = terms.filter((t) => t.endsWith('10')).sort();
+  const from = springs[springs.length - 3];
+  await setInput(page, `${NS}dr_from_term`, from);
+  await waitForIdle(page, { timeout: 300000 });
+  const shorter = await waitFor(page, (n) => {
+    const root = document.getElementById('dfw_rates-overall_plot');
+    const p = root?.classList.contains('js-plotly-plot') ? root : root?.querySelector('.js-plotly-plot');
+    return p?.data && (p.data[0].x || []).length < n;
+  }, { timeout: 300000, args: [springTerms] });
+  ok(shorter, `a later From term (${from}) shortens the series from ${springTerms} terms`);
+
+  await connect(page, { tab: 'dfw-rates', search: `tab=dfw-rates&term_type=spring&campus=EA&from_term=${from}`, expect: 'DFW Rates' });
+  const restored = await waitFor(page, (f) =>
     document.querySelector('input[name="dfw_rates-dr_term_type"]:checked')?.value === 'spring' &&
-    document.getElementById('dfw_rates-dr_campus')?.value === 'EA', { timeout: 60000 });
-  ok(restored, 'a link restores the term type and campus');
+    [...(document.getElementById('dfw_rates-dr_campus')?.selectedOptions || [])].map((o) => o.value).join(',') === 'EA' &&
+    document.getElementById('dfw_rates-dr_from_term')?.value === f, { timeout: 60000, args: [from] });
+  ok(restored, 'a link restores the term type, campus and From term');
   if (restored) {
     await waitBuilt('spring');
-    const campus = await readReactable(page, `${NS}campus_table`, { limit: 5 });
-    ok(campus.rows?.length === 1 && /^EA/.test(campus.rows[0][0]), `the campus scope narrows the campus table (${campus.rows?.map((r) => r[0])})`);
+    const eaCourses = await readReactable(page, `${NS}course_table`, { limit: 10 });
+    ok(eaCourses.rows?.length > 0 && eaCourses.rows.every((r) => r[2] === 'EA'), `the campus scope narrows the course table (${[...new Set(eaCourses.rows?.map((r) => r[2]))]})`);
+    const campus = await readReactable(page, `${NS}campus_table`, { limit: 20 });
+    ok(campus.rows?.length > 1, `the campus table still sets every campus side by side (${campus.rows?.map((r) => r[0])})`);
   }
 
   ok(jsErrors.length === 0, `no page errors (${jsErrors.join('; ')})`);

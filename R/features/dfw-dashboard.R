@@ -36,17 +36,21 @@ DFW_NR_NOTE_SHARE <- 0.01
 #' @param attempts The attempt measure table (`cedar_attempts`).
 #' @param dims The dimension tables (`cedar_dims`), for college names.
 #' @param opt `term_type` (required), `level` (default "lower"), `campus`
-#'   (NULL for every campus), `data_edges`, and the cones' thresholds
+#'   (teaching campus codes; NULL for every campus), `from_term` and `to_term`
+#'   (NULL for the whole history), `data_edges`, and the cones' thresholds
 #'   (`n_window`, `min_window_n`, `min_term_n`, `min_trend_terms`,
 #'   `min_section_n`, `min_sections`, `alpha`).
 #' @return A list of class `dfw_dashboard`: `overall`, `by_campus`,
-#'   `by_college` (get_dfw_term_series() output; `by_college` carries
+#'   `by_college` (get_dfw_term_series() output; `by_campus` reads every
+#'   campus whatever `campus` says, so the page can set each campus beside
+#'   the others; `by_college` carries
 #'   `college_name`), `courses` (get_dfw_course_board(), with
 #'   `college_name`), `sections` (get_dfw_section_spread()), `meta`.
 build_dfw_dashboard <- function(attempts, dims, opt = list()) {
   opt$level <- opt$level %||% "lower"
   overall <- get_dfw_term_series(attempts, opt)
-  by_campus <- get_dfw_term_series(attempts, opt, "campus")
+  # Every campus, beside each other, whichever the page scopes to.
+  by_campus <- get_dfw_term_series(attempts, utils::modifyList(opt, list(campus = NULL)), "campus")
   by_college <- get_dfw_term_series(attempts, opt, "college")
   by_college$terms$college_name <- .dfw_dash_college_names(by_college$terms$college, dims)
   by_college$trend$college_name <- .dfw_dash_college_names(by_college$trend$college, dims)
@@ -57,6 +61,7 @@ build_dfw_dashboard <- function(attempts, dims, opt = list()) {
     overall = overall, by_campus = by_campus, by_college = by_college,
     courses = courses, sections = sections,
     meta = list(term_type = opt$term_type, level = opt$level, campus = opt$campus,
+                from_term = opt$from_term, to_term = opt$to_term,
                 graded_edge = overall$meta$graded_edge, window_terms = courses$meta$window_terms)
   ), class = "dfw_dashboard")
 }
@@ -188,6 +193,8 @@ format_dfw_dashboard <- function(payload, n_list = 15L) {
   m <- payload$meta
   head <- paste0("DFW: ", m$level, "-division courses, ", m$term_type, " terms, ",
                  if (is.null(m$campus)) "every campus" else paste(m$campus, collapse = ", "),
+                 if (!is.null(m$from_term)) paste0(", from ", fmt_term(m$from_term)),
+                 if (!is.null(m$to_term)) paste0(", to ", fmt_term(m$to_term)),
                  ", graded through ", fmt_term(m$graded_edge),
                  ". DFW is every grade but A+ to C and CR, plus late withdrawals; early drops are left out.")
   paste(c(head, "",
@@ -195,7 +202,7 @@ format_dfw_dashboard <- function(payload, n_list = 15L) {
           .dfw_dash_courses(payload, n_list), "",
           .dfw_dash_changing(payload, n_list), "",
           .dfw_dash_sections(payload, n_list), "",
-          .dfw_dash_groups(payload$by_campus, "campus", "5. By campus (first term -> last, trend)"), "",
+          .dfw_dash_groups(payload$by_campus, "campus", "5. By campus, every campus (first term -> last, trend)"), "",
           .dfw_dash_groups(payload$by_college, "college_name", "6. By college (first term -> last, trend)")),
         collapse = "\n")
 }

@@ -222,7 +222,8 @@ which courses are getting worse, and which courses' sections disagree term
 after term.
 
 **In CEDAR:** **Bird's Eye → DFW Rates**. It builds when it opens; pick Fall,
-Spring or Summer, and a campus if you want one.
+Spring or Summer; it opens on ABQ and EA over every graded term, and both
+the campuses and the From and To terms can be changed.
 
 **Watch out for:**
 - Courses are ranked by DFW grades, not rate: the count is where the students are.

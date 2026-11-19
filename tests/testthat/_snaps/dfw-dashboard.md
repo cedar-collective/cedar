@@ -33,7 +33,7 @@
         Uneven in two or more terms: 1 course:
           MATH 1220 (ABQ)    uneven in 2 of 3 terms: Fall 2021 0-80% across 3; Fall 2022 20-100% across 3
       
-      5. By campus (first term -> last, trend)
+      5. By campus, every campus (first term -> last, trend)
         ABQ                                   20.0% ->  31.8%  steady
         EA                                    33.3% ->  33.3%  steady
       
