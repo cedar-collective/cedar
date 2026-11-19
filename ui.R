@@ -922,7 +922,8 @@ nav_panel(
 nav_panel(
   title = "Degree Explorer",
   icon = icon("graduation-cap"),
-  degreeExplorerUI("degree_explorer", CEDAR_DEGREE_BOARDS$catalog, CEDAR_DEGREE_BOARDS$roadmaps, CEDAR_DEGREE_BOARDS$status)
+  degreeExplorerUI("degree_explorer", CEDAR_DEGREE_BOARDS$catalog, CEDAR_DEGREE_BOARDS$roadmaps, CEDAR_DEGREE_BOARDS$status,
+    CEDAR_DEGREE_BOARDS$colleges)
 )
 
 ), # end Pathways nav_menu

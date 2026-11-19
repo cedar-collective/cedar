@@ -545,6 +545,8 @@ message("[global.R] Pathways choices ready: ",
 CEDAR_DEGREE_DRAFTS <- read_degree_drafts(file.path(cedar_institution_dir(), "degree_drafts"))
 CEDAR_DEGREE_BOARDS <- publish_degree_drafts(CEDAR_DEGREE_CATALOG, CEDAR_DEGREE_ROADMAPS, CEDAR_DEGREE_DRAFTS,
   degree_board_review_status(CEDAR_DEGREE_DRAFTS, file.path(data_dir, "catalog-normalizations", cedar_institution_id())))
+# Each degree's college, for Degree Explorer's College picker.
+CEDAR_DEGREE_BOARDS$colleges <- degree_catalog_colleges(CEDAR_DEGREE_BOARDS$catalog, cedar_dims)
 message("[global.R] Degree boards: ", sum(CEDAR_DEGREE_BOARDS$status$source == "compiled"), " compiled from the catalog, ",
         sum(CEDAR_DEGREE_BOARDS$status$review %in% "reviewed"), " of them reviewed")
 

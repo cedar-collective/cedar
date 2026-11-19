@@ -79,11 +79,14 @@ validate_degree_catalog <- function(catalog) {
 #'
 #' A code's major must be the catalog's program, or a pre-major that leads to
 #' it (FFDA is named "FDMA" but leads to Film and Digital Arts).
+#' Each code's major and Banner college are its second and third parts
+#' (`major_code`, `source_college_code`), the keys of the program hierarchy.
 degree_catalog_program_codes <- function(catalogs, programs) {
   rows <- lapply(seq_len(nrow(catalogs)), function(i) {
     codes <- degree_split_ids(catalogs$program_codes[i])
     data.frame(catalog_id = catalogs$catalog_id[i], program_code = codes,
-               major_code = sub("^[A-Z]+-([A-Z0-9]+)-[A-Z]+$", "\\1", codes), stringsAsFactors = FALSE)
+               major_code = sub("^[A-Z]+-([A-Z0-9]+)-[A-Z]+$", "\\1", codes),
+               source_college_code = sub("^.*-", "", codes), stringsAsFactors = FALSE)
   })
   codes <- do.call(rbind, rows)
   row <- match(codes$major_code, programs$program_code)

@@ -5,21 +5,25 @@
 # them. www/cedar-roadmap.js handles hover previews and connectors only; a
 # click opens the standard CEDAR modal, rendered here from the same payload.
 
-degreeExplorerUI <- function(id, catalog, roadmaps, status = NULL) {
+degreeExplorerUI <- function(id, catalog, roadmaps, status = NULL, colleges = NULL) {
   ns <- NS(id)
   if (!nrow(catalog$catalogs)) return(empty_state("No degree roadmaps are configured for this institution."))
   english <- roadmaps$starts[roadmaps$starts$track == "english", ]
+  choices <- degree_catalog_choices(catalog, status)
   tagList(
     htmltools::htmlDependency("cedar-roadmap", "2.2.0", src = c(href = ""),
       stylesheet = "cedar-roadmap.css", script = "cedar-roadmap.js"),
     filter_bar("Build your degree roadmap", "Choose a degree and your starting courses. Watch the sequence change.",
       fluidRow(
-        column(4, selectInput(ns("dx_catalog_id"), "Degree · latest catalog", choices = degree_catalog_choices(catalog, status))),
-        column(3, selectInput(ns("dx_math_start"), "Where will you start in math?",
-          choices = degree_math_start_choices(roadmaps, catalog$catalogs$catalog_id[1]))),
-        column(3, selectInput(ns("dx_english_start"), "Where will you start in English?",
+        if (!is.null(colleges)) column(4, selectInput(ns("dx_college"), "College", choices = degree_college_choices(colleges))),
+        column(if (is.null(colleges)) 12 else 8, selectInput(ns("dx_catalog_id"), "Degree · latest catalog",
+          choices = choices, selected = choices[[1]], width = "100%"))),
+      fluidRow(
+        column(4, selectInput(ns("dx_math_start"), "Where will you start in math?",
+          choices = degree_math_start_choices(roadmaps, choices[[1]]))),
+        column(4, selectInput(ns("dx_english_start"), "Where will you start in English?",
           choices = stats::setNames(english$start_id, english$label))),
-        column(2, selectInput(ns("dx_start_season"), "First semester", choices = c(Fall = "fall", Spring = "spring")),
+        column(4, selectInput(ns("dx_start_season"), "First semester", choices = c(Fall = "fall", Spring = "spring")),
           filter_actions(actionButton(ns("dx_copy_url"), label = NULL, icon = icon("link"),
             title = "Copy shareable link for current view", class = "btn-outline-secondary btn-sm"))))),
     filter_actions(actionButton(ns("show_rules"), "Rules behind this plan", icon = icon("list"))),
@@ -27,9 +31,22 @@ degreeExplorerUI <- function(id, catalog, roadmaps, status = NULL) {
     tags$p(class = "text-hint", "Want to see what students actually take? Open Pathways → Course paths."))
 }
 
-degreeExplorerServer <- function(id, catalog, roadmaps, sections, course_terms, edges, shared = NULL, status = NULL) {
+degreeExplorerServer <- function(id, catalog, roadmaps, sections, course_terms, edges, shared = NULL, status = NULL,
+                                 colleges = NULL) {
   if (!nrow(catalog$catalogs)) return(invisible(NULL))
   moduleServer(id, function(input, output, session) {
+    # A college narrows the degree list; the degree in view stays when it is
+    # the college's, so a restored link is never replaced.
+    observeEvent(input$dx_college, {
+      req(colleges)
+      ids <- if (identical(input$dx_college, "all")) NULL else
+        colleges$catalog_id[colleges$college_code == input$dx_college]
+      choices <- degree_catalog_choices(catalog, status, ids)
+      current <- isolate(input$dx_catalog_id)
+      updateSelectInput(session, "dx_catalog_id", choices = choices,
+        selected = if (!is.null(current) && current %in% choices) current else choices[[1]])
+    }, ignoreInit = TRUE)
+
     observeEvent(input$dx_catalog_id, {
       updateSelectInput(session, "dx_math_start",
         choices = degree_math_start_choices(roadmaps, input$dx_catalog_id),
@@ -126,9 +143,10 @@ degreePlanRulesUI <- function(id, catalog, roadmaps) {
   ns <- NS(id)
   if (!nrow(catalog$catalogs)) return(empty_state("No degree visualization prototypes are configured."))
   english <- roadmaps$starts[roadmaps$starts$track == "english", ]
+  choices <- degree_catalog_choices(catalog)
   tagList(subtab_header("Visualization rules", "The readable rules behind Degree Explorer, generated from its saved course lists, choices and graph. Compare catalog requirements with their source; CEDAR planning preferences are labeled separately."),
-    fluidRow(column(5, selectInput(ns("catalog"), "Program", degree_catalog_choices(catalog), width = "100%")),
-      column(3, selectInput(ns("math"), "Math starting point", degree_math_start_choices(roadmaps, catalog$catalogs$catalog_id[1]), width = "100%")),
+    fluidRow(column(5, selectInput(ns("catalog"), "Program", choices, width = "100%")),
+      column(3, selectInput(ns("math"), "Math starting point", degree_math_start_choices(roadmaps, choices[[1]]), width = "100%")),
       column(4, selectInput(ns("english"), "English starting point", stats::setNames(english$start_id, english$label), width = "100%"))),
     uiOutput(ns("summary")), downloadButton(ns("download"), "Download readable rules"),
     reactable::reactableOutput(ns("table")))

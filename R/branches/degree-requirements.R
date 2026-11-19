@@ -6,14 +6,60 @@
 # docs/developers/degree-explorer-rules.md; contract:
 # docs/developers/degree-requirements.md.
 
-#' The degree list; with `status` (publish_degree_drafts()), a draft board says so.
-degree_catalog_choices <- function(catalog, status = NULL) {
+#' The degree picker's choices, alphabetical by label; with `status`
+#' (publish_degree_drafts()), a draft board says so.
+#'
+#' @param catalog_ids Optional: only these degrees (a college's).
+degree_catalog_choices <- function(catalog, status = NULL, catalog_ids = NULL) {
   label <- paste(catalog$catalogs$degree_label, catalog$catalogs$catalog_year, sep = " · ")
   if (!is.null(status)) {
     draft <- status$review[match(catalog$catalogs$catalog_id, status$catalog_id)] %in% "draft"
     label[draft] <- paste(label[draft], "draft", sep = " · ")
   }
-  stats::setNames(catalog$catalogs$catalog_id, label)
+  ids <- catalog$catalogs$catalog_id
+  keep <- if (is.null(catalog_ids)) rep(TRUE, length(ids)) else ids %in% catalog_ids
+  ids <- ids[keep]; label <- label[keep]
+  ord <- order(tolower(label))
+  stats::setNames(ids[ord], label[ord])
+}
+
+#' Each degree's college, from the mapping files
+#'
+#' A degree's college is its program codes' college under the program
+#' hierarchy (`attach_unit()`), so programs.csv decides it as it decides a
+#' declaration's, and a major it has not decided takes Banner's college. A
+#' degree whose codes resolve to no college, or to two, stops: the picker
+#' could not place it.
+#'
+#' @param catalog A degree catalog with `program_codes` (`load_degree_catalog()`).
+#' @param dims `build_cedar_dims()` output.
+#' @return One row per catalog: `catalog_id`, `college_code`, `college_name`.
+degree_catalog_colleges <- function(catalog, dims) {
+  codes <- catalog$program_codes
+  for (col in c("catalog_id", "major_code", "source_college_code")) {
+    if (!col %in% names(codes)) stop("[degree-requirements.R] catalog$program_codes lacks ", col, call. = FALSE)
+  }
+  # The catalog carries Banner's college code, not its name.
+  codes$source_college <- NA_character_
+  placed <- attach_unit(codes, dims, "program")
+  colleges <- unique(placed[!is.na(placed$college_code), c("catalog_id", "college_code")])
+  n <- table(factor(colleges$catalog_id, levels = catalog$catalogs$catalog_id))
+  if (any(n != 1L)) {
+    stop("[degree-requirements.R] Each degree needs exactly one college; check programs.csv for: ",
+         paste(names(n)[n != 1L], collapse = ", "), call. = FALSE)
+  }
+  colleges$college_name <- unname(college_code_names(dims)[colleges$college_code])
+  colleges[match(catalog$catalogs$catalog_id, colleges$catalog_id), , drop = FALSE]
+}
+
+#' The college picker's choices: every college with a degree, alphabetical,
+#' with its degree count, after "All colleges"
+degree_college_choices <- function(colleges) {
+  n <- table(colleges$college_code)
+  codes <- names(n)
+  names_ <- colleges$college_name[match(codes, colleges$college_code)]
+  ord <- order(tolower(names_))
+  c("All colleges" = "all", stats::setNames(codes[ord], paste0(names_[ord], " (", as.integer(n[ord]), ")")))
 }
 
 degree_math_start_choices <- function(roadmaps, catalog_id) {
