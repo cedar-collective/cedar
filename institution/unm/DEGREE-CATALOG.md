@@ -56,7 +56,9 @@ the shared nodes reachable from its entry routes, rather than every shared node.
 `degree_roadmap_plans.csv` stores
 the 120-credit planning targets and 15-usual/16-maximum workload policy.
 Its `upper_level_from_semester = 5` is a planning preference requested for the
-prototype: Gen Ed and foundations first, upper-level work later. It is not a
+prototype: Gen Ed and foundations first, upper-level work later. Its
+`senior_level_from_semester = 6` (requested 2026-11-18) plans 400-level work in
+semesters 6–8. It is not a
 catalog timing restriction. Nodes explicitly identify lower/upper level;
 concrete components are checked against `course_levels.csv` and choice groups
 are authored rather than inferred from labels.

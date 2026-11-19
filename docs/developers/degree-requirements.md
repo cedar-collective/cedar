@@ -172,7 +172,10 @@ or new generic prerequisite sequence is implied.
 
 A topological scheduler respects authored minimum semesters, strictly earlier
 and earlier-or-same edges, and the institution plan's maximum load (16 at UNM).
-Upper-level nodes also respect `upper_level_from_semester` (5 in the pilot).
+Upper-level nodes also respect `upper_level_from_semester` (5 in the pilot), and
+a node whose courses (components or options) are all in the highest
+undergraduate band (`course_is_senior_level()`: UNM's 400-level) respects
+`senior_level_from_semester` (6).
 Course groups have authored levels; concrete components must agree with the
 institution's leading-digit bands. Never infer a group's level from its display
 label. Earliest eligible planning slots win ties, then file order. This later

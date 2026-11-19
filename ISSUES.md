@@ -59,7 +59,7 @@ Kept until the next release, so a recurrence is recognisable; each entry below g
 
 | ID | Kind | Summary |
 |---|---|---|
-| [I64](#i64--a-compiled-degree-board-plans-400-level-electives-in-the-first-semester) | Defect | The compiled Philosophy board plans its two "6 elective credits at the 400–499 level" tiles, and the four "two at the 400 level" elective tiles, in semester 1: a compiled elective slot was upper only when every course its group requires is upper. Readings can now state a pool's level (`course_level`, schema 1.1.0); Philosophy and History v2 state it and the tiles start in semester 5 (resolved 2026-11-18) |
+| [I64](#i64--a-compiled-degree-board-plans-400-level-electives-in-the-first-semester) | Defect | The compiled Philosophy board plans its two "6 elective credits at the 400–499 level" tiles, and the four "two at the 400 level" elective tiles, in semester 1: a compiled elective slot was upper only when every course its group requires is upper. Readings can now state a pool's lowest course number (`minimum_course_number`, schema 1.1.0), and 400-level work is planned from a new `senior_level_from_semester` (6); Philosophy's tiles start in semester 6 (resolved 2026-11-18) |
 | [I63](#i63--the-online-psychology-pre-major-leads-to-the-campus-major-not-the-online-one) | Defect | `programs.csv` said the online Psychology pre-major XFPY leads to PSY, though 360 of its students declared XPSY (57 PSY): a PSY population counted them as "chose elsewhere". XFPY now leads to XPSY, a separate program (resolved 2026-11-16) |
 | [I62](#i62--a-pathways-population-counted-every-program-that-shared-a-name) | Defect | A Pathways population matched programs by Banner name: department BIOL took in 1,873 Biochemistry students (BIOC and FBIC, another unit) because CHBI is named "Biochemistry", "Architecture" merged ARCH and ARCT, and "Liberal Arts" missed its renamed code LAIS (7 ongoing students instead of 411). Populations now match codes, follow confirmed renames in `code_history.csv`, and keep same-named programs apart (resolved 2026-11-16) |
 | [I60](#i60--takers-vs-non-takers-opens-on-a-classification-its-home-campus-scope-hardly-holds) | Defect | Takers vs Non-Takers picked its opening classification from the course's takers on every campus and then opened on the page's home campus: HIST 1110 opened on Concurrent Enrollment, nearly all of them dual-credit students at branch campuses, so on ABQ its passed and DFW'd groups were empty in almost every term. The defaults are now read off the takers in the opening home-campus scope (resolved) |
@@ -121,11 +121,15 @@ in semester 5 or later.
 ## I64 — A compiled degree board plans 400-level electives in the first semester
 
 **Status:** resolved 2026-11-18. The reading schema (1.1.0) gives a node an
-optional, cited `course_level`; the compiler places a slot at the level its
-reading states, else at its group's. Philosophy and History v2 readings state
-`upper` on their 400–499 and HIST 300–499 pools (packets re-prepared under the
-new schema; v1 kept), and the recompiled Philosophy board starts its two
-400-level tiles in semester 5. Still open, and already flagged in the reading
+optional, cited `minimum_course_number`; the compiler places a slot in the band
+of that number, else at its group's level. Philosophy and History v2 readings
+state 400 and 300 on their 400–499 and HIST 300–499 pools (packets re-prepared
+under the new schema; v1 kept). At the user's request every plan also gained
+`senior_level_from_semester` (6): a tile whose courses are all 400-level, or a
+400-level pool, starts no earlier. The recompiled Philosophy board starts its
+two 400-level tiles in semester 6; on the authored boards Population Health's
+POPH 420, Chemistry's instrumental analysis and Biochemistry's BIOC 445 move
+from 5 to 6. No plan grows a semester. Still open, and already flagged in the reading
 as the unresolved `elective-overlap`: "Four Philosophy electives, two at the
 400 level" restates the two credit pools as four more tiles in semester 1. Its
 limit covers only part of the pool, so it states no level.

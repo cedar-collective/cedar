@@ -813,6 +813,23 @@ test_that("upper-level courses wait for the institution's later planning stage",
   expect_true(all(late$terms$planned_credits <= 16))
 })
 
+test_that("400-level courses wait for the plan's senior-level semester; 300-level ones do not", {
+  # Change: the senior seminar (BIOL 499) is authored in semester 5, and
+  # senior-level work starts in semester 7.
+  r <- test_degree_roadmaps
+  r$nodes$semester[r$nodes$node_id == "biocap"] <- "5"
+  r$plans$senior_level_from_semester[r$plans$catalog_id == BIOLOGY] <- "7"
+  v <- roadmap_plan(r = r)
+  expect_true(node_at(v, "biocap", "senior_level"))
+  expect_false(node_at(v, "molecular", "senior_level"))
+  # Its prerequisite alone would put it in semester 6.
+  expect_equal(node_at(v, c("molecular", "biocap")), c(5L, 7L))
+  # A choice of 300- and 400-level courses is not held back.
+  expect_false(node_at(v, "bioelective", "senior_level"))
+  r$plans$senior_level_from_semester[r$plans$catalog_id == BIOLOGY] <- "4"
+  expect_error(validate_degree_roadmaps(r, test_degree_catalog), "Senior-level timing starts before upper-level")
+})
+
 # ── Layout ───────────────────────────────────────────────────────────────────
 
 test_that("course families align after scheduling and parallel courses take separate rows", {
@@ -1023,6 +1040,7 @@ test_that("the loaded institution's roadmaps keep every planning rule in every s
   for (id in c$catalogs$catalog_id) {
     max_load <- as.numeric(r$plans$max_load[r$plans$catalog_id == id])
     upper_start <- as.integer(r$plans$upper_level_from_semester[r$plans$catalog_id == id])
+    senior_start <- as.integer(r$plans$senior_level_from_semester[r$plans$catalog_id == id])
     for (math in r$starts$start_id[r$starts$track == "math"]) {
       for (english in r$starts$start_id[r$starts$track == "english"]) {
         v <- build_degree_roadmap(c, r, id, math, english)
@@ -1037,6 +1055,8 @@ test_that("the loaded institution's roadmaps keep every planning rule in every s
                       v$degree_credits - v$completed_credits + v$preparation_credits),
           "an upper-level course before its plan allows" =
             all(v$nodes$semester[v$nodes$course_level == "upper"] >= upper_start),
+          "a 400-level course before its plan allows" =
+            all(v$nodes$semester[v$nodes$senior_level] >= senior_start),
           "a course placed before what leads to it" =
             all(v$nodes$semester[match(v$links$to, v$nodes$node_id)] >=
               v$nodes$semester[match(v$links$from, v$nodes$node_id)] + as.integer(v$links$timing == "before")),

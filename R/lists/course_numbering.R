@@ -14,6 +14,21 @@
 COURSE_LEVEL_BY_LEADING_DIGIT <- stats::setNames(.cedar_course_levels$level,
                                                  .cedar_course_levels$leading_digit)
 
+# The institution's highest undergraduate band (UNM's 400-level courses): the
+# largest leading digit course_levels.csv maps to "upper". Degree Explorer plans
+# it later than the rest of upper-division work.
+COURSE_SENIOR_LEADING_DIGIT <- max(as.integer(names(COURSE_LEVEL_BY_LEADING_DIGIT)[COURSE_LEVEL_BY_LEADING_DIGIT == "upper"]))
+
+#' Whether a course is in the institution's highest undergraduate band
+#'
+#' @param subject_course Character vector like "HIST 491"; a bare number
+#'   ("400") is read the same way.
+#' @return Logical vector; FALSE for a code with no numeric course number.
+course_is_senior_level <- function(subject_course) {
+  number <- sub("^.*\\s", "", as.character(subject_course))
+  !is.na(number) & grepl("^[0-9]", number) & substr(number, 1, 1) == as.character(COURSE_SENIOR_LEADING_DIGIT)
+}
+
 #' Course level from a course code
 #'
 #' The one rule for course level, used by cedar_sections, cedar_registrations and the

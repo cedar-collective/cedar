@@ -264,10 +264,13 @@ assemble_compiled_degree_board <- function(compiled, courses, program, requisite
   course_rules <- rules[rules$role == "course" & !rules$subject_course %in% required_shared, ]
   main_subject <- names(sort(table(sub(" .*", "", course_rules$subject_course)), decreasing = TRUE))[1]
   upper_from <- as.character(degree_board_plan_default(shared$plans, "upper_level_from_semester"))
-  level_semester <- function(level) ifelse(level == "upper", upper_from, "1")
-  node <- function(node_id, code, title, credits, kind, level, url, row_group, detail)
+  senior_from <- as.character(degree_board_plan_default(shared$plans, "senior_level_from_semester"))
+  # A tile starts where its band does: the highest undergraduate band (UNM's
+  # 400-level) later than the rest of upper-division work.
+  level_semester <- function(level, senior = FALSE) if (senior) senior_from else ifelse(level == "upper", upper_from, "1")
+  node <- function(node_id, code, title, credits, kind, level, url, row_group, detail, senior = FALSE)
     data.frame(catalog_id = id, node_id = node_id, track = "main", code = code, title = title, credits = as.character(credits),
-      semester = level_semester(level), kind = kind, bundle = "0", detail = detail, source_url = url,
+      semester = level_semester(level, senior), kind = kind, bundle = "0", detail = detail, source_url = url,
       course_level = level, row_group = row_group, requirement_summary = "")
   nodes <- list(); options <- list(); components <- list(); basis <- list(); slot_subjects <- list()
   add_basis <- function(node_id, kind, eid, why) basis[[node_id]] <<- data.frame(catalog_id = id, node_id = node_id, basis = kind, evidence_id = eid, explanation = why)
@@ -284,7 +287,8 @@ assemble_compiled_degree_board <- function(compiled, courses, program, requisite
       nid <- degree_board_id(r$subject_course)
       level <- course_level_from_number(r$subject_course)
       kind <- if (sub(" .*", "", r$subject_course) == main_subject) "major" else "support"
-      nodes[[nid]] <- node(nid, r$subject_course, course$title, course$credits_min, kind, level, course$catalog_url, group, detail)
+      nodes[[nid]] <- node(nid, r$subject_course, course$title, course$credits_min, kind, level, course$catalog_url, group, detail,
+                           course_is_senior_level(r$subject_course))
       components[[nid]] <- data.frame(catalog_id = id, node_id = nid, subject_course = r$subject_course)
       add_basis(nid, "degree", rule_evidence(r), "Degree requirement in the draft reading.")
       next
@@ -292,17 +296,19 @@ assemble_compiled_degree_board <- function(compiled, courses, program, requisite
     eid <- rule_evidence(r)
     if (r$role == "slot") {
       siblings <- rules$subject_course[rules$role == "course" & rules$parent_id == r$parent_id & nzchar(r$parent_id)]
-      # The level the reading states for the pool ("Earned at least 6 credits from
-      # 400 - 499"); without one, its group's: upper when every course the group
-      # requires is upper (I64).
-      level <- if (nzchar(r$course_level)) r$course_level else
+      # The band of the lowest number the reading allows for the pool ("Earned at
+      # least 6 credits from 400 - 499"); without one, its group's level: upper
+      # when every course the group requires is upper (I64).
+      stated <- if (is.na(r$minimum_course_number)) NULL else as.character(r$minimum_course_number)
+      level <- if (!is.null(stated)) course_level_from_number(stated) else
         if (length(siblings) && all(course_level_from_number(siblings) == "upper")) "upper" else "lower"
+      senior <- !is.null(stated) && course_is_senior_level(stated)
       # Its subject, like its level, is its group's: the one subject every course the group requires shares.
       subject <- unique(sub(" .*", "", siblings))
       credits <- degree_board_split_credits(if (is.na(r$credits)) 3 * r$tiles else r$credits, r$tiles)
       for (k in seq_len(r$tiles)) {
         nid <- paste0(degree_board_id(r$rule_id), "_", k)
-        nodes[[nid]] <- node(nid, "Elective", r$label, credits[k], "choice", level, program$catalog_url, group, detail)
+        nodes[[nid]] <- node(nid, "Elective", r$label, credits[k], "choice", level, program$catalog_url, group, detail, senior)
         slot_subjects[[nid]] <- list(subject = if (length(subject) == 1L) subject else character(), level = level)
         add_basis(nid, "degree", eid, "Elective credits in the draft reading.")
       }
@@ -325,7 +331,8 @@ assemble_compiled_degree_board <- function(compiled, courses, program, requisite
       planned <- if (is.null(credits)) min(facts$credits_min) else min(max(credits[k], min(facts$credits_min)), max(facts$credits_max))
       level <- if (all(course_level_from_number(codes) == "upper")) "upper" else "lower"
       title <- if (size > 1L) paste0(r$label, " (course ", pos, " of ", size, ")") else r$label
-      nodes[[nid]] <- node(nid, "Choice", title, planned, "choice", level, program$catalog_url, group, detail)
+      nodes[[nid]] <- node(nid, "Choice", title, planned, "choice", level, program$catalog_url, group, detail,
+                           all(course_is_senior_level(codes)))
       options[[nid]] <- data.frame(catalog_id = id, node_id = nid, option_id = degree_board_id(names(at)), minimum = "1",
         subject_course = codes, course_title = facts$title, credits_min = as.character(facts$credits_min),
         credits_max = as.character(facts$credits_max), source_url = facts$catalog_url, evidence_id = eid, requisite_evidence_id = "")
@@ -452,6 +459,7 @@ assemble_compiled_degree_board <- function(compiled, courses, program, requisite
     max_load = as.character(degree_board_plan_default(shared$plans, "max_load")),
     baseline_semesters = as.character(degree_board_plan_default(shared$plans, "baseline_semesters")),
     evidence_id = plan_evidence, assumption = DEGREE_BOARD_DRAFT_NOTE, upper_level_from_semester = upper_from,
+    senior_level_from_semester = senior_from,
     allowance_slot_credits = as.character(degree_board_plan_default(shared$plans, "allowance_slot_credits")),
     gen_ed_source_url = as.character(degree_board_plan_default(shared$plans, "gen_ed_source_url")))
   reading <- degree_reading_rules(proposal, courses, id)

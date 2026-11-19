@@ -225,10 +225,12 @@ beside its hand-built board, semester by semester.
 - **Placement.** A lower-division tile starts in semester 1 and an upper-division
   one at the semester most authored plans use (5). The scheduler moves each one
   later for prerequisites and load, as it does for an authored board. An elective
-  slot takes the level its reading states (`course_level`, schema 1.1.0, cited
-  like any other field: "Earned at least 6 credits from 400 - 499"). A slot with
-  no stated level takes its group's: upper when every course its group requires
-  is upper. A label is never read for a level (ISSUES I64).
+  slot takes the band of the lowest course number its reading allows
+  (`minimum_course_number`, schema 1.1.0, cited like any other field: "Earned at
+  least 6 credits from 400 - 499" is 400), and a 400-level slot starts at the
+  plan's `senior_level_from_semester`. A slot with no stated number takes its
+  group's level: upper when every course its group requires is upper. A label is
+  never read for a level (ISSUES I64).
 - **Arrows** come from the course pages' structured requisites in a catalog
   analysis from extractor 1.4.0 or later, timed by the catalog's own template
   ([catalog-scanning.md](catalog-scanning.md#requisite-timing)). A requisite

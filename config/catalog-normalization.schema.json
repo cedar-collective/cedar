@@ -130,12 +130,8 @@
               "additionalProperties": false
             }
           },
-          "course_level": {
-            "type": "string",
-            "enum": [
-              "lower",
-              "upper"
-            ]
+          "minimum_course_number": {
+            "type": "number"
           }
         },
         "required": [

@@ -8,7 +8,7 @@ parent: Developer Guide
 
 This reference is auto-generated from roxygen2 comments in the source code.
 
-*Generated: 2026-11-18 18:56:43.994817*
+*Generated: 2026-11-18 21:56:54.795805*
 
 ---
 
@@ -564,7 +564,7 @@ Get Courses Adjacent to Student Entry or Exit Events  Finds courses taken in the
 **Parameters:**
 
 - `attempts` - The attempt measure table (`cedar_attempts`), or rows of it that keep its stamps (a dplyr filter does).
-- `opt` - The standard filter options (filter_attempts(): `course`, `crn`, `term`, `course_campus`, `course_college`, `dept_code`, `subj`, `inst`, `level`, `pt`, `uel`), plus `population_ids` (or `cohort_ids`) to keep those students' attempts, `min_term` for a left edge, and optionally `data_edges`, which must agree with the edge the table was built to.
+- `opt` - The standard filter options (filter_attempts(): `course`, `crn`, `term`, `course_campus`, `course_college`, `dept_code`, `subj`, `inst`, `level`, `pt`, `uel`), plus `population_ids` (or `cohort_ids`) to keep those students' attempts, `min_term` for a left edge, `max_term` for a last term the caller chose (never past the graded edge), and optionally `data_edges`, which must agree with the edge the table was built to.
 
 **Returns:** The rows in scope, with the table's columns; zero rows when nothing matches.
 
@@ -2369,7 +2369,7 @@ Each course's enrollment conditions, from the catalog analysis  The extractor st
 - `proposal` - The interpretation's `proposal` (parsed JSON, unsimplified).
 - `courses` - `degree_packet_course_facts()` for the same packet.
 
-**Returns:** List: `rules` (one row per compiled rule: `rule_id`, `parent_id`, `role`, `subject_course`, `label`, `tiles`, `credits`, `block_id`, `quote`), `options` (`rule_id`, `option_id`, `subject_course`), `conditions`, `credit_rules`, `flags`, `concentrations`, and `skipped` (information nodes).
+**Returns:** List: `rules` (one row per compiled rule: `rule_id`, `parent_id`, `role`, `subject_course`, `label`, `tiles`, `credits`, `minimum_course_number` (the lowest course number the reading allows, NA for no limit), `block_id`, `quote`), `options` (`rule_id`, `option_id`, `subject_course`), `conditions`, `credit_rules`, `flags`, `concentrations`, and `skipped` (information nodes).
 
 ---
 
@@ -2454,6 +2454,10 @@ The entry courses each starting point adds, and the degree credit it already ear
 *Source: degree-requirements.R*
 
 **The program's tiles plus the shared entry courses its routes use, typed for scheduling**
+
+**Parameters:**
+
+- `codes` - The course codes behind each tile (`catalog_id`, `node_id`, `subject_course`): its components, or a choice's options. A tile whose codes are all in the highest undergraduate band (`course_is_senior_level()`) waits for `senior_start`.
 
 ---
 
@@ -2682,7 +2686,7 @@ Summarize Student Demographics  Flexible demographic summary function that group
 **Parameters:**
 
 - `attempts` - The attempt measure table (`cedar_attempts`).
-- `opt` - `term_type` (required: "fall", "spring" or "summer"), `level` (default "lower"), `campus` (the teaching campus; NULL for every campus), `data_edges` (optional; must agree with the table's graded edge).
+- `opt` - `term_type` (required: "fall", "spring" or "summer"), `level` (default "lower"), `campus` (teaching campus codes; NULL for every campus), `from_term` and `to_term` (the first and last terms read; NULL for the whole history to the graded edge), `data_edges` (optional; must agree with the table's graded edge).
 
 **Returns:** The denominator attempts of that term type (graded or late withdrawn), with attempt_outcome_flags()' columns; attribute `graded_edge`.
 
