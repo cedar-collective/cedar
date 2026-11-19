@@ -34,9 +34,9 @@ moving toward:
 
 Supported surfaces: Dept Dashboard, Dept Trends, Course Dynamics; Student
 Pathways, Degree Explorer (Pathways); Regstats, Open Seats, Waitlists,
-Projections (Registration); Enrollment, Headcount, Gen Ed, Cancellations
-(Bird's Eye); Data & Usage, Changelog (Admin). Cross-course Retention is
-built but hidden.
+Projections (Registration); Enrollment, Headcount, Gen Ed, DFW Rates,
+Retention, Cancellations (Bird's Eye); Data & Usage, Changelog (Admin).
+Course-anchored retention across courses is built but hidden.
 
 ---
 
@@ -174,18 +174,12 @@ high-school GPA, Pell, first-generation all differ). The retention signal is
 the selection every course shows, not a lift the seminars add; the question
 worth a page is who does not pass a course, which is the return watch.
 
-- [ ] **Bird's Eye > Retention, settled return first** (decided 2026-11-19).
-  Shaped like DFW Rates: return to the next regular term, one term type at a
-  time, with a trend verdict (`returned_next_regular_term` where
-  `return_observable`, `compute_rate_trend()`); who is not coming back, by
-  warning sign (late withdrawal, a DFW, probation); by classification and
-  college of the primary major; then the courses where a DFW costs the most
-  (`get_stopout()`, opening Coming Back). The return watch below becomes its
-  top section once it is exact. Course lifts (Takers vs Non-Takers) and
-  IPEDS-style cohort retention stay off it.
-- [ ] **Return watch** on the Dept Dashboard and UNM-wide: continuing students
-  not yet registered against the same day a year earlier, by classification,
-  standing and warning sign. Exact from Fall 2027.
+- [ ] **Return watch** on the Dept Dashboard and as the top section of Bird's
+  Eye > Retention: continuing students not yet registered against the same
+  day a year earlier, by classification, standing and warning sign. Exact
+  from Fall 2027.
+- [ ] **Probation as a Retention warning sign** once `academic_standing`'s
+  Banner values are mapped to a standing group in an institution file.
 - [ ] **Roadblocks on the Dept Dashboard,** ranked by Impact (`get_stopout()`).
 - [ ] **Unhide cross-course Retention** once it sets each course against its
   department and college.
