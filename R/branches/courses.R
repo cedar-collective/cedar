@@ -390,6 +390,26 @@ course_ids_of <- function(codes, ..., caller = "course_ids_of") {
                 tbl = known, caller = caller))
 }
 
+#' The Gen Ed courses, as the course ids a loaded table keys on
+#'
+#' gen_ed_courses.csv names registrar codes; a loaded table's subject_course
+#' is the course id, so a renamed Gen Ed course is one course.
+#'
+#' @param tbl A loaded table with `subject_course` and `listed_code`
+#'   (`cedar_attempts`, the class list).
+#' @param caller Named in the errors.
+#' @return The Gen Ed course ids, each once.
+gen_ed_course_ids <- function(tbl, caller = "gen_ed_course_ids") {
+  if (!all(c("subject_course", "listed_code") %in% names(tbl))) {
+    stop("[courses.R] ", caller, "(): the table lacks subject_course or listed_code, which the ",
+         "Gen Ed codes resolve through.", call. = FALSE)
+  }
+  # CAMPUS_ROLLUP: a code-to-course lookup, not a count; a code names one
+  # course on every campus.
+  keyed <- dplyr::distinct(dplyr::transmute(tbl, course_id = subject_course, listed_code))
+  course_ids_of(unlist(gen_ed_all, use.names = FALSE), keyed, caller = caller)
+}
+
 #' The codes a course has been listed under in a table
 #'
 #' @param tbl A loaded table.

@@ -66,17 +66,7 @@ build_course_similar_students <- function(student_terms, attempts, applicants, o
   }
   cone_opt <- opt[intersect(names(opt), c("classification", "term", "campus", "min_n", "min_cell_n", "data_edges"))]
   if (comparison == "gen_ed") {
-    # The Gen Ed list names registrar codes; the loaded attempts key on the
-    # course id, their subject_course (a renamed Gen Ed course is one course).
-    if (!"listed_code" %in% names(attempts)) {
-      stop("[course-similar-students.R] attempts lacks listed_code, which the Gen Ed comparison ",
-           "resolves its codes through.", call. = FALSE)
-    }
-    # CAMPUS_ROLLUP: a code-to-course lookup, not a count; a code names one
-    # course on every campus.
-    keyed <- dplyr::distinct(dplyr::transmute(attempts, course_id = subject_course, listed_code))
-    cone_opt$comparison_courses <- course_ids_of(unlist(gen_ed_all, use.names = FALSE), keyed,
-                                                 caller = "build_course_similar_students")
+    cone_opt$comparison_courses <- gen_ed_course_ids(attempts, caller = "build_course_similar_students")
   }
   courses <- get_course_similar_students(student_terms, attempts, applicants, cone_opt)
   min_n <- as.integer(opt$min_n %||% 30L)

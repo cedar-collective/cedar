@@ -10,7 +10,7 @@
 //   node tests/e2e/course-cohort.test.mjs
 
 import { launch, connect, setInput, runAndWait, openSubTab,
-         waitForIdle, requireIds, waitForSelector } from './lib.mjs';
+         waitForIdle, requireIds, waitForSelector, waitFor } from './lib.mjs';
 
 const COURSE = process.env.CEDAR_COURSE_X || 'HIST 1110';
 const fail = [];
@@ -104,6 +104,29 @@ try {
   await waitForIdle(page);
   const genEd = await page.evaluate(() => document.getElementById('cr_cohort-results').textContent);
   ok(/took a Gen Ed course instead/.test(genEd), 'the Gen Ed comparison names whom it compared');
+
+  // The Gen Ed benchmark: the courses these students take most stand in for
+  // the college's, the college controls step aside, and the page names it.
+  ok(await page.evaluate(() => /Against the College's Courses/.test(document.getElementById('cr_cohort-results').textContent)),
+     'the default benchmark is the college\'s courses');
+  // Settings is a collapsed panel: open it, so the choice is made as a reader makes it.
+  await page.evaluate(() => {
+    document.getElementById('cr_cohort-benchmark').closest('details').open = true;
+  });
+  ok(await page.evaluate(() => document.getElementById('cr_cohort-college').closest('.shiny-input-container').checkVisibility()),
+     'the benchmark college shows while the benchmark is a college\'s');
+  await page.click('input[name="cr_cohort-benchmark"][value="gen_ed"]');
+  await waitFor(page, () => Shiny.shinyapp.$inputValues['cr_cohort-benchmark'] === 'gen_ed' &&
+    !document.getElementById('cr_cohort-college').closest('.shiny-input-container').checkVisibility());
+  ok(await page.evaluate(() => !document.getElementById('cr_cohort-college').closest('.shiny-input-container').checkVisibility()),
+     'choosing the Gen Ed benchmark hides the benchmark college and levels');
+  await runAndWait(page, 'cr_cohort-run', { timeout: 300000 });
+  await waitForSelector(page, '#cr_cohort-benchmark_table .rt-table', { timeout: 60000 });
+  await waitForIdle(page);
+  const genEdBenchmark = await page.evaluate(() => document.getElementById('cr_cohort-results').textContent);
+  ok(/Against the Gen Ed Courses They Take Most/.test(genEdBenchmark) &&
+     /other Gen Ed courses these students take most/.test(genEdBenchmark),
+     'the Gen Ed benchmark names its courses in the heading and the sentence');
 
   // Instructor names sit behind the gate: a session that has not unlocked it
   // sees the prompt, never the by-instructor table.

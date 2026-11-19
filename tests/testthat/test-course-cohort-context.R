@@ -96,6 +96,35 @@ test_that("RW01: a focal gap is placed among the benchmark's gaps", {
   expect_snapshot(cat(format_course_cohort_context(p), sep = "\n"))
 })
 
+test_that("RW01: the Gen Ed benchmark is the Gen Ed courses the population itself took most", {
+  st <- suppressMessages(build_student_terms(cedar_registrations_rw, cedar_programs_rw, edges = rw01_settled_edges))
+  att <- keyed_attempts(test_students_rw, rw01_settled_edges)
+  gen_ed <- function(course, classification, ...) build_course_cohort_context(st, att, list(
+    course = course, classification = classification, benchmark = "gen_ed",
+    min_n = 1L, data_edges = rw01_settled_edges, ...))
+  # The fixture's Gen Ed courses are HIST 1110 and MATH 1240. MATH 1240's one
+  # taker (RW_E) is a Junior, so a Sophomore benchmark is HIST 1110 alone, and
+  # no college is asked for.
+  p <- gen_ed("ENGL 1110", "Sophomore")
+  expect_equal(p$meta$benchmark, "gen_ed")
+  expect_null(p$meta$college_label)
+  expect_equal(p$meta$n_benchmark_candidates, 1L)
+  expect_equal(sort(unique(p$courses$course)), c("ENGL 1110", "HIST 1110"))
+  expect_equal(p$benchmark$term, 202080L)
+  expect_equal(p$benchmark$lift_return_median, 50)
+  # The Juniors' benchmark is the course they took; a Gen Ed focal course is
+  # never its own benchmark; benchmark_n caps the list.
+  expect_true("MATH 1240" %in% gen_ed("ENGL 1110", "Junior")$courses$course)
+  expect_equal(gen_ed("HIST 1110", "Sophomore")$meta$n_benchmark_candidates, 0L)
+  expect_equal(gen_ed("ENGL 1110", "Sophomore", benchmark_n = 0L)$meta$n_benchmark_candidates, 0L)
+  expect_error(build_course_cohort_context(st, att, list(course = "ENGL 1110", classification = "Sophomore",
+                                                        benchmark = "catalog", data_edges = rw01_settled_edges)),
+               "college\" or \"gen_ed")
+
+  testthat::local_edition(3)
+  expect_snapshot(cat(format_course_cohort_context(p), sep = "\n"))
+})
+
 test_that("the MC02 words", {
   testthat::local_edition(3)
   expect_snapshot(cat(format_course_cohort_context(mc02_context()), sep = "\n"))

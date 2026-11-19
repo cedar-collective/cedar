@@ -256,6 +256,13 @@ course; one far below it is where the question starts. A benchmark course
 needs the minimum in both its passed and its never-took groups, and the
 "Every Course in the Benchmark" table lists them.
 
+**Benchmark courses** under Settings can choose a different set: **The Gen
+Ed courses these students take most** benchmarks the course against the 25
+Gen Ed courses the same students took most often in the selected terms (each
+taken by at least the minimum). For a first-year course such as FYEX 1110,
+whose students take courses all over the catalog, that is the fairer
+comparison: the courses its students take the same semester.
+
 Before Matching reads the gap with no matching at all. How Far to Trust It,
 at the bottom, compares takers with never-takers on the measured covariates (ACT, high-school GPA, Pell eligibility, first-generation
 share and the rest) at each student's first selected term. A substantial

@@ -192,11 +192,6 @@ worth a page is who does not pass a course, which is the return watch.
   (`get_stopout()`, opening Coming Back). The return watch below becomes its
   top section once it is exact. Course lifts (Takers vs Non-Takers) and
   IPEDS-style cohort retention stay off it.
-- [ ] **Against Non-Takers: a first-year Gen Ed benchmark** (decided
-  2026-11-19). Beside "the college's courses", benchmark a course against the
-  Gen Ed courses its population takes most (`build_course_cohort_context()`).
-  On real data FYEX 1110 sits in the upper middle of that set, as it does
-  among Arts & Sciences lower-division courses (above).
 - [ ] **Return watch** on the Dept Dashboard and UNM-wide: continuing students
   not yet registered against the same day a year earlier, by classification,
   standing and warning sign. Exact from Fall 2027.
