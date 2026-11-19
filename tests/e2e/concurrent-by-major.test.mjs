@@ -111,6 +111,38 @@ try {
   ok(/student-term/.test(method) && /another campus/.test(method) && /lab/.test(method),
      'the method says what a student-term is, that another campus is not counted, and why the lab is apart');
 
+  // Harder Together: per campus a lead sentence and, where any course is a
+  // candidate, its table; the All students bars mark exactly the candidates.
+  await waitForSelector(page, '#cr_concurrent-pairs_panels h5', { timeout: 120000 });
+  await waitForIdle(page);
+  const pairs = await page.evaluate(() => {
+    const root = document.getElementById('cr_concurrent-pairs_panels');
+    const firstTable = root.querySelector(':scope > div > .reactable, :scope .reactable');
+    const candidates = [...root.querySelectorAll('.reactable')].slice(0, 1)
+      .flatMap((t) => [...t.querySelectorAll('.rt-tbody .rt-tr')].map((r) => r.querySelector('.rt-td')?.innerText.trim()));
+    return {
+      headings: [...root.querySelectorAll('h5')].map((h) => h.innerText),
+      text: root.innerText,
+      header: firstTable ? firstTable.querySelector('.rt-thead')?.innerText || '' : '',
+      candidates,
+      marked: [...document.querySelectorAll('#cr_concurrent-panels .finding-card')]
+        .flatMap((k) => [...k.querySelectorAll('*')].map((e) => e.childElementCount === 0 ? e.innerText : ''))
+        .filter((x) => / · harder together$/.test(x)).map((x) => x.replace(/ · harder together$/, '')),
+      method: document.getElementById('cr_concurrent-pairs_method').textContent,
+    };
+  });
+  ok(pairs.headings.length > 0 && pairs.headings.every((h) => /continuing student-terms in .*\(Fall \d{4} to Fall \d{4}\)/.test(h)),
+     `Harder Together has a heading per campus (${pairs.headings.join(' | ')})`);
+  ok(/candidates to look into, not causes|goes with failing it more often|so none is read/.test(pairs.text) &&
+     !/of 0 read/.test(pairs.text),
+     'each campus leads with how many courses go with failing it, as candidates');
+  ok(pairs.marked.length === 0 || pairs.marked.every((c) => /candidates to look into/.test(pairs.text) && pairs.text.includes(c)),
+     `the All students bars mark only courses Harder Together lists (${pairs.marked.join(', ') || 'none marked'})`);
+  ok(/Continuing students only/.test(pairs.method) && /first-term student/.test(pairs.method) &&
+     /lab/.test(pairs.method) && /not that one causes the other/.test(pairs.method),
+     'the method says who is read, why first-term students are not, and that a candidate is not a cause');
+  await page.screenshot({ path: '/tmp/cedar-harder-together.png', fullPage: true });
+
   await setInput(page, 'cr_concurrent-term_type', 'spring');
   const respun = await waitFor(page, () =>
     [...document.querySelectorAll('#cr_concurrent-panels h4')].some((h) => /\(Spring \d{4}/.test(h.innerText))

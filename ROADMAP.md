@@ -153,15 +153,6 @@ unusually; provost: cross-college patterns and risks).
 - [ ] **Choose the tabs** that get one: likely DFW, Enrollment Trends,
   Headcount Trends and Gen Ed.
 
-- [ ] **Harder together: course pairs worse taken in the same term**
-  (decided 2026-11-19). A's DFW rate among continuing students also taking B
-  that term against A's rate without B, within term, campus and entering-GPA
-  band (`gpa_entering`, `timeline_valid`); lecture–lab and stretch (X/Y) pairs
-  left out; a pair listed only when it holds in three or more terms, as a
-  candidate, never a verdict. A column on Course Dynamics > Other Courses >
-  Courses Taken Alongside. First-term students wait for placement measures:
-  without them placement courses top any list for who takes them.
-
 ## Retention signals while there is time to act
 
 Built: next-term registration of last term's students kept at every refresh

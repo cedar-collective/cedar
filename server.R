@@ -5910,7 +5910,8 @@ for (.download_key in names(.enrl_desr_view_ids)) {
     registrations = cr_students,
     student_terms = data_objects[["cedar_student_terms"]],
     dims = data_objects[["cedar_dims"]],
-    edges = data_objects[["cedar_edges"]]
+    edges = data_objects[["cedar_edges"]],
+    attempts = data_objects[["cedar_attempts"]]
   )
 
   # Course Dynamics > Downstream > Next Courses: the analysed course's students

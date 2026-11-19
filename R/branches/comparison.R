@@ -443,6 +443,24 @@ hs_gpa_band <- function(gpa) {
   factor(if_else(is.na(gpa), "not on file", band), levels = CEDAR_HS_GPA_BANDS)
 }
 
+# ── Entering-GPA bands ────────────────────────────────────────────────────────
+# A continuing student's GPA entering a term (build_gpa_timeline()'s
+# gpa_entering), for comparisons within like students. No "not on file" band:
+# a first-term student has no entering GPA, and a reader leaves them out or
+# reads them apart.
+CEDAR_ENTERING_GPA_BREAKS <- c(2.5, 3.0, 3.5)
+CEDAR_ENTERING_GPA_BANDS  <- c("below 2.5", "2.5 to 2.99", "3.0 to 3.49", "3.5 or higher")
+
+#' The entering-GPA band of each value
+#'
+#' @param gpa Numeric entering GPAs; NA stops (a band is for a known GPA).
+#' @return A factor over `CEDAR_ENTERING_GPA_BANDS`.
+entering_gpa_band <- function(gpa) {
+  if (anyNA(gpa)) stop("[comparison.R] entering_gpa_band(): a missing GPA has no band.", call. = FALSE)
+  factor(CEDAR_ENTERING_GPA_BANDS[findInterval(gpa, CEDAR_ENTERING_GPA_BREAKS) + 1L],
+         levels = CEDAR_ENTERING_GPA_BANDS)
+}
+
 #' One high-school GPA per student, off the applicants table
 #'
 #' The first row per student, as build_comparison() reads it, with the same
