@@ -270,10 +270,10 @@ Page-level legibility is [M43](ISSUES.md)–M48; these are the new pieces.
   Undecided (`UNDC`, 3,790 enrolled student-terms since Fall 2022) and
   Non-Degree (`NOND`, 23,427) are deliberately owned by no unit. Pathways'
   by-major population cannot stand in: it reads `cedar_programs`, which holds
-  no `UNDC` row (the code is on the class list only). Let the cone take
-  `opt$program_code` without a unit (own-unit share then blank), and give a
-  page a "Students in" picker by major name that includes them; list the
-  unit's own courses course by course beside the outside ones.
+  no `UNDC` row (the code is on the class list only). The cone takes
+  `opt$program_code` without a unit (own-unit share blank; PR #328). Left:
+  a page with a "Students in" picker by major name that includes them, and
+  the unit's own courses listed course by course beside the outside ones.
 - [ ] **The mapping assistant proposes ADCW for a branch-only code.**
   `scripts/propose-mappings.R` stops at "no evidence settles the unit" for a
   subject or program whose only source department is the Provost Branch
