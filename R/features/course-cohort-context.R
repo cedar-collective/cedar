@@ -10,6 +10,11 @@
 # where the focal course's gap sits among them. The population's own rates
 # are the floor everything is read against.
 #
+# The benchmark is the college's courses (the default) or, with
+# `opt$benchmark = "gen_ed"`, the Gen Ed courses the population itself takes
+# most: for a first-year course such as FYEX 1110, its students' other
+# first-year courses are the fairer comparison than a college's catalog.
+#
 # A course is in the benchmark for a term and campus when both its passed
 # and its never-took groups clear min_n. The focal course is never in its own
 # benchmark. The gap is descriptive on both sides: passing any course goes
@@ -34,7 +39,11 @@
 #'   edge), `min_n` (smallest group a row needs, and the smallest passed and
 #'   never-took groups a benchmark course needs; default 10), `data_edges`
 #'   (required), `college_label` (how the text names the college; default
-#'   the codes).
+#'   the codes), `benchmark` ("college", the default: the college's courses;
+#'   or "gen_ed": the `benchmark_n` Gen Ed courses, default 25, the
+#'   population took most in its anchor terms, the focal course aside, each
+#'   taken by at least `min_n`; `college` and `level` are then not read).
+#'   `meta$benchmark_label` names the benchmark courses for the page.
 #' @return A `course_cohort_context` list: `meta`; `population` (the cone's,
 #'   per term and campus); `focal` (per term and campus: the focal course's
 #'   three groups side by side, `lift_return` and `lift_next_dfw` as passed
@@ -52,11 +61,15 @@ build_course_cohort_context <- function(student_terms, attempts, opt = list(), p
   if (is.null(course) || length(course) != 1L || is.na(course) || !nzchar(course)) {
     stop("[course-cohort-context.R] opt$course (one focal course id) is required.", call. = FALSE)
   }
+  benchmark_kind <- opt$benchmark %||% "college"
+  if (length(benchmark_kind) != 1L || !benchmark_kind %in% c("college", "gen_ed")) {
+    stop("[course-cohort-context.R] opt$benchmark must be \"college\" or \"gen_ed\".", call. = FALSE)
+  }
   college <- opt$college
-  if (is.null(college) || length(college) == 0L) {
+  if (benchmark_kind == "college" && (is.null(college) || length(college) == 0L)) {
     stop("[course-cohort-context.R] opt$college (the benchmark's college codes) is required.", call. = FALSE)
   }
-  for (col in c("college", "level")) {
+  for (col in if (benchmark_kind == "college") c("college", "level") else character(0)) {
     if (!col %in% names(attempts)) stop("[course-cohort-context.R] attempts lacks ", col, call. = FALSE)
   }
   min_n <- as.integer(opt$min_n %||% 10L)
@@ -65,21 +78,28 @@ build_course_cohort_context <- function(student_terms, attempts, opt = list(), p
     stop("[course-cohort-context.R] opt$data_edges has no settled enrollment edge.", call. = FALSE)
   }
 
-  # The benchmark candidates: the college's courses anyone took in the anchor
-  # terms, with enough takers to possibly clear min_n in a group.
-  candidates <- attempts %>% filter(college %in% .env$college, term <= edge)
-  if (!is.null(opt$level)) candidates <- candidates %>% filter(level %in% opt$level)
-  if (!is.null(opt$term)) candidates <- candidates %>% filter(term %in% as.integer(opt$term))
-  # CAMPUS_ROLLUP: a pre-filter on how many students took the course at all;
-  # the cone then counts each course by the student's home campus.
-  candidates <- candidates %>%
-    group_by(subject_course) %>%
-    summarize(n = n_distinct(student_id), .groups = "drop") %>%
-    filter(n >= min_n) %>%
-    pull(subject_course)
+  if (benchmark_kind == "college") {
+    # The benchmark candidates: the college's courses anyone took in the anchor
+    # terms, with enough takers to possibly clear min_n in a group.
+    candidates <- attempts %>% filter(college %in% .env$college, term <= edge)
+    if (!is.null(opt$level)) candidates <- candidates %>% filter(level %in% opt$level)
+    if (!is.null(opt$term)) candidates <- candidates %>% filter(term %in% as.integer(opt$term))
+    # CAMPUS_ROLLUP: a pre-filter on how many students took the course at all;
+    # the cone then counts each course by the student's home campus.
+    candidates <- candidates %>%
+      group_by(subject_course) %>%
+      summarize(n = n_distinct(student_id), .groups = "drop") %>%
+      filter(n >= min_n) %>%
+      pull(subject_course)
+    benchmark_label <- paste0(opt$college_label %||% paste(college, collapse = "/"),
+                              if (!is.null(opt$level)) paste0(" ", paste(opt$level, collapse = "/"), "-division") else "",
+                              " courses")
+  } else {
+    candidates <- course_cohort_gen_ed_candidates(student_terms, attempts, opt, edge, min_n)
+    benchmark_label <- "Gen Ed courses these students take most"
+  }
   courses <- unique(c(course, candidates))
-  cedar_debug("[course-cohort-context.R] ", length(candidates), " benchmark candidates in ",
-              paste(college, collapse = "/"))
+  cedar_debug("[course-cohort-context.R] ", length(candidates), " benchmark candidates: ", benchmark_label)
 
   cone_opt <- opt[intersect(names(opt), c("classification", "campus", "term", "min_n", "data_edges"))]
   cone_opt$course <- courses
@@ -163,7 +183,9 @@ build_course_cohort_context <- function(student_terms, attempts, opt = list(), p
       course = course,
       classification = opt$classification,
       college = college,
-      college_label = opt$college_label %||% paste(college, collapse = "/"),
+      college_label = if (benchmark_kind == "college") opt$college_label %||% paste(college, collapse = "/") else NULL,
+      benchmark = benchmark_kind,
+      benchmark_label = benchmark_label,
       level = opt$level,
       campus = opt$campus,
       terms = sort(unique(res$population$term)),
@@ -186,6 +208,35 @@ build_course_cohort_context <- function(student_terms, attempts, opt = list(), p
     payload <- course_cohort_context_balance(payload, student_terms, attempts, programs)
   }
   payload
+}
+
+
+#' The Gen Ed courses a population takes most
+#'
+#' The population is the cone's: enrolled student-terms of the classification
+#' to the settled edge, in the anchor terms and home campuses. Its Gen Ed
+#' attempts in those same terms are counted by course; the focal course is
+#' left out, and the `benchmark_n` (default 25) courses with the most takers
+#' and at least `min_n` of them are the candidates.
+#' @noRd
+course_cohort_gen_ed_candidates <- function(student_terms, attempts, opt, edge, min_n) {
+  benchmark_n <- as.integer(opt$benchmark_n %||% 25L)
+  members <- student_terms %>%
+    filter(enrolled, student_classification %in% opt$classification, term <= edge)
+  if (!is.null(opt$term)) members <- members %>% filter(term %in% as.integer(opt$term))
+  if (!is.null(opt$campus)) members <- members %>% filter(student_campus %in% opt$campus)
+  gen_ed <- setdiff(gen_ed_course_ids(attempts, caller = "build_course_cohort_context"), opt$course)
+  # CAMPUS_ROLLUP: which courses the population takes most, a pre-filter like
+  # the college benchmark's; the cone then counts each by home campus.
+  attempts %>%
+    filter(subject_course %in% gen_ed) %>%
+    distinct(student_id, term, subject_course) %>%
+    semi_join(members, by = c("student_id", "term")) %>%
+    count(subject_course, name = "n") %>%
+    filter(n >= min_n) %>%
+    arrange(desc(n), subject_course) %>%
+    head(benchmark_n) %>%
+    pull(subject_course)
 }
 
 
@@ -351,9 +402,7 @@ format_course_cohort_context <- function(payload) {
   plural <- function(k, noun) paste0(n(k), " ", noun, if (k == 1) "" else "s")
 
   lines <- c(
-    paste0(meta$course, " against the ", meta$college_label,
-           if (!is.null(meta$level)) paste0(" ", paste(meta$level, collapse = "/"), "-division") else "",
-           " courses: ", paste(meta$classification, collapse = ", "),
+    paste0(meta$course, " against the ", meta$benchmark_label, ": ", paste(meta$classification, collapse = ", "),
            if (is.null(meta$campus)) ", each home campus its own row" else
              paste0(", home campus ", paste(meta$campus, collapse = ", "))),
     paste0("Population: ", n(meta$n_population_student_terms), " student-terms; enrollment settled through ",
@@ -398,11 +447,11 @@ format_course_cohort_context <- function(payload) {
       }
     }
     if (nrow(b) == 0L) {
-      lines <- c(lines, paste0("  Benchmark: no ", meta$college_label, " course clears ", meta$min_n,
+      lines <- c(lines, paste0("  Benchmark: none of the ", meta$benchmark_label, " clears ", meta$min_n,
                                " in both groups."))
     } else {
       lines <- c(lines, paste0(
-        "  Benchmark: ", plural(b$n_courses, paste(meta$college_label, "course")),
+        "  Benchmark: ", plural(b$n_courses, "course"),
         ". Passing one: median return ", pct(b$passed_return_median), iqr(b$passed_return_q1, b$passed_return_q3),
         "; median gap ", pts(b$lift_return_median), iqr_pts(b$lift_return_q1, b$lift_return_q3),
         if (nrow(f) > 0L && !is.na(b$share_below_return))

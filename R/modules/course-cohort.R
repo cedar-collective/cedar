@@ -98,7 +98,7 @@ courseCohortServer <- function(id, student_terms, attempts, programs, dims, edge
         ),
         info_panel(
           "Settings",
-          description = "This course's usual classification, home campus, term type and terms; its own college and level as the benchmark; 10 students per group.",
+          description = "This course's usual classification, home campus, term type and terms; its own college and level as the benchmark (or the Gen Ed courses its students take most); 10 students per group.",
         fluidRow(
           column(3, selectizeInput(ns("classification"), "Classification",
                                    choices = d$choices$classifications$student_classification,
@@ -108,10 +108,19 @@ courseCohortServer <- function(id, student_terms, attempts, programs, dims, edge
                                    options = list(placeholder = "Every home campus"))),
           column(3, selectizeInput(ns("terms"), "Terms", choices = term_choices,
                                    selected = d$terms, multiple = TRUE)),
-          column(2, selectizeInput(ns("college"), "Benchmark college", choices = college_choices,
-                                   selected = d$college)),
-          column(2, checkboxGroupInput(ns("level"), "Benchmark course levels", choices = level_choices,
-                                       selected = d$level))
+          column(4, radioButtons(ns("benchmark"), "Benchmark courses",
+                                 choices = c("A college's courses" = "college",
+                                             "The Gen Ed courses these students take most" = "gen_ed"),
+                                 selected = "college"))
+        ),
+        conditionalPanel(
+          condition = "input.benchmark == 'college'", ns = ns,
+          fluidRow(
+            column(3, selectizeInput(ns("college"), "Benchmark college", choices = college_choices,
+                                     selected = d$college)),
+            column(3, checkboxGroupInput(ns("level"), "Benchmark course levels", choices = level_choices,
+                                         selected = d$level, inline = TRUE))
+          )
         ),
         fluidRow(
           column(2, checkboxGroupInput(ns("term_type"), "Term types", choices = term_type_choices,
@@ -159,8 +168,9 @@ courseCohortServer <- function(id, student_terms, attempts, programs, dims, edge
       if (!shown && is.null(d)) return()
       setting <- function(name, default) if (shown) input[[name]] else default
       classification <- setting("classification", d$classification)
+      benchmark <- setting("benchmark", "college")
       college <- setting("college", d$college)
-      req(classification, college)
+      req(classification, benchmark == "gen_ed" || length(college) > 0)
       campus_sel <- setting("campus", d$campus)
       terms <- setting("terms", d$terms)
       level <- setting("level", d$level)
@@ -171,11 +181,12 @@ courseCohortServer <- function(id, student_terms, attempts, programs, dims, edge
         classification = classification,
         campus = if (length(campus_sel) > 0) campus_sel else NULL,
         term = if (length(terms) > 0) as.integer(terms) else NULL,
+        benchmark = benchmark,
         college = college,
         level = if (length(level) > 0) level else NULL,
         min_n = as.integer(input$min_n %||% 10L),
         data_edges = edges,
-        college_label = if (college %in% names(college_names)) unname(college_names[[college]]) else college
+        college_label = if (length(college) && college %in% names(college_names)) unname(college_names[[college]]) else college
       )
       withProgress(message = "Comparing takers with non-takers...", value = 0.3, {
         payload <- tryCatch(
@@ -230,15 +241,18 @@ courseCohortServer <- function(id, student_terms, attempts, programs, dims, edge
       tagList(
         uiOutput(ns("similar_ui")),
         dashboard_subsection(
-          "Before Matching: Against the College's Courses",
-          paste0("Whether passing ", meta$course, " goes with a bigger lead over every student who never took it than passing ", meta$college_label, "'s other courses does, with no matching."),
-          method = tags$p("A course's gap is its passers' rate minus the rate of the students who never took it, in percentage points; it describes who takes and passes the course before it describes the course. The same gap for every other ", meta$college_label,
-                          " course the population took, summarised as the median and quartiles across courses, with the share of courses whose gap is below ",
+          if (identical(meta$benchmark, "gen_ed")) "Before Matching: Against the Gen Ed Courses They Take Most"
+          else "Before Matching: Against the College's Courses",
+          paste0("Whether passing ", meta$course, " goes with a bigger lead over every student who never took it than passing the other ", meta$benchmark_label, " does, with no matching."),
+          method = tags$p("A course's gap is its passers' rate minus the rate of the students who never took it, in percentage points; it describes who takes and passes the course before it describes the course. The same gap for each of the other ", meta$benchmark_label,
+                          if (identical(meta$benchmark, "gen_ed")) paste0(" (up to 25, each taken by at least ", meta$min_n, " of them in the selected terms)")
+                          else " that the population took",
+                          ", summarised as the median and quartiles across courses, with the share of courses whose gap is below ",
                           meta$course, "'s. A median over courses counts a small course as much as a large one."),
           reactable::reactableOutput(ns("benchmark_table")),
           info_panel(
             "Every course in the benchmark",
-            description = "The same comparison for each of the college's other courses.",
+            description = paste0("The same comparison for each of the other ", meta$benchmark_label, "."),
             tags$p(class = "text-note", "One row per benchmark course, term and home campus. Sort by a gap column to see which courses' passers return most, or fail least, relative to the students who never took them."),
             reactable::reactableOutput(ns("courses_table"))
           ),
@@ -263,7 +277,7 @@ courseCohortServer <- function(id, student_terms, attempts, programs, dims, edge
                       n(sum(lo$n_unclassified)), " registrations with no posted grade."),
               tags$li("A group under ", meta$min_n, " students keeps its count and shows no rate. A benchmark course needs ",
                       meta$min_n, " in both its passed and its never-took groups, and this course is never its own benchmark; ",
-                      n(meta$n_benchmark_candidates), " ", meta$college_label, " courses were candidates.")
+                      n(meta$n_benchmark_candidates), " of the ", meta$benchmark_label, " were candidates.")
             )
           ),
           if (!is.null(p$balance)) cedar_alike_block(
@@ -469,7 +483,7 @@ courseCohortServer <- function(id, student_terms, attempts, programs, dims, edge
       p <- result(); req(p)
       if (nrow(p$benchmark) == 0L) {
         return(reactable::reactable(
-          tibble::tibble(Message = paste0("No ", p$meta$college_label, " course has both groups at ", p$meta$min_n, " students.")),
+          tibble::tibble(Message = paste0("None of the ", p$meta$benchmark_label, " has both groups at ", p$meta$min_n, " students.")),
           theme = cedar_tbl_theme, pagination = FALSE, columns = list(Message = reactable::colDef(minWidth = 260))
         ))
       }
