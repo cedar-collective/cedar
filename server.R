@@ -5883,6 +5883,7 @@ for (.download_key in names(.enrl_desr_view_ids)) {
                  instructor_access = dfw_authenticated, instructor_password = dfw_password)
 
   degreeExplorerServer("degree_explorer", CEDAR_DEGREE_BOARDS$catalog, CEDAR_DEGREE_BOARDS$roadmaps, status = CEDAR_DEGREE_BOARDS$status,
+    colleges = CEDAR_DEGREE_BOARDS$colleges,
     sections = cedar_sections, course_terms = data_objects[["cedar_course_terms"]],
     edges = data_objects[["cedar_edges"]], shared = CEDAR_SHARED_REQUIREMENTS)
 

@@ -630,6 +630,26 @@ test_that("catalog trees preserve alternatives, bundles, timing and unresolved s
   expect_error(validate_degree_catalog(bad), "evidence year")
 })
 
+test_that("the degree picker is alphabetical and a college narrows it, the college read from programs.csv", {
+  colleges <- degree_catalog_colleges(test_degree_catalog, test_dims)
+  expect_equal(colleges$catalog_id, c(BIOLOGY, HISTORY))
+  expect_equal(colleges$college_code, c("AS", "AS"))
+  expect_equal(unname(degree_college_choices(colleges)), c("all", "AS"))
+  expect_match(names(degree_college_choices(colleges))[2], "\\(2\\)$")
+  # The catalog listed History first: the picker still reads alphabetically.
+  reversed <- test_degree_catalog; reversed$catalogs <- reversed$catalogs[2:1, ]
+  expect_equal(unname(degree_catalog_choices(reversed)), c(BIOLOGY, HISTORY))
+  expect_equal(unname(degree_catalog_choices(reversed, catalog_ids = HISTORY)), HISTORY)
+  # A major programs.csv has not decided is placed by Banner's college, as a
+  # declaration is; with no college from either, the degree cannot be placed.
+  undecided <- test_degree_catalog
+  is_history <- undecided$program_codes$catalog_id == HISTORY
+  undecided$program_codes$major_code[is_history] <- "ZZZZ"
+  expect_equal(degree_catalog_colleges(undecided, test_dims)$college_code, c("AS", "AS"))
+  undecided$program_codes$source_college_code[is_history] <- "QQ"
+  expect_error(degree_catalog_colleges(undecided, test_dims), "exactly one college.*demo-history-ba-2026")
+})
+
 # Banner gives a field's B.A. and B.S. separate program codes (BA-PSY-AS,
 # BS-PSY-AS) under one program name, so a degree map claims its own codes.
 # The demo has no pre-major for History; FHIS below is built here, named after

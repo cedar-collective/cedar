@@ -157,6 +157,27 @@ const checkAdminSharedRules = async () => {
 const checkDegreeExplorer = async () => {
   await connect(page, { tab: 'degree-explorer' });
   await waitForSelector(page, '[data-roadmap][data-ready]');
+  // The degrees read alphabetically; a college narrows them to its own.
+  const labels = id => page.evaluate(id => Object.values(document.getElementById(id).selectize.options)
+    .sort((a, b) => a.$order - b.$order).map(o => o.label), id);
+  const degrees = await labels('degree_explorer-dx_catalog_id');
+  check(degrees.length > 10 && degrees.every((label, i) => i === 0 ||
+      degrees[i - 1].localeCompare(label, 'en', { sensitivity: 'base' }) <= 0),
+    `the ${degrees.length} degrees are listed alphabetically`);
+  await page.evaluate(() => document.getElementById('degree_explorer-dx_college').selectize.setValue('EN'));
+  check(await waitFor(page, () => {
+      const z = document.getElementById('degree_explorer-dx_catalog_id').selectize;
+      const labels = Object.values(z.options).map(o => o.label);
+      return labels.length >= 2 && labels.length < 10 && labels.some(l => l.startsWith('Computer Science'));
+    }, { timeout: 30000 }),
+    'School of Engineering narrows the degree list to its own degrees, Computer Science among them');
+  await choose('degree_explorer-dx_catalog_id', 'cs-bs-2026');
+  // Back to every college: the degree in view stays.
+  await page.evaluate(() => document.getElementById('degree_explorer-dx_college').selectize.setValue('all'));
+  check(await waitFor(page, () => Object.keys(document.getElementById('degree_explorer-dx_catalog_id').selectize.options).length > 10) &&
+    await page.$eval('#degree_explorer-dx_catalog_id', el => el.value) === 'cs-bs-2026',
+    'All colleges restores every degree and keeps Computer Science in view');
+  await waitForIdle(page);
   // Condensed cards first: code, title and credits only, empty rows collapsed.
   const tileHeights = () => page.$$eval('.cedar-roadmap-course', els => els.map(el => el.getBoundingClientRect().height));
   const condensedHeights = await tileHeights();
@@ -702,6 +723,8 @@ try {
   if (process.argv.includes('--shared-requirements-only')) {
     await connect(page, { tab: 'degree-explorer' });
     await waitForSelector(page, '[data-roadmap][data-ready]');
+    // The page opens on the first degree alphabetically; the overlap is CS's.
+    await choose('degree_explorer-dx_catalog_id', 'cs-bs-2026');
     // The overlap labels are on the Detailed cards, which the full run has
     // switched to by the time it reaches them.
     await page.click('[data-roadmap-view="detailed"]');
