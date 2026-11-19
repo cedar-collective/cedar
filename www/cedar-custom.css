@@ -148,6 +148,38 @@
   --bs-info-text-emphasis:    var(--juniper-blue-dark);
   --bs-warning-text-emphasis: var(--amber-dark);
   --bs-danger-text-emphasis:  var(--danger-red-dark);
+
+  /* ── Theme tokens (light; the dark values are in the dark-mode block) ── */
+  /* Text roles split from the brand colours they share a value with, so a
+     colour that is a header's background in both modes can be text that
+     lightens in the dark. */
+  --page-bg:        #ffffff;
+  --surface-raised: #ffffff;   /* panels, dropdowns, notifications, tabs  */
+  --surface-warm:   #faf6ef;   /* focused inputs, tab hover               */
+  --surface-hover:  #f0e8d8;   /* option hover                            */
+  --border-warm:    #d4c5b0;
+  --text-heading:   var(--cedar-green-dark);
+  --text-green:     var(--cedar-green);
+  --link-color:     var(--juniper-blue-dark);
+  --text-warning:   var(--amber-dark);
+  --text-critical:  var(--danger-red-dark);
+  --overlay-bg:     rgba(232, 227, 218, 0.85);   /* --parchment-ash at 85% */
+  --button-hover-bg: var(--parchment-ash);
+  --surface-veil:        rgba(255, 255, 255, 0.5);    /* lightens a tinted row */
+  --surface-veil-strong: rgba(255, 255, 255, 0.72);
+  /* Tables (cedar_tbl_theme reads these) */
+  --table-text:        var(--charcoal-soil);
+  --table-bg:          #ffffff;
+  --table-border:      #d4c5b0;
+  --table-stripe:      #faf5ee;
+  --table-highlight:   #f0e8d8;
+  --table-header-bg:   #706858;
+  --table-header-text: #f5eedf;
+  --table-header-rule: #8C8474;
+  /* Charts (cedar-theme.js reads these into each plotly figure) */
+  --chart-text:  #444444;
+  --chart-grid:  #eeeeee;
+  --chart-line:  #444444;
 }
 
 /* Enrollment projections -------------------------------------------------- */
@@ -501,6 +533,7 @@ details.enrollment-projection-evidence {
 body {
   font-size: 0.9em !important;
   color: var(--charcoal-soil);
+  background-color: var(--page-bg);
 }
 
 /* ── Shiny reconnect / deploy restart overlay ─────────────────────────────── */
@@ -523,7 +556,7 @@ body.cedar-shiny-disconnected #shiny-disconnected-overlay {
 }
 
 .cedar-disconnect-panel {
-  background: #fff;
+  background: var(--surface-raised);
   border: 1px solid var(--surface-soft-border);
   border-radius: var(--radius-md);
   box-shadow: 0 18px 45px rgba(35, 40, 38, 0.16);
@@ -533,7 +566,7 @@ body.cedar-shiny-disconnected #shiny-disconnected-overlay {
 }
 
 .cedar-disconnect-eyebrow {
-  color: var(--juniper-blue-dark);
+  color: var(--link-color);
   font-size: 0.8rem;
   font-weight: 750;
   letter-spacing: 0.08em;
@@ -542,7 +575,7 @@ body.cedar-shiny-disconnected #shiny-disconnected-overlay {
 }
 
 .cedar-disconnect-panel h1 {
-  color: var(--cedar-green-dark);
+  color: var(--text-heading);
   font-size: clamp(1.8rem, 5vw, 2.5rem);
   font-weight: 750;
   letter-spacing: 0;
@@ -559,7 +592,7 @@ body.cedar-shiny-disconnected #shiny-disconnected-overlay {
 
 .cedar-disconnect-status {
   align-items: center;
-  color: var(--juniper-blue-dark);
+  color: var(--link-color);
   display: flex;
   font-weight: 650;
   gap: 0.75rem;
@@ -702,7 +735,7 @@ body.cedar-shiny-disconnected #shiny-disconnected-overlay {
   align-items: center;
   background: rgba(255, 255, 255, 0.94);
   border-radius: var(--radius-sm);
-  color: var(--cedar-green-dark);
+  color: var(--cedar-green-dark);   /* a white chip on the green hero in both modes */
   display: flex;
   gap: 8px;
   font-size: 0.9rem;
@@ -713,7 +746,7 @@ body.cedar-shiny-disconnected #shiny-disconnected-overlay {
   margin-top: var(--space-6);
 }
 .cedar-home-section h2 {
-  color: var(--cedar-green-dark);
+  color: var(--text-heading);
   font-size: 1.24rem;
   font-weight: 700;
   letter-spacing: 0.02em;
@@ -732,7 +765,7 @@ body.cedar-shiny-disconnected #shiny-disconnected-overlay {
 }
 .cedar-home-card {
   align-items: flex-start;
-  background: #fff;
+  background: var(--surface-raised);
   border: 1px solid rgba(200, 191, 176, 0.85);
   border-left: 4px solid var(--juniper-blue);
   border-radius: var(--radius-md);
@@ -762,14 +795,14 @@ body.cedar-shiny-disconnected #shiny-disconnected-overlay {
   background: var(--surface-soft);
   border: 1px solid var(--surface-soft-border);
   border-radius: var(--radius-md);
-  color: var(--cedar-green-dark);
+  color: var(--text-heading);
   display: flex;
   height: 36px;
   justify-content: center;
   width: 36px;
 }
 .cedar-home-card-copy h3 {
-  color: var(--cedar-green-dark);
+  color: var(--text-heading);
   font-size: 1rem;
   font-weight: 700;
   letter-spacing: 0;
@@ -782,7 +815,7 @@ body.cedar-shiny-disconnected #shiny-disconnected-overlay {
   margin: 0;
 }
 .cedar-home-card-meta {
-  color: var(--juniper-blue-dark);
+  color: var(--link-color);
   display: block;
   font-size: 0.78rem;
   font-weight: 600;
@@ -838,7 +871,7 @@ body.cedar-shiny-disconnected #shiny-disconnected-overlay {
 }
 .cedar-spotlight-link {
   align-items: center;
-  background: #fff;
+  background: var(--surface-raised);
   border: 1px solid var(--surface-soft-border);
   border-left: 5px solid var(--cedar-green);
   border-radius: var(--radius-md);
@@ -867,7 +900,7 @@ body.cedar-shiny-disconnected #shiny-disconnected-overlay {
   background: var(--surface-soft);
   border: 1px solid var(--surface-soft-border);
   border-radius: var(--radius-md);
-  color: var(--cedar-green-dark);
+  color: var(--text-heading);
   display: flex;
   height: 42px;
   justify-content: center;
@@ -877,10 +910,10 @@ body.cedar-shiny-disconnected #shiny-disconnected-overlay {
    green hero. The spotlight card is white, where that is 1.92:1 — so darken it
    here only. */
 .cedar-spotlight-copy .cedar-home-kicker {
-  color: var(--juniper-blue-dark);   /* 8.49:1 on white */
+  color: var(--link-color);   /* 8.49:1 on white */
 }
 .cedar-spotlight-copy h2 {
-  color: var(--cedar-green-dark);
+  color: var(--text-heading);
   font-size: 1.1rem;
   font-weight: 700;
   margin: 2px 0 4px 0;
@@ -893,7 +926,7 @@ body.cedar-shiny-disconnected #shiny-disconnected-overlay {
 }
 .cedar-spotlight-cta {
   align-items: center;
-  color: var(--cedar-green-dark);
+  color: var(--text-heading);
   display: flex;
   flex-shrink: 0;
   font-size: 0.86rem;
@@ -960,7 +993,7 @@ body.cedar-shiny-disconnected #shiny-disconnected-overlay {
 }
 .cedar-whatsnew-card {
   align-items: flex-start;
-  background: rgba(255, 255, 255, 0.96);
+  background: var(--surface-raised);
   border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: var(--radius-md);
   color: var(--charcoal-soil);
@@ -981,7 +1014,7 @@ body.cedar-shiny-disconnected #shiny-disconnected-overlay {
   background: var(--surface-soft);
   border: 1px solid var(--surface-soft-border);
   border-radius: var(--radius-md);
-  color: var(--cedar-green-dark);
+  color: var(--text-heading);
   display: flex;
   height: 34px;
   justify-content: center;
@@ -997,7 +1030,7 @@ body.cedar-shiny-disconnected #shiny-disconnected-overlay {
   text-transform: uppercase;
 }
 .cedar-whatsnew-card-copy h3 {
-  color: var(--cedar-green-dark);
+  color: var(--text-heading);
   font-size: 0.92rem;
   font-weight: 700;
   margin: 0 0 4px 0;
@@ -1139,7 +1172,7 @@ a.cedar-whatsnew-chip:hover {
 .btn-outline-secondary:hover,
 .btn-outline-secondary:focus,
 .btn-outline-secondary:active {
-  background-color: var(--parchment-ash) !important;
+  background-color: var(--button-hover-bg) !important;
   border-color: var(--trunk-bark) !important;
   color: var(--charcoal-soil) !important;
 }
@@ -1149,8 +1182,8 @@ a.cedar-whatsnew-chip:hover {
 }
 
 /* ── Links ────────────────────────────────────────────────────────────────── */
-a       { color: var(--juniper-blue); }
-a:hover { color: var(--juniper-blue-dark); }
+a       { color: var(--link-color); }
+a:hover { color: var(--link-color); }
 
 /* ── Filter bar — full-width band flush to navbar ─────────────────────────── */
 .filters-compact {
@@ -1165,7 +1198,7 @@ a:hover { color: var(--juniper-blue-dark); }
 .filters-compact h1 {
   font-size: 1.1rem !important;
   font-weight: 600;
-  color: var(--cedar-green-dark);
+  color: var(--text-heading);
   margin: 0 0 4px 0;
   letter-spacing: 0.02em;
 }
@@ -1224,15 +1257,15 @@ a:hover { color: var(--juniper-blue-dark); }
 .filters-compact input[type=number]:focus {
   border-color: var(--juniper-blue-light) !important;
   box-shadow: var(--focus-ring) !important;
-  background-color: #faf6ef;
+  background-color: var(--surface-warm);
   outline: none;
 }
 /* Override browser autofill yellow — use warm parchment tint instead */
 .filters-compact input:-webkit-autofill,
 .filters-compact input:-webkit-autofill:hover,
 .filters-compact input:-webkit-autofill:focus {
-  -webkit-box-shadow: 0 0 0 1000px #faf6ef inset !important;
-  box-shadow: 0 0 0 1000px #faf6ef inset !important;
+  -webkit-box-shadow: 0 0 0 1000px var(--surface-warm) inset !important;
+  box-shadow: 0 0 0 1000px var(--surface-warm) inset !important;
   -webkit-text-fill-color: var(--charcoal-soil) !important;
 }
 /* ── Selectize controls and dropdowns ──────────────────────────────────────── */
@@ -1276,12 +1309,12 @@ a:hover { color: var(--juniper-blue-dark); }
 .selectize-control.focus .selectize-input {
   border-color: var(--juniper-blue-light) !important;
   box-shadow: var(--focus-ring) !important;
-  background-color: #faf6ef !important;
+  background-color: var(--surface-warm) !important;
 }
 /* Warm tan chips for selected values — global */
 .selectize-input .item {
   background: rgba(199, 169, 107, 0.18) !important;
-  color: var(--cedar-green-dark) !important;
+  color: var(--text-heading) !important;
   border: 1px solid rgba(199, 169, 107, 0.45) !important;
   border-radius: var(--radius-sm) !important;
   font-size: 0.8rem;
@@ -1344,7 +1377,7 @@ a:hover { color: var(--juniper-blue-dark); }
 }
 
 .filters-compact .filter-context-title {
-  color: var(--cedar-green-dark);
+  color: var(--text-heading);
   font-size: 0.82em;
   font-weight: 700;
   margin-bottom: 4px;
@@ -1371,7 +1404,7 @@ a:hover { color: var(--juniper-blue-dark); }
 .filters-compact .filter-context-code {
   background: rgba(63, 94, 75, 0.10);
   border-radius: var(--radius-sm);
-  color: var(--cedar-green-dark);
+  color: var(--text-heading);
   display: inline-block;
   font-family: monospace;
   font-size: 0.78em;
@@ -1381,7 +1414,7 @@ a:hover { color: var(--juniper-blue-dark); }
 /* A code's name beside its pill, in unit_codes_scope(); the margin separates
    one code from the next. */
 .filters-compact .filter-context-name {
-  color: var(--cedar-green-dark);
+  color: var(--text-heading);
   font-size: 0.82em;
   margin-right: 12px;
 }
@@ -1389,7 +1422,7 @@ a:hover { color: var(--juniper-blue-dark); }
 /* ── Selectize dropdown (global — all selectize instances) ────────────────── */
 .selectize-dropdown,
 .selectize-dropdown-content,
-.selectize-dropdown .option { background-color: #fff !important; }
+.selectize-dropdown .option { background-color: var(--surface-raised) !important; }
 .selectize-dropdown {
   border: 1px solid rgba(168, 152, 128, 0.75) !important;
   border-radius: var(--radius-sm) !important;
@@ -1411,14 +1444,14 @@ a:hover { color: var(--juniper-blue-dark); }
   color: var(--charcoal-soil) !important;
 }
 .selectize-dropdown .option:hover,
-.selectize-dropdown .option.active   { background-color: #f0e8d8 !important; color: var(--cedar-green-dark) !important; }
+.selectize-dropdown .option.active   { background-color: var(--surface-hover) !important; color: var(--text-heading) !important; }
 .selectize-dropdown .option.selected { background-color: rgba(199, 169, 107, 0.2) !important; color: var(--charcoal-soil) !important; }
 .selectize-dropdown .highlight       { background-color: rgba(199, 169, 107, 0.4) !important; color: inherit !important; border-radius: 2px; }
 
 /* ── Shiny notifications ──────────────────────────────────────────────────── */
 .shiny-notification-panel { bottom: 16px; right: 16px; width: 280px; }
 .shiny-notification {
-  background-color: #fff;
+  background-color: var(--surface-raised);
   border: none;
   border-left: 3px solid var(--cedar-green);
   border-radius: var(--radius-md);
@@ -1431,7 +1464,7 @@ a:hover { color: var(--juniper-blue-dark); }
 .shiny-notification.shiny-notification-warning { border-left-color: var(--lichen-gold); }
 .shiny-notification.shiny-notification-error   { border-left-color: var(--danger-red); }
 .shiny-notification-close       { color: var(--cedar-green-light) !important; opacity: 0.7; }
-.shiny-notification-close:hover { opacity: 1; color: var(--cedar-green-dark) !important; }
+.shiny-notification-close:hover { opacity: 1; color: var(--text-heading) !important; }
 
 /* ── Tab pane spacing (bslib 0.9 / Bootstrap 5 override) ─────────────────── */
 .navbar + .container-fluid > .tab-content > .tab-pane.active.html-fill-container {
@@ -1459,7 +1492,7 @@ a:hover { color: var(--juniper-blue-dark); }
   background: var(--surface-soft);
   border-top: 1px solid var(--surface-soft-border);
   font-size: 0.84em;
-  color: var(--cedar-green);
+  color: var(--text-green);
   padding: 6px var(--page-gutter);
   display: flex;
   align-items: center;
@@ -1488,7 +1521,7 @@ details.cedar-scope-details > summary::-webkit-details-marker { display: none; }
 details.cedar-scope-details > summary::before {
   content: "\25B6";
   font-size: 0.68em;
-  color: var(--cedar-green);
+  color: var(--text-green);
   transition: transform 0.15s;
 }
 details.cedar-scope-details[open] > summary::before { transform: rotate(90deg); }
@@ -1498,16 +1531,16 @@ details.cedar-scope-details .cedar-scope-details-hint {
   font-size: 0.82em;
 }
 details.cedar-scope-details[open] > summary { margin-bottom: 4px; }
-.enrl-scope-bar strong { color: var(--cedar-green-dark); }
+.enrl-scope-bar strong { color: var(--text-heading); }
 .enrl-scope-bar code {
   background: rgba(0, 0, 0, 0.07);
-  color: var(--cedar-green);
+  color: var(--text-green);
   border-radius: var(--radius-sm);
   padding: 0 4px;
   font-size: 0.92em;
 }
 .enrl-scope-bar .btn-link {
-  color: var(--juniper-blue-dark) !important;
+  color: var(--link-color) !important;
   padding: 0;
   margin-left: auto;
   flex-shrink: 0;
@@ -1526,7 +1559,7 @@ details.cedar-scope-details[open] > summary { margin-bottom: 4px; }
   white-space: nowrap;
 }
 .scope-chip-key   { color: var(--cedar-green-mid); font-size: 0.85em; text-transform: uppercase; letter-spacing: 0.03em; }
-.scope-chip-val   { color: var(--cedar-green-dark); font-weight: 600; }
+.scope-chip-val   { color: var(--text-heading); font-weight: 600; }
 .scope-count      { margin-left: auto; color: var(--cedar-green-mid); font-size: 0.85em; white-space: nowrap; }
 .scope-dedup-note { font-size: 0.78em; color: var(--status-neutral); white-space: nowrap; font-style: italic; }
 
@@ -1535,7 +1568,7 @@ details.cedar-scope-details[open] > summary { margin-bottom: 4px; }
 .scope-bar-placeholder { font-style: italic; color: var(--cedar-green-light); }
 .rs-stripe-row    { display: flex; align-items: center; gap: 6px; flex-wrap: nowrap; }
 .rs-stripe-label  { color: var(--cedar-green-mid); font-size: 0.85em; text-transform: uppercase; letter-spacing: 0.03em; flex-shrink: 0; }
-.rs-stripe-val    { color: var(--cedar-green-dark); font-weight: 600; }
+.rs-stripe-val    { color: var(--text-heading); font-weight: 600; }
 .rs-stripe-sep    { color: var(--cedar-green-light); }
 .rs-stripe-thresholds { color: var(--cedar-green-mid); }
 .rs-stripe-right  { margin-left: auto; display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
@@ -1543,7 +1576,7 @@ details.cedar-scope-details[open] > summary { margin-bottom: 4px; }
 
 /* ── Nav tabs — warm brown palette matching table headers ─────────────────── */
 .nav-tabs {
-  border-bottom: 1px solid #d4c5b0;
+  border-bottom: 1px solid var(--border-warm);
 }
 .nav-tabs .nav-link {
   color: var(--action-brown);
@@ -1558,15 +1591,15 @@ details.cedar-scope-details[open] > summary { margin-bottom: 4px; }
   transition: background-color 0.12s, border-color 0.12s;
 }
 .nav-tabs .nav-link:hover {
-  background-color: #faf5ee;
-  border-color: #d4c5b0 #d4c5b0 transparent;
+  background-color: var(--surface-warm);
+  border-color: var(--border-warm) var(--border-warm) transparent;
   color: #4a2e12;
 }
 .nav-tabs .nav-link.active {
-  background-color: #ffffff;
-  border-color: #d4c5b0 #d4c5b0 #ffffff;
+  background-color: var(--surface-raised);
+  border-color: var(--border-warm) var(--border-warm) var(--surface-raised);
   border-top: 2px solid #8B6240;
-  color: #232826;
+  color: var(--charcoal-soil);
   font-weight: 600;
 }
 
@@ -1606,7 +1639,7 @@ details.cedar-scope-details[open] > summary { margin-bottom: 4px; }
 .cedar-section-heading {
   font-size: 1rem;
   font-weight: 600;
-  color: var(--cedar-green-dark);
+  color: var(--text-heading);
   margin: var(--space-5) 0 var(--space-1);
 }
 .cedar-section-heading:first-child { margin-top: 12px; }
@@ -1683,7 +1716,7 @@ h4.cedar-section-heading {
   margin-bottom: 0;
 }
 .cedar-subtab-description strong {
-  color: var(--cedar-green-dark);
+  color: var(--text-heading);
 }
 
 /* A section bar directly under a subtab header needs less air above it — the
@@ -1745,7 +1778,7 @@ h4.cedar-section-heading {
 }
 .cedar-dashboard-subsection-title {
   align-items: center;
-  color: var(--cedar-green-dark);
+  color: var(--text-heading);
   display: flex;
   font-size: 1.1rem;
   font-weight: 750;
@@ -1762,7 +1795,7 @@ h4.cedar-section-heading {
   color: var(--status-success);
 }
 .cedar-dashboard-subsection-title.text-amber {
-  color: var(--amber-dark);
+  color: var(--text-warning);
 }
 .cedar-dashboard-subsection-description {
   color: var(--text-secondary);
@@ -1820,10 +1853,10 @@ h4.cedar-section-heading {
 .text-critical { color: var(--status-critical); }
 /* Text, so it uses the readable amber, not --status-warning/--lichen-gold
    (2.25:1). --status-warning stays the decorative token for borders/fills. */
-.text-warning  { color: var(--amber-dark); }
+.text-warning  { color: var(--text-warning); }
 .text-info     { color: var(--status-info); }
 .text-neutral  { color: var(--status-neutral); }
-.text-amber    { color: var(--amber-dark); }   /* dark amber — dirty/declining accents */
+.text-amber    { color: var(--text-warning); }   /* dark amber — dirty/declining accents */
 
 /* ── Pathways ─────────────────────────────────────────────────────────────── */
 .pathways-analysis-content .tab-content { font-size: 1em; }
@@ -1855,7 +1888,7 @@ h4.cedar-section-heading {
   display: inline-flex;
   align-items: baseline;
   gap: 14px;
-  color: var(--cedar-green-dark);
+  color: var(--text-heading);
 }
 .pathways-inline-summary-title {
   font-size: 1.25rem;
@@ -1935,7 +1968,7 @@ h4.cedar-section-heading {
   background: rgba(77, 111, 168, 0.12);
   border: 1px solid rgba(77, 111, 168, 0.28);
   border-radius: var(--radius-md);
-  color: var(--juniper-blue-dark);
+  color: var(--link-color);
   display: flex;
   flex-shrink: 0;
   height: 38px;
@@ -1943,7 +1976,7 @@ h4.cedar-section-heading {
   width: 38px;
 }
 .pathways-start-panel h4 {
-  color: var(--juniper-blue-dark);
+  color: var(--link-color);
   font-size: 1.05rem;
   font-weight: 700;
   letter-spacing: 0;
@@ -1962,7 +1995,7 @@ h4.cedar-section-heading {
 }
 .pathways-start-tab {
   align-items: flex-start;
-  background: rgba(255, 255, 255, 0.72);
+  background: var(--surface-veil-strong);
   border: 1px solid rgba(168, 189, 217, 0.7);
   border-radius: var(--radius-md);
   display: flex;
@@ -1971,7 +2004,7 @@ h4.cedar-section-heading {
   padding: 10px 12px;
 }
 .pathways-start-tab-icon {
-  color: var(--juniper-blue-dark);
+  color: var(--link-color);
   flex-shrink: 0;
   font-size: 0.92rem;
   padding-top: 2px;
@@ -1983,7 +2016,7 @@ h4.cedar-section-heading {
   gap: 2px;
 }
 .pathways-start-tab-copy strong {
-  color: var(--juniper-blue-dark);
+  color: var(--link-color);
   font-size: 0.9rem;
 }
 .pathways-start-tab-copy span {
@@ -2010,12 +2043,12 @@ h4.cedar-section-heading {
 }
 .pathways-start-caveat .fa,
 .pathways-start-caveat svg {
-  color: var(--juniper-blue-dark);
+  color: var(--link-color);
   flex-shrink: 0;
   font-size: 1.05rem;
   margin-top: 3px;
 }
-.pathways-start-caveat strong { color: var(--juniper-blue-dark); }
+.pathways-start-caveat strong { color: var(--link-color); }
 .pathways-demo-options {
   display: grid;
   grid-template-columns: max-content max-content minmax(150px, 1fr);
@@ -2051,10 +2084,10 @@ h4.cedar-section-heading {
 .pathways-population-count {
   font-size: 1.45em;
   font-weight: 700;
-  color: var(--cedar-green-dark);
+  color: var(--text-heading);
 }
 .pathways-population-description {
-  color: var(--cedar-green-dark);
+  color: var(--text-heading);
   font-size: 1em;
 }
 .pathways-population-detail {
@@ -2127,8 +2160,8 @@ h4.cedar-section-heading {
   color: var(--text-secondary);
   min-height: 1.1em;
 }
-.stat-compare--worse  { color: var(--amber-dark); font-weight: 600; }
-.stat-compare--better { color: var(--cedar-green); font-weight: 600; }
+.stat-compare--worse  { color: var(--text-warning); font-weight: 600; }
+.stat-compare--better { color: var(--text-green); font-weight: 600; }
 
 /* ── Finding figures ──────────────────────────────────────────────────────── */
 /* A finding drawn rather than written (cedar_finding_card()): the one count to
@@ -2285,7 +2318,7 @@ h4.cedar-section-heading {
 }
 .stat-row-label {
   align-items: baseline;
-  color: var(--cedar-green-dark);
+  color: var(--text-heading);
   display: flex;
   flex-wrap: wrap;
   font-size: 0.95rem;
@@ -2380,7 +2413,7 @@ h4.cedar-section-heading {
 }
 .cedar-snapshot-table caption {
   caption-side: top;
-  color: var(--cedar-green-dark);
+  color: var(--text-heading);
   font-size: 0.95rem;
   font-weight: 700;
   padding: 0 0 var(--space-1);
@@ -2401,7 +2434,7 @@ h4.cedar-section-heading {
 }
 .cedar-snapshot-table thead th.snap-current {
   background: var(--surface-soft);
-  color: var(--cedar-green-dark);
+  color: var(--text-heading);
   font-weight: 700;
 }
 .cedar-snapshot-table thead th.snap-current[colspan] {
@@ -2510,7 +2543,7 @@ h4.cedar-section-heading {
 }
 .movement-origin-stack > .movement-origin-row {
   align-items: center;
-  background: rgba(255, 255, 255, 0.5);
+  background: var(--surface-veil);
   border-radius: var(--radius-sm);
   box-shadow: inset 0 3px 0 var(--movement-unknown-accent);
   display: grid;
@@ -2575,7 +2608,7 @@ h4.cedar-section-heading {
   box-shadow: inset 0 3px 0 var(--movement-unknown-accent);
 }
 .movement-origin-row td {
-  background: rgba(255, 255, 255, 0.5);
+  background: var(--surface-veil);
   box-shadow: inset 0 3px 0 var(--movement-unknown-accent);
 }
 .movement-origin-row td:first-child {
@@ -2725,7 +2758,7 @@ details.cedar-info-panel .panel-body ul { margin: 3px 0 5px 0; padding-left: 16p
 details.cedar-info-panel .panel-body li { margin-bottom: 3px; }
 details.cedar-info-panel a              { color: var(--status-info); }
 details.cedar-detail-panel {
-  background: #fff;
+  background: var(--surface-raised);
   border: 1px solid var(--alert-info-border);
   border-left: 4px solid var(--alert-info-border);
   margin: 16px 0 10px 0;
@@ -2833,17 +2866,17 @@ details.cedar-detail-panel .panel-body p {
    lichen-gold at 2.25:1, juniper-light at 1.92:1) were chosen as tints and are
    unreadable at this size — see the decorative-only note on --lichen-gold. */
 .rs-count-item            { font-size: 0.9em; }
-.rs-count-bump    strong  { color: var(--amber-dark); }        /* 7.04:1 */
-.rs-count-dip     strong  { color: var(--cedar-green); }       /* 7.21:1 */
+.rs-count-bump    strong  { color: var(--text-warning); }        /* 7.04:1 */
+.rs-count-dip     strong  { color: var(--text-green); }       /* 7.21:1 */
 .rs-count-wait    strong  { color: var(--danger-red); }        /* 5.01:1 */
 .rs-count-squeeze strong  { color: var(--action-brown); }      /* 7.96:1 */
-.rs-count-drop    strong  { color: var(--juniper-blue-dark); } /* 8.49:1 */
+.rs-count-drop    strong  { color: var(--link-color); } /* 8.49:1 */
 .rs-data-age              { font-weight: 500; }
-.rs-age-fresh             { color: var(--cedar-green); }       /* 7.21:1 */
-.rs-age-warn              { color: var(--amber-dark); }        /* 7.04:1 */
-.rs-age-stale             { color: var(--danger-red-dark); font-weight: 600; } /* 9.65:1 */
+.rs-age-fresh             { color: var(--text-green); }       /* 7.21:1 */
+.rs-age-warn              { color: var(--text-warning); }        /* 7.04:1 */
+.rs-age-stale             { color: var(--text-critical); font-weight: 600; } /* 9.65:1 */
 .rs-regenerate-link       { font-size: 1em; color: var(--cedar-green-mid); text-decoration: underline; }
-.rs-regenerate-link:hover { color: var(--cedar-green-dark); }
+.rs-regenerate-link:hover { color: var(--text-heading); }
 #rs_tabs              { margin-top: 8px; }
 #rs_tabs .tab-content { padding-top: 4px !important; }
 
@@ -2862,7 +2895,7 @@ details.cedar-detail-panel .panel-body p {
 .dash-loader-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(232, 227, 218, 0.85);   /* --parchment-ash at 85% opacity */
+  background: var(--overlay-bg);
   backdrop-filter: blur(3px);
 }
 .dash-loader-box {
@@ -2873,7 +2906,7 @@ details.cedar-detail-panel .panel-body p {
   align-items: center;
   gap: 14px;
   padding: var(--space-6) 48px;
-  background: #fff;
+  background: var(--surface-raised);
   border-radius: var(--radius-lg);
   box-shadow: 0 4px 28px rgba(35, 40, 38, 0.14);
 }
@@ -2895,7 +2928,7 @@ details.cedar-detail-panel .panel-body p {
 }
 .dash-tree-icon { font-size: 1.7rem; line-height: 1; position: relative; }
 @keyframes dash-spin { to { transform: rotate(360deg); } }
-.dash-loader-msg  { font-size: 0.95em; font-weight: 600; color: var(--cedar-green-dark); text-align: center; }
+.dash-loader-msg  { font-size: 0.95em; font-weight: 600; color: var(--text-heading); text-align: center; }
 .dash-loader-detail {
   max-width: 520px;
   margin-top: -6px;
@@ -2931,3 +2964,93 @@ details.cedar-method-panel .scope-bar {
   padding-left: 0;
   padding-right: 0;
 }
+
+
+/* ── Dark mode ────────────────────────────────────────────────────────────────
+   html[data-bs-theme="dark"], set by www/cedar-theme.js from the reader's
+   choice (remembered per browser) or, until they choose, the system setting.
+   Only tokens change here: every rule above reads them. The brand greens
+   stay as backgrounds (navbar, section headers); text that used them reads
+   the lighter text tokens. Contrast against --page-bg: body text 13:1,
+   secondary 8:1, muted 5.6:1, links 7.5:1. */
+[data-bs-theme="dark"] {
+  color-scheme: dark;
+  --page-bg:        #161a18;
+  --surface-raised: #1e2321;
+  --surface-warm:   #262b28;
+  --surface-hover:  #2f3632;
+  --border-warm:    #4a453c;
+
+  --charcoal-soil:   #e4e2dc;
+  --text-secondary:  #b9b7b0;
+  --text-muted:      #9d9b95;
+  --cedar-green-mid: #93b89d;
+  --text-heading:    #a8cbb2;
+  --text-green:      #93b89d;
+  --link-color:      #9fb9e4;
+  --text-warning:    #e3bd6e;
+  --text-critical:   #eba08f;
+  --trunk-bark:      #a59d8c;   /* outline-button text and rule */
+  --action-brown:    #cfa77d;
+  --cedar-plum-bg:   #2c2232;
+  --cedar-plum-dark: #c9a6d6;
+  --overlay-bg:      rgba(22, 26, 24, 0.85);
+  --button-hover-bg: var(--surface-hover);
+  --surface-veil:        rgba(255, 255, 255, 0.04);
+  --surface-veil-strong: rgba(255, 255, 255, 0.07);
+
+  --filter-bar-bg:       #1d2620;
+  --filter-bar-border:   #34463a;
+  --surface-soft:        #1b231e;
+  --surface-soft-border: #2f4035;
+  --surface-card:        #222624;
+  --surface-card-border: #4f483d;
+  --movement-native-bg:   #3a2622;
+  --movement-transfer-bg: #1f2838;
+  --movement-unknown-bg:  #262b28;
+
+  --input-bg:     #1a1e1c;
+  --input-border: #6f6759;
+
+  --alert-critical-bg: #3a2420;
+  --alert-warning-bg:  #352d1c;
+  --alert-info-bg:     #1d2636;
+  --alert-success-bg:  #1c2b21;
+  --alert-neutral-bg:  #262a28;
+  --alert-neutral-border: #3d4240;
+  --alert-code-bg:     #20263a;
+
+  --table-text:        #e4e2dc;
+  --table-bg:          #1e2321;
+  --table-border:      #3d3a33;
+  --table-stripe:      #232826;
+  --table-highlight:   #2f3632;
+  --table-header-bg:   #3b372f;
+  --table-header-text: #efe7d6;
+  --table-header-rule: #5c5547;
+
+  --chart-text: #d6d4ce;
+  --chart-grid: rgba(255, 255, 255, 0.10);
+  --chart-line: #8a8a85;
+
+  --bs-body-bg:    var(--page-bg);
+  --bs-body-color: var(--charcoal-soil);
+  --bs-border-color: #3d4240;
+  --bs-secondary-bg: var(--surface-raised);
+  --bs-tertiary-bg:  var(--surface-warm);
+}
+
+/* The toggle in the navbar. */
+.cedar-theme-toggle {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: var(--radius-sm);
+  color: rgba(255, 255, 255, 0.86);
+  line-height: 1;
+  padding: 5px 8px;
+}
+.cedar-theme-toggle:hover,
+.cedar-theme-toggle:focus-visible { color: #fff; border-color: rgba(255, 255, 255, 0.6); }
+.cedar-theme-toggle .cedar-theme-dark,
+[data-bs-theme="dark"] .cedar-theme-toggle .cedar-theme-light { display: none; }
+[data-bs-theme="dark"] .cedar-theme-toggle .cedar-theme-dark { display: inline; }

@@ -52,7 +52,7 @@ alongside other work (M14, M16).
 | [I20](#i20--cedar_programs-holds-almost-no-branch-campus-students) | Defect | `cedar_programs` holds 1–3% of branch-campus students; branch program counts read near zero |
 | [I18](#i18--cedar_degrees-holds-no-associate-degrees-so-branch-campus-completions-read-zero) | Defect | `cedar_degrees` holds no associate degrees: branch-campus completions read zero |
 | [I4](#i4--pre-change-course-ratios-are-confounded-by-career-stage) | Defect | Pre-change course ratios confounded by career stage (deferred) |
-| M1–M57 | Improvement | See [Improvements](#improvements) |
+| M1–M58 | Improvement | See [Improvements](#improvements) |
 
 ### Resolved since the last release
 
@@ -4297,6 +4297,19 @@ Go Next** and **With or Without This Course** (the code keeps `later-course`
 and `course-sequence`); each opens on the students it starts from; the pickers
 read "Later course(s) its students took" and "Students in"; the guide's
 Downstream section is a side-by-side table, and its anchors are unchanged.
+
+**M58 — Colours written into R code do not follow dark mode.** Dark mode
+(2026-11-19) changes the CSS tokens, the table theme and each plotly figure's
+background, text and grid; a colour an R function writes itself stays as it
+was drawn for a white page. Nine inline `style =` colours remain:
+`R/modules/regstats.R:130,133` (a bar track `#e0dbd2`, a `#666` label),
+`R/modules/dept-trends.R:1220-1272` (`#555` and `#666` table text) and
+`R/modules/pathways.R:1513` (`#b07000`). They also break the rule against
+inline styles. Trace colours chosen for a white page (a near-black line or
+label) and the sparkline strokes in `R/modules/ui-helpers.R` are not checked.
+*Reproduce:* switch to dark mode and open Regstats, a Dept Trends degree
+table or Pathways' warning line. *Done when:* each is a CSS class reading a
+token, and a dark screenshot of each page shows no light-mode colour.
 
 ### Documentation and naming
 
