@@ -36,6 +36,7 @@ alongside other work (M14, M16).
 
 | ID | Kind | Summary |
 |---|---|---|
+| [I65](#i65--the-degree-explorer-browser-suite-checks-the-hand-built-boards-the-compiled-drafts-replaced) | Defect | `tests/e2e/degree-explorer.test.mjs` has failed since the compiled drafts replaced the CS, Business, History and Philosophy boards (#309, 2026-11-16): it hovers hand-board tiles (`java1`, `java2`, `os`, `historiography`, `philbuddhist`, `buscapstone`, …) the page no longer draws, and stops at the first |
 | [I61](#i61--summer-2025-holds-nr-grades-where-summer-2024-held-none-and-reads-as-a-dfw-spike) | Defect | Summer 2025 holds 1,479 NR grades in 336 sections (Summer 2024: none), so it reads 22.5% DFW against about 13% for other summers; suspected an early pull before grades rolled |
 | [I55](#i55--the-instructor-gate-password-stopped-reaching-the-app) | Defect | The instructor-gate password stopped reaching the app: since 2026-09-05 `.Renviron` is kept out of the image and nothing else passed `CEDAR_DFW_PASSWORD`, so every instructor gate on production reads "not configured" (fixed in code 2026-11-12; production needs the password in its `.env`) |
 | [I46](#i46--a-deploy-that-must-rebuild-a-table-the-app-cannot-start-without-takes-the-site-down) | Defect | The deploy's table gate ran after the health check, so a deploy that added a column to `cedar_student_terms` failed its health check on the missing column and never reached the gate: production served the restart page from 17:07 UTC on 2026-11-04 (gate moved before the first request) |
@@ -58,6 +59,7 @@ Kept until the next release, so a recurrence is recognisable; each entry below g
 
 | ID | Kind | Summary |
 |---|---|---|
+| [I64](#i64--a-compiled-degree-board-plans-400-level-electives-in-the-first-semester) | Defect | The compiled Philosophy board plans its two "6 elective credits at the 400–499 level" tiles, and the four "two at the 400 level" elective tiles, in semester 1: a compiled elective slot was upper only when every course its group requires is upper. Readings can now state a pool's level (`course_level`, schema 1.1.0); Philosophy and History v2 state it and the tiles start in semester 5 (resolved 2026-11-18) |
 | [I63](#i63--the-online-psychology-pre-major-leads-to-the-campus-major-not-the-online-one) | Defect | `programs.csv` said the online Psychology pre-major XFPY leads to PSY, though 360 of its students declared XPSY (57 PSY): a PSY population counted them as "chose elsewhere". XFPY now leads to XPSY, a separate program (resolved 2026-11-16) |
 | [I62](#i62--a-pathways-population-counted-every-program-that-shared-a-name) | Defect | A Pathways population matched programs by Banner name: department BIOL took in 1,873 Biochemistry students (BIOC and FBIC, another unit) because CHBI is named "Biochemistry", "Architecture" merged ARCH and ARCT, and "Liberal Arts" missed its renamed code LAIS (7 ongoing students instead of 411). Populations now match codes, follow confirmed renames in `code_history.csv`, and keep same-named programs apart (resolved 2026-11-16) |
 | [I60](#i60--takers-vs-non-takers-opens-on-a-classification-its-home-campus-scope-hardly-holds) | Defect | Takers vs Non-Takers picked its opening classification from the course's takers on every campus and then opened on the page's home campus: HIST 1110 opened on Concurrent Enrollment, nearly all of them dual-credit students at branch campuses, so on ABQ its passed and DFW'd groups were empty in almost every term. The defaults are now read off the takers in the opening home-campus scope (resolved) |
@@ -95,6 +97,62 @@ Kept until the next release, so a recurrence is recognisable; each entry below g
 ---
 
 # Defects
+
+## I65 — The Degree Explorer browser suite checks the hand-built boards the compiled drafts replaced
+
+**Status:** open.
+**Found:** 2026-11-18, running the suite for I64.
+**Severity:** moderate, tests only: the page is not broken, but its browser
+suite has guarded nothing past its first three checks since 2026-11-16.
+**Cause:** #309 (degree compiler step 3) put each compiled draft in place of
+the hand-built board with the same catalog id. The suite (last changed
+2026-11-15) still names the hand boards' tiles: `java1`, `java2`,
+`computing0`, `os` (CS), `buscapstone` (Business), `historiography` (History),
+`philbuddhist`, `philknowledge`, `phillogic` (Philosophy). The compiled boards
+name tiles by rule (`intro_1`, `elective_upper_1`).
+**Reproduction:** `node tests/e2e/degree-explorer.test.mjs` against any app
+built since #309: three checks pass, then `No element found for selector:
+[data-node="java1"]`.
+**Fix:** point the CS, Business, History and Philosophy checks at the compiled
+tiles (or at a hand-built board that is still shown, such as Physics or
+Biology), and assert I64's placement there: Philosophy's `elective_upper_*`
+in semester 5 or later.
+
+## I64 — A compiled degree board plans 400-level electives in the first semester
+
+**Status:** resolved 2026-11-18. The reading schema (1.1.0) gives a node an
+optional, cited `course_level`; the compiler places a slot at the level its
+reading states, else at its group's. Philosophy and History v2 readings state
+`upper` on their 400–499 and HIST 300–499 pools (packets re-prepared under the
+new schema; v1 kept), and the recompiled Philosophy board starts its two
+400-level tiles in semester 5. Still open, and already flagged in the reading
+as the unresolved `elective-overlap`: "Four Philosophy electives, two at the
+400 level" restates the two credit pools as four more tiles in semester 1. Its
+limit covers only part of the pool, so it states no level.
+**Found:** 2026-11-18, from the user's to-do list ("Degree Explorer puts
+upper-level electives too early"), by building every board.
+**Severity:** moderate, Degree Explorer only. The compiled Philosophy B.A.
+board (`institution/unm/degree_drafts/degree_roadmap_nodes.csv`) gives
+`elective_upper_1` and `elective_upper_2` ("At least 6 elective credits at the
+400–499 level") and `elective_count_1`–`_4` ("Four Philosophy electives, two
+at the 400 level") `course_level = lower` and semester 1, against the plan's
+upper-level boundary of semester 5. A student reading the board sees 400-level
+work planned for their first term.
+**Cause:** `assemble_compiled_degree_board()` gives an elective slot the level
+of its group: upper only when every course the group requires is upper
+(`R/branches/degree-compiler-board.R`, the `role == "slot"` branch). The
+Philosophy major group requires PHIL 1115 and others below 300, so its slots
+read lower. History's "18 credits in HIST300–499" reads upper only because
+every course its group requires happens to be upper. The level is stated only
+in the catalog text the reading cites ("Earned at least 6 credits from 400 -
+499"); the reading schema (`config/catalog-normalization.schema.json`) has no
+field for a pool's level, and a label is never parsed for one.
+**Reproduction:** `Rscript --vanilla scripts/compile-degree-interpretations.R`
+(or read the committed draft nodes file): the Philosophy rows above carry
+`course_level = lower`, `semester = 1`. The hand-authored boards are not
+affected the same way: their elective tiles carry an authored `course_level`,
+and the early ones say so (Anthropology's "Select an eligible lower-level
+course for this early slot").
 
 ## I63 — The online Psychology pre-major leads to the campus major, not the online one
 

@@ -107,7 +107,10 @@ The proposal uses the fixed normalized schema. Its complete coverage map and
 exact quotations bind it to the prepared unit; source hashes and locators remain
 in that immutable packet. Git retains the authored data and reviewable diffs.
 Create `program.v2.json` for a subsequent draft and retain v1. A changed source,
-schema or prompt needs a freshly prepared matching unit and a new draft.
+schema or prompt needs a freshly prepared matching unit and a new draft. The
+compile script builds each program from its latest version, from the packet
+whose program unit matches the reading's `unit_key`; packets prepared under an
+earlier schema stay in the store for the earlier versions.
 
 The app stages matching files automatically, idempotently. For maintenance:
 
@@ -222,8 +225,10 @@ beside its hand-built board, semester by semester.
 - **Placement.** A lower-division tile starts in semester 1 and an upper-division
   one at the semester most authored plans use (5). The scheduler moves each one
   later for prerequisites and load, as it does for an authored board. An elective
-  slot takes the level of its group: upper when every course its group requires
-  is upper.
+  slot takes the level its reading states (`course_level`, schema 1.1.0, cited
+  like any other field: "Earned at least 6 credits from 400 - 499"). A slot with
+  no stated level takes its group's: upper when every course its group requires
+  is upper. A label is never read for a level (ISSUES I64).
 - **Arrows** come from the course pages' structured requisites in a catalog
   analysis from extractor 1.4.0 or later, timed by the catalog's own template
   ([catalog-scanning.md](catalog-scanning.md#requisite-timing)). A requisite

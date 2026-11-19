@@ -292,7 +292,11 @@ assemble_compiled_degree_board <- function(compiled, courses, program, requisite
     eid <- rule_evidence(r)
     if (r$role == "slot") {
       siblings <- rules$subject_course[rules$role == "course" & rules$parent_id == r$parent_id & nzchar(r$parent_id)]
-      level <- if (length(siblings) && all(course_level_from_number(siblings) == "upper")) "upper" else "lower"
+      # The level the reading states for the pool ("Earned at least 6 credits from
+      # 400 - 499"); without one, its group's: upper when every course the group
+      # requires is upper (I64).
+      level <- if (nzchar(r$course_level)) r$course_level else
+        if (length(siblings) && all(course_level_from_number(siblings) == "upper")) "upper" else "lower"
       # Its subject, like its level, is its group's: the one subject every course the group requires shares.
       subject <- unique(sub(" .*", "", siblings))
       credits <- degree_board_split_credits(if (is.na(r$credits)) 3 * r$tiles else r$credits, r$tiles)

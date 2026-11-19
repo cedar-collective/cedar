@@ -9,7 +9,8 @@
 #   course   a required course                       -> one tile
 #   choice   choose-N, any-of, or N credits from a list -> one tile with options
 #   slot     a credit or course pool inside a major group with no listed
-#            courses ("12 upper-level HIST credits")  -> credits / 3 tiles, rounded
+#            courses ("12 upper-level HIST credits")  -> credits / 3 tiles, rounded,
+#            at the level the reading states for it (course_level), else its group's
 #   credit_rule  a credit requirement at the top of the tree with no listed
 #            courses. The schema cannot say whether it is an elective pool
 #            (CS's 9 technical-elective credits), a total (120 degree credits)
@@ -68,6 +69,8 @@ degree_compiler_nodes <- function(proposal) {
   dplyr::bind_rows(lapply(proposal$nodes, function(n) tibble::tibble(
     id = n$id, parent_id = n$parent_id, entity_id = n$entity_id, phase = n$phase, kind = n$kind,
     label = n$label, minimum = num(n$minimum), unit = n$unit, value = n$value,
+    # The level the reading states for the whole requirement (schema 1.1.0); "" when it states none.
+    course_level = n$course_level %||% "",
     course_ref = if (length(n$course_refs)) unlist(n$course_refs)[1] else NA_character_,
     block_id = if (length(n$citations)) n$citations[[1]]$block_id else NA_character_,
     quote = if (length(n$citations)) n$citations[[1]]$quote else NA_character_)))
@@ -78,7 +81,8 @@ degree_compiler_nodes <- function(proposal) {
 #' @param proposal The interpretation's `proposal` (parsed JSON, unsimplified).
 #' @param courses `degree_packet_course_facts()` for the same packet.
 #' @return List: `rules` (one row per compiled rule: `rule_id`, `parent_id`, `role`,
-#'   `subject_course`, `label`, `tiles`, `credits`, `block_id`, `quote`), `options` (`rule_id`, `option_id`,
+#'   `subject_course`, `label`, `tiles`, `credits`, `course_level` (the level
+#'   the reading states for the requirement, "" for none), `block_id`, `quote`), `options` (`rule_id`, `option_id`,
 #'   `subject_course`), `conditions`, `credit_rules`, `flags`, `concentrations`,
 #'   and `skipped` (information nodes).
 compile_degree_interpretation <- function(proposal, courses) {
@@ -101,7 +105,7 @@ compile_degree_interpretation <- function(proposal, courses) {
   add_rule <- function(node, role, tiles, credits, code = NA_character_) {
     out$rules[[length(out$rules) + 1L]] <<- tibble::tibble(rule_id = node$id, parent_id = node$parent_id, role = role,
       subject_course = code, label = node$label, tiles = as.integer(tiles), credits = credits,
-      block_id = node$block_id, quote = node$quote)
+      course_level = node$course_level, block_id = node$block_id, quote = node$quote)
   }
   add_options <- function(rule_id, children) {
     for (k in seq_len(nrow(children))) {
