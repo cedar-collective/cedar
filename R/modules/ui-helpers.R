@@ -506,6 +506,13 @@ dashboard_section_header <- function(title, description = NULL, ..., class = NUL
   )
 }
 
+# An action button's click count as a plain integer, for a run key. A button
+# that has not rendered yet reads NULL (0 here) and a rendered one Shiny's 0,
+# which carries a class: identical() calls them different, so a key holding
+# the raw value changes when a subtab's settings first render, and a view
+# that already ran on its defaults runs again (ISSUES I66).
+cedar_click_count <- function(value) as.integer(value %||% 0L)
+
 dashboard_section <- function(title, description = NULL, ..., method = NULL, class = NULL) {
   div(
     class = paste(c("cedar-dashboard-section", class), collapse = " "),
