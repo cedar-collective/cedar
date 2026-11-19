@@ -3419,7 +3419,7 @@ for (.download_key in names(.enrl_desr_view_ids)) {
   observe({
     req(isTRUE(cr_downstream_active() %in% "coming_back"),
         input$cr_course, nzchar(input$cr_course))
-    key <- list(cr_course_id(), input$cr_ret_run %||% 0L)
+    key <- list(cr_course_id(), cedar_click_count(input$cr_ret_run))
     if (identical(key, isolate(cr_retention_last()))) return()
     cr_retention_last(key)
     isolate(cr_run_retention())
@@ -4003,7 +4003,7 @@ for (.download_key in names(.enrl_desr_view_ids)) {
         input$cr_course, nzchar(input$cr_course))
     y <- cr_later$course_y()
     req(length(y) > 0, all(nzchar(y)))
-    key <- list(cr_course_id(), input$cr_campus, y, input$cr_impact_seq_update %||% 0L)
+    key <- list(cr_course_id(), input$cr_campus, y, cedar_click_count(input$cr_impact_seq_update))
     if (identical(key, isolate(cr_impact_sequence_last()))) return()
     cr_impact_sequence_last(key)
     isolate(cr_run_sequence(y))

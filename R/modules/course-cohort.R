@@ -144,7 +144,7 @@ courseCohortServer <- function(id, student_terms, attempts, programs, dims, edge
     observe({
       crs <- analysed()
       req(crs, nzchar(crs), isTRUE(view() %in% c("glance", "non_takers")))
-      key <- list(crs, input$run %||% 0L)
+      key <- list(crs, cedar_click_count(input$run))
       if (identical(key, isolate(last_run()))) return()
       last_run(key)
       isolate(run_comparison(crs))

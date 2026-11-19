@@ -59,6 +59,7 @@ Kept until the next release, so a recurrence is recognisable; each entry below g
 
 | ID | Kind | Summary |
 |---|---|---|
+| [I66](#i66--opening-a-downstream-subtab-reruns-the-analysis-at-a-glance-already-ran) | Defect | Opening Against Non-Takers, Next Courses or Prepared for It after At a Glance ran each analysis again, and Coming Back ran twice on opening: a run key held the subtab's Update button value, which Shiny reports as a classed 0 once the button renders and `identical()` holds different from the 0 used before it did. The keys read `cedar_click_count()` (resolved 2026-11-19) |
 | [I64](#i64--a-compiled-degree-board-plans-400-level-electives-in-the-first-semester) | Defect | The compiled Philosophy board plans its two "6 elective credits at the 400–499 level" tiles, and the four "two at the 400 level" elective tiles, in semester 1: a compiled elective slot was upper only when every course its group requires is upper. Readings can now state a pool's lowest course number (`minimum_course_number`, schema 1.1.0), and 400-level work is planned from a new `senior_level_from_semester` (6); Philosophy's tiles start in semester 6 (resolved 2026-11-18) |
 | [I63](#i63--the-online-psychology-pre-major-leads-to-the-campus-major-not-the-online-one) | Defect | `programs.csv` said the online Psychology pre-major XFPY leads to PSY, though 360 of its students declared XPSY (57 PSY): a PSY population counted them as "chose elsewhere". XFPY now leads to XPSY, a separate program (resolved 2026-11-16) |
 | [I62](#i62--a-pathways-population-counted-every-program-that-shared-a-name) | Defect | A Pathways population matched programs by Banner name: department BIOL took in 1,873 Biochemistry students (BIOC and FBIC, another unit) because CHBI is named "Biochemistry", "Architecture" merged ARCH and ARCT, and "Liberal Arts" missed its renamed code LAIS (7 ongoing students instead of 411). Populations now match codes, follow confirmed renames in `code_history.csv`, and keep same-named programs apart (resolved 2026-11-16) |
@@ -97,6 +98,31 @@ Kept until the next release, so a recurrence is recognisable; each entry below g
 ---
 
 # Defects
+
+## I66 — Opening a Downstream subtab reruns the analysis At a Glance already ran
+
+**Status:** resolved 2026-11-19. The four run keys read
+`cedar_click_count()` (`R/modules/ui-helpers.R`), a button's count as a
+plain integer; `tests/e2e/downstream-glance.test.mjs` records every progress
+notification after At a Glance settles and fails on a second run.
+**Found:** 2026-11-19, reported by the user: "the course dynamics downstream
+tab seems to compute everything on that click, and then again when i click
+its subtabs."
+**Severity:** moderate, Course Dynamics > Downstream only: no number was
+wrong, but each subtab repeated a run of tens of seconds.
+**Cause:** At a Glance runs Against Non-Takers, Next Courses and Prepared for
+It on their defaults before their subtabs have rendered, with a run key of
+`input$<update button> %||% 0L`, so `0L`. Opening a subtab renders its
+Update button, whose value is Shiny's `0` with class
+`shinyActionButtonValue`; `identical(0L, <that 0>)` is `FALSE`, so the key
+changed and the observer ran the view again (`courseCohortServer()`,
+`laterCourseServer()`, and Prepared for It's and Coming Back's observers in
+`server.R`). Coming Back ran twice for the same reason on its own subtab.
+**Reproduction:** in R, `identical(list("X", 0L), list("X",
+structure(0L, class = c("shinyActionButtonValue", "integer"))))` is
+`FALSE`. In the app, Course Dynamics with HIST 1110, Downstream, wait for At a
+Glance, then open Against Non-Takers: its progress notification shows again.
+The browser check counted 2 reruns before the fix and 0 after.
 
 ## I65 — The Degree Explorer browser suite checks the hand-built boards the compiled drafts replaced
 

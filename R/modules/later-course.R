@@ -510,7 +510,7 @@ laterCourseServer <- function(id, course, campus, students, attempts, programs, 
       req(course(), isTRUE(view() %in% LATER_COURSE_RUN_VIEWS))
       y <- resolved_y()
       req(length(y) > 0L)
-      key <- list(course(), campus(), y, input$update %||% 0L)
+      key <- list(course(), campus(), y, cedar_click_count(input$update))
       if (identical(key, isolate(last_run()))) return()
       last_run(key)
       isolate(run_later_course(y))
