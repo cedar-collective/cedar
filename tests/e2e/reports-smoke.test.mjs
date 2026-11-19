@@ -236,7 +236,8 @@ export async function runReportChecks({ scope = 'smoke', synthetic = false } = {
         await openReport(page, 'Data & Usage', 'data-usage');
         assert.ok(await page.evaluate(() => {
           const rows = [...document.querySelectorAll('#data_status_table tbody tr')];
-          return rows.length === 5 && rows.every(row => !row.innerText.includes('Not loaded'));
+          // Sections, students, programs, degrees: every one loaded.
+          return rows.length === 4 && rows.every(row => !row.innerText.includes('Not loaded'));
         }));
       });
     }
