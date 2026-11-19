@@ -14,7 +14,6 @@ server <- function(input, output, session) {
   #   - data_objects[["cedar_student_terms"]] - One row per student-term: enrolled, returned
   #   - data_objects[["cedar_programs"]]  - Student programs (academic studies)
   #   - data_objects[["cedar_degrees"]]   - Degree completions
-  #   - data_objects[["cedar_faculty"]]   - Faculty information
   #
   # DATA MODEL: CEDAR (lowercase column names, no backticks)
   #   - All data uses CEDAR naming conventions (e.g., campus, department, term)
@@ -27,7 +26,6 @@ server <- function(input, output, session) {
   cedar_registrations  <- data_objects[["cedar_registrations"]]
   cedar_programs  <- data_objects[["cedar_programs"]]
   cedar_degrees   <- data_objects[["cedar_degrees"]]
-  cedar_faculty   <- data_objects[["cedar_faculty"]]
   # One row per student-term (ADR-001 step 2): the one definition of enrolled
   # and returned, read by Roadblocks and Course Dynamics retention.
   cedar_student_terms <- data_objects[["cedar_student_terms"]]
@@ -4372,7 +4370,7 @@ output$enrl_classlist_download <- downloadHandler(
   # ===========================================================================
   # Open Seats tab (Shiny module)
   # ===========================================================================
-  seatfinderServer("seatfinder", data_objects[["cedar_attempts"]], cedar_sections, cedar_faculty,
+  seatfinderServer("seatfinder", data_objects[["cedar_attempts"]], cedar_sections,
                    edges = data_objects[["cedar_edges"]],
                    error_handler = handle_error)
 

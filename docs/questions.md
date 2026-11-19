@@ -203,15 +203,13 @@ today's totals on every past term.
 **Short answer:** The share of students who did not pass, including those who
 withdrew late, term by term.
 
-**In CEDAR:** **Course Dynamics → DFW** for one course, with trend lines and an
-optional breakdown by instructor type. **Dept Trends → DFW** for a department.
+**In CEDAR:** **Course Dynamics → DFW** for one course, with trend lines.
+**Dept Trends → DFW** for a department.
 
 **Watch out for:**
 - Only A+ through C (and CR) count as passing. C-, every D, F, W, incompletes,
   NC, NR, P, S, and late drops all count toward DFW. Early drops are never DFW.
 - Terms without posted grades are left out, not counted as zero.
-- The instructor-type breakdown depends on faculty HR data, which currently
-  ends in Spring 2025.
 
 **More:** [What CEDAR counts](users/what-cedar-counts#grade-outcomes) ·
 [Course Dynamics](users/course-reports#dfw)

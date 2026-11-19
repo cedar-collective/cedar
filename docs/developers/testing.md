@@ -26,7 +26,6 @@ hand-crafted tribbles; `tests/testthat/setup.R` sources it and exposes:
 | `test_students` | Students enrolled in those sections |
 | `test_programs` | Program declarations, including health-college samples |
 | `test_degrees` | Degrees awarded in stable terms |
-| `test_faculty` | Faculty in HIST, MATH, ANTH, PSYC, BIOL, NURS, MGMT, ENGL, POLS; MGMT and POLS have only Term Teacher rows, so they drop out of permanent-faculty counts |
 | `test_dims` | The demo institution's mapping files as dimension tables |
 | `data_objects` | The tables as the app holds them |
 

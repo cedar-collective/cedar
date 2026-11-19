@@ -15,8 +15,9 @@ file changes, update this one in the same commit — see
 
 ## 0. The source extracts
 
-**CEDAR is a student-data platform.** Four extracts carry the product; a fifth
-(faculty) is frozen and slated for retirement.
+**CEDAR is a student-data platform.** Four extracts carry the product. A fifth,
+the HR appointments report behind `cedar_faculty`, was retired on 2026-11-18
+(§5).
 
 | CEDAR table | source file (in `data/`) | UNM origin | rows | status |
 |---|---|---|---|---|
@@ -24,7 +25,6 @@ file changes, update this one in the same commit — see
 | `cedar_programs` | `academic_studies` | MyReports academic studies | 464,011 | **core** — declared programs |
 | `cedar_degrees` | `degrees` | Degrees awarded | 63,284 | **core** — completions |
 | `cedar_sections` | `DESRs` | Dept Enrollment Status Report | 241,941 | **core** — the schedule students enroll in |
-| `cedar_faculty` | `hr_data` | HR appointments | 37,675 | ⚠ **frozen / deprecated** — see §5 |
 
 Note the two naming conventions: **DESRs uses UPPERCASE Banner codes**
 (`SUBJ`, `CAMP`, `DEPT`); **the three student extracts use Title Case MyReports
@@ -237,52 +237,15 @@ not join to `cedar_sections` / `cedar_registrations`, which use codes.
 
 ---
 
-## 5. `cedar_faculty` ← `hr_data` — FROZEN, slated for retirement
+## 5. `cedar_faculty` ← `hr_data` — retired
 
-**Do not build against this table.** HR appointment data is no longer available
-to the project. The shipped snapshot is frozen at `as_of_date 2025-04-07`
-(terms 201780–202580) and cannot be refreshed.
-
-| CEDAR column | source field |
-|---|---|
-| `instructor_id` | `UNM ID` |
-| `term` | `term_code` |
-| `instructor_name` | `Name` |
-| `department` | `DEPT` |
-| `academic_title` | `Academic Title` |
-| `job_title` | `Job Title` |
-| `job_category` | `job_cat` |
-| `appointment_pct` | `Appt %` |
-| `college` | `Home Organization Desc` |
-
-> **Transform drift (2026-07-31):** `transform_faculty()` emits `college`, but
-> the shipped `cedar_faculty.qs` carries `home_org` — a name that appears
-> nowhere else in the codebase. The current transform cannot reproduce the
-> current data file. Given the retirement below, resolve by deleting rather
-> than repairing.
-
-### Retirement scope (verified 2026-07-31)
-
-Smaller than it looks. Only **one user-facing surface** consumes it:
-
-- **Dept Trends → Credit Hours**, two plots: `chd_by_fac_facet_plot` and
-  `chd_by_fac_plot` (registered in `dept-trends.R`'s `plot_map`).
-
-Everything else is either already absence-tolerant or dead:
-
-- `credit_hours_by_fac()` already returns `"No faculty data available"` when the
-  table is empty — the graceful path exists and is exercised.
-- `R/cones/sfr.R` (student-faculty ratio) has **no UI surface at all** — no
-  module, `ui.R`, or `server.R` reference. Dead code; retire with faculty.
-- `data.R` exports `.GlobalEnv$faculty` / `fac_by_term`, `global.R` counts rows
-  at startup, and `seatfinder.R` / `course-outcomes.R` / `course-report.R`
-  reference it defensively.
-
-Retiring means: drop the two Credit Hours plots, delete `sfr.R` and
-`transform_faculty()`, remove the startup load and globals, and drop
-`cedar_faculty` from `required_datasets`. `job_cat` on `cedar_sections` is
-populated at transform time from HR and would become `NA` — check whether
-anything reads it before removing the join.
+Retired on 2026-11-18. The HR appointments report stopped coming, so the
+shipped snapshot ended in Spring 2025, and the transform could no longer
+reproduce the saved file (it wrote `college` where the file held `home_org`).
+No page read the table. The transform, `parse-HRreport.R`,
+`source_organizations.csv` and the analyses that read the table (student-faculty
+ratios, credit hours by job category) were deleted; git history keeps them. If
+HR data returns, build a faculty table fresh from the new report.
 
 ---
 
@@ -355,7 +318,6 @@ under the same column name another table uses for a code.
 | `students` → `sections` | `term` + `crn` | ✅ |
 | `students` → `programs` | `student_id` + `term` | ✅ |
 | `programs` → `degrees` | `student_id` | ✅ |
-| `sections` → `faculty` | `instructor_id` + `term` | ✅ |
 | `students` → `sections` | `subject_course` + `term` | ✅ |
 | **any → any on `campus`** | — | ❌ two vocabularies |
 | **any → any on `college`** | — | ❌ two vocabularies |
@@ -399,7 +361,7 @@ student legitimately produces `College of Arts and Sciences` / `GP`. Do not
 
 ### Rule 4: one name per concept across tables
 
-`department` (sections, students, faculty) and `dept_code` (programs, degrees)
+`department` (sections, students) and `dept_code` (programs, degrees)
 are the same concept. Pick one.
 
 ---
@@ -418,8 +380,8 @@ are the same concept. Pick one.
    `Rscript scripts/audit-mappings.R` and confirm coverage; unmapped values
    surface in Admin → Data & Usage via `cedar_mapping_issues`.
 5. **Round-trip** — re-run the transform and diff column names against the
-   previous output. The faculty drift in §5 is what happens when this step is
-   skipped.
+   previous output. The faculty drift in §5, where the transform could no
+   longer rebuild the saved file, is what happens when this step is skipped.
 
 ---
 

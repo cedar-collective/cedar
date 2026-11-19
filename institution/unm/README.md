@@ -28,7 +28,6 @@ and the generated [2026–2027 rules](shared_requirements/2026-2027/RULES.md).
 | `projection_sequences.csv` | a course taken the term before another, whose change carries into it | `from_course`, `to_course`, `notes` |
 | `program_names.csv` | program name as an export writes it | `program_name`, `program_code` |
 | `program_name_aliases.csv` | variant program name | `source_name`, `program_name` |
-| `source_organizations.csv` | HR organisation name | `source_name`, `unit_code` |
 | `topic_titles.csv` | section title merged into another topic of its course | `subject_course`, `title`, `topic`, `notes` |
 
 **Every row is one line.** No blank lines and no line breaks inside a field:
@@ -356,7 +355,7 @@ with FYEX 1110's five variants on the 2026-10-08 pull; Fndmntl / Found. /
 Foundatnl Math Transition and Starts Here / Success Starts Here are left
 unmerged until someone who knows the seminars confirms them.
 
-## The text maps: program_names.csv, program_name_aliases.csv, source_organizations.csv
+## The text maps: program_names.csv, program_name_aliases.csv
 
 Free text from exports, translated to codes. `program_names.csv` maps a
 program name (without any "Pre-" prefix) to the program code the transform
@@ -364,11 +363,9 @@ fills in when an export has a name column but no code column (older formats,
 some graduate data); the code need not be in `programs.csv`, since older
 exports use codes since retired. `program_name_aliases.csv` maps a variant or
 historical name to the canonical `program_name` stored in `cedar_programs`
-(Banner rename artifacts, X-prefix variants whose text differs).
-`source_organizations.csv` maps the HR report's "Home Organization Desc" to
-the unit a faculty member belongs to; every `unit_code` must be in
-`units.csv`, and organisations not listed are dropped when the report is
-parsed (ISSUES.md M28). Text maps rot when a source renames something:
+(Banner rename artifacts, X-prefix variants whose text differs). A third,
+`source_organizations.csv` (HR organisation names), was retired with the
+faculty table on 2026-11-18. Text maps rot when a source renames something:
 look for names that no longer appear in current exports. Converted from
 `R/lists/mappings.R` on 2026-10-16 with no change to any entry.
 

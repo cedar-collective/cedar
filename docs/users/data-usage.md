@@ -37,7 +37,7 @@ its initial startup; this does not bypass data loading on the first request.
 
 The version comes from the newest entry in `config/changelog.yml`. The data
 status table reports row counts and term-level freshness for the major loaded
-tables, such as sections, students, programs, degrees, and faculty.
+tables: sections, students, programs and degrees.
 
 Use this after a data refresh or deployment to confirm that the app is reading
 the expected data snapshot.

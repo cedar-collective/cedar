@@ -39,15 +39,6 @@ test_that("create_dept_report_base requires the current term", {
   )
 })
 
-test_that("Dept Trends base no longer requires unused faculty data", {
-  data_objects$cedar_faculty <- NULL
-
-  expect_no_error(create_dept_report_base(
-    data_objects,
-    list(dept_code = "HIST", current_term = 202110L)
-  ))
-})
-
 test_that("Dept Trends preloads every non-Gen-Ed analysis tab", {
   expect_identical(
     DEPT_TRENDS_PRELOAD_TABS,
@@ -184,9 +175,6 @@ test_that("Dept Trends data-only tab payloads rebuild their plots", {
   expect_true(all(
     DEPT_TRENDS_CREDIT_HOUR_PLOTS %in% names(credit_hours$plots)
   ))
-  expect_false(any(c(
-    "chd_by_fac_facet_plot", "chd_by_fac_plot"
-  ) %in% names(credit_hours$plots)))
   expect_null(credit_hours$tables$credit_hours_data_w)
   expect_null(credit_hours$plots$sch_outside_pct_plot)
   expect_null(credit_hours$plots$sch_dept_pct_plot)

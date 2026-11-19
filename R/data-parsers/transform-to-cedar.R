@@ -183,13 +183,12 @@ encrypt_if_needed <- function(id) {
   unname(enc[id_chr])
 }
 
-# Hash an instructor ID the way parse-data.R hashes the class list's and the
-# HR report's (md5 of the ID), unless it already is a hash. The DESR's report
-# spec hashes nothing, so its PRIM_INST_ID arrived as the employee ID: the HR
-# merge below never matched (job_cat was NA on every section) and the saved
-# sections joined neither the class list nor cedar_faculty (ISSUES I52).
-# Applied to all four sources, so files that never went through parse-data
-# (the synthetic institution's) come out the same way. NA stays NA.
+# Hash an instructor ID the way parse-data.R hashes the class list's (md5 of
+# the ID), unless it already is a hash. The DESR's report spec hashes nothing,
+# so its PRIM_INST_ID arrived as the employee ID and the saved sections did not
+# join the class list (ISSUES I52). Applied to both sources, so files that
+# never went through parse-data (the synthetic institution's) come out the
+# same way. NA stays NA.
 hash_instructor_id <- function(id) {
   id_chr <- as.character(id)
   todo <- !is.na(id_chr) & !grepl("^[0-9a-f]{32}$", id_chr)
@@ -273,12 +272,8 @@ transform_sections <- function(desrs, data_dir, ext, maps) {
   # subject with no confirmed row is listed by the end-of-transform mapping
   # audit and on Admin > Mappings.
 
-  # The instructor ID is hashed as the class list's and cedar_faculty's are,
-  # so a section joins both (I52). A section carries no faculty attribute: a
-  # reader that wants one joins cedar_faculty on term and instructor_id. (The
-  # HR merge that stood here joined the employee ID to hashed IDs, matched
-  # nothing, and left job_cat NA on every section; an instructor holding
-  # several appointments a term would also have duplicated the section.)
+  # The instructor ID is hashed as the class list's is, so a section joins it
+  # (I52). A section carries no faculty attribute: CEDAR has no HR data.
   desrs$PRIM_INST_ID <- hash_instructor_id(desrs$PRIM_INST_ID)
 
   # ── Transmute to CEDAR model ─────────────────────────────────────────────
@@ -1299,42 +1294,6 @@ transform_degrees <- function(degrees, data_dir, ext, maps) {
 }
 
 
-# ── 5. transform_faculty: hr_data → cedar_faculty ────────────────────────────
-
-#' @param hr_data  Raw hr_data data frame
-#' @param data_dir Path to data directory
-#' @param ext      File extension
-#' @return list(saved = list(faculty = <meta>))
-transform_faculty <- function(hr_data, data_dir, ext) {
-  message("──────────────────────────────────────────────────────")
-  message("5. Transforming hr_data → cedar_faculty")
-  message("──────────────────────────────────────────────────────")
-  message("  Loaded ", nrow(hr_data), " rows, ", ncol(hr_data), " columns")
-  message("  Input columns: ", paste(names(hr_data), collapse = ", "))
-  message("  Transforming to CEDAR model...")
-
-  cedar_faculty <- hr_data %>%
-    transmute(
-      instructor_id   = hash_instructor_id(`UNM ID`),
-      term            = as.integer(term_code),
-      instructor_name = Name,
-      department      = DEPT,
-      academic_title  = if ("Academic Title"       %in% names(.)) `Academic Title`       else NA_character_,
-      job_title       = if ("Job Title"            %in% names(.)) `Job Title`            else NA_character_,
-      job_category    = if ("job_cat"              %in% names(.)) job_cat                else NA_character_,
-      appointment_pct = if ("Appt %"              %in% names(.)) as.numeric(`Appt %`)   else NA_real_,
-      college         = if ("Home Organization Desc" %in% names(.)) `Home Organization Desc` else NA_character_,
-      as_of_date      = if ("as_of_date"           %in% names(.)) as.Date(as_of_date)   else NA_Date_
-    )
-
-  message("  ✅ Created cedar_faculty: ", nrow(cedar_faculty), " rows, ", ncol(cedar_faculty), " columns")
-  message("  Output columns: ", paste(names(cedar_faculty), collapse = ", "))
-
-  saved_meta <- save_cedar_file(cedar_faculty, "faculty", data_dir, ext)
-  list(saved = list(faculty = saved_meta))
-}
-
-
 # ── 6. transform_applicants: admissions_applicants → cedar_applicants ─────────
 
 #' Transforms admissions applicant data to the CEDAR model.
@@ -1409,7 +1368,7 @@ transform_applicants <- function(applicants, data_dir, ext) {
 #' @param use_qs   Use .qs format (default: from config)
 #' @param tables   Character vector of tables to run (default: all)
 #'                 Options: "sections", "students", "programs", "degrees",
-#'                          "faculty", "applicants"
+#'                          "student_terms", "measures", "applicants"
 #' @return Invisibly: named list of save metadata for each table written
 transform_to_cedar <- function(data_dir = NULL, use_qs = NULL, tables = NULL,
                                include_student_terms = TRUE, min_term = NULL) {
@@ -1437,7 +1396,7 @@ transform_to_cedar <- function(data_dir = NULL, use_qs = NULL, tables = NULL,
 
   # Resolve which tables to run
   all_tables <- c("sections", "students", "programs", "degrees", "student_terms", "measures",
-                  "faculty", "applicants")
+                  "applicants")
   if (is.null(tables)) {
     run_tables <- all_tables
   } else {
@@ -1589,22 +1548,6 @@ transform_to_cedar <- function(data_dir = NULL, use_qs = NULL, tables = NULL,
     saved_files <- c(saved_files, result$saved)
   } else {
     message("  ⏭  Skipping the measure tables (not in --tables)")
-  }
-
-  # ── 5. cedar_faculty ──────────────────────────────────────────────────────
-  if ("faculty" %in% run_tables) {
-    hr_file <- file.path(data_dir, paste0("hr_data", ext))
-    if (file.exists(hr_file)) {
-      message("\nLoading: ", hr_file)
-      hr_data <- load_file(hr_file, ext)
-      result  <- transform_faculty(hr_data, data_dir, ext)
-      saved_files <- c(saved_files, result$saved)
-      rm(hr_data); gc(verbose = FALSE)
-    } else {
-      message("  ⚠️  hr_data file not found: ", hr_file, " — skipping cedar_faculty")
-    }
-  } else {
-    message("  ⏭  Skipping cedar_faculty (not in --tables)")
   }
 
   # ── 6. cedar_applicants ───────────────────────────────────────────────────

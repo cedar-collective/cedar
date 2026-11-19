@@ -156,7 +156,7 @@ decide that; it gives readers `degree_awarded` beside
 
 - Delivery `campus`. A student's courses can span campuses in one term; the
   attempt is where delivery campus lives. Home campus is here.
-- Anything from `cedar_sections` or `cedar_faculty`.
+- Anything from `cedar_sections`.
 - The pull-stamped fields. Any pull request adding `inst_*` or `overall_*`
   to this table is wrong by definition.
 - Demographics constant per student (`gender`, `ipeds_race`, `first_gen`,

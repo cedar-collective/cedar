@@ -2,14 +2,13 @@
 #
 # Verifies that all functions converted from ggplot to native plotly return
 # plotly objects with the expected trace types and shapes. Uses designed test
-# fixtures (test_sections, test_students, test_programs, test_degrees,
-# test_faculty) defined in setup.R / fixtures/designed_test_data.R.
+# fixtures (test_sections, test_students, test_programs, test_degrees)
+# defined in setup.R / fixtures/designed_test_data.R.
 #
 # Known fixture values used here:
 #   HIST: 5 total BA degrees across all terms (202060×2, 202080×2, 202110×1)
 #   HIST dept headcount 202010: 64 students (25 pre-major + 39 declared)
 #   HIST lower-div HIST 1110 202010: dfw_pct = 43.33
-#   test_faculty covers ANTH, BIOL, ENGL, HIST, MATH, NURS, PSYC (28 rows)
 
 context("Dept Trends Support Plots (plotly)")
 
@@ -409,92 +408,4 @@ test_that("get_credit_hours_for_dept_trends returns level-wide period table", {
   level_cols <- intersect(c("lower", "upper", "grad"), names(tbl))
   expect_gt(length(level_cols), 0)
   expect_equal(tbl$total, rowSums(tbl[level_cols], na.rm = TRUE))
-})
-
-
-# ===========================================================================
-# plot_chd_by_fac_faceted() and plot_chd_by_fac_stacked()
-# ===========================================================================
-
-test_that("plot_chd_by_fac_faceted returns a plotly object with bar traces", {
-  data <- tibble::tibble(
-    term         = rep(c(202010L, 202080L), 4),
-    level        = rep(c("lower", "upper"), each = 4),
-    job_category = rep(c("TT", "NTT"), 4),
-    total_hours  = c(300L, 250L, 280L, 260L, 200L, 180L, 195L, 175L)
-  )
-  p <- plot_chd_by_fac_faceted(data, subj_codes = "HIST", palette = "Set2")
-  expect_true(is_plotly(p))
-  expect_true("bar" %in% trace_types(p))
-})
-
-test_that("plot_chd_by_fac_faceted returns string for empty data", {
-  empty <- tibble::tibble(
-    term = integer(), level = character(),
-    job_category = character(), total_hours = integer()
-  )
-  result <- plot_chd_by_fac_faceted(empty, subj_codes = "HIST", palette = "Set2")
-  expect_true(is.character(result))
-})
-
-test_that("plot_chd_by_fac_stacked returns a plotly bar chart", {
-  data <- tibble::tibble(
-    term         = c(202010L, 202010L, 202080L, 202080L),
-    job_category = c("TT", "NTT", "TT", "NTT"),
-    total_hours  = c(500L, 300L, 520L, 310L)
-  )
-  p <- plot_chd_by_fac_stacked(data, subj_codes = "HIST", palette = "Set2")
-  expect_true(is_plotly(p))
-  expect_true("bar" %in% trace_types(p))
-})
-
-
-# ===========================================================================
-# get_sfr_data_for_dept_report() — verify NOT ggplot (was failing after conversion)
-# ===========================================================================
-
-test_that("get_sfr_data_for_dept_report plots are plotly not ggplot for HIST", {
-  result <- get_sfr_data_for_dept_report(test_programs, test_faculty, opt = list(dept_code = "HIST"))
-  has_plotly <- any_plotly(result$plots)
-  has_ggplot <- any(sapply(result$plots, function(p) inherits(p, "ggplot")))
-  expect_true(has_plotly,
-              info = "At least one SFR plot should be a plotly object")
-  expect_false(has_ggplot,
-               info = "No SFR plot should be a ggplot after conversion")
-})
-
-
-# ===========================================================================
-# credit_hours_by_fac() — tables are parameters (M12), not the data_objects bundle
-# ===========================================================================
-
-test_that("credit_hours_by_fac takes students and faculty as parameters", {
-  # HIST course rows in test_students have no instructor_id; stamp the fixture's
-  # HIST faculty member (INS001, Associate Professor in every term) so the
-  # instructor join resolves. Local scaffolding over the shared fixture.
-  st <- test_students
-  st$instructor_id[st$department == "HIST"] <- "INS001"
-
-  result <- credit_hours_by_fac(st, test_sections, test_faculty, "HIST", "HIST",
-                                cedar_report_start_term, cedar_report_end_term,
-                                palette = "Set2")
-  expect_setequal(names(result$plots), c("chd_by_fac_facet_plot", "chd_by_fac_plot"))
-  expect_true(is_plotly(result$plots$chd_by_fac_plot))
-  totals <- result$tables$chd_fac_by_total
-  expect_gt(nrow(totals), 0)
-  expect_true(all(totals$job_category == "Associate Professor"))
-  expect_true(all(totals$total_hours > 0))
-
-  # An empty faculty table is the documented "no HR data" state.
-  empty <- credit_hours_by_fac(st, test_sections, test_faculty[0, ], "HIST", "HIST",
-                               cedar_report_start_term, cedar_report_end_term,
-                               palette = "Set2")
-  expect_equal(empty$plots$chd_by_fac_plot, "No faculty data available")
-
-  # A missing table is an error, never a silent empty result.
-  expect_error(
-    credit_hours_by_fac(st, test_sections, NULL, "HIST", "HIST",
-                        cedar_report_start_term, cedar_report_end_term, palette = "Set2"),
-    "cedar_faculty"
-  )
 })

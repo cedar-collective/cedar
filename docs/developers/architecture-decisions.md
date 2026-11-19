@@ -42,7 +42,7 @@ DESRs            → cedar_sections
 class_lists      → cedar_students
 academic_studies → cedar_programs
 degrees          → cedar_degrees
-hr_data          → cedar_faculty   (frozen; see manifest §5)
+hr_data          → cedar_faculty   (retired 2026-11-18; see manifest §5)
 ```
 
 That is how the data arrives, and it was fine while the app was small. The

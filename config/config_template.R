@@ -8,7 +8,7 @@ cedar_use_qs <- TRUE
 ############ data locations
 # Trailing slash on cedar_base_dir is optional — the sub() below normalizes it.
 # Do NOT drop the trailing slash from cedar_data_dir / cedar_output_dir: the
-# standalone parsers (parse-NSO.R, parse-HRreport.R) append to them with paste0().
+# standalone parser (parse-NSO.R) appends to them with paste0().
 #
 # Worth getting right, because the failure is silent. If cedar_data_dir points
 # somewhere that does not exist, transform-to-cedar.R skips its "copy to local

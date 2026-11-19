@@ -1209,7 +1209,7 @@ compute_cr_flows_tab <- function(base, data_objects, min_contrib = 2, max_course
 
 compute_cr_outcomes_tab <- function(base, data_objects) {
   outcome_opt <- modifyList(base$opt, list(data_edges = data_objects[["cedar_edges"]]))
-  get_course_outcomes(data_objects[["cedar_attempts"]], data_objects[["cedar_faculty"]], outcome_opt)
+  get_course_outcomes(data_objects[["cedar_attempts"]], outcome_opt)
 }
 
 

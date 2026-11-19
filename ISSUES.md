@@ -4326,6 +4326,5 @@ with ids.
 `hr_org_desc_to_dept` (79 names to 32 departments) now comes from
 `institution/<id>/source_organizations.csv`, validated at load so every unit
 it names is in `units.csv` (`validate_text_maps()`; `test-catalogs.R`).
-Organisations not on it are still dropped when the HR report is parsed, and
-the report is no longer pulled, so retiring it with the faculty table remains
-open (see `docs/developers/source-to-cedar-manifest.md` §5).
+The report was no longer pulled; on 2026-11-18 the file, the HR parser and
+`cedar_faculty` were retired together (`docs/developers/source-to-cedar-manifest.md` §5).

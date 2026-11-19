@@ -31,7 +31,7 @@ try {
       text: table?.textContent, tag: table?.tagName,
       output: table?.className.includes('shiny') };
   });
-  check('initial HTML already contains all five freshness rows', initial.rows === 5);
+  check('initial HTML already contains all four freshness rows', initial.rows === 4);
   check('freshness is a plain table, not a Shiny output', initial.tag === 'TABLE' && !initial.output);
   check('initial HTML includes source dates or explicit missing states',
     /\d{4}-\d{2}-\d{2}|Not available/.test(initial.text));

@@ -159,7 +159,6 @@ normalize_inst_method <- function (courses) {
 #'
 #' @param attempts The attempt measure table (`cedar_attempts`), for each course's DFW rate
 #' @param courses Data frame from cedar_sections table with enrollment and capacity data
-#' @param cedar_faculty Data frame from cedar_faculty table (used for instructor job category in grades)
 #' @param opt Options list with required and optional parameters:
 #'   \itemize{
 #'     \item \code{term} - (Required) Term code or range (e.g., "202510" or "202410,202510")
@@ -212,14 +211,14 @@ normalize_inst_method <- function (courses) {
 #' \dontrun{
 #' # Compare Fall 2025 to Fall 2024 (default one-year comparison)
 #' opt <- list(term = "202580", part_term = "FT", department = "MATH")
-#' results <- seatfinder(cedar_attempts, cedar_sections, cedar_faculty, opt)
+#' results <- seatfinder(cedar_attempts, cedar_sections, opt)
 #'
 #' # View courses with largest availability decreases
 #' head(results$type_summary %>% arrange(avail_diff))
 #'
 #' # Compare specific terms
 #' opt <- list(term = "202410,202510")  # Spring 2024 vs Spring 2025
-#' results <- seatfinder(cedar_attempts, cedar_sections, cedar_faculty, opt)
+#' results <- seatfinder(cedar_attempts, cedar_sections, opt)
 #'
 #' # Check gen ed availability
 #' head(results$gen_ed_summary)
@@ -231,7 +230,7 @@ normalize_inst_method <- function (courses) {
 #' \code{\link{get_courses_diff}} for new/discontinued courses
 #'
 #' @export
-seatfinder <- function (attempts, courses, cedar_faculty, opt) {
+seatfinder <- function (attempts, courses, opt) {
   
   cedar_debug("[seatfinder.R] Welcome to seatfinder!")
   

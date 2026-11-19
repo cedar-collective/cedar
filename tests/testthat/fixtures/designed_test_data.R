@@ -2889,67 +2889,6 @@ cedar_degrees <- cedar_degrees %>%
 
 
 # =============================================================================
-# CEDAR_FACULTY
-# =============================================================================
-
-cedar_faculty <- tribble(
-  ~instructor_id, ~instructor_name,     ~term,   ~department,
-  ~job_category,              ~appointment_pct, ~college,
-
-  "INS001", "Morgan, Rachel",   202010L, "HIST", "Associate Professor", 1.0, "AS History",
-  "INS002", "Chen, David",      202010L, "MATH", "Assistant Professor", 1.0, "AS Mathematics",
-  "INS003", "Williams, Patricia",202010L,"ANTH", "Professor",           1.0, "AS Anthropology",
-  "INS004", "Thompson, James",  202010L, "PSYC", "Lecturer",            1.0, "AS Psychology",
-  "INS005", "Rodriguez, Maria", 202010L, "BIOL", "Assistant Professor", 1.0, "AS Biology",
-  "INS006", "Johnson, Lisa",    202010L, "NURS", "Associate Professor", 1.0, "College of Nursing",
-  "INS007", "Davis, Robert",    202010L, "MGMT", "Term Teacher",        1.0, "Anderson School",
-  "INS008", "Martinez, Anna",   202010L, "ENGL", "Lecturer",            1.0, "AS English",
-  "INS009", "Wilson, Brian",    202010L, "POLS", "Term Teacher",        0.5, "AS Political Science",
-
-  "INS001", "Morgan, Rachel",   202060L, "HIST", "Associate Professor", 1.0, "AS History",
-  "INS002", "Chen, David",      202060L, "MATH", "Assistant Professor", 1.0, "AS Mathematics",
-  "INS003", "Williams, Patricia",202060L,"ANTH", "Professor",           1.0, "AS Anthropology",
-  "INS004", "Thompson, James",  202060L, "PSYC", "Lecturer",            1.0, "AS Psychology",
-  "INS005", "Rodriguez, Maria", 202060L, "BIOL", "Assistant Professor", 1.0, "AS Biology",
-  "INS006", "Johnson, Lisa",    202060L, "NURS", "Associate Professor", 1.0, "College of Nursing",
-  "INS007", "Davis, Robert",    202060L, "MGMT", "Term Teacher",        1.0, "Anderson School",
-  "INS008", "Martinez, Anna",   202060L, "ENGL", "Lecturer",            1.0, "AS English",
-  "INS009", "Wilson, Brian",    202060L, "POLS", "Term Teacher",        0.5, "AS Political Science",
-
-  "INS001", "Morgan, Rachel",   202080L, "HIST", "Associate Professor", 1.0, "AS History",
-  "INS002", "Chen, David",      202080L, "MATH", "Assistant Professor", 1.0, "AS Mathematics",
-  "INS003", "Williams, Patricia",202080L,"ANTH", "Professor",           1.0, "AS Anthropology",
-  "INS004", "Thompson, James",  202080L, "PSYC", "Lecturer",            1.0, "AS Psychology",
-  "INS005", "Rodriguez, Maria", 202080L, "BIOL", "Assistant Professor", 1.0, "AS Biology",
-  "INS006", "Johnson, Lisa",    202080L, "NURS", "Associate Professor", 1.0, "College of Nursing",
-  "INS007", "Davis, Robert",    202080L, "MGMT", "Term Teacher",        1.0, "Anderson School",
-  "INS008", "Martinez, Anna",   202080L, "ENGL", "Lecturer",            1.0, "AS English",
-
-  "INS001", "Morgan, Rachel",   202110L, "HIST", "Associate Professor", 1.0, "AS History",
-  "INS002", "Chen, David",      202110L, "MATH", "Assistant Professor", 1.0, "AS Mathematics",
-  "INS003", "Williams, Patricia",202110L,"ANTH", "Professor",           1.0, "AS Anthropology",
-  "INS004", "Thompson, James",  202110L, "PSYC", "Lecturer",            1.0, "AS Psychology",
-  "INS005", "Rodriguez, Maria", 202110L, "BIOL", "Assistant Professor", 1.0, "AS Biology",
-  "INS006", "Johnson, Lisa",    202110L, "NURS", "Associate Professor", 1.0, "College of Nursing",
-  "INS007", "Davis, Robert",    202110L, "MGMT", "Term Teacher",        1.0, "Anderson School",
-  "INS008", "Martinez, Anna",   202110L, "ENGL", "Lecturer",            1.0, "AS English"
-)
-
-# Add columns present in real cedar_faculty that are missing from the tribble.
-cedar_faculty <- cedar_faculty %>%
-  dplyr::mutate(
-    academic_title = job_category,   # Banner academic rank; same as job_category in designed data
-    job_title      = paste(job_category, "of", department),  # e.g., "Associate Professor of HIST"
-    as_of_date     = as.Date(dplyr::case_when(
-      term == 202010L ~ "2020-01-13",
-      term == 202060L ~ "2020-06-01",
-      term == 202080L ~ "2020-08-17",
-      term == 202110L ~ "2021-01-19"
-    ))
-  )
-
-
-# =============================================================================
 # GEN ED ASSOCIATION FIXTURE
 # =============================================================================
 # Small purpose-built fixture for course-major association and Gen Ed profile

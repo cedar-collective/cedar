@@ -771,25 +771,19 @@ test_that("a settings.csv without a projection window stops the builder, not the
 })
 
 
-# ---- Configuration files: the three text maps ---------------------------------
+# ---- Configuration files: the two text maps -----------------------------------
 
-test_that("the text maps are the institution's files, and every HR unit exists (M28)", {
+test_that("the text maps are the institution's files", {
   dir <- cedar_institution_dir(cedar_base_dir, "unm")
-  units <- read_institution_file("units", dir)$unit_code
   tm <- validate_text_maps(read_institution_file("program_names", dir),
-                           read_institution_file("program_name_aliases", dir),
-                           read_institution_file("source_organizations", dir),
-                           known_units = units)
+                           read_institution_file("program_name_aliases", dir))
   expect_equal(names(major_name_to_major_code), tm$program_names$program_name)
   expect_equal(unname(major_name_to_major_code), tm$program_names$program_code)
   expect_equal(names(program_name_aliases), tm$aliases$source_name)
   expect_equal(unname(program_name_aliases), tm$aliases$program_name)
-  expect_equal(names(hr_org_desc_to_dept), tm$organizations$source_name)
-  expect_equal(unname(hr_org_desc_to_dept), tm$organizations$unit_code)
-  expect_true(all(hr_org_desc_to_dept %in% units))
   # Names with commas survive the round trip through the one-row-per-line file.
   expect_true(any(grepl(",", names(major_name_to_major_code))))
-  # The platform file names no program, code or organisation.
+  # The platform file names no program or code.
   code_lines <- grep("^\\s*#", readLines("../../R/lists/mappings.R"), value = TRUE, invert = TRUE)
   expect_false(any(grepl("\"[A-Z]{2,4}\"|\"[A-Z][a-z]+( [A-Za-z&]+)*\"", code_lines)))
 })
@@ -797,11 +791,9 @@ test_that("the text maps are the institution's files, and every HR unit exists (
 test_that("the demo institution's text maps load empty", {
   dir <- cedar_institution_dir(cedar_base_dir, "demo")
   tm <- validate_text_maps(read_institution_file("program_names", dir),
-                           read_institution_file("program_name_aliases", dir),
-                           read_institution_file("source_organizations", dir),
-                           known_units = read_institution_file("units", dir)$unit_code)
+                           read_institution_file("program_name_aliases", dir))
   expect_equal(nrow(tm$program_names), 0L)
-  expect_equal(nrow(tm$organizations), 0L)
+  expect_equal(nrow(tm$aliases), 0L)
 })
 
 test_that("the text-map validator reports every problem at once", {
@@ -811,17 +803,12 @@ test_that("the text-map validator reports every problem at once", {
                    file.path(dir, "program_names.csv"), row.names = FALSE)
   utils::write.csv(data.frame(source_name = c("Hist", "History"), program_name = c("History", "History")),
                    file.path(dir, "program_name_aliases.csv"), row.names = FALSE)
-  utils::write.csv(data.frame(source_name = c("AS History", "AS Basketry"), unit_code = c("HIST", "BSKT")),
-                   file.path(dir, "source_organizations.csv"), row.names = FALSE)
   err <- tryCatch(validate_text_maps(read_institution_file("program_names", dir),
-                                     read_institution_file("program_name_aliases", dir),
-                                     read_institution_file("source_organizations", dir),
-                                     known_units = "HIST"),
+                                     read_institution_file("program_name_aliases", dir)),
                   error = conditionMessage)
   expect_match(err, "program_names.csv: blank program_name")
   expect_match(err, "program_names.csv: duplicate program_name History")
   expect_match(err, "source_name equals program_name for History")
-  expect_match(err, "unit_code not in units.csv: BSKT")
 })
 
 # ── Dimensions and attach_unit() (ADR-001 step 3) ────────────────────────────

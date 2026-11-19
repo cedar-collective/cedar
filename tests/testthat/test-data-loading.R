@@ -43,7 +43,7 @@ test_that("load_global_data loads all required CEDAR model objects from configur
   with_temp_cedar_data_dir({
     cedar_files <- c(
       "cedar_sections", "cedar_registrations", "cedar_student_terms",
-      "cedar_programs", "cedar_degrees", "cedar_faculty", "cedar_applicants"
+      "cedar_programs", "cedar_degrees", "cedar_applicants"
     )
 
     # The loader attaches the unit columns from the mapping files (ADR-001
@@ -81,7 +81,6 @@ test_that("load_global_data loads all required CEDAR model objects from configur
     expect_equal(students$dataset, "cedar_registrations")
     expect_equal(programs$dataset, "cedar_programs")
     expect_equal(degrees$dataset, "cedar_degrees")
-    expect_equal(faculty$dataset, "cedar_faculty")
     expect_equal(applicants$dataset, "cedar_applicants")
   })
 })

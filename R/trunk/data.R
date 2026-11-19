@@ -201,7 +201,7 @@ load_cedar_model_data <- function(opt) {
   # Define CEDAR files to load
   cedar_files <- c(
     "cedar_sections", "cedar_registrations", "cedar_student_terms",
-    "cedar_programs", "cedar_degrees", "cedar_faculty", "cedar_applicants"
+    "cedar_programs", "cedar_degrees", "cedar_applicants"
   )
   message("[data.R] cedar_files: ", paste(cedar_files, collapse=", "))
 
@@ -246,8 +246,6 @@ load_cedar_model_data <- function(opt) {
     .GlobalEnv$cedar_student_terms <- data_objects[["cedar_student_terms"]]
     .GlobalEnv$programs <- data_objects[["cedar_programs"]]
     .GlobalEnv$degrees <- data_objects[["cedar_degrees"]]
-    .GlobalEnv$faculty <- data_objects[["cedar_faculty"]]
-    .GlobalEnv$fac_by_term <- data_objects[["cedar_faculty"]]  # Alias for compatibility
     .GlobalEnv$applicants <- data_objects[["cedar_applicants"]]
 
   }
@@ -299,7 +297,6 @@ get_data_status <- function (data_objects) {
   courses <- data_objects[["cedar_sections"]]
   academic_studies <- data_objects[["cedar_programs"]]
   degrees <- data_objects[["cedar_degrees"]]
-  cedar_faculty <- data_objects[["cedar_faculty"]]
   cedar_applicants <- data_objects[["cedar_applicants"]]
 
   # Initialize data_status tibble to return
@@ -378,12 +375,6 @@ get_data_status <- function (data_objects) {
   if (!is.null(degrees)) {
     message("getting cedar_degrees status...")
     stats <- get_dataset_stats(degrees, "cedar_degrees")
-    if (!is.null(stats)) data_status <- rbind(data_status, stats)
-  }
-
-  if (!is.null(cedar_faculty)) {
-    message("getting cedar_faculty status...")
-    stats <- get_dataset_stats(cedar_faculty, "cedar_faculty")
     if (!is.null(stats)) data_status <- rbind(data_status, stats)
   }
 

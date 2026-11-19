@@ -44,7 +44,7 @@ signature <- digest::digest(tools::md5sum(sources), algo = "sha256")
 # written onto the class list (below), so they are newer than it, as the
 # loader requires (ADR-001 step 6).
 outputs <- paste0("cedar_", c("sections", "registrations", "class_list_descriptions", "programs",
-                             "degrees", "faculty", "student_terms", "applicants",
+                             "degrees", "student_terms", "applicants",
                              "attempts", "course_terms", "course_flows"), ".qs")
 # The measure tables start at the demo's first term, the setting the demo app
 # reads (dev/shiny_config.R is its config/shiny_config.R).
