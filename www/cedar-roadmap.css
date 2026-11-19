@@ -136,5 +136,5 @@
 .cedar-roadmap-detail-text { margin:0; color:var(--text-secondary); font-size:.75rem; }
 
 @media(min-width:1500px) { .cedar-roadmap-course-code,.cedar-roadmap-course-title { font-size:13px; } }
-@media(max-width:700px) { .cedar-roadmap-prototype { margin-left:0; } .cedar-roadmap-detail-actions { justify-content:flex-start; } }
+@media(max-width:700px) { .cedar-roadmap-prototype { margin-left:0; white-space:normal; max-width:100%; } .cedar-roadmap-detail-actions { justify-content:flex-start; } }
 @media(prefers-reduced-motion:reduce) { .cedar-roadmap-course { transition:none; } }
