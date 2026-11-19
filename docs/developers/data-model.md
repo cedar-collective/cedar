@@ -27,7 +27,7 @@ Instead of working directly with vendor-specific report formats (MyReports, Bann
 
 ## Core Tables
 
-CEDAR requires 5 core tables. Each table is described below with:
+CEDAR requires 4 core tables. Each table is described below with:
 - **Purpose**: What this table represents
 - **Key columns**: Required fields
 - **Optional columns**: Helpful but not required
@@ -106,7 +106,7 @@ The flags are the startup edges from `cedar_data_edges()` passed in, never recom
 | `campus` | string | Campus code | "Main", "ABQ", "Online" | Filter (34 uses) |
 | `college` | string | College code | "AS" (Arts & Sciences) | Filter (30 uses) |
 | `department` | string | Department code | "MATH" | Filter (58 uses) |
-| `instructor_id` | string | Primary instructor ID, md5-hashed as on `cedar_registrations` and `cedar_faculty` (`hash_instructor_id()`, ISSUES I52; a file transformed before 2026-11-07 carries the employee ID). A section carries no faculty attribute: join `cedar_faculty` on `term` and `instructor_id` | "07c10c7c…" | FK to faculty |
+| `instructor_id` | string | Primary instructor ID, md5-hashed as on `cedar_registrations` (`hash_instructor_id()`, ISSUES I52; a file transformed before 2026-11-07 carries the employee ID). A section carries no faculty attribute | "07c10c7c…" | Joins the class list |
 | `instructor_name` | string | Instructor full name | "Smith, John" | Instructor filter |
 | `enrolled` | integer | Current enrollment | 28 | Analytics (11 uses) |
 | `capacity` | integer | Maximum enrollment | 30 | Seat analysis |
@@ -341,96 +341,11 @@ Class Lists, not the frozen Academic Studies `inst_credits_attempted` field.
 
 ---
 
-## 5. `cedar_faculty` (Faculty HR Data)
+## 5. `cedar_faculty` (retired)
 
-**Purpose:** Faculty appointment and job category data for instructor analysis, particularly student-faculty ratios and instructor/outcome context.
-
-**Source:** Transformed from HR reports via `transform-hr-to-cedar.R`
-
-**Used by:** `sfr.R` (student-faculty ratios), course outcome and retention analyses
-
-### Required Columns
-
-| Column | Type | Description | Example | Usage Count |
-|--------|------|-------------|---------|-------------|
-| `instructor_id` | string | **Encrypted** UNM ID (matches cedar_registrations) | "abc123..." | Join key |
-| `instructor_name` | string | Full name | "Smith, John D." | Display |
-| `term` | integer | Academic term | 202580 | Join key (34 uses) |
-| `department` | string | Home department code | "MATH" | Filter (28 uses) |
-| `job_category` | string | Employment category | "Professor", "Lecturer", "Term Teacher" | Analytics (15 uses) |
-| `appointment_pct` | numeric | Appointment percentage as decimal | 1.0 (100%), 0.5 (50%) | FTE calculation |
-| `as_of_date` | date | When HR data was processed | "2025-01-10" | Data freshness |
-
-**Important Notes:**
-- `department` uses **department codes** from HR data (e.g., "MATH", "ANTH")
-- `job_category` uses **Title Case** values from parse-HRreport.R (see values below)
-- `appointment_pct` is stored as **decimal 0.0-1.0**, not percentage (e.g., 0.5 = 50%)
-- `instructor_id` is the same md5 hash as on `cedar_sections` and `cedar_registrations` (I52). An instructor can hold several appointments a term, so a join from a section or a class-list row on `term` and `instructor_id` can return several rows: pick the appointment deliberately
-
-### Job Categories
-
-The `job_category` field uses values from parse-HRreport.R:
-
-| Category | Description | Counted in SFR? |
-|----------|-------------|-----------------|
-| `Professor` | Full professor | ✅ Yes (permanent) |
-| `Associate Professor` | Associate professor | ✅ Yes (permanent) |
-| `Assistant Professor` | Assistant professor | ✅ Yes (permanent) |
-| `Lecturer` | Lecturer (non-tenure track) | ✅ Yes (permanent) |
-| `Term Teacher` | Term teacher | ❌ No (temporary) |
-| `TPT` | Temporary part-time | ❌ No (temporary) |
-| `Grad` | Graduate assistant | ❌ No (temporary) |
-| `Professor Emeritus` | Emeritus professor | ❌ No (non-active) |
-
-**For SFR calculations**, only permanent faculty (Professor, Associate Professor, Assistant Professor, Lecturer) are counted as part of the faculty FTE denominator.
-
-### Optional Columns (Retained for Reference)
-
-| Column | Type | Description | Example |
-|--------|------|-------------|---------|
-| `academic_title` | string | Original academic title from HR | "Assistant Professor" |
-| `job_title` | string | Job title from HR | "Assistant Professor" |
-| `college` | string | Home organization description from HR | "AS Mathematics & Statistics" |
-
-### Transformation Details
-
-The `cedar_faculty` table is created by `transform-to-cedar.R` which:
-
-1. **Loads** `hr_data.Rds` (output from `parse-HRreport.R`)
-2. **Normalizes** column names to CEDAR conventions:
-   - `UNM ID` → `instructor_id` (encrypted)
-   - `term_code` → `term` (integer)
-   - `DEPT` → `department` (department code)
-   - `job_cat` → `job_category` (Title Case values)
-   - `Appt %` → `appointment_pct` (decimal 0.0-1.0)
-   - `Home Organization Desc` → `college`
-3. **Saves** to `cedar_faculty.Rds`
-
-### Example Queries
-
-**Calculate permanent faculty FTE by department:**
-```r
-cedar_faculty %>%
-  filter(job_category %in% c("professor", "associate_professor",
-                              "assistant_professor", "lecturer")) %>%
-  group_by(term, department) %>%
-  summarize(fte = sum(appointment_pct))
-```
-
-**Count faculty by job category:**
-```r
-cedar_faculty %>%
-  filter(term == 202580) %>%
-  count(job_category, sort = TRUE)
-```
-
-**Merge with course attempts for instructor outcome context:**
-```r
-course_attempts %>%
-  left_join(cedar_faculty, by = c("instructor_id", "term")) %>%
-  group_by(subject_course, job_category) %>%
-  summarize(n_attempts = n(), .groups = "drop")
-```
+Retired on 2026-11-18. It was built from an HR appointments report that the
+project no longer receives, and no page read it. Git history keeps its
+transform and the analyses that used it.
 
 ---
 
@@ -441,15 +356,13 @@ cedar_sections
     ├─► cedar_registrations (via term + crn)
     │       └─► cedar_programs (via student_id)
     │       └─► cedar_degrees (via student_id)
-    └─► cedar_faculty (via instructor_id)
 ```
 
 ### Key Foreign Key Relationships
 
 1. **sections → enrollments:** `cedar_sections.term + crn` = `cedar_registrations.term + crn`
-2. **sections → faculty:** `cedar_sections.instructor_id` = `cedar_faculty.instructor_id`
-3. **enrollments → programs:** `cedar_registrations.student_id` = `cedar_programs.student_id`
-4. **enrollments → degrees:** `cedar_registrations.student_id` = `cedar_degrees.student_id`
+2. **enrollments → programs:** `cedar_registrations.student_id` = `cedar_programs.student_id`
+3. **enrollments → degrees:** `cedar_registrations.student_id` = `cedar_degrees.student_id`
 
 ---
 
@@ -463,7 +376,6 @@ Typical data volumes for a mid-sized university (~25,000 students):
 | `cedar_registrations` | 100,000 - 150,000 | 750,000 - 1M | 60-100 MB |
 | `cedar_programs` | 30,000 - 40,000 | 200,000 - 300,000 | 15-25 MB |
 | `cedar_degrees` | 5,000 - 8,000 | 40,000 - 60,000 | 3-5 MB |
-| `cedar_faculty` | 1,500 - 2,500 | 10,000 - 15,000 | 1-2 MB |
 | **Total** | | | **~100 MB** |
 
 Compare to current MyReports format: ~300MB for same data!
@@ -611,7 +523,6 @@ How each loaded table is built, and how every row gets its unit and its course a
 | `cedar_class_list_descriptions` | ~470k | Saved by the transform; the app reads it at start only to summarise the roster's majors, then lets it go. One row per `student_id`, `term`, `as_of_date` and distinct roster description (`student_level`, `student_classification`, `major_code`, `major_name`, `student_college`, `student_campus`, `residency`, `dual_credit`), with `rows`, the class-list rows that carried it (`build_class_list_descriptions()`). `build_student_terms()` reads it; the summary (`summarize_class_list_majors()`, `data_objects$cedar_class_list_majors`) lets Admin > Mappings name an unmapped roster major. About 7 MB saved against 8 MB of columns on the class list file, and 56 MB in memory against 122 MB |
 | `cedar_programs` | ~200k | One row per student-term program declaration. `program_name`, `program_code`, `dept_code`, `college_code`, `student_campus`, `pell_eligible`, `first_gen`, `ipeds_race`, `gender`, `time_status`. Its `*_credits_*` columns are pull-stamped — see the field reliability contract |
 | `cedar_degrees` | ~20k | Awarded degrees. `degree`, `program_name`, `dept_code`, `cumulative_gpa`, `cumulative_credits` |
-| `cedar_faculty` | ~5k × terms | `instructor_id`, `instructor_name`, `department`, `job_category`, `appointment_pct` (0–100; divide by 100 for FTE), `college` |
 | `cedar_student_terms` | ~520k | One row per student-term with any class-list row or declaration. Built by `build_student_terms()` in the transform from students, programs and degrees (ADR-001 step 2; contract [student-terms.md](student-terms.md)). `enrolled` (registered or late-dropped: **CEDAR's one definition of an enrolled student-term**), `returned_next_regular_term` / `return_observable`, description columns in code vocabulary with the source and any conflict flagged, per-term and running (`cumulative_*`) attempted and completed UNM credits with `unm_credits_entering` and `timeline_valid`, grade points and graded hours per term and running (`quality_points`, `graded_hours`, `cumulative_*`; build 3, ADR-001 step 7 group 4: what `build_gpa_timeline()` divides, so the comparison's GPA covariate reads the table), `dfw_grades`, `degree_awarded`. Loaded by the app, which stops without it. Roadblocks reads its return, Course Dynamics retention its `enrolled` (I44 closed), every credit position its running totals through `build_credit_timeline()` (`cedar_student_term_credits` is retired) and the Gen Ed major mix its `primary_major_code`, Pathways' classification axis and the Gen Ed graduate cohort its `student_classification`, Dept Trends' SCH by major its `primary_major_code` (named through `name_program_codes()`), Course Dynamics' rollcall and the Waitlists splits its `student_classification` and `primary_major_code` (`attach_student_descriptions()`), and since 2026-11-07 every other reader of a student's description: the Course Report's DFW by classification and major, the Dept Dashboard's donuts and composition shifts, Admin's home-campus counts, Regstats' sophomore screen and the enrollment projections (0.29.0). The loaded class list carries none |
 | `cedar_courses` / `cedar_course_codes` | ~7.5k / ~7.6k | **The course dimension** (ADR-001 step 4), built at startup by `build_cedar_courses()` (`R/branches/courses.R`) from the sections, the class lists and `code_history.csv`; never saved. `cedar_courses` is one row per `course_id`: the last code of a confirmed succession chain (`SOC 371` → `SOCI 371`; `SOC 250` → `SOCI 250` → `SOCI 2315`) or the code itself, with the current `subject` and `course_number`, `level`, latest `course_title`, `first_term` / `last_term` over every code, `n_codes` and `former_codes`. `cedar_course_codes` is one row per code in the data with its `course_id`, where it appears (`in_sections`, `in_class_lists`) and `steps`. **Every loader keys the tables on the course** (decided 2026-11-07): `attach_course_ids()` sets `subject_course` on the loaded `cedar_sections` and `cedar_registrations` to the `course_id`, keeps the code the registrar used that term as `listed_code`, and writes `course_id` beside them (one shared vector). **So `subject_course` on a loaded table is the course**: a reader that filters, groups or joins on it follows a renamed or renumbered course across its codes with nothing to remember, and a reader that names the term's code (a section listing; "also listed as SOC 371") reads `listed_code`. The saved files keep the registrar's code. A picked code, current or former, resolves through `course_id_of()` / `course_ids_of()` or the shared `course` filter (`filter_DESRs()`, `filter_class_list()`), and the pickers whose readers resolve offer both (`course_picker_choices()`). Readers name a course's former codes from `course_former_code_spans()` (Regstats, Waitlists, the Dashboard), `course_former_codes_note()` (Course Dynamics) and Low Enrollment's history text (`"2 (Sp20); also as SOC 250"`). A cache over the loaded tables records `course_code_renames()` in its key or on its payload (Regstats v6, `cedar_course_terms`, the course flows, the neighbors cache). The enrollment projections read by course from model 0.28.0. The code-level functions alone read the registrar's code (`build_cedar_courses()`, `detect_course_renamings()`). `cedar_attempts` and `cedar_course_terms` are the measure tables (rows below) (ISSUES I37, I45) |
 | `cedar_course_terms` | ~61k | **The course-term measure table** (ADR-001 step 4), counted by `build_course_terms()` (`R/branches/course-terms.R`) from the keyed class list and held at `data_objects[["cedar_course_terms"]]`. **Built by the transform** (`transform_measures()`, step 6), never by the app: the loader (`cedar_load_measure_table()`) refuses, and the start stops, unless `course_terms_is_current()` finds its build version (`COURSE_TERMS_BUILD_VERSION`), its columns and the class list's renames, and the stamps of the mapping files (`cedar_dims_fingerprint`) and the first term (`cedar_min_term`) match the app's. One row per `campus`, `college`, `term`, `subject_course` (the course) and `part_term`, with `level`, `department` and the class-list counts: `registered` (final), `dr_early`, `dr_late`, `dr_all`, `wl_all` (waitlist rows, not true demand), `cl_total` (ever registered) and `census_enrl`. A student is in one part of term of a course-term-campus, so the part-of-term rows sum exactly to course × term × campus. It holds no mean or baseline across terms: that is the reader's question. A reader takes it as a parameter and refuses one not current for its class list (`require_current_course_terms()`), or, holding no class list, one not of this build (`require_course_terms_build()`). Build 2 adds the outcome counts from `cedar_attempts`: `attempts` (the DFW denominator, `passed + dfw`), `passed`, `dfw` and `withdrawn` (late withdrawals, part of `dfw`), zero for a graded course-term with no attempt and **NA after `last_graded`**, where nothing has posted; it is stamped with the `graded_edge` it was counted to, and the loader refuses a copy counted to another. **Build 3 (ADR-001 step 7 group 3, 2026-11-08) makes it the full join of two sides.** The class list's side adds `first_day_enrl`, `first_day_basis` and `first_day_started_enrl` (`calc_first_day_enrl()` over the rows in active sections). The schedule's side is the active offerings (status A with seats or students) counted by `get_enrl()` at the same grain: `sections`, `seats` (enrolled + available), `seats_known` (every section's seats finite and positive), `desr_enrl`, and `sections_matched` (active sections the class list has a row in). **NA on a side means that source has no row** (EC-11b): a cancelled offering students registered in has NA `sections`; an offering nobody is listed in has NA `registered`, census and first day, and `sections_matched` 0. A reader compares the sides and says which is missing, never fills one from the other, and takes a first day as the course's only when every section is matched. **Build 4 (group 3b, the same day) counts a crosslisted section once, under its home listing** (`keep_home_sections()`, the rule the Department Dashboard and the registration snapshots already applied): a partner listing's row holds students and no section, the seats are the family's, and a fill read against them needs the family (the Course Report's crosslist payload), not one listing. Regstats (its lifecycle history and saturation seats), the Department Dashboard's Regstats flags, Waitlists' census history, the Course Planning History (Degree Explorer's tiles), the registration snapshots (their registrations, drops, sections and seats; the waitlist count is still class-list true demand) and the demographic shares' denominator (`summarize_student_demographics()`) read it; `filter_course_terms()` scopes it by the class list's option names and refuses a section or student option it cannot answer. Two readers still count the class list on purpose, each marked where it counts: Open Seats' class-list tab is scoped to the sections the DESR filters selected, by CRN, which the table cannot answer, and the Course Report's crosslist family counts each student once across the listings they registered under |

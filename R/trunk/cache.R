@@ -254,8 +254,7 @@ cedar_dept_cache_version <- 14L
 
 # Include lookup-derived labels/department metadata where a tab uses them.
 # Credit Hours reads class lists, sections for late drops' credit values, the
-# student-term table for each row's major and programs for its name; no
-# visible tab consumes faculty data.
+# student-term table for each row's major and programs for its name.
 # cedar_dims: unit, college and program names are read off the dimension
 # tables since ADR-001 step 3, so a mapping edit that renames one must miss too.
 DEPT_CACHE_TABLES <- list(

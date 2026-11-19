@@ -37,7 +37,7 @@
 #' result <- get_headcount(cedar_programs, list(major_codes = "HIST", minor_codes = "ANTH"),
 #'                         dims = cedar_dims)
 #'
-#' # Custom grouping for SFR calculations
+#' # Custom grouping by department and level
 #' result <- get_headcount(
 #'   cedar_programs,
 #'   opt      = list(),
@@ -390,7 +390,7 @@ filter_programs_by_opt <- function(programs, opt = list(), dims = NULL) {
 #' @param group_by Character vector of column names to group by. When NULL:
 #'   - No program filter: groups by c("term", "student_level", "program_type")
 #'   - Program filter active: groups by c("term", "student_level", "program_type", "program_name")
-#'   Pass explicitly for custom aggregations (e.g. SFR: c("term", "dept_code", "student_level")).
+#'   Pass explicitly for custom aggregations (e.g. by department and level: c("term", "dept_code", "student_level")).
 #'
 #' @param dims The dimension tables (\code{build_cedar_dims()}), used only to
 #'   name departments through units.csv when a broad program selection is
@@ -578,7 +578,7 @@ format_headcount_export <- function(result) {
 #' @param group_by Optional character vector of columns to group by.
 #'   Defaults to c("term", "student_level", "program_type", "program_name") when a
 #'   program filter is active, or c("term", "student_level", "program_type") otherwise.
-#'   Pass explicitly for custom aggregations (e.g. SFR: c("term", "dept_code", "student_level")).
+#'   Pass explicitly for custom aggregations (e.g. by department and level: c("term", "dept_code", "student_level")).
 #'
 #' @return List with:
 #'   \describe{
@@ -601,7 +601,7 @@ format_headcount_export <- function(result) {
 #' result <- get_headcount(cedar_programs, list(major_codes = "HIST", minor_codes = "ANTH"),
 #'                         dims = cedar_dims)
 #'
-#' # SFR aggregation
+#' # By department and level
 #' result <- get_headcount(
 #'   cedar_programs,
 #'   opt      = list(),

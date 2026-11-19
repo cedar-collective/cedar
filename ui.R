@@ -7,7 +7,6 @@
 #   - data_objects[["cedar_registrations"]]  - Student enrollments (class lists)
 #   - data_objects[["cedar_programs"]]  - Student programs (academic studies)
 #   - data_objects[["cedar_degrees"]]   - Degree completions
-#   - data_objects[["cedar_faculty"]]   - Faculty information
 #
 # DATA MODEL: CEDAR (lowercase column names, no backticks)
 #   - All data uses CEDAR naming conventions (e.g., campus, department, term)
@@ -20,7 +19,6 @@ cedar_sections <- data_objects[["cedar_sections"]]
 cedar_registrations <- data_objects[["cedar_registrations"]]
 cedar_programs <- data_objects[["cedar_programs"]]
 cedar_degrees <- data_objects[["cedar_degrees"]]
-cedar_faculty <- data_objects[["cedar_faculty"]]
 
 # Helper: named vector of dept choices (dept_name → dept_code) for selectizeInput dropdowns.
 # Source: units.csv, read off data_objects[["cedar_dims"]] (unit_names()).

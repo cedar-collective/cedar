@@ -311,7 +311,7 @@ Page-level legibility is [M43](ISSUES.md)–M48; these are the new pieces.
   and Gen Ed's instructor DFW, the dashboard's section spread); only the
   section spread tests it against chance. Build one branch for units against
   the course's pooled rate and give the gated instructor views its test.
-- [ ] **Faculty counts** through the existing faculty/FTE helpers.
+- [ ] **Faculty counts**, if HR data returns: build a faculty table fresh from the new report. The old HR pipeline and `cedar_faculty` were retired on 2026-11-18, and git history keeps them.
 - [ ] **Low-enrollment exception workflow** for dean/chair decisions on
   flagged courses.
 

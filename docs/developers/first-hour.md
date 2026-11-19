@@ -169,7 +169,7 @@ the files to replace are exactly the CSVs under `institution/<id>/` (ADR-002):
 | `campuses.csv`, `student_levels.csv`, `course_levels.csv` | campus codes, default scope and the spellings the exports use for them; student level codes and their spellings; course-level bands |
 | `gen_ed_courses.csv`, `excluded_courses.csv` | Gen Ed areas; courses excluded from course lists |
 | `population_groups.csv`, `projection_groups.csv`, `projection_courses.csv` | named population groups; projection monitoring scopes |
-| `program_names.csv`, `program_name_aliases.csv`, `source_organizations.csv` | name → code, name → canonical name, and HR organisation → unit text maps |
+| `program_names.csv`, `program_name_aliases.csv` | name → code and name → canonical name text maps |
 
 Files marked `# CEDAR-PLATFORM:` are mechanism and policy you inherit: grade and
 status vocabulary, the lookup derivations, the anomaly screens, the semantics

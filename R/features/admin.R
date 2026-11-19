@@ -2,7 +2,7 @@
 build_admin_data_status <- function(summary, current_term) {
   terms <- summary$display_terms
   datasets <- c(sections = "Sections", students = "Students", programs = "Programs",
-                degrees = "Degrees", faculty = "Faculty")
+                degrees = "Degrees")
   rows <- lapply(names(datasets), function(key) {
     count <- summary[[paste0(key, "_count")]]
     dates <- summary[[paste0(key, "_term_dates")]]
@@ -539,7 +539,7 @@ build_counting_rules <- function(files, programs, sections, students, student_te
   tibble::tibble(
     rule = c("Concentrations", "Pre-majors by name", "PHRD", "Banner's college",
              "Course level", "Cross-listed courses", "Excluded courses",
-             "Students with no program record", "Home campus", "HR departments",
+             "Students with no program record", "Home campus",
              "Program names to codes"),
     what = c(
       "A concentration has no code in Banner's report, so it counts with the department of the student's primary major that term.",
@@ -553,7 +553,6 @@ build_counting_rules <- function(files, programs, sections, students, student_te
       "Thesis, dissertation, honors-credit and similar courses are left out wherever a computation applies the excluded list (opt$uel = TRUE): department enrollment trends and reviews, Regstats waitlists and saturation, Open Seats; optional on the Enrollment tab.",
       "Class lists cover every campus; program records (Academic Studies) mostly cover Albuquerque. A student-term with no program record counts in course enrollment but in no department's or college's headcount.",
       "Program records name a student's home campus (\"Albuquerque/Main\"); class lists code it (\"ABQ\"). No file maps one to the other: headcounts filter on the names, course figures on the codes.",
-      "Faculty get a department from the HR report's organisation name through a hand-kept list. HR organisations not on it are dropped when the report is parsed.",
       "Older exports with a program name but no code get the code from a hand-kept list of names."),
     affects = c(
       sprintf("%s concentration rows; %s count toward no department because the primary major is undecided.",
@@ -589,8 +588,6 @@ build_counting_rules <- function(files, programs, sections, students, student_te
       sprintf("%s home-campus names in program records; %s campus codes on the student-term table.",
               n(dplyr::n_distinct(stats::na.omit(programs$student_campus))),
               n(dplyr::n_distinct(stats::na.omit(student_terms$student_campus)))),
-      sprintf("%s organisation names to %s departments.", n(length(hr_org_desc_to_dept)),
-              n(dplyr::n_distinct(hr_org_desc_to_dept))),
       sprintf("%s names.", n(length(major_name_to_major_code)))),
     coded_in = c(
       "transform_programs(), R/data-parsers/transform-to-cedar.R",
@@ -602,7 +599,6 @@ build_counting_rules <- function(files, programs, sections, students, student_te
       "institution/<id>/excluded_courses.csv (excluded_courses, R/lists/excluded_courses.R)",
       "the source exports (mrgather); ISSUES.md I18, I20",
       "institution/<id>/campuses.csv (R/lists/campuses.R)",
-      "institution/<id>/source_organizations.csv (hr_org_desc_to_dept, R/lists/mappings.R); R/data-parsers/parse-HRreport.R",
       "institution/<id>/program_names.csv (major_name_to_major_code, R/lists/mappings.R)"))
 }
 

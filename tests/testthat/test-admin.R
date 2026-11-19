@@ -6,8 +6,8 @@ test_that("data freshness is complete static HTML with honest missing states", {
   summary <- list(
     display_terms = c(202080L, 202110L),
     sections_count = nrow(test_sections), students_count = nrow(test_students),
-    programs_count = nrow(test_programs), degrees_count = nrow(test_degrees),
-    faculty_count = 0L,
+    # A table with no rows reads "Not loaded".
+    programs_count = nrow(test_programs), degrees_count = 0L,
     sections_term_dates = list("202080" = "2026-09-04"),
     students_term_dates = list("202080" = "2026-09-03", "202110" = NA_character_),
     # class_list_status_date_coverage() output: the shape, not data.
@@ -17,7 +17,7 @@ test_that("data freshness is complete static HTML with honest missing states", {
     computed_at = as.POSIXct("2026-09-04 08:00:00", tz = "UTC")
   )
   data <- build_admin_data_status(summary, 202080L)
-  expect_equal(nrow(data$table), 5L)
+  expect_equal(nrow(data$table), 4L)
   expect_equal(data$current_column, 3L)
   expect_equal(data$table$Rows[[2]], as.character(nrow(test_students)))
   html <- as.character(dataStatusUI(summary, 202080L,

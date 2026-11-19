@@ -961,17 +961,15 @@ CEDAR_SURFACE_TINTS <- c(
 #' open-ended dimension (major code, department, course) that is fine and
 #' often desirable (see build_color_map()'s "sort by frequency" pattern), but
 #' for a small fixed vocabulary that recurs across many unrelated charts and
-#' tabs — course level, program type, faculty job category — first-appearance
+#' tabs — course level, program type — first-appearance
 #' order silently varies with how each chart's data pipeline happened to sort
-#' or group rows, so "grad" (or "Majors", or "Lecturer") ends up a different
+#' or group rows, so "grad" (or "Majors") ends up a different
 #' color in every chart. Passing one of these as `label_order` pins each
 #' known value to a fixed CEDAR_PALETTE slot everywhere it is used.
 CEDAR_LEVEL_ORDER <- c("lower", "upper", "grad")
 CEDAR_MAJOR_MINOR_ORDER <- c("Majors", "Minors")
 CEDAR_PROGRAM_TYPE_ORDER <- c("Major", "Second Major", "First Minor", "Second Minor",
                               "First Concentration", "Second Concentration", "Third Concentration")
-CEDAR_JOB_CATEGORY_ORDER <- c("Professor", "Associate Professor", "Assistant Professor",
-                              "Lecturer", "Term Teacher", "TPT", "Professor Emeritus")
 
 
 #' Build a named color map for consistent cross-chart coloring

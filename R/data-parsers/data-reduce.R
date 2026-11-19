@@ -70,7 +70,6 @@ file_specs <- list(
   # every row out. Academic Period is the field MyReports actually populates.
   academic_studies = list(file = "academic_studies", term_col = "Academic Period"),
   degrees = list(file = "degrees", term_col = "Academic Period Code")
-  #fac_by_term = list(file = "fac_by_term", term_col = "Academic Period")
 )
 
 # Helper function to find and load data file (tries .qs first, then .Rds)

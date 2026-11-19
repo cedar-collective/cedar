@@ -33,8 +33,7 @@ read_tbl <- function(n) {
   suppressWarnings(qs2::qs_read(f))
 }
 D <- list(sections = read_tbl("cedar_sections"), students = read_tbl(cedar_table_file("cedar_registrations")),
-          programs = read_tbl("cedar_programs"), degrees  = read_tbl("cedar_degrees"),
-          faculty  = read_tbl("cedar_faculty"))
+          programs = read_tbl("cedar_programs"), degrees  = read_tbl("cedar_degrees"))
 missing <- names(D)[vapply(D, is.null, logical(1))]
 if (length(missing)) stop("Missing cedar tables in data/: ", paste(missing, collapse = ", "))
 # The roster's description of each student-term (ADR-001 step 5): saved beside
@@ -61,7 +60,7 @@ vals <- function(tb, col) if (is.null(D[[tb]][[col]])) character(0) else uv(D[[t
 cat("========== 1. CROSS-TABLE VOCABULARY ==========\n")
 concepts <- list(
   department = list(sections="department", students="department", degrees="dept_code",
-                    programs="dept_code", faculty="department"),
+                    programs="dept_code"),
   college    = list(sections="college", students="college", degrees="college", programs="college_code"),
   campus     = list(sections="campus", students="campus", degrees="campus", programs="student_campus"),
   subject    = list(sections="subject", students="subject_code"),
@@ -103,7 +102,6 @@ report("dept_code_to_name",    names(dept_code_to_name),
        c(D$sections$department, D$programs$dept_code, D$degrees$dept_code))
 report("college_name_to_code", names(college_name_to_code),
        c(D$programs$student_college, D$degrees$college))
-report("hr_org_desc_to_dept",  names(hr_org_desc_to_dept),  D$faculty$home_org)
 
 cat("\n-- duplicate keys (R returns the FIRST silently)\n")
 for (nm in c("subj_to_dept","major_to_dept","college_name_to_code","dept_code_to_name")) {

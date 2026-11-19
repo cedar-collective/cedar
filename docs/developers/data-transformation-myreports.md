@@ -28,7 +28,6 @@ DESRs.qs (73 columns - ALL fields including gender, ethnicity, etc.)
 class_lists.qs (74 columns - FULL data preserved)
 academic_studies.qs (83 columns)
 degrees.qs (46 columns)
-hr_data.qs (varies)
 ```
 
 **Purpose:** Complete institutional data warehouse with all fields for future analytics
@@ -45,7 +44,6 @@ cedar_sections.qs (21 columns - streamlined for performance)
 cedar_registrations.qs (the class list; cedar_students.qs before 2026-11-09)
 cedar_programs.qs (10 columns)
 cedar_degrees.qs (14 columns)
-cedar_faculty.qs (8 columns)
 ```
 
 **Purpose:** Normalized, institution-agnostic tables optimized for Cedar analytics
@@ -60,7 +58,6 @@ cedar_faculty.qs (8 columns)
 | **Class Lists** | class_lists.qs | → | `cedar_registrations` |
 | **Academic Study Detail** | academic_studies.qs | → | `cedar_programs` |
 | **Graduates & Pending Graduates** | degrees.qs | → | `cedar_degrees` |
-| **HR Report** (optional) | hr_data.qs | → | `cedar_faculty` |
 
 ---
 
@@ -107,9 +104,8 @@ The complete transformation logic is in [R/data-parsers/transform-to-cedar.R](ht
   - `total_enrl` → `enrolled` (parser-created field)
   - Includes computed fields: `level`, `term_type`, `gen_ed_area`, `is_lab`
   - `PRIM_INST_ID` → `instructor_id`, md5-hashed as `parse-data.R` hashes the
-    class list's and HR's (`hash_instructor_id()`, applied to all three in
-    the transform), so a section joins both. No HR field is merged onto a
-    section; join `cedar_faculty` (ISSUES I52).
+    class list's (`hash_instructor_id()`, applied to both in the transform),
+    so a section joins it (ISSUES I52).
 
 **2. class_lists → cedar_registrations**
 - Keeps: 18 of 74 columns
@@ -163,10 +159,6 @@ The complete transformation logic is in [R/data-parsers/transform-to-cedar.R](ht
 **4. degrees → cedar_degrees**
 - Keeps: 14 of 46 columns
 - Focuses on degree conferral essentials
-
-**5. hr_data → cedar_faculty**
-- Keeps: 8 core columns
-- Instructor demographics and appointments
 
 ---
 

@@ -8,7 +8,7 @@ parent: Developer Guide
 
 This reference is auto-generated from roxygen2 comments in the source code.
 
-*Generated: 2026-11-17 07:03:37.875316*
+*Generated: 2026-11-18 17:05:44.974625*
 
 ---
 
@@ -969,7 +969,6 @@ Analyze outcomes for one or more courses  Runs the DFW trend and instructor comp
 **Parameters:**
 
 - `attempts` - The attempt measure table (`cedar_attempts`).
-- `cedar_faculty` - cedar_faculty data frame; kept for the callers, unread here.
 - `opt` - Options list: \itemize{ \item \code{course}  — character vector of subject_course values (required) \item \code{term}    — integer vector; restrict to these terms (optional) \item \code{campus}  — character vector; restrict by campus (optional) \item \code{min_n}   — integer; minimum graded students per group (default 5) \item \code{data_edges} — output of [cedar_data_edges()]; longitudinal grade outputs stop at the earlier of the complete-enrollment and graded edges, while persistence eligibility uses the complete-enrollment edge }
 
 **Returns:** Named list: \describe{ \item{dfw_trend}{Tibble: campus, college, subject_course, term, dfw_pct} \item{instructor_dfw}{Tibble: campus, college, subject_course, instructor_id, instructor_name, dfw_pct, course_avg_dfw, dfw_diff} \item{courses}{Character vector of courses analyzed} }
@@ -1875,28 +1874,6 @@ Credit Hours by Major  The main function for the "who is taking our courses" ana
 - `include_wide_table` - Whether to build the all-level wide export table.
 
 **Returns:** list with: $plots:  sch_outside_pct_lower_plot, sch_dept_pct_lower_plot, sch_top_majors_lower_plot, sch_outside_pct_upper_plot, sch_dept_pct_upper_plot, sch_top_majors_upper_plot, sch_outside_pct_plot, sch_dept_pct_plot $tables: credit_hours_data_w, sch_major_trends_lower, sch_outside_full_lower, sch_major_trends_upper, sch_outside_full_upper
-
----
-
-### `credit_hours_by_fac()`
-
-*Source: credit-hours.R*
-
-**Credit Hours by Faculty Category**
-
-Credit Hours by Faculty Category  Shows how SCH production is distributed across faculty job categories — tenure-track, lecturer, adjunct, etc. Requires the cedar_faculty table, which is built from HR data and is not always available. Not displayed by Dept Trends today (see `compute_dept_credit_hours_tab()`).
-
-**Parameters:**
-
-- `students` - cedar_registrations data frame
-- `sections` - cedar_sections data frame, for late drops' credit values
-- `faculty` - cedar_faculty data frame (term, instructor_id, department, job_category). An empty table returns the two "No faculty data available" placeholders; NULL is an error.
-- `dept_code` - Department code
-- `subj_codes` - Subject codes for plot titles
-- `term_start,term_end` - Integer term codes (inclusive)
-- `palette` - RColorBrewer palette name
-
-**Returns:** list($plots): chd_by_fac_facet_plot (breakdown by level), chd_by_fac_plot (totals stacked by job category); $tables: chd_fac_by_level, chd_fac_by_total
 
 ---
 
@@ -3926,7 +3903,7 @@ Summarize Headcount Data  Helper function that groups and counts students from f
 
 - `df` - Filtered programs data frame (from filter_programs_by_opt)
 - `has_program_filter` - Boolean indicating if program filters were applied
-- `group_by` - Character vector of column names to group by. When NULL: - No program filter: groups by c("term", "student_level", "program_type") - Program filter active: groups by c("term", "student_level", "program_type", "program_name") Pass explicitly for custom aggregations (e.g. SFR: c("term", "dept_code", "student_level")).
+- `group_by` - Character vector of column names to group by. When NULL: - No program filter: groups by c("term", "student_level", "program_type") - Program filter active: groups by c("term", "student_level", "program_type", "program_name") Pass explicitly for custom aggregations (e.g. by department and level: c("term", "dept_code", "student_level")).
 - `dims` - The dimension tables (\code{build_cedar_dims()}), used only to name departments through units.csv when a broad program selection is rolled up to department totals (see Details).
 
 **Returns:** Data frame with columns from group_by plus student_count (distinct student IDs)
@@ -3982,7 +3959,7 @@ Get Student Headcount  Main orchestrating function for calculating student headc
 
 - `programs` - Student program enrollment data in CEDAR format. Required columns: student_id, term, student_level, program_type, program_name, dept_code. Optional columns: student_college, student_campus, degree.
 - `opt` - Options list for filtering: \itemize{ \item campus - Filter by values from student_campus \item college - Filter by student_college values or mapped college codes \item dept_code - Filter program rows by department code(s) or the program-to-department lookup; omit for cross-department combinations \item major - Filter by major program name(s) \item minor - Filter by minor program name(s) \item concentration - Filter by concentration name(s) } Multiple program filters (major + minor, etc.) are combined with AND logic: only students satisfying all specified filters in the same term are counted. Multiple choices within one filter use OR. The plot reflects the primary filter (major > minor > concentration).
-- `group_by` - Optional character vector of columns to group by. Defaults to c("term", "student_level", "program_type", "program_name") when a program filter is active, or c("term", "student_level", "program_type") otherwise. Pass explicitly for custom aggregations (e.g. SFR: c("term", "dept_code", "student_level")).
+- `group_by` - Optional character vector of columns to group by. Defaults to c("term", "student_level", "program_type", "program_name") when a program filter is active, or c("term", "student_level", "program_type") otherwise. Pass explicitly for custom aggregations (e.g. by department and level: c("term", "dept_code", "student_level")).
 
 **Returns:** List with: \describe{ \item{data}{Data frame with student_count and grouping columns} \item{no_program_filter}{TRUE when no major/minor/concentration filter was applied} \item{metadata}{List with total_students, programs_included, filters_applied} }
 
@@ -4000,7 +3977,7 @@ result <- get_headcount(cedar_programs, list(dept_code = "HIST"))
 result <- get_headcount(cedar_programs, list(major_codes = "HIST", minor_codes = "ANTH"),
                         dims = cedar_dims)
 
-# SFR aggregation
+# By department and level
 result <- get_headcount(
   cedar_programs,
   opt      = list(),
@@ -5322,7 +5299,6 @@ Analyze Course Seat Availability Across Terms  Main seatfinder function that per
 
 - `attempts` - The attempt measure table (`cedar_attempts`), for each course's DFW rate
 - `courses` - Data frame from cedar_sections table with enrollment and capacity data
-- `cedar_faculty` - Data frame from cedar_faculty table (used for instructor job category in grades)
 - `opt` - Options list with required and optional parameters: \itemize{ \item \code{term} - (Required) Term code or range (e.g., "202510" or "202410,202510") If single term, compares to same term previous year (term - 100) \item \code{part_term} - (Optional) Part of term filter (e.g., "1H", "2H", "FT") \item \code{department} - (Optional) Department filter \item \code{subject} - (Optional) Subject filter \item \code{group_cols} - (Optional) Custom grouping columns Defaults to: campus, college, term, subject_course, part_term, level, gen_ed_area }
 
 **Returns:** Named list with six data frames: \describe{ \item{type_summary}{Courses with availability differences by part_term. Columns: campus, college, term, part_term, subject_course, avail, dfw_pct, avail_diff (change from previous year), enrolled, gen_ed_area} \item{courses_common}{Courses offered in both terms with enrollment changes. Includes enrl_diff_from_last_year showing YoY enrollment trends} \item{courses_prev}{Courses offered in start term but NOT in end term (discontinued)} \item{courses_new}{Courses offered in end term but NOT in start term (new offerings)} \item{gen_ed_summary}{Gen ed courses with available seats, sorted by area and availability} \item{gen_ed_likely}{Gen ed courses currently at zero capacity (may open later)} }
@@ -5336,121 +5312,17 @@ Seatfinder workflow: \enumerate{ \item Parse term parameter (single term vs comp
 \dontrun{
 # Compare Fall 2025 to Fall 2024 (default one-year comparison)
 opt <- list(term = "202580", part_term = "FT", department = "MATH")
-results <- seatfinder(cedar_attempts, cedar_sections, cedar_faculty, opt)
+results <- seatfinder(cedar_attempts, cedar_sections, opt)
 
 # View courses with largest availability decreases
 head(results$type_summary %>% arrange(avail_diff))
 
 # Compare specific terms
 opt <- list(term = "202410,202510")  # Spring 2024 vs Spring 2025
-results <- seatfinder(cedar_attempts, cedar_sections, cedar_faculty, opt)
+results <- seatfinder(cedar_attempts, cedar_sections, opt)
 
 # Check gen ed availability
 head(results$gen_ed_summary)
-}
-
-```
-
----
-
-## sfr
-
-### `get_perm_faculty_count()`
-
-*Source: sfr.R*
-
-**Get Permanent Faculty Count from CEDAR Faculty Table**
-
-Get Permanent Faculty Count from CEDAR Faculty Table  Calculates FTE (full-time equivalent) counts for permanent faculty by summing appointment percentages. Uses the cedar_faculty table with normalized CEDAR column names.
-
-**Parameters:**
-
-- `cedar_faculty` - Data frame from cedar_faculty table with columns: term, department, job_category, appointment_pct
-
-**Returns:** Data frame with columns: \itemize{ \item \code{term} - Term code \item \code{department} - Department code (lowercase) \item \code{total} - FTE count (sum of appointment percentages) } Returns NULL when the faculty table has no rows (no HR data loaded). Stops if the table is NULL or missing a required column.
-
-**Details:**
-
-Permanent faculty categories included in FTE calculation: \itemize{ \item professor \item associate_professor \item assistant_professor \item lecturer }  Excluded categories (non-permanent): \itemize{ \item term_teacher \item tpt (temporary part-time) \item grad (graduate assistants) \item professor_emeritus }  FTE calculation example: A professor at 100% appointment + a lecturer at 50% appointment = 1.5 FTE for that department/term.
-
-**Example:**
-```r
-\dontrun{
-# Calculate permanent faculty FTE
-perm_fac <- get_perm_faculty_count(cedar_faculty)
-
-# View FTE by department for recent term
-perm_fac %>% filter(term == 202510) %>% arrange(desc(total))
-}
-
-```
-
----
-
-### `get_sfr()`
-
-*Source: sfr.R*
-
-**Calculate Student-Faculty Ratios**
-
-Calculate Student-Faculty Ratios  Calculates student-faculty ratios (SFR) by merging headcount data with permanent faculty FTE counts. Separates majors and minors for detailed analysis.
-
-**Parameters:**
-
-- `programs` - The \code{cedar_programs} table (one row per student-term program declaration) used for the headcount.
-- `faculty` - The \code{cedar_faculty} table used for permanent faculty FTE.
-
-**Returns:** Data frame with columns: \itemize{ \item \code{term} - Term code (CEDAR naming) \item \code{department} - Department code (CEDAR naming, lowercase) \item \code{student_level} - Student level (Undergraduate/Graduate/GASM) \item \code{program_type} - Type: "all_majors" or "all_minors" \item \code{program_name} - Program name \item \code{total} - Faculty FTE count \item \code{students} - Student headcount \item \code{sfr} - Student-faculty ratio (students/total) } Returns NULL if headcount or faculty data is unavailable.
-
-**Details:**
-
-**CEDAR Data Model Only**  This function requires CEDAR-formatted data with lowercase column names.  Workflow: \enumerate{ \item Calls \code{get_headcount()} to get student headcount by department \item Calls \code{get_perm_faculty_count()} to get faculty FTE \item Merges headcount with faculty data (both use CEDAR naming) \item Filters out summer terms (term ending in 60) \item Separates majors from minors \item Calculates SFR = students / faculty_fte }  Major types included: \itemize{ \item Majors: "Major", "Second Major" \item Minors: "First Minor", "Second Minor" }  **Note**: Summer terms are excluded as they're not meaningful for SFR analysis.
-
-**Example:**
-```r
-\dontrun{
-# Calculate SFRs
-sfr_data <- get_sfr(cedar_programs, cedar_faculty)
-
-# View undergraduate major SFRs for Fall 2025
-sfr_data %>%
-  filter(term == 202510, `Student Level` == "Undergraduate", major_type == "all_majors") %>%
-  arrange(desc(sfr))
-}
-
-```
-
----
-
-### `get_sfr_data_for_dept_report()`
-
-*Source: sfr.R*
-
-**Get SFR Data for Legacy Department-Level Analysis**
-
-Get SFR Data for Legacy Department-Level Analysis  Generates student-faculty ratio plots and data for department-specific reports. Creates separate visualizations for undergraduate and graduate students, plus a scatter plot showing the department in context of the full college.
-
-**Parameters:**
-
-- `programs` - The \code{cedar_programs} table.
-- `faculty` - The \code{cedar_faculty} table.
-- `opt` - Named list. \code{dept_code} (required): the department to highlight, e.g. \code{"HIST"}.
-
-**Returns:** List with structure: list( plots  = list(ug_sfr_plot, grad_sfr_plot, sfr_scatterplot), tables = list() ) If insufficient data, plot values will be character strings instead of ggplot objects.
-
-**Details:**
-
-Plot specifications:  **Undergraduate SFR Plot**: \itemize{ \item X-axis: term \item Y-axis: sfr (students per faculty) \item Fill: major_type (all_majors vs all_minors) \item Grouped bar chart }  **Graduate SFR Plot**: \itemize{ \item Same structure as undergraduate plot \item Filtered for Graduate/GASM student level }  **SFR Scatterplot** (College Context): \itemize{ \item Shows all college departments as gray points/lines \item Highlights target department in color \item Y-axis limited to 0-50 (except PSYC which often has higher ratios) \item Uses major data only (excludes minors) }
-
-**Example:**
-```r
-\dontrun{
-# Generate SFR plots for History department
-result <- get_sfr_data_for_dept_report(cedar_programs, cedar_faculty,
-                                       opt = list(dept_code = "HIST"))
-print(result$plots$ug_sfr_plot)
-print(result$plots$grad_sfr_plot)
-print(result$plots$sfr_scatterplot)
 }
 
 ```
@@ -5835,7 +5707,7 @@ Transform MyReports data to CEDAR model  Loads parsed source files, calls each t
 
 - `data_dir` - Path to data directory (default: from config)
 - `use_qs` - Use .qs format (default: from config)
-- `tables` - Character vector of tables to run (default: all) Options: "sections", "students", "programs", "degrees", "faculty", "applicants"
+- `tables` - Character vector of tables to run (default: all) Options: "sections", "students", "programs", "degrees", "student_terms", "measures", "applicants"
 
 **Returns:** Invisibly: named list of save metadata for each table written
 

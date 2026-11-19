@@ -77,7 +77,6 @@ The credit-hour tab includes:
 - **By level and subject code** — SCH per term split by course level (lower 100–299, upper 300–499, graduate 500+) and by subject code prefix. Departments that teach under multiple subject codes (e.g., BIOL and BIOC) appear in separate facets.
 - **By subject code combined** — same data collapsed across levels, showing total SCH per subject code as a stacked bar over time.
 - **By major (home vs. outside)** — whose students are taking these courses? Home majors are students whose Banner major code matches the department's programs; outside majors are everyone else — other programs, pre-majors, undeclared students. Shown separately for lower and upper division.
-- **By instructor type** — SCH attributed to Professor, Associate Professor, Assistant Professor, Lecturer, Term Teacher, TPT (temporary part-time / adjunct), and Grad (graduate teaching assistant). Requires HR data to be loaded; charts are hidden if HR data is unavailable.
 
 The methodology note at the top of the tab explains exactly what is and isn't counted.
 

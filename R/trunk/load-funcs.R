@@ -147,7 +147,6 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
   source_file("cones/course-demographics.R")
   source_file("cones/seatfinder.R")
   source_file("cones/cancellations.R")
-  source_file("cones/sfr.R")
   source_file("cones/waitlist.R")
   source_file("cones/course-sequence-effect.R")   # did passing X improve grades in Y?
   source_file("cones/downstream-outcomes.R")            # of X's students, who took Y, when, and how they did

@@ -58,7 +58,7 @@ tests/testthat — unit tests
 Hard rules, no exceptions:
 
 - **Cones never call other cones.** A function that needs several belongs in `features/` or `modules/`.
-- **Cones and branches never touch global state.** No `exists("cedar_sections")`, no reading `data_objects`: every table is a parameter, optional enrichment an optional parameter (`get_course_outcomes(students, cedar_faculty, opt)`). `tests/testthat/test-architecture.R` fails on a global read (M12).
+- **Cones and branches never touch global state.** No `exists("cedar_sections")`, no reading `data_objects`: every table is a parameter, optional enrichment an optional parameter (`get_course_persistence()`'s `student_terms`). `tests/testthat/test-architecture.R` fails on a global read (M12).
 - **Modules contain zero business logic.** No `group_by`/`summarize` pipelines in a module server: collect inputs into `opt`, call a cone or branch, render.
 
 **Platform vs institution.** Every file in `R/lists/` opens with `# CEDAR-PLATFORM:` or `# CEDAR-INSTITUTION:`. Institution data lives in plain CSVs under `institution/<id>/` (chosen by `CEDAR_INSTITUTION`, default `unm`): the subject → department → college hierarchy, programs, campuses, student levels, course-level bands, Gen Ed areas, excluded courses, population groups, projection scopes, text maps, and `code_history.csv` (which code replaced which). Each is validated at startup by `R/lists/institution_files.R` through `CEDAR_CONFIG_FILE_SPECS`. An adopter replaces exactly those files. **Platform code may read an institution constant through a name; it may never contain one.** `test-architecture.R` fails on institution codes as literals outside `R/lists/`; mark a deliberate exception `INSTITUTION-OK:` with a reason. The same test ratchets silent `tryCatch` fallbacks per file (M11): each file's allowance may only go down.
@@ -75,7 +75,6 @@ Lowercase snake_case columns; legacy uppercase names are deprecated. How each ta
 | `cedar_registrations` | student × course × campus × term | the class list (was `cedar_students`; its file is `cedar_registrations.qs` since 2026-11-09, read through `cedar_table_file()`): `student_id`, `registration_status_code`, `final_grade`, `level`, `part_term`. **Saved and loaded without the student's description** (`thin_class_list()`; the transform saves it once per student-term as `cedar_class_list_descriptions`, which builds `cedar_student_terms`): a reader attaches classification, major, home campus or level from `cedar_student_terms` (`attach_student_descriptions()`) |
 | `cedar_programs` | student × term × program | declarations: `program_code`, `dept_code`, `college_code`, demographics. Its `*_credits_*` columns are pull-stamped (field reliability) |
 | `cedar_degrees` | awarded degree | `degree`, `program_name`, `dept_code` |
-| `cedar_faculty` | instructor × term | `appointment_pct` is 0–100; divide by 100 for FTE |
 | `cedar_student_terms` | student × term | **CEDAR's one definition of an enrolled student-term** (`enrolled`) and of return (`returned_next_regular_term`, `return_observable`); running credits and grade points (`cumulative_*`, `timeline_valid`; `build_gpa_timeline()` divides them); primary major and classification. Built in the transform; the app stops without it ([student-terms.md](docs/developers/student-terms.md)) |
 | `cedar_terms` | term | the term dimension: the right edges as flags (`is_settled`, `is_graded`, `in_progress`, …), season, next/previous regular term, first day, census date |
 | `cedar_dims` | — | the mapping files as dimension tables (`colleges`, `units`, `subjects`, `programs`, `settings`); names through `unit_names()`, `college_code_names()`, `subject_units()`, `name_program_codes()` |
@@ -281,7 +280,7 @@ There is one canonical way to count each thing: census `add_census_enrl()`; DFW 
 
 ## Tests
 
-All test data is in `tests/testthat/fixtures/`. `designed_test_data.R` **is** the test database; `setup.R` exposes `test_sections`, `test_students`, `test_programs`, `test_degrees`, `test_faculty`, `test_dims`, `data_objects`. Its header pins expected counts: update it and the affected tests in the same change as any fixture edit. New rows follow EC-xx / XLxx / SVARxx.
+All test data is in `tests/testthat/fixtures/`. `designed_test_data.R` **is** the test database; `setup.R` exposes `test_sections`, `test_students`, `test_programs`, `test_degrees`, `test_dims`, `data_objects`. Its header pins expected counts: update it and the affected tests in the same change as any fixture edit. New rows follow EC-xx / XLxx / SVARxx.
 
 - Expected values are committed after running against fixtures; if one changes, investigate before updating it.
 - Domain rows belong in the shared fixture; one function's intermediate frames are fixed objects in `fixtures/scenario_tables.R`, with documented expectations.

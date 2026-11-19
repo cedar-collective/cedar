@@ -39,7 +39,6 @@
 #' so the DFW formula and component fields match the rest of the app.
 #'
 #' @param attempts The attempt measure table (`cedar_attempts`).
-#' @param cedar_faculty cedar_faculty data frame; kept for the callers, unread here.
 #' @param opt Options list:
 #'   \itemize{
 #'     \item \code{course}  — character vector of subject_course values (required)
@@ -57,7 +56,7 @@
 #'       dfw_pct, course_avg_dfw, dfw_diff}
 #'     \item{courses}{Character vector of courses analyzed}
 #'   }
-get_course_outcomes <- function(attempts, cedar_faculty = NULL, opt = list()) {
+get_course_outcomes <- function(attempts, opt = list()) {
 
   message("[course-outcomes.R] Welcome to get_course_outcomes!")
 

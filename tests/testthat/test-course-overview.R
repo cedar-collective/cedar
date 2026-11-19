@@ -588,7 +588,7 @@ test_that("the whole Course Dynamics payload is keyed on the course", {
   # code did.
   edges <- cedar_data_edges(test_students, degrees = test_degrees)
   outcomes <- suppressMessages(get_course_outcomes(
-    attempts_for(rn$cedar_registrations, edges), test_faculty,
+    attempts_for(rn$cedar_registrations, edges),
     list(course = "HIST 3201", min_n = 1L, data_edges = edges)
   ))
   expect_setequal(outcomes$dfw_trend$term, c(202010L, 202110L))

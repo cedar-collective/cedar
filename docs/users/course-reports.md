@@ -175,7 +175,7 @@ Knowing that many students in an upper-division elective come from outside the h
 {: .warning }
 Course-level results remain visible. Instructor-level results require a configured password due to their sensitivity; when the administrator has not configured one, those results remain disabled.
 
-The DFW tab is intended to support conversations about course design and student support — not to evaluate individual instructors. The instructor-type breakdown (tenure-track vs. contingent faculty) is one lens for understanding patterns; it should be read alongside section size, student composition, and course context.
+The DFW tab is intended to support conversations about course design and student support — not to evaluate individual instructors. Read a rate alongside section size, student composition, and course context.
 
 ---
 

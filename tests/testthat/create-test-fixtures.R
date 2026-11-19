@@ -45,13 +45,9 @@ message("Creating test fixtures from CEDAR data files...")
 # 202110 = Spring 2021 (second spring — for trend/comparison tests)
 TEST_TERMS  <- c(202010, 202060, 202080, 202110)
 
-# Main analysis departments (sections, students, faculty).
+# Main analysis departments (sections, students).
 # NURS is included so health-domain code paths have real data.
 TEST_DEPTS <- c("HIST", "MATH", "ANTH", "NURS")
-
-# Faculty data only covers CAS departments — nursing and other colleges
-# are not in the HR extract.
-FACULTY_DEPTS <- c("HIST", "MATH", "ANTH")
 
 # Degree terms: one prior term for seatfinder/completion comparisons.
 DEGREE_TERMS <- c(201980, 202010, 202060, 202080, 202110)
@@ -84,13 +80,11 @@ sections <- qs_read("data/cedar_sections.qs")
 students  <- qs_read("data/cedar_students.qs")
 programs  <- qs_read("data/cedar_programs.qs")
 degrees   <- qs_read("data/cedar_degrees.qs")
-faculty   <- qs_read("data/cedar_faculty.qs")
 
 message(sprintf("  sections:  %s rows", format(nrow(sections),  big.mark = ",")))
 message(sprintf("  students:  %s rows", format(nrow(students),  big.mark = ",")))
 message(sprintf("  programs:  %s rows", format(nrow(programs),  big.mark = ",")))
 message(sprintf("  degrees:   %s rows", format(nrow(degrees),   big.mark = ",")))
-message(sprintf("  faculty:   %s rows", format(nrow(faculty),   big.mark = ",")))
 
 # =============================================================================
 # Validate required columns
@@ -118,10 +112,6 @@ require_cols(programs, "cedar_programs", c(
 
 require_cols(degrees, "cedar_degrees", c(
   "term", "student_id", "degree", "major_code", "department"
-))
-
-require_cols(faculty, "cedar_faculty", c(
-  "term", "instructor_id", "department", "job_category", "appointment_pct"
 ))
 
 message("✓ All required columns present\n")
@@ -515,23 +505,6 @@ test_degrees %>%
   pwalk(~ message(sprintf("    %d: %d degrees", ..1, ..2)))
 
 # =============================================================================
-# FACULTY
-# All faculty in CAS test departments and terms.
-# =============================================================================
-
-message("\nSampling faculty...")
-
-test_faculty <- faculty %>%
-  filter(term %in% TEST_TERMS, department %in% FACULTY_DEPTS) %>%
-  distinct(instructor_id, term, .keep_all = TRUE)
-
-message(sprintf("  %d faculty records, %d unique instructors",
-                nrow(test_faculty), n_distinct(test_faculty$instructor_id)))
-test_faculty %>%
-  count(term, department) %>%
-  pwalk(~ message(sprintf("    %d / %-5s : %d faculty", ..1, ..2, ..3)))
-
-# =============================================================================
 # Save fixtures
 # =============================================================================
 
@@ -544,15 +517,12 @@ qs_save(test_sections, file.path(fixture_dir, "cedar_sections_test.qs"))
 qs_save(test_students, file.path(fixture_dir, "cedar_students_test.qs"))
 qs_save(test_programs, file.path(fixture_dir, "cedar_programs_test.qs"))
 qs_save(test_degrees,  file.path(fixture_dir, "cedar_degrees_test.qs"))
-qs_save(test_faculty,  file.path(fixture_dir, "cedar_faculty_test.qs"))
 
 message("\n✅ Test fixtures written to tests/testthat/fixtures/")
 message(sprintf("   cedar_sections_test.qs  : %d rows", nrow(test_sections)))
 message(sprintf("   cedar_students_test.qs  : %d rows", nrow(test_students)))
 message(sprintf("   cedar_programs_test.qs  : %d rows", nrow(test_programs)))
 message(sprintf("   cedar_degrees_test.qs   : %d rows", nrow(test_degrees)))
-message(sprintf("   cedar_faculty_test.qs   : %d rows", nrow(test_faculty)))
 message(sprintf("\n   Stable terms: %s", paste(TEST_TERMS, collapse = ", ")))
 message(sprintf("   Section/student depts: %s", paste(TEST_DEPTS, collapse = ", ")))
-message(sprintf("   Faculty depts: %s (CAS only)", paste(FACULTY_DEPTS, collapse = ", ")))
 message("\n   Run tests: devtools::test()")

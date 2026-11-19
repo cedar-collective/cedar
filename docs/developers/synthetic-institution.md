@@ -63,8 +63,8 @@ waitlist demand; Regstats includes growing, declining, and flat histories.
 Missing section metadata is completed from the fixture's enrollment rows.
 People with no program history receive explicitly undeclared records; known
 students do not receive invented historical declarations. Section identifiers
-are unique across scenarios and copied cohorts. College codes, date fields,
-and fractional faculty appointments are converted to source-report conventions.
+are unique across scenarios and copied cohorts. College codes and date fields
+are converted to source-report conventions.
 Added sections are marked `synthetic_completion`. Enrollments, grades,
 program changes, and terms come from the fixtures.
 

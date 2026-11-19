@@ -5,7 +5,7 @@ with_temp_cedar_data_dir <- function(code) {
   old_use_qs <- if (exists("cedar_use_qs", inherits = TRUE)) cedar_use_qs else NULL
   old_use_small <- if (exists("cedar_use_small_data", inherits = TRUE)) cedar_use_small_data else NULL
   global_names <- c(
-    "sections", "courses", "students", "cedar_student_terms", "programs", "degrees", "faculty", "fac_by_term",
+    "sections", "courses", "students", "cedar_student_terms", "programs", "degrees",
     "applicants", "data_objects"
   )
   old_globals <- stats::setNames(vector("list", length(global_names)), global_names)

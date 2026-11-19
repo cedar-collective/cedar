@@ -189,11 +189,7 @@ create_dept_report_base <- function(data_objects, opt) {
   }
 
   incoming_dept <- opt[["dept_code"]]
-  dept_code <- if (incoming_dept %in% names(hr_org_desc_to_dept)) {
-    hr_org_desc_to_dept[[incoming_dept]]
-  } else {
-    incoming_dept
-  }
+  dept_code <- incoming_dept
 
   if (is.null(opt[["current_term"]]) || length(opt[["current_term"]]) == 0) {
     stop("[dept-trends.R] opt$current_term is required.")
@@ -624,10 +620,8 @@ compute_dept_credit_hours_tab <- function(base, data_objects,
     include_wide_table = FALSE
   )
 
-  # Faculty-category and all-undergraduate duplicate charts are not displayed
-  # anywhere in Dept Trends. Computing their joins/summaries here made the
-  # visible Credit Hours tab slower; the faculty join could also prevent every
-  # visible SCH chart from loading when faculty data was absent or stale.
+  # The all-undergraduate duplicate charts are not displayed anywhere in Dept
+  # Trends, so they are not computed here.
   plots <- c(sch_college$plots, sch_major$plots)
   plots["chd_by_year_plot"] <- list(plots$chd_by_period_plot)
   plots["enrl_college_dept_dual_plot"] <- list(plots$college_dept_dual_plot)

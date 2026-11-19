@@ -177,14 +177,12 @@ rm(.rn_course_tables)
 # test-degree-explorer.R. Independent of any real institution's annual catalog.
 test_degree_catalog  <<- read_degree_catalog(cedar_institution_dir(cedar_base_dir, "demo"))
 test_degree_roadmaps <<- read_degree_roadmaps(test_degree_catalog, cedar_institution_dir(cedar_base_dir, "demo"))
-test_faculty     <<- cedar_faculty
 
 data_objects <<- list(
   cedar_programs = test_programs,
   cedar_degrees  = test_degrees,
   cedar_registrations = test_students,
   cedar_student_terms = test_student_terms,
-  cedar_faculty  = test_faculty,
   cedar_sections = test_sections,
   cedar_dims     = test_dims
 )
@@ -256,8 +254,7 @@ message(sprintf("  test_sections: %d rows (%d XL) | test_students: %d rows | tes
                 nrow(test_sections),
                 sum(!is.na(test_sections$crosslist_group)),
                 nrow(test_students), nrow(test_programs)))
-message(sprintf("  test_faculty:  %d rows | test_degrees:  %d rows",
-                nrow(test_faculty), nrow(test_degrees)))
+message(sprintf("  test_degrees:  %d rows", nrow(test_degrees)))
 
 # -----------------------------------------------------------------------------
 # SCENARIO TABLES - the fixed tables one test file reads, each built once here

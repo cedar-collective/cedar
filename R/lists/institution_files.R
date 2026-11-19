@@ -238,9 +238,6 @@ CEDAR_CONFIG_FILE_SPECS <- list(
   # A variant or historical program name to the canonical program_name
   # stored in cedar_programs (Banner rename artifacts, X-prefix variants).
   program_name_aliases = c("source_name", "program_name"),
-  # The HR report's "Home Organization Desc" text to the unit a faculty member
-  # belongs to; organisations not listed are dropped when the report is parsed.
-  source_organizations = c("source_name", "unit_code"),
   # Section titles of one course that name the same topic in words the
   # wording-blind key (topic_title_key()) cannot match: a typo, an
   # abbreviation, a title cut short at the schedule's length limit.
@@ -571,13 +568,12 @@ validate_projection_sequences <- function(sequences) {
   sequences[, c("from_course", "to_course")]
 }
 
-#' Check the three text-map files together
+#' Check the two text-map files together
 #'
-#' @param program_names,aliases,organizations The tables as read.
-#' @param known_units Unit codes from units.csv.
-#' @return list(program_names, aliases, organizations), if valid. Stops listing
-#'   every problem otherwise.
-validate_text_maps <- function(program_names, aliases, organizations, known_units) {
+#' @param program_names,aliases The tables as read.
+#' @return list(program_names, aliases), if valid. Stops listing every problem
+#'   otherwise.
+validate_text_maps <- function(program_names, aliases) {
   problems <- character(0)
   blank <- function(x) is.na(x) | !nzchar(x)
   check <- function(df, file, key, value) {
@@ -588,15 +584,12 @@ validate_text_maps <- function(program_names, aliases, organizations, known_unit
   }
   check(program_names, "program_names.csv", "program_name", "program_code")
   check(aliases, "program_name_aliases.csv", "source_name", "program_name")
-  check(organizations, "source_organizations.csv", "source_name", "unit_code")
   same <- aliases$source_name[aliases$source_name == aliases$program_name]
   if (length(same)) problems <- c(problems, paste("program_name_aliases.csv: source_name equals program_name for", paste(same, collapse = ", ")))
-  bad <- setdiff(organizations$unit_code[!blank(organizations$unit_code)], known_units)
-  if (length(bad)) problems <- c(problems, paste("source_organizations.csv: unit_code not in units.csv:", paste(bad, collapse = ", ")))
   if (length(problems)) {
     stop("[institution_files.R] Invalid text-map files:\n  ", paste(problems, collapse = "\n  "))
   }
-  list(program_names = program_names, aliases = aliases, organizations = organizations)
+  list(program_names = program_names, aliases = aliases)
 }
 
 #' Check an institution's mapping files against each other

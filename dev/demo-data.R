@@ -35,7 +35,6 @@ build_demo_sources <- function(cohorts = 5L,
            is_pre_major = FALSE)
   programs <- bind_rows(programs, concurrent)
   degrees <- collect(c(base = "cedar_degrees", graduates = "cedar_degrees_gg"))
-  faculty <- collect(c(base = "cedar_faculty"))
 
   term_start <- function(term) as.Date(paste0(term %/% 100L,
     case_when(term %% 100L == 10L ~ "-01-15", term %% 100L == 60L ~ "-06-01",
@@ -110,13 +109,6 @@ build_demo_sources <- function(cohorts = 5L,
     program_name = coalesce(program_name, major_code),
     student_college = college_code(student_college),
     as_of_date = term_start(term) + 130L)
-  faculty <- faculty %>% mutate(synthetic_completion = FALSE)
-  missing_faculty <- sections %>% anti_join(faculty, by = c("instructor_id", "term")) %>%
-    distinct(instructor_id, term, .keep_all = TRUE) %>% transmute(
-      instructor_id, instructor_name, term, department, college,
-      academic_title = "Instructor", job_title = "Instructor", job_category = "Term Teacher",
-      appointment_pct = 1, fixture_source, synthetic_completion = TRUE)
-  faculty <- bind_rows(faculty, missing_faculty)
 
   replicate_table <- function(df, identity_columns) {
     bind_rows(lapply(seq_len(cohorts), function(cohort) {
@@ -134,7 +126,6 @@ build_demo_sources <- function(cohorts = 5L,
   students <- replicate_table(students, c("student_id", "crn", "instructor_id"))
   programs <- replicate_table(programs, "student_id")
   degrees <- replicate_table(degrees, "student_id")
-  faculty <- replicate_table(faculty, "instructor_id")
 
   DESRs <- sections %>% transmute(
     TERM = term, CRN = crn, SUBJ = subject, CRSE = course_number,
@@ -215,16 +206,11 @@ build_demo_sources <- function(cohorts = 5L,
     `Award Category` = award_category, `Cumulative GPA` = cumulative_gpa,
     `Cumulative Credits Earned` = cumulative_credits, `Academic Period Admitted` = admitted_term,
     as_of_date)
-  hr_data <- faculty %>% transmute(
-    `UNM ID` = instructor_id, term_code = as.character(term), Name = instructor_name,
-    DEPT = department, `Academic Title` = academic_title, `Job Title` = job_title,
-    job_cat = job_category, `Appt %` = 100 * appointment_pct,
-    `Home Organization Desc` = college, as_of_date = term_start(term) + 130L)
   # The old fixtures do not invent applicants. Preserve that absence explicitly.
   applicants <- tibble::tibble(ID = character(), `Academic Period Code` = integer(),
     `High School GPA` = numeric(), as_of_date = as.Date(character()))
   raw <- list(DESRs = DESRs, class_lists = class_lists, academic_studies = academic_studies,
-    degrees = degree_sources, hr_data = hr_data, admissions_applicants = applicants)
+    degrees = degree_sources, admissions_applicants = applicants)
   attr(raw, "provenance") <- list(
     students = bind_rows(students, programs, degrees) %>%
       distinct(student_id, fixture_student_id, synthetic_cohort, fixture_source),

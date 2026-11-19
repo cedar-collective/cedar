@@ -85,7 +85,6 @@ if (is_docker()) {
 #   - cedar_student_terms.qs - One row per student-term: enrolled, returned (ADR-001)
 #   - cedar_programs.qs    - Program enrollments
 #   - cedar_degrees.qs     - Degrees awarded
-#   - cedar_faculty.qs     - Faculty data
 #
 # data_objects Structure (what cones expect):
 #   data_objects[["cedar_sections"]]  - Course sections
@@ -93,7 +92,6 @@ if (is_docker()) {
 #   data_objects[["cedar_student_terms"]] - One row per student-term (enrolled, returned)
 #   data_objects[["cedar_programs"]]  - Program enrollments
 #   data_objects[["cedar_degrees"]]   - Degrees awarded
-#   data_objects[["cedar_faculty"]]   - Faculty data
 #   data_objects[["cedar_dims"]]      - The mapping files as dimension tables (units, colleges, subjects, programs), built at load
 #
 # Note: Runtime code should use the CEDAR table names above. Short aliases are
@@ -106,7 +104,6 @@ cedar_files <- list(
   cedar_registrations = cedar_table_file("cedar_registrations"),
   cedar_programs   = "cedar_programs",
   cedar_degrees    = "cedar_degrees",
-  cedar_faculty    = "cedar_faculty",
   cedar_student_terms = "cedar_student_terms", # One row per student-term: enrolled, returned (ADR-001 step 2)
   cedar_applicants = "cedar_applicants"  # Admissions data — used for course impact covariate matching
 )
@@ -203,7 +200,7 @@ for (key in names(cedar_files)) {
 #
 # Trim first (cedar_min_term, set in shiny_config.R): rows that go are never
 # attached, so the attach's transient copy is of the rows the app keeps.
-for (.key in c("cedar_sections", "cedar_registrations", "cedar_student_terms", "cedar_faculty", "cedar_degrees", "cedar_programs")) {
+for (.key in c("cedar_sections", "cedar_registrations", "cedar_student_terms", "cedar_degrees", "cedar_programs")) {
   if (!is.null(data_objects[[.key]]) && "term" %in% names(data_objects[[.key]])) {
     .n_before <- nrow(data_objects[[.key]])
     data_objects[[.key]] <- dplyr::filter(data_objects[[.key]], term >= cedar_min_term)
@@ -263,7 +260,6 @@ validation_specs <- list(
   cedar_registrations = c("student_id", "term", "department", "final_grade", "credits", "subject_code", "level", "instructor_id", "part_term"),
   cedar_programs = c("term", "student_level", "program_type", "program_name", "dept_code", "student_college", "student_campus"),
   cedar_degrees = c("term", "degree", "major_code"),
-  cedar_faculty = c("term", "instructor_id", "department", "job_category"),
   cedar_student_terms = c("student_id", "term", "enrolled", "returned_next_regular_term", "return_observable",
                           # the credit position every Pathways credit axis reads
                           "cumulative_attempted_unm_credits", "cumulative_completed_unm_credits",
@@ -355,17 +351,14 @@ cedar_programs_hash <- cedar_cache_object_hash(
 cedar_degrees_hash <- cedar_cache_object_hash(
   data_objects[["cedar_degrees"]], cedar_source_fingerprints[["cedar_degrees"]]
 )
-cedar_faculty_hash <- cedar_cache_object_hash(
-  data_objects[["cedar_faculty"]], cedar_source_fingerprints[["cedar_faculty"]]
-)
 # Dept Trends uses content hashes, prepared once so individual tab requests
 # never rescan source tables or invalidate just because a file was rewritten.
 cedar_dept_source_hashes <- hash_dept_cache_sources(data_objects)
 message(sprintf(
   paste0("[global.R] Cache hashes: students=%s sections=%s programs=%s ",
-         "degrees=%s faculty=%s"),
+         "degrees=%s"),
   cedar_registrations_hash, cedar_sections_hash, cedar_programs_hash,
-  cedar_degrees_hash, cedar_faculty_hash
+  cedar_degrees_hash
 ))
 
 message("[global.R] Data objects ready:")
@@ -374,7 +367,6 @@ message("  - cedar_registrations: ", nrow(data_objects[["cedar_registrations"]])
 message("  - cedar_student_terms: ", nrow(data_objects[["cedar_student_terms"]]), " rows")
 message("  - cedar_programs: ", nrow(data_objects[["cedar_programs"]]), " rows")
 message("  - cedar_degrees: ", nrow(data_objects[["cedar_degrees"]]), " rows")
-message("  - cedar_faculty: ", nrow(data_objects[["cedar_faculty"]]), " rows")
 } # end data loading for docker
 
 # ── The measure tables (ADR-001 step 6): built by the transform, loaded here ──
@@ -499,18 +491,9 @@ if (!is.null(data_objects[["cedar_degrees"]]) && nrow(data_objects[["cedar_degre
   cedar_data_summary$degrees_term_dates <- list()
 }
 
-# Faculty
-if (!is.null(data_objects[["cedar_faculty"]]) && nrow(data_objects[["cedar_faculty"]]) > 0) {
-  cedar_data_summary$faculty_count      <- nrow(data_objects[["cedar_faculty"]])
-  cedar_data_summary$faculty_term_dates <- .term_dates(data_objects[["cedar_faculty"]])
-} else {
-  cedar_data_summary$faculty_count      <- 0L
-  cedar_data_summary$faculty_term_dates <- list()
-}
-
 # Determine display terms: next + current + prev 2 non-summer + relevant summers
 all_data_terms <- unique(unlist(lapply(
-  c("cedar_sections","cedar_registrations","cedar_programs","cedar_degrees","cedar_faculty"),
+  c("cedar_sections","cedar_registrations","cedar_programs","cedar_degrees"),
   function(k) if (!is.null(data_objects[[k]])) data_objects[[k]][["term"]] else integer(0)
 )))
 cedar_data_summary$display_terms <- .select_display_terms(all_data_terms, cedar_current_term)

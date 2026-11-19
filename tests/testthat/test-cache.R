@@ -246,7 +246,6 @@ test_that("Dept Trends invalidates only tabs that consume the changed source", {
     # The Course Demand tab's student donuts read each seat's major and class
     # standing off the student-term table too (ADR-001 step 5).
     cedar_student_terms = c("enrl", "ch"),
-    cedar_faculty = character(0),
     # Credit Hours reads late drops' credit values from sections (3.0.0).
     cedar_sections = c("enrl", "ch"),
     # A mapping edit reaches the key through the unit columns attach_unit()

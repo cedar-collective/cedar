@@ -29,9 +29,8 @@ a course-count condition over an elective pool, a permission condition, a
 mixed-level choice set). Their URLs point at `example.edu`; their schedules are
 worked by hand in `tests/testthat/test-degree-explorer.R`, which reads these
 files as its fixture. Change a row there and update that test's header with it.
-The three text maps (`program_names.csv`, `program_name_aliases.csv`,
-`source_organizations.csv`) are headers only: the fixtures carry codes, and the
-demo parses no HR report.
+The two text maps (`program_names.csv`, `program_name_aliases.csv`) are
+headers only: the fixtures carry codes.
 
 `code_history.csv` records the RN01 fixtures' successions (`SOC` to `SOCI`,
 `SOCI 250` to `SOCI 2315`, `HIST 320` to `HIST 3201`) and one proposed row

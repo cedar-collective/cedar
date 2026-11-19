@@ -103,7 +103,7 @@ What each branch, cone and feature is for is listed in the
 ## CEDAR Data Model
 
 CEDAR's tables are facts (sections, class lists, program declarations,
-degrees, faculty, grades), dimensions built from the institution's mapping
+degrees, grades), dimensions built from the institution's mapping
 files (units, colleges, subjects, programs, courses, terms) and measure tables
 computed once under the canonical definitions (student-terms, course-terms).
 [Data Model](data-model.html) has every table and column;
