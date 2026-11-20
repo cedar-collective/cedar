@@ -360,3 +360,10 @@ Ideas not yet given a theme or an order. Add freely; triage moves an item into
 a theme above, into `ISSUES.md` if it is a fix to something that exists, or
 deletes it.
 
+- **A course's entering students, years on** (from the 2026-11-20 Downstream audit). For the first-term students who took a course: return a year later, second-year GPA and graduation in four years, against similar students of the same entering class, with the alike check. Against Non-Takers reads one semester ahead only, so it cannot answer "does this course raise graduation?".
+- **Placement scores in the admissions table.** A course students are placed into (developmental math, reading) cannot be compared like for like without the score that placed them: matched on high-school GPA, its students still start well behind. With the score, compare students just either side of the cut.
+- **An entering-type choice on Retention's entering classes**: first-time students, transfer students, with or without high-school students taking college courses. The cone takes the filter; the page does not offer it.
+- **The intended next course, authored.** Next Courses opens on the most-taken later course, which for a developmental course is not its sequel. A small file naming each course's intended sequel would set the default.
+- **One sub-tab for the later course.** Next Courses and Prepared for It read the same later course from two sides; combining them is proposed, not decided.
+- **Prepared for It on the same footing as Against Non-Takers** ([M60](ISSUES.md)): the same matching cells and the same check of the matching.
+
