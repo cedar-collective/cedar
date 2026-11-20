@@ -339,7 +339,11 @@ pathways_population_choice_lists <- function(programs, dims,
 
   rows <- programs[programs$program_type %in% c("Major", "Second Major"), , drop = FALSE]
   declared <- rows$major_code[!rows$is_pre_major]
-  program_choices <- program_choices(declared, dims, successions)
+  # Labelled with each program's degrees, campuses and years, so programs that
+  # share a name can be told apart. First majors only: a second major's row
+  # carries the student's primary program's degree.
+  program_choices <- program_choices(declared, dims, successions,
+                                     profile = rows[!rows$is_pre_major & rows$program_type == "Major", , drop = FALSE])
 
   depts <- sort(unique(stats::na.omit(rows$dept_code[!rows$is_pre_major])))
   depts <- depts[nzchar(depts)]

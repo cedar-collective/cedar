@@ -193,7 +193,11 @@ headcount_filter_choices <- function(programs, dims, opt = list()) {
                                    !is.na(program_name), nzchar(program_name)))
 
   list(
-    major = program_choices(majors$major_code, dims, successions),
+    # A major's label says its degrees, campuses and years, read from first
+    # majors (a second major's or a minor's row carries the student's primary
+    # program's degree, so minors are labelled by name and codes alone).
+    major = program_choices(majors$major_code, dims, successions,
+                            profile = majors[majors$program_type == "Major", , drop = FALSE]),
     minor = program_choices(minors$major_code, dims, successions),
     concentration = sort(unique(concentrations$program_name))
   )

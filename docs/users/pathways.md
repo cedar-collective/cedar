@@ -27,7 +27,7 @@ Use the filter stripe at the top of the tab, then click **Define Population**.
 | Control | What it does |
 |---|---|
 | **Select population by** | Choose majors, a department, a preset major group, or demographic criteria. |
-| **Majors / Department / Major Group / Demographics** | Defines the starting population. Each major is one major code (History is `HIST` at every degree), shown with its catalog name and code; a program that was renamed is one choice listing both codes (Liberal Arts & Integrative Studies: LAIS, LIBA). Two programs that share a name, such as a B.A. and a B.S. or an online version, are separate choices. A department means the programs it owns. |
+| **Majors / Department / Major Group / Demographics** | Defines the starting population. Each major is one major code (History is `HIST` at every degree), shown with its catalog name and code; a program that was renamed is one choice listing both codes (Liberal Arts & Integrative Studies: LAIS, LIBA). Two programs that share a name, such as a B.A. and a B.S. or an online version, are separate choices. To tell them apart, each choice also lists the degrees its students declared, their home campuses and the years it was declared: "Nursing (NUR) · Doctor of Philosophy · ABQ · 2018–2026" is not the Nursing B.S. A department means the programs it owns. |
 | **Population scope** | For major, department, and preset populations, choose declared majors only, declared + pre-major, or pre-major only. |
 | **Level** | Limits the population to undergraduate, graduate, or all levels. |
 | **Campus** | Limits the population by student campus. |
