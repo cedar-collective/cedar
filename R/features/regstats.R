@@ -467,7 +467,7 @@ attach_regstats_former_codes <- function(flagged, students, courses) {
 regstats_course_context <- function(flagged, regstats, sat) {
   keys <- c("campus", "college", "subject_course", "part_term", "term")
   raised <- dplyr::bind_rows(lapply(
-    c("bumps", "dips", "waits", "early_drops", "late_drops", "sat"),
+    c("bumps", "dips", "waits", "waits_by_course", "early_drops", "late_drops", "sat"),
     function(nm) {
       df <- flagged[[nm]]
       if (is.null(df) || nrow(df) == 0) return(NULL)
@@ -549,7 +549,8 @@ regstats_course_key_info <- function(flagged) {
 #'     \item \code{late_drops} - Courses with unusually high late drops
 #'     \item \code{dips} - Courses with unusually low enrollment
 #'     \item \code{bumps} - Courses with unusually high enrollment
-#'     \item \code{waits} - Courses with significant waitlists
+#'     \item \code{waits} - Courses with significant waitlists, one row per course title (the Waitlists grain)
+#'     \item \code{waits_by_course} - The same waiting students by course, each counted once: one row per campus, college, course, part of term and term
 #'     \item \code{running_hot_sat} - "Running hot" courses: fill above their own prior pattern by the configured SD band
 #'     \item \code{chronic_sat} - "Chronically full" courses: above the selected fill ceiling for the required number of prior same-type terms
 #'     \item \code{all_flagged_courses} - Character vector of all flagged course identifiers
@@ -959,6 +960,15 @@ flagged[["bumps"]] <- bumps %>% arrange(across(all_of(std_arrange_cols)))
     dplyr::filter(waiting >= thresholds[["min_wait"]]) %>%
     dplyr::arrange(dplyr::desc(waiting))
   flagged[["waits"]] <- waits
+  # The same waiting students by course: `waits` is at the Waitlists grain,
+  # one row per title, so a topics course with two titles has two rows and a
+  # student waiting for both is in each. The watch reads one row per course
+  # (features/registration-watch.R), each student once (ISSUES I71).
+  wait_course_cols <- setdiff(wait_group_cols, "course_title")
+  flagged[["waits_by_course"]] <- get_true_waitlisted_rows(wait_scoped_students) %>%
+    summarize_waitlist_demand(wait_course_cols, count_name = "waiting") %>%
+    dplyr::filter(waiting >= thresholds[["min_wait"]]) %>%
+    dplyr::arrange(dplyr::desc(waiting))
   
   
   ##### CAPACITY SATURATION (replaces squeeze)

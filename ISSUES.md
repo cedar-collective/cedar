@@ -60,6 +60,7 @@ Kept until the next release, so a recurrence is recognisable; each entry below g
 
 | ID | Kind | Summary |
 |---|---|---|
+| [I71](#i71--regstats-worth-a-look-stops-on-a-topics-course-waitlisted-under-two-titles) | Defect | Regstats' "Worth a look" could not be built for a term in which a topics course had waitlisted students under two titles: the waitlist screen has a row per title and the watch reads one row per course. The watch now reads `waits_by_course`, each student once (resolved 2026-11-20) |
 | [I70](#i70--production-mrgather-crashes-instead-of-retrying-a-failed-download) | Defect | Production mrgather crashed instead of retrying a failed download: its image called `tracker.recordReportFetchError()`, which the server's `reportTracker.js` lacked, so on 2026-11-13 one failed Academic Studies download ended the fetch and that day's class list was never pulled. The server's image was rebuilt from its own with only the current `reportTracker.js` added, keeping its Chrome (resolved 2026-11-20) |
 | [I69](#i69--the-nightly-dept-dashboard-warm-failed-every-department-since-the-measure-tables) | Defect | The refresh's Dept Dashboard warm failed every department every night from 2026-11-08: the script loaded its own tables and never the measure tables the Registration flags read, so chairs' dashboards were built on first visit. Every loader now reads the measure tables and computes the cache hashes through one function each (resolved 2026-11-19) |
 | [I66](#i66--opening-a-downstream-subtab-reruns-the-analysis-at-a-glance-already-ran) | Defect | Opening Against Non-Takers, Next Courses or Prepared for It after At a Glance ran each analysis again, and Coming Back ran twice on opening: a run key held the subtab's Update button value, which Shiny reports as a classed 0 once the button renders and `identical()` holds different from the 0 used before it did. The keys read `cedar_click_count()` (resolved 2026-11-19) |
@@ -102,6 +103,32 @@ Kept until the next release, so a recurrence is recognisable; each entry below g
 ---
 
 # Defects
+
+## I71 — Regstats "Worth a look" stops on a topics course waitlisted under two titles
+
+**Status:** resolved 2026-11-20.
+**Found:** 2026-11-19, running Regstats for Spring 2027.
+**Severity:** moderate: the whole "Worth a look" list is replaced by an error
+for the term; the screens' own tables still render.
+**Cause:** `get_reg_stats()` counts waitlist demand at the Waitlists grain,
+which includes `course_title`, so a topics course with waiting students under
+two titles has two `waits` rows. `build_registration_watch()` keys every
+screen on term, campus, college, course and part of term and stops on a
+repeated key.
+**Evidence:** the page showed "Worth a look could not be built:
+[registration-watch.R] flagged$waits repeats a term, campus, college, course
+and part of term" for an Honors topics course on ABQ.
+**Reproduction:** `watch_topic_regstats` (`fixtures/scenario_tables.R`): three
+students wait for SOCI 104, one of them under both of two titles.
+`build_registration_watch()` over it stopped with the message above.
+**Fix:** `get_reg_stats()` also returns `waits_by_course`, the same true
+waitlist rows counted by course with each student once, and the watch reads
+that. Summing the titled rows would count a student waiting for two titles
+twice. `cedar_regstats_cache_version` 10 so a saved run without the table is
+recomputed. A student registered in one title and waiting for another is
+still waiting, as on Waitlists.
+**Guard:** `test-registration-watch.R`, "a topics course waiting under two
+titles is one watch row, each student once".
 
 ## I70 — Production mrgather crashes instead of retrying a failed download
 
