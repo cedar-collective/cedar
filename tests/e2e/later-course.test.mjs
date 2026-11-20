@@ -54,7 +54,7 @@ try {
     const note = document.querySelector('[data-definition-id="downstream-outcomes"]');
     return note ? note.getAttribute('data-definition-version') : null;
   });
-  ok(definition === '1.0.0', 'the tab carries the downstream-outcomes definition v1');
+  ok(definition === '1.1.0', 'the tab carries the current downstream-outcomes definition');
 
   const opening = await waitFor(page, () =>
     ($('#cr_later-course_y_next')[0]?.selectize?.getValue() || []).length > 0,
