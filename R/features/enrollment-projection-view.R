@@ -1057,6 +1057,67 @@ projection_pressure_bump_summary <- function(projections, share) {
 }
 
 
+# How the pressure bump would have done on past forecasts, and one sentence
+# saying so: the published past forecasts' total against what registered,
+# with and without the bump's share added to the courses known to have been
+# near full the year before. Arithmetic over the saved aftcasts, never a
+# refit. It replays the bump's share only: the rule proper asks for near full
+# in every recent same-season term and adds the students left waiting when
+# that is more, neither of which a past forecast carries, and the sentence
+# says which courses got the share. Bundle-wide, like the track record.
+projection_pressure_bump_record <- function(backtests, share) {
+  if (!is.numeric(share) || length(share) != 1L || !is.finite(share)) {
+    stop("[enrollment-projection-view.R] The bundle's model_config has no ",
+         "pressure_bump_share.", call. = FALSE)
+  }
+  none <- list(n_folds = 0L, n_near_full = 0L, forecast_gap = NA_real_, plan_gap = NA_real_,
+               forecast_miss = NA_real_, plan_miss = NA_real_, sentence = "")
+  if (nrow(backtests) == 0L) return(none)
+  projection_require_columns(
+    backtests,
+    c("policy_selected", "projected_classlist_total", "actual_classlist_total",
+      "fold_prior_near_full"),
+    "projection_pressure_bump_record()"
+  )
+  past <- backtests %>%
+    dplyr::filter(policy_selected %in% TRUE, is.finite(projected_classlist_total),
+                  is.finite(actual_classlist_total), actual_classlist_total > 0)
+  near_full <- past$fold_prior_near_full %in% TRUE
+  if (nrow(past) == 0L || !any(near_full)) return(none)
+  actual <- past$actual_classlist_total
+  forecast <- past$projected_classlist_total
+  plan <- forecast * ifelse(near_full, 1 + share, 1)
+  gap <- function(x) sum(x) / sum(actual) - 1
+  miss <- function(x) sum(abs(x - actual)) / sum(actual)
+  side <- function(x) {
+    if (abs(x) < 0.0005) return("the same as what registered")
+    paste0(scales::percent(abs(x), accuracy = 0.1), if (x < 0) " below" else " above",
+           " what registered")
+  }
+  pct <- scales::percent(share, accuracy = 1)
+  list(
+    n_folds = nrow(past), n_near_full = sum(near_full),
+    forecast_gap = gap(forecast), plan_gap = gap(plan),
+    forecast_miss = miss(forecast), plan_miss = miss(plan),
+    sentence = paste0(
+      "Tried on the ", format(nrow(past), big.mark = ","), " past forecasts: last year's ",
+      "registrations alone added up to ", side(gap(forecast)), ". With ", pct,
+      " added to the ", format(sum(near_full), big.mark = ","),
+      " whose course was near full the year before, the total came to ", side(gap(plan)),
+      ". The typical miss for a course ",
+      if (abs(miss(plan) - miss(forecast)) < 0.005) {
+        paste0("stayed about the same (", scales::percent(miss(forecast), accuracy = 0.1),
+               " without it, ", scales::percent(miss(plan), accuracy = 0.1),
+               " with it): the ", pct, " moves the total, not any one course's number.")
+      } else {
+        paste0("went from ", scales::percent(miss(forecast), accuracy = 0.1), " to ",
+               scales::percent(miss(plan), accuracy = 0.1), ".")
+      }
+    )
+  )
+}
+
+
 # What the plan's feeder adjustment moves across the rows shown, and one
 # sentence saying so: how many plans it raised and lowered and by how much,
 # or why it moved none. `line` and `seasons` are the bundle's
@@ -1335,6 +1396,9 @@ enrollment_projection_attempts_ledger <- function() {
     "A 5% planning allowance for a course near full every recent year",
     "Changes the plan, never the forecast. 5% is the typical waiting backlog; it stays flat until waitlists can measure it per course.",
     "In the plan",
+    "Size the planning allowance by last year's growth in total enrollment",
+    "Within a point of the flat 5% on past forecasts, for the total and for the typical miss; growth is steady from year to year while a course's change is not. Adding growth on top of the 5% ran high.",
+    "Dropped",
     "Average two or more past years, or a damped trend",
     "No closer than last year alone on the same terms; a trend chased the schedule.",
     "Dropped",
@@ -2132,6 +2196,10 @@ build_enrollment_projection_view <- function(bundle, opt = list()) {
       undated_terms = projection_undated_history_terms(history),
       pressure_bump = projection_pressure_bump_summary(
         projections, bundle$model_config$pressure_bump_share
+      ),
+      # Bundle-wide: how the bump's share would have done on past forecasts.
+      pressure_bump_record = projection_pressure_bump_record(
+        bundle$backtests, bundle$model_config$pressure_bump_share
       ),
       plan_feeder = projection_plan_feeder_summary(
         projections, bundle$model_config$plan_feeder_change,
