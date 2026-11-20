@@ -67,3 +67,23 @@ test_that("get_course_band_dfw() stops without its edge, its columns or a known 
   expect_error(get_course_band_dfw(bd01$attempts, bd01$student_terms, list(data_edges = bd01$edges, term = 201980L)),
                "no graded attempt")
 })
+
+test_that("BD01: the page's lists, their count by chance and the sentence", {
+  opt <- list(term_type = "fall", campus = "ABQ", data_edges = bd01$edges)
+  r <- retention_dashboard_band_courses(bd01$attempts, bd01$student_terms, NULL, opt)
+  expect_equal(r$harder$subject_course, "GATE 101")
+  expect_equal(r$easier$subject_course, "OTHR 200")
+  # 30 attempts at a 30-point gap: 9 more DFWs than at the other students' excess.
+  expect_equal(r$harder$excess_dfw, 9)
+  expect_equal(r$meta$n_by_chance, 2 * stats::pnorm(-2))
+  # The latest two falls only: 20 attempts a side, under the guard.
+  two <- retention_dashboard_band_courses(bd01$attempts, bd01$student_terms, NULL, c(opt, list(band_terms = 2L)))
+  expect_equal(two$meta$terms, c(202180L, 202280L))
+  expect_equal(two$meta$n_courses, 0L)
+  hs <- retention_dashboard_band_courses(bd01$attempts, bd01$student_terms, bd01$applicants,
+                                         c(opt, list(band_by = "hs", min_n = 3L)))
+  testthat::local_edition(3)
+  expect_snapshot(cat(retention_band_sentence(r), retention_band_sentence(two), retention_band_sentence(hs), sep = "\n"))
+  expect_error(retention_dashboard_band_courses(bd01$attempts, bd01$student_terms, NULL,
+                                                list(term_type = "spring", data_edges = bd01$edges)), "no graded spring")
+})
