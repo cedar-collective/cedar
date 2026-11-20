@@ -48,3 +48,22 @@ test_that("a row that merges nothing, a title merged twice, or a chain of merges
   blank$topic[2] <- ""
   expect_error(validate_topic_titles(blank), "blank topic")
 })
+
+test_that("a topics title opens with one of the institution's labels", {
+  # UNM's settings.csv names "T:" and "ST:" (special topics).
+  expect_identical(CEDAR_TOPICS_TITLE_LABELS, c("T:", "ST:"))
+  expect_identical(
+    is_topics_course(c("T: Water History", " ST: Surveillance & Resistance", "Sem: Proseminar",
+                       "Statistics", "FIRST: Steps", NA)),
+    c(TRUE, TRUE, FALSE, FALSE, FALSE, FALSE)
+  )
+  # No label, no topics course; the labels are the caller's to replace.
+  expect_false(is_topics_course("T: Water History", labels = character(0)))
+  expect_true(is_topics_course("Sel T: Poetry", labels = "Sel T:"))
+})
+
+test_that("settings.csv topics labels each end in a colon", {
+  files <- cedar_institution_files
+  files$settings$value[files$settings$setting == "topics_title_labels"] <- "T|ST:"
+  expect_error(validate_mapping_files(files), "topics_title_labels must be title labels")
+})

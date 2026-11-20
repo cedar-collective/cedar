@@ -55,7 +55,7 @@ load_file <- function(path, ext) {
 # the app starts, and the derived tables after it. A transform edit that
 # leaves the stored tables alone bumps nothing and costs a deploy nothing. A
 # saved file with no stamp predates stamping (2026-11-11) and is rebuilt once.
-CEDAR_FACT_SCHEMA_VERSIONS <- c(sections = 2L, registrations = 1L, programs = 1L, degrees = 1L)
+CEDAR_FACT_SCHEMA_VERSIONS <- c(sections = 3L, registrations = 1L, programs = 1L, degrees = 1L)
 
 # The transform stage (`--tables`) that builds each fact table.
 CEDAR_FACT_TABLE_STAGES <- c(sections = "sections", registrations = "students",
@@ -447,9 +447,10 @@ transform_sections <- function(desrs, data_dir, ext, maps) {
   cedar_sections <- cedar_sections %>%
     mutate(course_title = iconv(course_title, from = "UTF-8", to = "UTF-8", sub = "?"))
 
-  # is_topics: TRUE if course_title begins with "T:" (Banner convention for rotating-topics slots).
+  # is_topics: the title opens with one of the institution's topics labels
+  # (settings.csv topics_title_labels; is_topics_course()).
   cedar_sections <- cedar_sections %>%
-    mutate(is_topics = grepl("^T:", trimws(course_title)))
+    mutate(is_topics = is_topics_course(course_title))
 
   # Deduplicate: DESR source has one row per crosslist partner; collapse to one row per section.
   n_before_dedup <- nrow(cedar_sections)

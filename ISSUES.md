@@ -60,6 +60,7 @@ Kept until the next release, so a recurrence is recognisable; each entry below g
 
 | ID | Kind | Summary |
 |---|---|---|
+| [I73](#i73--special-topics-st-titles-were-not-treated-as-topics-courses) | Defect | A topics course was recognised only by a title opening "T:"; "ST:" (special topics) sections were stored as ordinary courses, so their history, trends and dashboard cards mixed unrelated topics. The labels are now an institution setting read by one function (resolved 2026-11-20) |
 | [I72](#i72--the-enrollment-table-counted-a-crosslisted-offering-by-its-home-listing-alone) | Defect | The Enrollment table showed a crosslisted offering once, on its home row, with class-list counts (first day, census, final) for the home listing's students only, while the schedule's combined total beside it counted every listing. The home row now counts the whole offering, each student once (resolved 2026-11-20) |
 | [I71](#i71--regstats-worth-a-look-stops-on-a-topics-course-waitlisted-under-two-titles) | Defect | Regstats' "Worth a look" could not be built for a term in which a topics course had waitlisted students under two titles: the waitlist screen has a row per title and the watch reads one row per course. The watch now reads `waits_by_course`, each student once (resolved 2026-11-20) |
 | [I70](#i70--production-mrgather-crashes-instead-of-retrying-a-failed-download) | Defect | Production mrgather crashed instead of retrying a failed download: its image called `tracker.recordReportFetchError()`, which the server's `reportTracker.js` lacked, so on 2026-11-13 one failed Academic Studies download ended the fetch and that day's class list was never pulled. The server's image was rebuilt from its own with only the current `reportTracker.js` added, keeping its Chrome (resolved 2026-11-20) |
@@ -104,6 +105,23 @@ Kept until the next release, so a recurrence is recognisable; each entry below g
 ---
 
 # Defects
+
+## I73 — Special topics ("ST:") titles were not treated as topics courses
+
+**Status:** resolved 2026-11-20.
+**Found:** 2026-11-20, by a reader, on a class crosslisted under "T:" and
+"ST:" titles.
+**Severity:** moderate: a special-topics number's sections under different
+titles were read as one course, so a topic's low-enrollment history, its
+enrollment trend and the dashboard's topics cards mixed unrelated topics.
+**Cause:** the test was the literal `^T:`, written in the transform
+(`is_topics`) and in four readers.
+**Evidence:** sections whose title opens "ST:" carried `is_topics = FALSE`.
+**Fix:** `settings.csv` `topics_title_labels` (UNM: `T:|ST:`) and one test,
+`is_topics_course()` (`R/lists/topic_titles.R`), called by the transform and
+every reader. `CEDAR_FACT_SCHEMA_VERSIONS` sections 3.
+**Guard:** `test-topic-titles.R`. Other labels that may mark topics ("Sel
+T:", "Adv T:") are not on the list until someone confirms them.
 
 ## I72 — The Enrollment table counted a crosslisted offering by its home listing alone
 

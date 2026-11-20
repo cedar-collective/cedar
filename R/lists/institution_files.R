@@ -122,8 +122,12 @@ CEDAR_REQUIRED_SETTINGS <- c("mapping_files_url", "source_files_url")
 #   intersession_parts_of_term: `|`-separated part-of-term codes for sessions
 #   that run after a term's regular sessions (UNM's December intersession,
 #   INT). Enrollment projections leave them out. Without it, none are.
+#   topics_title_labels: `|`-separated labels a section title opens with when
+#   the course number is a topics slot, taught under a different title each
+#   time (UNM's "T:" and "ST:", special topics). Each ends in a colon. Read by
+#   is_topics_course(); without it, no title marks a topics course.
 CEDAR_OPTIONAL_SETTINGS <- c("source_values_without_college", "projection_history_start_term",
-                             "intersession_parts_of_term")
+                             "intersession_parts_of_term", "topics_title_labels")
 
 CEDAR_UNIT_KINDS <- c("department", "program", "college")
 # Course levels as cedar_sections$level records them.
@@ -710,6 +714,12 @@ validate_mapping_files <- function(files) {
   if (length(parts) == 1 && !grepl("^[A-Za-z0-9]+(\\|[A-Za-z0-9]+)*$", parts)) {
     problems <- c(problems, paste0("settings.csv: intersession_parts_of_term must be part-of-term ",
                                    "codes separated by |, got ", parts))
+  }
+
+  labels <- files$settings$value[files$settings$setting == "topics_title_labels"]
+  if (length(labels) == 1 && !grepl("^[^|:]+:(\\|[^|:]+:)*$", labels)) {
+    problems <- c(problems, paste0("settings.csv: topics_title_labels must be title labels, each ",
+                                   "ending in a colon, separated by |, got ", labels))
   }
 
   if (length(problems)) {

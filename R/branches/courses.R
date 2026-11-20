@@ -565,7 +565,7 @@ detect_course_renamings <- function(sections, students, files) {
     students %>% dplyr::count(subject_course, term, course_title, name = "n_rows")
   ) %>%
     dplyr::inner_join(resolved[c("subject_course", "course_id")], by = "subject_course") %>%
-    dplyr::filter(!is.na(course_title), nzchar(trimws(course_title)), !grepl("^T:", trimws(course_title)))
+    dplyr::filter(!is.na(course_title), nzchar(trimws(course_title)), !is_topics_course(course_title))
   window <- range(c(sections$term, students$term))
   by_course <- appearances %>%
     dplyr::group_by(course_id) %>%

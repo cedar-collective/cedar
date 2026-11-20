@@ -19,6 +19,31 @@
 #' Conc:"; the label says what kind of section it is, never which topic.
 TOPIC_TITLE_LABEL <- "^[^:]{1,12}:\\s*"
 
+#' The labels that mark a topics slot (settings.csv topics_title_labels,
+#' `|`-separated; UNM's "T:" and "ST:"), or none.
+CEDAR_TOPICS_TITLE_LABELS <- local({
+  s <- cedar_institution_files$settings
+  v <- s$value[s$setting == "topics_title_labels"]
+  if (length(v) == 1) strsplit(v, "|", fixed = TRUE)[[1]] else character(0)
+})
+
+#' Is this section title a topics slot's?
+#'
+#' A topics course is taught under a different title each time, and its title
+#' opens with one of the institution's topics labels. The one test of a title:
+#' the transform stores it as `cedar_sections$is_topics`, and a reader holding
+#' only titles (the class list, a history) calls this.
+#'
+#' @param course_title Character vector of section titles.
+#' @param labels The topics labels; the institution's by default.
+#' @return Logical vector; FALSE for an NA title.
+is_topics_course <- function(course_title, labels = CEDAR_TOPICS_TITLE_LABELS) {
+  title <- trimws(course_title)
+  hit <- rep(FALSE, length(title))
+  for (label in labels) hit <- hit | (!is.na(title) & startsWith(title, label))
+  hit
+}
+
 #' A section title without its leading section-type label
 #'
 #' @param title Character vector of section titles.
