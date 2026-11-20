@@ -205,8 +205,8 @@ retention_milestone_sentence <- function(payload) {
   class_term <- if (nrow(full) > 0L) max(full$term) else if (nrow(known) > 0L) max(known$term) else return(character(0))
   rows <- known %>% filter(term == class_term) %>% arrange(step)
   paste0("Of the ", format(rows$n_entering[[1]], big.mark = ","), " students who entered in ", fmt_term(class_term), ", ",
-         paste(sprintf("%.1f%% were enrolled %s", rows$here_pct,
-                       retention_milestone_label(rows$step, rows$target_term)), collapse = ", "), ".")
+         paste(sprintf("%.1f%% %s", rows$here_pct, retention_milestone_label(rows$step, rows$target_term)),
+               collapse = ", "), " were still enrolled or had graduated.")
 }
 
 #' The retention dashboard as text
