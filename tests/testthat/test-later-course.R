@@ -229,6 +229,16 @@ test_that("the picker lists only courses taken after X, each student once", {
                           n_students = if_else(subject_course == "PHIL 105", 99L, n_students))
   expect_equal(downstream_default_course(few_own), "PHIL 105")
   expect_equal(downstream_default_course(o[0, ]), character(0))
+  # A named sequel among the options wins over both; one not offered does not.
+  expect_equal(downstream_default_course(o, "PHIL 105"), "PHIL 105")
+  expect_equal(downstream_default_course(o, "CHEM 999"), "SPAN 201")
+  # The file names a sequel by listed code; a course with no row has none.
+  sequels <- data.frame(from_course = c("SPAN 101", "PHIL 105"), to_course = c("PHIL 105", "SPAN 201"))
+  keyed <- data.frame(course_id = c("SPAN 101", "PHIL 105", "SPAN 201"), listed_code = c("SPAN 101", "PHIL 105", "SPAN 201"))
+  expect_equal(course_sequel(sequels, "SPAN 101", keyed), "PHIL 105")
+  expect_equal(course_sequel(sequels, "SPAN 201", keyed), character(0))
+  expect_equal(course_sequel(sequels[0, ], "SPAN 101", keyed), character(0))
+  expect_error(course_sequel(sequels["from_course"], "SPAN 101", keyed), "to_course")
   # MC_A1, MC_A2, MC_A4 and MC_G1 reach it; MC_A3 goes to PHIL 105, MC_G2 stops.
   s201 <- dplyr::filter(o, subject_course == "SPAN 201")
   expect_equal(s201$n_students, 4L)

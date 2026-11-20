@@ -71,3 +71,7 @@ program_successions <- data.frame(
 )
 
 rm(.college_lu, .units, .programs, .every, .pre, .ch, .ps)
+
+# Intended sequels (course_sequels.csv): the course the curriculum means a
+# student of from_course to take next, one per course, by listed code.
+CEDAR_COURSE_SEQUELS <- validate_course_sequels(read_institution_file("course_sequels"))

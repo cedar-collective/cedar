@@ -18,6 +18,7 @@
 # One choice of later course serves two subtabs, Next Courses and Prepared
 # for It: each shows the picker (laterCoursePickerUI(id, slot)) and both
 # pickers hold the same value. It opens on downstream_default_course() (the
+# intended sequel course_sequels.csv names, else the
 # own department's most-taken sequel when enough students take it, otherwise
 # the most-taken later course of any department), so neither
 # subtab opens empty, and each view runs when its subtab is open and its
@@ -436,7 +437,8 @@ laterCourseServer <- function(id, course, campus, students, attempts, programs, 
       offered <- if (is.null(opts)) character() else opts$subject_course
       current <- chosen()
       keep <- intersect(current, c(offered, CR_ROLLUP_SENTINEL))
-      if (length(keep) == 0L) chosen(downstream_default_course(opts))
+      if (length(keep) == 0L) chosen(downstream_default_course(
+        opts, course_sequel(CEDAR_COURSE_SEQUELS, course(), attempts)))
       else if (!identical(keep, current)) chosen(keep)
     })
 
