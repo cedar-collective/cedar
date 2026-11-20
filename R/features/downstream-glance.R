@@ -127,8 +127,9 @@ DOWNSTREAM_GLANCE_STEPS <- c(
       if (alike$gap < 0) "lower" else "higher", " for takers), so this is not the course's doing alone.")),
     bars = tibble::tibble(label = c("Took it", "Similar students"), share = c(r$taker, r$similar) / 100,
                           text = .glance_pct(c(r$taker, r$similar)), reference = c(FALSE, TRUE)),
-    verdict = c(better = "Better than similar students", worse = "Worse than similar students",
-                same = "About the same as similar students", unclear = "Too few to judge")[[r$verdict]],
+    verdict = if (not_alike) "Not a like-for-like comparison" else
+      c(better = "Better than similar students", worse = "Worse than similar students",
+        same = "About the same as similar students", unclear = "Too few to judge")[[r$verdict]],
     tone = if (not_alike) NA_character_ else c(better = "better", worse = "worse", same = NA, unclear = NA)[[r$verdict]]
   )
 }

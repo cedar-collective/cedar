@@ -89,5 +89,5 @@ test_that("a gap between groups that were not alike is stated with its caveat an
   unlike <- downstream_glance("HIST 101", similar = build(ss_app_act))[[3]]
   expect_true(is.na(unlike$tone))
   testthat::local_edition(3)
-  expect_snapshot(cat(unlike$sentence))
+  expect_snapshot(cat(unlike$sentence, unlike$verdict, sep = "\n"))
 })

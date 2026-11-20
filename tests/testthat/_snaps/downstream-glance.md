@@ -8,7 +8,8 @@
 # a gap between groups that were not alike is stated with its caveat and takes no colour
 
     Code
-      cat(unlike$sentence)
+      cat(unlike$sentence, unlike$verdict, sep = "\n")
     Output
       100.0% of the 2 students who took HIST 101 came back the next semester, against 25.0% of similar students who did not take it. The two groups were not alike before the course (ACT 5.0 points lower for takers), so this is not the course's doing alone.
+      Not a like-for-like comparison
 
