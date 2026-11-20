@@ -1,7 +1,8 @@
 # get_course_similar_students() (R/cones/course-similar-students.R) and its
 # payload (R/features/course-similar-students.R): a course's takers against
 # non-takers of the same term, home campus, high-school GPA band and time
-# status.
+# status and, when asked, Pell eligibility, first-generation status and
+# credits already earned.
 #
 # Fixture: RP01 (setup.R), Freshman, ABQ, settled and graded edge 202110.
 #   202010 anchors (enrolled): BACK, DROP, FAIL, GONE, GRAD, REP, all with a
@@ -49,6 +50,46 @@ test_that("takers are read against the non-takers of their cell: return, other-c
   expect_equal(res$other_dfw_gap, 50)
   expect_equal(attr(res, "edge"), 202110L)
   expect_equal(attr(res, "cells"), c("term", "student_campus", "hs_gpa_band", "time_status"))
+})
+
+test_that("Pell eligibility and first-generation status are cells when the declarations are given", {
+  # `ss_aid`: BACK's only peer is GONE (did not return); FAIL's are DROP, GRAD
+  # and REP, of whom REP returned. Expected return (0 + 1/3) / 2.
+  res <- get_course_similar_students(ss_student_terms2, ss_attempts2, ss_app,
+                                     ss_opt(course = "HIST 101", term = 202010L), programs = ss_aid)
+  expect_equal(attr(res, "cells"), c("term", "student_campus", "hs_gpa_band", "time_status", "pell", "first_gen"))
+  expect_equal(res$n_covered, 2L)
+  expect_equal(res$return_pct, 100)
+  expect_equal(res$return_expected_pct, 100 / 6)
+  # A student-term the declarations do not describe is its own cell: with
+  # GONE's row gone, BACK has no peer and is not covered.
+  res <- get_course_similar_students(ss_student_terms2, ss_attempts2, ss_app,
+                                     ss_opt(course = "HIST 101", term = 202010L),
+                                     programs = ss_aid %>% filter(student_id != "RP_GONE"))
+  expect_equal(res$n_takers, 2L)
+  expect_equal(res$n_covered, 1L)
+  expect_equal(student_term_aid(ss_aid) %>% filter(student_id == "RP_REP") %>% pull(pell), "no")
+  expect_error(student_term_aid(ss_aid %>% select(-first_gen)), "first_gen")
+})
+
+test_that("credits already earned are a cell on request, and an invalid timeline is its own", {
+  # Stated here: BACK, DROP and REP enter 202010 with no credits, the rest with 20.
+  credits <- ss_student_terms2 %>%
+    mutate(unm_credits_entering = if_else(student_id %in% c("RP_BACK", "RP_DROP", "RP_REP"), 0, 20),
+           timeline_valid = TRUE)
+  res <- get_course_similar_students(credits, ss_attempts2, ss_app,
+                                     ss_opt(course = "HIST 101", term = 202010L, match_credits = TRUE))
+  expect_equal(attr(res, "cells"), c("term", "student_campus", "hs_gpa_band", "time_status", "credits_band"))
+  # BACK beside DROP and REP (REP returned): 1/2. FAIL beside GONE and GRAD: 0.
+  expect_equal(res$return_expected_pct, 25)
+  expect_equal(res$next_gpa_expected, 4)
+  expect_equal(res$next_gpa_n, 1L)
+  broken <- credits %>% mutate(timeline_valid = student_id != "RP_FAIL")
+  res <- get_course_similar_students(broken, ss_attempts2, ss_app,
+                                     ss_opt(course = "HIST 101", term = 202010L, match_credits = TRUE))
+  expect_equal(res$n_covered, 1L)
+  expect_error(get_course_similar_students(ss_student_terms2 %>% select(-any_of("timeline_valid")), ss_attempts2, ss_app,
+                                           ss_opt(course = "HIST 101", match_credits = TRUE)), "timeline_valid")
 })
 
 test_that("a taker's other-course DFW leaves the course itself out, and the non-takers' rate is theirs alone", {
