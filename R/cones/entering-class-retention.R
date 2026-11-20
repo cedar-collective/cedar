@@ -27,15 +27,31 @@
 #   Edge            enrollment is read to the settled edge; a target term past
 #                   it is unknown (NA), never zero.
 #
-# Who is in it: everyone new at the level, which includes transfer students
-# and, at the undergraduate level, students taking college courses while in
-# high school. `opt$classification` narrows the class to students holding one
-# of the given classifications in their entering term.
+# Who is in it: `opt$entry`.
+#   "all"         everyone new at the level, which includes transfer students
+#                 and, among undergraduates, students taking college courses
+#                 while in high school. The default.
+#   "first_time"  the standard retention cohort: students the record calls
+#                 first-time in that term (student_term_entry_type() over
+#                 `programs`), enrolled in it. A student who took college
+#                 courses in high school enters in the term the record calls
+#                 them first-time, not at their first course. A first-time
+#                 student who starts in the summer and is enrolled that fall
+#                 belongs to the fall class, as federal reporting counts
+#                 them; one who is not stays a summer entrant.
+#   "transfer"    students the record calls a new transfer in that term.
+# For the two recorded kinds the table's first term is a real class: the
+# record says who is new, so nothing is left out.
+# `opt$time_status` keeps students with one of the given time statuses in
+# their entering term (full-time, for the federal cohort).
+# `opt$classification` narrows the class to students holding one of the
+# given classifications in their entering term.
 #
 # Depends on: .build_enrolled_lookup(), .build_graduated_lookup(),
 #               .compute_retention() (branches/retention-context.R)
 #             cedar_longitudinal_edge() (branches/data-edges.R)
 #             advance_term() (branches/cedar-terms.R), get_term_type()
+#             student_term_entry_type() (branches/population.R)
 
 #' Each entering class's share still enrolled one to `n_terms` regular terms later
 #'
@@ -48,15 +64,30 @@
 #'   entering term; NULL keeps every campus), `classification` (entering-term
 #'   classifications to keep; NULL keeps all), `n_terms` (steps followed;
 #'   default 4), `min_n` (smallest entering class given a rate; default 30),
-#'   `data_edges` (`cedar_data_edges()` output, required).
+#'   `data_edges` (`cedar_data_edges()` output, required), `entry` (`"all"`,
+#'   the default, `"first_time"` or `"transfer"`: see the header; the last
+#'   two need `programs`), `time_status` (entering-term time statuses to
+#'   keep; NULL keeps all).
+#' @param programs `cedar_programs`, for `entry` other than `"all"`.
 #' @return A tibble, one row per entering `term` and `step`: `target_term`,
 #'   `n_entering`, `n_here` (NA past the edge), `here_pct` (NA past the edge
 #'   or under `min_n`). Attributes: `edge`, `first_term` (the table's first
-#'   term, left out), `n_first_term` (the students whose first row is there),
-#'   `n_terms`, `min_n`.
-get_entering_class_retention <- function(student_terms, degrees = NULL, opt = list()) {
+#'   term, left out under `entry = "all"`), `n_first_term` (the students
+#'   whose first row is there; 0 for a recorded entry kind), `entry`,
+#'   `n_summer_starts` (first-time summer starters counted in the fall
+#'   class), `n_terms`, `min_n`.
+get_entering_class_retention <- function(student_terms, degrees = NULL, opt = list(), programs = NULL) {
+  entry <- opt$entry %||% "all"
+  if (length(entry) != 1L || !entry %in% c("all", "first_time", "transfer")) {
+    stop("[entering-class-retention.R] opt$entry must be \"all\", \"first_time\" or \"transfer\".", call. = FALSE)
+  }
+  if (entry != "all" && is.null(programs)) {
+    stop("[entering-class-retention.R] programs (cedar_programs) is required for opt$entry = \"", entry,
+         "\": the record of who is new is there.", call. = FALSE)
+  }
   needed <- c("student_id", "term", "enrolled", "student_level", "student_campus",
-              if (!is.null(opt$classification)) "student_classification")
+              if (!is.null(opt$classification)) "student_classification",
+              if (!is.null(opt$time_status)) "time_status")
   missing <- setdiff(needed, names(student_terms))
   if (length(missing) > 0L) {
     stop("[entering-class-retention.R] student_terms lacks ", paste(missing, collapse = ", "), call. = FALSE)
@@ -80,16 +111,39 @@ get_entering_class_retention <- function(student_terms, degrees = NULL, opt = li
   # Each student's entering term at the level in scope: the first enrolled
   # term among that level's rows.
   at_level <- if (is.null(opt$student_level)) enrolled else enrolled %>% filter(student_level %in% opt$student_level)
-  entering <- at_level %>%
-    group_by(student_id) %>%
-    slice_min(term, n = 1L, with_ties = FALSE) %>%
-    ungroup()
-  n_first_term <- sum(entering$term == first_term)
-  entering <- entering %>% filter(term > first_term)
+  n_summer_starts <- 0L
+  if (entry == "all") {
+    entering <- at_level %>%
+      group_by(student_id) %>%
+      slice_min(term, n = 1L, with_ties = FALSE) %>%
+      ungroup()
+    n_first_term <- sum(entering$term == first_term)
+    entering <- entering %>% filter(term > first_term)
+  } else {
+    # The first enrolled term the record calls the student new in.
+    arrivals <- student_term_entry_type(programs) %>% filter(entry_type == entry)
+    entering <- at_level %>%
+      semi_join(arrivals, by = c("student_id", "term")) %>%
+      group_by(student_id) %>%
+      slice_min(term, n = 1L, with_ties = FALSE) %>%
+      ungroup()
+    n_first_term <- 0L
+    if (entry == "first_time") {
+      # A summer starter enrolled that fall is in the fall class, described
+      # by their fall row.
+      summer <- entering %>%
+        filter(get_term_type(term) == "summer") %>%
+        transmute(student_id, term = advance_term(term, 1L))
+      moved <- at_level %>% semi_join(summer, by = c("student_id", "term"))
+      n_summer_starts <- nrow(moved)
+      entering <- bind_rows(entering %>% filter(!student_id %in% moved$student_id), moved)
+    }
+  }
   if (!is.null(opt$term_type)) entering <- entering %>% filter(get_term_type(term) %in% opt$term_type)
   entering <- entering %>% filter(get_term_type(term) %in% c("fall", "spring", "summer"))
   if (!is.null(opt$campus)) entering <- entering %>% filter(student_campus %in% opt$campus)
   if (!is.null(opt$classification)) entering <- entering %>% filter(student_classification %in% opt$classification)
+  if (!is.null(opt$time_status)) entering <- entering %>% filter(time_status %in% opt$time_status)
   cedar_debug("[entering-class-retention.R] ", nrow(entering), " entering students to ", fmt_term(edge))
 
   empty <- tibble::tibble(term = integer(), step = integer(), target_term = integer(), n_entering = integer(),
@@ -113,6 +167,8 @@ get_entering_class_retention <- function(student_terms, degrees = NULL, opt = li
   attr(result, "edge") <- edge
   attr(result, "first_term") <- first_term
   attr(result, "n_first_term") <- n_first_term
+  attr(result, "entry") <- entry
+  attr(result, "n_summer_starts") <- n_summer_starts
   attr(result, "n_terms") <- n_terms
   attr(result, "min_n") <- min_n
   result

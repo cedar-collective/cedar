@@ -1910,7 +1910,8 @@ population_group_rename_successions <- data.frame(
 # by degree), 2 in Spring 2022 (A G) and 2 in Fall 2022 (A G). The Fall 2021
 # class is three: EC-F1 (to Spring 2022), EC-F2 (Fall 2021 only), EC-F3 (to
 # Fall 2022), and EC-X, a graduate student, entering at another level: 2 of 3
-# in Spring 2022, 1 of 3 in Fall 2022. Settled through Fall 2022.
+# in Spring 2022, 1 of 3 in Fall 2022. Settled through Fall 2022. EC-S (below)
+# first enrolls in Summer 2021, so by first enrolled term is a summer entrant.
 ec01 <- local({
   terms <- list(
     `EC-P` = c(201980L, 202080L),
@@ -1929,7 +1930,23 @@ ec01 <- local({
     student_id = id, term = terms[[id]], enrolled = TRUE,
     student_level = if (id == "EC-X") "GR" else "UG", student_campus = "ABQ",
     student_classification = if (id == "EC-E") "Sophomore, 2nd Yr" else "Freshman, 1st Yr, 1st Sem")))
-  list(student_terms = student_terms,
+  # Who the record calls new, in the declarations table's shape. First-time in
+  # Fall 2020: A, B, C, D (E is a new transfer, G is not called new). EC-P is
+  # called first-time in Fall 2019, the table's first term. EC-S starts in
+  # Summer 2021 and is enrolled that fall: a member of the Fall 2021 class
+  # with F1, F2 and F3, part-time where they are full-time, and gone after it.
+  # EC-N is called first-time in Fall 2021 and never enrolled.
+  student_terms <- dplyr::bind_rows(
+    student_terms %>% dplyr::mutate(time_status = "FT"),
+    tibble::tibble(student_id = "EC-S", term = c(202160L, 202180L), enrolled = TRUE, student_level = "UG",
+                   student_campus = "ABQ", student_classification = "Freshman, 1st Yr, 1st Sem", time_status = "PT"))
+  programs <- tibble::tibble(
+    student_id = c("EC-P", "EC-A", "EC-B", "EC-C", "EC-D", "EC-E", "EC-F1", "EC-F2", "EC-F3", "EC-S", "EC-N", "EC-A"),
+    term = c(201980L, rep(202080L, 5), rep(202180L, 3), 202160L, 202180L, 202110L),
+    student_population = c(rep("First Time/Beginning Freshman", 5), "New Transfer from NM Inst",
+                           rep("First Time/Beginning Freshman", 3), "Summer First Time/Beg Freshman",
+                           "First Time/Beginning Freshman", "Continuing"))
+  list(student_terms = student_terms, programs = programs,
        degrees = tibble::tibble(student_id = "EC-G", term = 202110L),
        edges = list(last_enrolled_complete = 202280L, last_graded = 202280L))
 })

@@ -395,6 +395,36 @@ classify_origin <- function(programs, candidate_ids) {
 
 
 # ---------------------------------------------------------------------------
+# student_term_entry_type
+# ---------------------------------------------------------------------------
+
+#' How each student-term's record says the student arrived: first-time or transfer
+#'
+#' Reads `student_population`, which the registrar sets in the term a student
+#' is new: a first-time student (a fall or spring beginner, or a summer one)
+#' or a new transfer. Every other term's value (continuing, readmitted,
+#' concurrent, a level change) is not an arrival and is left out.
+#'
+#' @param programs `cedar_programs`.
+#' @return A tibble of `student_id`, `term` and `entry_type` (`"first_time"`
+#'   or `"transfer"`), one row per student-term that records an arrival.
+student_term_entry_type <- function(programs) {
+  missing <- setdiff(c("student_id", "term", "student_population"), names(programs))
+  if (length(missing) > 0) {
+    stop("[population.R] student_term_entry_type: programs lacks ", paste(missing, collapse = ", "), call. = FALSE)
+  }
+  programs %>%
+    transmute(student_id, term = as.integer(term),
+              entry_type = case_when(
+                grepl("First Time.*Fresh|Beg[a-z]* Fresh", student_population, ignore.case = TRUE) ~ "first_time",
+                grepl("New Transfer", student_population, ignore.case = TRUE) ~ "transfer",
+                TRUE ~ NA_character_)) %>%
+    filter(!is.na(entry_type)) %>%
+    distinct(student_id, term, entry_type)
+}
+
+
+# ---------------------------------------------------------------------------
 # classify_entry_method
 # ---------------------------------------------------------------------------
 

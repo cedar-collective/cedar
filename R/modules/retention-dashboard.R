@@ -46,9 +46,11 @@ retentionDashboardUI <- function(id, campuses) {
       plotly::plotlyOutput(ns("overall_plot"), height = "340px")
     ),
     dashboard_section(
-      "Each Entering Class, Semesters Later",
-      "How much of each entering class is still enrolled a semester, a year and two years on?",
+      "Each Entering Class, Semester by Semester",
+      "How much of each entering class is still enrolled in its 2nd, 3rd, 4th and 5th semesters?",
       method = uiOutput(ns("method_milestones")),
+      radioButtons(ns("entry"), "Entering students", choices = RETENTION_ENTRY_CHOICES,
+                   selected = "first_time", inline = TRUE),
       uiOutput(ns("milestones_finding")),
       plotly::plotlyOutput(ns("milestones_plot"), height = "380px")
     ),
@@ -107,26 +109,54 @@ retentionDashboardUI <- function(id, campuses) {
       })))
 }
 
+# Who an entering class holds: the page's choices, and what each asks the cone
+# for. Full-time is the time status of the entering term.
+RETENTION_ENTRY_CHOICES <- c("First-time" = "first_time", "First-time, full-time" = "first_time_ft",
+                             "New transfer" = "transfer", "Everyone new at this level" = "all")
+RETENTION_ENTRY_OPTIONS <- list(
+  first_time = list(entry = "first_time", time_status = NULL),
+  first_time_ft = list(entry = "first_time", time_status = "FT"),
+  transfer = list(entry = "transfer", time_status = NULL),
+  all = list(entry = "all", time_status = NULL)
+)
+
+.retention_entry_note <- function(entry, type, n_summer_starts) {
+  switch(entry,
+    first_time = paste0(
+      "An entering class is the students the registrar's record calls first-time in that ", type,
+      " term and who were enrolled in it, by home campus that term. A student who took college courses in high school ",
+      "enters when the record calls them first-time, not at their first course. A first-time student who started in the ",
+      "summer and was enrolled that fall is in the fall class, as federal reporting counts them (",
+      .retention_n(n_summer_starts), " over these classes). The full-time choice keeps those full-time in their entering term."),
+    transfer = paste0("An entering class is the students the registrar's record calls a new transfer in that ", type,
+                      " term and who were enrolled in it, by home campus that term."),
+    all = paste0("An entering class is every student whose first enrolled term at this level was that ", type,
+                 " term, by home campus that term. It includes transfer students and, among undergraduates, students ",
+                 "taking college courses while in high school."))
+}
+
 # ── Server ───────────────────────────────────────────────────────────────────
 
 # student_terms, attempts, degrees, dims, edges   the loaded tables and edges.
 # active   reactive: TRUE while the tab is open.
-retentionDashboardServer <- function(id, student_terms, attempts, degrees, dims, edges, active) {
+retentionDashboardServer <- function(id, student_terms, attempts, degrees, programs, dims, edges, active) {
   moduleServer(id, function(input, output, session) {
     college_names <- college_code_names(dims)
     payload <- reactive({
-      req(isTRUE(active()), input$term_type, input$level)
+      req(isTRUE(active()), input$term_type, input$level, input$entry)
+      entry <- RETENTION_ENTRY_OPTIONS[[input$entry]]
       cedar_with_loading(session, session$ns("load"), report_type = "retention_dashboard", {
         tryCatch(
           build_retention_dashboard(student_terms, attempts, degrees, list(
             term_type = input$term_type, student_level = input$level,
-            campus = if (length(input$campus) > 0) input$campus else NULL, data_edges = edges)),
+            campus = if (length(input$campus) > 0) input$campus else NULL, data_edges = edges,
+            entry = entry$entry, entry_time_status = entry$time_status), programs),
           error = function(e) {
             showNotification(paste("Retention:", conditionMessage(e)), type = "error", duration = 10)
             NULL
           })
       })
-    }) |> bindCache(input$term_type, input$level, input$campus, cache = "session")
+    }) |> bindCache(input$term_type, input$level, input$campus, input$entry, cache = "session")
 
     output$overall_finding <- renderUI({
       p <- payload()
@@ -167,16 +197,17 @@ retentionDashboardServer <- function(id, student_terms, attempts, degrees, dims,
       p <- payload(); req(p, !is.null(p$milestones))
       ms <- p$milestones
       tags$ul(
-        tags$li(paste0("An entering class is every student whose first enrolled term at this level was that ",
-                       .retention_type(p), " term, by home campus that term. It includes transfer students and, among ",
-                       "undergraduates, students taking college courses while in high school.")),
+        tags$li(.retention_entry_note(attr(ms, "entry"), .retention_type(p), attr(ms, "n_summer_starts"))),
         tags$li("Still enrolled means enrolled in that later term on any campus, or awarded a degree by then. A student away one term and back the next is missing from the first and counted in the second."),
-        tags$li(paste0("Each line is one distance from entry. A semester is a fall or a spring; summer is not counted. ",
-                       "The gap between two lines is the share lost between them.")),
+        tags$li(paste0("Each line is one semester of the class's time here: the entering term is the 1st, so a year on is ",
+                       "the 3rd, the one retention is usually quoted at. A semester is a fall or a spring; summer is not ",
+                       "counted. The gap between two lines is the share lost between them.")),
         tags$li(paste0("A line stops at the last class whose later term has settled (enrollment settled through ",
-                       fmt_term(attr(ms, "edge")), "). ", fmt_term(attr(ms, "first_term")),
-                       " is the first term on record, so no one can be called new in it: ",
-                       .retention_n(attr(ms, "n_first_term")), " students first seen then are in no class. A class needs ",
+                       fmt_term(attr(ms, "edge")), "). ",
+                       if (identical(attr(ms, "entry"), "all")) paste0(
+                         fmt_term(attr(ms, "first_term")), " is the first term on record, so no one can be called new in it: ",
+                         .retention_n(attr(ms, "n_first_term")), " students first seen then are in no class. "),
+                       "A class needs ",
                        attr(ms, "min_n"), " students for a rate.")))
     })
 
