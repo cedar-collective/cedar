@@ -219,3 +219,29 @@ test_that("the app refuses a measure table that is missing, older than the class
   expect_error(load(), "--tables measures")
   expect_error(cedar_load_measure_table("cedar_sections", dir, class_list, check, "x", 1L), "not a measure table")
 })
+
+test_that("every loader reads the measure tables through load_measure_tables(), refused when stale", {
+  # global.R and the cache-warming scripts share it, so a script reads the
+  # tables the app reads (ISSUES I69: the dashboard warm read none, and failed
+  # every department nightly).
+  env <- load_transform_helpers()
+  dir <- withr::local_tempdir()
+  write_saved_fixtures(dir)
+  min_term <- min(test_students$term)
+  edges <- fixture_edges
+  fingerprint <- cedar_dims_fingerprint(test_dims)
+  suppressMessages(env$transform_measures(dir, ".qs", min_term = min_term, dims = test_dims, edges = edges))
+  loaded <- suppressMessages(load_measure_tables(test_students, dir, edges, fingerprint, min_term, ext = ".qs"))
+  expect_setequal(names(loaded), CEDAR_MEASURE_TABLES)
+  for (name in CEDAR_MEASURE_TABLES) {
+    expect_equal(nrow(loaded[[name]]), nrow(qs2::qs_read(file.path(dir, paste0(name, ".qs")))))
+  }
+
+  # A class list saved after the tables were counted is refused, with the
+  # rebuild command; so is a load with no class list.
+  Sys.setFileTime(file.path(dir, "cedar_registrations.qs"), Sys.time() + 3600)
+  expect_error(suppressMessages(load_measure_tables(test_students, dir, edges, fingerprint, min_term, ext = ".qs")),
+               "older than the class list")
+  expect_error(load_measure_tables(NULL, dir, edges, fingerprint, min_term, ext = ".qs"),
+               "the class list is not loaded")
+})

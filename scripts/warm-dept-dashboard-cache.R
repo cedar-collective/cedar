@@ -53,7 +53,7 @@ split_env <- function(name, default = character(0)) {
   trimws(strsplit(val, ",", fixed = TRUE)[[1]])
 }
 
-dashboard_source_paths <- list()
+dashboard_source_fingerprints <- list()
 resolve_data_path <- function(name) {
   preferred <- file.path(cedar_data_dir, paste0(cedar_table_file(name), get_data_extension()))
   alternate <- if (grepl("\\.qs$", preferred, ignore.case = TRUE)) {
@@ -71,21 +71,27 @@ load_table <- function(name) {
   if (is.null(tbl) || nrow(tbl) == 0) {
     stop("[warm-dept-dashboard-cache] Missing or empty table: ", name)
   }
-  dashboard_source_paths[[name]] <<- path
+  dashboard_source_fingerprints[[name]] <<- cedar_source_fingerprint(path)
   tbl
 }
 
+# Every table create_dept_dashboard_data() reads, loaded as global.R loads
+# it. The measure tables come after the edges, through load_measure_tables(),
+# as the app reads them (ISSUES I69: a script that loaded fewer tables than
+# the dashboard reads failed every department nightly).
 data_objects <- list(
   cedar_sections = load_table("cedar_sections"),
   cedar_registrations = load_table("cedar_registrations"),
-  cedar_programs = load_table("cedar_programs")
+  cedar_programs = load_table("cedar_programs"),
+  cedar_degrees = load_table("cedar_degrees"),
+  cedar_student_terms = load_table("cedar_student_terms")
 )
 
-if (exists("cedar_min_term", inherits = TRUE)) {
-  for (key in names(data_objects)) {
-    if ("term" %in% names(data_objects[[key]])) {
-      data_objects[[key]] <- dplyr::filter(data_objects[[key]], term >= cedar_min_term)
-    }
+# Trimmed to cedar_min_term as global.R trims: the measure tables are stamped
+# with it, and load_measure_tables() refuses a table built over other terms.
+for (key in names(data_objects)) {
+  if ("term" %in% names(data_objects[[key]])) {
+    data_objects[[key]] <- dplyr::filter(data_objects[[key]], term >= cedar_min_term)
   }
 }
 
@@ -109,26 +115,25 @@ data_objects[["cedar_courses"]] <- cedar_courses$courses
 data_objects[["cedar_course_codes"]] <- cedar_courses$codes
 
 # The same edges global.R computes, so the cache keys match what the app asks for.
-report_edges <- cedar_report_edges(data_objects[["cedar_registrations"]])
+report_edges <- cedar_report_edges(data_objects[["cedar_registrations"]],
+                                   degrees = data_objects[["cedar_degrees"]])
 cedar_edges <- report_edges$edges
+data_objects[["cedar_edges"]] <- cedar_edges
 cedar_graded_through <- report_edges$graded_through
 cedar_report_end_term <- report_edges$report_end_term
 cedar_report_latest_term <- report_edges$report_latest_term
 
-dashboard_cache_hash <- function(name) {
-  value <- data_objects[[name]]
-  path <- dashboard_source_paths[[name]]
-  info <- file.info(path)
-  fingerprint <- list(
-    path = normalizePath(path, mustWork = FALSE),
-    size = unname(info$size),
-    modified = as.character(info$mtime)
-  )
-  cedar_cache_object_hash(value, fingerprint)
-}
-cedar_registrations_hash <- dashboard_cache_hash("cedar_registrations")
-cedar_sections_hash <- dashboard_cache_hash("cedar_sections")
-cedar_programs_hash <- dashboard_cache_hash("cedar_programs")
+# The measure tables, checked against the class list as global.R checks them.
+cedar_dims_hash <- cedar_dims_fingerprint(cedar_dims)
+data_objects <- c(data_objects, load_measure_tables(data_objects[["cedar_registrations"]], cedar_data_dir,
+                                                   cedar_edges, cedar_dims_hash, cedar_min_term))
+
+# The source hashes global.R computes, by the same function, so each saved
+# dashboard sits under the key the app asks for.
+list2env(cedar_table_cache_hashes(data_objects, dashboard_source_fingerprints, cedar_dims_hash,
+                                  unit_tables = names(CEDAR_ATTACHED_UNIT_COLUMNS)),
+         envir = globalenv())
+cedar_dept_source_hashes <- hash_dept_cache_sources(data_objects)
 
 warm_campuses <- split_env("CEDAR_DASHBOARD_WARM_CAMPUSES", c("ABQ", "EA"))
 warm_colleges <- split_env("CEDAR_DASHBOARD_WARM_COLLEGES", c("AS", "ARTS"))
