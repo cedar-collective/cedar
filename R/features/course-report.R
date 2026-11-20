@@ -1291,13 +1291,13 @@ course_sequence_headline <- function(result) {
   smd <- result$balance$smd_table
   measured <- if (is.null(smd)) 0L else sum(!smd$balance_band %in% "unavailable")
   if (measured == 0L) {
-    verdict <- "No measured covariate could be compared, so nothing says how alike the two groups were."
+    verdict <- "Nothing known about the students beforehand could be compared, so nothing says how alike the two groups were."
   } else {
     flagged <- smd[smd$balance_band %in% "substantial", , drop = FALSE]
     if (nrow(flagged) == 0L) {
       verdict <- paste0(
-        "On the ", measured, " measured covariates the groups did not differ substantially; ",
-        "the gap is still a description of two self-selected paths, not an effect of ", result$course_x, "."
+        "On the ", measured, " things measured beforehand the groups were not far apart; ",
+        "the gap still describes two paths students chose, not what ", result$course_x, " did."
       )
     } else {
       top <- flagged[which.max(abs(flagged$smd)), , drop = FALSE]
@@ -1305,7 +1305,7 @@ course_sequence_headline <- function(result) {
       if (is.na(label)) label <- gsub("_", " ", top$covariate)
       value <- function(v) if (top$type == "binary") sprintf("%.1f%%", v) else sprintf("%.2f", v)
       verdict <- paste0(
-        "The groups differ substantially on ", nrow(flagged), " of ", measured, " measured covariates, ",
+        "The groups were far apart beforehand on ", nrow(flagged), " of the ", measured, " things measured, ",
         "most on ", label, " (", value(top$value_treatment), " against ", value(top$value_control),
         "), so the gap describes who took each path before it describes ", result$course_x, "."
       )

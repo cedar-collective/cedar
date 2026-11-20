@@ -497,8 +497,36 @@ definitions:
             functions: [get_course_persistence, next_term_persistence]
 
   - id: course-cohort-effect
-    current_version: "1.0.0"
+    current_version: "2.0.0"
     versions:
+      - version: "2.0.0"
+        title: Takers against non-takers
+        summary: Sets the students who took a course beside similar students who did not, and asks whether the takers came back the next semester, passed their other courses that semester, and earned a higher GPA the next semester. Similar means the same term, home campus, high-school GPA band and full- or part-time status. A second, simpler comparison with no matching sets the course's passers beside students who never took it, and reads that lead against the same lead for other courses.
+        population: Enrolled students of the selected classification(s) in the selected terms, by home campus, one row per student and term.
+        unit: A student in a term.
+        numerator: Takers who enrolled the next regular term; their other attempts that term not passed; their next-term GPA.
+        denominator: Takers whose return can be read; their other graded attempts that term; takers who came back and have a GPA.
+        campus: The student's home campus, not the campus that taught the course. A student who took the course on any campus is a taker.
+        time_window: Terms run to the most recent term whose enrollment has settled; grades are read through the most recent graded term. Summer is not a step.
+        exclusions: A student who dropped the course early, or has no posted grade in it, is neither a taker nor a non-taker. Takers with fewer than the minimum number of similar students are left out and counted. A group under the minimum keeps its count and shows no rate.
+        limitations:
+          - This shows who takes the course and how they fare, not what the course causes. The matching makes the two groups alike on four things only; placement, advising, major and motivation are not among them.
+          - The page checks its own matching. It runs the same comparison on ACT scores, which are not matched on and which the course cannot change. If takers and similar students differ there, they differed before the course, and every gap carries that difference. The check reads only students with a score on file.
+          - Taking almost any course goes with coming back, so a course's gap is read against the gaps of the other courses these students take, never against zero.
+          - A course students are placed into shows its placement. A course whose students started behind will look worse than it is.
+          - The unmatched comparison's benchmark is the typical course, counting a small course as much as a large one; raise the minimum to read only well-attended courses.
+          - A classification is what the record says that term, which for a branch-campus course can be mostly high-school students taking college courses.
+        guide: users/course-reports#takers-vs-non-takers
+        implementation:
+          - file: R/cones/course-similar-students.R
+            functions: [get_course_similar_students]
+          - file: R/features/course-similar-students.R
+            functions: [build_course_similar_students, course_similar_students_alike]
+          - file: R/cones/course-cohort-effect.R
+            functions: [get_course_cohort_effect]
+          - file: R/features/course-cohort-context.R
+            functions: [build_course_cohort_context, course_cohort_context_defaults]
+
       - version: "1.0.0"
         title: Takers against non-takers
         summary: Compares students who passed a course, students who got a D, an F or a withdrawal in it, and students of the same classification who never took it that term, on whether they came back the next semester and how many of their next-semester courses they did not pass. The passed group's lead over the never-took group is read against the same lead for the college's other courses.
@@ -522,8 +550,30 @@ definitions:
             functions: [build_course_cohort_context, course_cohort_context_defaults]
 
   - id: course-sequence
-    current_version: "2.0.0"
+    current_version: "3.0.0"
     versions:
+      - version: "3.0.0"
+        title: Prepared for the later course
+        summary: Among the students of a later course, compares those who had passed this course in an earlier term with those who had not, on how often each group did not pass the later course. A table under the result shows how alike the two groups were beforehand. Each measured difference is called small below 0.10 standard deviations, worth a look from 0.10 through 0.25, and large above 0.25.
+        population: Students with a first graded attempt at the later course and the records the comparison needs.
+        unit: A student, at their first graded attempt at the later course.
+        numerator: Attempts at the later course that were not passed, in each group.
+        denominator: Graded attempts at the later course in that group.
+        campus: The campuses selected for the course set which attempts at both courses are read.
+        time_window: This course must come before the later course, in an earlier term. What is known about a student is measured before the later course.
+        exclusions: Passing this course in the same term as the later course does not count as passing it first. A student missing a record the comparison needs is left out. A high-school GPA or ACT range, when set, leaves out students with no value on file.
+        limitations:
+          - Not having passed this course first does not mean never having studied it. Transfer credit, test credit and courses before the data begins are not seen.
+          - Students placed straight into the later course are usually stronger than students who needed this course first. A higher failure rate for those who passed this course first often shows that, not the course.
+          - The small, worth-a-look and large bands describe measured differences only. They do not make the groups alike, do not adjust the result, and say nothing about differences that are not measured.
+          - Keeping both groups inside one high-school GPA range tests how much the result depends on preparation. It is not a correction for every other difference.
+        guide: users/course-reports#course-sequence
+        implementation:
+          - file: R/cones/course-sequence-effect.R
+            functions: [get_course_sequence_effect]
+          - file: R/branches/comparison.R
+            functions: [build_comparison, classify_smd_balance, summarize_smd_balance, compute_balance]
+
       - version: "2.0.0"
         title: Course sequence comparison
         summary: Compares outcomes in course Y between students who passed course X in an earlier term and students with no observed prior pass in X. Balance diagnostics classify measured standardized differences as small below 0.10, review from 0.10 through 0.25, or substantial above 0.25.
@@ -565,8 +615,35 @@ definitions:
             functions: [get_course_sequence_effect]
 
   - id: downstream-outcomes
-    current_version: "1.0.0"
+    current_version: "1.1.0"
     versions:
+      - version: "1.1.0"
+        title: Going on to a later course
+        summary: Of the students who took a course, how many took a chosen later course within a set number of regular terms, and how many of those passed it. The same two numbers are read by the term they took the first course, by the grade they earned in it and, for those with instructor access, by their instructor in it.
+        population: Students with a registered or late-dropped attempt at the first course on a campus in scope, counted once, at their first attempt, through the most recent term whose registration has settled.
+        unit: Student, at their first attempt at the first course.
+        numerator: For going on, students who enrolled in the later course inside the window. For the pass rate, those who passed it in their first term taking it.
+        denominator: For going on, students who had the whole window and had not already passed the later course. For the pass rate, those who took the later course and have a grade.
+        campus: Students are scoped and grouped by the campus that taught the first course. The later course counts on any campus.
+        time_window: The later course counts within the chosen number of regular terms after the first course (three by default); a summer enrollment belongs to the regular term after it. Enrollment is followed through the most recent settled term and grades through the most recent graded term.
+        exclusions: Students too recent to have had the whole window are set aside, never counted as not going on. For a single later course, students who passed it in a term before the first course are removed; passing it in the same term is counted and not removed. For a set of later courses nobody is removed, each student counts at their first term with any of them, and that term passes only if everything taken from the set passed. A later course taken in a term with no grades yet counts as taken and not yet graded, never as failed.
+        limitations:
+          - Only A+ through C and CR pass; every other recorded grade and a late withdrawal count as not passing (DFW).
+          - A rate is shown only when at least the chosen minimum of students stands behind it; the counts stay.
+          - The grade earned in the first course separates later results more than anything else on the page. A term, an instructor or a campus whose students earned higher grades will show better later results for that reason alone.
+          - A trend across terms is called rising or falling only when its change a year is larger than chance and the terms' ordinary ups and downs would give. It is read within one term type and needs three terms with a rate.
+          - The instructor breakdown describes who went on, not how well anyone taught. Students choose sections by schedule, availability and reputation. The check under it compares only the two largest instructor groups and corrects nothing.
+        guide: users/course-reports#later-course
+        implementation:
+          - file: R/branches/downstream-cohort.R
+            functions: [build_downstream_cohort, get_downstream_course_options, downstream_default_course]
+          - file: R/cones/downstream-outcomes.R
+            functions: [get_downstream_outcomes]
+          - file: R/cones/downstream-instructor-balance.R
+            functions: [get_downstream_instructor_balance]
+          - file: R/features/later-course.R
+            functions: [build_later_course, later_course_trend]
+
       - version: "1.0.0"
         title: Later-course continuation and outcomes
         summary: Of the students who took a course, the share who took a chosen later course within a set number of regular terms, and the share of those who passed it, read by the term they took the first course, the grade they earned in it and, behind the instructor gate, their instructor in it.

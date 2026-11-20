@@ -2255,14 +2255,14 @@ for (.download_key in names(.enrl_desr_view_ids)) {
       failed = "Non-Passing",
       early_dropped = "Early Drops",
       late_dropped = "Late Drops",
-      covariate = "Covariate",
+      covariate = "Measure",
       type = "Type",
-      n_treatment = "Treatment N",
-      n_control = "Control N",
-      value_treatment = "Treatment Value",
-      value_control = "Control Value",
+      n_treatment = "First group, students",
+      n_control = "Second group, students",
+      value_treatment = "First group",
+      value_control = "Second group",
       unit = "Unit",
-      smd = "SMD",
+      smd = "Difference, in standard deviations",
       group = "Group",
       outcome = "Outcome",
       n = "Students",
@@ -3935,8 +3935,8 @@ for (.download_key in names(.enrl_desr_view_ids)) {
   # documents the groups and sample the selected comparison produced.
   cr_impact_limits <- function() {
     tagList(
-      tags$p("A descriptive contrast between two groups of students, not a measured effect of the course. Students choose their own courses and sequences, so the groups differ in ways CEDAR cannot see: motivation, advising, schedule, what else they carried that term."),
-      tags$p("Prior GPA and credits are rebuilt from term records and measured before the relevant course. The balance table under the results shows whether the groups started out different; if they did, the gap partly describes who took each path. A high-school GPA window is a sensitivity check: a gap that holds inside one band is more interesting, and still not causal evidence.")
+      tags$p("This compares two groups of students; it does not measure what the course did. Students choose their own courses and order, so the groups differ in ways CEDAR cannot see: motivation, advising, schedule, what else they carried that term."),
+      tags$p("Each student's earlier GPA and credits are counted up to the term before the course in question. The table under the results shows whether the groups started out different; if they did, the gap partly describes who took each path. Keeping both groups inside one high-school GPA range tests that: a gap that holds inside one range is more interesting, and still not proof.")
     )
   }
 

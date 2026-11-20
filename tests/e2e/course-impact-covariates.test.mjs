@@ -80,12 +80,12 @@ try {
     } : null;
   });
 
-  ok(definition?.version === '2.0.0',
+  ok(definition?.version === '3.0.0',
      'Course Sequence uses definition v2');
   // The result opens with the two rates and their counts, then the balance verdict.
   ok(/did not pass .* of the time \(\d[\d,]* of \d[\d,]*\)/.test(body),
      'the result opens with both groups\' rates and their counts');
-  ok(/measured covariate/i.test(body),
+  ok(/things measured|measured beforehand|known about the students beforehand/i.test(body),
      'the opening sentence carries the balance verdict');
   // The answer is drawn: both groups' DFW rates as bars, with their counts.
   ok(await page.evaluate(() => document.querySelectorAll(

@@ -179,7 +179,7 @@ test_that("SMD bands preserve both threshold boundaries", {
   expect_identical(summarize_smd_balance(c("unavailable", "unavailable")), "unavailable")
 })
 
-test_that("Course Sequence definition v2 documents the measured-difference bands", {
+test_that("the Course Sequence definition documents the measured-difference bands", {
   definition <- cedar_definition("course-sequence")
   copy <- paste(
     definition$summary,
@@ -187,7 +187,7 @@ test_that("Course Sequence definition v2 documents the measured-difference bands
     collapse = " "
   )
 
-  expect_identical(definition$version, "2.0.0")
+  expect_identical(definition$version, "3.0.0")
   expect_match(copy, "below 0.10", fixed = TRUE)
   expect_match(copy, "0.10 through 0.25", fixed = TRUE)
   expect_match(copy, "above 0.25", fixed = TRUE)

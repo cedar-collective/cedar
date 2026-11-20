@@ -100,7 +100,7 @@ courseCohortServer <- function(id, student_terms, attempts, programs, dims, edge
         ),
         info_panel(
           "Settings",
-          description = "This course's usual classification, home campus, term type and terms; its own college and level as the benchmark (or the Gen Ed courses its students take most); 10 students per group.",
+          description = "This course's usual classification, home campus, term type and terms; its own college and level to compare with (or the Gen Ed courses its students take most); 10 students per group.",
         fluidRow(
           column(3, selectizeInput(ns("classification"), "Classification",
                                    choices = d$choices$classifications$student_classification,
@@ -110,7 +110,7 @@ courseCohortServer <- function(id, student_terms, attempts, programs, dims, edge
                                    options = list(placeholder = "Every home campus"))),
           column(3, selectizeInput(ns("terms"), "Terms", choices = term_choices,
                                    selected = d$terms, multiple = TRUE)),
-          column(4, radioButtons(ns("benchmark"), "Benchmark courses",
+          column(4, radioButtons(ns("benchmark"), "Courses to compare with",
                                  choices = c("A college's courses" = "college",
                                              "The Gen Ed courses these students take most" = "gen_ed"),
                                  selected = "college"))
@@ -118,9 +118,9 @@ courseCohortServer <- function(id, student_terms, attempts, programs, dims, edge
         conditionalPanel(
           condition = "input.benchmark == 'college'", ns = ns,
           fluidRow(
-            column(3, selectizeInput(ns("college"), "Benchmark college", choices = college_choices,
+            column(3, selectizeInput(ns("college"), "Their college", choices = college_choices,
                                      selected = d$college)),
-            column(3, checkboxGroupInput(ns("level"), "Benchmark course levels", choices = level_choices,
+            column(3, checkboxGroupInput(ns("level"), "Their course levels", choices = level_choices,
                                          selected = d$level, inline = TRUE))
           )
         ),
@@ -307,7 +307,7 @@ courseCohortServer <- function(id, student_terms, attempts, programs, dims, edge
                    "The similar students' figure is what the takers would have shown at their peers' rates. A group of peers smaller than ", m$min_cell_n,
                    " supplies no figure, and its takers are left out."),
             if (length(txt$comparison)) tags$p(txt$comparison),
-            tags$p("Chance alone is two standard errors at the similar students' rates: a gap inside it could arise with no real difference. Came back means enrolled in the next fall or spring semester (summer does not count); other courses not passed counts a D, an F or a withdrawal among the semester's other attempts; GPA is the next semester's, for those who came back."),
+            tags$p("Chance alone is how far a gap can stray with no real difference between the groups (two standard errors at the similar students' rates): a gap inside it is not evidence of one. Came back means enrolled in the next fall or spring semester (summer does not count); other courses not passed counts a D, an F or a withdrawal among the semester's other attempts; GPA is the next semester's, for those who came back."),
             tags$p("The matching removes those four things and nothing else: placement, advising, major and motivation are not in it."),
             tags$p("The check on the matching runs the same comparison on ACT scores, which are not matched on and which the course cannot change. If takers and similar students differ there, they differed before the course, and the gaps carry that difference. It reads only students with a score on file; under 0.10 standard deviations the groups are called alike.")
           ),
