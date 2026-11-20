@@ -116,13 +116,21 @@ DOWNSTREAM_GLANCE_STEPS <- c(
   if (nrow(r) == 0L) {
     return(.glance_row("non_takers", "none", "Too few takers had similar students to compare with."))
   }
+  # When the two groups differed before the course on a measure outside the
+  # matching, the gap is not the course's: say so and colour nothing.
+  alike <- course_similar_students_alike(similar)
+  not_alike <- alike$status %in% c("somewhat_apart", "apart")
   .glance_row(
-    "non_takers", "ready", r$sentence[[1]],
+    "non_takers", "ready",
+    paste0(r$sentence[[1]], if (not_alike) paste0(
+      " The two groups were not alike before the course (ACT ", sprintf("%.1f", abs(alike$gap)), " points ",
+      if (alike$gap < 0) "lower" else "higher", " for takers), so this is not the course's doing alone.")),
     bars = tibble::tibble(label = c("Took it", "Similar students"), share = c(r$taker, r$similar) / 100,
                           text = .glance_pct(c(r$taker, r$similar)), reference = c(FALSE, TRUE)),
-    verdict = c(better = "Better than similar students", worse = "Worse than similar students",
-                same = "About the same as similar students", unclear = "Too few to judge")[[r$verdict]],
-    tone = c(better = "better", worse = "worse", same = NA, unclear = NA)[[r$verdict]]
+    verdict = if (not_alike) "Not a like-for-like comparison" else
+      c(better = "Better than similar students", worse = "Worse than similar students",
+        same = "About the same as similar students", unclear = "Too few to judge")[[r$verdict]],
+    tone = if (not_alike) NA_character_ else c(better = "better", worse = "worse", same = NA, unclear = NA)[[r$verdict]]
   )
 }
 

@@ -37,6 +37,15 @@
 # rate: its takers are left out of both sides and counted (`n_takers` less
 # `n_covered`).
 #
+# Were the matched students alike? The cells cannot say: they are alike on
+# what is in the cells by construction. So the same comparison is run on a
+# measure taken before college that the cells do not hold and the course
+# cannot have changed, the ACT composite where one is on file: the takers'
+# average against what their non-taking peers averaged, cell by cell. A gap
+# there is the students, not the course, and whatever made it is in every
+# outcome gap too. `act_gap_smd` is that gap in the non-takers' standard
+# deviations (classify_smd_balance() reads it).
+#
 # Descriptive, never an effect: the cells remove term, campus, high-school
 # GPA and time status and nothing else. Placement, advising, major and
 # motivation are not in them, and a course students are placed into shows
@@ -76,7 +85,9 @@
 #'   `return_gap`, `return_gap_se`; `other_attempts`, `other_dfw_pct`,
 #'   `other_dfw_expected_pct`, `other_dfw_gap`, `other_dfw_gap_se`;
 #'   `next_gpa_n`, `next_gpa`, `next_gpa_expected`, `next_gpa_gap`,
-#'   `next_gpa_gap_se`. Gaps are actual minus expected (a
+#'   `next_gpa_gap_se`; `act_n`, `act`, `act_expected`, `act_gap`,
+#'   `act_gap_se`, `act_gap_smd` (the alike check: takers with an ACT score
+#'   in cells whose non-takers have one). Gaps are actual minus expected (a
 #'   positive DFW gap is worse); an outcome with nothing observable is NA.
 #'   Attributes: `edge`, `graded_edge`, `n_population_student_terms`,
 #'   `cells` (the cell columns), `suppressed` (rows under `min_n`),
@@ -132,7 +143,7 @@ get_course_similar_students <- function(student_terms, attempts, applicants, opt
   members <- members %>%
     select(student_id, term, student_campus, time_status, next_regular_term,
            returned_next_regular_term, return_observable) %>%
-    left_join(applicant_hs_gpa(applicants), by = "student_id") %>%
+    left_join(applicant_hs_gpa(applicants, with_act = TRUE), by = "student_id") %>%
     left_join(next_gpas, by = c("student_id", "next_regular_term")) %>%
     mutate(
       hs_gpa_band = hs_gpa_band(high_school_cum_gpa),
@@ -141,7 +152,10 @@ get_course_similar_students <- function(student_terms, attempts, applicants, opt
       ret     = as.integer(return_observable %in% TRUE & returned_next_regular_term %in% TRUE),
       gpa_n   = as.integer(!is.na(next_gpa)),
       gpa_sum = coalesce(next_gpa, 0),
-      gpa_sq  = coalesce(next_gpa^2, 0)
+      gpa_sq  = coalesce(next_gpa^2, 0),
+      act_n   = as.integer(!is.na(act_score)),
+      act_sum = coalesce(act_score, 0),
+      act_sq  = coalesce(act_score^2, 0)
     )
   cedar_debug("[course-similar-students.R] ", nrow(members), " member student-terms to ", edge)
 
@@ -176,7 +190,8 @@ get_course_similar_students <- function(student_terms, attempts, applicants, opt
     paste(members$student_id, members$term) %in% paste(holders$student_id, holders$term)
   }
 
-  measures <- c("n", "ret_obs", "ret", "gpa_n", "gpa_sum", "gpa_sq", "tot_att", "tot_dfw")
+  measures <- c("n", "ret_obs", "ret", "gpa_n", "gpa_sum", "gpa_sq", "tot_att", "tot_dfw",
+                "act_n", "act_sum", "act_sq")
   cells <- members %>%
     filter(in_comparison) %>%
     group_by(across(all_of(cell_cols))) %>%
@@ -215,7 +230,10 @@ get_course_similar_students <- function(student_terms, attempts, applicants, opt
       nt_dfw    = if_else(tot_att.cell - tot_att > 0L, (tot_dfw.cell - tot_dfw) / (tot_att.cell - tot_att), NA_real_),
       nt_gpa    = if_else(gpa_n.cell - gpa_n > 0L, (gpa_sum.cell - gpa_sum) / (gpa_n.cell - gpa_n), NA_real_),
       nt_gpa_var = if_else(gpa_n.cell - gpa_n > 0L,
-                           pmax((gpa_sq.cell - gpa_sq) / (gpa_n.cell - gpa_n) - nt_gpa^2, 0), NA_real_)
+                           pmax((gpa_sq.cell - gpa_sq) / (gpa_n.cell - gpa_n) - nt_gpa^2, 0), NA_real_),
+      nt_act    = if_else(act_n.cell - act_n > 0L, (act_sum.cell - act_sum) / (act_n.cell - act_n), NA_real_),
+      nt_act_var = if_else(act_n.cell - act_n > 0L,
+                           pmax((act_sq.cell - act_sq) / (act_n.cell - act_n) - nt_act^2, 0), NA_real_)
     )
 
   row_cols <- c("course", if (grain == "instructor") c("instructor_id", "instructor_name"),
@@ -224,7 +242,8 @@ get_course_similar_students <- function(student_terms, attempts, applicants, opt
     filter(taker) %>%
     group_by(across(all_of(union(row_cols, cell_cols)))) %>%
     summarize(n = n(), ret_obs = sum(ret_obs), ret = sum(ret), gpa_n = sum(gpa_n), gpa_sum = sum(gpa_sum),
-              other_att = sum(other_att), other_dfw = sum(other_dfw), .groups = "drop") %>%
+              other_att = sum(other_att), other_dfw = sum(other_dfw),
+              act_n = sum(act_n), act_sum = sum(act_sum), .groups = "drop") %>%
     inner_join(non_takers, by = c("course", cell_cols)) %>%
     mutate(covered = nt_n >= min_cell_n)
 
@@ -232,7 +251,8 @@ get_course_similar_students <- function(student_terms, attempts, applicants, opt
   # rate for it; the same cells on both sides of every gap.
   ratio <- function(num, den) if_else(den > 0, num / den, NA_real_)
   rows <- taker_cells %>%
-    mutate(r_ok = covered & !is.na(nt_return), d_ok = covered & !is.na(nt_dfw), g_ok = covered & !is.na(nt_gpa)) %>%
+    mutate(r_ok = covered & !is.na(nt_return), d_ok = covered & !is.na(nt_dfw), g_ok = covered & !is.na(nt_gpa),
+           a_ok = covered & !is.na(nt_act)) %>%
     group_by(across(all_of(row_cols))) %>%
     summarize(
       n_takers = sum(n), n_covered = sum(n[covered]), n_terms = n_distinct(term[covered]),
@@ -245,6 +265,9 @@ get_course_similar_students <- function(student_terms, attempts, applicants, opt
       next_gpa_n = sum(gpa_n[g_ok]),
       .gpa = sum(gpa_sum[g_ok]), .gpa_exp = sum(gpa_n[g_ok] * nt_gpa[g_ok]),
       .gpa_var = sum(gpa_n[g_ok] * nt_gpa_var[g_ok]),
+      .act_n = sum(act_n[a_ok]),
+      .act = sum(act_sum[a_ok]), .act_exp = sum(act_n[a_ok] * nt_act[a_ok]),
+      .act_var = sum(act_n[a_ok] * nt_act_var[a_ok]),
       .groups = "drop"
     ) %>%
     mutate(
@@ -256,12 +279,18 @@ get_course_similar_students <- function(student_terms, attempts, applicants, opt
       other_dfw_gap_se = 100 * ratio(sqrt(.dfw_var), other_attempts),
       next_gpa = ratio(.gpa, next_gpa_n), next_gpa_expected = ratio(.gpa_exp, next_gpa_n),
       next_gpa_gap = next_gpa - next_gpa_expected,
-      next_gpa_gap_se = ratio(sqrt(.gpa_var), next_gpa_n)
+      next_gpa_gap_se = ratio(sqrt(.gpa_var), next_gpa_n),
+      act_n = as.integer(.act_n),
+      act = ratio(.act, act_n), act_expected = ratio(.act_exp, act_n),
+      act_gap = act - act_expected, act_gap_se = ratio(sqrt(.act_var), act_n),
+      # In the non-takers' standard deviations, pooled over the takers' cells.
+      act_gap_smd = if_else(.act_var > 0, act_gap / sqrt(ratio(.act_var, act_n)), NA_real_)
     ) %>%
     select(all_of(row_cols), n_takers, n_covered, n_terms,
            return_n, return_pct, return_expected_pct, return_gap, return_gap_se,
            other_attempts, other_dfw_pct, other_dfw_expected_pct, other_dfw_gap, other_dfw_gap_se,
-           next_gpa_n, next_gpa, next_gpa_expected, next_gpa_gap, next_gpa_gap_se) %>%
+           next_gpa_n, next_gpa, next_gpa_expected, next_gpa_gap, next_gpa_gap_se,
+           act_n, act, act_expected, act_gap, act_gap_se, act_gap_smd) %>%
     arrange(desc(return_gap), across(all_of(row_cols)))
   if (isTRUE(opt$by_term)) rows <- rows %>% arrange(across(all_of(row_cols)))
 
