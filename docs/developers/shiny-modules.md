@@ -286,9 +286,9 @@ the scope. It is not where a page explains itself.
 
 The navbar's toggle sets `html[data-bs-theme]` to `light` or `dark`
 (`www/cedar-theme.js`, loaded first in `<head>` so the page paints in its
-mode). Until the reader chooses, the mode follows the system setting and any
-change to it; a choice is kept in the browser's `localStorage`
-(`cedar-theme`) and wins over the system from then on.
+mode). Until the reader chooses, the page is light, whatever the system
+setting; a choice is kept in the browser's `localStorage` (`cedar-theme`).
+CEDAR has no sign-in, so the choice belongs to the browser, not the person.
 
 - **Colours are tokens.** `:root` in `www/cedar-custom.css` gives each its
   light value; the `[data-bs-theme="dark"]` block at the end of the file gives

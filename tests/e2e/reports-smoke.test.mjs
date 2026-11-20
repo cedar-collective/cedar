@@ -706,6 +706,16 @@ export async function runReportChecks({ scope = 'smoke', synthetic = false } = {
 
     await withStep(page, ['headcount'], 'Headcount runs', async () => {
       await openReport(page, 'Headcount', 'headcount');
+      // It opens on the main home campus alone (the declarations name it, so
+      // the value is Banner's name for the campus, not its code).
+      const campus = await (await page.waitForFunction(() => {
+        const s = document.getElementById('headcount-campus')?.selectize;
+        const v = s ? s.getValue() : [];
+        return v.length ? v : null;
+      }, { timeout: 30000, polling: 250 })).jsonValue();
+      if (campus.length !== 1 || !/ABQ|Albuquerque/.test(campus[0])) {
+        throw new Error(`Headcount should open on the main home campus alone: ${JSON.stringify(campus)}`);
+      }
       await setInput(page, 'headcount-dept', [DEPT]);
       await click(page, 'headcount-button');
       await waitForOutput(page, 'Headcount output', [

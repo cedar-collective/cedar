@@ -1,22 +1,20 @@
 // Light and dark mode.
 //
 // The mode is html[data-bs-theme]: the reader's choice, remembered in this
-// browser, or until they choose, the system setting (and it follows a change
-// to the system setting until then). Loaded first in <head>, so the page
-// paints in its mode. Every CSS colour is a token (www/cedar-custom.css);
+// browser, or light until they choose (the system setting is not read: light
+// is CEDAR's default everywhere). Loaded first in <head>, so the page paints
+// in its mode. Every CSS colour is a token (www/cedar-custom.css);
 // plotly figures carry their colours in their layout, so each one is
 // re-coloured from the --chart-* tokens when it draws and when the mode
 // changes.
 (function () {
   var KEY = 'cedar-theme';
   var root = document.documentElement;
-  var media = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
 
   function stored() {
     try { var v = window.localStorage.getItem(KEY); return v === 'dark' || v === 'light' ? v : null; }
     catch (e) { return null; }
   }
-  function system() { return media && media.matches ? 'dark' : 'light'; }
   function mode() { return root.getAttribute('data-bs-theme') === 'dark' ? 'dark' : 'light'; }
 
   function set(m) {
@@ -31,10 +29,7 @@
     themeAllPlots();
   }
 
-  set(stored() || system());
-  if (media && media.addEventListener) {
-    media.addEventListener('change', function () { if (!stored()) set(system()); });
-  }
+  set(stored() || 'light');
 
   // ── Plotly figures ────────────────────────────────────────────────────────
   function token(name) { return getComputedStyle(root).getPropertyValue(name).trim(); }

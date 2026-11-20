@@ -150,8 +150,12 @@ headcountServer <- function(id, programs, dims, in_progress_terms, error_handler
     updateSelectizeInput(session, "dept",
                          choices = .dept_choices,
                          server = TRUE)
+    # Home campus as the declarations name it (Banner's names, not codes); it
+    # opens on the main campus, through the campus file's names for it.
+    .campus_choices <- sort(unique(programs$student_campus[!is.na(programs$student_campus) & programs$student_campus != ""]))
     updateSelectizeInput(session, "campus",
-                         choices = sort(unique(programs$student_campus[!is.na(programs$student_campus) & programs$student_campus != ""])),
+                         choices = .campus_choices,
+                         selected = .campus_choices[cedar_campus_code_from_source(.campus_choices) %in% CEDAR_CAMPUS_MAIN],
                          server = TRUE)
 
     hc_data_rv <- reactiveVal(NULL)

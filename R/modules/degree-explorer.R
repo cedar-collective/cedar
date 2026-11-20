@@ -16,16 +16,17 @@ degreeExplorerUI <- function(id, catalog, roadmaps, status = NULL, colleges = NU
     filter_bar("Build your degree roadmap", "Choose a degree and your starting courses. Watch the sequence change.",
       fluidRow(
         if (!is.null(colleges)) column(4, selectInput(ns("dx_college"), "College", choices = degree_college_choices(colleges))),
-        column(if (is.null(colleges)) 12 else 8, selectInput(ns("dx_catalog_id"), "Degree · latest catalog",
-          choices = choices, selected = choices[[1]], width = "100%"))),
+        column(if (is.null(colleges)) 11 else 7, selectInput(ns("dx_catalog_id"), "Degree · latest catalog",
+          choices = choices, selected = choices[[1]], width = "100%")),
+        column(1, filter_actions(class = "filter-actions-end",
+          actionButton(ns("dx_copy_url"), label = NULL, icon = icon("link"),
+            title = "Copy shareable link for current view", class = "btn-outline-secondary btn-sm")))),
       fluidRow(
         column(4, selectInput(ns("dx_math_start"), "Where will you start in math?",
           choices = degree_math_start_choices(roadmaps, choices[[1]]))),
         column(4, selectInput(ns("dx_english_start"), "Where will you start in English?",
           choices = stats::setNames(english$start_id, english$label))),
-        column(4, selectInput(ns("dx_start_season"), "First semester", choices = c(Fall = "fall", Spring = "spring")),
-          filter_actions(actionButton(ns("dx_copy_url"), label = NULL, icon = icon("link"),
-            title = "Copy shareable link for current view", class = "btn-outline-secondary btn-sm"))))),
+        column(4, selectInput(ns("dx_start_season"), "First semester", choices = c(Fall = "fall", Spring = "spring"))))),
     filter_actions(actionButton(ns("show_rules"), "Rules behind this plan", icon = icon("list"))),
     uiOutput(ns("roadmap")),
     tags$p(class = "text-hint", "Want to see what students actually take? Open Pathways → Course paths."))

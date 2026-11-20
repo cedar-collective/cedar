@@ -673,7 +673,11 @@ ui <- page_navbar(
     "))
   ),
   
-  title = "CEDAR",
+  # The title is the way home: it clicks the Home tab's link, which stays in
+  # the page (hidden by CSS) so URL state, history and the tests still find
+  # every tab by its data-value (www/cedar-navigation.js).
+  title = tags$a(class = "cedar-brand-home", href = "?tab=home", title = "CEDAR home", "CEDAR"),
+  window_title = "CEDAR",
   header = if (isTRUE(get0("cedar_demo", ifnotfound = FALSE))) {
     div(id = "cedar_demo_banner", class = "alert alert-warning", role = "note",
       strong("Synthetic data — development only. "),
