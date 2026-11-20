@@ -76,8 +76,46 @@ retentionDashboardUI <- function(id, campuses) {
       "In which courses do students who got a D, F or withdrawal come back much less often than those who passed?",
       method = uiOutput(ns("method_courses")),
       reactable::reactableOutput(ns("courses_table"))
+    ),
+    dashboard_section(
+      "Courses Harder on Students with Lower GPAs",
+      "Which courses do students with lower GPAs fail by more than they fail the rest of their term, and in which do they hold their own?",
+      method = uiOutput(ns("method_bands")),
+      radioButtons(ns("band_by"), "Students", choices = RETENTION_BAND_CHOICES, selected = "entering", inline = TRUE),
+      uiOutput(ns("bands_finding")),
+      dashboard_subsection(
+        "Harder on Them",
+        "Their DFW rate here is further above the rest of their term than the course's other students' is.",
+        reactable::reactableOutput(ns("bands_harder"))),
+      dashboard_subsection(
+        "Where They Hold Their Own",
+        "Their DFW rate here is closer to, or below, the rest of their term, by more than for the course's other students.",
+        reactable::reactableOutput(ns("bands_easier")))
     ))
   )
+}
+
+RETENTION_BAND_CHOICES <- c("Continuing students, by GPA entering the term" = "entering",
+                            "First-term students, by high-school GPA" = "hs")
+
+# One by-band list as a table: the lowest band beside the course's other students.
+.retention_band_table <- function(rows, low_band) {
+  if (NROW(rows) == 0L) return(reactable::reactable(
+    data.frame(Message = "No course on this list."), theme = cedar_tbl_theme, compact = TRUE))
+  shown <- data.frame(
+    course = rows$subject_course, campus = rows$campus, low_n = rows$low_attempts,
+    low_dfw = rows$low_dfw_pct / 100, low_other = rows$low_other_dfw_pct / 100,
+    rest_dfw = rows$rest_dfw_pct / 100, rest_other = rows$rest_other_dfw_pct / 100,
+    gap = rows$gap_pts, chance = 2 * rows$gap_se, stringsAsFactors = FALSE)
+  reactable::reactable(shown, theme = cedar_tbl_theme, compact = TRUE, striped = TRUE, columns = list(
+    course = reactable::colDef(name = "Course"), campus = reactable::colDef(name = "Campus"),
+    low_n = cedar_count_coldef("Attempts"),
+    low_dfw = cedar_percent_coldef("DFW here"), low_other = cedar_percent_coldef("DFW in their other courses"),
+    rest_dfw = cedar_percent_coldef("DFW here"), rest_other = cedar_percent_coldef("DFW in their other courses"),
+    gap = cedar_points_coldef("Gap (points)"), chance = cedar_points_coldef("Chance alone, up to")),
+    columnGroups = list(
+      reactable::colGroup(name = paste0("GPA ", low_band), columns = c("low_n", "low_dfw", "low_other")),
+      reactable::colGroup(name = "The course's other students", columns = c("rest_dfw", "rest_other"))))
 }
 
 # ── Layout helpers (no analysis) ─────────────────────────────────────────────
@@ -139,7 +177,7 @@ RETENTION_ENTRY_OPTIONS <- list(
 
 # student_terms, attempts, degrees, dims, edges   the loaded tables and edges.
 # active   reactive: TRUE while the tab is open.
-retentionDashboardServer <- function(id, student_terms, attempts, degrees, programs, dims, edges, active) {
+retentionDashboardServer <- function(id, student_terms, attempts, degrees, programs, applicants, dims, edges, active) {
   moduleServer(id, function(input, output, session) {
     college_names <- college_code_names(dims)
     payload <- reactive({
@@ -171,6 +209,45 @@ retentionDashboardServer <- function(id, student_terms, attempts, degrees, progr
           NULL
         })
     }) |> bindCache(input$term_type, input$level, input$campus, cache = "app")
+
+    bands <- reactive({
+      req(isTRUE(active()), input$term_type, input$band_by)
+      if (identical(input$band_by, "hs") && is.null(applicants)) return(NULL)
+      tryCatch(
+        retention_dashboard_band_courses(attempts, student_terms, applicants, list(
+          term_type = input$term_type, campus = if (length(input$campus) > 0) input$campus else NULL,
+          data_edges = edges, band_by = input$band_by)),
+        error = function(e) {
+          showNotification(paste("Courses by GPA:", conditionMessage(e)), type = "error", duration = 10)
+          NULL
+        })
+    }) |> bindCache(input$term_type, input$campus, input$band_by, cache = "app")
+    output$bands_finding <- renderUI({
+      b <- bands()
+      if (is.null(b)) return(empty_state("This reading needs high-school GPAs, which this installation does not hold, or could not be built; a notification says why."))
+      lead_text(retention_band_sentence(b))
+    })
+    output$bands_harder <- reactable::renderReactable({ b <- bands(); req(b); .retention_band_table(b$harder, b$meta$low_band) })
+    output$bands_easier <- reactable::renderReactable({ b <- bands(); req(b); .retention_band_table(b$easier, b$meta$low_band) })
+    output$method_bands <- renderUI({
+      b <- bands(); req(b)
+      m <- b$meta
+      tags$ul(
+        tags$li(paste0("Graded attempts in ", paste(vapply(m$terms, fmt_term, character(1)), collapse = ", "),
+                       ", by the campus that taught the course (the campus chosen above). The GPA band is ",
+                       if (m$band_by == "entering") "the GPA a continuing student brought into the term, counted from their own earlier terms here; first-term students have none"
+                       else "the high-school GPA on file for a student in their first graded term here",
+                       ". ", .retention_n(m$n_banded), " student-terms are read; ", .retention_n(m$n_no_band),
+                       " have no such GPA and ", .retention_n(m$n_invalid), " have a record that cannot be counted up, and are left out.")),
+        tags$li(paste0("For each group, the DFW rate in the course is set beside the same students' DFW rate in the other ",
+                       "courses they took that term. A student who is struggling everywhere shows it in both, so the ",
+                       "difference is what this course adds. The gap is that difference for students with a GPA ",
+                       m$low_band, " less the same difference for the course's other students: a course hard on everyone has no gap.")),
+        tags$li(paste0("A course is read when both groups have ", m$min_n, " attempts, and listed when its gap is beyond ",
+                       "chance alone (two standard errors). ", .retention_n(m$n_courses), " courses were read; with that ",
+                       "many, chance alone lists some. Ranked by the attempts the gap stands for.")),
+        tags$li("A place to look, not a finding. The other courses are each student's own choice of a term, and a course usually taken beside lighter ones shows a larger gap for that reason."))
+    })
 
     # The entering classes are read on their own, so choosing who a class
     # holds rebuilds this chart and nothing else.
