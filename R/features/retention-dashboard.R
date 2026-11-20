@@ -47,7 +47,7 @@ RETENTION_SIGNS <- c(late_withdrawal = "A late withdrawal", dfw = "A DFW grade")
 #'   `milestones` (get_entering_class_retention() for the scope's entering
 #'   classes, four steps). A scope
 #'   with no readable return has an empty `series` and NULL elsewhere.
-build_retention_dashboard <- function(student_terms, attempts, degrees, opt = list()) {
+build_retention_dashboard <- function(student_terms, attempts, degrees, opt = list(), programs = NULL) {
   term_type <- opt$term_type
   if (length(term_type) != 1L || is.na(term_type)) {
     stop("[retention-dashboard.R] opt$term_type (one term type) is required.", call. = FALSE)
@@ -116,26 +116,51 @@ build_retention_dashboard <- function(student_terms, attempts, degrees, opt = li
   meta$n_groups_past <- sum(groups$last_term < latest)
   groups <- groups %>% filter(last_term == latest)
 
-  courses <- retention_dashboard_courses(student_terms, attempts, degrees, series, opt)
-  # The listed courses: a gap beyond chance (unadjusted across courses),
-  # ranked by the students it stands for, the DFW students who did not come
-  # back beyond the passers' rate (Roadblocks' impact with no baseline): a
-  # large course with a moderate gap ahead of a small one with a wide gap.
-  courses$listed <- if (is.null(courses$by_course)) NULL else courses$by_course %>%
-    filter(!is.na(pop_p_value), pop_p_value < 0.05, pop_stopout_gap > 0) %>%
-    mutate(excess_not_back = pop_n_dfw * pop_stopout_gap) %>%
-    arrange(desc(excess_not_back)) %>%
-    utils::head(25L)
+  # The slowest part; the page reads it on its own (opt$courses = FALSE).
+  courses <- if (isFALSE(opt$courses)) NULL else retention_dashboard_course_list(student_terms, attempts, degrees, series, opt)
 
   structure(list(
     meta = meta,
     series = series, trend = trend, signs = signs,
     signs_latest = signs %>% group_by(sign) %>% filter(term == max(term)) %>% ungroup(),
     groups = groups, courses = courses,
-    milestones = get_entering_class_retention(student_terms, degrees, list(
-      term_type = term_type, student_level = opt$student_level, campus = opt$campus,
-      data_edges = opt$data_edges, min_n = min_n, n_terms = 4L))
+    milestones = if (isFALSE(opt$milestones)) NULL else retention_dashboard_milestones(student_terms, degrees, opt, programs)
   ), class = "retention_dashboard")
+}
+
+#' The courses where a DFW goes with not coming back, and the 25 listed
+#'
+#' @param series The dashboard's `series` (its terms set which are read).
+#' @param opt The dashboard's scope.
+#' @return retention_dashboard_courses()'s list with `listed`: a gap beyond
+#'   chance (unadjusted across courses), ranked by the students it stands
+#'   for, the DFW students who did not come back beyond the passers' rate
+#'   (Roadblocks' impact with no baseline): a large course with a moderate
+#'   gap ahead of a small one with a wide gap.
+retention_dashboard_course_list <- function(student_terms, attempts, degrees, series, opt = list()) {
+  courses <- retention_dashboard_courses(student_terms, attempts, degrees, series, opt)
+  courses$listed <- if (is.null(courses$by_course)) NULL else courses$by_course %>%
+    filter(!is.na(pop_p_value), pop_p_value < 0.05, pop_stopout_gap > 0) %>%
+    mutate(excess_not_back = pop_n_dfw * pop_stopout_gap) %>%
+    arrange(desc(excess_not_back)) %>%
+    utils::head(25L)
+  courses
+}
+
+#' The page's entering classes: its scope handed to get_entering_class_retention()
+#'
+#' Its own function so the page can change who an entering class holds
+#' without rebuilding the rest (`opt$milestones = FALSE` leaves it out of
+#' build_retention_dashboard()).
+#'
+#' @param opt The dashboard's scope (`term_type`, `student_level`, `campus`,
+#'   `data_edges`, `min_n`), with `entry` and `entry_time_status`.
+#' @return get_entering_class_retention()'s rows, four semesters on.
+retention_dashboard_milestones <- function(student_terms, degrees, opt = list(), programs = NULL) {
+  get_entering_class_retention(student_terms, degrees, list(
+    term_type = opt$term_type, student_level = opt$student_level, campus = opt$campus,
+    data_edges = opt$data_edges, min_n = as.integer(opt$min_n %||% 30L), n_terms = 4L,
+    entry = opt$entry %||% "all", time_status = opt$entry_time_status), programs)
 }
 
 #' The courses where a DFW grade goes with not coming back the most
@@ -180,17 +205,23 @@ retention_trend_sentence <- function(t) {
          sprintf("%.1f", 2 * t$slope_se), ": ", RETENTION_DIRECTION_WORDS[[t$direction]], ".")
 }
 
-#' How a step after an entering term is named: its distance and its season
+#' How a step after an entering term is named: the semester it is, and its season
+#'
+#' The entering term is the 1st semester, so one regular term later is the
+#' 2nd and a year later the 3rd, the one retention is usually quoted at.
 #'
 #' @param step Regular terms after the entering term.
 #' @param target_term The term that step lands on.
-#' @return "1 semester later (spring)", "1 year later (fall)", and so on.
+#' @return "2nd semester (spring)", "3rd semester (fall)", and so on.
 retention_milestone_label <- function(step, target_term) {
-  years <- step %/% 2L
-  distance <- ifelse(step %% 2L == 0L, paste0(years, if_else(years == 1L, " year", " years")),
-                     paste0(step, if_else(step == 1L, " semester", " semesters")))
-  paste0(distance, " later (", get_term_type(target_term), ")")
+  k <- as.integer(step) + 1L
+  suffix <- ifelse(k %% 100L %in% 11:13, "th", c("th", "st", "nd", "rd", rep("th", 6))[k %% 10L + 1L])
+  paste0(k, suffix, " semester (", get_term_type(target_term), ")")
 }
+
+# The entering students a class holds, in the sentence's words.
+RETENTION_ENTRY_WORDS <- c(all = "students new at this level", first_time = "first-time students",
+                           transfer = "new transfer students")
 
 #' The latest entering class with a year behind it, in a sentence
 #'
@@ -203,13 +234,16 @@ retention_milestone_sentence <- function(payload) {
   known <- m %>% filter(!is.na(here_pct))
   full <- known %>% filter(step == 2L)
   class_term <- if (nrow(full) > 0L) max(full$term) else if (nrow(known) > 0L) max(known$term) else return(character(0))
-  rows <- known %>% filter(term == class_term) %>% arrange(step)
-  paste0("Of the ", format(rows$n_entering[[1]], big.mark = ","), " students who entered in ", fmt_term(class_term), ", ",
-         sprintf("%.1f%%", rows$here_pct[[1]]), " were still enrolled or had graduated ",
-         retention_milestone_label(rows$step[[1]], rows$target_term[[1]]),
-         if (nrow(rows) > 1L) paste0(", and ", paste(sprintf(
-           "%.1f%% %s", rows$here_pct[-1], retention_milestone_label(rows$step[-1], rows$target_term[-1])),
-           collapse = ", ")),
+  # The 3rd semester leads when the class has one; the rest follow in order.
+  rows <- known %>% filter(term == class_term) %>% arrange(step != 2L, step)
+  who <- RETENTION_ENTRY_WORDS[[attr(m, "entry") %||% "all"]]
+  # The sentence names the term itself where the chart's legend names the season.
+  where <- function(i) paste0("their ", sub(" \\(.*$", "", retention_milestone_label(rows$step[i], rows$target_term[i])),
+                              " (", vapply(rows$target_term[i], fmt_term, character(1)), ")")
+  paste0("Of the ", format(rows$n_entering[[1]], big.mark = ","), " ", who, " who entered in ", fmt_term(class_term), ", ",
+         sprintf("%.1f%%", rows$here_pct[[1]]), " were enrolled, or had graduated, in ", where(1),
+         if (nrow(rows) > 1L) paste0("; ", paste(sprintf("%.1f%% in %s", rows$here_pct[-1], where(seq_len(nrow(rows))[-1])),
+                                                 collapse = ", ")),
          ".")
 }
 
