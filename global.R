@@ -182,12 +182,7 @@ for (key in names(cedar_files)) {
 
   # Let load_cedar_data handle file existence and format fallback (QS -> RDS)
   data_objects[[key]] <- timed_read_data(data_path, basename(data_path))
-  source_info <- file.info(data_path)
-  cedar_source_fingerprints[[key]] <- list(
-    path = normalizePath(data_path, mustWork = FALSE),
-    size = unname(source_info$size),
-    modified = as.character(source_info$mtime)
-  )
+  cedar_source_fingerprints[[key]] <- cedar_source_fingerprint(data_path)
 }
 
 # ── Dimensions and the default unit (ADR-001 step 3) ─────────────────────────
@@ -243,13 +238,9 @@ data_objects[["cedar_courses"]] <- cedar_courses$courses
 data_objects[["cedar_course_codes"]] <- cedar_courses$codes
 # The mapping files now decide the unit columns on the attached tables without
 # changing any saved file, so they are an input to every cache keyed on those
-# tables' fingerprints (caching cardinal rule 1): fold a fingerprint of dims
-# into each attached table's, and a mapping edit is a miss.
+# tables' fingerprints (caching cardinal rule 1): cedar_table_cache_hashes()
+# folds this into each attached table's, and a mapping edit is a miss.
 cedar_dims_hash <- cedar_dims_fingerprint(cedar_dims)
-for (.key in intersect(names(CEDAR_ATTACHED_UNIT_COLUMNS), names(cedar_source_fingerprints))) {
-  cedar_source_fingerprints[[.key]][["dims"]] <- cedar_dims_hash
-}
-rm(.key)
 
 message("[global.R] Data loading complete. Validating CEDAR data structure...")
 
@@ -339,18 +330,11 @@ message(sprintf("[global.R] cedar_terms: %d terms, %s to %s", nrow(cedar_terms),
 # Pre-compute stable source hashes for cache keys. Each combines the loaded
 # dimensions with file size and modification time, so a same-shape replacement
 # still invalidates. Stored as globals so cache lookups do not touch large data.
-cedar_registrations_hash <- cedar_cache_object_hash(
-  data_objects[["cedar_registrations"]], cedar_source_fingerprints[["cedar_registrations"]]
-)
-cedar_sections_hash <- cedar_cache_object_hash(
-  data_objects[["cedar_sections"]], cedar_source_fingerprints[["cedar_sections"]]
-)
-cedar_programs_hash <- cedar_cache_object_hash(
-  data_objects[["cedar_programs"]], cedar_source_fingerprints[["cedar_programs"]]
-)
-cedar_degrees_hash <- cedar_cache_object_hash(
-  data_objects[["cedar_degrees"]], cedar_source_fingerprints[["cedar_degrees"]]
-)
+# The cache-warming scripts call the same function, so the keys they write
+# are the ones the app asks for.
+list2env(cedar_table_cache_hashes(data_objects, cedar_source_fingerprints, cedar_dims_hash,
+                                  unit_tables = names(CEDAR_ATTACHED_UNIT_COLUMNS)),
+         envir = environment())
 # Dept Trends uses content hashes, prepared once so individual tab requests
 # never rescan source tables or invalidate just because a file was rewritten.
 cedar_dept_source_hashes <- hash_dept_cache_sources(data_objects)
@@ -383,28 +367,8 @@ message("  - cedar_degrees: ", nrow(data_objects[["cedar_degrees"]]), " rows")
 # (scripts/rebuild-programs-if-mappings-changed.R) and the data refresh build
 # them; by hand, CEDAR_MEASURES_REBUILD_HINT.
 if (!is.null(data_objects[["cedar_registrations"]]) && nrow(data_objects[["cedar_registrations"]]) > 0) {
-  .class_list_path <- file.path(data_dir, paste0(cedar_files[["cedar_registrations"]], get_data_extension()))
-  .measure_checks <- list(
-    cedar_attempts = function(tbl) {
-      attempts_is_current(tbl, data_objects[["cedar_registrations"]], cedar_edges)
-    },
-    cedar_course_terms = function(tbl) {
-      course_terms_is_current(tbl, data_objects[["cedar_registrations"]],
-                              graded_edge = cedar_edges$last_graded)
-    },
-    cedar_course_flows = function(tbl) {
-      course_flows_is_current(tbl, data_objects[["cedar_registrations"]], cedar_edges)
-    }
-  )
-  for (.name in CEDAR_MEASURE_TABLES) {
-    .t <- system.time({
-      data_objects[[.name]] <- cedar_load_measure_table(
-        .name, data_dir, .class_list_path, .measure_checks[[.name]], cedar_dims_hash, cedar_min_term)
-    })
-    message(sprintf("[global.R] %s loaded: %d rows (%.1fs)", .name,
-                    nrow(data_objects[[.name]]), .t["elapsed"]))
-  }
-  rm(.class_list_path, .measure_checks, .name, .t)
+  data_objects <- c(data_objects, load_measure_tables(data_objects[["cedar_registrations"]], data_dir,
+                                                     cedar_edges, cedar_dims_hash, cedar_min_term))
 }
 
 # ── Pre-compute data summary for Data & Usage page ─────────────────────────

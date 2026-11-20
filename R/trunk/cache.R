@@ -43,6 +43,40 @@ cedar_cache_object_hash <- function(value, source_fingerprint = NULL) {
   substr(digest::digest(dimensions), 1, 10)
 }
 
+# A saved file's fingerprint: its path, size and modification time, so a
+# same-shape replacement still changes a hash.
+cedar_source_fingerprint <- function(path) {
+  info <- file.info(path)
+  list(path = normalizePath(path, mustWork = FALSE), size = unname(info$size),
+       modified = as.character(info$mtime))
+}
+
+#' The source hashes the app's cache keys read, for every loader
+#'
+#' global.R and the cache-warming scripts both call this, so a cache a script
+#' writes is the one the app asks for. A table whose unit columns are attached
+#' at load folds in the mapping files' fingerprint: a mapping edit is a miss.
+#' @param data_objects The loaded tables, as the app holds them.
+#' @param fingerprints Named list of cedar_source_fingerprint(), one per table.
+#' @param dims_hash cedar_dims_fingerprint() of the dimensions loaded.
+#' @param unit_tables The tables whose unit columns are attached at load
+#'   (names(CEDAR_ATTACHED_UNIT_COLUMNS)).
+#' @return Named list: `cedar_registrations_hash`, `cedar_sections_hash`,
+#'   `cedar_programs_hash`, `cedar_degrees_hash` (the global names the keys
+#'   read), a table not loaded left out.
+cedar_table_cache_hashes <- function(data_objects, fingerprints, dims_hash, unit_tables) {
+  tables <- c("cedar_registrations", "cedar_sections", "cedar_programs", "cedar_degrees")
+  hashes <- lapply(tables, function(name) {
+    if (is.null(data_objects[[name]])) return(NULL)
+    fp <- fingerprints[[name]]
+    if (is.null(fp)) stop("[cache.R] cedar_table_cache_hashes(): no source fingerprint for ", name, call. = FALSE)
+    if (name %in% unit_tables) fp[["dims"]] <- dims_hash
+    cedar_cache_object_hash(data_objects[[name]], fp)
+  })
+  hashes <- stats::setNames(hashes, paste0(tables, "_hash"))
+  hashes[!vapply(hashes, is.null, logical(1))]
+}
+
 # Get cache directory path
 get_cache_dir <- function() {
   cache_dir <- file.path(cedar_base_dir, "data", "cache")

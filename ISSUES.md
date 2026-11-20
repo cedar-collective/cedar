@@ -36,6 +36,7 @@ alongside other work (M14, M16).
 
 | ID | Kind | Summary |
 |---|---|---|
+| [I70](#i70--production-mrgather-crashes-instead-of-retrying-a-failed-download) | Defect | Production mrgather crashes instead of retrying a failed download: its image (built 2026-04-10) calls `tracker.recordReportFetchError()`, which its `reportTracker.js` lacks, so on 2026-11-13 one failed Academic Studies download ended the fetch and that day's class list was never pulled. Open until the image is rebuilt from current source |
 | [I68](#i68--the-compiled-computer-science-board-plans-composition-i-twice) | Defect | The compiled CS board plans Composition I twice: the English route's ENGL 1110 (`engl1`) and the reading's "Composition I: ENGL1110Y, ENGL1110Z or ENGL1110" choice (`composition_one_1`), 3 credits too many |
 | [I67](#i67--a-compiled-business-board-plans-its-writing-choice-before-composition-ii) | Defect | With stretch English, the compiled Business board plans "3 credits: ENGL2120 or ENGL2210" (`writing_1`) in semester 2, before Composition II in semester 3, though both options require it: a compiled choice tile carries no prerequisite its options share |
 | [I61](#i61--summer-2025-holds-nr-grades-where-summer-2024-held-none-and-reads-as-a-dfw-spike) | Defect | Summer 2025 holds 1,479 NR grades in 336 sections (Summer 2024: none), so it reads 22.5% DFW against about 13% for other summers; suspected an early pull before grades rolled |
@@ -52,7 +53,7 @@ alongside other work (M14, M16).
 | [I20](#i20--cedar_programs-holds-almost-no-branch-campus-students) | Defect | `cedar_programs` holds 1–3% of branch-campus students; branch program counts read near zero |
 | [I18](#i18--cedar_degrees-holds-no-associate-degrees-so-branch-campus-completions-read-zero) | Defect | `cedar_degrees` holds no associate degrees: branch-campus completions read zero |
 | [I4](#i4--pre-change-course-ratios-are-confounded-by-career-stage) | Defect | Pre-change course ratios confounded by career stage (deferred) |
-| M1–M58 | Improvement | See [Improvements](#improvements) |
+| M1–M59 | Improvement | See [Improvements](#improvements) |
 
 ### Resolved since the last release
 
@@ -60,6 +61,7 @@ Kept until the next release, so a recurrence is recognisable; each entry below g
 
 | ID | Kind | Summary |
 |---|---|---|
+| [I69](#i69--the-nightly-dept-dashboard-warm-failed-every-department-since-the-measure-tables) | Defect | The refresh's Dept Dashboard warm failed every department every night from 2026-11-08: the script loaded its own tables and never the measure tables the Registration flags read, so chairs' dashboards were built on first visit. Every loader now reads the measure tables and computes the cache hashes through one function each (resolved 2026-11-19) |
 | [I66](#i66--opening-a-downstream-subtab-reruns-the-analysis-at-a-glance-already-ran) | Defect | Opening Against Non-Takers, Next Courses or Prepared for It after At a Glance ran each analysis again, and Coming Back ran twice on opening: a run key held the subtab's Update button value, which Shiny reports as a classed 0 once the button renders and `identical()` holds different from the 0 used before it did. The keys read `cedar_click_count()` (resolved 2026-11-19) |
 | [I65](#i65--the-degree-explorer-browser-suite-checks-the-hand-built-boards-the-compiled-drafts-replaced) | Defect | `tests/e2e/degree-explorer.test.mjs` has failed since the compiled drafts replaced the CS, Business, History and Philosophy boards (#309, 2026-11-16): it hovers hand-board tiles (`java1`, `java2`, `os`, `historiography`, `philbuddhist`, `buscapstone`, …) the page no longer draws, and stops at the first. The suite now names the compiled tiles and asserts I64 on Philosophy (resolved 2026-11-19) |
 | [I64](#i64--a-compiled-degree-board-plans-400-level-electives-in-the-first-semester) | Defect | The compiled Philosophy board plans its two "6 elective credits at the 400–499 level" tiles, and the four "two at the 400 level" elective tiles, in semester 1: a compiled elective slot was upper only when every course its group requires is upper. Readings can now state a pool's lowest course number (`minimum_course_number`, schema 1.1.0), and 400-level work is planned from a new `senior_level_from_semester` (6); Philosophy's tiles start in semester 6 (resolved 2026-11-18) |
@@ -100,6 +102,51 @@ Kept until the next release, so a recurrence is recognisable; each entry below g
 ---
 
 # Defects
+
+## I70 — Production mrgather crashes instead of retrying a failed download
+
+**Status:** open.
+**Found:** 2026-11-19, explaining a gap in the registration snapshots.
+**Severity:** moderate: one failed download ends the whole fetch, and the
+reports after it are not pulled that day. The refresh then runs on the
+previous day's files for those reports (I33's per-report judgement keeps it
+honest: the summary lists each missing report).
+**Cause:** production's `mrgather-mrgather:latest` image was built on
+2026-04-10 from a `mrgather.js` whose retry path calls
+`tracker.recordReportFetchError()` and a `reportTracker.js` that does not
+define it. The current source defines it (`reportTracker.js`), so the image
+and the source disagree.
+**Evidence:** `/var/log/cedar-update-20261113_100501.log`: "Fatal error during
+report gathering: TypeError: tracker.recordReportFetchError is not a function"
+during the Academic Studies fetch; the class list was not downloaded, and the
+registration snapshot that day paired the 2026-11-12 class list with the
+2026-11-13 schedule.
+**Reproduction:** on the server, `docker run --rm --entrypoint sh
+mrgather-mrgather:latest -c "grep -c recordReportFetchError /app/*.js"`:
+`mrgather.js` 1, `reportTracker.js` 0.
+**Fix:** rebuild the production mrgather image from current source.
+
+## I69 — The nightly Dept Dashboard warm failed every department since the measure tables
+
+**Status:** resolved 2026-11-19.
+**Found:** 2026-11-19, reading the refresh logs for the registration snapshots.
+**Severity:** moderate: no wrong number, but every chair's dashboard was built
+on their first visit each day instead of read from the morning cache, and the
+refresh summary showed the step ⚠️ for twelve days unnoticed.
+**Cause:** `scripts/warm-dept-dashboard-cache.R` kept its own copy of
+global.R's loading. When the measure tables arrived (ADR-001 step 6,
+2026-11-08) the dashboard's Registration flags began to read
+`cedar_course_terms`, which the script never loaded: every department stopped
+with "get_reg_stats(): course_terms (cedar_course_terms, as the loader holds
+it) is required."
+**Evidence:** `/var/log/cedar-update-2026110[8-9]*` onward: "warm dashboard
+cache ⚠️ exit 1"; 2026-11-07 and earlier ✅.
+**Fix:** `load_measure_tables()` (`R/branches/measure-tables.R`) and
+`cedar_table_cache_hashes()` (`R/trunk/cache.R`) are the one way to load the
+measure tables and to hash the tables for cache keys; global.R and the warm
+script both call them, and the script loads every table the dashboard reads.
+A real-data run warmed a department and the app then loaded that cache
+instead of rebuilding it. Tests: `test-transform-measures.R`, `test-cache.R`.
 
 ## I68 — The compiled Computer Science board plans Composition I twice
 
@@ -4310,6 +4357,18 @@ label) and the sparkline strokes in `R/modules/ui-helpers.R` are not checked.
 *Reproduce:* switch to dark mode and open Regstats, a Dept Trends degree
 table or Pathways' warning line. *Done when:* each is a CSS class reading a
 token, and a dark screenshot of each page shows no light-mode colour.
+
+**M59 — Each cache-warming script copies global.R's load sequence.**
+`scripts/warm-dept-dashboard-cache.R`, `warm-dept-trends-cache.R` and
+`warm-cas-dept-profiles.R` each repeat global.R's steps by hand: read the
+tables, trim to `cedar_min_term`, `thin_class_list()`,
+`attach_default_units()`, `build_cedar_courses()` / `attach_course_ids()`,
+`cedar_report_edges()`. A step added to global.R and not to a script makes
+the script save caches the app never asks for, or stop (I69, where the
+measure tables were the missing step; I69's fix shares only the measure
+tables and the cache hashes). *Done when:* one function loads the tables as
+the app holds them, global.R and every warm script call it, and
+`scripts/cedar-repl.R` does too where its trimming allows.
 
 ### Documentation and naming
 

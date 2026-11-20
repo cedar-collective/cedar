@@ -99,6 +99,7 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
   source_file("branches/dfw-scope.R")            # the DFW dashboard's scoped attempts and counts
   source_file("branches/attempts.R")             # cedar_attempts: one classified outcome per graded attempt (ADR-001 step 4)
   source_file("branches/course-flows.R")
+  source_file("branches/measure-tables.R")        # load_measure_tables(): every loader reads the measure tables the same way
   source_file("branches/downstream-cohort.R")    # students who took course X, and what each did in course Y
   source_file("branches/enrollment-projections.R")
   source_file("branches/enrollment-projection-inputs.R")

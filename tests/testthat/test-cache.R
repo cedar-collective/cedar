@@ -431,6 +431,37 @@ test_that("dept dashboard cache key differs by term, campus, date, the mapping f
   expect_false(base == other_course_terms)
 })
 
+test_that("every loader hashes the tables the same way: the mapping files fold into a unit table's hash, a table not loaded is left out", {
+  # global.R and the cache-warming scripts both call cedar_table_cache_hashes(),
+  # so a dashboard a script saves sits under the key the app asks for (ISSUES I69).
+  dir <- withr::local_tempdir()
+  tables <- c("cedar_registrations", "cedar_sections", "cedar_programs", "cedar_degrees")
+  fingerprints <- lapply(stats::setNames(tables, tables), function(name) {
+    path <- file.path(dir, paste0(name, ".qs"))
+    qs2::qs_save(data_objects[[name]], path)
+    cedar_source_fingerprint(path)
+  })
+  units <- c("cedar_registrations", "cedar_sections", "cedar_programs")
+  hashes <- cedar_table_cache_hashes(data_objects, fingerprints, "dims-a", unit_tables = units)
+  expect_setequal(names(hashes), paste0(tables, "_hash"))
+  expect_identical(hashes$cedar_sections_hash,
+                   cedar_cache_object_hash(data_objects$cedar_sections,
+                                           modifyList(fingerprints$cedar_sections, list(dims = "dims-a"))))
+
+  # A mapping edit changes each unit table's hash and no other.
+  edited <- cedar_table_cache_hashes(data_objects, fingerprints, "dims-b", unit_tables = units)
+  for (name in units) expect_false(identical(hashes[[paste0(name, "_hash")]], edited[[paste0(name, "_hash")]]))
+  expect_identical(hashes$cedar_degrees_hash, edited$cedar_degrees_hash)
+
+  # A table not loaded has no hash; a loaded table without its file's
+  # fingerprint stops.
+  without_degrees <- cedar_table_cache_hashes(data_objects[setdiff(names(data_objects), "cedar_degrees")],
+                                              fingerprints, "dims-a", unit_tables = units)
+  expect_false("cedar_degrees_hash" %in% names(without_degrees))
+  expect_error(cedar_table_cache_hashes(data_objects, fingerprints[-1], "dims-a", unit_tables = units),
+               "no source fingerprint for cedar_registrations")
+})
+
 test_that("dept dashboard cache save/load roundtrips one dashboard payload", {
   with_temp_cache({
     opt <- list(dept_code = "HIST", campus = c("ABQ", "EA"), term = 202110L)
