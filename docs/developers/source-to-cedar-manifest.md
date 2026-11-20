@@ -95,7 +95,7 @@ The course schedule. One row per section per term.
 | `term_type` | from term code (fall / spring / summer) |
 | `gen_ed_area` | lookup: `institution/<id>/gen_ed_courses.csv` |
 | `is_combined` | `CRSE` ends in `C` |
-| `is_topics` | title begins `T:` |
+| `is_topics` | title opens with one of the institution's topics labels (`settings.csv` `topics_title_labels`; UNM: `T:`, `ST:`), through `is_topics_course()` |
 | `total_enrl` | crosslist-aware combined enrollment |
 | `crosslist_group`, `crosslist_primary`, `crosslist_role`, `crosslist_partners`, `crosslist_external`, `is_split`, `split_sections` | crosslist resolution |
 

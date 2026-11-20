@@ -1041,11 +1041,8 @@ get_enrl_for_dept_report <- function(courses, dept_code, palette, term_start, te
 
 
 
-# Topics courses have titles prefixed with "T:"; keep this shared because
-# Enrollment trends and dashboard snapshot cards both need the same test.
-is_topics_course <- function(course_title) {
-  grepl("^T:", trimws(course_title))
-}
+# is_topics_course(), the one test of a topics title, is in
+# R/lists/topic_titles.R: the labels are the institution's (settings.csv).
 
 
 # Stop loudly if course history was built without campus keys.
@@ -3034,7 +3031,7 @@ get_course_enrollment_history <- function(courses, campus, dept, subj_crse, crse
     ) %>%
     drop_shell_sections()
 
-  is_topic_title <- isTRUE(any(grepl("^T:", trimws(course_history$course_title))))
+  is_topic_title <- isTRUE(any(is_topics_course(course_history$course_title)))
   if ("is_topics" %in% names(course_history)) {
     is_topic_title <- is_topic_title || isTRUE(any(course_history$is_topics %in% TRUE, na.rm = TRUE))
   }
@@ -3138,8 +3135,7 @@ get_course_enrollment_histories <- function(courses, course_keys,
     return(requested)
   }
 
-  topic_row <- grepl("^T:", trimws(scoped$course_title))
-  topic_row[is.na(topic_row)] <- FALSE
+  topic_row <- is_topics_course(scoped$course_title)
   if ("is_topics" %in% names(scoped)) {
     topic_row <- topic_row | dplyr::coalesce(scoped$is_topics %in% TRUE, FALSE)
   }
