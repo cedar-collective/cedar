@@ -50,16 +50,16 @@ test_that("a row that merges nothing, a title merged twice, or a chain of merges
 })
 
 test_that("a topics title opens with one of the institution's labels", {
-  # UNM's settings.csv names "T:" and "ST:" (special topics).
-  expect_identical(CEDAR_TOPICS_TITLE_LABELS, c("T:", "ST:"))
+  # UNM's settings.csv: topics, special, selected and advanced topics.
+  expect_identical(CEDAR_TOPICS_TITLE_LABELS, c("T:", "ST:", "Sel T:", "Adv T:"))
   expect_identical(
     is_topics_course(c("T: Water History", " ST: Surveillance & Resistance", "Sem: Proseminar",
-                       "Statistics", "FIRST: Steps", NA)),
-    c(TRUE, TRUE, FALSE, FALSE, FALSE, FALSE)
+                       "Statistics", "FIRST: Steps", NA, "Adv T: Poetics")),
+    c(TRUE, TRUE, FALSE, FALSE, FALSE, FALSE, TRUE)
   )
   # No label, no topics course; the labels are the caller's to replace.
   expect_false(is_topics_course("T: Water History", labels = character(0)))
-  expect_true(is_topics_course("Sel T: Poetry", labels = "Sel T:"))
+  expect_true(is_topics_course("Capstone: Poetry", labels = "Capstone:"))
 })
 
 test_that("settings.csv topics labels each end in a colon", {

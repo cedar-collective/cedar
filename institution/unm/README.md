@@ -47,10 +47,10 @@ enrollment projections read history from, so pandemic-era terms cannot shape
 accuracy or method selection; without it the projection builder stops and the
 app still loads. Optional `intersession_parts_of_term` (`INT`) names the parts
 of term that run after a term's regular sessions, `|`-separated; enrollment
-projections leave them out. Optional `topics_title_labels` (`T:|ST:`) names the
+projections leave them out. Optional `topics_title_labels` (`T:|ST:|Sel T:|Adv T:`) names the
 labels a section title opens with when its course number is a topics slot,
-taught under a different title each time ("T:", and "ST:" for special
-topics); each ends in a colon. Sections whose title opens with one are stored
+taught under a different title each time ("T:", "ST:" for special
+topics, "Sel T:" for selected and "Adv T:" for advanced topics); each ends in a colon. Sections whose title opens with one are stored
 as `is_topics`, and readers holding only a title call `is_topics_course()`.
 
 ## Colleges are mapped, not read

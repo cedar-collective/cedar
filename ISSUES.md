@@ -120,8 +120,9 @@ enrollment trend and the dashboard's topics cards mixed unrelated topics.
 **Fix:** `settings.csv` `topics_title_labels` (UNM: `T:|ST:`) and one test,
 `is_topics_course()` (`R/lists/topic_titles.R`), called by the transform and
 every reader. `CEDAR_FACT_SCHEMA_VERSIONS` sections 3.
-**Guard:** `test-topic-titles.R`. Other labels that may mark topics ("Sel
-T:", "Adv T:") are not on the list until someone confirms them.
+**Guard:** `test-topic-titles.R`. "Sel T:" and "Adv T:" (selected and
+advanced topics) joined the list the same day, confirmed by the user;
+sections 4.
 
 ## I72 — The Enrollment table counted a crosslisted offering by its home listing alone
 
