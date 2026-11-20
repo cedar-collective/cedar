@@ -70,6 +70,18 @@ resolve_enrollment_levels <- function(levels = NULL) {
 #' the class list has no row for keeps NA counts: no one has registered (or, for
 #' a term not yet pulled, the class list has nothing to say), never zero.
 #'
+#' A crosslisted section's own count is one listing's students. The primary
+#' listing's row (the home listing, or the one a same-subject group counts first) also carries the whole offering's count (`xl_registered`,
+#' `xl_dr_early`, `xl_dr_late`, `xl_census_enrl`, `xl_first_day_enrl`): its own
+#' students plus those of every offered partner listing in its crosslist group
+#' (term, campus, `crosslist_group`), read from the whole schedule, so partners
+#' outside the page's filters are counted. `xl_listings` says how many listings
+#' that is. A view that shows the home row in place of its partners reads
+#' these (`summarize_enrollment_view()`), so its class-list counts and the
+#' schedule's combined total (`total_enrl`) describe the same students. A
+#' student with a row under two listings (moved between them, or dropped both)
+#' is counted once, by the status `STATUS_PRECEDENCE` ranks first.
+#'
 #' @param sections Section rows from `get_enrl()` with no `group_cols`, carrying
 #'   `term`, `crn`, `enrolled`, `available` and `crosslist_code`.
 #' @param students Class-list rows (`cedar_registrations`); only those in
@@ -78,8 +90,9 @@ resolve_enrollment_levels <- function(levels = NULL) {
 #'   day, which `get_enrl()` does not return.
 #' @return list(rows = the offered section rows with `registered`, `dr_early`,
 #'   `dr_late`, `census_enrl`, `first_day_enrl`, `first_day_basis`, `seats`,
-#'   `seats_known` and `crosslisted`; n_placeholders = section rows dropped as
-#'   not offered).
+#'   `seats_known`, `crosslisted` and, on a crosslist group's primary row, the
+#'   `xl_*` counts and `xl_listings` (NA elsewhere); n_placeholders = section
+#'   rows dropped as not offered).
 attach_enrollment_section_counts <- function(sections, students, schedule) {
   need <- c("term", "crn", "enrolled", "available", "crosslist_code")
   missing <- setdiff(need, names(sections))
@@ -87,25 +100,51 @@ attach_enrollment_section_counts <- function(sections, students, schedule) {
     stop("[enrollment.R] attach_enrollment_section_counts(): sections lack ",
          paste(missing, collapse = ", "))
   }
-  missing <- setdiff(c("term", "crn", "status", "enrolled", "available",
-                       "total_enrl", "start_date"), names(schedule))
+  need <- c(need, "campus", "crosslist_role", "crosslist_primary")
+  missing <- setdiff(need, names(sections))
+  if (length(missing) > 0) {
+    stop("[enrollment.R] attach_enrollment_section_counts(): sections lack ",
+         paste(missing, collapse = ", "))
+  }
+  missing <- setdiff(c("term", "crn", "campus", "status", "enrolled", "available",
+                       "total_enrl", "start_date", "crosslist_group", "college", "subject_course"), names(schedule))
   if (length(missing) > 0) {
     stop("[enrollment.R] attach_enrollment_section_counts(): schedule lacks ",
          paste(missing, collapse = ", "))
   }
 
   sections <- dplyr::ungroup(sections)
-  offered_keys <- schedule %>%
-    dplyr::ungroup() %>%
-    keep_offered_sections() %>%
-    dplyr::distinct(term, crn)
+  # Only the terms on the page: the schedule and the class list are filtered
+  # by term (an integer test) before any join reads them.
+  terms <- unique(sections$term)
+  schedule <- schedule %>% dplyr::ungroup() %>% dplyr::filter(term %in% terms)
+  students <- students %>% dplyr::ungroup() %>% dplyr::filter(term %in% terms)
+  offered_schedule <- keep_offered_sections(schedule)
+  offered_keys <- offered_schedule %>% dplyr::distinct(term, crn)
   offered <- sections %>% dplyr::semi_join(offered_keys, by = c("term", "crn"))
   if (anyDuplicated(offered[c("term", "crn")]) > 0) {
     stop("[enrollment.R] attach_enrollment_section_counts(): a section (term, crn) ",
          "appears more than once; counts would be attached twice")
   }
 
-  scoped <- filter_classlist_to_sections(students, offered)
+  # Every offered listing of a crosslist group whose home row is on the page.
+  group_key <- c("term", "campus", "crosslist_group")
+  homes <- offered %>%
+    dplyr::filter(crosslist_primary %in% TRUE) %>%
+    dplyr::select(term, crn) %>%
+    dplyr::inner_join(offered_schedule %>%
+                        dplyr::filter(!is.na(crosslist_group)) %>%
+                        dplyr::distinct(term, crn, campus, crosslist_group),
+                      by = c("term", "crn"), relationship = "one-to-one") %>%
+    dplyr::rename(home_crn = crn)
+  listings <- offered_schedule %>%
+    dplyr::distinct(term, crn, campus, crosslist_group) %>%
+    dplyr::inner_join(homes, by = group_key, relationship = "many-to-one")
+
+  scoped <- filter_classlist_to_sections(
+    students, dplyr::bind_rows(offered %>% dplyr::select(term, crn),
+                               listings %>% dplyr::select(term, crn))
+  )
   if (nrow(scoped) > 0) {
     counts <- calc_cl_enrls(scoped, by_section = TRUE) %>%
       dplyr::ungroup() %>%
@@ -114,7 +153,6 @@ attach_enrollment_section_counts <- function(sections, students, schedule) {
       scoped,
       schedule %>%
         dplyr::ungroup() %>%
-        dplyr::semi_join(offered_keys, by = c("term", "crn")) %>%
         dplyr::select(term, crn, start_date),
       by_section = TRUE
     ) %>%
@@ -128,9 +166,49 @@ attach_enrollment_section_counts <- function(sections, students, schedule) {
                                 first_day_basis = character())
   }
 
+  # The offering behind each home row, counted as the Course Report counts a
+  # crosslist family (get_course_crosslist_classlist_enrl()): every listing's
+  # rows relabelled to the home listing, so calc_cl_enrls() keeps one row a
+  # student, the one STATUS_PRECEDENCE ranks first. A student who dropped one
+  # listing and registered under another is registered, once.
+  empty_offering <- tibble::tibble(
+    term = offered$term[0], crn = offered$crn[0], xl_listings = integer(),
+    xl_registered = integer(), xl_dr_early = integer(), xl_dr_late = integer(),
+    xl_census_enrl = integer(), xl_first_day_enrl = integer()
+  )
+  offering <- if (nrow(listings) == 0) empty_offering else {
+    home_label <- offered_schedule %>%
+      dplyr::semi_join(homes, by = c("term", "crn" = "home_crn")) %>%
+      dplyr::distinct(term, home_crn = crn, .campus = campus, .college = college,
+                      .course = subject_course)
+    n_listings <- listings %>% dplyr::count(term, crn = home_crn, name = "xl_listings")
+    pooled <- scoped %>%
+      dplyr::inner_join(listings %>% dplyr::select(term, crn, home_crn),
+                        by = c("term", "crn"), relationship = "many-to-one") %>%
+      dplyr::inner_join(home_label, by = c("term", "home_crn"), relationship = "many-to-one") %>%
+      dplyr::mutate(crn = home_crn, campus = .campus, college = .college, subject_course = .course)
+    if (nrow(pooled) == 0) {
+      dplyr::bind_rows(empty_offering, n_listings)
+    } else {
+      n_listings %>%
+        dplyr::left_join(
+          calc_cl_enrls(pooled, by_section = TRUE) %>%
+            dplyr::ungroup() %>%
+            dplyr::select(term, crn, xl_registered = registered, xl_dr_early = dr_early,
+                          xl_dr_late = dr_late, xl_census_enrl = census_enrl),
+          by = c("term", "crn"), relationship = "one-to-one") %>%
+        dplyr::left_join(
+          calc_first_day_enrl(pooled, schedule %>% dplyr::select(term, crn, start_date),
+                              by_section = TRUE) %>%
+            dplyr::select(term, crn, xl_first_day_enrl = first_day_enrl),
+          by = c("term", "crn"), relationship = "one-to-one")
+    }
+  }
+
   rows <- offered %>%
     dplyr::left_join(counts, by = c("term", "crn"), relationship = "one-to-one") %>%
     dplyr::left_join(first_day, by = c("term", "crn"), relationship = "one-to-one") %>%
+    dplyr::left_join(offering, by = c("term", "crn"), relationship = "one-to-one") %>%
     dplyr::mutate(
       seats = as.numeric(enrolled) + as.numeric(available),
       seats_known = is.finite(enrolled) & is.finite(available) & seats > 0,
@@ -138,6 +216,9 @@ attach_enrollment_section_counts <- function(sections, students, schedule) {
     )
   list(rows = rows, n_placeholders = nrow(sections) - nrow(offered))
 }
+
+# The crosslist views that show an offering once, on its home row.
+ENROLLMENT_OFFERING_VIEWS <- c("home", "xl-home", "split")
 
 #' Build one crosslist view of the Enrollment table
 #'
@@ -159,6 +240,9 @@ attach_enrollment_section_counts <- function(sections, students, schedule) {
 #' @param opt `view` (a `filter_enrollment_crosslist_view()` view, default
 #'   "home"), `group_cols` (NULL for one row per section), `enrl_min`,
 #'   `enrl_max` (census bounds; NULL or NA for none).
+#' In the views that leave a crosslisted offering's partner listings out (home,
+#' xl-home and split), the row shown counts the whole offering (the `xl_*` counts);
+#' every other view counts each listing's own students.
 #' A row grouped by `subject_course` (and not by `course_title`) carries
 #' `course_title`, its sections' most common title, and `n_titles`.
 #'
@@ -168,6 +252,16 @@ summarize_enrollment_view <- function(section_rows, opt = list()) {
   group_cols <- opt[["group_cols"]]
   grouped <- length(group_cols) > 0
   rows <- filter_enrollment_crosslist_view(section_rows, view)
+  # A view that shows a crosslisted offering once, on its home row, counts the
+  # whole offering there: the home listing's students and its partners'.
+  if (view %in% ENROLLMENT_OFFERING_VIEWS && nrow(rows) > 0) {
+    # Same-subject listings ("internal") each keep a row in the home views, so
+    # there each counts its own students; Split Level shows the primary alone.
+    whole <- !is.na(rows$xl_listings) & (view == "split" | rows$crosslist_role %in% "home")
+    for (col in c("registered", "dr_early", "dr_late", "census_enrl", "first_day_enrl")) {
+      rows[[col]][whole] <- rows[[paste0("xl_", col)]][whole]
+    }
+  }
 
   if (grouped) {
     missing <- setdiff(group_cols, names(rows))

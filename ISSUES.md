@@ -60,6 +60,7 @@ Kept until the next release, so a recurrence is recognisable; each entry below g
 
 | ID | Kind | Summary |
 |---|---|---|
+| [I72](#i72--the-enrollment-table-counted-a-crosslisted-offering-by-its-home-listing-alone) | Defect | The Enrollment table showed a crosslisted offering once, on its home row, with class-list counts (first day, census, final) for the home listing's students only, while the schedule's combined total beside it counted every listing. The home row now counts the whole offering, each student once (resolved 2026-11-20) |
 | [I71](#i71--regstats-worth-a-look-stops-on-a-topics-course-waitlisted-under-two-titles) | Defect | Regstats' "Worth a look" could not be built for a term in which a topics course had waitlisted students under two titles: the waitlist screen has a row per title and the watch reads one row per course. The watch now reads `waits_by_course`, each student once (resolved 2026-11-20) |
 | [I70](#i70--production-mrgather-crashes-instead-of-retrying-a-failed-download) | Defect | Production mrgather crashed instead of retrying a failed download: its image called `tracker.recordReportFetchError()`, which the server's `reportTracker.js` lacked, so on 2026-11-13 one failed Academic Studies download ended the fetch and that day's class list was never pulled. The server's image was rebuilt from its own with only the current `reportTracker.js` added, keeping its Chrome (resolved 2026-11-20) |
 | [I69](#i69--the-nightly-dept-dashboard-warm-failed-every-department-since-the-measure-tables) | Defect | The refresh's Dept Dashboard warm failed every department every night from 2026-11-08: the script loaded its own tables and never the measure tables the Registration flags read, so chairs' dashboards were built on first visit. Every loader now reads the measure tables and computes the cache hashes through one function each (resolved 2026-11-19) |
@@ -103,6 +104,31 @@ Kept until the next release, so a recurrence is recognisable; each entry below g
 ---
 
 # Defects
+
+## I72 — The Enrollment table counted a crosslisted offering by its home listing alone
+
+**Status:** resolved 2026-11-20.
+**Found:** 2026-11-20, by a reader: a topics course taught as one class under
+four departments' codes showed its home department's students only.
+**Severity:** high for crosslisted courses: Census and Final understate the
+class by the partners' students, so a healthy shared class looks
+under-enrolled and falls under a Census Max filter.
+**Cause:** `attach_enrollment_section_counts()` (added with the class-list
+counts, #323) joined counts to a row by its own `(term, crn)`. The Home,
+Crosslisted and Split-level views drop the partner rows, so their students
+appeared nowhere; a department filter also keeps the partners off the page.
+**Evidence:** the home row's class-list counts were below its own
+crosslist-combined schedule total (`total_enrl`).
+**Reproduction:** EC-15 (`test_sections_xl_switch`): MATH 3750 is home to a
+section shared with CS 3750. Filtered to MATH, the home row counted 5
+registered against a combined total of 9.
+**Fix:** the primary row also carries the offering's counts (`xl_*`): every
+offered listing of its crosslist group, read from the whole schedule and
+counted as the Course Report counts a family, each student once by
+`STATUS_PRECEDENCE`. `summarize_enrollment_view()` reads them in the views
+that show the offering once; Away and All keep each listing's own count.
+**Guard:** `test-enrollment.R`, "a crosslisted offering's home row counts
+every listing's students once (EC-15)".
 
 ## I71 — Regstats "Worth a look" stops on a topics course waitlisted under two titles
 
