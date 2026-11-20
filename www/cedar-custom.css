@@ -2183,11 +2183,20 @@ h4.cedar-section-heading {
 /* A finding drawn rather than written (cedar_finding_card()): the one count to
    act on, a thin bar splitting the whole into its parts, and the parts listed
    beneath with a swatch each. Cards sit side by side where there is room. */
+/* Cards sit side by side whenever two fit at their 340px minimum, each
+   growing to 660px. (A grid's repeat(auto-fit, minmax(340px, 660px)) counted
+   its columns from the 660px maximum, so two cards stacked on any content
+   narrower than about 1340px.) */
 .finding-card-row {
-  display: grid;
+  display: flex;
+  flex-wrap: wrap;
   gap: var(--space-3);
-  grid-template-columns: repeat(auto-fit, minmax(340px, 660px));
   margin: 0 0 var(--space-3);
+}
+.finding-card-row > .finding-card {
+  flex: 1 1 340px;
+  max-width: 660px;
+  min-width: min(100%, 340px);
 }
 .finding-card { margin-bottom: 0; }
 .finding-card--warn { border-top-color: var(--danger-red); }

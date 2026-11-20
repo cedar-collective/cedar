@@ -34,7 +34,7 @@ The page builds as soon as it opens; there is no run button.
 
 | Section | What it shows |
 |---|---|
-| **How Often Students Come Back** | The latest term's rate against the first, the trend's verdict (rising, falling or steady), and every term's rate as a line. |
+| **How Often Students Come Back** | Every term's rate as a line (hover a term for its counts), with the trend as a dashed line labelled with its points a year and its verdict: rising, falling or steady. |
 | **Who Isn't Coming Back** | For a late withdrawal and for a DFW grade: how many students had it, how often they came back against those without it, and what share of the students who did not come back had it. |
 | **By Classification and College** | Each classification and each primary-major college: its latest rate, its rate over the terms and its terms as a small line with the trend. |
 | **Courses Where a DFW Costs the Most** | Over the latest three terms with posted grades, the courses where students who got a DFW came back much less often than those who passed: the 25 largest gaps. |

@@ -39,7 +39,11 @@ try {
 
   await connect(page, { tab: 'retention', expect: 'Retention' });
   ok(await mode() === 'dark', 'the choice survives a reload');
-  await waitForSelector(page, '#retention_dashboard-overall_finding .finding-card', { timeout: 300000 });
+  await waitFor(page, () => {
+    const r = document.getElementById('retention_dashboard-overall_plot');
+    const p = r?.classList.contains('js-plotly-plot') ? r : r?.querySelector('.js-plotly-plot');
+    return !!(p && p.data && p.data.length);
+  }, { timeout: 300000 });
   await waitForIdle(page, { timeout: 300000 });
   await waitFor(page, () => !!document.querySelector('#retention_dashboard-signs_table .rt-th'), { timeout: 120000 });
   const darkFig = await waitFor(page, () => {
