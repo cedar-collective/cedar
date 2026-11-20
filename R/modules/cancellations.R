@@ -46,8 +46,9 @@ cancellationsUI <- function(id, sections, default_term, dept_choices) {
         ),
         column(2,
           filter_actions(
-            actionButton(ns("cn_button"), label = "Find Cancellations",
-                         icon = icon("ban"), class = "btn-primary"),
+            cedar_requires(actionButton(ns("cn_button"), label = "Find Cancellations",
+                                        icon = icon("ban"), class = "btn-primary"),
+                           ns("cn_term"), "Choose at least one term first"),
             cedar_link_menu(ns("cn_copy_url"))
           )
         )

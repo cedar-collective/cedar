@@ -109,7 +109,7 @@ retentionDashboardServer <- function(id, student_terms, attempts, degrees, dims,
     college_names <- college_code_names(dims)
     payload <- reactive({
       req(isTRUE(active()), input$term_type, input$level)
-      cedar_with_loading(session, session$ns("load"), {
+      cedar_with_loading(session, session$ns("load"), report_type = "retention_dashboard", {
         tryCatch(
           build_retention_dashboard(student_terms, attempts, degrees, list(
             term_type = input$term_type, student_level = input$level,

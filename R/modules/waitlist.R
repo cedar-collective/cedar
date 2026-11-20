@@ -180,8 +180,9 @@ waitlistUI <- function(id, sections, default_term, dept_choices) {
         ),
         column(2,
           filter_actions(
-            actionButton(ns("wl_button"), label = "Inspect Waitlists",
-                         icon = icon("list-ol"), class = "btn-primary"),
+            cedar_requires(actionButton(ns("wl_button"), label = "Inspect Waitlists",
+                                        icon = icon("list-ol"), class = "btn-primary"),
+                           c(ns("wl_course"), ns("wl_term")), "Choose a course or a term first", any = TRUE),
             cedar_link_menu(ns("wl_copy_url"))
           )
         )

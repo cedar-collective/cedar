@@ -190,7 +190,7 @@ courseCohortServer <- function(id, student_terms, attempts, programs, dims, edge
         data_edges = edges,
         college_label = if (length(college) && college %in% names(college_names)) unname(college_names[[college]]) else college
       )
-      cedar_with_loading(session, ns("load"), {
+      cedar_with_loading(session, ns("load"), report_type = "course_cohort", {
         payload <- tryCatch(
           build_course_cohort_context(student_terms, attempts, opt),
           error = function(e) {

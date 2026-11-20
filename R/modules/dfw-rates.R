@@ -339,7 +339,7 @@ dfwRatesServer <- function(id, attempts, dims, edges, active) {
       }
       key <- paste(input$dr_term_type, paste(campus, collapse = "+"), from_term, to_term)
       if (!is.null(built[[key]])) return(built[[key]])
-      p <- cedar_with_loading(session, session$ns("load"), {
+      p <- cedar_with_loading(session, session$ns("load"), report_type = "dfw_dashboard", {
         tryCatch(
           build_dfw_dashboard(attempts, dims, list(term_type = input$dr_term_type, campus = campus,
                                                    from_term = from_term, to_term = to_term,

@@ -204,7 +204,7 @@ server <- function(input, output, session) {
             "<style>",
             ".changelog-title { margin-top: 0; margin-bottom: 0rem; }",
             ".changelog-entry { margin-bottom: 0; }",
-            ".changelog-date { font-size: 1.5rem; color: #666; margin-bottom: 5px; }",
+            ".changelog-date { font-size: 1.5rem; color: var(--text-muted); margin-bottom: 5px; }",
             "</style>",
             changelog_html,
             "<hr>",
@@ -899,7 +899,7 @@ for (.download_key in names(.enrl_desr_view_ids)) {
       downloadLink(
         download_id,
         tagList(icon("download"), " Download CSV"),
-        style = "font-size: 0.85em; color: #666; display: inline-block; margin-bottom: 8px;"
+        style = "font-size: 0.85em; color: var(--text-muted); display: inline-block; margin-bottom: 8px;"
       )
     })
 
@@ -1199,7 +1199,7 @@ for (.download_key in names(.enrl_desr_view_ids)) {
         h4("No Courses Found", class = "my-2"),
         p(no_results_msg, style = "margin: 5px 0; font-size: 1.1em;"),
         p("Try adjusting your filters or thresholds.",
-          style = "margin-top: 15px; color: #666;")
+          style = "margin-top: 15px; color: var(--text-muted);")
       ))
     }
 
@@ -1357,11 +1357,11 @@ for (.download_key in names(.enrl_desr_view_ids)) {
     warn_lvl <- threshold * 0.75
     function(value, ...) {
       if (is.na(value) || !is.numeric(value)) return(NULL)
-      bg <- if      (value < critical)  "#f8d7da"
-            else if (value < warn_lvl)  "#fff3cd"
-            else if (value < threshold) "#d1ecf1"
-            else if (include_buffer)    "#d4edda"
-            else                        "#d1ecf1"
+      bg <- if      (value < critical)  "var(--alert-critical-bg)"
+            else if (value < warn_lvl)  "var(--alert-warning-bg)"
+            else if (value < threshold) "var(--alert-info-bg)"
+            else if (include_buffer)    "var(--alert-success-bg)"
+            else                        "var(--alert-info-bg)"
       list(background = bg, fontWeight = "bold")
     }
   }
@@ -1462,8 +1462,8 @@ for (.download_key in names(.enrl_desr_view_ids)) {
       if (is.na(value)) list(background = "var(--alert-neutral-bg)") else band_style(value)
     }
     header_nowrap <- list(whiteSpace = "nowrap")
-    trend_colors <- c("↑ up" = "#28a745", "↓ down" = "#dc3545",
-                      "↔ stable" = "#6c757d")
+    trend_colors <- c("↑ up" = "var(--text-green)", "↓ down" = "var(--text-critical)",
+                      "↔ stable" = "var(--text-muted)")
     split_cols   <- if (show_split_info)
       list(`Split Partners` = reactable::colDef(minWidth = 120, headerStyle = header_nowrap)) else list()
 
@@ -1533,7 +1533,7 @@ for (.download_key in names(.enrl_desr_view_ids)) {
 
   output$low_enrl_download_ui <- renderUI({
     req(low_enrl_data())
-    downloadLink("low_enrl_download", "Download CSV", style = "font-size: 0.85em; color: #888;")
+    downloadLink("low_enrl_download", "Download CSV", style = "font-size: 0.85em; color: var(--text-muted);")
   })
 
   output$low_enrl_download <- downloadHandler(
@@ -1824,10 +1824,10 @@ for (.download_key in names(.enrl_desr_view_ids)) {
     run_course_report(course)
   }, ignoreInit = TRUE)
 
-  with_cr_tab_loading <- function(message_text, expr) {
-    showNotification(message_text, type = "message", duration = NULL, id = "cr_tab_loading")
-    on.exit(removeNotification("cr_tab_loading"), add = TRUE)
-    force(expr)
+  # A subtab's first computation runs behind Course Dynamics' overlay, timed in
+  # its own log so the overlay says how long it usually takes.
+  with_cr_tab_loading <- function(message_text, report_type, expr) {
+    cedar_with_loading(session, "cr", expr, label = message_text, report_type = report_type)
   }
 
   # Shared helper — compute one tab's data and merge it into course_report_data().
@@ -1838,7 +1838,7 @@ for (.download_key in names(.enrl_desr_view_ids)) {
 
     if (tab == "Other Courses" && !isTRUE(base$flows_loaded)) {
       flow_payload <- with_cr_tab_loading(
-        "Computing course flows...",
+        "Following students to their other courses…", "course_report_flows",
         compute_cr_flows_tab(base, data_objects)
       )
       base$plots <- c(base$plots, flow_payload$plots)
@@ -1852,7 +1852,7 @@ for (.download_key in names(.enrl_desr_view_ids)) {
       base <- course_report_data() %||% base
       if (is.null(base$projections)) {
         base$projections <- with_cr_tab_loading(
-          "Reading the saved projections...",
+          "Reading the saved projections…", "course_report_projections",
           lapply(
             load_cr_projection_bundles(),
             enrollment_projection_course_outlook,
@@ -1876,7 +1876,7 @@ for (.download_key in names(.enrl_desr_view_ids)) {
       base <- course_report_data() %||% base
       if (is.null(base$outcomes)) {
         outcomes <- with_cr_tab_loading(
-          "Computing outcomes...",
+          "Reading the course's outcomes…", "course_report_outcomes",
           compute_cr_outcomes_tab(base, data_objects)
         )
         base$outcomes <- outcomes
@@ -2169,10 +2169,10 @@ for (.download_key in names(.enrl_desr_view_ids)) {
         
         do.call(tagList, plot_list)
       } else {
-        p("No flow data available for this course.", style = "color: #666;")
+        p("No flow data available for this course.", style = "color: var(--text-muted);")
       }
     } else {
-      p("Generate a report to see student flow diagrams.", style = "color: #666;")
+      p("Generate a report to see student flow diagrams.", style = "color: var(--text-muted);")
     }
   })
 
@@ -2744,7 +2744,7 @@ for (.download_key in names(.enrl_desr_view_ids)) {
           tags$strong("Data window: "), dfw_edge_note,
           tags$br(), tags$br(),
           tags$strong("What counts as non-passing?"),
-          tags$span(style = "font-size: 0.85em; color: #555; margin-left: 8px;",
+          tags$span(style = "font-size: 0.85em; color: var(--text-secondary); margin-left: 8px;",
             "Affects all course-level charts and tables below."),
           radioButtons("cr_dfw_threshold", label = NULL,
             choices = c(
@@ -3998,7 +3998,8 @@ for (.download_key in names(.enrl_desr_view_ids)) {
     )
 
     # Behind Course Dynamics' own overlay, labelled for this comparison.
-    cedar_with_loading(session, "cr", label = "Building the sequence comparison…", {
+    cedar_with_loading(session, "cr", label = "Building the sequence comparison…",
+                       report_type = "course_sequence", {
       tryCatch({
         result <- get_course_sequence_effect(
           students     = cr_students,
@@ -4335,15 +4336,15 @@ for (.download_key in names(.enrl_desr_view_ids)) {
   }
 
   # Dashboard color palette and table constants
-  .dash_up       <- "#2e7d32"  # green — above average / positive trend
-  .dash_down     <- "#c62828"  # red   — below average / negative trend
-  .dash_neu      <- "#777777"  # grey  — neutral / no trend
+  .dash_up       <- "var(--text-green)"  # green — above average / positive trend
+  .dash_down     <- "var(--text-critical)"  # red   — below average / negative trend
+  .dash_neu      <- "var(--text-muted)"  # grey  — neutral / no trend
   .dash_max_rows <- 8L         # max rows shown per course table
 
   # Render a single trend line: "1yr: ↑ 12%" with the arrow colored
   trend_line <- function(period_label, pct) {
     if (is.na(pct)) return(tags$span(
-      style = "color: #aaa; white-space: nowrap;",
+      style = "color: var(--text-muted); white-space: nowrap;",
       paste0(period_label, ": —")
     ))
     color <- if (pct > 0) .dash_up else if (pct < 0) .dash_down else .dash_neu
@@ -4513,17 +4514,13 @@ for (.download_key in names(.enrl_desr_view_ids)) {
       stats <- get_subject_current_stats(cedar_sections, subj, ct)
 
       make_simple_card <- function(count, label) {
-        div(
-          style = paste0(
-            "background: #f8f9fa; border-radius: 8px; padding: 14px 18px; ",
-            "text-align: center; border-top: 3px solid #dee2e6;"
-          ),
-          div(style = "font-size: 2rem; font-weight: 700; color: #222;", count),
-          div(style = "font-size: 0.85rem; color: #444; margin-top: 4px; font-weight: 600;", label)
+        div(class = "dept-headcount-card",
+          div(class = "dept-headcount-count", count),
+          div(class = "dept-headcount-label", label)
         )
       }
 
-      return(fluidRow(
+      return(fluidRow(class = "dept-headcount-row",
         column(3, make_simple_card(stats$total_enrl, paste0(subj, " enrolled (current term)"))),
         column(3, make_simple_card(stats$n_sections, paste0(subj, " sections (current term)")))
       ))
@@ -4536,22 +4533,14 @@ for (.download_key in names(.enrl_desr_view_ids)) {
     hc <- d$headcount_summary
     if (is.null(hc) || nrow(hc) == 0) return(NULL)
 
+    # A program's card under its level's total is the quieter one.
     make_card <- function(label, count, pct_1yr, pct_3yr, pct_6yr, transparent = FALSE) {
-      opacity_style <- if (transparent) "opacity: 0.65;" else ""
       div(
-        style = paste0(
-          "background: #f8f9fa; border-radius: 8px; padding: 14px 18px; ",
-          "text-align: center; border-top: 3px solid #dee2e6; ", opacity_style
-        ),
-        div(style = "font-size: 2rem; font-weight: 700; color: #222;", count),
-        div(style = "font-size: 0.85rem; color: #444; margin-top: 4px; font-weight: 600;",
-            label),
+        class = paste("dept-headcount-card", if (transparent) "dept-headcount-card--part"),
+        div(class = "dept-headcount-count", count),
+        div(class = "dept-headcount-label", label),
         div(
-          style = paste(
-            "font-size: 0.72rem; margin-top: 8px; line-height: 1.2;",
-            "display: flex; justify-content: center; gap: 8px;",
-            "white-space: nowrap;"
-          ),
+          class = "dept-headcount-trends",
           trend_line("1yr", pct_1yr),
           trend_line("3yr", pct_3yr),
           trend_line("6yr", pct_6yr)
@@ -4572,7 +4561,7 @@ for (.download_key in names(.enrl_desr_view_ids)) {
           transparent = !isTRUE(row$is_total)
         ))
       })
-      fluidRow(!!!cards)
+      fluidRow(class = "dept-headcount-row", !!!cards)
     }
 
     tagList(
@@ -4592,16 +4581,18 @@ for (.download_key in names(.enrl_desr_view_ids)) {
   # Rendered while the panel is closed, so opening it never shows an empty box.
   outputOptions(output, "dashboard_headcount_scope", suspendWhenHidden = FALSE)
 
-  # Headcount sparkline (static ggplot — no hover).
+  # Headcount sparkline (native plotly, so dark mode recolours it).
   # Hidden when a subject is selected (sparklines show dept-level trends, not subject).
-  output$dashboard_headcount_sparkline <- renderPlot({
+  output$dashboard_headcount_sparkline <- plotly::renderPlotly({
     subj <- input$dashboard_subject
     if (!is.null(subj) && nchar(subj) > 0) return(NULL)
     d <- dashboard_data()
     req(d)
     req(d$headcount_series)
-    make_headcount_sparklines(d$headcount_series)
-  }, bg = "transparent", height = 200)
+    fig <- make_headcount_sparklines(d$headcount_series)
+    req(fig)
+    fig
+  })
 
   output$dashboard_credit_hour_shifts <- renderUI({
     d <- dashboard_data()
@@ -4624,7 +4615,7 @@ for (.download_key in names(.enrl_desr_view_ids)) {
       paste0(sign_chr, scales::comma(round(diff)), pct_txt)
     }
     diff_color <- function(x) {
-      ifelse(is.na(x), "#666", ifelse(x > 0, "#7A5010", "#2e7d32"))
+      ifelse(is.na(x), "var(--text-muted)", ifelse(x > 0, "var(--text-warning)", "var(--text-green)"))
     }
     cell_left <- "padding: 4px 10px 4px 0; font-weight: 600;"
     cell_num <- "padding: 4px 10px; text-align: right; white-space: nowrap;"
@@ -4635,7 +4626,7 @@ for (.download_key in names(.enrl_desr_view_ids)) {
         tags$td(style = cell_left, r$level),
         tags$td(style = cell_num,
                 fmt_ch(r$current_credit_hours)),
-        tags$td(style = paste0(cell_num, " color: #666;"),
+        tags$td(style = paste0(cell_num, " color: var(--text-muted);"),
                 fmt_ch(r$hist_avg_credit_hours)),
         tags$td(
           style = paste0(
@@ -4679,10 +4670,10 @@ for (.download_key in names(.enrl_desr_view_ids)) {
       )
     }
     diff_color <- function(x) {
-      ifelse(is.na(x), "#666", ifelse(x > 0, "#7A5010", "#2e7d32"))
+      ifelse(is.na(x), "var(--text-muted)", ifelse(x > 0, "var(--text-warning)", "var(--text-green)"))
     }
     cell_signal <- "padding: 4px 10px 4px 0; font-weight: 600; white-space: nowrap;"
-    cell_text <- "padding: 4px 10px; color: #555;"
+    cell_text <- "padding: 4px 10px; color: var(--text-secondary);"
     cell_num <- "padding: 4px 10px; text-align: right; white-space: nowrap;"
 
     rows <- lapply(seq_len(min(nrow(shifts), 10L)), function(i) {
@@ -4690,10 +4681,10 @@ for (.download_key in names(.enrl_desr_view_ids)) {
       tags$tr(
         tags$td(style = cell_signal, r$signal),
         tags$td(style = cell_text, r$group),
-        tags$td(style = paste0(cell_text, " color: #333;"), r$category),
+        tags$td(style = paste0(cell_text, " color: var(--table-text);"), r$category),
         tags$td(style = cell_num,
                 fmt_share(r$current_share)),
-        tags$td(style = paste0(cell_num, " color: #666;"),
+        tags$td(style = paste0(cell_num, " color: var(--text-muted);"),
                 fmt_share(r$hist_avg_share)),
         tags$td(
           style = paste0(
@@ -4745,7 +4736,7 @@ for (.download_key in names(.enrl_desr_view_ids)) {
   # Each column gets a td_style vector element. empty_msg shown when rows is empty.
   .make_dashboard_table <- function(rows, empty_msg = "No data available.") {
     if (length(rows) == 0)
-      return(p(empty_msg, style = "color: #999; font-size: 0.85em;"))
+      return(p(empty_msg, style = "color: var(--text-muted); font-size: 0.85em;"))
     tags$table(
       class = "table table-sm",
       style = "font-size: 0.82em; margin-bottom: 0;",
@@ -4795,7 +4786,7 @@ for (.download_key in names(.enrl_desr_view_ids)) {
       tags$tr(
         tags$td(style = "padding: 2px 6px 2px 0; font-weight: 600; white-space: nowrap;",
                 paste0(r$subject_course, .campus_suffix(r, x))),
-        tags$td(style = "padding: 2px 4px; color: #555;", r$course_title),
+        tags$td(style = "padding: 2px 4px; color: var(--text-secondary);", r$course_title),
         tags$td(style = "padding: 2px 4px; text-align: right; white-space: nowrap;",
                 paste0(r$total_enrl, " enrolled")),
         tags$td(style = paste0("padding: 2px 0 2px 6px; text-align: right; white-space: nowrap; color: ", .dash_up, ";"),
@@ -4815,7 +4806,7 @@ for (.download_key in names(.enrl_desr_view_ids)) {
       tags$tr(
         tags$td(style = "padding: 2px 6px 2px 0; font-weight: 600; white-space: nowrap;",
                 paste0(r$subject_course, .campus_suffix(r, x))),
-        tags$td(style = "padding: 2px 4px; color: #555;", r$course_title),
+        tags$td(style = "padding: 2px 4px; color: var(--text-secondary);", r$course_title),
         tags$td(style = "padding: 2px 4px; text-align: right; white-space: nowrap;",
                 paste0(r$total_enrl, " enrolled")),
         tags$td(style = paste0("padding: 2px 0 2px 6px; text-align: right; white-space: nowrap; color: ", .dash_down, ";"),
@@ -4873,11 +4864,11 @@ for (.download_key in names(.enrl_desr_view_ids)) {
       tags$tr(
         tags$td(style = "padding: 2px 6px 2px 0; font-weight: 600; white-space: nowrap;",
                 paste0(r$subject_course, .campus_suffix(r, x))),
-        tags$td(style = "padding: 2px 4px; color: #555;", r$course_title),
+        tags$td(style = "padding: 2px 4px; color: var(--text-secondary);", r$course_title),
         tags$td(style = "padding: 2px 4px; text-align: right; white-space: nowrap;",
                 paste0(r$drop_early, " early drops"), tags$br(),
-                tags$small(style = "color:#666;", rate_txt)),
-        tags$td(style = "padding: 2px 4px; text-align: right; white-space: nowrap; color: #666;",
+                tags$small(style = "color:var(--text-muted);", rate_txt)),
+        tags$td(style = "padding: 2px 4px; text-align: right; white-space: nowrap; color: var(--text-muted);",
                 paste0("usually ", r$hist_avg), tags$br(),
                 tags$small(paste0("usual rate ", hist_rate_txt))),
         tags$td(style = paste0("padding: 2px 0 2px 6px; text-align: right; white-space: nowrap; color: ", .dash_down, ";"),
@@ -4902,11 +4893,11 @@ for (.download_key in names(.enrl_desr_view_ids)) {
       tags$tr(
         tags$td(style = "padding: 2px 6px 2px 0; font-weight: 600; white-space: nowrap;",
                 paste0(r$subject_course, .campus_suffix(r, x))),
-        tags$td(style = "padding: 2px 4px; color: #555;", r$course_title),
+        tags$td(style = "padding: 2px 4px; color: var(--text-secondary);", r$course_title),
         tags$td(style = "padding: 2px 4px; text-align: right; white-space: nowrap;",
                 paste0(r$drop_late, " late drops"), tags$br(),
-                tags$small(style = "color:#666;", rate_txt)),
-        tags$td(style = "padding: 2px 4px; text-align: right; white-space: nowrap; color: #666;",
+                tags$small(style = "color:var(--text-muted);", rate_txt)),
+        tags$td(style = "padding: 2px 4px; text-align: right; white-space: nowrap; color: var(--text-muted);",
                 paste0("usually ", r$hist_avg), tags$br(),
                 tags$small(paste0("usual rate ", hist_rate_txt))),
         tags$td(style = paste0("padding: 2px 0 2px 6px; text-align: right; white-space: nowrap; color: ", .dash_down, ";"),
@@ -4943,11 +4934,11 @@ for (.download_key in names(.enrl_desr_view_ids)) {
     header_wrap <- list(whiteSpace = "normal", lineHeight = "1.1")
     priority_badge <- function(value) {
       cfg <- switch(as.character(value),
-        Critical = list(bg = "#F2E3DE", fg = "#A15D4E"),
-        Warning  = list(bg = "#F4E9D2", fg = "#7A5010"),
-        Watch    = list(bg = "#E3ECF2", fg = "#3A5A7A"),
-        Buffer   = list(bg = "#E4EEE7", fg = "#2E7D32"),
-        list(bg = "#eeeeee", fg = "#555555")
+        Critical = list(bg = "var(--alert-critical-bg)", fg = "var(--text-critical)"),
+        Warning  = list(bg = "var(--alert-warning-bg)",  fg = "var(--text-warning)"),
+        Watch    = list(bg = "var(--alert-info-bg)",     fg = "var(--bs-info-text-emphasis)"),
+        Buffer   = list(bg = "var(--alert-success-bg)",  fg = "var(--text-green)"),
+        list(bg = "var(--alert-neutral-bg)", fg = "var(--text-secondary)")
       )
       htmltools::span(
         style = paste0(
@@ -4961,19 +4952,19 @@ for (.download_key in names(.enrl_desr_view_ids)) {
     row_style <- function(index) {
       rank <- display$.priority_rank[index]
       if (identical(rank, 1L)) {
-        list(background = "#FFF7F5", borderLeft = "3px solid #A15D4E")
+        list(background = "var(--alert-critical-bg)", borderLeft = "3px solid var(--text-critical)")
       } else if (identical(rank, 2L)) {
-        list(background = "#FFF9EC", borderLeft = "3px solid #C7A96B")
+        list(background = "var(--alert-warning-bg)", borderLeft = "3px solid var(--status-warning)")
       } else if (identical(rank, 3L)) {
-        list(background = "#F7FAFD", borderLeft = "3px solid #7FA3C3")
+        list(background = "var(--alert-info-bg)", borderLeft = "3px solid var(--status-info)")
       } else {
-        list(background = "#FAFCFA", borderLeft = "3px solid #8AB091")
+        list(background = "var(--alert-success-bg)", borderLeft = "3px solid var(--status-success)")
       }
     }
     enrl_style <- function(value) {
       if (is.na(value)) return(NULL)
-      if (value < 6) list(fontWeight = "700", color = "#A15D4E")
-      else if (value < 10) list(fontWeight = "700", color = "#7A5010")
+      if (value < 6) list(fontWeight = "700", color = "var(--text-critical)")
+      else if (value < 10) list(fontWeight = "700", color = "var(--text-warning)")
       else list(fontWeight = "600")
     }
     # Recent History has no fixed length, so it wraps within its column
@@ -5021,10 +5012,10 @@ for (.download_key in names(.enrl_desr_view_ids)) {
       tags$tr(
         tags$td(style = "padding: 2px 6px 2px 0; font-weight: 600; white-space: nowrap;",
                 paste0(r$subject_course, .campus_suffix(r, x))),
-        tags$td(style = "padding: 2px 4px; color: #555;", r$course_title),
-        tags$td(style = "padding: 2px 4px; text-align: right; white-space: nowrap; color: #1565c0;",
+        tags$td(style = "padding: 2px 4px; color: var(--text-secondary);", r$course_title),
+        tags$td(style = "padding: 2px 4px; text-align: right; white-space: nowrap; color: var(--link-color);",
                 paste0(r$total_enrl, " enrolled")),
-        tags$td(style = "padding: 2px 0 2px 6px; text-align: right; white-space: nowrap; color: #888;",
+        tags$td(style = "padding: 2px 0 2px 6px; text-align: right; white-space: nowrap; color: var(--text-muted);",
                 slot_txt)
       )
     })
@@ -5042,8 +5033,8 @@ for (.download_key in names(.enrl_desr_view_ids)) {
       tags$tr(
         tags$td(style = "padding: 2px 6px 2px 0; font-weight: 600; white-space: nowrap;",
                 paste0(r$subject_course, .campus_suffix(r, x))),
-        tags$td(style = "padding: 2px 4px; color: #555;", r$course_title),
-        tags$td(style = "padding: 2px 0 2px 6px; text-align: right; white-space: nowrap; color: #888;",
+        tags$td(style = "padding: 2px 4px; color: var(--text-secondary);", r$course_title),
+        tags$td(style = "padding: 2px 0 2px 6px; text-align: right; white-space: nowrap; color: var(--text-muted);",
                 hist_txt)
       )
     })
@@ -5062,10 +5053,10 @@ for (.download_key in names(.enrl_desr_view_ids)) {
       tags$tr(
         tags$td(style = "padding: 2px 6px 2px 0; font-weight: 600; white-space: nowrap;",
                 paste0(r$subject_course, .campus_suffix(r, x))),
-        tags$td(style = "padding: 2px 4px; color: #555;", r$course_title),
+        tags$td(style = "padding: 2px 4px; color: var(--text-secondary);", r$course_title),
         tags$td(style = "padding: 2px 4px; text-align: right; white-space: nowrap;",
                 paste0(r$total_enrl, " enrolled")),
-        tags$td(style = "padding: 2px 0 2px 6px; text-align: right; white-space: nowrap; color: #888;",
+        tags$td(style = "padding: 2px 0 2px 6px; text-align: right; white-space: nowrap; color: var(--text-muted);",
                 hist_txt)
       )
     })
@@ -5812,7 +5803,7 @@ for (.download_key in names(.enrl_desr_view_ids)) {
     end_date   <- if (!is.null(input$feature_end_date))   as.character(input$feature_end_date)   else as.character(Sys.Date())
     tryCatch({
       stats <- get_usage_stats(start_date, end_date, logs = feature_usage_data())
-      if ("message" %in% names(stats)) return(p(stats$message, style = "color:#888;"))
+      if ("message" %in% names(stats)) return(p(stats$message, style = "color:var(--text-muted);"))
       date_label <- if (start_date == end_date) start_date else paste(start_date, "–", end_date)
       tagList(
         fluidRow(

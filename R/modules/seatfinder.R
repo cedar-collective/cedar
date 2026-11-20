@@ -46,8 +46,9 @@ seatfinderUI <- function(id, sections, default_term, dept_choices) {
         ),
         column(2,
           filter_actions(
-            actionButton(ns("sf_button"), label = "Find Seats",
-                         icon = icon("door-open"), class = "btn-primary"),
+            cedar_requires(actionButton(ns("sf_button"), label = "Find Seats",
+                                        icon = icon("door-open"), class = "btn-primary"),
+                           ns("sf_term"), "Choose at least one term first"),
             cedar_link_menu(ns("sf_copy_url"))
           )
         )
@@ -70,35 +71,35 @@ seatfinderServer <- function(id, attempts, sections, edges,
 
     avail_style <- function(v) {
       if (is.na(v)) return(list())
-      if (v <  5)  list(background = "#F2E3DE", fontWeight = "600")
-      else if (v < 15) list(background = "#F4E9D2", fontWeight = "600")
-      else             list(background = "#E4EEE7", fontWeight = "600")
+      if (v <  5)  list(background = "var(--alert-critical-bg)", fontWeight = "600")
+      else if (v < 15) list(background = "var(--alert-warning-bg)", fontWeight = "600")
+      else             list(background = "var(--alert-success-bg)", fontWeight = "600")
     }
     diff_style <- function(v) {
       if (is.na(v)) return(list())
-      if (v < -5)  list(background = "#F2E3DE")
-      else if (v <= 5) list(background = "#F4E9D2")
-      else             list(background = "#E4EEE7")
+      if (v < -5)  list(background = "var(--alert-critical-bg)")
+      else if (v <= 5) list(background = "var(--alert-warning-bg)")
+      else             list(background = "var(--alert-success-bg)")
     }
     dfw_style <- function(v) {
       if (is.na(v) || v == "") return(list())
       n <- suppressWarnings(as.numeric(gsub("%", "", v)))
       if (is.na(n)) return(list())
-      if (n > 30) list(background = "#F2E3DE", fontWeight = "600")
-      else if (n >= 15) list(background = "#F4E9D2")
-      else              list(background = "#E4EEE7")
+      if (n > 30) list(background = "var(--alert-critical-bg)", fontWeight = "600")
+      else if (n >= 15) list(background = "var(--alert-warning-bg)")
+      else              list(background = "var(--alert-success-bg)")
     }
     enrl_style <- function(v) {
       if (is.na(v)) return(list())
-      if (v < 8)  list(background = "#F2E3DE")
-      else if (v < 12) list(background = "#F4E9D2")
-      else             list(background = "#E6EDF6")
+      if (v < 8)  list(background = "var(--alert-critical-bg)")
+      else if (v < 12) list(background = "var(--alert-warning-bg)")
+      else             list(background = "var(--alert-info-bg)")
     }
     diff_enrl_style <- function(v) {
       if (is.na(v)) return(list())
-      if (v < -5)  list(background = "#F2E3DE")
-      else if (v <= 5) list(background = "#F4E9D2")
-      else             list(background = "#E4EEE7")
+      if (v < -5)  list(background = "var(--alert-critical-bg)")
+      else if (v <= 5) list(background = "var(--alert-warning-bg)")
+      else             list(background = "var(--alert-success-bg)")
     }
 
     sf_col_defs <- function(df) {
@@ -242,7 +243,7 @@ seatfinderServer <- function(id, attempts, sections, edges,
               style = paste0(
                 "display:inline-block;padding:1px 7px;border-radius:9px;",
                 "font-size:0.73rem;font-weight:600;",
-                "background:#F4E9D2;color:#7A5010"
+                "background:var(--alert-warning-bg);color:var(--text-warning)"
               ),
               "Likely"
             )
@@ -260,7 +261,7 @@ seatfinderServer <- function(id, attempts, sections, edges,
         pageSizeOptions = c(25, 50, 100),
         rowStyle = function(index) {
           if (isTRUE(df$likely[index]))
-            list(background = "#FFF8EE", borderLeft = "3px solid #C7A96B")
+            list(background = "var(--surface-warm)", borderLeft = "3px solid var(--status-warning)")
           else
             list()
         },

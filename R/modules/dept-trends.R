@@ -1217,9 +1217,9 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
       }
 
       header <- tags$tr(
-        tags$th(style = "padding: 2px 6px 4px 0; font-weight: 600; color: #555; font-size: 0.8em;", ""),
-        tags$th(style = "padding: 2px 4px 4px; font-weight: 600; color: #555; font-size: 0.8em; text-align: right;", "Count"),
-        tags$th(style = "padding: 2px 0 4px 6px; font-weight: 600; color: #555; font-size: 0.8em; text-align: right;", "Share")
+        tags$th(style = "padding: 2px 6px 4px 0; font-weight: 600; color: var(--text-secondary); font-size: 0.8em;", ""),
+        tags$th(style = "padding: 2px 4px 4px; font-weight: 600; color: var(--text-secondary); font-size: 0.8em; text-align: right;", "Count"),
+        tags$th(style = "padding: 2px 0 4px 6px; font-weight: 600; color: var(--text-secondary); font-size: 0.8em; text-align: right;", "Share")
       )
 
       rows <- lapply(seq_len(nrow(df)), function(i) {
@@ -1235,7 +1235,7 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
             tags$span(r$label, style = "font-size: 0.85em; vertical-align: middle;")
           ),
           tags$td(style = "padding: 2px 4px; text-align: right; font-size: 0.85em; white-space: nowrap;", cur_str),
-          tags$td(style = "padding: 2px 0 2px 6px; text-align: right; font-size: 0.85em; white-space: nowrap; color: #555;", share_str)
+          tags$td(style = "padding: 2px 0 2px 6px; text-align: right; font-size: 0.85em; white-space: nowrap; color: var(--text-secondary);", share_str)
         )
       })
 
@@ -1258,7 +1258,7 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
           df <- data$plots$student_donuts[[paste0(lvl, "_major_table_df")]]
           tagList(
             p(paste0(lvl_label, " Majors - selected term"),
-              style = "font-size: 0.8em; color: #666; margin-bottom: 4px;"),
+              style = "font-size: 0.8em; color: var(--text-muted); margin-bottom: 4px;"),
             render_enrl_composition_table(df)
           )
         })
@@ -1269,7 +1269,7 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
           df <- data$plots$student_donuts[[paste0(lvl, "_class_table_df")]]
           tagList(
             p(paste0(lvl_label, " Class Standing - selected term"),
-              style = "font-size: 0.8em; color: #666; margin-bottom: 4px;"),
+              style = "font-size: 0.8em; color: var(--text-muted); margin-bottom: 4px;"),
             render_enrl_composition_table(df)
           )
         })

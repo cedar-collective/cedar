@@ -176,7 +176,7 @@ courseTopicsServer <- function(id, course, campus, sections, students, attempts,
     payload <- reactive({
       crs <- course()
       req(crs, nzchar(crs), isTRUE(has_topics()))
-      cedar_with_loading(session, session$ns("load"), {
+      cedar_with_loading(session, session$ns("load"), report_type = "course_topics", {
         tryCatch(
           build_course_topics(sections, students, attempts, student_terms,
                               list(course = crs, campus = campus(), data_edges = edges),
