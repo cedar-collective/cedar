@@ -168,6 +168,7 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
   source_file("cones/major-course-units.R")        # which units teach the courses a major's students take
   source_file("cones/concurrent-courses-by-major.R")  # what else a course's students take that term, by major
   source_file("cones/course-pair-dfw.R")  # is a course harder for students taking another course that term
+  source_file("cones/course-band-dfw.R")  # is a course harder on its lowest-GPA students than their other courses are
   source_file("cones/dfw-term-series.R")         # the DFW rate term by term, with its trend
   source_file("cones/dfw-course-board.R")        # the courses ranked by DFW grades, with their trends
   source_file("cones/dfw-section-spread.R")      # whether a course's sections agree on its DFW rate
