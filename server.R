@@ -4286,6 +4286,7 @@ for (.download_key in names(.enrl_desr_view_ids)) {
   retentionDashboardServer("retention_dashboard", student_terms = data_objects[["cedar_student_terms"]],
                            attempts = data_objects[["cedar_attempts"]], degrees = cedar_degrees,
                            programs = data_objects[["cedar_programs"]],
+                           applicants = data_objects[["cedar_applicants"]],
                            dims = data_objects[["cedar_dims"]], edges = data_objects[["cedar_edges"]],
                            active = reactive(identical(input$main_navbar, "Retention")))
 

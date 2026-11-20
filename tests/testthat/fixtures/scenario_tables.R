@@ -503,6 +503,57 @@ pd01 <- local({
   list(attempts = attempts, student_terms = student_terms)
 })
 
+# ── test-course-band-dfw.R ──────────────────────────────────────────────────────
+
+# BD01: GATE 101 and OTHR 200 on ABQ in three falls (202080, 202180, 202280),
+# the same seats each fall (student ids carry the term). Every seat but EA1
+# takes both.
+#   low band (entering GPA 2.0), L01-L10: L01-L06 DFW GATE 101; L01, L02 DFW
+#     OTHR 200. GATE 101: 60% against 20% in their other course, excess 40.
+#   higher band (3.2), H01-H10: H01, H02 DFW GATE 101; H01 DFWs OTHR 200.
+#     GATE 101: 20% against 10%, excess 10.
+# So GATE 101's gap is +30 points and OTHR 200's is -30 (its excesses are -40
+# and -10): over three falls, 30 attempts a side,
+#   se = 100 * sqrt((.6*.4 + .2*.8 + .2*.8 + .1*.9) / 30) = 100 * sqrt(.65 / 30).
+# Left out of the entering-GPA reading: F1-F3, first-term students (no
+# entering GPA), and V1, whose timeline is not valid. F1 (high-school GPA 2.5)
+# DFWs GATE 101 and passes OTHR 200; F2 (3.9) passes both; F3 has no
+# high-school GPA on file. EA1 (2.0) takes GATE 101 on EA and nothing else: a
+# course of one, banded and never read.
+bd01 <- local({
+  falls <- c(202080L, 202180L, 202280L)
+  seats <- tibble::tibble(
+    seat = c(sprintf("L%02d", 1:10), sprintf("H%02d", 1:10), "F1", "F2", "F3", "V1", "EA1"),
+    gpa = c(rep(2.0, 10), rep(3.2, 10), NA, NA, NA, 2.0, 2.0),
+    valid = c(rep(TRUE, 23), FALSE, TRUE),
+    gate_dfw = c(rep(TRUE, 6), rep(FALSE, 4), TRUE, TRUE, rep(FALSE, 8), TRUE, FALSE, FALSE, TRUE, TRUE),
+    othr_dfw = c(TRUE, TRUE, rep(FALSE, 8), TRUE, rep(FALSE, 9), FALSE, FALSE, FALSE, TRUE, FALSE)
+  )
+  rows <- tidyr::crossing(term = falls, seats) %>%
+    dplyr::mutate(student_id = paste0("BD01-", seat, "-", term))
+  attempts <- dplyr::bind_rows(
+    tibble::tibble(student_id = rows$student_id, term = rows$term,
+                   campus = ifelse(rows$seat == "EA1", "EA", "ABQ"), subject_course = "GATE 101",
+                   outcome = ifelse(rows$gate_dfw, "dfw", "pass")),
+    tibble::tibble(student_id = rows$student_id, term = rows$term, campus = "ABQ", subject_course = "OTHR 200",
+                   outcome = ifelse(rows$othr_dfw, "dfw", "pass")) %>%
+      dplyr::filter(!grepl("-EA1-", student_id))
+  )
+  prior_hours <- ifelse(is.na(rows$gpa), 0, 30)
+  student_terms <- tibble::tibble(
+    student_id = rows$student_id, term = rows$term,
+    quality_points = 36, graded_hours = 12,
+    cumulative_quality_points = 36 + prior_hours * dplyr::coalesce(rows$gpa, 0),
+    cumulative_graded_hours = 12 + prior_hours,
+    timeline_valid = rows$valid
+  )
+  first_term <- rows[rows$seat %in% c("F1", "F2"), ]
+  applicants <- tibble::tibble(student_id = first_term$student_id,
+                               high_school_cum_gpa = ifelse(first_term$seat == "F1", 2.5, 3.9))
+  list(attempts = attempts, student_terms = student_terms, applicants = applicants,
+       edges = list(last_graded = 202280L, last_enrolled_complete = 202280L))
+})
+
 # ── test-course-planning-history.R ──────────────────────────────────────────────
 
 course_history_terms <- course_terms_for(test_students_course_history, test_sections_course_history)

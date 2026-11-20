@@ -80,6 +80,15 @@ try {
   const excess = courses.rows?.map((r) => parseInt(r[7].replace(/,/g, ''), 10)) || [];
   ok(excess.every((v, i) => i === 0 || v <= excess[i - 1]), `ranked by the students a gap stands for (${excess.slice(0, 5)})`);
 
+  // Courses by GPA band: the sentence counts what was read and what chance
+  // would list, and each list sets the lowest band beside the other students.
+  await waitFor(page, () => !!document.querySelector(`#${NS}bands_harder .rt-tbody`), { timeout: 240000 });
+  const bandLead = await page.$eval(`#${NS}bands_finding`, (el) => el.innerText);
+  ok(/Of the \d[\d,]* courses? read/.test(bandLead) && /Chance alone would put/.test(bandLead),
+     `the by-band sentence counts the courses read and chance (${bandLead.slice(0, 60)})`);
+  const harder = await readReactable(page, `${NS}bands_harder`, { limit: 5 });
+  ok(harder.rows?.every((r) => r.length === 9), `the harder list has its nine columns (${harder.rows?.length} rows)`);
+
   const methods = await page.evaluate((ns) => ['method_overall', 'method_signs', 'method_groups', 'method_courses']
     .map((id) => document.getElementById(ns + id)?.textContent.trim().length || 0), NS);
   ok(methods.every((n) => n > 80), `every section's method is filled (${methods})`);

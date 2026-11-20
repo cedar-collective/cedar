@@ -380,3 +380,71 @@ plot_entering_class_milestones <- function(payload) {
                  range = c(max(0, min(m$here_pct) - 8), 100)),
     legend = list(orientation = "h", y = -0.2))
 }
+
+# ── Courses by GPA band ───────────────────────────────────────────────────────
+
+# Who each band choice reads, in the page's words.
+RETENTION_BAND_WORDS <- c(
+  entering = "continuing students who entered the term with a GPA",
+  hs = "first-term students with a high-school GPA of"
+)
+
+#' The courses harder, and easier, on the lowest-GPA students than the rest of their term
+#'
+#' get_course_band_dfw() over the latest `band_terms` graded terms of the
+#' page's term type, with the two lists the page shows and how many courses
+#' chance alone would put on each.
+#'
+#' @param opt `term_type` (required), `campus` (the campuses that taught the
+#'   courses; NULL reads every campus, each apart), `data_edges` (required),
+#'   `band_by` (`"entering"` or `"hs"`), `band_terms` (terms pooled; default
+#'   5), `min_n`, `z_min`.
+#' @return get_course_band_dfw()'s list with `harder` and `easier` (the
+#'   courses of each verdict, by the attempts the gap stands for, 15 at most)
+#'   and `meta$n_courses`, `meta$n_by_chance` (the courses read times the
+#'   one-sided chance of a gap beyond `z_min`).
+retention_dashboard_band_courses <- function(attempts, student_terms, applicants = NULL, opt = list()) {
+  if (length(opt$term_type) != 1L || is.na(opt$term_type)) {
+    stop("[retention-dashboard.R] opt$term_type (one term type) is required.", call. = FALSE)
+  }
+  edge <- opt$data_edges[["last_graded"]]
+  if (is.null(edge)) stop("[retention-dashboard.R] opt$data_edges has no graded edge (last_graded).", call. = FALSE)
+  terms <- sort(unique(as.integer(attempts$term)))
+  terms <- terms[terms <= as.integer(edge) & get_term_type(terms) %in% opt$term_type]
+  terms <- utils::tail(terms, as.integer(opt$band_terms %||% 5L))
+  if (length(terms) == 0L) stop("[retention-dashboard.R] no graded ", opt$term_type, " term to read.", call. = FALSE)
+  r <- get_course_band_dfw(attempts, student_terms,
+                           c(opt[intersect(names(opt), c("campus", "data_edges", "band_by", "min_n", "z_min"))],
+                             list(term = terms)), applicants)
+  listed <- function(which) r$courses %>%
+    filter(verdict == which) %>%
+    mutate(excess_dfw = low_attempts * gap_pts / 100) %>%
+    arrange(desc(abs(excess_dfw))) %>%
+    utils::head(15L)
+  r$harder <- listed("harder")
+  r$easier <- listed("easier")
+  r$meta$n_courses <- nrow(r$courses)
+  r$meta$n_by_chance <- nrow(r$courses) * stats::pnorm(-r$meta$z_min)
+  r
+}
+
+#' The by-band course result in a sentence
+#'
+#' @param result `retention_dashboard_band_courses()` output.
+#' @return One sentence: how many courses were read, how many fell on each
+#'   list, and how many chance alone would put there.
+retention_band_sentence <- function(result) {
+  m <- result$meta
+  who <- paste0(RETENTION_BAND_WORDS[[m$band_by]], " ", m$low_band)
+  if (m$n_courses == 0L) {
+    return(paste0("No course had ", m$min_n, " graded attempts by ", who, " and ", m$min_n,
+                  " by its other students over these terms."))
+  }
+  n <- function(k) format(as.integer(k), big.mark = ",")
+  paste0("Of the ", n(m$n_courses), if (m$n_courses == 1L) " course" else " courses", " read, ", n(nrow(result$harder)),
+         if (nrow(result$harder) == 1L) " was" else " were", " harder on ", who,
+         " than the rest of their own term was, by more than for the course's other students, and ",
+         n(nrow(result$easier)), " easier. Chance alone would put ",
+         if (m$n_by_chance < 0.5) "fewer than 1" else paste0("about ", sprintf("%.0f", m$n_by_chance)),
+         " on each list, so a course here is a place to look, not a finding.")
+}
