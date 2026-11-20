@@ -59,6 +59,7 @@
       In the model | Add the students still waiting when last year was near full
       In the model for Spring | Follow enrollment changes in the term just finished (retakes, the course taken just before, feeder courses)
       In the plan | A 5% planning allowance for a course near full every recent year
+      Dropped | Size the planning allowance by last year's growth in total enrollment
       Dropped | Average two or more past years, or a damped trend
       Dropped | Blend the two forecasts, or pick one for the whole course set
       Dropped | Forecast from student populations (majors, classifications, feeder transitions)

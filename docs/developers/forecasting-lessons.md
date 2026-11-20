@@ -618,6 +618,29 @@ The sequence list is fixed today and applied at past folds, so the rates
 learned at a past fold use a list chosen with later knowledge. The pairs are
 structural (a course and its continuation), so the look-ahead is mild.
 
+## A growth-sized allowance, replayed (2026-11-20)
+
+Asked whether the pressure bump should follow enrollment growth as a whole
+(about 3% a year lately) in place of a flat 5%. Replayed on the published
+past forecasts of both saved bundles, with no model change: the trailing
+year's growth in total headcount, known before each target term, applied to
+every course or to the near-full ones; a flat 3% on every course; the flat 5%
+on courses near full the year before; and growth with the 5% on top.
+
+- Every single allowance brought the total close to what registered and left
+  the typical miss within a point of last year's count alone. None was
+  distinguishable from the flat 5%.
+- Growth is steady from year to year; how far the watched courses ran above
+  last year is not. A steady number corrects the average, which the 5%
+  already does, and cannot follow the swings.
+- Growth with the 5% on top ran high and raised the miss.
+
+The rule stands. The page now replays the share on past forecasts
+(`projection_pressure_bump_record()`), so a reader sees what the 5% does and
+does not do. The replay is an approximation: it gives the share to a course
+near full the year before, where the rule asks for every recent same-season
+term and adds the students left waiting when that is more.
+
 ## The pressure bump (model 0.23.0, 2026-10-18)
 
 A near-full course's registrations follow its seats, not its demand. On the

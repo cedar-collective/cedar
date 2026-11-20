@@ -1782,6 +1782,7 @@ enrollmentProjectionsServer <- function(id, bundles, load_bundle) {
     output$pressure_summary <- renderUI({
       tags$p(
         view()$meta$pressure_bump$sentence, " ",
+        view()$meta$pressure_bump_record$sentence, " ",
         view()$meta$plan_feeder$sentence, " ",
         view()$meta$preceding_waiting$sentence
       )

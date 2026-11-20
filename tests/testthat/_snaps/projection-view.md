@@ -22,6 +22,18 @@
     Output
       The range assumes seats like last year's. No past forecast has an earlier one to build a range from, so how often it held cannot be shown yet. 
 
+# the pressure bump's record replays its share on the published past forecasts
+
+    Code
+      cat(record$sentence, "\n\n")
+    Output
+      Tried on the 4 past forecasts: last year's registrations alone added up to 2.4% below what registered. With 5% added to the 2 whose course was near full the year before, the total came to the same as what registered. The typical miss for a course went from 4.9% to 2.4%. 
+      
+    Code
+      cat(projection_pressure_bump_record(same, 0.05)$sentence, "\n")
+    Output
+      Tried on the 4 past forecasts: last year's registrations alone added up to the same as what registered. With 5% added to the 2 whose course was near full the year before, the total came to 2.5% above what registered. The typical miss for a course stayed about the same (5.0% without it, 5.0% with it): the 5% moves the total, not any one course's number. 
+
 # the draft comparison separates short of day one from short of the plan
 
     Code

@@ -967,6 +967,20 @@ projection_backtest_row <- tibble::tibble(
   scheduled_capacity = 200
 )
 
+# Four published past forecasts and one the rule did not publish, for the
+# pressure bump's record: each projected 100. Registered 110 and 105 where the
+# course was near full the year before, 100 where it was not, 95 where the
+# year before's first day is unknown; the unpublished row is never read.
+# Total 400 forecast against 410 registered. With 5% on the two near-full
+# rows: 410 against 410, misses 5 + 0 + 0 + 5 = 10 where the forecast's were 20.
+projection_bump_record_backtests <- tibble::tibble(
+  subject_course = paste("TEST", 101:105),
+  policy_selected = c(TRUE, TRUE, TRUE, TRUE, FALSE),
+  projected_classlist_total = 100,
+  actual_classlist_total = c(110, 105, 100, 95, 300),
+  fold_prior_near_full = c(TRUE, TRUE, FALSE, NA, TRUE)
+)
+
 # Six summarised aftcasts of seasonal_last for TEST 101, Falls 2018 to 2023:
 # 110 projected against 100 actual every year, never capacity constrained.
 projection_summary_backtests <- local({

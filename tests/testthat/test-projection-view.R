@@ -89,6 +89,24 @@ test_that("the range's rolling coverage is reported by whether seats held", {
   )
 })
 
+test_that("the pressure bump's record replays its share on the published past forecasts", {
+  record <- projection_pressure_bump_record(projection_bump_record_backtests, 0.05)
+  expect_equal(c(record$n_folds, record$n_near_full), c(4L, 2L))
+  expect_equal(c(record$forecast_gap, record$plan_gap), c(400 / 410 - 1, 0))
+  expect_equal(c(record$forecast_miss, record$plan_miss), c(20 / 410, 10 / 410))
+  # No past forecast, or none known near full, says nothing.
+  quiet <- dplyr::mutate(projection_bump_record_backtests, fold_prior_near_full = FALSE)
+  expect_identical(projection_pressure_bump_record(quiet, 0.05)$sentence, "")
+  expect_identical(projection_pressure_bump_record(projection_bump_record_backtests[0, ], 0.05)$sentence, "")
+  expect_error(projection_pressure_bump_record(projection_bump_record_backtests, NA_real_), "pressure_bump_share")
+  # A share that leaves the typical miss where it was says so.
+  same <- dplyr::mutate(projection_bump_record_backtests, actual_classlist_total = c(110, 95, 100, 95, 300))
+  expect_snapshot({
+    cat(record$sentence, "\n\n")
+    cat(projection_pressure_bump_record(same, 0.05)$sentence, "\n")
+  })
+})
+
 test_that("the draft comparison separates short of day one from short of the plan", {
   projections <- tibble::tibble(
     market_id = "abq_ea_course_market",
