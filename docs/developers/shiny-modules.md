@@ -312,6 +312,11 @@ CEDAR has no sign-in, so the choice belongs to the browser, not the person.
   Trace colours are not changed: pick palette colours that read on both.
 - Degree Explorer's board names its roles in `www/cedar-roadmap.css` and
   overrides its inks for the dark on `.cedar-roadmap`.
+- The restart screens follow the mode too: the in-app one
+  (`www/cedar-disconnect.js`) reads the tokens, its backdrop
+  `--disconnect-veil`; nginx's static pages (`deploy/nginx/cedar-restarting.html`,
+  `cedar-maintenance.html`), served from the same site while the app is down,
+  read the same `cedar-theme` key and carry their own dark values.
 - `tests/e2e/theme.test.mjs` covers the toggle, the remembered choice, a
   table and a figure in both modes. Colours still written into R code are
   ISSUES M58.
