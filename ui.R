@@ -1481,7 +1481,10 @@ nav_panel(
                label = "Group by",
                multiple = TRUE,
                choices = c("campus", "college", "subject_course", "course_title", "department", "term", "term_type", "part_term", "delivery_method", "instructor_name", "gen_ed_area"),
-               selected = c("term", "subject_course")),
+               # A course number can carry several titles in a term (topics
+               # courses): the title is in the default grouping so each has
+               # its own row.
+               selected = c("term", "subject_course", "course_title")),
       ),
       # column(1,  # Gen Ed filter — hidden to save space; re-enable if needed
       #        selectInput(
@@ -1546,7 +1549,9 @@ nav_panel(
           method = tagList(
             tags$p(
               "Rows are the sections your filters choose, grouped by Group by (no grouping ",
-              "gives one row per section; grouping by course keeps campus in the key). The ",
+              "gives one row per section; grouping by course keeps campus in the key). It opens ",
+              "with the title in the grouping, so a course number offered under several titles ",
+              "(a topics course) has a row for each; remove course_title to see the number as one row. The ",
               "student counts come from the class list, section by section, so they follow ",
               "every filter and add up to any grouping."
             ),
