@@ -17,8 +17,9 @@
 #
 # One choice of later course serves two subtabs, Next Courses and Prepared
 # for It: each shows the picker (laterCoursePickerUI(id, slot)) and both
-# pickers hold the same value. It opens on the first course the list offers
-# (the course's own department first, then by how many took it), so neither
+# pickers hold the same value. It opens on downstream_default_course() (the
+# own department's most-taken sequel when enough students take it, otherwise
+# the most-taken later course of any department), so neither
 # subtab opens empty, and each view runs when its subtab is open and its
 # course, campus, later course or Update Results click has changed.
 #
@@ -70,7 +71,7 @@ laterCoursePickerUI <- function(id, slot) {
     class = "later-course-picker",
     uiOutput(ns(paste0("picker_", slot))),
     cedar_method_panel(tagList(
-      tags$p("The list holds the later courses this course's students took within the window (three regular terms unless changed under Next Courses' Settings), each with how many took it and the share that is of those who could have. It opens on the first: the course's own department first, then by how many took it. Students are grouped by the campus that taught them this course; the later course counts on any campus."),
+      tags$p("The list holds the later courses this course's students took within the window (three regular terms unless changed under Next Courses' Settings), each with how many took it and the share that is of those who could have. It opens on the course's own department's most-taken later course when at least ", DOWNSTREAM_OWN_DEPT_DEFAULT_PCT, "% of its students took one, and otherwise on the later course most of them took, whatever its department. Students are grouped by the campus that taught them this course; the later course counts on any campus."),
       tags$p("Choose several codes to read them as one course (a course and its modular or stretch forms): each student counts once, at their earliest attempt of any of them. Department ownership and how many continue neither establish nor rule out an intended sequence."),
       tags$p("Next Courses and Prepared for It read the same choice. Prepared for It counts a pass of this course in any earlier term, whatever the window.")
     ), title = "About this list")
@@ -355,7 +356,10 @@ later_course_view <- function(r, ns, access) {
              " columns first: an instructor who passed fewer students sends a stronger group on, so their students' later pass rate can be higher without those students being better prepared. The last columns compare students with the same grade in ",
              x, ". Not a measure of teaching and not a basis for evaluating anyone."),
       if (access) .later_course_instructor_reactable(later_course_instructor_table(r), r)
-      else instructorGateUI(ns("instructor_gate"))
+      else instructorGateUI(ns("instructor_gate")),
+      # The check that belongs to this table: were two instructors' students
+      # alike to begin with? It says nothing about the course-level rates above.
+      if (access) .later_course_balance_section(r)
     ),
     downstream_trust_section(
       paste0("Who left the count before the rates were read: students who had already passed ", y, " before ", x, " or alongside it."),
@@ -368,7 +372,6 @@ later_course_view <- function(r, ns, access) {
           "; a same-term pass stays in it. Either is their union, not their sum.")),
         .later_course_order_reactable(later_course_order_table(r), r)
       ),
-      if (access) .later_course_balance_section(r),
       method = cedar_definition_note("downstream-outcomes")
     )
   )
@@ -427,13 +430,13 @@ laterCourseServer <- function(id, course, campus, students, attempts, programs, 
     })
 
     # Keep what was chosen while the list still offers it; otherwise open on
-    # the list's first course, so neither subtab opens empty.
+    # the default later course, so neither subtab opens empty.
     observe({
       opts <- course_options()
       offered <- if (is.null(opts)) character() else opts$subject_course
       current <- chosen()
       keep <- intersect(current, c(offered, CR_ROLLUP_SENTINEL))
-      if (length(keep) == 0L) chosen(utils::head(offered, 1L))
+      if (length(keep) == 0L) chosen(downstream_default_course(opts))
       else if (!identical(keep, current)) chosen(keep)
     })
 
