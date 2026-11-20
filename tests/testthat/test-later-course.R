@@ -222,6 +222,13 @@ test_that("the picker lists only courses taken after X, each student once", {
   # does not establish relevance.
   expect_true(o$same_dept[[1]])
   expect_equal(o$subject_course[[1]], "SPAN 201")
+  # The page opens on the own department's sequel while enough students take
+  # it; when few do (a service course), on the most-taken later course.
+  expect_equal(downstream_default_course(o), "SPAN 201")
+  few_own <- o %>% mutate(pct_of_x = if_else(same_dept, DOWNSTREAM_OWN_DEPT_DEFAULT_PCT - 1, pct_of_x),
+                          n_students = if_else(subject_course == "PHIL 105", 99L, n_students))
+  expect_equal(downstream_default_course(few_own), "PHIL 105")
+  expect_equal(downstream_default_course(o[0, ]), character(0))
   # MC_A1, MC_A2, MC_A4 and MC_G1 reach it; MC_A3 goes to PHIL 105, MC_G2 stops.
   s201 <- dplyr::filter(o, subject_course == "SPAN 201")
   expect_equal(s201$n_students, 4L)

@@ -66,6 +66,33 @@ DOWNSTREAM_OPTION_COLUMNS <- c(
 .downstream_band_precedence <- c("Withdrew", "C- to F", "Other nonpassing",
                                  "Other passing", "C", "B", "A", "Not graded")
 
+# A course of the analysed course's own department leads the page only when
+# this share of its students who could have taken it did.
+DOWNSTREAM_OWN_DEPT_DEFAULT_PCT <- 10
+
+#' The later course a page opens on
+#'
+#' The most-taken later course of the course's own department, when at least
+#' `DOWNSTREAM_OWN_DEPT_DEFAULT_PCT` percent of its students who could have
+#' taken it did: a department's own sequel is the likelier intended sequence.
+#' Otherwise the most-taken later course of any department: a service course
+#' (a first-year seminar, a developmental course) feeds other departments,
+#' and its own department's next course is one few of its students take.
+#'
+#' @param options `get_downstream_course_options()` output.
+#' @return One course id, or `character(0)` when the list is empty.
+downstream_default_course <- function(options) {
+  if (is.null(options) || nrow(options) == 0L) return(character(0))
+  missing <- setdiff(c("subject_course", "n_students", "pct_of_x", "same_dept"), names(options))
+  if (length(missing)) {
+    stop("[downstream-cohort.R] downstream_default_course(): options lacks ", paste(missing, collapse = ", "), call. = FALSE)
+  }
+  own <- options[options$same_dept %in% TRUE & options$pct_of_x >= DOWNSTREAM_OWN_DEPT_DEFAULT_PCT, , drop = FALSE]
+  pick <- if (nrow(own) > 0L) own else options
+  pick <- pick[order(-pick$n_students, pick$subject_course), , drop = FALSE]
+  pick$subject_course[[1]]
+}
+
 #' How a page names the later course
 #'
 #' @param course_y The later course, or a set of them.

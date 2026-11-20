@@ -4101,8 +4101,8 @@ for (.download_key in names(.enrl_desr_view_ids)) {
       dashboard_subsection(
         paste0("Passed ", x, " First, Against Not"),
         paste0("How often each group did not pass ", y_label, "."),
-        method = tags$p(paste0("Each student counts once, at their ", result$y_attempt_rule,
-                               ". DFW is the default policy: only A+ through C and CR pass.")),
+        method = tags$p(paste0("Each student counts once, at their first attempt at ", y_label,
+                               " that has a grade or a late withdrawal. Only A+ through C and CR pass; every other grade and a late withdrawal count as not passing (DFW).")),
         lead_text(paste(course_sequence_headline(result), collapse = " ")),
         cedar_finding_card(
           paste0("DFW rate in ", y_label),
@@ -4115,7 +4115,11 @@ for (.download_key in names(.enrl_desr_view_ids)) {
         info_panel(
           "Every grade outcome",
           description = paste0("Each group's results in ", y_label, ", counted."),
-          cr_basic_reactable(cr_humanize_columns(result$outcomes), default_page_size = 10L, searchable = FALSE)
+          cr_basic_reactable(
+            cr_humanize_columns(result$outcomes %>% dplyr::mutate(
+              group = .course_sequence_group_label(result, group),
+              outcome = dplyr::recode(outcome, pass = "Passed", dfw = "Did not pass (DFW)"))),
+            default_page_size = 10L, searchable = FALSE)
         )
       ),
       dashboard_subsection(
