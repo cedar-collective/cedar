@@ -232,6 +232,10 @@ CEDAR_CONFIG_FILE_SPECS <- list(
   # predecessor's enrollment change into the next course at that pair's own
   # measured rate, apart from the pooled feeders. notes is free text for why.
   projection_sequences = c("from_course", "to_course", "notes"),
+  # Intended sequels: to_course is the course the curriculum means a student
+  # of from_course to take next, one per course. Read for a page's default
+  # later course; it changes no forecast (that is projection_sequences).
+  course_sequels = c("from_course", "to_course", "notes"),
   # Text maps for exports that carry a name but no code. program_names: a
   # program name as a source writes it (without any "Pre-" prefix) to the
   # program code the transform fills in when the export has none.
@@ -567,6 +571,28 @@ validate_projection_sequences <- function(sequences) {
     stop("[institution_files.R] Invalid projection_sequences.csv:\n  ", paste(problems, collapse = "\n  "))
   }
   sequences[, c("from_course", "to_course")]
+}
+
+#' Check course_sequels.csv
+#'
+#' @param sequels The table as read.
+#' @return `sequels` with `from_course` and `to_course` only, if valid: no
+#'   blank, no course its own sequel, one sequel per course. Stops listing
+#'   every problem otherwise.
+validate_course_sequels <- function(sequels) {
+  problems <- character(0)
+  blank <- function(x) is.na(x) | !nzchar(x)
+  for (col in c("from_course", "to_course")) {
+    if (any(blank(sequels[[col]]))) problems <- c(problems, paste("course_sequels.csv: blank", col))
+  }
+  same <- unique(sequels$from_course[sequels$from_course == sequels$to_course])
+  if (length(same)) problems <- c(problems, paste("course_sequels.csv: a course cannot be its own sequel:", paste(same, collapse = ", ")))
+  twice <- unique(sequels$from_course[duplicated(sequels$from_course)])
+  if (length(twice)) problems <- c(problems, paste("course_sequels.csv: more than one sequel for", paste(twice, collapse = ", ")))
+  if (length(problems)) {
+    stop("[institution_files.R] Invalid course_sequels.csv:\n  ", paste(problems, collapse = "\n  "))
+  }
+  sequels[, c("from_course", "to_course")]
 }
 
 #' Check the two text-map files together

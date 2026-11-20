@@ -70,9 +70,31 @@ DOWNSTREAM_OPTION_COLUMNS <- c(
 # this share of its students who could have taken it did.
 DOWNSTREAM_OWN_DEPT_DEFAULT_PCT <- 10
 
+#' A course's intended sequel, as a course id
+#'
+#' @param sequels `CEDAR_COURSE_SEQUELS` (course_sequels.csv): `from_course`,
+#'   `to_course`, by listed code.
+#' @param course The course id.
+#' @param tbl A loaded table keyed by attach_course_ids(), to follow a code
+#'   to its course (course_id_of()).
+#' @return The sequel's course id, or `character(0)` when the file names none.
+course_sequel <- function(sequels, course, tbl) {
+  missing <- setdiff(c("from_course", "to_course"), names(sequels))
+  if (length(missing)) {
+    stop("[downstream-cohort.R] course_sequel(): sequels lacks ", paste(missing, collapse = ", "), call. = FALSE)
+  }
+  if (nrow(sequels) == 0L) return(character(0))
+  from_ids <- vapply(sequels$from_course, course_id_of, character(1), tbl = tbl, caller = "course_sequel")
+  to <- sequels$to_course[from_ids == course]
+  if (length(to) == 0L) return(character(0))
+  unique(vapply(to, course_id_of, character(1), tbl = tbl, caller = "course_sequel"))
+}
+
 #' The later course a page opens on
 #'
-#' The most-taken later course of the course's own department, when at least
+#' The course's intended sequel (course_sequel()), when the file names one
+#' and it is among the options. Otherwise
+#' the most-taken later course of the course's own department, when at least
 #' `DOWNSTREAM_OWN_DEPT_DEFAULT_PCT` percent of its students who could have
 #' taken it did: a department's own sequel is the likelier intended sequence.
 #' Otherwise the most-taken later course of any department: a service course
@@ -80,13 +102,17 @@ DOWNSTREAM_OWN_DEPT_DEFAULT_PCT <- 10
 #' and its own department's next course is one few of its students take.
 #'
 #' @param options `get_downstream_course_options()` output.
+#' @param sequel The intended sequel's course id (course_sequel()), or
+#'   `character(0)`.
 #' @return One course id, or `character(0)` when the list is empty.
-downstream_default_course <- function(options) {
+downstream_default_course <- function(options, sequel = character(0)) {
   if (is.null(options) || nrow(options) == 0L) return(character(0))
   missing <- setdiff(c("subject_course", "n_students", "pct_of_x", "same_dept"), names(options))
   if (length(missing)) {
     stop("[downstream-cohort.R] downstream_default_course(): options lacks ", paste(missing, collapse = ", "), call. = FALSE)
   }
+  named <- intersect(sequel, options$subject_course)
+  if (length(named) > 0L) return(named[[1]])
   own <- options[options$same_dept %in% TRUE & options$pct_of_x >= DOWNSTREAM_OWN_DEPT_DEFAULT_PCT, , drop = FALSE]
   pick <- if (nrow(own) > 0L) own else options
   pick <- pick[order(-pick$n_students, pick$subject_course), , drop = FALSE]

@@ -26,6 +26,7 @@ and the generated [2026–2027 rules](shared_requirements/2026-2027/RULES.md).
 | `projection_groups.csv` | enrollment-projection monitoring scope | `group_id`, `label`, `description`, `market_id`, `campuses`, `include_gen_ed` |
 | `projection_courses.csv` | course named in a projection scope | `group_id`, `subject_course`, `always_monitored`, `history_start_term`, `retention_min_terms` |
 | `projection_sequences.csv` | a course taken the term before another, whose change carries into it | `from_course`, `to_course`, `notes` |
+| `course_sequels.csv` | a course's intended next course | `from_course`, `to_course`, `notes` |
 | `program_names.csv` | program name as an export writes it | `program_name`, `program_code` |
 | `program_name_aliases.csv` | variant program name | `source_name`, `program_name` |
 | `topic_titles.csv` | section title merged into another topic of its course | `subject_course`, `title`, `topic`, `notes` |
@@ -315,6 +316,18 @@ course's override must agree across groups. Course membership is by exact
 `subject_course`; suffix variants are never included by prefix. Converted from
 `R/lists/enrollment_projection_groups.R` on 2026-10-16 with no change to any
 scope.
+
+## course_sequels.csv
+
+The course the curriculum means a student to take next (`from_course`, then
+`to_course`), one per course, by the code the catalog lists. Course Dynamics >
+Downstream > Next Courses opens on it; without a row the page opens on the
+most-taken later course, which for a course that serves other departments (a
+first-year seminar, a developmental course) is rarely its sequel. It changes
+no forecast: `projection_sequences.csv` is the list the projections read, and
+a pair belongs there only on measured carry-through. A row here is a statement
+of intent, and a reader may ignore it where the data says few students follow
+it. Add a row by PR.
 
 ## projection_sequences.csv
 

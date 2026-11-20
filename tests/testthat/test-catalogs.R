@@ -730,6 +730,20 @@ test_that("the projection validator reports every problem at once", {
   expect_match(err, "history_start_term differs between groups for MATH 1215")
 })
 
+test_that("intended sequels are the institution's file, one per course", {
+  expect_equal(CEDAR_COURSE_SEQUELS,
+               validate_course_sequels(read_institution_file("course_sequels", cedar_institution_dir(cedar_base_dir, "unm"))))
+  expect_equal(names(CEDAR_COURSE_SEQUELS), c("from_course", "to_course"))
+  expect_true(nrow(validate_course_sequels(
+    read_institution_file("course_sequels", cedar_institution_dir(cedar_base_dir, "demo")))) > 0L)
+  bad <- data.frame(from_course = c("ENGL 1110", "ENGL 1110", "MATH 1512", ""),
+                    to_course = c("ENGL 1120", "ENGL 2210", "MATH 1512", "MATH 1522"), notes = "")
+  err <- tryCatch(validate_course_sequels(bad), error = conditionMessage)
+  expect_match(err, "blank from_course")
+  expect_match(err, "its own sequel: MATH 1512")
+  expect_match(err, "more than one sequel for ENGL 1110")
+})
+
 test_that("course sequences are the institution's file and the validator reports every problem", {
   dir <- cedar_institution_dir(cedar_base_dir, "unm")
   sequences <- validate_projection_sequences(read_institution_file("projection_sequences", dir))
