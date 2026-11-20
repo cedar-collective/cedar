@@ -75,9 +75,7 @@ regstatsUI <- function(id, sections, thresholds, dept_choices, default_term = NU
           filter_actions(
             actionButton(ns("rs_dashboard_button"), "Get Stats",
               class = "btn-primary", icon = icon("tachometer-alt")),
-            actionButton(ns("rs_copy_url"), label = NULL, icon = icon("link"),
-              title = "Copy shareable link for current view",
-              class = "btn-outline-secondary btn-sm")
+            cedar_link_menu(ns("rs_copy_url"))
           )
         ),
       ),

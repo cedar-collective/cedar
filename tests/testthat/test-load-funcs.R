@@ -40,6 +40,16 @@ test_that("link state parses the original query and resolves legacy slugs", {
   expect_equal(state$query$dept, "CHEM")
 })
 
+test_that("a start page is named by its tab and the values its link carries", {
+  # Home shows this name for the page a reader chose to open CEDAR on.
+  expect_equal(cedar_start_page_label("dept-dashboard", list(campus = c("ABQ", "EA"), dept = "HIST", term = "202680")),
+               "Dept Dashboard \u00b7 ABQ, EA \u00b7 HIST \u00b7 Fall 2026")
+  # Empty values are left out; a slug with no tab is shown as given.
+  expect_equal(cedar_start_page_label("dept-dashboard", list(campus = character(0), dept = "", term = NA)),
+               "Dept Dashboard")
+  expect_equal(cedar_start_page_label("no-such-tab", list()), "no-such-tab")
+})
+
 test_that("link controller accepts bootstrap state present before its first flush", {
   domain <- shiny::MockShinySession$new()
   inputs <- shiny::reactiveValues(

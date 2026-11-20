@@ -48,9 +48,7 @@ cancellationsUI <- function(id, sections, default_term, dept_choices) {
           filter_actions(
             actionButton(ns("cn_button"), label = "Find Cancellations",
                          icon = icon("ban"), class = "btn-primary"),
-            actionButton(ns("cn_copy_url"), label = NULL, icon = icon("link"),
-                         title = "Copy shareable link for current view",
-                         class = "btn-outline-secondary btn-sm")
+            cedar_link_menu(ns("cn_copy_url"))
           )
         )
       ),

@@ -558,6 +558,31 @@ filter_bar <- function(title, subtitle = NULL, ..., class = NULL) {
 }
 
 # Aligns run/download/copy buttons with compact filter inputs.
+# A page's link button: a small menu with "Copy link" and "Make this my start
+# page". `id` is the copy input's full id (ns("x_copy_url") in a module): "Copy
+# link" keeps it, so cedar_copy_url_observer() is unchanged; the start-page
+# item is `<id>_home`, and the visible toggle `<id>_menu`, which the
+# observer flashes. The start page lives in this browser (www/cedar-navigation.js).
+cedar_link_menu <- function(id) {
+  div(
+    class = "dropdown cedar-link-menu",
+    tags$button(
+      id = paste0(id, "_menu"), type = "button",
+      class = "btn btn-outline-secondary btn-sm dropdown-toggle",
+      `data-bs-toggle` = "dropdown", `aria-expanded` = "false",
+      title = "Copy a link to this view, or make it your start page",
+      `aria-label` = "Link options",
+      icon("link")
+    ),
+    tags$ul(
+      class = "dropdown-menu dropdown-menu-end",
+      tags$li(actionLink(id, "Copy link", icon = icon("copy"), class = "dropdown-item")),
+      tags$li(actionLink(paste0(id, "_home"), "Make this my start page", icon = icon("house"),
+                         class = "dropdown-item"))
+    )
+  )
+}
+
 filter_actions <- function(..., class = NULL) {
   classes <- paste(c("filter-actions", class), collapse = " ")
   div(class = classes, ...)

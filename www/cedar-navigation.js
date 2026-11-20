@@ -1,3 +1,45 @@
+// A start page: a link a reader chose with "Make this my start page" (the
+// link menu beside a page's filters). Opening CEDAR with nothing in the address
+// goes there; any address with its own page or scope wins, and the CEDAR title
+// still opens Home. Kept in this browser only. Runs before the page builds.
+(() => {
+  if (window.location.search && window.location.search !== '?') return;
+  try {
+    const saved = JSON.parse(window.localStorage.getItem('cedar-start-page') || 'null');
+    if (saved && typeof saved.query === 'string' && /^tab=[a-z0-9-]+(&|$)/.test(saved.query)) {
+      window.location.replace(window.location.pathname + '?' + saved.query + window.location.hash);
+    }
+  } catch (e) { /* storage blocked or unreadable: open Home */ }
+})();
+
+// Home says what the start page is and offers to clear it.
+(() => {
+  window.cedarShowStartPage = () => {
+    const status = document.getElementById('cedar_start_page_status');
+    const clear = document.getElementById('cedar_start_page_clear');
+    if (!status) return;
+    let saved = null;
+    try { saved = JSON.parse(window.localStorage.getItem('cedar-start-page') || 'null'); } catch (e) { saved = null; }
+    status.textContent = '';
+    if (saved && saved.query) {
+      status.append('This browser opens CEDAR on ');
+      const link = document.createElement('a');
+      link.href = '?' + saved.query;
+      link.textContent = saved.label || saved.query;
+      status.append(link, '.');
+    } else {
+      status.append('No start page is set, so CEDAR opens here.');
+    }
+    if (clear) clear.hidden = !(saved && saved.query);
+  };
+  document.addEventListener('click', event => {
+    if (!event.target.closest('#cedar_start_page_clear')) return;
+    try { window.localStorage.removeItem('cedar-start-page'); } catch (e) { /* nothing kept */ }
+    window.cedarShowStartPage();
+  });
+  document.addEventListener('DOMContentLoaded', () => window.cedarShowStartPage());
+})();
+
 // bslib's independently generated menu prefixes can collide. Resolve primary
 // panels by their data-value before Bootstrap or URL navigation follows an ID.
 (() => {

@@ -508,6 +508,9 @@ const checkDegreeExplorer = async () => {
     window.cedarCopiedLink = null;
     navigator.clipboard.writeText = text => { window.cedarCopiedLink = text; return Promise.resolve(); };
   });
+  // The link button is a menu: Copy link, or Make this my start page.
+  await page.click('#degree_explorer-dx_copy_url_menu');
+  await page.waitForSelector('#degree_explorer-dx_copy_url', { visible: true });
   await page.click('#degree_explorer-dx_copy_url');
   const copiedLink = await waitFor(page, () => !!window.cedarCopiedLink)
     ? new URL(await page.evaluate(() => window.cedarCopiedLink)) : null;

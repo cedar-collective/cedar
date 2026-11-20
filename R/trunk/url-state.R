@@ -85,7 +85,7 @@ CEDAR_SHARE_SPECS <- list(
     types = list(course = "select_server")
   ),
 
-  # Restore-only tabs (no copy button, but reachable via hand-crafted URLs).
+  # Top-level tabs (not modules): their buttons and inputs are unnamespaced.
   "Dept Dashboard"      = list(
     slug = "dept-dashboard", prefix = "dashboard", sep = "_", run = "button",
     fields = c("campus", "dept", "term"),
@@ -210,20 +210,47 @@ cedar_share_query <- function(slug, values, autorun = TRUE) {
 #   slug       — the ?tab= slug, or a function() computing it (Enrollment varies
 #                its slug by active sub-tab). If NULL, taken from spec_title.
 #   spec_title — registry key to source the slug from when `slug` is NULL.
-#   button_id  — DOM id used for the green-flash feedback; defaults to
-#                session$ns(copy_id). Pass explicitly for top-level (non-module)
-#                buttons whose id must stay unnamespaced.
+#   button_id  — DOM id used for the green-flash feedback; defaults to the
+#                link menu's toggle, session$ns(copy_id) + "_menu". Pass
+#                explicitly for top-level (non-module) buttons whose id must
+#                stay unnamespaced.
+# The link menu's second item (cedar_link_menu(), input `<copy_id>_home`) sends
+# the same link to be kept as this browser's start page, named by its tab and
+# the values it carries.
 cedar_copy_url_observer <- function(input, session, copy_id, values_fn,
                                     slug = NULL, spec_title = NULL, button_id = NULL) {
   if (is.null(slug) && !is.null(spec_title)) slug <- CEDAR_SHARE_SPECS[[spec_title]]$slug
-  if (is.null(button_id)) button_id <- session$ns(copy_id)
-  observeEvent(input[[copy_id]], {
+  if (is.null(button_id)) button_id <- session$ns(paste0(copy_id, "_menu"))
+  send <- function(action) {
     this_slug <- if (is.function(slug)) slug() else slug
+    values <- values_fn()
     session$sendCustomMessage("copy_cedar_url", list(
-      queryStr = cedar_share_query(this_slug, values_fn()),
-      buttonId = button_id
+      queryStr = cedar_share_query(this_slug, values),
+      buttonId = button_id,
+      action = action,
+      label = cedar_start_page_label(this_slug, values)
     ))
+  }
+  observeEvent(input[[copy_id]], send("copy"), ignoreInit = TRUE)
+  observeEvent(input[[paste0(copy_id, "_home")]], {
+    send("home")
+    shiny::showNotification("This view is now your start page in this browser.", type = "message",
+                            duration = 4, session = session)
   }, ignoreInit = TRUE)
+}
+
+# A start page's name for Home: its tab and the values its link carries.
+cedar_start_page_label <- function(slug, values) {
+  tab <- cedar_tab_from_slug(slug) %||% slug
+  shown <- unlist(lapply(names(values) %||% rep("", length(values)), function(key) {
+    v <- as.character(values[[key]])
+    v <- v[!is.na(v) & nzchar(v)]
+    # A term reads as its name ("Fall 2026"), never its code.
+    if (grepl("term$", key)) v <- vapply(v, function(t) if (grepl("^[0-9]{6}$", t)) fmt_term(as.integer(t)) else t,
+                                          character(1), USE.NAMES = FALSE)
+    if (length(v)) paste(v, collapse = ", ") else NULL
+  }), use.names = FALSE)
+  paste(c(tab, shown), collapse = " \u00b7 ")
 }
 
 # The browser sends the original query string only after all CEDAR link message

@@ -182,9 +182,7 @@ waitlistUI <- function(id, sections, default_term, dept_choices) {
           filter_actions(
             actionButton(ns("wl_button"), label = "Inspect Waitlists",
                          icon = icon("list-ol"), class = "btn-primary"),
-            actionButton(ns("wl_copy_url"), label = NULL, icon = icon("link"),
-                         title = "Copy shareable link for current view",
-                         class = "btn-outline-secondary btn-sm")
+            cedar_link_menu(ns("wl_copy_url"))
           )
         )
       ),

@@ -42,9 +42,7 @@ dfwRatesUI <- function(id, campuses, terms) {
                                  selected = unname(utils::head(term_choices, 1L)))),
         column(2, selectizeInput(ns("dr_to_term"), "To term", choices = term_choices,
                                  selected = unname(utils::tail(term_choices, 1L)))),
-        column(2, filter_actions(actionButton(ns("dr_copy_url"), label = NULL, icon = icon("link"),
-                                              title = "Copy shareable link for current view",
-                                              class = "btn-outline-secondary btn-sm")))
+        column(2, filter_actions(cedar_link_menu(ns("dr_copy_url"))))
       )
     ),
     uiOutput(ns("caveat")),

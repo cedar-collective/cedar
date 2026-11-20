@@ -169,9 +169,7 @@ genEdExploreUI <- function(id, sections, dept_choices, current_term = NULL, defa
         column(1,
           filter_actions(
             actionButton(ns("ge_button"), "Run", class = "btn-sm btn-primary", icon = icon("play")),
-            actionButton(ns("ge_copy_url"), label = NULL, icon = icon("link"),
-                         title = "Copy shareable link for current view",
-                         class = "btn-outline-secondary btn-sm")
+            cedar_link_menu(ns("ge_copy_url"))
           )
         )
       ),

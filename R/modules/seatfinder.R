@@ -48,9 +48,7 @@ seatfinderUI <- function(id, sections, default_term, dept_choices) {
           filter_actions(
             actionButton(ns("sf_button"), label = "Find Seats",
                          icon = icon("door-open"), class = "btn-primary"),
-            actionButton(ns("sf_copy_url"), label = NULL, icon = icon("link"),
-                         title = "Copy shareable link for current view",
-                         class = "btn-outline-secondary btn-sm")
+            cedar_link_menu(ns("sf_copy_url"))
           )
         )
       ),

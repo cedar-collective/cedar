@@ -19,6 +19,8 @@ From there, use the guide below to find the analyses most relevant to your role.
 
 **Light or dark.** The moon button at the right of the navigation bar switches CEDAR to dark mode (a sun switches it back). CEDAR opens in light mode; once you choose, this browser remembers it.
 
+**A start page.** If you open the same page every day, such as your department's dashboard, set it up the way you want it, choose the link button beside its filters, then **Make this my start page**. CEDAR then opens there in this browser. A link someone sends you still opens what it names, the CEDAR name at the top still brings you to the home page, and the home page says which start page is set and lets you clear it.
+
 ---
 
 ## Application overview
