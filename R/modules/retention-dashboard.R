@@ -46,9 +46,11 @@ retentionDashboardUI <- function(id, campuses) {
       plotly::plotlyOutput(ns("overall_plot"), height = "340px")
     ),
     dashboard_section(
-      "Each Entering Class, Semesters Later",
-      "How much of each entering class is still enrolled a semester, a year and two years on?",
+      "Each Entering Class, Semester by Semester",
+      "How much of each entering class is still enrolled in its 2nd, 3rd, 4th and 5th semesters?",
       method = uiOutput(ns("method_milestones")),
+      radioButtons(ns("entry"), "Entering students", choices = RETENTION_ENTRY_CHOICES,
+                   selected = "first_time", inline = TRUE),
       uiOutput(ns("milestones_finding")),
       plotly::plotlyOutput(ns("milestones_plot"), height = "380px")
     ),
@@ -107,11 +109,37 @@ retentionDashboardUI <- function(id, campuses) {
       })))
 }
 
+# Who an entering class holds: the page's choices, and what each asks the cone
+# for. Full-time is the time status of the entering term.
+RETENTION_ENTRY_CHOICES <- c("First-time" = "first_time", "First-time, full-time" = "first_time_ft",
+                             "New transfer" = "transfer", "Everyone new at this level" = "all")
+RETENTION_ENTRY_OPTIONS <- list(
+  first_time = list(entry = "first_time", time_status = NULL),
+  first_time_ft = list(entry = "first_time", time_status = "FT"),
+  transfer = list(entry = "transfer", time_status = NULL),
+  all = list(entry = "all", time_status = NULL)
+)
+
+.retention_entry_note <- function(entry, type, n_summer_starts) {
+  switch(entry,
+    first_time = paste0(
+      "An entering class is the students the registrar's record calls first-time in that ", type,
+      " term and who were enrolled in it, by home campus that term. A student who took college courses in high school ",
+      "enters when the record calls them first-time, not at their first course. A first-time student who started in the ",
+      "summer and was enrolled that fall is in the fall class, as federal reporting counts them (",
+      .retention_n(n_summer_starts), " over these classes). The full-time choice keeps those full-time in their entering term."),
+    transfer = paste0("An entering class is the students the registrar's record calls a new transfer in that ", type,
+                      " term and who were enrolled in it, by home campus that term."),
+    all = paste0("An entering class is every student whose first enrolled term at this level was that ", type,
+                 " term, by home campus that term. It includes transfer students and, among undergraduates, students ",
+                 "taking college courses while in high school."))
+}
+
 # ── Server ───────────────────────────────────────────────────────────────────
 
 # student_terms, attempts, degrees, dims, edges   the loaded tables and edges.
 # active   reactive: TRUE while the tab is open.
-retentionDashboardServer <- function(id, student_terms, attempts, degrees, dims, edges, active) {
+retentionDashboardServer <- function(id, student_terms, attempts, degrees, programs, dims, edges, active) {
   moduleServer(id, function(input, output, session) {
     college_names <- college_code_names(dims)
     payload <- reactive({
@@ -120,13 +148,45 @@ retentionDashboardServer <- function(id, student_terms, attempts, degrees, dims,
         tryCatch(
           build_retention_dashboard(student_terms, attempts, degrees, list(
             term_type = input$term_type, student_level = input$level,
-            campus = if (length(input$campus) > 0) input$campus else NULL, data_edges = edges)),
+            campus = if (length(input$campus) > 0) input$campus else NULL, data_edges = edges,
+            milestones = FALSE, courses = FALSE)),
           error = function(e) {
             showNotification(paste("Retention:", conditionMessage(e)), type = "error", duration = 10)
             NULL
           })
       })
-    }) |> bindCache(input$term_type, input$level, input$campus, cache = "session")
+    # Shared by every session: the tables are fixed for the life of the
+    # process, so the first reader after a start waits and the rest do not.
+    }) |> bindCache(input$term_type, input$level, input$campus, cache = "app")
+
+    # The course list is the slowest part: read after the charts above it.
+    courses <- reactive({
+      p <- payload(); req(p, nrow(p$series) > 0L)
+      tryCatch(
+        retention_dashboard_course_list(student_terms, attempts, degrees, p$series, list(
+          student_level = input$level, campus = if (length(input$campus) > 0) input$campus else NULL,
+          data_edges = edges)),
+        error = function(e) {
+          showNotification(paste("Courses:", conditionMessage(e)), type = "error", duration = 10)
+          NULL
+        })
+    }) |> bindCache(input$term_type, input$level, input$campus, cache = "app")
+
+    # The entering classes are read on their own, so choosing who a class
+    # holds rebuilds this chart and nothing else.
+    milestones <- reactive({
+      req(isTRUE(active()), input$term_type, input$level, input$entry)
+      entry <- RETENTION_ENTRY_OPTIONS[[input$entry]]
+      tryCatch(
+        retention_dashboard_milestones(student_terms, degrees, list(
+          term_type = input$term_type, student_level = input$level,
+          campus = if (length(input$campus) > 0) input$campus else NULL, data_edges = edges,
+          entry = entry$entry, entry_time_status = entry$time_status), programs),
+        error = function(e) {
+          showNotification(paste("Entering classes:", conditionMessage(e)), type = "error", duration = 10)
+          NULL
+        })
+    }) |> bindCache(input$term_type, input$level, input$campus, input$entry, cache = "app")
 
     output$overall_finding <- renderUI({
       p <- payload()
@@ -154,29 +214,29 @@ retentionDashboardServer <- function(id, student_terms, attempts, degrees, dims,
     })
 
     output$milestones_finding <- renderUI({
-      p <- payload(); req(p)
-      sentence <- retention_milestone_sentence(p)
+      ms <- milestones(); req(ms)
+      sentence <- retention_milestone_sentence(list(milestones = ms))
       if (length(sentence) == 0L) return(empty_state("No entering class in this scope has a settled later term to read."))
       lead_text(sentence)
     })
     output$milestones_plot <- plotly::renderPlotly({
-      p <- payload(); req(p, !is.null(p$milestones), any(!is.na(p$milestones$here_pct)))
-      plot_entering_class_milestones(p)
+      ms <- milestones(); req(ms, any(!is.na(ms$here_pct)))
+      plot_entering_class_milestones(list(milestones = ms))
     })
     output$method_milestones <- renderUI({
-      p <- payload(); req(p, !is.null(p$milestones))
-      ms <- p$milestones
+      p <- payload(); ms <- milestones(); req(p, ms)
       tags$ul(
-        tags$li(paste0("An entering class is every student whose first enrolled term at this level was that ",
-                       .retention_type(p), " term, by home campus that term. It includes transfer students and, among ",
-                       "undergraduates, students taking college courses while in high school.")),
+        tags$li(.retention_entry_note(attr(ms, "entry"), .retention_type(p), attr(ms, "n_summer_starts"))),
         tags$li("Still enrolled means enrolled in that later term on any campus, or awarded a degree by then. A student away one term and back the next is missing from the first and counted in the second."),
-        tags$li(paste0("Each line is one distance from entry. A semester is a fall or a spring; summer is not counted. ",
-                       "The gap between two lines is the share lost between them.")),
+        tags$li(paste0("Each line is one semester of the class's time here: the entering term is the 1st, so a year on is ",
+                       "the 3rd, the one retention is usually quoted at. A semester is a fall or a spring; summer is not ",
+                       "counted. The gap between two lines is the share lost between them.")),
         tags$li(paste0("A line stops at the last class whose later term has settled (enrollment settled through ",
-                       fmt_term(attr(ms, "edge")), "). ", fmt_term(attr(ms, "first_term")),
-                       " is the first term on record, so no one can be called new in it: ",
-                       .retention_n(attr(ms, "n_first_term")), " students first seen then are in no class. A class needs ",
+                       fmt_term(attr(ms, "edge")), "). ",
+                       if (identical(attr(ms, "entry"), "all")) paste0(
+                         fmt_term(attr(ms, "first_term")), " is the first term on record, so no one can be called new in it: ",
+                         .retention_n(attr(ms, "n_first_term")), " students first seen then are in no class. "),
+                       "A class needs ",
                        attr(ms, "min_n"), " students for a rate.")))
     })
 
@@ -225,8 +285,8 @@ retentionDashboardServer <- function(id, student_terms, attempts, degrees, dims,
     })
 
     output$courses_table <- reactable::renderReactable({
-      p <- payload(); req(p, NROW(p$courses$listed) > 0L)
-      top <- p$courses$listed
+      crs <- courses(); req(crs, NROW(crs$listed) > 0L)
+      top <- crs$listed
       shown <- data.frame(course = top$subject_course, campus = top$campus, n_dfw = top$pop_n_dfw,
                           dfw_rate = top$pop_dfw_rate, after_dfw = 1 - top$pop_dfw_stopout_rate,
                           after_pass = 1 - top$pop_pass_stopout_rate, gap = 100 * top$pop_stopout_gap,
@@ -241,8 +301,8 @@ retentionDashboardServer <- function(id, student_terms, attempts, degrees, dims,
         excess = cedar_count_coldef("Not back, beyond the passers' rate")))
     })
     output$method_courses <- renderUI({
-      p <- payload(); req(p)
-      terms <- p$courses$terms
+      p <- payload(); crs <- courses(); req(p, crs)
+      terms <- crs$terms
       tags$ul(
         tags$li(paste0("The students of the latest ", length(terms), " ", .retention_type(p), " terms with posted grades (",
                        paste(vapply(terms, fmt_term, character(1)), collapse = ", "), "), by the campus that taught ",

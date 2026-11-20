@@ -48,6 +48,34 @@ test_that("EC01: without the degrees a graduate reads as gone, and the scope nar
                                                  list(term_type = "spring", data_edges = ec01$edges))), 0L)
 })
 
+test_that("EC01: a first-time class is who the record calls new, with summer starters in the fall class", {
+  ft <- get_entering_class_retention(ec01$student_terms, ec01$degrees,
+                                     list(term_type = "fall", student_level = "UG", min_n = 1L, entry = "first_time",
+                                          data_edges = ec01$edges), ec01$programs)
+  # Fall 2019 is a class now (EC-P): the record says who is new.
+  expect_equal(ft$n_entering[ft$step == 1L], c(1L, 4L, 4L))
+  expect_equal(attr(ft, "n_first_term"), 0L)
+  # Fall 2020: A B C D. Spring 2021 A B C; Fall 2021 A B; then A alone.
+  expect_equal(ft$n_here[ft$term == 202080L], c(3L, 2L, 1L, 1L))
+  # Fall 2021: F1 F2 F3 and the summer starter EC-S; EC-N never enrolled.
+  expect_equal(attr(ft, "n_summer_starts"), 1L)
+  expect_equal(ft$n_here[ft$term == 202180L], c(2L, 1L, NA, NA))
+  # Full-time in the entering term: EC-S (part-time that fall) is out.
+  full <- get_entering_class_retention(ec01$student_terms, ec01$degrees,
+                                       list(term_type = "fall", student_level = "UG", min_n = 1L, entry = "first_time",
+                                            time_status = "FT", data_edges = ec01$edges), ec01$programs)
+  expect_equal(full$n_entering[full$term == 202180L][1], 3L)
+  transfer <- get_entering_class_retention(ec01$student_terms, ec01$degrees,
+                                           list(term_type = "fall", min_n = 1L, entry = "transfer", data_edges = ec01$edges),
+                                           ec01$programs)
+  expect_equal(transfer$term[1], 202080L)
+  expect_equal(transfer$n_here, c(0L, 1L, 0L, 0L))
+  expect_error(get_entering_class_retention(ec01$student_terms, NULL, list(entry = "first_time", data_edges = ec01$edges)),
+               "programs")
+  expect_error(get_entering_class_retention(ec01$student_terms, NULL, list(entry = "new", data_edges = ec01$edges)),
+               "opt\\$entry")
+})
+
 test_that("get_entering_class_retention() stops without its edge, its columns or a step", {
   expect_error(get_entering_class_retention(ec01$student_terms, NULL, list()), "settled enrollment edge")
   expect_error(get_entering_class_retention(ec01$student_terms %>% select(-student_level), NULL,
@@ -58,11 +86,17 @@ test_that("get_entering_class_retention() stops without its edge, its columns or
 
 test_that("EC01: a step is named by its distance and season, and the sentence reads the latest class a year on", {
   expect_equal(retention_milestone_label(1:4, c(202110L, 202180L, 202210L, 202280L)),
-               c("1 semester later (spring)", "1 year later (fall)", "3 semesters later (spring)", "2 years later (fall)"))
+               c("2nd semester (spring)", "3rd semester (fall)", "4th semester (spring)", "5th semester (fall)"))
+  expect_equal(retention_milestone_label(c(10L, 11L, 20L), 202080L),
+               c("11th semester (fall)", "12th semester (fall)", "21st semester (fall)"))
   ms <- get_entering_class_retention(ec01$student_terms, ec01$degrees,
                                      list(term_type = "fall", student_level = "UG", min_n = 1L, data_edges = ec01$edges))
   testthat::local_edition(3)
-  expect_snapshot(cat(retention_milestone_sentence(list(milestones = ms))))
+  first_time <- get_entering_class_retention(ec01$student_terms, ec01$degrees,
+                                             list(term_type = "fall", student_level = "UG", min_n = 1L, entry = "first_time",
+                                                  data_edges = ec01$edges), ec01$programs)
+  expect_snapshot(cat(retention_milestone_sentence(list(milestones = ms)),
+                      retention_milestone_sentence(list(milestones = first_time)), sep = "\n"))
   expect_equal(retention_milestone_sentence(list(milestones = ms[0, ])), character(0))
   # The chart: one line per step, each stopping at its last settled class.
   fig <- plotly::plotly_build(plot_entering_class_milestones(list(milestones = ms)))

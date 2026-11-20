@@ -52,7 +52,7 @@ alongside other work (M14, M16).
 | [I20](#i20--cedar_programs-holds-almost-no-branch-campus-students) | Defect | `cedar_programs` holds 1–3% of branch-campus students; branch program counts read near zero |
 | [I18](#i18--cedar_degrees-holds-no-associate-degrees-so-branch-campus-completions-read-zero) | Defect | `cedar_degrees` holds no associate degrees: branch-campus completions read zero |
 | [I4](#i4--pre-change-course-ratios-are-confounded-by-career-stage) | Defect | Pre-change course ratios confounded by career stage (deferred) |
-| M1–M60 | Improvement | See [Improvements](#improvements) |
+| M1–M61 | Improvement | See [Improvements](#improvements) |
 
 ### Resolved since the last release
 
@@ -4416,6 +4416,13 @@ check of its matching (the ACT comparison Against Non-Takers runs). *Done
 when:* one branch function standardizes a group to another over named cells
 and returns the covered count, the expected value and its error; both cones
 call it; and Prepared for It reads the same cells and the same alike check.
+
+**M61 — Three readers of `student_population` each match its labels.**
+`student_term_entry_type()` and `classify_origin()` (`population.R`),
+`.recode_population()` (`population-trend.R`) and the Pathways module
+(`pathways.R`, a `grepl("transfer", ...)`) each carry their own patterns for
+Banner's labels. *Done when:* one branch function recodes the label, the
+labels it reads are an institution file, and the others call it.
 
 ### Documentation and naming
 
