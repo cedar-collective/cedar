@@ -19,8 +19,7 @@ degreeExplorerUI <- function(id, catalog, roadmaps, status = NULL, colleges = NU
         column(if (is.null(colleges)) 11 else 7, selectInput(ns("dx_catalog_id"), "Degree · latest catalog",
           choices = choices, selected = choices[[1]], width = "100%")),
         column(1, filter_actions(class = "filter-actions-end",
-          actionButton(ns("dx_copy_url"), label = NULL, icon = icon("link"),
-            title = "Copy shareable link for current view", class = "btn-outline-secondary btn-sm")))),
+          cedar_link_menu(ns("dx_copy_url"))))),
       fluidRow(
         column(4, selectInput(ns("dx_math_start"), "Where will you start in math?",
           choices = degree_math_start_choices(roadmaps, choices[[1]]))),

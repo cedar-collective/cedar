@@ -28,7 +28,7 @@ The page builds as soon as it opens; there is no run button.
 | **Campus** | The campuses that taught the courses. ABQ and EA to start; clear it to read every campus. The By Campus table always sets every campus side by side. |
 | **From term** / **To term** | The first and last terms read, earliest and latest graded by default. A trend and the course window read only the terms in this range. |
 
-The link button copies a shareable URL for the current term type, campuses and terms.
+The link button's **Copy link** copies a shareable URL for the current term type, campuses and terms; **Make this my start page** opens CEDAR here in this browser.
 
 ---
 

@@ -627,7 +627,7 @@ observeEvent(input$enrl_dept_info_btn, {
 # (not a module), so the button id stays unnamespaced and the slug varies by the
 # active sub-tab (Low Enrollment vs. Enrollment).
 cedar_copy_url_observer(
-  input, session, "enrl_copy_url", button_id = "enrl_copy_url",
+  input, session, "enrl_copy_url", button_id = "enrl_copy_url_menu",
   slug = function() if (identical(input$enrl_output_tabs, "low_enrl")) "low-enrollment" else "enrollment",
   values_fn = function() list(
     campus  = input$enrl_campus,
@@ -642,11 +642,23 @@ cedar_copy_url_observer(
 # Course Dynamics is top-level (not a module), so keep the button id
 # unnamespaced while using the shared Course Dynamics URL spec.
 cedar_copy_url_observer(
-  input, session, "cr_copy_url", button_id = "cr_copy_url",
+  input, session, "cr_copy_url", button_id = "cr_copy_url_menu",
   spec_title = "Course Dynamics",
   values_fn = function() list(
     campus = input$cr_campus,
     course = input$cr_course
+  )
+)
+
+# Dept Dashboard is top-level too: its link menu copies the view or makes it
+# this browser's start page (the department a chair opens every morning).
+cedar_copy_url_observer(
+  input, session, "dashboard_copy_url", button_id = "dashboard_copy_url_menu",
+  spec_title = "Dept Dashboard",
+  values_fn = function() list(
+    campus = input$dashboard_campus,
+    dept   = input$dashboard_dept,
+    term   = input$dashboard_term
   )
 )
 

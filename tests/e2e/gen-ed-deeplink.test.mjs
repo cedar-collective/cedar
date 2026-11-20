@@ -38,7 +38,7 @@ function check(ok, label) {
       `From term opens on the first term (${opening.from})`);
     check(JSON.stringify(await ticked(page)) === JSON.stringify(['fall', 'spring']),
       'Term types open on Fall and Spring');
-    check(await page.$('#gen_ed-ge_copy_url') !== null, 'the link button is beside Run');
+    check(await page.$('#gen_ed-ge_copy_url_menu') !== null, 'the link button is beside Run');
 
     // A shared link: one term type, restored and run.
     await connect(page, { tab: 'gen-ed', search: SEARCH });
@@ -71,6 +71,9 @@ function check(ok, label) {
       window.cedarCopiedLink = null;
       navigator.clipboard.writeText = (text) => { window.cedarCopiedLink = text; return Promise.resolve(); };
     });
+    // The link button is a menu: Copy link, or Make this my start page.
+    await page.click('#gen_ed-ge_copy_url_menu');
+    await page.waitForSelector('#gen_ed-ge_copy_url', { visible: true });
     await page.click('#gen_ed-ge_copy_url');
     const copied = await waitFor(page, () => !!window.cedarCopiedLink)
       ? new URL(await page.evaluate(() => window.cedarCopiedLink)) : null;

@@ -29,7 +29,7 @@ Set the filter stripe, then click **Run**.
 | **From term / To term** | Sets the historical term window. It opens on every term up to the current default term. |
 | **Term types** | Which kinds of term the run pools: Fall and Spring by default. A Fall term and a Spring one hold different students, and a Summer term a small, different mix, so read one term type at a time when comparing. |
 
-Click **Run** to update the summary cards and views. The link button beside **Run** copies a link that opens this page with the same filters and runs it. Course, grade-distribution, and instructor outcome rows use a fixed five-attempt display threshold; there is no Min N control on this page.
+Click **Run** to update the summary cards and views. The link button beside **Run** offers **Copy link**, a link that opens this page with the same filters and runs it, and **Make this my start page**. Course, grade-distribution, and instructor outcome rows use a fixed five-attempt display threshold; there is no Min N control on this page.
 
 ---
 

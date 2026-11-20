@@ -226,6 +226,21 @@ cedar_home_ui <- function() {
       )
     ),
 
+    # The start page (www/cedar-navigation.js fills the status line).
+    div(
+      class = "cedar-home-startpage",
+      icon("house"),
+      div(
+        tags$strong("Start where you work. "),
+        "Open the page you use most, such as your department's dashboard, choose the link button ",
+        icon("link"), " beside its filters, then ", HTML("<em>Make this my start page</em>."),
+        " CEDAR will open there in this browser, and the CEDAR name at the top always brings you back here. ",
+        tags$span(id = "cedar_start_page_status", class = "text-note"),
+        tags$button(id = "cedar_start_page_clear", type = "button", hidden = NA,
+                    class = "btn btn-link btn-sm cedar-start-page-clear", "Clear start page")
+      )
+    ),
+
     tags$section(
       class = "cedar-home-section",
       tags$h2("Department Views"),
@@ -517,6 +532,16 @@ ui <- page_navbar(
               if (icon) icon.className = savedClass;
             }, 1500);
           }
+          // 'Make this my start page': kept in this browser, read by
+          // www/cedar-navigation.js when CEDAR opens with no page in its address.
+          if (msg.action === 'home') {
+            try {
+              localStorage.setItem('cedar-start-page', JSON.stringify({ query: msg.queryStr, label: msg.label || '' }));
+              flash();
+              if (window.cedarShowStartPage) window.cedarShowStartPage();
+            } catch (e) { /* storage blocked: nothing kept */ }
+            return;
+          }
           if (navigator.clipboard && window.isSecureContext) {
             navigator.clipboard.writeText(url).then(flash);
           } else {
@@ -757,7 +782,8 @@ nav_panel(
         actionButton("dashboard_button",
                      label = "Gather Data",
                      class = "btn-primary",
-                     icon  = icon("sync-alt"))
+                     icon  = icon("sync-alt")),
+        cedar_link_menu("dashboard_copy_url")
       ),
       scope_output = uiOutput("dashboard_program_info")
     )
@@ -979,13 +1005,7 @@ nav_panel(
             disabled = "disabled",
             `aria-disabled` = "true"
           ),
-          actionButton(
-            "cr_copy_url",
-            label = NULL,
-            icon = icon("link"),
-            title = "Copy shareable link for current view",
-            class = "btn-outline-secondary btn-sm"
-          )
+          cedar_link_menu("cr_copy_url")
         )
       )
     )
@@ -1534,11 +1554,7 @@ nav_panel(
                        icon = icon("sync-alt"),
                        disabled = "disabled",
                        `aria-disabled` = "true"),
-          actionButton("enrl_copy_url",
-                       label = NULL,
-                       icon = icon("link"),
-                       title = "Copy shareable link for current view",
-                       class = "btn-outline-secondary btn-sm")
+          cedar_link_menu("enrl_copy_url")
         ),
         tags$small(
           class = "text-muted",

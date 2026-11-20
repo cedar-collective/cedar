@@ -16,24 +16,27 @@
   <style>
     :root {
       color-scheme: light;
-      --cedar-blue: #2f6f9f;
-      --cedar-blue-dark: #1e557e;
-      --cedar-ink: #20323f;
-      --cedar-muted: #5d7180;
-      --cedar-line: #d8e6ee;
-      --cedar-bg: #f4f8fa;
+      /* CEDAR's evergreen and lichen gold (www/cedar-custom.css). */
+      --cedar-gold-text: #7A5010;
+      --cedar-heading: #2D4336;
+      --cedar-ink: #232826;
+      --cedar-muted: #555555;
+      --cedar-line: #d4c5b0;
+      --cedar-bg: #f6f3ec;
       --cedar-panel: #ffffff;
+      --cedar-wash: rgba(63, 94, 75, 0.10);
     }
 
     :root[data-theme="dark"] {
       color-scheme: dark;
-      --cedar-blue: #7f9fd6;
-      --cedar-blue-dark: #9fb9e4;
+      --cedar-gold-text: #e3bd6e;
+      --cedar-heading: #a8cbb2;
       --cedar-ink: #e4e2dc;
       --cedar-muted: #b9b7b0;
-      --cedar-line: #3d4240;
+      --cedar-line: #34463a;
       --cedar-bg: #161a18;
       --cedar-panel: #1e2321;
+      --cedar-wash: rgba(63, 94, 75, 0.25);
     }
 
     :root[data-theme="dark"] main {
@@ -51,7 +54,7 @@
       place-items: center;
       padding: 2rem;
       background:
-        linear-gradient(180deg, rgba(47, 111, 159, 0.08), rgba(47, 111, 159, 0)),
+        linear-gradient(180deg, var(--cedar-wash), rgba(63, 94, 75, 0)),
         var(--cedar-bg);
       color: var(--cedar-ink);
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -62,6 +65,7 @@
       width: min(100%, 42rem);
       padding: 2rem;
       border: 1px solid var(--cedar-line);
+      border-top: 4px solid #C7A96B;
       border-radius: 8px;
       background: var(--cedar-panel);
       box-shadow: 0 18px 45px rgba(32, 50, 63, 0.12);
@@ -69,7 +73,7 @@
 
     .eyebrow {
       margin: 0 0 0.5rem;
-      color: var(--cedar-blue-dark);
+      color: var(--cedar-gold-text);
       font-size: 0.8rem;
       font-weight: 750;
       letter-spacing: 0.08em;
@@ -78,6 +82,7 @@
 
     h1 {
       margin: 0;
+      color: var(--cedar-heading);
       font-size: clamp(1.8rem, 5vw, 2.6rem);
       line-height: 1.15;
       letter-spacing: 0;

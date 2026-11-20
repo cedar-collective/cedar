@@ -30,7 +30,7 @@ Set the filter stripe, then click **Find Cancellations**.
 | **Method** | Limits by delivery method. |
 | **Level** | Limits by course level. Defaults to lower division. |
 
-The link button copies a shareable URL for the current view.
+The link button's **Copy link** copies a shareable URL for the current view; **Make this my start page** opens CEDAR here in this browser.
 
 ---
 
