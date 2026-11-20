@@ -121,6 +121,9 @@ test_that("RR01: the trend carries its fitted line's ends, the least-squares lin
   expect_equal((t$fit_last_pct - t$fit_first_pct) / ((t$last_term - t$first_term) %/% 100L), t$slope)
 })
 
+# RR01's students each hold one term's row (a new id every fall), so every
+# entering class reads 0% still enrolled: the text shows the lines are there.
+# The arithmetic is EC01's (test-entering-class-retention.R).
 test_that("RR01: the dashboard as text", {
   testthat::local_edition(3)
   expect_snapshot(cat(format_retention_dashboard(rr01$dashboard), sep = "\n"))

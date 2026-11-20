@@ -1897,6 +1897,43 @@ population_group_rename_successions <- data.frame(
 
 # ── test-return-rates.R ─────────────────────────────────────────────────────────
 
+# EC01: two entering classes followed term by term (test-entering-class-retention.R).
+# Fall 2019 is the table's first term, so EC-P (enrolled then and in Fall
+# 2020) enters no class. The Fall 2020 class is six students:
+#   EC-A  every term through Fall 2022
+#   EC-B  through Fall 2021
+#   EC-C  through Spring 2021
+#   EC-D  Fall 2020 only
+#   EC-E  away in Spring 2021, back in Fall 2021 only
+#   EC-G  Fall 2020 and Spring 2021, awarded a degree in Spring 2021
+# so 4 of 6 are here in Spring 2021 (A B C G), 4 in Fall 2021 (A B E, and G
+# by degree), 2 in Spring 2022 (A G) and 2 in Fall 2022 (A G). The Fall 2021
+# class is three: EC-F1 (to Spring 2022), EC-F2 (Fall 2021 only), EC-F3 (to
+# Fall 2022), and EC-X, a graduate student, entering at another level: 2 of 3
+# in Spring 2022, 1 of 3 in Fall 2022. Settled through Fall 2022.
+ec01 <- local({
+  terms <- list(
+    `EC-P` = c(201980L, 202080L),
+    `EC-A` = c(202080L, 202110L, 202180L, 202210L, 202280L),
+    `EC-B` = c(202080L, 202110L, 202180L),
+    `EC-C` = c(202080L, 202110L),
+    `EC-D` = 202080L,
+    `EC-E` = c(202080L, 202180L),
+    `EC-G` = c(202080L, 202110L),
+    `EC-F1` = c(202180L, 202210L),
+    `EC-F2` = 202180L,
+    `EC-F3` = c(202180L, 202210L, 202280L),
+    `EC-X` = c(202180L, 202210L)
+  )
+  student_terms <- dplyr::bind_rows(lapply(names(terms), function(id) tibble::tibble(
+    student_id = id, term = terms[[id]], enrolled = TRUE,
+    student_level = if (id == "EC-X") "GR" else "UG", student_campus = "ABQ",
+    student_classification = if (id == "EC-E") "Sophomore, 2nd Yr" else "Freshman, 1st Yr, 1st Sem")))
+  list(student_terms = student_terms,
+       degrees = tibble::tibble(student_id = "EC-G", term = 202110L),
+       edges = list(last_enrolled_complete = 202280L, last_graded = 202280L))
+})
+
 # RR01: four falls (202080, 202180, 202280, 202380, k = 1..4) of the same
 # shape, and Fall 2024 with no settled next term. Each fall:
 #   ABQ freshmen (college AS), RR01-A01..A40: A01..A(26+2k) come back (28,

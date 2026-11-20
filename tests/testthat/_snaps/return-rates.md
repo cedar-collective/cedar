@@ -17,5 +17,9 @@
       Classification Sophomore, 2nd Yr: 75.0% in Fall 2023; steady.
       College AS: 85.0% in Fall 2023; steady.
       College EN: 75.0% in Fall 2023; steady.
+      Entered Fall 2021 (62): 0.0% 1 semester later (spring); 0.0% 1 year later (fall); 0.0% 3 semesters later (spring); 0.0% 2 years later (fall).
+      Entered Fall 2022 (62): 0.0% 1 semester later (spring); 0.0% 1 year later (fall); 0.0% 3 semesters later (spring); 0.0% 2 years later (fall).
+      Entered Fall 2023 (62): 0.0% 1 semester later (spring); 0.0% 1 year later (fall); — 3 semesters later (spring); — 2 years later (fall).
+      Entered Fall 2024 (10): — 1 semester later (spring); — 1 year later (fall); — 3 semesters later (spring); — 2 years later (fall).
       Course MATH 101 (ABQ): 21 with a DFW, 9.5% back against 91.7% after passing; 17.2 beyond the passers' rate.
 
