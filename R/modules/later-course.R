@@ -438,7 +438,7 @@ laterCourseServer <- function(id, course, campus, students, attempts, programs, 
       current <- chosen()
       keep <- intersect(current, c(offered, CR_ROLLUP_SENTINEL))
       if (length(keep) == 0L) chosen(downstream_default_course(
-        opts, course_sequel(CEDAR_COURSE_SEQUELS, course(), attempts)))
+        opts, course_sequel(CEDAR_COURSE_SEQUELS, course(), students)))
       else if (!identical(keep, current)) chosen(keep)
     })
 
