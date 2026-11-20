@@ -490,3 +490,26 @@ applicant_hs_gpa <- function(applicants, with_act = FALSE) {
   }
   out
 }
+
+#' Each student-term's Pell eligibility and first-generation status, as cell labels
+#'
+#' The declarations table carries both on every row of a student's term. A
+#' student-term is "yes" when any of its rows says so, "no" when one says no
+#' and none says yes, and absent from the result when no row records it.
+#'
+#' @param programs `cedar_programs`.
+#' @return A tibble of `student_id`, `term`, `pell` and `first_gen`
+#'   (`"yes"`, `"no"` or NA), one row per student-term.
+student_term_aid <- function(programs) {
+  missing <- setdiff(c("student_id", "term", "pell_eligible", "first_gen"), names(programs))
+  if (length(missing) > 0) {
+    stop("[comparison.R] student_term_aid: programs lacks ", paste(missing, collapse = ", "), call. = FALSE)
+  }
+  label <- function(x) if_else(is.na(x), NA_character_, if_else(x, "yes", "no"))
+  programs %>%
+    group_by(student_id, term = as.integer(term)) %>%
+    summarize(pell = suppressWarnings(max(as.logical(pell_eligible), na.rm = TRUE)),
+              first_gen = suppressWarnings(max(as.logical(first_gen), na.rm = TRUE)), .groups = "drop") %>%
+    mutate(pell = label(if_else(is.finite(pell), pell == 1, NA)),
+           first_gen = label(if_else(is.finite(first_gen), first_gen == 1, NA)))
+}

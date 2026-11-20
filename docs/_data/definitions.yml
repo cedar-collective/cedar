@@ -497,8 +497,38 @@ definitions:
             functions: [get_course_persistence, next_term_persistence]
 
   - id: course-cohort-effect
-    current_version: "2.0.0"
+    current_version: "2.1.0"
     versions:
+      - version: "2.1.0"
+        title: Takers against non-takers
+        summary: Sets the students who took a course beside similar students who did not, and asks whether the takers came back the next semester, passed their other courses that semester, and earned a higher GPA the next semester. Similar means the same term, home campus, high-school GPA band, full- or part-time status, Pell eligibility, first-generation status and credits already earned here, which is what the records hold reliably for nearly every student. A second, simpler comparison with no matching sets the course's passers beside students who never took it, and reads that lead against the same lead for other courses.
+        population: Enrolled students of the selected classification(s) in the selected terms, by home campus, one row per student and term.
+        unit: A student in a term.
+        numerator: Takers who enrolled the next regular term; their other attempts that term not passed; their next-term GPA.
+        denominator: Takers whose return can be read; their other graded attempts that term; takers who came back and have a GPA.
+        campus: The student's home campus, not the campus that taught the course. A student who took the course on any campus is a taker.
+        time_window: Terms run to the most recent term whose enrollment has settled; grades are read through the most recent graded term. Summer is not a step.
+        exclusions: A student who dropped the course early, or has no posted grade in it, is neither a taker nor a non-taker. Takers with fewer than the minimum number of similar students are left out and counted. A group under the minimum keeps its count and shows no rate.
+        limitations:
+          - This shows who takes the course and how they fare, not what the course causes. The matching makes the two groups alike on what it names only; placement, advising, major and motivation are not among them.
+          - The page checks its own matching. It runs the same comparison on ACT scores, which are not matched on and which the course cannot change. If takers and similar students differ there, they differed before the course, and every gap carries that difference. The check reads only students with a score on file, a small and shrinking share now that the ACT is optional, so it is evidence about the matching and not a measure of every taker.
+          - Taking almost any course goes with coming back, so a course's gap is read against the gaps of the other courses these students take, never against zero.
+          - A course students are placed into shows its placement. A course whose students started behind will look worse than it is.
+          - The unmatched comparison's benchmark is the typical course, counting a small course as much as a large one; raise the minimum to read only well-attended courses.
+          - A classification is what the record says that term, which for a branch-campus course can be mostly high-school students taking college courses.
+        guide: users/course-reports#takers-vs-non-takers
+        implementation:
+          - file: R/cones/course-similar-students.R
+            functions: [get_course_similar_students]
+          - file: R/branches/comparison.R
+            functions: [student_term_aid, applicant_hs_gpa, hs_gpa_band]
+          - file: R/features/course-similar-students.R
+            functions: [build_course_similar_students, course_similar_students_alike]
+          - file: R/cones/course-cohort-effect.R
+            functions: [get_course_cohort_effect]
+          - file: R/features/course-cohort-context.R
+            functions: [build_course_cohort_context, course_cohort_context_defaults]
+
       - version: "2.0.0"
         title: Takers against non-takers
         summary: Sets the students who took a course beside similar students who did not, and asks whether the takers came back the next semester, passed their other courses that semester, and earned a higher GPA the next semester. Similar means the same term, home campus, high-school GPA band and full- or part-time status. A second, simpler comparison with no matching sets the course's passers beside students who never took it, and reads that lead against the same lead for other courses.

@@ -53,7 +53,7 @@ try {
     const note = document.querySelector('[data-definition-id="course-cohort-effect"]');
     return note ? note.getAttribute('data-definition-version') : null;
   });
-  ok(definition === '2.0.0', 'the tab carries the current course-cohort-effect definition');
+  ok(definition === '2.1.0', 'the tab carries the current course-cohort-effect definition');
 
   // The synthetic institution is small: a guard of one lets every group show.
   await setInput(page, 'cr_cohort-min_n', 1);

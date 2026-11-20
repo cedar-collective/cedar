@@ -552,6 +552,17 @@ ss_app_act <- ss_app %>%
 ss_app_act_alike <- ss_app_act %>%
   mutate(unm_act_combined_score = if_else(student_id %in% c("RP_BACK", "RP_FAIL"), 24, unm_act_combined_score))
 
+# Pell eligibility and first-generation status for 202010, in the declarations
+# table's shape. HIST 101's takers split: BACK is Pell-eligible with GONE (who
+# did not return) as the only non-taker like that; FAIL is not, with DROP,
+# GRAD and REP. REP has two rows that term, one of them recording nothing.
+ss_aid <- tibble::tibble(
+  student_id    = c("RP_BACK", "RP_FAIL", "RP_GONE", "RP_DROP", "RP_GRAD", "RP_REP", "RP_REP"),
+  term          = 202010L,
+  pell_eligible = c(TRUE, FALSE, TRUE, FALSE, FALSE, FALSE, NA),
+  first_gen     = c(FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, NA)
+)
+
 # Per-term gaps in by_term's shape, four falls (2019-2022) with a spring and a
 # summer between: GAP 100's return gap climbs 0, 2, 4, 6 (+2 a year) with
 # standard error 0.5; GAP 200's falls 6, 4, 2, 0; GAP 300's zigzags 0, 6, 0, 6
