@@ -212,8 +212,7 @@ The Downstream tab follows the course's students afterwards, one question a subt
 |---|---|---|
 | **Coming Back** | Did the students who passed the course come back more often than those who did not? | this course's students, by their result here |
 | **Against Non-Takers** | Do students who take it come back and do well more often than similar students who don't? | takers against students who did not take it |
-| **Next Courses** | How many went on to a later course, and how did they do in it, by their grade here? | this course's students, by their grade here |
-| **Prepared for It** | In a later course, did students who passed this one first do better? | later-course students who passed this one first against those who did not |
+| **Next Courses** | How many went on to a later course, how did they do in it by their grade here, and did passing this course first help? | this course's students by their grade here; then the later course's students who passed this one first against those who had not |
 
 The first two read the university as a whole (return, grades in other courses, GPA); the last two read one later course. The **What counts as failing?** choice in Coming Back's Settings applies there only; every other view counts pass and DFW by the standard rule.
 
@@ -227,7 +226,7 @@ Downstream opens on **At a Glance**: the whole story in five cards, read top to 
 2. **Coming Back**: how often students who passed came back the next semester, against those who did not.
 3. **Against Non-Takers**: how often its students came back against similar students who did not take it, and whether that is better, worse or about the same once chance is allowed for. It needs admissions records; without them the card says so.
 4. **Next Courses**: of the students who could have taken the later course, how many did within the window, and how many of them passed it.
-5. **Prepared for It**: the later course's DFW rate for students who passed this course first against those who did not, and whether the two groups were alike before it.
+5. **Did Passing It First Help?** (a section of Next Courses): the later course's DFW rate for students who passed this course first against those who did not, and whether the two groups were alike before it.
 
 Each card gives its number as a sentence and a small figure, names the campus it reads (the one with the most students, so a number is never a blend of campuses), and opens the subtab behind it, where the same number comes with its change over time, its breakdowns and how far to trust it. Opening At a Glance runs the views it reads on their defaults, so its cards fill in one by one; the later course is the one Next Courses and Prepared for It show.
 
@@ -328,13 +327,13 @@ course these students take, and its table shows the same return-gap line for
 every course, with its slope a year, so a set of courses can be read for
 their trends side by side.
 
-### Next Courses and Prepared for It
+### Next Courses
 
-Both subtabs read one later course, chosen in a picker that sits on each: change it on one and the other follows. It opens on the first course the list offers, the later course of this course's own department that most of its students took (or the most-taken one when the department has none), so neither opens empty. The list shows, beside each course, how many of this course's students took it within the window (three regular terms unless you change it under Next Courses' Settings). Choose several codes to read them as one course.
+The subtab reads one later course, chosen in the picker at its top, from two sides: its own sections, then **Did Passing It First Help?** under them (a subtab of its own, Prepared for It, until November 2026). It opens on the first course the list offers, the later course of this course's own department that most of its students took (or the most-taken one when the department has none), so neither opens empty. The list shows, beside each course, how many of this course's students took it within the window (three regular terms unless you change it under Next Courses' Settings). Choose several codes to read them as one course.
 
 They start from different students:
 
-| | **Next Courses** | **Prepared for It** |
+| | **The first sections** | **Did Passing It First Help?** |
 |---|---|---|
 | Starts from | everyone who took this course | everyone in the later course |
 | Asks | how many went on to the later course, and how they did in it | did students who passed this course first do better there than those who did not? |
@@ -383,7 +382,7 @@ The view gives, for each campus that taught the course:
 A student who took the later course in a term whose grades are not posted yet
 counts as having taken it, and is listed as not yet graded, never as failing.
 
-### Prepared for It
+### Did Passing It First Help?
 {: #course-sequence}
 
 {% include definition-summary.html id="course-sequence" %}
@@ -432,7 +431,7 @@ This depends on what your institution has loaded into CEDAR. Check with your CED
 
 Two views answer two halves of this, and neither answers the whole of it.
 
-- **Downstream → Prepared for It** compares grades in one later course you
+- **Downstream → Next Courses → Did Passing It First Help?** compares grades in one later course you
   name (ENGL 1120, say) between students who passed the first-year course
   first and students who took the later course without it. The first sentence
   of the result gives both rates with their counts and says how alike the

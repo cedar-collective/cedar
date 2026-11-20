@@ -22,7 +22,7 @@
 
 DOWNSTREAM_GLANCE_STEPS <- c(
   in_course = "In the Course", coming_back = "Coming Back", non_takers = "Against Non-Takers",
-  next_courses = "Next Courses", prepared = "Prepared for It"
+  next_courses = "Next Courses", prepared = "Did Passing It First Help?"
 )
 
 .glance_pct <- function(x) sprintf("%.1f%%", x)

@@ -15,9 +15,9 @@
 # (modules/instructor-gate.R). The breakdown is on the payload either way; it
 # is rendered only while the gate is open.
 #
-# One choice of later course serves two subtabs, Next Courses and Prepared
-# for It: each shows the picker (laterCoursePickerUI(id, slot)) and both
-# pickers hold the same value. It opens on downstream_default_course() (the
+# One choice of later course serves the whole Next Courses subtab: this
+# module's sections and, under them, Did Passing It First Help? (server.R's
+# course-sequence comparison, a subtab of its own until 2026-11-20). It opens on downstream_default_course() (the
 # intended sequel course_sequels.csv names, else the
 # own department's most-taken sequel when enough students take it, otherwise
 # the most-taken later course of any department), so neither
@@ -64,8 +64,9 @@ downstream_course_choices <- function(opts, include_rollup = FALSE, dept = NULL)
   out
 }
 
-# The later-course picker, one per subtab that reads it (slot "next" on Next
-# Courses, "seq" on Prepared for It); the server keeps the two on one value.
+# The later-course picker (slot "next", on Next Courses). The slot argument
+# stays so a second view could show the same choice; the server keeps every
+# slot on one value.
 laterCoursePickerUI <- function(id, slot) {
   ns <- NS(id)
   div(
@@ -74,7 +75,7 @@ laterCoursePickerUI <- function(id, slot) {
     cedar_method_panel(tagList(
       tags$p("The list holds the later courses this course's students took within the window (three regular terms unless changed under Next Courses' Settings), each with how many took it and the share that is of those who could have. It opens on the course's own department's most-taken later course when at least ", DOWNSTREAM_OWN_DEPT_DEFAULT_PCT, "% of its students took one, and otherwise on the later course most of them took, whatever its department. Students are grouped by the campus that taught them this course; the later course counts on any campus."),
       tags$p("Choose several codes to read them as one course (a course and its modular or stretch forms): each student counts once, at their earliest attempt of any of them. Department ownership and how many continue neither establish nor rule out an intended sequence."),
-      tags$p("Next Courses and Prepared for It read the same choice. Prepared for It counts a pass of this course in any earlier term, whatever the window.")
+      tags$p("Every section of this tab reads this choice. Did Passing It First Help? counts a pass of this course in any earlier term, whatever the window.")
     ), title = "About this list")
   )
 }
@@ -83,7 +84,7 @@ laterCourseUI <- function(id) {
   ns <- NS(id)
   tagList(
     subtab_header("Next Courses",
-                  "Of this course's students, how many went on to a later course, and how did they do in it, by their grade here?",
+                  "Of this course's students, how many went on to a later course, how did they do in it by their grade here, and did passing this course first help?",
                   method = cedar_definition_note("downstream-outcomes")),
     laterCoursePickerUI(id, "next"),
     info_panel(
@@ -392,8 +393,8 @@ later_course_view <- function(r, ns, access) {
 #                     (and on "glance", which reads its result).
 # instructor_access   the session's shared instructor-gate flag.
 # instructor_password the configured password ("" when none is).
-LATER_COURSE_PICKER_SLOTS <- c("next", "seq")
-LATER_COURSE_LIST_VIEWS <- c("glance", "next_courses", "prepared")
+LATER_COURSE_PICKER_SLOTS <- "next"
+LATER_COURSE_LIST_VIEWS <- c("glance", "next_courses")
 LATER_COURSE_RUN_VIEWS <- c("glance", "next_courses")
 
 laterCourseServer <- function(id, course, campus, students, attempts, programs, applicants,

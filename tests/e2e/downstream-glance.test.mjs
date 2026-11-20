@@ -17,7 +17,7 @@ import { launch, connect, setInput, runAndWait, openSubTab, appReloads, explainA
          waitForIdle, requireIds, waitForSelector } from './lib.mjs';
 
 const COURSE = process.env.CEDAR_COURSE_X || 'HIST 1110';
-const STEPS = ['In the Course', 'Coming Back', 'Against Non-Takers', 'Next Courses', 'Prepared for It'];
+const STEPS = ['In the Course', 'Coming Back', 'Against Non-Takers', 'Next Courses', 'Did Passing It First Help?'];
 const fail = [];
 const ok = (cond, msg) => { if (!cond) fail.push(msg); console.log(`${cond ? 'ok  ' : 'FAIL'} ${msg}`); };
 
@@ -77,7 +77,7 @@ try {
   for (const c of cards.filter((x) => x.ready)) {
     ok(c.bars > 0, `${c.title} draws its figure (${c.bars} bars)`);
   }
-  for (const c of cards.filter((x) => x.ready && !/Against Non-Takers|Prepared/.test(x.title))) {
+  for (const c of cards.filter((x) => x.ready && !/Against Non-Takers|Did Passing/.test(x.title))) {
     ok(!!c.scope, `${c.title} names the campus it reads (${c.scope})`);
   }
   ok(cards.every((c) => /\S/.test(c.text)), 'every step says something, ready or not');
@@ -95,7 +95,7 @@ try {
   });
   const runs = (re) => page.evaluate((src) =>
     Object.values(window.__cedarRuns).filter((t) => new RegExp(src).test(t)).length, re.source);
-  for (const view of ['Against Non-Takers', 'Next Courses', 'Prepared for It']) {
+  for (const view of ['Against Non-Takers', 'Next Courses']) {
     await openSubTab(page, view, { timeout: 300000 });
     await waitForIdle(page, { timeout: 300000 });
   }

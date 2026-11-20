@@ -47,23 +47,21 @@ try {
   // tab that rendered nothing. The later-course choice is the one Next
   // Courses shares; the subtab runs on it when opened.
   await openSubTab(page, 'Downstream', { timeout: 300000 });
-  await openSubTab(page, 'Prepared for It', { timeout: 300000 });
-  await waitForSelector(page, '#cr_later-picker_seq .selectize-control', { timeout: 120000, nonEmpty: false });
-  await requireIds(page, ['cr_later-course_y_seq', 'cr_impact_seq_update', 'cr_impact_seq_min_n']);
+  await openSubTab(page, 'Next Courses', { timeout: 300000 });
+  await waitForSelector(page, '#cr_later-picker_next .selectize-control', { timeout: 120000, nonEmpty: false });
+  await requireIds(page, ['cr_later-course_y_next', 'cr_impact_seq_update', 'cr_impact_seq_min_n']);
+  ok(!(await page.evaluate(() => [...document.querySelectorAll('.nav-link')].some((a) => a.textContent.trim() === 'Prepared for It'))),
+     'the comparison is a section of Next Courses, not a subtab of its own');
+  ok(!(await page.evaluate(() => !!document.getElementById('cr_later-course_y_seq'))),
+     'and the tab has one later-course picker');
   ok(!(await page.evaluate(() => !!document.getElementById('cr_impact_seq_course_y'))),
      'the comparison has no picker of its own');
   ok(!(await page.evaluate(() => !!document.getElementById('cr_later-run'))),
      'and no Show Results button: it runs when the subtab opens');
 
-  await setInput(page, 'cr_later-course_y_seq', [COURSE_Y]);
+  await setInput(page, 'cr_later-course_y_next', [COURSE_Y]);
   await waitForSelector(page, '#cr_impact_sequence_results .compare-bars', { timeout: 300000 });
   await waitForIdle(page, { timeout: 300000 });
-  // Both pickers hold the one choice: Next Courses opens on it.
-  await openSubTab(page, 'Next Courses', { timeout: 300000 });
-  await waitForSelector(page, '#cr_later-picker_next .selectize-control', { timeout: 120000, nonEmpty: false });
-  const shared = await page.evaluate(() => $('#cr_later-course_y_next')[0].selectize.getValue());
-  ok(shared.length === 1 && shared[0] === COURSE_Y, `Next Courses' picker follows the choice (${shared})`);
-  await openSubTab(page, 'Prepared for It', { timeout: 300000 });
 
   // textContent, not innerText: the counting notes and the per-term table
   // sit in collapsed panels, and innerText leaves collapsed content out.

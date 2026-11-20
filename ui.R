@@ -1330,11 +1330,9 @@ nav_panel(
           nav_panel(
             "Next Courses", value = "next_courses",
             icon = icon("shuffle"),
-            laterCourseUI("cr_later")
-          ),
-          nav_panel(
-            "Prepared for It", value = "prepared",
-            icon = icon("stairs"),
+            laterCourseUI("cr_later"),
+            # The same later course from the other side: among its students,
+            # those who passed this course first against those who had not.
             uiOutput("cr_impact_sequence_ui")
           )
         )
