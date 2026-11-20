@@ -1,8 +1,8 @@
 // Light and dark mode (www/cedar-theme.js, the tokens in www/cedar-custom.css).
 //
-// Asserts the page follows the system setting until the reader chooses; the
-// navbar toggle switches the mode and the choice survives a reload and a
-// system change; in the dark a table's header and a plotly figure read the
+// Asserts the page opens light until the reader chooses, whatever the system
+// setting; the navbar toggle switches the mode and the choice survives a
+// reload; in the dark a table's header and a plotly figure read the
 // dark tokens (the figure's background clear, its text light); and back in
 // light mode the figure gets exactly the colours the server drew.
 //
@@ -29,10 +29,7 @@ try {
   await connect(page, { tab: 'home' });
   await page.evaluate(() => { try { localStorage.removeItem('cedar-theme'); } catch (e) {} });
   await connect(page, { tab: 'home' });
-  ok(await mode() === 'dark', 'with no choice made, a dark system setting gives dark mode');
-  await page.emulateMediaFeatures([{ name: 'prefers-color-scheme', value: 'light' }]);
-  ok(await waitFor(page, () => document.documentElement.getAttribute('data-bs-theme') === 'light', { timeout: 5000 }),
-     'and it follows the system to light until the reader chooses');
+  ok(await mode() === 'light', 'with no choice made, the page opens light, even on a dark system setting');
 
   await page.click('.cedar-theme-toggle');
   ok(await mode() === 'dark', 'the navbar toggle switches to dark');
@@ -41,7 +38,7 @@ try {
   await page.emulateMediaFeatures([{ name: 'prefers-color-scheme', value: 'light' }]);
 
   await connect(page, { tab: 'retention', expect: 'Retention' });
-  ok(await mode() === 'dark', 'the choice survives a reload, against a light system setting');
+  ok(await mode() === 'dark', 'the choice survives a reload');
   await waitForSelector(page, '#retention_dashboard-overall_finding .finding-card', { timeout: 300000 });
   await waitForIdle(page, { timeout: 300000 });
   await waitFor(page, () => !!document.querySelector('#retention_dashboard-signs_table .rt-th'), { timeout: 120000 });

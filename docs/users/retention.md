@@ -26,7 +26,7 @@ The page builds as soon as it opens; there is no run button.
 |---|---|
 | **Term type** | Fall or spring: the term the students were enrolled in. One at a time, since a fall's students are not a spring's. |
 | **Student level** | Undergraduate to start. |
-| **Home campus** | The students' home campus. Leave it empty to read every campus. Coming back is counted at UNM on any campus. |
+| **Home campus** | The students' home campus. It opens on the main campus; clear it to read every campus. Coming back is counted at UNM on any campus. |
 
 ---
 

@@ -28,4 +28,15 @@
     });
   };
   document.addEventListener('DOMContentLoaded', () => window.cedarEnsureNavTargets('main_navbar'));
+
+  // The navbar title goes home: it clicks the hidden Home tab link, so the
+  // switch is the same tab change (and address-bar update) as any other.
+  document.addEventListener('click', event => {
+    const brand = event.target.closest('.cedar-brand-home');
+    if (!brand) return;
+    const home = document.querySelector('#main_navbar a[data-value="Home"]');
+    if (!home) return;
+    event.preventDefault();
+    home.click();
+  });
 })();

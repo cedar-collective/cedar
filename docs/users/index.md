@@ -17,7 +17,7 @@ If you're new to CEDAR, start with **Dept Dashboard**. Select a department and y
 
 From there, use the guide below to find the analyses most relevant to your role.
 
-**Light or dark.** The moon button at the right of the navigation bar switches CEDAR to dark mode (a sun switches it back). Until you choose, CEDAR follows your computer's setting; once you choose, this browser remembers it.
+**Light or dark.** The moon button at the right of the navigation bar switches CEDAR to dark mode (a sun switches it back). CEDAR opens in light mode; once you choose, this browser remembers it.
 
 ---
 

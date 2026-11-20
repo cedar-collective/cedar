@@ -48,6 +48,8 @@ try {
   ok(termType === 'fall', `the page opens on fall terms (${termType})`);
   const level = await page.$eval(`#${NS}level`, (el) => el.value);
   ok(level === 'UG', `the page opens on undergraduates (${level})`);
+  const campus = await page.$eval(`#${NS}campus`, (el) => (el.selectize ? el.selectize.getValue() : [...el.selectedOptions].map((o) => o.value)));
+  ok(JSON.stringify(campus) === '["ABQ"]', `the page opens on the main home campus (${campus})`);
 
   const fall = await cards();
   ok(fall.map((c) => c.title).join('|') === 'Latest term|Trend', `latest-term and trend cards (${fall.map((c) => c.title)})`);

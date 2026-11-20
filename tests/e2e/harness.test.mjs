@@ -76,6 +76,22 @@ try {
     ? ok('an address-bar update is not counted as an app reload')
     : bad('an address-bar update is not counted as an app reload', String(appReloads(page)));
 
+  // The navbar title is the way home (its Home tab link is hidden): clicking
+  // it is a tab change like any other, not a page load.
+  await clickNavTab(page, 'Gen Ed');
+  await page.waitForFunction(() => new URLSearchParams(location.search).get('tab') !== 'home',
+    { timeout: 15000, polling: 250 });
+  await page.click('.cedar-brand-home');
+  await page.waitForFunction(() => new URLSearchParams(location.search).get('tab') === 'home',
+    { timeout: 15000, polling: 250 });
+  (await activeTab(page)) === 'Home' && appReloads(page) === 0
+    ? ok('the CEDAR title opens Home without a page load')
+    : bad('the CEDAR title opens Home without a page load', `${await activeTab(page)}, ${appReloads(page)} reloads`);
+  const homeLinkShown = await page.$eval('#main_navbar a[data-value="Home"]', (a) => a.checkVisibility());
+  !homeLinkShown
+    ? ok('the separate Home tab link is not shown')
+    : bad('the separate Home tab link is not shown', 'visible');
+
   await page.reload({ waitUntil: 'domcontentloaded' });
   appReloads(page) === 1
     ? ok('an undeclared reload is detected', '1 app reload')

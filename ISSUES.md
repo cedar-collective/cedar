@@ -36,7 +36,6 @@ alongside other work (M14, M16).
 
 | ID | Kind | Summary |
 |---|---|---|
-| [I70](#i70--production-mrgather-crashes-instead-of-retrying-a-failed-download) | Defect | Production mrgather crashes instead of retrying a failed download: its image (built 2026-04-10) calls `tracker.recordReportFetchError()`, which its `reportTracker.js` lacks, so on 2026-11-13 one failed Academic Studies download ended the fetch and that day's class list was never pulled. Open until the image is rebuilt from current source |
 | [I68](#i68--the-compiled-computer-science-board-plans-composition-i-twice) | Defect | The compiled CS board plans Composition I twice: the English route's ENGL 1110 (`engl1`) and the reading's "Composition I: ENGL1110Y, ENGL1110Z or ENGL1110" choice (`composition_one_1`), 3 credits too many |
 | [I67](#i67--a-compiled-business-board-plans-its-writing-choice-before-composition-ii) | Defect | With stretch English, the compiled Business board plans "3 credits: ENGL2120 or ENGL2210" (`writing_1`) in semester 2, before Composition II in semester 3, though both options require it: a compiled choice tile carries no prerequisite its options share |
 | [I61](#i61--summer-2025-holds-nr-grades-where-summer-2024-held-none-and-reads-as-a-dfw-spike) | Defect | Summer 2025 holds 1,479 NR grades in 336 sections (Summer 2024: none), so it reads 22.5% DFW against about 13% for other summers; suspected an early pull before grades rolled |
@@ -61,6 +60,7 @@ Kept until the next release, so a recurrence is recognisable; each entry below g
 
 | ID | Kind | Summary |
 |---|---|---|
+| [I70](#i70--production-mrgather-crashes-instead-of-retrying-a-failed-download) | Defect | Production mrgather crashed instead of retrying a failed download: its image called `tracker.recordReportFetchError()`, which the server's `reportTracker.js` lacked, so on 2026-11-13 one failed Academic Studies download ended the fetch and that day's class list was never pulled. The server's image was rebuilt from its own with only the current `reportTracker.js` added, keeping its Chrome (resolved 2026-11-20) |
 | [I69](#i69--the-nightly-dept-dashboard-warm-failed-every-department-since-the-measure-tables) | Defect | The refresh's Dept Dashboard warm failed every department every night from 2026-11-08: the script loaded its own tables and never the measure tables the Registration flags read, so chairs' dashboards were built on first visit. Every loader now reads the measure tables and computes the cache hashes through one function each (resolved 2026-11-19) |
 | [I66](#i66--opening-a-downstream-subtab-reruns-the-analysis-at-a-glance-already-ran) | Defect | Opening Against Non-Takers, Next Courses or Prepared for It after At a Glance ran each analysis again, and Coming Back ran twice on opening: a run key held the subtab's Update button value, which Shiny reports as a classed 0 once the button renders and `identical()` holds different from the 0 used before it did. The keys read `cedar_click_count()` (resolved 2026-11-19) |
 | [I65](#i65--the-degree-explorer-browser-suite-checks-the-hand-built-boards-the-compiled-drafts-replaced) | Defect | `tests/e2e/degree-explorer.test.mjs` has failed since the compiled drafts replaced the CS, Business, History and Philosophy boards (#309, 2026-11-16): it hovers hand-board tiles (`java1`, `java2`, `os`, `historiography`, `philbuddhist`, `buscapstone`, …) the page no longer draws, and stops at the first. The suite now names the compiled tiles and asserts I64 on Philosophy (resolved 2026-11-19) |
@@ -105,7 +105,7 @@ Kept until the next release, so a recurrence is recognisable; each entry below g
 
 ## I70 — Production mrgather crashes instead of retrying a failed download
 
-**Status:** open.
+**Status:** resolved 2026-11-20.
 **Found:** 2026-11-19, explaining a gap in the registration snapshots.
 **Severity:** moderate: one failed download ends the whole fetch, and the
 reports after it are not pulled that day. The refresh then runs on the
@@ -124,7 +124,15 @@ registration snapshot that day paired the 2026-11-12 class list with the
 **Reproduction:** on the server, `docker run --rm --entrypoint sh
 mrgather-mrgather:latest -c "grep -c recordReportFetchError /app/*.js"`:
 `mrgather.js` 1, `reportTracker.js` 0.
-**Fix:** rebuild the production mrgather image from current source.
+**Fix:** the server's own source carried the old `reportTracker.js` too, so
+a rebuild from it would not have helped, and a full rebuild reinstalled
+Chrome (146 to 158) under the login automation. The image was instead built
+`FROM` the April image with only the current `reportTracker.js` copied in,
+so Chrome and `mrgather.js` are unchanged; the new file adds the method and
+a fetch-error section to the run summary and nothing else. The April image
+is kept as `mrgather-mrgather:pre-i70` and the old file as
+`/root/mrgather/reportTracker.js.pre-i70`. Checked in the new image:
+Chrome 146, and `recordReportFetchError()` records an error when called.
 
 ## I69 — The nightly Dept Dashboard warm failed every department since the measure tables
 

@@ -17,7 +17,8 @@
 
 RETENTION_TERM_TYPES <- c(Fall = "fall", Spring = "spring")
 
-# campuses  the home campuses to offer; none selected reads every campus.
+# campuses  the home campuses to offer; it opens on the main campus
+#           (CEDAR_CAMPUS_MAIN), and none selected reads every campus.
 retentionDashboardUI <- function(id, campuses) {
   ns <- NS(id)
   # The page opens on student_levels.csv's first level.
@@ -31,6 +32,7 @@ retentionDashboardUI <- function(id, campuses) {
                                selected = "fall", inline = TRUE)),
         column(3, selectInput(ns("level"), "Student level", choices = levels, selected = levels[[1]])),
         column(4, selectizeInput(ns("campus"), "Home campus", choices = campuses, multiple = TRUE,
+                                 selected = intersect(CEDAR_CAMPUS_MAIN, campuses),
                                  options = list(placeholder = "Every home campus")))
       )
     ),

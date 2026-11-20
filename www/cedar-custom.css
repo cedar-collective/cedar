@@ -642,6 +642,17 @@ body.cedar-shiny-disconnected #shiny-disconnected-overlay {
   font-size: 1.1rem;
   letter-spacing: 0.06em;
 }
+/* The title is the link home; the Home tab's own link stays in the page for
+   navigation and URL state, hidden. */
+.navbar .cedar-brand-home,
+.navbar .cedar-brand-home:hover,
+.navbar .cedar-brand-home:focus {
+  color: inherit;
+  text-decoration: none;
+}
+.navbar .nav-item:has(> a[data-value="Home"]) {
+  display: none;
+}
 .navbar .nav-link {
   color: rgba(255, 255, 255, 0.82) !important;
   border-radius: 0;
@@ -1374,6 +1385,10 @@ a:hover { color: var(--link-color); }
 }
 .filters-compact .filter-actions a {
   font-size: 0.85em;
+}
+/* An action at the end of a filter row, such as a page's copy-link button. */
+.filters-compact .filter-actions-end {
+  justify-content: flex-end;
 }
 
 .filters-compact .filter-context-title {
@@ -2968,7 +2983,7 @@ details.cedar-method-panel .scope-bar {
 
 /* ── Dark mode ────────────────────────────────────────────────────────────────
    html[data-bs-theme="dark"], set by www/cedar-theme.js from the reader's
-   choice (remembered per browser) or, until they choose, the system setting.
+   choice (remembered per browser); light until they choose.
    Only tokens change here: every rule above reads them. The brand greens
    stay as backgrounds (navbar, section headers); text that used them reads
    the lighter text tokens. Contrast against --page-bg: body text 13:1,
@@ -3038,6 +3053,12 @@ details.cedar-method-panel .scope-bar {
   --bs-border-color: #3d4240;
   --bs-secondary-bg: var(--surface-raised);
   --bs-tertiary-bg:  var(--surface-warm);
+  /* Bootstrap colours an alert's text from -text-emphasis; the light values
+     are the dark brand colours, unreadable on the dark alert backgrounds. */
+  --bs-info-text-emphasis:    var(--link-color);
+  --bs-success-text-emphasis: var(--text-green);
+  --bs-warning-text-emphasis: var(--text-warning);
+  --bs-danger-text-emphasis:  var(--text-critical);
 }
 
 /* The toggle in the navbar. */
