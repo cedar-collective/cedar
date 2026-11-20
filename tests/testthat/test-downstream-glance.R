@@ -79,3 +79,15 @@ test_that("prepared for it reads the two DFW rates and the balance verdict", {
   expect_equal(row$tone, "worse")
   expect_snapshot(cat(row$sentence))
 })
+
+test_that("a gap between groups that were not alike is stated with its caveat and takes no colour", {
+  # ss_app_act: HIST 101's takers average 5 ACT points under their matches;
+  # ss_app_act_alike: the same score on both sides.
+  build <- function(app) build_course_similar_students(ss_student_terms2, ss_attempts2, app,
+                                                       ss_opt(course = "HIST 101", term = 202010L))
+  expect_equal(downstream_glance("HIST 101", similar = build(ss_app_act_alike))[[3]]$tone, "better")
+  unlike <- downstream_glance("HIST 101", similar = build(ss_app_act))[[3]]
+  expect_true(is.na(unlike$tone))
+  testthat::local_edition(3)
+  expect_snapshot(cat(unlike$sentence))
+})

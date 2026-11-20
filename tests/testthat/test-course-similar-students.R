@@ -30,7 +30,8 @@ test_that("takers are read against the non-takers of their cell: return, other-c
                              "return_n", "return_pct", "return_expected_pct", "return_gap", "return_gap_se",
                              "other_attempts", "other_dfw_pct", "other_dfw_expected_pct", "other_dfw_gap",
                              "other_dfw_gap_se", "next_gpa_n", "next_gpa", "next_gpa_expected", "next_gpa_gap",
-                             "next_gpa_gap_se"))
+                             "next_gpa_gap_se", "act_n", "act", "act_expected", "act_gap", "act_gap_se",
+                             "act_gap_smd"))
   expect_equal(res$course, "HIST 101")
   expect_equal(res$n_takers, 2L)
   expect_equal(res$n_covered, 2L)
@@ -276,4 +277,49 @@ test_that("the payload carries the focal row, the benchmark and the instructors;
   expect_snapshot(cat(tail(course_similar_students_headline(trended), 2), sep = "\n"))
   expect_error(build_course_similar_students(ss_student_terms2, ss_attempts2, ss_app, ss_opt()), "focal course")
   expect_error(course_similar_students_headline(list()), "build_course_similar_students")
+})
+
+test_that("the alike check reads ACT, which the cells do not hold, the same way as an outcome", {
+  # ss_app_act: HIST 101's takers in 202010 average 19 against their
+  # non-takers' 24 (22, 24, 26: variance 8/3); REP has no score and is in
+  # neither average.
+  res <- get_course_similar_students(ss_student_terms2, ss_attempts2, ss_app_act, ss_opt(course = "HIST 101", term = 202010L))
+  expect_equal(res$act_n, 2L)
+  expect_equal(res$act, 19)
+  expect_equal(res$act_expected, 24)
+  expect_equal(res$act_gap, -5)
+  expect_equal(res$act_gap_se, sqrt(2 * 8 / 3) / 2)
+  expect_equal(res$act_gap_smd, -5 / sqrt(8 / 3))
+  # The outcomes do not move with the scores.
+  expect_equal(res$return_gap, 75)
+  # No score on file anywhere: nothing to check, never zero.
+  none <- get_course_similar_students(ss_student_terms2, ss_attempts2, ss_app, ss_opt(course = "HIST 101", term = 202010L))
+  expect_equal(none$act_n, 0L)
+  expect_true(is.na(none$act_gap))
+  # A value outside 1 to 36 is not a score.
+  bad <- ss_app_act %>% mutate(unm_act_combined_score = if_else(student_id == "RP_BACK", 0, unm_act_combined_score))
+  expect_equal(get_course_similar_students(ss_student_terms2, ss_attempts2, bad,
+                                           ss_opt(course = "HIST 101", term = 202010L))$act_n, 1L)
+})
+
+test_that("the alike verdict follows the gap in standard deviations", {
+  build <- function(app, ...) build_course_similar_students(ss_student_terms2, ss_attempts2, app,
+                                                            ss_opt(course = "HIST 101", term = 202010L, ...))
+  apart <- course_similar_students_alike(build(ss_app_act))
+  expect_equal(apart$status, "apart")
+  expect_equal(apart$gap, -5)
+  alike <- course_similar_students_alike(build(ss_app_act_alike))
+  expect_equal(alike$status, "alike")
+  expect_equal(course_similar_students_alike(build(ss_app))$status, "none")
+  expect_equal(course_similar_students_alike(build(ss_app))$sentence, character(0))
+  # Two takers, one with a score: under a guard of two, too few to check.
+  few <- build_course_similar_students(
+    ss_student_terms2, ss_attempts2,
+    ss_app_act %>% mutate(unm_act_combined_score = if_else(student_id == "RP_FAIL", NA, unm_act_combined_score)),
+    ss_opt(course = "HIST 101", term = 202010L, min_n = 2L)[-2])
+  expect_equal(course_similar_students_alike(few)$status, "too_few")
+  testthat::local_edition(3)
+  expect_snapshot(cat(course_similar_students_alike(build(ss_app_act))$sentence,
+                      course_similar_students_alike(build(ss_app_act_alike))$sentence,
+                      course_similar_students_alike(few)$sentence, sep = "\n"))
 })

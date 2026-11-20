@@ -308,11 +308,13 @@ courseCohortServer <- function(id, student_terms, attempts, programs, dims, edge
                    " supplies no figure, and its takers are left out."),
             if (length(txt$comparison)) tags$p(txt$comparison),
             tags$p("Chance alone is two standard errors at the similar students' rates: a gap inside it could arise with no real difference. Came back means enrolled in the next fall or spring semester (summer does not count); other courses not passed counts a D, an F or a withdrawal among the semester's other attempts; GPA is the next semester's, for those who came back."),
-            tags$p("The matching removes those four things and nothing else: placement, advising, major and motivation are not in it.")
+            tags$p("The matching removes those four things and nothing else: placement, advising, major and motivation are not in it."),
+            tags$p("The check on the matching runs the same comparison on ACT scores, which are not matched on and which the course cannot change. If takers and similar students differ there, they differed before the course, and the gaps carry that difference. It reads only students with a score on file; under 0.10 standard deviations the groups are called alike.")
           ),
           if (nrow(fnd) == 0L) lapply(txt$findings, lead_text) else tagList(
             div(class = "finding-card-row", lapply(seq_len(nrow(fnd)), function(i) similar_finding_card(fnd[i, ], m$course))),
-            tags$p(class = "text-note", "This shows who takes the course and how they fare, not what the course causes: students are matched on four things only.")
+            tags$p(class = "text-note", "This shows who takes the course and how they fare, not what the course causes: students are matched on four things only."),
+            lapply(txt$alike, lead_text)
           ),
           if (!is.null(s$focal)) reactable::reactableOutput(ns("similar_focal_table"))
         ),

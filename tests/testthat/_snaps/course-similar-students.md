@@ -50,3 +50,14 @@
       Fall to fall, the return gap went from +0.0 points in Fall 2019 to +6.0 in Fall 2022 over 4 terms: rising 2.0 a year, more than chance alone (±0.4).
       The gap in other courses not passed went from +0.0 points in Fall 2019 to +6.0 in Fall 2022 over 4 terms: rising 2.0 a year, more than chance alone (±0.4).
 
+# the alike verdict follows the gap in standard deviations
+
+    Code
+      cat(course_similar_students_alike(build(ss_app_act))$sentence,
+      course_similar_students_alike(build(ss_app_act_alike))$sentence,
+      course_similar_students_alike(few)$sentence, sep = "\n")
+    Output
+      A check on the matching: the 2 students who took HIST 101 and have an ACT score on file averaged 19.0, against 24.0 for the similar students: 5.0 points lower. The matching does not use ACT and the course cannot have changed it, so the two groups were not alike before the course, and part of every gap here is the students, not the course.
+      A check on the matching: the 2 students who took HIST 101 and have an ACT score on file averaged 24.0, against 24.0 for the similar students. The matching does not use ACT and the course cannot have changed it, so on a measure outside the matching the two groups look alike.
+      Only 1 of the students who took HIST 101 has an ACT score on file, too few to check whether they and the similar students were alike before the course.
+

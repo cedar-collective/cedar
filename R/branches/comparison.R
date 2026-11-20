@@ -467,16 +467,26 @@ entering_gpa_band <- function(gpa) {
 #' cleaning: a value above 5.5 or at or below zero is an unscaled or empty
 #' record and is not a GPA.
 #'
+#' With `with_act`, the student's ACT composite as `act_score` too (1 to 36;
+#' anything else is not a score). An applicants table with no ACT column gives
+#' every student NA: an installation without test scores has none to read.
+#'
 #' @param applicants `cedar_applicants`.
+#' @param with_act TRUE adds `act_score`. Default FALSE.
 #' @return A tibble of `student_id` and `high_school_cum_gpa`, one row each.
-applicant_hs_gpa <- function(applicants) {
+applicant_hs_gpa <- function(applicants, with_act = FALSE) {
   missing <- setdiff(c("student_id", "high_school_cum_gpa"), names(applicants))
   if (length(missing) > 0) {
     stop("[comparison.R] applicant_hs_gpa: applicants lacks ", paste(missing, collapse = ", "), call. = FALSE)
   }
-  applicants %>%
-    distinct(student_id, .keep_all = TRUE) %>%
+  first_rows <- applicants %>% distinct(student_id, .keep_all = TRUE)
+  out <- first_rows %>%
     transmute(student_id,
               high_school_cum_gpa = if_else(high_school_cum_gpa > 5.5 | high_school_cum_gpa <= 0,
                                             NA_real_, as.numeric(high_school_cum_gpa)))
+  if (isTRUE(with_act)) {
+    act <- if ("unm_act_combined_score" %in% names(first_rows)) as.numeric(first_rows$unm_act_combined_score) else NA_real_
+    out$act_score <- if_else(!is.na(act) & act >= 1 & act <= 36, act, NA_real_)
+  }
+  out
 }

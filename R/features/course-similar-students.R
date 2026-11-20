@@ -218,6 +218,48 @@ course_similar_students_findings <- function(payload) {
     select(outcome, title, n, taker, similar, gap, chance, unit, verdict, gap_label, sentence)
 }
 
+#' Were the takers and the similar students alike before the course?
+#'
+#' The cone's alike check (the ACT composite, which the matching does not use
+#' and the course cannot have changed) as a verdict and a sentence.
+#' `classify_smd_balance()` reads the gap in standard deviations: under 0.10
+#' the groups are `alike`, to 0.25 `somewhat_apart`, beyond it `apart`. Fewer
+#' than `min_n` takers with a score is `too_few`; a course with no row, or an
+#' installation with no scores at all, is `none`.
+#'
+#' @param payload `build_course_similar_students()` output.
+#' @return A list: `status`, `n`, `taker`, `similar`, `gap`, `smd`, and
+#'   `sentence` (character(0) under `none`).
+course_similar_students_alike <- function(payload) {
+  if (!inherits(payload, "course_similar_students")) {
+    stop("[course-similar-students.R] payload must come from build_course_similar_students().", call. = FALSE)
+  }
+  f <- payload$focal
+  course <- payload$meta$course
+  none <- list(status = "none", n = 0L, taker = NA_real_, similar = NA_real_, gap = NA_real_,
+               smd = NA_real_, sentence = character(0))
+  if (is.null(f) || is.na(f$act_n) || f$act_n == 0L) return(none)
+  out <- list(n = f$act_n, taker = f$act, similar = f$act_expected, gap = f$act_gap, smd = f$act_gap_smd)
+  fmt_n <- function(n) format(as.integer(n), big.mark = ",", trim = TRUE)
+  if (f$act_n < payload$meta$min_n || is.na(f$act_gap_smd)) {
+    return(c(list(status = "too_few"), out, list(sentence = paste0(
+      "Only ", fmt_n(f$act_n), " of the students who took ", course, if (f$act_n == 1L) " has" else " have",
+      " an ACT score on file, too few to check whether they and the similar students were alike before the course."))))
+  }
+  status <- c(small = "alike", review = "somewhat_apart", substantial = "apart")[[classify_smd_balance(f$act_gap_smd)]]
+  lead <- paste0(
+    "A check on the matching: the ", fmt_n(f$act_n), " students who took ", course,
+    " and have an ACT score on file averaged ", sprintf("%.1f", f$act), ", against ", sprintf("%.1f", f$act_expected),
+    " for the similar students")
+  sentence <- if (status == "alike") {
+    paste0(lead, ". The matching does not use ACT and the course cannot have changed it, so on a measure outside the matching the two groups look alike.")
+  } else {
+    paste0(lead, ": ", sprintf("%.1f", abs(f$act_gap)), " points ", if (f$act_gap < 0) "lower" else "higher",
+           ". The matching does not use ACT and the course cannot have changed it, so the two groups were not alike before the course, and part of every gap here is the students, not the course.")
+  }
+  c(list(status = status), out, list(sentence = sentence))
+}
+
 #' The similar-students result as sentences, by the section that shows them
 #'
 #' @param payload `build_course_similar_students()` output.
@@ -225,8 +267,9 @@ course_similar_students_findings <- function(payload) {
 #'   sentence and verdict; a course under the guard says so instead),
 #'   `comparison` (who the similar students were, under Gen Ed), `benchmark`
 #'   (where the return gap sits among the other courses), `instructors` (how
-#'   far the instructors' gaps spread beyond chance) and `trend` (each gap's
-#'   line across terms). An empty part is `character(0)`.
+#'   far the instructors' gaps spread beyond chance), `trend` (each gap's
+#'   line across terms) and `alike` (course_similar_students_alike()'s
+#'   sentence). An empty part is `character(0)`.
 course_similar_students_text <- function(payload) {
   if (!inherits(payload, "course_similar_students")) {
     stop("[course-similar-students.R] payload must come from build_course_similar_students().", call. = FALSE)
@@ -235,7 +278,7 @@ course_similar_students_text <- function(payload) {
   fmt_n <- function(n) format(as.integer(n), big.mark = ",", trim = TRUE)
   pts <- function(p) sprintf("%+.1f", p)
   out <- list(findings = character(0), comparison = character(0), benchmark = character(0),
-              instructors = character(0), trend = character(0))
+              instructors = character(0), trend = character(0), alike = character(0))
   if (is.null(payload$focal)) {
     under <- meta$focal_under_min_n
     out$findings <- paste0(
@@ -251,6 +294,7 @@ course_similar_students_text <- function(payload) {
     unclear = "Too few similar students to tell this difference from chance.")
   fnd <- course_similar_students_findings(payload)
   out$findings <- paste(fnd$sentence, verdict_words[fnd$verdict])
+  out$alike <- course_similar_students_alike(payload)$sentence
   if (is.na(payload$focal$return_gap)) {
     out$findings <- c(paste0("No return is observable yet for the ", fmt_n(payload$focal$n_covered),
                              " students who took ", meta$course, "."), out$findings)

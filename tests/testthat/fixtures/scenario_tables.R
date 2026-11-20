@@ -542,6 +542,16 @@ ss_ids <- unique(test_student_terms_rp$student_id)
 
 ss_app <- tibble::tibble(student_id = ss_ids, high_school_cum_gpa = 3.0)
 
+# The same applicants with ACT scores, for the alike check. HIST 101's two
+# takers in 202010 (BACK, FAIL) average 19; its non-takers with a score
+# (DROP, GONE, GRAD; REP has none) average 24, variance 8/3.
+ss_app_act <- ss_app %>%
+  mutate(unm_act_combined_score = c(RP_BACK = 18, RP_DROP = 22, RP_EDROP = 30, RP_FAIL = 20,
+                                    RP_GONE = 24, RP_GRAD = 26, RP_REP = NA)[student_id])
+# The takers scoring as their non-takers do: 24 each.
+ss_app_act_alike <- ss_app_act %>%
+  mutate(unm_act_combined_score = if_else(student_id %in% c("RP_BACK", "RP_FAIL"), 24, unm_act_combined_score))
+
 # Per-term gaps in by_term's shape, four falls (2019-2022) with a spring and a
 # summer between: GAP 100's return gap climbs 0, 2, 4, 6 (+2 a year) with
 # standard error 0.5; GAP 200's falls 6, 4, 2, 0; GAP 300's zigzags 0, 6, 0, 6
