@@ -244,12 +244,14 @@ test_that("Course Dynamics puts every after-the-course view under one Downstream
   expect_gt(start, 0L)
   tab <- substr(ui_src, start, regexpr("\\) # end navset_tab", ui_src))
   # At a Glance, then one view a subtab, in story order: coming back, against
-  # non-takers, the next courses, prepared for them.
+  # non-takers, the next courses; the comparison of the later course's
+  # students is a section of Next Courses, under the module's own.
   ids <- c('id = "cr_downstream_view"', '"At a Glance", value = "glance"', 'uiOutput("cr_downstream_glance_ui")',
            '"Coming Back", value = "coming_back"', 'uiOutput("cr_impact_retention_ui")',
            '"Against Non-Takers", value = "non_takers"', 'courseCohortUI("cr_cohort")',
            '"Next Courses", value = "next_courses"', 'laterCourseUI("cr_later")',
-           '"Prepared for It", value = "prepared"', 'uiOutput("cr_impact_sequence_ui")')
+           'uiOutput("cr_impact_sequence_ui")')
+  expect_false(grepl('value = "prepared"', tab, fixed = TRUE))
   at <- vapply(ids, function(x) regexpr(x, tab, fixed = TRUE)[[1]], integer(1))
   expect_true(all(at > 0L))
   expect_false(is.unsorted(at))
@@ -270,11 +272,12 @@ test_that("each Downstream view runs on its own subtab's value", {
     coming_back = grepl('cr_downstream_active() %in% "coming_back"', server, fixed = TRUE),
     non_takers = grepl('view() %in% c("glance", "non_takers")', cohort, fixed = TRUE),
     next_courses = grepl('LATER_COURSE_RUN_VIEWS <- c("glance", "next_courses")', later, fixed = TRUE),
-    prepared = grepl('cr_downstream_active() %in% c("glance", "prepared")', server, fixed = TRUE)
+    # The later-course comparison is a section of Next Courses and runs on it.
+    next_courses = grepl('cr_downstream_active() %in% c("glance", "next_courses")', server, fixed = TRUE)
   )
   expect_true(all(runs))
   expect_true(all(names(runs) %in% values))
-  expect_true(grepl('LATER_COURSE_LIST_VIEWS <- c("glance", "next_courses", "prepared")', later, fixed = TRUE))
+  expect_true(grepl('LATER_COURSE_LIST_VIEWS <- c("glance", "next_courses")', later, fixed = TRUE))
 })
 
 test_that("sequence effect uses one canonical Y outcome and scopes both courses", {
