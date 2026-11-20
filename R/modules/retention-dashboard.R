@@ -112,7 +112,7 @@ RETENTION_BAND_CHOICES <- c("Continuing students, by GPA entering the term" = "e
     low_n = cedar_count_coldef("Attempts"),
     low_dfw = cedar_percent_coldef("DFW here"), low_other = cedar_percent_coldef("DFW in their other courses"),
     rest_dfw = cedar_percent_coldef("DFW here"), rest_other = cedar_percent_coldef("DFW in their other courses"),
-    gap = cedar_points_coldef("Gap (points)"), chance = cedar_points_coldef("Chance alone, up to")),
+    gap = cedar_points_coldef("Gap (points)"), chance = reactable::colDef(name = "Chance alone, up to", align = "right", format = reactable::colFormat(digits = 1))),
     columnGroups = list(
       reactable::colGroup(name = paste0("GPA ", low_band), columns = c("low_n", "low_dfw", "low_other")),
       reactable::colGroup(name = "The course's other students", columns = c("rest_dfw", "rest_other"))))
