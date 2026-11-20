@@ -46,6 +46,13 @@ retentionDashboardUI <- function(id, campuses) {
       plotly::plotlyOutput(ns("overall_plot"), height = "340px")
     ),
     dashboard_section(
+      "Each Entering Class, Semesters Later",
+      "How much of each entering class is still enrolled a semester, a year and two years on?",
+      method = uiOutput(ns("method_milestones")),
+      uiOutput(ns("milestones_finding")),
+      plotly::plotlyOutput(ns("milestones_plot"), height = "380px")
+    ),
+    dashboard_section(
       "Who Isn't Coming Back",
       "How often students with each warning sign came back, and how many of those who did not had it.",
       method = uiOutput(ns("method_signs")),
@@ -144,6 +151,33 @@ retentionDashboardServer <- function(id, student_terms, attempts, degrees, dims,
                        retention_trend_sentence(p$trend[1, , drop = FALSE]))),
         tags$li(paste0("Enrollment settled through ", fmt_term(m$edge), "; a term's rate needs ", m$min_n,
                        " students whose return can be read. Hover a term for its counts.")))
+    })
+
+    output$milestones_finding <- renderUI({
+      p <- payload(); req(p)
+      sentence <- retention_milestone_sentence(p)
+      if (length(sentence) == 0L) return(empty_state("No entering class in this scope has a settled later term to read."))
+      lead_text(sentence)
+    })
+    output$milestones_plot <- plotly::renderPlotly({
+      p <- payload(); req(p, !is.null(p$milestones), any(!is.na(p$milestones$here_pct)))
+      plot_entering_class_milestones(p)
+    })
+    output$method_milestones <- renderUI({
+      p <- payload(); req(p, !is.null(p$milestones))
+      ms <- p$milestones
+      tags$ul(
+        tags$li(paste0("An entering class is every student whose first enrolled term at this level was that ",
+                       .retention_type(p), " term, by home campus that term. It includes transfer students and, among ",
+                       "undergraduates, students taking college courses while in high school.")),
+        tags$li("Still enrolled means enrolled in that later term on any campus, or awarded a degree by then. A student away one term and back the next is missing from the first and counted in the second."),
+        tags$li(paste0("Each line is one distance from entry. A semester is a fall or a spring; summer is not counted. ",
+                       "The gap between two lines is the share lost between them.")),
+        tags$li(paste0("A line stops at the last class whose later term has settled (enrollment settled through ",
+                       fmt_term(attr(ms, "edge")), "). ", fmt_term(attr(ms, "first_term")),
+                       " is the first term on record, so no one can be called new in it: ",
+                       .retention_n(attr(ms, "n_first_term")), " students first seen then are in no class. A class needs ",
+                       attr(ms, "min_n"), " students for a rate.")))
     })
 
     output$signs_table <- reactable::renderReactable({

@@ -215,12 +215,24 @@ export function setInput(page, id, value, { priority = 'event' } = {}) {
 
 // Click any element by DOM id — typically an actionButton (e.g. 'enrl_button',
 // 'pathways-population-build_btn').
-export function click(page, id) {
-  return page.evaluate((i) => {
-    const el = document.getElementById(i);
-    if (!el) throw new Error(`no element #${i}`);
-    el.click();
-  }, id);
+// A run button waits for its inputs (cedar_requires()) and is enabled a moment
+// after they are set, so a click waits for the element to be enabled, as a
+// reader has to. One that never enables is an error, never a silent no-op.
+export async function click(page, id) {
+  const deadline = Date.now() + 15000;
+  for (;;) {
+    const state = await page.evaluate((i) => {
+      const el = document.getElementById(i);
+      if (!el) return 'missing';
+      if (el.disabled) return 'disabled';
+      el.click();
+      return 'clicked';
+    }, id);
+    if (state === 'clicked') return;
+    if (state === 'missing') throw new Error(`no element #${id}`);
+    if (Date.now() > deadline) throw new Error(`#${id} stayed disabled: its inputs were never filled`);
+    await new Promise((r) => setTimeout(r, 100));
+  }
 }
 
 // Click a TOP-LEVEL nav tab by its page_navbar value (e.g. 'Pathways', 'Regstats').

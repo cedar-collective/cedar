@@ -13,7 +13,12 @@
 # get_stopout() (cones/stopout.R) over the latest terms' students. The payload
 # is typed; format_retention_dashboard() is its one text rendering.
 #
-# Depends on: get_return_rates(), get_stopout(), compute_rate_trend()
+# Each entering class followed one to four regular terms on
+# (get_entering_class_retention(), cones/entering-class-retention.R) sits
+# beside the one-step return: where a class is lost, not only how many.
+#
+# Depends on: get_return_rates(), get_stopout(), compute_rate_trend(),
+#             get_entering_class_retention()
 
 RETENTION_SIGNS <- c(late_withdrawal = "A late withdrawal", dfw = "A DFW grade")
 
@@ -38,7 +43,9 @@ RETENTION_SIGNS <- c(late_withdrawal = "A late withdrawal", dfw = "A DFW grade")
 #'   and trend; `meta$n_groups_past` counts the others); `courses`
 #'   (get_stopout()'s `by_course` over the latest `course_terms` anchors with
 #'   posted grades, its `terms` and coverage, and `listed`: the 25 gaps beyond
-#'   chance that stand for the most students, `excess_not_back`). A scope
+#'   chance that stand for the most students, `excess_not_back`);
+#'   `milestones` (get_entering_class_retention() for the scope's entering
+#'   classes, four steps). A scope
 #'   with no readable return has an empty `series` and NULL elsewhere.
 build_retention_dashboard <- function(student_terms, attempts, degrees, opt = list()) {
   term_type <- opt$term_type
@@ -60,7 +67,8 @@ build_retention_dashboard <- function(student_terms, attempts, degrees, opt = li
   # this level, say) is an answer, not an error: an empty payload says so.
   if (nrow(series) == 0L) {
     return(structure(list(meta = meta, series = series, trend = NULL, signs = NULL, signs_latest = NULL,
-                          groups = NULL, courses = list(terms = integer(0), by_course = NULL, listed = NULL)),
+                          groups = NULL, courses = list(terms = integer(0), by_course = NULL, listed = NULL),
+                          milestones = NULL),
                      class = "retention_dashboard"))
   }
   trend <- compute_rate_trend(series %>% transmute(term, k = n_returned, n = n_observable))
@@ -123,7 +131,10 @@ build_retention_dashboard <- function(student_terms, attempts, degrees, opt = li
     meta = meta,
     series = series, trend = trend, signs = signs,
     signs_latest = signs %>% group_by(sign) %>% filter(term == max(term)) %>% ungroup(),
-    groups = groups, courses = courses
+    groups = groups, courses = courses,
+    milestones = get_entering_class_retention(student_terms, degrees, list(
+      term_type = term_type, student_level = opt$student_level, campus = opt$campus,
+      data_edges = opt$data_edges, min_n = min_n, n_terms = 4L))
   ), class = "retention_dashboard")
 }
 
@@ -169,6 +180,39 @@ retention_trend_sentence <- function(t) {
          sprintf("%.1f", 2 * t$slope_se), ": ", RETENTION_DIRECTION_WORDS[[t$direction]], ".")
 }
 
+#' How a step after an entering term is named: its distance and its season
+#'
+#' @param step Regular terms after the entering term.
+#' @param target_term The term that step lands on.
+#' @return "1 semester later (spring)", "1 year later (fall)", and so on.
+retention_milestone_label <- function(step, target_term) {
+  years <- step %/% 2L
+  distance <- ifelse(step %% 2L == 0L, paste0(years, if_else(years == 1L, " year", " years")),
+                     paste0(step, if_else(step == 1L, " semester", " semesters")))
+  paste0(distance, " later (", get_term_type(target_term), ")")
+}
+
+#' The latest entering class with a year behind it, in a sentence
+#'
+#' @param payload `build_retention_dashboard()` output.
+#' @return One sentence, or `character(0)` when no class has a rate a
+#'   semester on.
+retention_milestone_sentence <- function(payload) {
+  m <- payload$milestones
+  if (is.null(m) || nrow(m) == 0L) return(character(0))
+  known <- m %>% filter(!is.na(here_pct))
+  full <- known %>% filter(step == 2L)
+  class_term <- if (nrow(full) > 0L) max(full$term) else if (nrow(known) > 0L) max(known$term) else return(character(0))
+  rows <- known %>% filter(term == class_term) %>% arrange(step)
+  paste0("Of the ", format(rows$n_entering[[1]], big.mark = ","), " students who entered in ", fmt_term(class_term), ", ",
+         sprintf("%.1f%%", rows$here_pct[[1]]), " were still enrolled or had graduated ",
+         retention_milestone_label(rows$step[[1]], rows$target_term[[1]]),
+         if (nrow(rows) > 1L) paste0(", and ", paste(sprintf(
+           "%.1f%% %s", rows$here_pct[-1], retention_milestone_label(rows$step[-1], rows$target_term[-1])),
+           collapse = ", ")),
+         ".")
+}
+
 #' The retention dashboard as text
 #'
 #' @param payload `build_retention_dashboard()` output.
@@ -207,6 +251,13 @@ format_retention_dashboard <- function(payload) {
     g <- payload$groups[i, ]
     lines <- c(lines, paste0(tools::toTitleCase(g$dimension), " ", g$group, ": ", pct(g$last_pct), " in ",
                              fmt_term(g$last_term), "; ", g$direction, "."))
+  }
+  ms <- payload$milestones
+  for (class_term in unique(ms$term)) {
+    rows <- ms[ms$term == class_term, ]
+    lines <- c(lines, paste0("Entered ", fmt_term(class_term), " (", n(rows$n_entering[[1]]), "): ",
+                             paste0(pct(rows$here_pct), " ", retention_milestone_label(rows$step, rows$target_term),
+                                    collapse = "; "), "."))
   }
   for (i in seq_len(NROW(payload$courses$listed))) {
     c <- payload$courses$listed[i, ]
@@ -258,4 +309,40 @@ plot_return_series <- function(payload) {
                  range = c(max(0, min(s$return_pct, na.rm = TRUE) - 8), 100)),
     annotations = trend_label,
     margin = list(r = if (is.null(trend_label)) 20 else 150))
+}
+
+
+#' Each entering class's share still enrolled, one line per step
+#'
+#' The x axis is the entering class; each line is a distance from entry, so a
+#' line that falls says later classes are being kept less well at that
+#' distance, and the space between two lines is the loss between those steps.
+#' A line stops where its target term has not settled.
+#'
+#' @param payload `build_retention_dashboard()` output with `milestones`.
+plot_entering_class_milestones <- function(payload) {
+  m <- payload$milestones %>% filter(!is.na(here_pct))
+  classes <- sort(unique(payload$milestones$term))
+  labels <- vapply(classes, fmt_term, character(1))
+  steps <- sort(unique(m$step))
+  # One name per step: every class of one term type lands on the same season.
+  names_by_step <- vapply(steps, function(k) retention_milestone_label(k, m$target_term[m$step == k][[1]]), character(1))
+  colours <- cedar_plotly_palette(names_by_step)
+  p <- plotly::plot_ly()
+  for (i in seq_along(steps)) {
+    rows <- m[m$step == steps[[i]], ]
+    p <- plotly::add_trace(
+      p, x = vapply(rows$term, fmt_term, character(1)), y = rows$here_pct, type = "scatter", mode = "lines+markers",
+      name = names_by_step[[i]], line = list(color = colours[[i]], width = 3), marker = list(color = colours[[i]], size = 8),
+      hovertext = paste0("Entered ", vapply(rows$term, fmt_term, character(1)), "<br>", names_by_step[[i]], ", in ",
+                         vapply(rows$target_term, fmt_term, character(1)), ": ",
+                         format(rows$n_here, big.mark = ","), " of ", format(rows$n_entering, big.mark = ","),
+                         sprintf(" (%.1f%%)", rows$here_pct)),
+      hoverinfo = "text")
+  }
+  plotly::layout(p,
+    xaxis = list(title = "Entering class", type = "category", categoryorder = "array", categoryarray = labels),
+    yaxis = list(title = "Still enrolled, or graduated", ticksuffix = "%",
+                 range = c(max(0, min(m$here_pct) - 8), 100)),
+    legend = list(orientation = "h", y = -0.2))
 }
