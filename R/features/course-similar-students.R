@@ -54,7 +54,7 @@ course_similar_comparisons <- function() {
 #'   return-gap trend: `return_trend`, `return_trend_slope`,
 #'   `return_trend_chance` (two standard errors) and `return_gap_series` (the
 #'   gaps in term order, a list column).
-build_course_similar_students <- function(student_terms, attempts, applicants, opt = list()) {
+build_course_similar_students <- function(student_terms, attempts, applicants, opt = list(), programs = NULL) {
   course <- opt$course
   if (is.null(course) || length(course) != 1L || is.na(course) || !nzchar(course)) {
     stop("[course-similar-students.R] opt$course (one focal course id) is required.", call. = FALSE)
@@ -64,11 +64,12 @@ build_course_similar_students <- function(student_terms, attempts, applicants, o
     stop("[course-similar-students.R] opt$comparison must be one of ",
          paste(names(course_similar_comparisons()), collapse = ", "), call. = FALSE)
   }
-  cone_opt <- opt[intersect(names(opt), c("classification", "term", "campus", "min_n", "min_cell_n", "data_edges"))]
+  cone_opt <- opt[intersect(names(opt), c("classification", "term", "campus", "min_n", "min_cell_n",
+                                          "match_credits", "data_edges"))]
   if (comparison == "gen_ed") {
     cone_opt$comparison_courses <- gen_ed_course_ids(attempts, caller = "build_course_similar_students")
   }
-  courses <- get_course_similar_students(student_terms, attempts, applicants, cone_opt)
+  courses <- get_course_similar_students(student_terms, attempts, applicants, cone_opt, programs)
   min_n <- as.integer(opt$min_n %||% 30L)
   suppressed <- attr(courses, "suppressed")
   meta <- list(
@@ -79,6 +80,7 @@ build_course_similar_students <- function(student_terms, attempts, applicants, o
     comparison_courses = attr(courses, "comparison_courses"),
     n_comparison_student_terms = attr(courses, "n_comparison_student_terms"),
     min_n = min_n, min_cell_n = as.integer(opt$min_cell_n %||% 5L),
+    cells = attr(courses, "cells"),
     edge = attr(courses, "edge"), graded_edge = attr(courses, "graded_edge"),
     n_population_student_terms = attr(courses, "n_population_student_terms"),
     focal_under_min_n = suppressed[suppressed$course == course, , drop = FALSE]
@@ -88,7 +90,7 @@ build_course_similar_students <- function(student_terms, attempts, applicants, o
   term_opt <- cone_opt
   term_opt$min_n <- as.integer(opt$min_term_n %||% 10L)
   courses_by_term <- get_course_similar_students(
-    student_terms, attempts, applicants, c(term_opt, list(by_term = TRUE))
+    student_terms, attempts, applicants, c(term_opt, list(by_term = TRUE)), programs
   )
   meta$min_term_n <- term_opt$min_n
   regular <- courses_by_term %>%
@@ -133,7 +135,7 @@ build_course_similar_students <- function(student_terms, attempts, applicants, o
 
   instructors <- get_course_similar_students(
     student_terms, attempts, applicants,
-    c(cone_opt, list(course = course, grain = "instructor"))
+    c(cone_opt, list(course = course, grain = "instructor")), programs
   ) %>% filter(!is.na(instructor_id))
   spread <- NULL
   measured <- instructors %>% filter(!is.na(return_gap), !is.na(return_gap_se), return_gap_se > 0)
@@ -218,6 +220,22 @@ course_similar_students_findings <- function(payload) {
     select(outcome, title, n, taker, similar, gap, chance, unit, verdict, gap_label, sentence)
 }
 
+#' The matching cells in a reader's words
+#'
+#' @param cells The cone's `cells` attribute (`meta$cells`).
+#' @return One phrase: "term, home campus, ... and credits already earned here".
+course_similar_cells_text <- function(cells) {
+  words <- c(term = "term", student_campus = "home campus", hs_gpa_band = "high-school GPA band",
+             time_status = "full- or part-time status", pell = "Pell eligibility",
+             first_gen = "first-generation status", credits_band = "credits already earned here")
+  unknown <- setdiff(cells, names(words))
+  if (length(unknown) > 0) {
+    stop("[course-similar-students.R] no wording for cell column(s): ", paste(unknown, collapse = ", "), call. = FALSE)
+  }
+  w <- unname(words[cells])
+  if (length(w) < 2L) w else paste0(paste(w[-length(w)], collapse = ", "), " and ", w[length(w)])
+}
+
 #' Were the takers and the similar students alike before the course?
 #'
 #' The cone's alike check (the ACT composite, which the matching does not use
@@ -248,8 +266,8 @@ course_similar_students_alike <- function(payload) {
   }
   status <- c(small = "alike", review = "somewhat_apart", substantial = "apart")[[classify_smd_balance(f$act_gap_smd)]]
   lead <- paste0(
-    "A check on the matching: the ", fmt_n(f$act_n), " students who took ", course,
-    " and have an ACT score on file averaged ", sprintf("%.1f", f$act), ", against ", sprintf("%.1f", f$act_expected),
+    "A check on the matching: of the ", fmt_n(f$n_covered), " students who took ", course, ", the ", fmt_n(f$act_n),
+    " with an ACT score on file averaged ", sprintf("%.1f", f$act), ", against ", sprintf("%.1f", f$act_expected),
     " for the similar students")
   sentence <- if (status == "alike") {
     paste0(lead, ". The matching does not use ACT and the course cannot have changed it, so on a measure outside the matching the two groups look alike.")
@@ -533,7 +551,7 @@ format_course_similar_students <- function(payload) {
     paste0(meta$course, " against ", course_similar_comparisons()[[meta$comparison]], ": ",
            paste(meta$classification, collapse = ", ")),
     paste0("Population: ", format(meta$n_population_student_terms, big.mark = ","), " student-terms; ",
-           "cells of term, home campus, high-school GPA band and time status with at least ", meta$min_cell_n,
+           "cells of ", course_similar_cells_text(meta$cells), " with at least ", meta$min_cell_n,
            " non-takers; rows with at least ", meta$min_n, " covered takers."),
     "", course_similar_students_headline(payload), "",
     paste0("Every course (", nrow(payload$courses), "), by return gap:"),

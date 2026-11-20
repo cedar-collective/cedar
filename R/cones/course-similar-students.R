@@ -3,7 +3,15 @@
 # One question: did the students who took course X do better that term and
 # the next than students like them who did not take it? "Like them" is a
 # cell: the same anchor term, home campus, high-school GPA band and time
-# status (full or part time). Inside each cell the non-takers supply a rate;
+# status (full or part time); with `programs`, the same Pell eligibility and
+# first-generation status that term too; with `opt$match_credits`, the same
+# band of UNM credits already earned (none, 1 to 14, 15 or more, from the
+# credit timeline, so a student with dual-credit or earlier terms is set
+# beside others with them). A value not on record is its own cell, never
+# dropped and never guessed. These are what the records hold for nearly
+# every student; ACT is not among them (optional since 2020, on file for a
+# small and falling share) and age is not (the admissions table holds age at
+# the pull, a frozen field). Inside each cell the non-takers supply a rate;
 # weighting those rates by the takers' own mix across cells gives the rate
 # the takers would have had if they had done as their non-taking peers did
 # (direct standardization). The gap is actual minus expected.
@@ -46,8 +54,8 @@
 # outcome gap too. `act_gap_smd` is that gap in the non-takers' standard
 # deviations (classify_smd_balance() reads it).
 #
-# Descriptive, never an effect: the cells remove term, campus, high-school
-# GPA and time status and nothing else. Placement, advising, major and
+# Descriptive, never an effect: the cells remove what they name and nothing
+# else. Placement, advising, major and
 # motivation are not in them, and a course students are placed into shows
 # its placement here. At the instructor grain a section tied to a program or
 # a learning community shows that program, not the teaching. Each gap's
@@ -57,7 +65,8 @@
 # non-takers' rates and so is a floor.
 #
 # Depends on: cedar_longitudinal_edge() (branches/data-edges.R)
-#             hs_gpa_band(), applicant_hs_gpa() (branches/comparison.R)
+#             hs_gpa_band(), applicant_hs_gpa(), student_term_aid()
+#               (branches/comparison.R)
 
 #' A course's takers against non-takers of the same term, campus, HS GPA band and time status
 #'
@@ -78,7 +87,11 @@
 #'   member without a row in the course),
 #'   `min_n` (smallest covered taker count a row needs; default 30),
 #'   `min_cell_n` (smallest non-taker count a cell needs; default 5),
+#'   `match_credits` (TRUE adds the band of UNM credits already earned to
+#'   the cells; default FALSE),
 #'   `data_edges` (`cedar_data_edges()` output, required).
+#' @param programs `cedar_programs`, optional: given, Pell eligibility and
+#'   first-generation status that term are cells too.
 #' @return A tibble, one row per `course` (and `instructor_id`,
 #'   `instructor_name` at the instructor grain): `n_takers`, `n_covered`,
 #'   `n_terms`; `return_n`, `return_pct`, `return_expected_pct`,
@@ -94,7 +107,7 @@
 #'   `comparison_courses` (as given, NULL for every non-taker),
 #'   `n_comparison_student_terms` (the members who may stand as non-takers:
 #'   every member without comparison courses).
-get_course_similar_students <- function(student_terms, attempts, applicants, opt = list()) {
+get_course_similar_students <- function(student_terms, attempts, applicants, opt = list(), programs = NULL) {
   classification <- opt$classification
   if (is.null(classification) || length(classification) == 0L) {
     stop("[course-similar-students.R] opt$classification is required.", call. = FALSE)
@@ -130,7 +143,15 @@ get_course_similar_students <- function(student_terms, attempts, applicants, opt
     stop("[course-similar-students.R] opt$data_edges has no graded edge (last_graded).", call. = FALSE)
   }
   graded_edge <- as.integer(graded_edge)
-  cell_cols <- c("term", "student_campus", "hs_gpa_band", "time_status")
+  cell_cols <- c("term", "student_campus", "hs_gpa_band", "time_status",
+                 if (!is.null(programs)) c("pell", "first_gen"),
+                 if (isTRUE(opt$match_credits)) "credits_band")
+  if (isTRUE(opt$match_credits)) {
+    missing_c <- setdiff(c("unm_credits_entering", "timeline_valid"), names(student_terms))
+    if (length(missing_c) > 0) {
+      stop("[course-similar-students.R] student_terms lacks ", paste(missing_c, collapse = ", "), call. = FALSE)
+    }
+  }
 
   # ── The population, one row per member, with its three outcomes ───────────
   members <- student_terms %>%
@@ -142,7 +163,8 @@ get_course_similar_students <- function(student_terms, attempts, applicants, opt
     select(student_id, next_regular_term = term, next_gpa = sem_gpa)
   members <- members %>%
     select(student_id, term, student_campus, time_status, next_regular_term,
-           returned_next_regular_term, return_observable) %>%
+           returned_next_regular_term, return_observable,
+           any_of(c("unm_credits_entering", "timeline_valid"))) %>%
     left_join(applicant_hs_gpa(applicants, with_act = TRUE), by = "student_id") %>%
     left_join(next_gpas, by = c("student_id", "next_regular_term")) %>%
     mutate(
@@ -157,6 +179,19 @@ get_course_similar_students <- function(student_terms, attempts, applicants, opt
       act_sum = coalesce(act_score, 0),
       act_sq  = coalesce(act_score^2, 0)
     )
+  if (!is.null(programs)) {
+    members <- members %>%
+      left_join(student_term_aid(programs), by = c("student_id", "term")) %>%
+      mutate(pell = coalesce(pell, "not recorded"), first_gen = coalesce(first_gen, "not recorded"))
+  }
+  if (isTRUE(opt$match_credits)) {
+    members <- members %>%
+      mutate(credits_band = case_when(
+        !(timeline_valid %in% TRUE) | is.na(unm_credits_entering) ~ "not recorded",
+        unm_credits_entering <= 0 ~ "none",
+        unm_credits_entering < 15 ~ "1 to 14",
+        TRUE ~ "15 or more"))
+  }
   cedar_debug("[course-similar-students.R] ", nrow(members), " member student-terms to ", edge)
 
   comparison <- opt$comparison_courses

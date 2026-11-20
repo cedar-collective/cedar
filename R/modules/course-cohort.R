@@ -216,7 +216,8 @@ courseCohortServer <- function(id, student_terms, attempts, programs, dims, edge
             build_course_similar_students(
               student_terms, attempts, applicants,
               list(course = crs, classification = opt$classification, campus = opt$campus, term = opt$term,
-                   comparison = input$comparison %||% "all", data_edges = edges)),
+                   comparison = input$comparison %||% "all", match_credits = TRUE, data_edges = edges),
+              programs),
             error = function(e) {
               showNotification(paste("Similar-students comparison:", conditionMessage(e)), type = "error", duration = 10)
               NULL
@@ -285,7 +286,7 @@ courseCohortServer <- function(id, student_terms, attempts, programs, dims, edge
             paste0("The students who took ", meta$course, " against those who never did, measured at each student's first selected term."),
             method = tags$p("A substantial difference says the gaps above describe who is placed into the course."),
             title = "How Alike Takers and Never-Takers Were"),
-          method = tags$p("Matching on term, home campus, high-school GPA band and full- or part-time status removes those four differences and nothing else: placement, advising, major and motivation are not in it. The unmatched comparison removes none.")
+          method = tags$p("The matching removes the differences it names and nothing else: placement, advising, major and motivation are not in it. The unmatched comparison removes none.")
         )
       )
     })
@@ -303,13 +304,13 @@ courseCohortServer <- function(id, student_terms, attempts, programs, dims, edge
           paste0("Did students who took ", m$course, " do better than students like them who did not",
                  if (identical(m$comparison, "gen_ed")) " and took a Gen Ed course instead" else "", "?"),
           method = tagList(
-            tags$p("Each student who took ", m$course, " is set beside students of the same term, home campus, high-school GPA band and full- or part-time status who did not take it, pooled over the selected terms. ",
+            tags$p("Each student who took ", m$course, " is set beside students of the same ", course_similar_cells_text(m$cells), " who did not take it, pooled over the selected terms. ",
                    "The similar students' figure is what the takers would have shown at their peers' rates. A group of peers smaller than ", m$min_cell_n,
                    " supplies no figure, and its takers are left out."),
             if (length(txt$comparison)) tags$p(txt$comparison),
             tags$p("Chance alone is how far a gap can stray with no real difference between the groups (two standard errors at the similar students' rates): a gap inside it is not evidence of one. Came back means enrolled in the next fall or spring semester (summer does not count); other courses not passed counts a D, an F or a withdrawal among the semester's other attempts; GPA is the next semester's, for those who came back."),
-            tags$p("The matching removes those four things and nothing else: placement, advising, major and motivation are not in it."),
-            tags$p("The check on the matching runs the same comparison on ACT scores, which are not matched on and which the course cannot change. If takers and similar students differ there, they differed before the course, and the gaps carry that difference. It reads only students with a score on file; under 0.10 standard deviations the groups are called alike.")
+            tags$p("These are what the records hold reliably for nearly every student. The matching removes those differences and nothing else: placement, advising, major and motivation are not in it. Credits already earned here are counted from the student's own terms: none, 1 to 14, or 15 or more."),
+            tags$p("The check on the matching runs the same comparison on ACT scores, which are not matched on and which the course cannot change. If takers and similar students differ there, they differed before the course, and the gaps carry that difference. It reads only students with a score on file, a small and shrinking share now that the ACT is optional, so it is evidence about the matching, not a measure of every taker; under 0.10 standard deviations the groups are called alike.")
           ),
           if (nrow(fnd) == 0L) lapply(txt$findings, lead_text) else tagList(
             div(class = "finding-card-row", lapply(seq_len(nrow(fnd)), function(i) similar_finding_card(fnd[i, ], m$course))),
