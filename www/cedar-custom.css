@@ -164,6 +164,7 @@
   --text-warning:   var(--amber-dark);
   --text-critical:  var(--danger-red-dark);
   --overlay-bg:     rgba(232, 227, 218, 0.85);   /* --parchment-ash at 85% */
+  --disconnect-veil: rgba(244, 248, 250, 0.96);  /* the restart screen's page behind its panel */
   --button-hover-bg: var(--parchment-ash);
   --surface-veil:        rgba(255, 255, 255, 0.5);    /* lightens a tinted row */
   --surface-veil-strong: rgba(255, 255, 255, 0.72);
@@ -545,7 +546,7 @@ body.cedar-shiny-disconnected #shiny-disconnected-overlay {
   align-items: center;
   background:
     linear-gradient(180deg, rgba(77, 111, 168, 0.1), rgba(77, 111, 168, 0)),
-    rgba(244, 248, 250, 0.96);
+    var(--disconnect-veil);
   color: var(--charcoal-soil);
   display: flex;
   inset: 0;
@@ -3010,6 +3011,7 @@ details.cedar-method-panel .scope-bar {
   --cedar-plum-bg:   #2c2232;
   --cedar-plum-dark: #c9a6d6;
   --overlay-bg:      rgba(22, 26, 24, 0.85);
+  --disconnect-veil: rgba(22, 26, 24, 0.97);
   --button-hover-bg: var(--surface-hover);
   --surface-veil:        rgba(255, 255, 255, 0.04);
   --surface-veil-strong: rgba(255, 255, 255, 0.07);
