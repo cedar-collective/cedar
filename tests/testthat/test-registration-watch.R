@@ -66,13 +66,13 @@ test_that("the watch reads the fixture Regstats run as it comes", {
 })
 
 test_that("a missing table, column or repeated row stops the watch", {
-  expect_error(build_registration_watch(watch_flagged[setdiff(names(watch_flagged), "waits")]),
-               "no `waits` table")
+  expect_error(build_registration_watch(watch_flagged[setdiff(names(watch_flagged), "waits_by_course")]),
+               "no `waits_by_course` table")
   expect_error(build_registration_watch(replace(watch_flagged, "dips",
                  list(dplyr::select(watch_flagged$dips, -impacted)))),
                "flagged\\$dips lacks impacted")
-  expect_error(build_registration_watch(replace(watch_flagged, "waits",
-                 list(dplyr::bind_rows(watch_flagged$waits, watch_flagged$waits[1, ])))),
+  expect_error(build_registration_watch(replace(watch_flagged, "waits_by_course",
+                 list(dplyr::bind_rows(watch_flagged$waits_by_course, watch_flagged$waits_by_course[1, ])))),
                "repeats a term, campus")
   # A payload from before course_context, or one missing a raised course's row.
   expect_error(build_registration_watch(watch_flagged[setdiff(names(watch_flagged), "course_context")]),
@@ -169,4 +169,19 @@ test_that("the chart's note says what it leaves out", {
 test_that("the text preview names each pattern and its courses", {
   testthat::local_edition(3)
   expect_snapshot(cat(format_registration_watch(watch_payload), sep = "\n"))
+})
+
+test_that("a topics course waiting under two titles is one watch row, each student once (I71)", {
+  # watch_topic_regstats: three students wait for SOCI 104, one of them for
+  # both of its titles. Regstats lists the two titles; the watch has the course.
+  titled <- watch_topic_regstats$waits %>% filter(subject_course == "SOCI 104")
+  expect_equal(sort(titled$course_title), c("Topics: Cities", "Topics: Migration"))
+  expect_equal(titled$waiting, c(2L, 2L))
+  by_course <- watch_topic_regstats$waits_by_course %>% filter(subject_course == "SOCI 104")
+  expect_equal(by_course$waiting, 3L)
+  x <- build_registration_watch(watch_topic_regstats)$courses %>%
+    filter(subject_course == "SOCI 104", campus == "ABQ", part_term == "1")
+  expect_equal(nrow(x), 1L)
+  expect_true(x$waitlist)
+  expect_equal(x$waiting, 3)
 })

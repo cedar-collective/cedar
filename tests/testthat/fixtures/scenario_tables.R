@@ -1534,11 +1534,11 @@ watch_flagged <- local({
       "ABQ",   "AS",     "SPAN 1110",     "Elementary Span I", 445,         548,               60,
       "ABQ",   "AS",     "HIST 1110",     "US History I",      60,          110,               30,
       "ABQ",   "FA",     "FDMA 1520",     "Film Production",   12,          62,                30),
-    waits = rw(
-      ~campus, ~college, ~subject_course, ~course_title,     ~waiting,
-      "EA",    "AS",     "SPAN 1110",     "Elementary Span I", 12,
-      "ABQ",   "AS",     "BIOL 2210",     "Anatomy & Phys I",  69,
-      "EA",    "AS",     "MATH 1350",     "College Algebra",   9),
+    waits_by_course = rw(
+      ~campus, ~college, ~subject_course, ~waiting,
+      "EA",    "AS",     "SPAN 1110",     12,
+      "ABQ",   "AS",     "BIOL 2210",     69,
+      "EA",    "AS",     "MATH 1350",     9),
     sat = rw(
       ~campus, ~college, ~subject_course, ~course_title,     ~census_enrl, ~capacity, ~fill_rate, ~is_full_now, ~is_chronic_hist, ~is_running_hot,
       "ABQ",   "AS",     "SPAN 1110",     "Elementary Span I", 445,         456,       0.976,      TRUE,         TRUE,             FALSE,
@@ -1579,6 +1579,32 @@ watch_payload <- build_registration_watch(watch_flagged)
 # with the thresholds test-regstats.R uses, so the watch reads real output.
 watch_regstats <- get_reg_stats(
   test_students_regstats, test_sections_regstats,
+  list(term = 202080L, bypass_cache = TRUE,
+       thresholds = list(min_impacted = 1, pct_sd = 1, chronic_fill_rate = .60,
+                         min_sat_terms = 1, min_wait = 1, section_proximity = .3)),
+  course_terms = test_course_terms_regstats)
+
+# A topics course on the waitlist under two titles (ISSUES I71). Three of
+# SOCI 104's registered students become waitlisted: the first for both
+# titles, the second for the first title, the third for the second. Four
+# waitlist rows, two titles, three students.
+watch_topic_students <- local({
+  rows <- test_students_regstats %>%
+    filter(term == 202080, subject_course == "SOCI 104", campus == "ABQ",
+           registration_status_code %in% STATUS_REGISTERED) %>%
+    arrange(student_id) %>%
+    slice(1:3) %>%
+    mutate(registration_status_code = STATUS_WAITLIST[1])
+  waiting <- bind_rows(
+    rows[c(1, 2), ] %>% mutate(course_title = "Topics: Cities"),
+    rows[c(1, 3), ] %>% mutate(course_title = "Topics: Migration")
+  )
+  bind_rows(anti_join(test_students_regstats, rows,
+                      by = c("student_id", "term", "subject_course", "campus")),
+            waiting)
+})
+watch_topic_regstats <- get_reg_stats(
+  watch_topic_students, test_sections_regstats,
   list(term = 202080L, bypass_cache = TRUE,
        thresholds = list(min_impacted = 1, pct_sd = 1, chronic_fill_rate = .60,
                          min_sat_terms = 1, min_wait = 1, section_proximity = .3)),

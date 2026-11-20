@@ -85,7 +85,7 @@ REGISTRATION_WATCH_PATTERNS <- tibble::tribble(
 #' Which registrations are worth a look, ranked
 #'
 #' @param flagged The list get_reg_stats() returns: `bumps`, `dips`,
-#'   `waits`, `sat`, `early_drops` and `late_drops` (a table may have no
+#'   `waits_by_course`, `sat`, `early_drops` and `late_drops` (a table may have no
 #'   rows), `course_context` (every raised course's census, usual census,
 #'   seats and fill) and `thresholds`.
 #' @param opt `include_known` (default FALSE: "usually near full" rows are counted,
@@ -104,7 +104,8 @@ build_registration_watch <- function(flagged, opt = list()) {
   key <- .REGISTRATION_WATCH_KEY
   bumps <- .registration_watch_frame(flagged, "bumps", "impacted")
   dips  <- .registration_watch_frame(flagged, "dips",  "impacted")
-  waits <- .registration_watch_frame(flagged, "waits", "waiting")
+  # By course, never `waits`: that table has a row per title of a topics course.
+  waits <- .registration_watch_frame(flagged, "waits_by_course", "waiting")
   sat   <- .registration_watch_frame(flagged, "sat", c("is_full_now", "is_chronic_hist", "is_running_hot"))
   context <- .registration_watch_frame(flagged, "course_context",
                                        c("census_enrl", "census_enrl_mean", "capacity", "fill_rate"))
