@@ -273,14 +273,16 @@ test_that("the Majors choices are one per program code, a rename joined, a share
   # Renamed: one choice, valued by the newest code, listing both codes.
   expect_true("BUMG-BBA" %in% majors)
   expect_false("BUAN-BBA" %in% majors)
-  expect_match(names(majors)[majors == "BUMG-BBA"], "\\(BUMG-BBA, BUAN-BBA\\)$")
+  expect_match(names(majors)[majors == "BUMG-BBA"], "\\(BUMG-BBA, BUAN-BBA\\) \u00b7 BBA \u00b7 ABQ \u00b7 2020$")
   # One Banner name ("History"), two programs: two choices.
   expect_true(all(c("HIST-BA", "HIST-MA") %in% majors))
   # Labels are programs.csv's names; a code the file lacks says so, never
   # named after itself (the fixture's HIST-BA is not a UNM code).
   expect_equal(names(majors)[majors == "FDMA"],
-               paste0(name_program_codes("FDMA", test_dims)[["FDMA"]], " (FDMA)"))
-  expect_equal(names(majors)[majors == "HIST-BA"], "[no programs.csv row] (HIST-BA)")
+               paste0(name_program_codes("FDMA", test_dims)[["FDMA"]], " (FDMA) \u00b7 BA \u00b7 ABQ \u00b7 2020"))
+  expect_equal(names(majors)[majors == "HIST-BA"], "[no programs.csv row] (HIST-BA) \u00b7 BA \u00b7 ABQ \u00b7 2020\u20132021")
+  # The two History programs differ by degree in their labels, not only by code.
+  expect_match(names(majors)[majors == "HIST-MA"], "\u00b7 MA \u00b7")
   # A pre-major is never offered; it joins its program through leads_to.
   expect_false("FFDA" %in% majors)
   expect_equal(unname(majors), unname(majors[order(names(majors))]))
@@ -293,6 +295,42 @@ test_that("the Majors choices are one per program code, a rename joined, a share
   depts <- choices$dept_choices
   expect_equal(names(depts)[depts == "HIST"], unit_names(test_dims)$dept_name[unit_names(test_dims)$dept_code == "HIST"])
   expect_error(pathways_population_choice_lists(test_programs, test_dims), "units.csv names no unit FSEC")
+})
+
+test_that("a program's label lists its degrees and home campuses, most common first, and the years declared", {
+  # Programs that share a name (eight Nursing codes at UNM) are told apart by
+  # what their students declared. Here History's BA rows are restated: five
+  # declare an MA, three name the main campus by its campus-file name, two a
+  # campus the file does not know.
+  rows <- dplyr::filter(test_programs, major_code == "HIST-BA")
+  expect_gt(nrow(rows), 10L)
+  rows$degree[1:5] <- "MA"
+  rows$student_campus[1:3] <- "Main"
+  rows$student_campus[4:5] <- "Somewhere"
+  choice <- program_choices(rows$major_code, test_dims, program_rename_successions[0, ], profile = rows)
+  expect_equal(unname(choice), "HIST-BA")
+  # The main campus's name reads as its code and joins its coded rows; an
+  # unknown name is shown as given, never guessed.
+  expect_equal(names(choice),
+               "[no programs.csv row] (HIST-BA) \u00b7 BA, MA \u00b7 ABQ, Somewhere \u00b7 2020\u20132021")
+  # Without a profile the label is the name and codes alone; a profile without
+  # its columns stops.
+  expect_equal(names(program_choices(rows$major_code, test_dims, program_rename_successions[0, ])),
+               "[no programs.csv row] (HIST-BA)")
+  expect_error(program_choices(rows$major_code, test_dims, program_rename_successions[0, ],
+                               profile = rows[c("major_code", "term")]),
+               "profile lacks degree, student_campus")
+
+  # The Majors list reads first majors only: a second major's row carries the
+  # student's primary program's degree. One HIST-BA row restated as a second
+  # major in HIST-MA, under a BS, leaves HIST-MA's label an MA.
+  programs <- dplyr::filter(test_programs, dept_code != "FSEC")
+  second <- which(programs$major_code == "HIST-BA")[1]
+  programs$program_type[second] <- "Second Major"
+  programs$major_code[second] <- "HIST-MA"
+  programs$degree[second] <- "BS"
+  majors <- pathways_population_choice_lists(programs, test_dims, program_rename_successions)$program_choices
+  expect_match(names(majors)[majors == "HIST-MA"], "\u00b7 MA \u00b7 ABQ \u00b7 2020$")
 })
 
 test_that("the focal program facts name every code a population counted and why", {

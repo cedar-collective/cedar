@@ -1194,11 +1194,21 @@ program_id_of <- function(codes, successions = program_successions) {
 #' (ARCH)", "Architecture (ARCT)"). A code programs.csv lacks is offered as
 #' "[no programs.csv row] (CODE)", never named after itself.
 #'
+#' With `profile`, each label also says what tells programs of one name apart
+#' (ISSUES: eight Nursing codes read alike): every degree its students
+#' declared, most common first; their home campuses, most common first, as
+#' codes where campuses.csv names the value; and the years it was declared.
+#' "Nursing (NURS) · BS in Nursing, Master of Science in Nursing · ABQ, TA ·
+#' 2018–2026". Descriptive only: the choice's value is the same program id.
+#'
 #' @param codes Program codes (NA dropped, repeats ignored).
 #' @param dims The dimension tables (build_cedar_dims()).
 #' @param successions As for program_succession_family().
+#' @param profile Optional declaration rows (cedar_programs): `major_code`,
+#'   `degree`, `student_campus`, `term`. A program's rows are those of every
+#'   code its choice covers.
 #' @return Named character vector, label to program id, in label order.
-program_choices <- function(codes, dims, successions = program_successions) {
+program_choices <- function(codes, dims, successions = program_successions, profile = NULL) {
   validate_cedar_dims(dims)
   codes <- sort(unique(stats::na.omit(as.character(codes))))
   codes <- codes[nzchar(codes)]
@@ -1207,13 +1217,46 @@ program_choices <- function(codes, dims, successions = program_successions) {
   ids <- names(by_id)
   id_names <- name_program_codes(ids, dims)
   in_file <- ids %in% dims$programs$program_code
+  if (!is.null(profile)) {
+    missing <- setdiff(c("major_code", "degree", "student_campus", "term"), names(profile))
+    if (length(missing)) {
+      stop("[population.R] program_choices(): profile lacks ", paste(missing, collapse = ", "), call. = FALSE)
+    }
+    profile <- profile[as.character(profile$major_code) %in% codes, , drop = FALSE]
+  }
   labels <- vapply(seq_along(ids), function(i) {
     id <- ids[i]
     covered <- c(id, setdiff(sort(by_id[[id]]), id))
     name <- if (in_file[i]) id_names[[id]] else "[no programs.csv row]"
-    paste0(name, " (", paste(covered, collapse = ", "), ")")
+    label <- paste0(name, " (", paste(covered, collapse = ", "), ")")
+    if (is.null(profile)) return(label)
+    rows <- profile[as.character(profile$major_code) %in% covered, , drop = FALSE]
+    if (nrow(rows) == 0L) return(label)
+    paste(c(label, .program_profile_parts(rows)), collapse = " \u00b7 ")
   }, character(1))
   stats::setNames(ids, labels)[order(labels)]
+}
+
+# What tells one program's declarations apart: its degrees and home campuses,
+# most common first, and the years declared. Parts with nothing known are left
+# out, never guessed.
+.program_profile_parts <- function(rows) {
+  by_count <- function(x) {
+    x <- as.character(x)
+    x <- x[!is.na(x) & nzchar(x)]
+    if (length(x) == 0L) return(character(0))
+    counts <- table(x)
+    names(counts)[order(-as.integer(counts), names(counts))]
+  }
+  degrees <- by_count(rows$degree)
+  campuses <- by_count(rows$student_campus)
+  coded <- cedar_campus_code_from_source(campuses)
+  campuses <- unique(ifelse(is.na(coded), campuses, coded))
+  years <- range(as.integer(rows$term) %/% 100L)
+  parts <- character(0)
+  if (length(degrees)) parts <- c(parts, paste(degrees, collapse = ", "))
+  if (length(campuses)) parts <- c(parts, paste(campuses, collapse = ", "))
+  c(parts, if (years[1] == years[2]) as.character(years[1]) else paste0(years[1], "\u2013", years[2]))
 }
 
 
