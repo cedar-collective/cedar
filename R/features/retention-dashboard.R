@@ -116,27 +116,51 @@ build_retention_dashboard <- function(student_terms, attempts, degrees, opt = li
   meta$n_groups_past <- sum(groups$last_term < latest)
   groups <- groups %>% filter(last_term == latest)
 
-  courses <- retention_dashboard_courses(student_terms, attempts, degrees, series, opt)
-  # The listed courses: a gap beyond chance (unadjusted across courses),
-  # ranked by the students it stands for, the DFW students who did not come
-  # back beyond the passers' rate (Roadblocks' impact with no baseline): a
-  # large course with a moderate gap ahead of a small one with a wide gap.
-  courses$listed <- if (is.null(courses$by_course)) NULL else courses$by_course %>%
-    filter(!is.na(pop_p_value), pop_p_value < 0.05, pop_stopout_gap > 0) %>%
-    mutate(excess_not_back = pop_n_dfw * pop_stopout_gap) %>%
-    arrange(desc(excess_not_back)) %>%
-    utils::head(25L)
+  # The slowest part; the page reads it on its own (opt$courses = FALSE).
+  courses <- if (isFALSE(opt$courses)) NULL else retention_dashboard_course_list(student_terms, attempts, degrees, series, opt)
 
   structure(list(
     meta = meta,
     series = series, trend = trend, signs = signs,
     signs_latest = signs %>% group_by(sign) %>% filter(term == max(term)) %>% ungroup(),
     groups = groups, courses = courses,
-    milestones = get_entering_class_retention(student_terms, degrees, list(
-      term_type = term_type, student_level = opt$student_level, campus = opt$campus,
-      data_edges = opt$data_edges, min_n = min_n, n_terms = 4L,
-      entry = opt$entry %||% "all", time_status = opt$entry_time_status), programs)
+    milestones = if (isFALSE(opt$milestones)) NULL else retention_dashboard_milestones(student_terms, degrees, opt, programs)
   ), class = "retention_dashboard")
+}
+
+#' The courses where a DFW goes with not coming back, and the 25 listed
+#'
+#' @param series The dashboard's `series` (its terms set which are read).
+#' @param opt The dashboard's scope.
+#' @return retention_dashboard_courses()'s list with `listed`: a gap beyond
+#'   chance (unadjusted across courses), ranked by the students it stands
+#'   for, the DFW students who did not come back beyond the passers' rate
+#'   (Roadblocks' impact with no baseline): a large course with a moderate
+#'   gap ahead of a small one with a wide gap.
+retention_dashboard_course_list <- function(student_terms, attempts, degrees, series, opt = list()) {
+  courses <- retention_dashboard_courses(student_terms, attempts, degrees, series, opt)
+  courses$listed <- if (is.null(courses$by_course)) NULL else courses$by_course %>%
+    filter(!is.na(pop_p_value), pop_p_value < 0.05, pop_stopout_gap > 0) %>%
+    mutate(excess_not_back = pop_n_dfw * pop_stopout_gap) %>%
+    arrange(desc(excess_not_back)) %>%
+    utils::head(25L)
+  courses
+}
+
+#' The page's entering classes: its scope handed to get_entering_class_retention()
+#'
+#' Its own function so the page can change who an entering class holds
+#' without rebuilding the rest (`opt$milestones = FALSE` leaves it out of
+#' build_retention_dashboard()).
+#'
+#' @param opt The dashboard's scope (`term_type`, `student_level`, `campus`,
+#'   `data_edges`, `min_n`), with `entry` and `entry_time_status`.
+#' @return get_entering_class_retention()'s rows, four semesters on.
+retention_dashboard_milestones <- function(student_terms, degrees, opt = list(), programs = NULL) {
+  get_entering_class_retention(student_terms, degrees, list(
+    term_type = opt$term_type, student_level = opt$student_level, campus = opt$campus,
+    data_edges = opt$data_edges, min_n = as.integer(opt$min_n %||% 30L), n_terms = 4L,
+    entry = opt$entry %||% "all", time_status = opt$entry_time_status), programs)
 }
 
 #' The courses where a DFW grade goes with not coming back the most

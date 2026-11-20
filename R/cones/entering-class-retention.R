@@ -114,9 +114,8 @@ get_entering_class_retention <- function(student_terms, degrees = NULL, opt = li
   n_summer_starts <- 0L
   if (entry == "all") {
     entering <- at_level %>%
-      group_by(student_id) %>%
-      slice_min(term, n = 1L, with_ties = FALSE) %>%
-      ungroup()
+      arrange(student_id, term) %>%
+      distinct(student_id, .keep_all = TRUE)
     n_first_term <- sum(entering$term == first_term)
     entering <- entering %>% filter(term > first_term)
   } else {
@@ -124,9 +123,8 @@ get_entering_class_retention <- function(student_terms, degrees = NULL, opt = li
     arrivals <- student_term_entry_type(programs) %>% filter(entry_type == entry)
     entering <- at_level %>%
       semi_join(arrivals, by = c("student_id", "term")) %>%
-      group_by(student_id) %>%
-      slice_min(term, n = 1L, with_ties = FALSE) %>%
-      ungroup()
+      arrange(student_id, term) %>%
+      distinct(student_id, .keep_all = TRUE)
     n_first_term <- 0L
     if (entry == "first_time") {
       # A summer starter enrolled that fall is in the fall class, described
