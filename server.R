@@ -3997,7 +3997,8 @@ for (.download_key in names(.enrl_desr_view_ids)) {
       campus      = if (length(input$cr_campus) > 0) input$cr_campus else NULL
     )
 
-    withProgress(message = "Building sequence comparison...", value = 0.3, {
+    # Behind Course Dynamics' own overlay, labelled for this comparison.
+    cedar_with_loading(session, "cr", label = "Building the sequence comparison…", {
       tryCatch({
         result <- get_course_sequence_effect(
           students     = cr_students,
@@ -4009,11 +4010,12 @@ for (.download_key in names(.enrl_desr_view_ids)) {
           data_edges   = data_objects[["cedar_edges"]]
         )
         cr_impact_sequence_data(result)
-        setProgress(1)
+        result
       }, error = function(e) {
         showNotification(paste("Sequence analysis failed:", conditionMessage(e)),
                          type = "error", duration = 10)
         message("[server.R] cr_impact_seq error: ", conditionMessage(e))
+        NULL
       })
     })
   }

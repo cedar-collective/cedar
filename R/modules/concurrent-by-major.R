@@ -26,7 +26,8 @@ CONCURRENT_BY_MAJOR_TERM_TYPES <- c(Fall = "fall", Spring = "spring", Summer = "
 
 concurrentByMajorUI <- function(id) {
   ns <- NS(id)
-  tagList(
+  # Opened by the server while it counts (cedar_with_loading()).
+  cedar_loading_overlay(ns("load"), run_button = NULL, emoji = "\U0001f332", loading_label = "Counting the courses taken alongside…",
     dashboard_subsection(
       "Courses Taken Alongside",
       "What else this course's students take the same term: all of them together, then by major.",
@@ -244,7 +245,7 @@ concurrentByMajorServer <- function(id, course, campus, active, registrations, s
   moduleServer(id, function(input, output, session) {
     payload <- reactive({
       req(isTRUE(active()), course(), input$term_type)
-      withProgress(message = "Counting the courses taken alongside…", value = 0.4, {
+      cedar_with_loading(session, session$ns("load"), label = "Counting the courses taken alongside…", {
         tryCatch(
           get_concurrent_courses_by_major(registrations, student_terms, dims, list(
             course = course(), term_type = input$term_type, campus = campus(), data_edges = edges)),
@@ -258,7 +259,7 @@ concurrentByMajorServer <- function(id, course, campus, active, registrations, s
 
     pairs <- reactive({
       req(isTRUE(active()), course(), input$term_type)
-      withProgress(message = "Reading which courses go with failing it…", value = 0.6, {
+      cedar_with_loading(session, session$ns("load"), label = "Reading which courses go with failing it…", {
         tryCatch(
           get_course_pair_dfw(attempts, student_terms, list(
             course = course(), term_type = input$term_type, campus = campus(), data_edges = edges)),

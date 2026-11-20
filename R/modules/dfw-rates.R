@@ -45,6 +45,9 @@ dfwRatesUI <- function(id, campuses, terms) {
         column(2, filter_actions(cedar_link_menu(ns("dr_copy_url"))))
       )
     ),
+    # Opened by the server while it reads (cedar_with_loading()).
+    cedar_loading_overlay(ns("load"), run_button = NULL, emoji = "\U0001f332",
+                          loading_label = "Reading every lower-division course's DFW grades…",
     uiOutput(ns("caveat")),
     dashboard_section(
       "How UNM Is Doing",
@@ -97,7 +100,7 @@ dfwRatesUI <- function(id, campuses, terms) {
         column(6, dashboard_subsection("College", "The college that offers the course.",
                                        reactable::reactableOutput(ns("college_table"))))
       )
-    )
+    ))
   )
 }
 
@@ -336,7 +339,7 @@ dfwRatesServer <- function(id, attempts, dims, edges, active) {
       }
       key <- paste(input$dr_term_type, paste(campus, collapse = "+"), from_term, to_term)
       if (!is.null(built[[key]])) return(built[[key]])
-      p <- withProgress(message = "Reading every lower-division course's DFW grades…", value = 0.3, {
+      p <- cedar_with_loading(session, session$ns("load"), {
         tryCatch(
           build_dfw_dashboard(attempts, dims, list(term_type = input$dr_term_type, campus = campus,
                                                    from_term = from_term, to_term = to_term,

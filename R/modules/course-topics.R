@@ -19,7 +19,9 @@
 
 courseTopicsUI <- function(id) {
   ns <- NS(id)
-  uiOutput(ns("body"))
+  # Opened by the server while it reads (cedar_with_loading()).
+  cedar_loading_overlay(ns("load"), run_button = NULL, emoji = "\U0001f332", loading_label = "Reading the course's topics…",
+                        uiOutput(ns("body")))
 }
 
 # ── Layout helpers (no analysis) ─────────────────────────────────────────────
@@ -174,7 +176,7 @@ courseTopicsServer <- function(id, course, campus, sections, students, attempts,
     payload <- reactive({
       crs <- course()
       req(crs, nzchar(crs), isTRUE(has_topics()))
-      withProgress(message = "Reading the course's topics...", value = 0.4, {
+      cedar_with_loading(session, session$ns("load"), {
         tryCatch(
           build_course_topics(sections, students, attempts, student_terms,
                               list(course = crs, campus = campus(), data_edges = edges),

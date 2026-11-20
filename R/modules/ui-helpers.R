@@ -1089,8 +1089,10 @@ downstream_trust_section <- function(description, who_counted = NULL, ..., metho
 #                  enrollment): a Shiny input name watched via shiny:inputchanged.
 #                  The overlay shows when that input changes — use it when the run
 #                  signal is a select or actionButton whose DOM id is not
-#                  namespaced as "<id>-<run_button>". Supply exactly one of
-#                  run_button / trigger_input.
+#                  namespaced as "<id>-<run_button>". Supply at most one of
+#                  run_button / trigger_input. With neither, only the server
+#                  opens the overlay: cedar_with_loading() around the work, for
+#                  a page that reads on open or whenever a filter changes.
 #   hide_on_empty  with trigger_input, also hide the overlay when the watched
 #                  input clears to empty (e.g. deselecting a dashboard department).
 #   ...            the tab body placed under the overlay (typically a uiOutput()).
@@ -1131,8 +1133,16 @@ cedar_loading_overlay <- function(id, run_button = NULL, ..., emoji = "\U0001f33
                                   loading_label = "Loading…",
                                   loading_detail = NULL,
                                   show_at_start = FALSE) {
-  if (is.null(run_button) && is.null(trigger_input)) {
-    stop("cedar_loading_overlay(): supply run_button (click trigger) or trigger_input (input-change trigger).")
+  if (!is.null(run_button) && !is.null(trigger_input)) {
+    stop("cedar_loading_overlay(): supply run_button or trigger_input, not both.")
+  }
+  # The page body goes in `...`: a tag passed second, unnamed, lands here and
+  # would be written into the overlay's script.
+  for (arg in list(run_button = run_button, trigger_input = trigger_input)) {
+    if (!is.null(arg) && !(is.character(arg) && length(arg) == 1L)) {
+      stop("cedar_loading_overlay(): run_button and trigger_input are input names; ",
+           "pass the page body after them, or name run_button = NULL.")
+    }
   }
   # Embed learned values on process startup so a busy single-threaded Shiny
   # worker does not leave the hard-coded default visible for the entire run.
@@ -1263,7 +1273,7 @@ cedar_loading_overlay <- function(id, run_button = NULL, ..., emoji = "\U0001f33
         showOverlay();
       }
     });
-  } else {
+  } else if (RUNBTN) {
     // Capture-phase click so the overlay opens before the manual run reaches
     // the Shiny input binding.
     document.addEventListener("click", function(e) {
@@ -1271,7 +1281,10 @@ cedar_loading_overlay <- function(id, run_button = NULL, ..., emoji = "\U0001f33
     }, true);
   }
 
-  Shiny.addCustomMessageHandler(PREFIX + "_load_start", function(msg) { showOverlay(); });
+  // The server opens it too (signal_load_start(), cedar_with_loading()), with
+  // the label of the work it is starting when it names one.
+  var customLabel = null;
+  Shiny.addCustomMessageHandler(PREFIX + "_load_start", function(msg) { showOverlay(msg && msg.label); });
   Shiny.addCustomMessageHandler(PREFIX + "_load_complete", function(msg) { completeOverlay(msg || {}); });
   Shiny.addCustomMessageHandler(PREFIX + "_timing_estimates", function(msg) {
     EXPECTED = msg && msg.fresh !== null && msg.fresh !== undefined ? msg.fresh : FRESH_DEFAULT;
@@ -1294,14 +1307,16 @@ cedar_loading_overlay <- function(id, run_button = NULL, ..., emoji = "\U0001f33
   }
 
   function loadingLabel() {
+    var label = customLabel || LOADING_LABEL;
     var freshText = rangeText(EXPECTED_RANGE, EXPECTED);
     var cachedText = rangeText(CACHED_RANGE, CACHED);
-    if (freshText && cachedText) return LOADING_LABEL + " (cached " + cachedText + "; fresh " + freshText + ")";
-    if (freshText) return LOADING_LABEL + " (usually " + freshText + ")";
-    return LOADING_LABEL;
+    if (freshText && cachedText) return label + " (cached " + cachedText + "; fresh " + freshText + ")";
+    if (freshText) return label + " (usually " + freshText + ")";
+    return label;
   }
 
-  function showOverlay() {
+  function showOverlay(label) {
+    customLabel = (typeof label === "string" && label) ? label : null;
     clearTimeout(hideTimer);
     clearTimeout(finalizeTimer);
     beginMeasurement();
@@ -1443,8 +1458,29 @@ cedar_loading_overlay <- function(id, run_button = NULL, ..., emoji = "\U0001f33
 #   cached = TRUE  → "Loaded from cache in Ns"; FALSE → "Generated in Ns";
 #            NULL (default, non-caching tabs) → "Loaded in Ns".
 # Rounding is handled here.
-signal_load_start <- function(session, id) {
-  session$sendCustomMessage(paste0(id, "_load_start"), list())
+signal_load_start <- function(session, id, label = NULL) {
+  session$sendCustomMessage(paste0(id, "_load_start"), list(label = label))
+}
+
+# Run `expr` behind the loading overlay `id` (session$ns("load") in a module,
+# cedar_loading_overlay(ns("load"), ...) in its UI): opens it with `label`,
+# and always closes it, with the elapsed time when `expr` returns a value and
+# with no timing when it fails or returns NULL (a caught error), so no page is
+# left behind a stuck overlay (ISSUES I31). The page's one way of saying it is
+# working, in place of withProgress().
+cedar_with_loading <- function(session, id, expr, label = NULL) {
+  signal_load_start(session, id, label)
+  started <- Sys.time()
+  value <- NULL
+  finished <- FALSE
+  on.exit(signal_load_complete(
+    session, id,
+    duration_sec = if (finished && !is.null(value)) as.numeric(difftime(Sys.time(), started, units = "secs")),
+    error = !finished || is.null(value)
+  ), add = TRUE)
+  value <- expr
+  finished <- TRUE
+  value
 }
 
 signal_load_complete <- function(session, id, duration_sec = NULL,
