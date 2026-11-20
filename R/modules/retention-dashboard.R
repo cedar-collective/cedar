@@ -123,19 +123,9 @@ retentionDashboardServer <- function(id, student_terms, attempts, degrees, dims,
       p <- payload()
       if (is.null(p)) return(empty_state("The retention figures could not be built; the notification says why."))
       if (nrow(p$series) == 0L) return(empty_state("No student in this scope has a settled next term to read."))
-      t <- p$trend[1, , drop = FALSE]
-      last <- p$series[nrow(p$series), , drop = FALSE]
-      div(class = "finding-card-row",
-          cedar_finding_card(
-            "Latest term", scope = fmt_term(last$term), headline = .retention_pct(last$return_pct),
-            caption = "came back",
-            tags$p(class = "stat-compare", paste0(.retention_n(last$n_returned), " of ", .retention_n(last$n_observable),
-                                                  " students came back the next regular term"))),
-          cedar_finding_card(
-            "Trend", scope = unname(DFW_DIRECTION_LABELS[t$direction]),
-            headline = if (is.na(t$slope)) "\u2014" else sprintf("%+.1f", t$slope), caption = "points a year",
-            warn = identical(t$direction, "falling"),
-            tags$p(class = "stat-compare", retention_trend_sentence(t))))
+      # The chart carries the finding: each term's rate, and the trend's line
+      # labelled with its slope and verdict.
+      NULL
     })
     output$overall_plot <- plotly::renderPlotly({ p <- payload(); req(p, nrow(p$series) > 0L); plot_return_series(p) })
     output$method_overall <- renderUI({
@@ -147,9 +137,11 @@ retentionDashboardServer <- function(id, student_terms, attempts, degrees, dims,
                        "at UNM on any campus: summer is not a step, and moving campus is not leaving.")),
         tags$li(paste0("Left out: ", .retention_n(m$n_graduated), " awarded a degree that term, who finished ",
                        "rather than left, and ", .retention_n(m$n_unobservable), " whose next term had not settled.")),
-        tags$li(paste0("The trend is a line through the terms; it is rising or falling when its slope is beyond ",
-                       "both chance and the ordinary term-to-term swings. Enrollment settled through ",
-                       fmt_term(m$edge), "; a term's rate needs ", m$min_n, " students whose return can be read.")))
+        tags$li(paste0("The dashed line is the trend, fitted through the terms; it is rising or falling when its ",
+                       "slope is beyond both chance and the ordinary term-to-term swings. ",
+                       retention_trend_sentence(p$trend[1, , drop = FALSE]))),
+        tags$li(paste0("Enrollment settled through ", fmt_term(m$edge), "; a term's rate needs ", m$min_n,
+                       " students whose return can be read. Hover a term for its counts.")))
     })
 
     output$signs_table <- reactable::renderReactable({

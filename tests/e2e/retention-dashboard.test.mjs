@@ -2,8 +2,8 @@
 // (R/modules/retention-dashboard.R over build_retention_dashboard()).
 //
 // Asserts the tab opens on fall terms and undergraduates and builds without a
-// run button: the latest-term and trend cards, the return line with a label
-// a term, the warning-sign table (a late withdrawal and a DFW grade, each with
+// run button: the return line with a label a term and the dashed trend line
+// labelled with its slope and verdict (no cards), the warning-sign table (a late withdrawal and a DFW grade, each with
 // and without), the classification and college tables with a trend line and
 // no word, the course table, every method slot filled; a re-read when the
 // term type or the student level changes; and the home card's
@@ -20,21 +20,21 @@ const NS = 'retention_dashboard-';
 
 const { browser, page, jsErrors } = await launch({ width: 1500, height: 1100 });
 
-const cards = () => page.evaluate((el) => [...document.querySelectorAll(`#${el} .finding-card`)].map((c) => ({
-  title: c.querySelector('.finding-card-title span')?.textContent.trim(),
-  headline: c.querySelector('.finding-card-headline .stat-num')?.textContent.trim(),
-  scope: c.querySelector('.finding-card-title')?.textContent.trim(),
-})), `${NS}overall_finding`);
-
 const line = () => page.evaluate((el) => {
   const root = document.getElementById(el);
   const p = root?.classList.contains('js-plotly-plot') ? root : root?.querySelector('.js-plotly-plot');
   if (!p || !p.data) return null;
-  return { n: (p.data[0].x || []).length, text: p.data[0].text || [] };
+  const ann = (p.layout.annotations || []).map((a) => a.text);
+  return { n: (p.data[0].x || []).length, x: p.data[0].x || [], y: p.data[0].y || [], text: p.data[0].text || [],
+           trend: p.data.find((d) => d.name === 'Trend') || null, label: ann.join(' | ') };
 }, `${NS}overall_plot`);
 
 const waitBuilt = async () => {
-  await waitForSelector(page, `#${NS}overall_finding .finding-card`, { timeout: 300000 });
+  await waitFor(page, () => {
+    const r = document.getElementById('retention_dashboard-overall_plot');
+    const p = r?.classList.contains('js-plotly-plot') ? r : r?.querySelector('.js-plotly-plot');
+    return !!(p && p.data && p.data.length);
+  }, { timeout: 300000 });
   await waitForIdle(page, { timeout: 300000 });
   await waitFor(page, () => !!document.querySelector('#retention_dashboard-courses_table .rt-tbody'), { timeout: 300000 });
 };
@@ -51,11 +51,14 @@ try {
   const campus = await page.$eval(`#${NS}campus`, (el) => (el.selectize ? el.selectize.getValue() : [...el.selectedOptions].map((o) => o.value)));
   ok(JSON.stringify(campus) === '["ABQ"]', `the page opens on the main home campus (${campus})`);
 
-  const fall = await cards();
-  ok(fall.map((c) => c.title).join('|') === 'Latest term|Trend', `latest-term and trend cards (${fall.map((c) => c.title)})`);
-  ok(/%$/.test(fall[0]?.headline || ''), `the latest term leads with its rate (${fall[0]?.headline})`);
+  const noCards = await page.evaluate(() => !document.querySelector('#retention_dashboard-overall_finding .finding-card'));
+  ok(noCards, 'the chart carries the finding: no cards');
   const ln = await line();
   ok(ln && ln.n >= 3 && ln.text.length === ln.n, `the return line labels each of its ${ln?.n} terms`);
+  ok(ln?.trend && ln.trend.x.length === 2 && ln.trend.line?.dash === 'dash',
+     'the trend is a dashed line from the first term to the last');
+  ok(/points a year/.test(ln?.label || '') && /(rising|falling|steady)/.test(ln?.label || ''),
+     `the trend line is labelled with its slope and verdict (${ln?.label})`);
 
   const signs = await readReactable(page, `${NS}signs_table`, { limit: 5 });
   ok(signs.rows?.map((r) => r[0]).join('|') === 'A late withdrawal|A DFW grade', `the two warning signs (${signs.rows?.map((r) => r[0])})`);
@@ -83,26 +86,31 @@ try {
 
   await page.screenshot({ path: '/tmp/cedar-retention.png', fullPage: true });
 
+  const plotX = () => {
+    const r = document.getElementById('retention_dashboard-overall_plot');
+    const p = r?.classList.contains('js-plotly-plot') ? r : r?.querySelector('.js-plotly-plot');
+    return p?.data?.[0] ? JSON.stringify([p.data[0].x, p.data[0].y]) : '';
+  };
   await setInput(page, `${NS}term_type`, 'spring');
-  const reread = await waitFor(page, (f) => {
-    const h = document.querySelector('#retention_dashboard-overall_finding .finding-card .finding-card-headline .stat-num')?.textContent.trim();
-    const scope = document.querySelector('#retention_dashboard-overall_finding .finding-card .finding-card-title')?.textContent;
-    return /Spring/.test(scope || '') && h && h !== f;
-  }, { timeout: 300000, args: [fall[0]?.headline] });
-  ok(reread, 'spring re-reads the page on a spring term');
+  const reread = await waitFor(page, () => {
+    const r = document.getElementById('retention_dashboard-overall_plot');
+    const p = r?.classList.contains('js-plotly-plot') ? r : r?.querySelector('.js-plotly-plot');
+    return (p?.data?.[0]?.x || []).every((x) => /Spring/.test(x)) && (p?.data?.[0]?.x || []).length > 0;
+  }, { timeout: 300000 });
+  ok(reread, 'spring re-reads the page on spring terms');
   await waitBuilt();
 
-  const countLine = () => page.evaluate(() =>
-    document.querySelector('#retention_dashboard-overall_finding .finding-card .stat-compare')?.textContent.trim());
-  const undergrad = await countLine();
+  const undergrad = await page.evaluate(plotX);
   // The second level in student_levels.csv (graduate at UNM). A home campus
   // changes little at the undergraduate level: nearly all are ABQ students.
   const second = await page.$eval(`#${NS}level`, (el) => Object.values(el.selectize?.options || {})
     .sort((a, b) => a.$order - b.$order).map((o) => o.value)[1]);
   await setInput(page, `${NS}level`, second);
   const narrowed = await waitFor(page, (f) => {
-    const t = document.querySelector('#retention_dashboard-overall_finding .finding-card .stat-compare')?.textContent.trim();
-    return t && t !== f;
+    const r = document.getElementById('retention_dashboard-overall_plot');
+    const p = r?.classList.contains('js-plotly-plot') ? r : r?.querySelector('.js-plotly-plot');
+    const now = p?.data?.[0] ? JSON.stringify([p.data[0].x, p.data[0].y]) : '';
+    return now && now !== f;
   }, { timeout: 300000, args: [undergrad] });
   ok(narrowed, `another student level (${second}) re-reads the page`);
 

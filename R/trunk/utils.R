@@ -546,7 +546,9 @@ compute_trend <- function(values, min_n = 2, threshold = 0) {
 #'   `se_chance`, `se_scatter`, `slope_se` (the larger), `direction`
 #'   ("rising", "falling", "steady" or "too_few_terms"), and the scatter
 #'   around the line: `resid_sd` (points) and `resid_p`, the chance of
-#'   scatter that large under binomial variation alone (NA under four terms).
+#'   scatter that large under binomial variation alone (NA under four terms);
+#'   and the fitted line's value at the first and last terms, `fit_first_pct`
+#'   and `fit_last_pct` (NA without a slope), for drawing it.
 compute_rate_trend <- function(series, group_cols = character(), min_terms = 3L) {
   with_se <- all(c("value", "se") %in% names(series))
   missing <- setdiff(c(group_cols, "term", if (with_se) c("value", "se") else c("k", "n")), names(series))
@@ -580,6 +582,10 @@ compute_rate_trend <- function(series, group_cols = character(), min_terms = 3L)
       last_term = dplyr::last(term),
       last_pct = dplyr::last(pct),
       pooled_pct = if (with_se) sum(pct / .var_se) / sum(1 / .var_se) else 100 * sum(k) / sum(n),
+      .ybar = mean(year),
+      .pbar = mean(pct),
+      .first_year = dplyr::first(year),
+      .last_year = dplyr::last(year),
       .sxx = sum((year - mean(year))^2),
       .sxy = sum((year - mean(year)) * pct),
       .syy = sum((pct - mean(pct))^2),
@@ -615,12 +621,15 @@ compute_rate_trend <- function(series, group_cols = character(), min_terms = 3L)
         slope < -2 * slope_se ~ "falling",
         TRUE ~ "steady"
       ),
+      fit_first_pct = .pbar + slope * (.first_year - .ybar),
+      fit_last_pct = .pbar + slope * (.last_year - .ybar),
       resid_sd = dplyr::if_else(n_terms >= 4L, sqrt(pmax(.syy - .sxy^2 / .sxx, 0) / (n_terms - 2L)), NA_real_),
       resid_p = dplyr::if_else(n_terms >= 4L, stats::pchisq(.chisq, df = n_terms - 2L, lower.tail = FALSE),
                                NA_real_)
     ) %>%
     dplyr::select(dplyr::all_of(group_cols), n_terms, first_term, first_pct, last_term, last_pct,
-                  pooled_pct, slope, se_chance, se_scatter, slope_se, direction, resid_sd, resid_p, chance_var)
+                  pooled_pct, slope, se_chance, se_scatter, slope_se, direction, resid_sd, resid_p, chance_var,
+                  fit_first_pct, fit_last_pct)
 }
 
 

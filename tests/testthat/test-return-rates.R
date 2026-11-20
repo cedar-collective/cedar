@@ -110,6 +110,17 @@ test_that("RR01: the courses read the latest graded falls' students", {
   expect_equal(courses$listed$excess_not_back, 21 * (19 / 21 - 8 / 96))
 })
 
+test_that("RR01: the trend carries its fitted line's ends, the least-squares line through the terms", {
+  # plot_return_series() draws the trend from these, so the dashed line is the
+  # fit the verdict was read from.
+  s <- rr01$dashboard$series
+  t <- rr01$dashboard$trend
+  fit <- stats::lm(return_pct ~ I(term %/% 100L), data = s)
+  expect_equal(t$fit_first_pct, unname(stats::fitted(fit)[1]))
+  expect_equal(t$fit_last_pct, unname(stats::fitted(fit)[nrow(s)]))
+  expect_equal((t$fit_last_pct - t$fit_first_pct) / ((t$last_term - t$first_term) %/% 100L), t$slope)
+})
+
 test_that("RR01: the dashboard as text", {
   testthat::local_edition(3)
   expect_snapshot(cat(format_retention_dashboard(rr01$dashboard), sep = "\n"))

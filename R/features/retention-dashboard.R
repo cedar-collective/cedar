@@ -225,6 +225,7 @@ format_retention_dashboard <- function(payload) {
 #' @param payload `build_retention_dashboard()` output.
 plot_return_series <- function(payload) {
   s <- payload$series
+  t <- payload$trend[1, , drop = FALSE]
   labels <- vapply(s$term, fmt_term, character(1))
   p <- plotly::plot_ly(
     x = labels, y = s$return_pct, type = "scatter", mode = "lines+markers+text",
@@ -232,9 +233,29 @@ plot_return_series <- function(payload) {
     line = list(color = CEDAR_PALETTE[[2]], width = 3), marker = list(color = CEDAR_PALETTE[[2]], size = 8),
     hovertext = paste0(labels, "<br>", format(s$n_returned, big.mark = ","), " of ",
                        format(s$n_observable, big.mark = ","), " came back"),
-    hoverinfo = "text", showlegend = FALSE)
+    hoverinfo = "text", showlegend = FALSE, name = "Came back")
+  # The fitted trend, drawn from compute_rate_trend()'s own line, labelled at
+  # its end with its slope and verdict (the colour says which way, when it is
+  # a trend at all).
+  trend_label <- NULL
+  if (!is.na(t$slope)) {
+    p <- plotly::add_trace(p, x = vapply(c(t$first_term, t$last_term), fmt_term, character(1)),
+                           y = c(t$fit_first_pct, t$fit_last_pct), type = "scatter", mode = "lines",
+                           line = list(color = CEDAR_SEMANTIC_COLORS[["reference"]], width = 2, dash = "dash"),
+                           text = NULL, hoverinfo = "skip", showlegend = FALSE, name = "Trend",
+                           inherit = FALSE)
+    tone <- switch(t$direction, falling = "negative", rising = "positive", "reference")
+    trend_label <- list(list(
+      x = fmt_term(t$last_term), y = t$fit_last_pct, xref = "x", yref = "y",
+      text = paste0("<b>", sprintf("%+.1f", t$slope), " points a year</b><br>",
+                    RETENTION_DIRECTION_WORDS[[t$direction]]),
+      showarrow = FALSE, xanchor = "left", xshift = 12, align = "left",
+      font = list(color = CEDAR_SEMANTIC_COLORS[[tone]], size = 13)))
+  }
   plotly::layout(p,
     xaxis = list(title = "", type = "category", categoryorder = "array", categoryarray = labels),
     yaxis = list(title = "Came back the next regular term", ticksuffix = "%",
-                 range = c(max(0, min(s$return_pct, na.rm = TRUE) - 8), 100)))
+                 range = c(max(0, min(s$return_pct, na.rm = TRUE) - 8), 100)),
+    annotations = trend_label,
+    margin = list(r = if (is.null(trend_label)) 20 else 150))
 }
