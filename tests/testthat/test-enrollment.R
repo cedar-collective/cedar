@@ -540,6 +540,40 @@ test_that("the Enrollment table attaches each section's class-list counts and le
                "appears more than once")
 })
 
+test_that("a crosslisted offering's home row counts every listing's students once (EC-15)", {
+  # MATH 3750 (home) and CS 3750 (partner) share one section; a MATH filter
+  # leaves the partner off the page. S1 and S2 moved from CS to MATH and D1
+  # dropped both: the shared section holds 9 current, 10 at census, 10 on day one.
+  every <- get_enrl(test_sections_xl_switch,
+                    list(status = "A", crosslist = "all", uel = FALSE, term = 202110L))
+  raw <- filter(every, subject == "MATH")
+  expect_setequal(raw$crn, c("EC15M1", "EC15M2"))
+  rows <- attach_enrollment_section_counts(raw, test_students_xl_switch, test_sections_xl_switch)$rows
+  home <- filter(rows, crn == "EC15M1")
+  # Its own listing, and the whole offering beside it.
+  expect_equal(c(home$registered, home$census_enrl), c(5, 5))
+  expect_equal(c(home$xl_listings, home$xl_registered, home$xl_dr_early, home$xl_dr_late,
+                 home$xl_census_enrl, home$xl_first_day_enrl),
+               c(2, 9, 1, 1, 10, 10))
+  expect_equal(home$xl_registered, home$total_enrl)
+  expect_true(is.na(filter(rows, crn == "EC15M2")$xl_listings))
+
+  # The home view shows the offering; the all view each listing's own students.
+  group_cols <- c("term", "subject_course", "campus")
+  by_view <- function(view) summarize_enrollment_view(rows, list(view = view, group_cols = group_cols))$rows
+  expect_equal(c(by_view("home")$registered, by_view("home")$census_enrl, by_view("home")$first_day_enrl),
+               c(11, 12, 12))
+  expect_equal(by_view("all")$registered, 7)
+  section_home <- summarize_enrollment_view(rows, list(view = "home"))$rows
+  expect_equal(filter(section_home, crn == "EC15M1")$census_enrl, 10)
+
+  # The partner's own row keeps its own count and no offering.
+  cs <- filter(every, subject == "CS")
+  cs_rows <- attach_enrollment_section_counts(cs, test_students_xl_switch, test_sections_xl_switch)$rows
+  expect_equal(cs_rows$registered, 4)
+  expect_true(is.na(cs_rows$xl_listings))
+})
+
 test_that("a section with no seats and no students is not an offering", {
   # The full-term SOCI 100 section stated as an empty placeholder.
   schedule <- mutate(test_sections_course_history,
