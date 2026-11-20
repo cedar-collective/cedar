@@ -558,6 +558,36 @@ filter_bar <- function(title, subtitle = NULL, ..., class = NULL) {
 }
 
 # Aligns run/download/copy buttons with compact filter inputs.
+# A run button that waits for what it needs: disabled, with `hint` as its
+# tooltip, until its inputs hold a value (www/cedar-navigation.js keeps it in
+# step as they change). The one way CEDAR disables a run button for a missing
+# input; the server's own check stays as the last guard. A button that waits
+# on server state (a defined population) is set by the server with
+# updateActionButton(disabled =).
+#   button  the actionButton() tag.
+#   inputs  full input ids (ns() applied) that must all hold a value; with
+#           `when`, a named list from each value of the `when` input to the
+#           ids that case needs (an empty case needs nothing).
+#   any     TRUE: one of the ids is enough.
+#   when    the id of an input (a radio group or select) that decides which
+#           case applies.
+cedar_requires <- function(button, inputs, hint, any = FALSE, when = NULL) {
+  spec <- if (is.null(when)) {
+    list(inputs = as.list(as.character(inputs)))
+  } else {
+    if (is.null(names(inputs)) || any(!nzchar(names(inputs)))) {
+      stop("cedar_requires(): with `when`, inputs is a list named by its values.")
+    }
+    list(when = when, cases = lapply(inputs, function(ids) as.list(as.character(ids))))
+  }
+  spec$any <- isTRUE(any)
+  htmltools::tagAppendAttributes(
+    button, disabled = NA, `aria-disabled` = "true",
+    `data-cedar-requires` = as.character(jsonlite::toJSON(spec, auto_unbox = TRUE)),
+    `data-cedar-requires-hint` = hint
+  )
+}
+
 # A page's link button: a small menu with "Copy link" and "Make this my start
 # page". `id` is the copy input's full id (ns("x_copy_url") in a module): "Copy
 # link" keeps it, so cedar_copy_url_observer() is unchanged; the start-page
@@ -1241,7 +1271,7 @@ cedar_loading_overlay <- function(id, run_button = NULL, ..., emoji = "\U0001f33
   // JSON payload Shiny delivers; it deliberately excludes query contents and
   // is not presented as an exact websocket byte count.
   $(document).on("shiny:value", function(e) {
-    if (!measurementActive || !REPORT_TYPE || !e.name) return;
+    if (!measurementActive || !activeReport || !e.name) return;
     var output = document.getElementById(e.name);
     var box = el("-loading-overlay");
     var anchor = box && box.closest ? box.closest(".loader-anchor") : null;
@@ -1284,11 +1314,13 @@ cedar_loading_overlay <- function(id, run_button = NULL, ..., emoji = "\U0001f33
   // The server opens it too (signal_load_start(), cedar_with_loading()), with
   // the label of the work it is starting when it names one.
   var customLabel = null;
-  Shiny.addCustomMessageHandler(PREFIX + "_load_start", function(msg) { showOverlay(msg && msg.label); });
+  Shiny.addCustomMessageHandler(PREFIX + "_load_start", function(msg) {
+    showOverlay(msg && msg.label, msg && msg.report_type, msg && msg.fresh_default);
+  });
   Shiny.addCustomMessageHandler(PREFIX + "_load_complete", function(msg) { completeOverlay(msg || {}); });
   Shiny.addCustomMessageHandler(PREFIX + "_timing_estimates", function(msg) {
-    EXPECTED = msg && msg.fresh !== null && msg.fresh !== undefined ? msg.fresh : FRESH_DEFAULT;
-    CACHED = msg && msg.cached !== null && msg.cached !== undefined ? msg.cached : CACHED_DEFAULT;
+    EXPECTED = msg && msg.fresh !== null && msg.fresh !== undefined ? msg.fresh : activeFreshDefault;
+    CACHED = msg && msg.cached !== null && msg.cached !== undefined ? msg.cached : activeCachedDefault;
     EXPECTED_RANGE = msg && msg.fresh_range ? msg.fresh_range
                    : (EXPECTED === null ? null : {lower: EXPECTED, upper: EXPECTED});
     CACHED_RANGE = msg && msg.cached_range ? msg.cached_range
@@ -1315,17 +1347,34 @@ cedar_loading_overlay <- function(id, run_button = NULL, ..., emoji = "\U0001f33
     return label;
   }
 
-  function showOverlay(label) {
+  // The server may name a timing log for the work (the report_type of
+  // cedar_with_loading()), so a subtab wait is estimated from its own runs,
+  // never from the page. Without one the overlay keeps its built-in estimates.
+  var ORIG = { expected: EXPECTED, cached: CACHED, expectedRange: EXPECTED_RANGE, cachedRange: CACHED_RANGE };
+  var activeReport = REPORT_TYPE, activeFreshDefault = FRESH_DEFAULT, activeCachedDefault = CACHED_DEFAULT;
+  var elapsedTimer = null;
+  function showOverlay(label, reportType, freshDefault) {
     customLabel = (typeof label === "string" && label) ? label : null;
     clearTimeout(hideTimer);
     clearTimeout(finalizeTimer);
     beginMeasurement();
-    if (REPORT_TYPE && window.Shiny && Shiny.setInputValue) {
+    if (typeof reportType === "string" && reportType && reportType !== REPORT_TYPE) {
+      activeReport = reportType;
+      activeFreshDefault = (freshDefault === undefined) ? null : freshDefault;
+      activeCachedDefault = null;
+      EXPECTED = activeFreshDefault; CACHED = null;
+      EXPECTED_RANGE = null; CACHED_RANGE = null;
+    } else {
+      activeReport = REPORT_TYPE; activeFreshDefault = FRESH_DEFAULT; activeCachedDefault = CACHED_DEFAULT;
+      EXPECTED = ORIG.expected; CACHED = ORIG.cached;
+      EXPECTED_RANGE = ORIG.expectedRange; CACHED_RANGE = ORIG.cachedRange;
+    }
+    if (activeReport && window.Shiny && Shiny.setInputValue) {
       Shiny.setInputValue("cedar_timing_estimate_request", {
         prefix: PREFIX,
-        report_type: REPORT_TYPE,
-        fresh_default: FRESH_DEFAULT,
-        cached_default: CACHED_DEFAULT,
+        report_type: activeReport,
+        fresh_default: activeFreshDefault,
+        cached_default: activeCachedDefault,
         nonce: Date.now()
       }, {priority: "event"});
     }
@@ -1333,6 +1382,13 @@ cedar_loading_overlay <- function(id, run_button = NULL, ..., emoji = "\U0001f33
     if (!box) return;
     el("-loading-label").textContent = loadingLabel();
     el("-timing-msg").textContent = "";
+    // How long it has been working, so a wait is never a blank screen.
+    clearInterval(elapsedTimer);
+    elapsedTimer = setInterval(function() {
+      if (runStartedAt === null) return;
+      var s = Math.round((performance.now() - runStartedAt) / 1000);
+      if (s >= 2) el("-timing-msg").textContent = "Working for " + s + "s";
+    }, 1000);
     box.style.opacity = "0";
     box.style.display = "flex";
     box.style.transition = "opacity 0.2s ease";
@@ -1386,7 +1442,7 @@ cedar_loading_overlay <- function(id, run_button = NULL, ..., emoji = "\U0001f33
 
     if (window.Shiny && Shiny.setInputValue) {
       Shiny.setInputValue("cedar_client_render_timing", {
-        report_type: REPORT_TYPE,
+        report_type: activeReport,
         overlay_id: PREFIX,
         compute_sec: computeSec,
         total_sec: Math.round(totalSec * 1000) / 1000,
@@ -1414,6 +1470,7 @@ cedar_loading_overlay <- function(id, run_button = NULL, ..., emoji = "\U0001f33
   }
 
   function stopMeasurement() {
+    clearInterval(elapsedTimer);
     clearTimeout(finalizeTimer);
     measurementActive = false;
     runStartedAt = null;
@@ -1458,8 +1515,9 @@ cedar_loading_overlay <- function(id, run_button = NULL, ..., emoji = "\U0001f33
 #   cached = TRUE  → "Loaded from cache in Ns"; FALSE → "Generated in Ns";
 #            NULL (default, non-caching tabs) → "Loaded in Ns".
 # Rounding is handled here.
-signal_load_start <- function(session, id, label = NULL) {
-  session$sendCustomMessage(paste0(id, "_load_start"), list(label = label))
+signal_load_start <- function(session, id, label = NULL, report_type = NULL, fresh_default = NULL) {
+  session$sendCustomMessage(paste0(id, "_load_start"),
+                            list(label = label, report_type = report_type, fresh_default = fresh_default))
 }
 
 # Run `expr` behind the loading overlay `id` (session$ns("load") in a module,
@@ -1468,16 +1526,24 @@ signal_load_start <- function(session, id, label = NULL) {
 # with no timing when it fails or returns NULL (a caught error), so no page is
 # left behind a stuck overlay (ISSUES I31). The page's one way of saying it is
 # working, in place of withProgress().
-cedar_with_loading <- function(session, id, expr, label = NULL) {
-  signal_load_start(session, id, label)
+# With `report_type`, the work is timed into its own log (start_report_timer()),
+# and the overlay's "usually ~Ns" is read from those runs.
+cedar_with_loading <- function(session, id, expr, label = NULL, report_type = NULL,
+                               fresh_default = NULL) {
+  signal_load_start(session, id, label, report_type, fresh_default)
+  timer <- if (!is.null(report_type)) start_report_timer(report_type, session = session)
   started <- Sys.time()
   value <- NULL
   finished <- FALSE
-  on.exit(signal_load_complete(
-    session, id,
-    duration_sec = if (finished && !is.null(value)) as.numeric(difftime(Sys.time(), started, units = "secs")),
-    error = !finished || is.null(value)
-  ), add = TRUE)
+  on.exit({
+    ok <- finished && !is.null(value)
+    duration <- if (!is.null(timer)) {
+      if (ok) end_report_timer(timer, result = value) else end_report_timer(timer, success = FALSE, result = NULL)
+    } else if (ok) {
+      as.numeric(difftime(Sys.time(), started, units = "secs"))
+    }
+    signal_load_complete(session, id, duration_sec = if (ok) duration, error = !ok)
+  }, add = TRUE)
   value <- expr
   finished <- TRUE
   value

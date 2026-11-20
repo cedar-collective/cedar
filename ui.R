@@ -779,10 +779,11 @@ nav_panel(
         selected = dashboard_default_term
       ),
       actions = filter_actions(
-        actionButton("dashboard_button",
+        cedar_requires(actionButton("dashboard_button",
                      label = "Gather Data",
                      class = "btn-primary",
                      icon  = icon("sync-alt")),
+          "dashboard_dept", "Choose a department first"),
         cedar_link_menu("dashboard_copy_url")
       ),
       scope_output = uiOutput("dashboard_program_info")
@@ -814,7 +815,7 @@ nav_panel(
         uiOutput("dashboard_headcount_scope")
       ),
       uiOutput("dashboard_headcount_cards"),
-      plotOutput("dashboard_headcount_sparkline", height = "200px")
+      plotly::plotlyOutput("dashboard_headcount_sparkline", height = "220px")
     ),
 
     dashboard_section(
@@ -997,62 +998,17 @@ nav_panel(
       ),
       column(4,
         filter_actions(
-          actionButton(
+          cedar_requires(actionButton(
             "cr_generate_button",
             "Analyze Course",
             icon = icon("chart-line"),
-            class = "btn-primary",
-            disabled = "disabled",
-            `aria-disabled` = "true"
-          ),
+            class = "btn-primary"
+          ), "cr_course", "Choose a course first"),
           cedar_link_menu("cr_copy_url")
         )
       )
     )
   ),
-
-  # Keep the expensive analysis action unavailable until the server-backed
-  # selectize input holds a real course. The server's req() remains the final
-  # guard; this prevents an invalid click from reaching it in the first place.
-  tags$script(HTML("(function() {
-    var inputId = 'cr_course';
-    var buttonId = 'cr_generate_button';
-
-    function hasSelection(value) {
-      if (Array.isArray(value)) {
-        return value.some(function(item) {
-          return item !== null && String(item).trim() !== '';
-        });
-      }
-      return value !== null && value !== undefined && String(value).trim() !== '';
-    }
-
-    function setButtonState(value) {
-      var button = document.getElementById(buttonId);
-      if (!button) return;
-      var enabled = hasSelection(value);
-      button.disabled = !enabled;
-      button.setAttribute('aria-disabled', enabled ? 'false' : 'true');
-    }
-
-    function syncFromInput() {
-      var input = document.getElementById(inputId);
-      var value = input && input.selectize ? input.selectize.getValue()
-                                          : (input ? input.value : null);
-      setButtonState(value);
-    }
-
-    $(document).on('change.cedarCourseAnalyzeGuard', function(event) {
-      if (event.target && event.target.id === inputId) {
-        setButtonState(event.target.value);
-      }
-    });
-    $(document).on('shiny:inputchanged.cedarCourseAnalyzeGuard', function(event) {
-      if (event.name === inputId) setButtonState(event.value);
-    });
-    $(document).on('shiny:connected.cedarCourseAnalyzeGuard', syncFromInput);
-    $(syncFromInput);
-  })();")),
 
   cedar_loading_overlay(
     "cr",
@@ -1548,12 +1504,14 @@ nav_panel(
       ),
       column(2,
         filter_actions(
-          actionButton("enrl_button",
+          # Level alone is not enough: Undergraduate is the broad default.
+          cedar_requires(actionButton("enrl_button",
                        label = "Gather Enrollments",
                        class = "btn-primary",
-                       icon = icon("sync-alt"),
-                       disabled = "disabled",
-                       `aria-disabled` = "true"),
+                       icon = icon("sync-alt")),
+            c("enrl_campus", "enrl_college", "enrl_term", "enrl_pt", "enrl_dept", "enrl_subj",
+              "enrl_course", "enrl_inst", "enrl_im", "enrl_gen_ed"),
+            "Choose a filter other than Level first", any = TRUE),
           cedar_link_menu("enrl_copy_url")
         ),
         tags$small(
@@ -1562,53 +1520,6 @@ nav_panel(
         )
       )
     ), # end fluidRow
-
-    # Keep the costly page action unavailable until it has a narrowing filter.
-    # Level is intentionally excluded because Undergraduate is the broad page
-    # default. The server repeats this guard for links and non-browser callers.
-    tags$script(HTML("(function() {
-      var buttonId = 'enrl_button';
-      var narrowingInputs = [
-        'enrl_campus', 'enrl_college', 'enrl_term', 'enrl_pt',
-        'enrl_dept', 'enrl_subj', 'enrl_course', 'enrl_inst',
-        'enrl_im', 'enrl_gen_ed'
-      ];
-
-      function hasSelection(value) {
-        if (Array.isArray(value)) {
-          return value.some(function(item) {
-            return item !== null && String(item).trim() !== '';
-          });
-        }
-        return value !== null && value !== undefined && String(value).trim() !== '';
-      }
-
-      function inputValue(id) {
-        var input = document.getElementById(id);
-        return input && input.selectize ? input.selectize.getValue()
-                                       : (input ? input.value : null);
-      }
-
-      function syncButton() {
-        var button = document.getElementById(buttonId);
-        if (!button) return;
-        var enabled = narrowingInputs.some(function(id) {
-          return hasSelection(inputValue(id));
-        });
-        button.disabled = !enabled;
-        button.setAttribute('aria-disabled', enabled ? 'false' : 'true');
-        button.title = enabled ? '' : 'Choose a filter other than Level first';
-      }
-
-      $(document).on('change.cedarEnrollmentScopeGuard', function(event) {
-        if (event.target && narrowingInputs.indexOf(event.target.id) !== -1) syncButton();
-      });
-      $(document).on('shiny:inputchanged.cedarEnrollmentScopeGuard', function(event) {
-        if (narrowingInputs.indexOf(event.name) !== -1) syncButton();
-      });
-      $(document).on('shiny:connected.cedarEnrollmentScopeGuard', syncButton);
-      $(syncButton);
-    })();")),
 
     filter_scope_stripe(uiOutput("enrl_filter_summary"))
 
@@ -1738,7 +1649,7 @@ nav_panel(
 
         # Threshold controls and calculate button
         div(style = "display: flex; align-items: flex-end; gap: 20px; padding: 4px 0 8px 0;",
-          span("Thresholds:", style = "font-weight: 600; color: #555; padding-bottom: 6px; white-space: nowrap;"),
+          span("Thresholds:", style = "font-weight: 600; color: var(--text-secondary); padding-bottom: 6px; white-space: nowrap;"),
           div(style = "width: 100px;",
             numericInput("low_enrl_threshold_lower", "Lower div", value = 12, min = 1, max = 100, step = 1)
           ),

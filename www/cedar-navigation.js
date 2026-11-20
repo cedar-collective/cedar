@@ -12,6 +12,59 @@
   } catch (e) { /* storage blocked or unreadable: open Home */ }
 })();
 
+// A run button waits for its inputs (cedar_requires() in
+// R/modules/ui-helpers.R): disabled, its hint as the tooltip, until each input
+// it names holds a value. Every such button is checked whenever any input
+// changes, so a restored link or a server update enables it too.
+(() => {
+  const valueOf = (id) => {
+    const el = document.getElementById(id);
+    if (!el) return null;
+    if (el.classList.contains('shiny-input-radiogroup') || el.classList.contains('shiny-input-checkboxgroup')) {
+      return [...el.querySelectorAll('input:checked')].map((i) => i.value);
+    }
+    if (el.type === 'checkbox') return el.checked;
+    if (el.selectize) return el.selectize.getValue();
+    if (el.multiple) return [...el.selectedOptions].map((o) => o.value);
+    return el.value;
+  };
+  // The value Shiny holds, which a programmatic setInputValue() changes
+  // without touching the DOM; its key may carry a ":type" suffix.
+  const shinyValueOf = (id) => {
+    const values = window.Shiny && Shiny.shinyapp && Shiny.shinyapp.$inputValues;
+    if (!values) return null;
+    if (id in values) return values[id];
+    const key = Object.keys(values).find((k) => k.startsWith(id + ':'));
+    return key ? values[key] : null;
+  };
+  const hasValue = (v) => {
+    if (Array.isArray(v)) return v.some((x) => x !== null && String(x).trim() !== '');
+    if (typeof v === 'boolean') return v;
+    return v !== null && v !== undefined && String(v).trim() !== '';
+  };
+  const filled = (id) => hasValue(valueOf(id)) || hasValue(shinyValueOf(id));
+  const sync = () => {
+    document.querySelectorAll('button[data-cedar-requires]').forEach((button) => {
+      let spec;
+      try { spec = JSON.parse(button.getAttribute('data-cedar-requires')); } catch (e) { return; }
+      let ids = spec.inputs || [];
+      if (spec.when) {
+        const w = shinyValueOf(spec.when) ?? valueOf(spec.when);
+        ids = (spec.cases || {})[Array.isArray(w) ? w[0] : w] || [];
+      }
+      const ready = ids.length === 0 || (spec.any ? ids.some(filled) : ids.every(filled));
+      if (!button.hasAttribute('data-cedar-title')) button.setAttribute('data-cedar-title', button.title || '');
+      button.disabled = !ready;
+      button.setAttribute('aria-disabled', ready ? 'false' : 'true');
+      button.title = ready ? button.getAttribute('data-cedar-title') : (button.getAttribute('data-cedar-requires-hint') || '');
+    });
+  };
+  window.cedarSyncRunButtons = sync;
+  $(document).on('change input', sync);
+  $(document).on('shiny:inputchanged shiny:connected shiny:value', () => setTimeout(sync, 0));
+  document.addEventListener('DOMContentLoaded', sync);
+})();
+
 // Home says what the start page is and offers to clear it.
 (() => {
   window.cedarShowStartPage = () => {

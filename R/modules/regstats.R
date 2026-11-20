@@ -125,10 +125,10 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
       htmltools::div(
         style = "display:flex;align-items:center;gap:6px",
         htmltools::div(
-          style = "flex:0 0 56px;background:#e0dbd2;border-radius:3px;overflow:hidden",
+          style = "flex:0 0 56px;background:var(--border-warm);border-radius:3px;overflow:hidden",
           htmltools::div(style = paste0("width:", pct, "%;height:8px;background:", col, ";border-radius:3px"))
         ),
-        htmltools::span(style = "font-size:0.82rem;color:#666", paste0(pct, "%"))
+        htmltools::span(style = "font-size:0.82rem;color:var(--text-muted)", paste0(pct, "%"))
       )
     }
 
@@ -214,8 +214,8 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
         impacted        = reactable::colDef(name = "Outside SD",  maxWidth = 100, align = "right",
           format = reactable::colFormat(digits = 1),
           style = function(v) {
-            if (is.na(v) || v <= 0) list(color = "#aaa")
-            else list(color = "#A15D4E", fontWeight = "600")
+            if (is.na(v) || v <= 0) list(color = "var(--text-muted)")
+            else list(color = "var(--text-critical)", fontWeight = "600")
           })
       )
 
@@ -1025,8 +1025,8 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
               if (!is.na(late) && late >= 5)
                 htmltools::span(
                   title = paste0(late, " late drops included in the class-list census proxy"),
-                  style = paste0("font-size:0.72rem;color:#7A5010;font-weight:600;",
-                                 "white-space:nowrap;background:#F4E9D2;border-radius:8px;padding:0 6px"),
+                  style = paste0("font-size:0.72rem;color:var(--text-warning);font-weight:600;",
+                                 "white-space:nowrap;background:var(--alert-warning-bg);border-radius:8px;padding:0 6px"),
                   paste0("▾", late))
               else NULL
             )
@@ -1043,16 +1043,16 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
           format = reactable::colFormat(digits = 2),
           style = function(v) {
             if (is.na(v)) return(list())
-            if (v >= 1.5) list(background = "#F2E3DE", fontWeight = "600")
-            else if (v >= 1.0) list(background = "#F4E9D2", fontWeight = "600")
-            else if (v >= 0.5) list(background = "#FFF8EE")
+            if (v >= 1.5) list(background = "var(--alert-critical-bg)", fontWeight = "600")
+            else if (v >= 1.0) list(background = "var(--alert-warning-bg)", fontWeight = "600")
+            else if (v >= 0.5) list(background = "var(--surface-warm)")
             else list()
           }),
         n_chronic_terms = reactable::colDef(name = "Terms at Cap", maxWidth = 92, align = "right",
           style = function(v) {
             if (is.na(v)) return(list())
-            if (v >= 5) list(color = "#A15D4E", fontWeight = "700")
-            else if (v >= 3) list(color = "#C7A96B", fontWeight = "600")
+            if (v >= 5) list(color = "var(--text-critical)", fontWeight = "700")
+            else if (v >= 3) list(color = "var(--status-warning)", fontWeight = "600")
             else list()
           }),
         n_hist_terms    = reactable::colDef(name = "Hist Terms", maxWidth = 78, align = "right")

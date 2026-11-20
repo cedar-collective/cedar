@@ -208,6 +208,20 @@ contracts: [degree-requirements.md](docs/developers/degree-requirements.md),
   preview for a population and its plans: the shared courses' day-1 fill,
   DFW gap and retake timing on the tiles they share, and a compact card mode
   so the board keeps its visual power as cards gain facts.
+- [ ] **Electives at the bottom right** (user 2026-11-19). Every elective
+  card, the major's own and free elective/minor space alike, moves below the
+  program's required courses, so the required courses sit together and nothing
+  is scrolled past to reach them. Revises the four-band rule in
+  degree-explorer-rules.md.
+- [ ] **Two-part sequences in consecutive semesters** (user 2026-11-19). An
+  authored sequence field beside `row_group` (never inferred from numbers);
+  the scheduler puts part two in the next regular semester, starting in fall
+  where it can, on one row. An audit lists same-subject number-adjacent pairs
+  (HIST 491/492) as candidates to confirm.
+- [ ] **Humanities Gen Ed before STEM Gen Ed** (user 2026-11-19), unless a
+  program requirement needs it sooner: a platform default order of Gen Ed
+  areas a program can override. Math and writing stay in the first year, and
+  one science Gen Ed is placed by the end of the second year.
 - [ ] **Minors.** Pilot list (English, Spanish, History, …), placed in the top
   band, with authored overlap rules.
 - [ ] **Elective guidance.** Reviewed, major-specific suggestions kept apart

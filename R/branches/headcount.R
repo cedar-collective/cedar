@@ -1128,66 +1128,50 @@ plot_dept_program_headcount <- function(data) {
 
 #' Headcount Sparkline for Department Dashboard
 #'
-#' Creates a compact static ggplot showing term-by-term headcount for a
-#' department's major and minor programs. Faceted by student level
-#' (Undergraduate / Graduate), with separate lines for Majors and Minors.
-#' Summer terms are already excluded by \code{get_headcount_series()}.
-#' Intended for embedding in the "Explore Your Unit" dashboard summary.
+#' A compact native plotly chart of term-by-term headcount for a department's
+#' major and minor programs: one panel per student level present
+#' (Undergraduate, Graduate), a line each for Majors and Minors. Native plotly,
+#' so dark mode recolours its grid and labels (www/cedar-theme.js); it was a
+#' static ggplot whose light grid glared on the dark page. Summer terms are
+#' already excluded by \code{get_headcount_series()}.
 #'
 #' @param series Data frame returned by \code{get_headcount_series()} in
 #'   dept-dashboard.R. Columns: term, group, student_level_clean, program_cat, count.
-#' @return A ggplot object, or NULL if series is NULL/empty.
-#' @export
+#' @return A plotly object, or NULL if series is NULL/empty.
 make_headcount_sparklines <- function(series) {
-  message("[headcount.R] make_headcount_sparklines")
-
   if (is.null(series) || nrow(series) == 0) return(NULL)
-
-  # Keep only levels that have data so we don't show empty facets
-  levels_present <- unique(series$student_level_clean)
+  levels_present <- intersect(c("Undergraduate", "Graduate"), unique(series$student_level_clean))
   if (length(levels_present) == 0) return(NULL)
 
-  series <- series %>%
-    dplyr::mutate(
-      student_level_clean = factor(student_level_clean,
-                                   levels = c("Undergraduate", "Graduate")),
-      program_cat = factor(program_cat, levels = c("Majors", "Minors"))
-    )
-
-  # Build ordered factor from sorted unique terms
-  term_labels <- term_axis_levels(series$term)
-
-  series <- series %>%
-    dplyr::mutate(term_label = factor(term_code_to_axis_label(term),
-                                      levels = term_labels, ordered = TRUE))
-
-  ggplot2::ggplot(series, ggplot2::aes(
-    x     = term_label,
-    y     = count,
-    color = program_cat,
-    group = program_cat
-  )) +
-    ggplot2::geom_line(linewidth = 1) +
-    ggplot2::geom_point(size = 1.8) +
-    ggplot2::facet_wrap(~ student_level_clean,
-                        scales = "free_y",
-                        ncol   = length(levels_present)) +
-    ggplot2::scale_color_manual(
-      values = cedar_plotly_palette(CEDAR_MAJOR_MINOR_ORDER),
-      labels = c(Majors = "Majors (incl. 2nd)", Minors = "Minors"),
-      name   = NULL
-    ) +
-    ggplot2::scale_y_continuous(labels = scales::comma_format(accuracy = 1)) +
-    ggplot2::labs(x = NULL, y = NULL) +
-    ggplot2::theme_minimal(base_size = 11) +
-    ggplot2::theme(
-      axis.text.x      = ggplot2::element_text(angle = 45, hjust = 1, size = 8),
-      axis.text.y      = ggplot2::element_text(size = 8),
-      legend.position  = "top",
-      legend.text      = ggplot2::element_text(size = 9),
-      panel.grid.minor = ggplot2::element_blank(),
-      strip.text       = ggplot2::element_text(size = 10, face = "bold")
-    )
+  colors <- cedar_plotly_palette(CEDAR_MAJOR_MINOR_ORDER)
+  shown <- c(Majors = "Majors (incl. 2nd)", Minors = "Minors")
+  panels <- lapply(seq_along(levels_present), function(i) {
+    level_rows <- series[series$student_level_clean == levels_present[[i]], , drop = FALSE]
+    p <- plotly::plot_ly()
+    for (cat in intersect(names(shown), unique(as.character(level_rows$program_cat)))) {
+      d <- level_rows[level_rows$program_cat == cat, , drop = FALSE]
+      d <- d[order(d$term), , drop = FALSE]
+      p <- plotly::add_trace(p, x = term_axis_factor(d$term), y = d$count,
+        type = "scatter", mode = "lines+markers", name = unname(shown[[cat]]),
+        legendgroup = cat, showlegend = i == 1L,
+        line = list(color = unname(colors[[cat]]), width = 2),
+        marker = list(color = unname(colors[[cat]]), size = 6),
+        hovertemplate = paste0(levels_present[[i]], " ", unname(shown[[cat]]), ", %{x}: %{y:,}<extra></extra>"))
+    }
+    p
+  })
+  n <- length(panels)
+  titles <- lapply(seq_len(n), function(i) list(
+    text = paste0("<b>", levels_present[[i]], "</b>"), x = (i - 0.5) / n, y = 1.02,
+    xref = "paper", yref = "paper", xanchor = "center", yanchor = "bottom",
+    showarrow = FALSE, font = list(size = 12)))
+  fig <- if (n == 1L) panels[[1]] else plotly::subplot(panels, nrows = 1, shareY = FALSE, margin = 0.06)
+  fig |>
+    plotly::layout(annotations = titles, hovermode = "closest",
+                   legend = list(orientation = "h", x = 0.5, xanchor = "center", y = 1.25),
+                   margin = list(t = 50, b = 40, l = 40, r = 10),
+                   font = list(size = 11)) |>
+    plotly::config(displayModeBar = FALSE)
 }
 
 

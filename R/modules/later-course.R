@@ -479,7 +479,7 @@ laterCourseServer <- function(id, course, campus, students, attempts, programs, 
       opt <- list(course_x = course(), course_y = y, campus = campus(),
                   window_terms = window_terms(), min_n = as.integer(input$min_n %||% 10L),
                   data_edges = edges)
-      cedar_with_loading(session, session$ns("load"), {
+      cedar_with_loading(session, session$ns("load"), report_type = "later_course", {
         payload <- tryCatch(
           build_later_course(students, attempts, opt),
           error = function(e) {

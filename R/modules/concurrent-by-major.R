@@ -245,7 +245,7 @@ concurrentByMajorServer <- function(id, course, campus, active, registrations, s
   moduleServer(id, function(input, output, session) {
     payload <- reactive({
       req(isTRUE(active()), course(), input$term_type)
-      cedar_with_loading(session, session$ns("load"), label = "Counting the courses taken alongside…", {
+      cedar_with_loading(session, session$ns("load"), label = "Counting the courses taken alongside…", report_type = "concurrent_by_major", {
         tryCatch(
           get_concurrent_courses_by_major(registrations, student_terms, dims, list(
             course = course(), term_type = input$term_type, campus = campus(), data_edges = edges)),
@@ -259,7 +259,7 @@ concurrentByMajorServer <- function(id, course, campus, active, registrations, s
 
     pairs <- reactive({
       req(isTRUE(active()), course(), input$term_type)
-      cedar_with_loading(session, session$ns("load"), label = "Reading which courses go with failing it…", {
+      cedar_with_loading(session, session$ns("load"), label = "Reading which courses go with failing it…", report_type = "concurrent_by_major", {
         tryCatch(
           get_course_pair_dfw(attempts, student_terms, list(
             course = course(), term_type = input$term_type, campus = campus(), data_edges = edges)),

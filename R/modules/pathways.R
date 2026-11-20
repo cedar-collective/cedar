@@ -229,9 +229,13 @@ populationSelectorUI <- function(id, campus_choices, program_choices = character
       ),
       column(2,
         filter_actions(
-          actionButton(ns("build_btn"), "Define Population",
-                       class = "btn-primary",
-                       icon  = icon("users"))
+          # What it needs follows "Select population by": a preset needs nothing.
+          cedar_requires(actionButton(ns("build_btn"), "Define Population",
+                                      class = "btn-primary",
+                                      icon  = icon("users")),
+            list(preset = character(0), dept = ns("dept_code"), major = ns("program_codes"),
+                 demographic = c(ns("demo_pell"), ns("demo_first_gen"), ns("demo_time_status"))),
+            "Choose who to include first", any = TRUE, when = ns("population_type"))
         )
       )
     ),
@@ -452,7 +456,8 @@ pathwaysUI <- function(id, campus_choices, program_choices = character(),
               column(2,
                 div(class = "mt-btn",
                   actionButton(ns("so_run"), "Run", class = "btn-sm btn-primary",
-                               icon = icon("play"))
+                               icon = icon("play"), disabled = NA,
+                               title = "Runs on the population defined above")
                 )
               )
             ),
@@ -539,7 +544,8 @@ pathwaysUI <- function(id, campus_choices, program_choices = character(),
               column(1,
                 div(class = "mt-btn",
                   actionButton(ns("ct_run"), "Run", class = "btn-sm btn-primary",
-                               icon = icon("play"))
+                               icon = icon("play"), disabled = NA,
+                               title = "Runs on the population defined above")
                 )
               )
             ),
@@ -601,7 +607,8 @@ pathwaysUI <- function(id, campus_choices, program_choices = character(),
               column(1,
                 div(class = "mt-btn",
                   actionButton(ns("cp_run"), "Run", class = "btn-sm btn-primary",
-                               icon = icon("play"))
+                               icon = icon("play"), disabled = NA,
+                               title = "Runs on the population defined above")
                 )
               )
             ),
@@ -660,7 +667,8 @@ pathwaysUI <- function(id, campus_choices, program_choices = character(),
               column(2,
                 div(class = "mt-btn",
                   actionButton(ns("ge_conv_run"), "Run", class = "btn-sm btn-primary",
-                               icon = icon("play"))
+                               icon = icon("play"), disabled = NA,
+                               title = "Runs on the population defined above")
                 )
               )
             ),
@@ -1215,23 +1223,14 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
       )
     })
 
-    # Modal guard — show a blocking dialog if any Run button is clicked before a population is built
-    walk(c("so_run", "ct_run", "cp_run", "ge_conv_run"), function(btn_id) {
-      observeEvent(input[[btn_id]], {
-        if (!population_built()) {
-          showModal(cedar_info_modal(
-            title = "No population defined",
-            p("You need to define a student population before running analysis."),
-            p("Use the population filters at the top of the page:"),
-            tags$ol(
-              tags$li("Choose a selection type (Major Group, Department, etc.)"),
-              tags$li("Select your majors or filters"),
-              tags$li("Click ", tags$strong("Define Population"))
-            ),
-            close_label = "Got it"
-          ))
-        }
-      }, ignoreInit = TRUE)
+    # The subtabs' Run buttons wait for a population: disabled until Define
+    # Population has built one (server state, so the server sets them; buttons
+    # that wait on an input use cedar_requires()).
+    observe({
+      built <- isTRUE(population_built())
+      for (btn_id in c("so_run", "ct_run", "cp_run", "ge_conv_run")) {
+        updateActionButton(session, btn_id, disabled = !built)
+      }
     })
 
     # ---- Auto-run on population rebuild ----
@@ -1510,7 +1509,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
         col <- outcome_colors[[oc]] %||% "#555"
         recent_note <- if (oc == "stopped_out" && n_recent_stopped > 0) {
           tags$p(class = "text-note",
-            style = "color: #b07000;",
+            style = "color: var(--text-warning);",
             paste0(n_recent_stopped, " last appeared in ", fmt_term(prev_term),
                    " — may not have fully left yet."))
         }
@@ -1530,7 +1529,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
           recent_note
         )
       }
-      make_count_card <- function(n, label, description, color = "#1565c0",
+      make_count_card <- function(n, label, description, color = "var(--link-color)",
                                   denominator = NULL,
                                   benchmark_n = NULL,
                                   benchmark_denominator = NULL) {
@@ -1804,7 +1803,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
             name = "Within Window",
             cell = function(value) if (isTRUE(value)) "Yes" else "No",
             style = function(value) {
-              if (isTRUE(value)) list(backgroundColor = "#fff8e1", fontWeight = "600")
+              if (isTRUE(value)) list(backgroundColor = "var(--alert-warning-bg)", fontWeight = "600")
             }
           )
         )
@@ -3157,8 +3156,8 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
               paste0(format(round(value, 1), nsmall = 1), "×")
             },
             style = function(value) {
-              if (is.na(value) || value < 1.5) return(list(color = "#888"))
-              list(color = "#c62828", fontWeight = "600")
+              if (is.na(value) || value < 1.5) return(list(color = "var(--text-muted)"))
+              list(color = "var(--text-critical)", fontWeight = "600")
             })
         )
       )
