@@ -3944,14 +3944,11 @@ for (.download_key in names(.enrl_desr_view_ids)) {
     course <- input$cr_course
     if (is.null(course) || !nzchar(course))
       return(empty_state("Select a course, then click Analyze Course to view this tab."))
-    tagList(
-      subtab_header(
-        "Prepared for It",
-        paste0("Of the students in a later course, did those who passed ", course,
-               " first do better there than those who did not?"),
-        method = tagList(cedar_definition_note("course-sequence"), cr_impact_limits())
-      ),
-      laterCoursePickerUI("cr_later", "seq"),
+    dashboard_section(
+      "Did Passing It First Help?",
+      paste0("Of the later course's students, did those who passed ", course,
+             " first do better there than those who had not?"),
+      method = tagList(cedar_definition_note("course-sequence"), cr_impact_limits()),
       info_panel(
         "Settings",
         fluidRow(
@@ -4022,7 +4019,7 @@ for (.download_key in names(.enrl_desr_view_ids)) {
   }
 
   observe({
-    req(isTRUE(cr_downstream_active() %in% c("glance", "prepared")),
+    req(isTRUE(cr_downstream_active() %in% c("glance", "next_courses")),
         input$cr_course, nzchar(input$cr_course))
     y <- cr_later$course_y()
     req(length(y) > 0, all(nzchar(y)))
@@ -4073,7 +4070,7 @@ for (.download_key in names(.enrl_desr_view_ids)) {
   # breakdowns, then How Far to Trust It.
   output$cr_impact_sequence_results <- renderUI({
     result <- cr_impact_sequence_data()
-    if (is.null(result)) return(empty_state("Choose a later course above; the results follow."))
+    if (is.null(result)) return(empty_state("Choose a later course at the top of this tab; the comparison follows."))
 
     x <- result$course_x
     y_label <- paste(result$course_y, collapse = " or ")
@@ -6002,7 +5999,7 @@ for (.download_key in names(.enrl_desr_view_ids)) {
         paste0("What happens to ", course, "'s students, step by step: in the course, coming back, against students who skipped it, in the next course, and whether it prepared them."),
         method = tagList(
           tags$p("Each step is read off the view named on it, on that view's defaults, and opens it: there the same numbers come with their change over time, their breakdowns and how far to trust them. A step reads the one campus with the most students, named on it, so its numbers are never a blend of campuses."),
-          tags$p("The first two steps follow this course's own students; Against Non-Takers sets them beside similar students who did not take it. Next Courses and Prepared for It read one later course, the one both of those subtabs show. The In the Course step uses the DFW tab's grade rule and Coming Back its own; every other step the standard rule.")
+          tags$p("The first two steps follow this course's own students; Against Non-Takers sets them beside similar students who did not take it. The last two steps read one later course, the one Next Courses shows; both are on that subtab. The In the Course step uses the DFW tab's grade rule and Coming Back its own; every other step the standard rule.")
         )
       ),
       if (!is.null(rows)) div(class = "downstream-glance", lapply(seq_along(rows), function(i) .downstream_glance_card(i, rows[[i]])))
@@ -6010,10 +6007,12 @@ for (.download_key in names(.enrl_desr_view_ids)) {
   })
 
   .downstream_glance_targets <- c(in_course = "DFW", coming_back = "coming_back", non_takers = "non_takers",
-                                  next_courses = "next_courses", prepared = "prepared")
+                                  next_courses = "next_courses", prepared = "next_courses")
 
   .downstream_glance_card <- function(i, row) {
-    open_label <- if (row$step == "in_course") "Open the DFW tab \u2192" else paste0("Open ", row$title, " \u2192")
+    open_label <- if (row$step == "in_course") "Open the DFW tab \u2192"
+                  else if (row$step == "prepared") "Open Next Courses \u2192"
+                  else paste0("Open ", row$title, " \u2192")
     cedar_finding_card(
       paste0(i, ". ", row$title),
       scope = row$scope,
