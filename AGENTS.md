@@ -238,7 +238,7 @@ Every new tab is a module (`R/modules/pathways.R` is the full pattern, `headcoun
 
 - **Data lives in `data_objects`, not bare globals**; pass tables to the module server explicitly.
 - One file per module, sourced after cones; UI in `ui.R`, server in `server.R`.
-- Errors caught with `tryCatch` + `showNotification()`; slow work in `withProgress()`; large choice lists with `updateSelectizeInput(server = TRUE)`.
+- Errors caught with `tryCatch` + `showNotification()`; slow work behind `cedar_loading_overlay()`, opened by its run button or by `cedar_with_loading()` (never `withProgress()`); large choice lists with `updateSelectizeInput(server = TRUE)`.
 - An Explore tool modeled on Open Seats or Regstats copies the whole run pattern: overlay, report timer, `*_load_complete` message, URL copy, autorun.
 - **Input values match data values**: level is `"lower"`/`"upper"`/`"grad"`; map labels to values in the server.
 - **Tables are interfaces**: pick an explicit display-column order in the module.

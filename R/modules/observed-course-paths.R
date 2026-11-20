@@ -68,10 +68,9 @@ observedCoursePathsServer <- function(id, students, population, description, edg
       }
       timer <- start_report_timer("degree-paths")
       tryCatch({
-        result <- withProgress(message = "Building course paths", value = 0.5, {
-          build_population_course_paths(students, population(), groups,
-            list(campus = input$campus, max_terms = input$max_terms, data_edges = edges), description())
-        })
+        # The page's overlay is already open (its run button); no second indicator.
+        result <- build_population_course_paths(students, population(), groups,
+          list(campus = input$campus, max_terms = input$max_terms, data_edges = edges), description())
         paths(result)
         updateSelectInput(session, "detail_group", choices = c("All groups" = "all",
           stats::setNames(result$groups$group_id, result$groups$group_label)), selected = "all")

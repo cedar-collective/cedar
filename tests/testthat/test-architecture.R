@@ -353,6 +353,17 @@ test_that("transformed delivery keys retain campus", {
   expect_false(grepl('by = c\\("term", "crosslist_group"\\)', transform))
 })
 
+test_that("a page says it is working one way: the loading overlay, never withProgress()", {
+  # Two loading systems looked like two apps. Slow work runs behind
+  # cedar_loading_overlay(), opened by a run button or by
+  # cedar_with_loading(), which always closes it (ISSUES I31).
+  files <- c(r_files_under("R", "modules"), file.path(cedar_base_dir, c("server.R", "ui.R")))
+  measured <- architecture_count_by_file(files, function(file) {
+    sum(gregexpr("\\b(withProgress|setProgress|incProgress)\\(", read_code(file), perl = TRUE)[[1]] > 0L)
+  })
+  architecture_expect_ratchet(measured, integer(0), "withProgress() call(s)")
+})
+
 test_that("the standard gate owns every committed browser suite", {
   runner <- paste(readLines(file.path(cedar_base_dir, "run-tests.sh"), warn = FALSE), collapse = "\n")
   suite_line <- regmatches(runner, regexpr("suites=\\([^)]*\\)", runner, perl = TRUE))

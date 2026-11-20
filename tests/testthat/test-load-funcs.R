@@ -50,6 +50,35 @@ test_that("a start page is named by its tab and the values its link carries", {
   expect_equal(cedar_start_page_label("no-such-tab", list()), "no-such-tab")
 })
 
+test_that("work behind the loading overlay always closes it, with timing only when it returned a value", {
+  # A session that records the messages it would send to the browser.
+  sent <- list()
+  session <- list(sendCustomMessage = function(type, message) sent[[length(sent) + 1L]] <<- list(type = type, msg = message))
+
+  expect_equal(cedar_with_loading(session, "x-load", 42, label = "Reading…"), 42)
+  expect_equal(vapply(sent, `[[`, "", "type"), c("x-load_load_start", "x-load_load_complete"))
+  expect_equal(sent[[1]]$msg$label, "Reading…")
+  expect_false(sent[[2]]$msg$error)
+  expect_true(is.numeric(sent[[2]]$msg$duration_sec))
+
+  # A caught error (NULL) and an uncaught one both close it, with no timing.
+  sent <- list()
+  expect_null(cedar_with_loading(session, "x-load", NULL))
+  expect_true(sent[[2]]$msg$error)
+  expect_null(sent[[2]]$msg$duration_sec)
+  sent <- list()
+  expect_error(cedar_with_loading(session, "x-load", stop("no data")), "no data")
+  expect_equal(vapply(sent, `[[`, "", "type"), c("x-load_load_start", "x-load_load_complete"))
+  expect_true(sent[[2]]$msg$error)
+})
+
+test_that("an overlay may be opened by the server alone, but not by two triggers", {
+  expect_s3_class(cedar_loading_overlay("x-load", run_button = NULL, shiny::div("body")), "shiny.tag")
+  expect_error(cedar_loading_overlay("x-load", run_button = "go", trigger_input = "pick"), "not both")
+  # A body passed second, unnamed, would be written into the script.
+  expect_error(cedar_loading_overlay("x-load", shiny::div("body")), "input names")
+})
+
 test_that("link controller accepts bootstrap state present before its first flush", {
   domain <- shiny::MockShinySession$new()
   inputs <- shiny::reactiveValues(

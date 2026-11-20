@@ -23,7 +23,9 @@
 
 courseCohortUI <- function(id) {
   ns <- NS(id)
-  uiOutput(ns("body"))
+  # Opened by the server while it compares (cedar_with_loading()).
+  cedar_loading_overlay(ns("load"), run_button = NULL, emoji = "\U0001f332", loading_label = "Comparing takers with non-takers…",
+                        uiOutput(ns("body")))
 }
 
 #' @param course Reactive: the analysed course's id (NULL before Analyze Course).
@@ -188,7 +190,7 @@ courseCohortServer <- function(id, student_terms, attempts, programs, dims, edge
         data_edges = edges,
         college_label = if (length(college) && college %in% names(college_names)) unname(college_names[[college]]) else college
       )
-      withProgress(message = "Comparing takers with non-takers...", value = 0.3, {
+      cedar_with_loading(session, ns("load"), {
         payload <- tryCatch(
           build_course_cohort_context(student_terms, attempts, opt),
           error = function(e) {
@@ -197,7 +199,6 @@ courseCohortServer <- function(id, student_terms, attempts, programs, dims, edge
           }
         )
         if (!is.null(payload) && !is.null(programs)) {
-          setProgress(0.8, detail = "balance table")
           # The programs table may lack the demographic columns the balance
           # needs; the groups stand without it, and the page says the table is
           # missing rather than failing the comparison.
@@ -211,7 +212,6 @@ courseCohortServer <- function(id, student_terms, attempts, programs, dims, edge
           )
         }
         if (!is.null(payload) && !is.null(applicants)) {
-          setProgress(0.9, detail = "similar students")
           similar(tryCatch(
             build_course_similar_students(
               student_terms, attempts, applicants,
@@ -224,7 +224,7 @@ courseCohortServer <- function(id, student_terms, attempts, programs, dims, edge
           ))
         }
         result(payload)
-        setProgress(1)
+        payload
       })
     }
 

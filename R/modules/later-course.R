@@ -95,7 +95,9 @@ laterCourseUI <- function(id) {
       tags$p(class = "text-note", "The window also sets which later courses the list offers. Change a setting, then click Update Results."),
       description = "Within 3 regular terms, and 10 students per rate, unless changed."
     ),
-    uiOutput(ns("results"))
+    # Opened by the server while it follows students (cedar_with_loading()).
+    cedar_loading_overlay(ns("load"), run_button = NULL, emoji = "\U0001f332", loading_label = "Following students into the later course…",
+                          uiOutput(ns("results")))
   )
 }
 
@@ -477,7 +479,7 @@ laterCourseServer <- function(id, course, campus, students, attempts, programs, 
       opt <- list(course_x = course(), course_y = y, campus = campus(),
                   window_terms = window_terms(), min_n = as.integer(input$min_n %||% 10L),
                   data_edges = edges)
-      withProgress(message = "Following students into the later course…", value = 0.3, {
+      cedar_with_loading(session, session$ns("load"), {
         payload <- tryCatch(
           build_later_course(students, attempts, opt),
           error = function(e) {
@@ -486,7 +488,6 @@ laterCourseServer <- function(id, course, campus, students, attempts, programs, 
           }
         )
         if (!is.null(payload) && !is.null(programs)) {
-          setProgress(0.8, detail = "instructor balance")
           # The outcomes stand without the balance check; the page says it is
           # missing rather than failing the run.
           payload <- tryCatch(
@@ -500,7 +501,7 @@ laterCourseServer <- function(id, course, campus, students, attempts, programs, 
           )
         }
         result(payload)
-        setProgress(1)
+        payload
       })
     }
 

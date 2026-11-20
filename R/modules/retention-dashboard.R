@@ -36,6 +36,8 @@ retentionDashboardUI <- function(id, campuses) {
                                  options = list(placeholder = "Every home campus")))
       )
     ),
+    # Opened by the server while it reads (cedar_with_loading()).
+    cedar_loading_overlay(ns("load"), run_button = NULL, emoji = "\U0001f332", loading_label = "Reading who came back…",
     dashboard_section(
       "How Often Students Come Back",
       "Is the share of students who come back the next regular term rising or falling?",
@@ -65,7 +67,7 @@ retentionDashboardUI <- function(id, campuses) {
       "In which courses do students who got a D, F or withdrawal come back much less often than those who passed?",
       method = uiOutput(ns("method_courses")),
       reactable::reactableOutput(ns("courses_table"))
-    )
+    ))
   )
 }
 
@@ -107,7 +109,7 @@ retentionDashboardServer <- function(id, student_terms, attempts, degrees, dims,
     college_names <- college_code_names(dims)
     payload <- reactive({
       req(isTRUE(active()), input$term_type, input$level)
-      withProgress(message = "Reading who came back…", value = 0.4, {
+      cedar_with_loading(session, session$ns("load"), {
         tryCatch(
           build_retention_dashboard(student_terms, attempts, degrees, list(
             term_type = input$term_type, student_level = input$level,
