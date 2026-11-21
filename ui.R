@@ -356,6 +356,12 @@ cedar_home_ui <- function() {
           "user-check"
         ),
         cedar_home_card(
+          "Graduation",
+          "Where students leave without a degree, how many credits they had when they stopped, and where they stood.",
+          "?tab=graduation",
+          "graduation-cap"
+        ),
+        cedar_home_card(
           "Cancellations",
           "Review canceled courses by term, campus, department, and course level.",
           "?tab=cancellations",
@@ -1804,6 +1810,13 @@ nav_panel(
       retentionDashboardUI("retention_dashboard",
                            sort(unique(stats::na.omit(data_objects[["cedar_student_terms"]]$student_campus))))
     ), # end Retention nav_panel
+
+    nav_panel(
+      title = "Graduation",
+      icon = icon("graduation-cap"),
+      graduationUI("graduation",
+                   sort(unique(stats::na.omit(data_objects[["cedar_student_terms"]]$student_campus))))
+    ), # end Graduation nav_panel
 
     nav_panel(
       title = "Cancellations",

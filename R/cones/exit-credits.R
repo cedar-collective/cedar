@@ -118,7 +118,8 @@ get_exit_credits <- function(student_terms, programs, degrees, terms, opt = list
     summarize(recorded = first_known(overall_credits_earned),
               recorded_attempted = first_known(overall_credits_attempted),
               gpa = first_known(inst_gpa),
-              as_of = max(as_of_date), .groups = "drop")
+              # No rows, no groups: summarize() still evaluates once.
+              as_of = if (n() == 0L) as.Date(NA) else max(as_of_date), .groups = "drop")
   pell <- programs %>%
     semi_join(left, by = "student_id") %>%
     group_by(student_id) %>%
