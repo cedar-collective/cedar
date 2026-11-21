@@ -108,7 +108,7 @@ Kept until the next release, so a recurrence is recognisable; each entry below g
 
 ## I76 — Dept Trends raises a plotly "axis scaling" error in the browser
 
-**Status:** open; cause not found.
+**Status:** resolved 2026-11-21 (branch `dept-trends/axis-scaling-i76`).
 **Found:** 2026-11-21, running `./run-tests.sh --e2e dept-trends` for the
 Courses Taken course list. The same run against production, on code without
 that change, raises it too, so it predates it.
@@ -131,11 +131,19 @@ is likely a hover or drag on a figure being redrawn, not a failed first draw.
 reports `Error: Something went wrong with axis scaling`. CI does not see it:
 it runs the synthetic `demo` tour, which passes.
 
-### Fix
+### Cause and fix
 
-Find the figure (log the page error with the sub-tab open at the time). The
-usual causes are a figure drawn into a hidden, zero-width container, or an
-axis with no finite range.
+The figure was Courses Taken's grid of outside courses
+(`plot_major_course_units_course_history()`), for a campus with one or two
+courses to draw (History on ABQ has one). The page gave it 110px plus 26px a
+row; the colour scale beside the grid put its title above itself, which left
+the scale's own axis no length, and plotly stopped the whole draw: the grid
+showed as an empty frame. Redrawing the same figure in the browser with one
+ingredient removed at a time found it: without the scale, or at 170px, it drew.
+
+The scale's title now runs up its side, and a grid is never shorter than four
+rows (`major_course_grid_height()`). Not the cause, though tried first: the
+figure's margins, and a one-course axis order sent as a bare string.
 
 ## I75 — Graduation stayed blank for every session after a first visit to another page
 
