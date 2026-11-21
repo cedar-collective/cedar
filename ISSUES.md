@@ -106,6 +106,37 @@ Kept until the next release, so a recurrence is recognisable; each entry below g
 
 # Defects
 
+## I76 — Dept Trends raises a plotly "axis scaling" error in the browser
+
+**Status:** open; cause not found.
+**Found:** 2026-11-21, running `./run-tests.sh --e2e dept-trends` for the
+Courses Taken course list. The same run against production, on code without
+that change, raises it too, so it predates it.
+**Severity:** low to moderate: every step of the tour passes and the charts
+checked are drawn, but one chart on the page fails to lay out, and the tour's
+"no uncaught JS page errors" check fails, so the `dept-trends` scope cannot go
+green.
+**Affects:** some plotly figure opened by the Dept Trends tour
+(`tests/e2e/reports-smoke.test.mjs`, scope `dept-trends`, department HIST,
+campuses ABQ and EA). It fires as the Courses Taken sub-tab opens and again
+as the reader leaves it for the next one, so it is one of that tab's figures;
+which one is not yet known. Every figure on the tab is laid out with a
+finite range afterwards, and the error's stack runs through a mouse-event
+handler on a figure (`setScale` called from an SVG element's listener), so it
+is likely a hover or drag on a figure being redrawn, not a failed first draw.
+
+### Reproduce
+
+`./run-tests.sh --e2e dept-trends` on the institutional app: the last check
+reports `Error: Something went wrong with axis scaling`. CI does not see it:
+it runs the synthetic `demo` tour, which passes.
+
+### Fix
+
+Find the figure (log the page error with the sub-tab open at the time). The
+usual causes are a figure drawn into a hidden, zero-width container, or an
+axis with no finite range.
+
 ## I75 — Graduation stayed blank for every session after a first visit to another page
 
 **Status:** resolved 2026-11-21. Graduation first (PR #370), then both pages

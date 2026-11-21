@@ -410,6 +410,49 @@ gen_ed_course_ids <- function(tbl, caller = "gen_ed_course_ids") {
   course_ids_of(unlist(gen_ed_all, use.names = FALSE), keyed, caller = caller)
 }
 
+#' What a list of courses is: title, level and Gen Ed area
+#'
+#' For a page that lists courses by their id. The title and level are the
+#' course dimension's; a topics course, taught under a different title each
+#' time, is named as one. The Gen Ed list names registrar codes and is
+#' resolved to courses, so a renamed Gen Ed course is found.
+#'
+#' @param course_ids Course ids (a loaded table's `subject_course`).
+#' @param courses `cedar_courses`: `course_id`, `course_title`, `level`.
+#' @param course_codes `cedar_course_codes`: `subject_course` (the code), `course_id`.
+#' @return One row per distinct id: `subject_course`, `title`, `course_level`,
+#'   `gen_ed_area` (NA outside Gen Ed). A course the dimension does not hold
+#'   has NA title and level.
+describe_courses <- function(course_ids, courses, course_codes) {
+  for (need in list(list(courses, c("course_id", "course_title", "level"), "courses"),
+                    list(course_codes, c("subject_course", "course_id"), "course_codes"))) {
+    missing <- setdiff(need[[2]], names(need[[1]]))
+    if (length(missing) > 0) stop("[courses.R] describe_courses(): ", need[[3]], " lacks ", paste(missing, collapse = ", "), call. = FALSE)
+  }
+  gen_ed <- CEDAR_GEN_ED_COURSES %>%
+    dplyr::transmute(subject_course = course_code_ids(subject_course, course_codes), gen_ed_area = area_label) %>%
+    # CAMPUS_ROLLUP: catalog membership, the same on every campus; a course
+    # listed under two areas counts under the first listed.
+    dplyr::distinct(subject_course, .keep_all = TRUE)
+  tibble::tibble(subject_course = unique(as.character(course_ids))) %>%
+    dplyr::left_join(courses %>% dplyr::transmute(
+      subject_course = course_id,
+      title = dplyr::if_else(is_topics_course(course_title), "Topics (title varies)", course_title),
+      course_level = level), by = "subject_course") %>%
+    dplyr::left_join(gen_ed, by = "subject_course")
+}
+
+#' Registrar codes as course ids, one for one
+#'
+#' @param codes Registrar codes, current or former.
+#' @param course_codes `cedar_course_codes`: `subject_course` (the code), `course_id`.
+#' @return The course id of each code, in order; a code the data never held is its own course.
+course_code_ids <- function(codes, course_codes) {
+  codes <- as.character(codes)
+  ids <- course_codes$course_id[match(codes, course_codes$subject_course)]
+  dplyr::coalesce(ids, codes)
+}
+
 #' The codes a course has been listed under in a table
 #'
 #' @param tbl A loaded table.

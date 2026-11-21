@@ -332,12 +332,45 @@ prepare_major_course_units_top_units <- function(unit_rows, own_label, min_n = 1
            term_registrations)
 }
 
-#' The outside courses a major's students sit in, term by term
+#' Narrow a major's course rows to the ones a reader asked for
 #'
-#' @param course_rows One row per `term`, `campus` and outside course that
+#' @param course_rows Rows that name a course with `course_level` and
+#'   `gen_ed_area` (NA for a course in no Gen Ed area), and `is_own_unit`
+#'   when `taught_by` narrows them: `compute_dept_course_units_tab()`'s
+#'   `all_courses`, or Pathways' described course table.
+#' @param taught_by `"all"`, `"own"` (the members' own unit) or `"outside"`.
+#'   A course whose subject has no unit is in neither `"own"` nor `"outside"`
+#'   when the members' unit is unknown (`is_own_unit` NA), and outside otherwise.
+#' @param level Course levels to keep (`"lower"`, `"upper"`, `"grad"`); NULL keeps all.
+#' @param gen_ed `"all"`, `"gen_ed"` or `"not_gen_ed"`.
+#' @return The rows kept, columns unchanged.
+filter_major_course_rows <- function(course_rows, taught_by = "all", level = NULL, gen_ed = "all") {
+  missing <- setdiff(c(if (taught_by != "all") "is_own_unit", "course_level", "gen_ed_area"), names(course_rows))
+  if (length(missing) > 0) {
+    stop("[major-course-units.R] course_rows lacks ", paste(missing, collapse = ", "), call. = FALSE)
+  }
+  if (!taught_by %in% c("all", "own", "outside") || !gen_ed %in% c("all", "gen_ed", "not_gen_ed")) {
+    stop("[major-course-units.R] taught_by is all / own / outside and gen_ed is all / gen_ed / not_gen_ed.", call. = FALSE)
+  }
+  rows <- course_rows
+  if (taught_by == "own") rows <- rows %>% filter(is_own_unit %in% TRUE)
+  if (taught_by == "outside") rows <- rows %>% filter(is_own_unit %in% FALSE)
+  if (!is.null(level)) rows <- rows %>% filter(course_level %in% level)
+  if (gen_ed == "gen_ed") rows <- rows %>% filter(!is.na(gen_ed_area))
+  if (gen_ed == "not_gen_ed") rows <- rows %>% filter(is.na(gen_ed_area))
+  rows
+}
+
+#' The courses a major's students sit in, term by term
+#'
+#' @param course_rows One row per `term`, `campus` and course that
 #'   cleared the guard, with `subject_course`, `unit_label`, `n_students`,
 #'   `term_students`, `share_of_students` and `in_progress`, as
-#'   `compute_dept_course_units_tab()` prepares them (`outside_courses`).
+#'   `compute_dept_course_units_tab()` prepares them (`outside_courses`,
+#'   or `all_courses` for every course).
+#' @param keep Columns of `course_rows` that describe the course (its title,
+#'   level, Gen Ed area, whether its unit is the members' own), carried onto
+#'   `courses` and `table`. Each must hold one value per campus, course and unit.
 #' @param terms Every term to give a column, whether or not a course cleared
 #'   the guard in it: the terms the members hold a registration in.
 #' @param term_types The term types to keep; NULL keeps every term.
@@ -345,13 +378,16 @@ prepare_major_course_units_top_units <- function(unit_rows, own_label, min_n = 1
 #' @return A list: `terms` (the terms kept, in order), `courses` (one row per
 #'   `campus` and course: `rank` within the campus by `student_terms`, the
 #'   majors counted in the course over the terms kept, with `n_terms`, the
-#'   terms it cleared the guard in, and `top`), `cells` (the rows of
+#'   terms it cleared the guard in, `share_of_students`, those majors over
+#'   the campus's majors in the terms kept that hold a row here, `top`, and
+#'   the `keep` columns), `cells` (the rows of
 #'   `course_rows` in the terms kept) and `table` (`courses` with one
 #'   `t_<term>` column per term kept, the majors in the course that term; NA
 #'   where it did not clear the guard).
-prepare_major_course_units_course_history <- function(course_rows, terms, term_types = NULL, n_top = 15L) {
+prepare_major_course_units_course_history <- function(course_rows, terms, term_types = NULL, n_top = 15L,
+                                                      keep = character()) {
   needed <- c("term", "campus", "subject_course", "unit_label", "n_students", "term_students",
-              "share_of_students", "in_progress")
+              "share_of_students", "in_progress", keep)
   missing <- setdiff(needed, names(course_rows))
   if (length(missing) > 0) {
     stop("[major-course-units.R] course_rows lacks ", paste(missing, collapse = ", "), call. = FALSE)
@@ -365,14 +401,27 @@ prepare_major_course_units_course_history <- function(course_rows, terms, term_t
   if (anyDuplicated(cells[c("term", "campus", "subject_course", "unit_label")]) > 0L) {
     stop("[major-course-units.R] course_rows repeats a term, campus, course and unit.", call. = FALSE)
   }
+  # The campus's majors over the terms kept: each term's total once.
+  campus_members <- cells %>%
+    distinct(campus, term, term_students) %>%
+    group_by(campus) %>%
+    summarize(campus_student_terms = sum(term_students), .groups = "drop")
+  described <- cells %>% distinct(across(all_of(c("campus", "subject_course", "unit_label", keep))))
+  if (anyDuplicated(described[c("campus", "subject_course", "unit_label")]) > 0L) {
+    stop("[major-course-units.R] a `keep` column holds two values for one campus, course and unit.", call. = FALSE)
+  }
   courses <- cells %>%
     group_by(campus, subject_course, unit_label) %>%
     summarize(n_terms = n(), student_terms = sum(n_students), .groups = "drop") %>%
+    left_join(campus_members, by = "campus") %>%
+    mutate(share_of_students = student_terms / campus_student_terms) %>%
     group_by(campus) %>%
     arrange(desc(student_terms), subject_course, unit_label, .by_group = TRUE) %>%
     mutate(rank = row_number(), top = rank <= as.integer(n_top)) %>%
     ungroup() %>%
-    select(campus, rank, subject_course, unit_label, n_terms, student_terms, top)
+    left_join(described, by = c("campus", "subject_course", "unit_label")) %>%
+    select(all_of(c("campus", "rank", "subject_course", "unit_label", "n_terms", "student_terms",
+                    "share_of_students", "top", keep)))
   wide <- cells %>%
     mutate(term = factor(term, levels = terms)) %>%
     select(campus, subject_course, unit_label, term, n_students) %>%

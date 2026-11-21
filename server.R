@@ -4487,7 +4487,8 @@ for (.download_key in names(.enrl_desr_view_ids)) {
     current_term = cedar_current_term,
     error_handler = handle_error,
     scope_info_ui = dept_scope_info_ui,
-    dfw_password = dfw_password
+    dfw_password = dfw_password,
+    boards = CEDAR_DEGREE_BOARDS
   )
 
   # TRUE only when dashboard_data() was produced by the filters currently on
@@ -5906,7 +5907,9 @@ for (.download_key in names(.enrl_desr_view_ids)) {
                  program_choices = cedar_pathways_choices$program_choices,
                  dept_choices = cedar_pathways_choices$dept_choices,
                  edges = data_objects[["cedar_edges"]], pathway_groups = CEDAR_PATHWAY_SUBJECT_GROUPS,
-                 instructor_access = dfw_authenticated, instructor_password = dfw_password)
+                 instructor_access = dfw_authenticated, instructor_password = dfw_password,
+                 courses = data_objects[["cedar_courses"]], course_codes = data_objects[["cedar_course_codes"]],
+                 boards = CEDAR_DEGREE_BOARDS)
 
   degreeExplorerServer("degree_explorer", CEDAR_DEGREE_BOARDS$catalog, CEDAR_DEGREE_BOARDS$roadmaps, status = CEDAR_DEGREE_BOARDS$status,
     colleges = CEDAR_DEGREE_BOARDS$colleges,

@@ -287,8 +287,13 @@ Page-level legibility is [M43](ISSUES.md)–M48; these are the new pieces.
   had no answer. The cone now reads any major by its code (PR #328; own-unit
   share blank). Left: show it on Pathways for the majors its Major picker
   already offers (Undecided among them; `cedar_programs` holds its
-  declarations), with no picker of its own, and list the unit's own courses
-  course by course beside the outside ones.
+  declarations), with no picker of its own. The unit's own courses are now
+  listed course by course beside the outside ones, with level and Gen Ed
+  filters, and the courses a compiled degree plan names are marked (Every
+  Course These Majors Take, 2026-11-21). Pathways > Course paths lists the
+  same descriptions on its course table (2026-11-21). Open: a plan written
+  with a course's new number marks nothing until the renumbering is confirmed
+  in `code_history.csv` (Computer Science's lower-level courses).
 - [ ] **The mapping assistant proposes ADCW for a branch-only code.**
   `scripts/propose-mappings.R` stops at "no evidence settles the unit" for a
   subject or program whose only source department is the Provost Branch

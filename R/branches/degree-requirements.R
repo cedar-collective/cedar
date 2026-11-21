@@ -34,6 +34,39 @@ degree_named_requirements <- function(roadmaps, catalog_ids) {
   list(courses = tibble::as_tibble(courses), not_read = not_read)
 }
 
+#' The courses the degree plans of some majors name as required
+#'
+#' A plan is keyed on Banner's degree program (`BA-HIST-AS`); a page that
+#' reads students by major code finds the plans through the declarations,
+#' which carry both. Only named requirements mark a course
+#' (`degree_named_requirements()`): a choice, an elective or a Gen Ed slot
+#' names none.
+#'
+#' @param boards `publish_degree_drafts()` output (`catalog`, `roadmaps`).
+#' @param major_codes The majors read.
+#' @param declarations `cedar_programs`: `major_code`, `program_code`.
+#' @param course_codes `cedar_course_codes`, to resolve the plans' codes to courses.
+#' @return list(`courses`: `subject_course` (the course id), `in_plan` (the
+#'   plans naming it, by label, joined with "; "); `plans`: the labels of the
+#'   plans read, sorted).
+degree_plan_course_marks <- function(boards, major_codes, declarations, course_codes) {
+  missing <- setdiff(c("major_code", "program_code"), names(declarations))
+  if (length(missing) > 0) stop("[degree-requirements.R] the declarations lack ", paste(missing, collapse = ", "), call. = FALSE)
+  degree_programs <- unique(declarations$program_code[declarations$major_code %in% major_codes &
+                                                        !is.na(declarations$program_code)])
+  keyed <- boards$catalog$program_codes
+  plan_ids <- unique(keyed$catalog_id[keyed$program_code %in% degree_programs])
+  labels <- boards$catalog$catalogs$degree_label[match(plan_ids, boards$catalog$catalogs$catalog_id)]
+  courses <- degree_named_requirements(boards$roadmaps, plan_ids)$courses %>%
+    transmute(subject_course = course_code_ids(subject_course, course_codes),
+              plan = labels[match(catalog_id, plan_ids)]) %>%
+    distinct() %>%
+    # CAMPUS_ROLLUP: a degree plan names a course, not a campus's offering of it.
+    group_by(subject_course) %>%
+    summarize(in_plan = paste(sort(plan), collapse = "; "), .groups = "drop")
+  list(courses = courses, plans = sort(labels))
+}
+
 #' The degree picker's choices, alphabetical by label; with `status`
 #' (publish_degree_drafts()), a draft board says so.
 #'
@@ -154,12 +187,15 @@ attach_pathway_groups <- function(rows, groups) {
 #'
 #' @param paths get_grouped_student_paths() output.
 #' @param group_id A group's id, or "all".
+#' @param descriptions Optional: one row per `subject_course` with columns
+#'   that describe it (`describe_courses()`, with `in_plan` joined), carried
+#'   onto each row after `subject_course`.
 #' @return Tibble: `campus`, `group_id`, `group_label`, `subject_course`,
 #'   `peak_pct` (the course's largest share in any term), then for each term
 #'   k in 1..`paths$meta$max_terms`, `term_k` (percent of that campus's
 #'   students that term, NA where the course had too few) and `n_k` (its
 #'   students). Rows run by group, campus, then largest share first.
-degree_path_course_table <- function(paths, group_id = "all") {
+degree_path_course_table <- function(paths, group_id = "all", descriptions = NULL) {
   needed <- c("campus", "relative_term", "group_id", "group_label", "subject_course", "n_students", "pct_students")
   missing <- setdiff(needed, names(paths$courses))
   if (length(missing)) stop("[degree-requirements.R] Course detail missing: ", paste(missing, collapse = ", "))
@@ -176,9 +212,17 @@ degree_path_course_table <- function(paths, group_id = "all") {
   }
   pct_cols <- paste0("term_", terms)
   wide$peak_pct <- if (nrow(wide)) apply(as.matrix(wide[pct_cols]), 1, max, na.rm = TRUE) else numeric(0)
-  wide %>%
+  table <- wide %>%
     select(all_of(key), peak_pct, all_of(as.vector(rbind(pct_cols, paste0("n_", terms))))) %>%
     arrange(group_label, campus, desc(peak_pct), subject_course)
+  if (is.null(descriptions)) return(table)
+  if (!"subject_course" %in% names(descriptions) || anyDuplicated(descriptions$subject_course) > 0L) {
+    stop("[degree-requirements.R] descriptions must hold one row per subject_course")
+  }
+  # CAMPUS_ROLLUP: a description is the course's, the same on every campus.
+  table %>%
+    left_join(descriptions, by = "subject_course") %>%
+    relocate(all_of(setdiff(names(descriptions), "subject_course")), .after = subject_course)
 }
 
 #' Schedule one selected route using prerequisite timing and authored semester floors

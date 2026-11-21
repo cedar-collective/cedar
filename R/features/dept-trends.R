@@ -751,15 +751,21 @@ rebuild_dept_credit_hours_tab <- function(cached, base) {
 #'   as bars (`prepare_major_course_units_top_units()`), under the same
 #'   labels; `outside_courses`: per term, campus and course outside the unit
 #'   with `min_n` members in it, the members in it and their share of that
-#'   term's members on the campus), `plots` (`top_units`: one plotly per
+#'   term's members on the campus; `all_courses`: the same rows for every
+#'   course, the unit's own among them, with `is_own_unit`, the course's
+#'   `title` and `course_level` (the course dimension), `gen_ed_area` (NA
+#'   outside Gen Ed) and `in_plan` (the degree plans of these majors that name
+#'   the course as required, from `boards`; NA for none), which the page narrows with
+#'   `filter_major_course_rows()`), `plots` (`top_units`: one plotly per
 #'   campus with `min_n` members in the latest term, a bar in its college's
 #'   colour) and `meta` (`chart_campuses`: the campuses with `min_n` members
 #'   in some term, which the over-time charts draw). The over-time charts are
 #'   drawn by the page from `own_share`, `by_college` and `outside_courses`,
 #'   for the term types its reader ticks.
 compute_dept_course_units_tab <- function(base, data_objects, campus_filter = NULL, min_n = 10L,
-                                          program_code = NULL, n_outside = 15L, n_top = 8L) {
-  for (key in c("cedar_student_terms", "cedar_registrations", "cedar_dims", "cedar_edges")) {
+                                          program_code = NULL, n_outside = 15L, n_top = 8L, boards = NULL) {
+  for (key in c("cedar_student_terms", "cedar_registrations", "cedar_dims", "cedar_edges", "cedar_courses",
+                "cedar_course_codes", if (!is.null(boards)) "cedar_programs")) {
     if (is.null(data_objects[[key]])) stop("[dept-trends.R] compute_dept_course_units_tab: data_objects lacks ", key)
   }
   if (is.null(base$dept_code) || !nzchar(base$dept_code)) stop("[dept-trends.R] base$dept_code is required")
@@ -899,14 +905,34 @@ compute_dept_course_units_tab <- function(base, data_objects, campus_filter = NU
     data_objects[["cedar_student_terms"]], data_objects[["cedar_registrations"]],
     list(dept_code = base$dept_code, campus = campus_filter, min_n = 1L, program_code = program_code,
          grain = "course", include_in_progress = TRUE, data_edges = data_objects[["cedar_edges"]])
-  ) %>% filter(!is_own_unit)
-  outside_courses <- courses %>%
+  )
+  # Every course, the unit's own among them, described for the page's list
+  # (describe_courses()): title, level, Gen Ed area.
+  # CAMPUS_ROLLUP: the descriptions and plan marks are a course's, the same on
+  # every campus; the rows they are joined to keep their campus.
+  course_facts <- describe_courses(courses$subject_course, data_objects[["cedar_courses"]],
+                                   data_objects[["cedar_course_codes"]])
+  # The degree plans of these majors, and the courses each names as required.
+  marks <- if (is.null(boards)) list(courses = tibble::tibble(subject_course = character(), in_plan = character()),
+                                     plans = character(0))
+           else degree_plan_course_marks(boards, program_code %||% programs$program_code,
+                                         data_objects[["cedar_programs"]], data_objects[["cedar_course_codes"]])
+  plan_courses <- marks$courses
+  plans <- marks$plans
+  all_courses <- courses %>%
     filter(n_students >= min_n) %>%
     left_join(unit_labels, by = "dept_code") %>%
     mutate(unit_label = case_when(is.na(dept_code) ~ no_unit, is.na(dept_name) ~ dept_code, TRUE ~ dept_name)) %>%
-    select(term, campus, in_progress, subject_course, unit_label, dept_code,
-           n_students, term_students, share_of_students) %>%
+    left_join(course_facts, by = "subject_course") %>%
+    left_join(plan_courses, by = "subject_course") %>%
+    select(term, campus, in_progress, subject_course, title, unit_label, dept_code, is_own_unit, course_level,
+           gen_ed_area, in_plan, n_students, term_students, share_of_students) %>%
     arrange(term, campus, desc(n_students), subject_course)
+  # The seats another unit's schedule supplies: the same rows, the own unit's out.
+  outside_courses <- all_courses %>%
+    filter(!is_own_unit) %>%
+    select(term, campus, in_progress, subject_course, unit_label, dept_code,
+           n_students, term_students, share_of_students)
 
   # A chart is drawn for a campus that has min_n members to read: in some
   # term for the series, in the latest term for its bars. A smaller campus is
@@ -919,7 +945,7 @@ compute_dept_course_units_tab <- function(base, data_objects, campus_filter = NU
 
   list(
     tables = list(own_share = own_share, by_college = by_college, latest_units = latest_units,
-                  top_units = top_units, outside_courses = outside_courses),
+                  top_units = top_units, outside_courses = outside_courses, all_courses = all_courses),
     plots = list(top_units = plot_major_course_units_top_units(top_units, college_colors)),
     meta = list(
       dept_code = base$dept_code,
@@ -927,6 +953,8 @@ compute_dept_course_units_tab <- function(base, data_objects, campus_filter = NU
       member_name = member_name,
       program_code = program_code,
       programs = programs,
+      # The degree plans read for these majors (labels); none without `boards`.
+      plans = plans,
       edge = attr(result, "edge"),
       window_end = window_end,
       latest_term = latest,
