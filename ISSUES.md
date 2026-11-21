@@ -120,7 +120,10 @@ green.
 (`tests/e2e/reports-smoke.test.mjs`, scope `dept-trends`, department HIST,
 campuses ABQ and EA). It fires as the Courses Taken sub-tab opens and again
 as the reader leaves it for the next one, so it is one of that tab's figures;
-which one is not yet known.
+which one is not yet known. Every figure on the tab is laid out with a
+finite range afterwards, and the error's stack runs through a mouse-event
+handler on a figure (`setScale` called from an SVG element's listener), so it
+is likely a hover or drag on a figure being redrawn, not a failed first draw.
 
 ### Reproduce
 
