@@ -152,6 +152,7 @@ CEDAR_TAB_SLUGS <- c(
   "cancellations"      = "Cancellations",
   "dfw-rates"          = "DFW Rates",
   "retention"          = "Retention",
+  "graduation"         = "Graduation",
   "data-usage"         = "Data & Usage",
   "changelog"          = "Changelog",
 
