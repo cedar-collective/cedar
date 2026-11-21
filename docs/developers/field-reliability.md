@@ -96,6 +96,46 @@ a clear label is not.
 
 `relative_term` (terms enrolled) needs no credit data at all and stays populated to the tail, but measures time at UNM rather than degree progress, and normally requires an `opt$start_classification` filter against left truncation — unnecessary for a cohort *defined* as starting inside the window, e.g. `get_gen_ed_grad_cohort()`.
 
+### A student who has stopped: the one read of a stamped total for a past term
+
+Decided 2026-11-20, for "how far along were the students who left without a
+degree" (`get_exit_credits()`, `R/cones/exit-credits.R`).
+
+A pull-stamped total is wrong for a past term because the student kept
+earning after it. A student whose last enrolled term is behind them did not:
+the total stamped on that last term's record is the total they left with.
+The UNM-only running total cannot stand in for it. It leaves out transfer and
+test credit, and the typical bachelor's graduate shows well under 120 on it.
+
+So, **for a student who has left, and only on their last term's row**,
+`overall_credits_earned`, `overall_credits_attempted` and `inst_gpa` may be
+read as what the student left with. The conditions, all of them:
+
+- **Left is observed, not assumed.** Two regular terms after the last term
+  are settled with no enrollment, and the last term is at or before the
+  degree edge. A last term past either is not judged.
+- **The last term's row only.** Never an earlier term of the same student,
+  and never any row of a student still enrolled.
+- **The pull date is read.** A record pulled before the next regular term
+  began does not hold the last term's own credits; the class list's completed
+  and attempted credits for that term are added and the row says so
+  (`credits_basis`). A pull that falls between the end of a term and the
+  start of the next would count that term twice; no pull so far has.
+- **The page says what it is**: the credits on record when the student
+  stopped, not a per-term measurement.
+- **Never matched on.** It bands and describes; it is not a covariate.
+
+What this does not settle: the stamp is trusted to be the registrar's total
+at the pull. It has not been checked against a second pull for departed
+students (the measured verdict above notes that students who had stopped
+accruing are the ones whose totals did not drift, which is the right
+direction, and is not a test).
+
+**The page as a whole is due a reassessment.** It grew out of one audit and
+states its verdicts more firmly than it documents how each was measured. The
+open work is in `ROADMAP.md`: restate each field's verdict with the
+measurement behind it, and re-measure on two current pulls.
+
 ### Small-cell guards are mandatory on any progress axis
 
 Eligibility thins sharply toward the far end of every one of these axes. `pct_pop` will report one student over four eligible as "25%", visually identical to a 23% built on 101. Guard the **band** (minimum students who reached it) and the **cell** (minimum students in it) separately — they fail differently. `get_gen_ed_grad_profile()`'s `min_band_n` / `min_n` are the worked example.
