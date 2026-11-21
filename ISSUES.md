@@ -122,10 +122,10 @@ classes look consistent with one another.
 A transfer student's credits brought are `overall_credits_attempted -
 inst_credits_attempted`, read off rows stamped at each pull. For the Fall 2025
 transfer class (ABQ undergraduates), read a year on, the band that brought
-under 30 credits shows about 62% not enrolled, where the five classes before it
-show 23% to 28%; the 30-to-59 band shows about 14%, where earlier classes show
-22% to 27%. A class does not differ that much by band from one year to the
-next.
+under 30 credits shows more than twice the not-enrolled share of the five
+classes before it, and the 30-to-59 band shows about half of theirs; the
+earlier classes agree with one another within a few points. A class does not
+differ that much by band from one year to the next.
 
 The likely cause: a student who left before their transfer credit was posted
 has only early stamps, with little or no credit brought, and lands in the
