@@ -144,6 +144,7 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
   source_file("cones/return-rates.R")  # how often enrolled students come back the next regular term
   source_file("cones/entering-class-retention.R")  # each entering class's share still here 1..n regular terms later
   source_file("cones/exit-credits.R")  # students who left without a degree, by credits at their last term
+  source_file("cones/exit-requirements.R")  # of those students, who passed each course their plan requires
   source_file("cones/course-outcomes.R")
   source_file("cones/pathway.R")               # course timing + curriculum map
   source_file("cones/course-pairs.R")          # ordered A->B course sequences

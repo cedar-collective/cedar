@@ -1,3 +1,32 @@
+# XC01: with attempts and boards the payload counts each plan's required courses
+
+    Code
+      cat(format_graduation_dashboard(p)[-(1:25)], sep = "\n")
+    Output
+      ## By major
+                                                   Left     120+  Standards   Pell
+        Anthropology                                  2        0          0      2
+        History                                       2        2          1      1
+      
+      ## The courses their plan names, and what they did in them here
+      Half of these students left with 119 credits or more, and half had earned 119 or fewer of them here. 1 of 4 earned most of their credits somewhere else, so a course with no attempt here may have been met there.
+      4 of the 4 students who left without a degree with 90 credits or more were in a program with a degree plan on file; 0 were not. Plans with fewer than 2 such students are not listed: 0 (0 students).
+      Passed: a passing grade here in the course. Tried: a grade or late withdrawal here, never a pass.
+      None: no attempt here, which is not the same as still required. -- : no one had taken a course under this code by then.
+      
+      ### Anthropology B.A.
+      2 students in this program left without a degree with 90 credits or more, 1 of them pre-majors. Not read: 0 choices and elective slots.
+        Course                   Passed    Tried     None
+        ANTH 101                      0        1        1
+      
+      ### History B.A.
+      2 students in this program left without a degree with 90 credits or more, 0 of them pre-majors. Not read: 2 choices and elective slots; 1 course no one had taken under the plan's number by then.
+        Course                   Passed    Tried     None
+        HIST 1101                     2        0        0
+        HIST 201                      1        0        1
+        HIST 201L                     0        1        1
+        HIST 900                     --       --       --
+
 # XC01: the page's words
 
     Code

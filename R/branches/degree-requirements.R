@@ -6,6 +6,34 @@
 # docs/developers/degree-explorer-rules.md; contract:
 # docs/developers/degree-requirements.md.
 
+#' The courses each board names as required, one row per course
+#'
+#' A requirement here is a board tile with courses of its own and no
+#' alternatives: one named course, or a lecture and lab required together
+#' (a row each, sharing the tile's title).
+#' Choices, elective and Gen Ed space, preparation courses and the math and
+#' English entry routes are not named requirements and are counted in
+#' `not_read`, never guessed at. Reads the boards only.
+#'
+#' @param roadmaps The boards (`publish_degree_drafts()$roadmaps`).
+#' @param catalog_ids The degrees wanted.
+#' @return list(`courses`: `catalog_id`, `requirement_id` (the tile),
+#'   `title`, `semester`, `subject_course`; `not_read`: `catalog_id`,
+#'   `n_not_read`, the board's other main-track tiles).
+degree_named_requirements <- function(roadmaps, catalog_ids) {
+  key <- function(df) paste(df$catalog_id, df$node_id)
+  nodes <- roadmaps$nodes[roadmaps$nodes$catalog_id %in% catalog_ids & roadmaps$nodes$track == "main", ]
+  components <- roadmaps$courses[roadmaps$courses$catalog_id %in% catalog_ids, ]
+  named <- key(nodes) %in% key(components) & !key(nodes) %in% key(roadmaps$options) &
+    nodes$kind != "preparation"
+  courses <- nodes[named, ] %>%
+    transmute(catalog_id, requirement_id = node_id, title, semester = as.integer(semester)) %>%
+    inner_join(components %>% transmute(catalog_id, requirement_id = node_id, subject_course),
+               by = c("catalog_id", "requirement_id"), relationship = "one-to-many")
+  not_read <- tibble::tibble(catalog_id = nodes$catalog_id[!named]) %>% count(catalog_id, name = "n_not_read")
+  list(courses = tibble::as_tibble(courses), not_read = not_read)
+}
+
 #' The degree picker's choices, alphabetical by label; with `status`
 #' (publish_degree_drafts()), a draft board says so.
 #'

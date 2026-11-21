@@ -35,6 +35,20 @@ test_that("XC01: the far-along students are counted by term, college and major",
                "lacks is_pre_major")
 })
 
+test_that("XC01: with attempts and boards the payload counts each plan's required courses", {
+  p <- build_graduation_dashboard(xc01$student_terms, xc01$programs, xc01$degrees, xc01$terms, test_dims,
+                                  c(xc01$opt, list(line = 90, min_list = 2L)), attempts = xc01$attempts,
+                                  boards = xc01$boards)
+  t <- graduation_required_table(p)
+  expect_equal(t$plan, c("Anthropology B.A.", rep("History B.A.", 4)))
+  expect_equal(t$n_tried, c(1L, 0L, 0L, 1L, NA))
+  expect_equal(p$required$programs$n_not_read, c(0L, 2L))
+  # X-A earned 40 of 100 here; the other three all of theirs.
+  expect_equal(c(p$meta$n_far_here_known, p$meta$n_far_mostly_elsewhere), c(4L, 1L))
+  expect_equal(c(p$meta$median_credits, p$meta$median_credits_here), c(119, 119))
+  expect_snapshot(cat(format_graduation_dashboard(p)[-(1:25)], sep = "\n"))
+})
+
 test_that("XC01: the page's words", {
   p <- build_graduation_dashboard(xc01$student_terms, xc01$programs, xc01$degrees, xc01$terms, test_dims,
                                   c(xc01$opt, list(line = 90, min_list = 2L)))

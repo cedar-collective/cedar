@@ -2051,6 +2051,21 @@ ec01 <- local({
 #        edge, so not yet a degree. 120 or more.
 # Eight judged last terms: one with a degree, seven left. X-B and X-K are
 # History majors, the rest Anthropology; every one in college AS.
+# Programs that term: X-B and X-K BA-HIST-AS, X-J BA-ANTH-AS, the rest the
+# Anthropology pre-major BA-FANT-AS. X-A brought 60 of their credits from
+# elsewhere; everyone else earned all of theirs here.
+# Two degree plans (`boards`), and what the four students who left with 90
+# credits or more did in the courses each names (`attempts`):
+#   hist-ba  HIST 1101 (the course HIST 101, renumbered): X-B passed it; X-K
+#              failed it at ABQ and passed it at EA under the new number.
+#            HIST 201 + HIST 201L, required together, a row each: X-B
+#              passed the lecture and failed the lab; X-K took neither.
+#            HIST 900: its first grade is in Fall 2022, after the latest last
+#              term here (not readable).
+#            one open choice tile (not read).
+#   anth-ba  ANTH 101: X-A failed it (tried); X-J dropped it early (none).
+# X-A also passed HIST 1101, which is not in their plan, and X-C (under 30
+# credits) passed ANTH 101.
 xc01 <- local({
   last <- c(`X-A` = 202110L, `X-B` = 202110L, `X-C` = 202080L, `X-D` = 202110L, `X-E` = 202210L,
             `X-F` = 202280L, `X-H` = 202110L, `X-I` = 202110L, `X-J` = 202110L, `X-K` = 202110L)
@@ -2063,7 +2078,10 @@ xc01 <- local({
     lapply(names(last), function(id) row(id, last[[id]])),
     row("X-J", 202010L), row("X-G", 202080L), row("X-G", 202180L, "GR"))
   stamp <- function(id, term, earned, attempted, gpa, pell, as_of = "2022-06-01") tibble::tibble(
-    student_id = id, term = term, overall_credits_earned = earned,
+    student_id = id, term = term,
+    program_code = if (id %in% c("X-K", "X-B")) "BA-HIST-AS" else if (id == "X-J") "BA-ANTH-AS" else "BA-FANT-AS",
+    # X-A brought 60 credits from elsewhere; everyone else earned all of theirs here.
+    inst_credits_earned = if (id == "X-A") earned - 60 else earned, overall_credits_earned = earned,
     overall_credits_attempted = attempted, inst_gpa = gpa, pell_eligible = pell,
     as_of_date = as.Date(as_of))
   programs <- dplyr::bind_rows(
@@ -2080,6 +2098,46 @@ xc01 <- local({
     terms = tibble::tibble(term = c(202080L, 202110L, 202180L, 202210L, 202280L),
                            start_date = as.Date(c("2020-08-17", "2021-01-19", "2021-08-23",
                                                   "2022-01-18", "2022-08-22"))),
+    attempts = tibble::tribble(
+      ~student_id, ~term,   ~campus, ~subject_course, ~listed_code, ~outcome,
+      "X-B",       202080L, "ABQ",   "HIST 101",      "HIST 101",   "pass",
+      "X-B",       202080L, "ABQ",   "HIST 201",      "HIST 201",   "pass",
+      "X-B",       202080L, "ABQ",   "HIST 201L",     "HIST 201L",  "dfw",
+      "X-K",       202080L, "ABQ",   "HIST 101",      "HIST 101",   "dfw",
+      "X-K",       202110L, "EA",    "HIST 101",      "HIST 1101",  "pass",
+      "X-A",       202080L, "ABQ",   "ANTH 101",      "ANTH 101",   "dfw",
+      "X-A",       202080L, "ABQ",   "HIST 101",      "HIST 101",   "pass",
+      "X-J",       202010L, "ABQ",   "ANTH 101",      "ANTH 101",   NA,
+      "X-C",       202080L, "ABQ",   "ANTH 101",      "ANTH 101",   "pass",
+      "X-F",       202280L, "ABQ",   "HIST 900",      "HIST 900",   "pass"),
+    boards = list(
+      catalog = list(
+        catalogs = tibble::tibble(catalog_id = c("hist-ba", "anth-ba"),
+                                  degree_label = c("History B.A.", "Anthropology B.A.")),
+        program_codes = tibble::tibble(
+          catalog_id = c("hist-ba", "hist-ba", "anth-ba", "anth-ba"),
+          program_code = c("BA-HIST-AS", "BA-FHIS-AS", "BA-ANTH-AS", "BA-FANT-AS"),
+          is_pre_major = c(FALSE, TRUE, FALSE, TRUE))),
+      roadmaps = list(
+        nodes = tibble::tribble(
+          ~catalog_id, ~node_id,  ~track, ~kind,         ~code,              ~title,              ~semester,
+          "hist-ba",   "survey",  "main", "major",       "HIST 1101",        "Survey",            1L,
+          "hist-ba",   "methods", "main", "major",       "HIST 201 + 201L",  "Methods and lab",   3L,
+          "hist-ba",   "new",     "main", "major",       "HIST 900",         "New seminar",       7L,
+          "hist-ba",   "upper",   "main", "choice",      "HIST 300-499",     "Upper-level",       5L,
+          "hist-ba",   "prep",    "main", "preparation", "HIST 100",         "Preparation",       1L,
+          "anth-ba",   "intro",   "main", "major",       "ANTH 101",         "Introduction",      1L,
+          "*",         "math",    "math", "support",     "MATH 101",         "Math",              1L),
+        courses = tibble::tribble(
+          ~catalog_id, ~node_id,  ~subject_course,
+          "hist-ba",   "survey",  "HIST 1101",
+          "hist-ba",   "methods", "HIST 201",
+          "hist-ba",   "methods", "HIST 201L",
+          "hist-ba",   "new",     "HIST 900",
+          "hist-ba",   "prep",    "HIST 100",
+          "anth-ba",   "intro",   "ANTH 101",
+          "*",         "math",    "MATH 101"),
+        options = tibble::tibble(catalog_id = character(), node_id = character()))),
     edges = list(last_enrolled_complete = 202280L, last_graded = 202280L, last_degree = 202280L),
     # Undergraduates, no small-cell guard, read through those edges.
     opt = list(student_level = "UG", min_n = 1L,

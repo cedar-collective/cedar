@@ -4,7 +4,8 @@
 # students whose last enrolled term is behind them and who hold no degree: how
 # many credits they had when they stopped, when they stopped, where they stood
 # against the general standards for aid, and which colleges and majors the
-# far-along ones were in.
+# far-along ones were in, and in the courses their program's degree plan
+# names, how many tried here and never passed.
 #
 # The module holds no analysis: it collects the level, the home campuses and
 # the credit line, calls build_graduation_dashboard()
@@ -13,7 +14,7 @@
 #
 # Exported functions:
 #   graduationUI(id, campuses)
-#   graduationServer(id, student_terms, programs, degrees, terms, dims, edges, active)
+#   graduationServer(id, student_terms, programs, degrees, terms, dims, edges, active, attempts, boards)
 
 graduationUI <- function(id, campuses) {
   ns <- NS(id)
@@ -61,6 +62,16 @@ graduationUI <- function(id, campuses) {
                            reactable::reactableOutput(ns("college_table"))),
       dashboard_subsection("Major", "The student's primary major in their last term, with its code: two majors may share a name.",
                            reactable::reactableOutput(ns("major_table")))
+    ),
+    dashboard_section(
+      "The Courses Their Program Requires",
+      "Of the far-along students who left without a degree, how many had tried each course their program requires here and never passed it?",
+      method = uiOutput(ns("method_required")),
+      uiOutput(ns("required_lead")),
+      selectInput(ns("plan"), "Degree plan", choices = NULL, width = "100%"),
+      uiOutput(ns("plan_note")),
+      plotly::plotlyOutput(ns("required_plot"), height = "auto"),
+      reactable::reactableOutput(ns("required_table"))
     ))
   )
 }
@@ -87,7 +98,8 @@ graduationUI <- function(id, campuses) {
 
 # student_terms, programs, degrees, terms, dims, edges   the loaded tables and edges.
 # active   reactive: TRUE while the tab is open.
-graduationServer <- function(id, student_terms, programs, degrees, terms, dims, edges, active) {
+# attempts, boards   cedar_attempts and the degree boards (publish_degree_drafts()).
+graduationServer <- function(id, student_terms, programs, degrees, terms, dims, edges, active, attempts, boards) {
   moduleServer(id, function(input, output, session) {
     payload <- reactive({
       req(isTRUE(active()), input$level, input$line)
@@ -95,7 +107,7 @@ graduationServer <- function(id, student_terms, programs, degrees, terms, dims, 
         tryCatch(
           build_graduation_dashboard(student_terms, programs, degrees, terms, dims, list(
             student_level = input$level, campus = if (length(input$campus) > 0) input$campus else NULL,
-            line = as.numeric(input$line), data_edges = edges)),
+            line = as.numeric(input$line), data_edges = edges), attempts = attempts, boards = boards),
           error = function(e) {
             showNotification(paste("Graduation:", conditionMessage(e)), type = "error", duration = 10)
             NULL
@@ -187,7 +199,63 @@ graduationServer <- function(id, student_terms, programs, degrees, terms, dims, 
                        "below the GPA line or at the credit line above.")),
         tags$li(paste0("A major with fewer than ", m$min_list, " such students is not named: ", n(m$n_majors_pooled),
                        " are counted together as all other majors.")),
-        tags$li("What each student's major still required is not shown yet: it needs a reviewed requirement file for the program."))
+        tags$li("The courses these students' programs require are in the next section, for the programs with a degree plan on file."))
+    })
+
+    # The plans with enough students to list, largest first.
+    plans <- reactive({
+      p <- payload(); req(has_rows(p))
+      shown <- p$required$programs[p$required$programs$shown, ]
+      stats::setNames(shown$catalog_id, paste0(shown$label, " (", n(shown$n_students), " students)"))
+    })
+    observeEvent(plans(), {
+      keep <- if (isTRUE(input$plan %in% plans())) input$plan else if (length(plans()) > 0L) plans()[[1]] else character(0)
+      updateSelectInput(session, "plan", choices = plans(), selected = keep)
+    })
+    plan <- reactive({ req(length(plans()) > 0L, input$plan %in% plans()); input$plan })
+    output$required_lead <- renderUI({
+      p <- payload(); req(has_rows(p))
+      tagList(lead_text(graduation_credit_source_note(p)), tags$p(graduation_required_lead(p)),
+              if (length(plans()) == 0L) empty_state("No degree plan has enough of these students to list."))
+    })
+    output$plan_note <- renderUI(tags$p(graduation_plan_note(payload(), plan())))
+    output$required_plot <- plotly::renderPlotly({
+      p <- payload(); id <- plan()
+      req(any(p$required$courses$readable[p$required$courses$catalog_id == id]))
+      plot_exit_required(p, id)
+    })
+    output$required_table <- reactable::renderReactable({
+      p <- payload(); id <- plan()
+      rows <- p$required$courses[p$required$courses$catalog_id == id, ]
+      shown <- data.frame(course = rows$subject_course, title = rows$title, tried = rows$n_tried,
+                          passed = rows$n_passed, none = rows$n_none, stringsAsFactors = FALSE)
+      reactable::reactable(shown, theme = cedar_tbl_theme, compact = TRUE, striped = TRUE, pagination = FALSE,
+        columns = list(
+          course = reactable::colDef(name = "Course", minWidth = 110),
+          title = reactable::colDef(name = "Title", minWidth = 220),
+          tried = cedar_count_coldef("Tried here, never passed"),
+          passed = cedar_count_coldef("Passed here"),
+          none = cedar_count_coldef("No attempt here")))
+    })
+    output$method_required <- renderUI({
+      p <- payload(); req(has_rows(p))
+      m <- p$required$meta
+      tags$ul(
+        tags$li(paste0("Everyone counted here left without a degree with ", p$meta$line, " credits or more. A count is ",
+                       "how many of them had that history in the course, not how many of the course's students ",
+                       "went on to leave, and it does not say the course is why they left.")),
+        tags$li(paste0("A student's program is the one on their last term's record, matched to its degree plan; a ",
+                       "pre-major counts under the plan it leads to, and a student with two majors under each. The ",
+                       "plan is the current catalog's, not the one a student entered under.")),
+        tags$li(paste0("Each course the plan names is counted by itself, a lab apart from its lecture. Passed means a ",
+                       "passing grade here, on any campus. Tried means a grade or a late withdrawal here and never a pass.")),
+        tags$li(paste0("No attempt here is not the same as still required: the course may have been met by transfer or ",
+                       "test credit, or before the class lists begin. Only the tried count says a student met the ",
+                       "course and did not get through it.")),
+        tags$li(paste0("Choices, elective space, general education and the math and English starting courses are not ",
+                       "read. A course no one had taken under the plan's number by these students' last terms shows a dash.")),
+        tags$li(paste0("A plan with fewer than ", m$min_n, " such students is not listed: ", n(m$n_plans_withheld),
+                       " plans, ", n(m$n_students_withheld), " students.")))
     })
   })
 }

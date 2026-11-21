@@ -25,9 +25,10 @@
 #                 Where that record was pulled before the next regular term
 #                 began, the last term's own credits were not yet in it and
 #                 the class list's completed credits for that term are added
-#                 (`credits_basis = "recorded + last term"`). `inst_gpa` and
-#                 `overall_credits_attempted` are read the same way, for the
-#                 same students only. None of this may be done for a student
+#                 (`credits_basis = "recorded + last term"`). `inst_gpa`,
+#                 `overall_credits_attempted` and `inst_credits_earned` (the
+#                 part earned here; the rest came from elsewhere) are read the
+#                 same way, for the same students only. None of this may be done for a student
 #                 who is still enrolled, or for any term but the last.
 #   Not a claim   that anyone lost aid. The floor and the ceiling are general
 #                 standards (R/lists/aid_progress.R); the data has no
@@ -56,6 +57,7 @@
 #'   given a rate; default 30).
 #' @return list(`students` one row per student who left: `student_id`,
 #'   `exit_term`, `primary_major_code`, `student_campus`, `credits`,
+#'   `credits_here` (the part earned at this institution),
 #'   `credits_basis`, `band`, `gpa`, `gpa_below`, `attempted`, `over_ceiling`,
 #'   `flagged` (either line), `ever_pell`; `bands` one row per band, in order,
 #'   then "Not recorded": `n`, `share_pct`, and for Pell, the floor, the
@@ -66,7 +68,7 @@ get_exit_credits <- function(student_terms, programs, degrees, terms, opt = list
     student_terms = c("student_id", "term", "enrolled", "student_level", "student_campus",
                       "primary_major_code", "completed_unm_credits", "attempted_unm_credits"),
     programs = c("student_id", "term", "overall_credits_earned", "overall_credits_attempted",
-                 "inst_gpa", "pell_eligible", "as_of_date"),
+                 "inst_credits_earned", "inst_gpa", "pell_eligible", "as_of_date"),
     degrees = c("student_id", "term"),
     terms = c("term", "start_date")
   )
@@ -117,6 +119,7 @@ get_exit_credits <- function(student_terms, programs, degrees, terms, opt = list
     group_by(student_id, term) %>%
     summarize(recorded = first_known(overall_credits_earned),
               recorded_attempted = first_known(overall_credits_attempted),
+              recorded_here = first_known(inst_credits_earned),
               gpa = first_known(inst_gpa),
               # No rows, no groups: summarize() still evaluates once.
               as_of = if (n() == 0L) as.Date(NA) else max(as_of_date), .groups = "drop")
@@ -138,6 +141,7 @@ get_exit_credits <- function(student_terms, programs, degrees, terms, opt = list
       early = !is.na(as_of) & !is.na(next_start) & as.Date(as_of) < next_start,
       credits = recorded + if_else(early, coalesce(as.numeric(completed_unm_credits), 0), 0),
       attempted = recorded_attempted + if_else(early, coalesce(as.numeric(attempted_unm_credits), 0), 0),
+      credits_here = recorded_here + if_else(early, coalesce(as.numeric(completed_unm_credits), 0), 0),
       credits_basis = case_when(is.na(recorded) ~ NA_character_,
                                 early ~ "recorded + last term",
                                 TRUE ~ "recorded"),
@@ -150,7 +154,7 @@ get_exit_credits <- function(student_terms, programs, degrees, terms, opt = list
                           is.na(gpa_below) | is.na(over_ceiling) ~ NA,
                           TRUE ~ FALSE)
     ) %>%
-    transmute(student_id, exit_term = term, primary_major_code, student_campus, credits,
+    transmute(student_id, exit_term = term, primary_major_code, student_campus, credits, credits_here,
               credits_basis, band, gpa, gpa_below, attempted, over_ceiling, flagged, ever_pell)
 
   rate <- function(hit, known) if_else(known >= min_n, 100 * hit / known, NA_real_)

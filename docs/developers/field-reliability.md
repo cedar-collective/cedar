@@ -108,8 +108,9 @@ The UNM-only running total cannot stand in for it. It leaves out transfer and
 test credit, and the typical bachelor's graduate shows well under 120 on it.
 
 So, **for a student who has left, and only on their last term's row**,
-`overall_credits_earned`, `overall_credits_attempted` and `inst_gpa` may be
-read as what the student left with. The conditions, all of them:
+`overall_credits_earned`, `overall_credits_attempted`, `inst_credits_earned`
+(the part earned here: the rest came from elsewhere, and its courses are not in
+the class list) and `inst_gpa` may be read as what the student left with. The conditions, all of them:
 
 - **Left is observed, not assumed.** Two regular terms after the last term
   are settled with no enrollment, and the last term is at or before the
