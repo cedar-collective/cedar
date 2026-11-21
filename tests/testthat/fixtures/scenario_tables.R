@@ -2176,6 +2176,32 @@ xc01 <- local({
                                  last_degree = 202280L)))
 })
 
+# MT01: students entering Undecided, followed semester by semester
+# (test-major-tenure.R). The data begin in Spring 2020; settled and degrees
+# posted through Spring 2022. Each student's enrolled terms and major:
+#   M-A  Fall 2020 UNDC, Spring 2021 UNDC, Fall 2021 HIST, Spring 2022 HIST.
+#   M-B  Fall 2020 UNDC, away Spring 2021, Fall 2021 UNDC, away Spring 2022.
+#   M-C  Fall 2020 UNDC, Spring 2021 BIOL, a degree in Fall 2021.
+#   M-D  enters Fall 2021: UNDC, Spring 2022 UNDC. Two steps can be read.
+#   M-E  UNDC in Spring 2020, when the data begin: no entry to count from.
+#   M-F  Fall 2020 UNDC, Spring 2021 enrolled with no major on record, then away.
+mt01 <- local({
+  row <- function(id, term, major) tibble::tibble(student_id = id, term = term, enrolled = TRUE, primary_major_code = major)
+  list(
+    population = tibble::tibble(student_id = c("M-A", "M-B", "M-C", "M-D", "M-E", "M-F"), population_label = "Undecided",
+                                first_unit_term = c(202080L, 202080L, 202080L, 202180L, 202010L, 202080L)),
+    student_terms = dplyr::bind_rows(
+      row("M-A", 202080L, "UNDC"), row("M-A", 202110L, "UNDC"), row("M-A", 202180L, "HIST"), row("M-A", 202210L, "HIST"),
+      row("M-B", 202080L, "UNDC"), row("M-B", 202180L, "UNDC"),
+      row("M-C", 202080L, "UNDC"), row("M-C", 202110L, "BIOL"), row("M-C", 202180L, "BIOL"),
+      row("M-D", 202180L, "UNDC"), row("M-D", 202210L, "UNDC"),
+      row("M-E", 202010L, "UNDC"), row("M-E", 202080L, "UNDC"),
+      row("M-F", 202080L, "UNDC"), row("M-F", 202110L, NA_character_)),
+    degrees = tibble::tibble(student_id = "M-C", term = 202180L),
+    opt = list(program_codes = "UNDC", n_terms = 3L,
+               data_edges = list(last_enrolled_complete = 202210L, last_degree = 202210L)))
+})
+
 # ST01's degree plan (test-dept-report.R, Courses Taken): History B.A., keyed
 # on Banner's BA-HIST-AS, which the declarations give major code HIST. It
 # names HIST 1110 and MATH 1215 as required; its upper-level choice names no

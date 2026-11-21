@@ -146,6 +146,7 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
   source_file("cones/exit-credits.R")  # students who left without a degree, by credits at their last term
   source_file("cones/exit-requirements.R")  # of those students, who passed each course their plan requires
   source_file("cones/credit-ceiling.R")  # students passing the attempted-credit ceiling: where from, what next
+  source_file("cones/major-tenure.R")  # students passing the attempted-credit ceiling: where from, what next
   source_file("cones/course-outcomes.R")
   source_file("cones/pathway.R")               # course timing + curriculum map
   source_file("cones/course-pairs.R")          # ordered A->B course sequences

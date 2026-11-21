@@ -111,6 +111,14 @@ try {
     return el && el.innerText.trim().length > 0;
   }, { timeout: 180000 });
   ok(mcReady, 'Major Changes computes');
+  // Semester by Semester After Entering: a lead sentence, a bar per semester.
+  const tenure = await waitFor(page, () => {
+    const lead = document.getElementById('pathways-mc_tenure_lead');
+    const plot = document.getElementById('pathways-mc_tenure_plot');
+    return lead && /students entered/.test(lead.innerText) && plot && plot.data && plot.data.length >= 2
+      && plot.data.every((t) => t.type === 'bar');
+  }, { timeout: 60000 });
+  ok(tenure, 'Major Changes follows entrants semester by semester (lead sentence and stacked bars)');
   ok((await errorToasts()).length === 0, 'Major Changes raised no error notification');
 
   // The change-events table lives inside a collapsed <details> panel, and Shiny
