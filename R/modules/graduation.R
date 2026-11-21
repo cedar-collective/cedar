@@ -135,8 +135,10 @@ graduationUI <- function(id, campuses) {
 # attempts, boards   cedar_attempts and the degree boards (publish_degree_drafts()).
 graduationServer <- function(id, student_terms, programs, degrees, terms, dims, edges, active, attempts, boards) {
   moduleServer(id, function(input, output, session) {
-    payload <- reactive({
-      req(isTRUE(active()), input$level, input$line)
+    # The build, shared by every session. It holds no req(): a cached reactive
+    # stores a failed req() like any other result, so a first read while the
+    # tab was closed left the page blank for every session until a restart.
+    built <- reactive({
       cedar_with_loading(session, session$ns("load"), report_type = "graduation_dashboard", {
         tryCatch(
           build_graduation_dashboard(student_terms, programs, degrees, terms, dims, list(
@@ -149,6 +151,11 @@ graduationServer <- function(id, student_terms, programs, degrees, terms, dims, 
       })
     # Shared by every session: the tables are fixed for the life of the process.
     }) |> bindCache(input$level, input$campus, input$line, cache = "app")
+    # Waiting for the tab and its inputs happens here, outside the cache.
+    payload <- reactive({
+      req(isTRUE(active()), input$level, input$line)
+      built()
+    })
 
     n <- function(x) format(as.integer(x), big.mark = ",", trim = TRUE)
     has_rows <- function(p) !is.null(p) && p$meta$n_left > 0L
