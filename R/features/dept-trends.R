@@ -908,8 +908,12 @@ compute_dept_course_units_tab <- function(base, data_objects, campus_filter = NU
   # its title and level from the course dimension, its Gen Ed area if it has one.
   # CAMPUS_ROLLUP: both lookups describe a course, the same on every campus;
   # the rows they are joined to keep their campus.
+  # A topics course is taught under a different title each time: the latest
+  # one would name one offering as if it were the course.
   course_facts <- data_objects[["cedar_courses"]] %>%
-    transmute(subject_course = course_id, title = course_title, course_level = level)
+    transmute(subject_course = course_id,
+              title = if_else(is_topics_course(course_title), "Topics (title varies)", course_title),
+              course_level = level)
   all_courses <- courses %>%
     filter(n_students >= min_n) %>%
     left_join(unit_labels, by = "dept_code") %>%

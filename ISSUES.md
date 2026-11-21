@@ -118,7 +118,9 @@ checked are drawn, but one chart on the page fails to lay out, and the tour's
 green.
 **Affects:** some plotly figure opened by the Dept Trends tour
 (`tests/e2e/reports-smoke.test.mjs`, scope `dept-trends`, department HIST,
-campuses ABQ and EA). Which figure is not yet known.
+campuses ABQ and EA). It fires as the Courses Taken sub-tab opens and again
+as the reader leaves it for the next one, so it is one of that tab's figures;
+which one is not yet known.
 
 ### Reproduce
 
