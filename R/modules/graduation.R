@@ -135,11 +135,10 @@ graduationUI <- function(id, campuses) {
 # attempts, boards   cedar_attempts and the degree boards (publish_degree_drafts()).
 graduationServer <- function(id, student_terms, programs, degrees, terms, dims, edges, active, attempts, boards) {
   moduleServer(id, function(input, output, session) {
-    # The build, shared by every session. It holds no req(): a cached reactive
-    # stores a failed req() like any other result, so a first read while the
-    # tab was closed left the page blank for every session until a restart.
-    built <- reactive({
-      cedar_with_loading(session, session$ns("load"), report_type = "graduation_dashboard", {
+    # Shared by every session: the tables are fixed for the life of the process.
+    payload <- reactive({
+      req(isTRUE(active()), input$level, input$line)
+      cedar_shared_result(list("graduation_dashboard", input$level, input$campus, input$line), function() cedar_with_loading(session, session$ns("load"), report_type = "graduation_dashboard", {
         tryCatch(
           build_graduation_dashboard(student_terms, programs, degrees, terms, dims, list(
             student_level = input$level, campus = if (length(input$campus) > 0) input$campus else NULL,
@@ -148,13 +147,7 @@ graduationServer <- function(id, student_terms, programs, degrees, terms, dims, 
             showNotification(paste("Graduation:", conditionMessage(e)), type = "error", duration = 10)
             NULL
           })
-      })
-    # Shared by every session: the tables are fixed for the life of the process.
-    }) |> bindCache(input$level, input$campus, input$line, cache = "app")
-    # Waiting for the tab and its inputs happens here, outside the cache.
-    payload <- reactive({
-      req(isTRUE(active()), input$level, input$line)
-      built()
+      }))
     })
 
     n <- function(x) format(as.integer(x), big.mark = ",", trim = TRUE)
@@ -247,6 +240,8 @@ graduationServer <- function(id, student_terms, programs, degrees, terms, dims, 
     plans <- reactive({
       p <- payload(); req(has_rows(p))
       shown <- p$required$programs[p$required$programs$shown, ]
+      # No plan to show: an empty list, not a label pasted from nothing.
+      if (nrow(shown) == 0L) return(character(0))
       stats::setNames(shown$catalog_id, paste0(shown$label, " (", n(shown$n_students), " students)"))
     })
     observeEvent(plans(), {

@@ -142,13 +142,13 @@ catalogReviewServer <- function(id, root, active, catalog, roadmaps,
         refresh_revision(refresh_revision() + 1L)
       }, error = report_error)
     }, ignoreNULL = FALSE)
-    prepared <- bindCache(reactive({
-      load_catalog_review(root, input$scan)
-    }), {
+    # Shared by every session, keyed by the scan's files (cedar_shared_result()).
+    prepared <- reactive({
       refresh_revision()
       req(input$scan, scans(), input$scan %in% scans()$scan_id)
-      catalog_review_cache_key(root, input$scan)
-    }, cache = "app")
+      cedar_shared_result(list("catalog_review", catalog_review_cache_key(root, input$scan)),
+                          function() load_catalog_review(root, input$scan))
+    })
     observeEvent(list(input$scan, refresh_revision()), {
       req(isTRUE(active()), input$scan, scans(), input$scan %in% scans()$scan_id)
       tryCatch({

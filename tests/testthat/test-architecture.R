@@ -547,6 +547,18 @@ test_that("scope bars hold facts, never an explanation row", {
   architecture_expect_ratchet(measured, integer(0), "explanation row(s) in a scope bar")
 })
 
+test_that("no reactive is bound to the app-wide cache (ISSUES I75)", {
+  # bindCache(..., cache = "app") stores whatever the reactive raised, a failed
+  # req() among them, for every session until a restart: Graduation stayed
+  # blank on production that way. A result shared across sessions is read
+  # through cedar_shared_result() inside a plain reactive, after its req().
+  files <- c(r_files_under("R", "modules"), file.path(cedar_base_dir, "server.R"))
+  measured <- architecture_count_by_file(files, function(file) {
+    sum(gregexpr("cache\\s*=\\s*\"app\"", read_code(file), perl = TRUE)[[1]] > 0L)
+  })
+  architecture_expect_ratchet(measured, integer(0), "reactive(s) bound to the app-wide cache")
+})
+
 test_that("units are resolved only by attach_unit() and the lists layer (ADR-001 step 3)", {
   # The invariant that prevents I9: one place reads the mapping files into a
   # unit, so two readers cannot drift apart. attach_unit() in

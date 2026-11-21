@@ -1549,6 +1549,23 @@ cedar_with_loading <- function(session, id, expr, label = NULL, report_type = NU
   value
 }
 
+# A result built once and shared by every session, for the life of the process.
+# Called inside a reactive, after its req(): the reactive waits, this stores.
+# Only a built result is stored. A build that returns NULL (a caught error) is
+# not, so the next read tries again; and nothing here can store a failed req(),
+# which bindCache() does and which left a page blank for every session (I75).
+# `key` is every input that changes the result, with the result's name first.
+cedar_shared_result <- function(key, build, cache = shiny::getShinyOption("cache")) {
+  if (is.null(cache)) stop("[ui-helpers.R] cedar_shared_result() needs the app's cache.", call. = FALSE)
+  hash <- cedar_content_hash(key)
+  held <- cache$get(hash)
+  # cachem is shiny's own cache package; its marker tells a miss from a stored value.
+  if (!cachem::is.key_missing(held)) return(held)
+  value <- build()
+  if (!is.null(value)) cache$set(hash, value)
+  value
+}
+
 signal_load_complete <- function(session, id, duration_sec = NULL,
                                  cached = NULL, error = FALSE) {
   session$sendCustomMessage(paste0(id, "_load_complete"), list(

@@ -241,6 +241,7 @@ Every new tab is a module (`R/modules/pathways.R` is the full pattern, `headcoun
 - Errors caught with `tryCatch` + `showNotification()`; slow work behind `cedar_loading_overlay()`, opened by its run button or by `cedar_with_loading()` (never `withProgress()`); large choice lists with `updateSelectizeInput(server = TRUE)`.
 - An Explore tool modeled on Open Seats or Regstats copies the whole run pattern: overlay, report timer, `*_load_complete` message, URL copy, autorun.
 - **A run button waits for what it needs:** disabled, with a hint, until its inputs hold a value (`cedar_requires()`); one that waits on server state, such as a defined population, is set with `updateActionButton(disabled =)`. The server's own check stays as the last guard.
+- **A result shared across sessions is read through `cedar_shared_result()`** inside a plain reactive, after its `req()`; never `bindCache(..., cache = "app")`, which keeps a failed `req()` for every session until a restart (ISSUES I75; `test-architecture.R` fails on one).
 - **Input values match data values**: level is `"lower"`/`"upper"`/`"grad"`; map labels to values in the server.
 - **Tables are interfaces**: pick an explicit display-column order in the module.
 - Shared UI helpers and CSS classes only; no inline `style =` or one-off classes.
@@ -314,7 +315,7 @@ All test data is in `tests/testthat/fixtures/`. `designed_test_data.R` **is** th
 - Don't `source("setup.R")` from outside `tests/testthat`, `source("global.R")`, or hand-source modules. After a failing run, `rm -rf tests/testthat/_problems tests/testthat/testthat-problems.rds`.
 - Real-data checks: `Rscript --vanilla -e 'source("scripts/cedar-repl.R"); nrow(cedar_registrations)'`.
 
-**E2E rules** (`tests/e2e/lib.mjs` solves each): never `sleep()`, use `waitForIdle()` / `runAndWait()`; let `connect()` settle before touching inputs; `checkVisibility()`, not `offsetParent`; run `node tests/e2e/check-ids.mjs` for selector rot. `connect(page, { tab })` takes options; scope with `queryActive()`; module ids are namespaced.
+**E2E rules** (`tests/e2e/lib.mjs` solves each): after a rebuild, run a suite through `./run-tests.sh --e2e <suite>`, not bare `node`, so the home-page warm-up is the process's first session (I75); never `sleep()`, use `waitForIdle()` / `runAndWait()`; let `connect()` settle before touching inputs; `checkVisibility()`, not `offsetParent`; run `node tests/e2e/check-ids.mjs` for selector rot. `connect(page, { tab })` takes options; scope with `queryActive()`; module ids are namespaced.
 
 Full reference: [testing.md](docs/developers/testing.md), [e2e-testing.md](docs/developers/e2e-testing.md).
 
