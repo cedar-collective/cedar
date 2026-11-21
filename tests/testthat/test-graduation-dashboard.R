@@ -27,9 +27,9 @@ test_that("XC01: the far-along students are counted by term, college and major",
   expect_equal(nrow(top$majors), 1L)
   expect_equal(c(top$majors$n, top$meta$n_majors_pooled), c(2L, 1L))
   expect_true(is.na(top$majors$group))
-  expect_error(build_graduation_dashboard(dplyr::select(xc01$student_terms, -college), xc01$programs,
+  expect_error(build_graduation_dashboard(dplyr::select(xc01$student_terms, -primary_college_code), xc01$programs,
                                           xc01$degrees, xc01$terms, test_dims, xc01$opt),
-               "lacks college")
+               "lacks primary_college_code")
 })
 
 test_that("XC01: the page's words", {

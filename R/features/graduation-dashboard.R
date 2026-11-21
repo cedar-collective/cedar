@@ -22,8 +22,8 @@ GRADUATION_LINES <- c(90, 115, 120)
 #' The payload for Bird's Eye > Graduation
 #'
 #' @param student_terms,programs,degrees,terms As `get_exit_credits()` takes
-#'   them; `student_terms` also carries `college`, the college of the
-#'   student's primary major that term.
+#'   them; `student_terms` also carries `primary_college_code`, the
+#'   college of the student's primary major that term.
 #' @param dims The dimension tables, to name majors and colleges.
 #' @param opt `data_edges` (required), `student_level`, `campus`,
 #'   `first_exit_term`, `line` (credits that count as far along; default 90),
@@ -34,15 +34,15 @@ GRADUATION_LINES <- c(90, 115, 120)
 #'   group: `n`, `n_done`, `n_flagged`, `n_pell`; majors under `min_list`
 #'   pooled), `meta`).
 build_graduation_dashboard <- function(student_terms, programs, degrees, terms, dims, opt = list()) {
-  if (!"college" %in% names(student_terms)) {
-    stop("[graduation-dashboard.R] student_terms lacks college (the loader attaches it).", call. = FALSE)
+  if (!"primary_college_code" %in% names(student_terms)) {
+    stop("[graduation-dashboard.R] student_terms lacks primary_college_code (the loader attaches it).", call. = FALSE)
   }
   line <- as.numeric(opt$line %||% GRADUATION_LINES[[1]])
   min_list <- as.integer(opt$min_list %||% 10L)
   exit <- get_exit_credits(student_terms, programs, degrees, terms, opt)
   done_at <- max(exit$meta$breaks)
   students <- exit$students %>%
-    left_join(student_terms %>% transmute(student_id, exit_term = as.integer(term), college),
+    left_join(student_terms %>% transmute(student_id, exit_term = as.integer(term), college = primary_college_code),
               by = c("student_id", "exit_term"), relationship = "one-to-one")
   far <- students %>% filter(!is.na(credits), credits >= line)
 

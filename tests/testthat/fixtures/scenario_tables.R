@@ -2057,7 +2057,7 @@ xc01 <- local({
   row <- function(id, term, level = "UG") tibble::tibble(
     student_id = id, term = term, enrolled = TRUE, student_level = level,
     student_campus = if (id == "X-I") "EA" else "ABQ",
-    primary_major_code = if (id %in% c("X-K", "X-B")) "HIST" else "ANTH", college = "AS",
+    primary_major_code = if (id %in% c("X-K", "X-B")) "HIST" else "ANTH", primary_college_code = "AS",
     completed_unm_credits = 12, attempted_unm_credits = 12)
   student_terms <- dplyr::bind_rows(
     lapply(names(last), function(id) row(id, last[[id]])),
