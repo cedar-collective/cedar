@@ -2031,7 +2031,10 @@ ec01 <- local({
     term = c(201980L, rep(202080L, 5), rep(202180L, 3), 202160L, 202180L, 202110L),
     student_population = c(rep("First Time/Beginning Freshman", 5), "New Transfer from NM Inst",
                            rep("First Time/Beginning Freshman", 3), "Summer First Time/Beg Freshman",
-                           "First Time/Beginning Freshman", "Continuing"))
+                           "First Time/Beginning Freshman", "Continuing")) %>%
+    # EC-E, the new transfer, brought 45 credits; no one else brought any.
+    dplyr::mutate(inst_credits_attempted = 15,
+                  overall_credits_attempted = dplyr::if_else(student_id == "EC-E", 60, 15))
   # Credits completed each enrolled term, and the running total. EC-A 15 a
   # term; EC-B 9 a term; EC-F3 12 then 3 then 15; everyone else 15. EC-P's
   # first term is the table's first, so their running total is not whole.
@@ -2041,6 +2044,9 @@ ec01 <- local({
     dplyr::group_by(student_id) %>%
     dplyr::mutate(completed_unm_credits = mapply(per_term, student_id, dplyr::row_number()),
                   cumulative_completed_unm_credits = cumsum(completed_unm_credits),
+                  # Everything attempted was completed.
+                  cumulative_attempted_unm_credits = cumulative_completed_unm_credits,
+                  unm_credits_entering = cumulative_attempted_unm_credits - completed_unm_credits,
                   timeline_valid = student_id != "EC-P") %>%
     dplyr::ungroup()
   list(student_terms = student_terms, programs = programs,

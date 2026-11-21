@@ -46,6 +46,10 @@
 # their entering term (full-time, for the federal cohort).
 # `opt$classification` narrows the class to students holding one of the
 # given classifications in their entering term.
+# `opt$arrival_credits` (`c(low, high)`) keeps the entering students who
+# brought at least `low` and fewer than `high` credits from elsewhere
+# (build_credit_timeline()'s `transfer_credits`, the sanctioned read), so
+# transfer classes can be followed by how far along they arrived.
 #
 # Pace: `opt$pace` (credits a regular term, fastest first, named; e.g.
 # DEGREE_PACE_TERM_CREDITS) splits "still here" at each step. An extension,
@@ -92,7 +96,8 @@
 #'   `data_edges` (`cedar_data_edges()` output, required), `entry` (`"all"`,
 #'   the default, `"first_time"` or `"transfer"`: see the header; the last
 #'   two need `programs`), `time_status` (entering-term time statuses to
-#'   keep; NULL keeps all), `pace` (named credits a regular term, fastest
+#'   keep; NULL keeps all), `arrival_credits` (`c(low, high)` credits brought
+#'   from elsewhere; needs `programs`; NULL keeps all), `pace` (named credits a regular term, fastest
 #'   first; adds the pace columns, see the header).
 #' @param programs `cedar_programs`, for `entry` other than `"all"`.
 #' @return A tibble, one row per entering `term` and `step`: `target_term`,
@@ -175,6 +180,15 @@ get_entering_class_retention <- function(student_terms, degrees = NULL, opt = li
   if (!is.null(opt$campus)) entering <- entering %>% filter(student_campus %in% opt$campus)
   if (!is.null(opt$classification)) entering <- entering %>% filter(student_classification %in% opt$classification)
   if (!is.null(opt$time_status)) entering <- entering %>% filter(time_status %in% opt$time_status)
+  if (!is.null(opt$arrival_credits)) {
+    range <- as.numeric(opt$arrival_credits)
+    if (length(range) != 2L || anyNA(range) || range[1] >= range[2] || is.null(programs)) {
+      stop("[entering-class-retention.R] opt$arrival_credits must be c(low, high) and needs programs.", call. = FALSE)
+    }
+    brought <- build_credit_timeline(entering, programs)
+    keep <- brought$student_id[brought$transfer_credits >= range[1] & brought$transfer_credits < range[2]]
+    entering <- entering %>% filter(student_id %in% keep)
+  }
   cedar_debug("[entering-class-retention.R] ", nrow(entering), " entering students to ", fmt_term(edge))
 
   empty <- tibble::tibble(term = integer(), step = integer(), target_term = integer(), n_entering = integer(),

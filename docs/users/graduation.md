@@ -113,7 +113,14 @@ begins (the second, third, fourth or fifth), and split into:
 If the enrolled share grows from class to class while the on-pace share does
 not, students are being kept and not moved forward. Credit brought from
 elsewhere is not counted, so a student who arrived with credit is further
-along than shown. Transfer students are not in these classes.
+along than shown.
+
+**Transfer students** have their own classes, chosen with **Students who
+started as**: each fall's new transfer students, grouped by the credits they
+brought (under 30, 30 to 59, 60 or more). They start part-way, so they are
+not read against a four-year pace. The split is by the credits a term they
+earn here: 15 or more, 10 to 14, or fewer. Students who transfer in a spring
+are not in these classes yet.
 
 **Credits earned, term by term** draws a line for each class: the credits the
 middle enrolled student had earned here before each term, against the

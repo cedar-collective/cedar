@@ -76,3 +76,14 @@ test_that("EC01: the entering classes' pace, as the page shows it", {
   expect_equal(graduation_pace_shares(pace, 4L)$class, "Fall 2020")
   expect_snapshot(cat(format_graduation_pace(pace), sep = "\n"))
 })
+
+test_that("EC01: a transfer class is described by what it earns here, not by a four-year pace", {
+  pace <- get_entering_class_retention(ec01$student_terms, ec01$degrees,
+                                       list(term_type = "fall", min_n = 1L, entry = "transfer", data_edges = ec01$edges,
+                                            n_terms = 4L, arrival_credits = c(30, 60), pace = DEGREE_PACE_TERM_CREDITS),
+                                       ec01$programs)
+  attr(pace, "started") <- "transfer"
+  attr(pace, "arrival_band") <- "30 to 59"
+  expect_equal(graduation_pace_shares(pace, 2L)$slower_pct, 100)
+  expect_snapshot(cat(format_graduation_pace(pace), sep = "\n"))
+})
