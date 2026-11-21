@@ -53,7 +53,8 @@ GRADUATION_PACE_PARTS <- c(
 #'   group: `n`, `n_done`, `n_flagged`, `n_pell`; majors under `min_list`
 #'   pooled), `required` (NULL without `attempts` and `boards`), `pace`
 #'   (each fall's first-time class at each regular term for six years:
-#'   `get_entering_class_retention()` with `DEGREE_PACE_TERM_CREDITS`), `meta`).
+#'   `get_entering_class_retention()` with `DEGREE_PACE_TERM_CREDITS`),
+#'   `ceiling` (`get_credit_ceiling_crossings()` for the scope), `meta`).
 build_graduation_dashboard <- function(student_terms, programs, degrees, terms, dims, opt = list(),
                                        attempts = NULL, boards = NULL) {
   if (!"primary_college_code" %in% names(student_terms)) {
@@ -118,6 +119,11 @@ build_graduation_dashboard <- function(student_terms, programs, degrees, terms, 
     n_terms = GRADUATION_PACE_TERMS, min_n = as.integer(opt$min_n %||% 30L), data_edges = opt$data_edges,
     pace = DEGREE_PACE_TERM_CREDITS), programs)
 
+  # Students passing the attempted-credit ceiling with no degree yet.
+  ceiling <- get_credit_ceiling_crossings(student_terms, programs, degrees, list(
+    student_level = opt$student_level, campus = opt$campus, data_edges = opt$data_edges,
+    credit_ceiling = opt$credit_ceiling))
+
   series <- students %>%
     group_by(exit_term) %>%
     summarize(n_left = n(), n_far = sum(credits >= line, na.rm = TRUE),
@@ -126,7 +132,7 @@ build_graduation_dashboard <- function(student_terms, programs, degrees, terms, 
 
   list(
     bands = exit$bands, series = series, colleges = colleges, majors = majors, required = required,
-    pace = pace,
+    pace = pace, ceiling = ceiling,
     meta = c(exit$meta, list(line = line, done_at = done_at, n_far = nrow(far),
                              n_done = sum(far$credits >= done_at),
                              n_far_flagged = sum(far$flagged %in% TRUE),
@@ -423,6 +429,136 @@ plot_credit_accumulation <- function(pace) {
     legend = list(orientation = "h", y = -0.25), margin = list(t = 20))
 }
 
+# The parts of a student's attempted credits at the ceiling: column, label.
+GRADUATION_CEILING_PARTS <- c(
+  elsewhere = "Brought from elsewhere",
+  completed_here = "Completed here",
+  not_completed_here = "Attempted here, not completed")
+# Fewest students followed to a step for it to be drawn.
+GRADUATION_CEILING_MIN_N <- 30L
+
+#' The average student's attempted credits at the ceiling, by where they came from
+#'
+#' Means, so the parts add to the total.
+#' @param ceiling `payload$ceiling`.
+#' @return One row per part of `GRADUATION_CEILING_PARTS`: `part`, `label`,
+#'   `credits` (the mean), `share_pct`.
+graduation_ceiling_parts <- function(ceiling) {
+  parts <- names(GRADUATION_CEILING_PARTS)
+  means <- vapply(parts, function(part) if (nrow(ceiling$students) == 0L) NA_real_ else mean(ceiling$students[[part]]),
+                  numeric(1))
+  tibble::tibble(part = parts, label = unname(GRADUATION_CEILING_PARTS), credits = unname(means),
+                 share_pct = 100 * unname(means) / sum(means))
+}
+
+#' What had happened by each term after passing the ceiling, as shares
+#'
+#' @param ceiling `payload$ceiling`.
+#' @param min_n Fewest students followed to a step for it to be kept.
+#' @return One row per step kept: `step`, `when`, `n_observed`, the three
+#'   counts and `degree_pct`, `enrolled_pct`, `gone_pct`.
+graduation_ceiling_outcomes <- function(ceiling, min_n = GRADUATION_CEILING_MIN_N) {
+  ceiling$outcomes %>%
+    filter(n_observed >= min_n) %>%
+    mutate(when = if_else(step == 0L, "The term they passed it",
+                          paste0(step, if_else(step == 1L, " regular term later", " regular terms later"))),
+           degree_pct = 100 * n_degree / n_observed, enrolled_pct = 100 * n_enrolled / n_observed,
+           gone_pct = 100 * n_gone / n_observed) %>%
+    select(step, when, n_observed, n_degree, n_enrolled, n_gone, degree_pct, enrolled_pct, gone_pct)
+}
+
+#' The section's lead: how many passed the ceiling, and where the credits came from
+#' @param ceiling `payload$ceiling`.
+graduation_ceiling_lead <- function(ceiling) {
+  m <- ceiling$meta
+  if (m$n_passed == 0L) return(paste0("No student in this scope passed ", m$ceiling, " attempted credits where it can be seen."))
+  p <- graduation_ceiling_parts(ceiling)
+  credits <- function(part) round(p$credits[p$part == part])
+  paste0(.graduation_n(m$n_passed), " students passed ", m$ceiling, " attempted credits between ",
+         fmt_term(min(ceiling$by_term$term)), " and ", fmt_term(max(ceiling$by_term$term)),
+         " with no degree yet. On average ", credits("elsewhere"), " of those credits were brought from elsewhere, ",
+         credits("completed_here"), " were completed here and ", credits("not_completed_here"),
+         " were attempted here and not completed.")
+}
+
+#' The sentence on what happened after
+#' @param ceiling `payload$ceiling`.
+graduation_ceiling_outcome_note <- function(ceiling) {
+  o <- graduation_ceiling_outcomes(ceiling)
+  if (nrow(o) == 0L) return("Too few of these students can be followed yet to say what happened next.")
+  first <- o[1, ]; last <- o[nrow(o), ]
+  pct <- function(x) sprintf("%.1f%%", x)
+  paste0(pct(first$degree_pct), " were awarded a degree in the term they passed it. ",
+         if (last$step > 0L) paste0("Of the ", .graduation_n(last$n_observed), " who can be followed ", last$step,
+                                    " regular terms on, ", pct(last$degree_pct), " had a degree, ",
+                                    pct(last$enrolled_pct), " were still enrolled and ", pct(last$gone_pct),
+                                    " were not enrolled.") else "")
+}
+
+#' Where the average student's credits came from: one bar in three parts
+#' @param ceiling `payload$ceiling`.
+plot_ceiling_parts <- function(ceiling) {
+  p <- graduation_ceiling_parts(ceiling)
+  if (anyNA(p$credits)) stop("[graduation-dashboard.R] no student passed the ceiling.", call. = FALSE)
+  colours <- c(elsewhere = CEDAR_SEMANTIC_COLORS[["neutral"]], completed_here = CEDAR_SEMANTIC_COLORS[["positive"]],
+               not_completed_here = CEDAR_PALETTE[[2]])
+  fig <- plotly::plot_ly(height = 170)
+  for (i in seq_len(nrow(p))) {
+    fig <- plotly::add_trace(fig, y = "", x = p$credits[i], type = "bar", orientation = "h", name = p$label[i],
+                             marker = list(color = unname(colours[[p$part[i]]])),
+                             text = round(p$credits[i]), textposition = "inside",
+                             insidetextanchor = "middle", textangle = 0,
+                             hovertext = paste0(p$label[i], ": ", round(p$credits[i]), " credits on average (",
+                                                sprintf("%.1f%%", p$share_pct[i]), ")"), hoverinfo = "text")
+  }
+  fig %>% plotly::layout(barmode = "stack",
+                         legend = list(orientation = "h", y = 1.05, yanchor = "bottom", traceorder = "normal"),
+                         xaxis = list(title = "Attempted credits, the average student at the ceiling"),
+                         yaxis = list(title = ""), margin = list(t = 30, b = 40))
+}
+
+#' What had happened by each term after: one stacked bar a step
+#' @param ceiling `payload$ceiling`.
+plot_ceiling_outcomes <- function(ceiling) {
+  o <- graduation_ceiling_outcomes(ceiling)
+  if (nrow(o) == 0L) stop("[graduation-dashboard.R] too few students followed to draw.", call. = FALSE)
+  bar <- function(fig, share, count, name, colour) {
+    plotly::add_trace(fig, x = o$when, y = share, type = "bar", name = name, marker = list(color = colour),
+                      text = sprintf("%.0f%%", share), textposition = "inside", textangle = 0,
+                      hovertext = paste0(o$when, "<br>", name, ": ", .graduation_n(count), " of ",
+                                         .graduation_n(o$n_observed), " (", sprintf("%.1f%%", share), ")"),
+                      hoverinfo = "text")
+  }
+  plotly::plot_ly() %>%
+    bar(o$degree_pct, o$n_degree, "Awarded a degree", CEDAR_SEMANTIC_COLORS[["positive"]]) %>%
+    bar(o$enrolled_pct, o$n_enrolled, "Still enrolled, no degree", CEDAR_PALETTE[[2]]) %>%
+    bar(o$gone_pct, o$n_gone, "Not enrolled, no degree", CEDAR_SEMANTIC_COLORS[["reference"]]) %>%
+    plotly::layout(barmode = "stack",
+                   xaxis = list(title = "", type = "category", categoryorder = "array", categoryarray = o$when),
+                   yaxis = list(title = "Share of students followed that far", ticksuffix = "%",
+                                range = c(0, 100)),
+                   legend = list(orientation = "h", y = -0.15, traceorder = "normal"), margin = list(t = 20))
+}
+
+#' The ceiling section as text
+#' @param ceiling `payload$ceiling`.
+#' @return Character vector, one element per line.
+format_graduation_ceiling <- function(ceiling) {
+  m <- ceiling$meta
+  head <- c("", paste0("## Passing ", m$ceiling, " attempted credits with no degree yet"),
+            graduation_ceiling_lead(ceiling),
+            paste0("Not placed: ", .graduation_n(m$n_not_readable), " whose record began before the class lists, ",
+                   .graduation_n(m$n_already_past), " already past it in their first term on record, ",
+                   .graduation_n(m$n_prior_degree), " who already held a degree."))
+  if (m$n_passed == 0L) return(head)
+  o <- graduation_ceiling_outcomes(ceiling, min_n = 1L)
+  pct <- function(x) sprintf("%.1f%%", x)
+  c(head, "", graduation_ceiling_outcome_note(ceiling),
+    sprintf("  %-26s %9s %8s %9s %8s", "When", "Followed", "Degree", "Enrolled", "Gone"),
+    sprintf("  %-26s %9s %8s %9s %8s", o$when, .graduation_n(o$n_observed), pct(o$degree_pct), pct(o$enrolled_pct),
+            pct(o$gone_pct)))
+}
+
 #' Far-along students who left, by last term
 plot_exit_series <- function(payload) {
   s <- payload$series
@@ -476,6 +612,7 @@ format_graduation_dashboard <- function(payload) {
     "", "## By college", group_head, group_lines(payload$colleges),
     "", "## By major", group_head, group_lines(payload$majors),
     if (!is.null(payload$required)) .format_graduation_required(payload),
-    format_graduation_pace(payload$pace)
+    format_graduation_pace(payload$pace),
+    format_graduation_ceiling(payload$ceiling)
   )
 }

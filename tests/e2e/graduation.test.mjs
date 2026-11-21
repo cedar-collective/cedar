@@ -90,10 +90,16 @@ try {
   ok(paceParts?.length === 6 && paceParts[1] === 'Enrolled, on pace for four years', `each class is split into six parts (${paceParts?.length})`);
   const creditLines = await page.evaluate(plotTraces, `${NS}accumulation_plot`);
   ok(creditLines?.length >= 3 && creditLines.some((t) => /class$/.test(t)), `credits are drawn a line a class against the two paces (${creditLines?.length})`);
+  await waitFor(page, plotTraces, { timeout: 300000, args: [`${NS}ceiling_outcomes_plot`] });
+  const ceilingParts = await page.evaluate(plotTraces, `${NS}ceiling_parts_plot`);
+  ok(ceilingParts?.length === 3 && ceilingParts[0] === 'Brought from elsewhere', `credits at 160 are drawn in three parts (${ceilingParts})`);
+  const ceilingNext = await page.evaluate(plotTraces, `${NS}ceiling_outcomes_plot`);
+  ok(ceilingNext?.[0] === 'Awarded a degree' && ceilingNext.length === 3, `what happened next has three outcomes (${ceilingNext?.length})`);
+
   const paceLead = await page.$eval(`#${NS}pace_lead`, (el) => el.textContent);
   ok(/At the start of their third year/.test(paceLead), 'the lead reads the third year by default');
 
-  const methods = await page.evaluate((ns) => ['method_bands', 'method_series', 'method_standing', 'method_groups', 'method_required', 'method_pace']
+  const methods = await page.evaluate((ns) => ['method_bands', 'method_series', 'method_standing', 'method_groups', 'method_required', 'method_pace', 'method_ceiling']
     .map((id) => document.getElementById(ns + id)?.textContent.trim().length || 0), NS);
   ok(methods.every((n) => n > 80), `every section's method is filled (${methods})`);
 

@@ -77,6 +77,24 @@ Choices, elective space, general education and the math and English starting
 courses are not read. A course no one had taken under the plan's number by
 then shows a dash. A plan with fewer than 10 such students is not listed.
 
+## At 160 Attempted Credits
+
+The students whose attempted credits passed 160 with no degree yet. 160
+attempted credits is a general standard for aid; CEDAR holds no record of
+anyone's aid, so this is who would no longer have met the standard.
+
+- **Where the credits came from.** One bar for the average student at that
+  point: credits brought from elsewhere, credits completed here, and credits
+  attempted here and not completed (failed, withdrawn, incomplete or repeated).
+- **What happened next.** For the term they passed it and each regular term
+  after: the share with a degree, still enrolled, and not enrolled. Each bar
+  counts only the students who can be followed that far.
+
+A student whose record began before the class lists, or who was already past
+160 in their first term on record, cannot be placed and is counted in the
+section's method. For the same reason the number passing each term is not
+shown as a trend.
+
 ## Still Here, and Moving Forward?
 
 Retention says a student came back. This section asks whether they are also
