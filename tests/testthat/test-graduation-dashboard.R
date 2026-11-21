@@ -60,3 +60,19 @@ test_that("XC01: the page's words", {
   })
   expect_equal(graduation_band_table(p)$n, c(1L, 0L, 1L, 1L, 1L, 2L, 1L))
 })
+
+test_that("EC01: the entering classes' pace, as the page shows it", {
+  pace <- get_entering_class_retention(ec01$student_terms, ec01$degrees,
+                                       list(student_level = "UG", data_edges = ec01$edges, min_n = 1L, n_terms = 4L,
+                                            term_type = "fall", pace = DEGREE_PACE_TERM_CREDITS))
+  s <- graduation_pace_shares(pace, 2L)
+  # Fall 2020: one degree, one on the four-year pace, two slower, two gone of six.
+  expect_equal(s$class, c("Fall 2020", "Fall 2021"))
+  expect_equal(unlist(s[1, c("degree_pct", "four_year_pct", "slower_pct", "gone_pct")], use.names = FALSE),
+               100 * c(1, 1, 2, 2) / 6)
+  # The shares are the whole class.
+  expect_equal(rowSums(s[grepl("_pct$", names(s)) & names(s) != "here_pct"]), c(100, 100))
+  # Fall 2021's fourth term is past the settled edge: one class left.
+  expect_equal(graduation_pace_shares(pace, 4L)$class, "Fall 2020")
+  expect_snapshot(cat(format_graduation_pace(pace), sep = "\n"))
+})

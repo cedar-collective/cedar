@@ -102,3 +102,35 @@ test_that("EC01: a step is named by its distance and season, and the sentence re
   fig <- plotly::plotly_build(plot_entering_class_milestones(list(milestones = ms)))
   expect_equal(vapply(fig$x$data, function(t) length(t$x), integer(1)), c(2L, 2L, 1L, 1L))
 })
+
+test_that("EC01: with a pace, still here splits into degree, each pace, slower and gone", {
+  r <- get_entering_class_retention(ec01$student_terms, ec01$degrees,
+                                    list(student_level = "UG", data_edges = ec01$edges, min_n = 1L, n_terms = 3L,
+                                         term_type = "fall", pace = DEGREE_PACE_TERM_CREDITS))
+  at <- function(term, step) as.list(r[r$term == term & r$step == step, ])
+  parts <- c("n_degree", "n_four_year", "n_six_year", "n_slower", "n_credits_unknown", "n_gone")
+  expect_equal(unlist(at(202080L, 1L)[parts], use.names = FALSE), c(1, 2, 0, 1, 0, 2))
+  # EC-E is back after a term away, behind; EC-C has gone.
+  expect_equal(unlist(at(202080L, 2L)[parts], use.names = FALSE), c(1, 1, 0, 2, 0, 2))
+  expect_equal(unlist(at(202080L, 3L)[parts], use.names = FALSE), c(1, 1, 0, 0, 0, 4))
+  # 12 credits after one term is the six-year pace; 15 after two is neither.
+  expect_equal(unlist(at(202180L, 1L)[parts], use.names = FALSE), c(0, 1, 1, 0, 0, 1))
+  expect_equal(unlist(at(202180L, 2L)[parts], use.names = FALSE), c(0, 0, 0, 1, 0, 2))
+  # The parts are the class, and degree plus enrolled is "still here".
+  known <- r[!is.na(r$n_here), ]
+  expect_equal(unname(rowSums(known[parts])), known$n_entering)
+  expect_equal(known$n_entering - known$n_gone, known$n_here)
+  # The enrolled students' credits before the term: A 15, B 9, C 15.
+  expect_equal(unlist(at(202080L, 1L)[c("credits_q1", "credits_median", "credits_q3")], use.names = FALSE), c(12, 15, 15))
+  # Past the settled edge nothing is counted.
+  expect_true(all(is.na(unlist(at(202180L, 3L)[parts]))))
+  # Without a pace the table is as it was.
+  plain <- get_entering_class_retention(ec01$student_terms, ec01$degrees,
+                                        list(student_level = "UG", data_edges = ec01$edges, min_n = 1L, n_terms = 3L,
+                                             term_type = "fall"))
+  expect_equal(names(plain), c("term", "step", "target_term", "n_entering", "n_here", "here_pct"))
+  expect_equal(as.data.frame(r[names(plain)]), as.data.frame(plain), check.attributes = FALSE)
+  expect_error(get_entering_class_retention(ec01$student_terms, NULL,
+                                            list(data_edges = ec01$edges, pace = c(slow = 10, fast = 15))),
+               "fastest first")
+})

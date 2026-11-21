@@ -21,6 +21,19 @@
 
 GRADUATION_LINES <- c(90, 115, 120)
 
+# The moments a fall class is read at: regular terms since entering.
+GRADUATION_PACE_STEPS <- c("second" = 2L, "third" = 4L, "fourth" = 6L, "fifth" = 8L)
+# How many regular terms each class is followed for (six years).
+GRADUATION_PACE_TERMS <- 12L
+# A class's parts at a step, in drawing order: the cone's column, the label.
+GRADUATION_PACE_PARTS <- c(
+  n_degree = "Awarded a degree",
+  n_four_year = "Enrolled, on pace for four years",
+  n_six_year = "Enrolled, on pace for six years",
+  n_slower = "Enrolled, slower than that",
+  n_credits_unknown = "Enrolled, earlier credits not on record",
+  n_gone = "Not enrolled")
+
 #' The payload for Bird's Eye > Graduation
 #'
 #' @param student_terms,programs,degrees,terms As `get_exit_credits()` takes
@@ -38,7 +51,9 @@ GRADUATION_LINES <- c(90, 115, 120)
 #' @return list(`bands`, `series` (one row per last term: `n_left`, `n_far`,
 #'   `n_done`: at 120 or more), `colleges`, `majors` (far-along students by
 #'   group: `n`, `n_done`, `n_flagged`, `n_pell`; majors under `min_list`
-#'   pooled), `required` (NULL without `attempts` and `boards`), `meta`).
+#'   pooled), `required` (NULL without `attempts` and `boards`), `pace`
+#'   (each fall's first-time class at each regular term for six years:
+#'   `get_entering_class_retention()` with `DEGREE_PACE_TERM_CREDITS`), `meta`).
 build_graduation_dashboard <- function(student_terms, programs, degrees, terms, dims, opt = list(),
                                        attempts = NULL, boards = NULL) {
   if (!"primary_college_code" %in% names(student_terms)) {
@@ -97,6 +112,12 @@ build_graduation_dashboard <- function(student_terms, programs, degrees, terms, 
   # from elsewhere, and its courses are not on record.
   both <- far %>% filter(!is.na(credits_here))
 
+  # Each fall's first-time students, term by term: still here, and at what pace.
+  pace <- get_entering_class_retention(student_terms, degrees, list(
+    entry = "first_time", term_type = "fall", student_level = opt$student_level, campus = opt$campus,
+    n_terms = GRADUATION_PACE_TERMS, min_n = as.integer(opt$min_n %||% 30L), data_edges = opt$data_edges,
+    pace = DEGREE_PACE_TERM_CREDITS), programs)
+
   series <- students %>%
     group_by(exit_term) %>%
     summarize(n_left = n(), n_far = sum(credits >= line, na.rm = TRUE),
@@ -105,6 +126,7 @@ build_graduation_dashboard <- function(student_terms, programs, degrees, terms, 
 
   list(
     bands = exit$bands, series = series, colleges = colleges, majors = majors, required = required,
+    pace = pace,
     meta = c(exit$meta, list(line = line, done_at = done_at, n_far = nrow(far),
                              n_done = sum(far$credits >= done_at),
                              n_far_flagged = sum(far$flagged %in% TRUE),
@@ -119,6 +141,34 @@ build_graduation_dashboard <- function(student_terms, programs, degrees, terms, 
 }
 
 .graduation_n <- function(x) format(as.integer(round(x)), big.mark = ",", trim = TRUE)
+
+#' The entering classes' pace as text
+#'
+#' @param pace `payload$pace`.
+#' @return Character vector, one element per line.
+format_graduation_pace <- function(pace) {
+  head <- c("", "## Each fall's first-time students: still here, and at what pace")
+  blocks <- unlist(lapply(unname(GRADUATION_PACE_STEPS), function(step) {
+    s <- graduation_pace_shares(pace, step)
+    if (nrow(s) == 0L) return(c("", graduation_pace_lead(pace, step)))
+    pct <- function(x) sprintf("%.1f%%", x)
+    c("", graduation_pace_lead(pace, step),
+      sprintf("  %-10s %8s %8s %8s %8s %8s %8s %8s", "Class", "Entered", "Degree", "4-year", "6-year", "Slower",
+              "Unknown", "Gone"),
+      sprintf("  %-10s %8s %8s %8s %8s %8s %8s %8s", s$class, .graduation_n(s$n_entering), pct(s$degree_pct),
+              pct(s$four_year_pct), pct(s$six_year_pct), pct(s$slower_pct), pct(s$credits_unknown_pct),
+              pct(s$gone_pct)))
+  }))
+  middle <- pace[pace$step <= max(GRADUATION_PACE_STEPS) & !is.na(pace$credits_median) & !is.na(pace$here_pct), ]
+  credits <- if (nrow(middle) == 0L) "  No class has credits on record." else {
+    sprintf("  %-10s %s", vapply(sort(unique(middle$term)), fmt_term, character(1)),
+            vapply(sort(unique(middle$term)), function(class) {
+              paste(sprintf("%4.0f", middle$credits_median[middle$term == class]), collapse = "")
+            }, character(1)))
+  }
+  c(head, blocks, "", "### Credits earned here by the middle enrolled student, before each regular term since entering",
+    credits)
+}
 
 .format_graduation_required <- function(payload) {
   r <- payload$required
@@ -271,6 +321,108 @@ plot_exit_required <- function(payload, catalog_id) {
       margin = list(t = 40, b = 60))
 }
 
+#' Each entering class's parts at one moment, as shares of the class
+#'
+#' @param pace `payload$pace`.
+#' @param step Regular terms since entering (one of `GRADUATION_PACE_STEPS`).
+#' @return One row per class that can be read at that step (the step is
+#'   settled and graded, the class at least `min_n`): `term`, `class`,
+#'   `n_entering`, `here_pct`, then each part of `GRADUATION_PACE_PARTS` as a
+#'   count and, with `_pct` for `n_`, a share.
+graduation_pace_shares <- function(pace, step) {
+  parts <- names(GRADUATION_PACE_PARTS)
+  rows <- pace[pace$step == step & !is.na(pace$here_pct) & !is.na(pace$n_degree), ]
+  shares <- stats::setNames(lapply(parts, function(part) 100 * rows[[part]] / rows$n_entering),
+                            sub("^n_", "", paste0(parts, "_pct")))
+  tibble::as_tibble(c(list(term = rows$term, class = vapply(rows$term, fmt_term, character(1)),
+                           n_entering = rows$n_entering, here_pct = rows$here_pct),
+                      as.list(rows[parts]), shares))
+}
+
+#' The sentence comparing the earliest and latest class at one moment
+#' @param pace `payload$pace`.
+#' @param step One of `GRADUATION_PACE_STEPS`.
+graduation_pace_lead <- function(pace, step) {
+  s <- graduation_pace_shares(pace, step)
+  year <- names(GRADUATION_PACE_STEPS)[match(step, GRADUATION_PACE_STEPS)]
+  if (nrow(s) == 0L) return(paste0("No entering class can be read at the start of its ", year, " year yet."))
+  known <- s[s$n_credits_unknown < s$n_entering - s$n_gone - s$n_degree | s$n_four_year > 0, ]
+  one <- function(row) paste0(sprintf("%.1f%%", row$here_pct), " of the ", row$class,
+                              " class were still enrolled or had a degree, and ",
+                              sprintf("%.1f%%", row$four_year_pct), " were enrolled on pace for four years")
+  if (nrow(known) == 0L) return(paste0("At the start of their ", year, " year, no class's credits are on record whole."))
+  first <- known[1, ]; last <- known[nrow(known), ]
+  paste0("At the start of their ", year, " year, ", one(first),
+         if (nrow(known) > 1L) paste0(". For the ", last$class, " class it was ", sprintf("%.1f%%", last$here_pct),
+                                      " and ", sprintf("%.1f%%", last$four_year_pct)) else "", ".")
+}
+
+#' Each entering class at one moment: one stacked bar a class
+#' @param pace `payload$pace`.
+#' @param step One of `GRADUATION_PACE_STEPS`.
+plot_class_pace <- function(pace, step) {
+  s <- graduation_pace_shares(pace, step)
+  if (nrow(s) == 0L) stop("[graduation-dashboard.R] no class can be read at step ", step, call. = FALSE)
+  colours <- c(n_degree = CEDAR_SEMANTIC_COLORS[["positive"]], n_four_year = CEDAR_SEMANTIC_COLORS[["neutral"]],
+               n_six_year = CEDAR_SEMANTIC_COLORS[["caution"]], n_slower = CEDAR_SEMANTIC_COLORS[["negative"]],
+               n_credits_unknown = CEDAR_SEMANTIC_COLORS[["other"]], n_gone = CEDAR_SEMANTIC_COLORS[["reference"]])
+  fig <- plotly::plot_ly()
+  for (part in names(GRADUATION_PACE_PARTS)) {
+    share <- s[[sub("^n_", "", paste0(part, "_pct"))]]
+    fig <- plotly::add_trace(
+      fig, x = s$class, y = share, type = "bar", name = GRADUATION_PACE_PARTS[[part]],
+      marker = list(color = unname(colours[[part]])),
+      text = ifelse(share >= 4, sprintf("%.0f%%", share), ""), textposition = "inside", textangle = 0,
+      hovertext = paste0(s$class, " class<br>", GRADUATION_PACE_PARTS[[part]], ": ", .graduation_n(s[[part]]),
+                         " of ", .graduation_n(s$n_entering), " (", sprintf("%.1f%%", share), ")"),
+      hoverinfo = "text")
+  }
+  fig %>% plotly::layout(
+    barmode = "stack",
+    xaxis = list(title = "Entering class (first-time students)", type = "category", categoryorder = "array",
+                 categoryarray = s$class),
+    yaxis = list(title = "Share of the entering class", ticksuffix = "%", range = c(0, 100)),
+    legend = list(orientation = "h", y = -0.25, traceorder = "normal"), margin = list(t = 20))
+}
+
+#' Credits earned here by the middle enrolled student, term by term, a line a class
+#'
+#' Read before each term begins, against the four-year and six-year paces.
+#' Shown through the start of the fifth year: after it most of a class has
+#' its degree and the students left are the slowest.
+#' @param pace `payload$pace`.
+plot_credit_accumulation <- function(pace) {
+  last_step <- max(GRADUATION_PACE_STEPS)
+  rows <- pace[pace$step <= last_step & !is.na(pace$credits_median) & !is.na(pace$here_pct), ]
+  if (nrow(rows) == 0L) stop("[graduation-dashboard.R] no class has credits on record to draw.", call. = FALSE)
+  classes <- sort(unique(rows$term))
+  colours <- build_color_map(vapply(classes, fmt_term, character(1)))
+  steps <- seq_len(last_step)
+  rates <- DEGREE_PACE_TERM_CREDITS
+  fig <- plotly::plot_ly() %>%
+    plotly::add_trace(x = steps, y = rates[["four_year"]] * steps, type = "scatter", mode = "lines",
+                      name = paste(rates[["four_year"]], "credits a term (four years)"),
+                      line = list(color = CEDAR_SEMANTIC_COLORS[["reference"]], dash = "dash"), hoverinfo = "name") %>%
+    plotly::add_trace(x = steps, y = rates[["six_year"]] * steps, type = "scatter", mode = "lines",
+                      name = paste(rates[["six_year"]], "credits a term (six years)"),
+                      line = list(color = CEDAR_SEMANTIC_COLORS[["reference"]], dash = "dot"), hoverinfo = "name")
+  for (class in classes) {
+    r <- rows[rows$term == class, ]
+    label <- fmt_term(class)
+    fig <- plotly::add_trace(
+      fig, x = r$step, y = r$credits_median, type = "scatter", mode = "lines+markers", name = paste(label, "class"),
+      line = list(color = unname(colours[[label]])), marker = list(color = unname(colours[[label]])),
+      hovertext = paste0(label, " class, after ", r$step, if_else(r$step == 1L, " term", " terms"), "<br>",
+                         "The middle enrolled student: ", round(r$credits_median), " credits<br>",
+                         "Half are between ", round(r$credits_q1), " and ", round(r$credits_q3)),
+      hoverinfo = "text")
+  }
+  fig %>% plotly::layout(
+    xaxis = list(title = "Regular terms completed since entering", dtick = 1),
+    yaxis = list(title = "Credits earned here", rangemode = "tozero"),
+    legend = list(orientation = "h", y = -0.25), margin = list(t = 20))
+}
+
 #' Far-along students who left, by last term
 plot_exit_series <- function(payload) {
   s <- payload$series
@@ -323,6 +475,7 @@ format_graduation_dashboard <- function(payload) {
             .graduation_n(payload$series$n_left)),
     "", "## By college", group_head, group_lines(payload$colleges),
     "", "## By major", group_head, group_lines(payload$majors),
-    if (!is.null(payload$required)) .format_graduation_required(payload)
+    if (!is.null(payload$required)) .format_graduation_required(payload),
+    format_graduation_pace(payload$pace)
   )
 }

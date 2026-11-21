@@ -26,6 +26,19 @@
         HIST 201                      1        0        1
         HIST 201L                     0        1        1
         HIST 900                     --       --       --
+      
+      ## Each fall's first-time students: still here, and at what pace
+      
+      No entering class can be read at the start of its second year yet.
+      
+      No entering class can be read at the start of its third year yet.
+      
+      No entering class can be read at the start of its fourth year yet.
+      
+      No entering class can be read at the start of its fifth year yet.
+      
+      ### Credits earned here by the middle enrolled student, before each regular term since entering
+        No class has credits on record.
 
 # XC01: the page's words
 
@@ -61,9 +74,47 @@
                                                    Left     120+  Standards   Pell
         Anthropology                                  2        0          0      2
         History                                       2        2          1      1
+      
+      ## Each fall's first-time students: still here, and at what pace
+      
+      No entering class can be read at the start of its second year yet.
+      
+      No entering class can be read at the start of its third year yet.
+      
+      No entering class can be read at the start of its fourth year yet.
+      
+      No entering class can be read at the start of its fifth year yet.
+      
+      ### Credits earned here by the middle enrolled student, before each regular term since entering
+        No class has credits on record.
     Code
       cat("\n", graduation_headline(none), "\n")
     Output
       
        No student in this scope has a last term that can be judged yet. 
+
+# EC01: the entering classes' pace, as the page shows it
+
+    Code
+      cat(format_graduation_pace(pace), sep = "\n")
+    Output
+      
+      ## Each fall's first-time students: still here, and at what pace
+      
+      At the start of their second year, 66.7% of the Fall 2020 class were still enrolled or had a degree, and 16.7% were enrolled on pace for four years. For the Fall 2021 class it was 33.3% and 0.0%.
+        Class       Entered   Degree   4-year   6-year   Slower  Unknown     Gone
+        Fall 2020         6    16.7%    16.7%     0.0%    33.3%     0.0%    33.3%
+        Fall 2021         3     0.0%     0.0%     0.0%    33.3%     0.0%    66.7%
+      
+      At the start of their third year, 33.3% of the Fall 2020 class were still enrolled or had a degree, and 16.7% were enrolled on pace for four years.
+        Class       Entered   Degree   4-year   6-year   Slower  Unknown     Gone
+        Fall 2020         6    16.7%    16.7%     0.0%     0.0%     0.0%    66.7%
+      
+      No entering class can be read at the start of its fourth year yet.
+      
+      No entering class can be read at the start of its fifth year yet.
+      
+      ### Credits earned here by the middle enrolled student, before each regular term since entering
+        Fall 2020    15  18  45  60
+        Fall 2021    14  15
 

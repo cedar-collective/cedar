@@ -47,6 +47,31 @@
 # `opt$classification` narrows the class to students holding one of the
 # given classifications in their entering term.
 #
+# Pace: `opt$pace` (credits a regular term, fastest first, named; e.g.
+# DEGREE_PACE_TERM_CREDITS) splits "still here" at each step. An extension,
+# not a sibling: same classes, same steps, and no existing column changes.
+#   Degree        awarded in or before the target term.
+#   On a pace     enrolled in the target term having completed, before it
+#                 began, at least that pace's credits for each regular term
+#                 since entry (summer credits count; the entering term is
+#                 term one). Each student is counted under the fastest pace
+#                 they meet, else `n_slower`.
+#   Credits       completed credits earned here, the running total on
+#                 cedar_student_terms. Credit brought from elsewhere (test,
+#                 dual or transfer credit) is not in it, so a student who
+#                 arrived with credit is further along than shown. A running
+#                 total that is not whole (`timeline_valid` not TRUE) is
+#                 `n_credits_unknown`, never placed on a pace.
+#   Gone          not enrolled in the target term and no degree. A student
+#                 away for the term is gone at that step and may be back at
+#                 the next.
+#   Pace edge     credits before a term need every earlier term graded: a
+#                 step is split only where its target term is at or before
+#                 the calendar term after `last_graded` (attribute
+#                 `pace_edge`). Past it the pace columns are NA.
+# `credits_q1` / `credits_median` / `credits_q3` describe the enrolled
+# students with a known total: survivors only, which the reader is told.
+#
 # Depends on: .build_enrolled_lookup(), .build_graduated_lookup(),
 #               .compute_retention() (branches/retention-context.R)
 #             cedar_longitudinal_edge() (branches/data-edges.R)
@@ -67,11 +92,14 @@
 #'   `data_edges` (`cedar_data_edges()` output, required), `entry` (`"all"`,
 #'   the default, `"first_time"` or `"transfer"`: see the header; the last
 #'   two need `programs`), `time_status` (entering-term time statuses to
-#'   keep; NULL keeps all).
+#'   keep; NULL keeps all), `pace` (named credits a regular term, fastest
+#'   first; adds the pace columns, see the header).
 #' @param programs `cedar_programs`, for `entry` other than `"all"`.
 #' @return A tibble, one row per entering `term` and `step`: `target_term`,
 #'   `n_entering`, `n_here` (NA past the edge), `here_pct` (NA past the edge
-#'   or under `min_n`). Attributes: `edge`, `first_term` (the table's first
+#'   or under `min_n`). With `opt$pace`, also `n_degree`, one `n_<name>` per
+#'   pace, `n_slower`, `n_credits_unknown`, `n_gone` and the three credit
+#'   quartiles of the enrolled, all NA past the edge. Attributes: `edge`, `first_term` (the table's first
 #'   term, left out under `entry = "all"`), `n_first_term` (the students
 #'   whose first row is there; 0 for a recorded entry kind), `entry`,
 #'   `n_summer_starts` (first-time summer starters counted in the fall
@@ -85,7 +113,12 @@ get_entering_class_retention <- function(student_terms, degrees = NULL, opt = li
     stop("[entering-class-retention.R] programs (cedar_programs) is required for opt$entry = \"", entry,
          "\": the record of who is new is there.", call. = FALSE)
   }
+  pace <- opt$pace
+  if (!is.null(pace) && (is.null(names(pace)) || any(!nzchar(names(pace))) || is.unsorted(rev(pace), strictly = TRUE))) {
+    stop("[entering-class-retention.R] opt$pace must be named credits a term, fastest first.", call. = FALSE)
+  }
   needed <- c("student_id", "term", "enrolled", "student_level", "student_campus",
+              if (!is.null(pace)) c("cumulative_completed_unm_credits", "completed_unm_credits", "timeline_valid"),
               if (!is.null(opt$classification)) "student_classification",
               if (!is.null(opt$time_status)) "time_status")
   missing <- setdiff(needed, names(student_terms))
@@ -162,6 +195,17 @@ get_entering_class_retention <- function(student_terms, degrees = NULL, opt = li
       select(term, step, target_term, n_entering, n_here, here_pct) %>%
       arrange(term, step)
   }
+  pace_edge <- NULL
+  if (!is.null(pace)) {
+    graded <- opt$data_edges[["last_graded"]]
+    if (is.null(graded)) {
+      stop("[entering-class-retention.R] opt$pace needs opt$data_edges$last_graded.", call. = FALSE)
+    }
+    pace_edge <- min(edge, advance_term(as.integer(graded), 1L, summer = TRUE))
+    result <- .entering_class_pace(result, entering, enrolled, degrees, pace, n_terms, pace_edge)
+  }
+  attr(result, "pace") <- pace
+  attr(result, "pace_edge") <- pace_edge
   attr(result, "edge") <- edge
   attr(result, "first_term") <- first_term
   attr(result, "n_first_term") <- n_first_term
@@ -170,4 +214,59 @@ get_entering_class_retention <- function(student_terms, degrees = NULL, opt = li
   attr(result, "n_terms") <- n_terms
   attr(result, "min_n") <- min_n
   result
+}
+
+# The pace columns for get_entering_class_retention(): each entering student's
+# state at each step whose target term is settled, counted by class and step.
+.entering_class_pace <- function(result, entering, enrolled, degrees, pace, n_terms, edge) {
+  at_term <- enrolled %>%
+    transmute(student_id, target_term = term,
+              credits = if_else(timeline_valid %in% TRUE,
+                                as.numeric(cumulative_completed_unm_credits) - as.numeric(completed_unm_credits),
+                                NA_real_))
+  awarded <- if (is.null(degrees)) tibble::tibble(student_id = character(), degree_term = integer()) else {
+    degrees %>% filter(term <= edge) %>% transmute(student_id, degree_term = as.integer(term))
+  }
+  steps <- bind_rows(lapply(seq_len(n_terms), function(k) {
+    entering %>% transmute(student_id, term, step = k, target_term = advance_term(term, k))
+  })) %>%
+    filter(target_term <= edge)
+  # A degree counts from the entering term on, as "still here" counts it.
+  has_degree <- steps %>%
+    inner_join(awarded, by = "student_id", relationship = "many-to-many") %>%
+    filter(degree_term >= term, degree_term <= target_term) %>%
+    distinct(student_id, term, step)
+  states <- steps %>%
+    left_join(at_term, by = c("student_id", "target_term"), relationship = "many-to-one") %>%
+    left_join(has_degree %>% mutate(degree = TRUE), by = c("student_id", "term", "step"),
+              relationship = "one-to-one") %>%
+    left_join(at_term %>% distinct(student_id, target_term) %>% mutate(here = TRUE),
+              by = c("student_id", "target_term"), relationship = "many-to-one") %>%
+    mutate(degree = degree %in% TRUE, here = here %in% TRUE & !degree)
+  # The fastest pace met, as its position in `pace`; 0 is slower than all.
+  # Paces run fastest first, so the number met places the student.
+  n_met <- rowSums(vapply(unname(pace), function(rate) states$credits >= rate * states$step,
+                          logical(nrow(states))) %>% matrix(nrow = nrow(states)))
+  states$pace_met <- if_else(n_met > 0, length(pace) - n_met + 1, 0)
+  quartile <- function(x, p) if (length(x) == 0L) NA_real_ else stats::quantile(x, p, names = FALSE)
+  counts <- states %>%
+    group_by(term, step) %>%
+    summarize(
+      n_degree = sum(degree),
+      n_slower = sum(here & pace_met %in% 0), n_credits_unknown = sum(here & is.na(pace_met)),
+      n_gone = sum(!here & !degree),
+      credits_q1 = quartile(credits[here & !is.na(credits)], 0.25),
+      credits_median = quartile(credits[here & !is.na(credits)], 0.5),
+      credits_q3 = quartile(credits[here & !is.na(credits)], 0.75), .groups = "drop")
+  for (i in seq_along(pace)) {
+    on_pace <- states %>%
+      group_by(term, step) %>%
+      summarize(n = sum(here & pace_met %in% i), .groups = "drop")
+    counts[[paste0("n_", names(pace)[[i]])]] <- on_pace$n[match(paste(counts$term, counts$step),
+                                                                paste(on_pace$term, on_pace$step))]
+  }
+  counts <- counts %>%
+    select(term, step, n_degree, all_of(paste0("n_", names(pace))), n_slower, n_credits_unknown, n_gone,
+           credits_q1, credits_median, credits_q3)
+  result %>% left_join(counts, by = c("term", "step"), relationship = "one-to-one")
 }

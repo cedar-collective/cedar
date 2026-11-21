@@ -12,6 +12,10 @@
 # Credit bands for "how far along": the lower edge of each band after the
 # first. 120 is the credits a bachelor's degree asks for.
 
+# Pace: the credits a regular term that reach 120 in four years (eight
+# regular terms) and in six (twelve), fastest first.
+DEGREE_PACE_TERM_CREDITS <- c(four_year = 15, six_year = 10)
+
 EXIT_GPA_FLOOR <- 2.0
 EXIT_CREDIT_CEILING <- 160
 EXIT_CREDIT_BREAKS <- c(30, 60, 90, 115, 120)
