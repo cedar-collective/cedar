@@ -109,9 +109,16 @@ The tab reads from the top:
   charts lists every unit, with students, registrations and share.
 - **Teaching colleges over time** — one stacked bar per term, split by the
   college of the teaching unit, one chart per teaching campus.
-- **Top outside courses, latest term** — the courses outside the department
-  that the most of its majors sit in, with the share of that term's majors
-  and the count a year earlier.
+- **Top outside courses over time** — the courses outside the department
+  that the most of its majors sit in, term by term: a grid of the fifteen
+  most taken per teaching campus, and a table of every outside course with
+  ten or more of the majors in a term.
+- **Every course these majors take** — the full list, the department's own
+  courses included, with each course's title, the department that teaches
+  it, its level and its Gen Ed area. A column per term gives the majors in
+  the course; Share is those majors over the campus's majors in the terms
+  shown. Three controls narrow the list: who teaches the course, its level,
+  and Gen Ed or not.
 
 A teaching unit or college that taught fewer than ten of the majors in a term
 is not shown on its own: it is pooled with the others like it, as one table

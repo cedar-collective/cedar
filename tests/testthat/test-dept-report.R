@@ -444,11 +444,37 @@ test_that("compute_dept_course_units_tab reads the majors' teaching units and po
   data_objects$cedar_registrations <- test_students_st
   data_objects$cedar_edges <- list(last_enrolled = 202110L, last_enrolled_complete = 202110L,
                                    last_graded = 202110L)
+  # The course dimension, from the same class list: each course's title and level.
+  data_objects$cedar_courses <- suppressMessages(
+    build_cedar_courses(test_sections[0, ], test_students_st, test_dims))$courses
   base <- list(dept_code = "HIST", dept_name = "History")
 
   result <- compute_dept_course_units_tab(base, data_objects, min_n = 1L)
   expect_equal(names(result$tables), c("own_share", "by_college", "latest_units", "top_units",
-                                       "outside_courses"))
+                                       "outside_courses", "all_courses"))
+  # Every course, the unit's own among them: the outside rows are the same
+  # rows with HIST's own taken out.
+  all <- result$tables$all_courses
+  expect_setequal(unique(all$subject_course[!all$is_own_unit]), unique(result$tables$outside_courses$subject_course))
+  expect_true(any(all$is_own_unit))
+  expect_equal(nrow(all), nrow(result$tables$outside_courses) + sum(all$is_own_unit))
+  # Described from the course dimension and the Gen Ed list.
+  expect_equal(unique(all$course_level[all$subject_course == "HIST 1110"]), "lower")
+  expect_false(anyNA(all$course_level))
+  # The page's filters, and the list they give.
+  own <- filter_major_course_rows(all, taught_by = "own")
+  expect_true(all(own$is_own_unit))
+  expect_equal(nrow(filter_major_course_rows(all, level = "grad")), 0L)
+  expect_equal(nrow(filter_major_course_rows(all, gen_ed = "gen_ed")) + nrow(filter_major_course_rows(all, gen_ed = "not_gen_ed")),
+               nrow(all))
+  expect_error(filter_major_course_rows(all, taught_by = "home"), "taught_by")
+  listed <- prepare_major_course_units_course_history(all, terms = result$tables$own_share$term,
+                                                      keep = c("title", "is_own_unit", "course_level", "gen_ed_area"))
+  expect_equal(nrow(listed$courses), nrow(dplyr::distinct(all, campus, subject_course)))
+  # A course's share is its majors over the campus's majors in the terms kept.
+  expect_true(all(listed$courses$share_of_students > 0 & listed$courses$share_of_students <= 1))
+  expect_error(compute_dept_course_units_tab(base, utils::modifyList(data_objects, list(cedar_courses = NULL)), min_n = 1L),
+               "lacks cedar_courses")
   # Graded through the latest term: nothing is in progress.
   expect_false(any(result$tables$own_share$in_progress))
   expect_false(result$meta$latest_in_progress)

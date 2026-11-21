@@ -386,7 +386,9 @@ test_that("RW01: the outside courses term by term, ranked over the terms kept", 
   expect_equal(names(history), c("terms", "courses", "cells", "table"))
   expect_equal(history$terms, terms)
   expect_equal(names(history$courses), c("campus", "rank", "subject_course", "unit_label", "n_terms",
-                                         "student_terms", "top"))
+                                         "student_terms", "share_of_students", "top"))
+  # ABQ's majors over the two terms: 1 in Fall 2020, 3 in Spring 2021. EA: 1.
+  expect_equal(history$courses$share_of_students, c(3 / 4, 1 / 4, 1))
   expect_equal(history$courses$campus, c("ABQ", "ABQ", "EA"))
   expect_equal(history$courses$subject_course, c("HIST 2110", "ENGL 1110", "MATH 1240"))
   expect_equal(history$courses$rank, c(1L, 2L, 1L))

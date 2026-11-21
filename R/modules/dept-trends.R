@@ -567,6 +567,72 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
               reactable::reactableOutput(ns("mcu_outside_table"))
             )
           }
+        ),
+        dashboard_subsection(
+          "Every Course These Majors Take",
+          "The full list, the department's own courses included: how many of these majors were in each course, term by term.",
+          method = tags$p(paste0("Every course with ", meta$min_n, " or more of these majors in it in a term, over the term types ticked above; a blank cell is a term under ",
+                 meta$min_n, ", which is not shown. Share is the majors counted in the course over the campus's majors in the terms shown, so a course most of them take once in four years reads as a small share of any one term. ",
+                 "Level is the course number's; Gen Ed is the area the institution lists the course under. A course is counted under the code it has now.")),
+          if (nrow(data$tables$all_courses) == 0L) {
+            empty_state(paste0("No course has ", meta$min_n, " or more of these majors in any term."))
+          } else {
+            tagList(
+              fluidRow(
+                column(4, radioButtons(ns("mcu_list_taught_by"), "Taught by",
+                                       choices = c("Any department" = "all", "This department" = "own", "Other departments" = "outside"),
+                                       selected = "all", inline = TRUE)),
+                column(4, checkboxGroupInput(ns("mcu_list_level"), "Course level",
+                                             choices = c("Lower" = "lower", "Upper" = "upper", "Graduate" = "grad"),
+                                             selected = c("lower", "upper", "grad"), inline = TRUE)),
+                column(4, radioButtons(ns("mcu_list_gen_ed"), "Gen Ed",
+                                       choices = c("All courses" = "all", "Gen Ed only" = "gen_ed", "Not Gen Ed" = "not_gen_ed"),
+                                       selected = "all", inline = TRUE))),
+              reactable::reactableOutput(ns("mcu_all_courses_table"))
+            )
+          }
+        )
+      )
+    })
+
+    # The full course list, narrowed by its three controls.
+    mcu_course_list <- reactive({
+      data <- mcu_data()
+      req(data, input$mcu_list_taught_by, input$mcu_list_gen_ed)
+      rows <- filter_major_course_rows(data$tables$all_courses, taught_by = input$mcu_list_taught_by,
+                                       level = input$mcu_list_level %||% character(0), gen_ed = input$mcu_list_gen_ed)
+      prepare_major_course_units_course_history(rows, terms = data$tables$own_share$term, term_types = mcu_term_types(),
+                                                keep = c("title", "is_own_unit", "course_level", "gen_ed_area"))
+    })
+    output$mcu_all_courses_table <- reactable::renderReactable({
+      history <- mcu_course_list()
+      data <- mcu_data()
+      term_ids <- paste0("t_", history$terms)
+      term_cols <- stats::setNames(lapply(history$terms, function(term) {
+        cedar_count_coldef(paste0(term_code_to_axis_label(term),
+                                  if (term %in% as.integer(in_progress$term)) " (in progress)" else ""),
+                           minWidth = 70)
+      }), term_ids)
+      display <- history$table %>%
+        dplyr::mutate(taught_by = dplyr::if_else(is_own_unit %in% TRUE, paste0(unit_label, " (this department)"), unit_label),
+                      course_level = unname(c(lower = "Lower", upper = "Upper", grad = "Graduate")[course_level]))
+      reactable::reactable(
+        display[c("campus", "subject_course", "title", "taught_by", "course_level", "gen_ed_area", "student_terms",
+                  "share_of_students", term_ids)],
+        theme = cedar_tbl_theme, compact = TRUE, striped = TRUE, highlight = TRUE,
+        searchable = TRUE, defaultPageSize = 25, showPageSizeOptions = TRUE, pageSizeOptions = c(25, 50, 200),
+        columns = c(
+          list(
+            campus = reactable::colDef(name = "Campus", maxWidth = 90),
+            subject_course = reactable::colDef(name = "Course", minWidth = 110),
+            title = reactable::colDef(name = "Title", minWidth = 200, na = "\u2014"),
+            taught_by = reactable::colDef(name = "Taught by", minWidth = 200),
+            course_level = reactable::colDef(name = "Level", maxWidth = 100, na = "\u2014"),
+            gen_ed_area = reactable::colDef(name = "Gen Ed", minWidth = 150, na = "\u2014"),
+            student_terms = cedar_count_coldef("Majors, terms shown", minWidth = 110),
+            share_of_students = cedar_percent_coldef("Share")
+          ),
+          term_cols
         )
       )
     })

@@ -372,6 +372,26 @@ export async function runReportChecks({ scope = 'smoke', synthetic = false } = {
           { type: 'plotly', id: 'dept_trends-mcu_own_share_plot' },
         ]);
       }
+      // The full course list: the department's own courses are in it, and
+      // "Other departments" takes them out.
+      if (await page.$('#dept_trends-mcu_all_courses_table')) {
+        await waitForOutput(page, 'Courses Taken full course list', [
+          { type: 'reactable', id: 'dept_trends-mcu_all_courses_table' },
+        ]);
+        const ownRows = () => page.$eval('#dept_trends-mcu_all_courses_table', (el) => {
+          const state = window.Reactable?.getState?.(el.id);
+          return (state?.data || []).filter((row) => / \(this department\)$/.test(row.taught_by)).length;
+        });
+        const before = await ownRows();
+        if (!(before > 0)) throw new Error('The full course list holds none of the department\'s own courses');
+        await setShinyInput(page, 'dept_trends-mcu_list_taught_by', 'outside');
+        await waitForIdle(page, { timeout: 30000 });
+        const after = await ownRows();
+        if (after !== 0) throw new Error(`"Other departments" still lists ${after} of the department's own courses`);
+        await setShinyInput(page, 'dept_trends-mcu_list_taught_by', 'all');
+      } else if (!/No course has \d+ or more of these majors in any term/.test(coursesTaken.text)) {
+        throw new Error('Courses Taken has neither its full course list nor the reason');
+      }
       // The latest term's numbers are in the charts, not in a paragraph.
       if (/were in the unit's own courses/.test(coursesTaken.text)) {
         throw new Error('Courses Taken still opens with the latest-term paragraph');
