@@ -57,26 +57,26 @@ graduationUI <- function(id, campuses) {
       "By College and Major",
       "Which colleges and majors were the far-along students in when they stopped?",
       method = uiOutput(ns("method_groups")),
-      fluidRow(
-        column(5, dashboard_subsection("College", "The college of the student's primary major in their last term.",
-                                       reactable::reactableOutput(ns("college_table")))),
-        column(7, dashboard_subsection("Major", "The student's primary major in their last term.",
-                                       reactable::reactableOutput(ns("major_table"))))
-      )
+      dashboard_subsection("College", "The college of the student's primary major in their last term.",
+                           reactable::reactableOutput(ns("college_table"))),
+      dashboard_subsection("Major", "The student's primary major in their last term, with its code: two majors may share a name.",
+                           reactable::reactableOutput(ns("major_table")))
     ))
   )
 }
 
 # ── Layout helpers (no analysis) ─────────────────────────────────────────────
 
-.graduation_group_table <- function(g, done_at, first_col) {
+# show_code adds the group's code beside its name (majors: names repeat).
+.graduation_group_table <- function(g, done_at, first_col, show_code = FALSE) {
   if (NROW(g) == 0L) return(reactable::reactable(
     data.frame(Message = "No student in this scope."), theme = cedar_tbl_theme, compact = TRUE))
-  shown <- data.frame(group = g$label, n = g$n, n_done = g$n_done, n_flagged = g$n_flagged, n_pell = g$n_pell,
-                      stringsAsFactors = FALSE)
+  shown <- data.frame(group = g$label, code = g$group, n = g$n, n_done = g$n_done, n_flagged = g$n_flagged,
+                      n_pell = g$n_pell, stringsAsFactors = FALSE)
   reactable::reactable(shown, theme = cedar_tbl_theme, compact = TRUE, striped = TRUE, defaultPageSize = 15,
     columns = list(
       group = reactable::colDef(name = first_col, minWidth = 200),
+      code = reactable::colDef(name = "Code", show = show_code, na = "\u2014", minWidth = 80),
       n = cedar_count_coldef("Left"),
       n_done = cedar_count_coldef(paste(done_at, "credits or more")),
       n_flagged = cedar_count_coldef("Under a standard"),
@@ -176,7 +176,7 @@ graduationServer <- function(id, student_terms, programs, degrees, terms, dims, 
       p <- payload(); req(has_rows(p)); .graduation_group_table(p$colleges, p$meta$done_at, "College")
     })
     output$major_table <- reactable::renderReactable({
-      p <- payload(); req(has_rows(p)); .graduation_group_table(p$majors, p$meta$done_at, "Major")
+      p <- payload(); req(has_rows(p)); .graduation_group_table(p$majors, p$meta$done_at, "Major", show_code = TRUE)
     })
     output$method_groups <- renderUI({
       p <- payload(); req(p)

@@ -37,12 +37,16 @@ build_graduation_dashboard <- function(student_terms, programs, degrees, terms, 
   if (!"primary_college_code" %in% names(student_terms)) {
     stop("[graduation-dashboard.R] student_terms lacks primary_college_code (the loader attaches it).", call. = FALSE)
   }
+  if (!"is_pre_major" %in% names(student_terms)) {
+    stop("[graduation-dashboard.R] student_terms lacks is_pre_major.", call. = FALSE)
+  }
   line <- as.numeric(opt$line %||% GRADUATION_LINES[[1]])
   min_list <- as.integer(opt$min_list %||% 10L)
   exit <- get_exit_credits(student_terms, programs, degrees, terms, opt)
   done_at <- max(exit$meta$breaks)
   students <- exit$students %>%
-    left_join(student_terms %>% transmute(student_id, exit_term = as.integer(term), college = primary_college_code),
+    left_join(student_terms %>% transmute(student_id, exit_term = as.integer(term), college = primary_college_code,
+                                          is_pre_major),
               by = c("student_id", "exit_term"), relationship = "one-to-one")
   far <- students %>% filter(!is.na(credits), credits >= line)
 
@@ -58,7 +62,9 @@ build_graduation_dashboard <- function(student_terms, programs, degrees, terms, 
   colleges$label <- dplyr::coalesce(unname(college_names[colleges$group]), colleges$group, "No college on record")
 
   majors <- count_group(far, "primary_major_code")
-  major_names <- name_program_codes(majors$group, dims)
+  # `group` is the major code, which the page shows beside the name: two
+  # programs may share a name, and a pre-major is labelled as one.
+  major_names <- name_program_codes(far$primary_major_code, dims, far$is_pre_major)
   majors$label <- dplyr::coalesce(unname(major_names[majors$group]), "No major on record")
   # A major with few such students is not listed by name: pooled, counted.
   small <- majors$n < min_list
@@ -129,7 +135,7 @@ plot_exit_bands <- function(payload) {
   floor_of <- c(0, payload$meta$breaks, NA)[seq_along(labels)]
   far <- !is.na(floor_of) & floor_of >= payload$meta$line & labels != "Not recorded"
   plotly::plot_ly(
-    x = labels, y = b$n, type = "bar", text = .graduation_n(b$n), textposition = "outside",
+    x = labels, y = b$n, type = "bar", text = .graduation_n(b$n), textposition = "outside", cliponaxis = FALSE,
     marker = list(color = ifelse(far, CEDAR_PALETTE[[2]], CEDAR_SEMANTIC_COLORS[["reference"]])),
     hovertext = paste0(labels, " credits<br>", .graduation_n(b$n), " students (",
                        sprintf("%.1f%%", b$share_pct), ")"),
@@ -147,7 +153,7 @@ plot_exit_series <- function(payload) {
   labels <- vapply(s$exit_term, fmt_term, character(1))
   m <- payload$meta
   plotly::plot_ly(
-    x = labels, y = s$n_far, type = "bar", text = .graduation_n(s$n_far), textposition = "outside",
+    x = labels, y = s$n_far, type = "bar", text = .graduation_n(s$n_far), textposition = "outside", cliponaxis = FALSE,
     marker = list(color = CEDAR_PALETTE[[2]]), name = paste(m$line, "credits or more"),
     hovertext = paste0(labels, "<br>", .graduation_n(s$n_far), " left with ", m$line, " credits or more<br>",
                        .graduation_n(s$n_done), " with ", m$done_at, " or more<br>",

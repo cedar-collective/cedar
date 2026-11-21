@@ -2058,7 +2058,7 @@ xc01 <- local({
     student_id = id, term = term, enrolled = TRUE, student_level = level,
     student_campus = if (id == "X-I") "EA" else "ABQ",
     primary_major_code = if (id %in% c("X-K", "X-B")) "HIST" else "ANTH", primary_college_code = "AS",
-    completed_unm_credits = 12, attempted_unm_credits = 12)
+    is_pre_major = FALSE, completed_unm_credits = 12, attempted_unm_credits = 12)
   student_terms <- dplyr::bind_rows(
     lapply(names(last), function(id) row(id, last[[id]])),
     row("X-J", 202010L), row("X-G", 202080L), row("X-G", 202180L, "GR"))

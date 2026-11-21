@@ -64,7 +64,7 @@ try {
   const colleges = await readReactable(page, `${NS}college_table`, { limit: 5 });
   ok(colleges.rows?.length > 0 && colleges.rows.every((r) => r[0].length > 3), `colleges are named, not coded (${colleges.rows?.map((r) => r[0]).slice(0, 3)})`);
   const majors = await readReactable(page, `${NS}major_table`, { limit: 5 });
-  ok(majors.rows?.length > 0 && majors.rows.every((r) => r.length === 5), `the major table lists majors (${majors.rows?.length})`);
+  ok(majors.rows?.length > 0 && majors.rows.every((r) => r.length === 6), `the major table lists majors with their codes (${majors.rows?.length})`);
 
   const methods = await page.evaluate((ns) => ['method_bands', 'method_series', 'method_standing', 'method_groups']
     .map((id) => document.getElementById(ns + id)?.textContent.trim().length || 0), NS);

@@ -30,6 +30,9 @@ test_that("XC01: the far-along students are counted by term, college and major",
   expect_error(build_graduation_dashboard(dplyr::select(xc01$student_terms, -primary_college_code), xc01$programs,
                                           xc01$degrees, xc01$terms, test_dims, xc01$opt),
                "lacks primary_college_code")
+  expect_error(build_graduation_dashboard(dplyr::select(xc01$student_terms, -is_pre_major), xc01$programs,
+                                          xc01$degrees, xc01$terms, test_dims, xc01$opt),
+               "lacks is_pre_major")
 })
 
 test_that("XC01: the page's words", {
