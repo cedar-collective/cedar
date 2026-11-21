@@ -1988,6 +1988,16 @@ population_group_rename_successions <- data.frame(
 # Fall 2022), and EC-X, a graduate student, entering at another level: 2 of 3
 # in Spring 2022, 1 of 3 in Fall 2022. Settled through Fall 2022. EC-S (below)
 # first enrolls in Summer 2021, so by first enrolled term is a summer entrant.
+# Pace (15 credits a term for four years, 10 for six), read before each
+# target term begins. Fall 2020 class, everyone new at the level (A B C D E G):
+#   Spring 2021 (step 1)  A 15, C 15: four-year; B 9: slower; G: degree;
+#                         D, E: gone
+#   Fall 2021 (step 2)    A 30: four-year; B 18: slower; E 15: slower (back
+#                         after a term away); G: degree; C, D: gone
+#   Spring 2022 (step 3)  A 45: four-year; G: degree; four gone
+# Fall 2021 class (F1 F2 F3 S, by first enrolled term S is a summer entrant
+# and not in it): Spring 2022  F1 15: four-year; F3 12: six-year; F2: gone.
+#   Fall 2022  F3 15 of 20 for six years: slower; F1, F2: gone.
 ec01 <- local({
   terms <- list(
     `EC-P` = c(201980L, 202080L),
@@ -2022,6 +2032,17 @@ ec01 <- local({
     student_population = c(rep("First Time/Beginning Freshman", 5), "New Transfer from NM Inst",
                            rep("First Time/Beginning Freshman", 3), "Summer First Time/Beg Freshman",
                            "First Time/Beginning Freshman", "Continuing"))
+  # Credits completed each enrolled term, and the running total. EC-A 15 a
+  # term; EC-B 9 a term; EC-F3 12 then 3 then 15; everyone else 15. EC-P's
+  # first term is the table's first, so their running total is not whole.
+  per_term <- function(id, k) if (id == "EC-B") 9 else if (id == "EC-F3") c(12, 3, 15)[k] else 15
+  student_terms <- student_terms %>%
+    dplyr::arrange(student_id, term) %>%
+    dplyr::group_by(student_id) %>%
+    dplyr::mutate(completed_unm_credits = mapply(per_term, student_id, dplyr::row_number()),
+                  cumulative_completed_unm_credits = cumsum(completed_unm_credits),
+                  timeline_valid = student_id != "EC-P") %>%
+    dplyr::ungroup()
   list(student_terms = student_terms, programs = programs,
        degrees = tibble::tibble(student_id = "EC-G", term = 202110L),
        edges = list(last_enrolled_complete = 202280L, last_graded = 202280L))
@@ -2073,12 +2094,14 @@ xc01 <- local({
     student_id = id, term = term, enrolled = TRUE, student_level = level,
     student_campus = if (id == "X-I") "EA" else "ABQ",
     primary_major_code = if (id %in% c("X-K", "X-B")) "HIST" else "ANTH", primary_college_code = "AS",
-    is_pre_major = FALSE, completed_unm_credits = 12, attempted_unm_credits = 12)
+    is_pre_major = FALSE, completed_unm_credits = 12, attempted_unm_credits = 12,
+    # No one here is called first-time, so the page's entering classes are empty.
+    cumulative_completed_unm_credits = 12, timeline_valid = TRUE)
   student_terms <- dplyr::bind_rows(
     lapply(names(last), function(id) row(id, last[[id]])),
     row("X-J", 202010L), row("X-G", 202080L), row("X-G", 202180L, "GR"))
   stamp <- function(id, term, earned, attempted, gpa, pell, as_of = "2022-06-01") tibble::tibble(
-    student_id = id, term = term,
+    student_id = id, term = term, student_population = "Continuing",
     program_code = if (id %in% c("X-K", "X-B")) "BA-HIST-AS" else if (id == "X-J") "BA-ANTH-AS" else "BA-FANT-AS",
     # X-A brought 60 credits from elsewhere; everyone else earned all of theirs here.
     inst_credits_earned = if (id == "X-A") earned - 60 else earned, overall_credits_earned = earned,

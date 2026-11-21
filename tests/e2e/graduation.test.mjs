@@ -79,7 +79,21 @@ try {
   const courses = await readReactable(page, `${NS}required_table`, { limit: 5 });
   ok(courses.rows?.length > 0 && courses.rows.every((r) => r.length === 5), `the plan's courses are listed (${courses.rows?.length})`);
 
-  const methods = await page.evaluate((ns) => ['method_bands', 'method_series', 'method_standing', 'method_groups', 'method_required']
+  const plotTraces = (id) => {
+    const r = document.getElementById(id);
+    const p = r?.classList.contains('js-plotly-plot') ? r : r?.querySelector('.js-plotly-plot');
+    return p?.data?.length ? p.data.map((t) => t.name) : null;
+  };
+  await waitFor(page, plotTraces, { timeout: 300000, args: [`${NS}pace_plot`] });
+  await waitFor(page, plotTraces, { timeout: 300000, args: [`${NS}accumulation_plot`] });
+  const paceParts = await page.evaluate(plotTraces, `${NS}pace_plot`);
+  ok(paceParts?.length === 6 && paceParts[1] === 'Enrolled, on pace for four years', `each class is split into six parts (${paceParts?.length})`);
+  const creditLines = await page.evaluate(plotTraces, `${NS}accumulation_plot`);
+  ok(creditLines?.length >= 3 && creditLines.some((t) => /class$/.test(t)), `credits are drawn a line a class against the two paces (${creditLines?.length})`);
+  const paceLead = await page.$eval(`#${NS}pace_lead`, (el) => el.textContent);
+  ok(/At the start of their third year/.test(paceLead), 'the lead reads the third year by default');
+
+  const methods = await page.evaluate((ns) => ['method_bands', 'method_series', 'method_standing', 'method_groups', 'method_required', 'method_pace']
     .map((id) => document.getElementById(ns + id)?.textContent.trim().length || 0), NS);
   ok(methods.every((n) => n > 80), `every section's method is filled (${methods})`);
 

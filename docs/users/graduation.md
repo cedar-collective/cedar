@@ -77,6 +77,31 @@ Choices, elective space, general education and the math and English starting
 courses are not read. A course no one had taken under the plan's number by
 then shows a dash. A plan with fewer than 10 such students is not listed.
 
+## Still Here, and Moving Forward?
+
+Retention says a student came back. This section asks whether they are also
+earning credits. Each bar is one fall's first-time students, read as a year
+begins (the second, third, fourth or fifth), and split into:
+
+- **awarded a degree** by then;
+- **enrolled, on pace for four years**: 15 credits completed here for each
+  regular term since entering, summer credits included;
+- **enrolled, on pace for six years**: 10 credits a term;
+- **enrolled, slower than that**;
+- **enrolled, earlier credits not on record**: students whose first term here
+  is the first term of the class lists, which is the whole of the first class;
+- **not enrolled**.
+
+If the enrolled share grows from class to class while the on-pace share does
+not, students are being kept and not moved forward. Credit brought from
+elsewhere is not counted, so a student who arrived with credit is further
+along than shown. Transfer students are not in these classes.
+
+**Credits earned, term by term** draws a line for each class: the credits the
+middle enrolled student had earned here before each term, against the
+four-year and six-year paces. Students who left are not in a line, so it can
+rise because slower students left.
+
 ## Not yet on the page
 
 Programs with no degree plan on file, and a plan's choices and elective space;
