@@ -986,7 +986,8 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
                            attempts, cedar_student_terms = NULL,
                            dims, program_choices = character(),
                            dept_choices = character(), edges, pathway_groups,
-                           instructor_access = reactiveVal(FALSE), instructor_password = "") {
+                           instructor_access = reactiveVal(FALSE), instructor_password = "",
+                           courses, course_codes, boards = NULL) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
     # The course + instructor table names instructors beside student
@@ -1114,7 +1115,8 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
     })
 
     observedCoursePathsServer("course_paths", students, get_analysis_population,
-      reactive(get_description()), edges, pathway_groups)
+      reactive(get_description()), edges, pathway_groups,
+      courses = courses, course_codes = course_codes, boards = boards, declarations = programs)
 
     # TRUE once population has been successfully built
     population_built <- reactive({

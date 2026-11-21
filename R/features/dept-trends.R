@@ -906,55 +906,24 @@ compute_dept_course_units_tab <- function(base, data_objects, campus_filter = NU
     list(dept_code = base$dept_code, campus = campus_filter, min_n = 1L, program_code = program_code,
          grain = "course", include_in_progress = TRUE, data_edges = data_objects[["cedar_edges"]])
   )
-  # Every course, the unit's own among them, described for the page's list:
-  # its title and level from the course dimension, its Gen Ed area if it has one.
-  # CAMPUS_ROLLUP: both lookups describe a course, the same on every campus;
-  # the rows they are joined to keep their campus.
-  # A topics course is taught under a different title each time: the latest
-  # one would name one offering as if it were the course.
-  # The Gen Ed list and the degree plans name registrar codes; the rows are
-  # keyed on the course, so a renamed course is found under either code.
-  code_table <- data_objects[["cedar_course_codes"]] %>% transmute(course_id, listed_code = subject_course)
-  as_course <- function(codes) vapply(as.character(codes), course_id_of, character(1), tbl = code_table,
-                                      caller = "compute_dept_course_units_tab", USE.NAMES = FALSE)
-  gen_ed <- gen_ed_course_lookup() %>%
-    transmute(subject_course = as_course(subject_course), gen_ed_area = area_label) %>%
-    # CAMPUS_ROLLUP: catalog membership, the same on every campus; a course
-    # listed under two areas counts under the first listed.
-    distinct(subject_course, .keep_all = TRUE)
+  # Every course, the unit's own among them, described for the page's list
+  # (describe_courses()): title, level, Gen Ed area.
+  # CAMPUS_ROLLUP: the descriptions and plan marks are a course's, the same on
+  # every campus; the rows they are joined to keep their campus.
+  course_facts <- describe_courses(courses$subject_course, data_objects[["cedar_courses"]],
+                                   data_objects[["cedar_course_codes"]])
   # The degree plans of these majors, and the courses each names as required.
-  # A plan is keyed on Banner's degree program (BA-HIST-AS); the members are
-  # read by major code, and the declarations say which of one go with the other.
-  plan_courses <- tibble::tibble(subject_course = character(), in_plan = character())
-  plans <- character(0)
-  if (!is.null(boards)) {
-    declared <- data_objects[["cedar_programs"]]
-    missing <- setdiff(c("major_code", "program_code"), names(declared))
-    if (length(missing) > 0) stop("[dept-trends.R] cedar_programs lacks ", paste(missing, collapse = ", "))
-    majors <- program_code %||% programs$program_code
-    degree_programs <- unique(declared$program_code[declared$major_code %in% majors & !is.na(declared$program_code)])
-    plan_ids <- unique(boards$catalog$program_codes$catalog_id[boards$catalog$program_codes$program_code %in% degree_programs])
-    named <- degree_named_requirements(boards$roadmaps, plan_ids)$courses
-    labels <- boards$catalog$catalogs$degree_label[match(plan_ids, boards$catalog$catalogs$catalog_id)]
-    plans <- sort(labels)
-    plan_courses <- named %>%
-      transmute(subject_course = as_course(subject_course),
-                plan = labels[match(catalog_id, plan_ids)]) %>%
-      distinct() %>%
-      # CAMPUS_ROLLUP: a degree plan names a course, not a campus's offering of it.
-      group_by(subject_course) %>%
-      summarize(in_plan = paste(sort(plan), collapse = "; "), .groups = "drop")
-  }
-  course_facts <- data_objects[["cedar_courses"]] %>%
-    transmute(subject_course = course_id,
-              title = if_else(is_topics_course(course_title), "Topics (title varies)", course_title),
-              course_level = level)
+  marks <- if (is.null(boards)) list(courses = tibble::tibble(subject_course = character(), in_plan = character()),
+                                     plans = character(0))
+           else degree_plan_course_marks(boards, program_code %||% programs$program_code,
+                                         data_objects[["cedar_programs"]], data_objects[["cedar_course_codes"]])
+  plan_courses <- marks$courses
+  plans <- marks$plans
   all_courses <- courses %>%
     filter(n_students >= min_n) %>%
     left_join(unit_labels, by = "dept_code") %>%
     mutate(unit_label = case_when(is.na(dept_code) ~ no_unit, is.na(dept_name) ~ dept_code, TRUE ~ dept_name)) %>%
     left_join(course_facts, by = "subject_course") %>%
-    left_join(gen_ed, by = "subject_course") %>%
     left_join(plan_courses, by = "subject_course") %>%
     select(term, campus, in_progress, subject_course, title, unit_label, dept_code, is_own_unit, course_level,
            gen_ed_area, in_plan, n_students, term_students, share_of_students) %>%
