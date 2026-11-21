@@ -106,6 +106,45 @@ Kept until the next release, so a recurrence is recognisable; each entry below g
 
 # Defects
 
+## I75 — Graduation stayed blank for every session after a first visit to another page
+
+**Status:** fixed 2026-11-21 for Graduation (branch
+`graduation/fix-cached-wait`). The same shape is still in
+`R/modules/retention-dashboard.R` (four cached reactives with `req(active())`
+inside), harmless only while nothing reads them with the tab closed.
+**Found:** 2026-11-21, on production: clicking Bird's Eye > Graduation did
+nothing, with no loading overlay and no error.
+**Severity:** high: the page was blank for everyone until the next restart.
+**Affects:** `graduationServer()` in `R/modules/graduation.R`.
+
+### What was wrong
+
+The page's build was a reactive bound to the app-wide cache
+(`bindCache(..., cache = "app")`) with `req(isTRUE(active()), ...)` inside it.
+A cached reactive stores a failed `req()` like any other result. The plan
+picker's observer (added with the required-courses section) reads the build as
+soon as a session starts, on whatever page it opens. So the first session after
+a restart that opened anywhere but Graduation stored "not ready" under the
+default inputs' key, and every later session, on the tab or not, was handed
+that.
+
+The browser test opens Graduation directly, so the first read always happened
+with the tab open and the test passed.
+
+### Reproduce (before the fix)
+
+Restart the app; open the home page; then open Bird's Eye > Graduation with
+the default inputs. Nothing is drawn and the session log shows no build.
+
+### Fix
+
+The wait for the tab and its inputs moved to a plain reactive in front of the
+cached one. Still open: move the same wait out of Retention's cached
+reactives; and a build that fails is caught, returned as NULL and cached for
+the life of the process, so a passing fault also sticks until a restart (both
+pages). A browser check that opens another page first in a fresh process would
+have caught this; the suite has no such stage.
+
 ## I74 — The newest transfer class's "credits brought" band is tilted by who stayed
 
 **Status:** open; the page states it (Graduation > Still Here, and Moving
