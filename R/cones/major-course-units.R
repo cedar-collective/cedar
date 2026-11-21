@@ -334,9 +334,10 @@ prepare_major_course_units_top_units <- function(unit_rows, own_label, min_n = 1
 
 #' Narrow a major's course rows to the ones a reader asked for
 #'
-#' @param course_rows `compute_dept_course_units_tab()`'s `all_courses`: one
-#'   row per `term`, `campus` and course, with `is_own_unit`, `course_level`
-#'   and `gen_ed_area` (NA for a course in no Gen Ed area).
+#' @param course_rows Rows that name a course with `course_level` and
+#'   `gen_ed_area` (NA for a course in no Gen Ed area), and `is_own_unit`
+#'   when `taught_by` narrows them: `compute_dept_course_units_tab()`'s
+#'   `all_courses`, or Pathways' described course table.
 #' @param taught_by `"all"`, `"own"` (the members' own unit) or `"outside"`.
 #'   A course whose subject has no unit is in neither `"own"` nor `"outside"`
 #'   when the members' unit is unknown (`is_own_unit` NA), and outside otherwise.
@@ -344,7 +345,7 @@ prepare_major_course_units_top_units <- function(unit_rows, own_label, min_n = 1
 #' @param gen_ed `"all"`, `"gen_ed"` or `"not_gen_ed"`.
 #' @return The rows kept, columns unchanged.
 filter_major_course_rows <- function(course_rows, taught_by = "all", level = NULL, gen_ed = "all") {
-  missing <- setdiff(c("is_own_unit", "course_level", "gen_ed_area"), names(course_rows))
+  missing <- setdiff(c(if (taught_by != "all") "is_own_unit", "course_level", "gen_ed_area"), names(course_rows))
   if (length(missing) > 0) {
     stop("[major-course-units.R] course_rows lacks ", paste(missing, collapse = ", "), call. = FALSE)
   }

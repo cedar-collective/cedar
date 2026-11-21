@@ -189,6 +189,11 @@ Pathways controls, choose delivery campuses and enrolled-term count, and click
 **Show course paths**. This is a separate descriptive view of what students
 actually take. Changing the population clears its old result.
 
+Under the chart, **Courses inside the groups** lists each course with its
+title, level, Gen Ed area and, where a degree plan has been compiled for the
+population's majors, the plan that names it as required. Course group, course
+level and Gen Ed narrow the list.
+
 Term one is first observed undergraduate enrollment, anchored before campus
 filtering. Summer is included; gaps do not advance this enrolled-term clock.
 The report stops at settled enrollment and respects the population's leaving

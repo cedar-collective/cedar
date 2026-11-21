@@ -769,6 +769,17 @@ try {
   const table = await readReactable(page, 'pathways-course_paths-path_courses');
   check(!table.error && table.rows.length > 0 && colIndex(table.headers, 'Campus') >= 0,
     'moved course detail retains observed data and delivery campus');
+  check(['Title', 'Level', 'Gen Ed', 'Degree plan'].every((h) => colIndex(table.headers, h) >= 0),
+    'each listed course is described: title, level, Gen Ed area and degree plan');
+  const listed = table.rows.length;
+  await setInput(page, 'pathways-course_paths-detail_gen_ed', 'gen_ed');
+  await waitForIdle(page, { timeout: 30000 });
+  const genEdOnly = await readReactable(page, 'pathways-course_paths-path_courses');
+  const genEdCol = colIndex(genEdOnly.headers, 'Gen Ed');
+  check(!genEdOnly.error && genEdOnly.rows.every((row) => row[genEdCol] && row[genEdCol] !== '\u2014'),
+    `"Gen Ed only" lists only Gen Ed courses (${genEdOnly.rows?.length} of ${listed} rows shown)`);
+  await setInput(page, 'pathways-course_paths-detail_gen_ed', 'all');
+  await waitForIdle(page, { timeout: 30000 });
   const selectedCampuses = await page.$eval('#pathways-course_paths-campus', el => el.selectize.getValue());
   await setInput(page, 'pathways-course_paths-campus', []);
   await runAndWait(page, 'pathways-course_paths-button');

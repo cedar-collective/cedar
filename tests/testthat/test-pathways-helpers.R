@@ -71,6 +71,23 @@ test_that("the courses inside the groups read as one row per campus and course, 
   langs <- degree_path_course_table(p, "languages")
   expect_true(nrow(langs) > 0L && all(langs$group_id == "languages"))
   expect_error(degree_path_course_table(list(courses = p$courses["campus"], meta = p$meta)), "Course detail missing")
+
+  # Described: each course's title, level and Gen Ed area ride after its code,
+  # the rows and their cells unchanged.
+  dimension <- suppressMessages(build_cedar_courses(test_sections[0, ], test_students_mc, test_dims))
+  facts <- describe_courses(t$subject_course, dimension$courses, dimension$codes)
+  expect_equal(names(facts), c("subject_course", "title", "course_level", "gen_ed_area"))
+  expect_false(anyDuplicated(facts$subject_course) > 0L)
+  described <- degree_path_course_table(p, descriptions = facts)
+  expect_equal(names(described)[match("subject_course", names(described)) + 1:3], c("title", "course_level", "gen_ed_area"))
+  expect_equal(described[names(t)], t)
+  expect_equal(described$course_level, course_level_from_number(described$subject_course))
+  # The page's level and Gen Ed controls narrow the described rows.
+  expect_true(all(filter_major_course_rows(described, level = "lower")$course_level == "lower"))
+  expect_equal(nrow(filter_major_course_rows(described, gen_ed = "gen_ed")) +
+                 nrow(filter_major_course_rows(described, gen_ed = "not_gen_ed")), nrow(described))
+  expect_error(degree_path_course_table(p, descriptions = dplyr::bind_rows(facts, facts)), "one row per subject_course")
+  expect_error(describe_courses("HIST 1110", dimension$courses["course_id"], dimension$codes), "courses lacks")
 })
 
 test_that("pathways_level_filter translates UI values to CEDAR level values", {

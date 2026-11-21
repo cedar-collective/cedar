@@ -489,7 +489,7 @@ test_that("compute_dept_course_units_tab reads the majors' teaching units and po
   expect_setequal(unique(rows$subject_course[!is.na(rows$in_plan)]), c("HIST 1110", "MATH 1215"))
   expect_equal(unique(rows$in_plan[rows$subject_course == "HIST 1110"]), "History B.A.")
   planned$cedar_programs <- dplyr::select(st01_plan$programs, -major_code)
-  expect_error(compute_dept_course_units_tab(base, planned, min_n = 1L, boards = st01_plan$boards), "lacks major_code")
+  expect_error(compute_dept_course_units_tab(base, planned, min_n = 1L, boards = st01_plan$boards), "lack major_code")
   # Graded through the latest term: nothing is in progress.
   expect_false(any(result$tables$own_share$in_progress))
   expect_false(result$meta$latest_in_progress)
