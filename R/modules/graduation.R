@@ -5,7 +5,8 @@
 # many credits they had when they stopped, when they stopped, where they stood
 # against the general standards for aid, and which colleges and majors the
 # far-along ones were in, and in the courses their program's degree plan
-# names, how many tried here and never passed. Then each fall's first-time
+# names, how many tried here and never passed. Then the students who pass
+# 160 attempted credits with no degree, and each fall's first-time
 # students: still enrolled as each year begins, and at what pace of credits.
 #
 # The module holds no analysis: it collects the level, the home campuses and
@@ -73,6 +74,18 @@ graduationUI <- function(id, campuses) {
       uiOutput(ns("plan_note")),
       plotly::plotlyOutput(ns("required_plot"), height = "auto"),
       reactable::reactableOutput(ns("required_table"))
+    ),
+    dashboard_section(
+      "At 160 Attempted Credits",
+      "When students pass 160 attempted credits with no degree yet, where did the credits come from, and what happens next?",
+      method = uiOutput(ns("method_ceiling")),
+      uiOutput(ns("ceiling_lead")),
+      plotly::plotlyOutput(ns("ceiling_parts_plot"), height = "auto"),
+      dashboard_subsection(
+        "What happened next",
+        "By each term after they passed it, how many had a degree, were still enrolled, or were not enrolled?",
+        uiOutput(ns("ceiling_outcome_note")),
+        plotly::plotlyOutput(ns("ceiling_outcomes_plot"), height = "380px"))
     ),
     dashboard_section(
       "Still Here, and Moving Forward?",
@@ -252,6 +265,43 @@ graduationServer <- function(id, student_terms, programs, degrees, terms, dims, 
           passed = cedar_count_coldef("Passed here"),
           none = cedar_count_coldef("No attempt here")))
     })
+    output$ceiling_lead <- renderUI({
+      p <- payload(); req(p)
+      if (p$ceiling$meta$n_passed == 0L) return(empty_state(graduation_ceiling_lead(p$ceiling)))
+      lead_text(graduation_ceiling_lead(p$ceiling))
+    })
+    output$ceiling_parts_plot <- plotly::renderPlotly({
+      p <- payload(); req(p, p$ceiling$meta$n_passed > 0L); plot_ceiling_parts(p$ceiling)
+    })
+    output$ceiling_outcome_note <- renderUI({
+      p <- payload(); req(p, p$ceiling$meta$n_passed > 0L); tags$p(graduation_ceiling_outcome_note(p$ceiling))
+    })
+    output$ceiling_outcomes_plot <- plotly::renderPlotly({
+      p <- payload(); req(p, nrow(graduation_ceiling_outcomes(p$ceiling)) > 0L); plot_ceiling_outcomes(p$ceiling)
+    })
+    output$method_ceiling <- renderUI({
+      p <- payload(); req(p)
+      m <- p$ceiling$meta
+      tags$ul(
+        tags$li(paste0(m$ceiling, " attempted credits is a general standard for aid, computed here. The data holds no ",
+                       "record of anyone's aid, so this is who would no longer have met the standard, not who lost aid.")),
+        tags$li(paste0("Attempted credits are counted term by term from the class lists, with the credit a student ",
+                       "brought from elsewhere (transfer, test and dual credit) added. A student passes in the first ",
+                       "enrolled term that ends at or past ", m$ceiling, ", at this level and home campus that term.")),
+        tags$li(paste0("Not placed, because the passing cannot be seen: ", n(m$n_not_readable),
+                       " students whose record began before the class lists, and ", n(m$n_already_past),
+                       " already past it in their first term on record. ", n(m$n_prior_degree),
+                       " who already held a degree are left out. Because earlier records cannot be read, the count ",
+                       "of students passing each term is not shown as a trend: it would rise only because more ",
+                       "records become readable.")),
+        tags$li(paste0("Attempted here, not completed, is credit for courses failed, withdrawn from, left incomplete ",
+                       "or repeated. The three parts are averages, so they add to the average total.")),
+        tags$li(paste0("What happened next counts only the students whose later term is settled (enrollment through ",
+                       fmt_term(m$settled_edge), ", degrees through ", fmt_term(m$degree_edge),
+                       "), so each bar has its own number of students, in the hover. A bar with fewer than ",
+                       GRADUATION_CEILING_MIN_N, " is not drawn. Passing terms run through ", fmt_term(m$edge), ".")))
+    })
+
     pace_step <- reactive({ req(input$pace_step); as.integer(input$pace_step) })
     pace_drawn <- function(p) nrow(graduation_pace_shares(p$pace, pace_step())) > 0L
     output$pace_lead <- renderUI({

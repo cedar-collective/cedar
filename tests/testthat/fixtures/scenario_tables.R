@@ -2095,8 +2095,10 @@ xc01 <- local({
     student_campus = if (id == "X-I") "EA" else "ABQ",
     primary_major_code = if (id %in% c("X-K", "X-B")) "HIST" else "ANTH", primary_college_code = "AS",
     is_pre_major = FALSE, completed_unm_credits = 12, attempted_unm_credits = 12,
-    # No one here is called first-time, so the page's entering classes are empty.
-    cumulative_completed_unm_credits = 12, timeline_valid = TRUE)
+    # No one here is called first-time, so the page's entering classes are empty,
+    # and no one's attempted credits come near the ceiling.
+    cumulative_completed_unm_credits = 12, timeline_valid = TRUE,
+    unm_credits_entering = 0, cumulative_attempted_unm_credits = 12)
   student_terms <- dplyr::bind_rows(
     lapply(names(last), function(id) row(id, last[[id]])),
     row("X-J", 202010L), row("X-G", 202080L), row("X-G", 202180L, "GR"))
@@ -2105,7 +2107,7 @@ xc01 <- local({
     program_code = if (id %in% c("X-K", "X-B")) "BA-HIST-AS" else if (id == "X-J") "BA-ANTH-AS" else "BA-FANT-AS",
     # X-A brought 60 credits from elsewhere; everyone else earned all of theirs here.
     inst_credits_earned = if (id == "X-A") earned - 60 else earned, overall_credits_earned = earned,
-    overall_credits_attempted = attempted, inst_gpa = gpa, pell_eligible = pell,
+    overall_credits_attempted = attempted, inst_credits_attempted = attempted, inst_gpa = gpa, pell_eligible = pell,
     as_of_date = as.Date(as_of))
   programs <- dplyr::bind_rows(
     stamp("X-A", 202110L, 100, 110, 2.5, TRUE), stamp("X-A", 202110L, 100, 110, 2.5, TRUE),
@@ -2166,6 +2168,52 @@ xc01 <- local({
     opt = list(student_level = "UG", min_n = 1L,
                data_edges = list(last_enrolled_complete = 202280L, last_graded = 202280L,
                                  last_degree = 202280L)))
+})
+
+# CC01: undergraduates passing 160 attempted credits (test-credit-ceiling.R).
+# Settled, graded and degrees posted through Fall 2022. ABQ undergraduates
+# unless said. Credit from elsewhere, then the running attempted credits here
+# after each enrolled term (completed here in brackets where it differs):
+#   C-A  120 elsewhere; 15, 30, 45 [36] in Fall 2020, Spring 2021, Fall 2021:
+#        passes in Fall 2021 at 165 (9 not completed). Enrolled Spring 2022,
+#        awarded a degree that term.
+#   C-B  none elsewhere; 60, 120, 165 [150]: passes in Fall 2021 (15 not
+#        completed). Enrolled Spring and Fall 2022, no degree.
+#   C-C  150 elsewhere; 12 in Fall 2021: passes at 162, awarded a degree that term.
+#   C-D  150 elsewhere; 15 in Spring 2022: passes at 165, then not enrolled.
+#   C-I  150 elsewhere; 12 in Fall 2022: passes in the last settled term.
+#   C-E  170 elsewhere: already past in their first term.
+#   C-F  a record that began before the class lists: not readable.
+#   C-G  awarded a degree in Fall 2020, passes in Fall 2021: a second degree.
+#   C-H  a graduate student passing in Fall 2021: another level.
+#   C-J  10 elsewhere; 15, 30: never near.
+# Five pass: three in Fall 2021, one in Spring 2022, one in Fall 2022.
+cc01 <- local({
+  row <- function(id, term, after, completed = after, level = "UG", valid = TRUE) tibble::tibble(
+    student_id = id, term = term, enrolled = TRUE, student_level = level, student_campus = "ABQ",
+    primary_major_code = "HIST", cumulative_attempted_unm_credits = after,
+    cumulative_completed_unm_credits = completed, timeline_valid = valid)
+  student_terms <- dplyr::bind_rows(
+    row("C-A", 202080L, 15), row("C-A", 202110L, 30), row("C-A", 202180L, 45, 36), row("C-A", 202210L, 60, 51),
+    row("C-B", 202080L, 60), row("C-B", 202110L, 120), row("C-B", 202180L, 165, 150),
+    row("C-B", 202210L, 180, 165), row("C-B", 202280L, 195, 180),
+    row("C-C", 202180L, 12), row("C-D", 202210L, 15), row("C-I", 202280L, 12),
+    row("C-E", 202180L, 12), row("C-F", 202180L, 170, valid = FALSE),
+    row("C-G", 202080L, 150), row("C-G", 202180L, 165),
+    row("C-H", 202180L, 165, level = "GR"),
+    row("C-J", 202080L, 15), row("C-J", 202110L, 30)) %>%
+    dplyr::group_by(student_id) %>%
+    dplyr::mutate(unm_credits_entering = dplyr::lag(cumulative_attempted_unm_credits, default = 0)) %>%
+    dplyr::ungroup()
+  elsewhere <- c(`C-A` = 120, `C-B` = 0, `C-C` = 150, `C-D` = 150, `C-I` = 150, `C-E` = 170, `C-F` = 0,
+                 `C-G` = 0, `C-H` = 0, `C-J` = 10)
+  list(student_terms = student_terms,
+       programs = tibble::tibble(student_id = names(elsewhere), inst_credits_attempted = 30,
+                                 overall_credits_attempted = 30 + unname(elsewhere)),
+       degrees = tibble::tibble(student_id = c("C-A", "C-C", "C-G"), term = c(202210L, 202180L, 202080L)),
+       opt = list(student_level = "UG", campus = "ABQ",
+                  data_edges = list(last_enrolled_complete = 202280L, last_graded = 202280L,
+                                    last_degree = 202280L)))
 })
 
 # RR01: four falls (202080, 202180, 202280, 202380, k = 1..4) of the same

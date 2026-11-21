@@ -39,6 +39,10 @@
       
       ### Credits earned here by the middle enrolled student, before each regular term since entering
         No class has credits on record.
+      
+      ## Passing 160 attempted credits with no degree yet
+      No student in this scope passed 160 attempted credits where it can be seen.
+      Not placed: 0 whose record began before the class lists, 0 already past it in their first term on record, 0 who already held a degree.
 
 # XC01: the page's words
 
@@ -87,6 +91,10 @@
       
       ### Credits earned here by the middle enrolled student, before each regular term since entering
         No class has credits on record.
+      
+      ## Passing 160 attempted credits with no degree yet
+      No student in this scope passed 160 attempted credits where it can be seen.
+      Not placed: 0 whose record began before the class lists, 0 already past it in their first term on record, 0 who already held a degree.
     Code
       cat("\n", graduation_headline(none), "\n")
     Output
