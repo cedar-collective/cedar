@@ -141,8 +141,14 @@ Graduation's and Retention's shared results are read through
 `cedar_shared_result()` inside a plain reactive, after its `req()`. A build that
 fails returns NULL to the session that asked and is not stored, so the next
 read tries again. No module binds a reactive to the app-wide cache with a
-`req()` inside. Still open: the browser suite has no stage that starts a fresh
-process and opens another page first, which is what would have caught this.
+`req()` inside, and `test-architecture.R` fails on one.
+
+Why no test caught it: every `./run-tests.sh --e2e` run begins with a warm-up
+session on the home page, which is the condition, but the suites were run
+directly with `node` after a rebuild, and CI's tour (`demo`) did not open
+either page. The tour now opens Graduation and Retention in a session that
+began on the home page (`reports-smoke.test.mjs`, smoke scope, so CI's fresh
+app runs it on every PR). Confirmed by putting the fault back: the step fails.
 
 ## I74 — The newest transfer class's "credits brought" band is tilted by who stayed
 

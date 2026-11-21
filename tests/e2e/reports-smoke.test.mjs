@@ -12,6 +12,7 @@ import {
   click,
   clickNavTab,
   waitForIdle,
+  waitFor as waitForCondition,
   explainAppReload,
 } from './lib.mjs';
 import assert from 'node:assert/strict';
@@ -241,6 +242,24 @@ export async function runReportChecks({ scope = 'smoke', synthetic = false } = {
         }));
       });
     }
+
+    // Graduation and Retention share one built result across every session.
+    // This session began on the home page, as the warm-up's did, so on a fresh
+    // process their first read happened with the tab closed. A page that kept
+    // that "not ready" for everyone stays blank here (ISSUES I75).
+    await withStep(page, ['smoke'], 'Pages that share results build after a start on another page', async () => {
+      for (const [nav, slug, ns, outputs] of [
+        ['Graduation', 'graduation', 'graduation-', ['headline', 'bands_plot']],
+        ['Retention', 'retention', 'retention_dashboard-', ['overall_finding', 'overall_plot']],
+      ]) {
+        await openReport(page, nav, slug);
+        const built = await waitForCondition(page, (prefix, ids) => ids.some((id) => {
+          const el = document.getElementById(prefix + id);
+          return !!el && (el.innerText.trim().length > 0 || !!el.querySelector('.plot-container'));
+        }), { timeout: STEP_TIMEOUT, args: [ns, outputs] });
+        assert.ok(built, `${nav} drew nothing after the session began on another page`);
+      }
+    });
 
     await withStep(page, ['headcount'], 'Dept Dashboard runs', async () => {
       await openReport(page, 'Dept Dashboard', 'dept-dashboard');
