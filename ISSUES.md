@@ -108,10 +108,9 @@ Kept until the next release, so a recurrence is recognisable; each entry below g
 
 ## I75 — Graduation stayed blank for every session after a first visit to another page
 
-**Status:** fixed 2026-11-21 for Graduation (branch
-`graduation/fix-cached-wait`). The same shape is still in
-`R/modules/retention-dashboard.R` (four cached reactives with `req(active())`
-inside), harmless only while nothing reads them with the tab closed.
+**Status:** resolved 2026-11-21. Graduation first (PR #370), then both pages
+moved to `cedar_shared_result()` (`R/modules/ui-helpers.R`), which stores only
+a built result: never a failed `req()`, never a failed build.
 **Found:** 2026-11-21, on production: clicking Bird's Eye > Graduation did
 nothing, with no loading overlay and no error.
 **Severity:** high: the page was blank for everyone until the next restart.
@@ -138,12 +137,12 @@ the default inputs. Nothing is drawn and the session log shows no build.
 
 ### Fix
 
-The wait for the tab and its inputs moved to a plain reactive in front of the
-cached one. Still open: move the same wait out of Retention's cached
-reactives; and a build that fails is caught, returned as NULL and cached for
-the life of the process, so a passing fault also sticks until a restart (both
-pages). A browser check that opens another page first in a fresh process would
-have caught this; the suite has no such stage.
+Graduation's and Retention's shared results are read through
+`cedar_shared_result()` inside a plain reactive, after its `req()`. A build that
+fails returns NULL to the session that asked and is not stored, so the next
+read tries again. No module binds a reactive to the app-wide cache with a
+`req()` inside. Still open: the browser suite has no stage that starts a fresh
+process and opens another page first, which is what would have caught this.
 
 ## I74 — The newest transfer class's "credits brought" band is tilted by who stayed
 

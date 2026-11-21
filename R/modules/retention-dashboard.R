@@ -182,7 +182,7 @@ retentionDashboardServer <- function(id, student_terms, attempts, degrees, progr
     college_names <- college_code_names(dims)
     payload <- reactive({
       req(isTRUE(active()), input$term_type, input$level)
-      cedar_with_loading(session, session$ns("load"), report_type = "retention_dashboard", {
+      cedar_shared_result(list("retention_dashboard", input$term_type, input$level, input$campus), function() cedar_with_loading(session, session$ns("load"), report_type = "retention_dashboard", {
         tryCatch(
           build_retention_dashboard(student_terms, attempts, degrees, list(
             term_type = input$term_type, student_level = input$level,
@@ -192,36 +192,37 @@ retentionDashboardServer <- function(id, student_terms, attempts, degrees, progr
             showNotification(paste("Retention:", conditionMessage(e)), type = "error", duration = 10)
             NULL
           })
-      })
-    # Shared by every session: the tables are fixed for the life of the
-    # process, so the first reader after a start waits and the rest do not.
-    }) |> bindCache(input$term_type, input$level, input$campus, cache = "app")
+      }))
+    # Shared by every session (cedar_shared_result()): the tables are fixed for
+    # the life of the process, so the first reader after a start waits and the
+    # rest do not.
+    })
 
     # The course list is the slowest part: read after the charts above it.
     courses <- reactive({
       p <- payload(); req(p, nrow(p$series) > 0L)
-      tryCatch(
+      cedar_shared_result(list("retention_courses", input$term_type, input$level, input$campus), function() tryCatch(
         retention_dashboard_course_list(student_terms, attempts, degrees, p$series, list(
           student_level = input$level, campus = if (length(input$campus) > 0) input$campus else NULL,
           data_edges = edges)),
         error = function(e) {
           showNotification(paste("Courses:", conditionMessage(e)), type = "error", duration = 10)
           NULL
-        })
-    }) |> bindCache(input$term_type, input$level, input$campus, cache = "app")
+        }))
+    })
 
     bands <- reactive({
       req(isTRUE(active()), input$term_type, input$band_by)
       if (identical(input$band_by, "hs") && is.null(applicants)) return(NULL)
-      tryCatch(
+      cedar_shared_result(list("retention_bands", input$term_type, input$campus, input$band_by), function() tryCatch(
         retention_dashboard_band_courses(attempts, student_terms, applicants, list(
           term_type = input$term_type, campus = if (length(input$campus) > 0) input$campus else NULL,
           data_edges = edges, band_by = input$band_by)),
         error = function(e) {
           showNotification(paste("Courses by GPA:", conditionMessage(e)), type = "error", duration = 10)
           NULL
-        })
-    }) |> bindCache(input$term_type, input$campus, input$band_by, cache = "app")
+        }))
+    })
     output$bands_finding <- renderUI({
       b <- bands()
       if (is.null(b)) return(empty_state("This reading needs high-school GPAs, which this installation does not hold, or could not be built; a notification says why."))
@@ -254,7 +255,7 @@ retentionDashboardServer <- function(id, student_terms, attempts, degrees, progr
     milestones <- reactive({
       req(isTRUE(active()), input$term_type, input$level, input$entry)
       entry <- RETENTION_ENTRY_OPTIONS[[input$entry]]
-      tryCatch(
+      cedar_shared_result(list("retention_milestones", input$term_type, input$level, input$campus, input$entry), function() tryCatch(
         retention_dashboard_milestones(student_terms, degrees, list(
           term_type = input$term_type, student_level = input$level,
           campus = if (length(input$campus) > 0) input$campus else NULL, data_edges = edges,
@@ -262,8 +263,8 @@ retentionDashboardServer <- function(id, student_terms, attempts, degrees, progr
         error = function(e) {
           showNotification(paste("Entering classes:", conditionMessage(e)), type = "error", duration = 10)
           NULL
-        })
-    }) |> bindCache(input$term_type, input$level, input$campus, input$entry, cache = "app")
+        }))
+    })
 
     output$overall_finding <- renderUI({
       p <- payload()
