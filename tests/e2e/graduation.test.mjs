@@ -1,0 +1,102 @@
+// Bird's Eye > Graduation: where students leave without a degree, and how far
+// along they were (R/modules/graduation.R over build_graduation_dashboard()).
+//
+// Asserts the tab opens on undergraduates, the main home campus and the 90
+// credit line, and builds without a run button: the lead sentence, one bar a
+// credit band, the bar chart by last term, the standing table (one row a band,
+// its aid-standard column group), the college and major tables with names, and
+// every method slot filled; a re-read when the credit line changes; and the
+// home card's link.
+//
+//   node tests/e2e/graduation.test.mjs
+
+import { launch, connect, setInput, waitFor, waitForIdle, requireIds, readReactable } from './lib.mjs';
+
+const fail = [];
+const ok = (cond, msg) => { if (!cond) fail.push(msg); console.log(`${cond ? 'ok  ' : 'FAIL'} ${msg}`); };
+const NS = 'graduation-';
+
+const { browser, page, jsErrors } = await launch({ width: 1500, height: 1100 });
+
+const bars = (id) => page.evaluate((el) => {
+  const root = document.getElementById(el);
+  const p = root?.classList.contains('js-plotly-plot') ? root : root?.querySelector('.js-plotly-plot');
+  if (!p || !p.data) return null;
+  return { x: p.data[0].x || [], y: p.data[0].y || [], text: p.data[0].text || [], title: p.layout?.yaxis?.title?.text || '' };
+}, `${NS}${id}`);
+
+const waitBuilt = async () => {
+  await waitFor(page, () => {
+    const r = document.getElementById('graduation-bands_plot');
+    const p = r?.classList.contains('js-plotly-plot') ? r : r?.querySelector('.js-plotly-plot');
+    return !!(p && p.data && p.data.length);
+  }, { timeout: 300000 });
+  await waitForIdle(page, { timeout: 300000 });
+  await waitFor(page, () => !!document.querySelector('#graduation-major_table .rt-tbody'), { timeout: 300000 });
+};
+
+try {
+  await connect(page, { tab: 'graduation', expect: 'Graduation' });
+  await waitBuilt();
+  await requireIds(page, [`${NS}level`, `${NS}campus`, `${NS}line`, `${NS}headline`, `${NS}bands_plot`,
+                          `${NS}series_plot`, `${NS}standing_table`, `${NS}college_table`, `${NS}major_table`]);
+  const level = await page.$eval(`#${NS}level`, (el) => el.value);
+  ok(level === 'UG', `the page opens on undergraduates (${level})`);
+  const lineAt = await page.$eval(`input[name="${NS}line"]:checked`, (el) => el.value);
+  ok(lineAt === '90', `far along opens at 90 credits (${lineAt})`);
+
+  const lead = await page.$eval(`#${NS}headline`, (el) => el.innerText);
+  ok(/left without one/.test(lead) && /had 90 credits or more/.test(lead), `the lead counts who left and who was far along (${lead.slice(0, 70)})`);
+
+  const bands = await bars('bands_plot');
+  ok(bands && bands.x.length >= 6 && bands.x[0] === 'Under 30' && bands.x.includes('120 or more'),
+     `one bar a credit band (${bands?.x})`);
+  ok(bands?.text.length === bands?.x.length, 'each bar is labelled with its count');
+  const series = await bars('series_plot');
+  ok(series && series.x.length >= 2 && /90 credits or more/.test(series.title), `a bar for each last term (${series?.x.length}; ${series?.title})`);
+
+  const standing = await readReactable(page, `${NS}standing_table`, { limit: 10 });
+  ok(standing.rows?.length === bands?.x.length && standing.rows.every((r) => r.length === 7),
+     `the standing table has a row a band and seven columns (${standing.rows?.length})`);
+  const group = await page.$eval(`#${NS}standing_table`, (el) => el.innerText);
+  ok(/No longer met a general standard for aid/.test(group), 'the two standards sit under one labelled group');
+
+  const colleges = await readReactable(page, `${NS}college_table`, { limit: 5 });
+  ok(colleges.rows?.length > 0 && colleges.rows.every((r) => r[0].length > 3), `colleges are named, not coded (${colleges.rows?.map((r) => r[0]).slice(0, 3)})`);
+  const majors = await readReactable(page, `${NS}major_table`, { limit: 5 });
+  ok(majors.rows?.length > 0 && majors.rows.every((r) => r.length === 5), `the major table lists majors (${majors.rows?.length})`);
+
+  const methods = await page.evaluate((ns) => ['method_bands', 'method_series', 'method_standing', 'method_groups']
+    .map((id) => document.getElementById(ns + id)?.textContent.trim().length || 0), NS);
+  ok(methods.every((n) => n > 80), `every section's method is filled (${methods})`);
+
+  await page.screenshot({ path: '/tmp/cedar-graduation.png', fullPage: true });
+
+  await setInput(page, `${NS}line`, '120');
+  const reread = await waitFor(page, () => {
+    const r = document.getElementById('graduation-series_plot');
+    const p = r?.classList.contains('js-plotly-plot') ? r : r?.querySelector('.js-plotly-plot');
+    return /120 credits or more/.test(p?.layout?.yaxis?.title?.text || '');
+  }, { timeout: 300000 });
+  ok(reread, 'the 120 line re-reads the page');
+  await waitBuilt();
+  const lead120 = await page.$eval(`#${NS}headline`, (el) => el.innerText);
+  ok(/had 120 credits or more\.$/.test(lead120.trim()), `the lead follows the line (${lead120.slice(-50)})`);
+
+  await connect(page, { tab: 'home' });
+  const card = await page.evaluate(() => [...document.querySelectorAll('a[href]')].some((a) => a.getAttribute('href') === '?tab=graduation'));
+  ok(card, 'the home page links to Graduation');
+
+  ok(jsErrors.length === 0, `no page errors (${jsErrors.join('; ')})`);
+} catch (e) {
+  fail.push(String(e));
+  console.log(`FAIL ${e}`);
+} finally {
+  await browser.close();
+}
+
+if (fail.length) {
+  console.log(`\n${fail.length} failed`);
+  process.exit(1);
+}
+console.log('\nall passed');

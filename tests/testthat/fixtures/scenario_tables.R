@@ -2049,13 +2049,15 @@ ec01 <- local({
 #        115 to 119.
 #   X-K  Spring 2021; 125 earned; a degree dated Spring 2023, past the degree
 #        edge, so not yet a degree. 120 or more.
-# Eight judged last terms: one with a degree, seven left.
+# Eight judged last terms: one with a degree, seven left. X-B and X-K are
+# History majors, the rest Anthropology; every one in college AS.
 xc01 <- local({
   last <- c(`X-A` = 202110L, `X-B` = 202110L, `X-C` = 202080L, `X-D` = 202110L, `X-E` = 202210L,
             `X-F` = 202280L, `X-H` = 202110L, `X-I` = 202110L, `X-J` = 202110L, `X-K` = 202110L)
   row <- function(id, term, level = "UG") tibble::tibble(
     student_id = id, term = term, enrolled = TRUE, student_level = level,
-    student_campus = if (id == "X-I") "EA" else "ABQ", primary_major_code = "HIST",
+    student_campus = if (id == "X-I") "EA" else "ABQ",
+    primary_major_code = if (id %in% c("X-K", "X-B")) "HIST" else "ANTH", college = "AS",
     completed_unm_credits = 12, attempted_unm_credits = 12)
   student_terms <- dplyr::bind_rows(
     lapply(names(last), function(id) row(id, last[[id]])),
