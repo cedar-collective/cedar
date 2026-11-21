@@ -4294,7 +4294,8 @@ for (.download_key in names(.enrl_desr_view_ids)) {
                    programs = data_objects[["cedar_programs"]], degrees = cedar_degrees,
                    terms = data_objects[["cedar_terms"]], dims = data_objects[["cedar_dims"]],
                    edges = data_objects[["cedar_edges"]],
-                   active = reactive(identical(input$main_navbar, "Graduation")))
+                   active = reactive(identical(input$main_navbar, "Graduation")),
+                   attempts = data_objects[["cedar_attempts"]], boards = CEDAR_DEGREE_BOARDS)
 
   # ===========================================================================
   # Waitlists tab (Shiny module)

@@ -20,6 +20,14 @@ optional styling suggestions. The data/API contract is in
   now supplies illustrative Gen Ed coverage and standard upper-credit context.
   It is not a student audit; grades, transfer, approvals and conditional
   alternatives remain unevaluated.
+- **One group count reads student records against a board:** Bird's Eye >
+  Graduation counts, for students who left without a degree, who passed each
+  named course of their program's board here, who tried and never passed, and
+  who has no attempt (`get_exit_requirement_progress()`). It is still not an
+  audit: the board is the current catalog's, choices and elective space are
+  not read, and "no attempt here" is never called "still required". Nothing
+  else may read a student against a board, and nothing may do it for one
+  student.
 - Degree totals, Gen Ed areas, college-taught credits, upper-division credits
   and residence are overlapping constraints. Never add all thresholds or
   duplicate earned credit. Allocate approved major/Gen Ed overlaps before

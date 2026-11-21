@@ -66,7 +66,20 @@ try {
   const majors = await readReactable(page, `${NS}major_table`, { limit: 5 });
   ok(majors.rows?.length > 0 && majors.rows.every((r) => r.length === 6), `the major table lists majors with their codes (${majors.rows?.length})`);
 
-  const methods = await page.evaluate((ns) => ['method_bands', 'method_series', 'method_standing', 'method_groups']
+  const plans = await page.$$eval(`#${NS}plan option`, (os) => os.map((o) => o.textContent));
+  ok(plans.length > 0 && plans.every((t) => /\(\d[\d,]* students\)$/.test(t)), `degree plans are listed with their students (${plans.length})`);
+  const requiredTraces = () => {
+    const r = document.getElementById('graduation-required_plot');
+    const p = r?.classList.contains('js-plotly-plot') ? r : r?.querySelector('.js-plotly-plot');
+    return p?.data?.length === 3 ? p.data.map((t) => t.name) : null;
+  };
+  await waitFor(page, requiredTraces, { timeout: 300000 });
+  const required = await page.evaluate(requiredTraces);
+  ok(required?.[0] === 'Tried here, never passed', `the chart leads with tried and never passed (${required})`);
+  const courses = await readReactable(page, `${NS}required_table`, { limit: 5 });
+  ok(courses.rows?.length > 0 && courses.rows.every((r) => r.length === 5), `the plan's courses are listed (${courses.rows?.length})`);
+
+  const methods = await page.evaluate((ns) => ['method_bands', 'method_series', 'method_standing', 'method_groups', 'method_required']
     .map((id) => document.getElementById(ns + id)?.textContent.trim().length || 0), NS);
   ok(methods.every((n) => n > 80), `every section's method is filled (${methods})`);
 

@@ -55,7 +55,29 @@ The far-along students by their primary major in their last term, and that
 major's college. A major with fewer than 10 such students is counted with all
 other majors.
 
+## The Courses Their Program Requires
+
+For the far-along students in a program with a degree plan on file, choose a
+plan to see each course it names and how many of those students:
+
+- **tried it here and never passed**: a grade or a late withdrawal, and no
+  passing grade. This is the count to read. It says a student met the course
+  and did not get through it. Everyone counted left without a degree, so it
+  is how many of the leavers had failed the course, not how many of the
+  course's students went on to leave, and not a claim that the course is why;
+- **passed it here**;
+- **have no attempt here**. This is not the same as still required. Most
+  students who leave far along earned most of their credits somewhere else, and
+  the class lists begin in 2019, so the course may have been met by transfer or
+  test credit, or in an earlier term. The section says how many credits these
+  students earned here.
+
+The plan is the current catalog's, not the one each student entered under.
+Choices, elective space, general education and the math and English starting
+courses are not read. A course no one had taken under the plan's number by
+then shows a dash. A plan with fewer than 10 such students is not listed.
+
 ## Not yet on the page
 
-What each student's major still required. That needs a reviewed requirement
-file for each program; see the roadmap.
+Programs with no degree plan on file, and a plan's choices and elective space;
+see the roadmap.
