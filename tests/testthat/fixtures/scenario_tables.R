@@ -2176,6 +2176,32 @@ xc01 <- local({
                                  last_degree = 202280L)))
 })
 
+# ST01's degree plan (test-dept-report.R, Courses Taken): History B.A., keyed
+# on Banner's BA-HIST-AS, which the declarations give major code HIST. It
+# names HIST 1110 and MATH 1215 as required; its upper-level choice names no
+# course. Anthropology's plan belongs to no HIST major and is not read.
+st01_plan <- list(
+  programs = tibble::tibble(major_code = c("HIST", "ANTH"), program_code = c("BA-HIST-AS", "BA-ANTH-AS")),
+  boards = list(
+    catalog = list(
+      catalogs = tibble::tibble(catalog_id = c("hist-ba", "anth-ba"),
+                                degree_label = c("History B.A.", "Anthropology B.A.")),
+      program_codes = tibble::tibble(catalog_id = c("hist-ba", "anth-ba"),
+                                     program_code = c("BA-HIST-AS", "BA-ANTH-AS"), is_pre_major = FALSE)),
+    roadmaps = list(
+      nodes = tibble::tribble(
+        ~catalog_id, ~node_id, ~track, ~kind,    ~code,          ~title,        ~semester,
+        "hist-ba",   "survey", "main", "major",  "HIST 1110",    "Survey",      1L,
+        "hist-ba",   "math",   "main", "major",  "MATH 1215",    "Math",        1L,
+        "hist-ba",   "upper",  "main", "choice", "HIST 300-499", "Upper-level", 5L,
+        "anth-ba",   "intro",  "main", "major",  "ENGL 1110",    "Composition", 1L),
+      courses = tibble::tribble(
+        ~catalog_id, ~node_id, ~subject_course,
+        "hist-ba",   "survey", "HIST 1110",
+        "hist-ba",   "math",   "MATH 1215",
+        "anth-ba",   "intro",  "ENGL 1110"),
+      options = tibble::tibble(catalog_id = character(), node_id = character()))))
+
 # CC01: undergraduates passing 160 attempted credits (test-credit-ceiling.R).
 # Settled, graded and degrees posted through Fall 2022. ABQ undergraduates
 # unless said. Credit from elsewhere, then the running attempted credits here

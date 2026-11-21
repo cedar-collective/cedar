@@ -57,7 +57,7 @@ deptTrendsUI <- function(id, sections, dept_choices, current_term = NULL) {
 
 deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
                              error_handler = NULL, scope_info_ui = NULL,
-                             dfw_password = NULL) {
+                             dfw_password = NULL, boards = NULL) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
 
@@ -365,7 +365,7 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
       req(base)
       tryCatch({
         payload <- compute_dept_course_units_tab(base, data_objects, active_scope()$campus,
-                                                 program_code = program_code)
+                                                 program_code = program_code, boards = boards)
         for (cmp in payload$meta$chart_campuses) local({
           campus_key <- cmp
           output[[paste0("mcu_college_share_", campus_key)]] <- renderPlotly({
@@ -573,7 +573,10 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
           "The full list, the department's own courses included: how many of these majors were in each course, term by term.",
           method = tags$p(paste0("Every course with ", meta$min_n, " or more of these majors in it in a term, over the term types ticked above; a blank cell is a term under ",
                  meta$min_n, ", which is not shown. Share is the majors counted in the course over the campus's majors in the terms shown, so a course most of them take once in four years reads as a small share of any one term. ",
-                 "Level is the course number's; Gen Ed is the area the institution lists the course under. A course is counted under the code it has now.")),
+                 "Level is the course number's; Gen Ed is the area the institution lists the course under. A course is counted under the code it has now. ",
+                 if (length(meta$plans) > 0L) paste0("Degree plan marks a course that a plan names as required (", paste(meta$plans, collapse = ", "),
+                                                      "); a choice among courses, an elective or a Gen Ed slot names no course and marks none. A plan compiled from the catalog is a draft until a reviewer signs it off.")
+                 else "No degree plan has been compiled for these majors yet, so no course is marked as required.")),
           if (nrow(data$tables$all_courses) == 0L) {
             empty_state(paste0("No course has ", meta$min_n, " or more of these majors in any term."))
           } else {
@@ -602,7 +605,7 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
       rows <- filter_major_course_rows(data$tables$all_courses, taught_by = input$mcu_list_taught_by,
                                        level = input$mcu_list_level %||% character(0), gen_ed = input$mcu_list_gen_ed)
       prepare_major_course_units_course_history(rows, terms = data$tables$own_share$term, term_types = mcu_term_types(),
-                                                keep = c("title", "is_own_unit", "course_level", "gen_ed_area"))
+                                                keep = c("title", "is_own_unit", "course_level", "gen_ed_area", "in_plan"))
     })
     output$mcu_all_courses_table <- reactable::renderReactable({
       history <- mcu_course_list()
@@ -617,8 +620,8 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
         dplyr::mutate(taught_by = dplyr::if_else(is_own_unit %in% TRUE, paste0(unit_label, " (this department)"), unit_label),
                       course_level = unname(c(lower = "Lower", upper = "Upper", grad = "Graduate")[course_level]))
       reactable::reactable(
-        display[c("campus", "subject_course", "title", "taught_by", "course_level", "gen_ed_area", "student_terms",
-                  "share_of_students", term_ids)],
+        display[c("campus", "subject_course", "title", "taught_by", "course_level", "gen_ed_area", "in_plan",
+                  "student_terms", "share_of_students", term_ids)],
         theme = cedar_tbl_theme, compact = TRUE, striped = TRUE, highlight = TRUE,
         searchable = TRUE, defaultPageSize = 25, showPageSizeOptions = TRUE, pageSizeOptions = c(25, 50, 200),
         columns = c(
@@ -629,6 +632,7 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
             taught_by = reactable::colDef(name = "Taught by", minWidth = 200),
             course_level = reactable::colDef(name = "Level", maxWidth = 100, na = "\u2014"),
             gen_ed_area = reactable::colDef(name = "Gen Ed", minWidth = 150, na = "\u2014"),
+            in_plan = reactable::colDef(name = "Degree plan", minWidth = 150, na = "\u2014"),
             student_terms = cedar_count_coldef("Majors, terms shown", minWidth = 110),
             share_of_students = cedar_percent_coldef("Share")
           ),

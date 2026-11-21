@@ -289,8 +289,8 @@ Page-level legibility is [M43](ISSUES.md)–M48; these are the new pieces.
   already offers (Undecided among them; `cedar_programs` holds its
   declarations), with no picker of its own. The unit's own courses are now
   listed course by course beside the outside ones, with level and Gen Ed
-  filters (Every Course These Majors Take, 2026-11-21). Later: mark the
-  courses a compiled degree plan names.
+  filters, and the courses a compiled degree plan names are marked (Every
+  Course These Majors Take, 2026-11-21).
 - [ ] **The mapping assistant proposes ADCW for a branch-only code.**
   `scripts/propose-mappings.R` stops at "no evidence settles the unit" for a
   subject or program whose only source department is the Provost Branch

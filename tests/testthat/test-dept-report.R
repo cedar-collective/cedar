@@ -445,8 +445,9 @@ test_that("compute_dept_course_units_tab reads the majors' teaching units and po
   data_objects$cedar_edges <- list(last_enrolled = 202110L, last_enrolled_complete = 202110L,
                                    last_graded = 202110L)
   # The course dimension, from the same class list: each course's title and level.
-  data_objects$cedar_courses <- suppressMessages(
-    build_cedar_courses(test_sections[0, ], test_students_st, test_dims))$courses
+  course_dimension <- suppressMessages(build_cedar_courses(test_sections[0, ], test_students_st, test_dims))
+  data_objects$cedar_courses <- course_dimension$courses
+  data_objects$cedar_course_codes <- course_dimension$codes
   base <- list(dept_code = "HIST", dept_name = "History")
 
   result <- compute_dept_course_units_tab(base, data_objects, min_n = 1L)
@@ -475,6 +476,20 @@ test_that("compute_dept_course_units_tab reads the majors' teaching units and po
   expect_true(all(listed$courses$share_of_students > 0 & listed$courses$share_of_students <= 1))
   expect_error(compute_dept_course_units_tab(base, utils::modifyList(data_objects, list(cedar_courses = NULL)), min_n = 1L),
                "lacks cedar_courses")
+  # With no degree plans, no course is marked.
+  expect_true(all(is.na(all$in_plan)))
+  expect_equal(result$meta$plans, character(0))
+  # ST01's plan: History B.A. names HIST 1110 and MATH 1215. ENGL 1110 is
+  # named by Anthropology's plan only, which no HIST major is in.
+  planned <- data_objects
+  planned$cedar_programs <- st01_plan$programs
+  marked <- compute_dept_course_units_tab(base, planned, min_n = 1L, boards = st01_plan$boards)
+  expect_equal(marked$meta$plans, "History B.A.")
+  rows <- marked$tables$all_courses
+  expect_setequal(unique(rows$subject_course[!is.na(rows$in_plan)]), c("HIST 1110", "MATH 1215"))
+  expect_equal(unique(rows$in_plan[rows$subject_course == "HIST 1110"]), "History B.A.")
+  planned$cedar_programs <- dplyr::select(st01_plan$programs, -major_code)
+  expect_error(compute_dept_course_units_tab(base, planned, min_n = 1L, boards = st01_plan$boards), "lacks major_code")
   # Graded through the latest term: nothing is in progress.
   expect_false(any(result$tables$own_share$in_progress))
   expect_false(result$meta$latest_in_progress)

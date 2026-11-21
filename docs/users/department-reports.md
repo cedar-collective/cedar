@@ -115,7 +115,9 @@ The tab reads from the top:
   ten or more of the majors in a term.
 - **Every course these majors take** — the full list, the department's own
   courses included, with each course's title, the department that teaches
-  it, its level and its Gen Ed area. A column per term gives the majors in
+  it, its level, its Gen Ed area, and the degree plan that names it as
+  required, where a plan has been compiled for these majors (a draft until
+  reviewed). A column per term gives the majors in
   the course; Share is those majors over the campus's majors in the terms
   shown. Three controls narrow the list: who teaches the course, its level,
   and Gen Ed or not.
