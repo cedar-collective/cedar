@@ -461,7 +461,7 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
       lapply(names(plots), function(cmp) tagList(
         section_heading(cmp, level = "h6"),
         plotlyOutput(ns(paste0("mcu_outside_", cmp)),
-                     height = paste0(110L + 26L * sum(listed$campus == cmp & listed$top), "px"))
+                     height = paste0(major_course_grid_height(sum(listed$campus == cmp & listed$top)), "px"))
       ))
     })
 

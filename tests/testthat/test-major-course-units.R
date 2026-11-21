@@ -417,6 +417,13 @@ test_that("RW01: the outside courses term by term, ranked over the terms kept", 
   expect_equal(names(grids), c("ABQ", "EA"))
   abq <- plotly::plotly_build(grids[["ABQ"]])$x$data[[1]]
   expect_equal(abq$type, "heatmap")
+  # One course (ISSUES I76): the colour scale's title is at its side and the
+  # grid is never shorter than four rows, or the scale has no room to draw.
+  built <- plotly::plotly_build(grids[["ABQ"]])$x
+  expect_equal(built$data[[1]]$colorbar$title$side, "right")
+  expect_equal(c(built$layout$margin$t, built$layout$margin$b), unname(MAJOR_COURSE_GRID_MARGIN))
+  expect_equal(major_course_grid_height(1L) - sum(MAJOR_COURSE_GRID_MARGIN), 4L * MAJOR_COURSE_GRID_ROW)
+  expect_equal(major_course_grid_height(15L), sum(MAJOR_COURSE_GRID_MARGIN) + 15L * MAJOR_COURSE_GRID_ROW)
   expect_equal(unique(as.character(abq$y)), "HIST 2110")
   expect_equal(as.character(abq$x), c("Fa 20", "Sp 21"))
   # 3 of the 3 SPAN majors registered on ABQ in Spring 2021; no row in Fall 2020.

@@ -361,6 +361,22 @@ filter_major_course_rows <- function(course_rows, taught_by = "all", level = NUL
   rows
 }
 
+# The course grid's vertical margins and row height, in pixels: the page
+# gives a grid of n courses major_course_grid_height(n).
+MAJOR_COURSE_GRID_MARGIN <- c(top = 10L, bottom = 70L)
+MAJOR_COURSE_GRID_ROW <- 26L
+MAJOR_COURSE_GRID_MIN_ROWS <- 4L
+
+#' The height of a course grid of `n_courses` rows, in pixels
+#'
+#' The margins plus a row each, and never less than MAJOR_COURSE_GRID_MIN_ROWS
+#' of drawing area: the colour scale beside the grid needs that much to draw
+#' (ISSUES I76; a 132px grid drew with the scale's title at its side, a 106px
+#' one did not).
+major_course_grid_height <- function(n_courses) {
+  sum(MAJOR_COURSE_GRID_MARGIN) + MAJOR_COURSE_GRID_ROW * max(as.integer(n_courses), MAJOR_COURSE_GRID_MIN_ROWS)
+}
+
 #' The courses a major's students sit in, term by term
 #'
 #' @param course_rows One row per `term`, `campus` and course that
@@ -618,6 +634,7 @@ plot_major_course_units_top_units <- function(top_units, colors) {
 #'   by their share of that term's majors on the campus, and is blank where
 #'   the course did not clear the guard.
 plot_major_course_units_course_history <- function(history, campuses = NULL) {
+  # (The page sizes each grid with major_course_grid_height().)
   needed <- c("terms", "courses", "cells")
   missing <- setdiff(needed, names(history))
   if (length(missing) > 0) {
@@ -657,13 +674,20 @@ plot_major_course_units_course_history <- function(history, campuses = NULL) {
       # The shading starts at zero, so a pale cell is a small share on every campus.
       zauto = FALSE, zmin = 0, zmax = max(grid$share_of_students, na.rm = TRUE),
       xgap = 2, ygap = 2,
-      colorbar = list(title = "Share of majors", tickformat = ".0%")
+      # The scale's title runs up its side. Above the scale it takes the room
+      # a short grid has, the scale's own axis is left with no length, and
+      # plotly stops the draw ("Something went wrong with axis scaling", I76).
+      colorbar = list(title = list(text = "Share of majors", side = "right"), tickformat = ".0%")
     ) %>%
       plotly::layout(
-        xaxis = list(title = "", tickangle = -45, categoryorder = "array", categoryarray = term_labels,
+        # as.list(): a one-course grid's order reaches the browser as an array,
+        # not the bare string a length-one vector is sent as.
+        xaxis = list(title = "", tickangle = -45, categoryorder = "array", categoryarray = as.list(term_labels),
                      showgrid = FALSE),
-        yaxis = list(title = "", categoryorder = "array", categoryarray = rev(listed$course_label),
-                     automargin = TRUE, showgrid = FALSE)
+        yaxis = list(title = "", categoryorder = "array", categoryarray = as.list(rev(listed$course_label)),
+                     automargin = TRUE, showgrid = FALSE),
+        # Stated margins, so major_course_grid_height() knows the drawing area.
+        margin = list(t = MAJOR_COURSE_GRID_MARGIN[["top"]], b = MAJOR_COURSE_GRID_MARGIN[["bottom"]])
       )
   }), drawn)
 }
