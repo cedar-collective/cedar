@@ -89,11 +89,17 @@ graduationUI <- function(id, campuses) {
     ),
     dashboard_section(
       "Still Here, and Moving Forward?",
-      "Of each fall's first-time students, how many are still enrolled as each year begins, and are they earning credits fast enough to finish?",
+      "Of each fall's new students, how many are still enrolled as each year begins, and are they earning credits fast enough to finish?",
       method = uiOutput(ns("method_pace")),
-      radioButtons(ns("pace_step"), "At the start of their",
-                   choices = stats::setNames(GRADUATION_PACE_STEPS, paste(names(GRADUATION_PACE_STEPS), "year")),
-                   selected = GRADUATION_PACE_STEPS[["third"]], inline = TRUE),
+      fluidRow(
+        column(7, radioButtons(ns("pace_started"), "Students who started as",
+                               choices = c("First-time students" = "first_time",
+                                           stats::setNames(paste0("transfer:", exit_credit_band_labels(GRADUATION_ARRIVAL_BREAKS)),
+                                                           paste0("Transfer, brought ", tolower(exit_credit_band_labels(GRADUATION_ARRIVAL_BREAKS)), " credits"))),
+                               selected = "first_time", inline = TRUE)),
+        column(5, radioButtons(ns("pace_step"), "At the start of their",
+                               choices = stats::setNames(GRADUATION_PACE_STEPS, paste(names(GRADUATION_PACE_STEPS), "year here")),
+                               selected = GRADUATION_PACE_STEPS[["third"]], inline = TRUE))),
       uiOutput(ns("pace_lead")),
       plotly::plotlyOutput(ns("pace_plot"), height = "420px"),
       dashboard_subsection(
@@ -303,18 +309,26 @@ graduationServer <- function(id, student_terms, programs, degrees, terms, dims, 
     })
 
     pace_step <- reactive({ req(input$pace_step); as.integer(input$pace_step) })
-    pace_drawn <- function(p) nrow(graduation_pace_shares(p$pace, pace_step())) > 0L
+    # The chosen group's table: first-time students, or one band of transfer students.
+    pace_table <- reactive({
+      p <- payload(); req(p, input$pace_started)
+      if (identical(input$pace_started, "first_time")) return(p$pace)
+      band <- sub("^transfer:", "", input$pace_started)
+      req(band %in% names(p$transfer))
+      p$transfer[[band]]
+    })
+    pace_drawn <- function(pace) nrow(graduation_pace_shares(pace, pace_step())) > 0L
     output$pace_lead <- renderUI({
-      p <- payload(); req(p)
-      if (!pace_drawn(p)) return(empty_state(graduation_pace_lead(p$pace, pace_step())))
-      lead_text(graduation_pace_lead(p$pace, pace_step()))
+      pace <- pace_table()
+      if (!pace_drawn(pace)) return(empty_state(graduation_pace_lead(pace, pace_step())))
+      lead_text(graduation_pace_lead(pace, pace_step()))
     })
     output$pace_plot <- plotly::renderPlotly({
-      p <- payload(); req(p, pace_drawn(p)); plot_class_pace(p$pace, pace_step())
+      pace <- pace_table(); req(pace_drawn(pace)); plot_class_pace(pace, pace_step())
     })
     output$accumulation_plot <- plotly::renderPlotly({
-      p <- payload(); req(p, any(!is.na(p$pace$credits_median) & !is.na(p$pace$here_pct)))
-      plot_credit_accumulation(p$pace)
+      pace <- pace_table(); req(any(!is.na(pace$credits_median) & !is.na(pace$here_pct)))
+      plot_credit_accumulation(pace)
     })
     output$method_pace <- renderUI({
       p <- payload(); req(p)
@@ -322,8 +336,15 @@ graduationServer <- function(id, student_terms, programs, degrees, terms, dims, 
       tags$ul(
         tags$li(paste0("An entering class is the students the record calls first-time that fall, at this level and ",
                        "home campus; a first-time student who started in the summer and enrolled that fall is in ",
-                       "the fall class (", n(attr(p$pace, "n_summer_starts")), " students). Transfer students are not in it. ",
+                       "the fall class (", n(attr(p$pace, "n_summer_starts")), " students). ",
                        "A class of fewer than ", attr(p$pace, "min_n"), " is not drawn.")),
+        tags$li(paste0("Transfer students are read apart, because they start part-way: each fall's students the record ",
+                       "calls a new transfer, grouped by the credits they brought from elsewhere. For them the split is ",
+                       "by the credits a term they earn here (", rates[["four_year"]], " or more, ", rates[["six_year"]],
+                       " to ", rates[["four_year"]] - 1, ", fewer), not by a four-year pace: a student who brought 60 ",
+                       "credits and earns ", rates[["four_year"]], " a term finishes in two years. Students who transfer ",
+                       "in a spring are not in these classes. The newest class's groups are less sure: a student who ",
+                       "left before their credit from elsewhere was posted is counted as having brought little.")),
         tags$li(paste0("Each student is in one part as the year begins: awarded a degree by then; enrolled that term; ",
                        "or not enrolled, which includes a student away for the term who later comes back.")),
         tags$li(paste0("An enrolled student is on pace for four years with ", rates[["four_year"]],

@@ -134,3 +134,18 @@ test_that("EC01: with a pace, still here splits into degree, each pace, slower a
                                             list(data_edges = ec01$edges, pace = c(slow = 10, fast = 15))),
                "fastest first")
 })
+
+test_that("EC01: a transfer class can be narrowed by the credits its students brought", {
+  run <- function(range) get_entering_class_retention(
+    ec01$student_terms, ec01$degrees,
+    list(term_type = "fall", min_n = 1L, entry = "transfer", data_edges = ec01$edges, n_terms = 2L,
+         arrival_credits = range, pace = DEGREE_PACE_TERM_CREDITS), ec01$programs)
+  # EC-E brought 45 credits: in the 30-to-59 band, in neither other.
+  mid <- run(c(30, 60))
+  expect_equal(mid$n_entering, c(1L, 1L))
+  # Away in Spring 2021; back in Fall 2021 with 15 credits after two terms: slower than 10 a term.
+  expect_equal(c(mid$n_gone[1], mid$n_slower[2]), c(1, 1))
+  expect_equal(nrow(run(c(0, 30))), 0L)
+  expect_equal(nrow(run(c(60, Inf))), 0L)
+  expect_error(run(c(60, 30)), "arrival_credits")
+})

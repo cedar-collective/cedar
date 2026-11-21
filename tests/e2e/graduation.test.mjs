@@ -99,6 +99,17 @@ try {
   const paceLead = await page.$eval(`#${NS}pace_lead`, (el) => el.textContent);
   ok(/At the start of their third year/.test(paceLead), 'the lead reads the third year by default');
 
+  await setInput(page, `${NS}pace_started`, 'transfer:60 or more');
+  const transferRead = await waitFor(page, (id) => {
+    const r = document.getElementById(id);
+    const p = r?.classList.contains('js-plotly-plot') ? r : r?.querySelector('.js-plotly-plot');
+    return /transfer students who brought 60 or more credits/.test(p?.layout?.xaxis?.title?.text || '');
+  }, { timeout: 300000, args: [`${NS}pace_plot`] });
+  ok(transferRead, 'transfer students are read as their own classes, by credits brought');
+  const transferParts = await page.evaluate(plotTraces, `${NS}pace_plot`);
+  ok(/earning 15 or more credits a term here/.test(transferParts?.[1] || ''), `a transfer class is split by credits earned here (${transferParts?.[1]})`);
+  await setInput(page, `${NS}pace_started`, 'first_time');
+
   const methods = await page.evaluate((ns) => ['method_bands', 'method_series', 'method_standing', 'method_groups', 'method_required', 'method_pace', 'method_ceiling']
     .map((id) => document.getElementById(ns + id)?.textContent.trim().length || 0), NS);
   ok(methods.every((n) => n > 80), `every section's method is filled (${methods})`);

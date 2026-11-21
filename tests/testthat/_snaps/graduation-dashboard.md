@@ -29,13 +29,52 @@
       
       ## Each fall's first-time students: still here, and at what pace
       
-      No entering class can be read at the start of its second year yet.
+      No entering class of first-time students can be read at the start of its second year yet.
       
-      No entering class can be read at the start of its third year yet.
+      No entering class of first-time students can be read at the start of its third year yet.
       
-      No entering class can be read at the start of its fourth year yet.
+      No entering class of first-time students can be read at the start of its fourth year yet.
       
-      No entering class can be read at the start of its fifth year yet.
+      No entering class of first-time students can be read at the start of its fifth year yet.
+      
+      ### Credits earned here by the middle enrolled student, before each regular term since entering
+        No class has credits on record.
+      
+      ## Each fall's new transfer students who brought under 30 credits: still here, and at what pace
+      
+      No entering class of new transfer students who brought under 30 credits can be read at the start of its second year here yet.
+      
+      No entering class of new transfer students who brought under 30 credits can be read at the start of its third year here yet.
+      
+      No entering class of new transfer students who brought under 30 credits can be read at the start of its fourth year here yet.
+      
+      No entering class of new transfer students who brought under 30 credits can be read at the start of its fifth year here yet.
+      
+      ### Credits earned here by the middle enrolled student, before each regular term since entering
+        No class has credits on record.
+      
+      ## Each fall's new transfer students who brought 30 to 59 credits: still here, and at what pace
+      
+      No entering class of new transfer students who brought 30 to 59 credits can be read at the start of its second year here yet.
+      
+      No entering class of new transfer students who brought 30 to 59 credits can be read at the start of its third year here yet.
+      
+      No entering class of new transfer students who brought 30 to 59 credits can be read at the start of its fourth year here yet.
+      
+      No entering class of new transfer students who brought 30 to 59 credits can be read at the start of its fifth year here yet.
+      
+      ### Credits earned here by the middle enrolled student, before each regular term since entering
+        No class has credits on record.
+      
+      ## Each fall's new transfer students who brought 60 or more credits: still here, and at what pace
+      
+      No entering class of new transfer students who brought 60 or more credits can be read at the start of its second year here yet.
+      
+      No entering class of new transfer students who brought 60 or more credits can be read at the start of its third year here yet.
+      
+      No entering class of new transfer students who brought 60 or more credits can be read at the start of its fourth year here yet.
+      
+      No entering class of new transfer students who brought 60 or more credits can be read at the start of its fifth year here yet.
       
       ### Credits earned here by the middle enrolled student, before each regular term since entering
         No class has credits on record.
@@ -81,13 +120,52 @@
       
       ## Each fall's first-time students: still here, and at what pace
       
-      No entering class can be read at the start of its second year yet.
+      No entering class of first-time students can be read at the start of its second year yet.
       
-      No entering class can be read at the start of its third year yet.
+      No entering class of first-time students can be read at the start of its third year yet.
       
-      No entering class can be read at the start of its fourth year yet.
+      No entering class of first-time students can be read at the start of its fourth year yet.
       
-      No entering class can be read at the start of its fifth year yet.
+      No entering class of first-time students can be read at the start of its fifth year yet.
+      
+      ### Credits earned here by the middle enrolled student, before each regular term since entering
+        No class has credits on record.
+      
+      ## Each fall's new transfer students who brought under 30 credits: still here, and at what pace
+      
+      No entering class of new transfer students who brought under 30 credits can be read at the start of its second year here yet.
+      
+      No entering class of new transfer students who brought under 30 credits can be read at the start of its third year here yet.
+      
+      No entering class of new transfer students who brought under 30 credits can be read at the start of its fourth year here yet.
+      
+      No entering class of new transfer students who brought under 30 credits can be read at the start of its fifth year here yet.
+      
+      ### Credits earned here by the middle enrolled student, before each regular term since entering
+        No class has credits on record.
+      
+      ## Each fall's new transfer students who brought 30 to 59 credits: still here, and at what pace
+      
+      No entering class of new transfer students who brought 30 to 59 credits can be read at the start of its second year here yet.
+      
+      No entering class of new transfer students who brought 30 to 59 credits can be read at the start of its third year here yet.
+      
+      No entering class of new transfer students who brought 30 to 59 credits can be read at the start of its fourth year here yet.
+      
+      No entering class of new transfer students who brought 30 to 59 credits can be read at the start of its fifth year here yet.
+      
+      ### Credits earned here by the middle enrolled student, before each regular term since entering
+        No class has credits on record.
+      
+      ## Each fall's new transfer students who brought 60 or more credits: still here, and at what pace
+      
+      No entering class of new transfer students who brought 60 or more credits can be read at the start of its second year here yet.
+      
+      No entering class of new transfer students who brought 60 or more credits can be read at the start of its third year here yet.
+      
+      No entering class of new transfer students who brought 60 or more credits can be read at the start of its fourth year here yet.
+      
+      No entering class of new transfer students who brought 60 or more credits can be read at the start of its fifth year here yet.
       
       ### Credits earned here by the middle enrolled student, before each regular term since entering
         No class has credits on record.
@@ -118,11 +196,34 @@
         Class       Entered   Degree   4-year   6-year   Slower  Unknown     Gone
         Fall 2020         6    16.7%    16.7%     0.0%     0.0%     0.0%    66.7%
       
-      No entering class can be read at the start of its fourth year yet.
+      No entering class of first-time students can be read at the start of its fourth year yet.
       
-      No entering class can be read at the start of its fifth year yet.
+      No entering class of first-time students can be read at the start of its fifth year yet.
       
       ### Credits earned here by the middle enrolled student, before each regular term since entering
         Fall 2020    15  18  45  60
         Fall 2021    14  15
+
+# EC01: a transfer class is described by what it earns here, not by a four-year pace
+
+    Code
+      cat(format_graduation_pace(pace), sep = "\n")
+    Output
+      
+      ## Each fall's new transfer students who brought 30 to 59 credits: still here, and at what pace
+      
+      At the start of their second year here, 100.0% of the Fall 2020 class were still enrolled or had a degree, and 0.0% were enrolled and earning 15 or more credits a term here.
+        Class       Entered   Degree      15+    10-14   Slower  Unknown     Gone
+        Fall 2020         1     0.0%     0.0%     0.0%   100.0%     0.0%     0.0%
+      
+      At the start of their third year here, 0.0% of the Fall 2020 class were still enrolled or had a degree, and 0.0% were enrolled and earning 15 or more credits a term here.
+        Class       Entered   Degree      15+    10-14   Slower  Unknown     Gone
+        Fall 2020         1     0.0%     0.0%     0.0%     0.0%     0.0%   100.0%
+      
+      No entering class of new transfer students who brought 30 to 59 credits can be read at the start of its fourth year here yet.
+      
+      No entering class of new transfer students who brought 30 to 59 credits can be read at the start of its fifth year here yet.
+      
+      ### Credits earned here by the middle enrolled student, before each regular term since entering
+        Fall 2020    15
 

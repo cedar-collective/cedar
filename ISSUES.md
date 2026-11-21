@@ -106,6 +106,48 @@ Kept until the next release, so a recurrence is recognisable; each entry below g
 
 # Defects
 
+## I74 — The newest transfer class's "credits brought" band is tilted by who stayed
+
+**Status:** open; the page states it (Graduation > Still Here, and Moving
+Forward?, method note). Cause not yet confirmed.
+**Found:** 2026-11-21, reading the first real-data run of the transfer classes.
+**Severity:** moderate: one class's bars are misleading in each band; older
+classes look consistent with one another.
+**Affects:** `get_entering_class_retention(opt$arrival_credits)` and so
+`build_graduation_dashboard()$transfer`; the source is
+`build_credit_timeline()`'s `transfer_credits`.
+
+### What is wrong
+
+A transfer student's credits brought are `overall_credits_attempted -
+inst_credits_attempted`, read off rows stamped at each pull. For the Fall 2025
+transfer class (ABQ undergraduates), read a year on, the band that brought
+under 30 credits shows more than twice the not-enrolled share of the five
+classes before it, and the 30-to-59 band shows about half of theirs; the
+earlier classes agree with one another within a few points. A class does not
+differ that much by band from one year to the next.
+
+The likely cause: a student who left before their transfer credit was posted
+has only early stamps, with little or no credit brought, and lands in the
+lowest band; a student who stayed has later stamps with the credit posted.
+Older classes were all covered by a later full historical pull, so their bands
+do not sort by who stayed.
+
+### Reproduce
+
+`build_graduation_dashboard()` on the shared data, undergraduates, ABQ; print
+`format_graduation_pace()` for each element of `$transfer` and compare the
+newest class's "Gone" share at the start of the second year with the classes
+before it, band by band.
+
+### Fix
+
+Confirm the cause by comparing, for the newest class, each student's first and
+latest stamped gap. Then either band the newest class only once a pull has
+covered it after its first year, or band on the latest stamp among students
+with a stamp after their second term and report the rest as "credit not yet
+posted".
+
 ## I73 — Special topics ("ST:") titles were not treated as topics courses
 
 **Status:** resolved 2026-11-20.
