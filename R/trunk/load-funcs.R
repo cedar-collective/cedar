@@ -50,6 +50,7 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
   source_file("lists/campuses.R")           # campus constants from campuses.csv, campus guards
   source_file("lists/student_levels.R")     # student level codes and their source spellings, from student_levels.csv
   source_file("lists/seat_fill.R")          # near full / full seat fill levels
+  source_file("lists/aid_progress.R")       # GPA floor, credit ceiling and credit bands for departing students
   source_file("lists/topic_titles.R")       # a course's topics from its section titles, and topic_titles.csv
   source_file("lists/enrollment_projection_groups.R")
   source_file("lists/degree_catalog.R")
@@ -142,6 +143,7 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
   source_file("cones/stopout.R")
   source_file("cones/return-rates.R")  # how often enrolled students come back the next regular term
   source_file("cones/entering-class-retention.R")  # each entering class's share still here 1..n regular terms later
+  source_file("cones/exit-credits.R")  # students who left without a degree, by credits at their last term
   source_file("cones/course-outcomes.R")
   source_file("cones/pathway.R")               # course timing + curriculum map
   source_file("cones/course-pairs.R")          # ordered A->B course sequences

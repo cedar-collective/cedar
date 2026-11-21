@@ -2027,6 +2027,64 @@ ec01 <- local({
        edges = list(last_enrolled_complete = 202280L, last_graded = 202280L))
 })
 
+# XC01: undergraduates whose last term is behind them (test-exit-credits.R).
+# Enrollment is settled and degrees are posted through Fall 2022. ABQ unless
+# said. Each student's last term, and what the declarations table stamped on it:
+#   X-A  Spring 2021; 100 earned, 110 attempted, GPA 2.5, Pell; two
+#        declarations that term, stamped alike. 90 to 114.
+#   X-B  Spring 2021; 108 earned, 150 attempted, GPA 1.8, pulled 2021-03-01,
+#        before Fall 2021 began: the term's own 12 completed and 12 attempted
+#        credits are added. 120 earned, 162 attempted: below the floor, past
+#        the ceiling. 120 or more.
+#   X-C  Fall 2020; 20 earned, GPA 3.0, Pell never recorded. Under 30.
+#   X-D  Spring 2021, a degree that term: not gone.
+#   X-E  Spring 2022: its second regular term after is past the edge. Not judged.
+#   X-F  Fall 2022, still enrolled. Not judged.
+#   X-G  an undergraduate in Fall 2020, a graduate student in Fall 2021: the
+#        last term is another level's.
+#   X-H  Spring 2021, no declaration row that term. Not recorded.
+#   X-I  Spring 2021, home campus EA; 65 earned, GPA 2.0 (at the floor, not
+#        under it). 60 to 89.
+#   X-J  Spring 2020, away, back in Spring 2021 and gone; 118 earned, no GPA.
+#        115 to 119.
+#   X-K  Spring 2021; 125 earned; a degree dated Spring 2023, past the degree
+#        edge, so not yet a degree. 120 or more.
+# Eight judged last terms: one with a degree, seven left.
+xc01 <- local({
+  last <- c(`X-A` = 202110L, `X-B` = 202110L, `X-C` = 202080L, `X-D` = 202110L, `X-E` = 202210L,
+            `X-F` = 202280L, `X-H` = 202110L, `X-I` = 202110L, `X-J` = 202110L, `X-K` = 202110L)
+  row <- function(id, term, level = "UG") tibble::tibble(
+    student_id = id, term = term, enrolled = TRUE, student_level = level,
+    student_campus = if (id == "X-I") "EA" else "ABQ", primary_major_code = "HIST",
+    completed_unm_credits = 12, attempted_unm_credits = 12)
+  student_terms <- dplyr::bind_rows(
+    lapply(names(last), function(id) row(id, last[[id]])),
+    row("X-J", 202010L), row("X-G", 202080L), row("X-G", 202180L, "GR"))
+  stamp <- function(id, term, earned, attempted, gpa, pell, as_of = "2022-06-01") tibble::tibble(
+    student_id = id, term = term, overall_credits_earned = earned,
+    overall_credits_attempted = attempted, inst_gpa = gpa, pell_eligible = pell,
+    as_of_date = as.Date(as_of))
+  programs <- dplyr::bind_rows(
+    stamp("X-A", 202110L, 100, 110, 2.5, TRUE), stamp("X-A", 202110L, 100, 110, 2.5, TRUE),
+    stamp("X-B", 202110L, 108, 150, 1.8, FALSE, "2021-03-01"),
+    stamp("X-C", 202080L, 20, 24, 3.0, NA),
+    stamp("X-D", 202110L, 121, 125, 3.1, FALSE),
+    stamp("X-I", 202110L, 65, 70, 2.0, FALSE),
+    stamp("X-J", 202010L, 90, 95, 2.2, TRUE), stamp("X-J", 202110L, 118, 120, NA, FALSE),
+    stamp("X-K", 202110L, 125, 130, 3.2, TRUE))
+  list(
+    student_terms = student_terms, programs = programs,
+    degrees = tibble::tibble(student_id = c("X-D", "X-K"), term = c(202110L, 202310L)),
+    terms = tibble::tibble(term = c(202080L, 202110L, 202180L, 202210L, 202280L),
+                           start_date = as.Date(c("2020-08-17", "2021-01-19", "2021-08-23",
+                                                  "2022-01-18", "2022-08-22"))),
+    edges = list(last_enrolled_complete = 202280L, last_graded = 202280L, last_degree = 202280L),
+    # Undergraduates, no small-cell guard, read through those edges.
+    opt = list(student_level = "UG", min_n = 1L,
+               data_edges = list(last_enrolled_complete = 202280L, last_graded = 202280L,
+                                 last_degree = 202280L)))
+})
+
 # RR01: four falls (202080, 202180, 202280, 202380, k = 1..4) of the same
 # shape, and Fall 2024 with no settled next term. Each fall:
 #   ABQ freshmen (college AS), RR01-A01..A40: A01..A(26+2k) come back (28,
