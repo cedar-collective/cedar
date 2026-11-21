@@ -149,6 +149,9 @@ directly with `node` after a rebuild, and CI's tour (`demo`) did not open
 either page. The tour now opens Graduation and Retention in a session that
 began on the home page (`reports-smoke.test.mjs`, smoke scope, so CI's fresh
 app runs it on every PR). Confirmed by putting the fault back: the step fails.
+Its first CI run found a second fault on the synthetic institution: with no
+plan to show, Graduation's plan picker built a one-label list for zero plans,
+the observer errored and the session dropped. Fixed with an empty list.
 
 ## I74 — The newest transfer class's "credits brought" band is tilted by who stayed
 

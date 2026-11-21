@@ -240,6 +240,8 @@ graduationServer <- function(id, student_terms, programs, degrees, terms, dims, 
     plans <- reactive({
       p <- payload(); req(has_rows(p))
       shown <- p$required$programs[p$required$programs$shown, ]
+      # No plan to show: an empty list, not a label pasted from nothing.
+      if (nrow(shown) == 0L) return(character(0))
       stats::setNames(shown$catalog_id, paste0(shown$label, " (", n(shown$n_students), " students)"))
     })
     observeEvent(plans(), {
