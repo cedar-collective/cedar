@@ -751,6 +751,25 @@ pathwaysUI <- function(id, campus_choices, program_choices = character(),
           ),
           filter_scope_stripe(div(class = "subtab-scope", uiOutput(ns("mc_meta")))),
 
+          # ── Semester by semester after entering ─────────────────────────────
+          dashboard_section(
+            "Semester by Semester After Entering",
+            "Of the students who entered, how many are still in it each semester after, and where are the rest?",
+            method = tagList(
+              tags$p("A student enters in the first term with a record in the selected majors, a pre-major's ",
+                     "included. Each bar is the start of a regular semester after that (Summer is not a step) and ",
+                     "counts every entrant whose semester that far on is complete in the data, so recent entrants ",
+                     "are in the early bars only. A bar with too few students to show safely is not drawn."),
+              tags$p("A student is placed by their primary major that semester. One who holds a degree by then is ",
+                     "counted as awarded a degree whatever they enrolled in. Not enrolled that semester includes ",
+                     "students who came back later. Students already in the major when the data begin have no ",
+                     "entry to count from and are left out; the sentence above the chart says how many.")
+            ),
+            uiOutput(ns("mc_tenure_lead")),
+            plotlyOutput(ns("mc_tenure_plot"), height = "380px"),
+            reactable::reactableOutput(ns("mc_tenure_table"))
+          ),
+
           # ── Summary cards ───────────────────────────────────────────────────
           uiOutput(ns("mc_summary_cards")),
 
@@ -2447,6 +2466,63 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
     })
 
     # ---- Major Changes ----
+
+    # Semester by semester after entering: needs majors to be the population's
+    # definition (a demographic population has no major to stay in or leave).
+    mc_tenure <- reactive({
+      pop <- get_population()
+      req(pop)
+      population_opt <- population_rv()$opt %||% list()
+      if (!(population_opt$type %||% "preset") %in% c("major", "preset", "dept") || is.null(degrees)) return(NULL)
+      tryCatch({
+        codes <- resolve_focal_programs(programs, population_opt)$codes$program_code
+        names <- resolve_pathways_focal_programs(population_opt, programs)
+        list(tenure = get_major_tenure(pop, cedar_student_terms, degrees,
+                                       list(program_codes = codes, data_edges = edges)),
+             major_name = if (length(unique(names)) == 1L) unique(names) else "the selected majors")
+      }, error = function(e) {
+        showNotification(paste("Semester by semester:", conditionMessage(e)), type = "error", duration = 10)
+        NULL
+      })
+    })
+
+    output$mc_tenure_lead <- renderUI({
+      t <- mc_tenure()
+      if (is.null(t)) return(empty_state("Shown when the population is defined by majors."))
+      n_unclear <- t$tenure$meta$n_unclear
+      tagList(
+        lead_text(major_tenure_lead(t$tenure, t$major_name, min_n = cedar_min_group_size)),
+        if (n_unclear > 0L) tags$p(class = "text-hint", format(n_unclear, big.mark = ","),
+                                   " more were already in it when the data begin and are not followed."))
+    })
+
+    output$mc_tenure_plot <- renderPlotly({
+      t <- mc_tenure()
+      req(t, nrow(major_tenure_shares(t$tenure, cedar_min_group_size)) > 0L)
+      plot_major_tenure(t$tenure, min_n = cedar_min_group_size)
+    })
+
+    output$mc_tenure_table <- reactable::renderReactable({
+      t <- mc_tenure()
+      req(t)
+      s <- major_tenure_shares(t$tenure, cedar_min_group_size)
+      req(nrow(s) > 0L)
+      pct <- reactable::colFormat(digits = 1, suffix = "%")
+      shown <- s %>% select(when, n_observed, in_major_pct, other_major_pct, no_major_pct, degree_pct, not_enrolled_pct)
+      # A state no student is ever in has no bar and no column.
+      if (sum(s$n_no_major) == 0L) shown <- shown %>% select(-no_major_pct)
+      reactable::reactable(
+        shown,
+        columns = list(
+          when = reactable::colDef(name = "When"),
+          n_observed = reactable::colDef(name = "Students followed", format = reactable::colFormat(separators = TRUE)),
+          in_major_pct = reactable::colDef(name = MAJOR_TENURE_STATES[["n_in_major"]], format = pct),
+          other_major_pct = reactable::colDef(name = MAJOR_TENURE_STATES[["n_other_major"]], format = pct),
+          no_major_pct = reactable::colDef(name = MAJOR_TENURE_STATES[["n_no_major"]], format = pct),
+          degree_pct = reactable::colDef(name = MAJOR_TENURE_STATES[["n_degree"]], format = pct),
+          not_enrolled_pct = reactable::colDef(name = MAJOR_TENURE_STATES[["n_not_enrolled"]], format = pct)),
+        sortable = FALSE, compact = TRUE, theme = cedar_tbl_theme)
+    })
 
     mc_data <- reactive({
       req(get_population())

@@ -99,7 +99,9 @@ This subtab has two scopes. The Course + Instructor table uses the population on
 
 Shows movement into, within, and out of the selected unit. The page separates pre-major and full-major patterns where that distinction is visible in the program records.
 
-The top movement cards focus on four timing questions:
+The page opens with **Semester by Semester After Entering**: of the students who entered the selected majors, one bar for each semester after, split into still in it, enrolled in another major, awarded a degree, and not enrolled that semester. Pick Undecided as the major to see how long students stay Undecided and how many are no longer enrolled without having declared. Each bar counts only the students whose semester that far on is complete in the data, so recent entrants are in the early bars only; students already in the major when the data begin are left out and counted in the sentence above the chart. "Not enrolled that semester" includes students who came back later.
+
+The movement cards below it focus on four timing questions:
 
 - When do students first appear in the selected unit as pre-majors?
 - When do students first appear as full majors without a prior selected-unit pre-major record?
@@ -148,6 +150,7 @@ These are the main code paths:
 | Course Pairs | `R/cones/course-pairs.R`: `get_course_pairs()` |
 | Course to Major table | `R/cones/gen-ed-conversion.R`: `get_course_major_associations()` |
 | Courses Before Major Entry heatmaps | `R/cones/entry-heatmap.R`: `get_entry_heatmap()` |
+| Semester by Semester After Entering | `R/cones/major-tenure.R`: `get_major_tenure()` |
 | Major Changes | `R/branches/major-change-detection.R`: `detect_major_changes()` plus display assembly in `R/modules/pathways.R` |
 | Courses in the Term Before Students Left | `R/cones/major-changes.R`: `get_pre_change_courses()` |
 | Credit positions used in timing/change cards | `R/branches/credit-timeline.R`: `build_credit_timeline()`; the running credit totals on `cedar_student_terms`, built from class-list history |
