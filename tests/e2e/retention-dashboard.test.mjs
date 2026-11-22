@@ -103,8 +103,34 @@ try {
     const p = r?.classList.contains('js-plotly-plot') ? r : r?.querySelector('.js-plotly-plot');
     return p?.data?.[0] ? JSON.stringify([p.data[0].x, p.data[0].y]) : '';
   };
-  const summerShown = () => page.$eval(`#${NS}summer_plot`, (el) => el.checkVisibility());
-  ok(!(await summerShown()), 'Finishing in the Summer is not shown for fall terms');
+  // Each fall's classes, year by year, and their pace.
+  const plotTraces = (id) => {
+    const r = document.getElementById(id);
+    const p = r?.classList.contains('js-plotly-plot') ? r : r?.querySelector('.js-plotly-plot');
+    return p?.data?.length ? p.data.map((t) => t.name) : null;
+  };
+  await waitFor(page, plotTraces, { timeout: 300000, args: [`${NS}pace_plot`] });
+  await waitFor(page, plotTraces, { timeout: 300000, args: [`${NS}accumulation_plot`] });
+  const paceParts = await page.evaluate(plotTraces, `${NS}pace_plot`);
+  ok(paceParts?.length === 6 && paceParts[1] === 'Enrolled, on pace for four years', `each class is split into six parts (${paceParts?.length})`);
+  const creditLines = await page.evaluate(plotTraces, `${NS}accumulation_plot`);
+  ok(creditLines?.length >= 3 && creditLines.some((t) => /class$/.test(t)), `credits are drawn a line a class against the two paces (${creditLines?.length})`);
+  const paceLead = await page.$eval(`#${NS}pace_lead`, (el) => el.textContent);
+  ok(/At the start of their third year/.test(paceLead), 'the lead reads the third year by default');
+
+  await setInput(page, `${NS}pace_started`, 'transfer:60 or more');
+  const transferRead = await waitFor(page, (id) => {
+    const r = document.getElementById(id);
+    const p = r?.classList.contains('js-plotly-plot') ? r : r?.querySelector('.js-plotly-plot');
+    return /transfer students who brought 60 or more credits/.test(p?.layout?.xaxis?.title?.text || '');
+  }, { timeout: 300000, args: [`${NS}pace_plot`] });
+  ok(transferRead, 'transfer students are read as their own classes, by credits brought');
+  const transferParts = await page.evaluate(plotTraces, `${NS}pace_plot`);
+  ok(/earning 15 or more credits a term here/.test(transferParts?.[1] || ''), `a transfer class is split by credits earned here (${transferParts?.[1]})`);
+  await setInput(page, `${NS}pace_started`, 'first_time');
+
+  const paceMethod = await page.$eval(`#${NS}method_pace`, (el) => el.textContent.trim().length);
+  ok(paceMethod > 80, 'the pace section says how it is counted');
   ok((await outputsInError(page, NS)).length === 0, `no output in error on fall terms (${(await outputsInError(page, NS)).join('; ')})`);
   await setInput(page, `${NS}term_type`, 'spring');
   const reread = await waitFor(page, () => {
@@ -115,23 +141,6 @@ try {
   ok(reread, 'spring re-reads the page on spring terms');
   await waitBuilt();
 
-  // Spring students who finish in the summer: a bar a summer, split by credits, and their courses.
-  await waitFor(page, () => {
-    const r = document.getElementById('retention_dashboard-summer_plot');
-    const p = r?.classList.contains('js-plotly-plot') ? r : r?.querySelector('.js-plotly-plot');
-    return !!(p && p.data && p.data.length);
-  }, { timeout: 300000 });
-  const summer = await page.evaluate(() => {
-    const r = document.getElementById('retention_dashboard-summer_plot');
-    const p = r.classList.contains('js-plotly-plot') ? r : r.querySelector('.js-plotly-plot');
-    return { bands: p.data.map((d) => d.name), x: p.data[0].x };
-  });
-  ok(await summerShown(), 'Finishing in the Summer is shown for spring terms');
-  ok(summer.bands.length === 4 && summer.x.length > 0 && summer.x.every((x) => /Summer/.test(x)),
-     `a bar a summer, four credit bands (${summer.bands.join(', ')}; ${summer.x.length} summers)`);
-  await waitForSelector(page, `#${NS}summer_courses .rt-tbody`);
-  const summerCourses = await readReactable(page, `${NS}summer_courses`);
-  ok(summerCourses.rows.length > 0, `the summer courses table has rows (${summerCourses.rows.length})`);
   const leftOut = await page.$eval(`#${NS}method_overall`, (el) => el.textContent);
   ok(/in the summer after it/.test(leftOut), 'the method note counts summer finishers as finished');
   ok((await outputsInError(page, NS)).length === 0, `no output in error on spring terms (${(await outputsInError(page, NS)).join('; ')})`);

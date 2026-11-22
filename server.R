@@ -4278,6 +4278,14 @@ for (.download_key in names(.enrl_desr_view_ids)) {
                  active = reactive(identical(input$main_navbar, "DFW Rates")))
 
   # ===========================================================================
+  # Bird's Eye > First Year (Shiny module); builds only while the tab is open
+  # ===========================================================================
+  firstYearServer("first_year", student_terms = data_objects[["cedar_student_terms"]],
+                  degrees = cedar_degrees, programs = data_objects[["cedar_programs"]],
+                  edges = data_objects[["cedar_edges"]],
+                  active = reactive(identical(input$main_navbar, "First Year")))
+
+  # ===========================================================================
   # Bird's Eye > Retention (Shiny module); builds only while the tab is open
   # ===========================================================================
   retentionDashboardServer("retention_dashboard", student_terms = data_objects[["cedar_student_terms"]],

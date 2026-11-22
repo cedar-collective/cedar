@@ -95,37 +95,14 @@ A student whose record began before the class lists, or who was already past
 section's method. For the same reason the number passing each term is not
 shown as a trend.
 
-## Still Here, and Moving Forward?
+## Finishing in the Summer
 
-Retention says a student came back. This section asks whether they are also
-earning credits. Each bar is one fall's first-time students, read as a year
-begins (the second, third, fourth or fifth), and split into:
-
-- **awarded a degree** by then;
-- **enrolled, on pace for four years**: 15 credits completed here for each
-  regular term since entering, summer credits included;
-- **enrolled, on pace for six years**: 10 credits a term;
-- **enrolled, slower than that**;
-- **enrolled, earlier credits not on record**: students whose first term here
-  is the first term of the class lists, which is the whole of the first class;
-- **not enrolled**.
-
-If the enrolled share grows from class to class while the on-pace share does
-not, students are being kept and not moved forward. Credit brought from
-elsewhere is not counted, so a student who arrived with credit is further
-along than shown.
-
-**Transfer students** have their own classes, chosen with **Students who
-started as**: each fall's new transfer students, grouped by the credits they
-brought (under 30, 30 to 59, 60 or more). They start part-way, so they are
-not read against a four-year pace. The split is by the credits a term they
-earn here: 15 or more, 10 to 14, or fewer. Students who transfer in a spring
-are not in these classes yet.
-
-**Credits earned, term by term** draws a line for each class: the credits the
-middle enrolled student had earned here before each term, against the
-four-year and six-year paces. Students who left are not in a line, so it can
-rise because slower students left.
+The spring students who were awarded a degree that summer, a bar a year, split
+by the credits they took here that summer, and the courses they took most.
+These are the students Retention's spring return rate counts as finished.
+Where a summer's degrees are not posted yet, the bar shows students who have
+applied to graduate then, and is marked. What a student took is not what they
+were required to take: the data holds registrations, not degree audits.
 
 ## Not yet on the page
 

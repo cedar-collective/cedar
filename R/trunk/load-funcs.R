@@ -226,6 +226,7 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
     source_file("modules/cancellations.R")
     source_file("modules/dfw-rates.R")       # Bird's Eye > DFW Rates
     source_file("modules/retention-dashboard.R")  # Bird's Eye > Retention
+    source_file("modules/first-year.R")  # Bird's Eye > First Year (after Retention: it reads RETENTION_TERM_TYPES)
     source_file("modules/graduation.R")  # Bird's Eye > Graduation
     source_file("modules/waitlist.R")
     source_file("modules/regstats.R")
