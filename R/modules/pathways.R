@@ -765,8 +765,15 @@ pathwaysUI <- function(id, campus_choices, program_choices = character(),
               tags$p("A student is placed by their primary major that semester. One who holds a degree by then is ",
                      "counted as awarded a degree whatever they enrolled in. Not enrolled that semester includes ",
                      "students who came back later. Students already in the major when the data begin have no ",
-                     "entry to count from and are left out; the sentence above the chart says how many.")
+                     "entry to count from and are left out; the sentence above the chart says how many."),
+              tags$p("How a student entered is what their record says in the term they entered: new to UNM as a ",
+                     "first-time student, new as a transfer student, or neither (continuing, readmitted or ",
+                     "changing level), which means they were already at UNM. The groups stay enrolled at ",
+                     "different rates, so all students together is a blend of them.")
             ),
+            radioButtons(ns("mc_tenure_arrival"), "Students who entered as",
+                         choices = stats::setNames(names(MAJOR_TENURE_ARRIVALS), unname(MAJOR_TENURE_ARRIVALS)),
+                         selected = "all", inline = TRUE),
             uiOutput(ns("mc_tenure_lead")),
             plotlyOutput(ns("mc_tenure_plot"), height = "380px"),
             reactable::reactableOutput(ns("mc_tenure_table"))
@@ -2480,7 +2487,9 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
         codes <- resolve_focal_programs(programs, population_opt)$codes$program_code
         names <- resolve_pathways_focal_programs(population_opt, programs)
         list(tenure = get_major_tenure(pop, cedar_student_terms, degrees,
-                                       list(program_codes = codes, data_edges = edges)),
+                                       list(program_codes = codes, data_edges = edges,
+                                            arrival = input$mc_tenure_arrival %||% "all"),
+                                       programs = programs),
              major_name = if (length(unique(names)) == 1L) unique(names) else "the selected majors")
       }, error = function(e) {
         showNotification(paste("Semester by semester:", conditionMessage(e)), type = "error", duration = 10)
@@ -2494,8 +2503,13 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
       n_unclear <- t$tenure$meta$n_unclear
       tagList(
         lead_text(major_tenure_lead(t$tenure, t$major_name, min_n = cedar_min_group_size)),
-        if (n_unclear > 0L) tags$p(class = "text-hint", format(n_unclear, big.mark = ","),
-                                   " more were already in it when the data begin and are not followed."))
+        tags$p(class = "text-hint",
+               paste0("Of all who entered: ",
+                      paste0(format(t$tenure$meta$by_arrival$n, big.mark = ",", trim = TRUE), " ",
+                             c(first_time = "new first-time students", transfer = "new transfer students",
+                               already_here = "already at UNM")[t$tenure$meta$by_arrival$arrival], collapse = ", "), "."),
+               if (n_unclear > 0L) paste0(" ", format(n_unclear, big.mark = ","),
+                                          " more were already in it when the data begin and are not followed.")))
     })
 
     output$mc_tenure_plot <- renderPlotly({
@@ -2513,17 +2527,17 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
       shown <- s %>% select(when, n_observed, in_major_pct, other_major_pct, no_major_pct, degree_pct, not_enrolled_pct)
       # A state no student is ever in has no bar and no column.
       if (sum(s$n_no_major) == 0L) shown <- shown %>% select(-no_major_pct)
-      reactable::reactable(
-        shown,
-        columns = list(
+      columns <- list(
           when = reactable::colDef(name = "When"),
           n_observed = reactable::colDef(name = "Students followed", format = reactable::colFormat(separators = TRUE)),
           in_major_pct = reactable::colDef(name = MAJOR_TENURE_STATES[["n_in_major"]], format = pct),
           other_major_pct = reactable::colDef(name = MAJOR_TENURE_STATES[["n_other_major"]], format = pct),
           no_major_pct = reactable::colDef(name = MAJOR_TENURE_STATES[["n_no_major"]], format = pct),
           degree_pct = reactable::colDef(name = MAJOR_TENURE_STATES[["n_degree"]], format = pct),
-          not_enrolled_pct = reactable::colDef(name = MAJOR_TENURE_STATES[["n_not_enrolled"]], format = pct)),
-        sortable = FALSE, compact = TRUE, theme = cedar_tbl_theme)
+          not_enrolled_pct = reactable::colDef(name = MAJOR_TENURE_STATES[["n_not_enrolled"]], format = pct))
+      # reactable refuses a definition for a column that is not in the table.
+      reactable::reactable(shown, columns = columns[names(shown)],
+                           sortable = FALSE, compact = TRUE, theme = cedar_tbl_theme)
     })
 
     mc_data <- reactive({

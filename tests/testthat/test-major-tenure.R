@@ -33,6 +33,32 @@ test_that("MT01: where a major's entrants are at each semester after entering", 
                "lacks first_unit_term")
 })
 
+test_that("MT01: entrants by how they arrived", {
+  all <- get_major_tenure(mt01$population, mt01$student_terms, mt01$degrees, mt01$opt, programs = mt01$programs)
+  # The whole population is unchanged by the labels, and every entrant is in one group.
+  expect_equal(all$steps, get_major_tenure(mt01$population, mt01$student_terms, mt01$degrees, mt01$opt)$steps)
+  expect_equal(all$meta$by_arrival$n, c(2L, 1L, 2L))
+  expect_equal(sum(all$meta$by_arrival$n), all$meta$n_entered)
+
+  first <- get_major_tenure(mt01$population, mt01$student_terms, mt01$degrees,
+                            c(mt01$opt, list(arrival = "first_time")), programs = mt01$programs)
+  # M-A and M-D; M-D can be followed two steps.
+  expect_equal(first$steps$n_observed, c(2L, 2L, 1L, 1L))
+  expect_equal(first$steps$n_in_major, c(2L, 2L, 0L, 0L))
+  expect_equal(first$steps$n_other_major, c(0L, 0L, 1L, 1L))
+  here <- get_major_tenure(mt01$population, mt01$student_terms, mt01$degrees,
+                           c(mt01$opt, list(arrival = "already_here")), programs = mt01$programs)
+  # M-C and M-F: neither is new that term.
+  expect_equal(here$steps$n_observed, c(2L, 2L, 2L, 2L))
+  expect_equal(here$steps$n_degree, c(0L, 0L, 1L, 1L))
+
+  expect_error(get_major_tenure(mt01$population, mt01$student_terms, mt01$degrees, c(mt01$opt, list(arrival = "transfer"))),
+               "needs programs")
+  expect_error(get_major_tenure(mt01$population, mt01$student_terms, mt01$degrees, c(mt01$opt, list(arrival = "other"))),
+               "must be one of")
+  expect_snapshot(cat(major_tenure_lead(first, "Undecided", min_n = 1L)))
+})
+
 test_that("MT01: the page's view of it", {
   r <- get_major_tenure(mt01$population, mt01$student_terms, mt01$degrees, mt01$opt)
   s <- major_tenure_shares(r, min_n = 5L)

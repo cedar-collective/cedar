@@ -119,6 +119,15 @@ try {
       && plot.data.every((t) => t.type === 'bar');
   }, { timeout: 60000 });
   ok(tenure, 'Major Changes follows entrants semester by semester (lead sentence and stacked bars)');
+  const tenureRows = await waitFor(page, () =>
+    document.querySelectorAll('#pathways-mc_tenure_table .rt-tbody .rt-tr').length >= 2, { timeout: 60000 });
+  ok(tenureRows, 'Semester by semester lists the same figures as a table');
+  // Choosing how students entered redraws it for that group.
+  await setInput(page, 'pathways-mc_tenure_arrival', 'first_time');
+  const firstTime = await waitFor(page, () => /as first-time students/.test(
+    document.getElementById('pathways-mc_tenure_lead')?.innerText || ''), { timeout: 60000 });
+  ok(firstTime, 'Semester by semester can be read for new first-time students alone');
+  await setInput(page, 'pathways-mc_tenure_arrival', 'all');
   ok((await errorToasts()).length === 0, 'Major Changes raised no error notification');
 
   // The change-events table lives inside a collapsed <details> panel, and Shiny
