@@ -35,6 +35,18 @@ test_that("XC01: the far-along students are counted by term, college and major",
                "lacks is_pre_major")
 })
 
+test_that("XC01: a last term is not final until the terms after it had time to show a return", {
+  open <- function(window) graduation_open_terms(build_graduation_dashboard(
+    xc01$student_terms, xc01$programs, xc01$degrees, xc01$terms, test_dims,
+    c(xc01$opt, list(line = 90, return_window = window))))
+  # Given no time to return, both last terms are final; given two more terms,
+  # only Fall 2020's absences could be read, so Spring 2021 is still open.
+  expect_equal(open(0L), integer(0))
+  expect_equal(open(2L), 202110L)
+  # The default four terms reach past the edge for every term: none was read, none is marked.
+  expect_equal(open(4L), integer(0))
+})
+
 test_that("XC01: with attempts and boards the payload counts each plan's required courses", {
   p <- build_graduation_dashboard(xc01$student_terms, xc01$programs, xc01$degrees, xc01$terms, test_dims,
                                   c(xc01$opt, list(line = 90, min_list = 2L)), attempts = xc01$attempts,

@@ -382,7 +382,7 @@ graduation_later_return_note <- function(meta) {
   if (is.null(r) || r$n == 0L) {
     return("The newest bars will come down a little: some students away two regular terms enroll again later.")
   }
-  paste0("The newest bars will come down a little, because some students away two regular terms enroll again later. ",
+  paste0("The hatched bars, marked not final, will come down a little, because some students away two regular terms enroll again later. ",
          "Through ", fmt_term(r$through), ", a student was away that long with no degree ", fmt_count(r$n),
          " times, and ", fmt_count(r$n_returned), " of those (", sprintf("%.1f%%", 100 * r$n_returned / r$n),
          ") were followed by a later enrollment. An older bar has already lost those students; a new one has not.")
@@ -644,23 +644,46 @@ format_graduation_ceiling <- function(ceiling) {
             pct(o$gone_pct)))
 }
 
+#' The last terms whose count is not final yet
+#'
+#' A last term is final once the terms after it have had time to show a
+#' return: the terms `meta$later_return` could read (through its `through`).
+#' The ones after it can still lose students who enroll again.
+#' @param payload A `build_graduation_dashboard()` result.
+#' @return The series' `exit_term`s still open to a return; none when no term has been read.
+graduation_open_terms <- function(payload) {
+  through <- payload$meta$later_return$through
+  if (is.null(through) || is.na(through)) return(integer(0))
+  payload$series$exit_term[payload$series$exit_term > through]
+}
+
 #' Far-along students who left, by last term
+#'
+#' The newest last terms (graduation_open_terms()) are drawn hatched and
+#' shaded, and labelled: their counts come down as students enroll again.
 plot_exit_series <- function(payload) {
   s <- payload$series
   labels <- vapply(s$exit_term, fmt_term, character(1))
   m <- payload$meta
-  plotly::plot_ly(
+  open <- s$exit_term %in% graduation_open_terms(payload)
+  p <- plotly::plot_ly(
     x = labels, y = s$n_far, type = "bar", text = fmt_count(s$n_far), textposition = "outside", cliponaxis = FALSE,
-    marker = list(color = CEDAR_PALETTE[[2]]), name = paste(m$line, "credits or more"),
+    marker = list(color = CEDAR_PALETTE[[2]], opacity = ifelse(open, 0.55, 1),
+                  pattern = list(shape = ifelse(open, "/", ""))),
+    name = paste(m$line, "credits or more"),
     hovertext = paste0(labels, "<br>", fmt_count(s$n_far), " left with ", m$line, " credits or more<br>",
                        fmt_count(s$n_done), " with ", m$done_at, " or more<br>",
-                       fmt_count(s$n_left), " left in all"),
+                       fmt_count(s$n_left), " left in all",
+                       ifelse(open, "<br>Not final: some of these students will enroll again", "")),
     hoverinfo = "text", showlegend = FALSE) %>%
     plotly::layout(
       xaxis = list(title = "Last enrolled term", type = "category", categoryorder = "array",
                    categoryarray = labels),
-      yaxis = list(title = paste0("Left with ", m$line, " credits or more")),
-      margin = list(t = 30))
+      # Headroom, so a tall bar's count clears the "Not final" label above it.
+      yaxis = list(title = paste0("Left with ", m$line, " credits or more"),
+                   range = c(0, 1.2 * max(c(s$n_far, 1), na.rm = TRUE))),
+      margin = list(t = 40))
+  mark_plotly_terms(p, labels[open], text = "Not final")
 }
 
 # ── Text preview ─────────────────────────────────────────────────────────────
