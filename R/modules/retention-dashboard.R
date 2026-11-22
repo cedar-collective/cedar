@@ -1,10 +1,14 @@
 # Bird's Eye > Retention
 #
-# Are students coming back? One term type at a time: how often enrolled
+# The middle of the three pages (First Year, Retention, Graduation): are
+# continuing students coming back? One term type at a time: how often enrolled
 # students came back the next regular term and whether that is rising or
 # falling; who is not coming back, by the warning signs known by the end of
-# the term; each classification and college; and the courses where a DFW
-# grade goes with not coming back the most.
+# the term; each classification and college; each fall's classes year by
+# year, and whether they are keeping pace; and the courses where a DFW grade
+# goes with not coming back the most. Entering classes' first semesters are
+# on First Year (modules/first-year.R); finishing in the summer is on
+# Graduation.
 #
 # The module holds no analysis: it collects the term type, level and home
 # campuses, calls build_retention_dashboard() (features/retention-dashboard.R)
@@ -26,7 +30,7 @@ retentionDashboardUI <- function(id, campuses) {
   tagList(
     filter_bar(
       "Retention",
-      "Are students coming back the next semester, and who is not?",
+      "After the first year: are students coming back each semester, are they keeping pace, and who is not?",
       fluidRow(
         column(3, radioButtons(ns("term_type"), "Term type", choices = RETENTION_TERM_TYPES,
                                selected = "fall", inline = TRUE)),
@@ -45,30 +49,6 @@ retentionDashboardUI <- function(id, campuses) {
       uiOutput(ns("overall_finding")),
       plotly::plotlyOutput(ns("overall_plot"), height = "340px")
     ),
-    # A fall's next regular term is the spring: no one finishes in between.
-    conditionalPanel(
-      condition = "input.term_type == 'spring'", ns = ns,
-      dashboard_section(
-        "Finishing in the Summer",
-        "How many spring students finish their degree that summer, and what do they take to do it?",
-        method = uiOutput(ns("method_summer")),
-        uiOutput(ns("summer_finding")),
-        plotly::plotlyOutput(ns("summer_plot"), height = "340px"),
-        dashboard_subsection(
-          "Their Summer Courses",
-          "The courses these students took most in the summer they finished.",
-          reactable::reactableOutput(ns("summer_courses")))
-      )
-    ),
-    dashboard_section(
-      "Each Entering Class, Semester by Semester",
-      "How much of each entering class is still enrolled in its 2nd, 3rd, 4th and 5th semesters?",
-      method = uiOutput(ns("method_milestones")),
-      radioButtons(ns("entry"), "Entering students", choices = RETENTION_ENTRY_CHOICES,
-                   selected = "first_time", inline = TRUE),
-      uiOutput(ns("milestones_finding")),
-      plotly::plotlyOutput(ns("milestones_plot"), height = "380px")
-    ),
     dashboard_section(
       "Who Isn't Coming Back",
       "How often students with each warning sign came back, and how many of those who did not had it.",
@@ -85,6 +65,26 @@ retentionDashboardUI <- function(id, campuses) {
         column(6, dashboard_subsection("College", "The college of the student's primary major that term.",
                                        reactable::reactableOutput(ns("college_table"))))
       )
+    ),
+    dashboard_section(
+      "Still Here, and Moving Forward?",
+      "Of each fall's new students, how many are still enrolled as each year begins, and are they earning credits fast enough to finish?",
+      method = uiOutput(ns("method_pace")),
+      fluidRow(
+        column(7, radioButtons(ns("pace_started"), "Students who started as",
+                               choices = c("First-time students" = "first_time",
+                                           stats::setNames(paste0("transfer:", exit_credit_band_labels(GRADUATION_ARRIVAL_BREAKS)),
+                                                           paste0("Transfer, brought ", tolower(exit_credit_band_labels(GRADUATION_ARRIVAL_BREAKS)), " credits"))),
+                               selected = "first_time", inline = TRUE)),
+        column(5, radioButtons(ns("pace_step"), "At the start of their",
+                               choices = stats::setNames(GRADUATION_PACE_STEPS, paste(names(GRADUATION_PACE_STEPS), "year here")),
+                               selected = GRADUATION_PACE_STEPS[["third"]], inline = TRUE))),
+      uiOutput(ns("pace_lead")),
+      plotly::plotlyOutput(ns("pace_plot"), height = "420px"),
+      dashboard_subsection(
+        "Credits earned, term by term",
+        "How many credits has the middle enrolled student of each class earned here before each term?",
+        plotly::plotlyOutput(ns("accumulation_plot"), height = "400px"))
     ),
     dashboard_section(
       "Courses Where a DFW Costs the Most",
@@ -159,32 +159,6 @@ RETENTION_BAND_CHOICES <- c("Continuing students, by GPA entering the term" = "e
       direction = reactable::colDef(name = "Trend", minWidth = 110, html = TRUE, cell = function(value, index) {
         as.character(tags$span(title = unname(DFW_DIRECTION_LABELS[value]), make_sparkline(series[[index]])))
       })))
-}
-
-# Who an entering class holds: the page's choices, and what each asks the cone
-# for. Full-time is the time status of the entering term.
-RETENTION_ENTRY_CHOICES <- c("First-time" = "first_time", "First-time, full-time" = "first_time_ft",
-                             "New transfer" = "transfer", "Everyone new at this level" = "all")
-RETENTION_ENTRY_OPTIONS <- list(
-  first_time = list(entry = "first_time", time_status = NULL),
-  first_time_ft = list(entry = "first_time", time_status = "FT"),
-  transfer = list(entry = "transfer", time_status = NULL),
-  all = list(entry = "all", time_status = NULL)
-)
-
-.retention_entry_note <- function(entry, type, n_summer_starts) {
-  switch(entry,
-    first_time = paste0(
-      "An entering class is the students the registrar's record calls first-time in that ", type,
-      " term and who were enrolled in it, by home campus that term. A student who took college courses in high school ",
-      "enters when the record calls them first-time, not at their first course. A first-time student who started in the ",
-      "summer and was enrolled that fall is in the fall class, as federal reporting counts them (",
-      fmt_count(n_summer_starts), " over these classes). The full-time choice keeps those full-time in their entering term."),
-    transfer = paste0("An entering class is the students the registrar's record calls a new transfer in that ", type,
-                      " term and who were enrolled in it, by home campus that term."),
-    all = paste0("An entering class is every student whose first enrolled term at this level was that ", type,
-                 " term, by home campus that term. It includes transfer students and, among undergraduates, students ",
-                 "taking college courses while in high school."))
 }
 
 # ── Server ───────────────────────────────────────────────────────────────────
@@ -265,22 +239,6 @@ retentionDashboardServer <- function(id, student_terms, attempts, degrees, progr
         tags$li("A place to look, not a finding. The other courses are each student's own choice of a term, and a course usually taken beside lighter ones shows a larger gap for that reason."))
     })
 
-    # The entering classes are read on their own, so choosing who a class
-    # holds rebuilds this chart and nothing else.
-    milestones <- reactive({
-      req(isTRUE(active()), input$term_type, input$level, input$entry)
-      entry <- RETENTION_ENTRY_OPTIONS[[input$entry]]
-      cedar_shared_result(list("retention_milestones", input$term_type, input$level, input$campus, input$entry), function() tryCatch(
-        retention_dashboard_milestones(student_terms, degrees, list(
-          term_type = input$term_type, student_level = input$level,
-          campus = if (length(input$campus) > 0) input$campus else NULL, data_edges = edges,
-          entry = entry$entry, entry_time_status = entry$time_status), programs),
-        error = function(e) {
-          showNotification(paste("Entering classes:", conditionMessage(e)), type = "error", duration = 10)
-          NULL
-        }))
-    })
-
     output$overall_finding <- renderUI({
       p <- payload()
       if (is.null(p)) return(empty_state("The retention figures could not be built; the notification says why."))
@@ -312,81 +270,76 @@ retentionDashboardServer <- function(id, student_terms, attempts, degrees, progr
                        " students whose return can be read. Hover a term for its counts.")))
     })
 
-    # Spring students who finish in the summer: read only when spring is chosen.
-    summer <- reactive({
-      req(isTRUE(active()), identical(input$term_type, "spring"), input$level)
-      cedar_shared_result(list("retention_summer", input$level, input$campus), function() tryCatch(
-        get_summer_finishers(student_terms, degrees, attempts, list(
-          term_type = "spring", student_level = input$level,
-          campus = if (length(input$campus) > 0) input$campus else NULL, data_edges = edges)),
+    # Each fall's entering classes, year by year: read on their own, the
+    # slowest part of the page.
+    class_pace <- reactive({
+      req(isTRUE(active()), input$level)
+      cedar_shared_result(list("class_pace", input$level, input$campus), function() tryCatch(
+        build_class_pace(student_terms, degrees, programs, list(
+          student_level = input$level, campus = if (length(input$campus) > 0) input$campus else NULL,
+          data_edges = edges)),
         error = function(e) {
-          showNotification(paste("Summer finishers:", conditionMessage(e)), type = "error", duration = 10)
+          showNotification(paste("Pace:", conditionMessage(e)), type = "error", duration = 10)
           NULL
         }))
     })
-    output$summer_finding <- renderUI({
-      s <- summer()
-      if (is.null(s)) return(empty_state("The summer figures could not be built; the notification says why."))
-      if (s$meta$n_finishers == 0L) return(empty_state("No spring student in this scope finished in the summer after it."))
-      NULL
+    pace_step <- reactive({ req(input$pace_step); as.integer(input$pace_step) })
+    # The chosen group's table: first-time students, or one band of transfer students.
+    pace_table <- reactive({
+      p <- class_pace(); req(p, input$pace_started)
+      if (identical(input$pace_started, "first_time")) return(p$pace)
+      band <- sub("^transfer:", "", input$pace_started)
+      req(band %in% names(p$transfer))
+      p$transfer[[band]]
     })
-    output$summer_plot <- plotly::renderPlotly({ s <- summer(); req(s, s$meta$n_finishers > 0L); plot_summer_finishers(s) })
-    output$summer_courses <- reactable::renderReactable({
-      s <- summer(); req(s)
-      if (nrow(s$courses) == 0L) return(reactable::reactable(
-        data.frame(Message = "No summer course was taken by enough of these students to list."),
-        theme = cedar_tbl_theme, compact = TRUE))
-      shown <- data.frame(course = s$courses$subject_course, campus = s$courses$campus,
-                          n = s$courses$n_students, share = s$courses$share_pct / 100, stringsAsFactors = FALSE)
-      reactable::reactable(shown, theme = cedar_tbl_theme, compact = TRUE, striped = TRUE, defaultPageSize = 15,
-        columns = list(course = reactable::colDef(name = "Course"), campus = reactable::colDef(name = "Campus"),
-                       n = cedar_count_coldef("Students"), share = cedar_percent_coldef("Of the summer finishers")))
+    pace_drawn <- function(pace) nrow(graduation_pace_shares(pace, pace_step())) > 0L
+    output$pace_lead <- renderUI({
+      pace <- pace_table()
+      if (!pace_drawn(pace)) return(empty_state(graduation_pace_lead(pace, pace_step())))
+      lead_text(graduation_pace_lead(pace, pace_step()))
     })
-    output$method_summer <- renderUI({
-      s <- summer(); req(s)
-      m <- s$meta
+    output$pace_plot <- plotly::renderPlotly({
+      pace <- pace_table(); req(pace_drawn(pace)); plot_class_pace(pace, pace_step())
+    })
+    output$accumulation_plot <- plotly::renderPlotly({
+      pace <- pace_table(); req(any(!is.na(pace$credits_median) & !is.na(pace$here_pct)))
+      plot_credit_accumulation(pace)
+    })
+    output$method_pace <- renderUI({
+      p <- class_pace(); req(p)
+      rates <- attr(p$pace, "pace")
       tags$ul(
-        tags$li(paste0("Students enrolled in a spring, at this level and home campus, who were awarded a degree in the ",
-                       "summer after it. They are the students the return rate above counts as finished. Where a ",
-                       "summer's degrees are not posted yet (they are posted through ", fmt_term(m$degree_edge),
-                       "), the bar shows students who have applied to graduate then, and is marked.")),
-        tags$li(paste0("Credits are those attempted here in that summer. No course here means the degree was posted in ",
-                       "the summer with no summer enrollment: an incomplete made up, a course finished elsewhere, or ",
-                       "the paperwork.")),
-        tags$li(if (length(m$course_terms) == 0L) "No summer in this scope has posted grades, so no course is listed."
-                else paste0("Courses are graded attempts in ", paste(vapply(m$course_terms, fmt_term, character(1)), collapse = ", "),
-                            ", by the campus that taught them, as a share of the ", fmt_count(m$n_course_finishers),
-                            " students who finished in those summers. A course taken by fewer than ", m$min_n,
-                            " of them is not listed.")),
-        tags$li("What a student took is not what they were required to take: the data holds registrations, not degree audits."))
+        tags$li(paste0("An entering class is the students the record calls first-time that fall, at this level and ",
+                       "home campus; a first-time student who started in the summer and enrolled that fall is in ",
+                       "the fall class (", fmt_count(attr(p$pace, "n_summer_starts")), " students). ",
+                       "A class of fewer than ", attr(p$pace, "min_n"), " is not drawn.")),
+        tags$li(paste0("Transfer students are read apart, because they start part-way: each fall's students the record ",
+                       "calls a new transfer, grouped by the credits they brought from elsewhere. For them the split is ",
+                       "by the credits a term they earn here (", rates[["four_year"]], " or more, ", rates[["six_year"]],
+                       " to ", rates[["four_year"]] - 1, ", fewer), not by a four-year pace: a student who brought 60 ",
+                       "credits and earns ", rates[["four_year"]], " a term finishes in two years. Students who transfer ",
+                       "in a spring are not in these classes.")),
+        tags$li(graduation_transfer_record_note(p$transfer[[1]])),
+        tags$li(paste0("Each student is in one part as the year begins: awarded a degree by then; enrolled that term; ",
+                       "or not enrolled, which includes a student away for the term who later comes back.")),
+        tags$li(paste0("An enrolled student is on pace for four years with ", rates[["four_year"]],
+                       " credits completed here for each regular term since entering, counted before the term ",
+                       "begins and with summer credits, and on pace for six with ", rates[["six_year"]],
+                       ". Credit brought from elsewhere (test, dual or transfer credit) is not counted, so a ",
+                       "student who arrived with credit is further along than shown.")),
+        tags$li(paste0("A student whose first term here is the first term of the class lists may have earlier credits ",
+                       "that cannot be seen, and is shown as enrolled with earlier credits not on record. The first ",
+                       "first-time class is the exception: the record calls its ", fmt_count(attr(p$pace, "n_label_trusted")),
+                       " students new that term, so their credits are counted from it. A few had earned credit here ",
+                       "before entering (dual credit), and are a little further along than shown.")),
+        tags$li(paste0("Degrees are posted through ", fmt_term(edges[["last_degree"]]), ". For a term after that, a student ",
+                       "who has applied to graduate counts as having the degree from the following term.")),
+        tags$li(paste0("Enrollment is settled through ", fmt_term(attr(p$pace, "edge")), " and credits are read through ",
+                       fmt_term(attr(p$pace, "pace_edge")), ". The credit lines show the middle student of those still ",
+                       "enrolled, with half of them between the figures in the hover; students who left are not in ",
+                       "them, so a line can rise because slower students left.")))
     })
 
-    output$milestones_finding <- renderUI({
-      ms <- milestones(); req(ms)
-      sentence <- retention_milestone_sentence(list(milestones = ms))
-      if (length(sentence) == 0L) return(empty_state("No entering class in this scope has a settled later term to read."))
-      lead_text(sentence)
-    })
-    output$milestones_plot <- plotly::renderPlotly({
-      ms <- milestones(); req(ms, any(!is.na(ms$here_pct)))
-      plot_entering_class_milestones(list(milestones = ms))
-    })
-    output$method_milestones <- renderUI({
-      p <- payload(); ms <- milestones(); req(p, ms)
-      tags$ul(
-        tags$li(.retention_entry_note(attr(ms, "entry"), .retention_type(p), attr(ms, "n_summer_starts"))),
-        tags$li("Still enrolled means enrolled in that later term on any campus, or awarded a degree by then. A student away one term and back the next is missing from the first and counted in the second."),
-        tags$li(paste0("Each line is one semester of the class's time here: the entering term is the 1st, so a year on is ",
-                       "the 3rd, the one retention is usually quoted at. A semester is a fall or a spring; summer is not ",
-                       "counted. The gap between two lines is the share lost between them.")),
-        tags$li(paste0("A line stops at the last class whose later term has settled (enrollment settled through ",
-                       fmt_term(attr(ms, "edge")), "). ",
-                       if (identical(attr(ms, "entry"), "all")) paste0(
-                         fmt_term(attr(ms, "first_term")), " is the first term on record, so no one can be called new in it: ",
-                         fmt_count(attr(ms, "n_first_term")), " students first seen then are in no class. "),
-                       "A class needs ",
-                       attr(ms, "min_n"), " students for a rate.")))
-    })
 
     output$signs_table <- reactable::renderReactable({
       p <- payload(); req(p, NROW(p$signs) > 0L)

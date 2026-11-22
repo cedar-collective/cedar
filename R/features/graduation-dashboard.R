@@ -36,6 +36,34 @@ GRADUATION_PACE_PARTS <- c(
   n_credits_unknown = "Enrolled, earlier credits not on record",
   n_gone = "Not enrolled")
 
+#' Each fall's entering classes, year by year: still here, and at what pace
+#'
+#' The first-time class, and the new transfer students in one table per band
+#' of credits brought (`GRADUATION_ARRIVAL_BREAKS`), each followed
+#' `GRADUATION_PACE_TERMS` regular terms by get_entering_class_retention()
+#' with `DEGREE_PACE_TERM_CREDITS`.
+#'
+#' @param student_terms,degrees,programs The loaded tables.
+#' @param opt `data_edges` (required), `student_level`, `campus`, `min_n`.
+#' @return list(`pace` (the first-time classes), `transfer` (named by band)).
+build_class_pace <- function(student_terms, degrees, programs, opt = list()) {
+  scope <- list(term_type = "fall", student_level = opt$student_level, campus = opt$campus,
+                n_terms = GRADUATION_PACE_TERMS, min_n = as.integer(opt$min_n %||% 30L),
+                data_edges = opt$data_edges, pace = DEGREE_PACE_TERM_CREDITS)
+  pace <- get_entering_class_retention(student_terms, degrees, c(scope, list(entry = "first_time")), programs)
+  attr(pace, "started") <- "first_time"
+  bands <- exit_credit_band_labels(GRADUATION_ARRIVAL_BREAKS)
+  edges <- c(0, GRADUATION_ARRIVAL_BREAKS, Inf)
+  transfer <- stats::setNames(lapply(seq_along(bands), function(i) {
+    t <- get_entering_class_retention(student_terms, degrees,
+                                      c(scope, list(entry = "transfer", arrival_credits = edges[c(i, i + 1L)])), programs)
+    attr(t, "started") <- "transfer"
+    attr(t, "arrival_band") <- bands[[i]]
+    t
+  }), bands)
+  list(pace = pace, transfer = transfer)
+}
+
 #' The payload for Bird's Eye > Graduation
 #'
 #' @param student_terms,programs,degrees,terms As `get_exit_credits()` takes
@@ -49,7 +77,7 @@ GRADUATION_PACE_PARTS <- c(
 #' @param opt `data_edges` (required), `student_level`, `campus`,
 #'   `first_exit_term`, `line` (credits that count as far along; default 90),
 #'   `min_list` (fewest students for a major to be listed by name; default
-#'   10), `min_n`.
+#'   10), `min_n`, `class_pace` (FALSE leaves `pace` and `transfer` NULL).
 #' @return list(`bands`, `series` (one row per last term: `n_left`, `n_far`,
 #'   `n_done`: at 120 or more), `colleges`, `majors` (far-along students by
 #'   group: `n`, `n_done`, `n_flagged`, `n_pell`; majors under `min_list`
@@ -117,25 +145,11 @@ build_graduation_dashboard <- function(student_terms, programs, degrees, terms, 
   # from elsewhere, and its courses are not on record.
   both <- far %>% filter(!is.na(credits_here))
 
-  # Each fall's first-time students, term by term: still here, and at what pace.
-  pace <- get_entering_class_retention(student_terms, degrees, list(
-    entry = "first_time", term_type = "fall", student_level = opt$student_level, campus = opt$campus,
-    n_terms = GRADUATION_PACE_TERMS, min_n = as.integer(opt$min_n %||% 30L), data_edges = opt$data_edges,
-    pace = DEGREE_PACE_TERM_CREDITS), programs)
-
-  attr(pace, "started") <- "first_time"
-  # The same reading for each fall's new transfer students, by credits brought.
-  bands <- exit_credit_band_labels(GRADUATION_ARRIVAL_BREAKS)
-  edges <- c(0, GRADUATION_ARRIVAL_BREAKS, Inf)
-  transfer <- stats::setNames(lapply(seq_along(bands), function(i) {
-    t <- get_entering_class_retention(student_terms, degrees, list(
-      entry = "transfer", term_type = "fall", student_level = opt$student_level, campus = opt$campus,
-      n_terms = GRADUATION_PACE_TERMS, min_n = as.integer(opt$min_n %||% 30L), data_edges = opt$data_edges,
-      pace = DEGREE_PACE_TERM_CREDITS, arrival_credits = edges[c(i, i + 1L)]), programs)
-    attr(t, "started") <- "transfer"
-    attr(t, "arrival_band") <- bands[[i]]
-    t
-  }), bands)
+  # Each fall's entering classes at each year: the Retention page reads them
+  # on their own (build_class_pace()), and passes class_pace = FALSE here.
+  class_pace <- if (isFALSE(opt$class_pace)) list(pace = NULL, transfer = NULL) else {
+    build_class_pace(student_terms, degrees, programs, opt)
+  }
 
   # Students passing the attempted-credit ceiling with no degree yet.
   ceiling <- get_credit_ceiling_crossings(student_terms, programs, degrees, list(
@@ -150,7 +164,7 @@ build_graduation_dashboard <- function(student_terms, programs, degrees, terms, 
 
   list(
     bands = exit$bands, series = series, colleges = colleges, majors = majors, required = required,
-    pace = pace, transfer = transfer, ceiling = ceiling,
+    pace = class_pace$pace, transfer = class_pace$transfer, ceiling = ceiling,
     meta = c(exit$meta, list(line = line, done_at = done_at, n_far = nrow(far),
                              n_done = sum(far$credits >= done_at),
                              n_far_flagged = sum(far$flagged %in% TRUE),
@@ -720,7 +734,7 @@ format_graduation_dashboard <- function(payload) {
     "", "## By college", group_head, group_lines(payload$colleges),
     "", "## By major", group_head, group_lines(payload$majors),
     if (!is.null(payload$required)) .format_graduation_required(payload),
-    format_graduation_pace(payload$pace),
+    if (!is.null(payload$pace)) format_graduation_pace(payload$pace),
     unlist(lapply(payload$transfer, format_graduation_pace)),
     format_graduation_ceiling(payload$ceiling)
   )

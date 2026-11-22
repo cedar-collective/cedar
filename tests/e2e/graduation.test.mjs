@@ -10,7 +10,7 @@
 //
 //   node tests/e2e/graduation.test.mjs
 
-import { launch, connect, setInput, waitFor, waitForIdle, requireIds, readReactable, outputsInError } from './lib.mjs';
+import { launch, connect, setInput, waitFor, waitForIdle, requireIds, readReactable, waitForSelector, outputsInError } from './lib.mjs';
 
 const fail = [];
 const ok = (cond, msg) => { if (!cond) fail.push(msg); console.log(`${cond ? 'ok  ' : 'FAIL'} ${msg}`); };
@@ -88,33 +88,30 @@ try {
     const p = r?.classList.contains('js-plotly-plot') ? r : r?.querySelector('.js-plotly-plot');
     return p?.data?.length ? p.data.map((t) => t.name) : null;
   };
-  await waitFor(page, plotTraces, { timeout: 300000, args: [`${NS}pace_plot`] });
-  await waitFor(page, plotTraces, { timeout: 300000, args: [`${NS}accumulation_plot`] });
-  const paceParts = await page.evaluate(plotTraces, `${NS}pace_plot`);
-  ok(paceParts?.length === 6 && paceParts[1] === 'Enrolled, on pace for four years', `each class is split into six parts (${paceParts?.length})`);
-  const creditLines = await page.evaluate(plotTraces, `${NS}accumulation_plot`);
-  ok(creditLines?.length >= 3 && creditLines.some((t) => /class$/.test(t)), `credits are drawn a line a class against the two paces (${creditLines?.length})`);
   await waitFor(page, plotTraces, { timeout: 300000, args: [`${NS}ceiling_outcomes_plot`] });
   const ceilingParts = await page.evaluate(plotTraces, `${NS}ceiling_parts_plot`);
   ok(ceilingParts?.length === 3 && ceilingParts[0] === 'Brought from elsewhere', `credits at 160 are drawn in three parts (${ceilingParts})`);
   const ceilingNext = await page.evaluate(plotTraces, `${NS}ceiling_outcomes_plot`);
   ok(ceilingNext?.[0] === 'Awarded a degree' && ceilingNext.length === 3, `what happened next has three outcomes (${ceilingNext?.length})`);
 
-  const paceLead = await page.$eval(`#${NS}pace_lead`, (el) => el.textContent);
-  ok(/At the start of their third year/.test(paceLead), 'the lead reads the third year by default');
-
-  await setInput(page, `${NS}pace_started`, 'transfer:60 or more');
-  const transferRead = await waitFor(page, (id) => {
-    const r = document.getElementById(id);
+  // Spring students who finish in the summer: a bar a summer, split by credits, and their courses.
+  await waitFor(page, () => {
+    const r = document.getElementById('graduation-summer_plot');
     const p = r?.classList.contains('js-plotly-plot') ? r : r?.querySelector('.js-plotly-plot');
-    return /transfer students who brought 60 or more credits/.test(p?.layout?.xaxis?.title?.text || '');
-  }, { timeout: 300000, args: [`${NS}pace_plot`] });
-  ok(transferRead, 'transfer students are read as their own classes, by credits brought');
-  const transferParts = await page.evaluate(plotTraces, `${NS}pace_plot`);
-  ok(/earning 15 or more credits a term here/.test(transferParts?.[1] || ''), `a transfer class is split by credits earned here (${transferParts?.[1]})`);
-  await setInput(page, `${NS}pace_started`, 'first_time');
+    return !!(p && p.data && p.data.length);
+  }, { timeout: 300000 });
+  const summer = await page.evaluate(() => {
+    const r = document.getElementById('graduation-summer_plot');
+    const p = r.classList.contains('js-plotly-plot') ? r : r.querySelector('.js-plotly-plot');
+    return { bands: p.data.map((d) => d.name), x: p.data[0].x };
+  });
+  ok(summer.bands.length === 4 && summer.x.length > 0 && summer.x.every((x) => /Summer/.test(x)),
+     `a bar a summer, four credit bands (${summer.bands.join(', ')}; ${summer.x.length} summers)`);
+  await waitForSelector(page, `#${NS}summer_courses .rt-tbody`);
+  const summerCourses = await readReactable(page, `${NS}summer_courses`);
+  ok(summerCourses.rows.length > 0, `the summer courses table has rows (${summerCourses.rows.length})`);
 
-  const methods = await page.evaluate((ns) => ['method_bands', 'method_series', 'method_standing', 'method_groups', 'method_required', 'method_pace', 'method_ceiling']
+  const methods = await page.evaluate((ns) => ['method_bands', 'method_series', 'method_standing', 'method_groups', 'method_required', 'method_ceiling', 'method_summer']
     .map((id) => document.getElementById(ns + id)?.textContent.trim().length || 0), NS);
   ok(methods.every((n) => n > 80), `every section's method is filled (${methods})`);
 

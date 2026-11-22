@@ -350,14 +350,20 @@ cedar_home_ui <- function() {
           "percent"
         ),
         cedar_home_card(
+          "First Year",
+          "How much of each entering class is still here after its first semesters, by how the students entered.",
+          "?tab=first-year",
+          "seedling"
+        ),
+        cedar_home_card(
           "Retention",
-          "Whether students come back the next semester, which warning signs go with not returning, and where a DFW costs the most.",
+          "After the first year: whether students come back each semester and keep pace, which warning signs go with not returning, and where a DFW costs the most.",
           "?tab=retention",
           "user-check"
         ),
         cedar_home_card(
           "Graduation",
-          "Where students leave without a degree, how many credits they had when they stopped, and where they stood.",
+          "The end of the road: who leaves without a degree and how far along they were, the courses they never passed, and who finishes in the summer.",
           "?tab=graduation",
           "graduation-cap"
         ),
@@ -1803,6 +1809,13 @@ nav_panel(
       dfwRatesUI("dfw_rates", cedar_campus_choices(data_objects[["cedar_attempts"]]),
                  terms = unique(data_objects[["cedar_attempts"]]$term))
     ), # end DFW Rates nav_panel
+
+    nav_panel(
+      title = "First Year",
+      icon = icon("seedling"),
+      firstYearUI("first_year",
+                  sort(unique(stats::na.omit(data_objects[["cedar_student_terms"]]$student_campus))))
+    ), # end First Year nav_panel
 
     nav_panel(
       title = "Retention",
