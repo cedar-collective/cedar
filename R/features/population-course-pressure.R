@@ -228,7 +228,7 @@ format_population_course_pressure <- function(payload) {
          call. = FALSE)
   }
   meta <- payload$meta
-  n <- function(x) ifelse(is.na(x), "—", format(as.integer(round(x)), big.mark = ","))
+  n <- fmt_count
   pct <- function(x) ifelse(is.na(x), "—", paste0(formatC(x, format = "f", digits = 1), "%"))
   share_pct <- function(x) pct(100 * x)
   whole_pct <- function(x) ifelse(is.na(x), "unknown", paste0(round(100 * x), "%"))

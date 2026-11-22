@@ -150,7 +150,7 @@ graduationServer <- function(id, student_terms, programs, degrees, terms, dims, 
       }))
     })
 
-    n <- function(x) format(as.integer(x), big.mark = ",", trim = TRUE)
+    n <- fmt_count
     has_rows <- function(p) !is.null(p) && p$meta$n_left > 0L
 
     output$headline <- renderUI({

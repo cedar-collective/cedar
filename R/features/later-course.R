@@ -58,7 +58,6 @@ LATER_COURSE_TERM_TYPES <- c("fall", "spring", "summer")
   paste0(window_terms, " regular term", if (window_terms == 1L) "" else "s")
 }
 
-.later_course_n <- function(x) format(as.integer(x), big.mark = ",", scientific = FALSE, trim = TRUE)
 
 .later_course_pct <- function(x) {
   ifelse(is.na(x), "—", paste0(formatC(x, format = "f", digits = 1), "%"))
@@ -482,7 +481,7 @@ format_later_course <- function(payload, instructors = FALSE) {
   .later_course_check(payload)
   x <- payload$course_x
   y <- payload$course_y_label
-  n <- .later_course_n
+  n <- fmt_count
   pct <- .later_course_pct
   rate <- function(k, d, p) paste0(pct(p), " (", n(k), " of ", n(d), ")")
   lines <- c(

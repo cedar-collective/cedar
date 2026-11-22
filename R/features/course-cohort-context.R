@@ -393,7 +393,7 @@ format_course_cohort_context <- function(payload) {
     stop("[course-cohort-context.R] payload must come from build_course_cohort_context().", call. = FALSE)
   }
   meta <- payload$meta
-  n <- function(x) ifelse(is.na(x), "—", format(as.integer(round(x)), big.mark = ","))
+  n <- fmt_count
   pct <- function(x) ifelse(is.na(x), "—", paste0(formatC(x, format = "f", digits = 1), "%"))
   pts <- function(x) ifelse(is.na(x), "—", paste0(ifelse(x >= 0, "+", ""), formatC(x, format = "f", digits = 1), " points"))
   share <- function(x) ifelse(is.na(x), "—", paste0(round(100 * x), "%"))

@@ -85,7 +85,7 @@
 # students with a known total: survivors only, which the reader is told.
 #
 # Depends on: .build_enrolled_lookup(), degrees_to_date(),
-#               .compute_retention() (branches/retention-context.R)
+#               follow_students() (branches/retention-context.R)
 #             cedar_longitudinal_edge() (branches/data-edges.R)
 #             advance_term() (branches/cedar-terms.R), get_term_type()
 #             student_term_entry_type() (branches/population.R)
@@ -234,17 +234,26 @@ get_entering_class_retention <- function(student_terms, degrees = NULL, opt = li
 
   empty <- tibble::tibble(term = integer(), step = integer(), target_term = integer(), n_entering = integer(),
                           n_here = integer(), here_pct = numeric())
+  followed <- tibble::tibble(student_id = character(), start = integer(), step = integer(),
+                             target_term = integer(), degree = logical(), enrolled = logical())
   result <- if (nrow(entering) == 0L) empty else {
-    cohort <- entering %>% transmute(student_id, anchor_term = term)
-    graduated <- if (is.null(to_date)) NULL else to_date %>% distinct(student_id, grad_term = degree_term)
-    # The lookup is every level's enrollment: a student who moves level is here.
-    followed <- .compute_retention(cohort, .build_enrolled_lookup(enrolled), n_terms, graduated)
+    # Every level's enrollment: a student who moves level is here. Both edges
+    # are the settled one: `to_date` already holds what counts as a degree to it.
+    followed <- follow_students(
+      entering %>% transmute(student_id, start = term), enrolled,
+      to_date %||% tibble::tibble(student_id = character(), degree_term = integer()),
+      n_terms, edge, edge, since_start = TRUE) %>%
+      filter(step > 0L)
+    here <- followed %>%
+      group_by(term = start, step) %>%
+      summarize(n_here = sum(enrolled | degree), .groups = "drop")
+    # Every class has every step; one past the edge has its class size and no count.
+    # A fresh table: the class sizes carry nothing of cedar_student_terms' own attributes.
+    sizes <- tibble::tibble(term = entering$term) %>% count(term, name = "n_entering")
     bind_rows(lapply(seq_len(n_terms), function(k) {
-      followed %>%
-        group_by(term = anchor_term) %>%
-        summarize(n_entering = n(), n_here = sum(.data[[paste0("retained_", k)]]), .groups = "drop") %>%
-        mutate(step = k, target_term = advance_term(term, k))
+      sizes %>% mutate(step = k, target_term = advance_term(term, k))
     })) %>%
+      left_join(here, by = c("term", "step"), relationship = "one-to-one") %>%
       mutate(n_here = as.integer(n_here),
              here_pct = if_else(n_entering >= min_n, 100 * n_here / n_entering, NA_real_)) %>%
       select(term, step, target_term, n_entering, n_here, here_pct) %>%
@@ -261,7 +270,7 @@ get_entering_class_retention <- function(student_terms, degrees = NULL, opt = li
     # first term is their entering term the running total is whole apart from
     # credit earned here before entering (dual credit), and is read.
     trusted <- if (entry == "first_time") entering$student_id[entering$term == first_term] else character(0)
-    result <- .entering_class_pace(result, entering, enrolled, to_date, pace, n_terms, pace_edge, trusted)
+    result <- .entering_class_pace(result, followed, enrolled, pace, pace_edge, trusted)
     attr(result, "n_label_trusted") <- length(trusted)
   }
   if (length(arrival_withheld) > 0L) {
@@ -283,32 +292,19 @@ get_entering_class_retention <- function(student_terms, degrees = NULL, opt = li
 }
 
 # The pace columns for get_entering_class_retention(): each entering student's
-# state at each step whose target term is settled, counted by class and step.
-.entering_class_pace <- function(result, entering, enrolled, to_date, pace, n_terms, edge, trusted = character(0)) {
+# state (follow_students() rows) at each step whose target term is at or
+# before the pace edge, counted by class and step.
+.entering_class_pace <- function(result, followed, enrolled, pace, edge, trusted = character(0)) {
   at_term <- enrolled %>%
     transmute(student_id, target_term = term,
               credits = if_else(timeline_valid %in% TRUE | student_id %in% trusted,
                                 as.numeric(cumulative_completed_unm_credits) - as.numeric(completed_unm_credits),
                                 NA_real_))
-  awarded <- if (is.null(to_date)) {
-    tibble::tibble(student_id = character(), degree_term = integer(), basis = character())
-  } else to_date %>% filter(degree_term <= edge)
-  steps <- bind_rows(lapply(seq_len(n_terms), function(k) {
-    entering %>% transmute(student_id, term, step = k, target_term = advance_term(term, k))
-  })) %>%
-    filter(target_term <= edge)
   # A degree counts from the entering term on, as "still here" counts it.
-  has_degree <- steps %>%
-    inner_join(awarded, by = "student_id", relationship = "many-to-many") %>%
-    filter(degree_term >= term, degree_term <= target_term) %>%
-    distinct(student_id, term, step)
-  states <- steps %>%
+  states <- followed %>%
+    filter(target_term <= edge) %>%
     left_join(at_term, by = c("student_id", "target_term"), relationship = "many-to-one") %>%
-    left_join(has_degree %>% mutate(degree = TRUE), by = c("student_id", "term", "step"),
-              relationship = "one-to-one") %>%
-    left_join(at_term %>% distinct(student_id, target_term) %>% mutate(here = TRUE),
-              by = c("student_id", "target_term"), relationship = "many-to-one") %>%
-    mutate(degree = degree %in% TRUE, here = here %in% TRUE & !degree)
+    transmute(student_id, term = start, step, target_term, credits, degree, here = enrolled & !degree)
   # The fastest pace met, as its position in `pace`; 0 is slower than all.
   # Paces run fastest first, so the number met places the student.
   n_met <- rowSums(vapply(unname(pace), function(rate) states$credits >= rate * states$step,

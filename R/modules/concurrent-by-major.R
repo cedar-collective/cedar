@@ -47,7 +47,6 @@ concurrentByMajorUI <- function(id) {
 
 # ── Layout helpers (no analysis) ─────────────────────────────────────────────
 
-.concurrent_by_major_n <- function(x) format(as.integer(x), big.mark = ",", trim = TRUE)
 
 .concurrent_by_major_terms <- function(meta, campus) {
   terms <- meta$terms$terms[[match(campus, meta$terms$campus)]]
@@ -57,7 +56,7 @@ concurrentByMajorUI <- function(id) {
 # One major's card: its name and codes, how many student-terms it holds, and
 # its courses as bars on the same 0-100% scale as every other card.
 .concurrent_by_major_card <- function(g, courses, min_course_n) {
-  n <- .concurrent_by_major_n
+  n <- fmt_count
   scope <- if (is.na(g$program_codes)) paste(n(g$n_majors), "majors") else g$program_codes
   body <- if (nrow(courses) == 0L) {
     tags$p(class = "text-note", paste0(
@@ -85,7 +84,7 @@ concurrentByMajorUI <- function(id) {
 # each with its count and its average a term; a Harder Together candidate is
 # marked.
 .concurrent_by_major_all_card <- function(rows, total, harder = character(0)) {
-  n <- .concurrent_by_major_n
+  n <- fmt_count
   top <- utils::head(rows, 10)
   cedar_finding_card(
     "All students", scope = paste("the", nrow(top), "most taken"),
@@ -101,7 +100,7 @@ concurrentByMajorUI <- function(id) {
 }
 
 .concurrent_by_major_campus <- function(p, campus, ns, harder = character(0)) {
-  n <- .concurrent_by_major_n
+  n <- fmt_count
   g <- p$groups[p$groups$campus == campus, , drop = FALSE]
   lab <- p$lab[p$lab$campus == campus, , drop = FALSE]
   every <- p$all_courses[p$all_courses$campus == campus, , drop = FALSE]
@@ -177,7 +176,7 @@ concurrentByMajorUI <- function(id) {
 }
 
 .concurrent_pairs_campus <- function(r, campus) {
-  n <- .concurrent_by_major_n
+  n <- fmt_count
   m <- r$meta
   rows <- r$pairs[r$pairs$campus == campus, , drop = FALSE]
   cand <- rows[rows$harder_together, , drop = FALSE]
@@ -207,7 +206,7 @@ concurrentByMajorUI <- function(id) {
 
 .concurrent_pairs_method <- function(r) {
   m <- r$meta
-  n <- .concurrent_by_major_n
+  n <- fmt_count
   per_campus <- vapply(seq_len(nrow(m$counts)), function(i) {
     k <- m$counts[i, ]
     paste0(k$campus, ": ", n(k$n_continuing), " of ", n(k$n_graded), " graded student-terms; ",

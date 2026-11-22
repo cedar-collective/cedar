@@ -35,7 +35,6 @@ DFW_SECTION_POSITION_LABELS <- c(above = "Above the course's rate", within = "Wi
   }
 }
 
-.dfw_view_n <- function(x) format(as.integer(x), big.mark = ",", trim = TRUE)
 .dfw_view_label <- function(course, campus) paste0(course, " (", campus, ")")
 .dfw_view_direction <- function(x) {
   factor(unname(DFW_DIRECTION_LABELS[dplyr::coalesce(x, "none")]), levels = unname(DFW_DIRECTION_LABELS))
@@ -91,9 +90,9 @@ dfw_concentration_parts <- function(payload) {
   k <- c(q, h - q, tot$n_courses - h)
   data.frame(
     part = c("quarter", "half", "rest"), n = as.integer(n), n_courses = as.integer(k),
-    label = c(paste0("in the ", .dfw_view_n(k[1]), " courses with the most"),
-              paste0("in the next ", .dfw_view_n(k[2])),
-              paste0("in the other ", .dfw_view_n(k[3]))),
+    label = c(paste0("in the ", fmt_count(k[1]), " courses with the most"),
+              paste0("in the next ", fmt_count(k[2])),
+              paste0("in the other ", fmt_count(k[3]))),
     detail = sprintf("%.1f%% of the DFW grades", 100 * n / tot$n_dfw),
     stringsAsFactors = FALSE
   )
@@ -298,8 +297,8 @@ plot_dfw_overall <- function(plot_data) {
     p <- plotly::add_trace(
       p, x = as.character(rows$term_label), y = rows$pts, type = "bar", name = k,
       marker = list(color = colors[[k]], line = list(color = "#FFFFFF", width = 1)),
-      hovertext = paste0(rows$term_label, "<br>", k, ": ", .dfw_view_n(rows$n), " of ",
-                         .dfw_view_n(rows$n_attempts), " attempts (", sprintf("%.1f", rows$pts), " points)"),
+      hovertext = paste0(rows$term_label, "<br>", k, ": ", fmt_count(rows$n), " of ",
+                         fmt_count(rows$n_attempts), " attempts (", sprintf("%.1f", rows$pts), " points)"),
       hoverinfo = "text"
     )
   }
@@ -328,7 +327,7 @@ plot_dfw_course_bars <- function(bars) {
     p <- plotly::add_trace(
       p, x = rows$n_dfw, y = rows$label, type = "bar", orientation = "h", name = d,
       marker = list(color = colors[[d]]),
-      hovertext = paste0(rows$label, "<br>", .dfw_view_n(rows$n_dfw), " DFW of ", .dfw_view_n(rows$n_attempts),
+      hovertext = paste0(rows$label, "<br>", fmt_count(rows$n_dfw), " DFW of ", fmt_count(rows$n_attempts),
                          " attempts (", sprintf("%.1f%%", rows$dfw_pct), ")<br>",
                          sprintf("%.1f%%", rows$share_pct), " of all DFW grades<br>Trend: ", d,
                          ifelse(rows$swings, ", swings", "")),
@@ -388,7 +387,7 @@ plot_dfw_section_strip <- function(strip) {
       p, x = rows$dfw_pct, y = rows$row, type = "scatter", mode = "markers", name = pos,
       marker = list(color = colors[[pos]], size = 6 + 2 * sqrt(rows$n_attempts),
                     line = list(color = "#FFFFFF", width = 1)),
-      hovertext = paste0("CRN ", rows$crn, ": ", .dfw_view_n(rows$n_dfw), " DFW of ", .dfw_view_n(rows$n_attempts),
+      hovertext = paste0("CRN ", rows$crn, ": ", fmt_count(rows$n_dfw), " DFW of ", fmt_count(rows$n_attempts),
                          " (", sprintf("%.1f%%", rows$dfw_pct), ")<br>Chance allows ",
                          sprintf("%.0f", rows$band_lo), "–", sprintf("%.0f%%", rows$band_hi),
                          " for a section this size"),

@@ -129,6 +129,16 @@ test_that("RR01: the dashboard as text", {
   expect_snapshot(cat(format_retention_dashboard(rr01$dashboard), sep = "\n"))
 })
 
+test_that("RR01: the first section's sentence gives the verdict over the terms, and says when too few can be read", {
+  testthat::local_edition(3)
+  t <- rr01$dashboard$trend[1, , drop = FALSE]
+  few <- t
+  few$direction <- "too_few_terms"
+  few$n_terms <- 2L
+  expect_snapshot(cat(retention_lead_sentence(t, "fall"), retention_trend_arithmetic(t),
+                      retention_lead_sentence(few, "fall"), sep = "\n"))
+})
+
 test_that("SG01: a spring student awarded a degree that summer finished, and is not a student who left", {
   r <- get_return_rates(sg01$student_terms, sg01$opt, sg01$degrees)$rates
   s22 <- r[r$term == 202210L, ]

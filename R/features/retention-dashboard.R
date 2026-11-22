@@ -202,9 +202,41 @@ retention_trend_sentence <- function(t) {
     return(paste0("A trend is read from 3 or more terms; ", t$n_terms, " can be read."))
   }
   paste0(pct(t$first_pct), " for ", fmt_term(t$first_term), ", ", pct(t$last_pct), " for ",
-         fmt_term(t$last_term), ". Across the ", t$n_terms, " terms the fitted line moves ",
+         fmt_term(t$last_term), ". ", retention_trend_arithmetic(t))
+}
+
+#' How a return trend's verdict was reached: the slope beside what chance gives
+#' @param t One row of compute_rate_trend() output.
+retention_trend_arithmetic <- function(t) {
+  if (t$direction == "too_few_terms") {
+    return(paste0("A trend is read from 3 or more terms; ", t$n_terms, " can be read."))
+  }
+  paste0("Across the ", t$n_terms, " terms the fitted line moves ",
          sprintf("%+.1f", t$slope), " points a year, where chance and the terms' own scatter give about ",
          sprintf("%.1f", 2 * t$slope_se), ": ", RETENTION_DIRECTION_WORDS[[t$direction]], ".")
+}
+
+# The verdict in the lead sentence's words.
+# Steady is a verdict about the line, not a claim that no term moved.
+RETENTION_LEAD_WORDS <- c(rising = "rising", falling = "falling", steady = "not clearly rising or falling")
+
+#' The section's answer in one sentence: the verdict over the terms, and its two ends
+#'
+#' The chart's trend label says the same verdict; the arithmetic behind it is
+#' retention_trend_arithmetic(), in the method note.
+#' @param t One row of compute_rate_trend() output.
+#' @param type The term type in words ("fall", "spring").
+retention_lead_sentence <- function(t, type) {
+  pct <- function(x) ifelse(is.na(x), "\u2014", sprintf("%.1f%%", x))
+  if (t$direction == "too_few_terms") {
+    return(paste0("Too few ", type, " terms can be read to say whether the share coming back is rising or falling: ",
+                  t$n_terms, " of the 3 a trend needs."))
+  }
+  paste0("The share of ", type, " students who came back the next regular term is ",
+         RETENTION_LEAD_WORDS[[t$direction]], ": ", pct(t$first_pct), " for ", fmt_term(t$first_term), ", ",
+         pct(t$last_pct), " for ", fmt_term(t$last_term),
+         if (t$direction == "steady") ", a difference within the terms' usual swings."
+         else paste0(", about ", sprintf("%.1f", abs(t$slope)), " points a year."))
 }
 
 #' How a step after an entering term is named: the semester it is, and its season
@@ -256,7 +288,7 @@ retention_milestone_sentence <- function(payload) {
 format_retention_dashboard <- function(payload) {
   if (!inherits(payload, "retention_dashboard")) stop("[retention-dashboard.R] not a retention_dashboard payload")
   m <- payload$meta
-  n <- function(x) ifelse(is.na(x), "—", format(as.integer(round(x)), big.mark = ","))
+  n <- fmt_count
   pct <- function(x) ifelse(is.na(x), "—", paste0(formatC(x, format = "f", digits = 1), "%"))
   t <- payload$trend
   lines <- c(
@@ -447,7 +479,7 @@ retention_band_sentence <- function(result) {
     return(paste0("No course had ", m$min_n, " graded attempts by ", who, " and ", m$min_n,
                   " by its other students over these terms."))
   }
-  n <- function(k) format(as.integer(k), big.mark = ",")
+  n <- fmt_count
   paste0("Of the ", n(m$n_courses), if (m$n_courses == 1L) " course" else " courses", " read, ", n(m$n_harder),
          if (m$n_harder == 1L) " was" else " were", " harder on ", who,
          " than the rest of their own term was, by more than for the course's other students, and ",

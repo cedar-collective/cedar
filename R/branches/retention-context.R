@@ -170,8 +170,8 @@ between_term_finishers <- function(anchors, degrees, degree_edge) {
 
 #' Where each student is at each regular term after a starting term
 #'
-#' The follow-up three analyses share (a class past 160 credits, a major's
-#' entrants): step 0 is the starting term and step k the k-th regular term
+#' The follow-up these analyses share (a class past 160 credits, a major's
+#' entrants, an entering class): step 0 is the starting term and step k the k-th regular term
 #' after it (summer is not a step, advance_term()). A step is returned only
 #' where it can be read: its term is at or before the settled enrollment edge
 #' and the degree edge, so a recent starter has the early steps and not the
@@ -183,15 +183,27 @@ between_term_finishers <- function(anchors, degrees, degree_edge) {
 #' @param awarded awarded_degrees() output.
 #' @param n_terms Steps after the start.
 #' @param settled,degree_edge The two edges (`last_enrolled_complete`, `last_degree`).
+#' @param since_start TRUE counts only a degree in or after the starting term:
+#'   a class entering a level (a graduate student's bachelor's degree is not
+#'   this class finishing). FALSE, the default, counts any earlier degree.
 #' @return One row per student and readable step: `student_id`, `start`,
 #'   `step`, `target_term`, `degree` (awarded a degree in or before the target
 #'   term) and `enrolled` (enrolled in the target term).
-follow_students <- function(starts, enrolled_terms, awarded, n_terms, settled, degree_edge) {
+follow_students <- function(starts, enrolled_terms, awarded, n_terms, settled, degree_edge,
+                            since_start = FALSE) {
   if (anyDuplicated(starts$student_id) > 0L) {
     stop("[retention-context.R] follow_students: starts holds a student twice.", call. = FALSE)
   }
   here <- enrolled_terms %>% distinct(student_id, target_term = as.integer(term)) %>% mutate(enrolled = TRUE)
-  first_degree <- awarded %>% arrange(degree_term) %>% distinct(student_id, .keep_all = TRUE)
+  counted <- awarded %>% select(student_id, degree_term)
+  if (since_start) {
+    counted <- counted %>%
+      inner_join(starts %>% transmute(student_id, .start = as.integer(start)), by = "student_id",
+                 relationship = "many-to-one") %>%
+      filter(degree_term >= .start) %>%
+      select(-.start)
+  }
+  first_degree <- counted %>% arrange(degree_term) %>% distinct(student_id, .keep_all = TRUE)
   bind_rows(lapply(0:as.integer(n_terms), function(k) {
     starts %>%
       transmute(student_id, start = as.integer(start), step = k,
@@ -265,6 +277,11 @@ build_retention_context <- function(students, degrees = NULL, opt = list(),
 
 # Given a cohort tibble with columns (student_id, anchor_term), compute
 # whether each student is retained at T+1 .. T+n_terms.
+#
+# Not follow_students(): a course's cohort holds a student once for each term
+# they took it, a degree counts from that term on, and the callers read one
+# wide row a cohort row with NA past the data. follow_students() is one start
+# a student, long, and drops what cannot be read.
 #
 # A student is retained at T+N if:
 #   - enrolled anywhere at UNM in the target term, OR

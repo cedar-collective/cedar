@@ -155,7 +155,6 @@ get_major_tenure <- function(population, student_terms, degrees, opt = list(), p
 }
 
 # A count as page text: whole, with separators.
-tenure_count <- function(x) format(as.integer(x), big.mark = ",", trim = TRUE)
 
 # ── Plot prep ───────────────────────────────────────────────────────────────
 
@@ -188,12 +187,12 @@ major_tenure_lead <- function(tenure, major_name, min_n = 10L) {
     if (nrow(row) == 0L) return(NULL)
     paste0("By their ", c("third", "fifth")[match(step, c(2L, 4L))], " semester, ", sprintf("%.1f%%", row$in_major_pct),
            " were still in it, ", sprintf("%.1f%%", row$other_major_pct), " were enrolled in another major and ",
-           sprintf("%.1f%%", row$not_enrolled_pct), " were not enrolled (of ", tenure_count(row$n_observed), " who can be followed that far).")
+           sprintf("%.1f%%", row$not_enrolled_pct), " were not enrolled (of ", fmt_count(row$n_observed), " who can be followed that far).")
   }
   how <- c(all = "", first_time = " in their first term at UNM, as first-time students,",
            transfer = " in their first term at UNM, as transfer students,",
            already_here = " when they were already at UNM")[[m$arrival %||% "all"]]
-  paste(c(paste0(tenure_count(m$n_entered), " students entered ", major_name, how, " between ", fmt_term(m$first_entry), " and ",
+  paste(c(paste0(fmt_count(m$n_entered), " students entered ", major_name, how, " between ", fmt_term(m$first_entry), " and ",
                  fmt_term(m$last_entry), "."), one(2L), one(4L)), collapse = " ")
 }
 
@@ -215,8 +214,8 @@ plot_major_tenure <- function(tenure, min_n = 10L) {
     fig <- plotly::add_trace(fig, x = s$when, y = share, type = "bar", name = MAJOR_TENURE_STATES[[state]],
                              marker = list(color = unname(colours[[state]])),
                              text = if_else(share >= 7, sprintf("%.0f%%", share), ""), textposition = "inside", textangle = 0,
-                             hovertext = paste0(s$when, "<br>", MAJOR_TENURE_STATES[[state]], ": ", tenure_count(s[[state]]), " of ",
-                                                tenure_count(s$n_observed), " (", sprintf("%.1f%%", share), ")"), hoverinfo = "text")
+                             hovertext = paste0(s$when, "<br>", MAJOR_TENURE_STATES[[state]], ": ", fmt_count(s[[state]]), " of ",
+                                                fmt_count(s$n_observed), " (", sprintf("%.1f%%", share), ")"), hoverinfo = "text")
   }
   fig %>% plotly::layout(barmode = "stack",
                          xaxis = list(title = "", type = "category", categoryorder = "array", categoryarray = as.list(s$when)),
@@ -236,8 +235,8 @@ format_major_tenure <- function(tenure, major_name) {
   pct <- function(x) sprintf("%.1f%%", x)
   c(paste0("## Semester by semester after entering ", major_name),
     major_tenure_lead(tenure, major_name, min_n = 1L),
-    paste0("Not followed: ", tenure_count(m$n_unclear), " already in it when the data begin."),
+    paste0("Not followed: ", fmt_count(m$n_unclear), " already in it when the data begin."),
     sprintf("  %-18s %9s %8s %8s %9s %8s %8s", "When", "Followed", "In it", "Other", "No major", "Degree", "Away"),
-    sprintf("  %-18s %9s %8s %8s %9s %8s %8s", s$when, tenure_count(s$n_observed), pct(s$in_major_pct), pct(s$other_major_pct),
+    sprintf("  %-18s %9s %8s %8s %9s %8s %8s", s$when, fmt_count(s$n_observed), pct(s$in_major_pct), pct(s$other_major_pct),
             pct(s$no_major_pct), pct(s$degree_pct), pct(s$not_enrolled_pct)))
 }

@@ -260,7 +260,7 @@ format_concurrent_courses_by_major <- function(payload) {
          call. = FALSE)
   }
   m <- payload$meta
-  whole <- function(x) format(as.integer(x), big.mark = ",", trim = TRUE)
+  whole <- fmt_count
   out <- sprintf("Courses taken alongside %s, %s terms, through %s (the settled edge)",
                  m$course, m$term_type, fmt_term(m$edge))
   if (nrow(payload$groups) == 0) {
@@ -314,7 +314,7 @@ prepare_concurrent_courses_treemap <- function(payload, campus) {
   if (nrow(rows) == 0L) {
     stop("[concurrent-courses-by-major.R] no all-students courses on campus ", campus, call. = FALSE)
   }
-  treemap_count <- function(x) format(as.integer(round(x)), big.mark = ",", trim = TRUE)
+  treemap_count <- fmt_count
   campus_terms <- rows$n_student_terms[1] / rows$pct[1] * 100
   leaves <- tibble::tibble(
     id = paste(rows$college, rows$subject_course, sep = " / "),

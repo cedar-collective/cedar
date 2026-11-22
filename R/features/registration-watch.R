@@ -221,7 +221,6 @@ build_registration_watch <- function(flagged, opt = list()) {
   )
 }
 
-.registration_watch_n <- function(x) format(as.integer(round(x)), big.mark = ",", trim = TRUE)
 
 # The near-full rate the run used (Regstats' Chronic Fill Rate), never assumed.
 .registration_watch_near_full <- function(meta) {
@@ -235,13 +234,13 @@ build_registration_watch <- function(flagged, opt = list()) {
 .registration_watch_line <- function(r) {
   parts <- c(
     if (!is.na(r$census_enrl) && !is.na(r$census_enrl_mean))
-      sprintf("%s enrolled against a usual %s", .registration_watch_n(r$census_enrl),
-              .registration_watch_n(r$census_enrl_mean)),
-    if (r$waitlist && !is.na(r$waiting)) sprintf("%s waiting", .registration_watch_n(r$waiting)),
+      sprintf("%s enrolled against a usual %s", fmt_count(r$census_enrl),
+              fmt_count(r$census_enrl_mean)),
+    if (r$waitlist && !is.na(r$waiting)) sprintf("%s waiting", fmt_count(r$waiting)),
     if (!is.na(r$fill_rate))
-      sprintf("%s seats, %.1f%% filled at census", .registration_watch_n(r$capacity), 100 * r$fill_rate),
+      sprintf("%s seats, %.1f%% filled at census", fmt_count(r$capacity), 100 * r$fill_rate),
     if ((r$early_drops || r$late_drops) && !is.na(r$drops_beyond))
-      sprintf("%s drops beyond the usual range", .registration_watch_n(r$drops_beyond))
+      sprintf("%s drops beyond the usual range", fmt_count(r$drops_beyond))
   )
   where <- paste(c(r$campus, r$college, if (!identical(r$part_term, "1")) paste("part", r$part_term)),
                  collapse = " · ")
@@ -265,7 +264,7 @@ format_registration_watch <- function(payload, n_per_pattern = 5L) {
   out <- c(
     sprintf("Registration watch: %s · %s", terms, paste(m$campuses, collapse = ", ")),
     sprintf("%s courses flagged by at least one Regstats screen; %s usually near full and %s.",
-            .registration_watch_n(m$n_flagged), .registration_watch_n(m$n_usually_full),
+            fmt_count(m$n_flagged), fmt_count(m$n_usually_full),
             if (isTRUE(m$include_known)) "listed" else "not listed"),
     sprintf("Near full means at least %s%% of seats filled at census.", format(100 * near_full))
   )
@@ -392,13 +391,13 @@ prepare_registration_watch_plot_data <- function(payload, opt = list()) {
         "<b>", subject_course, "</b> \u00b7 ", campus, " \u00b7 ", college,
         dplyr::if_else(part_term == "1", "", paste0(" \u00b7 part ", part_term)),
         "<br>", .registration_watch_label(pattern),
-        "<br>", .registration_watch_n(census_enrl), " at census against a usual ",
-        .registration_watch_n(census_enrl_mean), " (", .registration_watch_multiple(enrl_ratio), ")",
-        "<br>", sprintf("%.1f%%", y), " of ", .registration_watch_n(capacity), " seats filled at census",
+        "<br>", fmt_count(census_enrl), " at census against a usual ",
+        fmt_count(census_enrl_mean), " (", .registration_watch_multiple(enrl_ratio), ")",
+        "<br>", sprintf("%.1f%%", y), " of ", fmt_count(capacity), " seats filled at census",
         dplyr::if_else(waitlist & !is.na(waiting),
-                       paste0("<br>", .registration_watch_n(waiting), " waiting"), ""),
+                       paste0("<br>", fmt_count(waiting), " waiting"), ""),
         dplyr::if_else(!is.na(drops_beyond),
-                       paste0("<br>", .registration_watch_n(drops_beyond), " drops beyond the usual range"), ""),
+                       paste0("<br>", fmt_count(drops_beyond), " drops beyond the usual range"), ""),
         "<br>", n_screens, dplyr::if_else(n_screens == 1, " screen", " screens"))
     ) %>%
     dplyr::select(dplyr::all_of(.REGISTRATION_WATCH_KEY), pattern, label_text = subject_course,

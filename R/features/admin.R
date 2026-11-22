@@ -507,7 +507,7 @@ build_counting_rules <- function(files, programs, sections, students, student_te
   need(students, c("college_basis"), "cedar_registrations")
   need(student_terms, c("student_id", "term", "student_campus", "declared", "class_list_rows"),
        "cedar_student_terms")
-  n <- function(x) format(x, big.mark = ",")
+  n <- fmt_count
   pct <- function(a, b) if (b == 0) "—" else sprintf("%.1f%%", 100 * a / b)
   some <- function(codes, k = 6) {
     codes <- sort(unique(codes))

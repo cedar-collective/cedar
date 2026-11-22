@@ -23,3 +23,13 @@
       Entered Fall 2024 (10): — 2nd semester (spring); — 3rd semester (fall); — 4th semester (spring); — 5th semester (fall).
       Course MATH 101 (ABQ): 21 with a DFW, 9.5% back against 91.7% after passing; 17.2 beyond the passers' rate.
 
+# RR01: the first section's sentence gives the verdict over the terms, and says when too few can be read
+
+    Code
+      cat(retention_lead_sentence(t, "fall"), retention_trend_arithmetic(t),
+      retention_lead_sentence(few, "fall"), sep = "\n")
+    Output
+      The share of fall students who came back the next regular term is not clearly rising or falling: 71.7% for Fall 2020, 81.7% for Fall 2023, a difference within the terms' usual swings.
+      Across the 4 terms the fitted line moves +3.3 points a year, where chance and the terms' own scatter give about 4.9: steady.
+      Too few fall terms can be read to say whether the share coming back is rising or falling: 2 of the 3 a trend needs.
+

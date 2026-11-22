@@ -65,7 +65,6 @@ COURSE_TOPICS_MEASURES <- list(
   invisible(payload)
 }
 
-.course_topics_n <- function(x) format(as.integer(x), big.mark = ",", scientific = FALSE, trim = TRUE)
 
 .course_topics_pct <- function(x) {
   ifelse(is.na(x), "—", paste0(formatC(x, format = "f", digits = 1), "%"))
@@ -426,7 +425,7 @@ course_topics_scope_note <- function(payload) {
 #' @return Character vector of lines.
 format_course_topics <- function(payload, term_types = NULL, unlocked = FALSE) {
   .course_topics_check(payload)
-  n <- .course_topics_n
+  n <- fmt_count
   pct <- .course_topics_pct
   types <- .course_topics_types_arg(payload, term_types)
   plural <- function(k, word) paste0(n(k), " ", word, if (k == 1L) "" else "s")

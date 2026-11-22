@@ -135,7 +135,6 @@ RETENTION_BAND_CHOICES <- c("Continuing students, by GPA entering the term" = "e
 
 # ── Layout helpers (no analysis) ─────────────────────────────────────────────
 
-.retention_n <- function(x) format(as.integer(x), big.mark = ",", trim = TRUE)
 .retention_pct <- function(x) if (length(x) == 0L || is.na(x)) "—" else sprintf("%.1f%%", x)
 .retention_type <- function(p) tolower(names(RETENTION_TERM_TYPES)[RETENTION_TERM_TYPES == p$meta$term_type])
 .retention_rate_coldef <- function(name, ...) {
@@ -180,7 +179,7 @@ RETENTION_ENTRY_OPTIONS <- list(
       " term and who were enrolled in it, by home campus that term. A student who took college courses in high school ",
       "enters when the record calls them first-time, not at their first course. A first-time student who started in the ",
       "summer and was enrolled that fall is in the fall class, as federal reporting counts them (",
-      .retention_n(n_summer_starts), " over these classes). The full-time choice keeps those full-time in their entering term."),
+      fmt_count(n_summer_starts), " over these classes). The full-time choice keeps those full-time in their entering term."),
     transfer = paste0("An entering class is the students the registrar's record calls a new transfer in that ", type,
                       " term and who were enrolled in it, by home campus that term."),
     all = paste0("An entering class is every student whose first enrolled term at this level was that ", type,
@@ -253,15 +252,15 @@ retentionDashboardServer <- function(id, student_terms, attempts, degrees, progr
                        ", by the campus that taught the course (the campus chosen above). The GPA band is ",
                        if (m$band_by == "entering") "the GPA a continuing student brought into the term, counted from their own earlier terms here; first-term students have none"
                        else "the high-school GPA on file for a student in their first graded term here",
-                       ". A student is read once for each term: ", .retention_n(m$n_banded), " in all. ",
-                       .retention_n(m$n_no_band), " more have no such GPA, and ", .retention_n(m$n_invalid),
+                       ". A student is read once for each term: ", fmt_count(m$n_banded), " in all. ",
+                       fmt_count(m$n_no_band), " more have no such GPA, and ", fmt_count(m$n_invalid),
                        " started before the data does, so their GPA cannot be added up; both are left out.")),
         tags$li(paste0("For each group, the DFW rate in the course is set beside the same students' DFW rate in the other ",
                        "courses they took that term. A student who is struggling everywhere shows it in both, so the ",
                        "difference is what this course adds. The gap is that difference for students with a GPA ",
                        m$low_band, " less the same difference for the course's other students: a course hard on everyone has no gap.")),
         tags$li(paste0("A course is read when both groups have ", m$min_n, " attempts, and listed when its gap is beyond ",
-                       "chance alone (two standard errors). ", .retention_n(m$n_courses), " courses were read; with that ",
+                       "chance alone (two standard errors). ", fmt_count(m$n_courses), " courses were read; with that ",
                        "many, chance alone lists some. Ranked by the attempts the gap stands for.")),
         tags$li("A place to look, not a finding. The other courses are each student's own choice of a term, and a course usually taken beside lighter ones shows a larger gap for that reason."))
     })
@@ -286,9 +285,9 @@ retentionDashboardServer <- function(id, student_terms, attempts, degrees, progr
       p <- payload()
       if (is.null(p)) return(empty_state("The retention figures could not be built; the notification says why."))
       if (nrow(p$series) == 0L) return(empty_state("No student in this scope has a settled next term to read."))
-      # The chart carries the finding: each term's rate, and the trend's line
-      # labelled with its slope and verdict.
-      NULL
+      # The verdict over the terms; the chart below shows each term's rate
+      # and the trend's line.
+      lead_text(retention_lead_sentence(p$trend[1, , drop = FALSE], .retention_type(p)))
     })
     output$overall_plot <- plotly::renderPlotly({ p <- payload(); req(p, nrow(p$series) > 0L); plot_return_series(p) })
     output$method_overall <- renderUI({
@@ -298,17 +297,17 @@ retentionDashboardServer <- function(id, student_terms, attempts, degrees, progr
         tags$li(paste0("Every student enrolled in each of the ", .retention_type(p), " terms (registered, or withdrawn ",
                        "after census), counted once for each term, by the student's home campus. Came back means enrolled the next regular term, ",
                        "at UNM on any campus: summer is not a step, and moving campus is not leaving.")),
-        tags$li(paste0("Left out: ", .retention_n(m$n_graduated), " who finished rather than left, and ",
-                       .retention_n(m$n_unobservable), " whose next term had not settled. Finished means awarded a ",
+        tags$li(paste0("Left out: ", fmt_count(m$n_graduated), " who finished rather than left, and ",
+                       fmt_count(m$n_unobservable), " whose next term had not settled. Finished means awarded a ",
                        "degree that term",
                        if (m$term_type == "spring") paste0(
-                         " or in the summer after it (", .retention_n(m$n_finished_between), " students; ",
-                         .retention_n(m$n_applied_between), " more have applied to graduate in a summer whose ",
+                         " or in the summer after it (", fmt_count(m$n_finished_between), " students; ",
+                         fmt_count(m$n_applied_between), " more have applied to graduate in a summer whose ",
                          "degrees are not posted yet, and are counted as finishing)") else "",
                        ". A degree on hold is not a degree.")),
         tags$li(paste0("The dashed line is the trend, fitted through the terms; it is rising or falling when its ",
                        "slope is beyond both chance and the ordinary term-to-term swings. ",
-                       retention_trend_sentence(p$trend[1, , drop = FALSE]))),
+                       retention_trend_arithmetic(p$trend[1, , drop = FALSE]))),
         tags$li(paste0("Enrollment settled through ", fmt_term(m$edge), "; a term's rate needs ", m$min_n,
                        " students whose return can be read. Hover a term for its counts.")))
     })
@@ -356,7 +355,7 @@ retentionDashboardServer <- function(id, student_terms, attempts, degrees, progr
                        "the paperwork.")),
         tags$li(if (length(m$course_terms) == 0L) "No summer in this scope has posted grades, so no course is listed."
                 else paste0("Courses are graded attempts in ", paste(vapply(m$course_terms, fmt_term, character(1)), collapse = ", "),
-                            ", by the campus that taught them, as a share of the ", .retention_n(m$n_course_finishers),
+                            ", by the campus that taught them, as a share of the ", fmt_count(m$n_course_finishers),
                             " students who finished in those summers. A course taken by fewer than ", m$min_n,
                             " of them is not listed.")),
         tags$li("What a student took is not what they were required to take: the data holds registrations, not degree audits."))
@@ -384,7 +383,7 @@ retentionDashboardServer <- function(id, student_terms, attempts, degrees, progr
                        fmt_term(attr(ms, "edge")), "). ",
                        if (identical(attr(ms, "entry"), "all")) paste0(
                          fmt_term(attr(ms, "first_term")), " is the first term on record, so no one can be called new in it: ",
-                         .retention_n(attr(ms, "n_first_term")), " students first seen then are in no class. "),
+                         fmt_count(attr(ms, "n_first_term")), " students first seen then are in no class. "),
                        "A class needs ",
                        attr(ms, "min_n"), " students for a rate.")))
     })
@@ -430,7 +429,7 @@ retentionDashboardServer <- function(id, student_terms, attempts, degrees, progr
         tags$li("Classification is the student's that term; college is the college of the primary major that term."),
         tags$li(paste0("A group's rate is read in each term it had ", p$meta$min_n, " or more students whose return ",
                        "could be read; a group not read in the latest term is left out (",
-                       .retention_n(p$meta$n_groups_past), " here). Sorted with the lowest latest rate first.")))
+                       fmt_count(p$meta$n_groups_past), " here). Sorted with the lowest latest rate first.")))
     })
 
     output$courses_table <- reactable::renderReactable({

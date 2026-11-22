@@ -164,7 +164,6 @@ build_graduation_dashboard <- function(student_terms, programs, degrees, terms, 
   )
 }
 
-.graduation_n <- function(x) format(as.integer(round(x)), big.mark = ",", trim = TRUE)
 
 #' The entering classes' pace as text
 #'
@@ -183,7 +182,7 @@ format_graduation_pace <- function(pace) {
     c("", graduation_pace_lead(pace, step),
       sprintf("  %-10s %8s %8s %8s %8s %8s %8s %8s", "Class", "Entered", "Degree", fast[[1]], fast[[2]], "Slower",
               "Unknown", "Gone"),
-      sprintf("  %-10s %8s %8s %8s %8s %8s %8s %8s", s$class, .graduation_n(s$n_entering), pct(s$degree_pct),
+      sprintf("  %-10s %8s %8s %8s %8s %8s %8s %8s", s$class, fmt_count(s$n_entering), pct(s$degree_pct),
               pct(s$four_year_pct), pct(s$six_year_pct), pct(s$slower_pct), pct(s$credits_unknown_pct),
               pct(s$gone_pct)))
   }))
@@ -201,7 +200,7 @@ format_graduation_pace <- function(pace) {
 .format_graduation_required <- function(payload) {
   r <- payload$required
   t <- graduation_required_table(payload)
-  n <- function(x) ifelse(is.na(x), "--", .graduation_n(dplyr::coalesce(x, 0L)))
+  n <- function(x) ifelse(is.na(x), "--", fmt_count(dplyr::coalesce(x, 0L)))
   shown <- r$programs[r$programs$shown, ]
   plans <- unlist(lapply(seq_len(nrow(shown)), function(i) {
     rows <- t[t$plan == shown$label[i], ]
@@ -213,7 +212,7 @@ format_graduation_pace <- function(pace) {
     graduation_credit_source_note(payload),
     paste0(graduation_required_lead(payload), " Plans with fewer than ", r$meta$min_n,
            " such students are not listed: ", r$meta$n_plans_withheld, " (",
-           .graduation_n(r$meta$n_students_withheld), " students)."),
+           fmt_count(r$meta$n_students_withheld), " students)."),
     "Passed: a passing grade here in the course. Tried: a grade or late withdrawal here, never a pass.",
     "None: no attempt here, which is not the same as still required. -- : no one had taken a course under this code by then.",
     plans)
@@ -225,13 +224,13 @@ graduation_headline <- function(payload) {
   m <- payload$meta
   if (m$n_left == 0L) return("No student in this scope has a last term that can be judged yet.")
   paste0(
-    "Of the ", .graduation_n(m$n_left + m$n_with_degree), " students whose last term was between ",
+    "Of the ", fmt_count(m$n_left + m$n_with_degree), " students whose last term was between ",
     fmt_term(m$first_exit_term), " and ", fmt_term(m$last_exit_term), ", ",
-    .graduation_n(m$n_with_degree), if (m$n_with_degree == 1L) " holds" else " hold",
-    " a degree and ", .graduation_n(m$n_left),
-    " left without one. ", .graduation_n(m$n_far), " of those who left had ", m$line,
+    fmt_count(m$n_with_degree), if (m$n_with_degree == 1L) " holds" else " hold",
+    " a degree and ", fmt_count(m$n_left),
+    " left without one. ", fmt_count(m$n_far), " of those who left had ", m$line,
     " credits or more",
-    if (m$line < m$done_at) paste0(", ", .graduation_n(m$n_done), " of them ", m$done_at, " or more") else "",
+    if (m$line < m$done_at) paste0(", ", fmt_count(m$n_done), " of them ", m$done_at, " or more") else "",
     "."
   )
 }
@@ -259,9 +258,9 @@ plot_exit_bands <- function(payload) {
   floor_of <- c(0, payload$meta$breaks, NA)[seq_along(labels)]
   far <- !is.na(floor_of) & floor_of >= payload$meta$line & labels != "Not recorded"
   plotly::plot_ly(
-    x = labels, y = b$n, type = "bar", text = .graduation_n(b$n), textposition = "outside", cliponaxis = FALSE,
+    x = labels, y = b$n, type = "bar", text = fmt_count(b$n), textposition = "outside", cliponaxis = FALSE,
     marker = list(color = ifelse(far, CEDAR_PALETTE[[2]], CEDAR_SEMANTIC_COLORS[["reference"]])),
-    hovertext = paste0(labels, " credits<br>", .graduation_n(b$n), " students (",
+    hovertext = paste0(labels, " credits<br>", fmt_count(b$n), " students (",
                        sprintf("%.1f%%", b$share_pct), ")"),
     hoverinfo = "text", showlegend = FALSE) %>%
     plotly::layout(
@@ -291,8 +290,8 @@ graduation_credit_source_note <- function(payload) {
   m <- payload$meta
   if (m$n_far_here_known == 0L) return("Where these students earned their credits is not on record.")
   paste0("Half of these students left with ", round(m$median_credits), " credits or more, and half had earned ",
-         round(m$median_credits_here), " or fewer of them here. ", .graduation_n(m$n_far_mostly_elsewhere), " of ",
-         .graduation_n(m$n_far_here_known), " earned most of their credits somewhere else, so a course with no ",
+         round(m$median_credits_here), " or fewer of them here. ", fmt_count(m$n_far_mostly_elsewhere), " of ",
+         fmt_count(m$n_far_here_known), " earned most of their credits somewhere else, so a course with no ",
          "attempt here may have been met there.")
 }
 
@@ -300,9 +299,9 @@ graduation_credit_source_note <- function(payload) {
 #' @param payload A `build_graduation_dashboard()` result holding `required`.
 graduation_required_lead <- function(payload) {
   m <- payload$required$meta
-  paste0(.graduation_n(m$n_with_plan), " of the ", .graduation_n(m$n_students),
+  paste0(fmt_count(m$n_with_plan), " of the ", fmt_count(m$n_students),
          " students who left without a degree with ", payload$meta$line, " credits or more were in a program with a degree plan on file; ",
-         .graduation_n(m$n_without_plan), " were not.")
+         fmt_count(m$n_without_plan), " were not.")
 }
 
 #' One plan's line: its students, and what of the plan is not read
@@ -313,8 +312,8 @@ graduation_plan_note <- function(payload, catalog_id) {
   plan <- r$programs[r$programs$catalog_id == catalog_id, ]
   if (nrow(plan) != 1L || !plan$shown) stop("[graduation-dashboard.R] no listed plan ", catalog_id, call. = FALSE)
   unreadable <- sum(!r$courses$readable[r$courses$catalog_id == catalog_id])
-  paste0(.graduation_n(plan$n_students), " students in this program left without a degree with ",
-         payload$meta$line, " credits or more, ", .graduation_n(plan$n_pre_major),
+  paste0(fmt_count(plan$n_students), " students in this program left without a degree with ",
+         payload$meta$line, " credits or more, ", fmt_count(plan$n_pre_major),
          " of them pre-majors. Not read: ", plan$n_not_read, " choices and elective slots",
          if (unreadable > 0L) paste0("; ", unreadable, if (unreadable == 1L) " course" else " courses",
                                      " no one had taken under the plan's number by then") else "", ".")
@@ -330,10 +329,10 @@ plot_exit_required <- function(payload, catalog_id) {
   r <- payload$required
   rows <- r$courses[r$courses$catalog_id == catalog_id & r$courses$readable, ]
   if (nrow(rows) == 0L) stop("[graduation-dashboard.R] plan ", catalog_id, " has no readable course.", call. = FALSE)
-  hover <- function(count, what) paste0(rows$subject_course, " · ", rows$title, "<br>", .graduation_n(count), " ", what)
+  hover <- function(count, what) paste0(rows$subject_course, " · ", rows$title, "<br>", fmt_count(count), " ", what)
   bar <- function(fig, count, name, what, colour) {
     plotly::add_trace(fig, y = rows$subject_course, x = count, type = "bar", orientation = "h", name = name,
-                      marker = list(color = colour), text = .graduation_n(count), textposition = "inside",
+                      marker = list(color = colour), text = fmt_count(count), textposition = "inside",
                       insidetextanchor = "middle", textangle = 0, hovertext = hover(count, what), hoverinfo = "text")
   }
   plotly::plot_ly(height = 140 + 26 * nrow(rows)) %>%
@@ -384,8 +383,8 @@ graduation_later_return_note <- function(meta) {
     return("The newest bars will come down a little: some students away two regular terms enroll again later.")
   }
   paste0("The newest bars will come down a little, because some students away two regular terms enroll again later. ",
-         "Through ", fmt_term(r$through), ", a student was away that long with no degree ", .graduation_n(r$n),
-         " times, and ", .graduation_n(r$n_returned), " of those (", sprintf("%.1f%%", 100 * r$n_returned / r$n),
+         "Through ", fmt_term(r$through), ", a student was away that long with no degree ", fmt_count(r$n),
+         " times, and ", fmt_count(r$n_returned), " of those (", sprintf("%.1f%%", 100 * r$n_returned / r$n),
          ") were followed by a later enrollment. An older bar has already lost those students; a new one has not.")
 }
 
@@ -399,8 +398,8 @@ graduation_transfer_record_note <- function(pace) {
   base <- paste0("A transfer student is grouped by the credit from elsewhere on their record. A new student's first ",
                  "record has none, a later one fills it in, and a student who has left gets no later one.")
   if (is.null(unknown) || nrow(unknown) == 0L) return(paste(base, "Every student in these classes has it on record."))
-  classes <- paste0(vapply(unknown$term, fmt_term, character(1)), " (", .graduation_n(unknown$n), " of ",
-                    .graduation_n(unknown$n_class), ")", collapse = ", ")
+  classes <- paste0(vapply(unknown$term, fmt_term, character(1)), " (", fmt_count(unknown$n), " of ",
+                    fmt_count(unknown$n_class), ")", collapse = ", ")
   paste0(base, " Students without it are in no group: ", classes, ".",
          if (length(held) > 0L) paste0(" Where that is more than a few, the students left in the groups are mostly ",
                                        "the ones who stayed, so the class is not shown by group: ",
@@ -464,8 +463,8 @@ plot_class_pace <- function(pace, step) {
       fig, x = s$class, y = share, type = "bar", name = words$parts[[part]],
       marker = list(color = unname(colours[[part]])),
       text = ifelse(share >= 4, sprintf("%.0f%%", share), ""), textposition = "inside", textangle = 0,
-      hovertext = paste0(s$class, " class<br>", words$parts[[part]], ": ", .graduation_n(s[[part]]),
-                         " of ", .graduation_n(s$n_entering), " (", sprintf("%.1f%%", share), ")"),
+      hovertext = paste0(s$class, " class<br>", words$parts[[part]], ": ", fmt_count(s[[part]]),
+                         " of ", fmt_count(s$n_entering), " (", sprintf("%.1f%%", share), ")"),
       hoverinfo = "text")
   }
   fig %>% plotly::layout(
@@ -560,7 +559,7 @@ graduation_ceiling_lead <- function(ceiling) {
   if (m$n_passed == 0L) return(paste0("No student in this scope passed ", m$ceiling, " attempted credits where it can be seen."))
   p <- graduation_ceiling_parts(ceiling)
   credits <- function(part) round(p$credits[p$part == part])
-  paste0(.graduation_n(m$n_passed), " students passed ", m$ceiling, " attempted credits between ",
+  paste0(fmt_count(m$n_passed), " students passed ", m$ceiling, " attempted credits between ",
          fmt_term(min(ceiling$by_term$term)), " and ", fmt_term(max(ceiling$by_term$term)),
          " with no degree yet. On average ", credits("elsewhere"), " of those credits were brought from elsewhere, ",
          credits("completed_here"), " were completed here and ", credits("not_completed_here"),
@@ -575,7 +574,7 @@ graduation_ceiling_outcome_note <- function(ceiling) {
   first <- o[1, ]; last <- o[nrow(o), ]
   pct <- function(x) sprintf("%.1f%%", x)
   paste0(pct(first$degree_pct), " were awarded a degree in the term they passed it. ",
-         if (last$step > 0L) paste0("Of the ", .graduation_n(last$n_observed), " who can be followed ", last$step,
+         if (last$step > 0L) paste0("Of the ", fmt_count(last$n_observed), " who can be followed ", last$step,
                                     " regular terms on, ", pct(last$degree_pct), " had a degree, ",
                                     pct(last$enrolled_pct), " were still enrolled and ", pct(last$gone_pct),
                                     " were not enrolled.") else "")
@@ -611,8 +610,8 @@ plot_ceiling_outcomes <- function(ceiling) {
   bar <- function(fig, share, count, name, colour) {
     plotly::add_trace(fig, x = o$when, y = share, type = "bar", name = name, marker = list(color = colour),
                       text = sprintf("%.0f%%", share), textposition = "inside", textangle = 0,
-                      hovertext = paste0(o$when, "<br>", name, ": ", .graduation_n(count), " of ",
-                                         .graduation_n(o$n_observed), " (", sprintf("%.1f%%", share), ")"),
+                      hovertext = paste0(o$when, "<br>", name, ": ", fmt_count(count), " of ",
+                                         fmt_count(o$n_observed), " (", sprintf("%.1f%%", share), ")"),
                       hoverinfo = "text")
   }
   plotly::plot_ly() %>%
@@ -633,15 +632,15 @@ format_graduation_ceiling <- function(ceiling) {
   m <- ceiling$meta
   head <- c("", paste0("## Passing ", m$ceiling, " attempted credits with no degree yet"),
             graduation_ceiling_lead(ceiling),
-            paste0("Not placed: ", .graduation_n(m$n_not_readable), " whose record began before the class lists or whose credit from elsewhere is not on record, ",
-                   .graduation_n(m$n_already_past), " already past it in their first term on record, ",
-                   .graduation_n(m$n_prior_degree), " who already held a degree."))
+            paste0("Not placed: ", fmt_count(m$n_not_readable), " whose record began before the class lists or whose credit from elsewhere is not on record, ",
+                   fmt_count(m$n_already_past), " already past it in their first term on record, ",
+                   fmt_count(m$n_prior_degree), " who already held a degree."))
   if (m$n_passed == 0L) return(head)
   o <- graduation_ceiling_outcomes(ceiling, min_n = 1L)
   pct <- function(x) sprintf("%.1f%%", x)
   c(head, "", graduation_ceiling_outcome_note(ceiling),
     sprintf("  %-26s %9s %8s %9s %8s", "When", "Followed", "Degree", "Enrolled", "Gone"),
-    sprintf("  %-26s %9s %8s %9s %8s", o$when, .graduation_n(o$n_observed), pct(o$degree_pct), pct(o$enrolled_pct),
+    sprintf("  %-26s %9s %8s %9s %8s", o$when, fmt_count(o$n_observed), pct(o$degree_pct), pct(o$enrolled_pct),
             pct(o$gone_pct)))
 }
 
@@ -651,11 +650,11 @@ plot_exit_series <- function(payload) {
   labels <- vapply(s$exit_term, fmt_term, character(1))
   m <- payload$meta
   plotly::plot_ly(
-    x = labels, y = s$n_far, type = "bar", text = .graduation_n(s$n_far), textposition = "outside", cliponaxis = FALSE,
+    x = labels, y = s$n_far, type = "bar", text = fmt_count(s$n_far), textposition = "outside", cliponaxis = FALSE,
     marker = list(color = CEDAR_PALETTE[[2]]), name = paste(m$line, "credits or more"),
-    hovertext = paste0(labels, "<br>", .graduation_n(s$n_far), " left with ", m$line, " credits or more<br>",
-                       .graduation_n(s$n_done), " with ", m$done_at, " or more<br>",
-                       .graduation_n(s$n_left), " left in all"),
+    hovertext = paste0(labels, "<br>", fmt_count(s$n_far), " left with ", m$line, " credits or more<br>",
+                       fmt_count(s$n_done), " with ", m$done_at, " or more<br>",
+                       fmt_count(s$n_left), " left in all"),
     hoverinfo = "text", showlegend = FALSE) %>%
     plotly::layout(
       xaxis = list(title = "Last enrolled term", type = "category", categoryorder = "array",
@@ -674,27 +673,27 @@ format_graduation_dashboard <- function(payload) {
   m <- payload$meta
   pct <- function(x) ifelse(is.na(x), "--", sprintf("%.1f%%", x))
   b <- graduation_band_table(payload)
-  group_lines <- function(g) sprintf("  %-40s %6s %8s %10s %6s", substr(g$label, 1, 40), .graduation_n(g$n),
-                                     .graduation_n(g$n_done), .graduation_n(g$n_flagged), .graduation_n(g$n_pell))
+  group_lines <- function(g) sprintf("  %-40s %6s %8s %10s %6s", substr(g$label, 1, 40), fmt_count(g$n),
+                                     fmt_count(g$n_done), fmt_count(g$n_flagged), fmt_count(g$n_pell))
   group_head <- sprintf("  %-40s %6s %8s %10s %6s", "", "Left", paste0(m$done_at, "+"), "Standards", "Pell")
   c(
     "# Graduation: students who left without a degree",
     paste0("Enrollment settled through ", fmt_term(m$edge), "; degrees posted through ", fmt_term(m$degree_edge),
-           ". ", .graduation_n(m$n_not_judged), " last terms are too recent to judge (everyone still enrolled is among them)."),
+           ". ", fmt_count(m$n_not_judged), " last terms are too recent to judge (everyone still enrolled is among them)."),
     "", graduation_headline(payload), "",
     "## By credits when they stopped",
     sprintf("  %-14s %7s %7s %7s %10s %10s %8s", "Credits", "Left", "Share", "Pell", paste0("GPA <", m$gpa_floor),
             paste0(m$credit_ceiling, "+ att."), "Either"),
-    sprintf("  %-14s %7s %7s %7s %10s %10s %8s", b$band, .graduation_n(b$n), pct(b$share_pct), pct(b$pell_pct),
+    sprintf("  %-14s %7s %7s %7s %10s %10s %8s", b$band, fmt_count(b$n), pct(b$share_pct), pct(b$pell_pct),
             pct(b$gpa_below_pct), pct(b$over_ceiling_pct), pct(b$flagged_pct)),
-    paste0("  ", .graduation_n(m$n_last_term_added), if (m$n_last_term_added == 1L) " total includes" else " totals include",
+    paste0("  ", fmt_count(m$n_last_term_added), if (m$n_last_term_added == 1L) " total includes" else " totals include",
            " the last term's own credits, added because the record was pulled before the next term began."),
     "",
     paste0("## Left with ", m$line, " credits or more, by last term"),
     sprintf("  %-12s %6s %8s %8s", "Term", paste0(m$line, "+"), paste0(m$done_at, "+"), "All"),
     sprintf("  %-12s %6s %8s %8s", vapply(payload$series$exit_term, fmt_term, character(1)),
-            .graduation_n(payload$series$n_far), .graduation_n(payload$series$n_done),
-            .graduation_n(payload$series$n_left)),
+            fmt_count(payload$series$n_far), fmt_count(payload$series$n_done),
+            fmt_count(payload$series$n_left)),
     "", "## By college", group_head, group_lines(payload$colleges),
     "", "## By major", group_head, group_lines(payload$majors),
     if (!is.null(payload$required)) .format_graduation_required(payload),

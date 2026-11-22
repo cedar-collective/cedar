@@ -216,3 +216,9 @@ test_that("course_level_from_number reads the leading digit at any length", {
 test_that("course_level_from_number returns NA when there is no course number", {
   expect_equal(course_level_from_number(c("HIST ABC", NA)), c(NA_character_, NA_character_))
 })
+
+test_that("fmt_count() writes a whole number with separators, an em dash for NA, and no padding", {
+  expect_equal(fmt_count(c(5, 1234, 1234567.6, NA)), c("5", "1,234", "1,234,568", "\u2014"))
+  expect_equal(fmt_count(integer(0)), character(0))
+  expect_error(fmt_count("12"), "numbers")
+})

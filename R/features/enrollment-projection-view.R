@@ -767,7 +767,7 @@ projection_summary_sentence <- function(projections) {
     if (!is.finite(row$projected_classlist_total)) {
       return("Not enough comparable history to project this course.")
     }
-    count <- function(x) format(round(x), big.mark = ",")
+    count <- fmt_count
     bumped <- isTRUE(row$pressure_bump > 0)
     fed <- isTRUE(row$plan_feeder_adjustment != 0)
     raised <- bumped || fed
@@ -904,7 +904,7 @@ projection_plan_steps <- function(row) {
   if (!is.finite(row$projected_classlist_total) || !is.finite(row$spine)) {
     return(empty)
   }
-  count <- function(x) format(round(x), big.mark = ",")
+  count <- fmt_count
   signed <- function(x) {
     paste0(if (round(x) > 0) "+" else if (round(x) < 0) "\u2212" else "",
            count(abs(x)))
@@ -1145,7 +1145,7 @@ projection_plan_feeder_summary <- function(projections, line, seasons) {
   preceding <- stats::na.omit(projections$adjusted_preceding_term)
   preceding_label <- if (length(preceding) > 0L) fmt_term(preceding[[1]]) else
     "the term just finished"
-  count <- function(x) format(round(x), big.mark = ",")
+  count <- fmt_count
   whose <- function(n, noun) {
     if (n == 1L) paste0("1 course's ", noun) else paste0(n, " courses' ", noun, "s")
   }
@@ -1280,7 +1280,7 @@ projection_track_record_summary <- function(backtests, model_config) {
   } else ""
   n <- nrow(policy)
   pct <- function(x) scales::percent(x, accuracy = 0.1)
-  count <- function(x) format(x, big.mark = ",")
+  count <- fmt_count
   direction <- if (abs(bias) >= 0.01) paste0(
     " They ran ", pct(abs(bias)), if (bias < 0) " low" else " high",
     " on average",
@@ -1566,7 +1566,7 @@ build_enrollment_projection_draft_comparison <- function(view) {
   last_seats <- view$history %>%
     dplyr::filter(recency_rank == 1L) %>%
     dplyr::transmute(market_id, subject_course, last_capacity = as.numeric(scheduled_capacity))
-  count <- function(x) format(round(x), big.mark = ",", trim = TRUE)
+  count <- fmt_count
   sections_note <- function(n) dplyr::if_else(
     dplyr::coalesce(n, 0L) > 0L,
     paste0(" (", n, " section", dplyr::if_else(n == 1L, "", "s"), ")"),

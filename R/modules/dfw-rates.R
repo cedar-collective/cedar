@@ -106,7 +106,6 @@ dfwRatesUI <- function(id, campuses, terms) {
 
 # ── Layout helpers (no analysis) ─────────────────────────────────────────────
 
-.dfw_rates_n <- function(x) format(as.integer(x), big.mark = ",", trim = TRUE)
 .dfw_rates_pct <- function(x) if (length(x) == 0L || is.na(x)) "—" else sprintf("%.1f%%", x)
 .dfw_rates_terms <- function(terms) paste(vapply(terms, fmt_term, character(1)), collapse = ", ")
 .dfw_rates_type <- function(p) tolower(names(DFW_RATES_TERM_TYPES)[DFW_RATES_TERM_TYPES == p$meta$term_type])
@@ -149,8 +148,8 @@ dfwRatesUI <- function(id, campuses, terms) {
   div(class = "finding-card-row",
       cedar_finding_card(
         "Latest term", scope = fmt_term(f$term), headline = .dfw_rates_pct(f$dfw_pct), caption = "DFW",
-        tags$p(class = "stat-compare", paste0(.dfw_rates_n(f$n_dfw), " DFW grades in ",
-                                              .dfw_rates_n(f$n_attempts), " attempts"))),
+        tags$p(class = "stat-compare", paste0(fmt_count(f$n_dfw), " DFW grades in ",
+                                              fmt_count(f$n_attempts), " attempts"))),
       cedar_finding_card(
         "Trend", scope = unname(DFW_DIRECTION_LABELS[f$direction]),
         headline = if (is.na(f$slope)) "—" else sprintf("%+.1f", f$slope), caption = "points a year",
@@ -163,9 +162,9 @@ dfwRatesUI <- function(id, campuses, terms) {
   tot <- p$courses$totals
   cedar_finding_card(
     "DFW grades", scope = .dfw_rates_terms(p$courses$meta$window_terms),
-    headline = .dfw_rates_n(tot$n_dfw),
-    caption = paste0("DFW grades in ", .dfw_rates_n(tot$n_attempts), " attempts (",
-                     .dfw_rates_pct(tot$dfw_pct), ") over ", .dfw_rates_n(tot$n_courses), " courses"),
+    headline = fmt_count(tot$n_dfw),
+    caption = paste0("DFW grades in ", fmt_count(tot$n_attempts), " attempts (",
+                     .dfw_rates_pct(tot$dfw_pct), ") over ", fmt_count(tot$n_courses), " courses"),
     if (nrow(parts)) cedar_segment_figure(
       data.frame(n = parts$n, tone = unname(DFW_RATES_TONES[parts$part]), label = parts$label,
                  detail = parts$detail, stringsAsFactors = FALSE),
@@ -177,8 +176,8 @@ dfwRatesUI <- function(id, campuses, terms) {
 .dfw_rates_change_cards <- function(p) {
   k <- dfw_change_counts(p)
   card <- function(what, title, caption, warn = FALSE) {
-    cedar_finding_card(title, scope = paste("of", .dfw_rates_n(k$n_listed[1]), "listed courses"),
-                       headline = .dfw_rates_n(k$n[k$what == what]), caption = caption, warn = warn)
+    cedar_finding_card(title, scope = paste("of", fmt_count(k$n_listed[1]), "listed courses"),
+                       headline = fmt_count(k$n[k$what == what]), caption = caption, warn = warn)
   }
   div(class = "finding-card-row",
       card("rising", "Rising", "getting worse", warn = TRUE),
@@ -190,7 +189,7 @@ dfwRatesUI <- function(id, campuses, terms) {
   parts <- dfw_section_parts(p)
   cedar_finding_card(
     "Uneven term after term", scope = .dfw_rates_terms(p$sections$meta$window_terms),
-    headline = .dfw_rates_n(attr(parts, "n_repeat")), caption = "courses uneven in two or more terms",
+    headline = fmt_count(attr(parts, "n_repeat")), caption = "courses uneven in two or more terms",
     warn = attr(parts, "n_repeat") > 0L,
     if (sum(parts$n) > 0L) cedar_segment_figure(
       data.frame(n = parts$n, tone = unname(DFW_RATES_TONES[parts$part]), label = parts$label,
@@ -287,7 +286,7 @@ dfwRatesUI <- function(id, campuses, terms) {
     tags$li(paste0("Every course's rate moves from term to term by more than chance: a new instructor, another cohort. The typical course here moves ",
                    sprintf("%.1f", m$typical_extra_sd), " points a term beyond chance (the median, over the courses with a trend).")),
     tags$li(paste0("A course swings when its terms scatter around its line by more than chance plus that typical amount. ",
-                   .dfw_rates_n(m$n_swing_tests), " courses are tested at once, so the bar is shared across them: about a 1-in-20 chance that even one is called a swinger by luck.")),
+                   fmt_count(m$n_swing_tests), " courses are tested at once, so the bar is shared across them: about a 1-in-20 chance that even one is called a swinger by luck.")),
     tags$li("A swing is a question to ask, not a verdict: a course that changed format or text in one term will swing.")
   )
 }
@@ -360,7 +359,7 @@ dfwRatesServer <- function(id, attempts, dims, edges, active) {
       nr <- dfw_overall_finding(p)$nr_terms
       if (nrow(nr) == 0L) return(NULL)
       div(class = "alert-box alert-box--warning", paste0(
-        paste0(vapply(nr$term, fmt_term, character(1)), " holds ", .dfw_rates_n(nr$n_nr), " NR (not reported) grades, ",
+        paste0(vapply(nr$term, fmt_term, character(1)), " holds ", fmt_count(nr$n_nr), " NR (not reported) grades, ",
                sprintf("%.1f%%", 100 * nr$n_nr / nr$n_attempts), " of its attempts", collapse = "; "),
         ". Each counts as DFW, so that term reads high; the grades may not have been posted when the data was pulled."))
     })

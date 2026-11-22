@@ -479,7 +479,7 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
       data <- mcu_data()
       if (is.null(data)) return(empty_state("Loading where this department's majors take their courses\u2026"))
       meta <- data$meta
-      n <- function(x) format(as.integer(x), big.mark = ",", trim = TRUE)
+      n <- fmt_count
       note <- dept_course_units_note(data)
       if (nrow(data$tables$own_share) == 0L) return(empty_state(note))
       latest_label <- paste0(fmt_term(meta$latest_term), if (isTRUE(meta$latest_in_progress)) " (in progress)" else "")
