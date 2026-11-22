@@ -40,26 +40,26 @@ graduationUI <- function(id, campuses) {
     dashboard_section(
       "How Far Along They Were",
       "Of the students who left without a degree, how many credits had each earned when they stopped?",
-      method = uiOutput(ns("method_bands")),
+      method = uiOutput(ns("method_bands")), concept = "graduation.left-far-along",
       uiOutput(ns("headline")),
       plotly::plotlyOutput(ns("bands_plot"), height = "360px")
     ),
     dashboard_section(
       "Term by Term",
       "How many far-along students stopped after each term?",
-      method = uiOutput(ns("method_series")),
+      method = uiOutput(ns("method_series")), concept = "graduation.term-by-term",
       plotly::plotlyOutput(ns("series_plot"), height = "340px")
     ),
     dashboard_section(
       "Where They Stood",
       "In each credit band, how many had ever been Pell-eligible, and how many no longer met the general standards for aid?",
-      method = uiOutput(ns("method_standing")),
+      method = uiOutput(ns("method_standing")), concept = "graduation.standing",
       reactable::reactableOutput(ns("standing_table"))
     ),
     dashboard_section(
       "By College and Major",
       "Which colleges and majors were the far-along students in when they stopped?",
-      method = uiOutput(ns("method_groups")),
+      method = uiOutput(ns("method_groups")), concept = "graduation.college-major",
       dashboard_subsection("College", "The college of the student's primary major in their last term.",
                            reactable::reactableOutput(ns("college_table"))),
       dashboard_subsection("Major", "The student's primary major in their last term, with its code: two majors may share a name.",
@@ -68,7 +68,7 @@ graduationUI <- function(id, campuses) {
     dashboard_section(
       "The Courses Their Program Requires",
       "Of the far-along students who left without a degree, how many had tried each course their program requires here and never passed it?",
-      method = uiOutput(ns("method_required")),
+      method = uiOutput(ns("method_required")), concept = "graduation.required-courses",
       uiOutput(ns("required_lead")),
       selectInput(ns("plan"), "Degree plan", choices = NULL, width = "100%"),
       uiOutput(ns("plan_note")),
@@ -78,7 +78,7 @@ graduationUI <- function(id, campuses) {
     dashboard_section(
       "At 160 Attempted Credits",
       "When students pass 160 attempted credits with no degree yet, where did the credits come from, and what happens next?",
-      method = uiOutput(ns("method_ceiling")),
+      method = uiOutput(ns("method_ceiling")), concept = "graduation.credit-ceiling",
       uiOutput(ns("ceiling_lead")),
       plotly::plotlyOutput(ns("ceiling_parts_plot"), height = "auto"),
       dashboard_subsection(
@@ -90,7 +90,7 @@ graduationUI <- function(id, campuses) {
     dashboard_section(
       "Finishing in the Summer",
       "How many spring students finish their degree that summer, and what do they take to do it?",
-      method = uiOutput(ns("method_summer")),
+      method = uiOutput(ns("method_summer")), concept = "graduation.summer-finishers",
       uiOutput(ns("summer_finding")),
       plotly::plotlyOutput(ns("summer_plot"), height = "340px"),
       dashboard_subsection(

@@ -38,7 +38,7 @@ firstYearUI <- function(id, campuses) {
     dashboard_section(
       "Each Entering Class, Semester by Semester",
       "How much of each entering class is still enrolled in its 2nd, 3rd, 4th and 5th semesters?",
-      method = uiOutput(ns("method_milestones")),
+      method = uiOutput(ns("method_milestones")), concept = "first-year.entering-classes",
       radioButtons(ns("entry"), "Entering students", choices = RETENTION_ENTRY_CHOICES,
                    selected = "first_time", inline = TRUE),
       uiOutput(ns("milestones_finding")),
@@ -47,7 +47,7 @@ firstYearUI <- function(id, campuses) {
     dashboard_section(
       "The Summer After the First Spring",
       "Do students who take a course the summer after their first spring come back in the fall more often?",
-      method = uiOutput(ns("method_summer")),
+      method = uiOutput(ns("method_summer")), concept = "first-year.first-spring-summer",
       uiOutput(ns("summer_finding")),
       plotly::plotlyOutput(ns("summer_plot"), height = "340px"),
       dashboard_subsection(

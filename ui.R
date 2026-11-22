@@ -416,6 +416,7 @@ ui <- page_navbar(
   tags$head(
     # First, so the page paints in the reader's mode (light or dark).
     tags$script(src = "cedar-theme.js"),
+    tags$script(src = "cedar-method-dialog.js"),  # "How this is counted" opens as a dialog
     tags$script(src = "cedar-navigation.js"),
     # Switch to the URL-requested tab immediately at DOM-ready, before the Shiny
     # WebSocket connects. This prevents the homepage from showing for 5-7 seconds

@@ -45,6 +45,30 @@ validate_definition_registry <- function(registry) {
   invisible(registry)
 }
 
+# ── Section concepts ──────────────────────────────────────────────────────────
+# docs/_data/concepts.yml: one plain paragraph a section, keyed <page>.<section>.
+# The app shows it at the top of the section's "How this is counted" dialog.
+
+read_section_concepts <- function(path) {
+  if (!file.exists(path)) stop("Section concepts not found: ", path, call. = FALSE)
+  file <- read_utf8_yaml(path)
+  if (!identical(file$schema_version, 1L)) stop("Section concepts: unsupported schema_version", call. = FALSE)
+  concepts <- file$concepts
+  ok <- is.list(concepts) && length(concepts) > 0L && !is.null(names(concepts)) &&
+    all(grepl("^[a-z][a-z0-9-]*\\.[a-z][a-z0-9-]*$", names(concepts))) && !anyDuplicated(names(concepts)) &&
+    all(vapply(concepts, function(x) is.character(x) && length(x) == 1L && nzchar(trimws(x)), logical(1)))
+  if (!ok) stop("Section concepts: every entry is <page>.<section> with one paragraph of text", call. = FALSE)
+  vapply(concepts, trimws, character(1))
+}
+
+#' A section's concept paragraph; an unknown id is an error, never blank text
+cedar_section_concept <- function(id, concepts = CEDAR_SECTION_CONCEPTS) {
+  if (length(id) != 1L || is.na(id) || !id %in% names(concepts)) {
+    stop("Unknown section concept: ", paste(id, collapse = ", "), " (docs/_data/concepts.yml)", call. = FALSE)
+  }
+  concepts[[id]]
+}
+
 read_definition_registry <- function(path) {
   if (!file.exists(path)) stop("Definition registry not found: ", path, call. = FALSE)
   registry <- read_utf8_yaml(path)
