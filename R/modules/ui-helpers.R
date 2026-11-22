@@ -900,6 +900,24 @@ cedar_count_coldef <- function(name, ...) {
                     format = reactable::colFormat(separators = TRUE), ...)
 }
 
+# The courses a group of students took most (summer_course_list()'s `courses`):
+# code, title, the campus that taught it, students, and their share of the group.
+# titles   describe_courses() output for the listed courses.
+cedar_course_share_table <- function(courses, titles, share_label) {
+  if (NROW(courses) == 0L) return(reactable::reactable(
+    data.frame(Message = "No course was taken by enough of these students to list."),
+    theme = cedar_tbl_theme, compact = TRUE))
+  shown <- data.frame(course = courses$subject_course,
+                      title = titles$title[match(courses$subject_course, titles$subject_course)],
+                      campus = courses$campus, n = courses$n_students, share = courses$share_pct / 100,
+                      stringsAsFactors = FALSE)
+  reactable::reactable(shown, theme = cedar_tbl_theme, compact = TRUE, striped = TRUE, defaultPageSize = 15,
+    columns = list(course = reactable::colDef(name = "Course", minWidth = 110),
+                   title = reactable::colDef(name = "Title", minWidth = 220, na = "\u2014"),
+                   campus = reactable::colDef(name = "Campus"),
+                   n = cedar_count_coldef("Students"), share = cedar_percent_coldef(share_label)))
+}
+
 cedar_percent_coldef <- function(name, ...) {
   reactable::colDef(name = name, align = "right", na = "\u2014",
                     format = reactable::colFormat(percent = TRUE, digits = 1), ...)

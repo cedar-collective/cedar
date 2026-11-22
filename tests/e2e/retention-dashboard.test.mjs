@@ -131,6 +131,17 @@ try {
 
   const paceMethod = await page.$eval(`#${NS}method_pace`, (el) => el.textContent.trim().length);
   ok(paceMethod > 80, 'the pace section says how it is counted');
+  // Students behind on credits each spring, and what the summer did.
+  await waitFor(page, plotTraces, { timeout: 300000, args: [`${NS}pace_summer_plot`] });
+  const catchUp = await page.evaluate(plotTraces, `${NS}pace_summer_plot`);
+  ok(catchUp?.length === 3 && catchUp[2] === 'Summer course, caught up', `the students behind are drawn in three parts (${catchUp})`);
+  const catchUpLead = await page.$eval(`#${NS}pace_summer_finding`, (el) => el.innerText.trim());
+  ok(/had caught up by the fall\.$/.test(catchUpLead), `the section opens on the springs read (${catchUpLead.slice(0, 50)}…)`);
+  await waitForSelector(page, `#${NS}pace_summer_courses .rt-tbody`);
+  const behindCourses = await readReactable(page, `${NS}pace_summer_courses`, { limit: 5 });
+  ok(behindCourses.rows.length > 0 && behindCourses.rows[0].length === 5, `their summer courses are listed with titles (${behindCourses.rows.length})`);
+  const catchUpMethod = await page.$eval(`#${NS}method_pace_summer`, (el) => el.textContent.trim().length);
+  ok(catchUpMethod > 80, 'the summer and pace section says how it is counted');
   ok((await outputsInError(page, NS)).length === 0, `no output in error on fall terms (${(await outputsInError(page, NS)).join('; ')})`);
   await setInput(page, `${NS}term_type`, 'spring');
   const reread = await waitFor(page, () => {

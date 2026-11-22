@@ -4282,7 +4282,8 @@ for (.download_key in names(.enrl_desr_view_ids)) {
   # ===========================================================================
   firstYearServer("first_year", student_terms = data_objects[["cedar_student_terms"]],
                   degrees = cedar_degrees, programs = data_objects[["cedar_programs"]],
-                  edges = data_objects[["cedar_edges"]],
+                  attempts = data_objects[["cedar_attempts"]], courses = data_objects[["cedar_courses"]],
+                  course_codes = data_objects[["cedar_course_codes"]], edges = data_objects[["cedar_edges"]],
                   active = reactive(identical(input$main_navbar, "First Year")))
 
   # ===========================================================================
@@ -4293,7 +4294,9 @@ for (.download_key in names(.enrl_desr_view_ids)) {
                            programs = data_objects[["cedar_programs"]],
                            applicants = data_objects[["cedar_applicants"]],
                            dims = data_objects[["cedar_dims"]], edges = data_objects[["cedar_edges"]],
-                           active = reactive(identical(input$main_navbar, "Retention")))
+                           active = reactive(identical(input$main_navbar, "Retention")),
+                           course_dim = data_objects[["cedar_courses"]],
+                           course_codes = data_objects[["cedar_course_codes"]])
 
   # ===========================================================================
   # Bird's Eye > Graduation (Shiny module); builds only while the tab is open
@@ -4303,7 +4306,9 @@ for (.download_key in names(.enrl_desr_view_ids)) {
                    terms = data_objects[["cedar_terms"]], dims = data_objects[["cedar_dims"]],
                    edges = data_objects[["cedar_edges"]],
                    active = reactive(identical(input$main_navbar, "Graduation")),
-                   attempts = data_objects[["cedar_attempts"]], boards = CEDAR_DEGREE_BOARDS)
+                   attempts = data_objects[["cedar_attempts"]], boards = CEDAR_DEGREE_BOARDS,
+                   courses = data_objects[["cedar_courses"]],
+                   course_codes = data_objects[["cedar_course_codes"]])
 
   # ===========================================================================
   # Waitlists tab (Shiny module)

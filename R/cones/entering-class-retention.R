@@ -84,7 +84,7 @@
 # `credits_q1` / `credits_median` / `credits_q3` describe the enrolled
 # students with a known total: survivors only, which the reader is told.
 #
-# Depends on: .build_enrolled_lookup(), degrees_to_date(),
+# Depends on: entering_students(), degrees_to_date(),
 #               follow_students() (branches/retention-context.R)
 #             cedar_longitudinal_edge() (branches/data-edges.R)
 #             advance_term() (branches/cedar-terms.R), get_term_type()
@@ -153,48 +153,16 @@ get_entering_class_retention <- function(student_terms, degrees = NULL, opt = li
   }
   min_n <- as.integer(opt$min_n %||% 30L)
 
-  enrolled <- student_terms %>% filter(enrolled, term <= edge) %>% mutate(term = as.integer(term))
-  if (nrow(enrolled) == 0L) {
-    stop("[entering-class-retention.R] no enrolled student-term at or before the settled edge.", call. = FALSE)
-  }
-  first_term <- min(enrolled$term)
-
-  # Each student's entering term at the level in scope: the first enrolled
-  # term among that level's rows.
-  at_level <- if (is.null(opt$student_level)) enrolled else enrolled %>% filter(student_level %in% opt$student_level)
-  n_summer_starts <- 0L
+  found <- entering_students(student_terms, programs, edge, list(
+    entry = entry, student_level = opt$student_level, term_type = opt$term_type, campus = opt$campus,
+    classification = opt$classification, time_status = opt$time_status))
+  enrolled <- found$enrolled
+  entering <- found$entering
+  first_term <- found$first_term
+  n_first_term <- found$n_first_term
+  n_summer_starts <- found$n_summer_starts
   n_arrival_unknown <- NULL
   arrival_withheld <- integer(0)
-  if (entry == "all") {
-    entering <- at_level %>%
-      arrange(student_id, term) %>%
-      distinct(student_id, .keep_all = TRUE)
-    n_first_term <- sum(entering$term == first_term)
-    entering <- entering %>% filter(term > first_term)
-  } else {
-    # The first enrolled term the record calls the student new in.
-    arrivals <- student_term_entry_type(programs) %>% filter(entry_type == entry)
-    entering <- at_level %>%
-      semi_join(arrivals, by = c("student_id", "term")) %>%
-      arrange(student_id, term) %>%
-      distinct(student_id, .keep_all = TRUE)
-    n_first_term <- 0L
-    if (entry == "first_time") {
-      # A summer starter enrolled that fall is in the fall class, described
-      # by their fall row.
-      summer <- entering %>%
-        filter(get_term_type(term) == "summer") %>%
-        transmute(student_id, term = advance_term(term, 1L))
-      moved <- at_level %>% semi_join(summer, by = c("student_id", "term"))
-      n_summer_starts <- nrow(moved)
-      entering <- bind_rows(entering %>% filter(!student_id %in% moved$student_id), moved)
-    }
-  }
-  if (!is.null(opt$term_type)) entering <- entering %>% filter(get_term_type(term) %in% opt$term_type)
-  entering <- entering %>% filter(get_term_type(term) %in% c("fall", "spring", "summer"))
-  if (!is.null(opt$campus)) entering <- entering %>% filter(student_campus %in% opt$campus)
-  if (!is.null(opt$classification)) entering <- entering %>% filter(student_classification %in% opt$classification)
-  if (!is.null(opt$time_status)) entering <- entering %>% filter(time_status %in% opt$time_status)
   if (!is.null(opt$arrival_credits)) {
     range <- as.numeric(opt$arrival_credits)
     if (length(range) != 2L || anyNA(range) || range[1] >= range[2] || is.null(programs)) {

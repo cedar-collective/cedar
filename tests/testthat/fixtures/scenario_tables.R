@@ -2385,3 +2385,43 @@ sg01 <- local({
        opt = list(term_type = "spring", student_level = "UG", min_n = 1L,
                   data_edges = list(last_enrolled_complete = 202380L, last_graded = 202260L, last_degree = 202260L)))
 })
+
+# SS01: a spring's students in the summer after, and in the fall
+# (get_summer_after_spring()). Seven students of Spring 2022, each two regular
+# terms in, and one of Spring 2023. Enrollment is settled through Spring 2023;
+# grades and degrees are posted through Summer 2022.
+#   SS-A  24 credits through spring; 6 in the summer, all completed (30: caught
+#         up to 15 a term); enrolled in the fall.
+#   SS-B  24 through spring; 3 in the summer (27: still behind); enrolled in the fall.
+#   SS-C  20 through spring; no summer; not back.
+#   SS-D  30 through spring (not behind); no summer; enrolled in the fall.
+#   SS-E  40 through spring; 3 attempted in the summer, none completed; awarded
+#         a degree that summer, so back without a fall enrollment.
+#   SS-F  running total not whole (`timeline_valid` FALSE); no summer; enrolled in the fall.
+#   SS-G  Spring 2023: its fall is not settled and its summer not graded.
+#   SS-H  20 through spring and awarded a degree that spring: finished, so
+#         back without a fall enrollment and not read as behind.
+# Summer 2022 attempts: SS-A and SS-B MATH 101 (ABQ), SS-E HIST 101 (EA).
+ss01 <- local({
+  row <- function(id, term, attempted = 12, completed = 12, cumulative = NA_real_, valid = TRUE) tibble::tibble(
+    student_id = id, term = term, enrolled = TRUE, attempted_unm_credits = attempted,
+    completed_unm_credits = completed, cumulative_completed_unm_credits = cumulative, timeline_valid = valid)
+  student_terms <- dplyr::bind_rows(
+    row("SS-A", 202210L, cumulative = 24), row("SS-A", 202260L, 6, 6, 30), row("SS-A", 202280L, cumulative = 42),
+    row("SS-B", 202210L, cumulative = 24), row("SS-B", 202260L, 3, 3, 27), row("SS-B", 202280L, cumulative = 39),
+    row("SS-C", 202210L, cumulative = 20),
+    row("SS-D", 202210L, cumulative = 30), row("SS-D", 202280L, cumulative = 42),
+    row("SS-E", 202210L, cumulative = 40), row("SS-E", 202260L, 3, 0, 40),
+    row("SS-F", 202210L, cumulative = 12, valid = FALSE), row("SS-F", 202280L, cumulative = 24, valid = FALSE),
+    row("SS-G", 202310L, cumulative = 10), row("SS-H", 202210L, cumulative = 20))
+  spring_students <- tibble::tibble(
+    student_id = paste0("SS-", c("A", "B", "C", "D", "E", "F", "G", "H")),
+    term = c(rep(202210L, 6L), 202310L, 202210L), group = "Class", terms_completed = 2L)
+  degrees <- tibble::tibble(student_id = c("SS-E", "SS-H"), term = c(202260L, 202210L), graduation_status = "Awarded")
+  attempts <- test_attempts[rep(1L, 3L), ] %>%
+    dplyr::mutate(student_id = c("SS-A", "SS-B", "SS-E"), term = 202260L, campus = c("ABQ", "ABQ", "EA"),
+                  subject_course = c("MATH 101", "MATH 101", "HIST 101"))
+  list(student_terms = student_terms, spring_students = spring_students, degrees = degrees, attempts = attempts,
+       opt = list(min_n = 1L, pace_credits = 15,
+                  data_edges = list(last_enrolled_complete = 202310L, last_graded = 202260L, last_degree = 202260L)))
+})

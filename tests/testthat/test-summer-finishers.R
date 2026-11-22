@@ -24,6 +24,6 @@ test_that("SG01: who finished in the summer, the credits they took then and in w
   expect_error(get_summer_finishers(sg01$student_terms["student_id"], sg01$degrees, sg01$attempts, sg01$opt), "lacks")
   # One bar a finishing term, a trace a credit band.
   fig <- plotly::plotly_build(plot_summer_finishers(r))
-  expect_equal(vapply(fig$x$data, function(d) d$name, character(1)), SUMMER_FINISHER_BANDS)
+  expect_equal(vapply(fig$x$data, function(d) d$name, character(1)), SUMMER_CREDIT_BANDS)
   expect_equal(as.character(fig$x$data[[1]]$x), c("Summer 2022", "Summer 2023<br>(applied)"))
 })

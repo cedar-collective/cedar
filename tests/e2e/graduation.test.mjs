@@ -109,7 +109,7 @@ try {
      `a bar a summer, four credit bands (${summer.bands.join(', ')}; ${summer.x.length} summers)`);
   await waitForSelector(page, `#${NS}summer_courses .rt-tbody`);
   const summerCourses = await readReactable(page, `${NS}summer_courses`);
-  ok(summerCourses.rows.length > 0, `the summer courses table has rows (${summerCourses.rows.length})`);
+  ok(summerCourses.rows.length > 0 && summerCourses.rows[0].length === 5, `the summer courses table has rows, with titles (${summerCourses.rows.length})`);
 
   const methods = await page.evaluate((ns) => ['method_bands', 'method_series', 'method_standing', 'method_groups', 'method_required', 'method_ceiling', 'method_summer']
     .map((id) => document.getElementById(ns + id)?.textContent.trim().length || 0), NS);

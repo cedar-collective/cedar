@@ -10,7 +10,8 @@
 //
 //   node tests/e2e/first-year.test.mjs
 
-import { launch, connect, setInput, waitFor, waitForIdle, requireIds, outputsInError } from './lib.mjs';
+import { launch, connect, setInput, waitFor, waitForIdle, requireIds, outputsInError, readReactable,
+         waitForSelector } from './lib.mjs';
 
 const fail = [];
 const ok = (cond, msg) => { if (!cond) fail.push(msg); console.log(`${cond ? 'ok  ' : 'FAIL'} ${msg}`); };
@@ -50,6 +51,24 @@ try {
   ok(/^Of the /.test(lead) && /who entered in/.test(lead), `the section opens on one class in words (${lead.slice(0, 60)}…)`);
   const method = await page.$eval(`#${NS}method_milestones`, (el) => el.textContent.trim().length);
   ok(method > 80, 'the section says how it is counted');
+
+  // The summer after the first spring: back in the fall, by taking a summer course or not.
+  const traces = (id) => {
+    const r = document.getElementById(id);
+    const p = r?.classList.contains('js-plotly-plot') ? r : r?.querySelector('.js-plotly-plot');
+    return p?.data?.length ? p.data.map((t) => t.name) : null;
+  };
+  await waitFor(page, traces, { timeout: 300000, args: [`${NS}summer_plot`] });
+  const summerLines = await page.evaluate(traces, `${NS}summer_plot`);
+  ok(JSON.stringify(summerLines) === '["Took a summer course","Did not"]', `the summer chart has a line for each group (${summerLines})`);
+  const summerLead = await page.$eval(`#${NS}summer_finding`, (el) => el.innerText.trim());
+  ok(/back in the fall/.test(summerLead) && /not what it causes\.$/.test(summerLead),
+     `the summer section opens on the classes read, with its warning (${summerLead.slice(0, 50)}…)`);
+  await waitForSelector(page, `#${NS}summer_courses .rt-tbody`);
+  const summerCourses = await readReactable(page, `${NS}summer_courses`, { limit: 5 });
+  ok(summerCourses.rows.length > 0 && summerCourses.rows[0].length === 5, `the summer courses are listed with titles (${summerCourses.rows.length})`);
+  const summerMethod = await page.$eval(`#${NS}method_summer`, (el) => el.textContent.trim().length);
+  ok(summerMethod > 80, 'the summer section says how it is counted');
   ok((await outputsInError(page, NS)).length === 0, `no output in error (${(await outputsInError(page, NS)).join('; ')})`);
 
   await setInput(page, `${NS}entry`, 'transfer');

@@ -12,7 +12,7 @@
 #
 # Exported functions:
 #   firstYearUI(id, campuses)
-#   firstYearServer(id, student_terms, degrees, programs, edges, active)
+#   firstYearServer(id, student_terms, degrees, programs, attempts, courses, course_codes, edges, active)
 
 # campuses  the home campuses to offer; it opens on the main campus
 #           (CEDAR_CAMPUS_MAIN), and none selected reads every campus.
@@ -43,6 +43,17 @@ firstYearUI <- function(id, campuses) {
                    selected = "first_time", inline = TRUE),
       uiOutput(ns("milestones_finding")),
       plotly::plotlyOutput(ns("milestones_plot"), height = "380px")
+    ),
+    dashboard_section(
+      "The Summer After the First Spring",
+      "Do students who take a course the summer after their first spring come back in the fall more often?",
+      method = uiOutput(ns("method_summer")),
+      uiOutput(ns("summer_finding")),
+      plotly::plotlyOutput(ns("summer_plot"), height = "340px"),
+      dashboard_subsection(
+        "Their Summer Courses",
+        "The courses these students took most that summer.",
+        reactable::reactableOutput(ns("summer_courses")))
     )
     )
   )
@@ -76,10 +87,62 @@ RETENTION_ENTRY_OPTIONS <- list(
 
 # ── Server ───────────────────────────────────────────────────────────────────
 
-# student_terms, degrees, programs, edges   the loaded tables and edges.
+# student_terms, degrees, programs, attempts, edges   the loaded tables and edges.
+# courses, course_codes   the course dimension, for titles.
 # active   reactive: TRUE while the tab is open.
-firstYearServer <- function(id, student_terms, degrees, programs, edges, active) {
+firstYearServer <- function(id, student_terms, degrees, programs, attempts, courses, course_codes, edges, active) {
   moduleServer(id, function(input, output, session) {
+    # Each class in the summer after its first spring: read after the chart above.
+    summer <- reactive({
+      req(isTRUE(active()), input$term_type, input$level, input$entry)
+      entry <- RETENTION_ENTRY_OPTIONS[[input$entry]]
+      cedar_shared_result(list("first_year_summer", input$term_type, input$level, input$campus, input$entry), function() tryCatch(
+        build_first_year_summer(student_terms, attempts, degrees, programs, list(
+          term_type = input$term_type, student_level = input$level,
+          campus = if (length(input$campus) > 0) input$campus else NULL, data_edges = edges,
+          entry = entry$entry, entry_time_status = entry$time_status)),
+        error = function(e) {
+          showNotification(paste("Summer:", conditionMessage(e)), type = "error", duration = 10)
+          NULL
+        }))
+    })
+    summer_rows <- reactive({ s <- summer(); req(s); summer_return_by_taking(s) })
+    output$summer_finding <- renderUI({
+      s <- summer()
+      if (is.null(s)) return(empty_state("The summer figures could not be built; the notification says why."))
+      sentence <- summer_return_sentence(summer_rows())
+      if (length(sentence) == 0L) return(empty_state("No entering class in this scope has a settled fall after its first spring."))
+      lead_text(sentence)
+    })
+    output$summer_plot <- plotly::renderPlotly({
+      rows <- summer_rows(); req(any(!is.na(rows$back_took_pct)))
+      plot_summer_return(rows, label = function(r) paste(vapply(as.integer(r$group), fmt_term, character(1)), "class"))
+    })
+    output$summer_courses <- reactable::renderReactable({
+      s <- summer(); req(s)
+      cedar_course_share_table(s$courses, describe_courses(s$courses$subject_course, courses, course_codes),
+                               "Of those who took a summer course")
+    })
+    output$method_summer <- renderUI({
+      s <- summer(); req(s)
+      m <- s$meta
+      tags$ul(
+        tags$li(paste0("The students of each entering class who were enrolled in its first spring: the 2nd semester ",
+                       "of a fall class, the entering term of a spring one. ", fmt_count(m$n_students), " students over ",
+                       "these classes; ", fmt_count(m$n_took), " took a course here in the summer after.")),
+        tags$li(paste0("Back in the fall means enrolled then at this university, on any campus, or awarded a degree by ",
+                       "then. A class is read once that fall has settled (enrollment is settled through ",
+                       fmt_term(m$edge), "), and a line needs 30 students for a point.")),
+        tags$li(paste0("This does not show that a summer course keeps a student here. A student who signs up for ",
+                       "summer has usually already decided to come back, and differs from one who does not in ways ",
+                       "the data holds (credits, grades) and ways it does not (money, work, plans).")),
+        tags$li(if (length(m$course_terms) == 0L) "No summer in this scope has posted grades, so no course is listed."
+                else paste0("Courses are graded attempts in ", paste(vapply(m$course_terms, fmt_term, character(1)), collapse = ", "),
+                            ", by the campus that taught them, as a share of the ", fmt_count(m$n_course_students),
+                            " students who took a course in those summers. A course taken by fewer than ", m$min_n,
+                            " of them is not listed.")))
+    })
+
     # The entering classes are read on their own, so choosing who a class
     # holds rebuilds this chart and nothing else.
     milestones <- reactive({

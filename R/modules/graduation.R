@@ -125,7 +125,9 @@ graduationUI <- function(id, campuses) {
 # student_terms, programs, degrees, terms, dims, edges   the loaded tables and edges.
 # active   reactive: TRUE while the tab is open.
 # attempts, boards   cedar_attempts and the degree boards (publish_degree_drafts()).
-graduationServer <- function(id, student_terms, programs, degrees, terms, dims, edges, active, attempts, boards) {
+# courses, course_codes   the course dimension, for titles.
+graduationServer <- function(id, student_terms, programs, degrees, terms, dims, edges, active, attempts, boards,
+                             courses, course_codes) {
   moduleServer(id, function(input, output, session) {
     # Shared by every session: the tables are fixed for the life of the process.
     payload <- reactive({
@@ -328,14 +330,8 @@ graduationServer <- function(id, student_terms, programs, degrees, terms, dims, 
     output$summer_plot <- plotly::renderPlotly({ s <- summer(); req(s, s$meta$n_finishers > 0L); plot_summer_finishers(s) })
     output$summer_courses <- reactable::renderReactable({
       s <- summer(); req(s)
-      if (nrow(s$courses) == 0L) return(reactable::reactable(
-        data.frame(Message = "No summer course was taken by enough of these students to list."),
-        theme = cedar_tbl_theme, compact = TRUE))
-      shown <- data.frame(course = s$courses$subject_course, campus = s$courses$campus,
-                          n = s$courses$n_students, share = s$courses$share_pct / 100, stringsAsFactors = FALSE)
-      reactable::reactable(shown, theme = cedar_tbl_theme, compact = TRUE, striped = TRUE, defaultPageSize = 15,
-        columns = list(course = reactable::colDef(name = "Course"), campus = reactable::colDef(name = "Campus"),
-                       n = cedar_count_coldef("Students"), share = cedar_percent_coldef("Of the summer finishers")))
+      cedar_course_share_table(s$courses, describe_courses(s$courses$subject_course, courses, course_codes),
+                               "Of the summer finishers")
     })
     output$method_summer <- renderUI({
       s <- summer(); req(s)
