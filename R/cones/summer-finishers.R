@@ -36,7 +36,10 @@
 #' @return list(`by_term` one row per anchor term and credit band: `term`,
 #'   `finish_term`, `basis`, `band`, `n`; `courses` one row per course and
 #'   campus: `subject_course`, `campus`, `n_students`, `share_pct` of the
-#'   finishers in those terms; `meta`).
+#'   finishers in those terms; `by_major` (with `primary_major_code` on
+#'   `student_terms`: the awarded finishers by the major on the anchor term's
+#'   record: `n`, `n_no_course`, `n_full` in the top credit band; majors under
+#'   `min_n` left out, counted in `meta$n_majors_small`); `meta`).
 get_summer_finishers <- function(student_terms, degrees, attempts, opt = list()) {
   need <- list(student_terms = c("student_id", "term", "enrolled", "student_level", "student_campus",
                                  "attempted_unm_credits"),
@@ -72,11 +75,50 @@ get_summer_finishers <- function(student_terms, degrees, attempts, opt = list())
   listed <- summer_course_list(placed %>% transmute(student_id, summer_term = finish_term), attempts, graded_edge,
                                course_terms, min_n)
 
-  list(by_term = by_term, courses = listed$courses,
+  # By the major on the anchor term's record: which programs end in a summer
+  # by design (most of their finishers carry a full summer load) and which
+  # students are picking up a last course. Awarded degrees only.
+  by_major <- NULL
+  n_majors_small <- NULL
+  if ("primary_major_code" %in% names(student_terms)) {
+    majors <- placed %>%
+      filter(basis == "awarded") %>%
+      left_join(anchors %>% transmute(student_id, term = as.integer(term), primary_major_code),
+                by = c("student_id", "term"), relationship = "many-to-one") %>%
+      group_by(primary_major_code) %>%
+      summarize(n = n(), n_no_course = sum(band == SUMMER_CREDIT_BANDS[[1]]),
+                n_full = sum(band == SUMMER_CREDIT_BANDS[[length(SUMMER_CREDIT_BANDS)]]), .groups = "drop") %>%
+      arrange(desc(n), primary_major_code)
+    n_majors_small <- sum(majors$n < min_n)
+    by_major <- majors %>% filter(n >= min_n)
+  }
+
+  list(by_term = by_term, courses = listed$courses, by_major = by_major,
        meta = list(term_type = opt$term_type, student_level = opt$student_level, campus = opt$campus,
                    edge = edge, graded_edge = graded_edge, degree_edge = opt$data_edges[["last_degree"]],
                    n_finishers = nrow(placed), course_terms = listed$terms, n_course_finishers = listed$n_students_read,
-                   min_n = min_n))
+                   min_n = min_n, n_majors_small = n_majors_small))
+}
+
+#' Summer finishing in one sentence, over every summer with degrees posted
+#'
+#' @param result get_summer_finishers() output.
+#' @return One sentence; character(0) when no summer's degrees are posted.
+summer_finishers_sentence <- function(result) {
+  full <- SUMMER_CREDIT_BANDS[[length(SUMMER_CREDIT_BANDS)]]
+  by <- result$by_term %>%
+    filter(basis == "awarded") %>%
+    group_by(finish_term) %>%
+    summarize(total = sum(n), full_pct = 100 * sum(n[band == full]) / sum(n),
+              none_pct = 100 * sum(n[band == SUMMER_CREDIT_BANDS[[1]]]) / sum(n), .groups = "drop")
+  if (nrow(by) == 0L) return(character(0))
+  span <- function(x, f) if (f(min(x)) == f(max(x))) f(x[[1]]) else paste(f(min(x)), "to", f(max(x)))
+  pct <- function(x) sprintf("%.1f%%", x)
+  paste0(if (nrow(by) == 1L) paste0("In ", fmt_term(by$finish_term[[1]]), ", ")
+         else paste0("In each of the ", nrow(by), " summers with degrees posted, "),
+         span(by$total, fmt_count), " spring students finished their degree. ",
+         span(by$full_pct, pct), " of them took ", tolower(full), " here that summer, and ",
+         span(by$none_pct, pct), " took no course here.")
 }
 
 # ── Plotting ─────────────────────────────────────────────────────────────────

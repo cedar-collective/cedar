@@ -59,7 +59,17 @@ try {
   ok(series?.hatched === series?.marks && series.hatched < series.x.length,
      `the last terms still open to a return are hatched and marked not final (${series?.hatched} of ${series?.x.length})`);
 
+  // The page's numbers agree with each other: the sentence, the bars and the table are one count.
+  const num = (s) => Number(String(s).replace(/[^0-9.]/g, ''));
+  const leftInLead = num((lead.match(/and ([0-9,]+) left without one/) || [])[1]);
+  const leftInBars = (bands?.y || []).reduce((a, b) => a + b, 0);
+  ok(leftInLead > 0 && leftInLead === leftInBars, `the bars add to the students the sentence says left (${leftInBars} and ${leftInLead})`);
+  const farInLead = num((lead.match(/\. ([0-9,]+) of those who left had 90 credits or more/) || [])[1]);
+  const farInSeries = (series?.y || []).reduce((a, b) => a + b, 0);
+  ok(farInLead > 0 && farInLead === farInSeries, `the term-by-term bars add to the far-along students in the sentence (${farInSeries} and ${farInLead})`);
   const standing = await readReactable(page, `${NS}standing_table`, { limit: 10 });
+  ok(JSON.stringify(standing.rows?.map((r) => num(r[1]))) === JSON.stringify(bands?.y),
+     'the standing table counts each band as its bar does');
   ok(standing.rows?.length === bands?.x.length && standing.rows.every((r) => r.length === 7),
      `the standing table has a row a band and seven columns (${standing.rows?.length})`);
   const group = await page.$eval(`#${NS}standing_table`, (el) => el.innerText);
@@ -109,6 +119,11 @@ try {
      `a bar a summer, four credit bands (${summer.bands.join(', ')}; ${summer.x.length} summers)`);
   await waitForSelector(page, `#${NS}summer_courses .rt-tbody`);
   const summerCourses = await readReactable(page, `${NS}summer_courses`);
+  await waitForSelector(page, `#${NS}summer_majors .rt-tbody`);
+  const summerMajors = await readReactable(page, `${NS}summer_majors`, { limit: 5 });
+  ok(summerMajors.rows.length > 0 && summerMajors.rows[0].length === 5, `summer finishers are listed by major (${summerMajors.rows.length})`);
+  const summerLead = await page.$eval(`#${NS}summer_finding`, (el) => el.innerText.trim());
+  ok(/spring students finished their degree/.test(summerLead), `the summer section opens on the summers read (${summerLead.slice(0, 50)}…)`);
   ok(summerCourses.rows.length > 0 && summerCourses.rows[0].length === 5, `the summer courses table has rows, with titles (${summerCourses.rows.length})`);
 
   const methods = await page.evaluate((ns) => ['method_bands', 'method_series', 'method_standing', 'method_groups', 'method_required', 'method_ceiling', 'method_summer']

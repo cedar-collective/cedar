@@ -22,6 +22,14 @@ test_that("SG01: who finished in the summer, the credits they took then and in w
   gr <- get_summer_finishers(sg01$student_terms, sg01$degrees, sg01$attempts, utils::modifyList(sg01$opt, list(student_level = "GR")))
   expect_equal(gr$meta$n_finishers, 1L)
   expect_error(get_summer_finishers(sg01$student_terms["student_id"], sg01$degrees, sg01$attempts, sg01$opt), "lacks")
+  # By major, awarded degrees only (S-H's application is not one): S-A and
+  # S-C in History took courses, S-B in Anthropology took none.
+  expect_equal(r$by_major$primary_major_code, c("HIST", "ANTH"))
+  expect_equal(c(r$by_major$n, r$by_major$n_no_course, r$by_major$n_full), c(2L, 1L, 0L, 1L, 0L, 0L))
+  expect_equal(get_summer_finishers(sg01$student_terms, sg01$degrees, sg01$attempts,
+                                    utils::modifyList(sg01$opt, list(min_n = 2L)))$meta$n_majors_small, 1L)
+  testthat::local_edition(3)
+  expect_snapshot(cat(summer_finishers_sentence(r)))
   # One bar a finishing term, a trace a credit band.
   fig <- plotly::plotly_build(plot_summer_finishers(r))
   expect_equal(vapply(fig$x$data, function(d) d$name, character(1)), SUMMER_CREDIT_BANDS)

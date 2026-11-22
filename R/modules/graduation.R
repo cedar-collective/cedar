@@ -96,7 +96,11 @@ graduationUI <- function(id, campuses) {
       dashboard_subsection(
         "Their Summer Courses",
         "The courses these students took most in the summer they finished.",
-        reactable::reactableOutput(ns("summer_courses")))
+        reactable::reactableOutput(ns("summer_courses"))),
+      dashboard_subsection(
+        "By Major",
+        "Which majors' students finish in the summer, and how many of them carried a full summer of courses?",
+        reactable::reactableOutput(ns("summer_majors")))
     )
     )
   )
@@ -325,7 +329,23 @@ graduationServer <- function(id, student_terms, programs, degrees, terms, dims, 
       s <- summer()
       if (is.null(s)) return(empty_state("The summer figures could not be built; the notification says why."))
       if (s$meta$n_finishers == 0L) return(empty_state("No spring student in this scope finished in the summer after it."))
-      NULL
+      lead_text(summer_finishers_sentence(s))
+    })
+    output$summer_majors <- reactable::renderReactable({
+      s <- summer(); req(s)
+      m <- s$by_major
+      if (NROW(m) == 0L) return(reactable::reactable(
+        data.frame(Message = "No major has enough summer finishers to list."), theme = cedar_tbl_theme, compact = TRUE))
+      names_by_code <- name_program_codes(m$primary_major_code, dims)
+      shown <- data.frame(major = dplyr::coalesce(unname(names_by_code[m$primary_major_code]), "No major on record"),
+                          code = m$primary_major_code, n = m$n, full = m$n_full / m$n, none = m$n_no_course / m$n,
+                          stringsAsFactors = FALSE)
+      reactable::reactable(shown, theme = cedar_tbl_theme, compact = TRUE, striped = TRUE, defaultPageSize = 15,
+        columns = list(major = reactable::colDef(name = "Major", minWidth = 200),
+                       code = reactable::colDef(name = "Code", na = "\u2014", minWidth = 80),
+                       n = cedar_count_coldef("Finished in a summer"),
+                       full = cedar_percent_coldef("Took 7 credits or more"),
+                       none = cedar_percent_coldef("Took no course here")))
     })
     output$summer_plot <- plotly::renderPlotly({ s <- summer(); req(s, s$meta$n_finishers > 0L); plot_summer_finishers(s) })
     output$summer_courses <- reactable::renderReactable({
@@ -349,6 +369,11 @@ graduationServer <- function(id, student_terms, programs, degrees, terms, dims, 
                             ", by the campus that taught them, as a share of the ", fmt_count(m$n_course_finishers),
                             " students who finished in those summers. A course taken by fewer than ", m$min_n,
                             " of them is not listed.")),
+        tags$li(paste0("By major counts every summer with degrees posted, under the primary major on the spring's ",
+                       "record. A major most of whose summer finishers carried 7 credits or more is a program that ",
+                       "ends in summer; one whose finishers mostly took a course or none is students completing a ",
+                       "last requirement. A major with fewer than ", m$min_n, " summer finishers is not listed (",
+                       fmt_count(m$n_majors_small), " majors).")),
         tags$li("What a student took is not what they were required to take: the data holds registrations, not degree audits."))
     })
 

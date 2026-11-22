@@ -57,6 +57,18 @@ try {
   ok(/^The share of fall students who came back the next regular term is (rising|falling|not clearly rising or falling): /.test(lead),
      `the section opens on the verdict over the terms (${lead.slice(0, 60)}…)`);
   const ln = await line();
+  // Each point is its own counts: the rate drawn is came back over students read, as the hover states them.
+  const drawn = await page.evaluate((el) => {
+    const r = document.getElementById(el);
+    const p = r?.classList.contains('js-plotly-plot') ? r : r?.querySelector('.js-plotly-plot');
+    const d = p?.data?.[0];
+    return (d?.hovertext || []).map((h, i) => {
+      const m = String(h).replace(/,/g, '').match(/([0-9]+) of ([0-9]+) came back/);
+      return m ? Math.abs(100 * Number(m[1]) / Number(m[2]) - d.y[i]) : null;
+    });
+  }, `${NS}overall_plot`);
+  ok(drawn.length >= 3 && drawn.every((gap) => gap !== null && gap < 0.05),
+     `every term's rate is its hover's counts divided (${drawn.length} terms)`);
   ok(ln && ln.n >= 3 && ln.text.length === ln.n, `the return line labels each of its ${ln?.n} terms`);
   ok(ln?.trend && ln.trend.x.length === 2 && ln.trend.line?.dash === 'dash',
      'the trend is a dashed line from the first term to the last');
