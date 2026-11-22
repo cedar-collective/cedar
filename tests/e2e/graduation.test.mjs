@@ -22,7 +22,9 @@ const bars = (id) => page.evaluate((el) => {
   const root = document.getElementById(el);
   const p = root?.classList.contains('js-plotly-plot') ? root : root?.querySelector('.js-plotly-plot');
   if (!p || !p.data) return null;
-  return { x: p.data[0].x || [], y: p.data[0].y || [], text: p.data[0].text || [], title: p.layout?.yaxis?.title?.text || '' };
+  return { x: p.data[0].x || [], y: p.data[0].y || [], text: p.data[0].text || [], title: p.layout?.yaxis?.title?.text || '',
+           hatched: [].concat(p.data[0].marker?.pattern?.shape || []).filter((v) => v === '/').length,
+           marks: (p.layout?.annotations || []).filter((a) => a.text === 'Not final').length };
 }, `${NS}${id}`);
 
 const waitBuilt = async () => {
@@ -54,6 +56,8 @@ try {
   ok(bands?.text.length === bands?.x.length, 'each bar is labelled with its count');
   const series = await bars('series_plot');
   ok(series && series.x.length >= 2 && /90 credits or more/.test(series.title), `a bar for each last term (${series?.x.length}; ${series?.title})`);
+  ok(series?.hatched === series?.marks && series.hatched < series.x.length,
+     `the last terms still open to a return are hatched and marked not final (${series?.hatched} of ${series?.x.length})`);
 
   const standing = await readReactable(page, `${NS}standing_table`, { limit: 10 });
   ok(standing.rows?.length === bands?.x.length && standing.rows.every((r) => r.length === 7),
