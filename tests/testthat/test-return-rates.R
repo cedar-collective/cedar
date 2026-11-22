@@ -128,3 +128,24 @@ test_that("RR01: the dashboard as text", {
   testthat::local_edition(3)
   expect_snapshot(cat(format_retention_dashboard(rr01$dashboard), sep = "\n"))
 })
+
+test_that("SG01: a spring student awarded a degree that summer finished, and is not a student who left", {
+  r <- get_return_rates(sg01$student_terms, sg01$opt, sg01$degrees)$rates
+  s22 <- r[r$term == 202210L, ]
+  expect_equal(c(s22$n_enrolled, s22$n_graduated, s22$n_finished_between, s22$n_applied_between,
+                 s22$n_observable, s22$n_returned), c(7L, 4L, 3L, 0L, 3L, 1L))
+  # Summer 2023's degrees are not posted: the application stands in, counted apart.
+  s23 <- r[r$term == 202310L, ]
+  expect_equal(c(s23$n_graduated, s23$n_finished_between, s23$n_applied_between, s23$n_observable, s23$n_returned),
+               c(1L, 0L, 1L, 1L, 1L))
+  # Without the degrees table only the term's own degree is completion.
+  plain <- get_return_rates(sg01$student_terms, sg01$opt)
+  expect_equal(c(plain$rates$n_graduated[1], plain$rates$n_observable[1]), c(1L, 6L))
+  expect_false(plain$meta$between_terms)
+  # A fall's next regular term is the spring: nothing lies between.
+  fall <- get_return_rates(sg01$student_terms, utils::modifyList(sg01$opt, list(term_type = "fall")), sg01$degrees)$rates
+  expect_equal(sum(fall$n_finished_between + fall$n_applied_between), 0L)
+  no_degree_edge <- sg01$opt
+  no_degree_edge$data_edges <- list(last_enrolled_complete = 202380L)
+  expect_error(get_return_rates(sg01$student_terms, no_degree_edge, sg01$degrees), "degree edge")
+})

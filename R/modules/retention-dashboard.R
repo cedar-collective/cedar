@@ -45,6 +45,21 @@ retentionDashboardUI <- function(id, campuses) {
       uiOutput(ns("overall_finding")),
       plotly::plotlyOutput(ns("overall_plot"), height = "340px")
     ),
+    # A fall's next regular term is the spring: no one finishes in between.
+    conditionalPanel(
+      condition = "input.term_type == 'spring'", ns = ns,
+      dashboard_section(
+        "Finishing in the Summer",
+        "How many spring students finish their degree that summer, and what do they take to do it?",
+        method = uiOutput(ns("method_summer")),
+        uiOutput(ns("summer_finding")),
+        plotly::plotlyOutput(ns("summer_plot"), height = "340px"),
+        dashboard_subsection(
+          "Their Summer Courses",
+          "The courses these students took most in the summer they finished.",
+          reactable::reactableOutput(ns("summer_courses")))
+      )
+    ),
     dashboard_section(
       "Each Entering Class, Semester by Semester",
       "How much of each entering class is still enrolled in its 2nd, 3rd, 4th and 5th semesters?",
@@ -73,7 +88,7 @@ retentionDashboardUI <- function(id, campuses) {
     ),
     dashboard_section(
       "Courses Where a DFW Costs the Most",
-      "In which courses do students who got a D, F or withdrawal come back much less often than those who passed?",
+      "In which courses do students who did not pass (a grade below C, or a withdrawal) come back much less often than those who passed?",
       method = uiOutput(ns("method_courses")),
       reactable::reactableOutput(ns("courses_table"))
     ),
@@ -238,8 +253,9 @@ retentionDashboardServer <- function(id, student_terms, attempts, degrees, progr
                        ", by the campus that taught the course (the campus chosen above). The GPA band is ",
                        if (m$band_by == "entering") "the GPA a continuing student brought into the term, counted from their own earlier terms here; first-term students have none"
                        else "the high-school GPA on file for a student in their first graded term here",
-                       ". ", .retention_n(m$n_banded), " student-terms are read; ", .retention_n(m$n_no_band),
-                       " have no such GPA and ", .retention_n(m$n_invalid), " have a record that cannot be counted up, and are left out.")),
+                       ". A student is read once for each term: ", .retention_n(m$n_banded), " in all. ",
+                       .retention_n(m$n_no_band), " more have no such GPA, and ", .retention_n(m$n_invalid),
+                       " started before the data does, so their GPA cannot be added up; both are left out.")),
         tags$li(paste0("For each group, the DFW rate in the course is set beside the same students' DFW rate in the other ",
                        "courses they took that term. A student who is struggling everywhere shows it in both, so the ",
                        "difference is what this course adds. The gap is that difference for students with a GPA ",
@@ -279,16 +295,71 @@ retentionDashboardServer <- function(id, student_terms, attempts, degrees, progr
       p <- payload(); req(p)
       m <- p$meta
       tags$ul(
-        tags$li(paste0("Every enrolled student-term of the ", .retention_type(p), " terms (registered, or withdrawn after ",
-                       "census), by the student's home campus. Came back means enrolled the next regular term, ",
+        tags$li(paste0("Every student enrolled in each of the ", .retention_type(p), " terms (registered, or withdrawn ",
+                       "after census), counted once for each term, by the student's home campus. Came back means enrolled the next regular term, ",
                        "at UNM on any campus: summer is not a step, and moving campus is not leaving.")),
-        tags$li(paste0("Left out: ", .retention_n(m$n_graduated), " awarded a degree that term, who finished ",
-                       "rather than left, and ", .retention_n(m$n_unobservable), " whose next term had not settled.")),
+        tags$li(paste0("Left out: ", .retention_n(m$n_graduated), " who finished rather than left, and ",
+                       .retention_n(m$n_unobservable), " whose next term had not settled. Finished means awarded a ",
+                       "degree that term",
+                       if (m$term_type == "spring") paste0(
+                         " or in the summer after it (", .retention_n(m$n_finished_between), " students; ",
+                         .retention_n(m$n_applied_between), " more have applied to graduate in a summer whose ",
+                         "degrees are not posted yet, and are counted as finishing)") else "",
+                       ". A degree on hold is not a degree.")),
         tags$li(paste0("The dashed line is the trend, fitted through the terms; it is rising or falling when its ",
                        "slope is beyond both chance and the ordinary term-to-term swings. ",
                        retention_trend_sentence(p$trend[1, , drop = FALSE]))),
         tags$li(paste0("Enrollment settled through ", fmt_term(m$edge), "; a term's rate needs ", m$min_n,
                        " students whose return can be read. Hover a term for its counts.")))
+    })
+
+    # Spring students who finish in the summer: read only when spring is chosen.
+    summer <- reactive({
+      req(isTRUE(active()), identical(input$term_type, "spring"), input$level)
+      cedar_shared_result(list("retention_summer", input$level, input$campus), function() tryCatch(
+        get_summer_finishers(student_terms, degrees, attempts, list(
+          term_type = "spring", student_level = input$level,
+          campus = if (length(input$campus) > 0) input$campus else NULL, data_edges = edges)),
+        error = function(e) {
+          showNotification(paste("Summer finishers:", conditionMessage(e)), type = "error", duration = 10)
+          NULL
+        }))
+    })
+    output$summer_finding <- renderUI({
+      s <- summer()
+      if (is.null(s)) return(empty_state("The summer figures could not be built; the notification says why."))
+      if (s$meta$n_finishers == 0L) return(empty_state("No spring student in this scope finished in the summer after it."))
+      NULL
+    })
+    output$summer_plot <- plotly::renderPlotly({ s <- summer(); req(s, s$meta$n_finishers > 0L); plot_summer_finishers(s) })
+    output$summer_courses <- reactable::renderReactable({
+      s <- summer(); req(s)
+      if (nrow(s$courses) == 0L) return(reactable::reactable(
+        data.frame(Message = "No summer course was taken by enough of these students to list."),
+        theme = cedar_tbl_theme, compact = TRUE))
+      shown <- data.frame(course = s$courses$subject_course, campus = s$courses$campus,
+                          n = s$courses$n_students, share = s$courses$share_pct / 100, stringsAsFactors = FALSE)
+      reactable::reactable(shown, theme = cedar_tbl_theme, compact = TRUE, striped = TRUE, defaultPageSize = 15,
+        columns = list(course = reactable::colDef(name = "Course"), campus = reactable::colDef(name = "Campus"),
+                       n = cedar_count_coldef("Students"), share = cedar_percent_coldef("Of the summer finishers")))
+    })
+    output$method_summer <- renderUI({
+      s <- summer(); req(s)
+      m <- s$meta
+      tags$ul(
+        tags$li(paste0("Students enrolled in a spring, at this level and home campus, who were awarded a degree in the ",
+                       "summer after it. They are the students the return rate above counts as finished. Where a ",
+                       "summer's degrees are not posted yet (they are posted through ", fmt_term(m$degree_edge),
+                       "), the bar shows students who have applied to graduate then, and is marked.")),
+        tags$li(paste0("Credits are those attempted here in that summer. No course here means the degree was posted in ",
+                       "the summer with no summer enrollment: an incomplete made up, a course finished elsewhere, or ",
+                       "the paperwork.")),
+        tags$li(if (length(m$course_terms) == 0L) "No summer in this scope has posted grades, so no course is listed."
+                else paste0("Courses are graded attempts in ", paste(vapply(m$course_terms, fmt_term, character(1)), collapse = ", "),
+                            ", by the campus that taught them, as a share of the ", .retention_n(m$n_course_finishers),
+                            " students who finished in those summers. A course taken by fewer than ", m$min_n,
+                            " of them is not listed.")),
+        tags$li("What a student took is not what they were required to take: the data holds registrations, not degree audits."))
     })
 
     output$milestones_finding <- renderUI({
@@ -342,7 +413,7 @@ retentionDashboardServer <- function(id, student_terms, attempts, degrees, progr
                        fmt_term(p$meta$graded_edge), "; a student with no grade posted is in neither group.")),
         tags$li("Each sign is read apart: a student may carry both, so the shares can add to more than 100%."),
         tags$li(paste0("The latest term with the sign known is shown; a rate needs ", p$meta$min_n,
-                       " students. Probation is not yet a sign: academic standings are not yet mapped.")))
+                       " students.")))
     })
 
     output$classification_table <- reactable::renderReactable({
@@ -387,7 +458,8 @@ retentionDashboardServer <- function(id, student_terms, attempts, degrees, progr
                        "the course. A degree that term counts as finishing, not leaving.")),
         tags$li(paste0("A course is listed when 100 or more of these students took it, 20 or more got a DFW, and the ",
                        "students who did not pass came back less often than those who passed by more than chance ",
-                       "(chi-squared, p below 0.05, not adjusted across courses).")),
+                       "alone would explain. Each course is tested on its own, so among this many courses chance ",
+                       "still lists a few (a chi-squared test at the 5% level, not adjusted across courses).")),
         tags$li(paste0("Ranked by the students a gap stands for: the students with a DFW times the gap, how many ",
                        "more did not come back than would have at the passers' rate. A large course with a ",
                        "moderate gap comes before a small one with a wide gap. The top 25 are listed.")),

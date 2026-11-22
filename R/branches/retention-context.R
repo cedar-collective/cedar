@@ -119,6 +119,55 @@ pending_degrees <- function(degrees) {
     distinct(student_id, degree_term = as.integer(term))
 }
 
+#' Every degree that counts to date: awarded, or applied for where not yet posted
+#'
+#' Degrees are posted a term or two behind enrollment. To `degree_edge` a
+#' degree is one awarded (awarded_degrees()). Past it nothing is awarded yet,
+#' and a pending application to graduate stands in, marked, so a follow-up
+#' that reads enrollment past the degree edge does not count a student who
+#' has just finished as gone.
+#'
+#' @param degrees `cedar_degrees`.
+#' @param degree_edge `last_degree`.
+#' @return `student_id`, `degree_term`, `basis` ("awarded" or "applied").
+degrees_to_date <- function(degrees, degree_edge) {
+  if (is.null(degree_edge)) {
+    stop("[retention-context.R] degrees_to_date needs the degree edge (last_degree).", call. = FALSE)
+  }
+  bind_rows(
+    awarded_degrees(degrees) %>% filter(degree_term <= degree_edge) %>% mutate(basis = "awarded"),
+    if ("graduation_status" %in% names(degrees)) {
+      pending_degrees(degrees) %>% filter(degree_term > degree_edge) %>% mutate(basis = "applied")
+    }
+  )
+}
+
+#' Students who finished between a term and the next regular term
+#'
+#' A spring student awarded a degree in the summer did not leave: they
+#' finished, a term later than a spring graduate. This finds them: a degree
+#' dated after the anchor term and before its next regular term (in a
+#' fall/spring/summer calendar, only the summer after a spring). Where that
+#' term's degrees are not posted yet (it is past `degree_edge`), a pending
+#' application to graduate then stands in, marked `basis = "applied"`.
+#'
+#' @param anchors `student_id` and `term`: the student-terms to read.
+#' @param degrees `cedar_degrees`.
+#' @param degree_edge `last_degree`.
+#' @return One row per anchor with such a degree: `student_id`, `term`,
+#'   `finish_term`, `basis` ("awarded" or "applied").
+between_term_finishers <- function(anchors, degrees, degree_edge) {
+  found <- degrees_to_date(degrees, degree_edge)
+  anchors %>%
+    distinct(student_id, term = as.integer(term)) %>%
+    mutate(next_regular = advance_term(term, 1L)) %>%
+    inner_join(found, by = "student_id", relationship = "many-to-many") %>%
+    filter(degree_term > term, degree_term < next_regular) %>%
+    arrange(student_id, term, basis != "awarded", degree_term) %>%
+    distinct(student_id, term, .keep_all = TRUE) %>%
+    transmute(student_id, term, finish_term = degree_term, basis)
+}
+
 #' Where each student is at each regular term after a starting term
 #'
 #' The follow-up three analyses share (a class past 160 credits, a major's

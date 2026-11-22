@@ -55,13 +55,15 @@ build_retention_dashboard <- function(student_terms, attempts, degrees, opt = li
   min_n <- as.integer(opt$min_n %||% 30L)
   scope <- list(term_type = term_type, student_level = opt$student_level, campus = opt$campus,
                 data_edges = opt$data_edges, min_n = min_n)
-  rates <- function(group_cols) get_return_rates(student_terms, c(scope, list(group_cols = group_cols)))
+  rates <- function(group_cols) get_return_rates(student_terms, c(scope, list(group_cols = group_cols)), degrees)
 
   overall <- rates(character(0))
   series <- overall$rates %>% filter(n_observable > 0L)
   meta <- list(term_type = term_type, student_level = opt$student_level, campus = opt$campus,
                min_n = min_n, edge = overall$meta$edge, graded_edge = overall$meta$graded_edge,
                n_enrolled = sum(overall$rates$n_enrolled), n_graduated = sum(overall$rates$n_graduated),
+               n_finished_between = sum(overall$rates$n_finished_between),
+               n_applied_between = sum(overall$rates$n_applied_between),
                n_unobservable = sum(overall$rates$n_unobservable), n_groups_past = 0L)
   # A scope with no student whose return can be read (a campus with none at
   # this level, say) is an answer, not an error: an empty payload says so.
@@ -262,7 +264,9 @@ format_retention_dashboard <- function(payload) {
            if (!is.null(m$student_level)) paste0(", level ", paste(m$student_level, collapse = "/")) else "",
            if (!is.null(m$campus)) paste0(", home campus ", paste(m$campus, collapse = "/")) else "",
            "; settled through ", fmt_term(m$edge), ", grades through ", fmt_term(m$graded_edge), "."),
-    paste0("Left out: ", n(m$n_graduated), " awarded a degree that term; ", n(m$n_unobservable),
+    paste0("Left out: ", n(m$n_graduated), " awarded a degree that term or before the next regular term (",
+           n(m$n_finished_between), " in between, ", n(m$n_applied_between), " applied for one not yet posted); ",
+           n(m$n_unobservable),
            " whose next regular term is not yet settled."),
     if (nrow(payload$series) > 0L) paste0("Overall: ", retention_trend_sentence(t))
     else "Overall: no student in this scope has a settled next term."
@@ -419,10 +423,13 @@ retention_dashboard_band_courses <- function(attempts, student_terms, applicants
   listed <- function(which) r$courses %>%
     filter(verdict == which) %>%
     mutate(excess_dfw = low_attempts * gap_pts / 100) %>%
-    arrange(desc(abs(excess_dfw))) %>%
-    utils::head(15L)
-  r$harder <- listed("harder")
-  r$easier <- listed("easier")
+    arrange(desc(abs(excess_dfw)))
+  # Every course with the verdict is counted; the 15 that stand for the most
+  # attempts are shown.
+  r$meta$n_harder <- nrow(listed("harder"))
+  r$meta$n_easier <- nrow(listed("easier"))
+  r$harder <- utils::head(listed("harder"), 15L)
+  r$easier <- utils::head(listed("easier"), 15L)
   r$meta$n_courses <- nrow(r$courses)
   r$meta$n_by_chance <- nrow(r$courses) * stats::pnorm(-r$meta$z_min)
   r
@@ -441,10 +448,12 @@ retention_band_sentence <- function(result) {
                   " by its other students over these terms."))
   }
   n <- function(k) format(as.integer(k), big.mark = ",")
-  paste0("Of the ", n(m$n_courses), if (m$n_courses == 1L) " course" else " courses", " read, ", n(nrow(result$harder)),
-         if (nrow(result$harder) == 1L) " was" else " were", " harder on ", who,
+  paste0("Of the ", n(m$n_courses), if (m$n_courses == 1L) " course" else " courses", " read, ", n(m$n_harder),
+         if (m$n_harder == 1L) " was" else " were", " harder on ", who,
          " than the rest of their own term was, by more than for the course's other students, and ",
-         n(nrow(result$easier)), " easier. Chance alone would put ",
+         n(m$n_easier), " easier",
+         if (max(m$n_harder, m$n_easier) > 15L) " (the 15 that stand for the most attempts are listed)" else "",
+         ". Chance alone would put ",
          if (m$n_by_chance < 0.5) "fewer than 1" else paste0("about ", sprintf("%.0f", m$n_by_chance)),
          " on each list, so a course here is a place to look, not a finding.")
 }

@@ -84,7 +84,7 @@
 # `credits_q1` / `credits_median` / `credits_q3` describe the enrolled
 # students with a known total: survivors only, which the reader is told.
 #
-# Depends on: .build_enrolled_lookup(), .build_graduated_lookup(),
+# Depends on: .build_enrolled_lookup(), degrees_to_date(),
 #               .compute_retention() (branches/retention-context.R)
 #             cedar_longitudinal_edge() (branches/data-edges.R)
 #             advance_term() (branches/cedar-terms.R), get_term_type()
@@ -94,7 +94,9 @@
 #'
 #' @param student_terms `cedar_student_terms`.
 #' @param degrees `cedar_degrees`, so a degree counts as still here; NULL
-#'   reads enrollment alone.
+#'   reads enrollment alone. A degree is degrees_to_date(): awarded to the
+#'   degree edge (`opt$data_edges$last_degree`, required with `degrees`), and
+#'   past it an application to graduate.
 #' @param opt `term_type` (the entering classes' term type; NULL keeps every
 #'   regular term type), `student_level` (level codes; NULL keeps every
 #'   level, each student entering once), `campus` (home campuses in the
@@ -117,7 +119,9 @@
 #'   whose first row is there; 0 for a recorded entry kind), `entry`,
 #'   `n_summer_starts` (first-time summer starters counted in the fall
 #'   class), `n_arrival_unknown` and `arrival_withheld` (with
-#'   `arrival_credits`), `n_terms`, `min_n`.
+#'   `arrival_credits`), `n_label_trusted` (with `pace`: first-time students
+#'   entering in the table's first term, whose credits are read from that
+#'   term on), `n_terms`, `min_n`.
 get_entering_class_retention <- function(student_terms, degrees = NULL, opt = list(), programs = NULL) {
   entry <- opt$entry %||% "all"
   if (length(entry) != 1L || !entry %in% c("all", "first_time", "transfer")) {
@@ -214,12 +218,25 @@ get_entering_class_retention <- function(student_terms, degrees = NULL, opt = li
     entering <- entering %>% filter(student_id %in% keep)
   }
   cedar_debug("[entering-class-retention.R] ", nrow(entering), " entering students to ", fmt_term(edge))
+  # Degrees to the settled edge: awarded where posted, applied for past the
+  # degree edge, so the newest steps do not read a new graduate as gone.
+  to_date <- NULL
+  if (!is.null(degrees)) {
+    if (is.null(opt$data_edges[["last_degree"]])) {
+      stop("[entering-class-retention.R] degrees need opt$data_edges$last_degree.", call. = FALSE)
+    }
+    # An application is for a term the student may still be enrolled in: it
+    # counts from the term after.
+    to_date <- degrees_to_date(degrees, opt$data_edges[["last_degree"]]) %>%
+      mutate(degree_term = if_else(basis == "applied", advance_term(degree_term, 1L, summer = TRUE), degree_term)) %>%
+      filter(degree_term <= edge)
+  }
 
   empty <- tibble::tibble(term = integer(), step = integer(), target_term = integer(), n_entering = integer(),
                           n_here = integer(), here_pct = numeric())
   result <- if (nrow(entering) == 0L) empty else {
     cohort <- entering %>% transmute(student_id, anchor_term = term)
-    graduated <- .build_graduated_lookup(if (is.null(degrees)) NULL else degrees %>% filter(term <= edge))
+    graduated <- if (is.null(to_date)) NULL else to_date %>% distinct(student_id, grad_term = degree_term)
     # The lookup is every level's enrollment: a student who moves level is here.
     followed <- .compute_retention(cohort, .build_enrolled_lookup(enrolled), n_terms, graduated)
     bind_rows(lapply(seq_len(n_terms), function(k) {
@@ -240,7 +257,12 @@ get_entering_class_retention <- function(student_terms, degrees = NULL, opt = li
       stop("[entering-class-retention.R] opt$pace needs opt$data_edges$last_graded.", call. = FALSE)
     }
     pace_edge <- min(edge, advance_term(as.integer(graded), 1L, summer = TRUE))
-    result <- .entering_class_pace(result, entering, enrolled, degrees, pace, n_terms, pace_edge)
+    # A first-time student's record starts with them: where the table's
+    # first term is their entering term the running total is whole apart from
+    # credit earned here before entering (dual credit), and is read.
+    trusted <- if (entry == "first_time") entering$student_id[entering$term == first_term] else character(0)
+    result <- .entering_class_pace(result, entering, enrolled, to_date, pace, n_terms, pace_edge, trusted)
+    attr(result, "n_label_trusted") <- length(trusted)
   }
   if (length(arrival_withheld) > 0L) {
     held <- result$term %in% arrival_withheld
@@ -262,13 +284,15 @@ get_entering_class_retention <- function(student_terms, degrees = NULL, opt = li
 
 # The pace columns for get_entering_class_retention(): each entering student's
 # state at each step whose target term is settled, counted by class and step.
-.entering_class_pace <- function(result, entering, enrolled, degrees, pace, n_terms, edge) {
+.entering_class_pace <- function(result, entering, enrolled, to_date, pace, n_terms, edge, trusted = character(0)) {
   at_term <- enrolled %>%
     transmute(student_id, target_term = term,
-              credits = if_else(timeline_valid %in% TRUE,
+              credits = if_else(timeline_valid %in% TRUE | student_id %in% trusted,
                                 as.numeric(cumulative_completed_unm_credits) - as.numeric(completed_unm_credits),
                                 NA_real_))
-  awarded <- awarded_degrees(degrees) %>% filter(degree_term <= edge)
+  awarded <- if (is.null(to_date)) {
+    tibble::tibble(student_id = character(), degree_term = integer(), basis = character())
+  } else to_date %>% filter(degree_term <= edge)
   steps <- bind_rows(lapply(seq_len(n_terms), function(k) {
     entering %>% transmute(student_id, term, step = k, target_term = advance_term(term, k))
   })) %>%

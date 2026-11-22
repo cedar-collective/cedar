@@ -124,7 +124,7 @@ graduationUI <- function(id, campuses) {
       code = reactable::colDef(name = "Code", show = show_code, na = "\u2014", minWidth = 80),
       n = cedar_count_coldef("Left"),
       n_done = cedar_count_coldef(paste(done_at, "credits or more")),
-      n_flagged = cedar_count_coldef("Under a standard"),
+      n_flagged = cedar_count_coldef("No longer met a standard"),
       n_pell = cedar_count_coldef("Ever Pell-eligible")))
 }
 
@@ -187,7 +187,8 @@ graduationServer <- function(id, student_terms, programs, degrees, terms, dims, 
       tags$ul(
         tags$li(paste0("Each bar is the students whose last term it was and who had ", p$meta$line,
                        " credits or more. Hover a term for those at ", p$meta$done_at, " or more and for everyone who left.")),
-        tags$li("Terms are not alike: more students stop after a spring than a fall, and few after a summer. Compare a term with the same term a year earlier."))
+        tags$li("Terms are not alike: more students stop after a spring than a fall, and few after a summer. Compare a term with the same term a year earlier."),
+        tags$li(graduation_later_return_note(p$meta)))
     })
 
     output$standing_table <- reactable::renderReactable({
@@ -232,7 +233,7 @@ graduationServer <- function(id, student_terms, programs, degrees, terms, dims, 
       m <- p$meta
       tags$ul(
         tags$li(paste0("The ", n(m$n_far), " students who left with ", m$line, " credits or more, by the primary major ",
-                       "on record in their last term and that major's college. Under a standard counts the students ",
+                       "on record in their last term and that major's college. No longer met a standard counts the students ",
                        "below the GPA line or at the credit line above.")),
         tags$li(paste0("A major with fewer than ", m$min_list, " such students is not named: ", n(m$n_majors_pooled),
                        " are counted together as all other majors.")),
@@ -358,9 +359,13 @@ graduationServer <- function(id, student_terms, programs, degrees, terms, dims, 
                        "begins and with summer credits, and on pace for six with ", rates[["six_year"]],
                        ". Credit brought from elsewhere (test, dual or transfer credit) is not counted, so a ",
                        "student who arrived with credit is further along than shown.")),
-        tags$li(paste0("A student whose first term here is the first term of the class lists has earlier credits ",
-                       "that cannot be seen, and is shown as enrolled with earlier credits not on record. That is ",
-                       "the whole of the first class the lists hold.")),
+        tags$li(paste0("A student whose first term here is the first term of the class lists may have earlier credits ",
+                       "that cannot be seen, and is shown as enrolled with earlier credits not on record. The first ",
+                       "first-time class is the exception: the record calls its ", n(attr(p$pace, "n_label_trusted")),
+                       " students new that term, so their credits are counted from it. A few had earned credit here ",
+                       "before entering (dual credit), and are a little further along than shown.")),
+        tags$li(paste0("Degrees are posted through ", fmt_term(p$meta$degree_edge), ". For a term after that, a student ",
+                       "who has applied to graduate counts as having the degree from the following term.")),
         tags$li(paste0("Enrollment is settled through ", fmt_term(attr(p$pace, "edge")), " and credits are read through ",
                        fmt_term(attr(p$pace, "pace_edge")), ". The credit lines show the middle student of those still ",
                        "enrolled, with half of them between the figures in the hover; students who left are not in ",
@@ -385,7 +390,8 @@ graduationServer <- function(id, student_terms, programs, degrees, terms, dims, 
         tags$li(paste0("Choices, elective space, general education and the math and English starting courses are not ",
                        "read. A course no one had taken under the plan's number by these students' last terms shows a dash.")),
         tags$li(paste0("A plan with fewer than ", m$min_n, " such students is not listed: ", n(m$n_plans_withheld),
-                       " plans, ", n(m$n_students_withheld), " students.")))
+                       if (m$n_plans_withheld == 1L) " plan, " else " plans, ", n(m$n_students_withheld),
+                       if (m$n_students_withheld == 1L) " student." else " students.")))
     })
   })
 }

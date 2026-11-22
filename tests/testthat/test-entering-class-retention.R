@@ -187,3 +187,43 @@ test_that("EC01: a class with unrecorded transfer students is not read by band",
   expect_equal(read$n_here, c(1L, 1L))
   expect_equal(length(attr(read, "arrival_withheld")), 0L)
 })
+
+test_that("EC01: the first first-time class is read from its entering term; other first-term students are not", {
+  run <- function(entry) get_entering_class_retention(
+    ec01$student_terms, ec01$degrees,
+    list(term_type = "fall", student_level = "UG", min_n = 1L, entry = entry, data_edges = ec01$edges, n_terms = 2L,
+         pace = DEGREE_PACE_TERM_CREDITS), ec01$programs)
+  ft <- run("first_time")
+  # EC-P, first-time in Fall 2019 (the table's first term): away in Spring 2020,
+  # back in Fall 2020 with 15 credits after two terms: slower than 10 a term, not unknown.
+  p <- ft[ft$term == 201980L & ft$step == 2L, ]
+  expect_equal(c(p$n_slower, p$n_credits_unknown, p$n_gone), c(1L, 0L, 0L))
+  expect_equal(attr(ft, "n_label_trusted"), 1L)
+  # Later classes hold no one in the first term: nothing is trusted there.
+  expect_equal(sum(ft$n_credits_unknown[ft$term > 201980L], na.rm = TRUE), 0L)
+  expect_equal(attr(run("all"), "n_label_trusted"), 0L)
+})
+
+test_that("EC01: past the degree edge an application to graduate counts from the next term", {
+  # Degrees are posted through Spring 2021. EC-D (Fall 2020 only) has applied to
+  # graduate in Summer 2021; EC-C (gone after Spring 2021) in Fall 2021 itself.
+  degrees <- dplyr::bind_rows(
+    ec01$degrees %>% dplyr::mutate(graduation_status = "Awarded"),
+    tibble::tibble(student_id = c("EC-D", "EC-C"), term = c(202160L, 202180L), graduation_status = "Pending"))
+  edges <- utils::modifyList(ec01$edges, list(last_degree = 202110L))
+  run <- function(degrees, edges) get_entering_class_retention(
+    ec01$student_terms, degrees,
+    list(term_type = "fall", student_level = "UG", min_n = 1L, data_edges = edges, n_terms = 3L,
+         pace = DEGREE_PACE_TERM_CREDITS), ec01$programs)
+  base <- run(ec01$degrees, ec01$edges)
+  r <- run(degrees, edges)
+  f20 <- function(x) x[x$term == 202080L, ]
+  # Spring 2021: unchanged. Fall 2021: EC-D now has a degree. Spring 2022: EC-C too.
+  expect_equal(f20(r)$n_here - f20(base)$n_here, c(0L, 1L, 2L))
+  expect_equal(f20(r)$n_degree - f20(base)$n_degree, c(0L, 1L, 2L))
+  expect_equal(f20(r)$n_gone - f20(base)$n_gone, c(0L, -1L, -2L))
+  # The same applications inside the degree edge are not degrees.
+  expect_equal(f20(run(degrees, ec01$edges))$n_here, f20(base)$n_here)
+  no_edge <- ec01$edges; no_edge$last_degree <- NULL
+  expect_error(run(degrees, no_edge), "last_degree")
+})

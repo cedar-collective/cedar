@@ -12,7 +12,7 @@
 //   node tests/e2e/retention-dashboard.test.mjs
 
 import { launch, connect, setInput, waitFor, waitForIdle, requireIds, waitForSelector,
-         readReactable } from './lib.mjs';
+         readReactable, outputsInError } from './lib.mjs';
 
 const fail = [];
 const ok = (cond, msg) => { if (!cond) fail.push(msg); console.log(`${cond ? 'ok  ' : 'FAIL'} ${msg}`); };
@@ -100,6 +100,9 @@ try {
     const p = r?.classList.contains('js-plotly-plot') ? r : r?.querySelector('.js-plotly-plot');
     return p?.data?.[0] ? JSON.stringify([p.data[0].x, p.data[0].y]) : '';
   };
+  const summerShown = () => page.$eval(`#${NS}summer_plot`, (el) => el.checkVisibility());
+  ok(!(await summerShown()), 'Finishing in the Summer is not shown for fall terms');
+  ok((await outputsInError(page, NS)).length === 0, `no output in error on fall terms (${(await outputsInError(page, NS)).join('; ')})`);
   await setInput(page, `${NS}term_type`, 'spring');
   const reread = await waitFor(page, () => {
     const r = document.getElementById('retention_dashboard-overall_plot');
@@ -108,6 +111,27 @@ try {
   }, { timeout: 300000 });
   ok(reread, 'spring re-reads the page on spring terms');
   await waitBuilt();
+
+  // Spring students who finish in the summer: a bar a summer, split by credits, and their courses.
+  await waitFor(page, () => {
+    const r = document.getElementById('retention_dashboard-summer_plot');
+    const p = r?.classList.contains('js-plotly-plot') ? r : r?.querySelector('.js-plotly-plot');
+    return !!(p && p.data && p.data.length);
+  }, { timeout: 300000 });
+  const summer = await page.evaluate(() => {
+    const r = document.getElementById('retention_dashboard-summer_plot');
+    const p = r.classList.contains('js-plotly-plot') ? r : r.querySelector('.js-plotly-plot');
+    return { bands: p.data.map((d) => d.name), x: p.data[0].x };
+  });
+  ok(await summerShown(), 'Finishing in the Summer is shown for spring terms');
+  ok(summer.bands.length === 4 && summer.x.length > 0 && summer.x.every((x) => /Summer/.test(x)),
+     `a bar a summer, four credit bands (${summer.bands.join(', ')}; ${summer.x.length} summers)`);
+  await waitForSelector(page, `#${NS}summer_courses .rt-tbody`);
+  const summerCourses = await readReactable(page, `${NS}summer_courses`);
+  ok(summerCourses.rows.length > 0, `the summer courses table has rows (${summerCourses.rows.length})`);
+  const leftOut = await page.$eval(`#${NS}method_overall`, (el) => el.textContent);
+  ok(/in the summer after it/.test(leftOut), 'the method note counts summer finishers as finished');
+  ok((await outputsInError(page, NS)).length === 0, `no output in error on spring terms (${(await outputsInError(page, NS)).join('; ')})`);
 
   const undergrad = await page.evaluate(plotX);
   // The second level in student_levels.csv (graduate at UNM). A home campus

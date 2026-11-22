@@ -4,7 +4,7 @@
       cat(format_retention_dashboard(rr01$dashboard), sep = "\n")
     Output
       Return to the next regular term, fall terms, level UG; settled through Fall 2024, grades through Fall 2022.
-      Left out: 8 awarded a degree that term; 10 whose next regular term is not yet settled.
+      Left out: 8 awarded a degree that term or before the next regular term (0 in between, 0 applied for one not yet posted); 10 whose next regular term is not yet settled.
       Overall: 71.7% for Fall 2020, 81.7% for Fall 2023. Across the 4 terms the fitted line moves +3.3 points a year, where chance and the terms' own scatter give about 4.9: steady.
         Fall 2020: 43 of 60 returned, 71.7%.
         Fall 2021: 45 of 60 returned, 75.0%.
