@@ -374,6 +374,21 @@ plot_exit_required <- function(payload, catalog_id) {
   }
 }
 
+#' How often two regular terms away was not the end, for the series' caveat
+#'
+#' @param meta `build_graduation_dashboard()$meta` (with `later_return`).
+#' @return One sentence for the method note.
+graduation_later_return_note <- function(meta) {
+  r <- meta$later_return
+  if (is.null(r) || r$n == 0L) {
+    return("The newest bars will come down a little: some students away two regular terms enroll again later.")
+  }
+  paste0("The newest bars will come down a little, because some students away two regular terms enroll again later. ",
+         "Through ", fmt_term(r$through), ", a student was away that long with no degree ", .graduation_n(r$n),
+         " times, and ", .graduation_n(r$n_returned), " of those (", sprintf("%.1f%%", 100 * r$n_returned / r$n),
+         ") were followed by a later enrollment. An older bar has already lost those students; a new one has not.")
+}
+
 #' Which transfer classes are read by credits brought, and why some are not
 #'
 #' @param pace One of `build_graduation_dashboard()$transfer`.

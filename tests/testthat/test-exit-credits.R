@@ -85,3 +85,22 @@ test_that("XC01: scope, lines and edges are the caller's", {
   expect_error(get_exit_credits(xc01$student_terms, dplyr::select(xc01$programs, -inst_gpa), xc01$degrees,
                                 xc01$terms, xc01$opt), "programs lacks inst_gpa")
 })
+
+test_that("XC01: how often two regular terms away was followed by a return", {
+  run <- function(student_terms, window) {
+    get_exit_credits(student_terms, xc01$programs, xc01$degrees, xc01$terms,
+                     c(xc01$opt, list(return_window = window)))$meta$later_return
+  }
+  # Seven last terms were followed by two regular terms away and no degree by
+  # then (X-C after Fall 2020; A, B, H, I, J, K after Spring 2021). No one came back.
+  expect_equal(unlist(run(xc01$student_terms, 0L)[c("n", "n_returned", "through")]),
+               c(n = 7L, n_returned = 0L, through = 202110L))
+  # X-J was away one regular term (Fall 2020) before coming back: not such an absence.
+  # Given two terms more to show a return, only the Fall 2020 absence is read
+  # (Spring 2021's would need Spring 2023, past the edge).
+  expect_equal(run(xc01$student_terms, 2L)$n, 1L)
+  # Add X-A a Fall 2019 term: away Spring and Fall 2020, back in Spring 2021.
+  back <- dplyr::bind_rows(xc01$student_terms,
+                           xc01$student_terms %>% dplyr::filter(student_id == "X-A") %>% dplyr::mutate(term = 201980L))
+  expect_equal(unlist(run(back, 0L)[c("n", "n_returned")]), c(n = 8L, n_returned = 1L))
+})

@@ -2338,3 +2338,50 @@ rr01 <- local({
     min_n = 5L, course_min_n = 10L, course_min_dfw_n = 5L))
   list(student_terms = student_terms, attempts = attempts, dashboard = dashboard)
 })
+
+# SG01: spring students who finish in the summer (test-return-rates.R,
+# test-summer-finishers.R). Enrollment is settled through Fall 2023; degrees
+# are posted and grades are in through Summer 2022. ABQ undergraduates unless
+# said. Enrolled in Spring 2022:
+#   S-A  awarded a degree in Summer 2022; 3 summer credits (MATH 101, ABQ)
+#   S-B  awarded in Summer 2022; no summer enrollment
+#   S-C  awarded in Summer 2022; 6 summer credits (MATH 101 at ABQ, HIST 101 at EA)
+#   S-D  awarded in Spring 2022 itself
+#   S-E  back in Fall 2022
+#   S-F  not back, no degree
+#   S-G  not back; a Summer 2022 degree on hold, which is not a degree
+#   S-J  a graduate student awarded in Summer 2022 (another level)
+# So of 7 undergraduates 4 finished (D in the term; A, B, C in between) and
+# 1 of the other 3 came back. Without the degrees table only D finished: 1 of 6.
+# Enrolled in Spring 2023: S-H, not back, with an application to graduate in
+# Summer 2023, past the degree edge (applied); S-I, back in Fall 2023.
+# S-K, enrolled in Fall 2022 and awarded in Spring 2023: not in between (a
+# fall's next regular term is the spring).
+sg01 <- local({
+  row <- function(id, term, returned, level = "UG", awarded = FALSE, credits = 12) tibble::tibble(
+    student_id = id, term = term, enrolled = TRUE, student_level = level, student_campus = "ABQ",
+    returned_next_regular_term = returned, return_observable = TRUE, degree_awarded = awarded,
+    attempted_unm_credits = credits)
+  student_terms <- dplyr::bind_rows(
+    row("S-A", 202210L, FALSE), row("S-A", 202260L, FALSE, credits = 3),
+    row("S-B", 202210L, FALSE),
+    row("S-C", 202210L, FALSE), row("S-C", 202260L, FALSE, credits = 6),
+    row("S-D", 202210L, FALSE, awarded = TRUE),
+    row("S-E", 202210L, TRUE), row("S-E", 202280L, FALSE),
+    row("S-F", 202210L, FALSE),
+    row("S-G", 202210L, FALSE),
+    row("S-J", 202210L, FALSE, level = "GR"),
+    row("S-H", 202310L, FALSE),
+    row("S-I", 202310L, TRUE), row("S-I", 202380L, FALSE),
+    row("S-K", 202280L, FALSE))
+  degrees <- tibble::tibble(
+    student_id = c("S-A", "S-B", "S-C", "S-D", "S-G", "S-J", "S-H", "S-K"),
+    term = c(202260L, 202260L, 202260L, 202210L, 202260L, 202260L, 202360L, 202310L),
+    graduation_status = c("Awarded", "Awarded", "Awarded", "Awarded", "Hold Pending", "Awarded", "Pending", "Pending"))
+  attempts <- test_attempts[rep(1L, 3L), ] %>%
+    dplyr::mutate(student_id = c("S-A", "S-C", "S-C"), term = 202260L, campus = c("ABQ", "ABQ", "EA"),
+                  subject_course = c("MATH 101", "MATH 101", "HIST 101"))
+  list(student_terms = student_terms, degrees = degrees, attempts = attempts,
+       opt = list(term_type = "spring", student_level = "UG", min_n = 1L,
+                  data_edges = list(last_enrolled_complete = 202380L, last_graded = 202260L, last_degree = 202260L)))
+})

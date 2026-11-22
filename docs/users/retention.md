@@ -35,6 +35,7 @@ The page builds as soon as it opens; there is no run button.
 | Section | What it shows |
 |---|---|
 | **How Often Students Come Back** | Every term's rate as a line (hover a term for its counts), with the trend as a dashed line labelled with its points a year and its verdict: rising, falling or steady. |
+| **Finishing in the Summer** (spring only) | The spring students who were awarded a degree that summer, a bar a year, split by the credits they took here that summer; and the courses they took most. |
 | **Who Isn't Coming Back** | For a late withdrawal and for a DFW grade: how many students had it, how often they came back against those without it, and what share of the students who did not come back had it. |
 | **By Classification and College** | Each classification and each primary-major college: its latest rate, its rate over the terms and its terms as a small line with the trend. |
 | **Courses Where a DFW Costs the Most** | Over the latest three terms with posted grades, the courses where students who got a DFW came back much less often than those who passed: the 25 largest gaps. |
@@ -46,7 +47,7 @@ Each section's **How this is counted** gives its thresholds and the edge it read
 ## Reading it
 
 - **Coming back means enrolled the next regular term,** registered or withdrawn after census, at UNM on any campus. Summer is not a step: a spring's next term is the fall.
-- **A degree that term is finishing, not leaving.** Those students are left out of the rate and counted in the method note.
+- **A degree that term is finishing, not leaving,** and so is a degree in the summer after a spring. Those students are left out of the rate and counted in the method note. Where a summer's degrees are not posted yet, students who have applied to graduate then are counted as finishing, and the note says how many. A degree on hold is not a degree.
 - **The latest terms wait for their next term to settle.** A term whose next term is still registering has no rate yet.
 - **A DFW sign needs posted grades.** A term past the last graded term, or a student with no grade posted, is in neither group.
 - **A course's gap describes who fails it as much as the course.** Students who fail one course often struggle in others. Open the course in Course Dynamics for its full picture.

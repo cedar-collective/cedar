@@ -7,7 +7,11 @@
 # `returned_next_regular_term`, read UNM-wide (moving campus is not leaving).
 # A student-term whose next regular term is past the settled edge, or has no
 # class list, is not observable and stays out of the rate, counted; so does a
-# student awarded a degree that term, who completed rather than left.
+# student awarded a degree that term, who completed rather than left. With
+# `degrees`, so does a student awarded one before the next regular term
+# (between_term_finishers(): the summer after a spring), counted apart; where
+# that summer's degrees are not posted, an application to graduate stands in
+# and is counted apart again.
 #
 # Groups are the table's own descriptions (home campus, classification,
 # primary college) and two warning signs known by the end of the term: a late
@@ -15,7 +19,7 @@
 # drops counted apart). The DFW sign needs posted grades: past `last_graded`,
 # or with no graded row, it is unknown (NA), never "no DFW".
 #
-# Depends on: get_term_type() (trunk/utils.R)
+# Depends on: get_term_type() (trunk/utils.R), between_term_finishers() (branches/retention-context.R)
 
 RETURN_RATE_GROUPS <- c("student_campus", "student_classification", "primary_college_code",
                         "late_withdrawal", "dfw")
@@ -29,11 +33,15 @@ RETURN_RATE_GROUPS <- c("student_campus", "student_classification", "primary_col
 #'   `campus` (home campuses; NULL keeps every campus), `group_cols` (any of
 #'   `RETURN_RATE_GROUPS`; empty for one row a term), `min_n` (observable
 #'   student-terms a row needs for a rate; default 10).
+#' @param degrees `cedar_degrees`, or NULL: then only a degree in the term
+#'   itself is completion, and `meta$between_terms` is FALSE.
 #' @return list(rates, meta). `rates`: one row per `term` and group with
-#'   `n_enrolled`, `n_graduated` (awarded a degree that term), `n_unobservable`,
+#'   `n_enrolled`, `n_graduated` (awarded a degree that term or before the
+#'   next regular term; of them `n_finished_between` awarded in between and
+#'   `n_applied_between` with an application for a term not yet posted), `n_unobservable`,
 #'   `n_observable`, `n_returned` and `return_pct` (NA under `min_n`).
 #'   `meta`: the options and both edges.
-get_return_rates <- function(student_terms, opt = list()) {
+get_return_rates <- function(student_terms, opt = list(), degrees = NULL) {
   needed <- c("student_id", "term", "enrolled", "student_level", "student_campus",
               "returned_next_regular_term", "return_observable", "degree_awarded")
   group_cols <- opt$group_cols %||% character(0)
@@ -69,13 +77,21 @@ get_return_rates <- function(student_terms, opt = list()) {
   }
   cedar_debug("[return-rates.R] ", nrow(rows), " enrolled student-terms to ", fmt_term(edge))
 
+  rows$between <- NA_character_
+  if (!is.null(degrees)) {
+    between <- between_term_finishers(rows %>% select(student_id, term), degrees, opt$data_edges[["last_degree"]])
+    rows$between <- between$basis[match(paste(rows$student_id, rows$term), paste(between$student_id, between$term))]
+  }
   rates <- rows %>%
-    mutate(graduated = degree_awarded %in% TRUE,
+    mutate(in_term = degree_awarded %in% TRUE,
+           graduated = in_term | !is.na(between),
            observable = !graduated & return_observable %in% TRUE) %>%
     group_by(term, across(all_of(group_cols))) %>%
     summarize(
       n_enrolled = n(),
       n_graduated = sum(graduated),
+      n_finished_between = sum(!in_term & between %in% "awarded"),
+      n_applied_between = sum(!in_term & between %in% "applied"),
       n_unobservable = sum(!graduated & !observable),
       n_observable = sum(observable),
       n_returned = sum(observable & returned_next_regular_term %in% TRUE),
@@ -86,5 +102,6 @@ get_return_rates <- function(student_terms, opt = list()) {
 
   list(rates = rates,
        meta = list(term_type = opt$term_type, student_level = opt$student_level, campus = opt$campus,
-                   group_cols = group_cols, min_n = min_n, edge = edge, graded_edge = graded_edge))
+                   group_cols = group_cols, min_n = min_n, edge = edge, graded_edge = graded_edge,
+                   between_terms = !is.null(degrees)))
 }

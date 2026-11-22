@@ -187,7 +187,8 @@ graduationServer <- function(id, student_terms, programs, degrees, terms, dims, 
       tags$ul(
         tags$li(paste0("Each bar is the students whose last term it was and who had ", p$meta$line,
                        " credits or more. Hover a term for those at ", p$meta$done_at, " or more and for everyone who left.")),
-        tags$li("Terms are not alike: more students stop after a spring than a fall, and few after a summer. Compare a term with the same term a year earlier."))
+        tags$li("Terms are not alike: more students stop after a spring than a fall, and few after a summer. Compare a term with the same term a year earlier."),
+        tags$li(graduation_later_return_note(p$meta)))
     })
 
     output$standing_table <- reactable::renderReactable({

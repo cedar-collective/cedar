@@ -44,6 +44,31 @@
 #             cedar_longitudinal_edge() (branches/data-edges.R)
 #             EXIT_* (lists/aid_progress.R)
 
+# How often "away two regular terms with no degree" was not the end: of the
+# enrolled student-terms in scope followed by two regular terms away and no
+# degree by then, how many were followed by a later enrollment. Only terms
+# with `window` further regular terms settled after the two are read, so each
+# had time to show a return. The page's caveat on its newest last terms.
+.exit_later_return <- function(enrolled, awarded, edge, opt) {
+  window <- as.integer(opt$return_window %||% 4L)
+  key <- function(id, term) paste(id, term)
+  here <- key(enrolled$student_id, enrolled$term)
+  rows <- enrolled
+  if (!is.null(opt$student_level)) rows <- rows %>% filter(student_level %in% opt$student_level)
+  if (!is.null(opt$campus)) rows <- rows %>% filter(student_campus %in% opt$campus)
+  last_term <- enrolled %>% group_by(student_id) %>% summarize(last_term = max(term), .groups = "drop")
+  first_degree <- awarded %>% arrange(degree_term) %>% distinct(student_id, .keep_all = TRUE)
+  gaps <- rows %>%
+    transmute(student_id, term, second = advance_term(term, 2L)) %>%
+    filter(advance_term(term, 2L + window) <= edge,
+           !key(student_id, advance_term(term, 1L)) %in% here, !key(student_id, second) %in% here) %>%
+    left_join(first_degree, by = "student_id", relationship = "many-to-one") %>%
+    filter(is.na(degree_term) | degree_term > second) %>%
+    left_join(last_term, by = "student_id", relationship = "many-to-one")
+  list(n = nrow(gaps), n_returned = sum(gaps$last_term > gaps$second), window = window,
+       through = if (nrow(gaps) > 0L) max(gaps$term) else NA_integer_)
+}
+
 #' Students who left without a degree, by credits at their last term
 #'
 #' @param student_terms `cedar_student_terms`.
@@ -56,7 +81,11 @@
 #'   all), `campus` (home campuses in the last term; NULL keeps all),
 #'   `first_exit_term` (earliest last term kept; NULL keeps all), `breaks`
 #'   (band lower edges), `gpa_floor`, `credit_ceiling`, `min_n` (smallest band
-#'   given a rate; default 30).
+#'   given a rate; default 30), `return_window` (regular terms a past absence
+#'   is given to show a return, for `meta$later_return`; default 4).
+#'   `meta$later_return` is `n` (student-terms followed by two regular terms
+#'   away with no degree), `n_returned` (followed by a later enrollment),
+#'   `window` and `through` (the latest such term read).
 #' @return list(`students` one row per student who left: `student_id`,
 #'   `exit_term`, `primary_major_code`, `student_campus`, `credits`,
 #'   `credits_here` (the part earned at this institution),
@@ -109,7 +138,9 @@ get_exit_credits <- function(student_terms, programs, degrees, terms, opt = list
   judged <- advance_term(last$term, 2L) <= edge & last$term <= degree_edge
   n_not_judged <- sum(!judged)
   last <- last[judged, , drop = FALSE]
-  awarded <- awarded_degrees(degrees) %>% filter(degree_term <= degree_edge) %>% distinct(student_id)
+  awarded_terms <- awarded_degrees(degrees) %>% filter(degree_term <= degree_edge)
+  later_return <- .exit_later_return(enrolled, awarded_terms, edge, opt)
+  awarded <- awarded_terms %>% distinct(student_id)
   n_with_degree <- sum(last$student_id %in% awarded$student_id)
   left <- last %>% anti_join(awarded, by = "student_id")
   cedar_debug("[exit-credits.R] ", nrow(left), " left without a degree; ", n_with_degree,
@@ -202,6 +233,7 @@ get_exit_credits <- function(student_terms, programs, degrees, terms, opt = list
       n_left = nrow(students), n_with_degree = n_with_degree, n_not_judged = n_not_judged,
       n_last_term_added = sum(students$credits_basis %in% "recorded + last term"),
       n_applied_to_graduate = sum(students$applied_to_graduate),
+      later_return = later_return,
       breaks = breaks, gpa_floor = gpa_floor, credit_ceiling = ceiling, min_n = min_n
     )
   )
