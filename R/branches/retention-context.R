@@ -119,6 +119,29 @@ pending_degrees <- function(degrees) {
     distinct(student_id, degree_term = as.integer(term))
 }
 
+#' Every degree that counts to date: awarded, or applied for where not yet posted
+#'
+#' Degrees are posted a term or two behind enrollment. To `degree_edge` a
+#' degree is one awarded (awarded_degrees()). Past it nothing is awarded yet,
+#' and a pending application to graduate stands in, marked, so a follow-up
+#' that reads enrollment past the degree edge does not count a student who
+#' has just finished as gone.
+#'
+#' @param degrees `cedar_degrees`.
+#' @param degree_edge `last_degree`.
+#' @return `student_id`, `degree_term`, `basis` ("awarded" or "applied").
+degrees_to_date <- function(degrees, degree_edge) {
+  if (is.null(degree_edge)) {
+    stop("[retention-context.R] degrees_to_date needs the degree edge (last_degree).", call. = FALSE)
+  }
+  bind_rows(
+    awarded_degrees(degrees) %>% filter(degree_term <= degree_edge) %>% mutate(basis = "awarded"),
+    if ("graduation_status" %in% names(degrees)) {
+      pending_degrees(degrees) %>% filter(degree_term > degree_edge) %>% mutate(basis = "applied")
+    }
+  )
+}
+
 #' Students who finished between a term and the next regular term
 #'
 #' A spring student awarded a degree in the summer did not leave: they
@@ -134,15 +157,7 @@ pending_degrees <- function(degrees) {
 #' @return One row per anchor with such a degree: `student_id`, `term`,
 #'   `finish_term`, `basis` ("awarded" or "applied").
 between_term_finishers <- function(anchors, degrees, degree_edge) {
-  if (is.null(degree_edge)) {
-    stop("[retention-context.R] between_term_finishers needs the degree edge (last_degree).", call. = FALSE)
-  }
-  found <- bind_rows(
-    awarded_degrees(degrees) %>% filter(degree_term <= degree_edge) %>% mutate(basis = "awarded"),
-    if ("graduation_status" %in% names(degrees)) {
-      pending_degrees(degrees) %>% filter(degree_term > degree_edge) %>% mutate(basis = "applied")
-    }
-  )
+  found <- degrees_to_date(degrees, degree_edge)
   anchors %>%
     distinct(student_id, term = as.integer(term)) %>%
     mutate(next_regular = advance_term(term, 1L)) %>%

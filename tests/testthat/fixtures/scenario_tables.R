@@ -2051,7 +2051,7 @@ ec01 <- local({
     dplyr::ungroup()
   list(student_terms = student_terms, programs = programs,
        degrees = tibble::tibble(student_id = "EC-G", term = 202110L),
-       edges = list(last_enrolled_complete = 202280L, last_graded = 202280L))
+       edges = list(last_enrolled_complete = 202280L, last_graded = 202280L, last_degree = 202280L))
 })
 
 # XC01: undergraduates whose last term is behind them (test-exit-credits.R).

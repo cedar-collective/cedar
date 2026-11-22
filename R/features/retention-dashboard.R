@@ -423,10 +423,13 @@ retention_dashboard_band_courses <- function(attempts, student_terms, applicants
   listed <- function(which) r$courses %>%
     filter(verdict == which) %>%
     mutate(excess_dfw = low_attempts * gap_pts / 100) %>%
-    arrange(desc(abs(excess_dfw))) %>%
-    utils::head(15L)
-  r$harder <- listed("harder")
-  r$easier <- listed("easier")
+    arrange(desc(abs(excess_dfw)))
+  # Every course with the verdict is counted; the 15 that stand for the most
+  # attempts are shown.
+  r$meta$n_harder <- nrow(listed("harder"))
+  r$meta$n_easier <- nrow(listed("easier"))
+  r$harder <- utils::head(listed("harder"), 15L)
+  r$easier <- utils::head(listed("easier"), 15L)
   r$meta$n_courses <- nrow(r$courses)
   r$meta$n_by_chance <- nrow(r$courses) * stats::pnorm(-r$meta$z_min)
   r
@@ -445,10 +448,12 @@ retention_band_sentence <- function(result) {
                   " by its other students over these terms."))
   }
   n <- function(k) format(as.integer(k), big.mark = ",")
-  paste0("Of the ", n(m$n_courses), if (m$n_courses == 1L) " course" else " courses", " read, ", n(nrow(result$harder)),
-         if (nrow(result$harder) == 1L) " was" else " were", " harder on ", who,
+  paste0("Of the ", n(m$n_courses), if (m$n_courses == 1L) " course" else " courses", " read, ", n(m$n_harder),
+         if (m$n_harder == 1L) " was" else " were", " harder on ", who,
          " than the rest of their own term was, by more than for the course's other students, and ",
-         n(nrow(result$easier)), " easier. Chance alone would put ",
+         n(m$n_easier), " easier",
+         if (max(m$n_harder, m$n_easier) > 15L) " (the 15 that stand for the most attempts are listed)" else "",
+         ". Chance alone would put ",
          if (m$n_by_chance < 0.5) "fewer than 1" else paste0("about ", sprintf("%.0f", m$n_by_chance)),
          " on each list, so a course here is a place to look, not a finding.")
 }
