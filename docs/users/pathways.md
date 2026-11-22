@@ -97,16 +97,18 @@ This subtab has two scopes. The Course + Instructor table uses the population on
 
 ### Major Changes
 
-Shows movement into, within, and out of the selected unit. The page separates pre-major and full-major patterns where that distinction is visible in the program records.
+Shows movement into, within, and out of the selected majors. The page separates pre-major and full-major patterns where that distinction is visible in the program records.
 
 The page opens with **Semester by Semester After Entering**: of the students who entered the selected majors, one bar for each semester after, split into still in it, enrolled in another major, awarded a degree, and not enrolled that semester. Pick Undecided as the major to see how long students stay Undecided and how many are no longer enrolled without having declared. Each bar counts only the students whose semester that far on is complete in the data, so recent entrants are in the early bars only; students already in the major when the data begin are left out and counted in the sentence above the chart. "Not enrolled that semester" includes students who came back later.
 
 The movement cards below it focus on four timing questions:
 
-- When do students first appear in the selected unit as pre-majors?
-- When do students first appear as full majors without a prior selected-unit pre-major record?
-- When do selected-unit pre-majors convert to full majors?
-- When do selected-unit students leave for another program?
+- When do students first appear in the selected majors as pre-majors?
+- When do students first appear as full majors without a pre-major record first?
+- When do pre-majors convert to full majors?
+- When do students leave for another program?
+
+A population with no pre-major (Undecided, or a major without one) shows two cards, **Entered** and **Left for another major**.
 
 Each timing view separates Always UNM and Transfer students where the data allow it. Transfer origin is assigned from the student's earliest available Academic Studies **Student Population** label; it is not inferred from credits. Credit figures in these cards come from class-list-derived UNM credit histories. A separate entry-card eligibility rule excludes students at the data-start boundary or whose first selected-unit record occurs after more than 30 class-list-derived attempted UNM credits. That 30-credit rule does not label a student as Transfer.
 

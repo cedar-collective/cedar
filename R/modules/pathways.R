@@ -742,12 +742,14 @@ pathwaysUI <- function(id, campus_choices, program_choices = character(),
         nav_panel("Major Changes",
           subtab_header(
             "Major Changes",
-            "Shows when students enter the selected unit as pre-majors or full majors, when ",
-            "pre-majors become full majors, and when students leave for another major. ",
-            "Transfer origin comes from the Academic Studies Student Population label, not ",
-            "from a credit threshold. The separate 30-credit entry rule uses attempted UNM ",
-            "credits reconstructed term by term from Class Lists. ",
-            pathways_guide_link("major-changes")
+            "When students enter the selected majors, how long they stay, when they leave ",
+            "for another major, and where they go. ",
+            pathways_guide_link("major-changes"),
+            method = tags$p(
+              "Whether a student transferred in comes from the record's Student Population label, not ",
+              "from a credit count. Separately, a student first seen in the selected majors with more ",
+              "than 30 attempted UNM credits is left out of the entry cards, because when they entered ",
+              "cannot be seen; those credits are added up term by term from class lists.")
           ),
           filter_scope_stripe(div(class = "subtab-scope", uiOutput(ns("mc_meta")))),
 
@@ -831,7 +833,7 @@ pathwaysUI <- function(id, campus_choices, program_choices = character(),
             "Courses in the Term Before Students Left",
             description = tagList(
               tags$p(class = "text-hint",
-                "What students who left the selected unit were taking in their last term here. ",
+                "What students who left the selected majors were taking in their last term here. ",
                 "A switch reaches Banner the term after a student actually moves, so this is the ",
                 "term they were sitting in while deciding — not the term the change showed up."
               ),
@@ -2867,7 +2869,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
               event_group = "Entry",
               movement = "Direct full-major declaration",
               origin_group,
-              path_label = "No selected-unit pre-major observed",
+              path_label = "No pre-major record here first",
               student_id,
               event_term = first_full_term,
               term_basis = "from first observed class-list enrollment",
@@ -2889,7 +2891,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
               path_label = "Selected-unit pre-major converted",
               student_id,
               event_term = first_full_term,
-              term_basis = "from first selected-unit pre-major",
+              term_basis = "from first pre-major record here",
               credit_basis = "observed completed UNM credits through full-major term",
               terms = term_diff(first_pre_term, first_full_term),
               unm_credits = full_observed_completed_unm_credits,
@@ -2910,7 +2912,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
               ),
               student_id,
               event_term = first_change_term,
-              term_basis = "from first selected-unit record",
+              term_basis = "from first record here",
               credit_basis = "observed completed UNM credits through prior term",
               terms = term_diff(first_unit_term, first_change_term),
               unm_credits = departure_observed_completed_unm_credits,
@@ -2986,9 +2988,9 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
           mutate(
             entry_status = first_unit_status,
             entry_status_label = case_when(
-              first_unit_status == "pre_major" ~ "First selected-unit record was pre-major",
-              first_unit_status == "full_major" ~ "First selected-unit record was full major",
-              TRUE ~ "First selected-unit status unknown"
+              first_unit_status == "pre_major" ~ "First record here was pre-major",
+              first_unit_status == "full_major" ~ "First record here was full major",
+              TRUE ~ "First status here unknown"
             ),
             terms_until = term_diff(first_unit_term, first_change_term)
           ) %>%
@@ -3101,7 +3103,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
       if (is.data.frame(scope$entry_exclusion) && nrow(scope$entry_exclusion) > 0) {
         label_map <- c(
           "Already present at data start" = "already present at data start",
-          "First observed with prior UNM credits" = "first selected-unit record after >30 class-list-derived attempted UNM credits"
+          "First observed with prior UNM credits" = "first seen here with more than 30 attempted UNM credits"
         )
         exclusion_bits <- scope$entry_exclusion %>%
           mutate(
@@ -3190,7 +3192,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
 
       p(class = "text-hint",
         paste0(
-          fmt(pcc$n_switches), " departures from the selected unit. “In their last term” is out of ",
+          fmt(pcc$n_switches), " departures from the selected majors. “In their last term” is out of ",
           "the ", fmt(pcc$n_switches_with_courses),
           " of them whose coursework could be matched.", unseen_note,
           " “In a typical term” is measured across ", fmt(pcc$n_baseline_terms),
@@ -3204,7 +3206,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
       req(!is.null(mc_data()))
       pcc <- mc_data()$pre_change_courses
       if (is.null(pcc) || pcc$n_switches == 0)
-        return(message_table("No students switched out of the selected unit."))
+        return(message_table("No students left the selected majors for another major."))
       if (nrow(pcc$courses) == 0)
         return(message_table("No course was taken by enough departing students to show."))
 
@@ -3384,37 +3386,49 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
           source %>% filter(as.character(movement) == movement_name)
         }
 
-        transition_cards <- list(
+        # A population with no pre-major (Undecided, a major without one) gets
+        # the two cards that can hold students, in words without "pre-major".
+        pre_rows <- bind_rows(rows_for_movement("First pre-major declaration"),
+                              rows_for_movement("Pre-major to full major"))
+        has_pre_major <- is.data.frame(pre_rows) && nrow(pre_rows) > 0
+        left_card <- make_movement_card(
+          "Left for another major",
+          "The first move from the selected majors to another major. Graduations are not included; credits are counted through the term before the move posted.",
+          rows_for_movement("Left for another major", path_summary),
+          label_col = if (has_pre_major) "path_label" else NULL
+        )
+        transition_cards <- if (has_pre_major) list(
           make_movement_card(
             "First pre-major declaration",
-            "First selected-unit pre-major records with a reliable observed class-list start term.",
+            "Students whose first record here is a pre-major, where the term they started can be seen.",
             rows_for_movement("First pre-major declaration")
           ),
           make_movement_card(
             "Direct full-major declaration",
-            "Students first observed in the selected unit as full majors, with no earlier selected-unit pre-major record.",
+            "Students first seen here as full majors, with no pre-major record first.",
             rows_for_movement("Direct full-major declaration")
           ),
           make_movement_card(
             "Pre-major to full major",
-            "Students with a selected-unit pre-major record who later appear as full majors. Median terms are counted from first selected-unit pre-major record.",
+            "Students with a pre-major record here who later appear as full majors. Median terms are counted from the first pre-major record.",
             rows_for_movement("Pre-major to full major")
           ),
+          left_card
+        ) else list(
           make_movement_card(
-            "Left for another major",
-            "First observed move from the selected unit to another major. Graduations are not included; credits are lag-adjusted to the prior term.",
-            rows_for_movement("Left for another major", path_summary),
-            label_col = "path_label"
-          )
+            "Entered",
+            "Students first seen in the selected majors, where the term they started can be seen.",
+            rows_for_movement("Direct full-major declaration")
+          ),
+          left_card
         )
 
         section_block(
-          "When Students Enter, Convert, and Leave",
+          if (has_pre_major) "When Students Enter, Convert, and Leave" else "When Students Enter and Leave",
           description = tags$p(class = "text-hint",
-            "Major status movement is built from selected-unit program records and split by ",
-            "Always UNM versus Transfer. Entry cards exclude students already present at the ",
-            "data-start term or first observed with substantial class-list-derived attempted ",
-            "UNM credits, so uncertain records are not treated as new declarations."
+            "Each card splits students who started at UNM from students who transferred in. ",
+            "The entry cards leave out students already here when the data begin and students ",
+            "first seen here with many UNM credits, because when they entered cannot be seen."
           ),
           level = "h3",
           div(class = "movement-card-grid", transition_cards)
@@ -3426,10 +3440,10 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
         tags$strong("How to read these counts"),
         tags$ul(class = "mt-1 mb-0",
           tags$li(HTML("All counts are limited to the selected population. Entry and conversion
-                        cards describe major-status milestones inside the selected unit; departure
-                        cards and switch charts describe moves that touch the selected unit.")),
+                        cards describe milestones inside the selected majors; departure
+                        cards and switch charts describe moves into or out of them.")),
           tags$li("A switch is any pair of back-to-back primary-major records where the student's declared program is different."),
-          tags$li("Only switches that touch the selected unit are shown: students arriving into it, or leaving it for somewhere else."),
+          tags$li("Only switches into or out of the selected majors are shown."),
           tags$li("Moving from a pre-major to the full major in the same program does ", tags$em("not"), " count as a switch; switching to a different pre-major or major is counted."),
           tags$li("Undergraduate-to-graduate transitions are excluded."),
           tags$li(HTML("<strong>Median terms</strong> counts Spring/Fall steps only:
@@ -3437,8 +3451,8 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
                         counted as an additional term.")),
           tags$li(HTML("The starting point depends on the event: entry rows count
                         from first observed class-list enrollment; pre-major → full-major
-                        rows count from the first selected-unit pre-major record;
-                        departure rows count from the first selected-unit record.")),
+                        rows count from the first pre-major record here;
+                        departure rows count from the first record here.")),
           tags$li(HTML("<strong>Transfer origin is not inferred from credits.</strong> Transfer
                         vs Always UNM comes from the earliest available Academic Studies
                         <code>student_population</code> label for the student. The separate
@@ -3701,7 +3715,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
       ctx <- mc_data()$decl_context
       if (is.null(ctx)) return(NULL)
       p(paste0("Based on ", format(ctx$n_declarers, big.mark = ","),
-               " students who reached full-major status in the selected unit."),
+               " students who reached full-major status in the selected majors."),
         class = "text-hint")
     })
 
