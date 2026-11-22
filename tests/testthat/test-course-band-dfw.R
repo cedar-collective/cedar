@@ -84,6 +84,11 @@ test_that("BD01: the page's lists, their count by chance and the sentence", {
                                          c(opt, list(band_by = "hs", min_n = 3L)))
   testthat::local_edition(3)
   expect_snapshot(cat(retention_band_sentence(r), retention_band_sentence(two), retention_band_sentence(hs), sep = "\n"))
+  # Every course with a verdict is counted, whatever the lists show: with 20
+  # harder courses the sentence says 20 and that 15 are listed.
+  expect_equal(c(r$meta$n_harder, r$meta$n_easier), c(1L, 1L))
+  many <- r; many$meta$n_harder <- 20L
+  expect_snapshot(cat(retention_band_sentence(many)))
   expect_error(retention_dashboard_band_courses(bd01$attempts, bd01$student_terms, NULL,
                                                 list(term_type = "spring", data_edges = bd01$edges)), "no graded spring")
 })

@@ -374,6 +374,40 @@ plot_exit_required <- function(payload, catalog_id) {
   }
 }
 
+#' How often two regular terms away was not the end, for the series' caveat
+#'
+#' @param meta `build_graduation_dashboard()$meta` (with `later_return`).
+#' @return One sentence for the method note.
+graduation_later_return_note <- function(meta) {
+  r <- meta$later_return
+  if (is.null(r) || r$n == 0L) {
+    return("The newest bars will come down a little: some students away two regular terms enroll again later.")
+  }
+  paste0("The newest bars will come down a little, because some students away two regular terms enroll again later. ",
+         "Through ", fmt_term(r$through), ", a student was away that long with no degree ", .graduation_n(r$n),
+         " times, and ", .graduation_n(r$n_returned), " of those (", sprintf("%.1f%%", 100 * r$n_returned / r$n),
+         ") were followed by a later enrollment. An older bar has already lost those students; a new one has not.")
+}
+
+#' Which transfer classes are read by credits brought, and why some are not
+#'
+#' @param pace One of `build_graduation_dashboard()$transfer`.
+#' @return One sentence for the method note.
+graduation_transfer_record_note <- function(pace) {
+  unknown <- attr(pace, "n_arrival_unknown")
+  held <- attr(pace, "arrival_withheld")
+  base <- paste0("A transfer student is grouped by the credit from elsewhere on their record. A new student's first ",
+                 "record has none, a later one fills it in, and a student who has left gets no later one.")
+  if (is.null(unknown) || nrow(unknown) == 0L) return(paste(base, "Every student in these classes has it on record."))
+  classes <- paste0(vapply(unknown$term, fmt_term, character(1)), " (", .graduation_n(unknown$n), " of ",
+                    .graduation_n(unknown$n_class), ")", collapse = ", ")
+  paste0(base, " Students without it are in no group: ", classes, ".",
+         if (length(held) > 0L) paste0(" Where that is more than a few, the students left in the groups are mostly ",
+                                       "the ones who stayed, so the class is not shown by group: ",
+                                       paste(vapply(held, fmt_term, character(1)), collapse = ", "), ".") else "")
+}
+
+
 #' Each entering class's parts at one moment, as shares of the class
 #'
 #' @param pace `payload$pace`.
@@ -565,7 +599,7 @@ plot_ceiling_parts <- function(ceiling) {
   }
   fig %>% plotly::layout(barmode = "stack",
                          legend = list(orientation = "h", y = 1.05, yanchor = "bottom", traceorder = "normal"),
-                         xaxis = list(title = "Attempted credits, the average student at the ceiling"),
+                         xaxis = list(title = paste0("Attempted credits of the average student on passing ", ceiling$meta$ceiling)),
                          yaxis = list(title = ""), margin = list(t = 30, b = 40))
 }
 
@@ -599,7 +633,7 @@ format_graduation_ceiling <- function(ceiling) {
   m <- ceiling$meta
   head <- c("", paste0("## Passing ", m$ceiling, " attempted credits with no degree yet"),
             graduation_ceiling_lead(ceiling),
-            paste0("Not placed: ", .graduation_n(m$n_not_readable), " whose record began before the class lists, ",
+            paste0("Not placed: ", .graduation_n(m$n_not_readable), " whose record began before the class lists or whose credit from elsewhere is not on record, ",
                    .graduation_n(m$n_already_past), " already past it in their first term on record, ",
                    .graduation_n(m$n_prior_degree), " who already held a degree."))
   if (m$n_passed == 0L) return(head)

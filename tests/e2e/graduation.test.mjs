@@ -10,7 +10,7 @@
 //
 //   node tests/e2e/graduation.test.mjs
 
-import { launch, connect, setInput, waitFor, waitForIdle, requireIds, readReactable } from './lib.mjs';
+import { launch, connect, setInput, waitFor, waitForIdle, requireIds, readReactable, outputsInError } from './lib.mjs';
 
 const fail = [];
 const ok = (cond, msg) => { if (!cond) fail.push(msg); console.log(`${cond ? 'ok  ' : 'FAIL'} ${msg}`); };
@@ -126,6 +126,9 @@ try {
   await waitBuilt();
   const lead120 = await page.$eval(`#${NS}headline`, (el) => el.innerText);
   ok(/had 120 credits or more\.$/.test(lead120.trim()), `the lead follows the line (${lead120.slice(-50)})`);
+
+  const inError = await outputsInError(page, NS);
+  ok(inError.length === 0, `no output in error (${inError.join('; ')})`);
 
   await connect(page, { tab: 'home' });
   const card = await page.evaluate(() => [...document.querySelectorAll('a[href]')].some((a) => a.getAttribute('href') === '?tab=graduation'));

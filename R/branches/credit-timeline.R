@@ -62,7 +62,11 @@
 #'   }
 #'
 #' @return Tibble with `student_id`, `term`, `unm_credits_entering`,
-#'   `unm_credits_after`, `transfer_credits`, `total_credits_entering`,
+#'   `unm_credits_after`, `transfer_credits`, `transfer_credits_known` (FALSE
+#'   when the student has no recorded pair of totals to take the difference
+#'   of: `transfer_credits` is then 0 and means "not recorded", which a new
+#'   student's first pull is and a student who left before the next pull stays),
+#'   `total_credits_entering`,
 #'   `total_credits_after`, and `timeline_valid` (FALSE when the student's first
 #'   term in the data is the first term of the data, so their earlier
 #'   coursework is invisible and the running total starts too low).
@@ -85,7 +89,8 @@ build_credit_timeline <- function(student_terms, programs = NULL, opt = list()) 
     return(tibble::tibble(
       student_id = character(), term = integer(),
       unm_credits_entering = numeric(), unm_credits_after = numeric(),
-      transfer_credits = numeric(), total_credits_entering = numeric(),
+      transfer_credits = numeric(), transfer_credits_known = logical(),
+      total_credits_entering = numeric(),
       total_credits_after = numeric(), timeline_valid = logical()
     ))
   }
@@ -110,12 +115,13 @@ build_credit_timeline <- function(student_terms, programs = NULL, opt = list()) 
   timeline %>%
     dplyr::left_join(transfer, by = "student_id") %>%
     dplyr::mutate(
+      transfer_credits_known = !is.na(transfer_credits),
       transfer_credits       = dplyr::coalesce(transfer_credits, 0),
       total_credits_entering = transfer_credits + unm_credits_entering,
       total_credits_after    = transfer_credits + unm_credits_after
     ) %>%
     dplyr::select(student_id, term, unm_credits_entering, unm_credits_after,
-                  transfer_credits, total_credits_entering, total_credits_after,
+                  transfer_credits, transfer_credits_known, total_credits_entering, total_credits_after,
                   timeline_valid)
 }
 

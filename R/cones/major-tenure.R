@@ -25,7 +25,7 @@
 # bars are a blend of them.
 #
 # Sections: calculation, plot prep, plot, text.
-# Depends on: advance_term() (branches/cedar-terms.R), validate_population(),
+# Depends on: follow_students(), awarded_degrees() (branches/retention-context.R), validate_population(),
 #   fmt_term() (trunk/utils.R), student_term_entry_type() (branches/population.R).
 
 # The states a student can be in at a step, in drawing order: column, label.
@@ -50,7 +50,8 @@ MAJOR_TENURE_ARRIVALS <- c(
 #' @param population `build_population()` output with `first_unit_term`.
 #' @param student_terms `cedar_student_terms`: `student_id`, `term`,
 #'   `enrolled`, `primary_major_code`.
-#' @param degrees `cedar_degrees`: `student_id`, `term`.
+#' @param degrees `cedar_degrees`: `student_id`, `term`; a degree is one
+#'   awarded_degrees() keeps.
 #' @param opt `program_codes` (the focal major codes; required), `data_edges`
 #'   (required: `last_enrolled_complete`, `last_degree`), `n_terms` (steps
 #'   after entry, default 8), `arrival` (one name of `MAJOR_TENURE_ARRIVALS`,
@@ -123,24 +124,13 @@ get_major_tenure <- function(population, student_terms, degrees, opt = list(), p
   if (anyDuplicated(here[c("student_id", "target_term")]) > 0L) {
     stop("[major-tenure.R] student_terms holds two rows for one student and term.", call. = FALSE)
   }
-  first_degree <- degrees %>%
-    filter(student_id %in% entrants$student_id) %>%
-    transmute(student_id, degree_term = as.integer(term)) %>%
-    arrange(degree_term) %>%
-    distinct(student_id, .keep_all = TRUE)
-
-  placed <- bind_rows(lapply(0:n_terms, function(k) {
-    entrants %>%
-      transmute(student_id, step = k, target_term = if (k == 0L) entry else advance_term(entry, k)) %>%
-      # The opportunity edge: a step is read only where its term is settled.
-      filter(target_term <= settled, target_term <= degree_edge)
-  })) %>%
-    left_join(here %>% mutate(enrolled = TRUE), by = c("student_id", "target_term"), relationship = "many-to-one") %>%
-    left_join(first_degree, by = "student_id", relationship = "many-to-one") %>%
+  placed <- follow_students(entrants %>% transmute(student_id, start = entry),
+                            here %>% transmute(student_id, term = target_term), awarded_degrees(degrees),
+                            n_terms, settled, degree_edge) %>%
+    left_join(here, by = c("student_id", "target_term"), relationship = "many-to-one") %>%
     mutate(
-      enrolled = enrolled %in% TRUE,
       state = case_when(
-        !is.na(degree_term) & degree_term <= target_term ~ "n_degree",
+        degree ~ "n_degree",
         enrolled & !is.na(major) & major %in% codes ~ "n_in_major",
         enrolled & !is.na(major) ~ "n_other_major",
         enrolled ~ "n_no_major",

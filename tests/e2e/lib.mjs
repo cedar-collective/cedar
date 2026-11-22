@@ -399,6 +399,16 @@ export function readReactable(page, outputId, { limit = 30 } = {}) {
   }, outputId, limit);
 }
 
+// Every Shiny output under a module's namespace that is showing an error, as
+// "id: message". An output that errors draws nothing and says so only in its
+// own box, which a check reading the chart beside it never sees: every page
+// suite ends by asserting this list is empty.
+export function outputsInError(page, ns) {
+  return page.evaluate((prefix) => [...document.querySelectorAll(`[id^="${prefix}"].shiny-output-error`)]
+    .filter((el) => !el.classList.contains('shiny-output-error-shiny.silent.error'))
+    .map((el) => `${el.id.slice(prefix.length)}: ${el.innerText.trim().slice(0, 100)}`), ns);
+}
+
 // A reactable's column header cells, leaving out the headings over groups of
 // columns, so a header's position is its cells' position in a row.
 export const COLUMN_HEADER = '.rt-thead .rt-th:not(.rt-th-group):not(.rt-th-group-none)';

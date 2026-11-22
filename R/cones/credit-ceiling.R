@@ -13,9 +13,11 @@
 #                 term's. A student already past it in their first term on
 #                 record did not pass it where it can be seen
 #                 (`n_already_past`), and one whose record began before the
-#                 class lists has no readable total (`n_not_readable`,
-#                 `timeline_valid`): both are counted, neither is placed.
-#   No degree     a student awarded a degree before the passing term is
+#                 class lists, or whose credit from elsewhere is not on
+#                 record yet, has no readable total (`n_not_readable`):
+#                 both are counted, neither is placed.
+#   No degree     awarded_degrees(): a degree on hold or applied for is not
+#                 one. A student awarded a degree before the passing term is
 #                 working on another and is left out (`n_prior_degree`).
 #   Where from    three parts of the total at the passing term: brought from
 #                 elsewhere, completed here, attempted here and not completed
@@ -80,13 +82,15 @@ get_credit_ceiling_crossings <- function(student_terms, programs, degrees, opt =
   if (!is.null(opt$student_level)) first_past <- first_past %>% filter(student_level %in% opt$student_level)
   if (!is.null(opt$campus)) first_past <- first_past %>% filter(student_campus %in% opt$campus)
 
-  awarded <- degrees %>% transmute(student_id, degree_term = as.integer(term)) %>% filter(degree_term <= degree_edge)
+  awarded <- awarded_degrees(degrees) %>% filter(degree_term <= degree_edge)
   prior <- first_past %>%
     inner_join(awarded, by = "student_id", relationship = "many-to-many") %>%
     filter(degree_term < term) %>%
     distinct(student_id)
   candidates <- first_past %>% anti_join(prior, by = "student_id")
-  readable <- candidates %>% filter(timeline_valid)
+  # Readable: the running total is whole, and the credit brought from
+  # elsewhere is on record (a missing record would read as none brought).
+  readable <- candidates %>% filter(timeline_valid, transfer_credits_known)
   passed <- readable %>% filter(total_credits_entering < ceiling)
   cedar_debug("[credit-ceiling.R] ", nrow(passed), " passed ", ceiling, "; ", nrow(candidates) - nrow(readable),
               " not readable; ", nrow(readable) - nrow(passed), " already past")
@@ -97,16 +101,9 @@ get_credit_ceiling_crossings <- function(student_terms, programs, degrees, opt =
               completed_here = as.numeric(cumulative_completed_unm_credits),
               not_completed_here = unm_credits_after - as.numeric(cumulative_completed_unm_credits))
 
-  here <- enrolled %>% distinct(student_id, target_term = term) %>% mutate(here = TRUE)
-  first_degree <- awarded %>% group_by(student_id) %>% summarize(degree_term = min(degree_term), .groups = "drop")
-  outcomes <- bind_rows(lapply(0:n_terms, function(k) {
-    students %>%
-      transmute(student_id, step = k, target_term = if (k == 0L) term else advance_term(term, k)) %>%
-      filter(target_term <= settled, target_term <= degree_edge)
-  })) %>%
-    left_join(here, by = c("student_id", "target_term"), relationship = "many-to-one") %>%
-    left_join(first_degree, by = "student_id", relationship = "many-to-one") %>%
-    mutate(degree = !is.na(degree_term) & degree_term <= target_term, here = here %in% TRUE & !degree) %>%
+  outcomes <- follow_students(students %>% transmute(student_id, start = term), enrolled, awarded,
+                              n_terms, settled, degree_edge) %>%
+    mutate(here = enrolled & !degree) %>%
     group_by(step) %>%
     summarize(n_observed = n(), n_degree = sum(degree), n_enrolled = sum(here),
               n_gone = sum(!degree & !here), .groups = "drop")

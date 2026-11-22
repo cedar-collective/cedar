@@ -194,8 +194,7 @@ the observer errored and the session dropped. Fixed with an empty list.
 
 ## I74 — The newest transfer class's "credits brought" band is tilted by who stayed
 
-**Status:** open; the page states it (Graduation > Still Here, and Moving
-Forward?, method note). Cause not yet confirmed.
+**Status:** resolved 2026-11-22 (branch `audit/degree-rule-and-transfer-bands`).
 **Found:** 2026-11-21, reading the first real-data run of the transfer classes.
 **Severity:** moderate: one class's bars are misleading in each band; older
 classes look consistent with one another.
@@ -226,13 +225,20 @@ do not sort by who stayed.
 newest class's "Gone" share at the start of the second year with the classes
 before it, band by band.
 
-### Fix
+### Cause and fix
 
-Confirm the cause by comparing, for the newest class, each student's first and
-latest stamped gap. Then either band the newest class only once a pull has
-covered it after its first year, or band on the latest stamp among students
-with a stamp after their second term and report the rest as "credit not yet
-posted".
+Not who stayed, but who has a record at all. `build_credit_timeline()` read a
+student with no recorded pair of totals as having brought zero credits. A new
+student's first pull carries no totals; a later pull fills them in; a student
+who has left is not pulled again. So the newest class's leavers were "brought
+none" and filled the lowest band, and the in-progress class was nearly all
+there.
+
+`build_credit_timeline()` now returns `transfer_credits_known`.
+`get_entering_class_retention(opt$arrival_credits)` puts a student without a
+record in no band and counts them (`n_arrival_unknown`), and
+`get_credit_ceiling_crossings()` counts them as not readable. The page says how
+many.
 
 ## I73 — Special topics ("ST:") titles were not treated as topics courses
 
@@ -4596,6 +4602,21 @@ call it; and Prepared for It reads the same cells and the same alike check.
 (`pathways.R`, a `grepl("transfer", ...)`) each carry their own patterns for
 Banner's labels. *Done when:* one branch function recodes the label, the
 labels it reads are an institution file, and the others call it.
+
+**M62 — A count formatter is written out in 17 files.** `function(x)
+format(as.integer(x), big.mark = ",", ...)` is defined locally 21 times
+across modules, features and two cones (`.retention_n`, `.graduation_n`, a
+local `n` in most), with small differences in `trim` and in how NA shows.
+Found in the Retention and Graduation audit, 2026-11-21. *Done when:* one
+helper (whole number, separators, an em dash for NA) lives beside the other
+display helpers and the local copies call it.
+
+**M63 — Two step-by-step follow-ups remain beside `follow_students()`.**
+`get_credit_ceiling_crossings()` and `get_major_tenure()` share
+`follow_students()` (`retention-context.R`); `.entering_class_pace()` and
+`.compute_retention()` still build their own steps, with their own handling
+of the edge and of a degree. *Done when:* both read `follow_students()`, or
+its header says why not.
 
 ### Documentation and naming
 

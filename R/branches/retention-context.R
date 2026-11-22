@@ -83,12 +83,133 @@
     distinct(student_id, term = as.integer(term))
 }
 
-# Pre-build the graduated lookup.
+#' The degrees that count as awarded: one row per student and term
+#'
+#' CEDAR's one rule for "holds a degree" in a follow-up: the row's
+#' `graduation_status` is "Awarded". A degree on hold, an application still
+#' pending and a cleared record are not degrees (pending_degrees() reads the
+#' applications). A degrees table with no status column is all awards.
+#'
+#' @param degrees `cedar_degrees`, or NULL (no awards).
+#' @return A tibble of `student_id` and `degree_term` (integer).
+awarded_degrees <- function(degrees) {
+  if (is.null(degrees)) return(tibble::tibble(student_id = character(), degree_term = integer()))
+  missing <- setdiff(c("student_id", "term"), names(degrees))
+  if (length(missing) > 0L) {
+    stop("[retention-context.R] degrees lacks ", paste(missing, collapse = ", "), call. = FALSE)
+  }
+  awarded <- dplyr::ungroup(degrees)
+  if ("graduation_status" %in% names(awarded)) awarded <- awarded %>% filter(graduation_status == "Awarded")
+  awarded %>% filter(!is.na(term)) %>% distinct(student_id, degree_term = as.integer(term))
+}
+
+#' The graduation applications still pending: one row per student and term
+#'
+#' @param degrees `cedar_degrees` with `graduation_status`.
+#' @return A tibble of `student_id` and `degree_term` for rows whose status is
+#'   "Pending": the student has applied to graduate that term and the degree
+#'   is not posted.
+pending_degrees <- function(degrees) {
+  missing <- setdiff(c("student_id", "term", "graduation_status"), names(degrees))
+  if (length(missing) > 0L) {
+    stop("[retention-context.R] degrees lacks ", paste(missing, collapse = ", "), call. = FALSE)
+  }
+  dplyr::ungroup(degrees) %>%
+    filter(graduation_status == "Pending", !is.na(term)) %>%
+    distinct(student_id, degree_term = as.integer(term))
+}
+
+#' Every degree that counts to date: awarded, or applied for where not yet posted
+#'
+#' Degrees are posted a term or two behind enrollment. To `degree_edge` a
+#' degree is one awarded (awarded_degrees()). Past it nothing is awarded yet,
+#' and a pending application to graduate stands in, marked, so a follow-up
+#' that reads enrollment past the degree edge does not count a student who
+#' has just finished as gone.
+#'
+#' @param degrees `cedar_degrees`.
+#' @param degree_edge `last_degree`.
+#' @return `student_id`, `degree_term`, `basis` ("awarded" or "applied").
+degrees_to_date <- function(degrees, degree_edge) {
+  if (is.null(degree_edge)) {
+    stop("[retention-context.R] degrees_to_date needs the degree edge (last_degree).", call. = FALSE)
+  }
+  bind_rows(
+    awarded_degrees(degrees) %>% filter(degree_term <= degree_edge) %>% mutate(basis = "awarded"),
+    if ("graduation_status" %in% names(degrees)) {
+      pending_degrees(degrees) %>% filter(degree_term > degree_edge) %>% mutate(basis = "applied")
+    }
+  )
+}
+
+#' Students who finished between a term and the next regular term
+#'
+#' A spring student awarded a degree in the summer did not leave: they
+#' finished, a term later than a spring graduate. This finds them: a degree
+#' dated after the anchor term and before its next regular term (in a
+#' fall/spring/summer calendar, only the summer after a spring). Where that
+#' term's degrees are not posted yet (it is past `degree_edge`), a pending
+#' application to graduate then stands in, marked `basis = "applied"`.
+#'
+#' @param anchors `student_id` and `term`: the student-terms to read.
+#' @param degrees `cedar_degrees`.
+#' @param degree_edge `last_degree`.
+#' @return One row per anchor with such a degree: `student_id`, `term`,
+#'   `finish_term`, `basis` ("awarded" or "applied").
+between_term_finishers <- function(anchors, degrees, degree_edge) {
+  found <- degrees_to_date(degrees, degree_edge)
+  anchors %>%
+    distinct(student_id, term = as.integer(term)) %>%
+    mutate(next_regular = advance_term(term, 1L)) %>%
+    inner_join(found, by = "student_id", relationship = "many-to-many") %>%
+    filter(degree_term > term, degree_term < next_regular) %>%
+    arrange(student_id, term, basis != "awarded", degree_term) %>%
+    distinct(student_id, term, .keep_all = TRUE) %>%
+    transmute(student_id, term, finish_term = degree_term, basis)
+}
+
+#' Where each student is at each regular term after a starting term
+#'
+#' The follow-up three analyses share (a class past 160 credits, a major's
+#' entrants): step 0 is the starting term and step k the k-th regular term
+#' after it (summer is not a step, advance_term()). A step is returned only
+#' where it can be read: its term is at or before the settled enrollment edge
+#' and the degree edge, so a recent starter has the early steps and not the
+#' later ones, and a caller's denominators are each step's own rows.
+#'
+#' @param starts `student_id` and `start` (the starting term), one row a student.
+#' @param enrolled_terms `student_id` and `term`: every enrolled student-term,
+#'   on any campus and at any level.
+#' @param awarded awarded_degrees() output.
+#' @param n_terms Steps after the start.
+#' @param settled,degree_edge The two edges (`last_enrolled_complete`, `last_degree`).
+#' @return One row per student and readable step: `student_id`, `start`,
+#'   `step`, `target_term`, `degree` (awarded a degree in or before the target
+#'   term) and `enrolled` (enrolled in the target term).
+follow_students <- function(starts, enrolled_terms, awarded, n_terms, settled, degree_edge) {
+  if (anyDuplicated(starts$student_id) > 0L) {
+    stop("[retention-context.R] follow_students: starts holds a student twice.", call. = FALSE)
+  }
+  here <- enrolled_terms %>% distinct(student_id, target_term = as.integer(term)) %>% mutate(enrolled = TRUE)
+  first_degree <- awarded %>% arrange(degree_term) %>% distinct(student_id, .keep_all = TRUE)
+  bind_rows(lapply(0:as.integer(n_terms), function(k) {
+    starts %>%
+      transmute(student_id, start = as.integer(start), step = k,
+                target_term = if (k == 0L) as.integer(start) else advance_term(start, k)) %>%
+      # The opportunity edge: a step is read only where its term is settled.
+      filter(target_term <= settled, target_term <= degree_edge)
+  })) %>%
+    left_join(here, by = c("student_id", "target_term"), relationship = "many-to-one") %>%
+    left_join(first_degree, by = "student_id", relationship = "many-to-one") %>%
+    mutate(degree = !is.na(degree_term) & degree_term <= target_term, enrolled = enrolled %in% TRUE) %>%
+    select(student_id, start, step, target_term, degree, enrolled)
+}
+
+# Pre-build the graduated lookup: awarded_degrees() under this file's names.
 # Returns a tibble with (student_id, grad_term), or NULL if degrees unavailable.
 .build_graduated_lookup <- function(degrees) {
   if (is.null(degrees) || nrow(degrees) == 0) return(NULL)
-  degrees %>%
-    distinct(student_id, grad_term = term)
+  awarded_degrees(degrees) %>% rename(grad_term = degree_term)
 }
 
 # Prepare the shared, UNM-wide inputs used by every retention view. Course

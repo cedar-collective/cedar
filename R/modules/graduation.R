@@ -124,7 +124,7 @@ graduationUI <- function(id, campuses) {
       code = reactable::colDef(name = "Code", show = show_code, na = "\u2014", minWidth = 80),
       n = cedar_count_coldef("Left"),
       n_done = cedar_count_coldef(paste(done_at, "credits or more")),
-      n_flagged = cedar_count_coldef("Under a standard"),
+      n_flagged = cedar_count_coldef("No longer met a standard"),
       n_pell = cedar_count_coldef("Ever Pell-eligible")))
 }
 
@@ -168,7 +168,10 @@ graduationServer <- function(id, student_terms, programs, degrees, terms, dims, 
       tags$ul(
         tags$li(paste0("A student's last term is the last one they were enrolled in at this university, at any level, ",
                        "scoped by their level and home campus that term. They left when the two regular terms after it ",
-                       "passed with no enrollment (summer is not a step) and they hold no degree of any kind.")),
+                       "passed with no enrollment (summer is not a step) and they have been awarded no degree of any ",
+                       "kind. A degree on hold, or one applied for and not yet awarded, is not a degree: ",
+                       n(m$n_applied_to_graduate), " of those who left have an application to graduate on file for a ",
+                       "later term.")),
         tags$li(paste0("Enrollment is settled through ", fmt_term(m$edge), " and degrees are posted through ",
                        fmt_term(m$degree_edge), ". ", n(m$n_not_judged), " students' last terms are too recent to judge: ",
                        "everyone still enrolled is among them. ", n(m$n_with_degree),
@@ -184,7 +187,8 @@ graduationServer <- function(id, student_terms, programs, degrees, terms, dims, 
       tags$ul(
         tags$li(paste0("Each bar is the students whose last term it was and who had ", p$meta$line,
                        " credits or more. Hover a term for those at ", p$meta$done_at, " or more and for everyone who left.")),
-        tags$li("Terms are not alike: more students stop after a spring than a fall, and few after a summer. Compare a term with the same term a year earlier."))
+        tags$li("Terms are not alike: more students stop after a spring than a fall, and few after a summer. Compare a term with the same term a year earlier."),
+        tags$li(graduation_later_return_note(p$meta)))
     })
 
     output$standing_table <- reactable::renderReactable({
@@ -229,7 +233,7 @@ graduationServer <- function(id, student_terms, programs, degrees, terms, dims, 
       m <- p$meta
       tags$ul(
         tags$li(paste0("The ", n(m$n_far), " students who left with ", m$line, " credits or more, by the primary major ",
-                       "on record in their last term and that major's college. Under a standard counts the students ",
+                       "on record in their last term and that major's college. No longer met a standard counts the students ",
                        "below the GPA line or at the credit line above.")),
         tags$li(paste0("A major with fewer than ", m$min_list, " such students is not named: ", n(m$n_majors_pooled),
                        " are counted together as all other majors.")),
@@ -297,7 +301,8 @@ graduationServer <- function(id, student_terms, programs, degrees, terms, dims, 
                        "brought from elsewhere (transfer, test and dual credit) added. A student passes in the first ",
                        "enrolled term that ends at or past ", m$ceiling, ", at this level and home campus that term.")),
         tags$li(paste0("Not placed, because the passing cannot be seen: ", n(m$n_not_readable),
-                       " students whose record began before the class lists, and ", n(m$n_already_past),
+                       " students whose record began before the class lists or whose credit from elsewhere is not ",
+                       "on record yet, and ", n(m$n_already_past),
                        " already past it in their first term on record. ", n(m$n_prior_degree),
                        " who already held a degree are left out. Because earlier records cannot be read, the count ",
                        "of students passing each term is not shown as a trend: it would rise only because more ",
@@ -345,8 +350,8 @@ graduationServer <- function(id, student_terms, programs, degrees, terms, dims, 
                        "by the credits a term they earn here (", rates[["four_year"]], " or more, ", rates[["six_year"]],
                        " to ", rates[["four_year"]] - 1, ", fewer), not by a four-year pace: a student who brought 60 ",
                        "credits and earns ", rates[["four_year"]], " a term finishes in two years. Students who transfer ",
-                       "in a spring are not in these classes. The newest class's groups are less sure: a student who ",
-                       "left before their credit from elsewhere was posted is counted as having brought little.")),
+                       "in a spring are not in these classes.")),
+        tags$li(graduation_transfer_record_note(p$transfer[[1]])),
         tags$li(paste0("Each student is in one part as the year begins: awarded a degree by then; enrolled that term; ",
                        "or not enrolled, which includes a student away for the term who later comes back.")),
         tags$li(paste0("An enrolled student is on pace for four years with ", rates[["four_year"]],
@@ -354,9 +359,13 @@ graduationServer <- function(id, student_terms, programs, degrees, terms, dims, 
                        "begins and with summer credits, and on pace for six with ", rates[["six_year"]],
                        ". Credit brought from elsewhere (test, dual or transfer credit) is not counted, so a ",
                        "student who arrived with credit is further along than shown.")),
-        tags$li(paste0("A student whose first term here is the first term of the class lists has earlier credits ",
-                       "that cannot be seen, and is shown as enrolled with earlier credits not on record. That is ",
-                       "the whole of the first class the lists hold.")),
+        tags$li(paste0("A student whose first term here is the first term of the class lists may have earlier credits ",
+                       "that cannot be seen, and is shown as enrolled with earlier credits not on record. The first ",
+                       "first-time class is the exception: the record calls its ", n(attr(p$pace, "n_label_trusted")),
+                       " students new that term, so their credits are counted from it. A few had earned credit here ",
+                       "before entering (dual credit), and are a little further along than shown.")),
+        tags$li(paste0("Degrees are posted through ", fmt_term(p$meta$degree_edge), ". For a term after that, a student ",
+                       "who has applied to graduate counts as having the degree from the following term.")),
         tags$li(paste0("Enrollment is settled through ", fmt_term(attr(p$pace, "edge")), " and credits are read through ",
                        fmt_term(attr(p$pace, "pace_edge")), ". The credit lines show the middle student of those still ",
                        "enrolled, with half of them between the figures in the hover; students who left are not in ",
@@ -381,7 +390,8 @@ graduationServer <- function(id, student_terms, programs, degrees, terms, dims, 
         tags$li(paste0("Choices, elective space, general education and the math and English starting courses are not ",
                        "read. A course no one had taken under the plan's number by these students' last terms shows a dash.")),
         tags$li(paste0("A plan with fewer than ", m$min_n, " such students is not listed: ", n(m$n_plans_withheld),
-                       " plans, ", n(m$n_students_withheld), " students.")))
+                       if (m$n_plans_withheld == 1L) " plan, " else " plans, ", n(m$n_students_withheld),
+                       if (m$n_students_withheld == 1L) " student." else " students.")))
     })
   })
 }

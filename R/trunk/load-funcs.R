@@ -142,6 +142,7 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
   source_file("cones/entry-heatmap.R")         # courses taken before entering the focal major
   source_file("cones/stopout.R")
   source_file("cones/return-rates.R")  # how often enrolled students come back the next regular term
+  source_file("cones/summer-finishers.R")  # students who finish before the next regular term: what they took
   source_file("cones/entering-class-retention.R")  # each entering class's share still here 1..n regular terms later
   source_file("cones/exit-credits.R")  # students who left without a degree, by credits at their last term
   source_file("cones/exit-requirements.R")  # of those students, who passed each course their plan requires
