@@ -51,7 +51,7 @@ Each section's **How this is counted** gives its thresholds and the edge it read
 - **The latest terms wait for their next term to settle.** A term whose next term is still registering has no rate yet.
 - **A DFW sign needs posted grades.** A term past the last graded term, or a student with no grade posted, is in neither group.
 - **A course's gap describes who fails it as much as the course.** Students who fail one course often struggle in others. Open the course in Course Dynamics for its full picture.
-- **Probation is not yet a sign.** Banner's academic standings are not yet mapped to groups.
+- **Academic standing is not one of the signs.** The two read are a late withdrawal and a non-passing grade.
 
 ---
 

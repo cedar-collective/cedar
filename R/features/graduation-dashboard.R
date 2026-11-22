@@ -599,7 +599,7 @@ plot_ceiling_parts <- function(ceiling) {
   }
   fig %>% plotly::layout(barmode = "stack",
                          legend = list(orientation = "h", y = 1.05, yanchor = "bottom", traceorder = "normal"),
-                         xaxis = list(title = "Attempted credits, the average student at the ceiling"),
+                         xaxis = list(title = paste0("Attempted credits of the average student on passing ", ceiling$meta$ceiling)),
                          yaxis = list(title = ""), margin = list(t = 30, b = 40))
 }
 

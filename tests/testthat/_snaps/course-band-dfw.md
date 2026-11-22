@@ -8,3 +8,10 @@
       No course had 30 graded attempts by continuing students who entered the term with a GPA below 2.5 and 30 by its other students over these terms.
       Of the 2 courses read, 0 were harder on first-term students with a high-school GPA of 2.75 or lower than the rest of their own term was, by more than for the course's other students, and 0 easier. Chance alone would put fewer than 1 on each list, so a course here is a place to look, not a finding.
 
+---
+
+    Code
+      cat(retention_band_sentence(many))
+    Output
+      Of the 2 courses read, 20 were harder on continuing students who entered the term with a GPA below 2.5 than the rest of their own term was, by more than for the course's other students, and 1 easier (the 15 that stand for the most attempts are listed). Chance alone would put fewer than 1 on each list, so a course here is a place to look, not a finding.
+

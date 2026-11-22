@@ -4603,6 +4603,21 @@ call it; and Prepared for It reads the same cells and the same alike check.
 Banner's labels. *Done when:* one branch function recodes the label, the
 labels it reads are an institution file, and the others call it.
 
+**M62 — A count formatter is written out in 17 files.** `function(x)
+format(as.integer(x), big.mark = ",", ...)` is defined locally 21 times
+across modules, features and two cones (`.retention_n`, `.graduation_n`, a
+local `n` in most), with small differences in `trim` and in how NA shows.
+Found in the Retention and Graduation audit, 2026-11-21. *Done when:* one
+helper (whole number, separators, an em dash for NA) lives beside the other
+display helpers and the local copies call it.
+
+**M63 — Two step-by-step follow-ups remain beside `follow_students()`.**
+`get_credit_ceiling_crossings()` and `get_major_tenure()` share
+`follow_students()` (`retention-context.R`); `.entering_class_pace()` and
+`.compute_retention()` still build their own steps, with their own handling
+of the edge and of a degree. *Done when:* both read `follow_students()`, or
+its header says why not.
+
 ### Documentation and naming
 
 **M20 — Function reference can go stale.** *Done when:* CI regenerates it or
