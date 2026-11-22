@@ -79,6 +79,9 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
   assign("CEDAR_DEFINITIONS", read_definition_registry(
     file.path(cedar_base_dir, "docs", "_data", "definitions.yml")
   ), envir = .GlobalEnv)
+  assign("CEDAR_SECTION_CONCEPTS", read_section_concepts(
+    file.path(cedar_base_dir, "docs", "_data", "concepts.yml")
+  ), envir = .GlobalEnv)
 
   # 3. Branches (reusable cedar domain computations — called by multiple cones/features)
   message("[load-funcs.R] Loading branches...")

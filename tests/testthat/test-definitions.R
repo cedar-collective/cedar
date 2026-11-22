@@ -114,3 +114,15 @@ test_that("app explanations render the registry and exact-version docs links", {
   dept_gen_ed_html <- as.character(deptProfileGenEdUI("dept_gen_ed_definition_test"))
   expect_match(dept_gen_ed_html, 'data-definition-id="dfw"', fixed = TRUE)
 })
+
+test_that("every section concept is used by a page, and every page's concept exists", {
+  used <- unlist(lapply(list.files(file.path(cedar_base_dir, "R", "modules"), pattern = "\\.R$", full.names = TRUE),
+                        function(path) {
+                          code <- paste(readLines(path, warn = FALSE), collapse = "\n")
+                          regmatches(code, gregexpr('concept = "[^"]+"', code))[[1]]
+                        }))
+  used <- sub('^concept = "', "", sub('"$', "", used))
+  expect_setequal(used, names(CEDAR_SECTION_CONCEPTS))
+  expect_error(cedar_section_concept("no.such-section"), "Unknown section concept")
+  expect_error(read_section_concepts(tempfile()), "not found")
+})
