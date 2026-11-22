@@ -53,6 +53,9 @@ try {
 
   const noCards = await page.evaluate(() => !document.querySelector('#retention_dashboard-overall_finding .finding-card'));
   ok(noCards, 'the chart carries the finding: no cards');
+  const lead = await page.$eval(`#${NS}overall_finding`, (el) => el.innerText.trim());
+  ok(/^The share of fall students who came back the next regular term is (rising|falling|not clearly rising or falling): /.test(lead),
+     `the section opens on the verdict over the terms (${lead.slice(0, 60)}…)`);
   const ln = await line();
   ok(ln && ln.n >= 3 && ln.text.length === ln.n, `the return line labels each of its ${ln?.n} terms`);
   ok(ln?.trend && ln.trend.x.length === 2 && ln.trend.line?.dash === 'dash',

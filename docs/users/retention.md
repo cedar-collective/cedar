@@ -34,7 +34,7 @@ The page builds as soon as it opens; there is no run button.
 
 | Section | What it shows |
 |---|---|
-| **How Often Students Come Back** | Every term's rate as a line (hover a term for its counts), with the trend as a dashed line labelled with its points a year and its verdict: rising, falling or steady. |
+| **How Often Students Come Back** | One sentence with the verdict over the terms and the first and last rates, then every term's rate as a line (hover a term for its counts), with the trend as a dashed line labelled with its points a year and its verdict: rising, falling or steady. |
 | **Finishing in the Summer** (spring only) | The spring students who were awarded a degree that summer, a bar a year, split by the credits they took here that summer; and the courses they took most. |
 | **Who Isn't Coming Back** | For a late withdrawal and for a DFW grade: how many students had it, how often they came back against those without it, and what share of the students who did not come back had it. |
 | **By Classification and College** | Each classification and each primary-major college: its latest rate, its rate over the terms and its terms as a small line with the trend. |

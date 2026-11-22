@@ -13,6 +13,11 @@ test_that("MT01: each student's readable steps, with enrollment and degree at ea
   expect_equal(c_rows$enrolled, c(TRUE, TRUE, TRUE, FALSE))
   # A degree edge a term earlier leaves the last step unread for everyone.
   expect_equal(max(follow_students(starts, mt01$student_terms, awarded_degrees(mt01$degrees), 3L, 202210L, 202180L)$target_term), 202180L)
+  # Started after the degree: by default a degree held, with since_start not this start's.
+  late <- tibble::tibble(student_id = "M-C", start = 202210L)
+  expect_true(follow_students(late, mt01$student_terms, awarded_degrees(mt01$degrees), 0L, 202210L, 202210L)$degree)
+  expect_false(follow_students(late, mt01$student_terms, awarded_degrees(mt01$degrees), 0L, 202210L, 202210L,
+                               since_start = TRUE)$degree)
   expect_error(follow_students(dplyr::bind_rows(starts, starts), mt01$student_terms, awarded_degrees(mt01$degrees), 3L, 202210L, 202210L),
                "twice")
 })

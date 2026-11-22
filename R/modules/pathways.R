@@ -917,7 +917,7 @@ pathwaysUI <- function(id, campus_choices, program_choices = character(),
 pathways_coverage_panel <- function(coverage) {
   if (is.null(coverage) || is.na(coverage$pct_truncated %||% NA)) return(NULL)
 
-  fmt <- function(n) format(n, big.mark = ",")
+  fmt <- fmt_count
   n_tr <- coverage$n_truncated; n_ce <- coverage$n_censored
 
   info_panel(
@@ -3111,7 +3111,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
                          "Major Changes scope will appear after the analysis is available."))
       }
 
-      fmt_count <- function(x) format(as.integer(x %||% 0L), big.mark = ",")
+      count_or_zero <- function(x) fmt_count(x %||% 0L)
       excluded <- scope$n_entry_excluded %||% 0L
       exclusion_bits <- character(0)
       if (is.data.frame(scope$entry_exclusion) && nrow(scope$entry_exclusion) > 0) {
@@ -3122,21 +3122,21 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
         exclusion_bits <- scope$entry_exclusion %>%
           mutate(
             label = coalesce(unname(label_map[as.character(observability)]), as.character(observability)),
-            text = paste0(fmt_count(n_students), " ", label)
+            text = paste0(count_or_zero(n_students), " ", label)
           ) %>%
           pull(text)
       }
 
       tags$p(
         tags$strong("Major Changes scope: "),
-        fmt_count(scope$n_population), " students in the selected population. ",
+        count_or_zero(scope$n_population), " students in the selected population. ",
         "Entry headline cards include ",
-        tags$strong(fmt_count(scope$n_entry_included)),
+        tags$strong(count_or_zero(scope$n_entry_included)),
         " students with reliable observed starts",
         if (excluded > 0) {
           tagList(
             "; ",
-            tags$strong(fmt_count(excluded)),
+            tags$strong(count_or_zero(excluded)),
             " are excluded from those entry headlines because starts are uncertain",
             if (length(exclusion_bits) > 0) {
               paste0(" (", paste(exclusion_bits, collapse = "; "), ")")
@@ -3186,7 +3186,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
       pcc <- mc_data()$pre_change_courses
       if (is.null(pcc) || pcc$n_switches == 0) return(NULL)
 
-      fmt <- function(x) format(as.integer(x), big.mark = ",")
+      fmt <- fmt_count
 
       # Both denominators are stated here, in words, right above the table. They
       # are not the same number and they are not the same unit, and a reader who
@@ -3333,7 +3333,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
           if (length(x) == 0 || is.na(x)) return("—")
           paste0(format(round(x, digits), nsmall = digits, trim = TRUE, big.mark = ","), suffix)
         }
-        fmt_count <- function(x) format(as.integer(x %||% 0L), big.mark = ",")
+        count_or_zero <- function(x) fmt_count(x %||% 0L)
         fmt_pct <- function(x) {
           if (length(x) == 0 || is.na(x)) return("—")
           paste0(format(round(x, 0), trim = TRUE), "%")
@@ -3368,7 +3368,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
               ),
               div(class = "movement-origin-metrics",
                 div(class = "movement-origin-metric",
-                  tags$strong(fmt_count(r$n_students)),
+                  tags$strong(count_or_zero(r$n_students)),
                   tags$span("students")
                 ),
                 div(class = "movement-origin-metric",
@@ -3500,7 +3500,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
         if (length(x) == 0 || is.na(x)) return("—")
         format(round(x, digits), nsmall = digits, trim = TRUE, big.mark = ",")
       }
-      fmt_count <- function(x) format(as.integer(x %||% 0L), big.mark = ",")
+      count_or_zero <- function(x) fmt_count(x %||% 0L)
       fmt_completed_unm_credits <- function(unm) {
         HTML(paste0(
           fmt_card_num(unm),
@@ -3527,7 +3527,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
             tags$td(as.character(r$observability)),
             tags$td(as.character(r$term_basis)),
             tags$td(as.character(r$credit_basis)),
-            tags$td(fmt_count(r$n_students), class = "num"),
+            tags$td(count_or_zero(r$n_students), class = "num"),
             tags$td(fmt_card_num(r$median_terms), class = "num"),
             tags$td(fmt_completed_unm_credits(r$median_unm), class = "num"),
             tags$td(fmt_card_num(r$median_attempted_unm), class = "num"),

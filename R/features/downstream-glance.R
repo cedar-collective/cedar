@@ -26,7 +26,6 @@ DOWNSTREAM_GLANCE_STEPS <- c(
 )
 
 .glance_pct <- function(x) sprintf("%.1f%%", x)
-.glance_n <- function(x) format(as.integer(x), big.mark = ",", trim = TRUE)
 
 .glance_row <- function(step, status, sentence, bars = NULL, verdict = NA_character_,
                         tone = NA_character_, scope = NA_character_) {
@@ -36,7 +35,7 @@ DOWNSTREAM_GLANCE_STEPS <- c(
 
 .glance_bars <- function(label, pct, n, of, reference = c(FALSE, TRUE)) {
   tibble::tibble(label = label, share = pct / 100,
-                 text = sprintf("%s (%s of %s)", .glance_pct(pct), .glance_n(n), .glance_n(of)),
+                 text = sprintf("%s (%s of %s)", .glance_pct(pct), fmt_count(n), fmt_count(of)),
                  reference = reference[seq_along(label)])
 }
 
@@ -65,7 +64,7 @@ DOWNSTREAM_GLANCE_STEPS <- c(
   pooled <- 100 * sum(rows$k) / sum(rows$n)
   .glance_row(
     "in_course", "ready",
-    paste0(.glance_pct(pooled), " of the ", .glance_n(sum(rows$n)), " graded attempts at ", course,
+    paste0(.glance_pct(pooled), " of the ", fmt_count(sum(rows$n)), " graded attempts at ", course,
            " across ", nrow(rows), " terms ended in DFW. ", tools::toTitleCase(type), " to ", type,
            if (trend$direction == "too_few_terms") ", there are too few terms to read a trend."
            else paste0(", the rate was ", .glance_pct(trend$first_pct), " in ", fmt_term(trend$first_term),
@@ -147,7 +146,7 @@ DOWNSTREAM_GLANCE_STEPS <- c(
   window <- paste0(later$window_terms, " regular term", if (later$window_terms == 1L) "" else "s")
   .glance_row(
     "next_courses", "ready",
-    paste0("Of the ", .glance_n(main$n_eligible), " students who could have taken ", y, ", ",
+    paste0("Of the ", fmt_count(main$n_eligible), " students who could have taken ", y, ", ",
            .glance_pct(main$pct_took_y), " took it within ", window,
            if (is.na(main$pct_pass)) "; too few have a grade in it yet." else
              paste0(", and ", .glance_pct(main$pct_pass), " of those with a grade passed it.")),

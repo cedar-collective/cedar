@@ -106,7 +106,6 @@ laterCourseUI <- function(id) {
 
 # ── Layout helpers (no analysis) ─────────────────────────────────────────────
 
-.later_course_fmt_n <- function(x) format(as.integer(x), big.mark = ",", scientific = FALSE, trim = TRUE)
 
 .later_course_fmt_pct <- function(x) {
   if (length(x) == 0L || is.na(x)) "—" else paste0(formatC(x, format = "f", digits = 1), "%")
@@ -150,7 +149,7 @@ laterCourseUI <- function(id) {
       cls <- row_class[[role]]
       tags$tr(
         class = if (!is.na(cls)) cls,
-        tags$td(class = "text-end text-nowrap", paste0(sign[[role]], .later_course_fmt_n(steps$n[[i]]))),
+        tags$td(class = "text-end text-nowrap", paste0(sign[[role]], fmt_count(steps$n[[i]]))),
         tags$td(class = if (role %in% names(label_class)) label_class[[role]], steps$label[[i]])
       )
     }))
@@ -162,7 +161,7 @@ laterCourseUI <- function(id) {
   y <- r$course_y_label
   window <- paste0(r$window_terms, " regular term", if (r$window_terms == 1L) "" else "s")
   small <- paste0("fewer than ", r$min_n, " students")
-  n <- .later_course_fmt_n
+  n <- fmt_count
   div(
     class = "stat-row",
     div(class = "stat-row-label",

@@ -238,7 +238,7 @@ courseCohortServer <- function(id, student_terms, attempts, programs, dims, edge
       if (is.null(p)) return(NULL)
       meta <- p$meta
       lo <- p$left_out
-      n <- function(x) format(as.integer(x), big.mark = ",", trim = TRUE)
+      n <- fmt_count
       tagList(
         uiOutput(ns("similar_ui")),
         dashboard_subsection(

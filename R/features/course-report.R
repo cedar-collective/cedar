@@ -1275,7 +1275,7 @@ course_sequence_headline <- function(result) {
   rates <- course_sequence_rates(result)
   t <- as.list(rates[rates$group == "treatment", ])
   c <- as.list(rates[rates$group == "control", ])
-  fmt_n <- function(n) format(n, big.mark = ",", trim = TRUE)
+  fmt_n <- fmt_count
   fmt_pct <- function(p) sprintf("%.1f%%", p)
   gap <- t$pct - c$pct
   direction <- if (abs(gap) < 0.05) "the same rate" else if (gap > 0) "a higher rate" else "a lower rate"

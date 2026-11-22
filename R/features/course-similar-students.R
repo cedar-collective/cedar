@@ -180,7 +180,7 @@ course_similar_students_findings <- function(payload) {
                           similar = numeric(), gap = numeric(), chance = numeric(), unit = character(),
                           verdict = character(), gap_label = character(), sentence = character())
   if (is.null(f)) return(empty)
-  fmt_n <- function(n) format(as.integer(n), big.mark = ",", trim = TRUE)
+  fmt_n <- fmt_count
   pct <- function(p) sprintf("%.1f%%", p)
   gpa <- function(g) sprintf("%.2f", g)
   rows <- tibble::tibble(
@@ -258,7 +258,7 @@ course_similar_students_alike <- function(payload) {
                smd = NA_real_, sentence = character(0))
   if (is.null(f) || is.na(f$act_n) || f$act_n == 0L) return(none)
   out <- list(n = f$act_n, taker = f$act, similar = f$act_expected, gap = f$act_gap, smd = f$act_gap_smd)
-  fmt_n <- function(n) format(as.integer(n), big.mark = ",", trim = TRUE)
+  fmt_n <- fmt_count
   if (f$act_n < payload$meta$min_n || is.na(f$act_gap_smd)) {
     return(c(list(status = "too_few"), out, list(sentence = paste0(
       "Only ", fmt_n(f$act_n), " of the students who took ", course, if (f$act_n == 1L) " has" else " have",
@@ -293,7 +293,7 @@ course_similar_students_text <- function(payload) {
     stop("[course-similar-students.R] payload must come from build_course_similar_students().", call. = FALSE)
   }
   meta <- payload$meta
-  fmt_n <- function(n) format(as.integer(n), big.mark = ",", trim = TRUE)
+  fmt_n <- fmt_count
   pts <- function(p) sprintf("%+.1f", p)
   out <- list(findings = character(0), comparison = character(0), benchmark = character(0),
               instructors = character(0), trend = character(0), alike = character(0))

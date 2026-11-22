@@ -68,7 +68,6 @@ build_dfw_dashboard <- function(attempts, dims, opt = list()) {
 
 # ── Text preview ──────────────────────────────────────────────────────────────
 
-.dfw_dash_n <- function(x) format(as.integer(x), big.mark = ",", trim = TRUE)
 .dfw_dash_pct <- function(x) ifelse(is.na(x), "—", sprintf("%.1f%%", x))
 .dfw_dash_terms <- function(terms) paste(vapply(terms, fmt_term, character(1)), collapse = ", ")
 .dfw_dash_direction <- c(rising = "rising (worse)", falling = "falling (better)", steady = "steady",
@@ -91,13 +90,13 @@ dfw_trend_sentence <- function(t, min_terms) {
   terms <- s$terms
   lines <- sprintf("  %-12s %6s  %s of %s DFW  (W %s, F %s, D or C- %s, other %s)",
                    vapply(terms$term, fmt_term, character(1)), .dfw_dash_pct(terms$dfw_pct),
-                   .dfw_dash_n(terms$n_dfw), .dfw_dash_n(terms$n_attempts), .dfw_dash_n(terms$n_w),
-                   .dfw_dash_n(terms$n_f), .dfw_dash_n(terms$n_d + terms$n_c_minus),
-                   .dfw_dash_n(terms$n_other_nonpassing))
+                   fmt_count(terms$n_dfw), fmt_count(terms$n_attempts), fmt_count(terms$n_w),
+                   fmt_count(terms$n_f), fmt_count(terms$n_d + terms$n_c_minus),
+                   fmt_count(terms$n_other_nonpassing))
   nr <- terms[terms$n_nr / terms$n_attempts >= DFW_NR_NOTE_SHARE, , drop = FALSE]
   c("1. How UNM is doing", lines,
     paste0("  Trend: ", dfw_trend_sentence(s$trend[1, ], s$meta$min_trend_terms)),
-    if (nrow(nr)) paste0("  Not reported: ", fmt_term(nr$term), " holds ", .dfw_dash_n(nr$n_nr),
+    if (nrow(nr)) paste0("  Not reported: ", fmt_term(nr$term), " holds ", fmt_count(nr$n_nr),
                          " NR grades (", .dfw_dash_pct(100 * nr$n_nr / nr$n_attempts),
                          " of its attempts), each counted as DFW."))
 }
@@ -110,13 +109,13 @@ dfw_trend_sentence <- function(t, min_terms) {
   listed <- utils::head(b$courses[b$courses$listed, , drop = FALSE], n_list)
   rows <- sprintf("  %3d  %-18s %-30s %7s %6s %6s %6s %6s  %s%s",
                   listed$rank, .dfw_dash_course_label(listed), substr(listed$college_name, 1, 30),
-                  .dfw_dash_n(listed$n_attempts), .dfw_dash_n(listed$n_dfw), .dfw_dash_pct(listed$dfw_pct),
+                  fmt_count(listed$n_attempts), fmt_count(listed$n_dfw), .dfw_dash_pct(listed$dfw_pct),
                   .dfw_dash_pct(100 * listed$dfw_share), .dfw_dash_pct(100 * listed$cum_share),
                   dplyr::coalesce(unname(.dfw_dash_direction[listed$direction]), "no trend"),
                   ifelse(listed$swings, ", swings", ""))
   c(paste0("2. Where the DFW grades are (", .dfw_dash_terms(b$meta$window_terms), ")"),
-    paste0("  ", .dfw_dash_n(tot$n_dfw), " DFW grades in ", .dfw_dash_n(tot$n_attempts), " attempts (",
-           .dfw_dash_pct(tot$dfw_pct), ") over ", .dfw_dash_n(tot$n_courses), " campus-courses. The top ",
+    paste0("  ", fmt_count(tot$n_dfw), " DFW grades in ", fmt_count(tot$n_attempts), " attempts (",
+           .dfw_dash_pct(tot$dfw_pct), ") over ", fmt_count(tot$n_courses), " campus-courses. The top ",
            tot$courses_for_quarter, " hold a quarter of them; the top ", tot$courses_for_half, " hold half."),
     sprintf("  %3s  %-18s %-30s %7s %6s %6s %6s %6s  %s", "#", "course", "college", "tries", "DFW",
             "rate", "share", "cum", "trend"),
@@ -142,7 +141,7 @@ dfw_trend_sentence <- function(t, min_terms) {
     one("rising", "Rising"), one("falling", "Falling"),
     paste0("  Swinging more than courses usually do (a typical course moves ",
            sprintf("%.1f", b$meta$typical_extra_sd), " points a term beyond chance; ",
-           .dfw_dash_n(b$meta$n_swing_tests), " courses tested at once): ", sum(c_listed$swings),
+           fmt_count(b$meta$n_swing_tests), " courses tested at once): ", sum(c_listed$swings),
            if (nrow(sw)) ", most DFW grades first:" else "."),
     if (nrow(sw)) sprintf("    %-18s %4.1f points a term around its line", .dfw_dash_course_label(sw), sw$resid_sd))
 }
@@ -160,8 +159,8 @@ dfw_trend_sentence <- function(t, min_terms) {
                   " across ", u$n_sections, collapse = "; "))
   }, character(1))
   c(paste0("4. Sections that disagree (", .dfw_dash_terms(s$meta$window_terms), ")"),
-    paste0("  ", .dfw_dash_n(nrow(ct)), " course-terms had ", s$meta$min_sections, " or more sections of ",
-           s$meta$min_section_n, "+ attempts; in ", .dfw_dash_n(sum(ct$uneven)),
+    paste0("  ", fmt_count(nrow(ct)), " course-terms had ", s$meta$min_sections, " or more sections of ",
+           s$meta$min_section_n, "+ attempts; in ", fmt_count(sum(ct$uneven)),
            " the sections' rates differed more than chance allows."),
     paste0("  Uneven in two or more terms: ", sum(s$courses$terms_uneven >= 2L), " course",
            if (sum(s$courses$terms_uneven >= 2L) == 1L) "" else "s", if (length(detail)) ":" else "."),
