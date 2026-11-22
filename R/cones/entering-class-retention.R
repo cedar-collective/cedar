@@ -49,7 +49,15 @@
 # `opt$arrival_credits` (`c(low, high)`) keeps the entering students who
 # brought at least `low` and fewer than `high` credits from elsewhere
 # (build_credit_timeline()'s `transfer_credits`, the sanctioned read), so
-# transfer classes can be followed by how far along they arrived.
+# transfer classes can be followed by how far along they arrived. A student
+# with no record of it yet is in no band: attribute `n_arrival_unknown`
+# (`term`, `n`, `n_class`) counts them by class. A new student's first pull
+# has none, and a student who left before the next pull never gets one, so
+# reading them as "brought none" filled the lowest band with leavers, and
+# leaving them out leaves each band its stayers (ISSUES I74). A class with
+# more than `opt$max_unknown_share` (2%) of its students unrecorded is
+# therefore not read by band at all: its rows keep `n_entering` and every
+# rate and count is NA (attribute `arrival_withheld`, the terms).
 #
 # Pace: `opt$pace` (credits a regular term, fastest first, named; e.g.
 # DEGREE_PACE_TERM_CREDITS) splits "still here" at each step. An extension,
@@ -108,7 +116,8 @@
 #'   term, left out under `entry = "all"`), `n_first_term` (the students
 #'   whose first row is there; 0 for a recorded entry kind), `entry`,
 #'   `n_summer_starts` (first-time summer starters counted in the fall
-#'   class), `n_terms`, `min_n`.
+#'   class), `n_arrival_unknown` and `arrival_withheld` (with
+#'   `arrival_credits`), `n_terms`, `min_n`.
 get_entering_class_retention <- function(student_terms, degrees = NULL, opt = list(), programs = NULL) {
   entry <- opt$entry %||% "all"
   if (length(entry) != 1L || !entry %in% c("all", "first_time", "transfer")) {
@@ -150,6 +159,8 @@ get_entering_class_retention <- function(student_terms, degrees = NULL, opt = li
   # term among that level's rows.
   at_level <- if (is.null(opt$student_level)) enrolled else enrolled %>% filter(student_level %in% opt$student_level)
   n_summer_starts <- 0L
+  n_arrival_unknown <- NULL
+  arrival_withheld <- integer(0)
   if (entry == "all") {
     entering <- at_level %>%
       arrange(student_id, term) %>%
@@ -186,7 +197,20 @@ get_entering_class_retention <- function(student_terms, degrees = NULL, opt = li
       stop("[entering-class-retention.R] opt$arrival_credits must be c(low, high) and needs programs.", call. = FALSE)
     }
     brought <- build_credit_timeline(entering, programs)
-    keep <- brought$student_id[brought$transfer_credits >= range[1] & brought$transfer_credits < range[2]]
+    # No record of the credit brought is not "none brought": such a student
+    # is in no band, and counted (ISSUES I74).
+    unknown_ids <- brought$student_id[!brought$transfer_credits_known]
+    n_arrival_unknown <- entering %>%
+      group_by(term) %>%
+      summarize(n = sum(student_id %in% unknown_ids), n_class = n(), .groups = "drop") %>%
+      filter(n > 0L)
+    # The students without a record are mostly the ones who left (a student
+    # who stays gets one at the next pull), so the class's banded students are
+    # the ones who stayed. Past a small share the class is not read by band.
+    max_unknown <- as.numeric(opt$max_unknown_share %||% 0.02)
+    arrival_withheld <- n_arrival_unknown$term[n_arrival_unknown$n / n_arrival_unknown$n_class > max_unknown]
+    keep <- brought$student_id[brought$transfer_credits_known & brought$transfer_credits >= range[1] &
+                                 brought$transfer_credits < range[2]]
     entering <- entering %>% filter(student_id %in% keep)
   }
   cedar_debug("[entering-class-retention.R] ", nrow(entering), " entering students to ", fmt_term(edge))
@@ -218,6 +242,11 @@ get_entering_class_retention <- function(student_terms, degrees = NULL, opt = li
     pace_edge <- min(edge, advance_term(as.integer(graded), 1L, summer = TRUE))
     result <- .entering_class_pace(result, entering, enrolled, degrees, pace, n_terms, pace_edge)
   }
+  if (length(arrival_withheld) > 0L) {
+    held <- result$term %in% arrival_withheld
+    for (col in setdiff(names(result), c("term", "step", "target_term", "n_entering"))) result[[col]][held] <- NA
+  }
+  attr(result, "arrival_withheld") <- arrival_withheld
   attr(result, "pace") <- pace
   attr(result, "pace_edge") <- pace_edge
   attr(result, "edge") <- edge
@@ -225,6 +254,7 @@ get_entering_class_retention <- function(student_terms, degrees = NULL, opt = li
   attr(result, "n_first_term") <- n_first_term
   attr(result, "entry") <- entry
   attr(result, "n_summer_starts") <- n_summer_starts
+  attr(result, "n_arrival_unknown") <- n_arrival_unknown
   attr(result, "n_terms") <- n_terms
   attr(result, "min_n") <- min_n
   result
@@ -238,9 +268,7 @@ get_entering_class_retention <- function(student_terms, degrees = NULL, opt = li
               credits = if_else(timeline_valid %in% TRUE,
                                 as.numeric(cumulative_completed_unm_credits) - as.numeric(completed_unm_credits),
                                 NA_real_))
-  awarded <- if (is.null(degrees)) tibble::tibble(student_id = character(), degree_term = integer()) else {
-    degrees %>% filter(term <= edge) %>% transmute(student_id, degree_term = as.integer(term))
-  }
+  awarded <- awarded_degrees(degrees) %>% filter(degree_term <= edge)
   steps <- bind_rows(lapply(seq_len(n_terms), function(k) {
     entering %>% transmute(student_id, term, step = k, target_term = advance_term(term, k))
   })) %>%

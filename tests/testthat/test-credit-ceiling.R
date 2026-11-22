@@ -38,3 +38,19 @@ test_that("CC01: the page's view of it", {
   expect_equal(graduation_ceiling_outcomes(r, min_n = 4L)$step, c(0L, 1L))
   expect_snapshot(cat(format_graduation_ceiling(r), sep = "\n"))
 })
+
+test_that("CC01: no record of credit brought is not a readable total; a degree on hold is not a degree", {
+  base <- get_credit_ceiling_crossings(cc01$student_terms, cc01$programs, cc01$degrees, cc01$opt)
+  # C-B's totals are not on record: counted as not readable, not placed with none brought.
+  programs <- cc01$programs %>%
+    dplyr::mutate(overall_credits_attempted = dplyr::if_else(student_id == "C-B", NA_real_, overall_credits_attempted))
+  r <- get_credit_ceiling_crossings(cc01$student_terms, programs, cc01$degrees, cc01$opt)
+  expect_false("C-B" %in% r$students$student_id)
+  expect_equal(r$meta$n_not_readable, base$meta$n_not_readable + 1L)
+
+  # C-A's Spring 2022 degree on hold: enrolled or gone at the later steps, never "degree".
+  held <- cc01$degrees %>% dplyr::mutate(graduation_status = dplyr::if_else(student_id == "C-A", "Hold Pending", "Awarded"))
+  h <- get_credit_ceiling_crossings(cc01$student_terms, cc01$programs, held, cc01$opt)
+  expect_equal(h$outcomes$n_degree[2], base$outcomes$n_degree[2] - 1L)
+  expect_equal(h$outcomes$n_observed, base$outcomes$n_observed)
+})

@@ -11,6 +11,19 @@ test_that("XC01: who left, who finished and who cannot be judged yet", {
   expect_equal(c(r$meta$edge, r$meta$degree_edge), c(202280L, 202280L))
 })
 
+test_that("XC01: a degree on hold is not a degree, and an application to graduate is counted", {
+  # X-D's Spring 2021 degree is on hold; X-K's Spring 2023 row is an application.
+  degrees <- xc01$degrees %>% dplyr::mutate(graduation_status = c("Hold Pending", "Pending"))
+  r <- get_exit_credits(xc01$student_terms, xc01$programs, degrees, xc01$terms, xc01$opt)
+  expect_true("X-D" %in% r$students$student_id)
+  expect_equal(c(r$meta$n_left, r$meta$n_with_degree), c(8L, 0L))
+  expect_equal(r$students$student_id[r$students$applied_to_graduate], "X-K")
+  expect_equal(r$meta$n_applied_to_graduate, 1L)
+  # With no status on the table every row is an award and no one has applied.
+  plain <- get_exit_credits(xc01$student_terms, xc01$programs, xc01$degrees, xc01$terms, xc01$opt)
+  expect_equal(plain$meta$n_applied_to_graduate, 0L)
+})
+
 test_that("XC01: credits are the stamped total, with the last term added when the record predates it", {
   r <- get_exit_credits(xc01$student_terms, xc01$programs, xc01$degrees, xc01$terms, xc01$opt)
   s <- r$students[order(r$students$student_id), ]

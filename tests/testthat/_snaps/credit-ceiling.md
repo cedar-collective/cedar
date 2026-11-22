@@ -6,7 +6,7 @@
       
       ## Passing 160 attempted credits with no degree yet
       5 students passed 160 attempted credits between Fall 2021 and Fall 2022 with no degree yet. On average 114 of those credits were brought from elsewhere, 45 were completed here and 5 were attempted here and not completed.
-      Not placed: 1 whose record began before the class lists, 1 already past it in their first term on record, 1 who already held a degree.
+      Not placed: 1 whose record began before the class lists or whose credit from elsewhere is not on record, 1 already past it in their first term on record, 1 who already held a degree.
       
       Too few of these students can be followed yet to say what happened next.
         When                        Followed   Degree  Enrolled     Gone

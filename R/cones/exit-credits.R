@@ -9,7 +9,9 @@
 #                 level and home campus in scope are that term's. A student
 #                 who moved on to another level did not leave it.
 #   Left          no enrollment in the two regular terms after the last term
-#                 (summer is not a step), and no degree of any kind. Two edges
+#                 (summer is not a step), and no degree of any kind awarded
+#                 (awarded_degrees(): a degree on hold or applied for is not
+#                 one). Two edges
 #                 decide whether that can be seen: the second regular term
 #                 after the last term is at or before the settled enrollment
 #                 edge, and the last term is at or before the degree edge, so
@@ -59,7 +61,8 @@
 #'   `exit_term`, `primary_major_code`, `student_campus`, `credits`,
 #'   `credits_here` (the part earned at this institution),
 #'   `credits_basis`, `band`, `gpa`, `gpa_below`, `attempted`, `over_ceiling`,
-#'   `flagged` (either line), `ever_pell`; `bands` one row per band, in order,
+#'   `flagged` (either line), `ever_pell`, `applied_to_graduate` (a pending
+#'   graduation application for a term after the last one); `bands` one row per band, in order,
 #'   then "Not recorded": `n`, `share_pct`, and for Pell, the floor, the
 #'   ceiling and either a count, the number known and a rate, NA under
 #'   `min_n`; `by_term` one row per last term and band: `n`; `meta`).
@@ -106,11 +109,20 @@ get_exit_credits <- function(student_terms, programs, degrees, terms, opt = list
   judged <- advance_term(last$term, 2L) <= edge & last$term <= degree_edge
   n_not_judged <- sum(!judged)
   last <- last[judged, , drop = FALSE]
-  awarded <- degrees %>% filter(term <= degree_edge) %>% distinct(student_id)
+  awarded <- awarded_degrees(degrees) %>% filter(degree_term <= degree_edge) %>% distinct(student_id)
   n_with_degree <- sum(last$student_id %in% awarded$student_id)
   left <- last %>% anti_join(awarded, by = "student_id")
   cedar_debug("[exit-credits.R] ", nrow(left), " left without a degree; ", n_with_degree,
               " with one; ", n_not_judged, " not judged")
+
+  # Left, with a graduation application on file for a later term: not a
+  # degree, and not quite gone either. Counted, so the page can say so.
+  applied <- if ("graduation_status" %in% names(degrees)) {
+    pending_degrees(degrees) %>%
+      inner_join(left %>% select(student_id, term), by = "student_id", relationship = "many-to-one") %>%
+      filter(degree_term > term) %>%
+      pull(student_id) %>% unique()
+  } else character(0)
 
   first_known <- function(x) { x <- x[!is.na(x)]; if (length(x) == 0L) NA_real_ else as.numeric(max(x)) }
   stamped <- programs %>%
@@ -155,7 +167,8 @@ get_exit_credits <- function(student_terms, programs, degrees, terms, opt = list
                           TRUE ~ FALSE)
     ) %>%
     transmute(student_id, exit_term = term, primary_major_code, student_campus, credits, credits_here,
-              credits_basis, band, gpa, gpa_below, attempted, over_ceiling, flagged, ever_pell)
+              credits_basis, band, gpa, gpa_below, attempted, over_ceiling, flagged, ever_pell,
+              applied_to_graduate = student_id %in% applied)
 
   rate <- function(hit, known) if_else(known >= min_n, 100 * hit / known, NA_real_)
   bands <- students %>%
@@ -188,6 +201,7 @@ get_exit_credits <- function(student_terms, programs, degrees, terms, opt = list
       last_exit_term = if (nrow(students) > 0L) max(students$exit_term) else NA_integer_,
       n_left = nrow(students), n_with_degree = n_with_degree, n_not_judged = n_not_judged,
       n_last_term_added = sum(students$credits_basis %in% "recorded + last term"),
+      n_applied_to_graduate = sum(students$applied_to_graduate),
       breaks = breaks, gpa_floor = gpa_floor, credit_ceiling = ceiling, min_n = min_n
     )
   )

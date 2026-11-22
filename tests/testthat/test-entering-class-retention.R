@@ -148,4 +148,42 @@ test_that("EC01: a transfer class can be narrowed by the credits its students br
   expect_equal(nrow(run(c(0, 30))), 0L)
   expect_equal(nrow(run(c(60, Inf))), 0L)
   expect_error(run(c(60, 30)), "arrival_credits")
+  expect_equal(nrow(attr(mid, "n_arrival_unknown")), 0L)
+})
+
+test_that("EC01: a transfer student with no record of credit brought is in no band (ISSUES I74)", {
+  # EC-E's totals are not on record: that is not "brought none".
+  programs <- ec01$programs %>%
+    dplyr::mutate(overall_credits_attempted = dplyr::if_else(student_id == "EC-E", NA_real_, overall_credits_attempted))
+  run <- function(range) get_entering_class_retention(
+    ec01$student_terms, ec01$degrees,
+    list(term_type = "fall", min_n = 1L, entry = "transfer", data_edges = ec01$edges, n_terms = 2L,
+         arrival_credits = range, pace = DEGREE_PACE_TERM_CREDITS), programs)
+  low <- run(c(0, 30))
+  expect_equal(nrow(low), 0L)
+  expect_equal(attr(low, "n_arrival_unknown"), tibble::tibble(term = 202080L, n = 1L, n_class = 1L))
+  expect_equal(nrow(run(c(30, 60))), 0L)
+  # The class's only transfer student is unrecorded: the class is withheld.
+  expect_equal(attr(low, "arrival_withheld"), 202080L)
+})
+
+test_that("EC01: a class with unrecorded transfer students is not read by band", {
+  # EC-B and EC-C arrive as transfers beside EC-E; EC-C has no record. One of
+  # three unrecorded: the Fall 2020 class keeps its count and loses its rates.
+  programs <- ec01$programs %>%
+    dplyr::mutate(student_population = dplyr::if_else(student_id %in% c("EC-B", "EC-C") & term == 202080L,
+                                                      "New Transfer from NM Inst", student_population),
+                  overall_credits_attempted = dplyr::if_else(student_id == "EC-C", NA_real_, overall_credits_attempted))
+  run <- function(opt) get_entering_class_retention(
+    ec01$student_terms, ec01$degrees,
+    c(list(term_type = "fall", min_n = 1L, entry = "transfer", data_edges = ec01$edges, n_terms = 2L,
+           arrival_credits = c(0, 30), pace = DEGREE_PACE_TERM_CREDITS), opt), programs)
+  held <- run(list())
+  expect_equal(held$n_entering, c(1L, 1L))
+  expect_true(all(is.na(held$n_here)) && all(is.na(held$n_gone)) && all(is.na(held$here_pct)))
+  expect_equal(attr(held, "arrival_withheld"), 202080L)
+  # Allowing the share reads EC-B, the one recorded student who brought none.
+  read <- run(list(max_unknown_share = 0.5))
+  expect_equal(read$n_here, c(1L, 1L))
+  expect_equal(length(attr(read, "arrival_withheld")), 0L)
 })
