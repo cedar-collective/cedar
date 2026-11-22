@@ -257,28 +257,40 @@ retention_milestone_label <- function(step, target_term) {
 RETENTION_ENTRY_WORDS <- c(all = "students new at this level", first_time = "first-time students",
                            transfer = "new transfer students")
 
-#' The latest entering class with a year behind it, in a sentence
+#' The entering classes in a sentence: the range over every class read, then
+#' the newest class with a year behind it
 #'
 #' @param payload `build_retention_dashboard()` output.
-#' @return One sentence, or `character(0)` when no class has a rate a
+#' @return One or two sentences, or `character(0)` when no class has a rate a
 #'   semester on.
 retention_milestone_sentence <- function(payload) {
   m <- payload$milestones
   if (is.null(m) || nrow(m) == 0L) return(character(0))
   known <- m %>% filter(!is.na(here_pct))
-  full <- known %>% filter(step == 2L)
-  class_term <- if (nrow(full) > 0L) max(full$term) else if (nrow(known) > 0L) max(known$term) else return(character(0))
-  # The 3rd semester leads when the class has one; the rest follow in order.
-  rows <- known %>% filter(term == class_term) %>% arrange(step != 2L, step)
+  if (nrow(known) == 0L) return(character(0))
+  # The 3rd semester (a year on) leads when any class has one; the 2nd follows.
+  steps <- intersect(c(2L, 1L), known$step)
+  if (length(steps) == 0L) steps <- min(known$step)
   who <- RETENTION_ENTRY_WORDS[[attr(m, "entry") %||% "all"]]
-  # The sentence names the term itself where the chart's legend names the season.
-  where <- function(i) paste0("their ", sub(" \\(.*$", "", retention_milestone_label(rows$step[i], rows$target_term[i])),
-                              " (", vapply(rows$target_term[i], fmt_term, character(1)), ")")
-  paste0("Of the ", format(rows$n_entering[[1]], big.mark = ","), " ", who, " who entered in ", fmt_term(class_term), ", ",
-         sprintf("%.1f%%", rows$here_pct[[1]]), " were enrolled, or had graduated, in ", where(1),
-         if (nrow(rows) > 1L) paste0("; ", paste(sprintf("%.1f%% in %s", rows$here_pct[-1], where(seq_len(nrow(rows))[-1])),
-                                                 collapse = ", ")),
-         ".")
+  pct <- function(x) sprintf("%.1f%%", x)
+  semester <- function(rows) sub(" \\(.*$", "", retention_milestone_label(rows$step[[1]], rows$target_term[[1]]))
+  lead <- known %>% filter(step == steps[[1]]) %>% arrange(term)
+  span <- function(rows) if (nrow(rows) == 1L || min(rows$here_pct) == max(rows$here_pct)) pct(rows$here_pct[[1]])
+                         else paste0("between ", pct(min(rows$here_pct)), " and ", pct(max(rows$here_pct)))
+  rows_at <- function(step_k) known %>% filter(step == step_k)
+  when <- function(step_k) if (step_k == 2L) paste0("a year on (their ", semester(rows_at(step_k)), ")")
+                           else paste0("in their ", semester(rows_at(step_k)))
+  upper <- function(x) paste0(toupper(substring(x, 1, 1)), substring(x, 2))
+  rest <- if (length(steps) > 1L) paste0("; ", when(steps[[2]]), ", ", span(rows_at(steps[[2]]))) else ""
+  newest <- lead[nrow(lead), ]
+  if (nrow(lead) == 1L) {
+    return(paste0(upper(when(steps[[1]])), ", ", span(lead), " of the ", fmt_count(newest$n_entering), " ", who,
+                  " who entered in ", fmt_term(newest$term), " were enrolled or had graduated", rest, "."))
+  }
+  paste0(upper(when(steps[[1]])), ", ", span(lead), " of the ", who, " in each of the ", nrow(lead), " classes from ",
+         fmt_term(min(lead$term)), " to ", fmt_term(max(lead$term)), " were enrolled or had graduated", rest,
+         ". The newest of those classes, ", fmt_term(newest$term), " (", fmt_count(newest$n_entering),
+         " students), is at ", pct(newest$here_pct), ".")
 }
 
 #' The retention dashboard as text

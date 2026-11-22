@@ -2358,13 +2358,13 @@ rr01 <- local({
 # S-K, enrolled in Fall 2022 and awarded in Spring 2023: not in between (a
 # fall's next regular term is the spring).
 sg01 <- local({
-  row <- function(id, term, returned, level = "UG", awarded = FALSE, credits = 12) tibble::tibble(
+  row <- function(id, term, returned, level = "UG", awarded = FALSE, credits = 12, major = "HIST") tibble::tibble(
     student_id = id, term = term, enrolled = TRUE, student_level = level, student_campus = "ABQ",
     returned_next_regular_term = returned, return_observable = TRUE, degree_awarded = awarded,
-    attempted_unm_credits = credits)
+    attempted_unm_credits = credits, primary_major_code = major)
   student_terms <- dplyr::bind_rows(
     row("S-A", 202210L, FALSE), row("S-A", 202260L, FALSE, credits = 3),
-    row("S-B", 202210L, FALSE),
+    row("S-B", 202210L, FALSE, major = "ANTH"),
     row("S-C", 202210L, FALSE), row("S-C", 202260L, FALSE, credits = 6),
     row("S-D", 202210L, FALSE, awarded = TRUE),
     row("S-E", 202210L, TRUE), row("S-E", 202280L, FALSE),

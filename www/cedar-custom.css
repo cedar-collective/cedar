@@ -164,6 +164,7 @@
   --text-warning:   var(--amber-dark);
   --text-critical:  var(--danger-red-dark);
   --overlay-bg:     rgba(232, 227, 218, 0.85);   /* --parchment-ash at 85% */
+  --dialog-backdrop: rgba(30, 36, 32, 0.45);    /* behind the counting dialog */
   --disconnect-veil: rgba(246, 243, 236, 0.96);  /* the restart screen's page behind its panel */
   --tab-hover-text:  #4a2e12;   /* a sub-tab under the pointer */
   --tab-active-rule: #8B6240;   /* the open sub-tab's top rule */
@@ -3040,6 +3041,106 @@ details.cedar-more-rows > summary {
   margin: 4px 0;
 }
 
+/* How a section is counted: a small link after the section's sentence that
+   opens its text as a dialog (cedar_method_panel(), cedar-method-dialog.js).
+   The <details> stays in the page so the outputs inside it are filled; open,
+   its body is lifted into a centred box over a backdrop. */
+.cedar-section-lede { margin: 0; }
+.cedar-dashboard-section-lede { padding: 0 var(--space-4); }
+.cedar-section-lede > .cedar-dashboard-section-description,
+.cedar-section-lede > .cedar-dashboard-subsection-description,
+.cedar-section-lede > .cedar-subtab-description {
+  display: inline;
+  padding: 0;
+  margin: 0;
+}
+.cedar-dashboard-subsection > .cedar-section-lede { margin: 0 0 8px; }
+details.cedar-method-panel {
+  display: inline;
+  background: none;
+  border: 0;
+  padding: 0;
+  margin: 0 0 0 6px;
+  font-size: inherit;
+}
+.cedar-section-lede > details.cedar-method-panel:first-child { margin-left: 0; }
+details.cedar-method-panel > summary {
+  display: inline;
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 3px;
+  white-space: nowrap;
+}
+details.cedar-method-panel > summary::before { content: none; }
+details.cedar-method-panel > summary .cedar-info-summary-copy { display: inline; }
+details.cedar-method-panel > summary .cedar-info-summary-title { font-weight: 600; }
+details.cedar-method-panel[open]::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background: var(--dialog-backdrop);
+  z-index: 1050;
+}
+details.cedar-method-panel[open] > .panel-body {
+  position: fixed;
+  z-index: 1051;
+  top: 8vh;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(760px, 92vw);
+  max-height: 84vh;
+  overflow-y: auto;
+  margin: 0;
+  padding: 20px 26px 24px;
+  background: var(--surface-raised);
+  color: var(--text-primary);
+  border: 1px solid var(--surface-soft-border);
+  border-radius: var(--radius-md);
+  box-shadow: 0 12px 40px var(--dialog-backdrop);
+  font-size: 1rem;
+  line-height: 1.6;
+  white-space: normal;
+}
+details.cedar-method-panel .cedar-method-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 10px;
+}
+details.cedar-method-panel .cedar-method-title {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+details.cedar-method-panel .cedar-method-close {
+  background: none;
+  border: 1px solid var(--surface-soft-border);
+  border-radius: var(--radius-sm);
+  color: var(--status-info);
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 2px 12px;
+  cursor: pointer;
+}
+details.cedar-method-panel .cedar-method-idea {
+  font-size: 1.05rem;
+  color: var(--text-primary);
+  margin-bottom: 14px;
+}
+details.cedar-method-panel .cedar-method-label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+}
+details.cedar-method-panel[open] > .panel-body ul { margin: 4px 0 8px; padding-left: 20px; }
+details.cedar-method-panel[open] > .panel-body li { margin-bottom: 8px; }
+
 /* A scope bar inside a method panel is part of the panel's text, not a band
    of its own. */
 details.cedar-method-panel .scope-bar {
@@ -3079,6 +3180,7 @@ details.cedar-method-panel .scope-bar {
   --cedar-plum-bg:   #2c2232;
   --cedar-plum-dark: #c9a6d6;
   --overlay-bg:      rgba(22, 26, 24, 0.85);
+  --dialog-backdrop: rgba(0, 0, 0, 0.6);
   --disconnect-veil: rgba(22, 26, 24, 0.97);
   --tab-hover-text:  #f0e2c8;
   --tab-active-rule: var(--lichen-gold);

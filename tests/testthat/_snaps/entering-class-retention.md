@@ -1,9 +1,9 @@
-# EC01: a step is named by its distance and season, and the sentence reads the latest class a year on
+# EC01: a step is named by its distance and season, and the sentence reads every class a year on
 
     Code
       cat(retention_milestone_sentence(list(milestones = ms)),
       retention_milestone_sentence(list(milestones = first_time)), sep = "\n")
     Output
-      Of the 3 students new at this level who entered in Fall 2021, 33.3% were enrolled, or had graduated, in their 3rd semester (Fall 2022); 66.7% in their 2nd semester (Spring 2022).
-      Of the 4 first-time students who entered in Fall 2021, 25.0% were enrolled, or had graduated, in their 3rd semester (Fall 2022); 50.0% in their 2nd semester (Spring 2022).
+      A year on (their 3rd semester), between 33.3% and 66.7% of the students new at this level in each of the 2 classes from Fall 2020 to Fall 2021 were enrolled or had graduated; in their 2nd semester, 66.7%. The newest of those classes, Fall 2021 (3 students), is at 33.3%.
+      A year on (their 3rd semester), between 25.0% and 100.0% of the first-time students in each of the 3 classes from Fall 2019 to Fall 2021 were enrolled or had graduated; in their 2nd semester, between 0.0% and 75.0%. The newest of those classes, Fall 2021 (4 students), is at 25.0%.
 
